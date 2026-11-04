@@ -18,6 +18,7 @@ import type { CellValue } from '../engine/types.js';
 // browser's print pipeline is the entire export path.
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { numberFormatPaint } from '../format/number-format.js';
 import { gradientFillCss } from '../render/gradient-fill-css.js';
 import { cellFontFamily } from '../render/painters/text.js';
@@ -1320,7 +1321,7 @@ export function printSheet(
     : undefined;
   const doc = buildPrintDocument(wb, store, sheet, title, {
     printableBounds,
-    fontEffects: (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac',
+    fontEffects: isMacHost(host),
   });
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');

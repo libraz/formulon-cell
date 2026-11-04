@@ -14,6 +14,7 @@ import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range as EngineRange } from '../engine/types.js';
 import { PivotAggregation } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
@@ -562,7 +563,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   return {
     open(opts = {}) {
-      mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+      mac = isMacHost(host);
       if (mac) destInput.value = '';
       tableRangeInput.checked = true;
       sourceInput.value = selectedRangeLabel();

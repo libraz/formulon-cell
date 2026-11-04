@@ -1,6 +1,7 @@
 import { insertCopiedBand } from '../../commands/clipboard/insert-copied-cells.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { addrKey } from '../../engine/address.js';
+import { isMacHost } from '../../extensions/ui-options.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import { openCellShiftDialog, runCellShiftChoice } from '../../interact/cell-shift-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -95,8 +96,7 @@ const buildCellInsertAction =
   };
 
 /** Excel for Mac leaves Hide Sheet and Delete Sheet enabled on a one-sheet workbook and answers with an alert. */
-const isMacInstance = (instance: SpreadsheetInstance): boolean =>
-  (instance.host.closest<HTMLElement>('.fc-host') ?? instance.host).dataset.fcPlatform === 'mac';
+const isMacInstance = (instance: SpreadsheetInstance): boolean => isMacHost(instance.host);
 
 const reportSheetGuard = (instance: SpreadsheetInstance, message: string): void => {
   void showInstanceReport(instance, message, [{ severity: 'warning', label: message, detail: '' }]);

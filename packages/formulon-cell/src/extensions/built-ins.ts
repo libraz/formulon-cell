@@ -25,6 +25,7 @@ import {
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import { setSheetZoom, setWorkbookView } from '../commands/view.js';
+import { addrKey } from '../engine/address.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
@@ -58,6 +59,7 @@ import { platformLacksFeature } from '../mount/feature-flags.js';
 import { mutators } from '../store/store.js';
 import { resolveTheme } from '../theme/resolve.js';
 import type { Extension, ExtensionContext, ExtensionHandle } from './types.js';
+import { isMacHost } from './ui-options.js';
 
 const refreshCells = (ctx: ExtensionContext): void => {
   const wb = ctx.getWb();
@@ -79,7 +81,7 @@ export const formatPainter = (): Extension => ({
         const wb = ctx.getWb();
         return !wb.isStub && wb.capabilities.effectiveStyle
           ? effectiveCellFormat(wb, ctx.store.getState(), addr)
-          : ctx.store.getState().format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`);
+          : ctx.store.getState().format.formats.get(addrKey(addr));
       },
     });
     return {
@@ -157,7 +159,7 @@ export const statusBar = (): Extension => ({
 });
 
 const hostPlatform = (host: HTMLElement): 'mac' | 'default' =>
-  (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac' ? 'mac' : 'default';
+  isMacHost(host) ? 'mac' : 'default';
 
 /** Quick Analysis popover (Ctrl+Q) — id `'quickAnalysis'`. */
 export const quickAnalysis = (): Extension => ({

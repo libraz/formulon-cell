@@ -11,9 +11,10 @@ import {
 } from '../commands/find.js';
 import type { History } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import { formatA1Cell } from '../engine/address.js';
+import { addrKey, formatA1Cell } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -58,8 +59,7 @@ const cellRange = (addr: Addr): Range => ({
 export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const { host, store, wb } = deps;
   let strings = deps.strings ?? defaultStrings;
-  const isMac = (): boolean =>
-    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const isMac = (): boolean => isMacHost(host);
   /** The dialog's strings, with the Mac wording laid over them on the Mac host. */
   const copy = (): Strings['findReplace'] =>
     isMac() ? { ...strings.findReplace, ...strings.macFindReplace } : strings.findReplace;
@@ -432,7 +432,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     const attempted = new Set<string>();
     let m = nextMatchForNavigation(state, o, from, direction);
     while (m) {
-      const key = `${m.addr.sheet}:${m.addr.row}:${m.addr.col}`;
+      const key = addrKey(m.addr);
       if (attempted.has(key)) break;
       attempted.add(key);
       if (activateMatch(m)) break;

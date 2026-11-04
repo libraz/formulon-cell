@@ -1,4 +1,4 @@
-import { parseAddrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import {
   rangeArea,
@@ -13,7 +13,7 @@ export const MAX_MATERIALIZED_VALIDATION_CELLS = 10_000;
 
 /** Validation governing `addr`: the cell's own rule, else a range-stored one. */
 export function validationAt(format: FormatSlice, addr: Addr): CellValidation | undefined {
-  const own = format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`)?.validation;
+  const own = format.formats.get(addrKey(addr))?.validation;
   if (own) return own;
   return rangeValidationAt(format, addr);
 }

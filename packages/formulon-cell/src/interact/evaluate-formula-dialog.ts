@@ -1,6 +1,6 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { extractRefs, type FormulaRef } from '../commands/refs.js';
-import { formatA1Cell } from '../engine/address.js';
+import { addrKey, formatA1Cell } from '../engine/address.js';
 import type { CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -253,9 +253,7 @@ export function attachEvaluateFormulaDialog(
     const active = store.getState().selection.active;
     target.textContent = formatA1Cell(active.row, active.col);
     const formula =
-      wb?.cellFormula(active) ??
-      store.getState().data.cells.get(`${active.sheet}:${active.row}:${active.col}`)?.formula ??
-      null;
+      wb?.cellFormula(active) ?? store.getState().data.cells.get(addrKey(active))?.formula ?? null;
     if (!formula) {
       formulaBox.textContent = t.noFormula;
       evaluationBox.textContent = '';

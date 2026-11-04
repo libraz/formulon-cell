@@ -26,6 +26,7 @@ import {
 import { rangeForRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
 import type { ChartSourceHighlight, State } from '../store/types.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
@@ -487,8 +488,7 @@ export function attachSessionCharts(deps: {
   };
 
   let selectData: MacChartSelectDataHandle | null = null;
-  const isMac = (): boolean =>
-    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const isMac = (): boolean => isMacHost(host);
 
   /** Open the settings surface on `tab`, beside the chart's buttons; on the Mac
    *  profile Select Data opens its own dialog. */

@@ -1,3 +1,4 @@
+import { addrKey } from '../../engine/address.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../../store/store.js';
 import type { History } from '../history.js';
@@ -89,7 +90,7 @@ export const createDrawingClipboard = (deps: {
       // A paste anchors at the selection's top-left; repeats at the same anchor
       // cascade down and to the right.
       const at = { sheet: active.sheet, row: range.r0, col: range.c0 };
-      const anchorKey = `${at.sheet}:${at.row}:${at.col}`;
+      const anchorKey = addrKey(at);
       const repeats = held.at === anchorKey ? held.repeats + 1 : 0;
       const offset = { x: repeats * PASTE_CASCADE_PX, y: repeats * PASTE_CASCADE_PX };
       const authorization = {

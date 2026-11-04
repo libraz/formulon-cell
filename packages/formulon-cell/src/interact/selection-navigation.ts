@@ -1,6 +1,6 @@
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { mergeAt } from '../commands/merge.js';
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
@@ -322,7 +322,7 @@ function selectionIsOneLogicalCell(state: State): boolean {
 
   const { active, range } = selection;
   if (range.sheet !== active.sheet) return false;
-  const activeKey = `${active.sheet}:${active.row}:${active.col}`;
+  const activeKey = addrKey(active);
   const mergeKey = state.merges.byCell.get(activeKey) ?? activeKey;
   const merge = state.merges.byAnchor.get(mergeKey);
   if (merge) {

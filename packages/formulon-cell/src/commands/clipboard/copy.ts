@@ -230,7 +230,7 @@ function displayValue(
   locale?: string,
   localizeFormula?: (formula: string) => string,
 ): string {
-  const key = `${sheet}:${row}:${col}`;
+  const key = addrKey({ sheet, row, col });
   const cell = state.data.cells.get(key);
   const hyperlinkDisplay = state.format.formats.get(key)?.hyperlinkDisplay;
   if (!cell) return hyperlinkDisplay ?? '';

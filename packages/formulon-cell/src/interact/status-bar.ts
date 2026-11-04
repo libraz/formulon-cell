@@ -7,6 +7,7 @@ import {
 } from '../commands/aggregate.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import { formatGeneralNumber } from '../engine/value.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { normalizeFormatLocale } from '../format/locale.js';
 import { formatNumber } from '../format/number-format.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
@@ -365,8 +366,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     viewButtons.normal.title = t.normalView;
     viewButtons.pageLayout.setAttribute('aria-label', t.pageLayoutView);
     viewButtons.pageLayout.title = t.pageLayoutView;
-    const mac =
-      (statusbar.closest<HTMLElement>('.fc-host') ?? statusbar).dataset.fcPlatform === 'mac';
+    const mac = isMacHost(statusbar);
     const pageBreak = mac ? strings.macChrome.pageBreakPreview : t.pageBreakPreview;
     viewButtons.pageBreakPreview.setAttribute('aria-label', pageBreak);
     viewButtons.pageBreakPreview.title = pageBreak;
@@ -578,8 +578,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       pieces.push(`${labelFor(key)}: ${text}`);
     }
     // The Mac bar shows each aggregate as its own item, with no separator and no cell count.
-    const mac =
-      (statusbar.closest<HTMLElement>('.fc-host') ?? statusbar).dataset.fcPlatform === 'mac';
+    const mac = isMacHost(statusbar);
     const items = pieces.flatMap((text, i) => {
       const item = document.createElement('span');
       item.className = 'fc-host__statusbar-agg';

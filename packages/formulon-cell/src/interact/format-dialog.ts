@@ -18,6 +18,7 @@ import { displayCellFormatFromXf, effectiveCellFormat } from '../engine/cell-for
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, dictionaryLocaleFor, type Strings } from '../i18n/strings.js';
 import { rangeValidationAt } from '../store/range-validations.js';
@@ -229,8 +230,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const history = deps.history ?? null;
   const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
   const strings = deps.strings ?? defaultStrings;
-  const isMacHost = (): boolean =>
-    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
   const getFormatLocale = (): string => {
     const wb = getWb();
     const wbLocale = wb ? inputLocaleForWorkbook(wb) : undefined;
@@ -239,7 +238,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     );
   };
   const getDate1904 = (): boolean => store.getState().ui.date1904 === true;
-  const t = isMacHost()
+  const t = isMacHost(host)
     ? { ...strings.formatDialog, ...strings.macFormatDialog }
     : strings.formatDialog;
 
@@ -268,7 +267,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     strings,
     t,
     fontLocale: dictionaryLocaleFor(getFormatLocale()),
-    mac: isMacHost(),
+    mac: isMacHost(host),
   });
   const {
     shell,
@@ -288,9 +287,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     cancelBtn,
     hintBar,
   } = view;
-  overlay.classList.toggle('fc-fmtdlg--mac', isMacHost());
+  overlay.classList.toggle('fc-fmtdlg--mac', isMacHost(host));
   // The Mac dialog has no text-direction control.
-  if (isMacHost()) {
+  if (isMacHost(host)) {
     overlay
       .querySelector<HTMLElement>('.fc-fmtdlg__text-direction-row')
       ?.setAttribute('hidden', '');
@@ -374,7 +373,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       fmt,
       getFormatLocale(),
       localizeDialogFormula,
-      isMacHost() ? 0 : 2,
+      isMacHost(host) ? 0 : 2,
     );
     borderTab.clearPendingPreset();
 
@@ -410,7 +409,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     padNumber: () => padsNumberRows(getWb()),
     // A rule's differential format has no cell to preview; a number format has.
     previewValue: () => (dialogMode === 'dxf' ? null : previewValue),
-    fontEffects: () => isMacHost(),
+    fontEffects: () => isMacHost(host),
   });
   const renderPreview = (): void => {
     alignTab.syncRotationDial();
@@ -418,7 +417,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const defaultPatternFor = (cat: NumberCategory): string =>
-    defaultPatternForLocale(cat, getFormatLocale(), isMacHost());
+    defaultPatternForLocale(cat, getFormatLocale(), isMacHost(host));
 
   // ── Tab switch ─────────────────────────────────────────────────────────
   const tabOrder = Array.from(tabButtons.keys());
@@ -528,10 +527,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     hyperlinkSection.hidden = dataValidationMode;
     commentSection.hidden = dataValidationMode;
     validationSection.classList.toggle('fc-fmtdlg__section--standalone', dataValidationMode);
-    syncValidationCaptions(dataValidationMode && isMacHost());
+    syncValidationCaptions(dataValidationMode && isMacHost(host));
     for (const [tabId, button] of tabButtons) {
       // The Mac app has no seventh tab; it opens only when asked for by name.
-      const macHidden = isMacHost() && tabId === 'more' && !showMoreTab;
+      const macHidden = isMacHost(host) && tabId === 'more' && !showMoreTab;
       button.hidden =
         macHidden ||
         (numberMode && tabId !== 'number') ||
@@ -781,7 +780,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     getLocale: getFormatLocale,
     getDate1904,
     isDxfMode: () => dialogMode === 'dxf',
-    isMacPlatform: isMacHost,
+    isMacPlatform: () => isMacHost(host),
   };
   shell.on(tabsStrip, 'click', onTabClick as EventListener);
   shell.on(tabsStrip, 'keydown', onTabKeyDown as EventListener);
@@ -836,7 +835,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       const requested =
         options?.mode === 'numberFormat'
           ? 'number'
-          : (tab ?? (isMacHost() && options?.mode !== 'dxf' ? remembered : undefined));
+          : (tab ?? (isMacHost(host) && options?.mode !== 'dxf' ? remembered : undefined));
       if (requested && tabButtons.has(requested)) setActiveTab(requested);
       if (options?.mode === 'dataValidation') setActiveTab('more');
       shell.open();

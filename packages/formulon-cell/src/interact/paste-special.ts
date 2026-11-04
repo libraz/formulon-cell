@@ -11,6 +11,7 @@ import type { History } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -95,7 +96,7 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const { host, store, wb } = deps;
   if (deps.history) wb.attachHistory(deps.history);
   const strings = deps.strings ?? defaultStrings;
-  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const mac = isMacHost(host);
   // The dialog's strings, with the Mac wording laid over them on the Mac host.
   const t: PasteSpecialText = mac
     ? { ...strings.pasteSpecialDialog, ...strings.macPasteSpecial }

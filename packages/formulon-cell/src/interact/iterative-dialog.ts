@@ -5,6 +5,7 @@ import { hydrateCalcSettingsFromEngine } from '../engine/calc-settings-sync.js';
 import { formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { WorkbookCalcSettings } from '../engine/workbook-handle-formulas.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { showConfirm } from '../toolbar/dialogs/prompt.js';
@@ -84,8 +85,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   const menuText = strings.ribbonMenu;
   // The Mac Calculation pane words a few labels differently and has no mode
   // group label, explanatory note or formulas heading; resolved per open.
-  const isMac = (): boolean =>
-    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const isMac = (): boolean => isMacHost(host);
   let t: typeof shared = shared;
 
   const shell = createDialogShell({

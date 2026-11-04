@@ -12,6 +12,7 @@ import {
 } from '../commands/mac-data-tools.js';
 import { MAX_COL } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
@@ -38,9 +39,6 @@ interface Field {
   readonly input: HTMLInputElement;
   readonly text: HTMLSpanElement;
 }
-
-const isMacHost = (host: HTMLElement): boolean =>
-  (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
 
 const formatLocalizedNumericInitial = (value: number, locale: string | undefined): string => {
   try {

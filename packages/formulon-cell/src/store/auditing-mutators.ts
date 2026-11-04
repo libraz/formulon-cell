@@ -30,7 +30,7 @@ export const auditingMutators = {
   addWatchRanges(store: SpreadsheetStore, ranges: readonly Range[]): void {
     if (ranges.some((range) => rangeArea(range) > MAX_WATCH_RANGE_CELLS)) return;
     store.setState((s) => {
-      const seen = new Set(s.watch.watches.map((w) => `${w.sheet}:${w.row}:${w.col}`));
+      const seen = new Set(s.watch.watches.map((w) => addrKey(w)));
       const next: Addr[] = [...s.watch.watches];
       let changed = false;
       for (const range of ranges) {

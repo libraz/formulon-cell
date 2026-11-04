@@ -1,4 +1,11 @@
-import { colFromLetters, colLetter, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
+import {
+  addrKey,
+  colFromLetters,
+  colLetter,
+  formatA1Range,
+  MAX_COL,
+  MAX_ROW,
+} from '../engine/address.js';
 import { rangeForRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue } from '../engine/types.js';
 import { formatCell, fromEngineValue } from '../engine/value.js';
@@ -134,7 +141,7 @@ const absRangeRef = (r0: number, c0: number, r1: number, c1: number): string =>
   formatA1Range({ r0, c0, r1, c1 }, { absolute: true, collapse: false });
 
 const cellText = (state: State, sheet: number, row: number, col: number): string => {
-  const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
+  const cell = state.data.cells.get(addrKey({ sheet, row, col }));
   if (!cell) return '';
   if (cell.value.kind === 'text') return cell.value.value;
   if (cell.value.kind === 'number') return String(cell.value.value);

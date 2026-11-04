@@ -33,6 +33,7 @@ import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/stru
 import { setOutlineSymbolsVisible, setShowFormulas } from '../commands/view.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { excelSerialFromParts } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
 import { openCellShiftDialog, runCellShiftChoice } from '../interact/cell-shift-dialog.js';
@@ -107,8 +108,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     const currentWb = input.wb();
     const restricted = interactionControllerFor(input.store)?.policy !== undefined;
     const meta = e.ctrlKey || e.metaKey;
-    const macPlatform =
-      (input.host.closest<HTMLElement>('.fc-host') ?? input.host).dataset.fcPlatform === 'mac';
+    const macPlatform = isMacHost(input.host);
     const k = e.key.toLowerCase();
     // Control-U starts cell editing on Excel for Mac. The sheet keyboard
     // router owns the edit transition; keep this host-level format handler

@@ -1,4 +1,4 @@
-import { parseAddrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 /**
  * High-level import/export commands for tabular text formats. The lower-level
  * encoders / parsers live next to clipboard so paste-as-CSV stays trivial.
@@ -216,7 +216,7 @@ function displayValue(
   col: number,
   locale?: string,
 ): string {
-  const key = `${sheet}:${row}:${col}`;
+  const key = addrKey({ sheet, row, col });
   const cell = state.data.cells.get(key);
   const hyperlinkDisplay = state.format.formats.get(key)?.hyperlinkDisplay;
   if (!cell) return hyperlinkDisplay ?? '';

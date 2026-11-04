@@ -8,6 +8,7 @@ import type { History } from '../commands/history.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { appendDialogActions, createDialogShell } from './dialog-shell.js';
@@ -82,7 +83,7 @@ export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
   const options = [...shifts, ['rows', t.entireRow], ['cols', t.entireColumn]] as const;
   // The vertical shift is the default, except that Mac's Delete dialog opens
   // on the left shift.
-  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const mac = isMacHost(host);
   const defaultChoice = (kind === 'delete' && mac ? shifts[0] : shifts[1])?.[0];
   for (const [value, label] of options)
     choices.appendChild(radio(ownerDocument, name, value, label, value === defaultChoice));

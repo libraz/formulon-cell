@@ -46,6 +46,10 @@ export function resolveSpreadsheetPlatform(
   return platform.includes('mac') || userAgent.includes('macintosh') ? 'mac' : 'default';
 }
 
+/** Whether `el` sits in a spreadsheet host rendered with the Mac platform profile. */
+export const isMacHost = (el: HTMLElement): boolean =>
+  (el.closest<HTMLElement>('.fc-host') ?? el).dataset.fcPlatform === 'mac';
+
 export interface SpreadsheetFeatureSwitches {
   ribbon?: boolean;
   formulaBar?: boolean;

@@ -12,6 +12,7 @@ import {
   type PrinterProfile,
 } from '../commands/printer-profile.js';
 import { recordPageSetupChange } from '../commands/slice-history.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   defaultPageSetup,
@@ -71,7 +72,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const { host, store } = deps;
   const history = deps.history ?? null;
   const strings = deps.strings ?? defaultStrings;
-  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const mac = isMacHost(host);
   const t = mac ? { ...strings.pageSetup, ...strings.macPageSetup } : strings.pageSetup;
   let openingPrinterProfileId = normalizePrinterProfileId(deps.getPrinterProfileId?.());
 

@@ -25,6 +25,7 @@ import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { bodyBandOrigin, layoutForView, rangeRects } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -311,8 +312,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     withDialogAnchor(anchor, action);
   };
 
-  const isMacPlatform = (): boolean =>
-    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const isMacPlatform = (): boolean => isMacHost(host);
 
   const activePanel = (): HTMLElement => (focusPanel === 'sub' ? sub : root);
 

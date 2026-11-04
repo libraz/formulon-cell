@@ -1,3 +1,4 @@
+import { isMacHost } from '../extensions/ui-options.js';
 import type { ErrorMenuHandle } from '../interact/error-menu.js';
 import type { ErrorTriangleHit } from '../render/grid/hit-state.js';
 import { gridHitState } from '../render/grid.js';
@@ -58,8 +59,7 @@ export function createErrorIndicatorClickHandler(
   deps: ErrorIndicatorClickDeps,
 ): ErrorIndicatorClickHandler {
   const { grid, canvas, getErrorMenu, invalidate } = deps;
-  const isMac = (): boolean =>
-    (grid.closest<HTMLElement>('.fc-host') ?? grid).dataset.fcPlatform === 'mac';
+  const isMac = (): boolean => isMacHost(grid);
   let armed: ArmedTriangle | null = null;
 
   const localPoint = (e: MouseEvent): { x: number; y: number } => {

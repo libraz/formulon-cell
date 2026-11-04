@@ -21,7 +21,7 @@ export const phoneticReading = (runs: readonly PhoneticRun[] | undefined): strin
 
 /** The guide on `addr`, as the readings a single-field editor opens on. */
 export function phoneticReadingAt(store: SpreadsheetStore, addr: Addr): string {
-  const key = `${addr.sheet}:${addr.row}:${addr.col}`;
+  const key = addrKey(addr);
   return phoneticReading(store.getState().format.formats.get(key)?.phonetic);
 }
 
@@ -75,7 +75,7 @@ function readBackGuide(
   const runs = wb.getCellPhoneticRuns(addr.sheet, addr.row, addr.col);
   if (runs !== null) return runs.length > 0 ? runs : undefined;
   if (!reading) return undefined;
-  const cell = store.getState().data.cells.get(`${addr.sheet}:${addr.row}:${addr.col}`);
+  const cell = store.getState().data.cells.get(addrKey(addr));
   const text = cell?.value.kind === 'text' ? cell.value.value : '';
   return [{ start: 0, end: text.length, text: reading }];
 }

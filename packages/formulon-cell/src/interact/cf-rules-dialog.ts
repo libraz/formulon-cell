@@ -5,6 +5,7 @@ import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
 import { rewriteEngineConditionalFormat } from '../engine/cf-writeback.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { rangesIntersect } from '../store/selection-geometry.js';
 import { type ConditionalRule, mutators, type SpreadsheetStore } from '../store/store.js';
@@ -189,7 +190,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   const { host, getWb, getActiveSheet, onChanged } = deps;
   let strings = deps.strings ?? defaultStrings;
   // The Mac manager works on a draft: edits take effect on OK and are dropped on Cancel.
-  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const mac = isMacHost(host);
   const dialogStrings = (): typeof strings.cfRulesDialog =>
     mac ? { ...strings.cfRulesDialog, ...strings.macCfRulesDialog } : strings.cfRulesDialog;
   let t = dialogStrings();

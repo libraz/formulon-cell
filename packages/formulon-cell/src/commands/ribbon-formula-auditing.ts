@@ -10,6 +10,7 @@
 // `{kind:'report', report}` so each host renders through its own ribbon-report
 // shell.
 
+import { addrKey } from '../engine/address.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -77,7 +78,7 @@ export const executeRibbonFormulaAuditingAction = (
   if (action === 'ignoreError') {
     const state = store.getState();
     const active = state.selection.active;
-    const activeCell = state.data.cells.get(`${active.sheet}:${active.row}:${active.col}`);
+    const activeCell = state.data.cells.get(addrKey(active));
     if (activeCell?.formula && cellValueIsFormulaError(activeCell.value)) {
       recordIgnoredErrorsChange(history, store, () => {
         ignoreCellError(store, active);

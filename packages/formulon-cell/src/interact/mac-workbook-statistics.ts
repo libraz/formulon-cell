@@ -1,4 +1,4 @@
-import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -131,7 +131,7 @@ export function collectWorkbookStatistics(
       const addr = parseAddrKey(key);
       if (!addr) continue;
       if (!addUsedAddress(addr.sheet, addr.row, addr.col)) continue;
-      const canonicalKey = `${addr.sheet}:${addr.row}:${addr.col}`;
+      const canonicalKey = addrKey(addr);
       if (format.comment) seenComments.add(canonicalKey);
       if (format.hyperlink) seenHyperlinks.add(canonicalKey);
     }

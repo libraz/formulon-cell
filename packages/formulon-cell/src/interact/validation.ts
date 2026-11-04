@@ -11,6 +11,7 @@ import { addrKey } from '../engine/address.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
 import { gridHitState } from '../render/grid.js';
 import { validationAt } from '../store/range-validations.js';
@@ -73,8 +74,6 @@ export interface ValidationAlertHandle {
  * Hit-tests against the chevron rect surfaced by the renderer; clicking opens
  * a popover, picking writes the chosen value to the cell.
  */
-const isMacHost = (grid: HTMLElement): boolean =>
-  (grid.closest<HTMLElement>('.fc-host') ?? grid).dataset.fcPlatform === 'mac';
 
 export function attachValidationList(deps: ValidationListDeps): ValidationListHandle {
   const { grid, store, wb } = deps;
@@ -425,9 +424,7 @@ export function attachValidationAlert(deps: ValidationAlertDeps): ValidationAler
       const text = protectedCell ? labels.protectedCell : message.message;
       const title = message.title?.trim() || defaultTitle(message.severity);
       // The Mac desktop's protected-cell panel carries no title.
-      const untitled =
-        protectedCell &&
-        (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+      const untitled = protectedCell && isMacHost(host);
       header.hidden = untitled;
       header.textContent = untitled ? '' : title;
       messageEl.textContent = text;

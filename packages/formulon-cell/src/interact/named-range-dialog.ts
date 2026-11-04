@@ -13,6 +13,7 @@ import {
 } from '../commands/named-ranges.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -96,8 +97,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const shared = strings.namedRangeDialog;
   // The Mac Name Manager words a few labels differently and orders the
   // reference row and editor buttons its own way; resolved on every open.
-  const isMac = (): boolean =>
-    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const isMac = (): boolean => isMacHost(host);
   let mac = isMac();
   let t: typeof shared = mac ? { ...shared, ...strings.macNamedRangeDialog } : shared;
   const rangePickerOptions =
