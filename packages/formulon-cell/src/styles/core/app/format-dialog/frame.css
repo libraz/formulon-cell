@@ -2,6 +2,11 @@
    the horizontal tab strip, and the body container. */
 
 @layer fc.app {
+  /* Mac: the panel is pinned by its own left/top (see interact/dialog-placement.ts). */
+  .fc-fmtdlg--placed:not([hidden]) {
+    display: block;
+  }
+
   .fc-fmtdlg {
     position: fixed;
     inset: 0;

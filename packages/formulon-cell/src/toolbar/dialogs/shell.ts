@@ -3,6 +3,11 @@
 // keyboard handling, focus restoration, and aria wiring stay consistent.
 
 import { advanceDialogTab } from '../../interact/dialog-focus.js';
+import {
+  currentDialogAnchor,
+  type DialogAnchor,
+  placeDialogPanel,
+} from '../../interact/dialog-placement.js';
 import { isSubmitEnter } from '../../interact/mac-dialog-keys.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
 
@@ -39,6 +44,8 @@ export interface DialogShell {
   body: HTMLDivElement;
   footer: HTMLDivElement;
   opener: HTMLElement | null;
+  /** The point a context-menu dispatch asked the dialog to centre on, captured when the shell is built. */
+  anchor: DialogAnchor | null;
 }
 
 /** Builds the overlay → panel → header/body/footer skeleton shared by every
@@ -75,7 +82,7 @@ export const createDialogShell = (opts: DialogShellOptions): DialogShell => {
 
   const overlayHost = opts.host ?? opener?.closest<HTMLElement>('.fc-host') ?? opener;
   overlayPortalFor(overlayHost).appendChild(overlay);
-  return { overlay, panel, header, body, footer, opener };
+  return { overlay, panel, header, body, footer, opener, anchor: currentDialogAnchor() };
 };
 
 export interface DialogButtonOptions {
@@ -207,6 +214,7 @@ export const mountDialog = (
   // `createDialogShell` mounts into the containing host's portal. Keep this
   // idempotent for callers that detached the shell before mounting again.
   if (!shell.overlay.isConnected) overlayPortalFor(shell.overlay).appendChild(shell.overlay);
+  placeDialogPanel(shell.overlay, shell.panel, shell.anchor);
   if (!focusInit) return;
   const focus = (): void => {
     // A dialog can be cancelled before its deferred focus callback runs. Do

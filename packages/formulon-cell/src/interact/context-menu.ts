@@ -78,6 +78,7 @@ import {
   runContextMenuStructureItem,
 } from './context-menu-structure.js';
 import { type MenuTarget, resolveContextMenuTarget } from './context-menu-target.js';
+import { withDialogAnchor } from './dialog-placement.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
@@ -295,13 +296,19 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     }
   };
 
-  const invokeMenuAction = (action: () => void): void => {
+  /** `row` is the clicked item: a dialog the action opens centres on it. The anchor lasts only for this dispatch. */
+  const invokeMenuAction = (action: () => void, row?: HTMLElement): void => {
+    const rowRect = row?.getBoundingClientRect();
+    const anchor =
+      rowRect && rowRect.width > 0
+        ? { x: rowRect.left + rowRect.width / 2, y: rowRect.top + rowRect.height / 2 }
+        : null;
     const menuHadFocus =
       root.contains(ownerDocument.activeElement) || sub.contains(ownerDocument.activeElement);
     hide(false);
     // Focus the host before the action so keyboard undo works and an opened dialog keeps focus.
     if (menuHadFocus) host.focus({ preventScroll: true });
-    action();
+    withDialogAnchor(anchor, action);
   };
 
   const isMacPlatform = (): boolean =>
@@ -515,7 +522,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       e.preventDefault();
       e.stopPropagation();
       if (btn.disabled) return;
-      invokeMenuAction(() => runEntry(entry));
+      invokeMenuAction(() => runEntry(entry), btn);
     });
     btn.addEventListener('mouseenter', () => {
       if (panel === 'root') {
@@ -576,7 +583,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        invokeMenuAction(() => run(item.id));
+        invokeMenuAction(() => run(item.id), btn);
       });
       toolbar.appendChild(btn);
     }

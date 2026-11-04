@@ -1,5 +1,6 @@
 import { enhanceCustomSelect, syncCustomSelects } from './custom-select.js';
 import { advanceDialogTab, focusableDialogItems } from './dialog-focus.js';
+import { clearDialogPlacement, currentDialogAnchor, placeDialogPanel } from './dialog-placement.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
 export interface DialogShellDeps {
@@ -312,6 +313,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
           document.activeElement instanceof OwnerHTMLElement ? document.activeElement : host;
       }
       overlay.hidden = false;
+      placeDialogPanel(overlay, panel, currentDialogAnchor());
       if (!overlay.contains(document.activeElement)) {
         const first = focusableDialogItems(panel)[0] ?? panel;
         first.focus({ preventScroll: true });
@@ -325,6 +327,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
         (overlay.contains(document.activeElement) || document.activeElement === document.body);
       overlay.dispatchEvent(new CustomEvent('fc-range-picker-stop-all'));
       overlay.hidden = true;
+      clearDialogPlacement(overlay, panel);
       if (shouldRestore) {
         restoreFocusEl?.focus({ preventScroll: true });
       }
