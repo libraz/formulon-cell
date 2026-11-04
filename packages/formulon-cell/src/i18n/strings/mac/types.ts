@@ -1,11 +1,20 @@
+import type { ExternalLinksPaneStrings } from '../../../interact/external-links-pane.js';
+import type { TextToColumnsWizardStrings } from '../../../toolbar/dialogs/text-to-columns.js';
 import type { CellFormatStrings } from '../cell-format/types.js';
+import type { MacAdvancedFilterStrings } from './advanced-filter.js';
+import type { MacChromeStrings } from './chrome.js';
+import type { MacCreateTableStrings } from './create-table.js';
 import type { MacFindReplaceStrings } from './find-replace.js';
+import type { MacGoToDialogStrings } from './goto-dialog.js';
 import type { MacIterativeDialogStrings } from './iterative-dialog.js';
 import type { MacNamedRangeDialogStrings } from './named-range-dialog.js';
 import type { MacPasteSpecialStrings } from './paste-special.js';
 import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
+import type { MacProtectSheetStrings } from './protect-sheet.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
 import type { MacSortDialogStrings } from './sort-dialog.js';
+import type { MacStyleDialogStrings } from './style-dialog.js';
+import type { MacZoomDialogStrings } from './zoom-dialog.js';
 
 export interface MacStrings {
   /** Overrides of `formatDialog` that apply on the Mac host only. */
@@ -24,6 +33,24 @@ export interface MacStrings {
   macRemoveDuplicates: MacRemoveDuplicatesStrings;
   /** Overrides of the Sort dialog wording, plus its Mac-only labels, that apply on the Mac host only. */
   macSortDialog: MacSortDialogStrings;
+  /** Overrides of `protection`, plus its Mac-only lines, for the Mac Protect Sheet dialog. */
+  macProtectSheet: MacProtectSheetStrings;
+  /** Overrides of the Advanced Filter wording, plus its Mac-only radios, on the Mac host. */
+  macAdvancedFilter: MacAdvancedFilterStrings;
+  /** Overrides of `goToDialog`, plus its Mac-only lines, that apply on the Mac host only. */
+  macGoToDialog: MacGoToDialogStrings;
+  /** Accessible names of the Mac formula bar and status bar controls. */
+  macChrome: MacChromeStrings;
+  /** The Mac three-step Convert Text to Columns wizard. */
+  macTextToColumnsWizard: TextToColumnsWizardStrings;
+  /** The Mac Style dialog opened from New Cell Style. */
+  macStyleDialog: MacStyleDialogStrings;
+  /** The Mac Workbook Links pane. */
+  macExternalLinksPane: ExternalLinksPaneStrings;
+  /** Labels only the Mac Create Table dialog shows. */
+  macCreateTable: MacCreateTableStrings;
+  /** Labels of the Mac Zoom dialog. */
+  macZoomDialog: MacZoomDialogStrings;
   macData: {
     goalSeek: {
       title: string;
@@ -51,6 +78,15 @@ export interface MacStrings {
       unsupportedOption: string;
       run: string;
       cancel: string;
+      /** Caption of the list of added source references. */
+      referenceList: string;
+      select: string;
+      add: string;
+      remove: string;
+      /** Heading of the label-source checkboxes. */
+      criteria: string;
+      topRow: string;
+      leftColumn: string;
     };
     subtotal: {
       title: string;
@@ -67,6 +103,8 @@ export interface MacStrings {
       groupTotal: string;
       /** Label of the grand-total row. */
       grandTotal: string;
+      pageBreak: string;
+      removeAll: string;
     };
     functions: { sum: string; average: string; count: string; min: string; max: string };
     /** Keyed by the error codes returned from the Data command planners. */

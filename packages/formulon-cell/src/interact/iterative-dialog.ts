@@ -11,6 +11,7 @@ import { showConfirm } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogActions,
+  appendDialogButton,
   appendDialogFrame,
   createDialogShell,
   deferInitialFocus,
@@ -95,7 +96,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   });
 
   shell.overlay.classList.add('fc-fmtdlg');
-  const { body, footer } = appendDialogFrame(shell, {
+  const { header, body, footer } = appendDialogFrame(shell, {
     title: t.title,
     panelClasses: ['fc-fmtdlg__panel'],
     headerClass: 'fc-fmtdlg__header fc-iterdlg__header',
@@ -189,8 +190,19 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     buttonPrimaryClass: 'fc-fmtdlg__btn--primary fc-iterdlg__btn--primary',
   });
 
+  // The Mac pane has no buttons; a close control in the header dismisses it.
+  const closeBtn = appendDialogButton(header, {
+    label: '',
+    baseClass: 'fc-fmtdlg__close',
+  });
+  closeBtn.setAttribute('aria-label', strings.watchPanel.close);
+  closeBtn.title = strings.watchPanel.close;
+  closeBtn.addEventListener('click', () => api.close());
+
   const applyPlatformLabels = (): void => {
     const mac = isMac();
+    footer.hidden = mac;
+    closeBtn.hidden = !mac;
     const overlay = mac ? strings.macIterativeDialog : null;
     t = overlay ? { ...shared, ...overlay } : shared;
     modeLabel.hidden = mac;
@@ -289,6 +301,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     confirmingPrecision = false;
     draft.fullPrecision = !accepted;
     syncControls();
+    commitLive();
   };
 
   const applyIterative = (wb: WorkbookHandle): boolean => {
@@ -335,6 +348,23 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     }
   };
 
+  /** The Mac pane applies each change at once instead of waiting for OK. */
+  const commitLive = (): void => {
+    if (!isMac() || confirmingPrecision || invalidMaxIterations || invalidMaxChange) return;
+    const wb = getWb();
+    if (!wb) return;
+    if (!applyIterative(wb)) {
+      status.textContent = t.unsupported;
+      return;
+    }
+    status.textContent = '';
+    applySettings(wb);
+    if (deps.store) {
+      mutators.replaceCells(deps.store, wb.cells(deps.store.getState().data.sheetIndex));
+    }
+    opened = { ...draft };
+  };
+
   const onOk = (): void => {
     if (confirmingPrecision) return;
     if (invalidMaxIterations || invalidMaxChange) {
@@ -365,25 +395,32 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
       if (!input.checked) return;
       draft.calcMode = mode;
       syncControls();
+      commitLive();
     });
   }
   shell.on(calcOnSaveInput, 'change', () => {
     draft.calcOnSave = calcOnSaveInput.checked;
+    commitLive();
   });
   shell.on(enableInput, 'change', () => {
     draft.iterative = enableInput.checked;
     syncControls();
+    commitLive();
   });
   shell.on(maxIterInput, 'input', onIter);
+  shell.on(maxIterInput, 'change', commitLive);
   shell.on(maxChangeInput, 'input', onChange);
+  shell.on(maxChangeInput, 'change', commitLive);
   shell.on(r1c1Input, 'change', () => {
     draft.r1c1 = r1c1Input.checked;
+    commitLive();
   });
   shell.on(precisionInput, 'change', () => {
     void onPrecision();
   });
   shell.on(date1904Input, 'change', () => {
     draft.date1904 = date1904Input.checked;
+    commitLive();
   });
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', () => api.close());

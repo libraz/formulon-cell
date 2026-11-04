@@ -192,6 +192,42 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('opens the Mac Advanced Filter with action radios and an absolute list range', async () => {
+    sheet.dispose();
+    sheet = await mountStubSheet({ locale: 'ja', ui: { platform: 'mac' } });
+    for (let r = 0; r < 7; r += 1) for (let c = 0; c < 4; c += 1) seedNumber(sheet, r, c, r + c);
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 6, c1: 3 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const sortButton = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="sortFilterHome"]',
+    );
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'sortFilterHome', menuId: 'menu-sort-home' },
+      sortButton as HTMLButtonElement,
+    );
+    const button = host.querySelector<HTMLButtonElement>('[data-sort="filter-advanced"]');
+    const event = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(event, 'target', { value: button });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const labels = [...(dialog?.querySelectorAll('.fc-advfilter__row') ?? [])].map(
+      (row) => row.firstElementChild?.textContent,
+    );
+    expect(labels).toEqual(['リスト範囲:', '検索条件範囲:', '抽出範囲:']);
+    const radios = [...(dialog?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? [])];
+    expect(radios.map((r) => r.parentElement?.textContent)).toEqual(['選択範囲内', '指定した範囲']);
+    expect(dialog?.querySelector<HTMLInputElement>('.fc-advfilter__row--list input')?.value).toBe(
+      '$A$1:$D$7',
+    );
+    dialog
+      ?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
+      ?.click();
+    tb.dispose();
+  });
+
   it('opens custom sort and remove duplicates from the Home Sort dropdown', async () => {
     seedNumber(sheet, 0, 0, 2);
     seedNumber(sheet, 1, 0, 1);

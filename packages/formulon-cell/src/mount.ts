@@ -375,6 +375,7 @@ export const Spreadsheet = {
       firstSheet,
       getStrings: () => strings,
       getWb: () => wb,
+      getWorkbookName: opts.getWorkbookName,
       history,
       hydrateActiveSheet,
       invalidate: () => renderer.invalidate(),
@@ -906,7 +907,10 @@ export const Spreadsheet = {
           history.clear();
         }
         if (profileChanged) refreshCells();
-        if (platformChanged) renderer.invalidate();
+        if (platformChanged) {
+          refreshFormulaBarLabels();
+          renderer.invalidate();
+        }
         instance.setFeatures({ ...ui.features, ...opts.features });
         if (platformChanged && flags.fxDialog && !featureState.fxDialog) {
           attachHostFeature('fxDialog');

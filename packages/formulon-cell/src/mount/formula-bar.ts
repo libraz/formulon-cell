@@ -254,7 +254,9 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const refreshActions = (): void => {
     const dirty = fxEditing && fxInput.value !== fxBaseline;
-    const strings = getStrings().a11y;
+    const all = getStrings();
+    const strings = all.a11y;
+    const macNames = isMacPlatform() ? all.macChrome : null;
     const cancelReason = fxEditing ? null : strings.cancelFormulaEditUnavailable;
     const acceptReason = dirty
       ? null
@@ -263,11 +265,11 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         : strings.enterFormulaUnavailable;
     projectDisabledState(fxCancel, !fxEditing, cancelReason, {
       datasetKey: 'disabledReason',
-      titlePrefix: strings.cancelFormulaEdit,
+      titlePrefix: macNames?.cancelFormulaEdit ?? strings.cancelFormulaEdit,
     });
     projectDisabledState(fxAccept, !dirty, acceptReason, {
       datasetKey: 'disabledReason',
-      titlePrefix: strings.enterFormula,
+      titlePrefix: macNames?.enterFormula ?? strings.enterFormula,
     });
     formulabar.dataset.fcEditing = fxEditing ? '1' : '0';
   };

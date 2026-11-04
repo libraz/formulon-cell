@@ -82,6 +82,13 @@ export interface WorkbookChromeStrings {
     insertSheet: string;
     moveLeft: string;
     moveRight: string;
+    moveCopy: string;
+    moveCopyTitle: string;
+    moveCopyTargetBook: string;
+    moveCopyBefore: string;
+    moveCopyToEnd: string;
+    moveCopyMakeCopy: string;
+    moveCopyUnavailable: string;
     tabColor: string;
     noColor: string;
     tabColorRed: string;

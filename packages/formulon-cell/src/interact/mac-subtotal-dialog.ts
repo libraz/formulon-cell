@@ -1,18 +1,26 @@
+import { inferAutoFilterRange } from '../commands/filter.js';
 import {
   commitMacSubtotal,
   describeMacDataError,
   formatMacRangeAddress,
   type MacDataFunction,
-  parseMacRange,
   planMacSubtotal,
+  removeMacSubtotals,
+  replaceMacSubtotals,
   type SubtotalRequest,
 } from '../commands/mac-data-tools.js';
-import { colFromLetters, colLetter } from '../engine/address.js';
+import { colLetter } from '../engine/address.js';
+import type { Range } from '../engine/types.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { syncCustomSelects } from './custom-select.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogButton,
+  appendDialogFrame,
+  createDialogShell,
+} from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 
 interface SubtotalDialogHandle {
@@ -24,35 +32,34 @@ interface SubtotalDialogHandle {
 const handles = new WeakMap<SpreadsheetInstance, SubtotalDialogHandle>();
 const FUNCTIONS: readonly MacDataFunction[] = ['sum', 'average', 'count', 'min', 'max'];
 
-interface Field {
-  readonly input: HTMLInputElement;
-  readonly text: HTMLSpanElement;
-}
-
-const appendField = (body: HTMLElement, id: string): Field => {
+const appendRow = (body: HTMLElement): { row: HTMLLabelElement; text: HTMLSpanElement } => {
   const row = document.createElement('label');
   row.className = 'fc-fmtdlg__row fc-mac-subtotal__row';
   const text = document.createElement('span');
-  const input = document.createElement('input');
-  input.id = id;
-  input.type = 'text';
-  input.className = 'fc-fmtdlg__input';
-  input.autocomplete = 'off';
-  input.spellcheck = false;
-  row.append(text, input);
+  row.appendChild(text);
   body.appendChild(row);
-  return { input, text };
+  return { row, text };
 };
 
-/** A 1-based column number or A1 column letters, as a 0-based index. */
-const columnIndex = (token: string): number | null => {
-  const trimmed = token.trim();
-  if (!trimmed) return null;
-  if (/^\d+$/.test(trimmed)) {
-    const n = Number(trimmed);
-    return Number.isInteger(n) && n > 0 ? n - 1 : null;
-  }
-  return /^[A-Za-z]+$/.test(trimmed) ? colFromLetters(trimmed) : null;
+const appendSelect = (row: HTMLElement, id: string): HTMLSelectElement => {
+  const select = document.createElement('select');
+  select.id = id;
+  select.className = 'fc-fmtdlg__select';
+  row.appendChild(select);
+  return select;
+};
+
+const appendOption = (
+  body: HTMLElement,
+): { row: HTMLLabelElement; input: HTMLInputElement; text: HTMLSpanElement } => {
+  const row = document.createElement('label');
+  row.className = 'fc-mac-subtotal__option';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  const text = document.createElement('span');
+  row.append(input, text);
+  body.appendChild(row);
+  return { row, input, text };
 };
 
 function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHandle {
@@ -71,19 +78,12 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
     bodyClass: 'fc-fmtdlg__body fc-mac-subtotal__body',
     footerClass: 'fc-fmtdlg__footer fc-mac-subtotal__footer',
   });
-  const rangeField = appendField(body, 'fc-mac-subtotal-range');
-  const groupByField = appendField(body, 'fc-mac-subtotal-group-by');
-  const columnsField = appendField(body, 'fc-mac-subtotal-columns');
-  const rangeInput = rangeField.input;
-  const groupByInput = groupByField.input;
-  const columnsInput = columnsField.input;
 
-  const functionRow = document.createElement('label');
-  functionRow.className = 'fc-fmtdlg__row fc-mac-subtotal__row';
-  const functionLabel = document.createElement('span');
-  const functionSelect = document.createElement('select');
-  functionSelect.id = 'fc-mac-subtotal-function';
-  functionSelect.className = 'fc-fmtdlg__select';
+  // The list is the current region; its header row names the columns.
+  const groupByRow = appendRow(body);
+  const groupBySelect = appendSelect(groupByRow.row, 'fc-mac-subtotal-group-by');
+  const functionRow = appendRow(body);
+  const functionSelect = appendSelect(functionRow.row, 'fc-mac-subtotal-function');
   appendDialogSelectOptions(
     functionSelect,
     FUNCTIONS.map((fn) => ({ value: fn, label: '' })),
@@ -91,28 +91,18 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
   const functionOptions = new Map<MacDataFunction, HTMLOptionElement>(
     FUNCTIONS.map((fn, index) => [fn, functionSelect.options[index] as HTMLOptionElement]),
   );
-  functionRow.append(functionLabel, functionSelect);
-  // Desktop order: group by, function, then the columns to total.
-  body.insertBefore(functionRow, columnsInput.parentElement);
+  const fieldsLabel = document.createElement('div');
+  fieldsLabel.className = 'fc-mac-subtotal__fields-label';
+  const fields = document.createElement('div');
+  fields.className = 'fc-mac-subtotal__fields';
+  fields.setAttribute('role', 'group');
+  body.append(fieldsLabel, fields);
 
-  const replaceRow = document.createElement('label');
-  replaceRow.className = 'fc-mac-subtotal__option';
-  const replaceInput = document.createElement('input');
-  replaceInput.type = 'checkbox';
-  projectDisabledState(replaceInput, true, t.unsupportedOption, { datasetKey: 'disabledReason' });
-  const replaceText = document.createElement('span');
-  replaceRow.append(replaceInput, replaceText);
-  body.appendChild(replaceRow);
-
-  const summaryRow = document.createElement('label');
-  summaryRow.className = 'fc-mac-subtotal__option';
-  const summaryInput = document.createElement('input');
-  summaryInput.type = 'checkbox';
-  summaryInput.checked = true;
-  projectDisabledState(summaryInput, true, t.unsupportedOption, { datasetKey: 'disabledReason' });
-  const summaryText = document.createElement('span');
-  summaryRow.append(summaryInput, summaryText);
-  body.appendChild(summaryRow);
+  const replaceOption = appendOption(body);
+  replaceOption.input.checked = true;
+  const pageBreakOption = appendOption(body);
+  const summaryOption = appendOption(body);
+  summaryOption.input.checked = true;
 
   const status = document.createElement('div');
   status.className = 'fc-mac-subtotal__status';
@@ -120,6 +110,13 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
   status.setAttribute('aria-live', 'polite');
   body.appendChild(status);
 
+  const removeAllBtn = appendDialogButton(footer, {
+    label: '',
+    baseClass: 'fc-fmtdlg__btn fc-mac-subtotal__btn',
+  });
+  removeAllBtn.dataset.fcMacAction = 'subtotal-remove-all';
+  // Anchored on the left, away from Cancel / OK.
+  removeAllBtn.style.marginRight = 'auto';
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
     cancelLabel: t.cancel,
     okLabel: t.run,
@@ -128,21 +125,28 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
   okBtn.dataset.fcMacAction = 'subtotal-ok';
   cancelBtn.dataset.fcMacAction = 'subtotal-cancel';
 
+  let region: Range = instance.store.getState().selection.range;
+  const checks: HTMLInputElement[] = [];
+
   const applyLabels = (): void => {
     strings = instance.i18n.strings.macData;
     t = strings.subtotal;
     shell.setAriaLabel(t.title);
     header.textContent = t.title;
-    rangeField.text.textContent = t.range;
-    groupByField.text.textContent = t.groupBy;
-    columnsField.text.textContent = t.columns;
-    functionLabel.textContent = t.function;
+    groupByRow.text.textContent = t.groupBy;
+    functionRow.text.textContent = t.function;
+    fieldsLabel.textContent = t.columns;
     for (const [fn, option] of functionOptions) option.textContent = strings.functions[fn];
-    replaceText.textContent = t.replace;
-    summaryText.textContent = t.summaryBelow;
-    for (const input of [replaceInput, summaryInput]) {
-      projectDisabledState(input, true, t.unsupportedOption, { datasetKey: 'disabledReason' });
+    replaceOption.text.textContent = t.replace;
+    pageBreakOption.text.textContent = t.pageBreak;
+    summaryOption.text.textContent = t.summaryBelow;
+    // Page breaks and summary rows above the data have no counterpart here.
+    for (const option of [pageBreakOption, summaryOption]) {
+      projectDisabledState(option.input, true, t.unsupportedOption, {
+        datasetKey: 'disabledReason',
+      });
     }
+    removeAllBtn.textContent = t.removeAll;
     okBtn.textContent = t.run;
     cancelBtn.textContent = t.cancel;
     syncCustomSelects(shell.panel);
@@ -155,62 +159,101 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
     instance.host.focus();
   };
 
-  const defaults = (): void => {
-    const selection = instance.store.getState().selection.range;
-    rangeInput.value = formatMacRangeAddress(instance.workbook, selection);
-    groupByInput.value = colLetter(selection.c0);
-    columnsInput.value = Array.from({ length: Math.max(0, selection.c1 - selection.c0) }, (_, i) =>
-      colLetter(selection.c0 + i + 1),
-    ).join(',');
-    functionSelect.value = 'sum';
+  /** The header row's text names each column; a blank header falls back to its letter. */
+  const headerName = (col: number): string => {
+    const value = instance.workbook.getValue({ sheet: region.sheet, row: region.r0, col });
+    const text =
+      value.kind === 'text' ? value.value : value.kind === 'number' ? String(value.value) : '';
+    return text.trim() || colLetter(col);
   };
 
-  const run = (): void => {
+  const defaults = (): void => {
+    region = inferAutoFilterRange(instance.store.getState());
+    const columns = Array.from({ length: region.c1 - region.c0 + 1 }, (_, i) => region.c0 + i);
+    groupBySelect.replaceChildren();
+    appendDialogSelectOptions(
+      groupBySelect,
+      columns.map((col) => ({ value: String(col), label: headerName(col) })),
+    );
+    groupBySelect.value = String(region.c0);
+    fields.replaceChildren();
+    checks.length = 0;
+    for (const col of columns) {
+      const label = document.createElement('label');
+      label.className = 'fc-mac-subtotal__field';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = String(col);
+      // The last column is totalled by default.
+      input.checked = col === region.c1 && columns.length > 1;
+      const text = document.createElement('span');
+      text.textContent = headerName(col);
+      label.append(input, text);
+      fields.appendChild(label);
+      checks.push(input);
+    }
+    functionSelect.value = 'sum';
+    replaceOption.input.checked = true;
+    syncCustomSelects(shell.panel);
+  };
+
+  const fail = (message: string): void => {
+    status.dataset.state = 'error';
+    status.textContent = message;
+  };
+
+  const removeAll = (): void => {
     delete status.dataset.state;
     status.textContent = '';
-    const parsed = parseMacRange(
-      instance.workbook,
-      rangeInput.value,
-      instance.store.getState().data.sheetIndex,
-    );
-    if (!parsed) {
-      status.dataset.state = 'error';
-      status.textContent = strings.errors.invalidRange;
-      return;
-    }
-    const groupBy = columnIndex(groupByInput.value);
-    const columns = columnsInput.value
-      .split(/[\s,;]+/)
-      .map(columnIndex)
-      .filter((value): value is number => value !== null);
-    if (groupBy === null || columns.length === 0) {
-      status.dataset.state = 'error';
-      status.textContent = strings.errors.invalidColumn;
-      return;
-    }
-    const request: SubtotalRequest = {
-      range: rangeInput.value,
-      groupByColumn: groupBy,
-      subtotalColumns: columns,
-      function: (FUNCTIONS.includes(functionSelect.value as MacDataFunction)
-        ? functionSelect.value
-        : 'sum') as MacDataFunction,
-    };
-    const plan = planMacSubtotal(instance, request);
-    if (!plan.ok) {
-      status.dataset.state = 'error';
-      status.textContent = describeMacDataError(instance.i18n.strings, plan.error);
-      return;
-    }
-    const committed = commitMacSubtotal(instance, request, plan.value);
-    if (!committed.ok) {
-      status.dataset.state = 'error';
-      status.textContent = describeMacDataError(instance.i18n.strings, committed.error);
+    const removed = removeMacSubtotals(instance, region);
+    if (!removed.ok) {
+      fail(describeMacDataError(instance.i18n.strings, removed.error));
       return;
     }
     close();
   };
 
+  const run = (): void => {
+    delete status.dataset.state;
+    status.textContent = '';
+    const columns = checks.filter((input) => input.checked).map((input) => Number(input.value));
+    if (columns.length === 0) {
+      fail(strings.errors.invalidColumn);
+      return;
+    }
+    const makeRequest = (target: Range): SubtotalRequest => ({
+      range: formatMacRangeAddress(instance.workbook, target),
+      groupByColumn: Number(groupBySelect.value),
+      subtotalColumns: columns,
+      function: (FUNCTIONS.includes(functionSelect.value as MacDataFunction)
+        ? functionSelect.value
+        : 'sum') as MacDataFunction,
+    });
+    // Replacing the old subtotals and writing the new ones is a single undo step.
+    if (replaceOption.input.checked) {
+      const replaced = replaceMacSubtotals(instance, region, makeRequest);
+      if (!replaced.ok) {
+        fail(describeMacDataError(instance.i18n.strings, replaced.error));
+        return;
+      }
+      close();
+      return;
+    }
+    const request = makeRequest(region);
+    const plan = planMacSubtotal(instance, request);
+    if (!plan.ok) {
+      fail(describeMacDataError(instance.i18n.strings, plan.error));
+      return;
+    }
+    const committed = commitMacSubtotal(instance, request, plan.value);
+    if (!committed.ok) {
+      fail(describeMacDataError(instance.i18n.strings, committed.error));
+      return;
+    }
+    close();
+  };
+
+  shell.on(removeAllBtn, 'click', removeAll);
   shell.on(okBtn, 'click', run);
   shell.on(cancelBtn, 'click', close);
   shell.on(shell.overlay, 'keydown', (event) => {
@@ -227,7 +270,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
       delete status.dataset.state;
       status.textContent = '';
       shell.open();
-      queueMicrotask(() => rangeInput.focus());
+      queueMicrotask(() => groupBySelect.focus());
     },
     close,
     detach(): void {

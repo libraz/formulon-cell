@@ -1,4 +1,5 @@
 import { attachRangePickerButton } from '../../interact/range-picker-control.js';
+import { projectDisabledState } from '../menu-a11y.js';
 import {
   appendDialogActions,
   appendErrorRow,
@@ -14,6 +15,8 @@ export interface AdvancedFilterDialogOptions {
   criteriaRangeLabel: string;
   copyToLabel: string;
   uniqueOnlyLabel: string;
+  /** In-place / copy action radios; Copy to stays disabled while in place. */
+  actionLabels?: { inPlace: string; copy: string };
   initialListRange: string;
   initialCriteriaRange?: string;
   initialCopyTo?: string;
@@ -59,6 +62,21 @@ export const showAdvancedFilterDialog = (
   new Promise<AdvancedFilterDialogResult | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title, bodyVariant: 'app' });
 
+    const actionInputs = opts.actionLabels
+      ? [opts.actionLabels.inPlace, opts.actionLabels.copy].map((text, index) => {
+          const label = document.createElement('label');
+          label.className = 'fc-advfilter__option fc-tb__dlg__label';
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = 'fc-advfilter-action';
+          input.value = index === 0 ? 'in-place' : 'copy';
+          input.checked = index === 0;
+          label.append(input, document.createTextNode(text));
+          shell.body.appendChild(label);
+          return input;
+        })
+      : null;
+
     const rangeGroup = document.createElement('div');
     rangeGroup.className = 'fc-advfilter__ranges';
     shell.body.appendChild(rangeGroup);
@@ -98,14 +116,24 @@ export const showAdvancedFilterDialog = (
       'fc-advfilter__row--copy-to',
     );
     const pickCopyTo = opts.pickAddress ?? opts.pickRange;
+    let copyToPicker: HTMLButtonElement | null = null;
     if (opts.rangePickerLabel && pickCopyTo) {
-      attachRangePickerButton(copyTo, {
+      copyToPicker = attachRangePickerButton(copyTo, {
         label: opts.rangePickerLabel,
         getValue: pickCopyTo,
         subscribeToRangeChanges: opts.subscribeToRangeChanges,
         kind: 'advanced-filter-copy-to',
       });
     }
+
+    const copying = (): boolean => !actionInputs || actionInputs[1]?.checked === true;
+    const syncCopyTo = (): void => {
+      const disabled = !copying();
+      projectDisabledState(copyTo, disabled, null);
+      if (copyToPicker) projectDisabledState(copyToPicker, disabled, null);
+    };
+    for (const input of actionInputs ?? []) input.addEventListener('change', syncCopyTo);
+    syncCopyTo();
 
     const uniqueRow = document.createElement('label');
     uniqueRow.className = 'fc-advfilter__option fc-tb__dlg__label';
@@ -130,7 +158,8 @@ export const showAdvancedFilterDialog = (
     const onOk = (): void => {
       const listError = opts.validateRange(listRange.value);
       const criteriaError = opts.validateRange(criteriaRange.value);
-      const copyError = copyTo.value.trim() ? opts.validateAddress(copyTo.value) : null;
+      const copyValue = copying() ? copyTo.value.trim() : '';
+      const copyError = copyValue ? opts.validateAddress(copyValue) : null;
       if (listError) {
         showInputError(errorRow, listRange, listError);
         return;
@@ -146,7 +175,7 @@ export const showAdvancedFilterDialog = (
       lifecycle.finish({
         listRange: listRange.value.trim(),
         criteriaRange: criteriaRange.value.trim(),
-        copyTo: copyTo.value.trim(),
+        copyTo: copyValue,
         uniqueOnly: uniqueOnly.checked,
       });
     };

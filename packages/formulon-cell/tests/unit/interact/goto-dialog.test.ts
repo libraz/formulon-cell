@@ -127,6 +127,49 @@ describe('attachGoToDialog', () => {
     handle.detach();
   });
 
+  it('words the Mac options and moves sub-options into the オプション box', () => {
+    host.dataset.fcPlatform = 'mac';
+    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    handle.open('special');
+    const label = (kind: string): string | null | undefined =>
+      document.querySelector(`.fc-goto__kinds input[value="${kind}"]`)?.parentElement?.textContent;
+    expect(label('comments')).toBe('メモ');
+    expect(label('blanks')).toBe('空白');
+    expect(document.querySelector('.fc-goto__caption')?.textContent).toBe('選択');
+    const box = document.querySelector<HTMLFieldSetElement>('fieldset.fc-goto__options');
+    expect(box?.querySelector('legend')?.textContent).toBe('オプション');
+    const visible = (el: Element | null | undefined): boolean =>
+      !!el && !(el as HTMLElement).hidden;
+    const filters = box?.querySelector('.fc-goto__value-filters');
+    const levels = box?.querySelector('.fc-goto__levels');
+    const rules = box?.querySelector('.fc-goto__rules');
+    const none = box?.querySelector('.fc-goto__no-options');
+    // Constants is the default and owns the value-kind filters.
+    expect([visible(filters), visible(levels), visible(rules), visible(none)]).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+    const pick = (kind: string): void =>
+      document.querySelector<HTMLInputElement>(`.fc-goto__kinds input[value="${kind}"]`)?.click();
+    pick('comments');
+    expect(none?.textContent).toBe('この選択項目にはオプションはありません。');
+    expect([visible(filters), visible(levels), visible(rules), visible(none)]).toEqual([
+      false,
+      false,
+      false,
+      true,
+    ]);
+    pick('dependents');
+    expect(visible(levels)).toBe(true);
+    pick('data-validation');
+    expect(visible(rules)).toBe(true);
+    handle.open('go-to');
+    expect(document.querySelector('.fc-goto__reference span')?.textContent).toBe('参照:');
+    handle.detach();
+  });
+
   it('renders the options in the two-column order with constants pre-checked', () => {
     const handle = attachGoToDialog({ host, store, getWb: () => wb });
     handle.open();
@@ -348,7 +391,7 @@ describe('attachGoToDialog', () => {
     const handle = attachGoToDialog({ host, store, getWb: () => wb });
     handle.open('go-to');
     expect(document.body.textContent).toContain('参照先');
-    expect(kindRadios()[0]?.closest('.fc-goto__kinds')?.hasAttribute('hidden')).toBe(true);
+    expect(kindRadios()[0]?.closest('[hidden]')).toBeTruthy();
     specialBtn()?.click();
     expect(overlay()?.hidden).toBe(false);
     expect(overlay()?.querySelector('.fc-fmtdlg__header')?.textContent).toBe(

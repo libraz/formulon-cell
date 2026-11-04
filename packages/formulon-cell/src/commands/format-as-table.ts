@@ -171,6 +171,9 @@ export interface FormatAsTableOptions {
   firstCol?: boolean;
   lastCol?: boolean;
   styleName?: string;
+  /** Name of a new engine-backed table, already checked with `tableNameError`;
+   *  defaults to the next free `Table<n>`. */
+  name?: string;
   /** Label a new total row carries in its first column; defaults to `Total`. */
   totalsLabel?: string;
   /** When the active engine supports it, back the overlay with an OOXML
@@ -286,7 +289,11 @@ export const tableColumns = (
   return columns;
 };
 
-const nextTableName = (workbook: WorkbookHandle, overlays: readonly TableOverlay[]): string => {
+/** The next free default table name (`Table1`, `テーブル1`, …) in the workbook's language. */
+export const nextTableName = (
+  workbook: WorkbookHandle,
+  overlays: readonly TableOverlay[],
+): string => {
   const existing = new Set(workbook.getTables().map((table) => table.name.toLocaleLowerCase()));
   for (const overlay of overlays) if (overlay.name) existing.add(overlay.name.toLocaleLowerCase());
   const { table } = defaultObjectNames(workbook);
@@ -450,7 +457,7 @@ export function formatAsTable(
   options: FormatAsTableOptions = {},
 ): TableOverlay | null {
   if (blockedByProtection(store, range.sheet, 'formatAsTable')) return null;
-  const { workbook, totalsLabel = 'Total', ...overlayOptions } = options;
+  const { workbook, totalsLabel = 'Total', name, ...overlayOptions } = options;
   if (overlapsOtherTable(store, overlayOptions.id ?? defaultTableId(range), range)) return null;
   const engineBacked = workbook?.capabilities?.tableMutate === true;
   const overlay: TableOverlay = {
@@ -459,7 +466,7 @@ export function formatAsTable(
     id: overlayOptions.id ?? defaultTableId(range),
     source: engineBacked ? 'engine' : 'session',
     ...(engineBacked && workbook
-      ? { name: nextTableName(workbook, store.getState().tables.tables) }
+      ? { name: name?.trim() || nextTableName(workbook, store.getState().tables.tables) }
       : {}),
     range,
   };
@@ -509,7 +516,7 @@ export function formatAsTableByStyleId(
   variant: CustomTableStyle['variant'] = 'banded',
   options: Pick<
     FormatAsTableOptions,
-    'showHeader' | 'showTotal' | 'firstCol' | 'lastCol' | 'workbook' | 'totalsLabel'
+    'showHeader' | 'showTotal' | 'firstCol' | 'lastCol' | 'workbook' | 'totalsLabel' | 'name'
   > = {},
 ): TableOverlay | null {
   return formatAsTable(store, range, {

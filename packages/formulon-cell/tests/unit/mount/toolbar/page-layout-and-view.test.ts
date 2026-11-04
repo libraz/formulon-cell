@@ -67,6 +67,34 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('opens the Mac Zoom presets and zooms to the selection', async () => {
+    sheet.dispose();
+    sheet = await mountStubSheet({ locale: 'ja', ui: { platform: 'mac' } });
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 39, c1: 0 });
+    const refreshZoom = vi.fn();
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      refreshZoom,
+    });
+    tb.setActiveTab('view');
+    host
+      .querySelector<HTMLButtonElement>(
+        '[data-ribbon-command="mac.view.zoom"], [data-ribbon-command="zoomDialog"]',
+      )
+      ?.click();
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    expect(dialog?.textContent).toContain('倍率:');
+    const fit = [...(dialog?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? [])].find(
+      (input) => input.value === 'selection',
+    );
+    expect(fit?.parentElement?.textContent).toBe('選択範囲をズーム');
+    fit?.click();
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await waitFor(() => sheet.instance.store.getState().viewport.zoom === 0.5);
+    expect(refreshZoom).toHaveBeenCalled();
+    tb.dispose();
+  });
+
   it('sets, adds, and clears the current selection through the Print Area dropdown', () => {
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 3 });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {

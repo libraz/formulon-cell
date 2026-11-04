@@ -41,7 +41,7 @@ import { dictionaries } from '../i18n/strings.js';
 import { isNavigationAddrAllowed } from '../interact/navigation-policy.js';
 import { mutators } from '../store/store.js';
 import { reportDialogLabels, showReport } from '../toolbar/dialogs/report.js';
-import { showZoomDialog } from '../toolbar/dialogs/zoom.js';
+import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
 import { backstageMenuText, pageScaleMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
 import {
   analyzeAccessibilityCells,
@@ -521,6 +521,29 @@ export function createDefaultRibbonHooks(
       zoomDialog: async () => {
         const strings = instance.i18n.strings.ribbon;
         const current = Math.round(instance.store.getState().viewport.zoom * 100);
+        if (instance.host.dataset.fcPlatform === 'mac') {
+          const mac = instance.i18n.strings.macZoomDialog;
+          const choice = await showMacZoomDialog({
+            locale: () => instance.locale,
+            title: strings.zoomDialogTitle,
+            caption: mac.caption,
+            fitSelection: mac.fitSelection,
+            custom: mac.custom,
+            initial: current,
+            okLabel: instance.i18n.strings.formatDialog.ok,
+            cancelLabel: instance.i18n.strings.formatDialog.cancel,
+            invalidMessage: strings.zoomDialogInvalid,
+          });
+          if (choice === null) return;
+          const zoom =
+            choice.kind === 'selection'
+              ? zoomForSelection(instance.store.getState().selection.range)
+              : choice.percent / 100;
+          setSheetZoom(instance.store, zoom, instance.workbook);
+          opts.refreshZoom?.();
+          instance.host.focus();
+          return;
+        }
         const next = await showZoomDialog({
           locale: () => instance.locale,
           title: strings.zoomDialogTitle,

@@ -5,8 +5,10 @@ import {
   STATUS_AGGREGATE_KEYS,
   statusAggregateValue,
 } from '../commands/aggregate.js';
-import { parseAddrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
+import { formatGeneralNumber } from '../engine/value.js';
 import { normalizeFormatLocale } from '../format/locale.js';
+import { formatNumber } from '../format/number-format.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
@@ -20,6 +22,7 @@ import {
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import {
   mutators,
+  type NumFmt,
   type SpreadsheetStore,
   type State,
   type StatusAggKey,
@@ -190,11 +193,29 @@ const createStatusBarChooserRow = (
   return { row, check };
 };
 
-const fmt = (n: number, locale: string): string => {
-  if (!Number.isFinite(n)) return '—';
+/** Largest General result the bar shows, counting the point: 0.666666667, 15346.83333. */
+const GENERAL_WIDTH = 11;
+
+/** General format fitted to the bar's width, without digit grouping. */
+const fmtGeneral = (n: number, locale: string): string => {
   const abs = Math.abs(n);
-  if (abs !== 0 && (abs < 0.01 || abs >= 1e9)) return n.toExponential(3);
-  return n.toLocaleString(normalizeFormatLocale(locale), { maximumFractionDigits: 4 });
+  if (abs >= 10 ** (GENERAL_WIDTH - 1) || (abs !== 0 && abs < 1e-9)) {
+    return formatGeneralNumber(n, locale);
+  }
+  const intDigits = abs < 1 ? 1 : Math.floor(Math.log10(abs)) + 1;
+  return n.toLocaleString(normalizeFormatLocale(locale), {
+    maximumFractionDigits: Math.max(0, GENERAL_WIDTH - 1 - intDigits),
+    useGrouping: false,
+  });
+};
+
+/** A numeric aggregate in the first numeric cell's number format, else General. */
+const fmt = (n: number, locale: string, numFmt?: NumFmt, date1904 = false): string => {
+  if (!Number.isFinite(n)) return '—';
+  if (numFmt && numFmt.kind !== 'general') {
+    return formatNumber(n, numFmt, normalizeFormatLocale(locale), date1904);
+  }
+  return fmtGeneral(n, locale);
 };
 
 export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
@@ -329,8 +350,11 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     viewButtons.normal.title = t.normalView;
     viewButtons.pageLayout.setAttribute('aria-label', t.pageLayoutView);
     viewButtons.pageLayout.title = t.pageLayoutView;
-    viewButtons.pageBreakPreview.setAttribute('aria-label', t.pageBreakPreview);
-    viewButtons.pageBreakPreview.title = t.pageBreakPreview;
+    const mac =
+      (statusbar.closest<HTMLElement>('.fc-host') ?? statusbar).dataset.fcPlatform === 'mac';
+    const pageBreak = mac ? strings.macChrome.pageBreakPreview : t.pageBreakPreview;
+    viewButtons.pageBreakPreview.setAttribute('aria-label', pageBreak);
+    viewButtons.pageBreakPreview.title = pageBreak;
   };
 
   const refreshModeLabel = (): void => {
@@ -512,20 +536,45 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       };
     }
     const keys = s.ui.statusAggs;
+    const aggLocale = deps.getLocale?.() ?? bundledLocaleForStrings(strings) ?? 'en-US';
+    const first = stats.firstNumeric;
+    const numFmt = first
+      ? s.format.formats.get(addrKey({ sheet: first.sheet, row: first.row, col: first.col }))
+          ?.numFmt
+      : undefined;
     const pieces: string[] = [];
     for (const key of keys) {
       const v = statusAggregateValue(key, stats);
-      if (v != null)
-        pieces.push(
-          `${labelFor(key)}: ${fmt(v, deps.getLocale?.() ?? bundledLocaleForStrings(strings) ?? 'en-US')}`,
-        );
+      if (v == null) continue;
+      // Counts are whole numbers in no particular format.
+      const counted = key === 'count' || key === 'countNumbers';
+      const text = counted
+        ? fmtGeneral(v, aggLocale)
+        : fmt(v, aggLocale, numFmt, s.ui.date1904 === true);
+      pieces.push(`${labelFor(key)}: ${text}`);
     }
-    center.textContent = pieces.join(' · ');
+    // The Mac bar shows each aggregate as its own item, with no separator and no cell count.
+    const mac =
+      (statusbar.closest<HTMLElement>('.fc-host') ?? statusbar).dataset.fcPlatform === 'mac';
+    const items = pieces.flatMap((text, i) => {
+      const item = document.createElement('span');
+      item.className = 'fc-host__statusbar-agg';
+      item.textContent = text;
+      return i > 0 && !mac ? [document.createTextNode(' · '), item] : [item];
+    });
+    center.replaceChildren(...items);
 
     const cells = stats.cells;
-    const cellText =
-      cells === 1 ? `1 ${strings.statusBar.cell}` : `${cells} ${strings.statusBar.cells}`;
-    right.textContent = deps.showEngineLabel ? `${cellText} · ${getEngineLabel()}` : cellText;
+    const cellText = mac
+      ? ''
+      : cells === 1
+        ? `1 ${strings.statusBar.cell}`
+        : `${cells} ${strings.statusBar.cells}`;
+    right.textContent = deps.showEngineLabel
+      ? cellText
+        ? `${cellText} · ${getEngineLabel()}`
+        : getEngineLabel()
+      : cellText;
     refreshLockIndicators();
     refreshUploadStatus();
     refreshMacroRecording();

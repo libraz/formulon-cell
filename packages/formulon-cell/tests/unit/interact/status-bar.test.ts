@@ -129,12 +129,10 @@ describe('attachStatusBar', () => {
       getEngineLabel: () => 'stub',
       getLocale: () => locale,
     });
-    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('1.244,5');
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('1244,5');
     locale = 'fr';
     handle.setStrings(fr);
-    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain(
-      '1\u202f244,5',
-    );
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('1244,5');
     handle.detach();
   });
 
@@ -249,7 +247,8 @@ describe('attachStatusBar', () => {
       selection: { ...s.selection, extraRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }] },
     }));
     expect(IterationCountingMap.iterations).toBe(scansAfterMount + 2);
-    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('10');
+    // One cell (selected twice) carries no aggregates.
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toBe('');
 
     store.setState((s) => ({ ...s, selection: { ...s.selection, extraRanges: [] } }));
     expect(IterationCountingMap.iterations).toBe(scansAfterMount + 2);
@@ -289,7 +288,7 @@ describe('attachStatusBar', () => {
     }));
     expect(IterationCountingMap.iterations).toBe(scansBeforeSheetSwitch);
     expect(IterationCountingMap.gets).toBe(lookupsBeforeSheetSwitch + 1);
-    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('90');
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toBe('');
     handle.detach();
   });
 
@@ -335,7 +334,7 @@ describe('attachStatusBar', () => {
 
     expect(IterationCountingMap.iterations).toBe(1);
     expect(reads.cellVisits - firstColumnVisits).toBe(1000);
-    expect(center?.textContent).toContain('Sum: 1,001,000');
+    expect(center?.textContent).toContain('Sum: 1001000');
     handle.detach();
   });
 

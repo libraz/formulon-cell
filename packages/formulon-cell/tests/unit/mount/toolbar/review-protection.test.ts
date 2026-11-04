@@ -29,6 +29,42 @@ describe('Spreadsheet.mountToolbar', () => {
     host.remove();
   });
 
+  it('uses the Mac Protect Sheet wording on the Mac host', async () => {
+    sheet.dispose();
+    sheet = await mountStubSheet({ locale: 'ja', ui: { platform: 'mac' } });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    tb.setActiveTab('review');
+    host
+      .querySelector<HTMLButtonElement>(
+        '[data-ribbon-command="mac.review.protectSheet"], [data-ribbon-command="protectReview"]',
+      )
+      ?.click();
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    expect(dialog?.querySelector('.fc-fmtdlg__header, .fc-tb__dlg__title')?.textContent).toBe(
+      'シートの保護',
+    );
+    const text = dialog?.textContent ?? '';
+    for (const label of [
+      'シートとロックされたセルの内容を保護する',
+      '既定ではすべてのセルがロックされていますが、ロックは解除可能です。',
+      'パスワード (省略可):',
+      '確認:',
+      'ロックされたセルの選択',
+      'ロックされていないセルの選択',
+      'ピボットテーブルとピボットグラフを使用する',
+    ]) {
+      expect(text).toContain(label);
+    }
+    expect(dialog?.querySelector<HTMLInputElement>('input[type="password"]')?.placeholder).toBe('');
+    dialog
+      ?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
+      ?.click();
+    tb.dispose();
+  });
+
   it('opens Protect Sheet from primary click and keeps protection options secondary', async () => {
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {

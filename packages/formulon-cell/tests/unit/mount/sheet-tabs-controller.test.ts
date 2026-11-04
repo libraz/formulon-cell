@@ -387,23 +387,49 @@ describe('mount/sheet-tabs-controller', () => {
       const items = Array.from(
         h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__item'),
       );
-      // 8 menu buttons: rename, insert, moveLeft, moveRight, delete, hide,
-      // very hide, unhide.
-      expect(items.length).toBe(8);
+      // 9 menu buttons: rename, insert, moveLeft, moveRight, move or copy,
+      // delete, hide, very hide, unhide.
+      expect(items.length).toBe(9);
       // Active is sheet 1, so moveLeft + moveRight are both enabled, delete enabled
       // (sheetCount > 1), unhide disabled (no hidden sheets yet).
       const enabled = items.map((b) => !b.disabled);
-      // [rename, insert, moveLeft, moveRight, delete, hide, veryHide, unhide]
-      expect(enabled).toEqual([true, true, true, true, true, true, true, false]);
-      expect(items[6]?.textContent).toBe(en.sheetTabs.veryHideSheet);
-      expect(items[7]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetUnhideRequiresHiddenSheet);
-      expect(items[7]?.getAttribute('aria-description')).toBe(
+      // [rename, insert, moveLeft, moveRight, moveCopy, delete, hide, veryHide, unhide]
+      expect(enabled).toEqual([true, true, true, true, true, true, true, true, false]);
+      expect(items[4]?.textContent).toBe(en.sheetTabs.moveCopy);
+      expect(items[7]?.textContent).toBe(en.sheetTabs.veryHideSheet);
+      expect(items[8]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetUnhideRequiresHiddenSheet);
+      expect(items[8]?.getAttribute('aria-description')).toBe(
         en.ribbonMenu.sheetUnhideRequiresHiddenSheet,
       );
-      expect(items[7]?.title).toBe(
+      expect(items[8]?.title).toBe(
         `${en.sheetTabs.unhideSheet}\n${en.ribbonMenu.sheetUnhideRequiresHiddenSheet}`,
       );
       expect(h.sheetMenu.querySelector('.fc-sheetmenu__colors')).not.toBeNull();
+    });
+
+    it('moves a sheet through the Move or Copy dialog', async () => {
+      h = mount({ sheets: ['A', 'B', 'C'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(0, tab, 0, 0);
+      const item = Array.from(
+        h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__item'),
+      ).find((b) => b.textContent === en.sheetTabs.moveCopy);
+      item?.click();
+      const options = document.querySelectorAll<HTMLElement>('.fc-movecopy__list [role="option"]');
+      expect(Array.from(options, (o) => o.textContent)).toEqual([
+        'A',
+        'B',
+        'C',
+        en.sheetTabs.moveCopyToEnd,
+      ]);
+      options[3]?.click();
+      document
+        .querySelector<HTMLButtonElement>('.fc-fmtdlg__footer .fc-fmtdlg__btn--primary')
+        ?.click();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(h.state.sheets).toEqual(['B', 'C', 'A']);
+      expect(h.hydrateActiveSheet).toHaveBeenCalled();
     });
 
     it('sets and clears an Excel-style tab color from the sheet menu palette', () => {
@@ -519,12 +545,13 @@ describe('mount/sheet-tabs-controller', () => {
       // insert is unconditional (uses engine addSheet directly).
       expect(items[0]?.disabled).toBe(true); // rename
       expect(items[1]?.disabled).toBe(false); // insert
-      expect(items[4]?.disabled).toBe(true); // delete (capability)
-      expect(items[5]?.disabled).toBe(true); // hide
-      expect(items[6]?.disabled).toBe(true); // unhide
+      expect(items[4]?.disabled).toBe(true); // move or copy
+      expect(items[5]?.disabled).toBe(true); // delete (capability)
+      expect(items[6]?.disabled).toBe(true); // hide
+      expect(items[7]?.disabled).toBe(true); // very hide
       expect(items[0]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetActionUnavailable);
-      expect(items[4]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetMutationUnavailable);
-      expect(items[5]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetActionUnavailable);
+      expect(items[5]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetMutationUnavailable);
+      expect(items[6]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetActionUnavailable);
     });
 
     it('projects workbook protection reasons on sheet menu actions', () => {

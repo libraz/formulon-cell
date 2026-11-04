@@ -61,7 +61,11 @@ const buildTextToColumnsCustom =
       textToColumnsOther: string;
       textToColumnsPreview: string;
     };
+    // The Mac host runs the desktop three-step wizard.
+    const macWizard =
+      instance.host.dataset.fcPlatform === 'mac' ? strings.macTextToColumnsWizard : undefined;
     const result = await showTextToColumnsDialog({
+      wizard: macWizard,
       strings: {
         title: strings.ribbonMenu.textToColumnsDialogTitle,
         dataType: textToColumnsStrings.textToColumnsDataType,
@@ -80,7 +84,7 @@ const buildTextToColumnsCustom =
         ok: strings.hyperlinkDialog.ok,
         cancel: strings.hyperlinkDialog.cancel,
       },
-      initialDelimiters: [','],
+      initialDelimiters: macWizard ? undefined : [','],
       previewRows,
     });
     if (result === null) {
@@ -88,9 +92,16 @@ const buildTextToColumnsCustom =
       return;
     }
     const selected = normalizedSelectionRange(instance);
-    const targets = textToColumnsTargets(instance.store.getState(), selected, result.delimiters, {
+    const splitOptions = {
       collapseConsecutiveDelimiters: result.collapseConsecutiveDelimiters,
-    });
+      ...(result.textQualifier === undefined ? {} : { textQualifier: result.textQualifier }),
+    };
+    const targets = textToColumnsTargets(
+      instance.store.getState(),
+      selected,
+      result.delimiters,
+      splitOptions,
+    );
     runAfterAllowedRangeUnlock(instance.store, targets, () => {
       instance.history.begin();
       try {
@@ -100,7 +111,7 @@ const buildTextToColumnsCustom =
           instance.workbook,
           selected,
           result.delimiters,
-          { collapseConsecutiveDelimiters: result.collapseConsecutiveDelimiters },
+          splitOptions,
         );
         mutators.replaceCells(instance.store, instance.workbook.cells(selected.sheet));
       } finally {

@@ -181,6 +181,26 @@ const currencyPresetItem = (label: string, symbol: string): HTMLButtonElement =>
   return menuPresetButton(label, 'currencyPreset', symbol, menuIconSpacer());
 };
 
+/** Paints a cell-style swatch with the style's own fill, ink and type treatment. */
+export const paintCellStyleChip = (
+  btn: HTMLElement,
+  fmt: {
+    bold?: boolean;
+    italic?: boolean;
+    underline?: CellFormat['underline'];
+    color?: string;
+    fill?: string;
+    fontSize?: number;
+  },
+): void => {
+  btn.style.background = fmt.fill ?? '#ffffff';
+  btn.style.color = fmt.color ?? '#1f1f1f';
+  if (fmt.bold) btn.style.fontWeight = '700';
+  if (fmt.italic) btn.style.fontStyle = 'italic';
+  if (fmt.underline) btn.style.textDecoration = 'underline';
+  if (fmt.fontSize) btn.style.fontSize = `${Math.min(fmt.fontSize, 13)}px`;
+};
+
 export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFactories => {
   const { ribbonLang, ribbonMenuText, ribbonText } = deps;
   const t = ribbonMenuText as StylesMenuText;
@@ -212,13 +232,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       attr: 'cellStyle',
       value: def.id,
     });
-    const fmt = def.format ?? {};
-    btn.style.background = fmt.fill ?? '#ffffff';
-    btn.style.color = fmt.color ?? '#1f1f1f';
-    if (fmt.bold) btn.style.fontWeight = '700';
-    if (fmt.italic) btn.style.fontStyle = 'italic';
-    if (fmt.underline) btn.style.textDecoration = 'underline';
-    if (fmt.fontSize) btn.style.fontSize = `${Math.min(fmt.fontSize, 13)}px`;
+    paintCellStyleChip(btn, def.format ?? {});
     return btn;
   };
   const createCellStyleChip = (id: CellStyleId): HTMLButtonElement => {

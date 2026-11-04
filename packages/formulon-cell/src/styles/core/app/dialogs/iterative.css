@@ -43,4 +43,9 @@
     font-size: 12px;
     color: var(--fc-cell-error-fg, #c44);
   }
+  /* The Mac pane drops its footer; the shared header close control replaces it. */
+  .fc-iterdlg .fc-fmtdlg__footer[hidden],
+  .fc-iterdlg .fc-fmtdlg__close[hidden] {
+    display: none;
+  }
 }

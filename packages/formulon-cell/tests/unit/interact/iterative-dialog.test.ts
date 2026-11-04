@@ -309,4 +309,82 @@ describe('attachIterativeDialog', () => {
     expect(visibleText('.fc-iterdlg__note')).toEqual([]);
     handle.detach();
   });
+
+  describe('on the Mac host', () => {
+    // Excel for Mac's Calculation pane applies each change at once and has no OK / Cancel.
+    const openMac = () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      const calls: string[] = [];
+      const handle = {
+        capabilities: { iterativeProgress: true, calcMode: true, calcSettings: true } as never,
+        setIterative: vi.fn((...args: unknown[]) => {
+          calls.push(`iter:${args.join(',')}`);
+          return true;
+        }),
+        setIterativeProgress: vi.fn(() => true),
+        setCalcMode: vi.fn((mode: number) => {
+          calls.push(`mode:${mode}`);
+          return true;
+        }),
+        setCalcSetting: vi.fn((key: string, value: unknown) => {
+          calls.push(`${key}:${value}`);
+          return true;
+        }),
+        recalcAuto: vi.fn(),
+        cells: () => [],
+      } as unknown as WorkbookHandle;
+      const dialog = attachIterativeDialog({ host, getWb: () => handle });
+      dialog.open();
+      return { dialog, calls };
+    };
+    const change = (el: HTMLInputElement, checked?: boolean): void => {
+      if (checked !== undefined) el.checked = checked;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    it('hides the OK and Cancel footer and shows a close control', () => {
+      const { dialog } = openMac();
+      expect(document.querySelector<HTMLElement>('.fc-iterdlg__footer')?.hidden).toBe(true);
+      expect(document.querySelector<HTMLElement>('.fc-fmtdlg__close')?.hidden).toBe(false);
+      dialog.detach();
+    });
+
+    it('applies the calculation mode as soon as it is picked', () => {
+      const { dialog, calls } = openMac();
+      const manual = document.querySelector<HTMLInputElement>(
+        '.fc-iterdlg [data-calc-option="manual"]',
+      );
+      if (!manual) throw new Error('missing manual radio');
+      change(manual, true);
+      expect(calls).toContain('mode:1');
+      dialog.detach();
+    });
+
+    it('applies iterative calculation and its limits without OK', () => {
+      const { dialog, calls } = openMac();
+      const enable = enableInput();
+      if (!enable) throw new Error('missing checkbox');
+      change(enable, true);
+      expect(calls).toContain('iter:true,100,0.001');
+      const max = numberInput();
+      if (!max) throw new Error('missing input');
+      max.value = '50';
+      max.dispatchEvent(new Event('input', { bubbles: true }));
+      change(max);
+      expect(calls).toContain('iter:true,50,0.001');
+      dialog.detach();
+    });
+
+    it('keeps OK semantics on the other profiles', () => {
+      const fake = makeFakeWb();
+      const dialog = attachIterativeDialog({ host, getWb: () => fake.handle });
+      dialog.open();
+      const cb = enableInput();
+      if (!cb) throw new Error('missing checkbox');
+      change(cb, true);
+      expect(fake.setIterative).not.toHaveBeenCalled();
+      dialog.detach();
+    });
+  });
 });

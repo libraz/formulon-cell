@@ -3,16 +3,26 @@ import { dataObjectsZh } from '../data-objects/zh.js';
 import { editDialogsZh } from '../edit-dialogs/zh.js';
 import { formulaDialogsZh } from '../formula-dialogs/zh.js';
 import { gridPopupsZh } from '../grid-popups/zh.js';
+import { ribbonZh } from '../ribbon/zh.js';
 import { ribbonMenusZh } from '../ribbon-menus/zh.js';
+import { workbookChromeZh } from '../workbook-chrome/zh.js';
+import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macChromeFrom } from './chrome.js';
+import { macExternalLinksPaneZh } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macGoToDialogFrom } from './goto-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
+import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
+import { macStyleDialogZh } from './style-dialog.js';
+import { macTextToColumnsWizardZh } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macZh: MacStrings = {
   macData: {
@@ -42,6 +52,13 @@ export const macZh: MacStrings = {
       unsupportedOption: '此选项尚不受支持。',
       run: '确定',
       cancel: '取消',
+      referenceList: '所有引用位置:',
+      select: '浏览...',
+      add: '添加',
+      remove: '删除',
+      criteria: '标签位置:',
+      topRow: '首行',
+      leftColumn: '最左列',
     },
     subtotal: {
       title: '分类汇总',
@@ -56,6 +73,8 @@ export const macZh: MacStrings = {
       cancel: '取消',
       groupTotal: '{group} 汇总',
       grandTotal: '总计',
+      pageBreak: '每组数据分页',
+      removeAll: '全部删除',
     },
     functions: { sum: '求和', average: '平均值', count: '计数', min: '最小值', max: '最大值' },
     errors: {
@@ -169,6 +188,25 @@ export const macZh: MacStrings = {
   }),
   macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsZh.namedRangeDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
+  macZoomDialog: macZoomDialogFrom(ribbonZh.ribbon, cellFormatZh.formatDialog),
+  macProtectSheet: macProtectSheetFrom(editDialogsZh.protection, {
+    heading: '保护工作表及锁定的单元格内容',
+    note: '默认情况下所有单元格均已锁定，但可以解除锁定。',
+  }),
+  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusZh.ribbonMenu, {
+    filterInPlace: '在原有区域显示筛选结果',
+    copyToLocation: '将筛选结果复制到其他位置',
+  }),
+  macChrome: macChromeFrom(workbookChromeZh, formulaDialogsZh),
+  macTextToColumnsWizard: macTextToColumnsWizardZh,
+  macStyleDialog: macStyleDialogZh,
+  macExternalLinksPane: macExternalLinksPaneZh,
+  macCreateTable: { nameLabel: '表名称是什么?' },
+  macGoToDialog: macGoToDialogFrom(editDialogsZh.goToDialog, {
+    selectCaption: '选择',
+    optionsGroup: '选项',
+    noOptions: '此选择项没有选项。',
+  }),
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
     chooseConnection: '选择连接...',
   }),

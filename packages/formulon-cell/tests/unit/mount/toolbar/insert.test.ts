@@ -23,6 +23,53 @@ describe('Spreadsheet.mountToolbar', () => {
     host.remove();
   });
 
+  it('seeds the Mac Create Table range as =$A$1:$D$7 and creates the table from it', async () => {
+    sheet.dispose();
+    sheet = await mountStubSheet({
+      workbook: await WorkbookHandle.createDefault(),
+      locale: 'ja',
+      ui: { platform: 'mac' },
+    });
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 6, c1: 3 });
+    for (const [c, text] of ['地域', '商品', '数量', '金額'].entries()) seedText(sheet, 0, c, text);
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    tb.setActiveTab('insert');
+    host
+      .querySelector<HTMLButtonElement>(
+        '[data-ribbon-command="mac.insert.table"], [data-ribbon-command="formatTableInsert"]',
+      )
+      ?.click();
+    await Promise.resolve();
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const rangeInput = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
+    expect(rangeInput?.value).toBe('=$A$1:$D$7');
+    const rows = [...(dialog?.querySelectorAll('.fc-tb__dlg__label') ?? [])];
+    const nameRow = rows.find((row) => row.textContent?.startsWith('テーブルの名前は何ですか?'));
+    const nameInput = nameRow?.querySelector<HTMLInputElement>('input');
+    expect(nameInput?.value).toBe('テーブル1');
+    if (!nameInput) throw new Error('missing table name field');
+    nameInput.value = 'A1';
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(dialog?.querySelector('.fc-tb__dlg__error')?.textContent).toBe(
+      sheet.instance.i18n.strings.ribbon.tableNameInvalid,
+    );
+    nameInput.value = '売上';
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await waitFor(() => sheet.instance.store.getState().tables.tables.length === 1);
+    expect(sheet.instance.store.getState().tables.tables[0]?.name).toBe('売上');
+    expect(sheet.instance.store.getState().tables.tables[0]?.range).toEqual({
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 6,
+      c1: 3,
+    });
+    tb.dispose();
+  });
+
   it('opens Create Table from the Insert ribbon primary button', async () => {
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 });
     seedText(sheet, 0, 0, 'Region');

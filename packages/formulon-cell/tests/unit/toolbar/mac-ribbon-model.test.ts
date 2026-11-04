@@ -559,10 +559,7 @@ describe('Mac Excel ribbon profile', () => {
     expect(fontIds).not.toContain('strike');
     expect(fontIds.indexOf('showPhonetic')).toBeGreaterThan(fontIds.indexOf('fontColor'));
     expect(home?.groups.at(-1)?.commands.map((command) => command.id)).toEqual(['mac.home.addins']);
-    expect(findCommand('home', 'mac.home.addins')).toMatchObject({
-      disabled: true,
-      disabledReason: 'Requires a cloud service connection.',
-    });
+    expect(findCommand('home', 'mac.home.addins')?.disabled).toBeFalsy();
 
     const data = model.find((tab) => tab.id === 'data');
     expect(
@@ -701,7 +698,7 @@ describe('Mac Excel ribbon profile', () => {
         expect(mac.get(id)?.className ?? '').not.toContain('fc-tb__rb--mac-icon-only');
       }
       expect(mac.get('autosum')?.label).toBe(macLabels.autoSum);
-      expect(mac.get('autosum')?.title).toBe(`${macLabels.autoSum} (Σ)`);
+      expect(mac.get('autosum')?.title).toBe(macLabels.autoSum);
       expect(mac.get('conditional')?.label).toBe(macLabels.conditional);
       expect(mac.get('cellStyles')?.label).toBe(macLabels.cellStyles);
       expect(generic.get('paste')?.label).toBe(dictionaries[locale].ribbon.paste);

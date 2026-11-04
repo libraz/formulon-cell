@@ -96,6 +96,7 @@ export {
   type TextToColumnsDialogOptions,
   type TextToColumnsDialogResult,
   type TextToColumnsDialogStrings,
+  type TextToColumnsWizardStrings,
 } from './text-to-columns.js';
 export {
   chooseWorkbookSaveFormat,

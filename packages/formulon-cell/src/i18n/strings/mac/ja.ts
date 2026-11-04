@@ -1,10 +1,19 @@
+import { macAdvancedFilterJa } from './advanced-filter.js';
+import { macChromeJa } from './chrome.js';
+import { macCreateTableJa } from './create-table.js';
+import { macExternalLinksPaneJa } from './external-links-pane.js';
+import { macGoToDialogJa } from './goto-dialog.js';
 import { macIterativeDialogJa } from './iterative-dialog.js';
 import { macNamedRangeDialogJa } from './named-range-dialog.js';
 import { macPasteSpecialJa } from './paste-special.js';
 import { macPivotTableDialogJa } from './pivot-table-dialog.js';
+import { macProtectSheetJa } from './protect-sheet.js';
 import { macRemoveDuplicatesJa } from './remove-duplicates.js';
 import { macSortDialogJa } from './sort-dialog.js';
+import { macStyleDialogJa } from './style-dialog.js';
+import { macTextToColumnsWizardJa } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macZoomDialogJa } from './zoom-dialog.js';
 
 export const macJa: MacStrings = {
   macData: {
@@ -34,6 +43,13 @@ export const macJa: MacStrings = {
       unsupportedOption: 'このオプションはまだサポートされていません。',
       run: 'OK',
       cancel: '閉じる',
+      referenceList: '統合元:',
+      select: '選択...',
+      add: '追加',
+      remove: '削除',
+      criteria: '統合の基準:',
+      topRow: '上端行',
+      leftColumn: '左端列',
     },
     subtotal: {
       title: '小計',
@@ -48,6 +64,8 @@ export const macJa: MacStrings = {
       cancel: 'キャンセル',
       groupTotal: '{group} 集計',
       grandTotal: '総計',
+      pageBreak: 'グループごとに改ページを挿入する',
+      removeAll: 'すべて削除',
     },
     functions: {
       sum: '合計',
@@ -166,6 +184,15 @@ export const macJa: MacStrings = {
   macIterativeDialog: macIterativeDialogJa,
   macNamedRangeDialog: macNamedRangeDialogJa,
   macPasteSpecial: macPasteSpecialJa,
+  macZoomDialog: macZoomDialogJa,
+  macProtectSheet: macProtectSheetJa,
+  macAdvancedFilter: macAdvancedFilterJa,
+  macChrome: macChromeJa,
+  macTextToColumnsWizard: macTextToColumnsWizardJa,
+  macStyleDialog: macStyleDialogJa,
+  macExternalLinksPane: macExternalLinksPaneJa,
+  macCreateTable: macCreateTableJa,
+  macGoToDialog: macGoToDialogJa,
   macPivotTableDialog: macPivotTableDialogJa,
   macRemoveDuplicates: macRemoveDuplicatesJa,
   macSortDialog: macSortDialogJa,

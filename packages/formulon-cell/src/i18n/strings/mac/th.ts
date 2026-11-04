@@ -3,16 +3,26 @@ import { dataObjectsTh } from '../data-objects/th.js';
 import { editDialogsTh } from '../edit-dialogs/th.js';
 import { formulaDialogsTh } from '../formula-dialogs/th.js';
 import { gridPopupsTh } from '../grid-popups/th.js';
+import { ribbonTh } from '../ribbon/th.js';
 import { ribbonMenusTh } from '../ribbon-menus/th.js';
+import { workbookChromeTh } from '../workbook-chrome/th.js';
+import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macChromeFrom } from './chrome.js';
+import { macExternalLinksPaneTh } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macGoToDialogFrom } from './goto-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
+import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
+import { macStyleDialogTh } from './style-dialog.js';
+import { macTextToColumnsWizardTh } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macTh: MacStrings = {
   macData: {
@@ -42,6 +52,13 @@ export const macTh: MacStrings = {
       unsupportedOption: 'ยังไม่รองรับตัวเลือกนี้',
       run: 'ตกลง',
       cancel: 'ยกเลิก',
+      referenceList: 'การอ้างอิงทั้งหมด:',
+      select: 'เรียกดู...',
+      add: 'เพิ่ม',
+      remove: 'ลบ',
+      criteria: 'ใช้ป้ายชื่อใน:',
+      topRow: 'แถวบนสุด',
+      leftColumn: 'คอลัมน์ซ้ายสุด',
     },
     subtotal: {
       title: 'ผลรวมย่อย',
@@ -56,6 +73,8 @@ export const macTh: MacStrings = {
       cancel: 'ยกเลิก',
       groupTotal: '{group} รวม',
       grandTotal: 'ผลรวมทั้งหมด',
+      pageBreak: 'ตัวแบ่งหน้าระหว่างกลุ่ม',
+      removeAll: 'เอาออกทั้งหมด',
     },
     functions: { sum: 'ผลรวม', average: 'ค่าเฉลี่ย', count: 'นับ', min: 'ต่ำสุด', max: 'สูงสุด' },
     errors: {
@@ -169,6 +188,25 @@ export const macTh: MacStrings = {
   }),
   macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsTh.namedRangeDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
+  macZoomDialog: macZoomDialogFrom(ribbonTh.ribbon, cellFormatTh.formatDialog),
+  macProtectSheet: macProtectSheetFrom(editDialogsTh.protection, {
+    heading: 'ป้องกันเวิร์กชีตและเนื้อหาของเซลล์ที่ถูกล็อก',
+    note: 'ตามค่าเริ่มต้น เซลล์ทั้งหมดถูกล็อก แต่สามารถปลดล็อกได้',
+  }),
+  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusTh.ribbonMenu, {
+    filterInPlace: 'กรองรายการในตำแหน่งเดิม',
+    copyToLocation: 'คัดลอกไปยังตำแหน่งอื่น',
+  }),
+  macChrome: macChromeFrom(workbookChromeTh, formulaDialogsTh),
+  macTextToColumnsWizard: macTextToColumnsWizardTh,
+  macStyleDialog: macStyleDialogTh,
+  macExternalLinksPane: macExternalLinksPaneTh,
+  macCreateTable: { nameLabel: 'ตารางของคุณชื่ออะไร' },
+  macGoToDialog: macGoToDialogFrom(editDialogsTh.goToDialog, {
+    selectCaption: 'เลือก',
+    optionsGroup: 'ตัวเลือก',
+    noOptions: 'รายการที่เลือกนี้ไม่มีตัวเลือก',
+  }),
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
     chooseConnection: 'เลือกการเชื่อมต่อ...',
   }),

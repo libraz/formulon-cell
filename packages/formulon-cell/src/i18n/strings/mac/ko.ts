@@ -3,16 +3,26 @@ import { dataObjectsKo } from '../data-objects/ko.js';
 import { editDialogsKo } from '../edit-dialogs/ko.js';
 import { formulaDialogsKo } from '../formula-dialogs/ko.js';
 import { gridPopupsKo } from '../grid-popups/ko.js';
+import { ribbonKo } from '../ribbon/ko.js';
 import { ribbonMenusKo } from '../ribbon-menus/ko.js';
+import { workbookChromeKo } from '../workbook-chrome/ko.js';
+import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macChromeFrom } from './chrome.js';
+import { macExternalLinksPaneKo } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macGoToDialogFrom } from './goto-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
+import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
+import { macStyleDialogKo } from './style-dialog.js';
+import { macTextToColumnsWizardKo } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macKo: MacStrings = {
   macData: {
@@ -42,6 +52,13 @@ export const macKo: MacStrings = {
       unsupportedOption: '이 옵션은 아직 지원되지 않습니다.',
       run: '확인',
       cancel: '취소',
+      referenceList: '모든 참조 영역:',
+      select: '찾아보기...',
+      add: '추가',
+      remove: '삭제',
+      criteria: '사용할 레이블:',
+      topRow: '첫 행',
+      leftColumn: '왼쪽 열',
     },
     subtotal: {
       title: '부분합',
@@ -56,6 +73,8 @@ export const macKo: MacStrings = {
       cancel: '취소',
       groupTotal: '{group} 요약',
       grandTotal: '총합계',
+      pageBreak: '그룹 사이에서 페이지 나누기',
+      removeAll: '모두 제거',
     },
     functions: { sum: '합계', average: '평균', count: '개수', min: '최소', max: '최대' },
     errors: {
@@ -170,6 +189,25 @@ export const macKo: MacStrings = {
   }),
   macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsKo.namedRangeDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsKo.pasteSpecialDialog),
+  macZoomDialog: macZoomDialogFrom(ribbonKo.ribbon, cellFormatKo.formatDialog),
+  macProtectSheet: macProtectSheetFrom(editDialogsKo.protection, {
+    heading: '워크시트 및 잠긴 셀의 내용 보호',
+    note: '기본적으로 모든 셀이 잠겨 있지만 잠금을 해제할 수 있습니다.',
+  }),
+  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusKo.ribbonMenu, {
+    filterInPlace: '현재 위치에 필터',
+    copyToLocation: '다른 장소에 복사',
+  }),
+  macChrome: macChromeFrom(workbookChromeKo, formulaDialogsKo),
+  macTextToColumnsWizard: macTextToColumnsWizardKo,
+  macStyleDialog: macStyleDialogKo,
+  macExternalLinksPane: macExternalLinksPaneKo,
+  macCreateTable: { nameLabel: '표 이름은 무엇입니까?' },
+  macGoToDialog: macGoToDialogFrom(editDialogsKo.goToDialog, {
+    selectCaption: '선택',
+    optionsGroup: '옵션',
+    noOptions: '이 선택 항목에는 옵션이 없습니다.',
+  }),
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsKo.pivotTableDialog, {
     chooseConnection: '연결 선택...',
   }),

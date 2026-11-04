@@ -1,0 +1,111 @@
+@layer fc.app {
+  /* Move or Copy sheet. */
+  .fc-movecopy__book {
+    padding: 3px 8px;
+    border: 1px solid var(--fc-rule);
+    border-radius: 4px;
+    background: var(--fc-bg);
+  }
+
+  .fc-movecopy__list {
+    display: flex;
+    flex-direction: column;
+    height: 135px;
+    border: 1px solid var(--fc-rule);
+    border-radius: 4px;
+    background: var(--fc-bg);
+    overflow-y: auto;
+  }
+
+  .fc-movecopy__item {
+    padding: 2px 8px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .fc-movecopy__item[aria-selected="true"] {
+    background: var(--fc-accent);
+    color: var(--fc-accent-fg, #fff);
+  }
+
+  /* Workbook Links pane docked to the grid's right edge. */
+  .fc-extlinkpane {
+    position: absolute;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    border-left: 1px solid var(--fc-rule);
+    background: var(--fc-bg-rail, var(--fc-bg));
+    color: var(--fc-fg);
+    font-family: var(--fc-font-ui);
+    font-size: 12px;
+  }
+
+  .fc-extlinkpane[hidden] {
+    display: none;
+  }
+
+  /* Docked beside the grid, the pane is a flex child spanning the dock. */
+  .fc-host__taskpane-dock > .fc-extlinkpane {
+    position: relative;
+    right: auto;
+    flex: 1 1 auto;
+    width: auto;
+  }
+
+  .fc-extlinkpane__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px 6px 12px;
+    border-bottom: 1px solid var(--fc-rule);
+  }
+
+  .fc-extlinkpane__title {
+    font-weight: 600;
+  }
+
+  .fc-extlinkpane__close {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--fc-rule);
+    cursor: pointer;
+  }
+
+  .fc-extlinkpane__body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .fc-extlinkpane__empty {
+    margin: 0;
+  }
+
+  .fc-extlinkpane__link {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .fc-extlinkpane__kind {
+    color: var(--fc-fg-mute);
+  }
+
+  .fc-extlinkpane__help {
+    color: var(--fc-accent);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+}

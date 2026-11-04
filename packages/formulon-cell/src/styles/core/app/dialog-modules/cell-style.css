@@ -1,0 +1,106 @@
+@layer fc.app {
+  .fc-cellstyledlg .fc-cellstyledlg__namerow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .fc-cellstyledlg__preview {
+    padding: 2px 10px;
+    font-size: 12px;
+  }
+
+  .fc-cellstyledlg__caption {
+    margin: 10px 0 6px;
+  }
+
+  .fc-cellstyledlg__table {
+    min-height: 163px;
+    border: 1px solid var(--fc-rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .fc-cellstyledlg__head,
+  .fc-cellstyledlg__row {
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr);
+    align-items: center;
+    padding: 2px 8px;
+  }
+
+  .fc-cellstyledlg__head {
+    border-bottom: 1px solid var(--fc-rule);
+    color: var(--fc-fg-mute);
+  }
+
+  .fc-cellstyledlg__row {
+    grid-template-columns: 130px minmax(0, 1fr);
+  }
+
+  .fc-cellstyledlg__row .fc-fmtdlg__checkbox {
+    margin: 0;
+  }
+
+  .fc-textcols__step[hidden] {
+    display: none;
+  }
+
+  .fc-textcols__prompt {
+    margin: 0 0 6px;
+  }
+
+  .fc-textcols__type-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  /* Mac Consolidate / Subtotal lists. */
+  .fc-mac-consolidate__list,
+  .fc-mac-subtotal__fields {
+    display: flex;
+    flex-direction: column;
+    min-height: 82px;
+    max-height: 120px;
+    border: 1px solid var(--fc-rule);
+    border-radius: 4px;
+    background: var(--fc-bg);
+    overflow-y: auto;
+  }
+  .fc-mac-consolidate__reference {
+    padding: 2px 8px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .fc-mac-consolidate__reference[aria-selected="true"] {
+    background: var(--fc-accent);
+    color: var(--fc-accent-fg, #fff);
+  }
+  .fc-mac-consolidate__list-actions {
+    display: flex;
+    gap: 4px;
+    margin: 6px 0;
+  }
+  .fc-mac-consolidate__list-actions > :first-child {
+    margin-right: auto;
+  }
+  .fc-mac-consolidate__criteria {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .fc-mac-consolidate__criteria .fc-mac-consolidate__option {
+    margin-left: 12px;
+  }
+  .fc-mac-subtotal__field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 8px;
+  }
+}

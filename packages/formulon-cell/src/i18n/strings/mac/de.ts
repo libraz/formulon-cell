@@ -3,16 +3,26 @@ import { dataObjectsDe } from '../data-objects/de.js';
 import { editDialogsDe } from '../edit-dialogs/de.js';
 import { formulaDialogsDe } from '../formula-dialogs/de.js';
 import { gridPopupsDe } from '../grid-popups/de.js';
+import { ribbonDe } from '../ribbon/de.js';
 import { ribbonMenusDe } from '../ribbon-menus/de.js';
+import { workbookChromeDe } from '../workbook-chrome/de.js';
+import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macChromeFrom } from './chrome.js';
+import { macExternalLinksPaneDe } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macGoToDialogFrom } from './goto-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
+import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
+import { macStyleDialogDe } from './style-dialog.js';
+import { macTextToColumnsWizardDe } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macDe: MacStrings = {
   macData: {
@@ -42,6 +52,13 @@ export const macDe: MacStrings = {
       unsupportedOption: 'Diese Option wird noch nicht unterstützt.',
       run: 'OK',
       cancel: 'Abbrechen',
+      referenceList: 'Vorhandene Verweise:',
+      select: 'Durchsuchen...',
+      add: 'Hinzufügen',
+      remove: 'Löschen',
+      criteria: 'Beschriftung aus:',
+      topRow: 'Oberster Zeile',
+      leftColumn: 'Linker Spalte',
     },
     subtotal: {
       title: 'Teilergebnis',
@@ -56,6 +73,8 @@ export const macDe: MacStrings = {
       cancel: 'Abbrechen',
       groupTotal: '{group} Ergebnis',
       grandTotal: 'Gesamtergebnis',
+      pageBreak: 'Seitenumbrüche zwischen Gruppen einfügen',
+      removeAll: 'Alle entfernen',
     },
     functions: { sum: 'Summe', average: 'Mittelwert', count: 'Anzahl', min: 'Min', max: 'Max' },
     errors: {
@@ -172,6 +191,25 @@ export const macDe: MacStrings = {
   }),
   macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsDe.namedRangeDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsDe.pasteSpecialDialog),
+  macZoomDialog: macZoomDialogFrom(ribbonDe.ribbon, cellFormatDe.formatDialog),
+  macProtectSheet: macProtectSheetFrom(editDialogsDe.protection, {
+    heading: 'Arbeitsblatt und Inhalt gesperrter Zellen schützen',
+    note: 'Standardmäßig sind alle Zellen gesperrt, die Sperre kann aber aufgehoben werden.',
+  }),
+  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusDe.ribbonMenu, {
+    filterInPlace: 'Liste an gleicher Stelle filtern',
+    copyToLocation: 'An eine andere Stelle kopieren',
+  }),
+  macChrome: macChromeFrom(workbookChromeDe, formulaDialogsDe),
+  macTextToColumnsWizard: macTextToColumnsWizardDe,
+  macStyleDialog: macStyleDialogDe,
+  macExternalLinksPane: macExternalLinksPaneDe,
+  macCreateTable: { nameLabel: 'Wie lautet der Name Ihrer Tabelle?' },
+  macGoToDialog: macGoToDialogFrom(editDialogsDe.goToDialog, {
+    selectCaption: 'Auswählen',
+    optionsGroup: 'Optionen',
+    noOptions: 'Für diese Auswahl gibt es keine Optionen.',
+  }),
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsDe.pivotTableDialog, {
     chooseConnection: 'Verbindung auswählen...',
   }),

@@ -15,6 +15,9 @@ import {
 
 export interface ProtectSheetDialogStrings {
   title: string;
+  /** Lines above the password fields; omitted when absent or empty. */
+  heading?: string;
+  note?: string;
   password: string;
   passwordPlaceholder: string;
   confirmPassword: string;
@@ -191,6 +194,16 @@ export const showProtectSheetDialog = (opts: {
     const strings = opts.strings;
     const initial = { ...defaultSheetProtectionPermissions(), ...(opts.initial ?? {}) };
     const shell = createDialogShell({ title: strings.title, bodyVariant: 'app' });
+    for (const [text, className] of [
+      [strings.heading, 'fc-tb__dlg__label'],
+      [strings.note, 'fc-tb__dlg__message'],
+    ] as const) {
+      if (!text) continue;
+      const line = document.createElement('div');
+      line.className = className;
+      line.textContent = text;
+      shell.body.appendChild(line);
+    }
     const password = appendInputRow(shell.body, strings.password, {
       placeholder: strings.passwordPlaceholder,
     });
@@ -204,7 +217,9 @@ export const showProtectSheetDialog = (opts: {
     shell.body.appendChild(allowLabel);
 
     const choices = document.createElement('div');
-    choices.className = 'fc-fmtdlg__choice-grid fc-tb__dlg__choices';
+    choices.className = 'fc-fmtdlg__choice-grid fc-tb__dlg__choices fc-protectdlg__choices';
+    choices.setAttribute('role', 'group');
+    choices.setAttribute('aria-label', strings.allowLabel);
     const inputs = new Map<keyof SheetProtectionPermissions, HTMLInputElement>();
     for (const key of permissionOrder) {
       const row = document.createElement('label');

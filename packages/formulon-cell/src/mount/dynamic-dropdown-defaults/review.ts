@@ -194,7 +194,8 @@ const buildProtectAction =
   async (action) => {
     if (action === 'protect-sheet') {
       const strings = instance.i18n.strings;
-      const protectionStrings = strings.protection as typeof strings.protection & {
+      const mac = instance.host.dataset.fcPlatform === 'mac' ? strings.macProtectSheet : null;
+      const protectionStrings = { ...strings.protection, ...mac } as typeof strings.protection & {
         allowAutoFilter: string;
         allowDeleteColumns: string;
         allowDeleteRows: string;
@@ -217,8 +218,11 @@ const buildProtectAction =
       const result = await showProtectSheetDialog({
         strings: {
           title: protectionStrings.protectSheet,
+          heading: mac?.heading,
+          note: mac?.note,
           password: protectionStrings.password,
-          passwordPlaceholder: protectionStrings.passwordPlaceholder,
+          // The Mac password field carries no placeholder; (省略可) is in its label.
+          passwordPlaceholder: mac ? '' : protectionStrings.passwordPlaceholder,
           confirmPassword: protectionStrings.confirmPassword,
           passwordMismatch: protectionStrings.passwordMismatch,
           allowLabel: protectionStrings.allowUsersTo,

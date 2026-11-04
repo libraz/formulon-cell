@@ -3,16 +3,26 @@ import { dataObjectsFr } from '../data-objects/fr.js';
 import { editDialogsFr } from '../edit-dialogs/fr.js';
 import { formulaDialogsFr } from '../formula-dialogs/fr.js';
 import { gridPopupsFr } from '../grid-popups/fr.js';
+import { ribbonFr } from '../ribbon/fr.js';
 import { ribbonMenusFr } from '../ribbon-menus/fr.js';
+import { workbookChromeFr } from '../workbook-chrome/fr.js';
+import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macChromeFrom } from './chrome.js';
+import { macExternalLinksPaneFr } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macGoToDialogFrom } from './goto-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
+import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
+import { macStyleDialogFr } from './style-dialog.js';
+import { macTextToColumnsWizardFr } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macFr: MacStrings = {
   macData: {
@@ -42,6 +52,13 @@ export const macFr: MacStrings = {
       unsupportedOption: 'Cette option n’est pas encore prise en charge.',
       run: 'OK',
       cancel: 'Annuler',
+      referenceList: 'Toutes les références :',
+      select: 'Parcourir...',
+      add: 'Ajouter',
+      remove: 'Supprimer',
+      criteria: 'Étiquettes dans :',
+      topRow: 'Ligne du haut',
+      leftColumn: 'Colonne de gauche',
     },
     subtotal: {
       title: 'Sous-total',
@@ -56,6 +73,8 @@ export const macFr: MacStrings = {
       cancel: 'Annuler',
       groupTotal: 'Total {group}',
       grandTotal: 'Total général',
+      pageBreak: 'Saut de page entre les groupes',
+      removeAll: 'Supprimer tout',
     },
     functions: { sum: 'Somme', average: 'Moyenne', count: 'Nombre', min: 'Min', max: 'Max' },
     errors: {
@@ -171,6 +190,25 @@ export const macFr: MacStrings = {
   }),
   macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsFr.namedRangeDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsFr.pasteSpecialDialog),
+  macZoomDialog: macZoomDialogFrom(ribbonFr.ribbon, cellFormatFr.formatDialog),
+  macProtectSheet: macProtectSheetFrom(editDialogsFr.protection, {
+    heading: 'Protéger la feuille et le contenu des cellules verrouillées',
+    note: 'Par défaut, toutes les cellules sont verrouillées, mais vous pouvez les déverrouiller.',
+  }),
+  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusFr.ribbonMenu, {
+    filterInPlace: 'Filtrer la liste, sur place',
+    copyToLocation: 'Copier vers un autre emplacement',
+  }),
+  macChrome: macChromeFrom(workbookChromeFr, formulaDialogsFr),
+  macTextToColumnsWizard: macTextToColumnsWizardFr,
+  macStyleDialog: macStyleDialogFr,
+  macExternalLinksPane: macExternalLinksPaneFr,
+  macCreateTable: { nameLabel: 'Quel est le nom de votre tableau ?' },
+  macGoToDialog: macGoToDialogFrom(editDialogsFr.goToDialog, {
+    selectCaption: 'Sélectionner',
+    optionsGroup: 'Options',
+    noOptions: 'Cette sélection n’a pas d’options.',
+  }),
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsFr.pivotTableDialog, {
     chooseConnection: 'Choisir la connexion...',
   }),

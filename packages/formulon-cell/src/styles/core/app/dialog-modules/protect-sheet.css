@@ -1,0 +1,15 @@
+@layer fc.app {
+  /* Excel for Mac: the permissions sit in a group box, two columns filled top
+   * to bottom (eight on the left, seven on the right). */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-protectdlg__choices {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(8, auto);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 12px;
+    padding: 10px 12px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 6px;
+  }
+}

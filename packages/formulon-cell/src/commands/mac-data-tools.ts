@@ -7,10 +7,10 @@ import type { SpreadsheetInstance } from '../mount/types.js';
 import { rangeArea, rangesIntersect, sameRange } from '../store/selection-geometry.js';
 import { blockDataTableShift } from './data-table-guard.js';
 import type { OperationIntent, PermissionDecision } from './interaction-policy.js';
-import { groupRows } from './outline.js';
+import { groupRows, ungroupRows } from './outline.js';
 import { isSheetProtected } from './protection.js';
 import { sameSavedWorkbook } from './saved-workbook-proof.js';
-import { insertRows } from './structure.js';
+import { deleteRows, insertRows } from './structure.js';
 
 /** Data commands exposed by the Mac ribbon. The limits are
  * deliberately finite because these commands materialize every output cell
@@ -22,12 +22,15 @@ export const MAX_SUBTOTAL_GROUPS = 1_000;
 export const MAX_GOAL_SEEK_ITERATIONS = 100;
 /** Desktop default Maximum Change: Goal Seek stops once |formula - target| is below it. */
 const GOAL_SEEK_MAX_CHANGE = 0.001;
-/** First trial offset, as a fraction of |x0| (1 when x0 is 0). A flat
- * formula also walks down from x0 by this step doubled, up to 2^25 times. */
+/** First trial offset, as a fraction of |x0| (1 when x0 is 0). When neither
+ * side helps, the search walks down from x0 by this step doubled, up to 2^25. */
 const GOAL_SEEK_PROBE = 0.01;
-const GOAL_SEEK_FLAT_DOUBLINGS = 25;
+const GOAL_SEEK_PROBE_DOUBLINGS = 25;
 /** Secant steps are capped at this fraction of the scale, doubling per step. */
 const GOAL_SEEK_STEP_LIMIT = 0.1;
+/** Measured on desktop: a search that never improves ends at the step limit
+ * 0.1 * 2^48, i.e. after 49 steps past the first trial. */
+const GOAL_SEEK_SEARCH_STEPS = 49;
 
 export type MacDataFunction = 'sum' | 'average' | 'count' | 'min' | 'max';
 
@@ -92,6 +95,10 @@ export interface ConsolidateRequest {
   readonly sources: readonly string[];
   readonly destination: string;
   readonly function: MacDataFunction;
+  /** Match columns across sources by the labels in each source's top row. */
+  readonly topRow?: boolean;
+  /** Match rows across sources by the labels in each source's left column. */
+  readonly leftColumn?: boolean;
 }
 
 export interface ConsolidateSolution {
@@ -495,51 +502,119 @@ export async function solveMacGoalSeek(
     if (initialValue === null) return failure('invalid', 'nonFiniteResult');
     const target = request.targetValue;
     if (Math.abs(initialValue - target) < tolerance) return finish(initial, initialValue, 0, true);
-    // Desktop Goal Seek is a secant search: a first trial 1% of |x0| away
-    // (toward whichever side lowers the residual), then secant steps whose
-    // size limit starts at 10% of |x0| and doubles every step.
+    // Desktop Goal Seek is a secant search scaled by s = |x0| (1 when x0 is
+    // 0): a first trial s/100 away, then secant steps capped at s/10 with the
+    // cap doubling per step. A trial is kept when it lowers |residual| or
+    // crosses the target; otherwise the half step is tried, and failing that
+    // the search widens from the last kept point by the doubling cap.
     const scale = initial === 0 ? 1 : Math.abs(initial);
-    let previous = initial;
-    let previousValue = initialValue;
-    let x = initial + GOAL_SEEK_PROBE * scale;
-    let value = evaluate(x);
-    if (value === null || !(Math.abs(value - target) < Math.abs(initialValue - target))) {
-      x = initial - GOAL_SEEK_PROBE * scale;
-      value = evaluate(x);
-    }
-    if (value === null) return finish(initial, initialValue, 0, false);
-    if (Math.abs(value - target) < tolerance) return finish(x, value, 1, true);
-    let limit = GOAL_SEEK_STEP_LIMIT * scale;
-    let flatOrigin: number | null = null;
-    let flatDoublings = 0;
-    for (let iteration = 2; iteration <= maxIterations; iteration += 1) {
-      let candidate: number;
-      if (value === previousValue) {
-        // Flat formula: walk down from where it went flat, doubling the step.
-        if (flatOrigin === null) flatOrigin = previous;
-        if (flatDoublings === GOAL_SEEK_FLAT_DOUBLINGS) {
-          return finish(x, value, iteration - 1, false);
-        }
-        flatDoublings += 1;
-        candidate = flatOrigin - GOAL_SEEK_PROBE * scale * 2 ** flatDoublings;
-      } else {
-        flatOrigin = null;
-        flatDoublings = 0;
-        const residual = value - target;
-        let step = (-residual * (x - previous)) / (value - previousValue);
-        if (Math.abs(step) > limit) step = Math.sign(step) * limit;
-        limit *= 2;
-        candidate = x + step;
-      }
+    const probe = GOAL_SEEK_PROBE * scale;
+    const firstLimit = GOAL_SEEK_STEP_LIMIT * scale;
+    const initialResidual = initialValue - target;
+    const improves = (next: number | null, residual: number): next is number => {
+      if (next === null) return false;
+      const r = next - target;
+      return Math.abs(r) < Math.abs(residual) || r > 0 !== residual > 0;
+    };
+    // The last finite trial is what the desktop app leaves in the cell.
+    let lastX = initial;
+    let lastValue = initialValue;
+    const trial = (candidate: number): number | null => {
       const next = evaluate(candidate);
-      if (next === null) return finish(x, value, iteration - 1, false);
+      if (next !== null) {
+        lastX = candidate;
+        lastValue = next;
+      }
+      return next;
+    };
+    const finishLast = (iterations: number): MacDataResult<GoalSeekSolution> =>
+      finish(lastX, lastValue, iterations, false);
+
+    let first: number | null = null;
+    let firstValue = 0;
+    let iterations = 1;
+    for (const candidate of [initial + probe, initial - probe]) {
+      const next = trial(candidate);
+      if (improves(next, initialResidual)) {
+        first = candidate;
+        firstValue = next;
+        break;
+      }
+    }
+    for (let doublings = 1; first === null && doublings <= GOAL_SEEK_PROBE_DOUBLINGS; doublings++) {
+      const candidate = initial - probe * 2 ** doublings;
+      const next = trial(candidate);
+      iterations += 1;
+      if (improves(next, initialResidual)) {
+        first = candidate;
+        firstValue = next;
+      }
+    }
+    if (first === null) return finishLast(iterations);
+    if (Math.abs(firstValue - target) < tolerance)
+      return finish(first, firstValue, iterations, true);
+
+    const direction = first > initial ? 1 : -1;
+    let previous = initial;
+    let previousResidual = initialResidual;
+    let x = first;
+    let value = firstValue;
+    let limit = firstLimit;
+    // While every step is capped in the first trial's direction, positions are
+    // measured from the first trial, as the desktop app does.
+    let walking = true;
+    let widening = 0;
+    const steps = Math.min(GOAL_SEEK_SEARCH_STEPS, maxIterations - iterations);
+    for (let step = 0; step < steps; step += 1) {
+      iterations += 1;
+      const residual = value - target;
+      let candidate: number;
+      if (widening !== 0) {
+        candidate = x + widening * limit;
+        limit *= 2;
+        const next = trial(candidate);
+        if (improves(next, residual)) {
+          widening = 0;
+          previous = x;
+          previousResidual = residual;
+          x = candidate;
+          value = next;
+          if (Math.abs(value - target) < tolerance) return finish(x, value, iterations, true);
+        }
+        continue;
+      }
+      let delta =
+        residual === previousResidual
+          ? -direction * Number.POSITIVE_INFINITY
+          : -residual * ((x - previous) / (residual - previousResidual));
+      const capped = Math.abs(delta) > limit;
+      if (capped) delta = Math.sign(delta) * limit;
+      if (capped && walking && Math.sign(delta) === direction) {
+        candidate = first + direction * (2 * limit - firstLimit);
+      } else {
+        walking = false;
+        candidate = x + delta;
+      }
+      limit *= 2;
+      let next = trial(candidate);
+      if (!improves(next, residual)) {
+        walking = false;
+        const half = x + (candidate - x) / 2;
+        const halfValue = evaluate(half);
+        if (!improves(halfValue, residual)) {
+          widening = candidate > x ? 1 : -1;
+          continue;
+        }
+        candidate = half;
+        next = halfValue;
+      }
       previous = x;
-      previousValue = value;
+      previousResidual = residual;
       x = candidate;
       value = next;
-      if (Math.abs(value - target) < tolerance) return finish(x, value, iteration, true);
+      if (Math.abs(value - target) < tolerance) return finish(x, value, iterations, true);
     }
-    return finish(x, value, maxIterations, false);
+    return finishLast(iterations);
   } catch (error) {
     return failure('invalid', 'failed', thrownReason(error));
   } finally {
@@ -608,6 +683,85 @@ export function commitMacGoalSeek(
     : failure('rejected', 'writeFailed', result.rejected[0]?.reason);
 }
 
+/** Consolidate that matches columns by top-row label and/or rows by left-column label;
+ *  an axis without labels is matched by position. Cells no source reaches stay empty. */
+function planLabelledConsolidate(
+  instance: SpreadsheetInstance,
+  request: ConsolidateRequest,
+  sources: readonly Range[],
+  fallbackSheet: number,
+): MacDataResult<ConsolidateSolution> {
+  const wb = instance.workbook;
+  const topRow = request.topRow === true;
+  const leftColumn = request.leftColumn === true;
+  const rowKeys = new Map<string, CellValue>();
+  const colKeys = new Map<string, CellValue>();
+  const buckets = new Map<string, CellValue[]>();
+  const keyOf = (value: CellValue, position: number, labelled: boolean): string | null =>
+    labelled ? (value.kind === 'blank' ? null : `t:${subtotalLabel(value)}`) : `p:${position}`;
+  let sourceCells = 0;
+  for (const range of sources) {
+    const r0 = range.r0 + (topRow ? 1 : 0);
+    const c0 = range.c0 + (leftColumn ? 1 : 0);
+    sourceCells += (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+    for (let row = r0; row <= range.r1; row += 1) {
+      const rowLabel = leftColumn
+        ? wb.getValue({ sheet: range.sheet, row, col: range.c0 })
+        : ({ kind: 'blank' } as CellValue);
+      const rk = keyOf(rowLabel, row - r0, leftColumn);
+      if (rk === null) continue;
+      if (!rowKeys.has(rk)) rowKeys.set(rk, rowLabel);
+      for (let col = c0; col <= range.c1; col += 1) {
+        const colLabel = topRow
+          ? wb.getValue({ sheet: range.sheet, row: range.r0, col })
+          : ({ kind: 'blank' } as CellValue);
+        const ck = keyOf(colLabel, col - c0, topRow);
+        if (ck === null) continue;
+        if (!colKeys.has(ck)) colKeys.set(ck, colLabel);
+        const bucketKey = `${rk}\u0000${ck}`;
+        const list = buckets.get(bucketKey) ?? [];
+        list.push(wb.getValue({ sheet: range.sheet, row, col }));
+        buckets.set(bucketKey, list);
+      }
+    }
+  }
+  if (sourceCells > MAX_CONSOLIDATE_CELLS) return failure('unsupported', 'areaLimit');
+  // Position keys stay in numeric order even when a later source is larger.
+  const ordered = (keys: Map<string, CellValue>, labelled: boolean): [string, CellValue][] =>
+    labelled ? [...keys] : [...keys].sort((a, b) => Number(a[0].slice(2)) - Number(b[0].slice(2)));
+  const rowList = ordered(rowKeys, leftColumn);
+  const colList = ordered(colKeys, topRow);
+  const rows = rowList.length + (topRow ? 1 : 0);
+  const cols = colList.length + (leftColumn ? 1 : 0);
+  if (rowList.length === 0 || colList.length === 0) return failure('invalid', 'noSources');
+  const destination = parseDestination(wb, request.destination, fallbackSheet, rows, cols);
+  if (!destination) return failure('invalid', 'invalidDestination');
+  if (sources.some((source) => rangesIntersect(source, destination))) {
+    return failure('invalid', 'destinationOverlapsSource');
+  }
+  const output: CellValue[] = [];
+  const blankValue: CellValue = { kind: 'blank' };
+  if (topRow) {
+    if (leftColumn) output.push(blankValue);
+    for (const [, label] of colList) output.push(label);
+  }
+  for (const [rk, rowLabel] of rowList) {
+    if (leftColumn) output.push(rowLabel);
+    for (const [ck] of colList) {
+      const values = buckets.get(`${rk}\u0000${ck}`);
+      output.push(values ? numericAggregate(values, request.function) : blankValue);
+    }
+  }
+  const authorization = dataIntent(
+    instance,
+    'valueEdit',
+    cellAddresses(destination),
+    'mac.data.consolidate',
+  );
+  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
+  return success({ destination, values: output });
+}
+
 /** Position-based Consolidate. The destination must not overlap any source, so
  * a run can never overwrite its own inputs. Unsupported label/link/replace modes are intentionally absent from
  * this operation; the dialog exposes them as disabled affordances. */
@@ -629,6 +783,9 @@ export function planMacConsolidate(
   }
   const first = parsedSources[0];
   if (!first) return failure('invalid', 'noSources');
+  if (request.topRow || request.leftColumn) {
+    return planLabelledConsolidate(instance, request, parsedSources, fallbackSheet);
+  }
   const rows = first.r1 - first.r0 + 1;
   const cols = first.c1 - first.c0 + 1;
   const area = rows * cols;
@@ -858,6 +1015,8 @@ export function commitMacSubtotal(
   instance: SpreadsheetInstance,
   request: SubtotalRequest,
   solution: SubtotalSolution,
+  /** True when the caller already holds the outer history transaction. */
+  nested = false,
 ): MacDataResult<void> {
   const { store, workbook: wb, history } = instance;
   const parsed = parseMacRange(wb, request.range, store.getState().data.sheetIndex);
@@ -889,9 +1048,9 @@ export function commitMacSubtotal(
   if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
   let token: ReturnType<typeof history.begin>;
   try {
-    token = history.begin({
-      replayAuthorization: { undo: intents.undo, redo: intents.redo },
-    });
+    token = history.begin(
+      nested ? undefined : { replayAuthorization: { undo: intents.undo, redo: intents.redo } },
+    );
   } catch (error) {
     return failure('invalid', 'failed', thrownReason(error));
   }
@@ -945,6 +1104,96 @@ export function commitMacSubtotal(
       return failure('invalid', 'failed', thrownReason(abortError));
     }
     return failure('invalid', 'failed', thrownReason(error));
+  }
+}
+
+/** Rows of `range` below its header whose cells hold a SUBTOTAL formula. */
+const subtotalRowsIn = (wb: WorkbookHandle, range: Range): number[] => {
+  const rows: number[] = [];
+  for (let row = range.r0 + 1; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      const formula = wb.cellFormula({ sheet: range.sheet, row, col });
+      if (formula && /^=?\s*SUBTOTAL\(/i.test(formula)) {
+        rows.push(row);
+        break;
+      }
+    }
+  }
+  return rows;
+};
+
+/** Remove every subtotal row from the region and clear the outline it carried.
+ *  Returns how many rows were removed; a region with none is a no-op. */
+export function removeMacSubtotals(
+  instance: SpreadsheetInstance,
+  range: Range,
+): MacDataResult<number> {
+  const { store, workbook: wb, history } = instance;
+  if (isSheetProtected(store.getState(), range.sheet)) return failure('rejected', 'protectedSheet');
+  if (blockSubtotalOverDataTable(wb, range)) return failure('rejected', 'notEditable');
+  const rows = subtotalRowsIn(wb, range);
+  if (rows.length === 0) return success(0);
+  let token: ReturnType<typeof history.begin>;
+  try {
+    token = history.begin();
+  } catch (error) {
+    return failure('invalid', 'failed', thrownReason(error));
+  }
+  try {
+    // Bottom-up, so the rows still to delete keep their indices.
+    for (const row of [...rows].reverse()) {
+      if (!deleteRows(store, wb, history, row, 1))
+        throw new Error('Could not delete subtotal row.');
+    }
+    const lastRow = range.r1 - rows.length;
+    // Subtotal outlines nest up to three levels deep.
+    for (let level = 0; level < 3; level += 1) ungroupRows(store, history, range.r0, lastRow, wb);
+    history.end(token);
+    return success(rows.length);
+  } catch (error) {
+    try {
+      history.abort(token);
+    } catch (abortError) {
+      return failure('invalid', 'failed', thrownReason(abortError));
+    }
+    return failure('invalid', 'failed', thrownReason(error));
+  }
+}
+
+/** Replace the region's existing subtotals with a new set as one history step.
+ *  `makeRequest` receives the region as it stands once the old rows are gone. */
+export function replaceMacSubtotals(
+  instance: SpreadsheetInstance,
+  region: Range,
+  makeRequest: (target: Range) => SubtotalRequest,
+): MacDataResult<void> {
+  const { history } = instance;
+  let token: ReturnType<typeof history.begin>;
+  try {
+    token = history.begin();
+  } catch (error) {
+    return failure('invalid', 'failed', thrownReason(error));
+  }
+  const abort = <T>(result: MacDataResult<T>): MacDataResult<void> => {
+    try {
+      history.abort(token);
+    } catch (abortError) {
+      return failure('invalid', 'failed', thrownReason(abortError));
+    }
+    return result.ok ? success(undefined) : result;
+  };
+  try {
+    const removed = removeMacSubtotals(instance, region);
+    if (!removed.ok) return abort(removed);
+    const request = makeRequest({ ...region, r1: region.r1 - removed.value });
+    const plan = planMacSubtotal(instance, request);
+    if (!plan.ok) return abort(plan);
+    const committed = commitMacSubtotal(instance, request, plan.value, true);
+    if (!committed.ok) return abort(committed);
+    history.end(token);
+    return success(undefined);
+  } catch (error) {
+    return abort(failure('invalid', 'failed', thrownReason(error)));
   }
 }
 

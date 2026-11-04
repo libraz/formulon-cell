@@ -14,6 +14,7 @@ import type { Strings } from '../i18n/strings.js';
 import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-colors.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import { showMoveCopySheetDialog } from '../toolbar/dialogs/move-copy-sheet.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { hiddenSheetIndexes, visibleSheetIndexes } from './sheet-indexes.js';
 import {
@@ -32,6 +33,8 @@ interface SheetTabsControllerInput {
   addSheetBtn: HTMLButtonElement;
   firstSheet: HTMLButtonElement;
   getStrings: () => Strings;
+  /** Name shown as the target book in Move or Copy; blank when the host gives none. */
+  getWorkbookName?: () => string | null | undefined;
   getWb: () => WorkbookHandle;
   history: History;
   hydrateActiveSheet: () => void;
@@ -257,6 +260,30 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       refreshStatusBar();
       invalidate();
     };
+    const openMoveCopy = async (): Promise<void> => {
+      const shown = visible();
+      const result = await showMoveCopySheetDialog({
+        strings: {
+          title: strings.sheetTabs.moveCopyTitle,
+          targetBook: strings.sheetTabs.moveCopyTargetBook,
+          before: strings.sheetTabs.moveCopyBefore,
+          toEnd: strings.sheetTabs.moveCopyToEnd,
+          makeCopy: strings.sheetTabs.moveCopyMakeCopy,
+          copyUnavailable: strings.sheetTabs.moveCopyUnavailable,
+          ok: strings.hyperlinkDialog.ok,
+          cancel: strings.hyperlinkDialog.cancel,
+        },
+        bookName: input.getWorkbookName?.() ?? '',
+        sheets: shown.map((i) => wb.sheetName(i)),
+        current: Math.max(0, shown.indexOf(idx)),
+      });
+      if (!result) return;
+      const beforeSheet = shown[result.before];
+      const last = shown.at(-1) ?? idx;
+      const to =
+        beforeSheet === undefined ? last : idx < beforeSheet ? beforeSheet - 1 : beforeSheet;
+      moveAndRefresh(idx, Math.max(0, Math.min(wb.sheetCount - 1, to)));
+    };
     const sheetActionReason = (): string =>
       structureProtected
         ? strings.ribbonMenu.workbookStructureProtectedBlocked
@@ -366,6 +393,14 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         () => moveAndRefresh(idx, idx + 1),
         structureProtected || !canMutate || idx >= wb.sheetCount - 1,
         moveReason(idx >= wb.sheetCount - 1),
+      ),
+      menuButton(
+        strings.sheetTabs.moveCopy,
+        () => {
+          void openMoveCopy();
+        },
+        structureProtected || !canMutate,
+        sheetActionReason(),
       ),
       createSheetMenuSeparator(),
       colorPalette,

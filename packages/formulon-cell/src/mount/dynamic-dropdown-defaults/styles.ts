@@ -14,7 +14,9 @@ import {
   DEFAULT_TABLE_COLOR,
   formatAsTableByStyleId,
   inferTableHasHeaders,
+  nextTableName,
   pivotTableStyleAssignment,
+  tableNameError,
   tableOverlayAt,
   tableStyleOptionsById,
   tableVariantFromOptions,
@@ -22,12 +24,13 @@ import {
 } from '../../commands/format-as-table.js';
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
 import { recordConditionalRulesChange, recordTablesChange } from '../../commands/slice-history.js';
+import { addrKey, formatA1Range } from '../../engine/address.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { Range } from '../../engine/types.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { type ConditionalRule, mutators } from '../../store/store.js';
-import { showCellStyleDialog } from '../../toolbar/dialogs/cell-style.js';
+import { describeCellStyleFormat, showCellStyleDialog } from '../../toolbar/dialogs/cell-style.js';
 import { showChoiceDialog } from '../../toolbar/dialogs/choice.js';
 import {
   showConditionalFormatNumberDialog,
@@ -212,23 +215,43 @@ export const showCreateTableDialog = async (
     createTableInvalidRange: string;
   };
   const parsedRange = (value: string): Range | null =>
-    parseA1Range(value, selection.sheet, sheetName) as Range | null;
+    parseA1Range(value.trim().replace(/^=/, ''), selection.sheet, sheetName) as Range | null;
+  // The Mac dialog writes the range as a formula reference on the active
+  // sheet, `=$A$1:$D$7`; elsewhere it carries the sheet name.
+  const mac = instance.host.dataset.fcPlatform === 'mac';
+  const formatRange = (range: Range): string =>
+    mac
+      ? `=${formatA1Range(range, { absolute: true })}`
+      : formatSheetAbsoluteRange(instance.workbook.sheetName(range.sheet), range);
   const result = await showFormatAsTableDialog({
     title: pivotDialogStrings.createTableTitle,
     rangeLabel: pivotDialogStrings.createTableRangeLabel,
     headersLabel: pivotDialogStrings.createTableHeadersLabel,
-    initialRange: formatSheetAbsoluteRange(sheetName, selection),
+    initialRange: formatRange(selection),
     initialHasHeaders: inferTableHasHeaders(instance.workbook, selection),
     okLabel: pivotDialogStrings.ok,
     cancelLabel: pivotDialogStrings.cancel,
     rangePickerLabel: pivotDialogStrings.rangePickerSelect,
-    pickRange: () => {
-      const picked = normalizedSelectionRange(instance);
-      return formatSheetAbsoluteRange(instance.workbook.sheetName(picked.sheet), picked);
-    },
+    pickRange: () => formatRange(normalizedSelectionRange(instance)),
     subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
     validateRange: (value) =>
       parsedRange(value) ? null : pivotDialogStrings.createTableInvalidRange,
+    // The Mac dialog names the table up front; only an engine table carries a name.
+    ...(mac && instance.workbook.capabilities.tableMutate
+      ? {
+          nameLabel: instance.i18n.strings.macCreateTable.nameLabel,
+          initialName: nextTableName(instance.workbook, instance.store.getState().tables.tables),
+          validateName: (value: string) => {
+            const error = tableNameError(instance.store, '', value);
+            const ribbon = instance.i18n.strings.ribbon;
+            return error === 'invalid'
+              ? ribbon.tableNameInvalid
+              : error === 'duplicate'
+                ? ribbon.tableNameDuplicate
+                : null;
+          },
+        }
+      : {}),
   });
   if (!result) {
     instance.host.focus();
@@ -246,6 +269,7 @@ export const showCreateTableDialog = async (
       {
         showHeader: result.hasHeaders,
         workbook: instance.workbook,
+        ...(result.name ? { name: result.name } : {}),
       },
     );
   });
@@ -384,10 +408,26 @@ const buildCellStyleFooterAction =
   async (action) => {
     const strings = instance.i18n.strings;
     if (action === 'new-cell-style') {
+      // The Mac host shows the desktop Style dialog.
+      const macStyle =
+        instance.host.dataset.fcPlatform === 'mac' ? strings.macStyleDialog : undefined;
+      const active = instance.store.getState().selection.active;
+      const activeFormat = instance.store.getState().format.formats.get(addrKey(active));
       const value = await showCellStyleDialog({
         title: strings.ribbonMenu.cellStyleNew,
         strings,
         initialName: strings.ribbonMenu.cellStyleNormal,
+        mac: macStyle && {
+          strings: macStyle,
+          summaries: describeCellStyleFormat(activeFormat, macStyle.summary),
+          preview: {
+            fill: activeFormat?.fill,
+            color: activeFormat?.color,
+            bold: activeFormat?.bold,
+            italic: activeFormat?.italic,
+          },
+          onFormat: () => instance.openFormatDialog(),
+        },
       });
       if (value) {
         createCellStyleFromActiveFormat(

@@ -19,6 +19,10 @@ export interface FormatAsTableDialogOptions {
   okLabel: string;
   cancelLabel: string;
   validateRange: (value: string) => string | null;
+  /** Table-name field, shown when a label is given. */
+  nameLabel?: string;
+  initialName?: string;
+  validateName?: (value: string) => string | null;
   rangePickerLabel?: string;
   pickRange?: () => string;
   subscribeToRangeChanges?: (listener: () => void) => () => void;
@@ -27,6 +31,8 @@ export interface FormatAsTableDialogOptions {
 export interface FormatAsTableDialogResult {
   range: string;
   hasHeaders: boolean;
+  /** Present when the dialog showed a name field. */
+  name?: string;
 }
 
 export const showFormatAsTableDialog = (
@@ -43,6 +49,10 @@ export const showFormatAsTableDialog = (
         kind: 'table-range',
       });
     }
+
+    const nameInput = opts.nameLabel
+      ? appendInputRow(shell.body, opts.nameLabel, { initial: opts.initialName ?? '' })
+      : null;
 
     const headersLabel = document.createElement('label');
     headersLabel.className = 'fc-fmtdlg__check fc-tb__dlg__check';
@@ -73,7 +83,17 @@ export const showFormatAsTableDialog = (
         showInputError(errorRow, rangeInput, err);
         return;
       }
-      lifecycle.finish({ range, hasHeaders: headersInput.checked });
+      if (!nameInput) {
+        lifecycle.finish({ range, hasHeaders: headersInput.checked });
+        return;
+      }
+      const name = nameInput.value.trim();
+      const nameErr = opts.validateName?.(name) ?? null;
+      if (nameErr) {
+        showInputError(errorRow, nameInput, nameErr);
+        return;
+      }
+      lifecycle.finish({ range, hasHeaders: headersInput.checked, name });
     };
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));

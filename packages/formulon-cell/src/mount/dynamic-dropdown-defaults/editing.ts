@@ -458,8 +458,12 @@ const buildSortMenuAction =
       return;
     }
     if (action === 'filter-advanced') {
-      const strings = instance.i18n.strings
-        .ribbonMenu as typeof instance.i18n.strings.ribbonMenu & {
+      const mac =
+        instance.host.dataset.fcPlatform === 'mac' ? instance.i18n.strings.macAdvancedFilter : null;
+      const strings = {
+        ...instance.i18n.strings.ribbonMenu,
+        ...mac,
+      } as typeof instance.i18n.strings.ribbonMenu & {
         advancedFilterInvalidRange: string;
         advancedFilterRangePicker: string;
       };
@@ -476,7 +480,11 @@ const buildSortMenuAction =
         criteriaRangeLabel: strings.advancedFilterCriteriaRange,
         copyToLabel: strings.advancedFilterCopyTo,
         uniqueOnlyLabel: strings.advancedFilterUniqueOnly,
-        initialListRange: formatA1Range(range),
+        ...(mac?.filterInPlace && mac.copyToLocation
+          ? { actionLabels: { inPlace: mac.filterInPlace, copy: mac.copyToLocation } }
+          : {}),
+        // The Mac dialog seeds the list range pinned, as `$A$1:$D$7`.
+        initialListRange: formatA1Range(range, { absolute: mac !== null }),
         okLabel: strings.sortDialogApply,
         cancelLabel: strings.sortDialogCancel,
         rangePickerLabel: strings.advancedFilterRangePicker,

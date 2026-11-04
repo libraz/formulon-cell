@@ -4,6 +4,11 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogButton, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  attachExternalLinksPane,
+  type ExternalLinksPaneHandle,
+  type ExternalLinksPaneStrings,
+} from './external-links-pane.js';
 
 export interface ExternalLinksDialogDeps {
   host: HTMLElement;
@@ -212,15 +217,36 @@ export function attachExternalLinksDialog(
     focusRow(selectedIndex);
   };
 
+  // The Mac host shows the links as a docked pane.
+  const paneStrings = (): ExternalLinksPaneStrings | undefined =>
+    host.closest<HTMLElement>('[data-fc-platform]')?.dataset.fcPlatform === 'mac' ||
+    host.dataset.fcPlatform === 'mac'
+      ? strings.macExternalLinksPane
+      : undefined;
+  let pane: ExternalLinksPaneHandle | null = null;
+
   return {
     open() {
+      const wording = paneStrings();
+      if (wording) {
+        pane ??= attachExternalLinksPane({
+          host,
+          getWb,
+          strings,
+          paneStrings: () => paneStrings() ?? wording,
+        });
+        pane.open();
+        return;
+      }
       renderTable();
       shell.open();
     },
     close() {
+      pane?.close();
       shell.close();
     },
     refresh() {
+      pane?.refresh();
       strings = deps.strings ?? defaultStrings;
       t = strings.externalLinksDialog;
       shell.setAriaLabel(t.title);
@@ -247,6 +273,7 @@ export function attachExternalLinksDialog(
       if (shell.isOpen()) renderTable();
     },
     detach() {
+      pane?.detach();
       shell.dispose();
     },
   };

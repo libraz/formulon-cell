@@ -45,10 +45,10 @@ import { fontPointsToCssPx } from '../../engine/font-units.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { outlineSummaryFor } from '../../store/outline-summary.js';
-import { clampZoom } from '../../store/render-scale.js';
 import { getPageSetup } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
 import { showMessage } from '../dialogs/prompt.js';
+import { zoomForSelection } from '../dialogs/zoom.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import type { ToolbarMenuText } from '../menu-text.js';
 import { applyMergeAction } from '../merge-action.js';
@@ -689,12 +689,7 @@ const applyGenericRibbonCommand = (
       hooks?.automation?.addInManager?.();
       return true;
     case 'zoomSelection': {
-      const selected = i.store.getState().selection.range;
-      const selectedRows = Math.max(1, selected.r1 - selected.r0 + 1);
-      const selectedCols = Math.max(1, selected.c1 - selected.c0 + 1);
-      const scaleForRows = 20 / selectedRows;
-      const scaleForCols = 12 / selectedCols;
-      setSheetZoom(i.store, clampZoom(Math.min(scaleForRows, scaleForCols)), i.workbook);
+      setSheetZoom(i.store, zoomForSelection(i.store.getState().selection.range), i.workbook);
       runtime.refreshZoom();
       runtime.focusSheet();
       return true;

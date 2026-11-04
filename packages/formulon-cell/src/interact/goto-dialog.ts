@@ -93,9 +93,10 @@ const quoteSheetName = (name: string): string =>
 export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   const { host, store, getWb } = deps;
   const strings = deps.strings ?? defaultStrings;
-  const t = strings.goToDialog;
   let mode: 'go-to' | 'special' = 'special';
   const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const macText = mac ? strings.macGoToDialog : null;
+  const t = macText ? { ...strings.goToDialog, ...macText } : strings.goToDialog;
 
   const shell = createDialogShell({
     host,
@@ -154,9 +155,18 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   body.appendChild(referenceRow);
 
   // ── Go To Special: category radios in two columns ─────────────────────
+  // The Mac dialog captions the radios and keeps sub-options in a box below.
+  const specialGroup = document.createElement('div');
+  body.appendChild(specialGroup);
+  if (macText?.selectCaption) {
+    const caption = document.createElement('div');
+    caption.className = 'fc-goto__caption';
+    caption.textContent = macText.selectCaption;
+    specialGroup.appendChild(caption);
+  }
   const kindList = document.createElement('div');
   kindList.className = 'fc-goto__kinds';
-  body.appendChild(kindList);
+  specialGroup.appendChild(kindList);
   const leftColumn = document.createElement('div');
   const rightColumn = document.createElement('div');
   kindList.append(leftColumn, rightColumn);
@@ -234,7 +244,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
 
   for (const kind of mac ? MAC_LEFT_KINDS : LEFT_KINDS) {
     addKind(leftColumn, kind);
-    if (kind === 'formulas') leftColumn.appendChild(valueFilters);
+    if (kind === 'formulas' && !mac) leftColumn.appendChild(valueFilters);
   }
 
   const levelName = `fc-goto-level-${suffix}`;
@@ -253,8 +263,28 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     all: makeRadio(document.createElement('div'), ruleName, 'all', t.ruleAll, 'rule'),
     same: makeRadio(document.createElement('div'), ruleName, 'same', t.ruleSame, 'rule'),
   };
+  const optionsBox = document.createElement('fieldset');
+  const levelsGroup = document.createElement('div');
+  const rulesGroup = document.createElement('div');
+  const noOptions = document.createElement('div');
+  if (mac) {
+    optionsBox.className = 'fc-goto__options';
+    const legend = document.createElement('legend');
+    legend.textContent = macText?.optionsGroup ?? '';
+    levelsGroup.className = 'fc-goto__levels';
+    rulesGroup.className = 'fc-goto__rules';
+    noOptions.className = 'fc-goto__no-options';
+    noOptions.textContent = macText?.noOptions ?? '';
+    for (const input of Object.values(levelInputs))
+      levelsGroup.appendChild(input.parentElement as Node);
+    for (const input of Object.values(ruleInputs))
+      rulesGroup.appendChild(input.parentElement as Node);
+    optionsBox.append(legend, valueFilters, levelsGroup, rulesGroup, noOptions);
+    specialGroup.appendChild(optionsBox);
+  }
   for (const kind of mac ? MAC_RIGHT_KINDS : RIGHT_KINDS) {
     addKind(rightColumn, kind);
+    if (mac) continue;
     if (kind === 'dependents') {
       for (const input of Object.values(levelInputs))
         rightColumn.appendChild(input.parentElement as Node);
@@ -439,6 +469,12 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     for (const input of Object.values(levelInputs)) projectDisabledState(input, !traced, null);
     const ruled = kind === 'conditional-format' || kind === 'data-validation';
     for (const input of Object.values(ruleInputs)) projectDisabledState(input, !ruled, null);
+    if (mac) {
+      valueFilters.hidden = !filtered;
+      levelsGroup.hidden = !traced;
+      rulesGroup.hidden = !ruled;
+      noOptions.hidden = filtered || traced || ruled;
+    }
   };
 
   for (const input of kindInputs.values()) shell.on(input, 'change', syncEnabled);
@@ -451,7 +487,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     shell.setAriaLabel(normal ? t.goToTitle : t.title);
     referenceRow.hidden = !normal;
     specialBtn.hidden = !normal;
-    kindList.hidden = normal;
+    specialGroup.hidden = normal;
     if (normal) renderTargets();
     else {
       targetList.hidden = true;

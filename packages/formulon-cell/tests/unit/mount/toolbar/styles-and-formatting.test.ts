@@ -456,7 +456,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const accent = host.querySelector<HTMLButtonElement>('[data-cell-style="accent1_40"]');
     expect(accent).toBeTruthy();
     expect(accent?.style.background).toBe('#83cceb');
-    expect(host.querySelectorAll('[data-cell-style]').length).toBe(47);
+    expect(host.querySelectorAll('.fc-tb__cellstyle-menu [data-cell-style]').length).toBe(47);
     tb.dispose();
   });
 

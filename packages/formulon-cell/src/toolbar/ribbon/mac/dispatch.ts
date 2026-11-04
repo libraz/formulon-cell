@@ -31,6 +31,7 @@ const liveNameSet = (names: LiveFunctionNames): ReadonlySet<string> | undefined 
 };
 
 const aliases: Readonly<Record<string, string>> = {
+  'mac.home.addins': 'addIn',
   'mac.insert.link': 'hyperlinkInsert',
   'mac.page.background': 'sheetBackground',
   'mac.page.printTitles': 'printTitles',

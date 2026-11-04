@@ -1,6 +1,8 @@
 import { projectDisabledReason, projectDisabledState } from '../menu-a11y.js';
+import { createDialogSelect } from './form-controls.js';
 import {
   appendDialogActions,
+  appendDialogButton,
   appendErrorRow,
   clearDialogError,
   createDialogShell,
@@ -28,13 +30,45 @@ export interface TextToColumnsDialogStrings {
   cancel: string;
 }
 
+/** Wording of the three-step wizard. `{step}` in `title` stands for the step number. */
+export interface TextToColumnsWizardStrings {
+  title: string;
+  step1Intro: string;
+  step1Prompt: string;
+  delimitedHint: string;
+  fixedWidth: string;
+  fixedHint: string;
+  preview: string;
+  step2Prompt: string;
+  delimiters: string;
+  other: string;
+  qualifier: string;
+  /** Bare word for the no-qualifier option; rendered in braces like the desktop list. */
+  qualifierNone: string;
+  step3Prompt: string;
+  columnFormat: string;
+  general: string;
+  text: string;
+  date: string;
+  skip: string;
+  destination: string;
+  details: string;
+  back: string;
+  next: string;
+  finish: string;
+}
+
 export interface TextToColumnsDialogResult {
   delimiters: string[];
   collapseConsecutiveDelimiters: boolean;
+  /** Set by the wizard: the quote that keeps delimiters inside a field, or null for none. */
+  textQualifier?: string | null;
 }
 
 export interface TextToColumnsDialogOptions {
   strings: TextToColumnsDialogStrings;
+  /** When given, the dialog runs as the desktop three-step wizard. */
+  wizard?: TextToColumnsWizardStrings;
   initialDelimiters?: readonly string[];
   previewRows?: readonly string[];
 }
@@ -71,7 +105,249 @@ const splitPreview = (
     .join('\n');
 };
 
+const QUALIFIERS = ['"', "'"] as const;
+
+const showTextToColumnsWizard = (
+  opts: TextToColumnsDialogOptions & { wizard: TextToColumnsWizardStrings },
+): Promise<TextToColumnsDialogResult | null> =>
+  new Promise<TextToColumnsDialogResult | null>((resolve) => {
+    const { strings, wizard } = opts;
+    const stepTitle = (n: number): string => wizard.title.replace('{step}', String(n));
+    const shell = createDialogShell({ title: stepTitle(1), bodyVariant: 'app' });
+    const prompt = (text: string): HTMLParagraphElement => {
+      const p = document.createElement('p');
+      p.className = 'fc-textcols__prompt';
+      p.textContent = text;
+      return p;
+    };
+    const stepPanel = (n: number): HTMLDivElement => {
+      const panel = document.createElement('div');
+      panel.className = 'fc-textcols__step';
+      panel.dataset.step = String(n);
+      panel.hidden = n !== 1;
+      shell.body.appendChild(panel);
+      return panel;
+    };
+    const step1 = stepPanel(1);
+    const step2 = stepPanel(2);
+    const step3 = stepPanel(3);
+
+    // Step 1: kind of source data.
+    const typeRow = (input: HTMLInputElement, label: string, hint: string): HTMLLabelElement => {
+      const row = document.createElement('label');
+      row.className = 'fc-fmtdlg__radio fc-textcols__type-row';
+      const hintEl = document.createElement('span');
+      hintEl.className = 'fc-tb__dlg__hint';
+      hintEl.textContent = hint;
+      row.append(input, document.createTextNode(label), hintEl);
+      return row;
+    };
+    const delimited = document.createElement('input');
+    delimited.type = 'radio';
+    delimited.name = 'fc-textcols-type';
+    delimited.checked = true;
+    const fixed = document.createElement('input');
+    fixed.type = 'radio';
+    fixed.name = 'fc-textcols-type';
+    projectDisabledState(fixed, true, strings.fixedWidthUnavailable);
+    step1.append(
+      prompt(wizard.step1Intro),
+      prompt(wizard.step1Prompt),
+      typeRow(delimited, strings.delimited, wizard.delimitedHint),
+      typeRow(fixed, wizard.fixedWidth, wizard.fixedHint),
+    );
+
+    // Step 2: delimiters, consecutive runs and the quote character.
+    const initial = new Set(opts.initialDelimiters ?? ['\t']);
+    const checks: HTMLInputElement[] = [];
+    const delimiterBox = document.createElement('div');
+    delimiterBox.className = 'fc-textcols__delimiter-grid';
+    delimiterBox.setAttribute('role', 'group');
+    delimiterBox.setAttribute('aria-label', wizard.delimiters);
+    for (const spec of delimiterSpecs(strings)) {
+      const label = document.createElement('label');
+      label.className = 'fc-textcols__delimiter';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = spec.value;
+      checkbox.checked = initial.has(spec.value);
+      checkbox.dataset.dialogField = `delimiter-${spec.value === '\t' ? 'tab' : spec.value}`;
+      checks.push(checkbox);
+      const text = document.createElement('span');
+      text.textContent = spec.label;
+      label.append(checkbox, text);
+      delimiterBox.appendChild(label);
+    }
+    const otherLabel = document.createElement('label');
+    otherLabel.className = 'fc-textcols__other';
+    const otherInput = document.createElement('input');
+    otherInput.type = 'text';
+    otherInput.className = 'fc-tb__dlg__input';
+    otherInput.maxLength = 1;
+    otherInput.dataset.dialogField = 'delimiter-other';
+    const customInitial = [...initial].find(
+      (delimiter) => !delimiterSpecs(strings).some((spec) => spec.value === delimiter),
+    );
+    if (customInitial) otherInput.value = customInitial;
+    const otherText = document.createElement('span');
+    otherText.textContent = wizard.other;
+    otherLabel.append(otherText, otherInput);
+    delimiterBox.appendChild(otherLabel);
+    const collapseLabel = document.createElement('label');
+    collapseLabel.className = 'fc-textcols__collapse';
+    const collapse = document.createElement('input');
+    collapse.type = 'checkbox';
+    collapse.dataset.dialogField = 'collapse-consecutive';
+    collapseLabel.append(collapse, document.createTextNode(strings.treatConsecutive));
+    const qualifierLabel = document.createElement('label');
+    qualifierLabel.className = 'fc-textcols__qualifier';
+    const qualifier = createDialogSelect(
+      [
+        ...QUALIFIERS.map((q) => ({ value: q, label: q })),
+        { value: '', label: `{${wizard.qualifierNone}}` },
+      ],
+      '"',
+      { className: '', ariaLabel: wizard.qualifier },
+    );
+    const qualifierText = document.createElement('span');
+    qualifierText.textContent = wizard.qualifier;
+    qualifierLabel.append(qualifierText, qualifier);
+    const delimiterLegend = document.createElement('div');
+    delimiterLegend.className = 'fc-tb__dlg__label';
+    delimiterLegend.textContent = wizard.delimiters;
+    step2.append(
+      prompt(wizard.step2Prompt),
+      delimiterLegend,
+      delimiterBox,
+      collapseLabel,
+      qualifierLabel,
+    );
+
+    // Step 3: column data format and destination; only General applies to the result today.
+    const formatLegend = document.createElement('div');
+    formatLegend.className = 'fc-tb__dlg__label';
+    formatLegend.textContent = wizard.columnFormat;
+    step3.append(prompt(wizard.step3Prompt), formatLegend);
+    const formatName = 'fc-textcols-format';
+    for (const [label, checkedByDefault] of [
+      [wizard.general, true],
+      [wizard.text, false],
+      [wizard.date, false],
+      [wizard.skip, false],
+    ] as const) {
+      const row = document.createElement('label');
+      row.className = 'fc-fmtdlg__radio';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = formatName;
+      radio.checked = checkedByDefault;
+      if (!checkedByDefault) projectDisabledState(radio, true, strings.fixedWidthUnavailable);
+      row.append(radio, document.createTextNode(label));
+      step3.appendChild(row);
+    }
+    const destRow = document.createElement('label');
+    destRow.className = 'fc-textcols__destination';
+    const destText = document.createElement('span');
+    destText.textContent = wizard.destination;
+    const destInput = document.createElement('input');
+    destInput.type = 'text';
+    destInput.className = 'fc-tb__dlg__input';
+    projectDisabledState(destInput, true, strings.fixedWidthUnavailable);
+    destRow.append(destText, destInput);
+    step3.appendChild(destRow);
+    const detailsBtn = appendDialogButton(step3, { label: wizard.details });
+    projectDisabledState(detailsBtn, true, strings.fixedWidthUnavailable);
+
+    // Preview of the source data, shared by every step.
+    const previewWrap = document.createElement('section');
+    previewWrap.className = 'fc-textcols__preview';
+    const previewLabel = document.createElement('div');
+    previewLabel.className = 'fc-textcols__preview-label fc-tb__dlg__label';
+    previewLabel.textContent = wizard.preview;
+    const preview = document.createElement('pre');
+    preview.className = 'fc-tb__dlg__preview';
+    previewWrap.append(previewLabel, preview);
+    shell.body.appendChild(previewWrap);
+
+    const errorRow = appendErrorRow(shell.body);
+    const cancelBtn = appendDialogButton(shell.footer, { label: strings.cancel });
+    const backBtn = appendDialogButton(shell.footer, { label: wizard.back });
+    const nextBtn = appendDialogButton(shell.footer, { label: wizard.next });
+    const finishBtn = appendDialogButton(shell.footer, {
+      label: wizard.finish,
+      variant: 'primary',
+    });
+
+    const selectedDelimiters = (): string[] => {
+      const values = checks.filter((c) => c.checked).map((c) => c.value);
+      if (otherInput.value) values.push(otherInput.value);
+      return values;
+    };
+    const updatePreview = (): void => {
+      preview.textContent = splitPreview(
+        opts.previewRows ?? [],
+        selectedDelimiters(),
+        collapse.checked,
+      );
+    };
+    let current = 1;
+    const showStep = (n: number): void => {
+      current = n;
+      [step1, step2, step3].forEach((panel, i) => {
+        panel.hidden = i + 1 !== n;
+      });
+      shell.header.textContent = stepTitle(n);
+      projectDisabledState(backBtn, n === 1, null);
+      projectDisabledState(nextBtn, n === 3, null);
+      clearDialogError(errorRow);
+    };
+
+    const lifecycle = installDialogLifecycle<TextToColumnsDialogResult | null>({
+      shell,
+      resolve,
+      onCancel: () => null,
+      onSubmit: () => onFinish(),
+    });
+    const onFinish = (): void => {
+      const delimiters = selectedDelimiters();
+      if (delimiters.length === 0) {
+        showStep(2);
+        showDialogError(errorRow, strings.noDelimited);
+        return;
+      }
+      lifecycle.finish({
+        delimiters,
+        collapseConsecutiveDelimiters: collapse.checked,
+        textQualifier: qualifier.value === '' ? null : qualifier.value,
+      });
+    };
+    for (const input of [...checks, collapse, otherInput]) {
+      const refresh = (): void => {
+        clearDialogError(errorRow);
+        updatePreview();
+      };
+      input.addEventListener('input', refresh);
+      input.addEventListener('change', refresh);
+    }
+    backBtn.addEventListener('click', () => showStep(Math.max(1, current - 1)));
+    nextBtn.addEventListener('click', () => showStep(Math.min(3, current + 1)));
+    finishBtn.addEventListener('click', onFinish);
+    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
+
+    showStep(1);
+    updatePreview();
+    mountDialog(shell, delimited);
+  });
+
 export const showTextToColumnsDialog = (
+  opts: TextToColumnsDialogOptions,
+): Promise<TextToColumnsDialogResult | null> => {
+  const { wizard } = opts;
+  if (wizard) return showTextToColumnsWizard({ ...opts, wizard });
+  return showTextToColumnsSinglePage(opts);
+};
+
+const showTextToColumnsSinglePage = (
   opts: TextToColumnsDialogOptions,
 ): Promise<TextToColumnsDialogResult | null> =>
   new Promise<TextToColumnsDialogResult | null>((resolve) => {

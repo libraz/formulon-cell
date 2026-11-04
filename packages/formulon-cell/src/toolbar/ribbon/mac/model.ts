@@ -708,10 +708,34 @@ const MAC_HOME_LABEL_KEYS: Readonly<Record<string, keyof Strings['macHomeRibbon'
   autosum: 'autoSum',
 };
 
+/** Control names the Japanese Mac Home tab uses where they differ from the shared model. */
+const MAC_HOME_JA_NAMES: Readonly<Record<string, string>> = {
+  textOrientation: '文字の向き',
+  indentDecrease: 'インデント解除',
+  indentIncrease: 'インデント',
+  borders: '線種/網かけ変更',
+  fillColor: '網かけ',
+  decUp: '小数点表示桁上げ',
+  decDown: '小数点表示桁下げ',
+  insertRows: '挿入',
+  deleteRows: '削除',
+};
+/** Tooltips that read differently from the control name. */
+const MAC_HOME_JA_HELP: Readonly<Record<string, string>> = {
+  formatPainter: '書式を別の場所にコピーして適用',
+  alignC: '文字列中央揃え',
+};
+/** Mac tooltips are the bare control name: no shortcut or symbol suffix. */
+const stripShortcutHint = (title: string): string =>
+  title.replace(/\s*\((?:Cmd|Ctrl|⌘)[^)]*\)|\s*\(Σ\)/g, '');
+
 const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonCommand => {
+  const measuredName = lang === 'ja' ? MAC_HOME_JA_NAMES[candidate.id] : undefined;
+  const measuredHelp = lang === 'ja' ? MAC_HOME_JA_HELP[candidate.id] : undefined;
   const commandWithMacTitle = {
     ...candidate,
-    title: candidate.title.replace(/\bCtrl\+/g, 'Cmd+'),
+    ...(measuredName ? { label: measuredName, title: measuredName } : {}),
+    title: stripShortcutHint(measuredName ?? candidate.title),
   };
   const macLabelKey = MAC_HOME_LABEL_KEYS[candidate.id];
   const homeLabel =
@@ -730,6 +754,7 @@ const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonComm
   const commandWithMacHomeLabel = homeLabel
     ? { ...commandWithMacTitle, title: macHomeTitle(homeLabel), label: homeLabel }
     : commandWithMacTitle;
+  if (measuredHelp) commandWithMacHomeLabel.title = measuredHelp;
   if (MAC_HOME_WIDE_STACKED_COMMAND_IDS.has(candidate.id)) {
     return {
       ...commandWithMacHomeLabel,
@@ -774,7 +799,7 @@ const macHomeTab = (home: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => 
       };
     }),
     group({ ja: 'アドイン', en: 'Add-ins' }, [
-      disabledCommand('mac.home.addins', t('addins'), 'addIn', OFFICE_REQUIRED),
+      menuCommand('mac.home.addins', t('addins'), 'addIn'),
     ]),
   ],
 });
@@ -863,7 +888,6 @@ export const MAC_RIBBON_COMMAND_IDS: readonly string[] = Object.freeze(
 );
 
 export const MAC_RIBBON_DISABLED_COMMAND_IDS: ReadonlySet<string> = new Set([
-  'mac.home.addins',
   ...macCatalog.flatMap((tab) =>
     tab.groups.flatMap((g) => g.commands.filter((c) => c.disabled).map((c) => c.id)),
   ),

@@ -66,11 +66,21 @@ export function createMountChrome({
   tag.setAttribute('aria-label', strings.a11y.nameBox);
   tag.value = 'A1';
 
+  // The Mac formula bar names its controls with the desktop accessibility text.
+  const barLabels = (current: typeof strings) => {
+    const mac = host.dataset.fcPlatform === 'mac' ? current.macChrome : null;
+    return {
+      fx: mac?.fxButton ?? current.fxDialog?.fxButtonLabel ?? current.a11y.formulaBar,
+      cancel: mac?.cancelFormulaEdit ?? current.a11y.cancelFormulaEdit,
+      enter: mac?.enterFormula ?? current.a11y.enterFormula,
+      expand: mac?.expandFormulaBar ?? current.a11y.expandFormulaBar,
+    };
+  };
   const fx = createHostButton({
     className: 'fc-host__formulabar-fx',
     text: 'ƒx',
     tabIndex: -1,
-    ariaLabel: strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar,
+    ariaLabel: barLabels(strings).fx,
   });
   const setFxDialogAvailable = (available: boolean): void => {
     const strings = getStrings();
@@ -78,7 +88,7 @@ export function createMountChrome({
     fx.style.cursor = available ? '' : 'default';
     projectDisabledState(fx, !available, reason, {
       datasetKey: 'disabledReason',
-      titlePrefix: strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar,
+      titlePrefix: barLabels(strings).fx,
     });
   };
   setFxDialogAvailable(flags.fxDialog !== false);
@@ -86,23 +96,23 @@ export function createMountChrome({
   const fxCancel = createHostButton({
     className: 'fc-host__formulabar-action fc-host__formulabar-action--cancel',
     tabIndex: -1,
-    ariaLabel: strings.a11y.cancelFormulaEdit,
+    ariaLabel: barLabels(strings).cancel,
     iconPaths: ['M6 6l8 8', 'M14 6l-8 8'],
   });
   projectDisabledState(fxCancel, true, strings.a11y.cancelFormulaEditUnavailable, {
     datasetKey: 'disabledReason',
-    titlePrefix: strings.a11y.cancelFormulaEdit,
+    titlePrefix: barLabels(strings).cancel,
   });
 
   const fxAccept = createHostButton({
     className: 'fc-host__formulabar-action fc-host__formulabar-action--accept',
     tabIndex: -1,
-    ariaLabel: strings.a11y.enterFormula,
+    ariaLabel: barLabels(strings).enter,
     iconPaths: ['M5 10.5l3 3 7-7'],
   });
   projectDisabledState(fxAccept, true, strings.a11y.enterFormulaUnavailable, {
     datasetKey: 'disabledReason',
-    titlePrefix: strings.a11y.enterFormula,
+    titlePrefix: barLabels(strings).enter,
   });
 
   const fxInput = document.createElement('textarea');
@@ -123,16 +133,14 @@ export function createMountChrome({
   let refreshGridLabels = (): void => {};
   const refreshFormulaBarLabels = (): void => {
     const strings = getStrings();
-    fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar);
+    const labels = barLabels(strings);
+    fx.setAttribute('aria-label', labels.fx);
     setFxDialogAvailable(!fx.disabled);
-    fxCancel.setAttribute('aria-label', strings.a11y.cancelFormulaEdit);
-    fxAccept.setAttribute('aria-label', strings.a11y.enterFormula);
+    fxCancel.setAttribute('aria-label', labels.cancel);
+    fxAccept.setAttribute('aria-label', labels.enter);
     fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
     const expanded = fxExpand.getAttribute('aria-expanded') === 'true';
-    fxExpand.setAttribute(
-      'aria-label',
-      expanded ? strings.a11y.collapseFormulaBar : strings.a11y.expandFormulaBar,
-    );
+    fxExpand.setAttribute('aria-label', expanded ? strings.a11y.collapseFormulaBar : labels.expand);
     refreshGridLabels();
   };
   refreshFormulaBarLabels();

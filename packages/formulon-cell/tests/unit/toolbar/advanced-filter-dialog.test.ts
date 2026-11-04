@@ -11,6 +11,39 @@ describe('showAdvancedFilterDialog', () => {
     document.body.replaceChildren();
   });
 
+  it('keeps Copy to disabled until the copy action is chosen', async () => {
+    const pending = showAdvancedFilterDialog({
+      title: 'フィルター オプションの設定',
+      listRangeLabel: 'リスト範囲:',
+      criteriaRangeLabel: '検索条件範囲:',
+      copyToLabel: '抽出範囲:',
+      uniqueOnlyLabel: '重複するレコードは無視する',
+      actionLabels: { inPlace: '選択範囲内', copy: '指定した範囲' },
+      initialListRange: '$A$1:$D$7',
+      initialCopyTo: 'F1',
+      okLabel: 'OK',
+      cancelLabel: 'キャンセル',
+      validateRange: () => null,
+      validateAddress: () => null,
+    });
+    const radios = [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+    expect(radios.map((r) => r.parentElement?.textContent)).toEqual(['選択範囲内', '指定した範囲']);
+    expect(radios[0]?.checked).toBe(true);
+    const copyTo = document.querySelector<HTMLInputElement>('.fc-advfilter__row--copy-to input');
+    expect(copyTo?.disabled).toBe(true);
+    radios[1]?.click();
+    expect(copyTo?.disabled).toBe(false);
+    radios[0]?.click();
+    expect(copyTo?.disabled).toBe(true);
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await expect(pending).resolves.toEqual({
+      listRange: '$A$1:$D$7',
+      criteriaRange: '',
+      copyTo: '',
+      uniqueOnly: false,
+    });
+  });
+
   it('uses shared range pickers for list, criteria, and copy-to references', async () => {
     const listeners: Array<() => void> = [];
     let pickedRange = 'A1:C5';

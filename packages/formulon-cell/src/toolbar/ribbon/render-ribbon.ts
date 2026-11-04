@@ -33,6 +33,7 @@ import {
   ribbonActivationForCommand,
 } from './activation.js';
 import { createRibbonButton } from './button.js';
+import { createMacCellStylesGallery } from './mac/home-styles-gallery.js';
 import { createMacRibbonMenuFactory, type MacRibbonMenuFactory } from './mac/menus.js';
 import { createTableNameInput } from './table-design.js';
 
@@ -538,8 +539,20 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
             makeSvg,
             chevronPath,
           });
-          tools.appendChild(b);
           const submenu = ribbonSubmenuFactoryFor(c.id, profile);
+          if (profile === 'excel365Mac' && c.id === 'cellStyles') {
+            // The Mac Home tab embeds the cell-styles gallery; the button becomes its more arrow.
+            tools.appendChild(
+              createMacCellStylesGallery({
+                lang: ctx.ribbonLang,
+                getInst: ctx.getInst,
+                arrow: b,
+                menu: submenu?.() ?? null,
+              }),
+            );
+            continue;
+          }
+          tools.appendChild(b);
           if (submenu) {
             const menu = submenu();
             if (menu) tools.appendChild(menu);

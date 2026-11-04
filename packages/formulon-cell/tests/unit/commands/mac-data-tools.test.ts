@@ -10,10 +10,13 @@ import {
   commitMacConsolidate,
   commitMacGoalSeek,
   commitMacSubtotal,
+  formatMacRangeAddress,
   MAX_SUBTOTAL_GROUPS,
   MAX_SUBTOTAL_OUTPUT_CELLS,
   planMacConsolidate,
   planMacSubtotal,
+  removeMacSubtotals,
+  replaceMacSubtotals,
   type SubtotalRequest,
   solveMacGoalSeek,
   supportsSubtotal,
@@ -355,6 +358,112 @@ describe('Mac Data command operations', () => {
     expect(history.canUndo()).toBe(false);
   });
 
+  describe('label-based consolidate', () => {
+    const seed = async () => {
+      const wb = await WorkbookHandle.createDefault();
+      handles.push(wb);
+      const put = (row: number, col: number, v: string | number): void => {
+        if (typeof v === 'number') wb.setNumber({ sheet: 0, row, col }, v);
+        else wb.setText({ sheet: 0, row, col }, v);
+      };
+      // Source one A1:C3, source two E1:G3; the top-left cells hold no label.
+      const one: (string | number)[][] = [
+        ['', 'x', 'y'],
+        ['a', 1, 2],
+        ['b', 3, 4],
+      ];
+      const two: (string | number)[][] = [
+        ['', 'y', 'z'],
+        ['b', 10, 20],
+        ['c', 30, 40],
+      ];
+      for (const [i, r] of one.entries()) {
+        for (const [j, v] of r.entries()) if (v !== '') put(i, j, v);
+      }
+      for (const [i, r] of two.entries()) {
+        for (const [j, v] of r.entries()) if (v !== '') put(i, 4 + j, v);
+      }
+      wb.recalc();
+      const instance = makeInstance(wb, createSpreadsheetStore());
+      const run = (
+        flags: { topRow?: boolean; leftColumn?: boolean },
+        fn: 'sum' | 'count' = 'sum',
+      ) => {
+        const request: ConsolidateRequest = {
+          sources: ['A1:C3', 'E1:G3'],
+          destination: 'J1',
+          function: fn,
+          ...flags,
+        };
+        const plan = planMacConsolidate(instance, request);
+        if (!plan.ok) throw new Error(plan.error.code);
+        return plan.value;
+      };
+      return { run };
+    };
+    const text = (value: string) => ({ kind: 'text', value });
+    const num = (value: number) => ({ kind: 'number', value });
+    const blank = { kind: 'blank' };
+
+    it('matches rows and columns by label, leaving unmatched cells empty', async () => {
+      const { run } = await seed();
+      const plan = run({ topRow: true, leftColumn: true });
+      expect(plan.destination).toMatchObject({ r0: 0, c0: 9, r1: 3, c1: 12 });
+      expect(plan.values).toEqual([
+        blank,
+        text('x'),
+        text('y'),
+        text('z'),
+        text('a'),
+        num(1),
+        num(2),
+        blank,
+        text('b'),
+        num(3),
+        num(14),
+        num(20),
+        text('c'),
+        blank,
+        num(30),
+        num(40),
+      ]);
+    });
+
+    it('matches columns by their top-row label and rows by position', async () => {
+      const { run } = await seed();
+      const plan = run({ topRow: true });
+      expect(plan.destination).toMatchObject({ r0: 0, r1: 2, c0: 9, c1: 11 });
+      expect(plan.values).toEqual([
+        text('x'),
+        text('y'),
+        text('z'),
+        num(1),
+        num(12),
+        num(20),
+        num(3),
+        num(34),
+        num(40),
+      ]);
+    });
+
+    it('matches rows by their left-column label and columns by position', async () => {
+      const { run } = await seed();
+      const plan = run({ leftColumn: true });
+      expect(plan.destination).toMatchObject({ r0: 0, r1: 2, c0: 9, c1: 11 });
+      expect(plan.values).toEqual([
+        text('a'),
+        num(1),
+        num(2),
+        text('b'),
+        num(13),
+        num(24),
+        text('c'),
+        num(30),
+        num(40),
+      ]);
+    });
+  });
+
   it('refuses consolidate before writing when authorization denies the output', async () => {
     const wb = await WorkbookHandle.createDefault();
     handles.push(wb);
@@ -462,6 +571,86 @@ describe('Mac Data command operations', () => {
     expect(Array.from({ length: 10 }, (_, row) => levels.get(row) ?? 0)).toEqual([
       0, 2, 2, 1, 2, 2, 1, 2, 1, 0,
     ]);
+  });
+
+  it('removes every subtotal row and its outline again', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    handles.push(wb);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    wb.setText({ sheet: 0, row: 0, col: 0 }, 'key');
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'value');
+    for (const [index, group] of ['x', 'x', 'y'].entries()) {
+      wb.setText({ sheet: 0, row: index + 1, col: 0 }, group);
+      wb.setNumber({ sheet: 0, row: index + 1, col: 1 }, index + 1);
+    }
+    wb.recalc();
+    const instance = makeControllerInstance(wb, store, history);
+    const request: SubtotalRequest = {
+      range: 'A1:B4',
+      groupByColumn: 0,
+      subtotalColumns: [1],
+      function: 'sum',
+    };
+    const plan = planMacSubtotal(instance, request);
+    if (!plan.ok) throw new Error('plan failed');
+    expect(commitMacSubtotal(instance, request, plan.value).ok).toBe(true);
+    const grown = { sheet: 0, r0: 0, c0: 0, r1: 4 + plan.value.insertedRows, c1: 1 };
+    const removed = removeMacSubtotals(instance, grown);
+    expect(removed).toEqual({ ok: true, value: plan.value.insertedRows });
+    expect(wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'text', value: 'y' });
+    expect(wb.getValue({ sheet: 0, row: 4, col: 0 })).toEqual({ kind: 'blank' });
+    expect(store.getState().layout.outlineRows.size).toBe(0);
+    expect(history.undo()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 4, col: 0 })).not.toEqual({ kind: 'blank' });
+  });
+
+  it('replaces existing subtotals as one undo step', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    handles.push(wb);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    wb.setText({ sheet: 0, row: 0, col: 0 }, 'key');
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'value');
+    for (const [index, group] of ['x', 'x', 'y'].entries()) {
+      wb.setText({ sheet: 0, row: index + 1, col: 0 }, group);
+      wb.setNumber({ sheet: 0, row: index + 1, col: 1 }, index + 1);
+    }
+    wb.recalc();
+    const instance = makeControllerInstance(wb, store, history);
+    const first: SubtotalRequest = {
+      range: 'A1:B4',
+      groupByColumn: 0,
+      subtotalColumns: [1],
+      function: 'sum',
+    };
+    const plan = planMacSubtotal(instance, first);
+    if (!plan.ok) throw new Error('plan failed');
+    expect(commitMacSubtotal(instance, first, plan.value).ok).toBe(true);
+    const snapshot = (): string[] => {
+      const out: string[] = [];
+      for (let row = 0; row < 12; row += 1) {
+        out.push(
+          JSON.stringify([
+            wb.getValue({ sheet: 0, row, col: 0 }),
+            wb.getValue({ sheet: 0, row, col: 1 }),
+          ]),
+        );
+      }
+      return out;
+    };
+    const before = snapshot();
+    const grown = { sheet: 0, r0: 0, c0: 0, r1: 4 + plan.value.insertedRows, c1: 1 };
+    const result = replaceMacSubtotals(instance, grown, (target) => ({
+      range: formatMacRangeAddress(wb, target),
+      groupByColumn: 0,
+      subtotalColumns: [1],
+      function: 'average',
+    }));
+    expect(result).toEqual({ ok: true, value: undefined });
+    expect(snapshot()).not.toEqual(before);
+    expect(history.undo()).toBe(true);
+    expect(snapshot()).toEqual(before);
   });
 
   it('aborts every Subtotal mutation when a later structural step fails', async () => {
@@ -854,11 +1043,31 @@ describe('Mac Data command operations', () => {
       expect(solution.formulaValue).toBe(5);
     });
 
-    it('keeps the last iterate when no solution exists', async () => {
-      const { solution } = await solve('=A1^2', -1, 1);
+    // Start values scale both the first trial and the step limit by |x0|.
+    it.each([
+      { formula: '=A1^2', target: 2, start: 0.5, a1: 1.4141771092907198 },
+      { formula: '=A1^2', target: 2, start: 0.1, a1: 1.4139967316690243 },
+      { formula: '=A1^2', target: 2, start: 2, a1: 1.4143315892190063 },
+      { formula: '=A1*3-9', target: 0, start: 0.5, a1: 2.9999999999999996 },
+      { formula: '=A1*3-9', target: 0, start: 0.1, a1: 3 },
+      { formula: '=A1*3-9', target: 0, start: 2, a1: 3 },
+      { formula: '=A1*100', target: 1, start: 0.5, a1: 0.010000000000000009 },
+      { formula: '=A1*100', target: 1, start: 2, a1: 0.01000000000000012 },
+    ])('scales the search to the start value for $formula from $start', async (c) => {
+      const { solution } = await solve(c.formula, c.target, c.start);
+      expect(solution.converged).toBe(true);
+      expect(solution.changingValue).toBe(c.a1);
+    });
+
+    it.each([
+      { start: 1, a1: -28147497671065.71 },
+      { start: 0.5, a1: -14073748835532.855 },
+      { start: 0, a1: -335544.32 },
+    ])('ends the no-solution search where desktop does from $start', async (c) => {
+      const { solution } = await solve('=A1^2', -1, c.start);
       expect(solution.converged).toBe(false);
-      expect(solution.changingValue).not.toBe(1);
-      expect(solution.formulaValue).toBeCloseTo(solution.changingValue ** 2, 9);
+      expect(solution.changingValue).toBe(c.a1);
+      expect(solution.formulaValue).toBe(c.a1 * c.a1);
     });
 
     it('commits a non-converged iterate as one undoable step', async () => {

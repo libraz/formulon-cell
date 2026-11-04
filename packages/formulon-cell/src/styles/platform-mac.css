@@ -14,8 +14,8 @@
     --fc-formulabar-namebox-width: 87px;
     --fc-formulabar-height: 28px;
     --fc-sheetbar-height: 26px;
-    --fc-sheetbar-tab-min-width: 78px;
-    --fc-sheetbar-tab-max-width: 78px;
+    --fc-sheetbar-tab-min-width: 0;
+    --fc-sheetbar-tab-max-width: none;
   }
 }
 
@@ -1628,37 +1628,13 @@
     min-width: 0;
   }
 
-  .fc-host[data-fc-platform="mac"] .fc-host__sheetbar-tab {
-    flex: 0 1 auto;
-    width: 78px;
-    min-width: 78px;
-    max-width: 78px;
-    height: 26px;
-    padding: 0 8px;
-  }
-
   .fc-host[data-fc-platform="mac"] .fc-host__sheetbar-tab[aria-selected="true"]::before {
     display: none;
-  }
-
-  .fc-host[data-fc-platform="mac"] .fc-host__sheetbar-add {
-    flex: 0 0 36px;
-    width: 36px;
-    height: 22px;
-    margin: 2px 8px 2px 0;
-    border-radius: 2px;
   }
 
   .fc-host[data-fc-platform="mac"] .fc-host__statusbar {
     min-height: 28px;
     height: 28px;
-  }
-
-  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-view--active {
-    border-color: var(--fc-tb-fg-soft);
-    border-radius: 4px;
-    background: var(--fc-tb-fg-soft);
-    color: var(--fc-tb-ribbon-bg);
   }
 
   /* Keep compact controls usable on a narrow window: the ribbon and tab rail
@@ -1672,5 +1648,286 @@
       margin-right: 4px;
       margin-left: 4px;
     }
+  }
+}
+
+/* Mac chrome geometry */
+@layer fc.chrome {
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar {
+    --fc-formulabar-action-size: 26px;
+    --fc-formulabar-fx-width: 40px;
+    /* 87 pt name box plus the 5 pt gap before the action buttons. */
+    --fc-formulabar-namebox-width: 92px;
+    gap: 0;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar-tag {
+    width: 87px;
+    justify-self: start;
+    background-image:
+      linear-gradient(135deg, transparent 50%, var(--fc-fg-mute) 50%),
+      linear-gradient(45deg, var(--fc-fg-mute) 50%, transparent 50%);
+    background-position:
+      calc(100% - 8px) 6px,
+      calc(100% - 8px) calc(100% - 6px);
+    background-size: 5px 3px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar-action {
+    height: 26px;
+    border-right: 0;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar-fx {
+    position: relative;
+    height: 26px;
+    padding: 0 12px 0 0;
+    border-right: 0;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--fc-fg-faint) 50%),
+      linear-gradient(135deg, var(--fc-fg-faint) 50%, transparent 50%);
+    background-position:
+      calc(100% - 9px) 50%,
+      calc(100% - 5px) 50%;
+    background-repeat: no-repeat;
+    background-size: 4px 4px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar-fx::after {
+    position: absolute;
+    top: 0;
+    right: -7px;
+    width: 3px;
+    height: 25px;
+    background: var(--fc-rule);
+    content: "";
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar-input {
+    margin-left: 6px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar-expand {
+    height: 21px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__sheetbar {
+    align-items: flex-start;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__sheetbar-tab {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    height: 22px;
+    padding: 0 30px;
+    border-radius: 0 0 6px 6px;
+    border-bottom: var(--fc-hairline) solid var(--fc-rule-strong, var(--fc-rule));
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__sheetbar-add {
+    flex: 0 0 36px;
+    width: 36px;
+    height: 22px;
+    margin: 0;
+    border: 0;
+    border-right: var(--fc-hairline) solid var(--fc-rule);
+    border-radius: 0;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-dot {
+    display: none;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-left {
+    padding-left: 3px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-aggs {
+    padding: 0;
+    text-align: right;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-agg {
+    padding: 0 8px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-views {
+    gap: 0;
+    margin-left: 3px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-view {
+    width: 36px;
+    height: 24px;
+    border: 0;
+    border-radius: 3px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-view--active {
+    background: #b8b8b8;
+    color: inherit;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-zoom {
+    gap: 3px;
+    margin-left: 3px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-zoom-btn {
+    width: 14px;
+    height: 28px;
+    border: 0;
+    border-radius: 0;
+    font-size: 16px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-zoom-slider {
+    width: 102px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-zoom-label {
+    min-width: 54px;
+    text-align: center;
+  }
+}
+
+/* Mac Home cell styles gallery: 430 x 60 pt strip, two rows of swatches and a more arrow. */
+@layer fc.chrome {
+  [data-fc-platform="mac"] .fc-tb__cellstyle-gallery {
+    display: flex;
+    align-items: stretch;
+    width: 430px;
+    height: 60px;
+    flex: 0 0 430px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__cellstyle-gallery-grid {
+    display: grid;
+    grid-template-rows: repeat(2, 1fr);
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 1px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__cellstyle-gallery-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    height: 29px;
+    padding: 0 4px;
+    border: 1px solid var(--fc-rule);
+    border-radius: 0;
+    font: inherit;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__cellstyle-gallery-chip[aria-pressed="true"] {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: -2px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__cellstyle-gallery-arrow {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 58px;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background:
+      linear-gradient(45deg, transparent 50%, var(--fc-fg-mute) 50%) calc(50% - 2px) 50% / 4px 4px
+      no-repeat,
+      linear-gradient(135deg, var(--fc-fg-mute) 50%, transparent 50%) calc(50% + 2px) 50% / 4px 4px
+      no-repeat;
+  }
+
+  [data-fc-platform="mac"]
+    .fc-tb__ribbon-group:not(.fc-tb__ribbon-group--condensed)
+    .fc-tb__cellstyle-gallery
+    .fc-tb__cellstyle-gallery-arrow.fc-tb__rb
+    > :is(span, svg) {
+    display: none;
+  }
+  /* A condensed ribbon drops the strip and keeps the cell-styles button as a plain row. */
+  [data-fc-platform="mac"] .fc-tb__ribbon-group--condensed .fc-tb__cellstyle-gallery {
+    display: contents;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__ribbon-group--condensed .fc-tb__cellstyle-gallery-grid {
+    display: none;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__ribbon-group--condensed .fc-tb__cellstyle-gallery-arrow {
+    flex: initial;
+    width: auto;
+    height: auto;
+    background: none;
+  }
+  /* The condensed row rules match direct children of the tools grid; the strip's
+     wrapper is transparent to layout, so repeat them for the button inside it. */
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__ribbon-tools
+    > .fc-tb__cellstyle-gallery
+    > .fc-tb__rb.fc-tb__rb {
+    grid-row: auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 3px;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    height: 24px;
+    padding: 1px 4px;
+    font-size: 10.5px;
+    line-height: 1;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__cellstyle-gallery
+    > .fc-tb__rb
+    .fc-tb__rb-icon {
+    flex: 0 0 17px;
+    width: 17px;
+    height: 17px;
+  }
+
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__cellstyle-gallery
+    > .fc-tb__rb
+    > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+    display: block;
+    flex: 0 1 auto;
+    align-self: center;
+    width: auto;
+    min-width: 0;
+    max-height: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-line-clamp: none;
+  }
+
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__cellstyle-gallery
+    > .fc-tb__rb
+    .fc-tb__rb-split-chevron {
+    position: static;
+    flex: 0 0 8px;
+    width: 8px;
+    height: 6px;
+    margin: 0 0 0 1px;
   }
 }

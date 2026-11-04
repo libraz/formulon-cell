@@ -33,27 +33,18 @@ describe('Consolidate dialog', () => {
     fx.dispose();
   });
 
-  it('starts with an empty destination so the selection is never the default output', () => {
-    expect(byId<HTMLInputElement>('fc-mac-consolidate-destination').value).toBe('');
-  });
-
-  it('rejects a destination that overlaps a source and leaves the cells untouched', () => {
-    byId<HTMLTextAreaElement>('fc-mac-consolidate-sources').value = 'A1:A2';
-    byId<HTMLInputElement>('fc-mac-consolidate-destination').value = 'A1';
+  it('writes the result at the active cell, never over the source', () => {
+    fx.store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        active: { sheet: 0, row: 0, col: 2 },
+        range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+      },
+    }));
+    openMacConsolidateDialog(fx.instance);
+    byId<HTMLInputElement>('fc-mac-consolidate-sources').value = 'A1:A2';
     byAction('consolidate-ok').click();
-    expect(status().dataset.state).toBe('error');
-    expect(status().textContent).toContain('overlap');
-    expect(fx.workbook.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
-      kind: 'number',
-      value: 1,
-    });
-  });
-
-  it('writes the aggregate to a disjoint destination on Enter', () => {
-    byId<HTMLTextAreaElement>('fc-mac-consolidate-sources').value = 'A1:A2';
-    const destination = byId<HTMLInputElement>('fc-mac-consolidate-destination');
-    destination.value = 'C1';
-    pressEnter(destination);
     expect(fx.workbook.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({
       kind: 'number',
       value: 1,
@@ -64,17 +55,70 @@ describe('Consolidate dialog', () => {
     });
   });
 
+  it('rejects a result that would land on a source and leaves the cells untouched', () => {
+    byId<HTMLInputElement>('fc-mac-consolidate-sources').value = 'A1:A2';
+    byAction('consolidate-ok').click();
+    expect(status().dataset.state).toBe('error');
+    expect(status().textContent).toContain('overlap');
+    expect(fx.workbook.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+      kind: 'number',
+      value: 1,
+    });
+  });
+
+  it('adds typed references to the list and removes the selected one', () => {
+    const input = byId<HTMLInputElement>('fc-mac-consolidate-sources');
+    input.value = 'A1:A2';
+    byAction('consolidate-add').click();
+    input.value = 'C1:C2';
+    byAction('consolidate-add').click();
+    const items = () =>
+      Array.from(
+        document.querySelectorAll('.fc-mac-consolidate__reference'),
+        (el) => el.textContent,
+      );
+    expect(items()).toEqual(['A1:A2', 'C1:C2']);
+    expect(input.value).toBe('');
+    document.querySelectorAll<HTMLElement>('.fc-mac-consolidate__reference')[0]?.click();
+    byAction('consolidate-remove').click();
+    expect(items()).toEqual(['C1:C2']);
+  });
+
+  it('offers the top row and left column label options, enabled and unchecked', () => {
+    const options = Array.from(
+      document.querySelectorAll<HTMLInputElement>('.fc-mac-consolidate__criteria input'),
+    );
+    expect(options).toHaveLength(2);
+    expect(options.map((o) => [o.checked, o.disabled])).toEqual([
+      [false, false],
+      [false, false],
+    ]);
+  });
+
   it('ignores Enter on the Cancel button, the select, and during composition', () => {
-    byId<HTMLTextAreaElement>('fc-mac-consolidate-sources').value = 'A1:A2';
-    const destination = byId<HTMLInputElement>('fc-mac-consolidate-destination');
-    destination.value = 'C1';
+    fx.store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        active: { sheet: 0, row: 0, col: 2 },
+        range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+      },
+    }));
+    openMacConsolidateDialog(fx.instance);
+    const input = byId<HTMLInputElement>('fc-mac-consolidate-sources');
+    input.value = 'A1:A2';
     pressEnter(byAction('consolidate-cancel'));
     pressEnter(byId('fc-mac-consolidate-function'));
     const custom = document.querySelector('.fc-mac-consolidate .fc-select__button');
     if (custom) pressEnter(custom);
-    pressEnter(destination, { isComposing: true });
+    pressEnter(input, { isComposing: true });
     expect(fx.workbook.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'blank' });
     expect(document.querySelector<HTMLElement>('.fc-mac-consolidate')?.hidden).toBe(false);
+    pressEnter(input);
+    expect(fx.workbook.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({
+      kind: 'number',
+      value: 1,
+    });
   });
 
   it('relabels the dialog when the locale changes', () => {
@@ -91,7 +135,16 @@ describe('Consolidate dialog', () => {
     const rows = [...(panel?.querySelectorAll('.fc-mac-consolidate__row') ?? [])].map(
       (row) => row.firstElementChild?.textContent,
     );
-    expect(rows.slice(0, 2)).toEqual(['集計の方法:', '統合元範囲:']);
+    expect(rows.slice(0, 3)).toEqual(['集計の方法:', '統合元範囲:', '統合元:']);
+    expect(panel?.querySelector('.fc-mac-consolidate__criteria-heading')?.textContent).toBe(
+      '統合の基準:',
+    );
+    expect(
+      [
+        ...(panel?.querySelectorAll('.fc-mac-consolidate__criteria .fc-mac-consolidate__option') ??
+          []),
+      ].map((el) => el.textContent),
+    ).toEqual(['上端行', '左端列']);
     const options = [...(panel?.querySelectorAll<HTMLElement>('.fc-mac-consolidate__option') ?? [])]
       .filter((el) => !el.hidden)
       .map((el) => el.textContent);
