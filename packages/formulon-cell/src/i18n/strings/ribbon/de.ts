@@ -138,6 +138,7 @@ export const ribbonDe: RibbonStrings = {
     totalRow: 'Ergebniszeile',
     bandedRows: 'Gebänderte Zeilen',
     bandedColumns: 'Gebänderte Spalten',
+    filterButton: 'Filterschaltfläche',
     firstColumn: 'Erste Spalte',
     lastColumn: 'Letzte Spalte',
     tableTotalsNone: 'Keine',

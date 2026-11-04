@@ -136,6 +136,7 @@ export const ribbonTh: RibbonStrings = {
     totalRow: 'แถวผลรวม',
     bandedRows: 'แถวแบบมีแถบสี',
     bandedColumns: 'คอลัมน์แบบมีแถบสี',
+    filterButton: 'ปุ่มตัวกรอง',
     firstColumn: 'คอลัมน์แรก',
     lastColumn: 'คอลัมน์สุดท้าย',
     tableTotalsNone: 'ไม่มี',

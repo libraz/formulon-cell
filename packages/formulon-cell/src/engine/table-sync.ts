@@ -22,6 +22,7 @@ type TableReader = Pick<WorkbookHandle, 'getTables'> &
       | 'getCustomTableStyles'
       | 'getPivotStyleInfo'
       | 'getPivotTables'
+      | 'getTableAutoFilter'
       | 'capabilities'
     >
   >;
@@ -160,6 +161,10 @@ export function tableOverlaysFromEngine(
       ...(details
         ? { ...overlayLook(details, customs), totals: totalsFromDetails(details) }
         : { style: 'medium', showHeader: true, showTotal: false, banded: true }),
+      // A table without its AutoFilter shows no header filter buttons.
+      ...(wb.capabilities?.typedTableAutoFilter && wb.getTableAutoFilter?.(table.index) === null
+        ? { filterButton: false }
+        : {}),
     });
   }
   return out;
@@ -199,6 +204,7 @@ function sameEngineLook(a: TableOverlay, b: TableOverlay): boolean {
     a.banded === b.banded &&
     !!a.firstCol === !!b.firstCol &&
     !!a.lastCol === !!b.lastCol &&
-    !!a.colStripes === !!b.colStripes
+    !!a.colStripes === !!b.colStripes &&
+    (a.filterButton !== false) === (b.filterButton !== false)
   );
 }

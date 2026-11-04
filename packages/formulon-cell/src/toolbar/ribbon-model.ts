@@ -893,6 +893,7 @@ export function buildRibbonModel(
             'tableBandedColumns',
             'wide',
           ),
+          cmd('tableFilterButton', tr.filterButton, tr.filterButton, 'filterToggle', 'wide'),
         ]),
       ]),
       contextual: true,

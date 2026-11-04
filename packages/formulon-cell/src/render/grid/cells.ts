@@ -1,6 +1,10 @@
 import { inputLocaleForWorkbook } from '../../commands/coerce-input.js';
 import { errorCheckFlagged } from '../../commands/error-indicators.js';
-import { isHeaderRow, tableForCell } from '../../commands/format-as-table.js';
+import {
+  isHeaderRow,
+  showsHeaderFilterButton,
+  tableForCell,
+} from '../../commands/format-as-table.js';
 import { formatA1FormulaAsR1C1 } from '../../commands/refs.js';
 import { addrKey } from '../../engine/address.js';
 import { effectiveCellFormatFromEngine } from '../../engine/cell-format-projection.js';
@@ -685,6 +689,7 @@ export function paintCells(
       // Icon-set: paint the glyph in the leading gutter and inset the text by
       // the gutter width so the value reads cleanly next to the icon.
       const tableHeader = table ? isHeaderRow(table, r, c) : false;
+      const headerButton = table ? showsHeaderFilterButton(table, r, c) : false;
       if (overlay?.iconKind && overlay.iconSlot !== undefined) {
         // Icons are screen pixels at 100%: they follow the sheet zoom only,
         // not the platform screen scale.
@@ -711,8 +716,8 @@ export function paintCells(
       } else if (hideConditionalValue) {
         // Conditional formatting's "Show Bar/Icon Only" suppresses the
         // value text while still leaving fills, bars, and icons visible.
-      } else if (tableHeader || pivotButton) {
-        const reserved = tableHeader ? 20 : pivotButtonSize + 1;
+      } else if (headerButton || pivotButton) {
+        const reserved = headerButton ? 20 : pivotButtonSize + 1;
         paintCellText({
           ...paintCtx,
           bounds: {
@@ -753,7 +758,7 @@ export function paintCells(
       } else {
         paintCellText(paintCtx);
       }
-      if (tableHeader) paintTableHeaderChevron(ctx, bounds, theme, rtl);
+      if (headerButton) paintTableHeaderChevron(ctx, bounds, theme, rtl);
       if (filterHeader) {
         paintFilterButton(ctx, filterButtonRect(bounds, rtl), theme, {
           active: layout.hiddenRows.size > 0,

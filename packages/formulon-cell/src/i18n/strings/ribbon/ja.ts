@@ -138,6 +138,7 @@ export const ribbonJa: RibbonStrings = {
     totalRow: '集計行',
     bandedRows: '縞模様 (行)',
     bandedColumns: '縞模様 (列)',
+    filterButton: 'フィルター ボタン',
     firstColumn: '最初の列',
     lastColumn: '最後の列',
     tableTotalsNone: 'なし',

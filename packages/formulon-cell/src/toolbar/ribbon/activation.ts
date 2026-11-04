@@ -419,6 +419,7 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'spellingReview',
   'tableBandedColumns',
   'tableBandedRows',
+  'tableFilterButton',
   'tableFirstColumn',
   'tableHeaderRow',
   'tableLastColumn',

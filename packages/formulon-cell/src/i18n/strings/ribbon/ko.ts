@@ -137,6 +137,7 @@ export const ribbonKo: RibbonStrings = {
     totalRow: '요약 행',
     bandedRows: '줄무늬 행',
     bandedColumns: '줄무늬 열',
+    filterButton: '필터 단추',
     firstColumn: '첫째 열',
     lastColumn: '마지막 열',
     tableTotalsNone: '없음',

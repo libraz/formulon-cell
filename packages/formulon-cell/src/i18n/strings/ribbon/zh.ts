@@ -136,6 +136,7 @@ export const ribbonZh: RibbonStrings = {
     totalRow: '汇总行',
     bandedRows: '镶边行',
     bandedColumns: '镶边列',
+    filterButton: '筛选按钮',
     firstColumn: '第一列',
     lastColumn: '最后一列',
     tableTotalsNone: '无',

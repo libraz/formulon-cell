@@ -408,6 +408,7 @@ const applyGenericRibbonCommand = (
     case 'tableFirstColumn':
     case 'tableLastColumn':
     case 'tableBandedColumns':
+    case 'tableFilterButton':
       if (
         toggleTableOption(
           i.store,

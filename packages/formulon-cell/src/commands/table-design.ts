@@ -26,7 +26,8 @@ export type TableOption =
   | 'banded'
   | 'firstCol'
   | 'lastCol'
-  | 'colStripes';
+  | 'colStripes'
+  | 'filterButton';
 
 /** Table Design ribbon commands and the show-flag each one flips. */
 export const TABLE_OPTION_COMMANDS: Readonly<Record<string, TableOption>> = {
@@ -36,6 +37,7 @@ export const TABLE_OPTION_COMMANDS: Readonly<Record<string, TableOption>> = {
   tableFirstColumn: 'firstCol',
   tableLastColumn: 'lastCol',
   tableBandedColumns: 'colStripes',
+  tableFilterButton: 'filterButton',
 };
 
 export type TableRenameResult = 'renamed' | 'unchanged' | 'none' | 'protected' | TableNameError;
@@ -161,9 +163,11 @@ export function toggleTableOption(
   if (option === 'showHeader' || option === 'showTotal') {
     return toggleBoundaryRow(store, history, wb, table, option, totalsLabel);
   }
+  // Filter buttons default to on, so an absent flag reads as shown.
+  const on = option === 'filterButton' ? table.filterButton !== false : !!table[option];
   let applied = false;
   recordTablesChange(history, store, () => {
-    applied = updateTableOverlay(store, table.id, { [option]: !table[option] }) !== null;
+    applied = updateTableOverlay(store, table.id, { [option]: !on }) !== null;
   });
   return applied ? 'toggled' : 'blocked';
 }

@@ -153,6 +153,9 @@ export interface TableOverlay {
   lastCol?: boolean;
   /** Column stripes of the engine table; carried so a loaded table keeps it. */
   colStripes?: boolean;
+  /** Show the header row's filter buttons (the table's AutoFilter). Absent
+   *  means on, as a new table has them. */
+  filterButton?: boolean;
   /** Totals-row settings by column, left to right; engine overlays only. */
   totals?: readonly TableColumnTotals[];
   /** Exact engine style name (built-in or custom) the look was read from or
@@ -427,6 +430,7 @@ export type TableOverlayPatch = Partial<
     | 'firstCol'
     | 'lastCol'
     | 'colStripes'
+    | 'filterButton'
     | 'totals'
     | 'styleName'
     | 'name'
@@ -740,6 +744,11 @@ export function clearTablesInRange(store: SpreadsheetStore, range: Range): void 
 }
 
 /** True when (row, col) sits on the header row of `t`. */
+/** True when (row, col) is a header cell that shows its filter button. */
+export function showsHeaderFilterButton(t: TableOverlay, row: number, col: number): boolean {
+  return t.filterButton !== false && isHeaderRow(t, row, col);
+}
+
 export function isHeaderRow(t: TableOverlay, row: number, col: number): boolean {
   if (!t.showHeader) return false;
   if (row !== t.range.r0) return false;

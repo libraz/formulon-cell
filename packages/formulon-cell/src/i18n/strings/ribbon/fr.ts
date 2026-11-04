@@ -138,6 +138,7 @@ export const ribbonFr: RibbonStrings = {
     totalRow: 'Ligne de total',
     bandedRows: 'Lignes à bandes',
     bandedColumns: 'Colonnes à bandes',
+    filterButton: 'Bouton de filtre',
     firstColumn: 'Première colonne',
     lastColumn: 'Dernière colonne',
     tableTotalsNone: 'Aucun',

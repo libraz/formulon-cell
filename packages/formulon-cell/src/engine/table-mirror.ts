@@ -82,6 +82,23 @@ const tableFilterRange = (wb: WorkbookHandle, index: number, sheet: number): Ran
   };
 };
 
+/** Remove the table's AutoFilter, or give it back one over the header and
+ *  body, so the header filter buttons follow `table.filterButton`. Row
+ *  visibility is left as it is. */
+const syncTableFilterButton = (wb: WorkbookHandle, index: number, table: TableOverlay): void => {
+  if (table.filterButton === false) {
+    wb.removeTableAutoFilter(index);
+    return;
+  }
+  if (wb.getTableAutoFilter(index)) return;
+  const { r0, c0, r1, c1 } = table.range;
+  wb.setTableAutoFilter(index, {
+    range: { firstRow: r0, firstCol: c0, lastRow: table.showTotal ? r1 - 1 : r1, lastCol: c1 },
+    columns: [],
+    sort: null,
+  });
+};
+
 const createEngineTable = (
   wb: WorkbookHandle,
   table: TableOverlay & { name: string },
@@ -383,7 +400,8 @@ export class TableMirror {
       if (existing && old) {
         const patch = tableUpdate(old, table);
         const totalsChanged = !sameTotals(old.totals, table.totals);
-        if (Object.keys(patch).length === 0 && !totalsChanged) continue;
+        const filterToggled = (old.filterButton !== false) !== (table.filterButton !== false);
+        if (Object.keys(patch).length === 0 && !totalsChanged && !filterToggled) continue;
         from = tableFilterRangeIn(store.getState(), old.range);
         const reshaped =
           old.range.sheet !== table.range.sheet ||
@@ -407,10 +425,12 @@ export class TableMirror {
           this.adoptTotals(edits, table, existing.index);
           // Rewritten structured references hold no value until the next recalc.
           if (patch.name !== undefined) cellsChanged = true;
+          if (filterToggled) syncTableFilterButton(wb, existing.index, table);
           const filterMoved =
             patch.ref !== undefined ||
             patch.headerRow !== undefined ||
-            patch.totalsRow !== undefined;
+            patch.totalsRow !== undefined ||
+            filterToggled;
           if (!filterMoved) continue;
         } else {
           // A new column count or sheet needs a new table; when the engine
@@ -453,6 +473,8 @@ export class TableMirror {
         edits.rejected.set(table.id, null);
         continue;
       }
+      // A table created or re-created without its filter buttons drops the AutoFilter.
+      if (table.filterButton === false) wb.removeTableAutoFilter(index);
       const range = tableFilterRange(wb, index, table.range.sheet);
       if (range) edits.added.push({ range, from });
     }

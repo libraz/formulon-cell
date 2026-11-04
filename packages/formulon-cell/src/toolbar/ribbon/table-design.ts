@@ -91,7 +91,10 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
   for (const [command, option] of Object.entries(TABLE_OPTION_COMMANDS)) {
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
     if (!button) continue;
-    const pressed = table?.[option] === true;
+    const pressed =
+      option === 'filterButton'
+        ? !!table && table.filterButton !== false
+        : table?.[option] === true;
     button.classList.toggle('fc-tb__rb--active', pressed);
     button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
     // Leave other disabled reasons (policy, protection) alone when the table is engine-backed.

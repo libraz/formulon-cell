@@ -30,7 +30,7 @@ import { cellTextHorizontalMetrics, wrapText } from '../render/text-wrap.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { DEFAULT_CELL_FONT_THEME, resolveTheme } from '../theme/resolve.js';
 import { formatNumber } from './format.js';
-import { isHeaderRow, tableForCell } from './format-as-table.js';
+import { showsHeaderFilterButton, tableForCell } from './format-as-table.js';
 
 /** Width the in-cell AutoFilter button occupies at a header cell's trailing
  *  edge: the button plus its one-pixel inset. */
@@ -331,7 +331,8 @@ function headerButtonWidth(
     ? FILTER_DROPDOWN_RESERVED_WIDTH
     : 0;
   const table = tableForCell(state.tables.tables, sheet, row, col);
-  const chevron = table && isHeaderRow(table, row, col) ? TABLE_HEADER_RESERVED_WIDTH : 0;
+  const chevron =
+    table && showsHeaderFilterButton(table, row, col) ? TABLE_HEADER_RESERVED_WIDTH : 0;
   return Math.max(filter, chevron);
 }
 

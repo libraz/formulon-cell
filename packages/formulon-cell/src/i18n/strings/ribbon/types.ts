@@ -141,6 +141,7 @@ export interface RibbonStrings {
     totalRow: string;
     bandedRows: string;
     bandedColumns: string;
+    filterButton: string;
     firstColumn: string;
     lastColumn: string;
     tableTotalsNone: string;
