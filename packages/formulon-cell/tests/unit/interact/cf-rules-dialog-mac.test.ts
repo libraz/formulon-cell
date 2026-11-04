@@ -157,11 +157,50 @@ describe('attachCfRulesDialog on the Mac profile', () => {
       '条件を満たす場合は停止',
     ]);
     expect(document.querySelectorAll('.fc-cfrulesdlg__table tbody tr')).toHaveLength(0);
-    expect(labels('.fc-cfrulesdlg__appliesto > span')).toEqual(['適用対象:']);
+    expect(
+      document.querySelector('.fc-cfrulesdlg__appliesto')?.firstElementChild?.textContent,
+    ).toBe('適用対象:');
     // The + / - group shares the footer row with Cancel / OK.
     expect(
       document.querySelector('.fc-cfrulesdlg__footer .fc-cfrulesdlg__bottombar'),
     ).not.toBeNull();
+    handle.detach();
+  });
+
+  it('renders the Applies to editor disabled until a rule is selected', () => {
+    const empty = open([]);
+    const row = q<HTMLElement>('.fc-cfrulesdlg__appliesto');
+    expect(row.dataset.disabled).toBe('true');
+    const input = q<HTMLInputElement>('.fc-cfrulesdlg__appliesto input');
+    expect(input.disabled).toBe(true);
+    const buttons = [...row.querySelectorAll<HTMLButtonElement>('button')];
+    expect(buttons.map((b) => b.className.match(/--(cancel|commit)\b/)?.[1] ?? 'picker')).toEqual([
+      'cancel',
+      'commit',
+      'picker',
+    ]);
+    expect(buttons.every((b) => b.disabled)).toBe(true);
+    empty.handle.detach();
+    document.body.innerHTML = '';
+    host = document.createElement('div');
+    host.dataset.fcPlatform = 'mac';
+    document.body.appendChild(host);
+
+    const { handle } = open([rule()]);
+    expect(q<HTMLElement>('.fc-cfrulesdlg__appliesto').dataset.disabled).toBe('false');
+    expect(q<HTMLInputElement>('.fc-cfrulesdlg__appliesto input').disabled).toBe(false);
+    // Range editing is not wired, so the cancel / commit / picker controls stay disabled.
+    expect(
+      [...document.querySelectorAll<HTMLButtonElement>('.fc-cfrulesdlg__appliesto button')].every(
+        (b) => b.disabled,
+      ),
+    ).toBe(true);
+    handle.detach();
+  });
+
+  it('sizes the four rule columns with a colgroup', () => {
+    const { handle } = open([]);
+    expect(document.querySelectorAll('.fc-cfrulesdlg__table colgroup col')).toHaveLength(4);
     handle.detach();
   });
 });

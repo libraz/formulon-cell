@@ -14,9 +14,11 @@ import {
   appendDialogActions,
   appendDialogButton,
   appendDialogFrame,
+  appendDialogIconButton,
   createDialogButton,
   createDialogShell,
 } from './dialog-shell.js';
+import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface CfRulesDialogDeps {
   host: HTMLElement;
@@ -284,7 +286,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   tableWrap.className = 'fc-cfrulesdlg__tablewrap';
   body.appendChild(tableWrap);
 
-  const appliesToRow = document.createElement('label');
+  // A label would forward clicks to the Mac row's first button, so that row is a div.
+  const appliesToRow = document.createElement(mac ? 'div' : 'label');
   appliesToRow.className = 'fc-cfrulesdlg__appliesto';
   const appliesToText = document.createElement('span');
   const appliesToCaption = (): string =>
@@ -292,8 +295,38 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   appliesToText.textContent = appliesToCaption();
   const appliesToInput = document.createElement('input');
   appliesToInput.type = 'text';
+  if (mac) appliesToInput.setAttribute('aria-label', appliesToCaption());
   appliesToInput.readOnly = true;
   appliesToRow.append(appliesToText, appliesToInput);
+  // The Mac row also carries cancel / commit buttons and a range picker.
+  // Editing a rule's range here is not supported, so they stay disabled.
+  const appliesToControls: HTMLButtonElement[] = [];
+  if (mac) {
+    const names = strings.namedRangeDialog;
+    for (const [kind, label] of [
+      ['cancel', names.cancelButton],
+      ['commit', names.commitButton],
+    ] as const) {
+      const button = appendDialogIconButton(appliesToRow, {
+        label: '',
+        ariaLabel: label,
+        baseClass: 'fc-namedlg__refers-icon',
+      });
+      button.classList.add(`fc-namedlg__refers-icon--${kind}`);
+      appliesToRow.insertBefore(button, appliesToInput);
+      appliesToControls.push(button);
+    }
+    appliesToControls.push(
+      attachRangePickerButton(appliesToInput, {
+        label: strings.pivotTableDialog.rangePickerSelect,
+        getValue: () => appliesToInput.value,
+        kind: 'cf-rules-applies-to',
+      }),
+    );
+    for (const button of appliesToControls) {
+      projectDisabledState(button, true, t.editUnavailable, { datasetKey: 'disabledReason' });
+    }
+  }
   // The Mac + / - group sits at the start of the footer row, before Cancel / OK.
   if (mac) {
     body.append(appliesToRow);
@@ -384,6 +417,10 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     const engineReadOnlyReason =
       selected?.source === 'engine' && selected.copies.length === 0 ? t.editUnavailable : null;
     appliesToInput.value = selected?.range ?? '';
+    if (mac) {
+      appliesToRow.dataset.disabled = String(!selected);
+      projectDisabledState(appliesToInput, !selected, null);
+    }
     const noSelectionReason = selected ? null : t.selectRuleActionReason;
     const mutationUnavailableReason = selected && !deps.store ? t.note : null;
     setDisabledState(
@@ -690,6 +727,16 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     currentRules = rules;
     const table = document.createElement('table');
     table.className = 'fc-cfrulesdlg__table';
+    if (mac) {
+      // Desktop column widths of the four-column Mac list.
+      const colgroup = document.createElement('colgroup');
+      for (const width of ['26.7%', '25%', '25.3%', '23%']) {
+        const col = document.createElement('col');
+        col.style.width = width;
+        colgroup.appendChild(col);
+      }
+      table.appendChild(colgroup);
+    }
     const thead = document.createElement('thead');
     const headRow = document.createElement('tr');
     for (const label of [
@@ -973,6 +1020,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     labelCommand(moveUpBtn, t.moveUp, '▲');
     labelCommand(moveDownBtn, t.moveDown, '▼');
     appliesToText.textContent = appliesToCaption();
+    if (mac) appliesToInput.setAttribute('aria-label', appliesToCaption());
     orderLabel.textContent = mac ? strings.macCfRulesDialog.orderLabel : '';
     closeBtn.textContent = t.close;
     if (!armed) clearAllBtn.textContent = t.clearAll;
