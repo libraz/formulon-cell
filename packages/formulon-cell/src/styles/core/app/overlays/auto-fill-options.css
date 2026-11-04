@@ -2,11 +2,11 @@
   .fc-autofill-options__button {
     position: fixed;
     z-index: var(--fc-z-menu, 2147483060);
-    width: 22px;
-    height: 22px;
+    width: 23.6px;
+    height: 21.8px;
     padding: 0;
     border: 1px solid var(--fc-rule-strong);
-    border-radius: 2px;
+    border-radius: 3px;
     background: var(--fc-bg-elev);
     color: var(--fc-fg);
     box-shadow:
@@ -30,6 +30,7 @@
   }
 
   .fc-autofill-options__button::after {
+    display: none;
     content: "";
     position: absolute;
     right: 3px;
@@ -41,8 +42,14 @@
 
   .fc-autofill-options__button:hover,
   .fc-autofill-options__button:focus-visible {
+    width: 35px;
     border-color: var(--fc-accent);
     outline: none;
+  }
+
+  .fc-autofill-options__button:hover::after,
+  .fc-autofill-options__button:focus-visible::after {
+    display: block;
   }
 
   .fc-autofill-options__menu {

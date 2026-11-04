@@ -319,6 +319,26 @@ describe('mount/sheet-tabs-controller', () => {
       expect(input?.value).toBe('A');
     });
 
+    it('opens the rename editor at the width of the tab it replaces', () => {
+      h = mount({ sheets: ['A', 'B'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      tab.getBoundingClientRect = () => ({ width: 79 }) as DOMRect;
+      tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }));
+      const input = h.sheetTabs.querySelector<HTMLInputElement>('input.fc-host__sheetbar-rename');
+      expect(input?.style.width).toBe('79px');
+    });
+
+    it('draws the Mac rename editor flush with the tab: no frame, pale green selection', () => {
+      const css = readFileSync(join(root, 'src/styles/platform-mac.css'), 'utf8');
+      expect(css).toMatch(
+        /\.fc-host\[data-fc-platform="mac"\] \.fc-host__sheetbar-rename\s*\{[\s\S]*?height: 22px;[\s\S]*?margin: 0;[\s\S]*?border: 0;[\s\S]*?border-radius: 0 0 6px 6px;/,
+      );
+      expect(css).toMatch(
+        /\.fc-host__sheetbar-rename::selection\s*\{[\s\S]*?background: color-mix\(in srgb, var\(--fc-accent\)/,
+      );
+    });
+
     it('Home and End move to the first and last visible sheet tabs', () => {
       h = mount({ sheets: ['A', 'B', 'C', 'D'], capabilities: {} }, { initialIndex: 1 });
       h.store.setState((s) => ({

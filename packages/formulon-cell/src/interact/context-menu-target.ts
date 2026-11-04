@@ -4,7 +4,12 @@ import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { MenuKind } from './context-menu-spec.js';
 
-export type MenuTarget = { kind: MenuKind; cell: Addr };
+export type MenuTarget = {
+  kind: MenuKind;
+  cell: Addr;
+  /** The select-all corner: the cell list, worded as the band menus are. */
+  corner?: true;
+};
 
 /** Resolve which menu flavour to show based on the click target. Header
  *  clicks promote the selection to the whole row/column so the action
@@ -23,6 +28,10 @@ export const resolveContextMenuTarget = (
   const zone = hitZone(layoutForView(s), s.viewport, x, y, [], { resizeHandles: false });
   const fallback = { kind: 'cell' as const, cell: { ...s.selection.active } };
   if (!zone) return fallback;
+  if (zone.kind === 'corner') {
+    if (canChangeSelection()) mutators.selectAll(store);
+    return { kind: 'cell', cell: { ...store.getState().selection.active }, corner: true };
+  }
   const selectedRanges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
   if (zone.kind === 'row-header' || zone.kind === 'row-resize') {
     const inSel = selectedRanges.some(

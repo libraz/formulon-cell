@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { attachAutoFillOptions } from '../../../src/interact/auto-fill-options.js';
@@ -106,6 +107,7 @@ describe('auto fill options', () => {
       'Fill Series',
       'Fill Formatting Only',
       'Fill Without Formatting',
+      'Flash Fill',
     ]);
     const copy = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.fc-autofill-options__item'),
@@ -158,6 +160,7 @@ describe('auto fill options', () => {
       'Fill Weekdays',
       'Fill Months',
       'Fill Years',
+      'Flash Fill',
     ]);
     const months = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.fc-autofill-options__item'),
@@ -389,5 +392,49 @@ describe('auto fill options', () => {
       /\.fc-autofill-options__item\s*\{[\s\S]*?min-height: 24px;[\s\S]*?padding: 3px 12px 3px 8px;/,
     );
     expect(css).not.toContain('box-shadow: var(--fc-shadow-2)');
+  });
+
+  it('offers Flash Fill from the chip, disabled without a history, and drops the chip after it', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 1, col: 0, value: 2 },
+    ]);
+    const history = new History();
+    const handle = attachAutoFillOptions({ host, store, wb, strings: en, history });
+    detach = () => handle.detach();
+    host.dispatchEvent(
+      new CustomEvent('fc:autofilloptions', {
+        detail: {
+          src: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+          dest: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 },
+          mode: 'series',
+          clientX: 120,
+          clientY: 90,
+        },
+      }),
+    );
+    const button = document.querySelector<HTMLButtonElement>('.fc-autofill-options__button');
+    button?.click();
+    const flash = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.fc-autofill-options__item'),
+    ).find((item) => item.textContent === 'Flash Fill');
+    expect(flash?.disabled).toBe(false);
+    expect(flash?.getAttribute('role')).toBe('menuitem');
+    flash?.click();
+    expect(button?.style.display).toBe('none');
+    expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 });
+  });
+
+  it('sizes the chip 23.6 x 21.8 with a 3 px radius, widening to 35 px on hover', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/overlays/auto-fill-options.css'),
+      'utf8',
+    );
+    expect(css).toMatch(
+      /\.fc-autofill-options__button\s*\{[\s\S]*?width: 23\.6px;[\s\S]*?height: 21\.8px;[\s\S]*?border-radius: 3px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-autofill-options__button:hover,\s*\.fc-autofill-options__button:focus-visible\s*\{[\s\S]*?width: 35px;/,
+    );
   });
 });

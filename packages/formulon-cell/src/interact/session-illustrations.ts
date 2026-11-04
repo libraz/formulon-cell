@@ -30,6 +30,7 @@ import { SVG_NS } from '../svg-namespace.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDrawingHandles,
+  appendRotationHandle,
   createObjectSelectionPublisher,
   type DrawingFrame,
   type DrawingHandle,
@@ -566,6 +567,7 @@ export function attachSessionIllustrations(deps: {
           select(item.id, panel);
           applyDrag(event, item, panel, handle);
         });
+        appendRotationHandle(panel);
       }
       root.appendChild(panel);
     }

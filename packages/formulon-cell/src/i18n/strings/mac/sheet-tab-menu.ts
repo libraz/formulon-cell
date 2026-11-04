@@ -4,6 +4,10 @@ export interface MacSheetTabMenuStrings {
   tabColor: string;
   hideSheet: string;
   unhideSheet: string;
+  /** Title of the dialog that lists the hidden sheets. */
+  unhideTitle: string;
+  /** Caption above that dialog's list. */
+  unhideList: string;
   viewCode: string;
   selectAllSheets: string;
   /** Why the entries without a host feature cannot be used. */
@@ -16,6 +20,8 @@ export const macSheetTabMenuEn: MacSheetTabMenuStrings = {
   tabColor: 'Tab Color',
   hideSheet: 'Hide',
   unhideSheet: 'Unhide...',
+  unhideTitle: 'Unhide',
+  unhideList: 'Unhide sheet:',
   viewCode: 'View Code',
   selectAllSheets: 'Select All Sheets',
   unavailable: 'This feature is not implemented yet.',
@@ -27,6 +33,8 @@ export const macSheetTabMenuJa: MacSheetTabMenuStrings = {
   tabColor: 'シート見出しの色',
   hideSheet: '表示しない',
   unhideSheet: '再表示...',
+  unhideTitle: '再表示',
+  unhideList: '再表示するシート:',
   viewCode: 'コードの表示',
   selectAllSheets: 'すべてのシートを選択',
   unavailable: 'この機能は未実装です。',
@@ -38,6 +46,8 @@ export const macSheetTabMenuDe: MacSheetTabMenuStrings = {
   tabColor: 'Registerkartenfarbe',
   hideSheet: 'Ausblenden',
   unhideSheet: 'Einblenden...',
+  unhideTitle: 'Einblenden',
+  unhideList: 'Blatt einblenden:',
   viewCode: 'Code anzeigen',
   selectAllSheets: 'Alle Blätter auswählen',
   unavailable: 'Diese Funktion ist noch nicht implementiert.',
@@ -49,6 +59,8 @@ export const macSheetTabMenuFr: MacSheetTabMenuStrings = {
   tabColor: 'Couleur de l’onglet',
   hideSheet: 'Masquer',
   unhideSheet: 'Afficher...',
+  unhideTitle: 'Afficher',
+  unhideList: 'Afficher la feuille :',
   viewCode: 'Afficher le code',
   selectAllSheets: 'Sélectionner toutes les feuilles',
   unavailable: 'Cette fonctionnalité n’est pas encore implémentée.',
@@ -60,6 +72,8 @@ export const macSheetTabMenuZh: MacSheetTabMenuStrings = {
   tabColor: '选项卡颜色',
   hideSheet: '隐藏',
   unhideSheet: '取消隐藏...',
+  unhideTitle: '取消隐藏',
+  unhideList: '取消隐藏工作表:',
   viewCode: '查看代码',
   selectAllSheets: '选定全部工作表',
   unavailable: '此功能尚未实现。',
@@ -71,6 +85,8 @@ export const macSheetTabMenuKo: MacSheetTabMenuStrings = {
   tabColor: '탭 색',
   hideSheet: '숨기기',
   unhideSheet: '숨기기 취소...',
+  unhideTitle: '숨기기 취소',
+  unhideList: '숨기기를 취소할 시트:',
   viewCode: '코드 보기',
   selectAllSheets: '모든 시트 선택',
   unavailable: '이 기능은 아직 구현되지 않았습니다.',
@@ -82,6 +98,8 @@ export const macSheetTabMenuTh: MacSheetTabMenuStrings = {
   tabColor: 'สีแท็บ',
   hideSheet: 'ซ่อน',
   unhideSheet: 'ยกเลิกการซ่อน...',
+  unhideTitle: 'ยกเลิกการซ่อน',
+  unhideList: 'ยกเลิกการซ่อนแผ่นงาน:',
   viewCode: 'ดูโค้ด',
   selectAllSheets: 'เลือกแผ่นงานทั้งหมด',
   unavailable: 'ฟีเจอร์นี้ยังไม่ได้ใช้งาน',

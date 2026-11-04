@@ -823,6 +823,17 @@ export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
   ];
 }
 
+/** Select-all corner menu: the Mac cell list with the band wording for Insert and Delete. */
+export function buildMacCornerEntries(s: Strings, hasNote: boolean): MenuEntry[] {
+  const m = s.macContextMenu;
+  return buildMacCellEntries(s, hasNote).map((entry) => {
+    if (entry.kind !== 'item') return entry;
+    if (entry.id === 'insertCells') return { ...entry, label: m.insertBand };
+    if (entry.id === 'deleteCells') return { ...entry, label: m.deleteBand };
+    return entry;
+  });
+}
+
 /** Row header menu in the Mac desktop order. */
 export function buildMacRowEntries(s: Strings): MenuEntry[] {
   const m = s.macContextMenu;

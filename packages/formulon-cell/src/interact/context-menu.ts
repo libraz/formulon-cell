@@ -65,6 +65,7 @@ import {
   buildColEntries,
   buildMacCellEntries,
   buildMacColEntries,
+  buildMacCornerEntries,
   buildMacRowEntries,
   buildPivotEntries,
   buildRowEntries,
@@ -607,7 +608,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     return toolbar;
   };
 
-  const buildMenu = (kind: MenuKind): void => {
+  const buildMenu = (kind: MenuKind, corner = false): void => {
     if (openSub) closeSubmenu();
     clearActiveItems();
     activeIndex = -1;
@@ -647,7 +648,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
             ? buildMacColEntries(strings)
             : buildColEntries(strings)
           : mac
-            ? buildMacCellEntries(strings, commentAt(store.getState(), activeAddr) !== null)
+            ? (corner ? buildMacCornerEntries : buildMacCellEntries)(
+                strings,
+                commentAt(store.getState(), activeAddr) !== null,
+              )
             : buildCellEntries(strings);
     const platformEntries = mac && pivot ? toMacBandEntries(raw, strings) : raw;
     const hasCopiedCells = !!store.getState().ui.copyRange;
@@ -778,7 +782,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         : host;
     root.setAttribute('aria-label', strings.contextMenu.title);
     focusPanel = 'root';
-    buildMenu(target.kind);
+    buildMenu(target.kind, target.corner === true);
     if (options?.mode === 'host') {
       const context = activeContext;
       root.style.display = 'none';

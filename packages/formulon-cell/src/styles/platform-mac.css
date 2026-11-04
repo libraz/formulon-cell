@@ -1756,6 +1756,24 @@
     border-bottom: var(--fc-hairline) solid var(--fc-rule-strong, var(--fc-rule));
   }
 
+  /* The rename editor takes the tab's place: same box, no frame, a pale green selection. */
+  .fc-host[data-fc-platform="mac"] .fc-host__sheetbar-rename {
+    box-sizing: border-box;
+    height: 22px;
+    margin: 0;
+    padding: 0 30px;
+    border: 0;
+    border-radius: 0 0 6px 6px;
+    background: var(--fc-bg);
+    color: #000;
+    text-align: center;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__sheetbar-rename::selection {
+    background: color-mix(in srgb, var(--fc-accent) 30%, white);
+    color: #000;
+  }
+
   /* Measured: a 9 x 11 pt padlock, 8 pt clear of the name, in the idle ink. */
   .fc-host[data-fc-platform="mac"] .fc-host__sheetbar-tab-lock {
     width: 12px;

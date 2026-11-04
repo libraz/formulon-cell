@@ -5,6 +5,7 @@ import {
   fillOutputRange,
   fillRange,
 } from '../commands/fill.js';
+
 import type { History } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
@@ -13,6 +14,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   createFloatingOptionsButton,
   createFloatingOptionsMenuItem,
@@ -95,7 +97,20 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   const withoutFormattingItem = createAutoFillItem('withoutFormatting');
   const dayItems = (['days', 'weekdays', 'months', 'years'] as const).map(createAutoFillItem);
 
-  menu.append(copyItem, seriesItem, formattingOnlyItem, withoutFormattingItem, ...dayItems);
+  const flashItem = createFloatingOptionsMenuItem({
+    className: 'fc-autofill-options__item',
+    mode: 'flash',
+  });
+  projectDisabledState(flashItem, history === null, null);
+
+  menu.append(
+    copyItem,
+    seriesItem,
+    formattingOnlyItem,
+    withoutFormattingItem,
+    ...dayItems,
+    flashItem,
+  );
   overlayPortalFor(host).append(button, menu);
 
   const applyLabels = (): void => {
@@ -107,6 +122,7 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
     seriesItem.textContent = t.fillSeries;
     formattingOnlyItem.textContent = t.fillFormattingOnly;
     withoutFormattingItem.textContent = t.fillWithoutFormatting;
+    flashItem.textContent = t.dragMenu.flashFill;
     const labels = [t.fillDays, t.fillWeekdays, t.fillMonths, t.fillYears];
     dayItems.forEach((item, index) => {
       item.textContent = labels[index] ?? '';
@@ -250,6 +266,16 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
 
   const dragMenu = createObjectMenu(host);
 
+  /** Flash Fill over the filled range; the chip does not outlive it. */
+  const runFlashFill = (dest: Range): void => {
+    if (!history) return;
+    mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
+    mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
+    if (executeRibbonFillAction({ store, workbook: wb, history, action: 'flash' })) {
+      deps.onAfterCommit?.();
+    }
+  };
+
   /** What the source cells allow, which decides the enabled rows of the drag menu. */
   const sourceKinds = (src: Range): { number: boolean; date: boolean; text: boolean } => {
     const state = store.getState();
@@ -327,14 +353,7 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
         id: 'flashFill',
         label: t.dragMenu.flashFill,
         disabled: history === null,
-        run: () => {
-          if (!history) return;
-          mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
-          mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
-          if (executeRibbonFillAction({ store, workbook: wb, history, action: 'flash' })) {
-            deps.onAfterCommit?.();
-          }
-        },
+        run: () => runFlashFill(dest),
       },
       // The series dialog has no counterpart in this build yet.
       { id: 'seriesDialog', label: t.dragMenu.seriesDialog, run: () => undefined, disabled: true },
@@ -372,8 +391,14 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
     if (!target) return;
     e.preventDefault();
     e.stopPropagation();
-    const mode = target.dataset.fcMode as AutoFillMode | undefined;
+    const mode = target.dataset.fcMode as AutoFillMode | 'flash' | undefined;
     if (!mode) return;
+    if (mode === 'flash') {
+      const dest = detail?.dest;
+      hide();
+      if (dest) runFlashFill(dest);
+      return;
+    }
     reapply(mode);
   };
 

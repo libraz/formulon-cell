@@ -112,6 +112,43 @@ describe('context menu on the Mac platform profile', () => {
     ]);
   });
 
+  it('opens the cell list with band wording on the select-all corner and selects the sheet', () => {
+    attach();
+    store.setState((st) => ({
+      ...st,
+      selection: {
+        ...st.selection,
+        active: { sheet: 0, row: 3, col: 3 },
+        anchor: { sheet: 0, row: 3, col: 3 },
+        range: { sheet: 0, r0: 3, c0: 3, r1: 3, c1: 3 },
+      },
+    }));
+    fireContextMenu(host, 10, 10); // corner
+    const labels = Array.from(
+      visibleMenu()?.querySelectorAll(':scope > .fc-ctxmenu__item .fc-ctxmenu__label') ?? [],
+    ).map((node) => node.textContent);
+    expect(labels).toEqual([
+      'カット',
+      'コピー',
+      'ペースト',
+      '形式を選択してペースト',
+      '挿入',
+      '削除',
+      '数式と値のクリア',
+      'フィルター',
+      '並べ替え',
+      '新しいメモ',
+      'セルの書式設定...',
+      'ふりがなの表示',
+      '名前の定義...',
+      'ハイパーリンク...',
+      'ハイパーリンクを開く',
+    ]);
+    const sel = store.getState().selection;
+    expect(sel.active).toEqual({ sheet: 0, row: 0, col: 0 });
+    expect(sel.range).toMatchObject({ r0: 0, c0: 0, r1: 1048575 });
+  });
+
   it('lists the pasted-link and source-format rows in the Paste Special submenu', () => {
     const sub = buildMacCellEntries(ja, false).find((e) => e.id === 'pasteSpecialMenu');
     const labels =

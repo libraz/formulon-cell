@@ -145,6 +145,14 @@ export const appendDrawingHandles = (
   }
 };
 
+/** Append the rotation handle drawn above the top middle sizing handle. */
+export const appendRotationHandle = (panel: HTMLElement): void => {
+  const grip = document.createElement('div');
+  grip.className = 'fc-drawing-rotate';
+  grip.setAttribute('aria-hidden', 'true');
+  panel.appendChild(grip);
+};
+
 /**
  * Drag an object's frame from `start`: the whole frame when `handle` is
  * omitted, else one sizing handle. `preview` follows the pointer once it

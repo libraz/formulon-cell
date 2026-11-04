@@ -9,21 +9,25 @@ import {
   setSheetHidden,
   setSheetTabVisibility,
 } from '../commands/sheet-mutate.js';
+import { createColorPalette, themeColorColumns } from '../components/color-palette.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
+import { clampPanelToViewport } from '../interact/overlay-position.js';
 import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-colors.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { showMoveCopySheetDialog } from '../toolbar/dialogs/move-copy-sheet.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
+import { showUnhideSheetDialog } from '../toolbar/dialogs/unhide-sheet.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { hiddenSheetIndexes, visibleSheetIndexes } from './sheet-indexes.js';
 import {
   createSheetMenuButton,
   createSheetMenuColorButton,
   createSheetMenuSeparator,
+  createSheetMenuSubmenuTrigger,
   createSheetTabButton,
   formatSheetLabel,
   positionSheetMenu,
@@ -238,6 +242,9 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     renameInput.spellcheck = false;
     renameInput.autocomplete = 'off';
     renameInput.setAttribute('aria-label', formatSheetLabel(strings.sheetTabs.renameSheet, before));
+    // The editor stands in for the tab at the tab's own width.
+    const tabWidth = tab.getBoundingClientRect().width;
+    if (tabWidth > 0) renameInput.style.width = `${tabWidth}px`;
     tab.replaceWith(renameInput);
 
     let done = false;
@@ -472,13 +479,90 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       ),
       ...unhideButtons,
     ];
+    // The Mac tab-colour submenu opens beside the menu with the shared palette.
+    const openColorSub = (trigger: HTMLButtonElement): void => {
+      const m = strings.macSheetTabMenu;
+      const sub = document.createElement('div');
+      sub.className = 'fc-sheetmenu__sub';
+      sub.setAttribute('role', 'menu');
+      sub.setAttribute('aria-label', m.tabColor);
+      const apply = (color: string | null): void => {
+        mutators.setSheetTabColor(store, idx, color);
+        update();
+        closeMenu();
+      };
+      const palette = createColorPalette({
+        themeLabel: strings.ribbon.themeColors,
+        standardLabel: strings.ribbon.standardColors,
+        moreColorsLabel: strings.ribbon.moreColors,
+        highContrastOnlyLabel: strings.ribbon.highContrastOnly,
+        noFillLabel: strings.sheetTabs.noColor,
+        ariaLabel: m.tabColor,
+        theme: themeColorColumns(wb.getTheme?.()?.colors),
+        value: tabColor ?? null,
+        onPick: (color) => apply(color || null),
+        onMoreColors: () => {
+          const picker = document.createElement('input');
+          picker.type = 'color';
+          picker.value = tabColor ?? '#ffffff';
+          picker.style.cssText = 'position:fixed;left:-9999px;opacity:0';
+          picker.addEventListener('change', () => {
+            picker.remove();
+            apply(picker.value);
+          });
+          document.body.appendChild(picker);
+          picker.click();
+        },
+      });
+      sub.appendChild(palette.el);
+      sheetMenu.appendChild(sub);
+      const menuRect = sheetMenu.getBoundingClientRect();
+      const rowRect = trigger.getBoundingClientRect();
+      const { x: left, y: top } = clampPanelToViewport(sub, menuRect.right - 1, rowRect.top, {
+        pad: 8,
+        fallbackWidth: 198,
+        fallbackHeight: 285,
+      });
+      sub.style.left = `${left}px`;
+      sub.style.top = `${top}px`;
+      trigger.setAttribute('aria-expanded', 'true');
+    };
     // The Mac desktop's tab menu lists its own entries in its own order.
     const macItems = (): HTMLElement[] => {
       const m = strings.macSheetTabMenu;
       const protectedSheet = isSheetProtected(store.getState(), idx);
       const sheetProtection = input.toggleSheetProtection;
-      colorLabel.textContent = m.tabColor;
-      colorPalette.setAttribute('aria-label', m.tabColor);
+      const colorTrigger = createSheetMenuSubmenuTrigger(m.tabColor);
+      const toggleColorSub = (open: boolean): void => {
+        sheetMenu.querySelector('.fc-sheetmenu__sub')?.remove();
+        colorTrigger.setAttribute('aria-expanded', 'false');
+        if (open) openColorSub(colorTrigger);
+      };
+      colorTrigger.addEventListener('click', () => toggleColorSub(true));
+      colorTrigger.addEventListener('pointerenter', () => toggleColorSub(true));
+      colorTrigger.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        toggleColorSub(true);
+        sheetMenu.querySelector<HTMLButtonElement>('.fc-sheetmenu__sub button')?.focus();
+      });
+      const unhideSheetsAction = async (): Promise<void> => {
+        const targets = hidden();
+        const pos = await showUnhideSheetDialog({
+          host: sheetTabs,
+          strings: {
+            title: m.unhideTitle,
+            list: m.unhideList,
+            ok: strings.hyperlinkDialog.ok,
+            cancel: strings.hyperlinkDialog.cancel,
+          },
+          sheets: targets.map((i) => wb.sheetName(i)),
+        });
+        const target = pos === null ? undefined : targets[pos];
+        if (target === undefined || !setSheetHidden(store, wb, history, target, false)) return;
+        switchSheet(target);
+        update();
+      };
       return [
         menuButton(
           m.insertSheet,
@@ -515,7 +599,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           !sheetProtection,
           m.unavailable,
         ),
-        colorPalette,
+        colorTrigger,
         createSheetMenuSeparator(),
         menuButton(
           m.hideSheet,
@@ -523,14 +607,26 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           structureProtected || !canHide || visibleIndexes.length <= 1,
           hideReason(),
         ),
-        ...(hiddenIndexes.length > 0
-          ? unhideButtons
-          : [menuButton(m.unhideSheet, () => undefined, true, unhideReason(false))]),
+        menuButton(
+          m.unhideSheet,
+          () => {
+            void unhideSheetsAction();
+          },
+          structureProtected || !canHide || hiddenIndexes.length === 0,
+          unhideReason(hiddenIndexes.length > 0),
+        ),
         createSheetMenuSeparator(),
         menuButton(m.selectAllSheets, () => undefined, true, m.unavailable),
       ];
     };
     sheetMenu.replaceChildren(...(isMacWorkbook(wb) ? macItems() : desktopItems));
+    for (const entry of sheetMenu.querySelectorAll<HTMLElement>('.fc-sheetmenu__item')) {
+      if (entry.getAttribute('aria-haspopup')) continue;
+      entry.addEventListener('pointerenter', () => {
+        sheetMenu.querySelector('.fc-sheetmenu__sub')?.remove();
+        sheetMenu.querySelector('[aria-haspopup="menu"]')?.setAttribute('aria-expanded', 'false');
+      });
+    }
     positionSheetMenu(sheetMenu, x, y);
     sheetMenu.querySelector<HTMLButtonElement>('.fc-sheetmenu__item:not([disabled])')?.focus();
   };
@@ -656,6 +752,19 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     }
     if (e.key === 'Tab') {
       closeMenu();
+      return;
+    }
+    const inSub = document.activeElement?.closest('.fc-sheetmenu__sub');
+    if (inSub) {
+      // The palette owns its arrows; Left and Escape fold the submenu back.
+      if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
+        sheetMenu.querySelector('.fc-sheetmenu__sub')?.remove();
+        const trigger = sheetMenu.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]');
+        trigger?.setAttribute('aria-expanded', 'false');
+        trigger?.focus();
+      }
       return;
     }
     const items = Array.from(sheetMenu.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'));

@@ -8,6 +8,7 @@ import {
   type ContextMenuHandle,
 } from '../../../../src/interact/context-menu.js';
 import { disposeOverlayPortal } from '../../../../src/interact/overlay-portal.js';
+import { cellRect, layoutForView } from '../../../../src/render/geometry.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
 import { loadFixture } from '../../engine/pivot-excel-parity/fixture.js';
 import { fireContextMenu, item, setRange } from './fixtures.js';
@@ -73,7 +74,12 @@ describe('PivotTable context menu, as measured on the Mac app', () => {
 
   const open = (cell: readonly [number, number]): void => {
     setRange(store, cell[0], cell[1], cell[0], cell[1]);
-    fireContextMenu(host, 10, 10);
+    clickCell(cell[0], cell[1]);
+  };
+  const clickCell = (row: number, col: number): void => {
+    const s = store.getState();
+    const rect = cellRect(layoutForView(s), s.viewport, row, col);
+    fireContextMenu(host, rect.x + 4, rect.y + 4);
   };
   const menu = (): string[] => rows(document.querySelector('.fc-ctxmenu'));
   const submenu = (id: string): string[] => {
@@ -430,7 +436,6 @@ describe('PivotTable context menu, as measured on the Mac app', () => {
   });
 
   it('builds the menu for the clicked cell, not the active one', async () => {
-    const { layoutForView, cellRect } = await import('../../../../src/render/geometry.js');
     setRange(store, CELL.header[0], CELL.header[1], CELL.header[0], CELL.header[1]);
     const s = store.getState();
     const rect = cellRect(layoutForView(s), s.viewport, CELL.total[0], CELL.total[1]);
@@ -440,7 +445,6 @@ describe('PivotTable context menu, as measured on the Mac app', () => {
   });
 
   it('shows the clicked value cell in the Number Format sample', async () => {
-    const { layoutForView, cellRect } = await import('../../../../src/render/geometry.js');
     setRange(store, CELL.header[0], CELL.header[1], CELL.header[0], CELL.header[1]);
     const s = store.getState();
     const rect = cellRect(layoutForView(s), s.viewport, CELL.value[0], CELL.value[1]);
@@ -478,7 +482,9 @@ describe('Hide Field List in the PivotTable menu', () => {
     });
     const show = (): void => {
       setRange(store, 2, 0, 2, 0);
-      fireContextMenu(host, 10, 10);
+      const st = store.getState();
+      const rect = cellRect(layoutForView(st), st.viewport, 2, 0);
+      fireContextMenu(host, rect.x + 4, rect.y + 4);
     };
     show();
     expect(item('pivotShowFieldList')?.getAttribute('aria-checked')).toBe('false');

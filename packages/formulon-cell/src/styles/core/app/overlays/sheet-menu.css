@@ -61,6 +61,48 @@
     background: var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
   }
 
+  .fc-sheetmenu__item--submenu {
+    justify-content: space-between;
+  }
+
+  .fc-sheetmenu__chevron {
+    width: 6px;
+    height: 6px;
+    margin-left: 12px;
+    border-top: 1.5px solid currentColor;
+    border-right: 1.5px solid currentColor;
+    transform: rotate(45deg);
+  }
+
+  /* Tab-colour submenu: the 16 px swatch palette in a 198 pt panel. */
+  .fc-sheetmenu__sub {
+    position: fixed;
+    box-sizing: border-box;
+    width: 198px;
+    padding: 0;
+    background: var(--fc-bg-elev, Canvas);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-radius: 2px;
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.15),
+      0 1px 4px rgba(0, 0, 0, 0.12);
+  }
+
+  .fc-sheetmenu__sub .fc-colorpalette {
+    width: 100%;
+    gap: 4px;
+  }
+
+  .fc-sheetmenu__sub .fc-colorpalette__grid {
+    grid-template-columns: repeat(10, 16px);
+  }
+
+  .fc-sheetmenu__sub .fc-colorpalette__swatch {
+    width: 16px;
+    height: 16px;
+  }
+
   .fc-sheetmenu__colors {
     padding: 5px 10px 7px 28px;
   }

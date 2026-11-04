@@ -6,6 +6,10 @@
     max-width: 96vw;
   }
 
+  .fc-movecopy.fc-unhidesheet {
+    min-height: 0;
+  }
+
   .fc-movecopy.fc-fmtdlg__panel:not(:has(> .fc-fmtdlg__tabs)) > .fc-fmtdlg__body {
     padding-inline: 0;
   }

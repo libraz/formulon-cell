@@ -30,6 +30,22 @@ export function createSheetMenuButton(
   return button;
 }
 
+/** A menu entry that opens a submenu: no click-to-close, with a trailing chevron. */
+export function createSheetMenuSubmenuTrigger(label: string): HTMLButtonElement {
+  const button = createHostButton({
+    className: 'fc-sheetmenu__item fc-sheetmenu__item--submenu',
+    role: 'menuitem',
+    text: label,
+  });
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  const chevron = document.createElement('span');
+  chevron.className = 'fc-sheetmenu__chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  button.appendChild(chevron);
+  return button;
+}
+
 export function createSheetMenuSeparator(): HTMLDivElement {
   const sep = document.createElement('div');
   sep.className = 'fc-sheetmenu__sep';
