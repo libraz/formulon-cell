@@ -23,6 +23,7 @@ import {
   slantTailLines,
   strokeSpans,
 } from './border-edges.js';
+import { rulePx } from './chrome-context.js';
 import { gridLinesShown } from './lines.js';
 import { mergedDiagonalBorders, mergeRangeAt } from './merged-cells.js';
 import { connectedRects } from './range-rects.js';
@@ -49,7 +50,7 @@ export function paintBorders(
   const { layout, data, format } = state;
   if (format.formats.size === 0 && !inherited) return;
   const sheet = data.sheetIndex;
-  const g = Math.max(1, Math.round(dpr));
+  const g = rulePx(dpr);
   const rtl = layout.rtl === true;
 
   const sidesCache = new Map<string, CellBorders | null>();

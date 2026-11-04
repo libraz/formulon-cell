@@ -67,10 +67,6 @@ let cachedSegmenterConstructor: SegmenterConstructor;
 
 const combiningMark = /\p{Mark}/u;
 
-/** Width available to a cell's wrapped text under the shared canvas/AutoFit contract. */
-export const availableTextWidth = (cellWidth: number, indentPx = 0): number =>
-  Math.max(1, cellWidth - CELL_TEXT_HORIZONTAL_PADDING_PX - Math.max(0, indentPx));
-
 const segmentWithIntl = (
   text: string,
   locale: string | undefined,

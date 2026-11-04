@@ -409,9 +409,10 @@ describe('paintHeaders', () => {
     const colSeps = paths.filter((p) => p.style !== '' && p.points[0]?.[1] === top);
     expect(colSeps.length).toBeGreaterThan(0);
     for (const sep of colSeps) expect(sep.points[1]?.[1]).toBe(oy - 1);
-    const rowSeps = paths.filter((p) => p.points[0]?.[0] === left && p.points[1]?.[0] !== 260);
-    expect(rowSeps.length).toBe(2);
-    for (const sep of rowSeps) expect(sep.points[1]?.[0]).toBe(ox - 1);
+    const rowSep = paths.find((p) => p.points[0]?.[0] === left && p.points[1]?.[0] !== 260);
+    const rowEnds = (rowSep?.points ?? []).filter((_, i) => i % 2 === 1);
+    expect(rowEnds.length).toBe(2);
+    for (const end of rowEnds) expect(end[0]).toBe(ox - 1);
   });
 
   it('centres row numbers in the strip and sets labels in the given family', () => {

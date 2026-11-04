@@ -10,8 +10,6 @@ import {
   isRowVisible,
   rangeRects,
   type ViewLayout,
-  visibleCols,
-  visibleRows,
 } from '../../../src/render/geometry.js';
 import type { ViewportSlice } from '../../../src/store/store.js';
 
@@ -61,8 +59,8 @@ describe('freeze band with an origin', () => {
   });
 
   it('renders the band then the body, skipping everything above/left of the origin', () => {
-    expect(visibleRows(layout, viewport)).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
-    expect(visibleCols(layout, viewport)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(buildRowLayout(layout, viewport).visible).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
+    expect(buildColLayout(layout, viewport).visible).toEqual([1, 2, 3, 4, 5, 6]);
     expect(buildRowLayout(layout, viewport).frozenTotal).toBe(60);
     expect(buildColLayout(layout, viewport).visible[0]).toBe(1);
     expect(isRowVisible(layout, viewport, 8)).toBe(false);
@@ -82,7 +80,7 @@ describe('freeze band with an origin', () => {
 
   it('ignores the origin on an axis with nothing frozen', () => {
     const colsOnly = { ...layout, freezeRows: 0 };
-    expect(visibleRows(colsOnly, { ...viewport, rowStart: 4 })[0]).toBe(4);
+    expect(buildRowLayout(colsOnly, { ...viewport, rowStart: 4 }).visible[0]).toBe(4);
     expect(frozenRowsHeight(colsOnly, viewport)).toBe(0);
   });
 });

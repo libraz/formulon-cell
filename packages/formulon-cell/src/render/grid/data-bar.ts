@@ -53,13 +53,11 @@ export function paintDataBar(
   const x = growsLeft ? endX : axisX;
   ctx.fillRect(x, top, w, height);
   if (overlay.barBorderColor && w > 0) {
-    ctx.globalAlpha = 1;
     ctx.strokeStyle = overlay.barBorderColor;
     ctx.lineWidth = 1;
     ctx.strokeRect(x, top, w, height);
   }
   if (overlay.barAxisVisible) {
-    ctx.globalAlpha = 1;
     ctx.fillStyle = overlay.barAxisColor ?? '#000000';
     ctx.fillRect(axisX - 0.5, top, 1, height);
   }

@@ -30,6 +30,8 @@ export function gridLinesShown(state: {
 }
 
 /** Draw `from..to` minus the `gaps` intervals along one rule. */
+const NO_GAPS: readonly [number, number][] = [];
+
 function segments(
   ctx: CanvasRenderingContext2D,
   from: number,
@@ -86,9 +88,12 @@ export function paintGridLines(
     .flatMap((range) => rangeRects(layout, state.viewport, range));
   for (const x of xs) {
     const xx = ruleCenter(x, dpr, rtl);
-    const gaps = bareRects
-      .filter((r) => x > r.x && x < r.x + r.w)
-      .map((r): [number, number] => [r.y, r.y + r.h]);
+    const gaps =
+      bareRects.length === 0
+        ? NO_GAPS
+        : bareRects
+            .filter((r) => x > r.x && x < r.x + r.w)
+            .map((r): [number, number] => [r.y, r.y + r.h]);
     segments(ctx, 0, cssHeight, gaps, (y) => [xx, y]);
   }
   const ys = new Set<number>();
@@ -99,9 +104,12 @@ export function paintGridLines(
   }
   for (const y of ys) {
     const yy = ruleCenter(y, dpr);
-    const gaps = bareRects
-      .filter((r) => y > r.y && y <= r.y + r.h)
-      .map((r): [number, number] => [r.x, r.x + r.w]);
+    const gaps =
+      bareRects.length === 0
+        ? NO_GAPS
+        : bareRects
+            .filter((r) => y > r.y && y <= r.y + r.h)
+            .map((r): [number, number] => [r.x, r.x + r.w]);
     segments(ctx, 0, cssWidth, gaps, (x) => [x, yy]);
   }
 

@@ -78,20 +78,31 @@ export function visibleNotes(formats: ReadonlyMap<string, CellFormat>): readonly
 }
 
 /** Screen rect of the freeze / split pane holding the cell, headers excluded. */
-function paneRect(layout: ViewLayout, cols: AxisLayout, rows: AxisLayout, addr: Addr): Rect {
+function paneRect(
+  layout: ViewLayout,
+  cols: AxisLayout,
+  rows: AxisLayout,
+  addr: Addr,
+  bodyEnd: number,
+): Rect {
   const originX = gridOriginX(layout);
   const originY = gridOriginY(layout);
   const inFrozenCols = (cols.positionAt.get(addr.col) ?? 0) < cols.frozenTotal;
   const inFrozenRows = (rows.positionAt.get(addr.row) ?? 0) < rows.frozenTotal;
   const x0 = originX + (inFrozenCols ? 0 : cols.frozenTotal);
   const x1 = inFrozenCols ? originX + cols.frozenTotal : Math.max(layout.viewWidth, x0);
+  const y0 = originY + (inFrozenRows ? 0 : rows.frozenTotal);
+  const y1 = originY + (inFrozenRows ? rows.frozenTotal : bodyEnd);
+  return { x: mirrorX(layout, x0, x1 - x0), y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/** Bottom edge of the scrolling body: the last visible row's end. */
+function bodyEndOf(rows: AxisLayout): number {
   let bodyEnd = rows.frozenTotal;
   for (const r of rows.visible) {
     bodyEnd = Math.max(bodyEnd, (rows.positionAt.get(r) ?? 0) + (rows.sizeAt.get(r) ?? 0));
   }
-  const y0 = originY + (inFrozenRows ? 0 : rows.frozenTotal);
-  const y1 = originY + (inFrozenRows ? rows.frozenTotal : bodyEnd);
-  return { x: mirrorX(layout, x0, x1 - x0), y: y0, w: x1 - x0, h: y1 - y0 };
+  return bodyEnd;
 }
 
 export function paintVisibleNotes(
@@ -105,14 +116,17 @@ export function paintVisibleNotes(
   const scale = renderScale(layout, viewport);
   const rtl = layout.rtl === true;
   const macPt = wholePointAdvances(layout) ? fontPointsToCssPx(1) * scale : null;
-  for (const note of visibleNotes(state.format.formats)) {
+  const notes = visibleNotes(state.format.formats);
+  if (notes.length === 0) return;
+  const bodyEnd = bodyEndOf(rows);
+  for (const note of notes) {
     const { addr } = note;
     if (addr.sheet !== sheet) continue;
     if (!isRowVisible(layout, viewport, addr.row) || !isColVisible(layout, viewport, addr.col)) {
       continue;
     }
     const cell = cellRectIn(layout, cols, rows, addr.row, addr.col);
-    const pane = paneRect(layout, cols, rows, addr);
+    const pane = paneRect(layout, cols, rows, addr, bodyEnd);
     if (macPt !== null) {
       paintMacNote(ctx, note, cell, pane, macPt, rtl);
       continue;

@@ -1,5 +1,6 @@
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
+import { FALLBACK_ACCENT } from './markers.js';
 
 /** Outer box of the 2px selection outline around `bounds`. Desktop
  *  spreadsheets cover the range's own gridlines plus one pixel outside them,
@@ -99,7 +100,7 @@ export function paintActiveCellBox(
   ctx.save();
   ctx.setLineDash([]);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = theme.accent || '#0078d4';
+  ctx.strokeStyle = theme.accent || FALLBACK_ACCENT;
   ctx.strokeRect((rtl ? left + 1 : left) + 1.5, top + 1.5, right - left - 4, bottom - top - 4);
   ctx.restore();
 }
@@ -130,7 +131,7 @@ export function paintFillHandle(
   ctx.fillStyle = '#ffffff';
   if (ring) ctx.fillRect(x - 1, y - 1, hs + 2, hs + 2);
   else ctx.fillRect(gapX, y - 1, hs + 1, hs + 1);
-  ctx.fillStyle = theme.accent || '#0078d4';
+  ctx.fillStyle = theme.accent || FALLBACK_ACCENT;
   ctx.fillRect(x, y, hs, hs);
   return { x: x - 1, y: y - 1, w: hs + 2, h: hs + 2 };
 }

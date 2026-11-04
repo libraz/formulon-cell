@@ -10,6 +10,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { headerLabelScale } from '../store/header-strip.js';
+import { validationAt } from '../store/range-validations.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { CellFormat, State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
@@ -28,6 +29,7 @@ import {
   gridOriginX,
   gridOriginY,
   layoutForView,
+  pointPx,
   type Rect,
   rangeRects,
   rowGap,
@@ -188,6 +190,13 @@ export class GridRenderer {
 
   private rafId = 0;
 
+  private resolutionQueryDpr: number | undefined;
+
+  private resolutionUnwatch: (() => void) | null = null;
+
+  /** Platform profile resolved for the paint in flight; null outside a paint. */
+  private macProfileInPaint: boolean | null = null;
+
   private marqueeRafId = 0;
 
   private readonly sheetBackgroundImages = new Map<
@@ -216,12 +225,35 @@ export class GridRenderer {
     this.cssWidth = Math.max(0, rect.width);
     this.cssHeight = Math.max(0, rect.height);
     this.dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-    this.canvas.width = Math.round(this.cssWidth * this.dpr);
-    this.canvas.height = Math.round(this.cssHeight * this.dpr);
+    const pxW = Math.round(this.cssWidth * this.dpr);
+    const pxH = Math.round(this.cssHeight * this.dpr);
+    // Assigning either dimension clears the backing store, so only on change.
+    if (this.canvas.width !== pxW) this.canvas.width = pxW;
+    if (this.canvas.height !== pxH) this.canvas.height = pxH;
     this.canvas.style.width = `${this.cssWidth}px`;
     this.canvas.style.height = `${this.cssHeight}px`;
+    this.watchResolution();
     this.resizeViewport();
     this.invalidate();
+  }
+
+  /** Re-runs `resize` when the display scale changes (window moved to another monitor, browser zoom). */
+  private watchResolution(): void {
+    if (this.resolutionQueryDpr === window.devicePixelRatio) return;
+    this.unwatchResolution();
+    if (typeof window.matchMedia !== 'function') return;
+    const dpr = window.devicePixelRatio;
+    const query = window.matchMedia(`(resolution: ${dpr}dppx)`);
+    const onChange = (): void => this.resize();
+    query.addEventListener?.('change', onChange);
+    this.resolutionQueryDpr = dpr;
+    this.resolutionUnwatch = () => query.removeEventListener?.('change', onChange);
+  }
+
+  private unwatchResolution(): void {
+    this.resolutionUnwatch?.();
+    this.resolutionUnwatch = null;
+    this.resolutionQueryDpr = undefined;
   }
 
   private resizeViewport(): void {
@@ -268,9 +300,10 @@ export class GridRenderer {
   }
 
   invalidate(): void {
-    // Resize now; the frame pass repeats it after the native format epoch settles.
-    if (this.cssWidth > 0 && this.cssHeight > 0) this.resizeViewport();
+    // The first invalidate of a frame sizes now; the frame pass repeats it
+    // after the native format epoch settles. Later ones wait for that pass.
     if (this.rafId) return;
+    if (this.cssWidth > 0 && this.cssHeight > 0) this.resizeViewport();
     this.rafId = requestAnimationFrame(() => {
       try {
         this.resizeViewport();
@@ -286,11 +319,20 @@ export class GridRenderer {
     this.rafId = 0;
     if (this.marqueeRafId) cancelAnimationFrame(this.marqueeRafId);
     this.marqueeRafId = 0;
+    this.unwatchResolution();
   }
 
   private paint(): void {
     if (this.cssWidth === 0 || this.cssHeight === 0) return;
+    this.macProfileInPaint = this.macProfileLookup();
+    try {
+      this.paintFrame();
+    } finally {
+      this.macProfileInPaint = null;
+    }
+  }
 
+  private paintFrame(): void {
     const baseState = this.getState();
     const state: ViewState = { ...baseState, layout: layoutForView(baseState) };
     const theme = this.getTheme();
@@ -466,9 +508,7 @@ export class GridRenderer {
     const refs = state.ui.editorRefs;
     if (!refs || refs.length === 0) return;
     const sheet = state.data.sheetIndex;
-    const macPt = this.macProfile()
-      ? fontPointsToCssPx(1) * renderScale(state.layout, state.viewport)
-      : undefined;
+    const macPt = this.macProfile() ? pointPx(state.layout, state.viewport) : undefined;
     for (const ref of refs) {
       const bounds = this.rangeBounds(state, {
         sheet,
@@ -529,13 +569,17 @@ export class GridRenderer {
     );
     const bounds = activeRects[0];
     if (!triangle || !bounds) return;
-    const ptPx = fontPointsToCssPx(1) * renderScale(state.layout, state.viewport);
+    const ptPx = pointPx(state.layout, state.viewport);
     const rect = paintErrorSmartTag(this.ctx, bounds, ptPx, state.layout.rtl);
     this.hits.errorTag = { rect, addr: { ...anchor }, kind: 'error' };
   }
 
   /** Whether the host renders the Mac profile, which several painters follow. */
   private macProfile(): boolean {
+    return this.macProfileInPaint ?? this.macProfileLookup();
+  }
+
+  private macProfileLookup(): boolean {
     return (
       (this.host.closest?.<HTMLElement>('.fc-host') ?? this.host).dataset?.fcPlatform === 'mac'
     );
@@ -672,7 +716,7 @@ export class GridRenderer {
     // cells is active, and boxes a blocked formula's target only while its
     // anchor is; other profiles keep the faint always-on ring and red blockers.
     const mac = this.macProfile();
-    const macPtPx = mac ? fontPointsToCssPx(1) * renderScale(layout, viewport) : undefined;
+    const macPtPx = mac ? pointPx(layout, viewport) : undefined;
     for (const r of ranges) {
       if (mac && !inRange(r)) continue;
       for (const rect of rangeRects(layout, viewport, r)) {
@@ -820,9 +864,7 @@ export class GridRenderer {
       : a;
     const validationBounds = trailingRect(activeRects, layout.rtl);
     // The Mac desktop sets its chrome in points.
-    const macPt = this.macProfile()
-      ? fontPointsToCssPx(1) * renderScale(layout, viewport)
-      : undefined;
+    const macPt = this.macProfile() ? pointPx(layout, viewport) : undefined;
     if (validationBounds && shouldShowValidationChevron(validationAt(format, activeAnchor))) {
       const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl, macPt);
       this.hits.validationChevron = {
@@ -919,7 +961,3 @@ export {
   VALIDATION_TRIANGLE_COLOR,
   type ValidationChevron,
 } from './grid/hit-state.js';
-
-import { fontPointsToCssPx } from '../engine/font-units.js';
-import { validationAt } from '../store/range-validations.js';
-import { renderScale } from '../store/render-scale.js';

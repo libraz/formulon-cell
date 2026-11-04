@@ -10,7 +10,6 @@ import { addrKey } from '../../engine/address.js';
 import { effectiveCellFormatFromEngine } from '../../engine/cell-format-projection.js';
 import { evaluateCfFromEngine } from '../../engine/cf-sync.js';
 import { formulaForEdit } from '../../engine/edit-seed.js';
-import { fontPointsToCssPx } from '../../engine/font-units.js';
 import { numFmtToFormatCode } from '../../engine/format-writeback.js';
 import { pivotStyleLayer } from '../../engine/pivot-style.js';
 import { makeRangeResolver, type RangeResolver } from '../../engine/range-resolver.js';
@@ -30,6 +29,7 @@ import {
   cellRectUnclamped,
   gridOriginX,
   gridOriginY,
+  pointPx,
   type Rect,
   rangeRects,
   type ViewState,
@@ -68,6 +68,7 @@ import {
   paintTableHeaderChevron,
   paintValidationCircle,
   paintValidationTriangle,
+  TABLE_HEADER_TEXT_RESERVE,
 } from '../painters.js';
 import { rowBaselineFonts } from '../row-baseline.js';
 import { paintCellSparkline } from '../sparkline.js';
@@ -188,7 +189,7 @@ export function paintCells(
     visualZoom(state.viewport.zoom),
   );
   const pivotButtonLook = cellCtx.fontEffects ? MAC_PIVOT_BUTTON_LOOK : FILTER_BUTTON_LOOK;
-  const ptPx = fontPointsToCssPx(1) * renderScale(state.layout, state.viewport);
+  const ptPx = pointPx(state.layout, state.viewport);
   const visibleBounds = {
     r0: state.viewport.rowStart,
     c0: state.viewport.colStart,
@@ -717,7 +718,7 @@ export function paintCells(
         // Conditional formatting's "Show Bar/Icon Only" suppresses the
         // value text while still leaving fills, bars, and icons visible.
       } else if (headerButton || pivotButton) {
-        const reserved = headerButton ? 20 : pivotButtonSize + 1;
+        const reserved = headerButton ? TABLE_HEADER_TEXT_RESERVE : pivotButtonSize + 1;
         paintCellText({
           ...paintCtx,
           bounds: {

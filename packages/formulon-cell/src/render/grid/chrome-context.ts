@@ -9,15 +9,18 @@ export interface ChromePaintContext {
   cssHeight: number;
 }
 
+/** Device pixels in one rule: one CSS pixel snapped to whole device pixels. */
+export const rulePx = (dpr: number): number => Math.max(1, Math.round(dpr));
+
 /** A one-CSS-pixel rule, snapped to whole device pixels, as the spreadsheet
  *  draws gridlines at every display scale. */
-export const ruleWidth = (dpr: number): number => Math.max(1, Math.round(dpr)) / dpr;
+export const ruleWidth = (dpr: number): number => rulePx(dpr) / dpr;
 
 /** CSS centre of the rule a boundary owns. The spreadsheet draws each
  *  gridline on the last device pixels before the boundary — after it when
  *  `mirrored` (RTL columns), where the trailing edge is on the left. */
 export const ruleCenter = (boundary: number, dpr: number, mirrored = false): number => {
-  const g = Math.max(1, Math.round(dpr));
+  const g = rulePx(dpr);
   const edge = Math.round(boundary * dpr);
   return (mirrored ? edge + g / 2 : edge - g / 2) / dpr;
 };
@@ -33,7 +36,7 @@ interface PaintRect {
  *  rule over the gridline before it, so a filled cell hides both of its
  *  gridlines as in the spreadsheet. */
 export const fillRect = (bounds: PaintRect, dpr: number, mirrored = false): PaintRect => {
-  const g = Math.max(1, Math.round(dpr));
+  const g = rulePx(dpr);
   const l = Math.round(bounds.x * dpr);
   const r = Math.round((bounds.x + bounds.w) * dpr);
   const t = Math.round(bounds.y * dpr);
@@ -49,7 +52,7 @@ export const fillRect = (bounds: PaintRect, dpr: number, mirrored = false): Pain
 /** A cell's surface between its gridlines: the device-snapped cell minus the
  *  rule it owns on its trailing edges. */
 export const surfaceRect = (bounds: PaintRect, dpr: number, mirrored = false): PaintRect => {
-  const g = Math.max(1, Math.round(dpr));
+  const g = rulePx(dpr);
   const l = Math.round(bounds.x * dpr);
   const r = Math.round((bounds.x + bounds.w) * dpr);
   const t = Math.round(bounds.y * dpr);

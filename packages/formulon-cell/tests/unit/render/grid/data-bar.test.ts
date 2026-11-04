@@ -79,7 +79,7 @@ describe('data-bar painting', () => {
     expect(fillRect).toHaveBeenNthCalledWith(1, 59.5, 21, expect.closeTo(38.8), 26);
     expect(strokeRect).toHaveBeenCalledWith(59.5, 21, expect.closeTo(38.8), 26);
     expect(fillRect).toHaveBeenNthCalledWith(2, 59, 21, 1, 26);
-    expect(alphaValues).toEqual([1, 1, 1]);
+    expect(alphaValues).toEqual([1]);
   });
 
   it('does not stroke a zero-length bar while retaining the axis hook', () => {

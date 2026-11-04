@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { computeAutofitRowHeight } from '../../../src/commands/autofit-measurement.js';
 import { paintCellText } from '../../../src/render/painters/text.js';
 import {
-  availableTextWidth,
   CELL_TEXT_HORIZONTAL_PADDING_PX,
+  CELL_TEXT_INDENT_PX,
   cellTextHorizontalMetrics,
   wrapText,
 } from '../../../src/render/text-wrap.js';
@@ -135,8 +135,8 @@ describe('shared wrapped text behavior', () => {
     // One line of the Normal font fills the default height; each further line adds a pitch.
     const pitch = Math.round(theme.textCell * 1.28);
     expect(autoHeight).toBe(store.getState().layout.defaultRowHeight + (fills.length - 1) * pitch);
-    expect(availableTextWidth(bounds.w, format.indent * 8)).toBe(
-      bounds.w - CELL_TEXT_HORIZONTAL_PADDING_PX - format.indent * 8,
+    expect(cellTextHorizontalMetrics(bounds.w, format.indent).availableWidth).toBe(
+      bounds.w - CELL_TEXT_HORIZONTAL_PADDING_PX - format.indent * CELL_TEXT_INDENT_PX,
     );
   });
 

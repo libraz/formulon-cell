@@ -52,8 +52,10 @@ export interface ConditionalCellOverlay {
 
 /** Single-slot identity cache owned by one renderer. zustand replaces
  *  conditional.rules / data.cells by reference on every mutation, so matching
- *  references mean the previous evaluation is still valid; pan, scroll, and
- *  selection changes leave them untouched and hit the cache. */
+ *  references mean the previous evaluation is still valid; selection changes
+ *  leave them untouched and hit the cache. A scroll changes the visible
+ *  bounds, so the overlay is rebuilt for the new window, but rule-wide
+ *  statistics are reused (see `ruleStats`). */
 export interface ConditionalCache {
   key: ConditionalCacheKey | null;
   overlay: Map<string, ConditionalCellOverlay> | null;
@@ -374,15 +376,15 @@ function overlayFor(
     if (rule.kind === 'cell-value') {
       paintCellValue(state, rule, ruleOverlay, wb, visibleBounds);
     } else if (rule.kind === 'color-scale') {
-      paintColorScale(state, rule, ruleOverlay);
+      paintColorScale(state, rule, ruleOverlay, visibleBounds);
     } else if (rule.kind === 'data-bar') {
-      paintDataBar(state, rule, ruleOverlay);
+      paintDataBar(state, rule, ruleOverlay, visibleBounds);
     } else if (rule.kind === 'icon-set') {
-      paintIconSet(state, rule, ruleOverlay);
+      paintIconSet(state, rule, ruleOverlay, visibleBounds);
     } else if (rule.kind === 'top-bottom') {
-      paintTopBottom(state, rule, ruleOverlay);
+      paintTopBottom(state, rule, ruleOverlay, visibleBounds);
     } else if (rule.kind === 'average') {
-      paintAverage(state, rule, ruleOverlay);
+      paintAverage(state, rule, ruleOverlay, visibleBounds);
     } else if (rule.kind === 'text-contains') {
       paintTextContains(state, rule, ruleOverlay, visibleBounds);
     } else if (rule.kind === 'date-occurring') {
@@ -390,7 +392,7 @@ function overlayFor(
     } else if (rule.kind === 'formula') {
       paintFormula(state, rule, ruleOverlay, wb, visibleBounds);
     } else if (rule.kind === 'duplicates' || rule.kind === 'unique') {
-      paintDupsUnique(state, rule, ruleOverlay);
+      paintDupsUnique(state, rule, ruleOverlay, visibleBounds);
     } else if (
       rule.kind === 'blanks' ||
       rule.kind === 'non-blanks' ||
@@ -438,34 +440,85 @@ function paintCellValue(
   }
 }
 
+/** Rule-wide statistics (extremes, thresholds, counts) depend only on the
+ *  cell map and the rule, never on the viewport, so they are computed once per
+ *  (cells, rule) pair and every scroll step only applies them. */
+const ruleStatsCache = new WeakMap<object, WeakMap<object, unknown>>();
+
+function ruleStats<T>(cells: State['data']['cells'], rule: ConditionalRule, compute: () => T): T {
+  let byRule = ruleStatsCache.get(cells);
+  if (!byRule) {
+    byRule = new WeakMap();
+    ruleStatsCache.set(cells, byRule);
+  }
+  if (byRule.has(rule)) return byRule.get(rule) as T;
+  const stats = compute();
+  byRule.set(rule, stats);
+  return stats;
+}
+
+/** Numeric cell values across the whole rule range. */
+function numericValuesInRange(state: State, range: Range, finiteOnly: boolean): number[] {
+  const sheet = state.data.sheetIndex;
+  const values: number[] = [];
+  for (let r = range.r0; r <= range.r1; r += 1) {
+    for (let c = range.c0; c <= range.c1; c += 1) {
+      const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
+      if (cell?.value.kind !== 'number') continue;
+      if (!finiteOnly || Number.isFinite(cell.value.value)) values.push(cell.value.value);
+    }
+  }
+  return values;
+}
+
+const ascending = (a: number, b: number): number => a - b;
+
+interface ParsedStop {
+  raw: string;
+  rgb: [number, number, number] | null;
+}
+
+interface ColorScaleStats {
+  scale: ColorScaleThresholds;
+  two: boolean;
+  s0: ParsedStop;
+  s1: ParsedStop;
+  s2: ParsedStop;
+}
+
+const parseStop = (raw: string): ParsedStop => ({ raw, rgb: parseColor(raw) });
+
 function paintColorScale(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'color-scale' }>,
   out: Map<string, ConditionalCellOverlay>,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
+  const stats = ruleStats<ColorScaleStats | null>(state.data.cells, rule, () => {
+    const sorted = numericValuesInRange(state, rule.range, true).sort(ascending);
+    const scale = colorScaleThresholds(rule, sorted);
+    if (!scale) return null;
+    const raw0 = rule.stops[0] ?? '#000000';
+    const raw1 = rule.stops[1] ?? raw0;
+    const raw2 = rule.stops[2] ?? raw1;
+    return {
+      scale,
+      two: rule.stops.length === 2,
+      s0: parseStop(raw0),
+      s1: parseStop(raw1),
+      s2: parseStop(raw2),
+    };
+  });
+  if (!stats) return;
   const sheet = state.data.sheetIndex;
-  const values: number[] = [];
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
-      if (cell?.value.kind !== 'number') continue;
-      values.push(cell.value.value);
-    }
-  }
-  if (values.length === 0) return;
-  const scale = colorScaleThresholds(rule, values);
-  if (!scale) return;
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      if (cell?.value.kind !== 'number') continue;
-      const v = cell.value.value;
-      const t = colorScalePosition(v, scale);
-      const overlay = out.get(key) ?? {};
-      overlay.fill = pickStop(rule.stops, t);
-      out.set(key, overlay);
-    }
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    if (cell?.value.kind !== 'number') continue;
+    const t = colorScalePosition(cell.value.value, stats.scale);
+    const overlay = out.get(key) ?? {};
+    overlay.fill = pickStop(stats, t);
+    out.set(key, overlay);
   }
 }
 
@@ -477,12 +530,8 @@ interface ColorScaleThresholds {
 
 function colorScaleThresholds(
   rule: Extract<ConditionalRule, { kind: 'color-scale' }>,
-  values: readonly number[],
+  sorted: readonly number[],
 ): ColorScaleThresholds | null {
-  const sorted = values
-    .filter((value) => Number.isFinite(value))
-    .slice()
-    .sort((a, b) => a - b);
   if (sorted.length === 0) return null;
   const defaultThresholds =
     rule.stops.length === 2
@@ -530,160 +579,172 @@ function colorScalePosition(value: number, thresholds: ColorScaleThresholds): nu
   return Math.max(0.5, Math.min(1, 0.5 + ((value - mid) / (high - mid)) * 0.5));
 }
 
+interface DataBarStats {
+  low: number;
+  high: number;
+  span: number;
+  axis: number;
+  axisVisible: boolean;
+}
+
 function paintDataBar(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'data-bar' }>,
   out: Map<string, ConditionalCellOverlay>,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
-  const sheet = state.data.sheetIndex;
-  const values: number[] = [];
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
-      if (cell?.value.kind !== 'number') continue;
-      if (Number.isFinite(cell.value.value)) values.push(cell.value.value);
-    }
-  }
-  const sorted = values.slice().sort((a, b) => a - b);
-  if (sorted.length === 0) return;
-  const resolvedMin = resolveScalePoint(rule.min ?? { kind: 'min' }, sorted);
-  const resolvedMax = resolveScalePoint(rule.max ?? { kind: 'max' }, sorted);
-  const min = Number.isFinite(resolvedMin) ? resolvedMin : (sorted[0] ?? 0);
-  const max = Number.isFinite(resolvedMax) ? resolvedMax : (sorted[sorted.length - 1] ?? min);
-  // Automatic endpoints retain the legacy data-bar zero baseline: positive
-  // ranges start at zero and negative ranges end at zero. Explicit endpoints
-  // replace that side of the baseline with the resolved scale point.
-  const hasExplicitMin = rule.min !== undefined && rule.min.kind !== 'min';
-  const hasExplicitMax = rule.max !== undefined && rule.max.kind !== 'max';
   const axisPosition = rule.axisPosition ?? 'automatic';
-  const lowerBound = axisPosition === 'automatic' && !hasExplicitMin ? Math.min(min, 0) : min;
-  const upperBound = axisPosition === 'automatic' && !hasExplicitMax ? Math.max(max, 0) : max;
-  const low = Math.min(lowerBound, upperBound);
-  const high = Math.max(lowerBound, upperBound);
-  const span = high - low;
-  const hasNegativePopulation = sorted[0] !== undefined && sorted[0] < 0;
-  const lastValue = sorted[sorted.length - 1];
-  const hasPositivePopulation = lastValue !== undefined && lastValue > 0;
-  const axis =
-    axisPosition === 'middle'
-      ? 0.5
-      : axisPosition === 'none'
-        ? 0
-        : low < 0 && high > 0
-          ? Math.max(0, Math.min(1, Math.abs(low) / (Math.abs(low) + high)))
-          : high <= 0
-            ? 1
-            : 0;
-  const clampToBounds = (value: number): number => Math.max(low, Math.min(high, value));
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      if (cell?.value.kind !== 'number' || !Number.isFinite(cell.value.value)) continue;
-      const originalValue = cell.value.value;
-      const v = clampToBounds(originalValue);
-      const overlay = out.get(key) ?? {};
-      const negative = originalValue < 0;
-      const mirror =
-        rule.direction === 'right-to-left' ||
-        ((rule.direction === undefined || rule.direction === 'context') &&
-          state.ui.rightToLeft === true);
-      const length =
-        axisPosition === 'automatic'
-          ? negative && low < 0 && high > 0
-            ? Math.abs(v) / Math.max(Math.abs(low), 1e-9)
-            : negative
-              ? span === 0
-                ? 0
-                : (high - v) / span
-              : low < 0 && high > 0
-                ? v / Math.max(high, 1e-9)
-                : span === 0
-                  ? 0
-                  : (v - low) / span
-          : span === 0
-            ? 1
-            : Math.max(0, Math.min(1, (v - low) / span));
-      const noneNegative = axisPosition === 'none' && negative;
-      const barSide = noneNegative ? false : negative;
-      overlay.bar = barSide
-        ? Math.max(0, Math.min(axis, length * axis))
-        : Math.max(0, Math.min(1 - axis, length * (1 - axis)));
-      overlay.barAxis = mirror ? 1 - axis : axis;
-      overlay.barDirection = barSide !== mirror ? 'left' : 'right';
-      overlay.barColor =
-        negative && rule.negativeColor !== undefined ? rule.negativeColor : rule.color;
-      overlay.barBorderColor = negative ? rule.negativeBorderColor : rule.borderColor;
-      overlay.barAxisColor = rule.axisColor ?? '#000000';
-      overlay.barAxisVisible =
+  const stats = ruleStats<DataBarStats | null>(state.data.cells, rule, () => {
+    const sorted = numericValuesInRange(state, rule.range, true).sort(ascending);
+    if (sorted.length === 0) return null;
+    const resolvedMin = resolveScalePoint(rule.min ?? { kind: 'min' }, sorted);
+    const resolvedMax = resolveScalePoint(rule.max ?? { kind: 'max' }, sorted);
+    const min = Number.isFinite(resolvedMin) ? resolvedMin : (sorted[0] ?? 0);
+    const max = Number.isFinite(resolvedMax) ? resolvedMax : (sorted[sorted.length - 1] ?? min);
+    // Automatic endpoints retain the legacy data-bar zero baseline: positive
+    // ranges start at zero and negative ranges end at zero. Explicit endpoints
+    // replace that side of the baseline with the resolved scale point.
+    const hasExplicitMin = rule.min !== undefined && rule.min.kind !== 'min';
+    const hasExplicitMax = rule.max !== undefined && rule.max.kind !== 'max';
+    const lowerBound = axisPosition === 'automatic' && !hasExplicitMin ? Math.min(min, 0) : min;
+    const upperBound = axisPosition === 'automatic' && !hasExplicitMax ? Math.max(max, 0) : max;
+    const low = Math.min(lowerBound, upperBound);
+    const high = Math.max(lowerBound, upperBound);
+    const hasNegativePopulation = sorted[0] !== undefined && sorted[0] < 0;
+    const lastValue = sorted[sorted.length - 1];
+    const hasPositivePopulation = lastValue !== undefined && lastValue > 0;
+    const axis =
+      axisPosition === 'middle'
+        ? 0.5
+        : axisPosition === 'none'
+          ? 0
+          : low < 0 && high > 0
+            ? Math.max(0, Math.min(1, Math.abs(low) / (Math.abs(low) + high)))
+            : high <= 0
+              ? 1
+              : 0;
+    return {
+      low,
+      high,
+      span: high - low,
+      axis,
+      axisVisible:
         axisPosition === 'middle' ||
         (axisPosition === 'automatic' &&
           hasNegativePopulation &&
           hasPositivePopulation &&
           axis > 0 &&
-          axis < 1);
-      overlay.barGradient = rule.gradient === true;
-      overlay.showValue = rule.showValue !== false;
-      out.set(key, overlay);
-    }
+          axis < 1),
+    };
+  });
+  if (!stats) return;
+  const { low, high, span, axis, axisVisible } = stats;
+  const sheet = state.data.sheetIndex;
+  const mirror =
+    rule.direction === 'right-to-left' ||
+    ((rule.direction === undefined || rule.direction === 'context') &&
+      state.ui.rightToLeft === true);
+  const clampToBounds = (value: number): number => Math.max(low, Math.min(high, value));
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    if (cell?.value.kind !== 'number' || !Number.isFinite(cell.value.value)) continue;
+    const originalValue = cell.value.value;
+    const v = clampToBounds(originalValue);
+    const overlay = out.get(key) ?? {};
+    const negative = originalValue < 0;
+    const length =
+      axisPosition === 'automatic'
+        ? negative && low < 0 && high > 0
+          ? Math.abs(v) / Math.max(Math.abs(low), 1e-9)
+          : negative
+            ? span === 0
+              ? 0
+              : (high - v) / span
+            : low < 0 && high > 0
+              ? v / Math.max(high, 1e-9)
+              : span === 0
+                ? 0
+                : (v - low) / span
+        : span === 0
+          ? 1
+          : Math.max(0, Math.min(1, (v - low) / span));
+    const noneNegative = axisPosition === 'none' && negative;
+    const barSide = noneNegative ? false : negative;
+    overlay.bar = barSide
+      ? Math.max(0, Math.min(axis, length * axis))
+      : Math.max(0, Math.min(1 - axis, length * (1 - axis)));
+    overlay.barAxis = mirror ? 1 - axis : axis;
+    overlay.barDirection = barSide !== mirror ? 'left' : 'right';
+    overlay.barColor =
+      negative && rule.negativeColor !== undefined ? rule.negativeColor : rule.color;
+    overlay.barBorderColor = negative ? rule.negativeBorderColor : rule.borderColor;
+    overlay.barAxisColor = rule.axisColor ?? '#000000';
+    overlay.barAxisVisible = axisVisible;
+    overlay.barGradient = rule.gradient === true;
+    overlay.showValue = rule.showValue !== false;
+    out.set(key, overlay);
   }
+}
+
+interface IconSetStats {
+  min: number;
+  max: number;
+  slots: number;
+  thresholds: IconSetThreshold[] | null;
+  floor: { value: number; gte: boolean } | undefined;
 }
 
 function paintIconSet(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'icon-set' }>,
   out: Map<string, ConditionalCellOverlay>,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
+  const stats = ruleStats<IconSetStats | null>(state.data.cells, rule, () => {
+    const sorted = numericValuesInRange(state, rule.range, true).sort(ascending);
+    if (sorted.length === 0) return null;
+    const min = sorted[0] ?? 0;
+    return {
+      min,
+      max: sorted[sorted.length - 1] ?? min,
+      slots: iconSetSlotCount(rule.icons),
+      thresholds: iconSetThresholdValues(rule, sorted),
+      floor: rule.floor
+        ? { value: resolveScalePoint(rule.floor, sorted), gte: rule.floor.gte !== false }
+        : undefined,
+    };
+  });
+  if (!stats) return;
+  const { min, max, slots, thresholds, floor } = stats;
   const sheet = state.data.sheetIndex;
-  const values: number[] = [];
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
-      if (cell?.value.kind !== 'number') continue;
-      values.push(cell.value.value);
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    if (cell?.value.kind !== 'number') continue;
+    const v = cell.value.value;
+    // `floor` is separate from the N-1 bucket boundaries. A value below
+    // it does not match the icon-set rule and should leave the cell alone.
+    if (floor !== undefined && (floor.gte ? v < floor.value : v <= floor.value)) continue;
+    const t = max === min ? 0.5 : (v - min) / (max - min);
+    let slot =
+      thresholds === null
+        ? iconSetSlotFor(rule.icons, t)
+        : thresholds.reduce(
+            (count, threshold) =>
+              (threshold.gte ? v >= threshold.value : v > threshold.value) ? count + 1 : count,
+            0,
+          );
+    slot = Math.max(0, Math.min(slots - 1, slot));
+    if (rule.reverseOrder) slot = slots - 1 - slot;
+    const overlay = out.get(key) ?? {};
+    const icon = rule.customIcons ? rule.customIcons[slot] : { set: rule.icons, slot };
+    if (icon) {
+      overlay.iconKind = icon.set;
+      overlay.iconSlot = icon.slot;
     }
-  }
-  const sorted = values
-    .filter((value) => Number.isFinite(value))
-    .slice()
-    .sort((a, b) => a - b);
-  if (sorted.length === 0) return;
-  const min = sorted[0] ?? 0;
-  const max = sorted[sorted.length - 1] ?? min;
-  const slots = iconSetSlotCount(rule.icons);
-  const thresholds = iconSetThresholdValues(rule, sorted);
-  const floor = rule.floor
-    ? { value: resolveScalePoint(rule.floor, sorted), gte: rule.floor.gte !== false }
-    : undefined;
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      if (cell?.value.kind !== 'number') continue;
-      const v = cell.value.value;
-      // `floor` is separate from the N-1 bucket boundaries. A value below
-      // it does not match the icon-set rule and should leave the cell alone.
-      if (floor !== undefined && (floor.gte ? v < floor.value : v <= floor.value)) continue;
-      const t = max === min ? 0.5 : (v - min) / (max - min);
-      let slot =
-        thresholds === null
-          ? iconSetSlotFor(rule.icons, t)
-          : thresholds.reduce(
-              (count, threshold) =>
-                (threshold.gte ? v >= threshold.value : v > threshold.value) ? count + 1 : count,
-              0,
-            );
-      slot = Math.max(0, Math.min(slots - 1, slot));
-      if (rule.reverseOrder) slot = slots - 1 - slot;
-      const overlay = out.get(key) ?? {};
-      const icon = rule.customIcons ? rule.customIcons[slot] : { set: rule.icons, slot };
-      if (icon) {
-        overlay.iconKind = icon.set;
-        overlay.iconSlot = icon.slot;
-      }
-      overlay.showValue = rule.showValue !== false;
-      out.set(key, overlay);
-    }
+    overlay.showValue = rule.showValue !== false;
+    out.set(key, overlay);
   }
 }
 
@@ -711,29 +772,28 @@ function paintTopBottom(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'top-bottom' }>,
   out: Map<string, ConditionalCellOverlay>,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
-  const sheet = state.data.sheetIndex;
-  const values: number[] = [];
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
-      if (cell && cell.value.kind === 'number') values.push(cell.value.value);
-    }
-  }
-  const cutoff = topBottomThreshold(values, rule.mode, rule.n, rule.percent ?? false);
+  const cutoff = ruleStats<number | null>(state.data.cells, rule, () =>
+    topBottomThreshold(
+      numericValuesInRange(state, rule.range, false),
+      rule.mode,
+      rule.n,
+      rule.percent ?? false,
+    ),
+  );
   if (cutoff === null) return;
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      if (cell?.value.kind !== 'number') continue;
-      const v = cell.value.value;
-      const passes = rule.mode === 'top' ? v >= cutoff : v <= cutoff;
-      if (!passes) continue;
-      const overlay = out.get(key) ?? {};
-      mergeApply(overlay, rule.apply);
-      out.set(key, overlay);
-    }
+  const sheet = state.data.sheetIndex;
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    if (cell?.value.kind !== 'number') continue;
+    const v = cell.value.value;
+    const passes = rule.mode === 'top' ? v >= cutoff : v <= cutoff;
+    if (!passes) continue;
+    const overlay = out.get(key) ?? {};
+    mergeApply(overlay, rule.apply);
+    out.set(key, overlay);
   }
 }
 
@@ -741,44 +801,39 @@ function paintAverage(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'average' }>,
   out: Map<string, ConditionalCellOverlay>,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
+  const stats = ruleStats<{ avg: number; stdDev: number } | null>(state.data.cells, rule, () => {
+    const values = numericValuesInRange(state, rule.range, true);
+    if (values.length === 0) return null;
+    const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+    const variance = values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / values.length;
+    return { avg, stdDev: Math.sqrt(variance) };
+  });
+  if (!stats) return;
+  const { avg, stdDev } = stats;
   const sheet = state.data.sheetIndex;
-  const values: number[] = [];
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
-      if (cell?.value.kind === 'number' && Number.isFinite(cell.value.value)) {
-        values.push(cell.value.value);
-      }
-    }
-  }
-  if (values.length === 0) return;
-  const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
-  const variance = values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / values.length;
-  const stdDev = Math.sqrt(variance);
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      if (cell?.value.kind !== 'number') continue;
-      const v = cell.value.value;
-      const passes =
-        rule.mode === 'above'
-          ? v > avg
-          : rule.mode === 'below'
-            ? v < avg
-            : rule.mode === 'equal-or-above'
-              ? v >= avg
-              : rule.mode === 'equal-or-below'
-                ? v <= avg
-                : rule.mode === 'above-std-dev'
-                  ? v > avg + stdDev * (rule.stdDev ?? 1)
-                  : v < avg - stdDev * (rule.stdDev ?? 1);
-      if (!passes) continue;
-      const overlay = out.get(key) ?? {};
-      mergeApply(overlay, rule.apply);
-      out.set(key, overlay);
-    }
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    if (cell?.value.kind !== 'number') continue;
+    const v = cell.value.value;
+    const passes =
+      rule.mode === 'above'
+        ? v > avg
+        : rule.mode === 'below'
+          ? v < avg
+          : rule.mode === 'equal-or-above'
+            ? v >= avg
+            : rule.mode === 'equal-or-below'
+              ? v <= avg
+              : rule.mode === 'above-std-dev'
+                ? v > avg + stdDev * (rule.stdDev ?? 1)
+                : v < avg - stdDev * (rule.stdDev ?? 1);
+    if (!passes) continue;
+    const overlay = out.get(key) ?? {};
+    mergeApply(overlay, rule.apply);
+    out.set(key, overlay);
   }
 }
 
@@ -941,32 +996,34 @@ function paintDupsUnique(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'duplicates' | 'unique' }>,
   out: Map<string, ConditionalCellOverlay>,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
   const sheet = state.data.sheetIndex;
-  const counts = new Map<string, number>();
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
-      if (!cell) continue;
-      const k = valueKey(cell.value);
-      if (k === null) continue;
-      counts.set(k, (counts.get(k) ?? 0) + 1);
+  const counts = ruleStats(state.data.cells, rule, () => {
+    const tally = new Map<string, number>();
+    for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
+      for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
+        const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
+        if (!cell) continue;
+        const k = valueKey(cell.value);
+        if (k === null) continue;
+        tally.set(k, (tally.get(k) ?? 0) + 1);
+      }
     }
-  }
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      if (!cell) continue;
-      const k = valueKey(cell.value);
-      if (k === null) continue;
-      const count = counts.get(k) ?? 0;
-      const passes = rule.kind === 'duplicates' ? count > 1 : count === 1;
-      if (!passes) continue;
-      const overlay = out.get(key) ?? {};
-      mergeApply(overlay, rule.apply);
-      out.set(key, overlay);
-    }
+    return tally;
+  });
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    if (!cell) continue;
+    const k = valueKey(cell.value);
+    if (k === null) continue;
+    const count = counts.get(k) ?? 0;
+    const passes = rule.kind === 'duplicates' ? count > 1 : count === 1;
+    if (!passes) continue;
+    const overlay = out.get(key) ?? {};
+    mergeApply(overlay, rule.apply);
+    out.set(key, overlay);
   }
 }
 
@@ -1080,20 +1137,17 @@ function mergeOverlayByPriority(
   }
 }
 
-function pickStop(stops: readonly string[], t: number): string {
-  const s0 = stops[0] ?? '#000000';
-  const s1 = stops[1] ?? s0;
-  const s2 = stops[2] ?? s1;
-  if (stops.length === 2) return interpolate(s0, s1, t);
+function pickStop(stops: ColorScaleStats, t: number): string {
+  if (stops.two) return interpolate(stops.s0, stops.s1, t);
   // Three-stop: low, mid, high
-  if (t <= 0.5) return interpolate(s0, s1, t * 2);
-  return interpolate(s1, s2, (t - 0.5) * 2);
+  if (t <= 0.5) return interpolate(stops.s0, stops.s1, t * 2);
+  return interpolate(stops.s1, stops.s2, (t - 0.5) * 2);
 }
 
-function interpolate(a: string, b: string, t: number): string {
-  const ca = parseColor(a);
-  const cb = parseColor(b);
-  if (!ca || !cb) return a;
+function interpolate(a: ParsedStop, b: ParsedStop, t: number): string {
+  const ca = a.rgb;
+  const cb = b.rgb;
+  if (!ca || !cb) return a.raw;
   const r = Math.round(ca[0] + (cb[0] - ca[0]) * t);
   const g = Math.round(ca[1] + (cb[1] - ca[1]) * t);
   const blu = Math.round(ca[2] + (cb[2] - ca[2]) * t);

@@ -6,13 +6,12 @@ import type {
   ConditionalIconSet,
 } from '../../store/store.js';
 import type { Rect } from '../geometry.js';
-import { fillRect, surfaceRect } from '../grid/chrome-context.js';
+import { fillRect, rulePx, surfaceRect } from '../grid/chrome-context.js';
 import { drawConditionalIconArt } from './cf-icons.js';
 import { visualZoom } from './text.js';
 import type { CellPaintCtx } from './types.js';
 
-/* ---- Base painters wired in MS-A. Future slots (formatting, CF, DV,
- * comments, hyperlinks) live next to these, capability-gated. ---- */
+/* ---- Base cell painters: background, fill, borders, diagonals, text. ---- */
 
 export function paintCellBackground({
   ctx,
@@ -191,6 +190,17 @@ const tileRuns = (row: string): [number, number][] => {
   return runs;
 };
 
+const tileRunCache = new WeakMap<readonly string[], [number, number][][]>();
+
+const tileRunsOf = (tile: readonly string[]): [number, number][][] => {
+  let runs = tileRunCache.get(tile);
+  if (!runs) {
+    runs = tile.map(tileRuns);
+    tileRunCache.set(tile, runs);
+  }
+  return runs;
+};
+
 /** Pattern ink over `bounds`, drawn per device pixel from the sheet-anchored
  *  tile so the phase does not depend on the cell the pattern sits in. */
 function paintPatternTile(
@@ -204,7 +214,7 @@ function paintPatternTile(
   const y0 = Math.round(bounds.y * dpr);
   const x1 = Math.round((bounds.x + bounds.w) * dpr);
   const y1 = Math.round((bounds.y + bounds.h) * dpr);
-  const runs = tile.map(tileRuns);
+  const runs = tileRunsOf(tile);
   ctx.fillStyle = color;
   ctx.beginPath();
   for (let y = y0; y < y1; y++) {
@@ -287,7 +297,7 @@ const DIAGONAL_DASH: Partial<Record<CellBorderStyle, readonly number[]>> = {
 export function paintCellDiagonals({ ctx, bounds, theme, format, dpr = 1 }: CellPaintCtx): void {
   const sides = format?.borders;
   if (!sides?.diagonalDown && !sides?.diagonalUp) return;
-  const g = Math.max(1, Math.round(dpr));
+  const g = rulePx(dpr);
   const rule = g / dpr;
   const l = Math.round(bounds.x * dpr) / dpr;
   const r = Math.round((bounds.x + bounds.w) * dpr) / dpr;

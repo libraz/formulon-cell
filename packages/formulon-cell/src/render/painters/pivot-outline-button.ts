@@ -1,4 +1,5 @@
 import { mirrorInRect, type Rect } from '../geometry.js';
+import { rulePx } from '../grid/chrome-context.js';
 
 /** Horizontal step of one PivotTable outline level, in points. A compact row
  *  label's text starts this many points further in per step. */
@@ -51,7 +52,7 @@ export function paintPivotCollapseButton(
   dpr = 1,
 ): void {
   const { x, y, w, h } = rect;
-  const px = 1 / Math.max(1, Math.round(dpr));
+  const px = 1 / rulePx(dpr);
   const look = PIVOT_COLLAPSE_LOOK;
   ctx.save();
   const face = ctx.createLinearGradient(0, y, 0, y + h);

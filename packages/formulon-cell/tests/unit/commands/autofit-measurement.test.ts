@@ -21,7 +21,7 @@ import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import { gridOriginX, gridOriginY, hitZone, layoutForView } from '../../../src/render/geometry.js';
 import { filterButtonRect } from '../../../src/render/painters/filter-button.js';
 import { paintTableHeaderChevron } from '../../../src/render/painters/markers.js';
-import { availableTextWidth } from '../../../src/render/text-wrap.js';
+import { CELL_TEXT_INDENT_PX, cellTextHorizontalMetrics } from '../../../src/render/text-wrap.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -369,8 +369,8 @@ describe('computeAutofitRowHeight', () => {
     const { ctx } = fakeMeasureCtx();
 
     // 63px of text fits the old 64px (width - 12) calculation, but not the
-    // shared renderer contract: 76 - 6px padding - 8px indent = 62px.
-    expect(availableTextWidth(76, 8)).toBe(62);
+    // shared renderer contract: 76 - 6px padding - one indent level.
+    expect(cellTextHorizontalMetrics(76, 1).availableWidth).toBe(70 - CELL_TEXT_INDENT_PX);
     expect(computeAutofitRowHeight(wrapped.getState(), 0, ctx)).toBe(37);
   });
 });

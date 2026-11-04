@@ -19,8 +19,6 @@ import {
   rowHeight,
   rowTopEdge,
   type ViewLayout,
-  visibleCols,
-  visibleRows,
 } from '../../../src/render/geometry.js';
 import type { ViewportSlice } from '../../../src/store/store.js';
 
@@ -240,19 +238,19 @@ describe('bodyBandOrigin', () => {
   });
 });
 
-describe('visibleRows / visibleCols', () => {
+describe('visible rows / cols', () => {
   it('lists exactly the body window when no freeze and no hidden', () => {
     const layout = makeLayout();
     const viewport = makeViewport({ rowStart: 5, rowCount: 3, colStart: 2, colCount: 4 });
-    expect(visibleRows(layout, viewport)).toEqual([5, 6, 7]);
-    expect(visibleCols(layout, viewport)).toEqual([2, 3, 4, 5]);
+    expect(buildRowLayout(layout, viewport).visible).toEqual([5, 6, 7]);
+    expect(buildColLayout(layout, viewport).visible).toEqual([2, 3, 4, 5]);
   });
 
   it('puts frozen rows/cols ahead of the body window', () => {
     const layout = makeLayout({ freezeRows: 2, freezeCols: 1 });
     const viewport = makeViewport({ rowStart: 5, rowCount: 2, colStart: 4, colCount: 2 });
-    expect(visibleRows(layout, viewport)).toEqual([0, 1, 5, 6]);
-    expect(visibleCols(layout, viewport)).toEqual([0, 4, 5]);
+    expect(buildRowLayout(layout, viewport).visible).toEqual([0, 1, 5, 6]);
+    expect(buildColLayout(layout, viewport).visible).toEqual([0, 4, 5]);
   });
 
   it('skips hidden indices in both bands', () => {
@@ -261,7 +259,7 @@ describe('visibleRows / visibleCols', () => {
       hiddenCols: new Set([1, 4]),
     });
     const viewport = makeViewport({ colStart: 3, colCount: 3 });
-    expect(visibleCols(layout, viewport)).toEqual([0, 3, 5]);
+    expect(buildColLayout(layout, viewport).visible).toEqual([0, 3, 5]);
   });
 
   it('clips body start to the freeze boundary', () => {
@@ -269,7 +267,7 @@ describe('visibleRows / visibleCols', () => {
     // so we never duplicate frozen cols.
     const layout = makeLayout({ freezeCols: 3 });
     const viewport = makeViewport({ colStart: 0, colCount: 5 });
-    expect(visibleCols(layout, viewport)).toEqual([0, 1, 2, 3, 4]);
+    expect(buildColLayout(layout, viewport).visible).toEqual([0, 1, 2, 3, 4]);
   });
 });
 

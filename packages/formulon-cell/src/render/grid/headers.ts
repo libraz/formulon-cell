@@ -168,7 +168,15 @@ export function paintHeaders(
   const activeBar = theme.headerActiveBar !== 'transparent';
 
   ctx.textAlign = 'center';
-  ctx.font = `400 ${labelSize}px ${labelFamily}`;
+  const plainFont = `400 ${labelSize}px ${labelFamily}`;
+  const litFont = `${theme.headerFgActiveWeight} ${labelSize}px ${labelFamily}`;
+  ctx.font = plainFont;
+  let currentFont = plainFont;
+  const setFont = (font: string): void => {
+    if (font === currentFont) return;
+    currentFont = font;
+    ctx.font = font;
+  };
   const labelBox = fontMetricsBox(ctx, labelSize);
   // Mac sets column letters like a row number in a default-height row centred
   // on whole points in the strip: Excel's baseline sits 16 / 14 / 14 device px
@@ -199,13 +207,13 @@ export function paintHeaders(
     0,
     oy - width,
   );
+  // Separators go in one stroke; nothing painted per label reaches them.
+  ctx.strokeStyle = colSepStyle;
+  ctx.lineWidth = width;
+  ctx.beginPath();
   for (const c of cols.visible) {
     const rect = cellRectIn(layout, cols, rows, firstRow, c);
     const w = cols.sizeAt.get(c) ?? 0;
-    const lit = isLitCol(c);
-    ctx.strokeStyle = colSepStyle;
-    ctx.lineWidth = width;
-    ctx.beginPath();
     const sepX = ruleCenter(rtl ? rect.x : rect.x + w, dpr, rtl);
     ctx.moveTo(sepX, labelTopY);
     ctx.lineTo(sepX, oy - width);
@@ -215,9 +223,14 @@ export function paintHeaders(
       ctx.moveTo(leadX, labelTopY);
       ctx.lineTo(leadX, oy - width);
     }
-    ctx.stroke();
+  }
+  ctx.stroke();
+  for (const c of cols.visible) {
+    const rect = cellRectIn(layout, cols, rows, firstRow, c);
+    const w = cols.sizeAt.get(c) ?? 0;
+    const lit = isLitCol(c);
     ctx.fillStyle = lit ? theme.headerFgActive : theme.headerFg;
-    ctx.font = `${lit ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
+    setFont(lit ? litFont : plainFont);
     const label = r1c1 ? `C${c + 1}` : colLetter(c);
     // Letters centre on the header cell less its trailing separator.
     const labelX = rtl ? rect.x + (w + width) / 2 : rect.x + (w - width) / 2;
@@ -247,19 +260,22 @@ export function paintHeaders(
     rtl ? rowSepX0 : rowSepX1,
     0,
   );
+  ctx.strokeStyle = rowSepStyle;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  for (const r of rows.visible) {
+    const rect = cellRectIn(layout, cols, rows, r, firstCol);
+    const sepY = ruleCenter(rect.y + (rows.sizeAt.get(r) ?? 0), dpr);
+    ctx.moveTo(rowSepX0, sepY);
+    ctx.lineTo(rowSepX1, sepY);
+  }
+  ctx.stroke();
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
     const lit = isLitRow(r);
-    ctx.strokeStyle = rowSepStyle;
-    ctx.lineWidth = width;
-    ctx.beginPath();
-    const sepY = ruleCenter(rect.y + h, dpr);
-    ctx.moveTo(rowSepX0, sepY);
-    ctx.lineTo(rowSepX1, sepY);
-    ctx.stroke();
     ctx.fillStyle = lit ? theme.headerFgActive : theme.headerFg;
-    ctx.font = `${lit ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
+    setFont(lit ? litFont : plainFont);
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
     const rowLabelY = textBaselineY({ ...rect, h }, labelBox, 'bottom', ROW_LABEL_PAD_Y);
     if (digitPitch !== undefined && !r1c1) {

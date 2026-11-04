@@ -1,5 +1,23 @@
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import { mirrorInRect, type Rect } from '../geometry.js';
+import { VALIDATION_TRIANGLE_COLOR } from '../grid/hit-state.js';
+
+/** Accent used by marker and handle painters when the theme defines none. */
+export const FALLBACK_ACCENT = '#0078d4';
+
+/** Right-triangle staircase of one-px steps, right angle at the top-left, or top-right when `anchorRight`. */
+function paintStaircase(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  anchorRight: boolean,
+): void {
+  for (let row = 0; row < size; row += 1) {
+    const w = size - row;
+    ctx.fillRect(anchorRight ? x + size - w : x, y + row, w, 1);
+  }
+}
 
 /** In-cell dropdown button, measured at 100%: 16x17px, hung from the cell's
  *  trailing edge 1px below its top (covering the outer half of the selection
@@ -110,6 +128,8 @@ export function paintValidationChevron(
 
 export const TABLE_HEADER_CHEVRON_SIZE = 14;
 export const TABLE_HEADER_CHEVRON_INSET = 3;
+/** Cell width a Table header gives its chevron: the button, its inset and a 3 px text gap. */
+export const TABLE_HEADER_TEXT_RESERVE = TABLE_HEADER_CHEVRON_SIZE + TABLE_HEADER_CHEVRON_INSET + 3;
 
 /** Paint the spreadsheet Table header filter/dropdown affordance. This is visual
  *  only today; table filtering still routes through the normal filter model. */
@@ -218,10 +238,7 @@ export function paintErrorTriangle(
   ctx.fillStyle = color;
   // Right angle at the cell's leading corner; the hypotenuse falls inwards as
   // a whole-pixel staircase, unsmoothed as the spreadsheet draws it.
-  for (let row = 0; row < size; row += 1) {
-    const w = size - row;
-    ctx.fillRect(rtl ? x + size - w : x, y + row, w, 1);
-  }
+  paintStaircase(ctx, x, y, size, rtl);
   ctx.restore();
   return { x, y, w: size, h: size };
 }
@@ -232,7 +249,7 @@ export function paintErrorTriangle(
 export function paintValidationTriangle(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
-  color = '#d24545',
+  color = VALIDATION_TRIANGLE_COLOR,
   rtl = false,
 ): Rect {
   return paintErrorTriangle(ctx, bounds, color, rtl);
@@ -244,7 +261,7 @@ export function paintValidationTriangle(
 export function paintValidationCircle(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
-  color = '#d24545',
+  color = VALIDATION_TRIANGLE_COLOR,
 ): void {
   const insetX = Math.min(5, Math.max(2, bounds.w * 0.08));
   const insetY = Math.min(4, Math.max(2, bounds.h * 0.12));
@@ -276,7 +293,7 @@ export function paintLockMarker(
   const h = 9;
   const x = Math.round(mirrorInRect(bounds, bounds.x + bounds.w - w - 2, w, rtl));
   const y = Math.round(bounds.y + 2);
-  const color = theme.accent || '#0078d4';
+  const color = theme.accent || FALLBACK_ACCENT;
   ctx.save();
   // Shackle (top arch, drawn as a stroked half-circle).
   ctx.strokeStyle = color;
@@ -299,9 +316,6 @@ export function paintCommentMarker(ctx: CanvasRenderingContext2D, bounds: Rect, 
   const x = mirrorInRect(bounds, bounds.x + bounds.w - 1 - size, size, rtl);
   ctx.save();
   ctx.fillStyle = '#ff0000';
-  for (let row = 0; row < size; row += 1) {
-    const width = size - row;
-    ctx.fillRect(rtl ? x : x + size - width, bounds.y + row, width, 1);
-  }
+  paintStaircase(ctx, x, bounds.y, size, !rtl);
   ctx.restore();
 }

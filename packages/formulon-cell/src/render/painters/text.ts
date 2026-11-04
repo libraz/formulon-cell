@@ -97,17 +97,6 @@ function fitGeneralNumberToWidth(
   return '#'.repeat(Math.max(1, Math.floor(availableWidth / digit)));
 }
 
-export const textMetricsBox = (metrics: TextMetrics, fontSize: number): TextMetricsBox => ({
-  ascent:
-    Number.isFinite(metrics.actualBoundingBoxAscent) && metrics.actualBoundingBoxAscent > 0
-      ? metrics.actualBoundingBoxAscent
-      : fontSize * 0.72,
-  descent:
-    Number.isFinite(metrics.actualBoundingBoxDescent) && metrics.actualBoundingBoxDescent > 0
-      ? metrics.actualBoundingBoxDescent
-      : fontSize * 0.22,
-});
-
 export const stableTextMetricsBox = (fontSize: number): TextMetricsBox => ({
   ascent: fontSize * 0.72,
   descent: fontSize * 0.22,

@@ -1,5 +1,6 @@
 import { pageLayoutGaps } from '../commands/pagination.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { fontPointsToCssPx } from '../engine/font-units.js';
 import type { Range } from '../engine/types.js';
 import {
   frozenColEnd,
@@ -159,6 +160,12 @@ export function rowGap(layout: PagedLayout, row: number): number {
  *  already projected for the current view. Paint passes take this so they
  *  cannot reach a raw `state.layout`. */
 export type ViewState = Omit<State, 'layout'> & { layout: ViewLayout };
+
+/** Screen px of one typographic point at the current zoom and screen scale. */
+export const pointPx = (
+  layout: Parameters<typeof renderScale>[0],
+  viewport?: Parameters<typeof renderScale>[1],
+): number => fontPointsToCssPx(1) * renderScale(layout, viewport);
 
 export function layoutForView(
   state: LayoutForViewInput,
@@ -626,44 +633,6 @@ export function colLeadingEdge(layout: ViewLayout, viewport: ViewportSlice, col:
 /** Return the absolute y of a row's top edge (header-inclusive coords). */
 export function rowTopEdge(layout: LayoutSlice, viewport: ViewportSlice, row: number): number {
   return gridOriginY(layout) + rowY(layout, viewport, row);
-}
-
-/** Indices of every row currently rendered, in render order. Frozen first,
- *  then the body slice. Hidden rows are omitted. */
-export function visibleRows(layout: LayoutSlice, viewport: ViewportSlice): number[] {
-  const out: number[] = [];
-  for (let r = frozenRowStart(layout); r < frozenRowEnd(layout); r += 1) {
-    if (
-      viewport.navigationRange &&
-      (r < viewport.navigationRange.r0 || r > viewport.navigationRange.r1)
-    )
-      continue;
-    if (!isRowHidden(layout, r)) out.push(r);
-  }
-  const start = viewportRowStart(layout, viewport);
-  const end = viewportRowEnd(viewport) + 1;
-  for (let r = start; r < end; r += 1) {
-    if (!isRowHidden(layout, r)) out.push(r);
-  }
-  return out;
-}
-
-export function visibleCols(layout: LayoutSlice, viewport: ViewportSlice): number[] {
-  const out: number[] = [];
-  for (let c = frozenColStart(layout); c < frozenColEnd(layout); c += 1) {
-    if (
-      viewport.navigationRange &&
-      (c < viewport.navigationRange.c0 || c > viewport.navigationRange.c1)
-    )
-      continue;
-    if (!layout.hiddenCols.has(c)) out.push(c);
-  }
-  const start = viewportColStart(layout, viewport);
-  const end = viewportColEnd(viewport) + 1;
-  for (let c = start; c < end; c += 1) {
-    if (!layout.hiddenCols.has(c)) out.push(c);
-  }
-  return out;
 }
 
 /** Per-axis layout cache for one paint cycle. Replaces O(visibleAxis) loops

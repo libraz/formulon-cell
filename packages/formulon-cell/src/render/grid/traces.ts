@@ -1,6 +1,6 @@
 // Trace-arrow overlay. Iterates the active traces in state and paints one dot
 // + arrow per same-sheet entry. Off-screen endpoints and cross-sheet entries
-// are silently skipped; partial visibility is not handled in v1 (matches the
+// are silently skipped; partial visibility is not handled (matches the
 // spreadsheet convention of clipping against the freeze divider).
 
 import {
