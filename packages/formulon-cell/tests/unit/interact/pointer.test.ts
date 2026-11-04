@@ -814,6 +814,61 @@ describe('attachPointer', () => {
       expect(sel).toEqual({ sheet: 0, r0: 0, c0: 1, r1: 3, c1: 1 });
     });
 
+    // Desktop measurements: a gap in the neighbour column ends the fill, the
+    // right-hand column is used when the left one is empty, a lone constant is
+    // copied, and a formula fills relatively with the filled range selected.
+    it('double-click on the fill handle stops at a gap in the left neighbour', () => {
+      gridHitState(host).fillHandle = { x: 256, y: 54, w: 6, h: 6 };
+      seed(store, wb, [
+        { row: 0, col: 0, value: 1 },
+        { row: 1, col: 0, value: 2 },
+        { row: 2, col: 0, value: 3 },
+        { row: 4, col: 0, value: 5 },
+        { row: 5, col: 0, value: 6 },
+        { row: 0, col: 1, value: 'x' },
+      ]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 1 });
+      detach = attachPointer(host, store, wb);
+      fireDblClick(host, 258, 56);
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 });
+      expect(wb.getValue({ sheet: 0, row: 3, col: 1 }).kind).toBe('blank');
+    });
+
+    it('double-click on the fill handle copies a lone constant along the right neighbour', () => {
+      gridHitState(host).fillHandle = { x: 256, y: 54, w: 6, h: 6 };
+      seed(store, wb, [
+        ...[0, 1, 2, 3, 4, 5].map((row) => ({ row, col: 2, value: row + 1 })),
+        { row: 0, col: 1, value: 7 },
+      ]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 1 });
+      detach = attachPointer(host, store, wb);
+      fireDblClick(host, 258, 56);
+      wb.recalc();
+      for (const row of [1, 5]) {
+        expect(wb.getValue({ sheet: 0, row, col: 1 })).toEqual({ kind: 'number', value: 7 });
+      }
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 1, r1: 5, c1: 1 });
+    });
+
+    it('double-click on the fill handle fills a formula relatively and selects the result', () => {
+      gridHitState(host).fillHandle = { x: 256, y: 54, w: 6, h: 6 };
+      seed(
+        store,
+        wb,
+        [0, 1, 2, 3, 4, 5].map((row) => ({ row, col: 0, value: row + 1 })),
+      );
+      wb.setFormula({ sheet: 0, row: 0, col: 1 }, '=A1*2');
+      wb.recalc();
+      mutators.replaceCells(store, wb.cells(0));
+      mutators.setActive(store, { sheet: 0, row: 0, col: 1 });
+      detach = attachPointer(host, store, wb);
+      fireDblClick(host, 258, 56);
+      wb.recalc();
+      expect(wb.cellFormula({ sheet: 0, row: 5, col: 1 })).toBe('=A6*2');
+      expect(wb.getValue({ sheet: 0, row: 5, col: 1 })).toEqual({ kind: 'number', value: 12 });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 1, r1: 5, c1: 1 });
+    });
+
     it('double-click on the fill handle is a no-op when neither neighbour has data', async () => {
       gridHitState(host).fillHandle = { x: 152, y: 54, w: 6, h: 6 };
 
