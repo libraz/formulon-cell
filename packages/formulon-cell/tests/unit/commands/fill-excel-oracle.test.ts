@@ -29,7 +29,8 @@ interface Oracle {
   locales: Record<string, Record<string, { source: Cell[]; fill: Cell[] }>>;
 }
 
-// Captured from desktop Excel by scripts/excel-autofill-probe.py.
+// Captured from desktop Excel by scripts/excel-autofill-probe.py; the weekday and month lists
+// follow the per-UI-language capture in excel-autofill-ui-language.json.
 const oracle = JSON.parse(
   readFileSync(join(__dirname, '../../fixtures/excel-autofill.json'), 'utf8'),
 ) as Oracle;
