@@ -1,3 +1,4 @@
+import type { CellInputAlert } from '../commands/cell-input-commit.js';
 import { writeInput } from '../commands/coerce-input.js';
 import { blockDataTableCells } from '../commands/data-table-guard.js';
 import {
@@ -44,6 +45,8 @@ export interface ValidationAlertLabels {
   stop: string;
   warning: string;
   information: string;
+  /** Wording of the `protectedCell` alert. */
+  protectedCell: string;
 }
 
 export interface ValidationAlertDeps {
@@ -55,6 +58,7 @@ export interface ValidationAlertMessage {
   severity: 'stop' | 'warning' | 'information';
   title?: string;
   message: string;
+  code?: CellInputAlert['code'];
 }
 
 export interface ValidationAlertHandle {
@@ -402,7 +406,8 @@ export function attachValidationAlert(deps: ValidationAlertDeps): ValidationAler
     show(message) {
       const title = message.title?.trim() || defaultTitle(message.severity);
       header.textContent = title;
-      messageEl.textContent = message.message;
+      messageEl.textContent =
+        message.code === 'protectedCell' ? labels.protectedCell : message.message;
       shell.setAriaLabel(title);
       shell.open();
       okBtn.focus({ preventScroll: true });

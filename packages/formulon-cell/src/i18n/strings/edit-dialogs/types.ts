@@ -188,6 +188,8 @@ export interface EditDialogsStrings {
     ok: string;
   };
   protection: {
+    /** Alert raised by an attempt to change a locked cell of a protected sheet. */
+    protectedCellEdit: string;
     /** Format-dialog tab label for the cell-lock section. */
     tabProtection: string;
     /** Checkbox label for the per-cell `locked` flag. */

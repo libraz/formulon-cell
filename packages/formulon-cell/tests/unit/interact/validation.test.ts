@@ -416,7 +416,13 @@ describe('attachValidationAlert', () => {
   it('shows a validation error alert with a custom title and message', () => {
     const handle = attachValidationAlert({
       host,
-      labels: { ok: 'OK', stop: 'Stop', warning: 'Warning', information: 'Information' },
+      labels: {
+        ok: 'OK',
+        stop: 'Stop',
+        warning: 'Warning',
+        information: 'Information',
+        protectedCell: 'Protected.',
+      },
     });
 
     handle.show({
@@ -431,6 +437,25 @@ describe('attachValidationAlert', () => {
     expect(dialog?.getAttribute('aria-label')).toBe('Invalid status');
     expect(dialog?.querySelector('.fc-valdlg__panel')).not.toBeNull();
     expect(dialog?.textContent).toContain('Use Open, Closed, or Hold.');
+    handle.detach();
+  });
+
+  it('words a protected-cell alert with its localized label', () => {
+    const handle = attachValidationAlert({
+      host,
+      labels: {
+        ok: 'OK',
+        stop: 'Stop',
+        warning: 'Warning',
+        information: 'Information',
+        protectedCell: 'The cell is on a protected sheet.',
+      },
+    });
+    handle.show({ severity: 'stop', code: 'protectedCell', message: 'cell is protected' });
+    const dialog = document.querySelector<HTMLElement>('.fc-valdlg');
+    expect(dialog?.querySelector('.fc-tb__dlg__message')?.textContent).toBe(
+      'The cell is on a protected sheet.',
+    );
     handle.detach();
   });
 

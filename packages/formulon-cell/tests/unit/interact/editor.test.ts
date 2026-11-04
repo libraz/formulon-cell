@@ -5,6 +5,7 @@ import {
   registerInteractionController,
 } from '../../../src/commands/interaction-controller.js';
 import type { InteractionPolicy } from '../../../src/commands/interaction-policy.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { InlineEditor } from '../../../src/interact/editor.js';
@@ -55,6 +56,25 @@ describe('InlineEditor', () => {
   afterEach(() => {
     if (editor.isActive()) editor.cancel();
     document.body.innerHTML = '';
+  });
+
+  it('refuses edit mode on a locked cell of a protected sheet and raises the protected-cell alert', () => {
+    // Excel: a double-click on a locked cell shows the alert without entering edit mode.
+    const onValidation = vi.fn();
+    const guarded = new InlineEditor({ host, grid, store, wb, onAfterCommit, onValidation });
+    setProtectedSheet(store, 0, true);
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    guarded.begin('');
+    expect(guarded.isActive()).toBe(false);
+    expect(grid.querySelector('textarea')).toBeNull();
+    expect(onValidation).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'stop', code: 'protectedCell' }),
+    );
+    // An unlocked cell still edits.
+    mutators.setCellFormat(store, { sheet: 0, row: 1, col: 1 }, { locked: false });
+    guarded.begin('');
+    expect(guarded.isActive()).toBe(true);
+    guarded.cancel();
   });
 
   it.each([

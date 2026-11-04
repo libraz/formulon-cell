@@ -6,9 +6,11 @@ import { tableForCell } from '../commands/format-as-table.js';
 import { mergeAt } from '../commands/merge.js';
 import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
+import { isCellFormattable, isCellWritable, protectedCellMessage } from '../commands/protection.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import { fontCssPxToDisplayPoints, fontPointsToCssPx } from '../engine/font-units.js';
+import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount.js';
 import { outlineSummaryFor } from '../store/outline-summary.js';
@@ -461,6 +463,32 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
   };
 };
 
+/** On the Mac desktop a locked active cell of a protected sheet greys Bold
+ *  (unless formatting is allowed) and Clear. Only what this projection
+ *  disabled is re-enabled; an embedding policy owns the rest. */
+const projectProtectedCellCommands = (
+  buttons: Map<string, HTMLButtonElement[]>,
+  instance: SpreadsheetInstance,
+): void => {
+  const state = instance.store.getState();
+  const active = state.selection.active;
+  const mac = isMacWorkbook(instance.workbook);
+  const reason = protectedCellMessage(instance.i18n.strings, instance.workbook);
+  for (const [command, open] of [
+    ['bold', !mac || isCellFormattable(state, active)],
+    ['clearFormat', !mac || isCellWritable(state, active)],
+  ] as const) {
+    for (const button of buttons.get(command) ?? []) {
+      if (open && button.dataset.protectedCell !== 'true') continue;
+      if (open) delete button.dataset.protectedCell;
+      else button.dataset.protectedCell = 'true';
+      projectDisabledState(button, !open, open ? null : reason, {
+        datasetKey: 'ribbonDisabledReason',
+      });
+    }
+  }
+};
+
 /** Projects the active state onto the ribbon buttons under `host`. */
 export const projectRibbonActiveState = (
   host: HTMLElement,
@@ -511,6 +539,7 @@ export const projectRibbonActiveState = (
       { datasetKey: 'ribbonDisabledReason' },
     );
   }
+  projectProtectedCellCommands(buttons, instance);
   for (const [command, key] of RIBBON_ACTIVE_COMMANDS) {
     const button = buttons.get(command)?.[0];
     if (!button) continue;

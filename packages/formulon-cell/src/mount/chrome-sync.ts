@@ -728,6 +728,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
 
   let lastSheetIdx = store.getState().data.sheetIndex;
   let lastHiddenSheets = store.getState().layout.hiddenSheets;
+  let lastProtectedSheets = store.getState().protection.protectedSheets;
   let lastSelection = store.getState().selection;
   const unsub = store.subscribe(() => {
     const s = store.getState();
@@ -736,8 +737,14 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       lastSheetIdx = s.data.sheetIndex;
       syncActiveSheet(getWb(), lastSheetIdx);
     }
-    if (sheetChanged || s.layout.hiddenSheets !== lastHiddenSheets) {
+    // Protecting a sheet changes its tab: the Mac desktop marks it with a padlock.
+    if (
+      sheetChanged ||
+      s.layout.hiddenSheets !== lastHiddenSheets ||
+      s.protection.protectedSheets !== lastProtectedSheets
+    ) {
       lastHiddenSheets = s.layout.hiddenSheets;
+      lastProtectedSheets = s.protection.protectedSheets;
       getSheetTabs()?.update();
     }
     if (!selectionEquals(lastSelection, s.selection)) {

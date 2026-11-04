@@ -690,7 +690,7 @@ describe('commands/cell-input-commit', () => {
         expect(result).toMatchObject({
           status: 'rejected',
           operation: 'valueEdit',
-          alert: { severity: 'stop', message: 'cell is protected' },
+          alert: { severity: 'stop', code: 'protectedCell' },
         });
         expect(realWb.getValue(anchor)).toEqual({ kind: 'blank' });
         expect(realWb.getValue(pendingAddr)).toEqual({ kind: 'blank' });

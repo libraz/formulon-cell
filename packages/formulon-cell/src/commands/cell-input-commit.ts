@@ -33,7 +33,18 @@ export interface CellInputAlert {
   severity: 'stop' | 'warning' | 'information';
   title?: string;
   message: string;
+  /** Set when the presenting surface words the alert itself: `protectedCell`
+   *  is a change to a locked cell of a protected sheet. */
+  code?: 'protectedCell';
 }
+
+/** The alert raised by a change to a locked cell of a protected sheet. The
+ *  message is a fallback; the alert dialog shows the localized wording. */
+export const protectedCellAlert = (): CellInputAlert => ({
+  severity: 'stop',
+  code: 'protectedCell',
+  message: 'cell is protected',
+});
 
 /**
  * - `applied`: written; `notice` is a non-blocking validation alert to surface.
@@ -154,7 +165,7 @@ export function commitCellInput({
       return {
         status: 'rejected',
         operation,
-        alert: { severity: 'stop', message: 'cell is protected' },
+        alert: protectedCellAlert(),
       };
     }
     if (controller) {

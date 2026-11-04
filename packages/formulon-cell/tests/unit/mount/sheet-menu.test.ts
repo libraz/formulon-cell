@@ -98,6 +98,26 @@ describe('mount/sheet-menu', () => {
     });
   });
 
+  describe('createSheetTabButton on a protected sheet', () => {
+    it('sets the padlock glyph before the sheet name', () => {
+      // Excel (Mac): a protected sheet's tab reads "[padlock] Sheet2".
+      const tab = createSheetTabButton({
+        index: 1,
+        label: 'Sheet2',
+        selected: false,
+        locked: true,
+      });
+      const lock = tab.firstElementChild;
+      expect(lock?.tagName.toLowerCase()).toBe('svg');
+      expect(lock?.classList.contains('fc-host__sheetbar-tab-lock')).toBe(true);
+      expect(lock?.getAttribute('aria-hidden')).toBe('true');
+      expect(tab.textContent).toBe('Sheet2');
+      expect(
+        createSheetTabButton({ index: 1, label: 'Sheet2', selected: false }).querySelector('svg'),
+      ).toBeNull();
+    });
+  });
+
   describe('createSheetMenuColorButton', () => {
     it('applies the shared color swatch button contract', () => {
       const onClick = vi.fn();

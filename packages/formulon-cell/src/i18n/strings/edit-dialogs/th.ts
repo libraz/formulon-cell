@@ -174,6 +174,8 @@ export const editDialogsTh: EditDialogsStrings = {
     ok: 'ตกลง',
   },
   protection: {
+    protectedCellEdit:
+      'เซลล์หรือแผนภูมิที่คุณกำลังพยายามเปลี่ยนแปลงอยู่บนแผ่นงานที่ได้รับการป้องกัน หากต้องการเปลี่ยนแปลง ให้ยกเลิกการป้องกันแผ่นงาน คุณอาจถูกขอให้ใส่รหัสผ่าน',
     tabProtection: 'การป้องกัน',
     locked: 'ถูกล็อก',
     hiddenFormula: 'ซ่อน',

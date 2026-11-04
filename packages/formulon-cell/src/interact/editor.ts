@@ -1,7 +1,12 @@
-import { commitCellInput, inputOperation } from '../commands/cell-input-commit.js';
+import {
+  type CellInputAlert,
+  commitCellInput,
+  inputOperation,
+  protectedCellAlert,
+} from '../commands/cell-input-commit.js';
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { deferForAllowedRangeUnlock } from '../commands/protection.js';
+import { deferForAllowedRangeUnlock, isCellWritable } from '../commands/protection.js';
 import { dblClickRange, editorRefHighlights, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -84,11 +89,7 @@ export interface EditorDeps {
   /** Optional callback fired when validation rejects (severity `stop`) or
    *  warns (`warning` / `information`). The host wires this to a status-bar
    *  toast. When omitted the editor logs to the console. */
-  onValidation?: (outcome: {
-    severity: 'stop' | 'warning' | 'information';
-    title?: string;
-    message: string;
-  }) => void;
+  onValidation?: (outcome: CellInputAlert) => void;
   getLabels?: () => {
     autocomplete?: Partial<AutocompleteLabels>;
     argHelper?: Partial<ArgHelperLabels>;
@@ -311,6 +312,12 @@ export class InlineEditor {
     const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
     if (deferForAllowedRangeUnlock(this.deps.store, [cell], () => this.begin(seed, options)))
       return;
+    // A locked cell of a protected sheet refuses edit mode up front, as the
+    // desktop does on a double-click, F2 or the first keystroke.
+    if (!isCellWritable(s, a)) {
+      this.deps.onValidation?.(protectedCellAlert());
+      return;
+    }
     const controller = interactionControllerFor(this.deps.store);
     if (controller && controller.policy !== undefined) {
       const operation = inputOperation(seed);

@@ -176,6 +176,8 @@ export const editDialogsJa: EditDialogsStrings = {
     ok: 'OK',
   },
   protection: {
+    protectedCellEdit:
+      '変更しようとしているセルやグラフは保護されているシート上にあります。変更するには、シートの保護を解除してください。パスワードの入力が必要な場合があります。',
     tabProtection: '保護',
     locked: 'ロック',
     hiddenFormula: '表示しない',

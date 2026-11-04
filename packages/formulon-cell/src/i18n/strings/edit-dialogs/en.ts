@@ -174,6 +174,8 @@ export const editDialogsEn: EditDialogsStrings = {
     ok: 'OK',
   },
   protection: {
+    protectedCellEdit:
+      "The cell or chart you're trying to change is on a protected sheet. To make a change, unprotect the sheet. You might be requested to enter a password.",
     tabProtection: 'Protection',
     locked: 'Locked',
     hiddenFormula: 'Hidden',

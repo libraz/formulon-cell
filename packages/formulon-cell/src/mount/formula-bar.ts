@@ -1,4 +1,4 @@
-import { commitCellInput } from '../commands/cell-input-commit.js';
+import { type CellInputAlert, commitCellInput } from '../commands/cell-input-commit.js';
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { deferForAllowedRangeUnlock, selectionEditRanges } from '../commands/protection.js';
@@ -84,11 +84,7 @@ interface AttachFormulaBarInput {
   getStrings: () => Strings;
   cancelBindingEditor: () => void;
   host: HTMLElement;
-  onValidation?: (outcome: {
-    severity: 'stop' | 'warning' | 'information';
-    title?: string;
-    message: string;
-  }) => void;
+  onValidation?: (outcome: CellInputAlert) => void;
   store: SpreadsheetStore;
   updateChrome: () => void;
   wb: () => WorkbookHandle;
@@ -650,11 +646,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     applyRecordedEdit(raw, nextCaret, nextCaret, 'external-set-value');
   };
 
-  const notifyValidation = (outcome: {
-    severity: 'stop' | 'warning' | 'information';
-    title?: string;
-    message: string;
-  }): void => {
+  const notifyValidation = (outcome: CellInputAlert): void => {
     if (!onValidation) return;
     try {
       onValidation(outcome);
@@ -663,11 +655,15 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
   };
 
-  const showCommitFailure = (message: string, title?: string): void => {
+  const showCommitFailure = (
+    message: string,
+    title?: string,
+    code?: CellInputAlert['code'],
+  ): void => {
     commitRejected = true;
     // Focusing the bar under an adopted draft would blur and close the palette.
     if (!detached && !externalDraft?.lease) fxInput.focus();
-    if (onValidation) notifyValidation({ severity: 'stop', title, message });
+    if (onValidation) notifyValidation({ severity: 'stop', title, message, code });
     else console.warn(`formulon-cell: formula-bar commit rejected: ${message}`);
   };
 
@@ -763,6 +759,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       showCommitFailure(
         result.alert?.message ?? `The ${result.operation} operation was rejected.`,
         result.alert?.title,
+        result.alert?.code,
       );
       return false;
     }

@@ -176,6 +176,8 @@ export const editDialogsFr: EditDialogsStrings = {
     ok: 'OK',
   },
   protection: {
+    protectedCellEdit:
+      'La cellule ou le graphique que vous essayez de modifier se trouve sur une feuille protégée. Pour effectuer une modification, ôtez la protection de la feuille. Vous devrez peut-être entrer un mot de passe.',
     tabProtection: 'Protection',
     locked: 'Verrouillé',
     hiddenFormula: 'Masqué',

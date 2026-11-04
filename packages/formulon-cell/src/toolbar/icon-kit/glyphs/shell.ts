@@ -1,9 +1,14 @@
 /** Title-bar quick access and search-panel glyphs. */
 
-import { arc, circle, hLine, type Point, poly, roundRect } from '../path.js';
+import { arc, circle, hLine, join, n, type Point, poly, roundRect } from '../path.js';
 import { arcArrow, filled, loopArrow, outlined, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
+
+/** A closed half-disc over `foot` units of straight sides: one wall of a
+ *  shackle when paired evenodd with a smaller one. */
+const arch = (cx: number, cy: number, r: number, foot: number): string =>
+  `${arc(cx, cy, r, r, 180, 360)}v${n(foot)}h${n(-2 * r)}z`;
 
 /** A clock whose rim turns counter-clockwise, its gap and head at the left. */
 function historyClock(cx: number, cy: number, r: number): IconDefinition {
@@ -38,6 +43,16 @@ function historyClock(cx: number, cy: number, r: number): IconDefinition {
 }
 
 export const SHELL_ICONS = {
+  // A protected sheet's tab mark: a solid padlock, its shackle a 3-unit arch
+  // over an 18 x 12 body (Excel Mac tab: 18 x 22 device px).
+  sheetLock: [
+    {
+      d: join(arch(12, 8, 7, 4), arch(12, 8, 4, 4)),
+      fill: PALETTE.ink,
+      fillRule: 'evenodd',
+    },
+    filled(roundRect(3, 11, 18, 12, 1.5), PALETTE.ink),
+  ],
   // A gabled house with its door.
   home: [
     outlined(

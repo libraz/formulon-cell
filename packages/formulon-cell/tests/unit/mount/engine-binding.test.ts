@@ -469,12 +469,12 @@ describe('mount/engine-binding — grid double-click begins inline edit', () => 
     expect(editor?.value).toBe('7');
   });
 
-  it('dblclick hides formula text when the active cell is Hidden on a protected sheet', () => {
+  it('dblclick hides formula text when an unlocked active cell is Hidden on a protected sheet', () => {
     const addr = { sheet: 0, row: 0, col: 0 };
     sheet.workbook.setFormula(addr, '=2+3');
     sheet.workbook.recalc();
     mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
-    mutators.setCellFormat(sheet.instance.store, addr, { formulaHidden: true });
+    mutators.setCellFormat(sheet.instance.store, addr, { formulaHidden: true, locked: false });
     mutators.setSheetProtected(sheet.instance.store, 0, true);
     mutators.setActive(sheet.instance.store, addr);
 
@@ -484,6 +484,19 @@ describe('mount/engine-binding — grid double-click begins inline edit', () => 
     const editor = sheet.host.querySelector('.fc-host__editor') as HTMLTextAreaElement | null;
     expect(editor).not.toBeNull();
     expect(editor?.value).toBe('');
+  });
+
+  it('dblclick on a locked cell of a protected sheet shows the protected-cell alert instead', () => {
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setSheetProtected(sheet.instance.store, 0, true);
+    mutators.setActive(sheet.instance.store, addr);
+
+    const grid = sheet.host.querySelector('.fc-host__grid') as HTMLElement;
+    grid.dispatchEvent(new MouseEvent('dblclick', { button: 0, bubbles: true }));
+
+    expect(sheet.host.querySelector('.fc-host__editor')).toBeNull();
+    const message = document.querySelector('.fc-valdlg .fc-tb__dlg__message');
+    expect(message?.textContent).toBe(sheet.instance.i18n.strings.protection.protectedCellEdit);
   });
 
   it('dblclick is ignored while the editor is already active', () => {

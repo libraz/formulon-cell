@@ -174,6 +174,8 @@ export const editDialogsKo: EditDialogsStrings = {
     ok: '확인',
   },
   protection: {
+    protectedCellEdit:
+      '변경하려는 셀 또는 차트가 보호된 시트에 있습니다. 변경하려면 시트 보호를 해제하세요. 암호를 입력해야 할 수도 있습니다.',
     tabProtection: '보호',
     locked: '잠김',
     hiddenFormula: '숨김',

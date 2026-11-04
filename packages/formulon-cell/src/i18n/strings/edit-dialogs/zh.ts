@@ -174,6 +174,8 @@ export const editDialogsZh: EditDialogsStrings = {
     ok: '确定',
   },
   protection: {
+    protectedCellEdit:
+      '您试图更改的单元格或图表位于受保护的工作表中。若要进行更改，请取消工作表保护。您可能需要输入密码。',
     tabProtection: '保护',
     locked: '锁定',
     hiddenFormula: '隐藏',

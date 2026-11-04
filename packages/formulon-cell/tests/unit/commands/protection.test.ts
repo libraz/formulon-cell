@@ -11,6 +11,7 @@ import {
   isCellWritable,
   isSheetProtected,
   isWorkbookStructureProtected,
+  protectedCellMessage,
   protectedSheetPassword,
   protectedSheetPasswordHash,
   protectedSheetPermissions,
@@ -27,6 +28,7 @@ import { hideRows, showRows } from '../../../src/commands/row-col-layout.js';
 import { deleteRows, insertRows } from '../../../src/commands/structure.js';
 import type { Addr, Range } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en, ja } from '../../../src/i18n/strings.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -515,5 +517,17 @@ describe('pasteTSV protection gate', () => {
     // C1 (locked) — blank.
     expect(wb.getValue({ sheet: 0, row: 0, col: 2 }).kind).toBe('blank');
     expect(result?.writtenRange).toBeDefined();
+  });
+});
+
+describe('protectedCellMessage', () => {
+  it('uses the desktop wording, with the Mac overlay on a Mac workbook', () => {
+    // Excel (Mac, ja) ends 「…パスワードの入力が必要な場合もあります。」.
+    const mac = { spreadsheetProfileId: () => 'mac-ja_JP' };
+    expect(protectedCellMessage(ja, mac)).toBe(
+      '変更しようとしているセルやグラフは保護されているシート上にあります。変更するには、シートの保護を解除してください。パスワードの入力が必要な場合もあります。',
+    );
+    expect(protectedCellMessage(ja, null)).toBe(ja.protection.protectedCellEdit);
+    expect(protectedCellMessage(en, null)).toMatch(/^The cell or chart you're trying to change/);
   });
 });

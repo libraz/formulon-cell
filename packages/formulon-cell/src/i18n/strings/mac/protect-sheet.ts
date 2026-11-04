@@ -11,7 +11,7 @@ export interface MacProtectSheetLabels {
 }
 
 /** Overrides of `protection`, plus the Mac-only lines, that apply to the Mac
- *  Protect Sheet dialog only. */
+ *  Protect Sheet dialog and the protected-cell alert only. */
 export type MacProtectSheetStrings = Partial<ProtectionStrings> & MacProtectSheetLabels;
 
 /** The `protection` keys the Mac dialog can override. A locale whose Mac
@@ -23,6 +23,7 @@ const MAC_PROTECT_SHEET_KEYS = [
   'allowSelectLockedCells',
   'allowSelectUnlockedCells',
   'allowPivotTables',
+  'protectedCellEdit',
 ] as const satisfies readonly (keyof ProtectionStrings)[];
 
 export const macProtectSheetFrom = (
@@ -41,6 +42,8 @@ export const macProtectSheetJa: MacProtectSheetStrings = {
   allowSelectLockedCells: 'ロックされたセルの選択',
   allowSelectUnlockedCells: 'ロックされていないセルの選択',
   allowPivotTables: 'ピボットテーブルとピボットグラフを使用する',
+  protectedCellEdit:
+    '変更しようとしているセルやグラフは保護されているシート上にあります。変更するには、シートの保護を解除してください。パスワードの入力が必要な場合もあります。',
   heading: 'シートとロックされたセルの内容を保護する',
   note: '既定ではすべてのセルがロックされていますが、ロックは解除可能です。',
 };

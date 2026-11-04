@@ -1,5 +1,5 @@
 import type { History } from '../commands/history.js';
-import { isWorkbookStructureProtected } from '../commands/protection.js';
+import { isSheetProtected, isWorkbookStructureProtected } from '../commands/protection.js';
 import {
   addSheet,
   moveSheet,
@@ -8,6 +8,7 @@ import {
   setSheetHidden,
   setSheetTabVisibility,
 } from '../commands/sheet-mutate.js';
+import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -460,6 +461,8 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     refreshLabels();
     sheetTabs.dataset.fcSheetOverflow = visibleIndexes.length > 1 ? 'true' : 'false';
     sheetTabs.replaceChildren();
+    // The Mac desktop marks a protected sheet's tab with a padlock.
+    const mac = isMacWorkbook(wb);
     for (const idx of visibleIndexes) {
       const selected = idx === active;
       const tabColor = store.getState().layout.sheetTabColors.get(idx);
@@ -468,6 +471,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         label: wb.sheetName(idx),
         selected,
         tabColor,
+        locked: mac && isSheetProtected(store.getState(), idx),
       });
       tab.addEventListener('click', () => switchSheet(idx));
       tab.addEventListener('contextmenu', (e) => {

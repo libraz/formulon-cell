@@ -1,4 +1,5 @@
 import { clampPanelToViewport } from '../interact/overlay-position.js';
+import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createHostButton } from './chrome-buttons.js';
 
@@ -41,6 +42,8 @@ export function createSheetTabButton(input: {
   label: string;
   selected: boolean;
   tabColor?: string | null;
+  /** The sheet is protected: the tab leads with a padlock. */
+  locked?: boolean;
 }): HTMLButtonElement {
   const button = createHostButton({
     className: 'fc-host__sheetbar-tab',
@@ -50,6 +53,10 @@ export function createSheetTabButton(input: {
     tabIndex: input.selected ? 0 : -1,
     text: input.label,
   });
+  if (input.locked) {
+    const lock = createExcelRibbonSvg('sheetLock', 'fc-host__sheetbar-tab-lock');
+    if (lock) button.prepend(lock);
+  }
   if (input.tabColor) {
     button.dataset.fcSheetTabColor = 'true';
     button.style.setProperty('--fc-sheet-tab-color', input.tabColor);

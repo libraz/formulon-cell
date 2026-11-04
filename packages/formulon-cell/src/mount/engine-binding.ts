@@ -3,6 +3,7 @@ import { setDataTableGuardSink } from '../commands/data-table-guard.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { setPivotGuardSink } from '../commands/pivot-guard.js';
+import { protectedCellMessage } from '../commands/protection.js';
 import { refreshChartsAfterRecalc, reloadChartsFromEngine } from '../engine/charts-sync.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import { reloadImagesFromEngine } from '../engine/images-sync.js';
@@ -180,6 +181,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
           stop: strings.formatDialog.validationErrorStop,
           warning: strings.formatDialog.validationErrorWarning,
           information: strings.formatDialog.validationErrorInfo,
+          protectedCell: protectedCellMessage(strings, wb),
         },
       })
     : null;

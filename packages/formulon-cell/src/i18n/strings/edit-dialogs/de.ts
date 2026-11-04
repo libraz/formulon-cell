@@ -176,6 +176,8 @@ export const editDialogsDe: EditDialogsStrings = {
     ok: 'OK',
   },
   protection: {
+    protectedCellEdit:
+      'Die Zelle oder das Diagramm, die bzw. das Sie ändern möchten, befindet sich auf einem geschützten Blatt. Um eine Änderung vorzunehmen, heben Sie den Blattschutz auf. Möglicherweise werden Sie zur Eingabe eines Kennworts aufgefordert.',
     tabProtection: 'Schutz',
     locked: 'Gesperrt',
     hiddenFormula: 'Ausgeblendet',
