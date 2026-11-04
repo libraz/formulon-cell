@@ -1063,3 +1063,33 @@ describe('attachFxDialog', () => {
     expect(css).not.toContain('letter-spacing: 0.04em');
   });
 });
+
+describe('attachFxDialog grid picking', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('a focused argument takes grid picks and the dialog stays open', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const handle = attachFxDialog({ host, store, onInsert: () => {} });
+    handle.open('SUM');
+    const overlay = document.querySelector<HTMLElement>('.fc-fxdialog');
+    const input = document.querySelector<HTMLInputElement>('.fc-fxdialog__arg-input');
+    if (!overlay || !input) throw new Error('missing fx argument input');
+    input.focus();
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        active: { sheet: 0, row: 1, col: 1 },
+        anchor: { sheet: 0, row: 1, col: 1 },
+        range: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 },
+      },
+    }));
+    expect(input.value).toBe('B2:C4');
+    expect(overlay.hidden).toBe(false);
+    expect(document.querySelector('.fc-fxdialog__preview')?.textContent).toContain('B2:C4');
+    handle.detach();
+  });
+});

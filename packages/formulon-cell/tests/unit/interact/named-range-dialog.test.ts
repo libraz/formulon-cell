@@ -691,6 +691,32 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     handle.detach();
   });
 
+  it('the Name Manager lets grid clicks through while the editor field is armed', async () => {
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', '=A1');
+    const handle = attachNamedRangeDialog({
+      host,
+      wb,
+      getSelectedRangeFormula: () => '=B2',
+      subscribeToRangeChanges: () => () => undefined,
+    });
+    handle.open();
+    const manager = document.querySelector<HTMLElement>('.fc-namedlg');
+    document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
+    const editorInput = document.querySelector<HTMLInputElement>(
+      '.fc-namedlg-editor__input[aria-label="参照範囲"]',
+    );
+    editorInput?.focus();
+    await Promise.resolve();
+    expect(manager?.style.pointerEvents).toBe('none');
+    document
+      .querySelector<HTMLButtonElement>('.fc-namedlg-editor__buttons button:last-child')
+      ?.click();
+    await Promise.resolve();
+    expect(manager?.style.pointerEvents).toBe('');
+    handle.detach();
+  });
+
   it('Filter menu narrows the Name Manager list to names with formula errors', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');

@@ -115,6 +115,16 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     if (typeof value === 'number') return localizedNumericInput(value);
     return value.startsWith('=') ? localizeFormulaForDisplay(value) : value;
   };
+  // A picked reference is stored as a `=` formula, the same text a typed cell reference gets.
+  const pickedReference = (): string => `=${formatA1Range(store.getState().selection.range)}`;
+  const attachReferencePicker = (input: HTMLInputElement, kind: string): void => {
+    attachRangePickerButton(input, {
+      label: strings.pivotTableDialog.rangePickerSelect,
+      getValue: pickedReference,
+      subscribeToRangeChanges: (listener) => store.subscribe(listener),
+      kind,
+    });
+  };
   const isMacPlatform = (): boolean =>
     (host.closest<HTMLElement>('[data-fc-platform]') ?? host).dataset.fcPlatform === 'mac';
   const shell = createDialogShell({
@@ -277,6 +287,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   valueAInput.type = 'text';
   valueAInput.value = '0';
   valueARow.append(valueALabel, valueAInput);
+  attachReferencePicker(valueAInput, 'conditional-format-value-a');
   cellValueGroup.appendChild(valueARow);
 
   const valueBRow = document.createElement('label');
@@ -287,6 +298,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   valueBInput.type = 'text';
   valueBInput.value = '0';
   valueBRow.append(valueBLabel, valueBInput);
+  attachReferencePicker(valueBInput, 'conditional-format-value-b');
   cellValueGroup.appendChild(valueBRow);
 
   // Apply: fill, color, bold, italic, underline, strike. The Mac dialog leaves these to the format popup.
@@ -412,6 +424,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   formulaInput.autocomplete = 'off';
   formulaInput.placeholder = t.formulaPlaceholder;
   formulaRow.append(formulaLabelEl, formulaInput);
+  attachReferencePicker(formulaInput, 'conditional-format-formula');
   formulaGroup.appendChild(formulaRow);
 
   // ── Text-containing subform ────────────────────────────────────────────

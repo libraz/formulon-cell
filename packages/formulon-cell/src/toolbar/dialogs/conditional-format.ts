@@ -1,4 +1,5 @@
 import { parseLocalizedNumericInput } from '../../commands/coerce-input.js';
+import { attachRangePickerButton } from '../../interact/range-picker-control.js';
 import {
   applyConditionalStylePreview,
   type ConditionalFormatDialogStyle,
@@ -51,7 +52,10 @@ export interface ConditionalFormatRuleDialogStrings {
 }
 
 export interface ConditionalFormatDialogResult {
+  /** Parsed number per field; `0` where the field holds a reference. */
   readonly values: readonly number[];
+  /** Per field, the `=` reference text the user typed or picked, or `null` for a number. */
+  readonly references?: readonly (string | null)[];
   readonly style: ConditionalFormatDialogStyle;
 }
 
@@ -72,6 +76,12 @@ export interface ConditionalFormatNumberDialogOptions {
   initialStyle?: string;
   /** BCP 47 locale used by the decimal input boundary and initial value. */
   locale?: string;
+  /** When present the fields also take a cell reference (`=B2`) and pick it from the grid. */
+  reference?: {
+    pickerLabel: string;
+    getValue: () => string;
+    subscribeToRangeChanges: (listener: () => void) => () => void;
+  };
   strings: ConditionalFormatRuleDialogStrings;
 }
 
@@ -194,6 +204,26 @@ export const showConditionalFormatNumberDialog = (
           })
         : null;
     if (second) second.inputMode = 'decimal';
+    const { reference } = opts;
+    if (reference) {
+      for (const input of second ? [first, second] : [first]) {
+        attachRangePickerButton(input, {
+          label: reference.pickerLabel,
+          getValue: reference.getValue,
+          subscribeToRangeChanges: reference.subscribeToRangeChanges,
+          kind: 'conditional-format-quick-value',
+        });
+      }
+    }
+    const readField = (
+      input: HTMLInputElement,
+    ): { value: number; reference: string | null } | null => {
+      const text = input.value.trim();
+      if (reference && text.length > 1 && text.startsWith('='))
+        return { value: 0, reference: text };
+      const value = readNumber(input, opts);
+      return value === null ? null : { value, reference: null };
+    };
     const formatRow = appendFormatRow(shell.body, opts.strings, opts.initialStyle);
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
@@ -208,8 +238,8 @@ export const showConditionalFormatNumberDialog = (
       onSubmit: () => onOk(),
     });
     const onOk = (): void => {
-      const a = readNumber(first, opts);
-      const b = second ? readNumber(second, opts) : null;
+      const a = readField(first);
+      const b = second ? readField(second) : null;
       if (a === null || (second && b === null)) {
         showInputError(
           errorRow,
@@ -218,8 +248,10 @@ export const showConditionalFormatNumberDialog = (
         );
         return;
       }
+      const fields = b ? [a, b] : [a];
       lifecycle.finish({
-        values: second ? [a, b as number] : [a],
+        values: fields.map((field) => field.value),
+        ...(reference ? { references: fields.map((field) => field.reference) } : {}),
         style: formatRow.getStyle(),
       });
     };

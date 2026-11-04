@@ -201,7 +201,7 @@ describe('attachExternalLinksDialog', () => {
     handle.detach();
   });
 
-  it('clicking the overlay backdrop closes the dialog', () => {
+  it('clicking the overlay backdrop leaves the dialog open', () => {
     const handle = attachExternalLinksDialog({
       host,
       getWb: () => fakeWb([]),
@@ -209,7 +209,7 @@ describe('attachExternalLinksDialog', () => {
     handle.open();
     const dialog = document.querySelector<HTMLElement>('.fc-extlinkdlg');
     dialog?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(dialog?.hidden).toBe(true);
+    expect(dialog?.hidden).toBe(false);
     handle.detach();
   });
 

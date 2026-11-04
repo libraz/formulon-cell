@@ -110,11 +110,21 @@ const buildConditionalMenuAction =
         ribbonLang: dictionaryLocaleFor(instance.i18n.locale),
         range: normalizedSelectionRange(instance),
         cfFill: { fill: '#ffc7ce', color: '#9c0006' },
-        promptCfNumber: (spec) =>
+        promptCfNumber: ({ allowReference, ...spec }) =>
           showConditionalFormatNumberDialog({
             ...spec,
             locale: instance.locale,
             strings: conditionalDialogStrings,
+            ...(allowReference
+              ? {
+                  reference: {
+                    pickerLabel: instance.i18n.strings.pivotTableDialog.rangePickerSelect,
+                    getValue: () => `=${formatA1Range(instance.store.getState().selection.range)}`,
+                    subscribeToRangeChanges: (listener: () => void) =>
+                      instance.store.subscribe(listener),
+                  },
+                }
+              : {}),
           }),
         promptCfText: (spec) =>
           showConditionalFormatTextDialog({

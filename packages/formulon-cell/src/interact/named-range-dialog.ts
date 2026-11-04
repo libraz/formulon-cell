@@ -267,6 +267,19 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       kind: 'named-range-editor-refers-to',
     });
   }
+  // While the editor's field picks from the grid, the Name Manager beneath must not catch the clicks.
+  const syncManagerPassthrough = (): void => {
+    const cls = editorShell.overlay.classList;
+    overlay.style.pointerEvents =
+      cls.contains('fc-fmtdlg--range-armed') || cls.contains('fc-fmtdlg--range-picking')
+        ? 'none'
+        : '';
+  };
+  const passthroughObserver = new MutationObserver(syncManagerPassthrough);
+  passthroughObserver.observe(editorShell.overlay, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
   const editorButtons = document.createElement('div');
   editorButtons.className = 'fc-namedlg-editor__buttons';
   const editorOkBtn = appendDialogButton(editorButtons, { label: t.ok, variant: 'primary' });
@@ -655,6 +668,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   function closeEditor(): void {
     editorShell.overlay.dispatchEvent(new CustomEvent('fc-range-picker-stop-all'));
     editorShell.close();
+    syncManagerPassthrough();
     clearError();
     if (!shell.isOpen()) host.focus();
   }
@@ -1124,6 +1138,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       closeFilterMenu();
       defineShell.dispose();
       deleteShell.dispose();
+      passthroughObserver.disconnect();
       editorShell.dispose();
       shell.dispose();
     },

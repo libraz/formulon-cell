@@ -168,6 +168,8 @@ export type CfApplyStyle = Partial<
 >;
 export type CfNumberDialogResult = {
   readonly values: readonly number[];
+  /** Per field, the `=` reference the user entered, or `null` for the number in `values`. */
+  readonly references?: readonly (string | null)[];
   readonly style: CfApplyStyle;
 };
 export type CfTextDialogResult = { readonly text: string; readonly style: CfApplyStyle };
@@ -187,6 +189,8 @@ export interface ConditionalMenuActionDeps {
     secondLabel?: string;
     secondInitial?: number;
     initialStyle?: string;
+    /** The fields also take a cell reference. */
+    allowReference?: boolean;
   }) => Promise<CfNumberDialogResult | null>;
   promptCfText: (spec: {
     title: string;
@@ -252,6 +256,7 @@ export const applyConditionalMenuAction = async (
             : title.equalPrompt,
       initial: 0,
       initialStyle: 'light-red-dark-red',
+      allowReference: true,
     });
     if (result === null) return;
     const n = result.values[0] ?? 0;
@@ -259,7 +264,7 @@ export const applyConditionalMenuAction = async (
       kind: 'cell-value',
       range,
       op: action === 'cell-gt' ? '>' : action === 'cell-lt' ? '<' : '=',
-      a: n,
+      a: result.references?.[0] ?? n,
       apply: result.style,
     });
     return;
@@ -272,16 +277,21 @@ export const applyConditionalMenuAction = async (
       secondLabel: title.betweenAndPrompt,
       secondInitial: 100,
       initialStyle: 'light-red-dark-red',
+      allowReference: true,
     });
     if (result === null) return;
     const a = result.values[0] ?? 0;
     const b = result.values[1] ?? a;
+    const refA = result.references?.[0] ?? null;
+    const refB = result.references?.[1] ?? null;
+    // Bounds are ordered only when both are numbers; a reference keeps its position.
+    const ordered = refA === null && refB === null;
     addConditionalRuleFromRibbon({
       kind: 'cell-value',
       range,
       op: 'between',
-      a: Math.min(a, b),
-      b: Math.max(a, b),
+      a: ordered ? Math.min(a, b) : (refA ?? a),
+      b: ordered ? Math.max(a, b) : (refB ?? b),
       apply: result.style,
     });
     return;

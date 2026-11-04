@@ -45,6 +45,40 @@ describe('range picker control', () => {
     expect(h.input.value).toBe('B2');
   });
 
+  it('returns focus to the field after a grid pick ends', async () => {
+    const h = mount();
+    h.input.focus();
+    h.input.blur();
+    h.pick('C3');
+    document.body.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    await Promise.resolve();
+    expect(document.activeElement).toBe(h.input);
+    expect(h.input.value).toBe('C3');
+  });
+
+  it('clicking the already-selected cell still writes the reference', async () => {
+    const h = mount();
+    h.input.focus();
+    h.input.value = 'typed';
+    h.input.blur();
+    document.body.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    await Promise.resolve();
+    expect(h.input.value).toBe('A1');
+    expect(document.activeElement).toBe(h.input);
+  });
+
+  it('a pointerup on a real control does not steal focus', async () => {
+    const h = mount();
+    h.input.focus();
+    h.input.blur();
+    h.other.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    const btn = document.createElement('button');
+    document.body.append(btn);
+    btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    await Promise.resolve();
+    expect(document.activeElement).not.toBe(h.input);
+  });
+
   it('keeps picking when focus leaves for the grid, stops for another dialog control', () => {
     const h = mount();
     h.input.focus();

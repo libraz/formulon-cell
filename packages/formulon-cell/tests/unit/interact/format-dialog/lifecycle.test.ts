@@ -326,7 +326,7 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
-  it('backdrop click closes the dialog; panel click does not', () => {
+  it('backdrop click never closes the dialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
@@ -337,7 +337,7 @@ describe('attachFormatDialog', () => {
     expect(overlay.hidden).toBe(false);
 
     overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    expect(overlay.hidden).toBe(true);
+    expect(overlay.hidden).toBe(false);
 
     handle.detach();
   });

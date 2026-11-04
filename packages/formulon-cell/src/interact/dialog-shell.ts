@@ -13,7 +13,7 @@ export interface DialogShellDeps {
   /** Accessible name; assigned to `aria-label` and refreshable via
    *  `setAriaLabel()` so locale swaps don't need a remount. */
   ariaLabel: string;
-  /** Invoked on Escape (while open) and on backdrop click. If omitted both
+  /** Invoked on Escape (while open); a backdrop click never dismisses. If omitted both
    *  dismissals are inert — the dialog stays mounted regardless. */
   onDismiss?: () => void;
 }
@@ -207,8 +207,8 @@ const keyWasHandled = (event: KeyboardEvent): boolean =>
  *     colors/shadows render outside the `.fc-host` `contain: strict` boundary.
  *  3. Keeps Tab / Shift+Tab focus inside the visible dialog, matching desktop
  *     modal behavior.
- *  4. Hooks Escape (document keydown, gated on `!hidden`) and backdrop click
- *     to a single `onDismiss` callback.
+ *  4. Hooks Escape (document keydown, gated on `!hidden`) to `onDismiss`;
+ *     a backdrop click is swallowed and never dismisses.
  *  5. Provides `on()` to register listeners with auto-cleanup. Every `on()`
  *     call is matched by a `removeEventListener` in `dispose()`, so callers
  *     never have to maintain their own bag.
@@ -275,10 +275,11 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
     listeners.push({ target, event, handler, options });
   }
 
+  // A modal dialog ignores backdrop clicks and keeps them away from the grid.
+  on(overlay, 'click', (e) => {
+    if (e.target === overlay) e.stopPropagation();
+  });
   if (onDismiss) {
-    on(overlay, 'click', (e) => {
-      if (ownsDialogKeys(overlay) && (e as MouseEvent).target === overlay) onDismiss();
-    });
     on(document, 'keydown', (e) => {
       const event = e as KeyboardEvent;
       if (overlay.hidden || keyWasHandled(event) || !ownsDialogKeys(overlay)) return;

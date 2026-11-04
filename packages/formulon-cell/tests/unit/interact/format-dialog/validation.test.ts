@@ -26,6 +26,25 @@ describe('attachFormatDialog', () => {
     document.body.innerHTML = '';
   });
 
+  it('a focused custom validation formula takes grid picks and the dialog stays open', () => {
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more');
+      const kind = document.querySelector<HTMLSelectElement>('select[aria-label="許可:"]');
+      const picker = document.querySelector('[data-range-picker="format-validation-formula"]');
+      const input = picker?.closest('.fc-range-picker')?.querySelector('input');
+      if (!kind || !input) throw new Error('validation formula controls missing');
+      kind.value = 'custom';
+      kind.dispatchEvent(new Event('change', { bubbles: true }));
+      input.focus();
+      setRange(store, 1, 1, 3, 2);
+      expect(input.value).toBe('=B2:C4');
+      expect(document.querySelector<HTMLElement>('.fc-fmtdlg')?.hidden).toBe(false);
+    } finally {
+      handle.detach();
+    }
+  });
+
   it('uses the shared range picker for validation list range sources', () => {
     setRange(store, 0, 0, 4, 2);
     const handle = attachFormatDialog({ host, store });

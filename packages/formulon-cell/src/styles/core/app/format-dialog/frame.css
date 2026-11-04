@@ -80,8 +80,18 @@
   .fc-fmtdlg--range-picking .fc-fmtdlg__body {
     overflow: visible;
   }
-  .fc-fmtdlg--range-picking .fc-fmtdlg__body > :not(:has(.fc-range-picker--picking)),
-  .fc-fmtdlg--range-picking .fc-fmtdlg__footer {
+  /* Collapse to the active field at any depth: keep the header, the picker's
+     ancestors, its row siblings and everything inside the picker. */
+  .fc-fmtdlg--range-picking
+    .fc-fmtdlg__panel
+    *:not(
+      .fc-fmtdlg__header,
+      .fc-fmtdlg__header *,
+      .fc-range-picker--picking,
+      .fc-range-picker--picking *,
+      :has(.fc-range-picker--picking),
+      :has(> .fc-range-picker--picking) > *
+    ) {
     display: none;
   }
   .fc-fmtdlg--data-validation .fc-fmtdlg__panel {

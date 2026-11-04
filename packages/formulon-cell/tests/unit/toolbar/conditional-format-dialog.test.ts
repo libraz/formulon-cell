@@ -41,6 +41,55 @@ describe('conditional-format rule dialogs', () => {
     document.body.replaceChildren();
   });
 
+  it('a focused field takes a grid pick and returns it as a reference', async () => {
+    const listeners = new Set<() => void>();
+    let picked = '=B2';
+    const pending = showConditionalFormatNumberDialog({
+      title: 'Greater Than...',
+      label: 'GREATER THAN:',
+      initial: 0,
+      reference: {
+        pickerLabel: 'Select range',
+        getValue: () => picked,
+        subscribeToRangeChanges: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+      strings,
+    });
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const input = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
+    if (!dialog || !input) throw new Error('Expected the number input.');
+    input.focus();
+    picked = '=C3';
+    for (const listener of [...listeners]) listener();
+    expect(input.value).toBe('=C3');
+    expect(document.body.contains(dialog)).toBe(true);
+    dialog.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    const result = await pending;
+    expect(result?.references).toEqual(['=C3']);
+  });
+
+  it('rejects a reference when the dialog does not take one', async () => {
+    const pending = showConditionalFormatNumberDialog({
+      title: 'Top 10 Items',
+      label: 'Format top:',
+      initial: 10,
+      strings,
+    });
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const input = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
+    if (!dialog || !input) throw new Error('Expected the number input.');
+    input.value = '=B2';
+    dialog.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(document.body.contains(dialog)).toBe(true);
+    dialog
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
+      ?.click();
+    await pending;
+  });
+
   it('returns numeric thresholds with the selected Excel-style format preset', async () => {
     const pending = showConditionalFormatNumberDialog({
       title: 'Greater Than...',

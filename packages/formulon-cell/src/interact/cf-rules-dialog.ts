@@ -3,7 +3,8 @@ import { recordConditionalRulesChange } from '../commands/slice-history.js';
 import { formatA1Range } from '../engine/address.js';
 import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
 import { rewriteEngineConditionalFormat } from '../engine/cf-writeback.js';
-import type { Range } from '../engine/types.js';
+import { parseRangeRef } from '../engine/range-resolver.js';
+import type { ConditionalFormatInput, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -142,6 +143,10 @@ const sessionRuleTypeLabel = (rule: ConditionalRule, t: Strings['cfRulesDialog']
   }
 };
 
+type SqrefArea = { firstRow: number; firstCol: number; lastRow: number; lastCol: number };
+
+const EMPTY: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+
 const cloneSessionRule = (rule: ConditionalRule): ConditionalRule => {
   const out = { ...rule, range: { ...rule.range } } as ConditionalRule;
   if ('apply' in out) out.apply = { ...out.apply };
@@ -167,6 +172,8 @@ type ManagedRule =
       stopIfTrue: boolean;
       /** Store indexes of the hydrated copies of this rule, one per range. */
       copies: number[];
+      /** Number of areas in the rule's sqref; only a single area is editable here. */
+      areas: number;
     }
   | {
       source: 'session';
@@ -297,10 +304,9 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   const appliesToInput = document.createElement('input');
   appliesToInput.type = 'text';
   if (mac) appliesToInput.setAttribute('aria-label', appliesToCaption());
-  appliesToInput.readOnly = true;
+  appliesToInput.readOnly = !mac;
   appliesToRow.append(appliesToText, appliesToInput);
   // The Mac row also carries cancel / commit buttons and a range picker.
-  // Editing a rule's range here is not supported, so they stay disabled.
   const appliesToControls: HTMLButtonElement[] = [];
   if (mac) {
     const names = strings.namedRangeDialog;
@@ -317,16 +323,16 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       appliesToRow.insertBefore(button, appliesToInput);
       appliesToControls.push(button);
     }
+    const store = deps.store;
     appliesToControls.push(
       attachRangePickerButton(appliesToInput, {
         label: strings.pivotTableDialog.rangePickerSelect,
-        getValue: () => appliesToInput.value,
+        getValue: () =>
+          formatA1Range(deps.getSelectionRange?.() ?? store?.getState().selection.range ?? EMPTY),
+        subscribeToRangeChanges: store ? (listener) => store.subscribe(listener) : undefined,
         kind: 'cf-rules-applies-to',
       }),
     );
-    for (const button of appliesToControls) {
-      projectDisabledState(button, true, t.editUnavailable, { datasetKey: 'disabledReason' });
-    }
   }
   // The Mac + / - group sits at the start of the footer row, before Cancel / OK.
   if (mac) {
@@ -368,6 +374,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     removed: new Set<number>(),
     priority: new Map<number, number>(),
     stop: new Map<number, boolean>(),
+    range: new Map<number, SqrefArea>(),
   };
   let sessionSnapshot: readonly ConditionalRule[] | null = null;
   const sessionHistory = (): History | null => (mac ? null : (deps.history ?? null));
@@ -402,6 +409,66 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     if (wb && deps.store) hydrateConditionalRulesFromEngine(wb, deps.store, getActiveSheet());
   };
 
+  let appliesToTarget: ManagedRule | null = null;
+  let appliesToDirty = false;
+
+  /** Only the Mac field is editable; a loaded rule needs a single-area sqref and engine writes. */
+  const appliesToEditable = (rule: ManagedRule | null): boolean => {
+    if (!rule || appliesToInput.readOnly) return false;
+    if (rule.source === 'session') return !!deps.store;
+    return !!getWb()?.capabilities?.conditionalFormatMutate && rule.areas === 1;
+  };
+
+  const parseAppliesTo = (text: string): SqrefArea | null => {
+    const parsed = parseRangeRef(text.trim());
+    if (!parsed || parsed.sheetName != null) return null;
+    return { firstRow: parsed.r0, firstCol: parsed.c0, lastRow: parsed.r1, lastCol: parsed.c1 };
+  };
+
+  /** Applies the field's text to the rule it was loaded for; bad text reverts to the rule's range. */
+  const commitAppliesTo = (): void => {
+    const target = appliesToTarget;
+    if (!target || !appliesToDirty || !currentRules.includes(target)) return;
+    appliesToDirty = false;
+    const area = parseAppliesTo(appliesToInput.value);
+    if (!area) {
+      appliesToInput.value = target.range;
+      appliesToInput.removeAttribute('aria-invalid');
+      return;
+    }
+    if (target.source === 'session') {
+      const store = deps.store;
+      if (!store) return;
+      recordConditionalRulesChange(sessionHistory(), store, () => {
+        store.setState((state) => {
+          const source = state.conditional.rules[target.index];
+          if (!source) return state;
+          const rules = [...state.conditional.rules];
+          rules[target.index] = {
+            ...source,
+            range: {
+              sheet: source.range.sheet,
+              r0: area.firstRow,
+              c0: area.firstCol,
+              r1: area.lastRow,
+              c1: area.lastCol,
+            },
+          };
+          return { ...state, conditional: { rules } };
+        });
+      });
+    } else {
+      pending.range.set(target.index, area);
+    }
+    target.range = formatSqref([area]);
+    appliesToInput.value = target.range;
+    const cell = tableWrap
+      .querySelectorAll('tbody tr')
+      [currentRules.indexOf(target)]?.querySelector('.fc-cfrulesdlg__cell-range');
+    if (cell) cell.textContent = target.range;
+    onChanged?.();
+  };
+
   const updateCommandState = (): void => {
     const selected = currentRules[selectedRuleIndex] ?? null;
     // A loaded rule is editable through its hydrated copy; one with several
@@ -417,9 +484,17 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         (selected?.source === 'engine' && selected.copies.length > 0));
     const engineReadOnlyReason =
       selected?.source === 'engine' && selected.copies.length === 0 ? t.editUnavailable : null;
+    appliesToTarget = selected;
+    appliesToDirty = false;
     appliesToInput.value = selected?.range ?? '';
+    appliesToInput.removeAttribute('aria-invalid');
     if (mac) {
-      projectDisabledState(appliesToInput, !selected, null);
+      const editable = appliesToEditable(selected);
+      const reason = selected ? t.editUnavailable : null;
+      projectDisabledState(appliesToInput, !editable, reason);
+      for (const button of appliesToControls) {
+        projectDisabledState(button, !editable, reason, { datasetKey: 'disabledReason' });
+      }
     }
     const noSelectionReason = selected ? null : t.selectRuleActionReason;
     const mutationUnavailableReason = selected && !deps.store ? t.note : null;
@@ -644,6 +719,24 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     const selected = currentRules[selectedRuleIndex];
     if (selected) moveManagedRule(selected, selectedRuleIndex, 1);
   });
+  shell.on(appliesToInput, 'input', () => {
+    appliesToDirty = true;
+  });
+  shell.on(appliesToInput, 'change', commitAppliesTo);
+  shell.on(appliesToInput, 'keydown', ((e: KeyboardEvent) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    e.stopPropagation();
+    commitAppliesTo();
+  }) as EventListener);
+  const [appliesToCancel, appliesToCommit] = appliesToControls;
+  if (appliesToCancel && appliesToCommit) {
+    shell.on(appliesToCommit, 'click', commitAppliesTo);
+    shell.on(appliesToCancel, 'click', () => {
+      appliesToDirty = false;
+      appliesToInput.value = appliesToTarget?.range ?? '';
+    });
+  }
   shell.on(closeBtn, 'click', () => close());
   shell.on(scopeSelect, 'change', () => {
     selectedRuleIndex = 0;
@@ -699,8 +792,11 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         priority: String(rule.priority),
         rule: ruleTypeLabel(rule.type, t),
         format: ruleTypeLabel(rule.type, t),
-        range: formatSqref(rule.sqref),
+        range: formatSqref(
+          pending.range.has(index) ? [pending.range.get(index) as SqrefArea] : rule.sqref,
+        ),
         stopIfTrue: rule.stopIfTrue,
+        areas: rule.sqref.length,
         copies: rule.id
           ? (deps.store?.getState().conditional.rules ?? []).flatMap((candidate, copyIndex) =>
               candidate.engineId === rule.id && candidate.range.sheet === sheet ? [copyIndex] : [],
@@ -771,7 +867,10 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       row.classList.toggle('fc-cfrulesdlg__row--selected', index === selectedRuleIndex);
       const loadedReadOnly = managedRule.source === 'engine' && managedRule.copies.length === 0;
       row.classList.toggle('fc-cfrulesdlg__row--readonly', loadedReadOnly);
-      row.addEventListener('click', () => focusRuleRow(index));
+      row.addEventListener('click', () => {
+        commitAppliesTo();
+        focusRuleRow(index);
+      });
       const kind = document.createElement('td');
       kind.className = 'fc-cfrulesdlg__cell-rule';
       kind.textContent = managedRule.rule;
@@ -918,6 +1017,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     pending.removed.clear();
     pending.priority.clear();
     pending.stop.clear();
+    pending.range.clear();
+    appliesToDirty = false;
     sessionSnapshot = null;
   };
 
@@ -932,9 +1033,14 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
 
   /** Applies the staged edits: loaded rules go to the engine, session rules as one history step. */
   const commitDraft = (): void => {
+    commitAppliesTo();
     const wb = getWb();
     const sheet = getActiveSheet();
-    const touched = new Set([...pending.priority.keys(), ...pending.stop.keys()]);
+    const touched = new Set([
+      ...pending.priority.keys(),
+      ...pending.stop.keys(),
+      ...pending.range.keys(),
+    ]);
     let changed = pending.removed.size > 0 || touched.size > 0;
     if (wb) {
       const formats = wb.getConditionalFormats(sheet);
@@ -943,11 +1049,20 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         .map((index) => {
           const priority = pending.priority.get(index);
           const stopIfTrue = pending.stop.get(index);
+          const area = pending.range.get(index);
           return {
             id: formats[index]?.id as string,
             patch: {
               ...(priority === undefined ? {} : { priority }),
               ...(stopIfTrue === undefined ? {} : { stopIfTrue }),
+              ...(area
+                ? {
+                    input: {
+                      ...(formats[index] as unknown as ConditionalFormatInput),
+                      sqref: [area],
+                    },
+                  }
+                : {}),
             },
           };
         });

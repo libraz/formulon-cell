@@ -109,7 +109,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(frameSource).toContain('.fc-fmtdlg--range-picking');
     expect(frameSource).toContain('pointer-events: none');
     expect(frameSource).toContain('width: min(460px, calc(100vw - 24px))');
-    expect(frameSource).toContain(':not(:has(.fc-range-picker--picking))');
+    expect(frameSource).toContain(':has(.fc-range-picker--picking)');
     expect(controlsSource).toContain('.fc-range-picker--picking > input');
     expect(controlsSource).toContain('.fc-range-picker--picking .fc-range-picker__btn');
   });

@@ -491,7 +491,7 @@ describe('attachPasteSpecial', () => {
     handle.detach();
   });
 
-  it('clicking the overlay backdrop closes the dialog', () => {
+  it('clicking the overlay backdrop leaves the dialog open', () => {
     seed(store, wb, [{ row: 0, col: 0, value: 1 }]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
 
@@ -506,7 +506,7 @@ describe('attachPasteSpecial', () => {
 
     const overlay = document.querySelector<HTMLElement>('.fc-pastesp');
     overlay?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(overlay?.hidden).toBe(true);
+    expect(overlay?.hidden).toBe(false);
     handle.detach();
   });
 

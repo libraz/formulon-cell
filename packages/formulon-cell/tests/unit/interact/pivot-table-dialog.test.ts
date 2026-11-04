@@ -358,6 +358,7 @@ describe('attachPivotTableDialog', () => {
       'input[name="fc-pivotdlg-destination"][value="existing"]',
     );
     existingSheet?.click();
+    expect(document.activeElement).toBe(rangeInputs[1]);
     expect(rangeInputs[1]?.disabled).toBe(false);
     expect(rangeInputs[1]?.dataset.disabledReason).toBeUndefined();
     expect(rangeInputs[1]?.hasAttribute('aria-description')).toBe(false);

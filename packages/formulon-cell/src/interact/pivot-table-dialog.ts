@@ -557,6 +557,9 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   shell.on(externalSourceInput, 'change', configureForSource as EventListener);
   shell.on(newWorksheetInput, 'change', updateDestinationPlacementState as EventListener);
   shell.on(existingWorksheetInput, 'change', updateDestinationPlacementState as EventListener);
+  shell.on(existingWorksheetInput, 'change', () => {
+    if (existingWorksheetInput.checked) destInput.focus({ preventScroll: true });
+  });
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', close);
   shell.on(overlay, 'keydown', onKey as EventListener);

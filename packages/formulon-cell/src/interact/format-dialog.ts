@@ -301,6 +301,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     subscribeToRangeChanges: (listener) => store.subscribe(listener),
     kind: 'format-validation-list-range',
   });
+  attachRangePickerButton(view.validationFormulaInput, {
+    label: strings.pivotTableDialog.rangePickerSelect,
+    getValue: () => `=${formatA1Range(store.getState().selection.range)}`,
+    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    kind: 'format-validation-formula',
+  });
 
   // ── State ──────────────────────────────────────────────────────────────
   let activeTab: TabId = 'number';
@@ -806,7 +812,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', onCancel);
   shell.on(overlay, 'click', (e) => {
-    if ((e as MouseEvent).target === overlay) api.close();
+    if ((e as MouseEvent).target === overlay) e.stopPropagation();
   });
   shell.on(overlay, 'keydown', onOverlayKey as EventListener);
   shell.on(overlay, 'mousedown', onOverlayPointerDown);

@@ -186,8 +186,8 @@ describe('attachCfRulesDialog on the Mac profile', () => {
     document.body.appendChild(host);
 
     const { handle } = open([rule()]);
-    expect(q<HTMLInputElement>('.fc-cfrulesdlg__appliesto input').disabled).toBe(false);
-    // Range editing is not wired, so the cancel / commit / picker controls stay disabled.
+    // A loaded rule is editable only when the engine can rewrite it.
+    expect(q<HTMLInputElement>('.fc-cfrulesdlg__appliesto input').disabled).toBe(true);
     expect(
       [...document.querySelectorAll<HTMLButtonElement>('.fc-cfrulesdlg__appliesto button')].every(
         (b) => b.disabled,
@@ -200,5 +200,65 @@ describe('attachCfRulesDialog on the Mac profile', () => {
     const { handle } = open([]);
     expect(document.querySelectorAll('.fc-cfrulesdlg__table colgroup col')).toHaveLength(4);
     handle.detach();
+  });
+
+  describe('Applies to editing', () => {
+    const setSelection = (
+      store: ReturnType<typeof createSpreadsheetStore>,
+      r0: number,
+      c0: number,
+      r1: number,
+      c1: number,
+    ): void => {
+      store.setState((s) => ({
+        ...s,
+        selection: {
+          active: { sheet: 0, row: r0, col: c0 },
+          anchor: { sheet: 0, row: r0, col: c0 },
+          range: { sheet: 0, r0, c0, r1, c1 },
+        },
+      }));
+    };
+    const sessionRule = {
+      kind: 'blanks' as const,
+      range: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 },
+      apply: {},
+    };
+
+    it('takes a grid pick into the focused field and stages it for OK', () => {
+      const store = createSpreadsheetStore();
+      mutators.addConditionalRule(store, sessionRule);
+      const { handle } = open([], { store });
+      const input = q<HTMLInputElement>('.fc-cfrulesdlg__appliesto input');
+      expect(input.disabled).toBe(false);
+      input.focus();
+      setSelection(store, 1, 1, 3, 2);
+      expect(input.value).toBe('B2:C4');
+      expect(q<HTMLElement>('.fc-cfrulesdlg').hidden).toBe(false);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(store.getState().conditional.rules[0]?.range).toMatchObject({
+        r0: 1,
+        c0: 1,
+        r1: 3,
+        c1: 2,
+      });
+      expect(labels('.fc-cfrulesdlg__cell-range')).toEqual(['B2:C4']);
+      handle.detach();
+    });
+
+    it('drops a picked range on Cancel', () => {
+      const store = createSpreadsheetStore();
+      mutators.addConditionalRule(store, sessionRule);
+      const { handle } = open([], { store });
+      const input = q<HTMLInputElement>('.fc-cfrulesdlg__appliesto input');
+      input.focus();
+      setSelection(store, 1, 1, 3, 2);
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      [...document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__footer button')]
+        .find((b) => b.textContent === defaultStrings.formatDialog.cancel)
+        ?.click();
+      expect(store.getState().conditional.rules[0]?.range).toMatchObject({ r0: 0, r1: 4 });
+      handle.detach();
+    });
   });
 });

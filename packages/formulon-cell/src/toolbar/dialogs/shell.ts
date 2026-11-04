@@ -188,7 +188,7 @@ export const installDialogLifecycle = <T>(
     }
   };
   shell.overlay.addEventListener('click', (event) => {
-    if (event.target === shell.overlay) finish(onCancel());
+    if (event.target === shell.overlay) event.stopPropagation();
   });
   shell.overlay.addEventListener('keydown', onKey);
   activeDialogCancellers.add(cancel);

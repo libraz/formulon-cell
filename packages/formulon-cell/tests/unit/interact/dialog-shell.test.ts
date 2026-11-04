@@ -594,7 +594,7 @@ describe('interact/dialog-shell', () => {
     shell.dispose();
   });
 
-  it('invokes onDismiss on backdrop click but not on panel-internal click', () => {
+  it('backdrop click never dismisses and does not leak to the host', () => {
     const onDismiss = vi.fn();
     const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X', onDismiss });
     shell.open();
@@ -603,8 +603,15 @@ describe('interact/dialog-shell', () => {
     shell.panel.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(onDismiss).not.toHaveBeenCalled();
 
-    // Click whose target IS the overlay → dismiss.
+    const leaked = vi.fn();
+    document.body.addEventListener('click', leaked);
     shell.overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document.body.removeEventListener('click', leaked);
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(leaked).not.toHaveBeenCalled();
+    expect(shell.isOpen()).toBe(true);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(onDismiss).toHaveBeenCalledTimes(1);
 
     shell.dispose();

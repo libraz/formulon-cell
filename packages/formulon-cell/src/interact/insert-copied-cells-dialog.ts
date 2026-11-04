@@ -61,7 +61,7 @@ export function openInsertCopiedCellsDialog(deps: InsertCopiedCellsDialogDeps): 
     }
   });
   root.addEventListener('mousedown', (e) => {
-    if (e.target === root) close();
+    if (e.target === root) e.stopPropagation();
   });
 
   panel.append(title, choices, footer);

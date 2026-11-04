@@ -14,6 +14,7 @@ import {
   subscribeRecentFunctions,
 } from '../commands/function-history.js';
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
+import { formatA1Range } from '../engine/address.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -35,6 +36,7 @@ import {
   nativeFunctionName,
   resolveCatalogFunctionName,
 } from './function-catalog-text.js';
+import { attachRangePickerButton } from './range-picker-control.js';
 
 /** Heuristic locale detector for hosts that supply no `getLocale`. Built-in
  * dictionaries use stable translated titles; custom overlays fall back to
@@ -464,6 +466,12 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       row.append(labelEl, input);
       argsFields.appendChild(row);
       input.value = initialArgs[index] ?? previousValues[index] ?? '';
+      attachRangePickerButton(input, {
+        label: strings.pivotTableDialog.rangePickerSelect,
+        getValue: () => formatA1Range(deps.store.getState().selection.range),
+        subscribeToRangeChanges: (listener) => deps.store.subscribe(listener),
+        kind: 'fx-argument',
+      });
       argInputs.push(input);
     }
     if (maxArity === null) {

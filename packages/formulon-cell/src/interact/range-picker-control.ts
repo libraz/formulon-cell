@@ -8,6 +8,9 @@ export interface RangePickerControlOptions {
   kind?: string;
 }
 
+const INTERACTIVE_SELECTOR =
+  'button, input, select, textarea, a[href], [role="button"], [role="menuitem"], [role="tab"]';
+
 export const attachRangePickerButton = (
   input: HTMLInputElement,
   opts: RangePickerControlOptions,
@@ -51,7 +54,29 @@ export const attachRangePickerButton = (
     input.dispatchEvent(new Event('input', { bubbles: true }));
     opts.onPicked?.(value);
   };
+  // A grid pick ends on pointerup; hand focus back so Enter/Escape/typing reach the field.
+  const onDocumentPointerUp = (event: PointerEvent): void => {
+    if (!unsubscribe) return;
+    const target = event.target;
+    if (target instanceof Node && dialog()?.contains(target)) return;
+    // Real controls (ribbon, tabs, inputs) keep their own focus.
+    if (target instanceof Element && target.closest(INTERACTIVE_SELECTOR)) return;
+    // Let the grid's own pointerup handling (host.focus) run first.
+    queueMicrotask(() => {
+      if (!unsubscribe || shouldStopForDialogState()) return;
+      if (!collapsed && document.activeElement === input) return;
+      if (!collapsed) applyPickedValueIfChanged();
+      input.focus({ preventScroll: true });
+    });
+  };
+  const applyPickedValueIfChanged = (): void => {
+    const picked = opts.getValue();
+    if (picked === lastSeen && input.value === picked) return;
+    lastSeen = picked;
+    applyPickedValue();
+  };
   const stopPicking = (): void => {
+    document.removeEventListener('pointerup', onDocumentPointerUp, true);
     if (unsubscribe) {
       unsubscribe();
       unsubscribe = null;
@@ -94,6 +119,7 @@ export const attachRangePickerButton = (
       wrap.classList.add('fc-range-picker--armed');
     }
     syncDialogClasses();
+    document.addEventListener('pointerup', onDocumentPointerUp, true);
     activeDialog = dialog();
     activeDialog?.addEventListener('fc-range-picker-stop-all', stopPicking);
     unsubscribe = opts.subscribeToRangeChanges(() => {
