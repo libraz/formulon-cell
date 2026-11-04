@@ -22,6 +22,7 @@ vi.mock('@libraz/formulon-cell', async (importOriginal) => {
     applyControlledLocale: actual.applyControlledLocale,
     applyControlledProps: actual.applyControlledProps,
     applyUiFeaturesToolbar: actual.applyUiFeaturesToolbar,
+    resolveAdapterTheme: actual.resolveAdapterTheme,
     Spreadsheet: { mount: mountCore },
     resolveSpreadsheetUiOptions: resolveUi,
   };

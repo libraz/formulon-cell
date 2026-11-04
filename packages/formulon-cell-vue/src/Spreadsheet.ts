@@ -10,7 +10,7 @@ import {
   type MountOptions,
   type PrinterProfile,
   type RecalcEvent,
-  resolveSpreadsheetUiOptions,
+  resolveAdapterTheme,
   type SelectionChangeEvent,
   Spreadsheet as SpreadsheetCore,
   type SpreadsheetInstance,
@@ -169,7 +169,7 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       try {
         inst = await SpreadsheetCore.mount(host, opts);
       } catch (error) {
-        mountError.value = error;
+        if (!disposed) mountError.value = error;
         return;
       }
       if (disposed) {
@@ -207,9 +207,8 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
     // API — react to prop changes without re-mounting.
     watch(
       () => props.theme,
-      (nextTheme) => {
-        const resolved = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
-        const theme = nextTheme ?? resolved?.theme;
+      () => {
+        const theme = resolveAdapterTheme(props);
         if (theme && instance.value) instance.value.setTheme(theme);
       },
     );
@@ -247,18 +246,17 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       },
     );
     watch(
-      () => [props.features, props.ui] as const,
-      ([nextFeatures, nextUi], previous) => {
+      () => [props.features, props.ui, props.toolbar] as const,
+      ([nextFeatures, nextUi, nextToolbar], previous) => {
         if (instance.value) {
           const uiChanged = nextUi !== previous?.[1];
           applyUiFeaturesToolbar(
             instance.value,
-            { ui: nextUi, features: nextFeatures, toolbar: props.toolbar },
+            { ui: nextUi, features: nextFeatures, toolbar: nextToolbar },
             uiChanged,
           );
           if (uiChanged) {
-            const theme =
-              props.theme ?? (nextUi ? resolveSpreadsheetUiOptions(nextUi).theme : undefined);
+            const theme = resolveAdapterTheme({ theme: props.theme, ui: nextUi });
             if (theme) instance.value.setTheme(theme);
           }
         }
@@ -292,15 +290,6 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
         if (instance.value) instance.value.setOverlayOptions(next);
       },
       { deep: true },
-    );
-    watch(
-      () => props.toolbar,
-      (next) => {
-        if (instance.value) {
-          const resolved = resolveSpreadsheetUiOptions(props.ui);
-          instance.value.setToolbar(next ?? (props.ui ? resolved.ribbon : false));
-        }
-      },
     );
     watch(
       () => props.extensions,

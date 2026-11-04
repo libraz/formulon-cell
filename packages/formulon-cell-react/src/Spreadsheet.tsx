@@ -10,7 +10,7 @@ import {
   type MountOptions,
   type PrinterProfile,
   type RecalcEvent,
-  resolveSpreadsheetUiOptions,
+  resolveAdapterTheme,
   type SelectionChangeEvent,
   Spreadsheet as SpreadsheetCore,
   type SpreadsheetInstance,
@@ -269,8 +269,7 @@ const SpreadsheetComponent = (
   useEffect(() => {
     const inst = instanceRef.current;
     if (!inst) return;
-    const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
-    const nextTheme = props.theme ?? ui?.theme;
+    const nextTheme = resolveAdapterTheme({ theme: props.theme, ui: props.ui });
     if (nextTheme) inst.setTheme(nextTheme);
   }, [props.theme, props.ui]);
 

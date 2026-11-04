@@ -4,10 +4,8 @@
 // optional review/automation/drawing/file callbacks as hooks.
 //
 // Everything else — DOM, helpers, menus, hook defaults — is provided by core
-// so this file stays small. The legacy SpreadsheetToolbar (~3.9k LOC of
-// React-native ribbon UI) was retired in Phase 3-b; consumers that depended
-// on internal class names or sub-component exports should migrate to the
-// core's `data-ribbon-*` attributes for selection.
+// so this file stays small. The ribbon is the core's DOM; select it through
+// the core's `data-ribbon-*` attributes rather than internal class names.
 import {
   buildAdapterRibbonWiring,
   dictionaryLocaleFor,
@@ -18,7 +16,7 @@ import {
 } from '@libraz/formulon-cell';
 import { type ReactElement, useEffect, useRef } from 'react';
 
-import type { SpreadsheetToolbarProps } from './toolbar/model.js';
+import type { RibbonTab, SpreadsheetToolbarProps } from './toolbar/model.js';
 
 export type { RibbonTab, SpreadsheetToolbarProps } from './toolbar/model.js';
 
@@ -32,7 +30,7 @@ type CallbackBag = {
   onAddIn?: () => void;
   onError?: (error: unknown) => void;
   onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
-  onTabChange: (tab: import('./toolbar/model.js').RibbonTab) => void;
+  onTabChange: (tab: RibbonTab) => void;
 };
 
 export const SpreadsheetToolbar = ({
@@ -58,18 +56,7 @@ export const SpreadsheetToolbar = ({
   // Keep the latest callbacks in a ref so the mount effect only re-runs on
   // instance / locale change. Hook implementations close over the ref so a
   // late-mutated callback still fires on the next click.
-  const callbacksRef = useRef<CallbackBag>({
-    onTabChange,
-    onSpellingReview,
-    onAccessibilityCheck,
-    onRunScript,
-    onDrawPen,
-    onDrawEraser,
-    onTranslate,
-    onAddIn,
-    onToolbarReady,
-  });
-  callbacksRef.current = {
+  const callbacks: CallbackBag = {
     onTabChange,
     onSpellingReview,
     onAccessibilityCheck,
@@ -81,6 +68,8 @@ export const SpreadsheetToolbar = ({
     onError,
     onToolbarReady,
   };
+  const callbacksRef = useRef<CallbackBag>(callbacks);
+  callbacksRef.current = callbacks;
 
   // Presence (not identity) of these props decides whether core defaults are
   // overridden, so only a change in presence re-mounts the toolbar.

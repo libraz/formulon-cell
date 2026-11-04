@@ -10,6 +10,7 @@ import {
   resolveSpreadsheetUiOptions,
   type SpreadsheetUiOptions,
 } from '../extensions/ui-options.js';
+import { DEFAULT_LOCALE } from '../i18n/locales.js';
 import type { SelectionSlice } from '../store/types.js';
 import type { RibbonHooks } from '../toolbar/ribbon/apply-ribbon-command.js';
 import type { DynamicDropdownsCtx } from '../toolbar/ribbon/dynamic-dropdowns.js';
@@ -24,7 +25,7 @@ export const ADAPTER_FALLBACK_SELECTION: SelectionSlice = {
 };
 
 /** Locale an adapter reports while no instance is mounted. */
-export const ADAPTER_FALLBACK_LOCALE = 'ja';
+export const ADAPTER_FALLBACK_LOCALE = DEFAULT_LOCALE;
 
 /** Props the adapters reconcile against a running instance. */
 export interface AdapterControlledProps {
@@ -84,6 +85,12 @@ export const applyControlledLocale = (
   return false;
 };
 
+/** Effective theme: the explicit `theme` prop, else the `ui` preset's theme. */
+export const resolveAdapterTheme = (
+  props: Pick<AdapterControlledProps, 'theme' | 'ui'>,
+): MountOptions['theme'] =>
+  props.theme ?? (props.ui ? resolveSpreadsheetUiOptions(props.ui).theme : undefined);
+
 /** Reconcile ui / features / toolbar; `uiChanged` also re-applies the ui preset. */
 export const applyUiFeaturesToolbar = (
   inst: SpreadsheetInstance,
@@ -121,8 +128,7 @@ export const applyControlledProps = async (
   if (props.overlays !== baseline.overlays) inst.setOverlayOptions(props.overlays);
   if (props.ui !== baseline.ui) inst.setUi(props.ui);
   const nextTheme = props.theme ?? ui?.theme;
-  const baselineTheme =
-    baseline.theme ?? (baseline.ui ? resolveSpreadsheetUiOptions(baseline.ui).theme : undefined);
+  const baselineTheme = resolveAdapterTheme(baseline);
   if (nextTheme && nextTheme !== baselineTheme) inst.setTheme(nextTheme);
   const localeAccepted =
     props.locale && props.locale !== baseline.locale

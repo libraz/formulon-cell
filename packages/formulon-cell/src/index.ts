@@ -535,6 +535,7 @@ export {
   applyControlledProps,
   applyUiFeaturesToolbar,
   buildAdapterRibbonWiring,
+  resolveAdapterTheme,
 } from './mount/adapter-props.js';
 export type { DefaultDynamicDropdownsOptions } from './mount/dynamic-dropdowns-defaults.js';
 export { createDefaultDynamicDropdownsCtx } from './mount/dynamic-dropdowns-defaults.js';
