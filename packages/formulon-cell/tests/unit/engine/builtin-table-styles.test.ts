@@ -11,14 +11,6 @@ const OFFICE_2007 = [
 const rgb = (hex: string | undefined): number[] =>
   hex ? [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) : [];
 
-/** Within one unit per channel: the host's HLS tint truncates where the desktop app rounds. */
-const near = (actual: number[], expected: number[]): void => {
-  expect(actual).toHaveLength(3);
-  actual.forEach((value, i) => {
-    expect(Math.abs(value - (expected[i] ?? -9))).toBeLessThanOrEqual(1);
-  });
-};
-
 describe('built-in table style elements', () => {
   it('defines every gallery style and nothing else', () => {
     for (const { name } of BUILTIN_TABLE_STYLES) {
@@ -43,7 +35,7 @@ describe('built-in table style elements', () => {
     ).toEqual([217, 217, 217]);
     const dark1 = builtinTableStyleElements('TableStyleDark1', OFFICE_2007);
     expect(rgb(dark1?.headerRow?.fill)).toEqual([0, 0, 0]);
-    near(rgb(dark1?.firstRowStripe?.fill), [64, 64, 64]);
+    expect(rgb(dark1?.firstRowStripe?.fill)).toEqual([64, 64, 64]);
     expect(dark1?.headerRow?.borders?.bottom).toEqual({ style: 'medium', color: '#ffffff' });
   });
 

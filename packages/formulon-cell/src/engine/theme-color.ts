@@ -58,8 +58,11 @@ const tintedArgb = (argb: number, tint: number): number => {
     if (hue < 0) hue += HLS_MAX;
     if (hue > HLS_MAX) hue -= HLS_MAX;
   }
-  const keep = tint < 0 ? 1 + tint : 1 - tint;
-  const scaled = tint < 0 ? lum * keep : lum * keep + (HLS_MAX - HLS_MAX * keep);
+  // A file stores a tint as a quantised fraction (0.8 as 0.79998...); the
+  // spreadsheet works from the percentage it stands for.
+  const nominal = Math.round(tint * 10_000) / 10_000;
+  const keep = nominal < 0 ? 1 + nominal : 1 - nominal;
+  const scaled = nominal < 0 ? lum * keep : lum * keep + (HLS_MAX - HLS_MAX * keep);
   const newLum = Math.min(HLS_MAX, Math.max(0, Math.floor(scaled)));
   const pack = (red: number, green: number, blue: number): number =>
     (0xff000000 | (red << 16) | (green << 8) | blue) >>> 0;
