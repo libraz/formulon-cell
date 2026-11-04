@@ -255,6 +255,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     }),
     hyperlinkFollow,
     () => confirmMoveOverwrite(strings, wb),
+    () => strings.resizeTip,
   );
   // Header / footer slots are only reachable in Page Layout view, but the
   // listener is cheap and stateless until one is clicked.

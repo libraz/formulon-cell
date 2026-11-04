@@ -45,9 +45,11 @@ const dragRow0To = (host: HTMLElement, store: SpreadsheetStore, screenPx: number
   const layout = layoutForView(s);
   const top = rowTopEdge(layout, s.viewport, 0);
   const bottom = top + rowHeight(layout, 0, s.viewport);
+  // The size follows the pointer 1:1 from the grab point.
+  const to = bottom - 1 + (screenPx - (bottom - top));
   firePointer(host, 'pointerdown', 10, bottom - 1);
-  firePointer(host, 'pointermove', 10, top + screenPx);
-  firePointer(host, 'pointerup', 10, top + screenPx);
+  firePointer(host, 'pointermove', 10, to);
+  firePointer(host, 'pointerup', 10, to);
 };
 
 /** Drag column 0's trailing edge so the column spans `screenPx` on screen. */
@@ -56,9 +58,10 @@ const dragCol0To = (host: HTMLElement, store: SpreadsheetStore, screenPx: number
   const layout = layoutForView(s);
   const leading = colLeadingEdge(layout, s.viewport, 0);
   const trailing = leading + colWidth(layout, 0, s.viewport);
+  const to = trailing - 1 + (screenPx - (trailing - leading));
   firePointer(host, 'pointerdown', trailing - 1, 10);
-  firePointer(host, 'pointermove', leading + screenPx, 10);
-  firePointer(host, 'pointerup', leading + screenPx, 10);
+  firePointer(host, 'pointermove', to, 10);
+  firePointer(host, 'pointerup', to, 10);
 };
 
 describe('screen-scaled resize and wheel', () => {

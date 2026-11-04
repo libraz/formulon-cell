@@ -9,7 +9,8 @@ import {
   frozenRowStart,
 } from '../store/freeze-band.js';
 import { isRowHidden } from '../store/row-visibility.js';
-import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
+import { type LayoutSlice, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
   type AutofitOptions,
   computeAutofitColWidth,
@@ -18,7 +19,11 @@ import {
 } from './autofit-measurement.js';
 import type { History } from './history.js';
 import { blockedByProtection } from './protection.js';
-import { captureLayoutSnapshot, recordLayoutChangeWithEngine } from './slice-history.js';
+import {
+  captureLayoutSnapshot,
+  type LayoutSnapshot,
+  recordLayoutChangeWithEngine,
+} from './slice-history.js';
 
 const MAX_MATERIALIZED_LAYOUT_ROWS = 100_000;
 const MAX_AUTOFIT_AXIS_SPAN_PAIRS = 100_000;
@@ -56,14 +61,17 @@ export function showRows(
 ): void {
   const sheet = store.getState().data.sheetIndex;
   if (blockedByProtection(store, sheet, 'showRows', 'formatRows')) return;
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    store.setState((s) => {
-      const next = new Set(s.layout.hiddenRows);
-      for (const row of s.layout.hiddenRows) {
-        if (row >= r0 && row <= r1) next.delete(row);
-      }
-      return { ...s, layout: { ...s.layout, ...showDefaultHiddenRows(s.layout, next, r0, r1) } };
-    });
+  recordLayoutChangeWithEngine(history, store, wb ?? null, () => revealRows(store, r0, r1));
+}
+
+/** Unhide rows [r0, r1] in the store without recording history. */
+function revealRows(store: SpreadsheetStore, r0: number, r1: number): void {
+  store.setState((s) => {
+    const next = new Set(s.layout.hiddenRows);
+    for (const row of s.layout.hiddenRows) {
+      if (row >= r0 && row <= r1) next.delete(row);
+    }
+    return { ...s, layout: { ...s.layout, ...showDefaultHiddenRows(s.layout, next, r0, r1) } };
   });
 }
 
@@ -131,12 +139,15 @@ export function showCols(
 ): void {
   const sheet = store.getState().data.sheetIndex;
   if (blockedByProtection(store, sheet, 'showCols', 'formatColumns')) return;
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    store.setState((s) => {
-      const next = new Set(s.layout.hiddenCols);
-      for (let c = c0; c <= c1; c += 1) next.delete(c);
-      return { ...s, layout: { ...s.layout, hiddenCols: next } };
-    });
+  recordLayoutChangeWithEngine(history, store, wb ?? null, () => revealCols(store, c0, c1));
+}
+
+/** Unhide columns [c0, c1] in the store without recording history. */
+function revealCols(store: SpreadsheetStore, c0: number, c1: number): void {
+  store.setState((s) => {
+    const next = new Set(s.layout.hiddenCols);
+    for (let c = c0; c <= c1; c += 1) next.delete(c);
+    return { ...s, layout: { ...s.layout, hiddenCols: next } };
   });
 }
 
@@ -570,4 +581,160 @@ export function applyFreezeMode(
   const rows = mode === 'firstColumn' ? 0 : 1;
   const cols = mode === 'firstColumn' ? 1 : 0;
   setFreezePanes(store, rows, cols, wb, { row: originRow, col: originCol });
+}
+
+/** Axis of a header-border gesture. */
+export type HeaderAxis = 'col' | 'row';
+
+/** Inclusive `[first, last]` track span. */
+export type TrackSpan = readonly [number, number];
+
+/**
+ * The track spans a border gesture on `track` applies to. When the selection
+ * holds whole columns (rows) and `track` lies inside one of them, every
+ * selected whole column (row) takes part; otherwise only `track` does.
+ */
+export function headerGestureSpans(state: State, axis: HeaderAxis, track: number): TrackSpan[] {
+  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])];
+  const spans: TrackSpan[] = [];
+  let total = 0;
+  for (const range of ranges) {
+    if (axis === 'col' ? !isWholeColumnRange(range) : !isWholeRowRange(range)) continue;
+    const span: TrackSpan = axis === 'col' ? [range.c0, range.c1] : [range.r0, range.r1];
+    spans.push(span);
+    total += spanSize(span[0], span[1]);
+  }
+  const inside = spans.some(([first, last]) => track >= first && track <= last);
+  if (!inside || total > MAX_MATERIALIZED_LAYOUT_ROWS) return [[track, track]];
+  return spans;
+}
+
+/**
+ * Lay out a border drag from the pre-drag layout `pre`: every track in
+ * `spans` gets `size` (canonical px), or is hidden when `size` is not
+ * positive. A single dragged track pushed past its own leading edge by
+ * `overshoot` also eats twice that from the visible tracks before it,
+ * hiding each one it exhausts.
+ */
+export function previewHeaderResize(
+  store: SpreadsheetStore,
+  axis: HeaderAxis,
+  pre: LayoutSnapshot,
+  spans: readonly TrackSpan[],
+  size: number,
+  overshoot: number,
+): void {
+  const isCol = axis === 'col';
+  store.setState((s) => ({
+    ...s,
+    layout: isCol
+      ? { ...s.layout, colWidths: new Map(pre.colWidths), hiddenCols: new Set(pre.hiddenCols) }
+      : {
+          ...s.layout,
+          rowHeights: new Map(pre.rowHeights),
+          hiddenRows: new Set(pre.hiddenRows),
+          shownRows: new Set(pre.shownRows),
+          defaultRowsHidden: pre.defaultRowsHidden,
+        },
+  }));
+  const setSize = (track: number, px: number): void =>
+    isCol ? mutators.setColWidth(store, track, px) : mutators.setRowHeight(store, track, px);
+  const hide = (first: number, last: number): void =>
+    store.setState((s) => {
+      if (isCol) {
+        const hiddenCols = new Set(s.layout.hiddenCols);
+        for (let t = first; t <= last; t += 1) hiddenCols.add(t);
+        return { ...s, layout: { ...s.layout, hiddenCols } };
+      }
+      const hiddenRows = new Set(s.layout.hiddenRows);
+      for (let t = first; t <= last; t += 1) hiddenRows.add(t);
+      return { ...s, layout: { ...s.layout, hiddenRows } };
+    });
+
+  if (size > 0) {
+    for (const [first, last] of spans) {
+      if (isCol) revealCols(store, first, last);
+      else revealRows(store, first, last);
+      for (let t = first; t <= last; t += 1) setSize(t, size);
+    }
+    return;
+  }
+  for (const [first, last] of spans) hide(first, last);
+  const single = spans.length === 1 ? spans[0] : undefined;
+  if (!single || single[0] !== single[1] || overshoot <= 0) return;
+  const only = single[0];
+
+  let remain = overshoot * 2;
+  for (let t = only - 1; t >= 0 && remain > 0; t -= 1) {
+    const layout = store.getState().layout;
+    if (isCol ? layout.hiddenCols.has(t) : isRowHidden(layout, t)) continue;
+    const current = isCol
+      ? (layout.colWidths.get(t) ?? layout.defaultColWidth)
+      : (layout.rowHeights.get(t) ?? layout.defaultRowHeight);
+    if (remain >= current) {
+      hide(t, t);
+      remain -= current;
+    } else {
+      setSize(t, current - remain);
+      remain = 0;
+    }
+  }
+}
+
+/**
+ * Header-border double-click. A hidden `track` is unhidden at its autofit
+ * size; otherwise every track in `spans` fits its own content. One history
+ * entry either way.
+ */
+export function autofitHeaderTracks(
+  store: SpreadsheetStore,
+  history: History | null,
+  axis: HeaderAxis,
+  track: number,
+  spans: readonly TrackSpan[],
+  wb?: WorkbookHandle,
+  opts?: AutofitOptions,
+): void {
+  const state = store.getState();
+  const isCol = axis === 'col';
+  const hidden = isCol ? state.layout.hiddenCols.has(track) : isRowHidden(state.layout, track);
+  if (hidden) {
+    if (
+      blockedByProtection(
+        store,
+        state.data.sheetIndex,
+        isCol ? 'showCols' : 'showRows',
+        isCol ? 'formatColumns' : 'formatRows',
+      )
+    )
+      return;
+    const measurementOptions = withWorkbookDisplayFont(opts, wb);
+    recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
+      const ctx = createAutofitMeasureContext();
+      if (isCol) {
+        revealCols(store, track, track);
+        const w = computeAutofitColWidth(store.getState(), track, ctx, measurementOptions);
+        mutators.setColWidth(store, track, w);
+      } else {
+        revealRows(store, track, track);
+        const h = computeAutofitRowHeight(store.getState(), track, ctx, measurementOptions);
+        mutators.setRowHeight(store, track, h);
+      }
+    });
+    return;
+  }
+  const [only] = spans;
+  if (spans.length === 1 && only && only[0] === only[1]) {
+    if (isCol) autofitColsWidth(store, history, track, track, wb, opts);
+    else autofitRowsHeight(store, history, track, track, wb, opts);
+    return;
+  }
+  const sheet = state.data.sheetIndex;
+  const ranges: Range[] = spans.map(([first, last]) =>
+    isCol
+      ? { sheet, r0: 0, c0: first, r1: MAX_ROW, c1: last }
+      : { sheet, r0: first, c0: 0, r1: last, c1: MAX_COL },
+  );
+  if (isCol) autofitColsWidthForRanges(store, history, ranges, wb, opts);
+  else autofitRowsHeightForRanges(store, history, ranges, wb, opts);
 }

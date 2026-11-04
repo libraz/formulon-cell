@@ -1,5 +1,6 @@
 @import "./popups/filter-dropdown.css";
 @import "./popups/fill-tooltip.css";
+@import "./popups/resize-tooltip.css";
 @import "./popups/pivot-filter-panel.css";
 @import "./popups/pivot-spill-callout.css";
 @import "./popups/formula-helpers.css";

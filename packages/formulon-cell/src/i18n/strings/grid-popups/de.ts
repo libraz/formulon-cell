@@ -232,4 +232,10 @@ export const gridPopupsDe: GridPopupsStrings = {
     traceError: 'Fehler verfolgen',
     ignore: 'Ignorieren',
   },
+  resizeTip: {
+    width: 'Breite: {size} ({pixels} Pixel)',
+    widthHidden: 'Breite: {size}',
+    height: 'Höhe: {size} ({pixels} Pixel)',
+    heightHidden: 'Höhe: {size}',
+  },
 };

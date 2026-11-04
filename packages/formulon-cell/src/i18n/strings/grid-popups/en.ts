@@ -230,4 +230,10 @@ export const gridPopupsEn: GridPopupsStrings = {
     traceError: 'Trace error',
     ignore: 'Ignore',
   },
+  resizeTip: {
+    width: 'Width: {size} ({pixels} pixels)',
+    widthHidden: 'Width: {size}',
+    height: 'Height: {size} ({pixels} pixels)',
+    heightHidden: 'Height: {size}',
+  },
 };

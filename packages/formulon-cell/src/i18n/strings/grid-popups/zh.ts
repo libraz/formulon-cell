@@ -230,4 +230,10 @@ export const gridPopupsZh: GridPopupsStrings = {
     traceError: '追踪错误',
     ignore: '忽略',
   },
+  resizeTip: {
+    width: '宽度: {size} ({pixels} 像素)',
+    widthHidden: '宽度: {size}',
+    height: '高度: {size} ({pixels} 像素)',
+    heightHidden: '高度: {size}',
+  },
 };

@@ -230,4 +230,10 @@ export const gridPopupsKo: GridPopupsStrings = {
     traceError: '오류 추적',
     ignore: '무시',
   },
+  resizeTip: {
+    width: '너비: {size} ({pixels} 픽셀)',
+    widthHidden: '너비: {size}',
+    height: '높이: {size} ({pixels} 픽셀)',
+    heightHidden: '높이: {size}',
+  },
 };

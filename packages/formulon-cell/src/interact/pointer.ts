@@ -21,10 +21,10 @@ import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-s
 import { paginationFor } from '../commands/pagination.js';
 import { blockedByProtection, deferForAllowedRangeUnlock } from '../commands/protection.js';
 import {
-  autofitColsWidth,
-  autofitRowsHeight,
-  setColsWidth,
-  setRowsHeight,
+  autofitHeaderTracks,
+  headerGestureSpans,
+  previewHeaderResize,
+  type TrackSpan,
 } from '../commands/row-col-layout.js';
 import {
   applyLayoutSnapshot,
@@ -36,9 +36,11 @@ import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import { pivotStyleLayer } from '../engine/pivot-style.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { GridPopupsStrings } from '../i18n/strings/grid-popups/types.js';
+import { defaultStrings } from '../i18n/strings.js';
 import {
   cellRect,
-  colLeadingEdge,
+  colWidth,
   frozenColsWidth,
   frozenRowsHeight,
   gridOriginX,
@@ -47,7 +49,7 @@ import {
   hitZone,
   layoutForView,
   type Rect,
-  rowTopEdge,
+  rowHeight,
   type ViewLayout,
 } from '../render/geometry.js';
 import { ruleWidth } from '../render/grid/chrome-context.js';
@@ -60,6 +62,7 @@ import {
 } from '../render/painters/filter-button.js';
 import { visualZoom } from '../render/painters/text.js';
 import { renderScale } from '../store/render-scale.js';
+import { isRowHidden } from '../store/row-visibility.js';
 import {
   isWholeColumnRange,
   isWholeRowRange,
@@ -94,6 +97,9 @@ import {
   updateCursor,
 } from './pointer-targets.js';
 import { type RangeInsertTarget, rangeRefOf, refOf } from './range-insert.js';
+import { createResizeSizeTooltip } from './resize-size-tooltip.js';
+
+type ResizeTipStrings = GridPopupsStrings['resizeTip'];
 
 type DragMode =
   | { kind: 'none' }
@@ -119,11 +125,22 @@ type DragMode =
   | {
       kind: 'col-resize';
       col: number;
-      leadingEdge: number;
+      /** Tracks the gesture resizes: the whole selected columns, or just `col`. */
+      spans: TrackSpan[];
+      /** Pointer x at press and the track's screen width then. */
+      startPointer: number;
+      startSize: number;
       rtl: boolean;
       preLayout: LayoutSnapshot;
     }
-  | { kind: 'row-resize'; row: number; topEdge: number; preLayout: LayoutSnapshot }
+  | {
+      kind: 'row-resize';
+      row: number;
+      spans: TrackSpan[];
+      startPointer: number;
+      startSize: number;
+      preLayout: LayoutSnapshot;
+    }
   | { kind: 'fill'; src: Range }
   /** Moving the selection by its frame; `grab` is the grabbed cell's offset
    *  from the block's top-left. */
@@ -178,6 +195,20 @@ const axisSelectionRange = (
 type SelectionMarqueeDrag = Extract<DragMode, { kind: 'selection-marquee' }>;
 
 const geometryLayout = (state: State): ViewLayout => layoutForView(state);
+
+const lastVisibleCol = (s: State): number =>
+  Math.min(
+    MAX_COL,
+    s.viewport.colStart + s.viewport.colCount - 1,
+    s.viewport.navigationRange?.c1 ?? MAX_COL,
+  );
+
+const lastVisibleRow = (s: State): number =>
+  Math.min(
+    MAX_ROW,
+    s.viewport.rowStart + s.viewport.rowCount - 1,
+    s.viewport.navigationRange?.r1 ?? MAX_ROW,
+  );
 
 const isNavigationRangeAllowed = (store: SpreadsheetStore, range: Range): boolean => {
   const bounds = navigationBoundsFor(store);
@@ -275,9 +306,12 @@ export function attachPointer(
   /** Asked before a drag-move overwrites data; a host without one overwrites,
    *  as the desktop does with its alerts off. */
   confirmMoveOverwrite: () => Promise<boolean> = async () => true,
+  /** Templates for the live size readout of a header-border drag. */
+  getResizeTipStrings: () => ResizeTipStrings = () => defaultStrings.resizeTip,
 ): () => void {
   const hits = gridHitState(host);
   const fillTooltip = createFillValueTooltip(host);
+  const resizeTooltip = createResizeSizeTooltip(host);
   let drag: DragMode = { kind: 'none' };
   const unsubscribeSheetChange = store.subscribe((state) => {
     if (drag.kind === 'selection-marquee' && state.data.sheetIndex !== drag.base.range.sheet) {
@@ -751,10 +785,9 @@ export function attachPointer(
         drag = {
           kind: 'col-resize',
           col: zone.col,
-          // The column's leading edge stays put while the trailing edge
-          // follows the pointer. On a right-to-left sheet that leading edge
-          // is physically on the right, so the drag runs the other way.
-          leadingEdge: colLeadingEdge(geometryLayout(s), s.viewport, zone.col),
+          spans: headerGestureSpans(s, 'col', zone.col),
+          startPointer: x,
+          startSize: colWidth(geometryLayout(s), zone.col, s.viewport),
           rtl: s.ui.rightToLeft === true,
           preLayout: captureLayoutSnapshot(s),
         };
@@ -770,11 +803,12 @@ export function attachPointer(
           drag = { kind: 'none' };
           return;
         }
-        const topEdge = rowTopEdge(geometryLayout(s), s.viewport, zone.row);
         drag = {
           kind: 'row-resize',
           row: zone.row,
-          topEdge,
+          spans: headerGestureSpans(s, 'row', zone.row),
+          startPointer: y,
+          startSize: rowHeight(geometryLayout(s), zone.row, s.viewport),
           preLayout: captureLayoutSnapshot(s),
         };
         return;
@@ -942,6 +976,39 @@ export function attachPointer(
     applyDrag(e, x, y);
   };
 
+  /** Show the dragged track's current size beside the pointer. */
+  const showResizeTip = (axis: 'col' | 'row', track: number, e: PointerEvent | null): void => {
+    if (!e) return;
+    const s = store.getState();
+    const strings = getResizeTipStrings();
+    const hidden = axis === 'col' ? s.layout.hiddenCols.has(track) : isRowHidden(s.layout, track);
+    const px = hidden
+      ? 0
+      : axis === 'col'
+        ? (s.layout.colWidths.get(track) ?? s.layout.defaultColWidth)
+        : (s.layout.rowHeights.get(track) ?? s.layout.defaultRowHeight);
+    const size = hidden
+      ? 0
+      : axis === 'col'
+        ? wb.columnDisplayChars(s.data.sheetIndex, px)
+        : wb.rowDisplayPt(px);
+    const template =
+      axis === 'col'
+        ? hidden
+          ? strings.widthHidden
+          : strings.width
+        : hidden
+          ? strings.heightHidden
+          : strings.height;
+    resizeTooltip.show(
+      template
+        .replace('{size}', size.toFixed(2))
+        .replace('{pixels}', String(Math.round(px * renderScale(s.layout)))),
+      e.clientX,
+      e.clientY,
+    );
+  };
+
   const applyDrag = (e: PointerEvent | null, x: number, y: number): void => {
     const s = store.getState();
 
@@ -951,44 +1018,58 @@ export function attachPointer(
         return;
       }
       case 'col-resize': {
-        // Screen px → canonical px; the mutator snaps and clamps. The drag
-        // records one history entry on pointerup, so each move writes bare.
-        const w = drag.rtl ? drag.leadingEdge - x : x - drag.leadingEdge;
-        setColsWidth(
+        // Screen px → canonical px; the layout is rebuilt from the pre-drag
+        // snapshot on every move, and one history entry lands on pointerup.
+        // The size follows the pointer 1:1 from where the border was grabbed;
+        // on a right-to-left sheet the trailing edge runs the other way.
+        const w = Math.round(
+          drag.startSize + (drag.rtl ? drag.startPointer - x : x - drag.startPointer),
+        );
+        const scale = renderScale(s.layout, s.viewport);
+        previewHeaderResize(
           store,
-          null,
-          drag.col,
-          drag.col,
-          Math.round(w) / renderScale(s.layout, s.viewport),
+          'col',
+          drag.preLayout,
+          drag.spans,
+          w / scale,
+          Math.max(0, -w) / scale,
         );
         host.style.cursor = 'col-resize';
+        showResizeTip('col', drag.col, e);
         return;
       }
       case 'row-resize': {
-        const h = y - drag.topEdge;
-        setRowsHeight(
+        const h = Math.round(drag.startSize + y - drag.startPointer);
+        const scale = renderScale(s.layout, s.viewport);
+        previewHeaderResize(
           store,
-          null,
-          drag.row,
-          drag.row,
-          Math.round(h) / renderScale(s.layout, s.viewport),
+          'row',
+          drag.preLayout,
+          drag.spans,
+          h / scale,
+          Math.max(0, -h) / scale,
         );
         host.style.cursor = 'row-resize';
+        showResizeTip('row', drag.row, e);
         return;
       }
       case 'col-header': {
         const layout = geometryLayout(s);
-        const zone = hitZone(layout, s.viewport, x, y);
-        if (zone && (zone.kind === 'col-header' || zone.kind === 'col-resize')) {
+        const zone = hitZone(layout, s.viewport, x, y, [], { resizeHandles: false });
+        if (zone && (zone.kind === 'col-header' || zone.kind === 'cell')) {
           mutators.selectCols(store, drag.anchorCol, zone.col);
+        } else if (zone === null) {
+          mutators.selectCols(store, drag.anchorCol, lastVisibleCol(s));
         }
         return;
       }
       case 'row-header': {
         const layout = geometryLayout(s);
-        const zone = hitZone(layout, s.viewport, x, y);
-        if (zone && (zone.kind === 'row-header' || zone.kind === 'row-resize')) {
+        const zone = hitZone(layout, s.viewport, x, y, [], { resizeHandles: false });
+        if (zone && (zone.kind === 'row-header' || zone.kind === 'cell')) {
           mutators.selectRows(store, drag.anchorRow, zone.row);
+        } else if (zone === null) {
+          mutators.selectRows(store, drag.anchorRow, lastVisibleRow(s));
         }
         return;
       }
@@ -1121,6 +1202,7 @@ export function attachPointer(
       return;
     }
     if (drag.kind === 'col-resize' || drag.kind === 'row-resize') {
+      resizeTooltip.hide();
       // One undo entry per drag, not per pixel: capture pre at drag-start and
       // post here, push the closure pair. Engine-side sync rides on the same
       // snapshot pair so undo/redo replays the resize in the workbook too.
@@ -1214,6 +1296,7 @@ export function attachPointer(
     mutators.setFillPreview(store, null);
     mutators.setMovePreview(store, null);
     fillTooltip.hide();
+    resizeTooltip.hide();
     host.style.cursor = '';
   };
 
@@ -1268,19 +1351,21 @@ export function attachPointer(
     const zone = hitZone(geometryLayout(s), s.viewport, x, y);
     if (!zone) return;
 
-    if (zone.kind === 'col-resize') {
+    if (zone.kind === 'col-resize' || zone.kind === 'row-resize') {
       e.preventDefault();
       e.stopPropagation();
       if (interactionControllerFor(store)?.policy !== undefined) return;
-      autofitColsWidth(store, history, zone.col, zone.col, wb, getAutofitOptions());
-      return;
-    }
-    if (zone.kind === 'row-resize') {
-      e.preventDefault();
-      e.stopPropagation();
-      if (interactionControllerFor(store)?.policy !== undefined) return;
-      autofitRowsHeight(store, history, zone.row, zone.row, wb, getAutofitOptions());
-      return;
+      const axis = zone.kind === 'col-resize' ? 'col' : 'row';
+      const track = zone.kind === 'col-resize' ? zone.col : zone.row;
+      autofitHeaderTracks(
+        store,
+        history,
+        axis,
+        track,
+        headerGestureSpans(s, axis, track),
+        wb,
+        getAutofitOptions(),
+      );
     }
   };
 
@@ -1301,6 +1386,7 @@ export function attachPointer(
     host.removeEventListener('pointerleave', onLeave);
     host.removeEventListener('dblclick', onDblClick);
     fillTooltip.dispose();
+    resizeTooltip.dispose();
     host.style.cursor = '';
   };
 }

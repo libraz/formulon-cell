@@ -234,4 +234,12 @@ export interface GridPopupsStrings {
     traceError: string;
     ignore: string;
   };
+  /** Live size readout while a row / column border is dragged. `{size}` is
+   *  characters (columns) or points (rows); `{pixels}` the on-screen count. */
+  resizeTip: {
+    width: string;
+    widthHidden: string;
+    height: string;
+    heightHidden: string;
+  };
 }

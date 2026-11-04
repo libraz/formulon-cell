@@ -1,0 +1,24 @@
+/* Header-border drag readout: dark rounded box above the pointer
+   (Excel Mac: fill #1e1e1e, 1px #303030 edge, soft shadow, white text). */
+
+@layer fc.app {
+  .fc-resize-tooltip {
+    position: fixed;
+    z-index: var(--fc-z-tooltip, 2147483030);
+    transform: translateY(-100%);
+    pointer-events: none;
+    padding: 0 6px;
+    border: 1px solid rgb(48, 48, 48);
+    border-radius: 4px;
+    background: rgb(30, 30, 30);
+    box-shadow: 0 1px 4px rgba(5, 5, 5, 0.5);
+    color: rgb(255, 255, 255);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 13px;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .fc-resize-tooltip[hidden] {
+    display: none;
+  }
+}

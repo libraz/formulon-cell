@@ -231,4 +231,10 @@ export const gridPopupsJa: GridPopupsStrings = {
     traceError: 'エラーの参照元',
     ignore: '無視',
   },
+  resizeTip: {
+    width: '幅: {size} ({pixels} ピクセル)',
+    widthHidden: '幅: {size}',
+    height: '高さ: {size} ({pixels} ピクセル)',
+    heightHidden: '高さ: {size}',
+  },
 };

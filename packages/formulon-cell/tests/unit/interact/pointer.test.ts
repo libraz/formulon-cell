@@ -121,11 +121,11 @@ const fireDblClick = (host: HTMLElement, x: number, y: number): MouseEvent => {
 };
 
 // Default layout coordinates (headerCol=52, headerRow=30, defaultColW=104,
-// defaultRowH=28, RESIZE_SLACK=4):
+// defaultRowH=28, resize zone 6 pt (8 px) for columns and 3 pt (4 px) for rows):
 //   col 0 x∈[52,156), col 1 x∈[156,260), col 2 x∈[260,364)
 //   row 0 y∈[30,58),  row 1 y∈[58,86),   row 2 y∈[86,114)
 //   corner:        (10, 10)
-//   col-header c0: (100, 10)   right-edge of c0 at x=156 → (151, 10) is still header
+//   col-header c0: (100, 10)   right-edge of c0 at x=156 → (147, 10) is still header
 //   col-resize c0: (154, 10)
 //   row-header r0: (10, 40)    bottom-edge at y=58 → (10, 53) is still header
 //   row-resize r0: (10, 56)
@@ -421,18 +421,18 @@ describe('attachPointer', () => {
     it('col-resize drag updates colWidths', () => {
       detach = attachPointer(host, store, wb);
       fireDown(host, 154, 10); // col 0 right-edge
-      // Drag the right edge to x=200; col 0 left edge is at 52, so width = 200-52 = 148.
+      // Grabbed 2 px inside the edge at x=154, then moved 46 px: 104 + 46 = 150.
       fireMove(host, 200, 10);
-      expect(store.getState().layout.colWidths.get(0)).toBe(148);
+      expect(store.getState().layout.colWidths.get(0)).toBe(150);
       expect(host.style.cursor).toBe('col-resize');
       fireUp(host, 200, 10);
     });
 
     it('row-resize drag updates rowHeights', () => {
       detach = attachPointer(host, store, wb);
-      fireDown(host, 10, 56); // row 0 bottom-edge (y=58 - slack 4 = 54)
-      fireMove(host, 10, 100); // row 0 top edge is 30, so height = 100-30 = 70.
-      expect(store.getState().layout.rowHeights.get(0)).toBe(70);
+      fireDown(host, 10, 56); // row 0 bottom-edge (y=58)
+      fireMove(host, 10, 100); // grabbed 2 px inside the edge, moved 44 px: 28 + 44 = 72.
+      expect(store.getState().layout.rowHeights.get(0)).toBe(72);
       expect(host.style.cursor).toBe('row-resize');
       fireUp(host, 10, 100);
     });
@@ -458,8 +458,8 @@ describe('attachPointer', () => {
       fireDown(host, 10, 56);
       fireMove(host, 10, 100);
       fireUp(host, 10, 100);
-      expect(store.getState().layout.colWidths.get(0)).toBe(148);
-      expect(store.getState().layout.rowHeights.get(0)).toBe(70);
+      expect(store.getState().layout.colWidths.get(0)).toBe(150);
+      expect(store.getState().layout.rowHeights.get(0)).toBe(72);
     });
 
     it('row-resize drag measures from the top edge when rows above are hidden', () => {
@@ -469,8 +469,8 @@ describe('attachPointer', () => {
       }));
       detach = attachPointer(host, store, wb);
       fireDown(host, 10, 56); // row 1 bottom-edge; row 0 is hidden so row 1 spans y=30..58
-      fireMove(host, 10, 100); // row 1 top edge is 30, so height = 100-30 = 70.
-      expect(store.getState().layout.rowHeights.get(1)).toBe(70);
+      fireMove(host, 10, 100); // row 1 spans 28 px; moved 44 px: 72.
+      expect(store.getState().layout.rowHeights.get(1)).toBe(72);
       fireUp(host, 10, 100);
     });
 
@@ -481,9 +481,9 @@ describe('attachPointer', () => {
         viewport: { ...s.viewport, rowStart: 6 },
       }));
       detach = attachPointer(host, store, wb);
-      fireDown(host, 10, 84); // frozen row 1 bottom-edge (y=86 - slack 4 = 82)
-      fireMove(host, 10, 100); // row 1 top edge is 58, so height = 100-58 = 42.
-      expect(store.getState().layout.rowHeights.get(1)).toBe(42);
+      fireDown(host, 10, 84); // frozen row 1 bottom-edge (y=86)
+      fireMove(host, 10, 100); // row 1 spans 28 px; moved 16 px: 44.
+      expect(store.getState().layout.rowHeights.get(1)).toBe(44);
       fireUp(host, 10, 100);
     });
 
@@ -493,7 +493,7 @@ describe('attachPointer', () => {
       fireDown(host, 154, 10);
       fireMove(host, 200, 10);
       fireUp(host, 200, 10);
-      expect(store.getState().layout.colWidths.get(0)).toBe(148);
+      expect(store.getState().layout.colWidths.get(0)).toBe(150);
       // Undo restores the original width (undefined → falls back to default).
       expect(history.undo()).toBe(true);
       expect(store.getState().layout.colWidths.get(0)).toBeUndefined();
@@ -504,7 +504,7 @@ describe('attachPointer', () => {
       detach = attachPointer(host, store, wb, undefined, history);
       fireDown(host, 154, 10);
       fireMove(host, 200, 10);
-      expect(store.getState().layout.colWidths.get(0)).toBe(148);
+      expect(store.getState().layout.colWidths.get(0)).toBe(150);
       fireCancel(host, 200, 10);
       expect(store.getState().layout.colWidths.get(0)).toBeUndefined();
       expect(history.canUndo()).toBe(false);

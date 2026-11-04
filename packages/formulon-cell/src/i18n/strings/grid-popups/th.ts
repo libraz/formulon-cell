@@ -230,4 +230,10 @@ export const gridPopupsTh: GridPopupsStrings = {
     traceError: 'ติดตามข้อผิดพลาด',
     ignore: 'ละเว้น',
   },
+  resizeTip: {
+    width: 'ความกว้าง: {size} ({pixels} พิกเซล)',
+    widthHidden: 'ความกว้าง: {size}',
+    height: 'ความสูง: {size} ({pixels} พิกเซล)',
+    heightHidden: 'ความสูง: {size}',
+  },
 };
