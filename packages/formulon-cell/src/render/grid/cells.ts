@@ -1,4 +1,5 @@
-import { formulaErrorIsFlagged } from '../../commands/error-indicators.js';
+import { inputLocaleForWorkbook } from '../../commands/coerce-input.js';
+import { errorCheckFlagged } from '../../commands/error-indicators.js';
 import { isHeaderRow, tableForCell } from '../../commands/format-as-table.js';
 import { formatA1FormulaAsR1C1 } from '../../commands/refs.js';
 import { addrKey } from '../../engine/address.js';
@@ -81,6 +82,8 @@ import {
   ERROR_TRIANGLE_COLOR,
   type ErrorTriangleHit,
   isPlainTextOverflowCandidate,
+  MAC_ERROR_TRIANGLE_COLOR,
+  MAC_ERROR_TRIANGLE_PT,
   normalizeFormatLocale,
   overflowSides,
   VALIDATION_TRIANGLE_COLOR,
@@ -218,6 +221,8 @@ export function paintCells(
   };
   const triangleHits: ErrorTriangleHit[] = [];
   const locale = normalizeFormatLocale(cellCtx.locale);
+  // Numbers stored as text are read the way typing them would be.
+  const inputLocale = (wb && inputLocaleForWorkbook(wb)) ?? cellCtx.locale;
   // Engine-side CF (rules loaded from .xlsx). Merged on top — engine rules
   // currently win per field for cells with overlap. Restricted to the
   // visible viewport rect so we don't pay for off-screen cells.
@@ -792,8 +797,26 @@ export function paintCells(
       const cellKey = key;
       if (!ignored.has(cellKey)) {
         const validation = fmt?.validation ?? rangeValidationAt(format, cellAddr);
-        if (formulaErrorIsFlagged(value, storedFormula)) {
-          const hit = paintErrorTriangle(ctx, bounds, ERROR_TRIANGLE_COLOR, rtl);
+        // A blocked PivotTable's anchor is checked like a formula's #SPILL!.
+        const pivotSpill = pivots.spills.some(
+          (spill) => spill.anchor.row === r && spill.anchor.col === c,
+        );
+        if (
+          errorCheckFlagged(value, storedFormula, pivotSpill, {
+            macNa: cellCtx.fontEffects,
+            numberAsText: cellCtx.fontEffects,
+            locale: inputLocale,
+          })
+        ) {
+          const hit = cellCtx.fontEffects
+            ? paintErrorTriangle(
+                ctx,
+                bounds,
+                MAC_ERROR_TRIANGLE_COLOR,
+                rtl,
+                MAC_ERROR_TRIANGLE_PT * ptPx,
+              )
+            : paintErrorTriangle(ctx, bounds, ERROR_TRIANGLE_COLOR, rtl);
           triangleHits.push({ rect: hit, addr: cellAddr, kind: 'error' });
         } else if (validation && detectValidationViolation(value, validation, getResolver())) {
           const hit = paintValidationTriangle(ctx, bounds, VALIDATION_TRIANGLE_COLOR, rtl);

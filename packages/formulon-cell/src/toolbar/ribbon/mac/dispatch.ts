@@ -1,4 +1,5 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
+import { inputLocaleForWorkbook } from '../../../commands/coerce-input.js';
 import {
   listThreadedComments,
   recordThreadedChange,
@@ -238,8 +239,16 @@ const runMacErrorCheck = (instance: SpreadsheetInstance): Promise<void> | void =
     r1: MAX_ROW,
     c1: MAX_COL,
   };
-  const next = selectNextFormulaError(instance.store, range, (addr) =>
-    isNavigationAddrAllowed(instance.store, addr),
+  const next = selectNextFormulaError(
+    instance.store,
+    range,
+    (addr) => isNavigationAddrAllowed(instance.store, addr),
+    {
+      macNa: true,
+      numberAsText: true,
+      locale: inputLocaleForWorkbook(instance.workbook),
+      workbook: instance.workbook,
+    },
   );
   if (next) {
     instance.host.focus();

@@ -336,3 +336,66 @@ describe('error indicator commands', () => {
     });
   });
 });
+
+describe('Error Checking on the Mac profile', () => {
+  const NA = { kind: 'error', code: 6, text: '#N/A' } as const;
+  const DIV0 = { kind: 'error', code: 1, text: '#DIV/0!' } as const;
+  const sheet = () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, NA, '=XLOOKUP(9,J1:J3,J1:J3)');
+    mutators.setCell(store, { sheet: 0, row: 1, col: 0 }, DIV0, '=1/0');
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    return store;
+  };
+  const all = { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 9 };
+
+  it('skips an XLOOKUP #N/A, which carries no triangle there', () => {
+    expect(selectNextFormulaError(sheet(), all, undefined, { macNa: true })).toEqual({
+      sheet: 0,
+      row: 1,
+      col: 0,
+    });
+  });
+
+  it('still visits it on the other profiles', () => {
+    expect(selectNextFormulaError(sheet(), all)).toEqual({ sheet: 0, row: 0, col: 1 });
+  });
+
+  it('visits a blocked PivotTable anchor, which carries the triangle', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 4, col: 0 },
+      { kind: 'error', code: 8, text: '#SPILL!' },
+      null,
+    );
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    const workbook = {
+      pivotSpills: () => [
+        {
+          pivotIndex: 0,
+          anchor: { sheet: 0, row: 4, col: 0 },
+          needed: { sheet: 0, r0: 4, c0: 0, r1: 8, c1: 1 },
+          blockers: [],
+        },
+      ],
+    };
+    expect(formulaErrorCellsInRange(store, all, { macNa: true, workbook })).toEqual([
+      { sheet: 0, row: 4, col: 0 },
+    ]);
+  });
+});
+
+describe('Error Checking finds numbers stored as text on the Mac profile', () => {
+  it('visits a text "0123" and skips date-like text', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'text', value: '12/3' }, null);
+    mutators.setCell(store, { sheet: 0, row: 1, col: 0 }, { kind: 'text', value: '0123' }, null);
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    const all = { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 9 };
+    expect(formulaErrorCellsInRange(store, all, { macNa: true, numberAsText: true })).toEqual([
+      { sheet: 0, row: 1, col: 0 },
+    ]);
+    expect(formulaErrorCellsInRange(store, all)).toEqual([]);
+  });
+});

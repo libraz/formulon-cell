@@ -1,9 +1,11 @@
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeValidationCells } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { type CellValidation, mutators, type SpreadsheetStore } from '../store/store.js';
+import { parseLocalizedNumericInput } from './coerce-input.js';
 import type { History } from './history.js';
 import { cellValueViolatesValidation } from './validate.js';
 
@@ -27,12 +29,15 @@ export function cellValueIsFormulaError(value: CellValue): boolean {
 /** The spreadsheet's "formulas that result in an error" check, which puts
  *  the indicator on a cell and drives Error Checking: a formula whose value
  *  is an error. A bare `=NA()` marks a value as missing on purpose and is not
- *  flagged, nor is a text result that only reads like an error. */
+ *  flagged, nor is a text result that only reads like an error. The Mac
+ *  desktop (`macNa`) leaves every #N/A unflagged, whatever formula gave it. */
 export function formulaErrorIsFlagged(
   value: CellValue,
   formula: string | null | undefined,
+  opts: { macNa?: boolean } = {},
 ): boolean {
   if (!formula || value.kind !== 'error') return false;
+  if (opts.macNa && value.code === 6) return false;
   return formula.replace(/^=/, '').replace(/\s+/g, '').toUpperCase() !== 'NA()';
 }
 
@@ -100,12 +105,58 @@ export function clearIgnoredCellErrors(store: SpreadsheetStore): void {
 const rowMajor = (left: Addr, right: Addr): number =>
   left.row - right.row || left.col - right.col || left.sheet - right.sheet;
 
-export function formulaErrorCellsInRange(store: SpreadsheetStore, range?: Range): Addr[] {
+/** What Error Checking needs to flag the cells the grid marks: the profile's
+ *  #N/A rule and number-stored-as-text check, the input locale numbers are
+ *  read in, and the workbook whose blocked PivotTables show #SPILL!. */
+export interface FormulaErrorCheckOptions {
+  macNa?: boolean;
+  numberAsText?: boolean;
+  locale?: string;
+  workbook?: Pick<WorkbookHandle, 'pivotSpills'> | null;
+}
+
+/** A text constant that typing would have entered as a number: the desktop's
+ *  "number stored as text" check. Date-like text such as "12/3" is not one. */
+export function numberStoredAsText(
+  value: CellValue,
+  formula: string | null | undefined,
+  locale?: string,
+): boolean {
+  if (formula || value.kind !== 'text') return false;
+  return parseLocalizedNumericInput(value.value, locale) !== null;
+}
+
+/** Whether a cell carries the error-check triangle: the one rule the grid
+ *  paints by and Error Checking walks. */
+export function errorCheckFlagged(
+  value: CellValue,
+  formula: string | null | undefined,
+  pivotSpill: boolean,
+  opts: Pick<FormulaErrorCheckOptions, 'macNa' | 'numberAsText' | 'locale'> = {},
+): boolean {
+  return (
+    pivotSpill ||
+    formulaErrorIsFlagged(value, formula, opts) ||
+    (opts.numberAsText === true && numberStoredAsText(value, formula, opts.locale))
+  );
+}
+
+export function formulaErrorCellsInRange(
+  store: SpreadsheetStore,
+  range?: Range,
+  opts: FormulaErrorCheckOptions = {},
+): Addr[] {
   const state = store.getState();
   const target = range ?? state.selection.range;
+  const anchors = new Set(
+    (typeof opts.workbook?.pivotSpills === 'function'
+      ? opts.workbook.pivotSpills(state.data.sheetIndex)
+      : []
+    ).map((spill) => addrKey(spill.anchor)),
+  );
   const out: Addr[] = [];
   for (const [key, cell] of state.data.cells) {
-    if (!formulaErrorIsFlagged(cell.value, cell.formula)) continue;
+    if (!errorCheckFlagged(cell.value, cell.formula, anchors.has(key), opts)) continue;
     if (state.errorIndicators.ignoredErrors.has(key)) continue;
     const addr = parseAddrKey(key);
     if (addr && rangeContainsAddr(target, addr)) out.push(addr);
@@ -117,10 +168,11 @@ export function selectNextFormulaError(
   store: SpreadsheetStore,
   range?: Range,
   accept?: (addr: Addr) => boolean,
+  opts: FormulaErrorCheckOptions = {},
 ): Addr | null {
   const state = store.getState();
   const active = state.selection.active;
-  const errors = formulaErrorCellsInRange(store, range ?? state.selection.range).filter(
+  const errors = formulaErrorCellsInRange(store, range ?? state.selection.range, opts).filter(
     (addr) => accept?.(addr) ?? true,
   );
   if (errors.length === 0) return null;

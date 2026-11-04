@@ -14,6 +14,7 @@ import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { inputLocaleForWorkbook } from './coerce-input.js';
 import {
   cellValueIsFormulaError,
   circleInvalidValidationData,
@@ -51,6 +52,8 @@ export interface ExecuteRibbonFormulaAuditingActionDeps {
   history: History;
   action: RibbonFormulaAuditingAction;
   strings: FormulaAuditingStrings;
+  /** The Mac profile, whose error check leaves every #N/A unflagged. */
+  macNa?: boolean;
 }
 
 const noErrorReport = (strings: FormulaAuditingStrings): RibbonFormulaAuditingReport => ({
@@ -81,7 +84,12 @@ export const executeRibbonFormulaAuditingAction = (
       });
       return { kind: 'mutated' };
     }
-    return selectNextFormulaError(store)
+    return selectNextFormulaError(store, undefined, undefined, {
+      macNa: deps.macNa,
+      numberAsText: deps.macNa,
+      locale: inputLocaleForWorkbook(workbook),
+      workbook,
+    })
       ? { kind: 'mutated' }
       : { kind: 'report', report: noErrorReport(strings) };
   }
@@ -110,7 +118,12 @@ export const executeRibbonFormulaAuditingAction = (
     });
     return { kind: 'mutated' };
   }
-  return selectNextFormulaError(store)
+  return selectNextFormulaError(store, undefined, undefined, {
+    macNa: deps.macNa,
+    numberAsText: deps.macNa,
+    locale: inputLocaleForWorkbook(workbook),
+    workbook,
+  })
     ? { kind: 'mutated' }
     : { kind: 'report', report: noErrorReport(strings) };
 };

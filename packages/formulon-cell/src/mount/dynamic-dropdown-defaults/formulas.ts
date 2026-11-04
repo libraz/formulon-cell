@@ -192,6 +192,9 @@ const buildFormulaAuditAction =
       history: instance.history,
       action: auditAction,
       strings: { errorChecking: instance.i18n.strings.ribbonMenu.errorChecking },
+      macNa:
+        (instance.host.closest<HTMLElement>('.fc-host') ?? instance.host).dataset.fcPlatform ===
+        'mac',
     });
     if (result.kind === 'trace-precedents') {
       instance.tracePrecedents();

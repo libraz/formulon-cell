@@ -51,6 +51,10 @@ export interface ErrorTriangleHit {
 
 /** Color used for formula-error triangles (spreadsheet-style green). */
 export const ERROR_TRIANGLE_COLOR = '#008000';
+
+/** The Mac desktop's error-check triangle: 6 pt legs in sRGB (0,129,0). */
+export const MAC_ERROR_TRIANGLE_COLOR = '#008100';
+export const MAC_ERROR_TRIANGLE_PT = 6;
 /** Color used for data-validation violation triangles (spreadsheet-style red). */
 export const VALIDATION_TRIANGLE_COLOR = '#d24545';
 

@@ -29,7 +29,8 @@ describe('Mac ribbon command dispatch', () => {
     mutators.setCell(
       store,
       { sheet: 0, row: 0, col: 2 },
-      { kind: 'error', code: 6, text: '#N/A' },
+      // An unknown name is #NAME?; the Mac error check leaves #N/A unflagged.
+      { kind: 'error', code: 4, text: '#NAME?' },
       '=MissingName',
     );
     mutators.setCell(

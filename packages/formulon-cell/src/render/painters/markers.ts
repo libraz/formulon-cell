@@ -114,8 +114,8 @@ export function paintErrorTriangle(
   bounds: Rect,
   color: string,
   rtl = false,
+  size = ERROR_TRIANGLE_SIZE,
 ): Rect {
-  const size = ERROR_TRIANGLE_SIZE;
   const x = mirrorInRect(bounds, bounds.x, size, rtl);
   const y = bounds.y;
   ctx.save();
