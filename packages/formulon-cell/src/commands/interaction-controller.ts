@@ -163,7 +163,8 @@ export class InteractionController {
   private readonly authorizer: InteractionAuthorizer;
   private readonly store: SpreadsheetStore;
   private readonly getWb: () => WorkbookHandle;
-  private readonly history: History;
+  /** Undo history the controller records its batches into. */
+  readonly history: History;
   private readonly manageHistoryGuard: boolean;
   private readonly getBounds?: () => Range | undefined;
   private readonly onChanged?: (result: ChangeBatchResult) => void;

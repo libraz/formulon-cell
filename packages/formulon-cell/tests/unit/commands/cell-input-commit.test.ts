@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commitCellInput, inputOperation } from '../../../src/commands/cell-input-commit.js';
 import { setFont } from '../../../src/commands/format.js';
+import { defaultObjectNames, formatAsTable } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
 import {
   InteractionController,
@@ -704,4 +705,103 @@ describe('commands/cell-input-commit', () => {
       }
     },
   );
+
+  describe('table auto-expansion', () => {
+    const at = (row: number, col: number) => ({ sheet: 0, row, col });
+    const tableRange = () => store.getState().tables.tables[0]?.range;
+    const seedTable = (r0: number, c0: number, headers: string[], rows: number): void => {
+      headers.forEach((h, i) => {
+        wb.setText(at(r0, c0 + i), h);
+        for (let r = 1; r <= rows; r += 1) wb.setNumber(at(r0 + r, c0 + i), r);
+      });
+      formatAsTable(store, { sheet: 0, r0, c0, r1: r0 + rows, c1: c0 + headers.length - 1 });
+    };
+    const type = (row: number, col: number, raw: string) =>
+      commitCellInput({ store, wb, addr: at(row, col), raw, origin: 'editor' });
+
+    it('grows by the row typed directly below, in any table column, value or formula', () => {
+      seedTable(9, 0, ['Name', 'Qty'], 3);
+      type(13, 0, 'd');
+      expect(tableRange()).toEqual({ sheet: 0, r0: 9, c0: 0, r1: 13, c1: 1 });
+      type(14, 1, '=1+1');
+      expect(tableRange()).toEqual({ sheet: 0, r0: 9, c0: 0, r1: 14, c1: 1 });
+    });
+
+    it('grows by the column typed directly right and names its header', () => {
+      seedTable(9, 0, ['Name', 'Qty'], 4);
+      type(10, 2, '7');
+      expect(tableRange()).toEqual({ sheet: 0, r0: 9, c0: 0, r1: 13, c1: 2 });
+      expect(wb.getValue(at(9, 2))).toEqual({
+        kind: 'text',
+        value: `${defaultObjectNames(wb).column}1`,
+      });
+    });
+
+    it('continues a trailing-number header pattern for the new column', () => {
+      seedTable(0, 10, ['k1', 'k2'], 2);
+      type(1, 12, '9');
+      expect(tableRange()).toEqual({ sheet: 0, r0: 0, c0: 10, r1: 2, c1: 12 });
+      expect(wb.getValue(at(0, 12))).toEqual({ kind: 'text', value: 'k3' });
+    });
+
+    it('leaves the table for a diagonal corner, a gap, an empty entry or a filled row', () => {
+      seedTable(9, 0, ['Name', 'Qty'], 5);
+      const before = { sheet: 0, r0: 9, c0: 0, r1: 14, c1: 1 };
+      type(15, 2, '5');
+      expect(tableRange()).toEqual(before);
+      type(16, 0, '1');
+      expect(tableRange()).toEqual(before);
+      type(9, 4, '9');
+      expect(tableRange()).toEqual(before);
+      type(15, 0, '');
+      expect(tableRange()).toEqual(before);
+      type(15, 1, '4');
+      expect(tableRange()).toEqual(before);
+    });
+
+    it('grows an engine-backed table and its engine columns', async () => {
+      const realWb = await createRealWorkbook();
+      const realStore = createSpreadsheetStore();
+      realWb.attachStore(realStore);
+      try {
+        realWb.setText(at(0, 0), 'k1');
+        realWb.setText(at(0, 1), 'k2');
+        realWb.setNumber(at(1, 0), 1);
+        realWb.setNumber(at(1, 1), 2);
+        formatAsTable(realStore, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 }, { workbook: realWb });
+        commitCellInput({
+          store: realStore,
+          wb: realWb,
+          addr: at(1, 2),
+          raw: '3',
+          origin: 'editor',
+        });
+        expect(realStore.getState().tables.tables[0]?.range).toEqual({
+          sheet: 0,
+          r0: 0,
+          c0: 0,
+          r1: 1,
+          c1: 2,
+        });
+        expect(realWb.getTables()[0]?.columns).toEqual(['k1', 'k2', 'k3']);
+      } finally {
+        realWb.detachStore(realStore);
+        realWb.dispose();
+      }
+    });
+
+    it('undoes the expansion first, keeping the typed value', () => {
+      const { history, dispose: release } = withController();
+      dispose = release;
+      seedTable(0, 0, ['Name', 'Qty'], 2);
+      type(1, 2, '7');
+      expect(tableRange()?.c1).toBe(2);
+      history.undo();
+      expect(tableRange()?.c1).toBe(1);
+      expect(wb.getValue(at(0, 2)).kind).toBe('blank');
+      expect(wb.getValue(at(1, 2))).toEqual({ kind: 'number', value: 7 });
+      history.undo();
+      expect(wb.getValue(at(1, 2)).kind).toBe('blank');
+    });
+  });
 });

@@ -13,6 +13,7 @@ import { formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
 import { formatWithPending, sameFormatTarget } from '../store/pending-format.js';
 import { validationAt } from '../store/range-validations.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { extendTablesForEntry } from './clipboard/table-extension.js';
 import {
   coerceInputForCell,
   inputLocaleForWorkbook,
@@ -197,6 +198,7 @@ export function commitCellInput({
       const currentPending = currentState.ui.pendingFormat;
       if (currentPending && sameFormatTarget(currentState, currentPending.addr, anchor))
         mutators.setPendingFormat(store, null);
+      if (raw !== '') extendTablesForEntry(store, wb, controller.history, anchor);
       return { status: 'applied', notice };
     }
     const outcome = writeInputValidated(wb, anchor, raw, ruleValidation, store, inputLocale);
@@ -242,5 +244,6 @@ export function commitCellInput({
     mutators.setPendingFormat(store, null);
   }
   if (directInputAxis) flushFormatToEngine(wb, store, anchor.sheet);
+  if (raw !== '') extendTablesForEntry(store, wb, null, anchor);
   return { status: 'applied', notice };
 }
