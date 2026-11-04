@@ -232,3 +232,17 @@ describe('color palette', () => {
     expect(onPick).toHaveBeenCalledWith('#7f7f7f');
   });
 });
+
+describe('theme swatch names', () => {
+  it('names the grid in Japanese the way Excel for Mac does', () => {
+    const columns = themeColorColumns(undefined, 'ja');
+    expect(columns[0]?.name).toBe('背景 1');
+    expect(columns[4]?.name).toBe('アクセント 1');
+    expect(columns[4]?.variantNames[0]).toBe('アクセント 1、白 + 基本色 80%');
+    expect(columns[4]?.variantNames[4]).toBe('アクセント 1、黒 + 基本色 50%');
+  });
+
+  it('keeps the English names for other languages', () => {
+    expect(themeColorColumns(undefined, 'en')[4]?.variantNames[0]).toBe('Accent 1, Lighter 80%');
+  });
+});

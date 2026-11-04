@@ -13,6 +13,8 @@ import { createRibbonButton } from './button.js';
 import {
   FONT_SUBMENU_FAMILIES,
   RECENT_FONT_VALUES,
+  recentFontValues,
+  recordRecentFont,
   THEME_FONT_VALUES,
 } from './font-availability.js';
 import { type FontFamilyOption, fontFamilyOptions } from './font-family-options.js';
@@ -148,6 +150,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     })?.value;
     if (option.value === firstInSection) {
       if (RECENT_FONT_VALUES.has(option.value)) return null;
+      if (section === 'recent') return ribbonText.fontSectionRecent;
       return section === 'theme' ? ribbonText.fontSectionTheme : ribbonText.fontSectionAll;
     }
     return null;
@@ -174,7 +177,16 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       return [{ value: 'current', label: ribbonText.currentView }, ...views];
     }
     if (command.id !== 'fontFamily') return options;
-    return fontFamilyOptions(ribbonLang, current, options, shouldShowFontOption);
+    const fonts = fontFamilyOptions(ribbonLang, current, options, shouldShowFontOption);
+    // Fonts picked this session come after the theme fonts as their own section.
+    const recent = recentFontValues().flatMap((value) => {
+      const match = fonts.find((font) => font.value === value);
+      return match ? [{ ...match, section: 'recent' as const }] : [];
+    });
+    if (recent.length === 0) return fonts;
+    const firstAll = fonts.findIndex((font) => font.section === 'all');
+    const at = firstAll === -1 ? fonts.length : firstAll;
+    return [...fonts.slice(0, at), ...recent, ...fonts.slice(at)];
   };
 
   const RIBBON_CHEVRON_PATH =
@@ -299,6 +311,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       close();
       button.focus({ preventScroll: true });
       applyRibbonControl(command.id, nextValue);
+      if (command.id === 'fontFamily') recordRecentFont(nextValue);
       // The command may reject the requested value (for example, a protected
       // selection can reject a font change), or may normalize it to a
       // different value. Read the control again after dispatch so the ribbon
@@ -343,7 +356,11 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           role: 'option',
           selected,
           tabIndex: -1,
-          dataset: { value: option.value, fcValue: option.value },
+          dataset: {
+            value: option.value,
+            fcValue: option.value,
+            ...(fontOption?.section === 'recent' ? { recent: 'true' } : {}),
+          },
         });
         const check = document.createElement('span');
         check.className = 'fc-tb__rb-dd__check';
@@ -533,7 +550,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         standardLabel: ribbonText.standardColors,
         moreColorsLabel: ribbonText.moreColors,
         ariaLabel: command.title,
-        theme: themeColorColumns(getInst()?.workbook.getTheme()?.colors),
+        theme: themeColorColumns(getInst()?.workbook.getTheme()?.colors, ribbonLang),
         value: currentRibbonControlValue(command.id),
         // The Mac palettes both carry the high-contrast option; elsewhere only the fill does.
         highContrastOnlyLabel:

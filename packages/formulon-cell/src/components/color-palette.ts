@@ -36,8 +36,20 @@ const variantTints = (base: string): readonly number[] => {
   return [0.8, 0.6, 0.4, -0.25, -0.5];
 };
 
-const variantName = (tint: number): string =>
-  `${tint > 0 ? 'Lighter' : 'Darker'} ${Math.round(Math.abs(tint) * 100)}%`;
+const variantName = (tint: number, locale: string): string => {
+  const percent = Math.round(Math.abs(tint) * 100);
+  if (locale === 'ja') return `${tint > 0 ? '白' : '黒'} + 基本色 ${percent}%`;
+  return `${tint > 0 ? 'Lighter' : 'Darker'} ${percent}%`;
+};
+
+/** A theme role's name in `locale`; only Japanese is localized. */
+const roleName = (role: string, locale: string): string => {
+  if (locale !== 'ja') return role;
+  return role
+    .replace('Background', '背景')
+    .replace('Text', 'テキスト')
+    .replace('Accent', 'アクセント');
+};
 
 /** The grid's columns in clrScheme slots (dk1, lt1, dk2, lt2, accent1..6), with their roles. */
 const GRID_SLOTS: readonly (readonly [slot: number, role: string])[] = [
@@ -64,16 +76,21 @@ const DEFAULT_THEME_COLORS: readonly number[] = [
  * background, text and accent colour over its five variants, tinted as the
  * spreadsheet paints them. Falls back to the default theme for a short list.
  */
-export function themeColorColumns(colors: readonly number[] | undefined): ThemeColorColumn[] {
+export function themeColorColumns(
+  colors: readonly number[] | undefined,
+  locale = 'en',
+): ThemeColorColumn[] {
   const source = colors && colors.length >= 10 ? colors : DEFAULT_THEME_COLORS;
   return GRID_SLOTS.map(([slot, role]) => {
     const base = cssColorFromArgb(source[slot] ?? 0);
     const tints = variantTints(base);
+    const name = roleName(role, locale);
+    const separator = locale === 'ja' ? '、' : ', ';
     return {
-      name: role,
+      name,
       base,
       variants: tints.map((tint) => tintCssColor(base, tint) ?? base),
-      variantNames: tints.map((tint) => `${role}, ${variantName(tint)}`),
+      variantNames: tints.map((tint) => `${name}${separator}${variantName(tint, locale)}`),
     };
   });
 }

@@ -18,6 +18,24 @@ export const THEME_FONT_VALUES = new Set([
   '游ゴシック',
 ]);
 export const RECENT_FONT_VALUES = new Set<string>();
+
+const RECENT_FONT_LIMIT = 5;
+const recentFonts: string[] = [];
+
+/** Remember `value` as the most recently picked font, for the list's Recently Used section. */
+export const recordRecentFont = (value: string): void => {
+  const at = recentFonts.indexOf(value);
+  if (at !== -1) recentFonts.splice(at, 1);
+  recentFonts.unshift(value);
+  recentFonts.length = Math.min(recentFonts.length, RECENT_FONT_LIMIT);
+};
+
+/** The fonts picked this session, newest first. */
+export const recentFontValues = (): readonly string[] => recentFonts;
+
+export const clearRecentFonts = (): void => {
+  recentFonts.length = 0;
+};
 export const COMMON_FONT_VALUES = new Set([
   'Calibri',
   'Arial',

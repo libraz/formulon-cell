@@ -11,7 +11,7 @@ export interface FontFamilyOption {
   value: string;
   /** Text shown before an optional localized role suffix. */
   label: string;
-  section: 'theme' | 'all';
+  section: 'theme' | 'recent' | 'all';
   role?: 'heading' | 'body';
   /** Alternate family names used only by the availability probe. */
   probeNames?: readonly string[];
