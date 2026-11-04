@@ -74,7 +74,6 @@ export const macZh: MacStrings = {
       function: '使用函数',
       replace: '替换当前分类汇总',
       summaryBelow: '汇总显示在数据下方',
-      unsupportedOption: '此选项尚不受支持。',
       run: '确定',
       cancel: '取消',
       groupTotal: '{group} 汇总',

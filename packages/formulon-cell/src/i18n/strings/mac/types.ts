@@ -114,7 +114,6 @@ export interface MacStrings {
       function: string;
       replace: string;
       summaryBelow: string;
-      unsupportedOption: string;
       run: string;
       cancel: string;
       /** Label of a subtotal row; `{group}` is the group's value. */

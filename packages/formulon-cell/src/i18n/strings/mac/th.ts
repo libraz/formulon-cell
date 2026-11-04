@@ -74,7 +74,6 @@ export const macTh: MacStrings = {
       function: 'ใช้ฟังก์ชัน',
       replace: 'แทนที่ผลรวมย่อยปัจจุบัน',
       summaryBelow: 'สรุปด้านล่างข้อมูล',
-      unsupportedOption: 'ยังไม่รองรับตัวเลือกนี้',
       run: 'ตกลง',
       cancel: 'ยกเลิก',
       groupTotal: '{group} รวม',

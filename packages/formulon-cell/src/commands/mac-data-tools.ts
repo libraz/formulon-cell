@@ -4,14 +4,15 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { type CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
+import { outlineSummaryFor } from '../store/outline-summary.js';
 import { rangeArea, rangesIntersect, sameRange } from '../store/selection-geometry.js';
-import { getPageSetup, mutators } from '../store/store.js';
+import { getPageSetup, mutators, type SpreadsheetStore } from '../store/store.js';
 import { blockDataTableShift } from './data-table-guard.js';
 import type { OperationIntent, PermissionDecision } from './interaction-policy.js';
 import { groupRows, ungroupRows } from './outline.js';
 import { isSheetProtected } from './protection.js';
 import { sameSavedWorkbook } from './saved-workbook-proof.js';
-import { recordPageSetupChange } from './slice-history.js';
+import { recordFormatChange, recordPageSetupChange } from './slice-history.js';
 import { deleteRows, insertRows } from './structure.js';
 
 /** Data commands exposed by the Mac ribbon. The limits are
@@ -115,6 +116,9 @@ export interface SubtotalRequest {
   readonly function: Exclude<MacDataFunction, 'count'> | 'count';
   /** Start every group after the first on a new printed page. */
   readonly pageBreaks?: boolean;
+  /** Put each subtotal row below its group and the grand total last; when
+   *  false they sit above their data, the grand total under the header. */
+  readonly summaryBelow?: boolean;
 }
 
 export interface SubtotalSolution {
@@ -898,10 +902,29 @@ export function formatMacRangeAddress(wb: WorkbookHandle, range: Range): string 
 const formulaRange = (col: number, row0: number, row1: number): string =>
   `${colLetter(col)}${row0 + 1}:${colLetter(col)}${row1 + 1}`;
 
+/** Final rows of each group's subtotal and of the grand total. Below: a group's
+ *  row follows its data and the grand total comes last. Above: the grand total
+ *  sits under the header and each group's row precedes its data. */
+const subtotalRows = (
+  range: Range,
+  groups: readonly { readonly start: number; readonly insertAt: number }[],
+  below: boolean,
+): { groupRows: number[]; grandTotalRow: number } =>
+  below
+    ? {
+        groupRows: groups.map((group, index) => group.insertAt + index),
+        grandTotalRow: range.r1 + groups.length + 1,
+      }
+    : {
+        groupRows: groups.map((group, index) => group.start + index + 1),
+        grandTotalRow: range.r0 + 1,
+      };
+
 const subtotalOutputCells = (
   range: Range,
   columns: readonly number[],
-  groups: readonly { readonly insertAt: number }[],
+  groups: readonly { readonly start: number; readonly insertAt: number }[],
+  below = true,
 ): { outputCells: Addr[]; formulaCells: Addr[] } | null => {
   const cellsPerGroup = columns.length + 1;
   const maxGroupsByOutput = Math.floor(MAX_SUBTOTAL_OUTPUT_CELLS / cellsPerGroup);
@@ -916,16 +939,25 @@ const subtotalOutputCells = (
       formulaCells.push(addr);
     }
   };
-  for (const [index, group] of groups.entries()) {
-    const finalSubtotalRow = group.insertAt + index;
-    if (finalSubtotalRow >= MAX_ROW) return null;
-    addRow(finalSubtotalRow);
+  const { groupRows, grandTotalRow } = subtotalRows(range, groups, below);
+  for (const row of [...groupRows, grandTotalRow]) {
+    if (row >= MAX_ROW) return null;
+    addRow(row);
   }
-  // The grand total lands under the last subtotal row.
-  const grandTotalRow = range.r1 + groups.length + 1;
-  if (grandTotalRow >= MAX_ROW) return null;
-  addRow(grandTotalRow);
   return { outputCells, formulaCells };
+};
+
+/** Place the sheet's outline summary rows above their detail as one history entry. */
+const recordOutlineSummaryAbove = (
+  history: SpreadsheetInstance['history'],
+  store: SpreadsheetStore,
+  sheet: number,
+): void => {
+  mutators.setOutlineSummary(store, sheet, { below: false });
+  history.push({
+    undo: () => mutators.setOutlineSummary(store, sheet, { below: true }),
+    redo: () => mutators.setOutlineSummary(store, sheet, { below: false }),
+  });
 };
 
 /** Analyze and authorize a Subtotal operation before it starts any row
@@ -1004,7 +1036,7 @@ export function planMacSubtotal(
 
   // Future subtotal rows are shifted by insertions belonging to groups above.
   // Preflight every apply, undo, and redo intent at their eventual positions.
-  const output = subtotalOutputCells(range, columns, groups);
+  const output = subtotalOutputCells(range, columns, groups, request.summaryBelow !== false);
   if (!output) return failure('unsupported', 'groupLimit');
   const intents = subtotalIntents(range, output.outputCells, output.formulaCells);
   const authorization = firstDeniedSubtotalIntent(instance, intents);
@@ -1045,7 +1077,8 @@ export function commitMacSubtotal(
   if (columns.length === 0 || columns.some((col) => !Number.isInteger(col))) {
     return failure('stale', 'stale');
   }
-  const output = subtotalOutputCells(range, columns, solution.groups);
+  const below = request.summaryBelow !== false;
+  const output = subtotalOutputCells(range, columns, solution.groups, below);
   if (!output) return failure('unsupported', 'groupLimit');
   const intents = subtotalIntents(range, output.outputCells, output.formulaCells);
   const authorization = firstDeniedSubtotalIntent(instance, intents);
@@ -1059,49 +1092,66 @@ export function commitMacSubtotal(
     return failure('invalid', 'failed', thrownReason(error));
   }
   try {
+    const writeTotalRow = (row: number, label: string, from: number, to: number): void => {
+      wb.setText({ sheet: range.sheet, row, col: range.c0 }, label);
+      wb.withBatchedRecalc(() => {
+        for (const col of columns) {
+          wb.setFormula(
+            { sheet: range.sheet, row, col },
+            `=SUBTOTAL(${functionCode},${formulaRange(col, from, to)})`,
+          );
+        }
+      });
+    };
     // Work bottom-up. Rows above the insertion point retain their original
     // indices; later upper insertions naturally shift formulas already made.
     for (let index = solution.groups.length - 1; index >= 0; index -= 1) {
       const group = solution.groups[index];
       if (!group) continue;
-      if (!insertRows(store, wb, history, group.insertAt, 1))
+      const subtotalRow = below ? group.insertAt : group.start;
+      if (!insertRows(store, wb, history, subtotalRow, 1))
         throw new Error('Could not insert subtotal row.');
-      const subtotalRow = group.insertAt;
-      wb.setText(
-        { sheet: range.sheet, row: subtotalRow, col: range.c0 },
-        labels.groupTotal.replace('{group}', group.label),
-      );
-      wb.withBatchedRecalc(() => {
-        for (const col of columns) {
-          wb.setFormula(
-            { sheet: range.sheet, row: subtotalRow, col },
-            `=SUBTOTAL(${functionCode},${formulaRange(col, group.start, group.end)})`,
-          );
-        }
-      });
-      if (group.end >= group.start) groupRows(store, history, group.start, group.end, wb);
+      const shift = below ? 0 : 1;
+      const label = labels.groupTotal.replace('{group}', group.label);
+      writeTotalRow(subtotalRow, label, group.start + shift, group.end + shift);
+      if (group.end >= group.start)
+        groupRows(store, history, group.start + shift, group.end + shift, wb);
     }
     // The grand total sums every data row; SUBTOTAL skips the nested subtotals.
     // Excel's outline puts detail rows at level 3, subtotal rows at 2 and the
     // header and grand total at 1, so one more group spans data and subtotals.
     const dataStart = range.r0 + 1;
     const lastSubtotalRow = range.r1 + solution.groups.length;
-    const grandTotalRow = lastSubtotalRow + 1;
+    const grandTotalRow = below ? lastSubtotalRow + 1 : dataStart;
     if (!insertRows(store, wb, history, grandTotalRow, 1))
       throw new Error('Could not insert the grand total row.');
-    wb.setText({ sheet: range.sheet, row: grandTotalRow, col: range.c0 }, labels.grandTotal);
-    wb.withBatchedRecalc(() => {
-      for (const col of columns) {
-        wb.setFormula(
-          { sheet: range.sheet, row: grandTotalRow, col },
-          `=SUBTOTAL(${functionCode},${formulaRange(col, dataStart, lastSubtotalRow - 1)})`,
-        );
+    if (below) {
+      writeTotalRow(grandTotalRow, labels.grandTotal, dataStart, lastSubtotalRow - 1);
+      groupRows(store, history, dataStart, lastSubtotalRow, wb);
+    } else {
+      // Above: the first group's subtotal row precedes the first data row.
+      writeTotalRow(grandTotalRow, labels.grandTotal, dataStart + 2, lastSubtotalRow + 1);
+      groupRows(store, history, dataStart + 1, lastSubtotalRow + 1, wb);
+    }
+    const finalRows = subtotalRows(range, solution.groups, below);
+    if (!below) {
+      // Summaries above: label cells are bold, the SUBTOTAL cells keep their
+      // format, and the outline summarizes above its detail.
+      recordFormatChange(history, store, () => {
+        for (const row of [...finalRows.groupRows, finalRows.grandTotalRow]) {
+          mutators.setCellFormat(store, { sheet: range.sheet, row, col: range.c0 }, { bold: true });
+        }
+      });
+      if (outlineSummaryFor(store.getState().layout, range.sheet).below) {
+        recordOutlineSummaryAbove(history, store, range.sheet);
       }
-    });
-    groupRows(store, history, dataStart, lastSubtotalRow, wb);
+    }
     if (request.pageBreaks) {
-      // Each group after the first starts below the subtotal rows inserted above it.
-      const breakRows = solution.groups.slice(1).map((group, index) => group.start + index + 1);
+      // Each group after the first starts below the subtotal rows inserted above
+      // it; with summaries above, its page opens on its own subtotal row.
+      const breakRows = below
+        ? solution.groups.slice(1).map((group, index) => group.start + index + 1)
+        : finalRows.groupRows.slice(1);
       if (breakRows.length > 0) {
         recordPageSetupChange(history, store, () => {
           const current = getPageSetup(store.getState(), range.sheet).manualPageBreakRows ?? [];

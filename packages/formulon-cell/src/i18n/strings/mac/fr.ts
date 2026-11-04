@@ -74,7 +74,6 @@ export const macFr: MacStrings = {
       function: 'Utiliser la fonction',
       replace: 'Remplacer les sous-totaux actuels',
       summaryBelow: 'Résumé sous les données',
-      unsupportedOption: 'Cette option n’est pas encore prise en charge.',
       run: 'OK',
       cancel: 'Annuler',
       groupTotal: 'Total {group}',

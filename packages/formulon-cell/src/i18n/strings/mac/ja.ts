@@ -65,7 +65,6 @@ export const macJa: MacStrings = {
       function: '集計の方法:',
       replace: '現在の小計をすべて置き換える',
       summaryBelow: '集計行をデータの下に挿入する',
-      unsupportedOption: 'このオプションはまだサポートされていません。',
       run: 'OK',
       cancel: 'キャンセル',
       groupTotal: '{group} 集計',

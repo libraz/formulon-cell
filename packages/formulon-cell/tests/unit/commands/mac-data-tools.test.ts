@@ -24,6 +24,7 @@ import {
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { ja } from '../../../src/i18n/strings/ja.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
+import { outlineSummaryFor } from '../../../src/store/outline-summary.js';
 import {
   createSpreadsheetStore,
   getPageSetup,
@@ -572,6 +573,70 @@ describe('Mac Data command operations', () => {
     expect(Array.from({ length: 10 }, (_, row) => levels.get(row) ?? 0)).toEqual([
       0, 2, 2, 1, 2, 2, 1, 2, 1, 0,
     ]);
+    expect(store.getState().format.formats.get('0:3:0')?.bold).toBeUndefined();
+    expect(outlineSummaryFor(store.getState().layout, 0).below).toBe(true);
+  });
+
+  it('puts the summary rows above their data when summaryBelow is off', async () => {
+    // Excel (ja), A1:B7 grouped on A (a,a,a,b,b,b; 1..6), SUM on B, summary
+    // below unchecked: '総計' =SUBTOTAL(9,B4:B10) under the header, then
+    // 'a 集計' =SUBTOTAL(9,B4:B6) and 'b 集計' =SUBTOTAL(9,B8:B10) above each
+    // group; bold labels, plain values; the outline summarizes above.
+    const wb = await WorkbookHandle.createDefault();
+    handles.push(wb);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    wb.setText({ sheet: 0, row: 0, col: 0 }, 'Grp');
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'Val');
+    for (const [index, group] of ['a', 'a', 'a', 'b', 'b', 'b'].entries()) {
+      wb.setText({ sheet: 0, row: index + 1, col: 0 }, group);
+      wb.setNumber({ sheet: 0, row: index + 1, col: 1 }, index + 1);
+    }
+    wb.recalc();
+    const instance = makeControllerInstance(wb, store, history);
+    const request: SubtotalRequest = {
+      range: 'A1:B7',
+      groupByColumn: 0,
+      subtotalColumns: [1],
+      function: 'sum',
+      summaryBelow: false,
+    };
+    const plan = planMacSubtotal(instance, request);
+    if (!plan.ok) throw new Error('plan failed');
+    expect(commitMacSubtotal(instance, request, plan.value).ok).toBe(true);
+    const text = (row: number) => wb.getValue({ sheet: 0, row, col: 0 });
+    const formula = (row: number) => wb.cellFormula({ sheet: 0, row, col: 1 });
+    expect([1, 2, 6].map(text)).toEqual([
+      { kind: 'text', value: '総計' },
+      { kind: 'text', value: 'a 集計' },
+      { kind: 'text', value: 'b 集計' },
+    ]);
+    expect([1, 2, 6].map(formula)).toEqual([
+      '=SUBTOTAL(9,B4:B10)',
+      '=SUBTOTAL(9,B4:B6)',
+      '=SUBTOTAL(9,B8:B10)',
+    ]);
+    expect([1, 2, 6].map((row) => wb.getValue({ sheet: 0, row, col: 1 }))).toEqual([
+      { kind: 'number', value: 21 },
+      { kind: 'number', value: 6 },
+      { kind: 'number', value: 15 },
+    ]);
+    const bold = (row: number, col: number) =>
+      store.getState().format.formats.get(`0:${row}:${col}`)?.bold === true;
+    expect([1, 2, 6].map((row) => [bold(row, 0), bold(row, 1)])).toEqual([
+      [true, false],
+      [true, false],
+      [true, false],
+    ]);
+    const levels = store.getState().layout.outlineRows;
+    expect(Array.from({ length: 11 }, (_, row) => levels.get(row) ?? 0)).toEqual([
+      0, 0, 1, 2, 2, 2, 1, 2, 2, 2, 0,
+    ]);
+    expect(outlineSummaryFor(store.getState().layout, 0).below).toBe(false);
+    expect(history.undo()).toBe(true);
+    expect(outlineSummaryFor(store.getState().layout, 0).below).toBe(true);
+    expect(text(1)).toEqual({ kind: 'text', value: 'a' });
+    expect(bold(1, 0)).toBe(false);
   });
 
   it('inserts a page break before each group after the first when asked', async () => {

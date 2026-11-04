@@ -13,7 +13,6 @@ import { colLetter } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { syncCustomSelects } from './custom-select.js';
 import {
   appendDialogActions,
@@ -140,10 +139,6 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
     replaceOption.text.textContent = t.replace;
     pageBreakOption.text.textContent = t.pageBreak;
     summaryOption.text.textContent = t.summaryBelow;
-    // Summary rows above the data have no counterpart here.
-    projectDisabledState(summaryOption.input, true, t.unsupportedOption, {
-      datasetKey: 'disabledReason',
-    });
     removeAllBtn.textContent = t.removeAll;
     okBtn.textContent = t.run;
     cancelBtn.textContent = t.cancel;
@@ -193,6 +188,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
     functionSelect.value = 'sum';
     replaceOption.input.checked = true;
     pageBreakOption.input.checked = false;
+    summaryOption.input.checked = true;
     syncCustomSelects(shell.panel);
   };
 
@@ -228,6 +224,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
         ? functionSelect.value
         : 'sum') as MacDataFunction,
       pageBreaks: pageBreakOption.input.checked,
+      summaryBelow: summaryOption.input.checked,
     });
     // Replacing the old subtotals and writing the new ones is a single undo step.
     if (replaceOption.input.checked) {

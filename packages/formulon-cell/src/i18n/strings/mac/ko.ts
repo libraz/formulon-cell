@@ -74,7 +74,6 @@ export const macKo: MacStrings = {
       function: '함수 사용',
       replace: '현재 부분합 바꾸기',
       summaryBelow: '데이터 아래에 요약 표시',
-      unsupportedOption: '이 옵션은 아직 지원되지 않습니다.',
       run: '확인',
       cancel: '취소',
       groupTotal: '{group} 요약',

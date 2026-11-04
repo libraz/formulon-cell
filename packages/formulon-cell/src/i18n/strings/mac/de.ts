@@ -74,7 +74,6 @@ export const macDe: MacStrings = {
       function: 'Funktion verwenden',
       replace: 'Aktuelle Teilergebnisse ersetzen',
       summaryBelow: 'Zusammenfassung unterhalb der Daten',
-      unsupportedOption: 'Diese Option wird noch nicht unterstützt.',
       run: 'OK',
       cancel: 'Abbrechen',
       groupTotal: '{group} Ergebnis',
