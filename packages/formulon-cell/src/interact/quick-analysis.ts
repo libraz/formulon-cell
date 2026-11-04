@@ -173,9 +173,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     }
     const rects = rangeRects(layoutForView(state), state.viewport, state.selection.range);
     const anchor = rects[rects.length - 1];
-    // The Mac spreadsheet has no launcher button; the shortcut still opens the panel.
-    const mac = host.closest<HTMLElement>('.fc-host')?.dataset.fcPlatform === 'mac';
-    if (mac || !anchor || !isMultiSelection() || state.ui.editor.kind !== 'idle' || open) {
+    if (!anchor || !isMultiSelection() || state.ui.editor.kind !== 'idle' || open) {
       button.hidden = true;
       return;
     }

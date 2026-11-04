@@ -54,6 +54,7 @@ import { attachViewToolbar } from '../interact/view-toolbar.js';
 import { attachWatchPanel } from '../interact/watch-panel.js';
 import { attachWheel } from '../interact/wheel.js';
 import { attachWorkbookObjectsPanel } from '../interact/workbook-objects.js';
+import { platformLacksFeature } from '../mount/feature-flags.js';
 import { mutators } from '../store/store.js';
 import { resolveTheme } from '../theme/resolve.js';
 import type { Extension, ExtensionContext, ExtensionHandle } from './types.js';
@@ -155,11 +156,18 @@ export const statusBar = (): Extension => ({
   },
 });
 
+const hostPlatform = (host: HTMLElement): 'mac' | 'default' =>
+  (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac' ? 'mac' : 'default';
+
 /** Quick Analysis popover (Ctrl+Q) — id `'quickAnalysis'`. */
 export const quickAnalysis = (): Extension => ({
   id: 'quickAnalysis',
   priority: 50,
   setup(ctx) {
+    // A platform whose desktop app has no Quick Analysis gets none from the extension either.
+    if (platformLacksFeature('quickAnalysis', hostPlatform(ctx.host))) {
+      return { open: () => {}, close: () => {}, dispose: () => {} };
+    }
     const handle = attachQuickAnalysis({
       host: ctx.host,
       store: ctx.store,

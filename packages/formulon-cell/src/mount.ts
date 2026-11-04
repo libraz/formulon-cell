@@ -188,7 +188,12 @@ export const Spreadsheet = {
     let requestedFeatures = { ...ui.features, ...opts.features };
     let contextMenuOptions = opts.contextMenu;
     const initialTheme = opts.theme ?? ui.theme;
-    let flags = resolveMountFlags(requestedFeatures, opts.policy !== undefined, contextMenuOptions);
+    let flags = resolveMountFlags(
+      requestedFeatures,
+      opts.policy !== undefined,
+      contextMenuOptions,
+      ui.platform,
+    );
     const emitter = new SpreadsheetEmitter();
     const formulaRegistry = new FormulaRegistry();
     if (opts.functions) {
@@ -949,6 +954,7 @@ export const Spreadsheet = {
           next,
           commands.policy !== undefined,
           contextMenuOptions,
+          ui.platform,
         );
         const shouldRebuildViewToolbarObjects =
           prevFlags.viewToolbar &&
