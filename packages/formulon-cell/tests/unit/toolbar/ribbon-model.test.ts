@@ -280,7 +280,7 @@ describe('toolbar/ribbon-model', () => {
       'background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));',
     );
     expect(layoutCss).toMatch(
-      /\.fc-tb__rb--active\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-hover\)\);[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);/,
+      /\.fc-tb__rb--active\s*\{[\s\S]*?background: var\(\s*--fc-tb-ribbon-checked,\s*var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-hover\)\)\s*\);[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);/,
     );
     expect(layoutCss).toMatch(
       /\.fc-tb__rb\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;[\s\S]*?border-radius: 2px;/,
