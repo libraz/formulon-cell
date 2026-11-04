@@ -71,18 +71,24 @@ export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): s
       if (aTxt === null || bTxt === null) return null;
       return `${tok.sheetQual}${aTxt}:${bTxt}`;
     }
-    const shiftAtom = (at: Atom): string | null => {
+    const shiftPoint = (at: Atom): { col: number; row: number } => {
       const col = colFromLetters(at.label);
       const row = Number.parseInt(at.rowStr, 10) - 1;
-      const nc = at.absCol ? col : col + dCol;
-      const nr = at.absRow ? row : row + dRow;
-      return renderAtom(at.absCol, nc, at.absRow, nr);
+      return { col: at.absCol ? col : col + dCol, row: at.absRow ? row : row + dRow };
     };
-    const aTxt = shiftAtom(tok.a);
-    if (aTxt === null) return null;
-    if (!tok.b) return `${tok.sheetQual}${aTxt}`;
-    const bTxt = shiftAtom(tok.b);
-    if (bTxt === null) return null;
+    const pa = shiftPoint(tok.a);
+    if (!tok.b) {
+      const aTxt = renderAtom(tok.a.absCol, pa.col, tok.a.absRow, pa.row);
+      return aTxt === null ? null : `${tok.sheetQual}${aTxt}`;
+    }
+    const pb = shiftPoint(tok.b);
+    // A range whose endpoints crossed is normalized per axis; each `$` stays
+    // in its endpoint slot rather than following the coordinate.
+    const [loCol, hiCol] = pa.col <= pb.col ? [pa.col, pb.col] : [pb.col, pa.col];
+    const [loRow, hiRow] = pa.row <= pb.row ? [pa.row, pb.row] : [pb.row, pa.row];
+    const aTxt = renderAtom(tok.a.absCol, loCol, tok.a.absRow, loRow);
+    const bTxt = renderAtom(tok.b.absCol, hiCol, tok.b.absRow, hiRow);
+    if (aTxt === null || bTxt === null) return null;
     return `${tok.sheetQual}${aTxt}:${bTxt}`;
   });
 }
@@ -220,6 +226,17 @@ export function adjustFormulaForCellBandShift(
       const atom = renderAtom(tok.a.absCol, aResult.col, tok.a.absRow, aResult.row);
       return atom === null ? null : `${tok.sheetQual}${atom}`;
     }
+    // A range moves or resizes only when the band covers its full extent across the shift axis.
+    const b = tok.b;
+    const colA = colFromLetters(tok.a.label);
+    const colB = colFromLetters(b.label);
+    const rowA = Number.parseInt(tok.a.rowStr, 10) - 1;
+    const rowB = Number.parseInt(b.rowStr, 10) - 1;
+    const crossLo = vertical ? Math.min(colA, colB) : Math.min(rowA, rowB);
+    const crossHi = vertical ? Math.max(colA, colB) : Math.max(rowA, rowB);
+    const bandLo = vertical ? affected.c0 : affected.r0;
+    const bandHi = vertical ? affected.c1 : affected.r1;
+    if (crossLo < bandLo || crossHi > bandHi) return renderToken(tok);
     const range = clampRange(
       tok,
       shiftAtom,
