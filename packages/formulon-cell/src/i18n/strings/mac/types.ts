@@ -20,6 +20,7 @@ import type { MacProtectSheetStrings } from './protect-sheet.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
 import type { MacSortDialogStrings } from './sort-dialog.js';
 import type { MacStyleDialogStrings } from './style-dialog.js';
+import type { MacWatchWindowStrings } from './watch-window.js';
 import type { MacZoomDialogStrings } from './zoom-dialog.js';
 
 export interface MacStrings {
@@ -57,6 +58,8 @@ export interface MacStrings {
   macStyleDialog: MacStyleDialogStrings;
   /** The Mac Workbook Links pane. */
   macExternalLinksPane: ExternalLinksPaneStrings;
+  /** The Mac Watch Window task pane. */
+  macWatchWindow: MacWatchWindowStrings;
   /** Overrides of `cfRulesDialog`, plus its Mac-only labels, that apply on the Mac host only. */
   macCfRulesDialog: MacCfRulesDialogStrings;
   /** Overrides of `hyperlinkDialog`, plus its Mac-only labels, that apply on the Mac host only. */

@@ -19,6 +19,7 @@ import { macSortDialogJa } from './sort-dialog.js';
 import { macStyleDialogJa } from './style-dialog.js';
 import { macTextToColumnsWizardJa } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macWatchWindowJa } from './watch-window.js';
 import { macZoomDialogJa } from './zoom-dialog.js';
 
 export const macJa: MacStrings = {
@@ -198,6 +199,7 @@ export const macJa: MacStrings = {
   macTextToColumnsWizard: macTextToColumnsWizardJa,
   macStyleDialog: macStyleDialogJa,
   macExternalLinksPane: macExternalLinksPaneJa,
+  macWatchWindow: macWatchWindowJa,
   macCreateTable: macCreateTableJa,
   macDataValidation: macDataValidationJa,
   macGoToDialog: macGoToDialogJa,

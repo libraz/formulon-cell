@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import type { CellValue } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { ja } from '../../../src/i18n/strings/ja.js';
 import { attachWatchPanel } from '../../../src/interact/watch-panel.js';
 import {
   createSpreadsheetStore,
@@ -322,5 +323,76 @@ describe('attachWatchPanel', () => {
     expect(css).toMatch(/\.fc-watch__row--selected\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
     expect(css).not.toContain('background: var(--fc-accent-soft');
     expect(css).not.toContain('text-transform: uppercase');
+  });
+});
+
+describe('Watch Window on the Mac host', () => {
+  let store: SpreadsheetStore;
+  let wb: WorkbookHandle;
+  let fcHost: HTMLElement;
+  let bottomDock: HTMLElement;
+  let taskpaneDock: HTMLElement;
+
+  beforeEach(async () => {
+    store = createSpreadsheetStore();
+    wb = await newWb();
+    fcHost = document.createElement('div');
+    fcHost.className = 'fc-host';
+    fcHost.dataset.fcPlatform = 'mac';
+    taskpaneDock = document.createElement('div');
+    taskpaneDock.className = 'fc-host__taskpane-dock';
+    taskpaneDock.hidden = true;
+    bottomDock = document.createElement('div');
+    bottomDock.className = 'fc-host__watchdock';
+    fcHost.append(taskpaneDock, bottomDock);
+    document.body.appendChild(fcHost);
+  });
+
+  afterEach(() => {
+    fcHost.remove();
+    wb.dispose();
+  });
+
+  it('docks in the task pane with the desktop tab, + / - toolbar and columns', () => {
+    const handle = attachWatchPanel({ host: bottomDock, store, getWb: () => wb, strings: ja });
+    handle.open();
+    const panel = taskpaneDock.querySelector<HTMLElement>('.fc-watch');
+    expect(panel).not.toBeNull();
+    expect(bottomDock.querySelector('.fc-watch')).toBeNull();
+    expect(taskpaneDock.hidden).toBe(false);
+    expect(panel?.querySelector('.fc-watch__title')?.textContent).toBe('ウォッチ ウインドウ');
+    const tools = [...(panel?.querySelectorAll<HTMLButtonElement>('.fc-watch__tool') ?? [])];
+    expect(tools.map((b) => [b.getAttribute('aria-label'), b.disabled])).toEqual([
+      ['追加', false],
+      ['削除', true],
+    ]);
+    expect(panel?.querySelector('.fc-watch__close')?.getAttribute('aria-label')).toBe('閉じる');
+    expect([...(panel?.querySelectorAll('thead th') ?? [])].map((th) => th.textContent)).toEqual([
+      'ブック',
+      'シート',
+      '名前',
+      'セル',
+      '値',
+      '数式',
+    ]);
+    handle.close();
+    expect(taskpaneDock.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('deletes the selected watch with the minus button', () => {
+    const handle = attachWatchPanel({ host: bottomDock, store, getWb: () => wb, strings: ja });
+    handle.open();
+    mutators.addWatch(store, { sheet: 0, row: 0, col: 0 });
+    mutators.addWatch(store, { sheet: 0, row: 1, col: 1 });
+    const rows = () => [...taskpaneDock.querySelectorAll<HTMLElement>('.fc-watch__row')];
+    expect(rows()[0]?.querySelector('.fc-watch__remove')).toBeNull();
+    rows()[1]?.click();
+    const minus = taskpaneDock.querySelectorAll<HTMLButtonElement>('.fc-watch__tool')[1];
+    expect(minus?.disabled).toBe(false);
+    minus?.click();
+    expect(store.getState().watch.watches).toEqual([{ sheet: 0, row: 0, col: 0 }]);
+    expect(minus?.disabled).toBe(true);
+    handle.detach();
   });
 });

@@ -170,4 +170,108 @@
     font-style: italic;
     font-size: 12px;
   }
+
+  /* Mac: a 400 pt task pane beside the grid, split from it by a 1 pt rule,
+     with a tab header, a joined + / - control and a striped table inset 20 pt. */
+  [data-fc-platform="mac"] .fc-host__taskpane-dock:has(> .fc-watch--mac:not([hidden])) {
+    flex-basis: 401px;
+  }
+  .fc-host__taskpane-dock > .fc-watch--mac {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-height: none;
+    border-top: 0;
+    border-left: 1px solid var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-watch--mac .fc-watch__header {
+    height: 28px;
+    padding: 0 6px 0 10px;
+  }
+  .fc-watch--mac .fc-watch__title {
+    color: var(--fc-fg, CanvasText);
+    font-weight: 400;
+  }
+  .fc-watch--mac .fc-watch__close {
+    width: 16px;
+    height: 16px;
+    border: 0;
+  }
+  .fc-watch__toolbar {
+    display: flex;
+    padding: 13px 20px 7px;
+    flex: 0 0 auto;
+  }
+  .fc-watch__tool {
+    appearance: none;
+    position: relative;
+    width: 27px;
+    height: 22px;
+    padding: 0;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 4px 0 0 4px;
+    background: var(--fc-bg, Canvas);
+    color: var(--fc-fg, CanvasText);
+    cursor: pointer;
+  }
+  .fc-watch__tool--remove {
+    width: 28px;
+    margin-left: -1px;
+    border-radius: 0 4px 4px 0;
+  }
+  .fc-watch__tool:disabled {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 40%, transparent));
+    cursor: default;
+  }
+  .fc-watch__tool::before,
+  .fc-watch__tool--add::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 1.4px;
+    border-radius: 1px;
+    background: currentColor;
+    content: "";
+    transform: translate(-50%, -50%);
+  }
+  .fc-watch__tool--add::after {
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+  .fc-watch--mac .fc-watch__body {
+    margin: 0 0 0 20px;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0 19px,
+        color-mix(in srgb, var(--fc-fg, CanvasText) 5%, transparent) 19px 38px
+      )
+      0 27px / 100% calc(100% - 27px) no-repeat;
+  }
+  .fc-watch--mac .fc-watch__table {
+    width: max-content;
+    min-width: 100%;
+    font-family: var(--fc-font-ui, system-ui);
+  }
+  .fc-watch--mac .fc-watch__table th {
+    height: 27px;
+    min-width: 50px;
+    padding: 0 8px 0 10px;
+    border-right: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    font-weight: 600;
+    color: var(--fc-fg, CanvasText);
+  }
+  .fc-watch--mac .fc-watch__table td {
+    height: 19px;
+    padding: 0 8px 0 10px;
+    border-bottom: 0;
+  }
+  .fc-watch--mac .fc-watch__row:nth-child(even) {
+    background: color-mix(in srgb, var(--fc-fg, CanvasText) 5%, transparent);
+  }
+  .fc-watch--mac .fc-watch__row--selected,
+  .fc-watch--mac .fc-watch__row--selected:nth-child(even) {
+    background: color-mix(in srgb, var(--fc-accent, Highlight) 18%, transparent);
+  }
 }

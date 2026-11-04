@@ -1,12 +1,14 @@
 import type { History } from '../commands/history.js';
 import { recordWatchesChange } from '../commands/watch.js';
-import { formatA1Cell } from '../engine/address.js';
+import { addrKey, formatA1Cell } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogButton } from './dialog-shell.js';
+import { syncTaskpaneDock } from './taskpane-dock.js';
 
 export interface WatchPanelDeps {
   /** Element the panel docks under. The panel appends itself as a child of
@@ -52,12 +54,20 @@ export interface WatchPanelHandle {
 export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   const { host, store, getWb } = deps;
   let strings = deps.strings ?? defaultStrings;
+  // The Mac host docks the window as a task pane beside the grid, with a tab,
+  // a + / - toolbar acting on the selected watch, and no per-row remove column.
+  const fcHost = host.closest<HTMLElement>('.fc-host') ?? host;
+  const mac = fcHost.dataset.fcPlatform === 'mac';
+  const dock = mac ? fcHost.querySelector<HTMLElement>('.fc-host__taskpane-dock') : null;
+  const macLabels = () => strings.macWatchWindow;
+  let selectedKey: string | null = null;
 
   const root = document.createElement('div');
   root.className = 'fc-watch';
+  root.classList.toggle('fc-watch--mac', mac);
   root.dataset.fcWatch = '1';
   root.setAttribute('role', 'region');
-  root.setAttribute('aria-label', strings.watchPanel.title);
+  root.setAttribute('aria-label', mac ? macLabels().title : strings.watchPanel.title);
   root.hidden = !store.getState().ui.watchPanelOpen;
   root.tabIndex = -1;
 
@@ -65,20 +75,38 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   header.className = 'fc-watch__header';
   const title = document.createElement('span');
   title.className = 'fc-watch__title';
-  title.textContent = strings.watchPanel.title;
+  title.textContent = mac ? macLabels().title : strings.watchPanel.title;
   const actions = document.createElement('span');
   actions.className = 'fc-watch__actions';
-  const addBtn = appendDialogButton(actions, {
-    label: strings.watchPanel.addWatch,
-    baseClass: 'fc-watch__btn',
+  const toolbar = document.createElement('div');
+  toolbar.className = 'fc-watch__toolbar';
+  const addBtn = appendDialogButton(mac ? toolbar : actions, {
+    label: mac ? '' : strings.watchPanel.addWatch,
+    baseClass: mac ? 'fc-watch__tool fc-watch__tool--add' : 'fc-watch__btn',
   });
-  const clearBtn = appendDialogButton(actions, {
-    label: strings.watchPanel.clearAll,
-    baseClass: 'fc-watch__btn',
-  });
+  const removeTool = mac
+    ? appendDialogButton(toolbar, {
+        label: '',
+        baseClass: 'fc-watch__tool fc-watch__tool--remove',
+      })
+    : null;
+  const clearBtn = mac
+    ? null
+    : appendDialogButton(actions, {
+        label: strings.watchPanel.clearAll,
+        baseClass: 'fc-watch__btn',
+      });
   const closeBtn = appendDialogButton(actions, { label: '', baseClass: 'fc-watch__btn' });
   closeBtn.classList.add('fc-watch__close');
-  closeBtn.setAttribute('aria-label', strings.watchPanel.close);
+  const labelMacTools = (): void => {
+    if (!mac) return;
+    addBtn.setAttribute('aria-label', macLabels().add);
+    addBtn.title = macLabels().add;
+    removeTool?.setAttribute('aria-label', macLabels().remove);
+    if (removeTool) removeTool.title = macLabels().remove;
+  };
+  closeBtn.setAttribute('aria-label', mac ? macLabels().close : strings.watchPanel.close);
+  labelMacTools();
   header.append(title, actions);
 
   const body = document.createElement('div');
@@ -104,11 +132,13 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     headRow.appendChild(th);
   }
   // Trailing column for the per-row remove button. No header label.
-  const thRemove = document.createElement('th');
-  thRemove.scope = 'col';
-  thRemove.dataset.fcCol = 'remove';
-  thRemove.setAttribute('aria-hidden', 'true');
-  headRow.appendChild(thRemove);
+  if (!mac) {
+    const thRemove = document.createElement('th');
+    thRemove.scope = 'col';
+    thRemove.dataset.fcCol = 'remove';
+    thRemove.setAttribute('aria-hidden', 'true');
+    headRow.appendChild(thRemove);
+  }
   thead.appendChild(headRow);
   const tbody = document.createElement('tbody');
   table.append(thead, tbody);
@@ -118,8 +148,13 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   empty.className = 'fc-watch__empty';
   empty.textContent = strings.watchPanel.empty;
 
-  root.append(header, body, empty);
-  host.appendChild(root);
+  if (mac) root.append(header, toolbar, body, empty);
+  else root.append(header, body, empty);
+  (dock ?? host).appendChild(root);
+  const syncDock = (): void => {
+    if (dock) syncTaskpaneDock(dock);
+  };
+  syncDock();
 
   let restoreFocusEl: HTMLElement | null = null;
 
@@ -228,20 +263,32 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     }
   };
 
+  const syncRemoveTool = (): void => {
+    if (!removeTool) return;
+    const watches = store.getState().watch.watches;
+    if (selectedKey !== null && !watches.some((addr) => addrKey(addr) === selectedKey)) {
+      selectedKey = null;
+    }
+    projectDisabledState(removeTool, selectedKey === null, null);
+  };
+
   const renderRows = (): void => {
     const watches = store.getState().watch.watches;
+    syncRemoveTool();
     tbody.replaceChildren();
+    // The Mac pane keeps its column headers over an empty, striped list.
     if (watches.length === 0) {
-      empty.hidden = false;
-      table.hidden = true;
+      empty.hidden = mac;
+      table.hidden = !mac;
       return;
     }
     empty.hidden = true;
     table.hidden = false;
     for (const addr of watches) {
       const active = store.getState().selection.active;
-      const selected =
-        active.sheet === addr.sheet && active.row === addr.row && active.col === addr.col;
+      const selected = mac
+        ? addrKey(addr) === selectedKey
+        : active.sheet === addr.sheet && active.row === addr.row && active.col === addr.col;
       const tr = document.createElement('tr');
       tr.className = 'fc-watch__row';
       tr.classList.toggle('fc-watch__row--selected', selected);
@@ -266,27 +313,34 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       tdFormula.className = 'fc-watch__formula';
       tdFormula.textContent = formulaOf(addr);
 
-      const tdRemove = document.createElement('td');
-      tdRemove.className = 'fc-watch__remove-cell';
-      const removeBtn = appendDialogButton(tdRemove, {
-        label: '',
-        baseClass: 'fc-watch__remove',
-      });
-      removeBtn.setAttribute('aria-label', strings.watchPanel.removeWatch);
-      removeBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        recordWatchesChange(deps.history ?? null, store, () => {
-          mutators.removeWatch(store, addr);
+      tr.append(tdBook, tdSheet, tdName, tdCell, tdValue, tdFormula);
+      if (!mac) {
+        const tdRemove = document.createElement('td');
+        tdRemove.className = 'fc-watch__remove-cell';
+        const removeBtn = appendDialogButton(tdRemove, {
+          label: '',
+          baseClass: 'fc-watch__remove',
         });
-      });
-
-      tr.append(tdBook, tdSheet, tdName, tdCell, tdValue, tdFormula, tdRemove);
-      tr.addEventListener('click', () => jumpTo(addr));
+        removeBtn.setAttribute('aria-label', strings.watchPanel.removeWatch);
+        removeBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          recordWatchesChange(deps.history ?? null, store, () => {
+            mutators.removeWatch(store, addr);
+          });
+        });
+        tr.appendChild(tdRemove);
+      }
+      const choose = (): void => {
+        if (mac) selectedKey = addrKey(addr);
+        jumpTo(addr);
+        if (mac) refresh();
+      };
+      tr.addEventListener('click', choose);
       tr.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          jumpTo(addr);
+          choose();
         }
       });
       tbody.appendChild(tr);
@@ -338,6 +392,16 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       mutators.addWatchRanges(store, [selection.range, ...(selection.extraRanges ?? [])]);
     });
   };
+  const onRemoveSelected = (): void => {
+    const key = selectedKey;
+    const addr = store.getState().watch.watches.find((watch) => addrKey(watch) === key);
+    if (!addr) return;
+    selectedKey = null;
+    recordWatchesChange(deps.history ?? null, store, () => {
+      mutators.removeWatch(store, addr);
+    });
+    syncRemoveTool();
+  };
   const onClear = (): void => {
     recordWatchesChange(deps.history ?? null, store, () => {
       mutators.clearWatches(store);
@@ -351,7 +415,8 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     close(true);
   };
   addBtn.addEventListener('click', onAdd);
-  clearBtn.addEventListener('click', onClear);
+  removeTool?.addEventListener('click', onRemoveSelected);
+  clearBtn?.addEventListener('click', onClear);
   closeBtn.addEventListener('click', onClose);
   root.addEventListener('keydown', onKeyDown);
 
@@ -369,6 +434,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     if (visible !== lastVisible) {
       lastVisible = visible;
       root.hidden = !visible;
+      syncDock();
       if (visible) {
         refresh();
         if (restoreFocusEl) focusInitial();
@@ -394,25 +460,28 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     refresh,
     detach(): void {
       addBtn.removeEventListener('click', onAdd);
-      clearBtn.removeEventListener('click', onClear);
+      removeTool?.removeEventListener('click', onRemoveSelected);
+      clearBtn?.removeEventListener('click', onClear);
       closeBtn.removeEventListener('click', onClose);
       root.removeEventListener('keydown', onKeyDown);
       unsub();
       root.remove();
+      syncDock();
     },
     setStrings(next: Strings): void {
       strings = next;
-      title.textContent = strings.watchPanel.title;
-      addBtn.textContent = strings.watchPanel.addWatch;
-      clearBtn.textContent = strings.watchPanel.clearAll;
-      closeBtn.setAttribute('aria-label', strings.watchPanel.close);
+      title.textContent = mac ? macLabels().title : strings.watchPanel.title;
+      if (!mac) addBtn.textContent = strings.watchPanel.addWatch;
+      if (clearBtn) clearBtn.textContent = strings.watchPanel.clearAll;
+      closeBtn.setAttribute('aria-label', mac ? macLabels().close : strings.watchPanel.close);
+      labelMacTools();
       empty.textContent = strings.watchPanel.empty;
       const ths = headRow.querySelectorAll('th');
       ths.forEach((th, i) => {
         const key = headers[i];
         if (key) th.textContent = strings.watchPanel[key];
       });
-      root.setAttribute('aria-label', strings.watchPanel.title);
+      root.setAttribute('aria-label', mac ? macLabels().title : strings.watchPanel.title);
       refresh();
     },
   } as WatchPanelHandle & { setStrings(next: Strings): void };

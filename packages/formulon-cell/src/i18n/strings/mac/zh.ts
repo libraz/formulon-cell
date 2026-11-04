@@ -28,6 +28,7 @@ import { macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogZh } from './style-dialog.js';
 import { macTextToColumnsWizardZh } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macWatchWindowZh } from './watch-window.js';
 import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macZh: MacStrings = {
@@ -211,6 +212,7 @@ export const macZh: MacStrings = {
   macTextToColumnsWizard: macTextToColumnsWizardZh,
   macStyleDialog: macStyleDialogZh,
   macExternalLinksPane: macExternalLinksPaneZh,
+  macWatchWindow: macWatchWindowZh,
   macCfRulesDialog: macCfRulesDialogFrom(cellFormatZh.cfRulesDialog, {
     orderLabel: '更改规则顺序:',
     appliesToLabel: '应用于:',

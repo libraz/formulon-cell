@@ -28,6 +28,7 @@ import { macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogKo } from './style-dialog.js';
 import { macTextToColumnsWizardKo } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macWatchWindowKo } from './watch-window.js';
 import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macKo: MacStrings = {
@@ -212,6 +213,7 @@ export const macKo: MacStrings = {
   macTextToColumnsWizard: macTextToColumnsWizardKo,
   macStyleDialog: macStyleDialogKo,
   macExternalLinksPane: macExternalLinksPaneKo,
+  macWatchWindow: macWatchWindowKo,
   macCfRulesDialog: macCfRulesDialogFrom(cellFormatKo.cfRulesDialog, {
     orderLabel: '규칙 순서 변경:',
     appliesToLabel: '적용 대상:',

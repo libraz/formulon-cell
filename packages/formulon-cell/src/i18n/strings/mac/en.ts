@@ -28,6 +28,7 @@ import { macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogEn } from './style-dialog.js';
 import { macTextToColumnsWizardEn } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
+import { macWatchWindowEn } from './watch-window.js';
 import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macEn: MacStrings = {
@@ -212,6 +213,7 @@ export const macEn: MacStrings = {
   macTextToColumnsWizard: macTextToColumnsWizardEn,
   macStyleDialog: macStyleDialogEn,
   macExternalLinksPane: macExternalLinksPaneEn,
+  macWatchWindow: macWatchWindowEn,
   macCfRulesDialog: macCfRulesDialogFrom(cellFormatEn.cfRulesDialog, {
     orderLabel: 'Change rule order:',
     appliesToLabel: 'Applies to:',
