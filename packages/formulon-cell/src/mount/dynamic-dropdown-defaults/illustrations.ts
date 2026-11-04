@@ -2,6 +2,7 @@ import { selectedSessionChart } from '../../commands/chart-design.js';
 import { arrangeSessionChart } from '../../commands/session-chart.js';
 import {
   arrangeSessionIllustration,
+  arrangeStackPosition,
   createRibbonImageFromSelection,
   createRibbonShapeFromSelection,
 } from '../../commands/session-illustration.js';
@@ -152,17 +153,12 @@ export function createIllustrationDropdownDefaults(
         ? state.charts.charts.filter((item) => item.sheet === sheet)
         : state.illustrations.illustrations.filter((item) => item.sheet === sheet);
       const activeId = chart?.id ?? activeIllustrationId(instance);
-      const activeIndex = activeId
-        ? visible.findIndex((candidate) => candidate.id === activeId)
-        : -1;
-      const hasTarget = activeIndex >= 0;
+      const { hasTarget, atFront, atBack } = arrangeStackPosition(visible, activeId);
       const nativeTarget =
         !chart &&
         hasTarget &&
         state.illustrations.illustrations.find((item) => item.id === activeId)?.nativeObjectId !==
           undefined;
-      const atBack = !hasTarget || activeIndex === 0;
-      const atFront = !hasTarget || activeIndex === visible.length - 1;
       const strings = instance.i18n.strings.ribbonMenu;
       for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-arrange-action]')) {
         const action = button.dataset.arrangeAction;

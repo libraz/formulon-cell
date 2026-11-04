@@ -1,8 +1,10 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
+import { selectedSessionChart } from '../../../commands/chart-design.js';
 import { commentAt } from '../../../commands/comment.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
 import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
+import { arrangeStackPosition } from '../../../commands/session-illustration.js';
 import { activeTableOverlay } from '../../../commands/table-design.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
 import { findPivotTableAtCell } from '../../../engine/passthrough-sync.js';
@@ -343,6 +345,28 @@ export const projectMacRibbonState = (
     ['mac.insert.recommendedChart.apply', hasData],
   ] as const) {
     for (const button of buttons.get(id) ?? []) button.hidden = !shown;
+  }
+
+  // A chart moves only among the sheet's charts: nothing in front or behind it
+  // leaves the matching command off, as the desktop does for a lone chart.
+  const chartState = instance.store.getState();
+  const chart = selectedSessionChart(chartState);
+  if (chart) {
+    const charts = chartState.charts.charts.filter((item) => item.sheet === chart.sheet);
+    const { atFront, atBack } = arrangeStackPosition(charts, chart.id);
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const [id, blocked, reason] of [
+      ['objectBringForward', atFront, strings.arrangeAtFront],
+      ['objectSendBackward', atBack, strings.arrangeAtBack],
+    ] as const) {
+      for (const button of buttons.get(id) ?? []) {
+        projectDisabledState(button, blocked, reason, {
+          datasetKey: 'ribbonDisabledReason',
+          titlePrefix:
+            button.getAttribute('aria-label')?.trim() || macRibbonLabelForCommand(id, lang),
+        });
+      }
+    }
   }
 
   for (const id of MAC_CONTENT_STATE_COMMANDS) {

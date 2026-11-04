@@ -978,6 +978,22 @@ const nativeZTarget = (
   return rank < 0 || to === undefined || to === from ? null : { from, to };
 };
 
+/** Where `activeId` sits in a sheet's drawing stack, listed back to front:
+ *  whether it is in the stack, and whether nothing lies in front of or
+ *  behind it to bring it forward or send it backward past. */
+export function arrangeStackPosition(
+  stack: readonly { id: string }[],
+  activeId: string | null,
+): { hasTarget: boolean; atFront: boolean; atBack: boolean } {
+  const index = activeId === null ? -1 : stack.findIndex((item) => item.id === activeId);
+  const hasTarget = index >= 0;
+  return {
+    hasTarget,
+    atFront: !hasTarget || index === stack.length - 1,
+    atBack: !hasTarget || index === 0,
+  };
+}
+
 export function arrangeSessionIllustration(
   store: SpreadsheetStore,
   id: string,
