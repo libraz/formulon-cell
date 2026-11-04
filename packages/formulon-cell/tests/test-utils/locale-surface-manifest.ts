@@ -657,13 +657,6 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'ribbonMenu',
     'block',
   ),
-  shell(
-    'toolbar.renameSheet',
-    'toolbar/dialogs/rename-sheet.ts',
-    'showRenameSheetDialog',
-    'sheetTabs',
-    'block',
-  ),
   shell('toolbar.report', 'toolbar/dialogs/report.ts', 'showReport', 'reviewReports', 'block'),
   shell(
     'toolbar.scriptCommand',
@@ -714,6 +707,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
 
 /** Source paths that are locale-sensitive but do not use the shared shell. */
 export const LOCALE_SURFACE_MANUAL_FACTORIES: readonly LocaleSurfaceFactory[] = [
+  manual(
+    'toolbar.renameSheet',
+    'toolbar/dialogs/rename-sheet.ts',
+    'showRenameSheetDialog',
+    'sheetTabs',
+    'block',
+  ),
   manual(
     'interact.commentDialog',
     'interact/comment-dialog.ts',
