@@ -495,6 +495,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'block',
   ),
   shell(
+    'interact.macPivotMoveDialog',
+    'interact/mac-pivot-move-dialog.ts',
+    'openMacPivotMoveDialog',
+    'macPivotTableDialog',
+    'block',
+  ),
+  shell(
     'interact.macSlicerDialog',
     'interact/mac-slicer-dialog.ts',
     'attachMacSlicerDialog',

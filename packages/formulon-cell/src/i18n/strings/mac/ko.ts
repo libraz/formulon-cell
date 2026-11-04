@@ -264,6 +264,8 @@ export const macKo: MacStrings = {
   macPivotOptions: macPivotOptionsKo,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsKo.pivotTableDialog, {
     chooseConnection: '연결 선택...',
+    moveTitle: '피벗 테이블 이동',
+    moveLocation: '위치:',
   }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusKo.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusKo.ribbonMenu, {

@@ -407,6 +407,7 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'sheetViewSave',
   'pivotFieldList',
   'pivotOptions',
+  'pivotMove',
   'pivotFieldSettings',
   'pivotRefresh',
   'pivotRowHeaders',

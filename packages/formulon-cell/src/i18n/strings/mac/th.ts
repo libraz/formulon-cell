@@ -263,6 +263,8 @@ export const macTh: MacStrings = {
   macPivotOptions: macPivotOptionsTh,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
     chooseConnection: 'เลือกการเชื่อมต่อ...',
+    moveTitle: 'ย้าย PivotTable',
+    moveLocation: 'ตำแหน่ง:',
   }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusTh.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusTh.ribbonMenu, {

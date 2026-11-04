@@ -6,6 +6,10 @@ type PivotTableDialogStrings = DataObjectsStrings['pivotTableDialog'];
 export interface MacPivotTableDialogLabels {
   /** Caption of the disabled button under the external-source choice. */
   chooseConnection: string;
+  /** Title of the Move PivotTable dialog. */
+  moveTitle: string;
+  /** Caption of the Move PivotTable dialog's location field. */
+  moveLocation: string;
 }
 
 /** Overrides of `pivotTableDialog`, plus the Mac-only labels, that apply on
@@ -35,4 +39,6 @@ export const macPivotTableDialogJa: MacPivotTableDialogStrings = {
   destinationSection: 'ピボットテーブルの作成先を選択してください。',
   destination: 'テーブル/範囲:',
   chooseConnection: '接続の選択...',
+  moveTitle: 'ピボットテーブルの移動',
+  moveLocation: '場所:',
 };

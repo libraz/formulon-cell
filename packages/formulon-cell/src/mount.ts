@@ -121,6 +121,7 @@ export type {
 
 import { disposeDataTableDialog } from './interact/data-table-dialog.js';
 import { disposeMacGoalSeekDialog } from './interact/mac-goal-seek-dialog.js';
+import { disposeMacPivotMoveDialog } from './interact/mac-pivot-move-dialog.js';
 
 function normalizeScreenClipResult(result: string | ScreenClipResult | null | undefined) {
   if (!result) return null;
@@ -1214,6 +1215,7 @@ export const Spreadsheet = {
         cleanup(() => disposeMacRibbonActions(instance));
         cleanup(() => disposeMacInk(instance));
         cleanup(() => disposeMacGoalSeekDialog(instance));
+        cleanup(() => disposeMacPivotMoveDialog(instance));
         cleanup(() => disposeDataTableDialog(instance));
         cleanup(() => ribbon.dispose());
         cleanup(() => emitter.dispose());

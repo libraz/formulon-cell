@@ -263,6 +263,8 @@ export const macZh: MacStrings = {
   macPivotOptions: macPivotOptionsZh,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
     chooseConnection: '选择连接...',
+    moveTitle: '移动数据透视表',
+    moveLocation: '位置:',
   }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusZh.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusZh.ribbonMenu, {

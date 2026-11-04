@@ -46,7 +46,8 @@ describe('PivotTable contextual tabs', () => {
   it('enables the field list and leaves what the host cannot do disabled', () => {
     const byId = new Map(commands('pivotAnalyze').map((c) => [c.id, c]));
     expect(byId.get('pivotFieldList')?.disabled).toBeFalsy();
-    for (const id of ['pivotInsertSlicer', 'pivotInsertTimeline', 'pivotChart', 'pivotMove']) {
+    expect(byId.get('pivotMove')?.disabled).toBeFalsy();
+    for (const id of ['pivotInsertSlicer', 'pivotInsertTimeline', 'pivotChart']) {
       expect(byId.get(id)?.disabled, id).toBe(true);
     }
   });

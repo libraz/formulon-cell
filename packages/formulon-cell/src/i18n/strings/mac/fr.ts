@@ -265,6 +265,8 @@ export const macFr: MacStrings = {
   macPivotOptions: macPivotOptionsFr,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsFr.pivotTableDialog, {
     chooseConnection: 'Choisir la connexion...',
+    moveTitle: 'Déplacer le tableau croisé dynamique',
+    moveLocation: 'Emplacement :',
   }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusFr.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusFr.ribbonMenu, {

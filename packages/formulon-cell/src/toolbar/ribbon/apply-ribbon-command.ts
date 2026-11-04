@@ -49,6 +49,7 @@ import {
 import { fontPointsToCssPx } from '../../engine/font-units.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { FeatureFlags } from '../../extensions/index.js';
+import { openMacPivotMoveDialog } from '../../interact/mac-pivot-move-dialog.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { outlineSummaryFor } from '../../store/outline-summary.js';
 import { getPageSetup } from '../../store/store.js';
@@ -381,6 +382,9 @@ const applyGenericRibbonCommand = (
       return true;
     case 'pivotOptions':
       i.openPivotOptions();
+      return true;
+    case 'pivotMove':
+      openMacPivotMoveDialog(i);
       return true;
     case 'pivotFieldSettings':
       i.openPivotFieldSettings();

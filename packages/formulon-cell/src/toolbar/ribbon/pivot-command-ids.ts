@@ -7,7 +7,6 @@ export const PIVOT_DISABLED_COMMAND_IDS: readonly string[] = [
   'pivotInsertTimeline',
   'pivotFilterConnections',
   'pivotChangeSource',
-  'pivotMove',
   'pivotChart',
   'pivotButtons',
   'pivotHeaders',

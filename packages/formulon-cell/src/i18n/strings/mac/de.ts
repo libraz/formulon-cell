@@ -267,6 +267,8 @@ export const macDe: MacStrings = {
   macPivotOptions: macPivotOptionsDe,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsDe.pivotTableDialog, {
     chooseConnection: 'Verbindung auswählen...',
+    moveTitle: 'PivotTable verschieben',
+    moveLocation: 'Speicherort:',
   }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusDe.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusDe.ribbonMenu, {
