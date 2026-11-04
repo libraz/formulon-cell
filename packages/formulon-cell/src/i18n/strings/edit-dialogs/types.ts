@@ -35,6 +35,12 @@ export interface EditDialogsStrings {
     threadTitle?: string;
     /** Placeholder used while composing a native threaded comment. */
     threadPlaceholder?: string;
+    /** Placeholder of the card that starts a new conversation on a cell. */
+    threadStart: string;
+    /** Send button of the conversation card. */
+    send: string;
+    /** Close button of the conversation card. */
+    close: string;
     reply?: string;
     resolve?: string;
     reopen?: string;

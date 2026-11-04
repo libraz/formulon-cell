@@ -124,6 +124,80 @@ describe('attachCommentDialog', () => {
     }
   });
 
+  it('starts a Mac conversation on a floating card with author, address and send', async () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    mutators.setActive(store, { sheet: 0, row: 4, col: 7 });
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      handle.open({ mode: 'thread' });
+      const card = wrap();
+      expect(card?.classList.contains('fc-cmtnote--start')).toBe(true);
+      expect(card?.querySelector('.fc-cmtnote__start-name')?.textContent).toBe('Formulon');
+      expect(card?.querySelector('.fc-cmtnote__start-addr')?.textContent).toBe('H5');
+      expect(card?.querySelector('.fc-cmtnote__start-avatar svg')).toBeTruthy();
+      expect(card?.querySelector('.fc-cmtnote__send svg')).toBeTruthy();
+      const close = card?.querySelector<HTMLButtonElement>('.fc-cmtnote__start-close');
+      expect(close?.getAttribute('aria-label')).toBe('閉じる');
+      expect(textarea()?.placeholder).toBe('会話を始める');
+      expect(card?.querySelector<HTMLElement>('.fc-cmtnote__head')?.hidden).toBe(true);
+      expect(card?.querySelector<HTMLElement>('.fc-cmtnote__footer')?.hidden).toBe(true);
+      const send = card?.querySelector<HTMLButtonElement>('.fc-cmtnote__send');
+      expect(send?.getAttribute('aria-label')).toBe('投稿');
+      expect(send?.disabled).toBe(true);
+
+      const ta = textarea();
+      if (!ta || !send) throw new Error('composer missing');
+      ta.value = 'Please check';
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      expect(send.disabled).toBe(false);
+      send.click();
+      expect(wrap()?.hidden).toBe(true);
+      const thread = wb.getThreadedComments(0);
+      expect(thread.map((entry) => entry.text)).toEqual(['Please check']);
+      expect(wb.getPersons().find((p) => p.id === thread[0]?.personId)?.displayName).toBe(
+        'Formulon',
+      );
+      handle.detach();
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('closes the Mac conversation card from its X without posting', async () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      handle.open({ mode: 'thread' });
+      const ta = textarea();
+      if (!ta) throw new Error('textarea missing');
+      ta.value = 'draft';
+      document.querySelector<HTMLButtonElement>('.fc-cmtnote__start-close')?.click();
+      expect(wrap()?.hidden).toBe(true);
+      expect(wb.getThreadedComments(0)).toEqual([]);
+      handle.detach();
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('keeps the titled thread editor on the default profile', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      handle.open({ mode: 'thread' });
+      expect(wrap()?.classList.contains('fc-cmtnote--start')).toBe(false);
+      expect(document.querySelector<HTMLElement>('.fc-cmtnote__head')?.hidden).toBe(false);
+      expect(textarea()?.placeholder).toBe('コメントを入力');
+      handle.detach();
+    } finally {
+      wb.dispose();
+    }
+  });
+
   it('keeps the native thread editor open when a note blocks creation', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {

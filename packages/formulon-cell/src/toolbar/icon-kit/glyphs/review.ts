@@ -1,7 +1,7 @@
 /** Review, accessibility, protection and annotation icons. */
 
 import { letter } from '../letters.js';
-import { circle, ellipse, join, line, poly, rect, roundRect } from '../path.js';
+import { arc, circle, ellipse, join, line, poly, rect, roundRect } from '../path.js';
 import {
   badge,
   bars,
@@ -125,5 +125,30 @@ export const REVIEW_ICONS = {
     chainLink({ from: [5.8, 18.2], to: [10.4, 13.6] }),
     chainLink({ from: [13.6, 10.4], to: [18.2, 5.8] }),
     stroked(line([10.2, 13.8], [13.8, 10.2]), PALETTE.info, 'bold'),
+  ],
+
+  // A generic person in a circle: the author of a new conversation.
+  commentAvatar: [
+    stroked(circle(12, 12, 9.6), PALETTE.ink, 'regular'),
+    stroked(circle(12, 9.8, 3.2), PALETTE.ink, 'regular'),
+    stroked(arc(12, 20.4, 5.8, 5.8, 205, 335), PALETTE.ink, 'regular'),
+  ],
+
+  // A paper plane pointing right: post the comment.
+  commentSend: [
+    stroked(
+      poly(
+        [
+          [3, 4.6],
+          [21.2, 12],
+          [3, 19.4],
+          [6.2, 12],
+        ],
+        true,
+      ),
+      PALETTE.ink,
+      'regular',
+    ),
+    stroked(line([6.2, 12], [12.4, 12]), PALETTE.ink, 'regular'),
   ],
 } satisfies Record<string, IconDefinition>;

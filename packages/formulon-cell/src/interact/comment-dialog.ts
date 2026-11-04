@@ -10,12 +10,16 @@ import {
   setComment,
   threadedCommentsAt,
 } from '../commands/comment.js';
+import { DEFAULT_COMMENT_AUTHOR } from '../commands/comment-author.js';
 import type { History } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
+import { formatA1Cell } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -42,6 +46,9 @@ export interface CommentDialogHandle {
 
 const NOTE_W = 240;
 const NOTE_MIN_H = 132;
+// The Mac conversation card, in pt taken as px; it centres on the cell.
+const START_W = 244;
+const START_H = 104;
 const GAP = 8;
 
 /**
@@ -87,12 +94,43 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   });
   wrap.appendChild(head);
 
+  // Mac: a new conversation opens as a card headed by author, cell and close.
+  const start = document.createElement('div');
+  start.className = 'fc-cmtnote__start';
+  start.hidden = true;
+  const avatar = document.createElement('span');
+  avatar.className = 'fc-cmtnote__start-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  const avatarGlyph = createExcelRibbonSvg('commentAvatar', 'fc-cmtnote__start-glyph');
+  if (avatarGlyph) avatar.appendChild(avatarGlyph);
+  const startName = document.createElement('strong');
+  startName.className = 'fc-cmtnote__start-name';
+  const startAddr = document.createElement('span');
+  startAddr.className = 'fc-cmtnote__start-addr';
+  start.append(avatar, startName, startAddr);
+  const startClose = appendDialogIconButton(start, {
+    label: '',
+    ariaLabel: t.close,
+    title: t.close,
+    baseClass: 'fc-cmtnote__start-close',
+  });
+  wrap.appendChild(start);
+
   const textarea = document.createElement('textarea');
   textarea.className = 'fc-cmtnote__textarea';
   textarea.placeholder = t.placeholder;
   textarea.setAttribute('aria-label', t.placeholder);
   textarea.spellcheck = true;
   wrap.appendChild(textarea);
+  const sendBtn = appendDialogIconButton(wrap, {
+    label: '',
+    ariaLabel: t.send,
+    title: t.send,
+    baseClass: 'fc-cmtnote__send',
+  });
+  sendBtn.hidden = true;
+  const sendGlyph = createExcelRibbonSvg('commentSend', 'fc-cmtnote__start-glyph');
+  if (sendGlyph) sendBtn.appendChild(sendGlyph);
 
   const thread = document.createElement('div');
   thread.className = 'fc-cmtnote__thread';
@@ -123,6 +161,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   host.appendChild(wrap);
 
   let threadedMode = false;
+  let startMode = false;
   let editingThreadId: string | null = null;
   let replyingTo: string | null = null;
   const labels = {
@@ -421,14 +460,18 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     const s = store.getState();
     const a = s.selection.active;
     const hostW = host.clientWidth;
-    let left = Math.max(8, hostW / 2 - NOTE_W / 2);
+    const noteW = startMode ? START_W : NOTE_W;
+    let left = Math.max(8, hostW / 2 - noteW / 2);
     let top = 80;
     let tailLeft: number | null = null;
     try {
       const r = cellRect(layoutForView(s), s.viewport, a.row, a.col);
+      // The grid's offsetParent can be a wrapper inside the host, so measure against the host.
       const gridEl = findGrid();
-      const offX = gridEl ? gridEl.offsetLeft : 0;
-      const offY = gridEl ? gridEl.offsetTop : 0;
+      const gridBox = gridEl?.getBoundingClientRect();
+      const hostBox = host.getBoundingClientRect();
+      const offX = gridBox ? gridBox.left - hostBox.left - host.clientLeft : 0;
+      const offY = gridBox ? gridBox.top - hostBox.top - host.clientTop : 0;
       // Cell coords inside the host coordinate system.
       const cellLeft = offX + r.x;
       const cellTop = offY + r.y;
@@ -436,23 +479,23 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       // Prefer the side the sheet reads towards, and fall back to the other
       // when the note would run off the host.
       const rtl = s.ui.rightToLeft === true;
-      const preferred = rtl ? cellLeft - GAP - NOTE_W : cellLeft + r.w + GAP;
-      const fallback = rtl ? cellLeft + r.w + GAP : cellLeft - GAP - NOTE_W;
-      const preferredFits = rtl ? preferred >= 8 : preferred + NOTE_W <= hostW - 8;
+      const preferred = rtl ? cellLeft - GAP - noteW : cellLeft + r.w + GAP;
+      const fallback = rtl ? cellLeft + r.w + GAP : cellLeft - GAP - noteW;
+      const preferredFits = rtl ? preferred >= 8 : preferred + noteW <= hostW - 8;
       const leftCandidate = preferredFits ? preferred : fallback;
       const placedRight = rtl ? !preferredFits : preferredFits;
       left = Math.max(8, leftCandidate);
       // Keep the note vertically near the cell — the tail is positioned at
       // top:14 inside the note, so we line that up with the cell mid.
-      top = Math.max(8, cellMid - 14 - 6);
-      tailLeft = placedRight ? -7 : NOTE_W - 1;
+      top = Math.max(8, startMode ? cellMid - START_H / 2 : cellMid - 14 - 6);
+      tailLeft = placedRight ? -7 : noteW - 1;
     } catch {
       tailLeft = null;
     }
     wrap.style.left = `${Math.round(left)}px`;
     wrap.style.top = `${Math.round(top)}px`;
-    wrap.style.width = `${NOTE_W}px`;
-    wrap.style.minHeight = `${NOTE_MIN_H}px`;
+    wrap.style.width = `${noteW}px`;
+    wrap.style.minHeight = `${startMode ? START_H : NOTE_MIN_H}px`;
     if (tailLeft == null) {
       tail.style.display = 'none';
     } else {
@@ -463,6 +506,11 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   };
 
   okBtn.addEventListener('click', onOk);
+  sendBtn.addEventListener('click', onOk);
+  startClose.addEventListener('click', onCancel);
+  textarea.addEventListener('input', () => {
+    if (startMode) projectDisabledState(sendBtn, textarea.value.length === 0, null);
+  });
   removeBtn.addEventListener('click', onRemove);
   replyBtn.addEventListener('click', onReply);
   resolveBtn.addEventListener('click', onResolve);
@@ -486,13 +534,30 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       );
       editingThreadId = null;
       replyingTo = null;
+      startMode =
+        threadedMode &&
+        threads.length === 0 &&
+        (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac';
+      wrap.classList.toggle('fc-cmtnote--start', startMode);
+      head.hidden = startMode;
+      footer.hidden = startMode;
+      start.hidden = !startMode;
+      sendBtn.hidden = !startMode;
+      projectDisabledState(sendBtn, true, null);
+      startName.textContent = DEFAULT_COMMENT_AUTHOR;
+      startAddr.textContent = formatA1Cell(addr.row, addr.col);
       removeBtn.hidden = threadedMode ? threads.length === 0 : !current;
       replyBtn.hidden = !threadedMode || threads.length === 0;
       resolveBtn.hidden = !threadedMode || threads.length === 0;
       title.textContent = threadedMode ? labels.threadTitle : current ? t.titleEdit : t.title;
       wrap.setAttribute('aria-label', title.textContent ?? t.title);
-      textarea.placeholder = threadedMode ? labels.threadPlaceholder : t.placeholder;
-      textarea.setAttribute('aria-label', threadedMode ? labels.threadPlaceholder : t.placeholder);
+      const placeholder = startMode
+        ? t.threadStart
+        : threadedMode
+          ? labels.threadPlaceholder
+          : t.placeholder;
+      textarea.placeholder = placeholder;
+      textarea.setAttribute('aria-label', placeholder);
       error.hidden = true;
       if (threadedMode && threads.length > 0) renderThread(threads);
       else {

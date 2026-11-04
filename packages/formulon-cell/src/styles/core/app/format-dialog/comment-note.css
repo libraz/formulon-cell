@@ -177,4 +177,123 @@
     border-color: var(--fc-accent);
     filter: brightness(1.05);
   }
+
+  /* Mac conversation card: author row over a separator, then a rounded input
+     with the send icon inside it. Sizes in pt taken as px. */
+  .fc-cmtnote--start {
+    background: var(--fc-bg-elev, #ffffff);
+    color: var(--fc-fg, #1f1f1f);
+    border: 0.5px solid color-mix(in srgb, var(--fc-fg, #000) 18%, transparent);
+    border-radius: 12px;
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Hiragino Sans", var(--fc-font-ui, system-ui), sans-serif;
+    font-size: 14px;
+  }
+  .fc-cmtnote--start .fc-cmtnote__tail {
+    top: calc(50% - 6px);
+  }
+  .fc-cmtnote--start .fc-cmtnote__tail::before {
+    border-right-color: color-mix(in srgb, var(--fc-fg, #000) 18%, transparent);
+  }
+  .fc-cmtnote--start .fc-cmtnote__tail::after {
+    border-right-color: var(--fc-bg-elev, #ffffff);
+  }
+  .fc-cmtnote__start {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 52px;
+    padding: 0 11px 0 13px;
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-fg, #000) 14%, transparent);
+  }
+  .fc-cmtnote__start[hidden],
+  .fc-cmtnote__head[hidden],
+  .fc-cmtnote__footer[hidden] {
+    display: none;
+  }
+  .fc-cmtnote__start-avatar {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    color: color-mix(in srgb, var(--fc-fg, #000) 55%, transparent);
+  }
+  .fc-cmtnote__start-avatar svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .fc-cmtnote__start-name {
+    flex: 1 1 auto;
+    overflow: hidden;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .fc-cmtnote__start-addr {
+    flex: 0 0 auto;
+  }
+  .fc-cmtnote__start-close {
+    position: relative;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .fc-cmtnote__start-close::before,
+  .fc-cmtnote__start-close::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 15px;
+    height: 1.5px;
+    border-radius: 1px;
+    background: currentColor;
+    content: "";
+  }
+  .fc-cmtnote__start-close::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .fc-cmtnote__start-close::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
+  }
+  .fc-cmtnote--start .fc-cmtnote__textarea {
+    flex: 0 0 auto;
+    min-height: 30px;
+    height: 30px;
+    margin: 10px 13px 11px;
+    padding: 6px 34px 6px 8px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--fc-fg, #000) 6%, transparent);
+    line-height: 18px;
+    overflow: hidden;
+  }
+  .fc-cmtnote__send {
+    position: absolute;
+    right: 19px;
+    bottom: 17px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--fc-accent, #217346);
+    cursor: pointer;
+  }
+  .fc-cmtnote__send[hidden] {
+    display: none;
+  }
+  .fc-cmtnote__send:disabled {
+    color: color-mix(in srgb, var(--fc-fg, #000) 30%, transparent);
+    cursor: default;
+  }
+  .fc-cmtnote__send svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
 }
