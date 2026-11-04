@@ -2,6 +2,7 @@ import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
 import { pageScaleMenuText, toolbarMenuText, viewToggleMenuText } from './menu-text.js';
 import { fontFamilyCatalog, fontFamilyLocaleForStrings } from './ribbon/font-family-options.js';
 import { buildMacRibbonModel } from './ribbon/mac/model.js';
+import { buildMacObjectTabs } from './ribbon/mac/object-tabs.js';
 import { buildPivotContextualTabs } from './ribbon/pivot-tabs.js';
 
 export type RibbonTab =
@@ -913,6 +914,9 @@ export function buildRibbonModel(
   const contextualById = new Map([
     ...contextualTabs.map((tab) => [tab.id, tab] as const),
     ...buildPivotContextualTabs(profileLang, tr.tabs).map((tab) => [tab.id, tab] as const),
+    ...(opts.profile === 'excel365Mac'
+      ? buildMacObjectTabs(profileLang, tr.tabs).map((tab) => [tab.id, tab] as const)
+      : []),
   ]);
   return [
     ...requestedTabs.flatMap((id) => {

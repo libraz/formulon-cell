@@ -211,6 +211,7 @@ export const RIBBON_ACTIVE_COMMANDS: ReadonlyMap<string, keyof ActiveState> = ne
   ['middle', 'vAlignMiddle'],
   ['bottomAlign', 'vAlignBottom'],
   ['wrap', 'wrapText'],
+  ['merge', 'merged'],
   ['currency', 'currency'],
   ['percent', 'percent'],
   ['comma', 'commaStyle'],

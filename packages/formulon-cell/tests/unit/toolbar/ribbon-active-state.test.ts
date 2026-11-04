@@ -30,6 +30,7 @@ import {
   localizeBorderStyles,
   projectActiveState,
   projectRibbonActiveState,
+  RIBBON_ACTIVE_COMMANDS,
 } from '../../../src/toolbar/ribbon-active-state.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 
@@ -229,6 +230,10 @@ describe('toolbar/ribbon-active-state', () => {
 
     setRotation(instance.store.getState(), instance.store, 0);
     expect(projectActiveState(instance).textOrientation).toBe('horizontalText');
+  });
+
+  it('highlights the Merge button on any merged cell, as Excel reads it', () => {
+    expect(RIBBON_ACTIVE_COMMANDS.get('merge')).toBe('merged');
   });
 
   it('mirrors merged and merge-center state from the active cell', () => {

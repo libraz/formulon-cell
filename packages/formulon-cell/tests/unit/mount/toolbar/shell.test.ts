@@ -8,7 +8,12 @@ import {
   RIBBON_MENU_FOR_COMMAND,
 } from '../../../../src/toolbar/ribbon/activation.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
-import { dynamicDropdownNoopOverrides, seedText, stubHelpers } from './fixtures.js';
+import {
+  dynamicDropdownNoopOverrides,
+  seedText,
+  selectStoreTable,
+  stubHelpers,
+} from './fixtures.js';
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -226,6 +231,22 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.focusActiveTab()).toBe(true);
     expect(document.activeElement).toBe(host.querySelector('[data-ribbon-tab="data"]'));
 
+    tb.dispose();
+  });
+
+  it('Mac shows its own table tab for a selected table, with the table name box intact', () => {
+    selectStoreTable(sheet.instance.store);
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      platform: 'mac',
+    });
+    const tab = host.querySelector<HTMLElement>('[data-ribbon-tab="tableDesign"]');
+    expect(tab?.textContent).toBe('Table');
+    tb.setActiveTab('tableDesign');
+    expect(host.querySelector('[data-ribbon-command="tableName"]')).toBeTruthy();
+    expect(
+      host.querySelector<HTMLButtonElement>('[data-ribbon-command="tableConvertRange"]')?.disabled,
+    ).toBe(true);
     tb.dispose();
   });
 
