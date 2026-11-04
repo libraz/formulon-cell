@@ -464,6 +464,9 @@ export class GridRenderer {
     const refs = state.ui.editorRefs;
     if (!refs || refs.length === 0) return;
     const sheet = state.data.sheetIndex;
+    const macPt = this.macProfile()
+      ? fontPointsToCssPx(1) * renderScale(state.layout, state.viewport)
+      : undefined;
     for (const ref of refs) {
       const bounds = this.rangeBounds(state, {
         sheet,
@@ -472,7 +475,7 @@ export class GridRenderer {
         r1: ref.r1,
         c1: ref.c1,
       });
-      if (bounds) paintRefHighlight(this.ctx, bounds, ref.colorIndex);
+      if (bounds) paintRefHighlight(this.ctx, bounds, ref.colorIndex, macPt);
     }
   }
 

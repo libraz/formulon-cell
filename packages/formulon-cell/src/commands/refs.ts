@@ -197,6 +197,15 @@ export const REF_HIGHLIGHT_COLORS: readonly string[] = [
   '#3953c4',
 ];
 
+/** The Mac desktop's reference colours, in order of first appearance (Excel
+ *  Mac, sRGB): blue, red, purple, green. Later references cycle. */
+export const MAC_REF_HIGHLIGHT_COLORS: readonly string[] = [
+  '#306ac8',
+  '#c2343d',
+  '#8256b8',
+  '#007d1f',
+];
+
 export interface F4Result {
   text: string;
   caret: number;

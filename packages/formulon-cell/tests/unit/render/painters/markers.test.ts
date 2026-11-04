@@ -241,3 +241,66 @@ describe('render/painters — paintCommentMarker', () => {
     ]);
   });
 });
+
+describe('render/painters — paintRefHighlight (Mac desktop)', () => {
+  const spy = () => {
+    const fills: { style: string; rect: number[] }[] = [];
+    let fillStyle = '';
+    const ctx = {
+      get fillStyle() {
+        return fillStyle;
+      },
+      set fillStyle(v: string) {
+        fillStyle = v;
+      },
+      save() {},
+      restore() {},
+      strokeRect() {
+        throw new Error('the Mac frame is filled, not stroked');
+      },
+      fillRect(...rect: number[]) {
+        fills.push({ style: fillStyle, rect });
+      },
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, fills };
+  };
+
+  it('frames the range 2 pt over its gridlines, tints it and marks the corners (C3, purple)', () => {
+    // Excel (Mac, 2x): C3 spans device x 258-364 / y 110-138; the frame covers
+    // x 254-257 / 362-365 and y 106-109 / 136-139, the tint (242,238,247)
+    // starts 1 pt inside, and 5 pt handles centre 0.5 pt before each corner.
+    const s = spy();
+    paintRefHighlight(s.ctx, { x: 129, y: 55, w: 53, h: 14 }, 2, 1);
+    const frame = s.fills.filter((f) => f.style === '#8256b8');
+    const sides = frame.filter((f) => f.rect[2] !== 5 || f.rect[3] !== 5).map((f) => f.rect);
+    expect(sides).toEqual(
+      expect.arrayContaining([
+        [127, 53, 2, 17],
+        [181, 53, 2, 17],
+        [127, 53, 56, 2],
+        [127, 68, 56, 2],
+      ]),
+    );
+    const handles = frame.filter((f) => f.rect[2] === 5 && f.rect[3] === 5).map((f) => f.rect);
+    expect(handles).toEqual(
+      expect.arrayContaining([
+        [126, 52, 5, 5],
+        [179, 52, 5, 5],
+        [126, 66, 5, 5],
+        [179, 66, 5, 5],
+      ]),
+    );
+    const tint = s.fills.find((f) => f.style.startsWith('rgba('));
+    expect(tint?.style).toBe('rgba(130, 86, 184, 0.1)');
+    expect(tint?.rect).toEqual([130, 56, 50, 11]);
+  });
+
+  it('cycles blue, red, purple and green by reference order', () => {
+    const colours = [0, 1, 2, 3, 4].map((i) => {
+      const s = spy();
+      paintRefHighlight(s.ctx, { x: 0, y: 0, w: 50, h: 14 }, i, 1);
+      return s.fills.at(-1)?.style;
+    });
+    expect(colours).toEqual(['#306ac8', '#c2343d', '#8256b8', '#007d1f', '#306ac8']);
+  });
+});
