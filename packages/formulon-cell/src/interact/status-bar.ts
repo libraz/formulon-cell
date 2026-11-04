@@ -17,6 +17,8 @@ import {
   steppedZoom,
   ZOOM_MAX,
   ZOOM_MIN,
+  ZOOM_SLIDER_MAX,
+  ZOOM_SLIDER_STEP,
   zoomToSliderPosition,
 } from '../store/render-scale.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
@@ -290,7 +292,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   zoomSlider.type = 'range';
   zoomSlider.className = 'fc-host__statusbar-zoom-slider';
   zoomSlider.min = '0';
-  zoomSlider.max = '100';
+  zoomSlider.max = String(ZOOM_SLIDER_MAX);
   zoomSlider.step = '1';
   const zoomIn = createStatusBarZoomButton('+');
   const zoomLabel = document.createElement('span');
@@ -616,6 +618,20 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   zoomSlider.addEventListener('input', () => {
     setZoom(sliderPositionToZoom(Number(zoomSlider.value)));
+  });
+  // Dragging stays fine-grained; arrow keys move one desktop slider increment.
+  const SLIDER_KEY_DIRECTION: Record<string, 1 | -1> = {
+    ArrowRight: 1,
+    ArrowUp: 1,
+    ArrowLeft: -1,
+    ArrowDown: -1,
+  };
+  zoomSlider.addEventListener('keydown', (e) => {
+    const direction = SLIDER_KEY_DIRECTION[e.key];
+    if (!direction) return;
+    e.preventDefault();
+    const position = zoomToSliderPosition(store.getState().viewport.zoom);
+    setZoom(sliderPositionToZoom(position + direction * ZOOM_SLIDER_STEP));
   });
   zoomOut.addEventListener('click', () => {
     setZoom(steppedZoom(store.getState().viewport.zoom, -1));

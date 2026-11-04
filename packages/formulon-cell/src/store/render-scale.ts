@@ -28,16 +28,26 @@ export function steppedZoom(zoom: number, direction: 1 | -1): number {
   return clampZoom(next / 100);
 }
 
+/** Status-bar slider positions run 0..ZOOM_SLIDER_MAX like the desktop
+ *  slider; one increment of ZOOM_SLIDER_STEP is 9% below 100% and 30% above. */
+export const ZOOM_SLIDER_MAX = 2000;
+export const ZOOM_SLIDER_STEP = 100;
+const ZOOM_SLIDER_MID = ZOOM_SLIDER_MAX / 2;
+
 /** The status-bar slider keeps 100% at its centre: the left half spans
- *  10%..100% and the right half 100%..400%. Positions run 0..100. */
+ *  10%..100% and the right half 100%..400%. */
 export function zoomToSliderPosition(zoom: number): number {
   const z = clampZoom(zoom);
-  return z <= 1 ? ((z - ZOOM_MIN) / (1 - ZOOM_MIN)) * 50 : 50 + ((z - 1) / (ZOOM_MAX - 1)) * 50;
+  return z <= 1
+    ? ((z - ZOOM_MIN) / (1 - ZOOM_MIN)) * ZOOM_SLIDER_MID
+    : ZOOM_SLIDER_MID + ((z - 1) / (ZOOM_MAX - 1)) * ZOOM_SLIDER_MID;
 }
 
 export function sliderPositionToZoom(position: number): number {
-  const p = Math.max(0, Math.min(100, position));
+  const p = Math.max(0, Math.min(ZOOM_SLIDER_MAX, position));
   const zoom =
-    p <= 50 ? ZOOM_MIN + (p / 50) * (1 - ZOOM_MIN) : 1 + ((p - 50) / 50) * (ZOOM_MAX - 1);
+    p <= ZOOM_SLIDER_MID
+      ? ZOOM_MIN + (p / ZOOM_SLIDER_MID) * (1 - ZOOM_MIN)
+      : 1 + ((p - ZOOM_SLIDER_MID) / ZOOM_SLIDER_MID) * (ZOOM_MAX - 1);
   return clampZoom(Math.round(zoom * 100) / 100);
 }

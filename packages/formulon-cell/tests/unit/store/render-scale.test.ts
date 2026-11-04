@@ -95,12 +95,16 @@ describe('zoom stepping and the status-bar slider', () => {
     expect(steppedZoom(4, 1)).toBe(4);
   });
 
-  it('keeps 100% at the slider centre with each half linear', () => {
-    expect(zoomToSliderPosition(0.1)).toBe(0);
-    expect(zoomToSliderPosition(0.55)).toBeCloseTo(25, 9);
-    expect(zoomToSliderPosition(1)).toBe(50);
-    expect(zoomToSliderPosition(2.5)).toBe(75);
-    expect(zoomToSliderPosition(4)).toBe(100);
+  it('maps the 0..2000 slider like the desktop one: 9% per 100 below 100%, 30% above', () => {
+    const measured = [
+      10, 19, 28, 37, 46, 55, 64, 73, 82, 91, 100, 130, 160, 190, 220, 250, 280, 310, 340, 370, 400,
+    ];
+    measured.forEach((pct, i) => {
+      expect(sliderPositionToZoom(i * 100), String(i * 100)).toBe(pct / 100);
+      expect(zoomToSliderPosition(pct / 100)).toBeCloseTo(i * 100, 9);
+    });
+    expect(sliderPositionToZoom(-50)).toBe(0.1);
+    expect(sliderPositionToZoom(2500)).toBe(4);
     for (const zoom of [0.1, 0.37, 1, 1.75, 4]) {
       expect(sliderPositionToZoom(zoomToSliderPosition(zoom))).toBeCloseTo(zoom, 2);
     }

@@ -1027,14 +1027,15 @@ describe('attachStatusBar', () => {
     const slider = statusbar.querySelector<HTMLInputElement>('.fc-host__statusbar-zoom-slider');
     const label = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-zoom-label');
     expect(slider).not.toBeNull();
-    // 100% sits at the centre: 10%..100% on the left half, 100%..400% on the right.
-    expect(slider?.value).toBe('50');
+    // 100% sits at the centre of 0..2000: 10%..100% on the left, 100%..400% on the right.
+    expect([slider?.min, slider?.max, slider?.step]).toEqual(['0', '2000', '1']);
+    expect(slider?.value).toBe('1000');
     expect(slider?.getAttribute('aria-valuetext')).toBe('100%');
     expect(label?.textContent).toBe('100%');
     expect(slider?.getAttribute('aria-label')).toBe('ズーム');
 
     if (!slider) throw new Error('expected zoom slider');
-    slider.value = '75';
+    slider.value = '1500';
     slider.dispatchEvent(new Event('input'));
     expect(store.getState().viewport.zoom).toBe(2.5);
     expect(label?.textContent).toBe('250%');
@@ -1042,6 +1043,38 @@ describe('attachStatusBar', () => {
     slider.dispatchEvent(new Event('input'));
     expect(store.getState().viewport.zoom).toBe(0.1);
     expect(slider.getAttribute('aria-valuetext')).toBe('10%');
+    handle.detach();
+  });
+
+  it('moves the zoom slider by 100 units per arrow key', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    const slider = statusbar.querySelector<HTMLInputElement>('.fc-host__statusbar-zoom-slider');
+    if (!slider) throw new Error('expected zoom slider');
+    const press = (key: string): boolean =>
+      slider.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+
+    expect(press('ArrowRight')).toBe(false);
+    expect(store.getState().viewport.zoom).toBe(1.3);
+    press('ArrowUp');
+    expect(store.getState().viewport.zoom).toBe(1.6);
+    press('ArrowLeft');
+    press('ArrowLeft');
+    press('ArrowDown');
+    expect(store.getState().viewport.zoom).toBe(0.91);
+    expect(slider.value).toBe('900');
+
+    mutators.setZoom(store, 4);
+    handle.refresh();
+    press('ArrowRight');
+    expect(store.getState().viewport.zoom).toBe(4);
+    mutators.setZoom(store, 0.1);
+    handle.refresh();
+    press('ArrowLeft');
+    expect(store.getState().viewport.zoom).toBe(0.1);
     handle.detach();
   });
 
