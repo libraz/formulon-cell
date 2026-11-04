@@ -2,6 +2,23 @@ import type { ChartValueFormatter } from './types.js';
 
 const finite = (value: number): number | null => (Number.isFinite(value) ? value : null);
 
+const NUMBER_FORMAT_CACHE_LIMIT = 64;
+const numberFormats = new Map<string, Intl.NumberFormat>();
+
+/** Memoized `Intl.NumberFormat`; construction dominates per-label cost. */
+const numberFormat = (locale: string, options: Intl.NumberFormatOptions): Intl.NumberFormat => {
+  const key = JSON.stringify([locale, options]);
+  let format = numberFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(locale, options);
+    if (numberFormats.size >= NUMBER_FORMAT_CACHE_LIMIT) {
+      numberFormats.delete(numberFormats.keys().next().value as string);
+    }
+    numberFormats.set(key, format);
+  }
+  return format;
+};
+
 const formatParts = (
   formatCode: string | undefined,
 ): {
@@ -50,14 +67,14 @@ export const formatChartNumber = (
   }
   try {
     if (parts.percent) {
-      return new Intl.NumberFormat(locale || 'en-US', {
+      return numberFormat(locale || 'en-US', {
         style: 'percent',
         useGrouping: parts.grouping,
         minimumFractionDigits: parts.minimumFractionDigits,
         maximumFractionDigits: parts.maximumFractionDigits,
       }).format(finiteValue);
     }
-    const formatted = new Intl.NumberFormat(locale || 'en-US', {
+    const formatted = numberFormat(locale || 'en-US', {
       useGrouping: parts.grouping,
       minimumFractionDigits: parts.minimumFractionDigits,
       maximumFractionDigits: isGeneral ? 12 : parts.maximumFractionDigits,

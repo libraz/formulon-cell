@@ -1,6 +1,7 @@
 import type { CategoryChartView, PreparedChartData, XYChartView } from './filters.js';
 import { formatChartValue } from './format.js';
 import { resolveChartLabelPosition } from './label-options.js';
+import { clamp, finite } from './numeric.js';
 import {
   categoryIndex,
   type Domain,
@@ -23,22 +24,15 @@ import {
   normalizedMagnitudes,
   segmentsFor,
 } from './series-geometry.js';
-import { fillColor, keyColor, resolveChartStyle } from './styles.js';
+import { fillColor, keyColor, resolveChartStyle, styleFor } from './styles.js';
 import type { ChartPrimitive, ChartScene, ChartSpec, ChartValueFormatter } from './types.js';
-
-const finite = (value: number, fallback: number): number =>
-  Number.isFinite(value) ? value : fallback;
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value));
 
 /** Series-level labels override the chart-wide labels; hidden series labels stay hidden. */
 const labelSpecFor = (
   spec: ChartSpec,
   series: { readonly id: string; readonly formatCode?: string },
 ): ChartSpec['dataLabels'] => {
-  const labels =
-    spec.seriesStyles?.find((style) => style.seriesId === series.id)?.dataLabels ?? spec.dataLabels;
+  const labels = styleFor(spec, series.id)?.dataLabels ?? spec.dataLabels;
   // The percentage part derives its own code from `numberFormat`, so only value labels inherit.
   if (!labels || labels.showPercentage || !series.formatCode) return labels;
   if (labels.numberFormat !== undefined && labels.numberFormat.trim().length > 0) return labels;

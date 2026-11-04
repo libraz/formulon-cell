@@ -1,3 +1,4 @@
+import { clamp } from './numeric.js';
 import { DEFAULT_THEME_ACCENTS } from './series-colors.js';
 import type {
   ChartFillSpec,
@@ -6,9 +7,6 @@ import type {
   ChartSeriesStyleSpec,
   ChartSpec,
 } from './types.js';
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value));
 
 const transparencyOpacity = (transparency: number | undefined): number | undefined =>
   transparency === undefined || !Number.isFinite(transparency)
@@ -38,7 +36,7 @@ export interface ResolvedChartStyle {
   readonly marker: ChartMarkerSpec;
 }
 
-const styleFor = (spec: ChartSpec, seriesId: string): ChartSeriesStyleSpec | undefined =>
+export const styleFor = (spec: ChartSpec, seriesId: string): ChartSeriesStyleSpec | undefined =>
   spec.seriesStyles?.find((style) => style.seriesId === seriesId);
 
 const colorOnly = (color: string | undefined): ChartFillSpec | undefined =>

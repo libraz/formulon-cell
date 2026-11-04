@@ -1,4 +1,5 @@
 import { formatChartValue } from './format.js';
+import { clamp } from './numeric.js';
 import {
   type Domain,
   numericProjection,
@@ -7,7 +8,7 @@ import {
   yCategory,
 } from './plot-scale.js';
 import { formatTick, majorTicks, powerTicks } from './scales.js';
-import { primitive, textWidth } from './scene-primitives.js';
+import { ellipsize, primitive, textWidth } from './scene-primitives.js';
 import { isCircularKind } from './series-geometry.js';
 import type {
   ChartAxisSpec,
@@ -17,9 +18,6 @@ import type {
   ChartSpec,
   ChartValueFormatter,
 } from './types.js';
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value));
 
 /** The text an axis title shows: its own text, or `axisTitle` for Excel's automatic title. */
 export const axisTitleText = (
@@ -144,16 +142,7 @@ export const numericAxisLabelMaxWidth = (canvasWidth: number): number =>
  */
 export const boundedAxisLabel = (label: string, maxWidth = AXIS_LABEL_MAX_WIDTH): string => {
   if (label.length <= AXIS_LABEL_MAX_CHARS && textWidth(label) <= maxWidth) return label;
-  let result = '';
-  let characterCount = 0;
-  for (const character of label) {
-    if (characterCount >= AXIS_LABEL_MAX_CHARS) break;
-    const candidate = `${result}${character}…`;
-    if (textWidth(candidate) > maxWidth) break;
-    result += character;
-    characterCount += 1;
-  }
-  return result.length > 0 ? `${result}…` : '…';
+  return ellipsize(label, maxWidth, 10, AXIS_LABEL_MAX_CHARS);
 };
 
 const numericAxisLabel = (

@@ -1,3 +1,4 @@
+import { clamp, finite } from './numeric.js';
 import type {
   CategoryChartData,
   ChartGrouping,
@@ -5,12 +6,6 @@ import type {
   ChartScene,
   ChartSpec,
 } from './types.js';
-
-const finite = (value: number, fallback: number): number =>
-  Number.isFinite(value) ? value : fallback;
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value));
 
 export const isCircularKind = (kind: ChartKind): boolean => kind === 'pie' || kind === 'doughnut';
 
@@ -101,6 +96,7 @@ export const segmentsFor = (
   const result: (StackSegment | null)[][] = data.series.map(() =>
     Array.from({ length: data.categories.length }, () => null),
   );
+  const runs = data.categories.map(() => ({ positive: 0, negative: 0 }));
   for (let seriesIndex = 0; seriesIndex < data.series.length; seriesIndex += 1) {
     const series = data.series[seriesIndex];
     const target = result[seriesIndex];
@@ -120,29 +116,17 @@ export const segmentsFor = (
         scale: 1,
         total: 0,
       };
-      // Keep positive and negative accumulators separate by deriving them from
-      // preceding segments. This avoids mutating the input data model.
-      let start = 0;
-      for (let prior = 0; prior < seriesIndex; prior += 1) {
-        const priorValue = data.series[prior]?.values[pointIndex] ?? null;
-        const normalized = valueFor(priorValue);
-        if (normalized === null || normalized >= 0 !== positive) continue;
-        start = saturatedAdd(start, normalized);
-      }
+      // Running sums per category keep positive and negative runs separate.
+      const running = runs[pointIndex] as { positive: number; negative: number };
+      const start = positive ? running.positive : running.negative;
       let rendered = value;
       if (grouping === 'percent-stacked') {
         rendered = stableTotal.total === 0 ? 0 : value / stableTotal.scale / stableTotal.total;
-        start = 0;
-        for (let prior = 0; prior < seriesIndex; prior += 1) {
-          const priorValue = valueFor(data.series[prior]?.values[pointIndex] ?? null);
-          if (priorValue === null || priorValue >= 0 !== positive) continue;
-          start = saturatedAdd(
-            start,
-            stableTotal.total === 0 ? 0 : priorValue / stableTotal.scale / stableTotal.total,
-          );
-        }
       }
-      target[pointIndex] = { start, end: saturatedAdd(start, rendered), value: rendered };
+      const end = saturatedAdd(start, rendered);
+      if (positive) running.positive = end;
+      else running.negative = end;
+      target[pointIndex] = { start, end, value: rendered };
     }
   }
   return result;

@@ -1,3 +1,4 @@
+import { clamp } from './numeric.js';
 import {
   automaticAxisDomain,
   linearScale,
@@ -7,9 +8,6 @@ import {
   validateLogBase,
 } from './scales.js';
 import type { ChartAxisSpec, ChartScene, ChartSpec } from './types.js';
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value));
 
 export interface Domain {
   min: number;

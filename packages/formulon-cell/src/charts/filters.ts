@@ -28,21 +28,25 @@ const categoryIdAt = (data: CategoryChartData, index: number): string =>
 const pointIdAt = (point: XYChartData['series'][number]['points'][number], index: number): string =>
   point.id ?? `point-${index}`;
 
-const hidden = (ids: readonly string[] | undefined, id: string): boolean =>
-  ids?.includes(id) ?? false;
+const hidden = (ids: ReadonlySet<string> | undefined, id: string): boolean => ids?.has(id) ?? false;
+
+const idSet = (ids: readonly string[] | undefined): ReadonlySet<string> | undefined =>
+  ids === undefined ? undefined : new Set(ids);
 
 const prepareCategoryData = (
   data: CategoryChartData,
   filter: ChartFilterSpec | undefined,
 ): CategoryChartView => {
+  const hiddenCategories = idSet(filter?.hiddenCategoryIds);
+  const hiddenSeries = idSet(filter?.hiddenSeriesIds);
   const originalCategoryIndices = data.categories
     .map((_category, index) => index)
-    .filter((index) => !hidden(filter?.hiddenCategoryIds, categoryIdAt(data, index)));
+    .filter((index) => !hidden(hiddenCategories, categoryIdAt(data, index)));
   const originalSeriesIndices = data.series
     .map((_series, index) => index)
     .filter((index) => {
       const series = data.series[index];
-      return series !== undefined && !hidden(filter?.hiddenSeriesIds, series.id);
+      return series !== undefined && !hidden(hiddenSeries, series.id);
     });
 
   const series = originalSeriesIndices.map((originalIndex) => {
@@ -68,11 +72,13 @@ const prepareCategoryData = (
 };
 
 const prepareXYData = (data: XYChartData, filter: ChartFilterSpec | undefined): XYChartView => {
+  const hiddenCategories = idSet(filter?.hiddenCategoryIds);
+  const hiddenSeries = idSet(filter?.hiddenSeriesIds);
   const originalSeriesIndices = data.series
     .map((_series, index) => index)
     .filter((index) => {
       const series = data.series[index];
-      return series !== undefined && !hidden(filter?.hiddenSeriesIds, series.id);
+      return series !== undefined && !hidden(hiddenSeries, series.id);
     });
   const originalPointIndices: number[][] = [];
   const series = originalSeriesIndices.map((originalIndex, visibleSeriesIndex) => {
@@ -85,7 +91,7 @@ const prepareXYData = (data: XYChartData, filter: ChartFilterSpec | undefined): 
       .map((_point, index) => index)
       .filter((index) => {
         const point = source.points[index];
-        return point !== undefined && !hidden(filter?.hiddenCategoryIds, pointIdAt(point, index));
+        return point !== undefined && !hidden(hiddenCategories, pointIdAt(point, index));
       });
     originalPointIndices[visibleSeriesIndex] = indexes;
     return {

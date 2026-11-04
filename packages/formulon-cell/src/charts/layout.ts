@@ -17,6 +17,7 @@ import {
 } from './filters.js';
 import { formatChartValue } from './format.js';
 import { addLegend, legendLabels, legendPreferredWidth } from './legend.js';
+import { finite } from './numeric.js';
 import {
   axisDomain,
   categoryNumericLogBase,
@@ -43,9 +44,6 @@ import type {
   ChartValueFormatter,
   XYChartData,
 } from './types.js';
-
-const finite = (value: number, fallback: number): number =>
-  Number.isFinite(value) ? value : fallback;
 
 /** Re-attach the engine's per-point states and series formats, which the filtered view does not carry. */
 const withPointStates = (view: PreparedChartData, source: ChartData): PreparedChartData => {

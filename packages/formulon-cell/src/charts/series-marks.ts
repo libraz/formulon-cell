@@ -25,13 +25,13 @@ import {
   markerSize,
   markerVisible,
   resolveChartStyle,
+  styleFor,
 } from './styles.js';
 import type { ChartPrimitive, ChartScene, ChartSpec } from './types.js';
 
 /** Whether a line or scatter series draws Excel's smoothed line. */
 const smoothed = (spec: ChartSpec, seriesId: string): boolean =>
-  (spec.kind === 'line' || spec.kind === 'scatter') &&
-  spec.seriesStyles?.find((style) => style.seriesId === seriesId)?.smooth === true;
+  (spec.kind === 'line' || spec.kind === 'scatter') && styleFor(spec, seriesId)?.smooth === true;
 
 /**
  * Excel's smoothed line through `points`: cubic Béziers from Catmull-Rom with
