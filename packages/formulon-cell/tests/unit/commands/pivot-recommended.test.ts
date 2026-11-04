@@ -102,6 +102,21 @@ describe('Recommended PivotTables on the Mac profile', () => {
     expect(wb.getPivotDefinition(0, 0)?.cacheId).toBe(existing.cacheId);
   });
 
+  it('shares the cache when the source sheet name reads as a cell reference', async () => {
+    const deps = await setup();
+    const { wb } = deps;
+    expect(wb.renameSheet(0, 'Q1')).toBe(true);
+    const existing = createPivotTableFromRange(wb, {
+      source: SOURCE,
+      destination: { sheet: 0, row: 10, col: 6 },
+      rowField: 'Region',
+      valueField: 'Amt',
+    });
+    if (!existing.ok) throw new Error('fixture pivot failed');
+    expect(recommend(deps)).toMatchObject({ kind: 'created' });
+    expect(wb.getPivotDefinition(0, 0)?.cacheId).toBe(existing.cacheId);
+  });
+
   it('builds a new cache when none has the source', async () => {
     const deps = await setup();
     const { wb } = deps;

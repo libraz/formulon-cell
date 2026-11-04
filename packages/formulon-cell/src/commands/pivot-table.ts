@@ -1,4 +1,4 @@
-import { formatA1Range } from '../engine/address.js';
+import { formatA1Range, quoteSheetName } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { lastPivotStyleLayer, pivotStyleLayer } from '../engine/pivot-style.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
@@ -200,9 +200,6 @@ export const pivotCacheWorksheetSourceRange = (
   if (sheet < 0) return null;
   return { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 };
 };
-
-const quoteSheetName = (name: string): string =>
-  /^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) ? name : `'${name.replace(/'/g, "''")}'`;
 
 export function inferPivotSourceFields(wb: WorkbookHandle, range: Range): PivotSourceField[] {
   if (range.r1 <= range.r0 || range.c1 < range.c0) return [];
