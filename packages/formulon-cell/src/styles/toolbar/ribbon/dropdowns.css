@@ -475,14 +475,6 @@
     font-size: 11px;
   }
 
-  /* ── Border style picker variant ───────────────────────────────────────── */
-  .fc-tb__rb-select--border-style {
-    width: 72px;
-  }
-  .fc-tb__rb-select--border-style > .fc-tb__rb-dd__btn {
-    width: 100%;
-  }
-
   /* Table Name box of the Table Design tab. */
   .fc-tb__rb-input {
     display: inline-flex;

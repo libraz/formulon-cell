@@ -99,12 +99,6 @@ export const letter = (name: LetterName, options: LetterOptions): IconSegment =>
   };
 };
 
-/** Width a letterform occupies once placed at `height`. */
-export const letterWidth = (name: LetterName, height: number): number => {
-  const [, , w, h] = LETTERS[name].box;
-  return (w / h) * height;
-};
-
 const round = (value: number): number => Math.round(value * 1000) / 1000;
 
 /**

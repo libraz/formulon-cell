@@ -27,8 +27,6 @@ export const UI_LOCALE_TAGS = [
   'th-TH',
 ] as const;
 
-export type UiLocaleTag = (typeof UI_LOCALE_TAGS)[number];
-
 /** Normalize a host locale into the canonical tag used by metadata providers. */
 export function displayLocaleTag(locale: string | null | undefined): string {
   const language = (locale ?? '').trim().toLowerCase().replace(/_/g, '-').split('-')[0];

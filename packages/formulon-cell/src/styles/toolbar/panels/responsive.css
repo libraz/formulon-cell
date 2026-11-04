@@ -16,12 +16,6 @@
       display: none;
     }
 
-    .fc-tb__commandbar {
-      align-items: stretch;
-      flex-direction: column;
-      gap: 8px;
-    }
-
     .fc-tb__backstage {
       inset: 39px 0 0;
       grid-template-columns: 120px minmax(0, 1fr);

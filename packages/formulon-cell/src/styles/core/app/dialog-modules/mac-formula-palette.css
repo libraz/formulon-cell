@@ -166,7 +166,6 @@
   }
 
   .fc-mac-formula-palette__function-description,
-  .fc-mac-formula-palette__description,
   .fc-mac-formula-palette__help,
   .fc-mac-formula-palette__guard,
   .fc-mac-formula-palette__empty {
@@ -190,8 +189,7 @@
     border-block-start: 1px solid var(--fc-rule);
   }
 
-  .fc-mac-formula-palette__summary code,
-  .fc-mac-formula-palette__syntax {
+  .fc-mac-formula-palette__summary code {
     font-family: var(--fc-font-mono);
     color: var(--fc-fg-mute);
   }
@@ -220,7 +218,6 @@
     font-size: 14px;
   }
 
-  .fc-mac-formula-palette__description,
   .fc-mac-formula-palette__guard,
   .fc-mac-formula-palette__empty {
     margin: 0;

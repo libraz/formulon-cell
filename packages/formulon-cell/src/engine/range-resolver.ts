@@ -132,11 +132,6 @@ export function sheetIndexByName(wb: WorkbookHandle, name: string): number {
   return -1;
 }
 
-/** True when a list source carries a range reference rather than literal values. */
-export function isRangeSource(source: string[] | { ref: string }): source is { ref: string } {
-  return !Array.isArray(source);
-}
-
 /** Resolve a range ref to its numeric values in source order. Non-numeric
  *  cells (blank, text, bool, error) are skipped — sparklines plot a numeric
  *  series, mirroring the spreadsheet behaviour. */

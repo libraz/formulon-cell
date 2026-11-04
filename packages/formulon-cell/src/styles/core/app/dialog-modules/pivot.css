@@ -15,16 +15,6 @@
     flex: 0 1 auto;
     max-height: min(70vh, 420px);
   }
-  .fc-pivotdlg__source {
-    border: var(--fc-hairline, 1px) solid color-mix(in srgb, #5b9bd5 42%, transparent);
-    border-radius: 2px;
-    background: #eaf3f8;
-    color: #1f4e79;
-    padding: 7px 9px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    font-weight: 600;
-  }
   .fc-pivotdlg__section {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

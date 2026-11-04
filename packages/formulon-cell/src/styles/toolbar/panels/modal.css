@@ -141,24 +141,6 @@
     outline-offset: 1px;
   }
 
-  .fc-tb__modal-note {
-    margin: 0;
-    font-size: 13px;
-  }
-
-  .fc-tb__modal-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .fc-tb__report-list {
-    display: grid;
-    gap: 8px;
-    max-height: 280px;
-    overflow: auto;
-  }
-
   .fc-tb__report-item {
     display: grid;
     gap: 3px;
@@ -166,18 +148,6 @@
     background: var(--fc-tb-panel-bg);
     border: 1px solid var(--fc-tb-ribbon-line);
     border-radius: 2px;
-    font-size: 12px;
-  }
-
-  .fc-tb__sort-dialog {
-    display: grid;
-    gap: 12px;
-  }
-
-  .fc-tb__sort-dialog__check {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     font-size: 12px;
   }
 

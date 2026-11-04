@@ -252,16 +252,6 @@ export function setPageOrientation(
   return getPageSetup(store.getState(), sheet);
 }
 
-export function togglePageOrientation(
-  store: SpreadsheetStore,
-  sheet: number,
-  history: History | null = null,
-): PageSetup {
-  const current = getPageSetup(store.getState(), sheet);
-  const next: PageOrientation = current.orientation === 'portrait' ? 'landscape' : 'portrait';
-  return setPageOrientation(store, sheet, next, history);
-}
-
 export function setPaperSize(
   store: SpreadsheetStore,
   sheet: number,

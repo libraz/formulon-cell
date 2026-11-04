@@ -12,12 +12,6 @@
     font-weight: 600;
     margin: 8px 0 4px;
   }
-  .fc-goto__scope {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding-bottom: 4px;
-  }
   .fc-goto__reference {
     display: grid;
     gap: 4px;

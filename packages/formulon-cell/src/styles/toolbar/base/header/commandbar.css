@@ -1,15 +1,4 @@
 @layer fc.chrome {
-  .fc-tb__commandbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    min-height: 36px;
-    padding: 4px 12px;
-    background: var(--fc-tb-ribbon-bg);
-    border-bottom: 1px solid var(--fc-tb-line-soft);
-  }
-
   .fc-tb__btn {
     padding: 5px 11px;
     font: inherit;

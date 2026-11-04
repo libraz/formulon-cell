@@ -31,7 +31,6 @@ import { renderElements } from './session-chart-settings-tabs/elements.js';
 import { renderFilters } from './session-chart-settings-tabs/filters.js';
 import {
   type NewSeriesDraft,
-  PALETTE_PRESETS,
   renderStyles,
   type SeriesActions,
   type StylesState,
@@ -516,4 +515,3 @@ export function createSessionChartSettings(
 }
 
 export const chartSettingsDefaults = DEFAULT_LABELS;
-export const chartSettingsPalettePresets = PALETTE_PRESETS;

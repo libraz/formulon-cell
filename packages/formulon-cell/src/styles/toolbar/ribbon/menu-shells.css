@@ -1,55 +1,11 @@
 @layer fc.chrome {
-  /* Ribbon dropdown menus — generic rb-menu shell, the merge-cells menu,
-     and the conditional-formatting menu (which embeds a large iconset
-     used by data-bar / icon-set rule presets). */
-
-  .fc-tb__rb-menu {
-    position: relative;
-    display: inline-flex;
-  }
-
-  .fc-tb__rb-menu__btn {
-    gap: 1px;
-    width: 32px;
-  }
-
-  .fc-tb__rb-menu__chev {
-    width: 10px;
-    height: 10px;
-    color: var(--fc-tb-fg-soft);
-  }
-
-  .fc-tb__merge-menu {
-    width: 206px;
-    padding: 3px 0;
-  }
-
-  .fc-tb__merge-menu__item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    min-height: 28px;
-    padding: 4px 12px 4px 20px;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    white-space: nowrap;
-    cursor: pointer;
-  }
+  /* Ribbon dropdown menus — the merge-cells menu hover state and the shared
+     dynamic-dropdown shell. */
 
   .fc-tb__merge-menu__item:hover,
   .fc-tb__merge-menu__item:focus-visible {
     background: var(--fc-tb-ribbon-hover);
     outline: none;
-  }
-
-  .fc-tb__merge-menu__item svg {
-    width: 17px;
-    height: 17px;
-    color: #185abd;
   }
 
   /* Shared menu shell used by dynamic ribbon dropdowns. */

@@ -412,19 +412,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .fc-tb__rb--bold {
-    font-weight: 700;
-  }
-  .fc-tb__rb--italic {
-    font-style: italic;
-  }
-  .fc-tb__rb--underline {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .fc-tb__rb--strike {
-    text-decoration: line-through;
-  }
 
   /* A collapsed ribbon opens over the worksheet without resizing its viewport. */
   .fc-tb__ribbon-shell--peek > .fc-tb__ribbon:not([hidden]) {

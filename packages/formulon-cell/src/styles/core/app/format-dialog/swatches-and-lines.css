@@ -304,28 +304,8 @@
     background: var(--fc-fmtdlg-list-selected-bg);
     outline: 1px solid var(--fc-fmtdlg-chip-checked-border);
   }
-  .fc-fmtdlg__line-sample {
-    display: block;
-    width: 100%;
-    border-top: 1px solid currentColor;
-  }
   .fc-fmtdlg__line-sample-svg {
     display: block;
     width: 100%;
-  }
-  .fc-fmtdlg__line-style--medium .fc-fmtdlg__line-sample {
-    border-top-width: 2px;
-  }
-  .fc-fmtdlg__line-style--thick .fc-fmtdlg__line-sample {
-    border-top-width: 3px;
-  }
-  .fc-fmtdlg__line-style--dashed .fc-fmtdlg__line-sample {
-    border-top-style: dashed;
-  }
-  .fc-fmtdlg__line-style--dotted .fc-fmtdlg__line-sample {
-    border-top-style: dotted;
-  }
-  .fc-fmtdlg__line-style--double .fc-fmtdlg__line-sample {
-    border-top: 3px double currentColor;
   }
 }

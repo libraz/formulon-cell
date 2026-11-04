@@ -423,7 +423,6 @@ export const ValueKind = {
   Ref: 6,
   Lambda: 7,
 } as const;
-export type ValueKindT = (typeof ValueKind)[keyof typeof ValueKind];
 
 /** A1-style cell coordinate. Zero-indexed. */
 export interface Addr {

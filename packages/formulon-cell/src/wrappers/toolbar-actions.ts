@@ -11,26 +11,15 @@ import {
 } from '../commands/auto-sum.js';
 import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
-import type { ConditionalPresetAction } from '../commands/conditional-format.js';
-import { applyConditionalPresetAction } from '../commands/conditional-format.js';
 import { recordRecentFunction } from '../commands/function-history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import {
-  applyFreezeMode,
-  type FreezeMode,
-  hiddenExtentInSelection,
-  hideCols,
-  hideRows,
-  showColsAroundSelection,
-  showRowsAroundSelection,
-} from '../commands/row-col-layout.js';
+import { applyFreezeMode, type FreezeMode } from '../commands/row-col-layout.js';
 import { addSheet, removeSheet } from '../commands/sheet-mutate.js';
-import { recordConditionalRulesChange } from '../commands/slice-history.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { mutators } from '../store/store.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
-import { applyMergeAction, type MergeAction } from '../toolbar/merge-action.js';
+import type { MergeAction } from '../toolbar/merge-action.js';
 
 export type AutoSumAction = AutoSumFunction | 'MORE';
 
@@ -51,24 +40,6 @@ export type PasteAction =
 
 export type CellInsertAction = 'shiftDown' | 'shiftRight' | 'rows' | 'cols' | 'sheet';
 export type CellDeleteAction = 'shiftUp' | 'shiftLeft' | 'rows' | 'cols' | 'sheet';
-
-export type WindowAction = 'hideRows' | 'showRows' | 'hideCols' | 'showCols';
-
-export type ConditionalMenuAction =
-  | ConditionalPresetAction
-  | 'new-rule'
-  | 'manage'
-  | 'highlight-more'
-  | 'top-bottom-more'
-  | 'data-bars-more'
-  | 'color-scales-more'
-  | 'icon-sets-more'
-  | 'cell-greater'
-  | 'cell-less'
-  | 'cell-between'
-  | 'cell-equal'
-  | 'text-contains'
-  | 'date-occurring';
 
 /** Routes a ribbon Copy/Cut/Paste click through the same `runShortcut` the
  *  keyboard router uses, so React/Vue hosts using `createDefaultRibbonHooks`
@@ -138,22 +109,6 @@ export const handlePasteAction = (
   if (preset) instance.pasteSpecial(preset);
 };
 
-export const handleMergeAction = async (
-  instance: SpreadsheetInstance | null,
-  action: MergeAction,
-): Promise<void> => {
-  if (!instance) return;
-  await applyMergeAction(
-    {
-      store: instance.store,
-      workbook: instance.workbook,
-      history: instance.history,
-      strings: instance.i18n.strings,
-    },
-    action,
-  );
-};
-
 export const handleFreezeAction = (
   instance: SpreadsheetInstance | null,
   action: FreezeAction,
@@ -210,25 +165,25 @@ export const handleAutoSumAction = (
   return handleAutoSum(instance, action);
 };
 
-export const insertSelectedRows = (instance: SpreadsheetInstance | null): void => {
+const insertSelectedRows = (instance: SpreadsheetInstance | null): void => {
   if (!instance) return;
   const r = instance.store.getState().selection.range;
   insertRows(instance.store, instance.workbook, instance.history, r.r0, r.r1 - r.r0 + 1);
 };
 
-export const deleteSelectedRows = (instance: SpreadsheetInstance | null): void => {
+const deleteSelectedRows = (instance: SpreadsheetInstance | null): void => {
   if (!instance) return;
   const r = instance.store.getState().selection.range;
   deleteRows(instance.store, instance.workbook, instance.history, r.r0, r.r1 - r.r0 + 1);
 };
 
-export const insertSelectedCols = (instance: SpreadsheetInstance | null): void => {
+const insertSelectedCols = (instance: SpreadsheetInstance | null): void => {
   if (!instance) return;
   const r = instance.store.getState().selection.range;
   insertCols(instance.store, instance.workbook, instance.history, r.c0, r.c1 - r.c0 + 1);
 };
 
-export const deleteSelectedCols = (instance: SpreadsheetInstance | null): void => {
+const deleteSelectedCols = (instance: SpreadsheetInstance | null): void => {
   if (!instance) return;
   const r = instance.store.getState().selection.range;
   deleteCols(instance.store, instance.workbook, instance.history, r.c0, r.c1 - r.c0 + 1);
@@ -290,107 +245,4 @@ export const handleDeleteCellsAction = (
     r,
     action === 'shiftUp' ? 'up' : 'left',
   );
-};
-
-export const handleWindowAction = (
-  instance: SpreadsheetInstance | null,
-  action: WindowAction,
-): void => {
-  if (!instance) return;
-  const r = instance.store.getState().selection.range;
-  if (action === 'hideRows') {
-    hideRows(instance.store, instance.history, r.r0, r.r1, instance.workbook);
-  } else if (action === 'showRows') {
-    showRowsAroundSelection(instance.store, instance.history, r.r0, r.r1, instance.workbook);
-  } else if (action === 'hideCols') {
-    hideCols(instance.store, instance.history, r.c0, r.c1, instance.workbook);
-  } else {
-    showColsAroundSelection(instance.store, instance.history, r.c0, r.c1, instance.workbook);
-  }
-};
-
-/** Mirrors the toolbar's "hide/show rows" toggle: if any rows in the
- *  selection are already hidden, restore them; otherwise hide the lot. */
-export const toggleSelectedRowsHidden = (instance: SpreadsheetInstance | null): void => {
-  if (!instance) return;
-  const s = instance.store.getState();
-  const r = s.selection.range;
-  if (hiddenExtentInSelection(s.layout, 'row', r.r0, r.r1) !== null) {
-    showRowsAroundSelection(instance.store, instance.history, r.r0, r.r1, instance.workbook);
-  } else {
-    hideRows(instance.store, instance.history, r.r0, r.r1, instance.workbook);
-  }
-};
-
-export const toggleSelectedColsHidden = (instance: SpreadsheetInstance | null): void => {
-  if (!instance) return;
-  const s = instance.store.getState();
-  const r = s.selection.range;
-  if (hiddenExtentInSelection(s.layout, 'col', r.c0, r.c1) !== null) {
-    showColsAroundSelection(instance.store, instance.history, r.c0, r.c1, instance.workbook);
-  } else {
-    hideCols(instance.store, instance.history, r.c0, r.c1, instance.workbook);
-  }
-};
-
-export const handleConditionalAction = (
-  instance: SpreadsheetInstance | null,
-  action: ConditionalMenuAction,
-): void => {
-  if (!instance) return;
-  if (action === 'new-rule') {
-    instance.openConditionalDialog({ mode: 'new' });
-    return;
-  }
-  if (action === 'cell-greater') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'cell-value', cellValueOp: '>' });
-    return;
-  }
-  if (action === 'cell-less') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'cell-value', cellValueOp: '<' });
-    return;
-  }
-  if (action === 'cell-between') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'cell-value', cellValueOp: 'between' });
-    return;
-  }
-  if (action === 'cell-equal') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'cell-value', cellValueOp: '=' });
-    return;
-  }
-  if (action === 'text-contains') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'text-contains' });
-    return;
-  }
-  if (action === 'date-occurring') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'date-occurring', datePeriod: 'today' });
-    return;
-  }
-  if (action === 'manage') {
-    instance.openCfRulesDialog();
-    return;
-  }
-  if (action === 'highlight-more') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'cell-value' });
-    return;
-  }
-  if (action === 'top-bottom-more') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'top-bottom' });
-    return;
-  }
-  if (action === 'data-bars-more') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'data-bar' });
-    return;
-  }
-  if (action === 'color-scales-more') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'color-scale' });
-    return;
-  }
-  if (action === 'icon-sets-more') {
-    instance.openConditionalDialog({ mode: 'new', kind: 'icon-set' });
-    return;
-  }
-  recordConditionalRulesChange(instance.history, instance.store, () => {
-    applyConditionalPresetAction(instance.store, action);
-  });
 };

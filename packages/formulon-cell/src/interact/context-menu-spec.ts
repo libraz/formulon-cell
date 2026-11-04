@@ -138,8 +138,6 @@ export type MenuContainerId =
   | 'pivotExpandMenu'
   | 'pivotMoveMenu';
 
-export type ContextMenuItemId = ItemId | MenuContainerId;
-
 export type MenuKind = 'cell' | 'row' | 'col';
 
 /** Plain insert entries. While a copy is pending the desktop menus replace

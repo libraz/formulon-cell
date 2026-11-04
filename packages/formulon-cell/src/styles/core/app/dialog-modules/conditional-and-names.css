@@ -407,12 +407,6 @@
   .fc-namedlg__row {
     font-size: 12px;
   }
-  .fc-namedlg__form {
-    display: grid;
-    grid-template-columns: minmax(120px, 0.85fr) minmax(220px, 1.5fr) auto;
-    gap: 8px;
-    align-items: center;
-  }
   .fc-namedlg-editor__panel {
     width: min(92vw, 440px);
     max-width: 440px;

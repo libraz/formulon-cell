@@ -1,7 +1,5 @@
 import type {
   CellBatchCommand,
-  InteractionOperation,
-  InteractionOrigin,
   OperationIntent,
   PermissionDecision,
 } from '../commands/interaction-policy.js';
@@ -79,19 +77,3 @@ export type ContextMenuOptions =
       /** The library suppresses its/browser menu and gives the host the context. */
       readonly onOpen: (context: ContextMenuContext) => void;
     };
-
-/**
- * The command origin used for built-in context-menu requests. Kept exported so
- * host command builders can use the same finite origin vocabulary as the
- * interaction policy without widening it to an arbitrary string.
- */
-export type ContextMenuCommandOrigin = Extract<InteractionOrigin, 'contextMenu'>;
-
-/** The operation set a custom cell-batch command may request. */
-export type ContextMenuCommandOperation =
-  | Extract<InteractionOperation, 'valueEdit'>
-  | Extract<InteractionOperation, 'formulaEdit'>
-  | Extract<InteractionOperation, 'clear'>
-  | Extract<InteractionOperation, 'paste'>
-  | Extract<InteractionOperation, 'fill'>
-  | Extract<InteractionOperation, 'moveCells'>;

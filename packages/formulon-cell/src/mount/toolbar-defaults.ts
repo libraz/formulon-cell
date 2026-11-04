@@ -575,14 +575,6 @@ export function createDefaultRibbonHooks(
   };
 }
 
-/** Default backstage view — an empty div. Hosts that want a full file menu
- *  pass their own `createBackstageView` to `mountToolbar`. */
-export function createDefaultBackstageView(_instance: SpreadsheetInstance): HTMLElement {
-  const placeholder = document.createElement('div');
-  placeholder.className = 'fc-tb__backstage fc-tb__backstage--placeholder';
-  return placeholder;
-}
-
 /** Re-exports so consumers can grab text dictionaries without reaching into
  *  the toolbar subfolder by hand. */
 export { backstageMenuText, pageScaleMenuText, toolbarMenuText, toolbarText };

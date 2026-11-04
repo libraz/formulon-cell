@@ -59,8 +59,6 @@ const mapIndexForStructureEvent = (
   };
 };
 
-export const sheetIndexMapperForStructureEvent = mapIndexForStructureEvent;
-
 interface RemappedAddressMap<T> {
   readonly map: Map<string, T>;
   readonly changed: boolean;

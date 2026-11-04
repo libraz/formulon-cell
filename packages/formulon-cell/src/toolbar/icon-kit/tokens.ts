@@ -7,9 +7,6 @@
  * belongs here first.
  */
 
-/** Every icon is authored on a 24x24 viewBox. */
-export const CANVAS = 24;
-
 /** Optical centre of the canvas. Every glyph's inked box is centred here. */
 export const CENTER = 12;
 
@@ -24,9 +21,6 @@ export const OPTICAL = 20;
 
 /** Reduced optical size for a glyph that carries a corner badge. */
 export const OPTICAL_BADGED = 17;
-
-/** Nothing may ink outside this inset, so icons never clip when scaled down. */
-export const SAFE_INSET = 1;
 
 /**
  * Stroke widths, in canvas units. Five steps only — the previous hand-authored
@@ -116,5 +110,3 @@ export const PALETTE = {
   scaleMid: '#ffeb84',
   scaleLow: '#f8696b',
 } as const;
-
-export type PaletteColor = (typeof PALETTE)[keyof typeof PALETTE];

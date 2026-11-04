@@ -91,17 +91,6 @@ export const place = (
   }));
 };
 
-/** A box of the given size centred on the canvas. */
-export const centeredBox = (
-  w: number,
-  h: number = w,
-): { x: number; y: number; w: number; h: number } => ({
-  x: CENTER - w / 2,
-  y: CENTER - h / 2,
-  w,
-  h,
-});
-
 // ---------------------------------------------------------------------------
 // Arrows
 // ---------------------------------------------------------------------------
@@ -544,8 +533,6 @@ export const star = (cx: number, cy: number, outer: number, inner: number): stri
 // ---------------------------------------------------------------------------
 // Sheet / table
 // ---------------------------------------------------------------------------
-
-export type SheetBands = readonly SheetBand[];
 
 export type SheetBand = {
   axis: 'row' | 'col';

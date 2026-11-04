@@ -931,22 +931,6 @@ export function gateProtection(state: State, range: Range): Range | null {
     : null;
 }
 
-/** Subset of `range` that survives the per-cell protection gate. Yields
- *  every writable address; an empty iterator means the entire range is
- *  blocked. Used by format / paste paths that need to skip locked cells
- *  while still touching unlocked ones. */
-export function* writableAddrs(state: State, range: Range): IterableIterator<Addr> {
-  const protectedSheet = isSheetProtected(state, range.sheet);
-  for (let r = range.r0; r <= range.r1; r += 1) {
-    for (let c = range.c0; c <= range.c1; c += 1) {
-      const addr: Addr = { sheet: range.sheet, row: r, col: c };
-      if (!protectedSheet || !isCellLocked(state, addr) || isAddrInAllowedEditRange(state, addr)) {
-        yield addr;
-      }
-    }
-  }
-}
-
 /** Set the `locked` flag across a range. `locked === undefined` is the
  *  desktop default (treated as locked); pass `false` to opt cells out, or
  *  `true` to make the lock explicit. NOT gated by sheet protection — the

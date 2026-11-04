@@ -22,7 +22,6 @@ export interface CommentEntry {
 }
 
 export type ThreadedCommentEntry = EngineThreadedComment;
-export type ThreadedPersonEntry = EnginePerson;
 
 export interface ThreadedMutationAuthorization {
   origin?: InteractionOrigin;

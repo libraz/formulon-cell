@@ -1,11 +1,5 @@
 import type { Status, Value, Workbook } from './types.js';
 
-/** The common `{ status, index }` shape returned by mutating helpers. */
-export interface IndexResult {
-  status: Status;
-  index: number;
-}
-
 /**
  * The npm/native 0.12 Workbook surface already declares the complete pivot
  * mutation API. Keep this type as a small adapter boundary for the two
