@@ -283,7 +283,7 @@
     grid-column: 1 / -1;
   }
   .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-cfrulesdlg__appliesto[data-disabled="true"]
+    .fc-cfrulesdlg__appliesto:has(input:disabled)
     > :first-child {
     color: var(--fc-fg-mute, GrayText);
   }

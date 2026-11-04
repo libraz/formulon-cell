@@ -187,11 +187,61 @@ export function createHeaderFooterTab(
   on(differentOddEven.input, 'change', syncVariantRows);
   syncVariantRows();
 
+  // The Mac tab stacks each pop-up over a preview of the three slots, puts
+  // both custom buttons on one row between the halves and lists the options
+  // in a single untitled column.
+  const previews: { el: HTMLDivElement; triple: typeof headerTriple }[] = [];
+  const makePreview = (triple: typeof headerTriple): HTMLDivElement => {
+    const el = document.createElement('div');
+    el.className = 'fc-pgsetup__hf-preview';
+    el.setAttribute('aria-hidden', 'true');
+    el.append(
+      document.createElement('span'),
+      document.createElement('span'),
+      document.createElement('span'),
+    );
+    previews.push({ el, triple });
+    return el;
+  };
+  const syncPreviews = (): void => {
+    for (const { el, triple } of previews) {
+      const [left, center, right] = Array.from(el.children);
+      if (left) left.textContent = triple.leftInput.value;
+      if (center) center.textContent = triple.centerInput.value;
+      if (right) right.textContent = triple.rightInput.value;
+    }
+  };
+  const macParts: HTMLElement[] = [];
+  if (mac) {
+    panel.classList.add('fc-pgsetup__tab--mac');
+    headerPreset.row.classList.add('fc-pgsetup__preset-row--mac');
+    footerPreset.row.classList.add('fc-pgsetup__preset-row--mac');
+    headerFooterOptionsRow.classList.add('fc-pgsetup__hf-options--mac');
+    const buttons = document.createElement('div');
+    buttons.className = 'fc-pgsetup__hf-buttons';
+    buttons.append(headerPreset.customButton, footerPreset.customButton);
+    macParts.push(
+      headerPreset.row,
+      makePreview(headerTriple),
+      headerTriple.legendRow,
+      buttons,
+      footerPreset.row,
+      makePreview(footerTriple),
+      footerTriple.legendRow,
+    );
+    for (const triple of [headerTriple, footerTriple]) {
+      for (const input of [triple.leftInput, triple.centerInput, triple.rightInput]) {
+        on(input, 'input', syncPreviews);
+      }
+    }
+    on(headerPreset.select, 'change', syncPreviews);
+    on(footerPreset.select, 'change', syncPreviews);
+  }
+
   panel.append(
-    headerPreset.row,
-    headerTriple.legendRow,
-    footerPreset.row,
-    footerTriple.legendRow,
+    ...(mac
+      ? macParts
+      : [headerPreset.row, headerTriple.legendRow, footerPreset.row, footerTriple.legendRow]),
     headerFooterOptionsRow,
     firstHeaderTriple.legendRow,
     firstFooterTriple.legendRow,
@@ -253,6 +303,7 @@ export function createHeaderFooterTab(
               ? 'path'
               : 'custom';
       syncSlotVisibility();
+      syncPreviews();
     },
     collect() {
       return {

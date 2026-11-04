@@ -2,6 +2,7 @@
 // and first page number.
 import type { PageOrientation, PageSetup, PaperSize, PrintQuality } from '../../store/store.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
+import { createExcelRibbonSvg } from '../../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../../toolbar/menu-a11y.js';
 import { appendDialogButton } from '../dialog-shell.js';
 import { makeNumberInput, makeRow, makeTextInput } from '../page-setup-dialog-dom.js';
@@ -64,11 +65,12 @@ export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): 
       input.value = o;
       const text = document.createElement('span');
       text.textContent = o === 'portrait' ? t.orientPortrait : t.orientLandscape;
-      const icon = document.createElement('span');
-      icon.className = 'fc-pgsetup__orient-icon';
-      icon.dataset.orientation = o;
-      icon.setAttribute('aria-hidden', 'true');
-      label.append(icon, input, text);
+      const icon = createExcelRibbonSvg(
+        o === 'portrait' ? 'pageOrientationPortrait' : 'pageOrientationLandscape',
+        'fc-pgsetup__orient-icon',
+      );
+      if (icon) label.append(icon);
+      label.append(input, text);
       orientRow.valueCell.appendChild(label);
       orientRadios.set(o, input);
       on(input, 'change', () => {
@@ -137,7 +139,7 @@ export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): 
   // The Mac dialog stacks each heading over its controls and disables the
   // fields of the scaling choice that is not selected.
   if (mac) {
-    panel.classList.add('fc-pgsetup__page--mac');
+    panel.classList.add('fc-pgsetup__tab--mac');
     orientRow.row.classList.add('fc-pgsetup__section', 'fc-pgsetup__orientation');
     scalingRow.classList.add('fc-pgsetup__section');
   }

@@ -170,7 +170,6 @@ describe('attachCfRulesDialog on the Mac profile', () => {
   it('renders the Applies to editor disabled until a rule is selected', () => {
     const empty = open([]);
     const row = q<HTMLElement>('.fc-cfrulesdlg__appliesto');
-    expect(row.dataset.disabled).toBe('true');
     const input = q<HTMLInputElement>('.fc-cfrulesdlg__appliesto input');
     expect(input.disabled).toBe(true);
     const buttons = [...row.querySelectorAll<HTMLButtonElement>('button')];
@@ -187,7 +186,6 @@ describe('attachCfRulesDialog on the Mac profile', () => {
     document.body.appendChild(host);
 
     const { handle } = open([rule()]);
-    expect(q<HTMLElement>('.fc-cfrulesdlg__appliesto').dataset.disabled).toBe('false');
     expect(q<HTMLInputElement>('.fc-cfrulesdlg__appliesto input').disabled).toBe(false);
     // Range editing is not wired, so the cancel / commit / picker controls stay disabled.
     expect(

@@ -9,6 +9,7 @@ import { FORMAT_ICONS } from './format.js';
 import { FORMULA_ICONS } from './formulas.js';
 import { MAC_ICONS } from './mac.js';
 import { MEDIA_ICONS } from './media.js';
+import { PAGE_SETUP_ICONS } from './page-setup.js';
 import { PIVOT_ICONS } from './pivot.js';
 import { REVIEW_ICONS } from './review.js';
 import { SORT_FILTER_ICONS } from './sort-filter.js';
@@ -32,6 +33,7 @@ export const RIBBON_GLYPHS = {
   ...MEDIA_ICONS,
   ...MAC_ICONS,
   ...PIVOT_ICONS,
+  ...PAGE_SETUP_ICONS,
   ...REVIEW_ICONS,
   ...VIEW_ICONS,
   ...FILE_ICONS,

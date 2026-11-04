@@ -102,11 +102,11 @@
   /* Excel for Mac, Page tab: each bold heading sits over its controls with a
    * separator between sections, orientation radios follow page icons, and
    * 先頭ページ番号: stays on one line with a short field. */
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac .fc-pgsetup__row {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac .fc-pgsetup__row {
     grid-template-columns: auto 1fr;
     justify-content: start;
   }
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac .fc-pgsetup__section {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac .fc-pgsetup__section {
     grid-template-columns: 1fr;
     gap: 10px;
     padding-block: 12px;
@@ -114,67 +114,287 @@
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
   }
   .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pgsetup__page--mac
+    .fc-pgsetup__tab--mac
     .fc-pgsetup__section
     > :first-child {
     font-weight: 600;
   }
   .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pgsetup__page--mac
+    .fc-pgsetup__tab--mac
     .fc-pgsetup__section
     > .fc-pgsetup__value {
     padding-inline-start: 12px;
   }
   .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pgsetup__page--mac
+    .fc-pgsetup__tab--mac
     .fc-pgsetup__orientation
     > .fc-pgsetup__value {
     padding-inline-start: 48px;
   }
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac .fc-pgsetup__text {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac .fc-pgsetup__text {
     flex: 0 0 90px;
   }
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac .fc-pgsetup__orient-icon {
-    position: relative;
-    display: inline-block;
-    width: 18px;
-    height: 24px;
-    margin-inline-end: 10px;
-    border: var(--fc-hairline, 1px) solid color-mix(in srgb, CanvasText 45%, transparent);
-    background:
-      repeating-linear-gradient(
-        to bottom,
-        transparent 0 3px,
-        color-mix(in srgb, CanvasText 35%, transparent) 3px 4px
-      )
-      3px 5px / calc(100% - 6px) calc(100% - 9px) no-repeat,
-      var(--fc-bg-elev, Canvas);
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac .fc-pgsetup__orient-icon {
+    width: 44px;
+    height: 44px;
+    margin-inline-end: 6px;
   }
   .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pgsetup__page--mac
-    .fc-pgsetup__orient-icon[data-orientation="landscape"] {
-    background:
-      repeating-linear-gradient(
-        to right,
-        transparent 0 3px,
-        color-mix(in srgb, CanvasText 35%, transparent) 3px 4px
-      )
-      4px 3px / calc(100% - 8px) calc(100% - 6px) no-repeat,
-      var(--fc-bg-elev, Canvas);
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pgsetup__page--mac
+    .fc-pgsetup__tab--mac
     .fc-pgsetup__row:not(.fc-pgsetup__section)
     > :first-child {
     font-weight: 400;
   }
   .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pgsetup__page--mac
+    .fc-pgsetup__tab--mac
     .fc-pgsetup__orientation
     .fc-fmtdlg__check {
     margin-inline-end: 48px;
   }
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac input:disabled {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac input:disabled {
     opacity: 0.5;
+  }
+  /* Excel for Mac, 余白 tab: the six fields sit around a page preview. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins-row--mac {
+    grid-template-columns: 1fr;
+    padding-bottom: 12px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins-row--mac > .fc-pgsetup__value {
+    justify-content: center;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins-row--mac > :first-child {
+    display: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins--mac {
+    width: auto;
+    grid-template-columns: repeat(3, auto);
+    grid-template-areas:
+      ". top header"
+      "left preview right"
+      ". bottom footer";
+    justify-content: center;
+    align-items: center;
+    gap: 14px 22px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins--mac [data-margin="top"] {
+    grid-area: top;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins--mac [data-margin="right"] {
+    grid-area: right;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins--mac [data-margin="bottom"] {
+    grid-area: bottom;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins--mac [data-margin="left"] {
+    grid-area: left;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins--mac [data-margin="header"] {
+    grid-area: header;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins--mac [data-margin="footer"] {
+    grid-area: footer;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins--mac .fc-pgsetup__margin {
+    display: grid;
+    gap: 4px;
+    color: var(--fc-fg-strong, CanvasText);
+    font-size: 12px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margins--mac .fc-pgsetup__num {
+    width: 71px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margin-preview {
+    grid-area: preview;
+    justify-self: center;
+    width: 114px;
+    height: 114px;
+  }
+  /* The preview is drawn large; its rules keep a 1 px weight like the desktop art. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__margin-preview path {
+    vector-effect: non-scaling-stroke;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac .fc-pgsetup__center-row--mac {
+    border-bottom: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__tab--mac
+    .fc-pgsetup__center-row--mac
+    > :first-child {
+    font-weight: 400;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__center-row--mac .fc-pgsetup__center {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-inline-start: 12px;
+  }
+  /* Excel for Mac, ヘッダー/フッター tab. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac .fc-pgsetup__preset-row--mac {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding-bottom: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__preset-row--mac > :first-child {
+    font-weight: 400;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__preset-row--mac .fc-pgsetup__select,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__preset-row--mac .fc-select {
+    width: 100%;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__hf-preview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: center;
+    height: 47px;
+    margin: 6px 16px 0;
+    padding: 0 8px;
+    border: 1px solid color-mix(in srgb, CanvasText 85%, transparent);
+    background: var(--fc-bg-elev, Canvas);
+    font-size: 11px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__hf-preview > :nth-child(2) {
+    text-align: center;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__hf-preview > :nth-child(3) {
+    text-align: right;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__hf-buttons {
+    display: flex;
+    justify-content: space-between;
+    padding: 18px 16px 12px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac .fc-pgsetup__hf-options--mac {
+    grid-template-columns: 1fr;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__hf-options--mac > :first-child {
+    display: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__hf-options--mac .fc-pgsetup__checks {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__hf-options--mac .fc-fmtdlg__check {
+    min-height: 22px;
+    padding-block: 0;
+  }
+  /* Excel for Mac, シート tab: headed groups with separators, fields carry
+   * their picker inside, コメント: sits right of 枠線. */
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__row:not(.fc-pgsetup__section) {
+    grid-template-columns: auto 1fr;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__row:not(.fc-pgsetup__section)
+    > :first-child {
+    font-weight: 400;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-area
+    > :first-child {
+    min-width: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-title
+    > :first-child,
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-comments
+    > :first-child {
+    min-width: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-order
+    .fc-fmtdlg__check,
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-options
+    .fc-fmtdlg__check {
+    min-height: 22px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-comments.fc-pgsetup__row {
+    grid-template-columns: auto minmax(0, 210px);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-pgsetup__sheet-area,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-pgsetup__sheet-group-end {
+    padding-bottom: 12px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-pgsetup__sheet-heading {
+    padding: 12px 16px 2px;
+    font-weight: 600;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-pgsetup__sheet-title {
+    padding-block: 2px;
+    padding-inline-start: 26px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-range-picker {
+    position: relative;
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-range-picker input {
+    box-sizing: border-box;
+    width: 100%;
+    padding-inline-end: 32px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-range-picker__btn {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__section.fc-pgsetup__sheet-options
+    > :first-child,
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__section.fc-pgsetup__sheet-order
+    > :first-child {
+    font-weight: 600;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-options
+    .fc-pgsetup__checks {
+    grid-template-columns: max-content 1fr;
+    gap: 2px 24px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-options
+    .fc-pgsetup__checks
+    > .fc-fmtdlg__check {
+    grid-column: 1;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-options
+    .fc-pgsetup__sheet-comments {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__sheet--mac
+    .fc-pgsetup__sheet-order
+    .fc-pgsetup__value {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-pgsetup__sheet-order {
+    border-bottom: 0;
   }
 }

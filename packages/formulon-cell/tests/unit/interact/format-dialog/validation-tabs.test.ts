@@ -84,4 +84,23 @@ describe('Data Validation dialog tabs', () => {
     clear.click();
     expect(select.value).toBe('none');
   });
+
+  it('keeps the message tabs filled while Allow is Any value', () => {
+    const pane = (i: number): HTMLElement => panes()[i] as HTMLElement;
+    const shown = (el: Element): boolean =>
+      !(el as HTMLElement).closest('[hidden]:not(.fc-fmtdlg__vpane)');
+    tabs()[1]?.click();
+    const input = pane(1);
+    const inputChecks = [...input.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    expect(inputChecks.some((c) => shown(c) && c.checked)).toBe(true);
+    expect([...input.querySelectorAll('input[type="text"], textarea')].filter(shown).length).toBe(
+      2,
+    );
+    tabs()[2]?.click();
+    const error = pane(2);
+    expect([...error.querySelectorAll('select')].filter(shown).length).toBe(1);
+    expect([...error.querySelectorAll('input[type="text"], textarea')].filter(shown).length).toBe(
+      2,
+    );
+  });
 });

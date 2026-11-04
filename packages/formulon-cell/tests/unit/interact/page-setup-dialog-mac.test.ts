@@ -71,7 +71,7 @@ describe('Page Setup dialog on the Mac profile', () => {
   it('shows the header and footer slot editors only for a custom preset', () => {
     const { store, handle } = open();
     const slot = (): HTMLElement | null =>
-      document.querySelector<HTMLElement>(`.fc-pgsetup input[aria-label^="${t.headerLabel} "]`);
+      document.querySelector<HTMLElement>('.fc-pgsetup input[aria-label^="ヘッダー: "]');
     expect(visible(slot())).toBe(false);
     handle.close();
     mutators.setPageSetup(store, 0, { headerLeft: 'Left' });
@@ -112,6 +112,34 @@ describe('Page Setup dialog on the Mac profile', () => {
     expect(fitWidth.disabled).toBe(false);
     expect(scale.disabled).toBe(true);
     expect((byLabel('先頭ページ番号:') as HTMLInputElement).value).toBe('自動');
+    handle.detach();
+  });
+
+  it('words and arranges the other tabs like the desktop app', () => {
+    const { handle } = open();
+    const text = document.querySelector('.fc-pgsetup')?.textContent ?? '';
+    for (const label of [
+      'ページ中央:',
+      '(指定しない)',
+      'ユーザー設定のヘッダー...',
+      'ページ余白に合わせて配置',
+      'タイトル行:',
+      'タイトル列:',
+      '印刷オプション',
+      '枠線',
+      '行列番号',
+    ]) {
+      expect(text).toContain(label);
+    }
+    const order = [
+      ...document.querySelectorAll<HTMLInputElement>('.fc-pgsetup__sheet-order input'),
+    ];
+    expect(order.map((r) => r.nextElementSibling?.textContent)).toEqual(['左から右', '上から下']);
+    expect(order[0]?.checked).toBe(true);
+    expect(visible(byLabel(t.cellErrorsAs))).toBe(false);
+    expect(document.querySelectorAll('.fc-pgsetup__hf-preview')).toHaveLength(2);
+    const margins = document.querySelector<HTMLInputElement>('.fc-pgsetup__margins--mac input');
+    expect(margins?.value.endsWith('"')).toBe(true);
     handle.detach();
   });
 });

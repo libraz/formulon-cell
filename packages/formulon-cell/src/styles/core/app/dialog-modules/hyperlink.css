@@ -111,4 +111,65 @@
   .fc-hldlg__recent [aria-selected="true"] {
     background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
   }
+  /* Desktop geometry (pt): display field 257 wide at x 135, ScreenTip 97x26,
+   * the tab box 489x254 from x 13, address field 309 and 選択... 61x26,
+   * Cancel 86 / OK 72. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__display {
+    flex: none;
+    display: grid;
+    grid-template-columns: 107px 257px;
+    gap: 6px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__tip {
+    width: 97px;
+    min-height: 26px;
+    padding-inline: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__tab {
+    padding: 0 12.5px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__tabs {
+    width: fit-content;
+    margin: 12px auto -12px;
+    padding: 0;
+    border-radius: 6px;
+    background: var(--fc-bg-rail, color-mix(in srgb, CanvasText 7%, Canvas));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__web,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__document,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__email {
+    min-height: 225px;
+    padding: 18px 17px 16px;
+    box-sizing: border-box;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__address .fc-hldlg__field {
+    flex: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__address .fc-fmtdlg__input {
+    width: 309px;
+    flex: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__browse {
+    width: 61px;
+    min-height: 26px;
+    padding-inline: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__panel .fc-fmtdlg__footer .fc-fmtdlg__btn {
+    flex: none;
+    width: 86px;
+    min-width: 0;
+    padding-inline: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-hldlg__panel
+    .fc-fmtdlg__footer
+    .fc-fmtdlg__btn--primary {
+    width: 72px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__panel .fc-fmtdlg__body {
+    padding-bottom: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__panel .fc-fmtdlg__footer {
+    padding-top: 12px;
+  }
 }

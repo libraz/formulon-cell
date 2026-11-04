@@ -1,6 +1,7 @@
 // Margins tab: page margins, printer non-printable insets, and page centering.
 import type { printableMarginAdjustments } from '../../commands/print.js';
 import type { PageSetup } from '../../store/store.js';
+import { createExcelRibbonSvg } from '../../toolbar/excel-ribbon-icons.js';
 import { labelize, makeNumberInput, makeRow } from '../page-setup-dialog-dom.js';
 import type { PageSetupTabContext } from './context.js';
 
@@ -40,6 +41,31 @@ export function createMarginsTab(panel: HTMLDivElement, ctx: PageSetupTabContext
   );
   marginRow.valueCell.appendChild(marginGroup);
   panel.appendChild(marginRow.row);
+  // The Mac tab places the six fields around a page preview, shows values with
+  // an inch mark and has no group caption.
+  if (mac) {
+    panel.classList.add('fc-pgsetup__tab--mac');
+    marginRow.row.classList.add('fc-pgsetup__margins-row--mac');
+    marginGroup.classList.add('fc-pgsetup__margins--mac');
+    const areas = ['top', 'right', 'bottom', 'left', 'header', 'footer'];
+    Array.from(marginGroup.children).forEach((cell, i) => {
+      (cell as HTMLElement).dataset.margin = areas[i];
+    });
+    const preview = createExcelRibbonSvg('pageMarginsPreview', 'fc-pgsetup__margin-preview');
+    if (preview) marginGroup.appendChild(preview);
+    for (const input of [
+      topInput,
+      rightInput,
+      bottomInput,
+      leftInput,
+      headerMarginInput,
+      footerMarginInput,
+    ]) {
+      input.type = 'text';
+      input.inputMode = 'decimal';
+    }
+  }
+  const showInches = (value: number): string => (mac ? `${value}"` : String(value));
 
   const printableRow = makeRow(t.printerMargins);
   const printableGroup = document.createElement('div');
@@ -93,6 +119,7 @@ export function createMarginsTab(panel: HTMLDivElement, ctx: PageSetupTabContext
   centerVLabel.append(centerVInput, centerVText);
   centerValue.append(centerHLabel, centerVLabel);
   centerRow.append(centerTitle, centerValue);
+  if (mac) centerRow.classList.add('fc-pgsetup__section', 'fc-pgsetup__center-row--mac');
   panel.appendChild(centerRow);
 
   return {
@@ -122,16 +149,16 @@ export function createMarginsTab(panel: HTMLDivElement, ctx: PageSetupTabContext
               .join(', ')}`;
     },
     hydrate(setup) {
-      topInput.value = String(setup.margins.top);
-      rightInput.value = String(setup.margins.right);
-      bottomInput.value = String(setup.margins.bottom);
-      leftInput.value = String(setup.margins.left);
+      topInput.value = showInches(setup.margins.top);
+      rightInput.value = showInches(setup.margins.right);
+      bottomInput.value = showInches(setup.margins.bottom);
+      leftInput.value = showInches(setup.margins.left);
       printableTopInput.value = String(setup.printableBounds?.top ?? 0);
       printableRightInput.value = String(setup.printableBounds?.right ?? 0);
       printableBottomInput.value = String(setup.printableBounds?.bottom ?? 0);
       printableLeftInput.value = String(setup.printableBounds?.left ?? 0);
-      headerMarginInput.value = String(setup.headerMargin ?? 0.3);
-      footerMarginInput.value = String(setup.footerMargin ?? 0.3);
+      headerMarginInput.value = showInches(setup.headerMargin ?? 0.3);
+      footerMarginInput.value = showInches(setup.footerMargin ?? 0.3);
       centerHInput.checked = setup.centerHorizontally === true;
       centerVInput.checked = setup.centerVertically === true;
     },

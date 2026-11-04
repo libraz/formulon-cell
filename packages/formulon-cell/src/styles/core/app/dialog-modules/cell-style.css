@@ -245,6 +245,69 @@
     padding-inline: 0;
   }
 
+  /* Consolidate rows (pt): pop-up and reference field 225x26 at x 97 with a
+   * 33 pt pitch, the picker inside the field end, then the list, buttons,
+   * link option and the 統合の基準 group. */
+  .fc-mac-consolidate__row > span:first-child,
+  .fc-mac-subtotal__row > span:first-child {
+    min-width: 0;
+    font-weight: 400;
+  }
+  .fc-mac-consolidate__body {
+    gap: 0;
+    padding-top: 8px;
+    padding-bottom: 6px;
+  }
+  .fc-mac-consolidate__body > .fc-mac-consolidate__row:not(.fc-mac-consolidate__row--list) {
+    grid-template-columns: 75px minmax(0, 1fr);
+    gap: 0;
+    min-height: 26px;
+    margin-bottom: 7px;
+  }
+  .fc-mac-consolidate__row .fc-select,
+  .fc-mac-consolidate__row .fc-select__button {
+    width: 100%;
+    min-height: 26px;
+  }
+  .fc-mac-consolidate__row .fc-range-picker {
+    position: relative;
+    display: block;
+    min-width: 0;
+  }
+  .fc-mac-consolidate__row .fc-range-picker input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 26px;
+    padding-inline-end: 30px;
+  }
+  .fc-mac-consolidate__row .fc-range-picker__btn {
+    position: absolute;
+    top: 50%;
+    right: 2px;
+    transform: translateY(-50%);
+  }
+  .fc-mac-consolidate__row--list {
+    gap: 7px;
+    margin-top: 0;
+  }
+  .fc-mac-consolidate__list-actions {
+    margin: 7px 0 18px;
+  }
+  .fc-mac-consolidate__body > .fc-mac-consolidate__option {
+    height: 18px;
+    margin: 0 0 16px;
+  }
+  .fc-mac-consolidate__criteria {
+    gap: 4px;
+  }
+  .fc-mac-consolidate__criteria-heading {
+    margin-bottom: 4px;
+  }
+  .fc-mac-consolidate__criteria .fc-mac-consolidate__option {
+    height: 18px;
+    margin: 0 0 0 12px;
+  }
+
   .fc-textcols__fixed {
     font-family: var(--fc-font-mono, ui-monospace, monospace);
     overflow-x: auto;

@@ -25,7 +25,7 @@ export function createSheetTab(
   ctx: PageSetupTabContext,
   focusSheetTab: () => void,
 ): SheetTab {
-  const { t, strings, store, on } = ctx;
+  const { t, strings, store, mac, on } = ctx;
 
   const makeOptionSelect = (
     label: string,
@@ -174,6 +174,26 @@ export function createSheetTab(
   pageOrderValue.append(downOverLabel, overDownLabel);
   pageOrderRow.append(pageOrderTitle, pageOrderValue);
   panel.appendChild(pageOrderRow);
+
+  // The Mac tab groups the rows under 印刷タイトル / 印刷オプション / ページの
+  // 方向 headings, shows no placeholders and has no cell-errors choice.
+  if (mac) {
+    panel.classList.add('fc-pgsetup__tab--mac', 'fc-pgsetup__sheet--mac');
+    for (const input of [printAreaInput, titleRowsInput, titleColsInput]) input.placeholder = '';
+    errorsRow.row.hidden = true;
+    printAreaRow.row.classList.add('fc-pgsetup__sheet-area');
+    const titlesHeading = document.createElement('div');
+    titlesHeading.className = 'fc-pgsetup__sheet-heading';
+    titlesHeading.textContent = strings.ribbon.printTitles;
+    panel.insertBefore(titlesHeading, titleRowsRow.row);
+    titleRowsRow.row.classList.add('fc-pgsetup__sheet-title');
+    titleColsRow.row.classList.add('fc-pgsetup__sheet-title', 'fc-pgsetup__sheet-group-end');
+    gridRow.classList.add('fc-pgsetup__section', 'fc-pgsetup__sheet-options');
+    // コメント: sits to the right of 枠線 inside the print options group.
+    printOptionsValue.insertBefore(commentsRow.row, blackWhiteLabel);
+    commentsRow.row.classList.add('fc-pgsetup__sheet-comments');
+    pageOrderRow.classList.add('fc-pgsetup__section', 'fc-pgsetup__sheet-order');
+  }
 
   const referenceError = document.createElement('div');
   referenceError.className = 'fc-pgsetup__error';

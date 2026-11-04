@@ -418,7 +418,6 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       selected?.source === 'engine' && selected.copies.length === 0 ? t.editUnavailable : null;
     appliesToInput.value = selected?.range ?? '';
     if (mac) {
-      appliesToRow.dataset.disabled = String(!selected);
       projectDisabledState(appliesToInput, !selected, null);
     }
     const noSelectionReason = selected ? null : t.selectRuleActionReason;

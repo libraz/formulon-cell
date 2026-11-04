@@ -146,7 +146,6 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
       k === 'whole' || k === 'decimal' || k === 'date' || k === 'time' || k === 'textLength';
     const isListLike = k === 'list';
     const isCustom = k === 'custom';
-    const isActive = k !== 'none';
     // With no rule yet the Data row and the blank option show greyed out, as on the desktop.
     const noRule = k === 'none';
     validationOpRow.hidden = !(isBounded || noRule);
@@ -161,13 +160,14 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
     validationShowDropdownRow.hidden = !isListLike;
     validationAllowBlankRow.hidden = false;
     projectDisabledState(validationAllowBlankInput, noRule, null);
-    validationErrorStyleRow.hidden = !isActive;
-    validationShowInputMessageRow.hidden = !isActive;
-    validationPromptTitleRow.hidden = !isActive || !draft.validationShowInputMessage;
-    validationPromptMessageRow.hidden = !isActive || !draft.validationShowInputMessage;
-    validationShowErrorMessageRow.hidden = !isActive;
-    validationErrorTitleRow.hidden = !isActive || !draft.validationShowErrorMessage;
-    validationErrorMessageRow.hidden = !isActive || !draft.validationShowErrorMessage;
+    // The message tabs keep their controls for Any value too, as on the desktop.
+    validationErrorStyleRow.hidden = false;
+    validationShowInputMessageRow.hidden = false;
+    validationPromptTitleRow.hidden = !draft.validationShowInputMessage;
+    validationPromptMessageRow.hidden = !draft.validationShowInputMessage;
+    validationShowErrorMessageRow.hidden = false;
+    validationErrorTitleRow.hidden = !draft.validationShowErrorMessage;
+    validationErrorMessageRow.hidden = !draft.validationShowErrorMessage;
   };
 
   const sync = (): void => {
