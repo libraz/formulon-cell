@@ -85,7 +85,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     const cols = r.c1 - r.c0 + 1;
     if (rows <= 0 || cols <= 0) return null;
     // Spreadsheets cap Format Painter source at the visible used range. We accept
-    // anything up to ~10000 cells; beyond that the snapshot grows too large.
+    // anything up to ~100000 cells; beyond that the snapshot grows too large.
     if (rows * cols > MAX_FORMAT_PAINTER_CELLS) return null;
     const pattern: (CellFormat | undefined)[][] = [];
     for (let dr = 0; dr < rows; dr += 1) {

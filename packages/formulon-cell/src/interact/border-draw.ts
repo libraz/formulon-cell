@@ -4,6 +4,7 @@ import { recordFormatChange } from '../commands/slice-history.js';
 import { addrKey } from '../engine/address.js';
 import type { Range as SheetRange } from '../engine/types.js';
 import { cellRect, hitTest, layoutForView } from '../render/geometry.js';
+import { MAX_RANGE_FORMAT_CELLS } from '../store/cell-mutators.js';
 import {
   type CellBorderSide,
   type CellBorderStyle,
@@ -172,13 +173,15 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     const c0 = Math.min(anchor.col, current.col);
     const c1 = Math.max(anchor.col, current.col);
     const side = sideValue();
+    const borders = { top: side, right: side, bottom: side, left: side };
+    // One notification per drag; setRangeFormat declines areas above this cap.
+    if ((r1 - r0 + 1) * (c1 - c0 + 1) <= MAX_RANGE_FORMAT_CELLS) {
+      mutators.setRangeFormat(store, { sheet, r0, c0, r1, c1 }, { borders });
+      return;
+    }
     for (let r = r0; r <= r1; r += 1) {
       for (let c = c0; c <= c1; c += 1) {
-        mutators.setCellFormat(
-          store,
-          { sheet, row: r, col: c },
-          { borders: { top: side, right: side, bottom: side, left: side } },
-        );
+        mutators.setCellFormat(store, { sheet, row: r, col: c }, { borders: { ...borders } });
       }
     }
   };

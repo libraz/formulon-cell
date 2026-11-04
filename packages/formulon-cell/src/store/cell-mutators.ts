@@ -7,6 +7,9 @@ import type { SpreadsheetStore } from './store.js';
 import type { CellFormat, CustomCellStyle } from './types.js';
 
 /** Cell values, the active sheet's data, per-cell formats and merges. */
+/** Largest area `setRangeFormat` paints; larger ranges are ignored. */
+export const MAX_RANGE_FORMAT_CELLS = 100_000;
+
 export const cellMutators = {
   setCell(
     store: SpreadsheetStore,
@@ -132,7 +135,7 @@ export const cellMutators = {
    *  millions of empty cells would OOM. */
   setRangeFormat(store: SpreadsheetStore, range: Range, patch: Partial<CellFormat> | null): void {
     const area = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-    if (area > 100_000) return;
+    if (area > MAX_RANGE_FORMAT_CELLS) return;
     store.setState((s) => {
       const formats = new Map(s.format.formats);
       const sheet = range.sheet;

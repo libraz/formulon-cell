@@ -1,7 +1,7 @@
 import { type FillFormattingMode, fillOutputRange, fillRange } from '../commands/fill.js';
 import type { History } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import { parseAddrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -45,8 +45,6 @@ export interface AutoFillOptionsDeps {
   history?: History | null;
   onAfterCommit?: () => void;
 }
-
-const VIEWPORT_PAD = 4;
 
 export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOptionsHandle {
   const { host, store, wb } = deps;
@@ -96,12 +94,29 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   const isDateFillCandidate = (): boolean => {
     if (!detail) return false;
     const state = store.getState();
-    for (const [key, format] of state.format.formats) {
-      const fmt = format.numFmt;
-      if (fmt?.kind !== 'date' && fmt?.kind !== 'datetime') continue;
+    const { src } = detail;
+    const isDate = (key: string): boolean => {
+      const fmt = state.format.formats.get(key)?.numFmt;
+      return (
+        (fmt?.kind === 'date' || fmt?.kind === 'datetime') &&
+        state.data.cells.get(key)?.value.kind === 'number'
+      );
+    };
+    // A small source is cheaper to walk cell by cell than the whole format map.
+    const area = (src.r1 - src.r0 + 1) * (src.c1 - src.c0 + 1);
+    if (area < state.format.formats.size) {
+      for (let row = src.r0; row <= src.r1; row += 1) {
+        for (let col = src.c0; col <= src.c1; col += 1) {
+          if (isDate(addrKey({ sheet: src.sheet, row, col }))) return true;
+        }
+      }
+      return false;
+    }
+    for (const key of state.format.formats.keys()) {
+      if (!isDate(key)) continue;
       const addr = parseAddrKey(key);
       if (!addr || !rangeContainsAddr(detail.src, addr)) continue;
-      if (state.data.cells.get(key)?.value.kind === 'number') return true;
+      return true;
     }
     return false;
   };
@@ -113,14 +128,12 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
 
   const position = (x: number, y: number): void => {
     const buttonPos = clampPanelToViewport(button, x + 6, y + 6, {
-      pad: VIEWPORT_PAD,
       fallbackWidth: 28,
       fallbackHeight: 28,
     });
     button.style.left = `${buttonPos.x}px`;
     button.style.top = `${buttonPos.y}px`;
     const menuPos = clampPanelToViewport(menu, buttonPos.x, buttonPos.y + 24, {
-      pad: VIEWPORT_PAD,
       fallbackWidth: 180,
       fallbackHeight: 80,
     });

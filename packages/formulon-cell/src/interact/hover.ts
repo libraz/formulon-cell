@@ -80,9 +80,35 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     };
   };
 
+  // Format lookup for the last hovered cell, valid while the format state is unchanged.
+  let last: {
+    row: number;
+    col: number;
+    sheet: number;
+    format: unknown;
+    fmt: ReturnType<typeof cellFormatAt>;
+  } | null = null;
+
   const onMove = (e: PointerEvent): void => {
     const at = cellAt(e);
-    const fmt = at ? cellFormatAt(at.row, at.col) : null;
+    let fmt: ReturnType<typeof cellFormatAt> = null;
+    if (at) {
+      const s = store.getState();
+      if (
+        last &&
+        last.row === at.row &&
+        last.col === at.col &&
+        last.sheet === s.data.sheetIndex &&
+        last.format === s.format
+      ) {
+        fmt = last.fmt;
+      } else {
+        fmt = cellFormatAt(at.row, at.col);
+        last = { row: at.row, col: at.col, sheet: s.data.sheetIndex, format: s.format, fmt };
+      }
+    } else {
+      last = null;
+    }
     // A shown note is already on the canvas; hovering it adds no popup.
     const tooltip = (fmt?.commentVisible ? undefined : fmt?.comment) || fmt?.hyperlinkTooltip;
     if (tooltip) {

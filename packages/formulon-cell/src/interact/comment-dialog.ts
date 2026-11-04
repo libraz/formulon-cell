@@ -518,7 +518,20 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   wrap.addEventListener('keydown', onKey);
 
   let attached = false;
-  const onScrollOrResize = (): void => place();
+  let placeFrame = 0;
+  const cancelPlaceFrame = (): void => {
+    if (placeFrame) window.cancelAnimationFrame(placeFrame);
+    placeFrame = 0;
+  };
+  // Coalesce to one reposition per frame; scrolling inside the panel does not move it.
+  const onScrollOrResize = (e: Event): void => {
+    if (e.type === 'scroll' && e.target instanceof Node && wrap.contains(e.target)) return;
+    if (placeFrame) return;
+    placeFrame = window.requestAnimationFrame(() => {
+      placeFrame = 0;
+      place();
+    });
+  };
 
   const api: CommentDialogHandle = {
     open(options: { mode?: 'note' | 'thread' } = {}): void {
@@ -586,6 +599,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
         window.removeEventListener('resize', onScrollOrResize);
         attached = false;
       }
+      cancelPlaceFrame();
       host.focus();
     },
     detach(): void {
@@ -601,6 +615,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
         window.removeEventListener('resize', onScrollOrResize);
         attached = false;
       }
+      cancelPlaceFrame();
       wrap.remove();
     },
   };

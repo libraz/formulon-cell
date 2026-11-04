@@ -16,6 +16,7 @@ import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { MacAccessibilityPaneStrings } from '../i18n/strings/mac/accessibility-pane.js';
 import type { Strings } from '../i18n/strings.js';
+import { sameRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -49,9 +50,6 @@ const fill = (template: string, values: Record<string, string | number>): string
   template.replace(/\{(\w+)\}/g, (match, key: string) =>
     key in values ? String(values[key]) : match,
   );
-
-const sameRange = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
 
 const sectionOf = (rule: AccessibilityRuleId): AccessibilitySectionId =>
   ACCESSIBILITY_SECTIONS.find((section) => section.rules.includes(rule))?.id ?? 'colorContrast';

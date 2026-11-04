@@ -170,13 +170,6 @@ export function nativeFontSamplesForDialog(
   wb: WorkbookHandle,
 ): Partial<CellFormat>[] {
   if (plan.axisBands.length === 0 || !wb.capabilities.rangeStylePatch) return [];
-  // Addresses with store entries are resolved by the store resolver, so
-  // their native bases are left out of the sampled ranges.
-  const storeAddrs: Addr[] = [];
-  for (const key of state.format.formats.keys()) {
-    const addr = parseAddrKey(key);
-    if (addr) storeAddrs.push(addr);
-  }
   if (
     plan.ranges.some(
       ({ sheet }) =>
@@ -198,6 +191,14 @@ export function nativeFontSamplesForDialog(
     )
   ) {
     return [];
+  }
+
+  // Addresses with store entries are resolved by the store resolver, so
+  // their native bases are left out of the sampled ranges.
+  const storeAddrs: Addr[] = [];
+  for (const key of state.format.formats.keys()) {
+    const addr = parseAddrKey(key);
+    if (addr) storeAddrs.push(addr);
   }
 
   try {

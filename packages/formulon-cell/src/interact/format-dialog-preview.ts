@@ -84,10 +84,13 @@ export const fillPatternImage = (pattern: FillPattern | undefined, color = '#000
   }
 };
 
+const borderWidthPx = (style: string | undefined): number =>
+  style === 'thick' ? 3 : style === 'medium' ? 2 : 1;
+
 const cssBorder = (s: CellBorderSide | undefined): string => {
   if (!s) return '0 solid transparent';
   const cfg = typeof s === 'object' ? s : { style: 'thin' as const };
-  const widthPx = cfg.style === 'thick' ? 3 : cfg.style === 'medium' ? 2 : 1;
+  const widthPx = borderWidthPx(cfg.style);
   const cssStyle =
     cfg.style === 'dashed'
       ? 'dashed'
@@ -183,7 +186,7 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
       draft.borders.diagonalDown || draft.borders.diagonalUp || activeDraftSide(draft);
     const diagCfg = typeof diagSide === 'object' ? diagSide : { style: 'thin' as const };
     const diagColor = (typeof diagSide === 'object' && diagSide.color) || 'currentColor';
-    const diagWidth = diagCfg.style === 'thick' ? 3 : diagCfg.style === 'medium' ? 2 : 1;
+    const diagWidth = borderWidthPx(diagCfg.style);
     borderVisualPreview.style.setProperty('--fc-fmtdlg-border-diag-color', diagColor);
     borderVisualPreview.style.setProperty('--fc-fmtdlg-border-diag-width', `${diagWidth}px`);
     for (const [key, buttons] of refs.visualSideButtons) {

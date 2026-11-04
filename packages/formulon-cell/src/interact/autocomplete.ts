@@ -607,6 +607,7 @@ function computeContext(
   if (!text.startsWith('=')) {
     const addr = deps.editingAddr;
     if (!addr || !deps.getColumnValues) return null;
+    if (caret !== text.length || text.length === 0) return null;
     const values = deps.getColumnValues(addr.sheet, addr.col, addr.row);
     return suggestColumnHistory(text, caret, values);
   }
@@ -662,20 +663,19 @@ function computeContext(
       entryNames.add(key);
       unique.push(entry);
     }
-    unique.sort((a, b) => compareCaseless(a.label, b.label));
+    const sorted = sortCaseless(unique, (e) => e.label);
     return {
-      matches: unique.map((e) => e.label),
+      matches: sorted.map((e) => e.label),
       tokenStart,
       tokenEnd: caret,
       insertSuffix: '(',
       kind: 'function',
-      kinds: unique.map((e) => e.kind),
-      details: unique.map((e) => e.detail),
+      kinds: sorted.map((e) => e.kind),
+      details: sorted.map((e) => e.detail),
     };
   }
-  merged.sort(compareCaseless);
   return {
-    matches: merged,
+    matches: sortCaseless(merged, (label) => label),
     tokenStart,
     tokenEnd: caret,
     insertSuffix: existingCallParenLength ? '' : '(',
@@ -780,11 +780,12 @@ function suggestCustomFunctions(
   return { token, tokenStart, matches };
 }
 
-const compareCaseless = (a: string, b: string): number => {
-  const x = a.toLocaleLowerCase();
-  const y = b.toLocaleLowerCase();
-  return x < y ? -1 : x > y ? 1 : 0;
-};
+/** Stable sort by lowercased label, lowercasing each label once. */
+const sortCaseless = <T>(items: readonly T[], label: (item: T) => string): T[] =>
+  items
+    .map((item) => ({ item, key: label(item).toLocaleLowerCase() }))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map((d) => d.item);
 
 /** Filter defined/table names against the partial token at `caret`. The match
  *  is a case-insensitive prefix, so Japanese names work the same way. */
@@ -961,14 +962,15 @@ export function suggestStructuredRef(
   const partial = decodeStructuredRefPartial(text.slice(columnBracket + 1, caret));
   const lower = partial.toLocaleLowerCase();
   const seen = new Set<string>();
-  const matches = table.columns
-    .filter((c) => {
+  const matches = sortCaseless(
+    table.columns.filter((c) => {
       const key = c.toLocaleLowerCase();
       if (!key.startsWith(lower) || seen.has(key)) return false;
       seen.add(key);
       return true;
-    })
-    .sort(compareCaseless);
+    }),
+    (c) => c,
+  );
   if (matches.length === 0) return null;
   return {
     matches,

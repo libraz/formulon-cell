@@ -117,7 +117,6 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     }
   };
 
-  /** Apply the panel's state; the Mac panel keeps itself open while it auto-applies. */
   /** The condition the panel's fields describe, or null while an operand is missing. */
   const readCondition = (op: ConditionFilterOp): ConditionFilterOptions | null => {
     if (!root) return null;
@@ -150,6 +149,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     }
   };
 
+  /** Apply the panel's state; the Mac panel keeps itself open while it auto-applies. */
   const applyActiveFilter = (closeAfter = true): void => {
     if (!activeRange || !root) return;
     const wb = deps.getWb?.();
@@ -256,12 +256,13 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const conditionLabel = ownerDocument.createElement('label');
     conditionLabel.className = 'fc-filter-dropdown__condition-label';
     conditionLabel.textContent = t.condition;
+    const numeric = mac && numericColumn(range, col);
     const conditionOptions: Array<{ value: '' | ConditionFilterOp; label: string }> = mac
       ? [
           { value: '', label: m.chooseOne },
           { value: 'equals', label: m.equals },
           { value: 'notEquals', label: m.notEquals },
-          ...(numericColumn(range, col)
+          ...(numeric
             ? ([
                 { value: 'greaterThan', label: m.greaterThan },
                 { value: 'greaterThanOrEqual', label: m.greaterThanOrEqual },
@@ -295,7 +296,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     });
     if (mac) {
       // Conditions that rank or bound numbers stay in Excel's list for a text column, unavailable.
-      if (!numericColumn(range, col)) {
+      if (!numeric) {
         appendDisabledOptions(conditionSelect, [
           m.between,
           m.top10,
@@ -424,18 +425,22 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const renderRows = (filter: string): void => {
       list.innerHTML = '';
       const f = filter.toLocaleLowerCase(activeLocale);
+      // Semantic keys of `hidden`, rebuilt after each mutation.
+      let hiddenKeys: Set<string> | null = null;
       const hiddenHas = (value: string): boolean => {
-        const key = semantics.key(value);
-        for (const hiddenValue of hidden) {
-          if (semantics.key(hiddenValue) === key) return true;
-        }
-        return false;
+        if (!hiddenKeys) hiddenKeys = new Set([...hidden].map((v) => semantics.key(v)));
+        return hiddenKeys.has(semantics.key(value));
+      };
+      const hiddenAdd = (value: string): void => {
+        hidden.add(value);
+        hiddenKeys = null;
       };
       const hiddenDelete = (value: string): void => {
         const key = semantics.key(value);
         for (const hiddenValue of hidden) {
           if (semantics.key(hiddenValue) === key) hidden.delete(hiddenValue);
         }
+        hiddenKeys = null;
       };
       // (Select All) header
       const allRow = ownerDocument.createElement('label');
@@ -448,8 +453,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       allCb.addEventListener('change', () => {
         if (allCb.checked) {
           hidden.clear();
+          hiddenKeys = null;
         } else {
-          for (const v of distinct) hidden.add(v.key);
+          for (const v of distinct) hiddenAdd(v.key);
         }
         renderRows(search.value);
         autoApplyIfOn();
@@ -472,7 +478,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         cb.addEventListener('keydown', handleRowKey);
         cb.addEventListener('change', () => {
           if (cb.checked) hiddenDelete(item.key);
-          else hidden.add(item.key);
+          else hiddenAdd(item.key);
           // Refresh select-all indeterminate state without rebuilding rows.
           allCb.checked = distinct.every((vv) => !hiddenHas(vv.key));
           allCb.indeterminate = !allCb.checked && distinct.some((vv) => !hiddenHas(vv.key));

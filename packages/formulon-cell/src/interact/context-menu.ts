@@ -81,7 +81,12 @@ import {
 import { type MenuTarget, resolveContextMenuTarget } from './context-menu-target.js';
 import { withDialogAnchor } from './dialog-placement.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
+import {
+  clampPanelToViewport,
+  panelSize,
+  VIEWPORT_PANEL_PAD,
+  viewportSize,
+} from './overlay-position.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
 
 export interface ContextMenuDeps {
@@ -141,8 +146,6 @@ export interface ContextMenuDeps {
   /** Shared authorization/execution service for restricted embeds. */
   interactionController?: ContextMenuInteractionController;
 }
-
-const VIEWPORT_PAD = 4;
 
 const itemIdSet = new Set<ItemId>([
   'bold',
@@ -445,8 +448,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const { width: sw } = panelSize(sub);
     const viewport = viewportSize(ownerDocument);
     let x = r.right - 2;
-    if (x + sw > viewport.width - VIEWPORT_PAD) x = r.left - sw + 2;
-    const pos = clampPanelToViewport(sub, x, r.top - 4, { pad: VIEWPORT_PAD });
+    if (x + sw > viewport.width - VIEWPORT_PANEL_PAD) x = r.left - sw + 2;
+    const pos = clampPanelToViewport(sub, x, r.top - 4);
     sub.style.left = `${pos.x}px`;
     sub.style.top = `${pos.y}px`;
     openSub = { id, parentBtn };
@@ -785,7 +788,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     root.style.left = '-9999px';
     root.style.top = '-9999px';
     visible = true;
-    const { x, y } = clampPanelToViewport(root, clientX, clientY, { pad: VIEWPORT_PAD });
+    const { x, y } = clampPanelToViewport(root, clientX, clientY);
     root.style.left = `${x}px`;
     root.style.top = `${y}px`;
     // A Mac menu opened by the pointer starts with no row highlighted; the
