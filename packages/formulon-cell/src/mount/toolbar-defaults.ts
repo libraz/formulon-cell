@@ -64,6 +64,7 @@ import { createInsertMenuFactories } from '../toolbar/ribbon/menus/insert.js';
 import type { MenuVariant } from '../toolbar/ribbon/menus/mac-variants.js';
 import { createPageLayoutMenuFactories } from '../toolbar/ribbon/menus/page-layout.js';
 import { createPasteMenu } from '../toolbar/ribbon/menus/paste.js';
+import { createPivotMenuFactories } from '../toolbar/ribbon/menus/pivot.js';
 import { createReviewMenuFactories } from '../toolbar/ribbon/menus/review.js';
 import { createShapeFormatMenuFactories } from '../toolbar/ribbon/menus/shape-format.js';
 import { createStylesMenuFactories } from '../toolbar/ribbon/menus/styles.js';
@@ -179,6 +180,7 @@ export function createDefaultRibbonMenus(
     sheetTabs: dictionaries[lang].sheetTabs,
     viewToolbar: dictionaries[lang].viewToolbar,
   });
+  const pivotFactories = createPivotMenuFactories({ ribbonMenuText });
   const styleFactories = createStylesMenuFactories({
     ribbonLang: lang,
     ribbonMenuText,
@@ -271,6 +273,9 @@ export function createDefaultRibbonMenus(
     tableStyle: styleFactories.createTableStyleMenu,
     cellStyles: styleFactories.createCellStylesMenu,
     currency: styleFactories.createCurrencyMenu,
+
+    // PivotTable Design and Analyze tabs
+    pivotLayout: pivotFactories.createPivotLayoutMenu,
   };
 }
 

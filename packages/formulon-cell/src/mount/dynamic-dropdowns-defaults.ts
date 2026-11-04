@@ -38,6 +38,7 @@ import { createIllustrationDropdownDefaults } from './dynamic-dropdown-defaults/
 import { createInsertDropdownDefaults } from './dynamic-dropdown-defaults/insert.js';
 import { showInstanceReport } from './dynamic-dropdown-defaults/menu-feedback.js';
 import { createPageLayoutDropdownDefaults } from './dynamic-dropdown-defaults/page-layout.js';
+import { createPivotDropdownDefaults } from './dynamic-dropdown-defaults/pivot.js';
 import { createReviewDropdownDefaults } from './dynamic-dropdown-defaults/review.js';
 import { normalizedSelectionRange } from './dynamic-dropdown-defaults/selection.js';
 import { createShapeFormatDropdownDefaults } from './dynamic-dropdown-defaults/shape-format.js';
@@ -161,6 +162,7 @@ export function createDefaultDynamicDropdownsCtx(
   const viewDefaults = createViewDropdownDefaults(instance);
   const chartDesignDefaults = createChartDesignDropdownDefaults(instance);
   const shapeFormatDefaults = createShapeFormatDropdownDefaults(instance);
+  const pivotDefaults = createPivotDropdownDefaults(instance);
 
   const base: DynamicDropdownsCtx = {
     getInst: () => instance,
@@ -254,6 +256,8 @@ export function createDefaultDynamicDropdownsCtx(
     insertScreenshotFromRibbon: illustrationDefaults.insertScreenshotFromRibbon,
     applyScriptAction: buildScriptAction(instance),
     applyPdfAction: buildPdfAction(instance),
+    applyPivotLayoutAction: pivotDefaults.applyPivotLayoutAction,
+    updatePivotLayoutMenu: pivotDefaults.updatePivotLayoutMenu,
     createTableFromSelection: styleDefaults.createTableFromSelection,
     openTableStyleFooterAction: styleDefaults.openTableStyleFooterAction,
     updateTableStylesMenu: styleDefaults.updateTableStylesMenu,

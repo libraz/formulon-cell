@@ -138,6 +138,7 @@ export interface RibbonMenus {
   chartColors?: RibbonMenuFactory;
   shapeFill?: RibbonMenuFactory;
   shapeOutline?: RibbonMenuFactory;
+  pivotLayout?: RibbonMenuFactory;
 }
 
 /** Renderer helpers from select-color.ts / control-dispatch.ts. These create

@@ -141,12 +141,20 @@ export const createPivotReadout = (
   input.title = command.title;
   input.setAttribute('aria-label', command.title);
   input.readOnly = true;
-  if (command.id === 'pivotName') {
-    const inst = ctx.getInst();
-    const pivot =
-      inst && findPivotTableAtCell(inst.workbook, inst.store.getState().selection.active);
+  const inst = ctx.getInst();
+  const active = inst?.store.getState().selection.active;
+  const pivot = inst && active ? findPivotTableAtCell(inst.workbook, active) : null;
+  const definition =
+    inst && pivot ? inst.workbook.getPivotDefinition(pivot.sheetIndex, pivot.pivotIndex) : null;
+  if (command.id === 'pivotName') input.value = definition?.name || '';
+  if (command.id === 'pivotActiveField' && inst && active && definition) {
+    // A value cell names its data field; a label names its own field.
+    const info = inst.workbook.pivotCellInfo(active);
+    const field = definition.fields.find((f) => f.cacheFieldIndex === info?.fieldIndex);
     input.value =
-      (pivot && inst?.workbook.getPivotDefinition(pivot.sheetIndex, pivot.pivotIndex)?.name) || '';
+      (info?.fieldIndex !== undefined && info.fieldIndex >= 0 && field
+        ? field.customName || field.sourceName
+        : info?.fieldName) || '';
   }
   wrap.append(label, input);
   return wrap;

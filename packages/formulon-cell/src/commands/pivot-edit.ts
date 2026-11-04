@@ -291,6 +291,10 @@ export function restorePivotFieldLayout(
           field.sortByField,
         ) && ok;
     }
+    if (now.subtotalTop !== field.subtotalTop) {
+      ok =
+        wb.setPivotFieldSubtotalTop(sheetIndex, pivotIndex, field.index, field.subtotalTop) && ok;
+    }
     if (!same(now.dateGroup, field.dateGroup)) {
       if (field.dateGroup) {
         const { granularity, calendar, ...bounds } = field.dateGroup;
@@ -307,6 +311,18 @@ export function restorePivotFieldLayout(
         ok = wb.clearPivotFieldDateGroup(sheetIndex, pivotIndex, field.index) && ok;
       }
     }
+  }
+  if (!same(current.grandTotals, definition.grandTotals)) {
+    ok =
+      wb.setPivotTableGrandTotals(
+        sheetIndex,
+        pivotIndex,
+        definition.grandTotals.rows,
+        definition.grandTotals.cols,
+      ) && ok;
+  }
+  if (definition.layout !== null && current.layout !== definition.layout) {
+    ok = wb.setPivotReportLayout(sheetIndex, pivotIndex, definition.layout) && ok;
   }
   ok =
     wb.setPivotRowFieldOrder(sheetIndex, pivotIndex, definition.rowFieldOrder) &&

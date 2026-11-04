@@ -70,6 +70,8 @@ export interface DynamicDropdownsCtx {
   updateTableStylesMenu: (menu: HTMLElement) => void;
   updateTextOrientationMenu: (menu: HTMLElement) => void;
   updateWatchMenu: (menu: HTMLElement) => void;
+  /** Optional so hosts built before it keep working; the menu then stays as built. */
+  updatePivotLayoutMenu?: (menu: HTMLElement) => void;
   // Sibling menu controllers that must close when a dynamic dropdown opens.
   closeBorderMenu: (restoreFocus?: boolean) => void;
   closeFreezeMenu: (restoreFocus?: boolean) => void;
@@ -135,6 +137,9 @@ export interface DynamicDropdownsCtx {
   insertScreenshotFromRibbon: (action?: string) => void | Promise<void>;
   applyScriptAction: (action: string) => void | Promise<void>;
   applyPdfAction: (action: string) => void | Promise<void>;
+  /** PivotTable Design / Analyze menu action. Optional so hosts built before it
+   *  keep working; the items then do nothing. */
+  applyPivotLayoutAction?: (action: string) => void;
   createTableFromSelection: (
     style?: string,
     color?: string,
@@ -216,6 +221,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'symbol-action',
   'script-action',
   'pdf-action',
+  'pivot-layout',
   'table-style',
   'table-style-footer',
   'pivot-table-style',
@@ -302,6 +308,13 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-shape-fill': 'updateShapeFillMenu',
   'menu-shape-outline': 'updateShapeOutlineMenu',
   'menu-shapes-insert': 'updateShapesInsertMenu',
+  'menu-pivot-subtotals': 'updatePivotLayoutMenu',
+  'menu-pivot-grand-totals': 'updatePivotLayoutMenu',
+  'menu-pivot-report-layout': 'updatePivotLayoutMenu',
+  'menu-pivot-blank-rows': 'updatePivotLayoutMenu',
+  'menu-pivot-clear': 'updatePivotLayoutMenu',
+  'menu-pivot-select': 'updatePivotLayoutMenu',
+  'menu-pivot-fields-items-sets': 'updatePivotLayoutMenu',
   'menu-calc-options': 'updateCalcOptionsMenu',
   'menu-what-if': 'updateWhatIfMenu',
   'menu-cell-styles-home': 'updateCellStylesMenu',
@@ -723,6 +736,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'symbol-action', handler: (v) => ctx.applySymbolAction(v) },
     { attr: 'script-action', handler: (v) => ctx.applyScriptAction(v) },
     { attr: 'pdf-action', handler: (v) => ctx.applyPdfAction(v) },
+    { attr: 'pivot-layout', handler: (v) => ctx.applyPivotLayoutAction?.(v) },
     {
       attr: 'table-style',
       handler: (v, { button }) => {

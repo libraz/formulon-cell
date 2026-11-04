@@ -175,12 +175,21 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('wires every registered dynamic ribbon dropdown to a rendered button and menu', () => {
-    // A contextual tab shows only while its kind of object is selected.
+  it('wires every registered dynamic ribbon dropdown to a rendered button and menu', async () => {
+    // A contextual tab shows only while its kind of object is selected; the
+    // PivotTable tabs need a report on the real engine.
     const rendered = new Set<string>();
-    for (const select of CONTEXTUAL_SELECTIONS) {
-      select(sheet.instance.store);
-      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+    const pivotSheet = await mountPivotSheet();
+    const contexts = [
+      ...CONTEXTUAL_SELECTIONS.map((select) => () => {
+        select(sheet.instance.store);
+        return sheet.instance;
+      }),
+      () => pivotSheet.instance,
+    ];
+    for (const context of contexts) {
+      const instance = context();
+      const tb = Spreadsheet.mountToolbar(host, instance, {
         ribbonTabs: RIBBON_TABS,
         dynamicDropdowns: true,
         helpers: stubHelpers(),
@@ -218,21 +227,31 @@ describe('Spreadsheet.mountToolbar', () => {
       }
       tb.dispose();
     }
+    pivotSheet.dispose();
     expect(new Set(Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND)).size).toBe(
       Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND).length,
     );
     expect([...rendered].sort()).toEqual(Object.keys(RIBBON_DROPDOWN_MENU_FOR_COMMAND).sort());
   }, 30_000);
 
-  it('opens every dropdown and gallery command menu from primary click', () => {
-    // A contextual tab shows only while its kind of object is selected.
+  it('opens every dropdown and gallery command menu from primary click', async () => {
+    // A contextual tab shows only while its kind of object is selected; the
+    // PivotTable tabs need a report on the real engine.
     const misses = new Set<string>(
       Array.from(RIBBON_DYNAMIC_MENU_FIRST_COMMANDS, (c) => `${c}:missing`),
     );
-    for (const select of CONTEXTUAL_SELECTIONS) {
-      select(sheet.instance.store);
+    const pivotSheet = await mountPivotSheet();
+    const contexts = [
+      ...CONTEXTUAL_SELECTIONS.map((select) => () => {
+        select(sheet.instance.store);
+        return sheet.instance;
+      }),
+      () => pivotSheet.instance,
+    ];
+    for (const context of contexts) {
+      const instance = context();
       const onCommand = vi.fn();
-      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      const tb = Spreadsheet.mountToolbar(host, instance, {
         dynamicDropdowns: true,
         helpers: stubHelpers(),
         onCommand,
@@ -258,6 +277,7 @@ describe('Spreadsheet.mountToolbar', () => {
       }
       tb.dispose();
     }
+    pivotSheet.dispose();
 
     expect([...misses]).toEqual([]);
   });
@@ -724,7 +744,7 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('keeps every registered dynamic dropdown handler key represented by default menus', () => {
+  it('keeps every registered dynamic dropdown handler key represented by default menus', async () => {
     mutators.upsertCustomPivotTableStyle(sheet.instance.store, {
       id: customPivotTableStyleId('Dispatch Coverage Pivot'),
       label: 'Dispatch Coverage Pivot',
@@ -733,10 +753,18 @@ describe('Spreadsheet.mountToolbar', () => {
       variant: 'bandedFirstCol',
     });
     const renderedKeys = new Set<string>();
-    // A contextual tab shows only while its kind of object is selected.
-    for (const select of CONTEXTUAL_SELECTIONS) {
-      select(sheet.instance.store);
-      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+    // A contextual tab shows only while its kind of object is selected; the
+    // PivotTable tabs need a report on the real engine.
+    const pivotSheet = await mountPivotSheet();
+    const contexts = [
+      ...CONTEXTUAL_SELECTIONS.map((select) => () => {
+        select(sheet.instance.store);
+        return sheet.instance;
+      }),
+      () => pivotSheet.instance,
+    ];
+    for (const context of contexts) {
+      const tb = Spreadsheet.mountToolbar(host, context(), {
         ribbonTabs: RIBBON_TABS,
         dynamicDropdowns: true,
         helpers: stubHelpers(),
@@ -750,6 +778,7 @@ describe('Spreadsheet.mountToolbar', () => {
       }
       tb.dispose();
     }
+    pivotSheet.dispose();
 
     const missing = Array.from(DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS)
       .filter((key) => !renderedKeys.has(key))

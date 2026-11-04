@@ -84,6 +84,7 @@ export const RIBBON_MENU_FACTORY_KEYS = [
   'chartColors',
   'shapeFill',
   'shapeOutline',
+  'pivotLayout',
 ] as const;
 
 export type RibbonMenuFactoryKey = (typeof RIBBON_MENU_FACTORY_KEYS)[number];
@@ -148,6 +149,13 @@ export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> 
   chartColors: 'menu-chart-colors',
   shapeFill: 'menu-shape-fill',
   shapeOutline: 'menu-shape-outline',
+  pivotSubtotals: 'menu-pivot-subtotals',
+  pivotGrandTotals: 'menu-pivot-grand-totals',
+  pivotReportLayout: 'menu-pivot-report-layout',
+  pivotBlankRows: 'menu-pivot-blank-rows',
+  pivotClear: 'menu-pivot-clear',
+  pivotSelect: 'menu-pivot-select',
+  pivotFieldsItemsSets: 'menu-pivot-fields-items-sets',
 };
 
 export const RIBBON_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
@@ -210,6 +218,13 @@ export const RIBBON_MENU_FACTORY_FOR_COMMAND: Readonly<Record<string, RibbonMenu
   chartColors: 'chartColors',
   shapeFill: 'shapeFill',
   shapeOutline: 'shapeOutline',
+  pivotSubtotals: 'pivotLayout',
+  pivotGrandTotals: 'pivotLayout',
+  pivotReportLayout: 'pivotLayout',
+  pivotBlankRows: 'pivotLayout',
+  pivotClear: 'pivotLayout',
+  pivotSelect: 'pivotLayout',
+  pivotFieldsItemsSets: 'pivotLayout',
 };
 
 export const RIBBON_AUDITED_PRIMARY_ACTION_SPLIT_COMMANDS = [
@@ -252,6 +267,13 @@ export const RIBBON_AUDITED_GALLERY_COMMANDS = [
 
 export const RIBBON_AUDITED_DROPDOWN_COMMANDS = [
   'arrangeObjectsPageLayout',
+  'pivotSubtotals',
+  'pivotGrandTotals',
+  'pivotReportLayout',
+  'pivotBlankRows',
+  'pivotClear',
+  'pivotSelect',
+  'pivotFieldsItemsSets',
   'chartAddElement',
   'chartColors',
   'shapeFill',
