@@ -1,7 +1,7 @@
+import { activeTableOverlay } from '../commands/table-design.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
-import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogActions,
@@ -61,30 +61,16 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     bodyClass: 'fc-fmtdlg__body fc-macslicerdlg__body',
   });
 
-  const tableSelect = document.createElement('select');
-  tableSelect.className = 'fc-fmtdlg__select fc-macslicerdlg__table';
-  tableSelect.dataset.macSlicerTable = 'true';
-  tableSelect.setAttribute('aria-label', strings.macSlicer.table);
-  const columnSelect = document.createElement('select');
-  columnSelect.className = 'fc-fmtdlg__select fc-macslicerdlg__column';
-  columnSelect.dataset.macSlicerColumn = 'true';
-  columnSelect.setAttribute('aria-label', strings.slicer.chooseColumn);
+  // Excel lists every field of the table; each checked one becomes a slicer.
+  const fieldList = document.createElement('div');
+  fieldList.className = 'fc-macslicerdlg__fields';
+  fieldList.setAttribute('role', 'group');
   const error = document.createElement('div');
   error.className = 'fc-fmtdlg__error fc-macslicerdlg__error';
   error.dataset.macSlicerError = 'true';
   error.setAttribute('role', 'alert');
   error.hidden = true;
-
-  const row = (control: HTMLElement): { wrapper: HTMLLabelElement; text: HTMLSpanElement } => {
-    const wrapper = document.createElement('label');
-    wrapper.className = 'fc-fmtdlg__row fc-macslicerdlg__row';
-    const text = document.createElement('span');
-    wrapper.append(text, control);
-    return { wrapper, text };
-  };
-  const tableRow = row(tableSelect);
-  const columnRow = row(columnSelect);
-  body.append(tableRow.wrapper, columnRow.wrapper, error);
+  body.append(fieldList, error);
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
     cancelLabel: strings.macSlicer.cancel,
     okLabel: strings.macSlicer.ok,
@@ -99,24 +85,13 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     });
   };
 
-  const renderColumns = (): void => {
-    const table = tables.find((entry) => entry.name === tableSelect.value);
-    const previous = columnSelect.value;
-    columnSelect.replaceChildren();
-    if (!table || table.columns.length === 0) {
-      setError(tables.length === 0 ? strings.macSlicer.noTable : strings.macSlicer.noColumns);
-      return;
-    }
-    appendDialogSelectOptions(
-      columnSelect,
-      table.columns.map((column) => ({ value: column, label: column })),
-    );
-    columnSelect.value = table.columns.includes(previous) ? previous : (table.columns[0] ?? '');
-    setError(null);
+  /** The table under the active cell, else the first one. */
+  const targetTable = (): TableOption | undefined => {
+    const active = activeTableOverlay(deps.store.getState());
+    return tables.find((entry) => entry.name === active?.name) ?? tables[0];
   };
 
-  const renderTables = (): void => {
-    const previous = tableSelect.value;
+  const renderFields = (): void => {
     tables = deps
       .getWb()
       .getTables()
@@ -125,56 +100,62 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
         displayName: table.displayName || table.name,
         columns: [...table.columns],
       }));
-    tableSelect.replaceChildren();
-    appendDialogSelectOptions(
-      tableSelect,
-      tables.map((table) => ({ value: table.name, label: table.displayName })),
-    );
-    if (tables.length > 0) {
-      tableSelect.value = tables.some((table) => table.name === previous)
-        ? previous
-        : (tables[0]?.name ?? '');
+    fieldList.replaceChildren();
+    const table = targetTable();
+    if (!table || table.columns.length === 0) {
+      setError(tables.length === 0 ? strings.macSlicer.noTable : strings.macSlicer.noColumns);
+      return;
     }
-    renderColumns();
+    for (const column of table.columns) {
+      const row = document.createElement('label');
+      row.className = 'fc-macslicerdlg__field';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = column;
+      const text = document.createElement('span');
+      text.textContent = column;
+      row.append(box, text);
+      fieldList.appendChild(row);
+    }
+    setError(null);
   };
 
-  const onTableChange = (): void => renderColumns();
   const onOk = (): void => {
-    const table = tables.find((entry) => entry.name === tableSelect.value);
-    const column = columnSelect.value;
-    if (!table || !column) {
-      setError(strings.macSlicer.chooseTableAndColumn);
+    const table = targetTable();
+    const checked = Array.from(
+      fieldList.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked'),
+      (box) => box.value,
+    );
+    if (!table || checked.length === 0) {
+      api.close();
       return;
     }
-    const result = deps.onAdd({ tableName: table.name, column });
-    if (!result) {
-      setError(strings.macSlicer.insertFailed);
-      return;
+    for (const column of checked) {
+      if (!deps.onAdd({ tableName: table.name, column })) {
+        setError(strings.macSlicer.insertFailed);
+        return;
+      }
     }
     api.close();
   };
   const onCancel = (): void => api.close();
 
-  shell.on(tableSelect, 'change', onTableChange);
   shell.on(cancelBtn, 'click', onCancel);
   shell.on(okBtn, 'click', onOk);
 
   const refreshLabels = (): void => {
     header.textContent = strings.slicer.addSlicer;
     shell.setAriaLabel(strings.slicer.addSlicer);
-    tableRow.text.textContent = strings.macSlicer.table;
-    columnRow.text.textContent = strings.slicer.chooseColumn;
-    tableSelect.setAttribute('aria-label', strings.macSlicer.table);
-    columnSelect.setAttribute('aria-label', strings.slicer.chooseColumn);
+    fieldList.setAttribute('aria-label', strings.slicer.chooseColumn);
     cancelBtn.textContent = strings.macSlicer.cancel;
     okBtn.textContent = strings.macSlicer.ok;
   };
 
   const api: MacSlicerDialogHandle = {
     open(): void {
-      renderTables();
+      renderFields();
       shell.open();
-      deferInitialFocus(shell.overlay, () => tableSelect.focus());
+      deferInitialFocus(shell.overlay, () => fieldList.querySelector('input')?.focus());
     },
     close(): void {
       shell.close();
@@ -182,12 +163,12 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     },
     refresh(): void {
       refreshLabels();
-      if (shell.isOpen()) renderTables();
+      if (shell.isOpen()) renderFields();
     },
     setStrings(next: Strings): void {
       strings = next;
       refreshLabels();
-      if (shell.isOpen()) renderTables();
+      if (shell.isOpen()) renderFields();
     },
     detach(): void {
       shell.dispose();

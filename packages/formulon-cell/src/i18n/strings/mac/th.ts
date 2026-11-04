@@ -134,12 +134,10 @@ export const macTh: MacStrings = {
     protectedLocation: 'ตำแหน่งเส้นประกายไฟได้รับการป้องกัน',
   },
   macSlicer: {
-    table: 'ตาราง',
     ok: 'ตกลง',
     cancel: 'ยกเลิก',
     noTable: 'ไม่มีตารางที่พร้อมใช้งาน',
     noColumns: 'ตารางไม่มีคอลัมน์',
-    chooseTableAndColumn: 'เลือกตารางและคอลัมน์',
     insertFailed: 'ไม่สามารถแทรกตัวแบ่งส่วนข้อมูลสำหรับตารางนี้ได้',
   },
   macWorkbookStats: {

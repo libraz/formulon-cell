@@ -136,12 +136,10 @@ export const macFr: MacStrings = {
     protectedLocation: 'L’emplacement du graphique sparkline est protégé.',
   },
   macSlicer: {
-    table: 'Tableau',
     ok: 'OK',
     cancel: 'Annuler',
     noTable: 'Aucun tableau n’est disponible.',
     noColumns: 'Le tableau ne contient aucune colonne.',
-    chooseTableAndColumn: 'Choisissez un tableau et une colonne.',
     insertFailed: 'Le segment n’a pas pu être inséré pour ce tableau.',
   },
   macWorkbookStats: {

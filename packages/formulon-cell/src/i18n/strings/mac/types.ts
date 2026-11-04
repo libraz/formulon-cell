@@ -181,12 +181,10 @@ export interface MacStrings {
     protectedLocation: string;
   };
   macSlicer: {
-    table: string;
     ok: string;
     cancel: string;
     noTable: string;
     noColumns: string;
-    chooseTableAndColumn: string;
     insertFailed: string;
   };
   macWorkbookStats: {

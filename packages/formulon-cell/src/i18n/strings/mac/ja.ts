@@ -132,12 +132,10 @@ export const macJa: MacStrings = {
     protectedLocation: 'スパークラインの場所は保護されています。',
   },
   macSlicer: {
-    table: 'テーブル',
     ok: 'OK',
     cancel: 'キャンセル',
     noTable: '使用できるテーブルがありません。',
     noColumns: 'テーブルに列がありません。',
-    chooseTableAndColumn: 'テーブルと列を選択してください。',
     insertFailed: 'このテーブルにスライサーを挿入できませんでした。',
   },
   macWorkbookStats: {

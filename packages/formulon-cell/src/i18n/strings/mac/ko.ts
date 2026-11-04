@@ -135,12 +135,10 @@ export const macKo: MacStrings = {
     protectedLocation: '스파크라인 위치가 보호되어 있습니다.',
   },
   macSlicer: {
-    table: '표',
     ok: '확인',
     cancel: '취소',
     noTable: '사용 가능한 표가 없습니다.',
     noColumns: '표에 열이 없습니다.',
-    chooseTableAndColumn: '표와 열을 선택하세요.',
     insertFailed: '이 표에 슬라이서를 삽입할 수 없습니다.',
   },
   macWorkbookStats: {

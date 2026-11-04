@@ -135,12 +135,10 @@ export const macEn: MacStrings = {
     protectedLocation: 'The sparkline location is protected.',
   },
   macSlicer: {
-    table: 'Table',
     ok: 'OK',
     cancel: 'Cancel',
     noTable: 'No table is available.',
     noColumns: 'The table has no columns.',
-    chooseTableAndColumn: 'Choose a table and column.',
     insertFailed: 'The slicer could not be inserted for this table.',
   },
   macWorkbookStats: {

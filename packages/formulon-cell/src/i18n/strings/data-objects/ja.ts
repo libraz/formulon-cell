@@ -559,7 +559,7 @@ export const dataObjectsJa: DataObjectsStrings = {
     selectAll: 'すべて選択',
     clear: 'クリア',
     close: '閉じる',
-    addSlicer: 'スライサーの追加',
+    addSlicer: 'スライサーの挿入',
     chooseColumn: '列を選択',
     tablePlaceholder: '対象テーブルが見つかりません',
   },

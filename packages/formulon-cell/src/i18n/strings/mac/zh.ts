@@ -134,12 +134,10 @@ export const macZh: MacStrings = {
     protectedLocation: '迷你图位置受保护。',
   },
   macSlicer: {
-    table: '表格',
     ok: '确定',
     cancel: '取消',
     noTable: '没有可用的表格。',
     noColumns: '表格没有列。',
-    chooseTableAndColumn: '请选择表格和列。',
     insertFailed: '无法为此表格插入切片器。',
   },
   macWorkbookStats: {

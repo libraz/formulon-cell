@@ -137,12 +137,10 @@ export const macDe: MacStrings = {
     protectedLocation: 'Die Sparkline-Position ist geschützt.',
   },
   macSlicer: {
-    table: 'Tabelle',
     ok: 'OK',
     cancel: 'Abbrechen',
     noTable: 'Keine Tabelle verfügbar.',
     noColumns: 'Die Tabelle enthält keine Spalten.',
-    chooseTableAndColumn: 'Wählen Sie eine Tabelle und eine Spalte aus.',
     insertFailed: 'Der Datenschnitt konnte für diese Tabelle nicht eingefügt werden.',
   },
   macWorkbookStats: {

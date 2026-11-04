@@ -1,0 +1,25 @@
+@layer fc.app {
+  /* Insert Slicers (Mac): a 323 pt window around a 283 x 100 pt list of field checkboxes. */
+  .fc-macslicerdlg__panel {
+    width: 323px;
+    max-height: none;
+  }
+
+  .fc-macslicerdlg__fields {
+    box-sizing: border-box;
+    width: 283px;
+    height: 100px;
+    overflow-y: auto;
+    padding: 2px 0;
+    border: 1px solid var(--fc-rule);
+    background: var(--fc-bg);
+  }
+
+  .fc-macslicerdlg__field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 22px;
+    padding: 0 8px;
+  }
+}
