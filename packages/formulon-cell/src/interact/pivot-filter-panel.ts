@@ -176,7 +176,7 @@ export function openPivotFieldFilter(
   const sortButton = (label: string, aria: string, order: PivotSortOrder): HTMLButtonElement => {
     const b = createInteractionButton({ className: 'fc-pivot-filter-panel__sort' });
     const glyph = createExcelRibbonSvg(
-      order === PivotSortOrder.Ascending ? 'sortAsc' : 'sortDesc',
+      order === PivotSortOrder.Ascending ? 'sortAscSmall' : 'sortDescSmall',
       'fc-pivot-filter-panel__sort-icon',
     );
     const text = doc.createElement('span');

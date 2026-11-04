@@ -7,6 +7,7 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { ja } from '../../../src/i18n/strings.js';
 import { openPivotFieldFilter } from '../../../src/interact/pivot-filter-panel.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+import { excelRibbonIconPaths } from '../../../src/toolbar/excel-ribbon-icons.js';
 
 /** Region / Amt at K1:L4; report at A3: rows Region, Sum of Amt (A3:B7). */
 const setup = async () => {
@@ -82,6 +83,21 @@ describe('PivotTable filter panel', () => {
     expect(panel()?.textContent).toContain('昇順');
     expect(panel()?.textContent).toContain('ラベル別:');
     expect(panel()?.textContent).toContain('値別:');
+  });
+
+  it('keys the sort buttons with the small A-over-Z glyphs', async () => {
+    // Excel (Mac): a blue A over a dark Z (Z over A for descending) and a
+    // short dark arrow, not the ribbon's full-height accent arrow.
+    const { ctx } = await setup();
+    openPivotFieldFilter(ctx, { sheet: 0, row: 2, col: 0 });
+    for (const [order, name] of [
+      ['asc', 'sortAscSmall'],
+      ['desc', 'sortDescSmall'],
+    ] as const) {
+      const icon = panel()?.querySelector(`[data-pivot-filter-sort="${order}"] svg`);
+      const drawn = [...(icon?.querySelectorAll('path') ?? [])].map((p) => p.getAttribute('d'));
+      expect(drawn).toEqual(excelRibbonIconPaths(name)?.map((segment) => segment.d));
+    }
   });
 
   it('applies an unchecked item at once as one undo step', async () => {

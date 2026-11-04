@@ -17,9 +17,30 @@ const sortArrow = [
   ...arrow({ from: [17.6, 3.6], to: [17.6, 20.4], color: PALETTE.accent, head: 'solid' }),
 ];
 
+/** The 16px sort key of the desktop's filter panels: a capital A in info over
+ *  or under an ink Z, the A keeping its colour in either order. */
+const smallSortKeys = (top: 'A' | 'Z') => [
+  letter('A', { height: 9.7, cx: 5.6, cy: top === 'A' ? 5.6 : 19.1, color: PALETTE.info }),
+  letter('Z', { height: 9.7, cx: 5.6, cy: top === 'A' ? 19.1 : 5.6, color: PALETTE.ink }),
+];
+
+/** Short ink arrow beside the small sort key, its head carrying the icon. */
+const smallSortArrow = [
+  ...arrow({
+    from: [19.5, 6.8],
+    to: [19.5, 20.2],
+    color: PALETTE.ink,
+    head: 'solid',
+    weight: 'heavy',
+    headScale: 1.95,
+  }),
+];
+
 export const SORT_FILTER_ICONS = {
   sortAsc: [...sortKeys('A', 'Z'), ...sortArrow],
   sortDesc: [...sortKeys('Z', 'A'), ...sortArrow],
+  sortAscSmall: [...smallSortKeys('A'), ...smallSortArrow],
+  sortDescSmall: [...smallSortKeys('Z'), ...smallSortArrow],
 
   // Sort *and* filter: the A-to-Z key beside the cone.
   sortFilter: [

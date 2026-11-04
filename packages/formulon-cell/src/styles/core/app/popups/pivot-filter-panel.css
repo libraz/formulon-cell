@@ -50,16 +50,18 @@
     font-weight: 700;
     line-height: 16px;
   }
+  /* Measured: two 109 x 26 pt buttons from x 20 with a 1 pt gap. */
   .fc-pivot-filter-panel__sort-row {
     display: flex;
-    gap: 3px;
-    margin: 0 19px;
+    gap: 1px;
+    margin: 0 18px 0 20px;
   }
   .fc-pivot-filter-panel__sort {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 4px;
+    flex: 0 0 109px;
     width: 109px;
     height: 26px;
   }
@@ -146,12 +148,15 @@
   .fc-pivot-filter-panel__footer {
     display: flex;
     justify-content: flex-end;
-    margin: 8px 19px 0;
+    margin: 8px 20px 0;
   }
+  /* Measured: 113 x 22 pt, its right edge 20 pt in from the panel's. */
   .fc-pivot-filter-panel__clear {
-    min-width: 113px;
+    flex: 0 0 113px;
+    width: 113px;
     height: 22px;
-    padding: 0 8px;
+    padding: 0 2px;
+    font-size: 12px;
     white-space: nowrap;
   }
 }
