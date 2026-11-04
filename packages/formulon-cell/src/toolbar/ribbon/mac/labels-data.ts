@@ -106,6 +106,36 @@ export const MAC_LABEL_SOURCES: Readonly<Record<string, CoreLabelSource>> = {
  * remain unchanged where that is the Excel UI term.
  */
 export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> = {
+  navigation: { de: 'Navigation', fr: 'Navigation', zh: '导航', ko: '탐색', th: 'การนำทาง' },
+  ruler: { de: 'Lineal', fr: 'Règle', zh: '标尺', ko: '눈금자', th: 'ไม้บรรทัด' },
+  dataTypeIcons: {
+    de: 'Datentypsymbole',
+    fr: 'Icônes de type de données',
+    zh: '数据类型图标',
+    ko: '데이터 형식 아이콘',
+    th: 'ไอคอนชนิดข้อมูล',
+  },
+  cellFocus: {
+    de: 'Zellfokus',
+    fr: 'Focus sur la cellule',
+    zh: '单元格焦点',
+    ko: '셀 포커스',
+    th: 'โฟกัสเซลล์',
+  },
+  dataCleanup: {
+    de: 'Datenbereinigung',
+    fr: 'Nettoyage des données',
+    zh: '数据清理',
+    ko: '데이터 정리',
+    th: 'ล้างข้อมูล',
+  },
+  dataAnalysis: {
+    de: 'Datenanalyse',
+    fr: 'Analyse des données',
+    zh: '数据分析',
+    ko: '데이터 분석',
+    th: 'วิเคราะห์ข้อมูล',
+  },
   recommendedPivotTable: {
     de: 'Empfohlene PivotTables',
     fr: 'Tableaux croisés dynamiques recommandés',
@@ -1332,10 +1362,56 @@ export const localizedFunctionName = (name: string, locale: Locale): string => {
   return translations?.[locale] ?? name;
 };
 
+/** Control names the Japanese Mac app uses where the shared dictionary words them differently. */
+export const MAC_JA_LABELS: Readonly<Record<string, string>> = {
+  powerQuery: 'データ ファイル指定 (Power Query)',
+  sortAsc: '昇順',
+  sortDesc: '降順',
+  flashFill: 'フラッシュ フィル',
+  removeDuplicates: '重複を削除',
+  validation: '入力規則',
+  showDetail: '詳細データの表示',
+  autoSum: 'オート SUM',
+  namesManager: 'ネーム マネージャー',
+  precedents: '参照元のトレース',
+  dependents: '参照先のトレース',
+  removeArrows: 'トレース矢印の削除',
+  watch: 'ウォッチ ウィンドウ',
+  recalc: '再計算実行',
+  errorCheck: 'エラー チェック',
+  spelling: 'スペル チェック',
+  stats: 'ブックの統計情報',
+  accessibility: 'アクセシビリティ チェック',
+  previousComment: '前のコメント',
+  nextComment: '次のコメント',
+  protectSheet: 'シートの保護',
+  protectWorkbook: 'ブックの保護',
+  pageBreakPreview: '改ページ プレビュー',
+  pageLayout: 'ページ レイアウト',
+  newWindow: '新しいウインドウを開く',
+  arrange: 'ウインドウの整列',
+  freeze: 'ウインドウ枠の固定',
+  hide: '表示しない',
+  resetWindow: 'ウインドウを元の位置に戻す',
+  switchWindow: 'ウインドウの切り替え',
+  width: '幅:',
+  height: '高さ:',
+  scaleWidth: '幅:',
+  scaleHeight: '高さ:',
+  symbol: '記号/文字',
+  dataCleanup: 'データのクリーニング',
+  dataAnalysis: 'データの分析',
+};
+
+const withMacJa = (key: string, label: Label): Label => {
+  const ja = MAC_JA_LABELS[key];
+  return ja ? { ...label, ja } : label;
+};
+
 export const localizedLabel = (key: string, seed: LegacyLabel): Label => {
   const source = MAC_LABEL_SOURCES[key];
-  if (source) return localizedFromCore(source);
+  if (source) return withMacJa(key, localizedFromCore(source));
   const translations = MAC_LABEL_TRANSLATIONS[key];
-  if (translations) return localizedFromTranslations(seed, translations);
+  if (translations) return withMacJa(key, localizedFromTranslations(seed, translations));
   throw new Error(`Missing Mac ribbon translations for label: ${key}`);
 };

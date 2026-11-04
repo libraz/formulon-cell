@@ -458,6 +458,13 @@ const dataTab = (): RibbonTabModel =>
       { ja: 'データ ツール', en: 'Data Tools' },
       [
         compactCommand('mac.data.textToColumns', t('textToColumns'), 'textToColumns'),
+        disabledCompactCommand('mac.data.dataCleanup', t('dataCleanup'), 'clear', OFFICE_REQUIRED),
+        disabledCompactCommand(
+          'mac.data.dataAnalysis',
+          t('dataAnalysis'),
+          'inspect',
+          OFFICE_REQUIRED,
+        ),
         compactCommand('mac.data.flashFill', t('flashFill'), 'flashFill'),
         compactCommand('mac.data.removeDuplicates', t('removeDuplicates'), 'removeDuplicates'),
         compactCommand('mac.data.validation', t('validation'), 'dataValidation'),
@@ -602,7 +609,21 @@ const viewTab = (): RibbonTabModel =>
     ),
     group(
       { ja: '表示/非表示', en: 'Show' },
-      [compactCommand('mac.view.show', t('show'), 'show')],
+      [
+        disabledCompactCommand('mac.view.navigation', t('navigation'), 'show', NOT_IMPLEMENTED),
+        disabledCompactCommand('mac.view.ruler', t('ruler'), 'show', NOT_IMPLEMENTED),
+        checkboxCommand('mac.view.gridlines', t('gridlines'), 'show'),
+        compactCommand('mac.view.formulaBar', t('formulaBar'), 'show'),
+        checkboxCommand('mac.view.headings', t('headings'), 'show'),
+        disabledCompactCommand(
+          'mac.view.dataTypeIcons',
+          t('dataTypeIcons'),
+          'show',
+          NOT_IMPLEMENTED,
+        ),
+        disabledCompactCommand('mac.view.cellFocus', t('cellFocus'), 'show', NOT_IMPLEMENTED),
+        checkboxCommand('mac.view.zeros', t('zeros'), 'show'),
+      ],
       'compact',
     ),
     group(
