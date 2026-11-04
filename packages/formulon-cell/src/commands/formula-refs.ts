@@ -386,6 +386,13 @@ function adjustFormulaForCutPasteWithContext(
 ): string {
   const dRow = dest.r0 - source.r0;
   const dCol = dest.c0 - source.c0;
+  const sourceBounds = rectangleBounds(source);
+  const destRect: CellRangeBounds = {
+    r0: dest.r0,
+    c0: dest.c0,
+    r1: dest.r0 + sourceBounds.r1 - sourceBounds.r0,
+    c1: dest.c0 + sourceBounds.c1 - sourceBounds.c0,
+  };
   return rewriteRefs(formula, (tok) => {
     if (tok.kind !== 'cell') {
       const targetSheet = resolveReferenceSheet(tok.sheetQual, context);
@@ -417,6 +424,9 @@ function adjustFormulaForCutPasteWithContext(
     );
     if (!tok.b) {
       if (a.atom === null) return null;
+      if (!a.moved && isOverwrittenByCut(targetSheet, tok.a, tok.a, destRect, context)) {
+        return `${a.qualifier}#REF!`;
+      }
       return `${a.qualifier}${a.atom}`;
     }
 
@@ -425,6 +435,17 @@ function adjustFormulaForCutPasteWithContext(
     // same-sheet cuts keep the range verbatim; cross-sheet cuts trim only a
     // complete edge strip. Corner and middle overlaps remain unchanged.
     const originalQualifier = tok.sheetQual || qualifierForOutputSheet(targetSheet, context);
+    // A range the pasted block covers entirely loses its cells, unless the
+    // whole range is itself part of the moved block.
+    if (
+      isOverwrittenByCut(targetSheet, tok.a, tok.b, destRect, context) &&
+      !(
+        targetSheet === context.sourceSheet &&
+        classifyCutRange(tok.a, tok.b, source, false).kind === 'move'
+      )
+    ) {
+      return `${originalQualifier}#REF!`;
+    }
     if (targetSheet !== context.sourceSheet) {
       return `${originalQualifier}${renderAtomRaw(tok.a)}:${renderAtomRaw(tok.b)}`;
     }
@@ -457,6 +478,19 @@ function adjustFormulaForCutPasteWithContext(
     if (trimmed === null) return null;
     return `${originalQualifier}${trimmed.a}:${trimmed.b}`;
   });
+}
+
+/** True when the cells `a`..`b` on `targetSheet` all lie inside the pasted block. */
+function isOverwrittenByCut(
+  targetSheet: number,
+  a: Atom,
+  b: Atom,
+  destRect: CellRangeBounds,
+  context: CutPasteSheetContext,
+): boolean {
+  if (targetSheet !== context.destinationSheet) return false;
+  const r = atomBounds(a, b);
+  return r.r0 >= destRect.r0 && r.r1 <= destRect.r1 && r.c0 >= destRect.c0 && r.c1 <= destRect.c1;
 }
 
 interface CellRangeBounds {

@@ -817,6 +817,10 @@ function applyPaste(
   // no-op while consuming the cut marquee. In particular, do not clear and
   // rewrite the source, which would manufacture an unnecessary undo entry.
   if (snap.mode === 'cut' && !opt.transpose && sameRange(sourceLogical, checked.destination)) {
+    // Excel's Range.Cut onto the same address does drop the merges it covers.
+    recordMergesChangeWithEngine(history, store, wb, sourceLogical.sheet, () => {
+      mutateMergeSlice(store, sourceLogical.sheet, [sourceLogical], []);
+    });
     consumeCutMarquee(store);
     return { writtenRange: checked.destination, skippedNonFiniteOperations: 0 };
   }
