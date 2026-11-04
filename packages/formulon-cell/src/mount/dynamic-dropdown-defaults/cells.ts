@@ -1,6 +1,5 @@
 import { insertCopiedBand } from '../../commands/clipboard/insert-copied-cells.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
-import { hiddenExtentInSelection } from '../../commands/row-col-layout.js';
 import { addrKey } from '../../engine/address.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import { openCellShiftDialog, runCellShiftChoice } from '../../interact/cell-shift-dialog.js';
@@ -201,8 +200,6 @@ const updateFormatCellsMenu =
       addrKey({ sheet: range.sheet, row: range.r0, col: range.c0 }),
     );
     const activeLocked = representativeFormat?.locked !== false;
-    const rowsHidden = hiddenExtentInSelection(state.layout, 'row', range.r0, range.r1) !== null;
-    const colsHidden = hiddenExtentInSelection(state.layout, 'col', range.c0, range.c1) !== null;
     const sheet = state.data.sheetIndex;
     const hiddenSheetCount = state.layout.hiddenSheets.size;
     const visibleSheetCount = instance.workbook.sheetCount - hiddenSheetCount;
@@ -212,8 +209,6 @@ const updateFormatCellsMenu =
     );
     const reasonForFormatAction = (action: string | undefined): string | undefined => {
       const t = instance.i18n.strings.ribbonMenu;
-      if (action === 'show-rows' && !rowsHidden) return t.formatNoHiddenRows;
-      if (action === 'show-cols' && !colsHidden) return t.formatNoHiddenCols;
       if (
         (action === 'rename-sheet' ||
           action === 'move-sheet-copy' ||
@@ -229,9 +224,8 @@ const updateFormatCellsMenu =
       if (action === 'move-sheet-right' && sheet >= instance.workbook.sheetCount - 1) {
         return t.sheetMoveAtBoundary;
       }
-      if (action === 'move-sheet-copy') return t.sheetActionUnavailable;
       if (action === 'default-width') return instance.i18n.strings.ribbon.disabled;
-      if (action === 'tab-color-high-contrast' || action === 'tab-color-more') {
+      if (action === 'tab-color-high-contrast') {
         return t.sheetActionUnavailable;
       }
       if (action === 'hide-sheet' && visibleSheetCount <= 1) return t.sheetHideRequiresVisibleSheet;
@@ -243,18 +237,14 @@ const updateFormatCellsMenu =
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-format]')) {
       const action = button.dataset.cellFormat;
       const disabled =
-        (action === 'show-rows' && !rowsHidden) ||
-        (action === 'show-cols' && !colsHidden) ||
-        (action === 'rename-sheet' && !canMoveSheet) ||
-        action === 'move-sheet-copy' ||
+        ((action === 'rename-sheet' || action === 'move-sheet-copy') && !canMoveSheet) ||
         action === 'default-width' ||
         (action === 'move-sheet-left' && (sheet <= 0 || !canMoveSheet)) ||
         (action === 'move-sheet-right' &&
           (sheet >= instance.workbook.sheetCount - 1 || !canMoveSheet)) ||
         (action === 'hide-sheet' && visibleSheetCount <= 1) ||
         (action === 'unhide-sheet' && hiddenSheetCount === 0) ||
-        action === 'tab-color-high-contrast' ||
-        action === 'tab-color-more';
+        action === 'tab-color-high-contrast';
       setMenuControlDisabled(button, disabled, reasonForFormatAction(action));
       if (action === 'lock-cell' || action === 'toggle-lock') {
         button.setAttribute('role', 'menuitemcheckbox');

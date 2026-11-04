@@ -38,8 +38,6 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     moveOrCopySheet: 'ย้ายหรือคัดลอกแผ่นงาน…',
     hideSheet: 'ซ่อนแผ่นงาน',
     showSheet: 'ยกเลิกการซ่อนแผ่นงาน…',
-    formatNoHiddenRows: 'ไม่ได้เลือกแถวที่ซ่อนอยู่',
-    formatNoHiddenCols: 'ไม่ได้เลือกคอลัมน์ที่ซ่อนอยู่',
     sheetActionUnavailable: 'กลไกเวิร์กบุ๊กไม่สามารถเปลี่ยนชื่อ ย้าย ซ่อน หรือยกเลิกการซ่อนแผ่นงานได้',
     sheetMoveAtBoundary: 'ไม่สามารถย้ายแผ่นงานนี้ไปในทิศทางนั้นได้อีก',
     sheetHideRequiresVisibleSheet: 'เวิร์กบุ๊กต้องมีแผ่นงานที่มองเห็นได้อย่างน้อยหนึ่งแผ่น',

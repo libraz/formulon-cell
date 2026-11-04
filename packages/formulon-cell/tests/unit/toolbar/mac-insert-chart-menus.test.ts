@@ -48,4 +48,14 @@ describe('Mac Insert chart galleries', () => {
         ?.getAttribute('aria-disabled'),
     ).toBe('false');
   });
+
+  it('Recommended Charts offers its explanation until the selection holds data', () => {
+    const menu = factory('mac.insert.recommendedChart');
+    const none = menu?.querySelector<HTMLElement>(
+      '[data-ribbon-command="mac.insert.recommendedChart.none"]',
+    );
+    expect(none?.textContent).toBe('選択したデータに対するおすすめグラフはありません。');
+    expect(none?.getAttribute('aria-disabled')).toBe('true');
+    expect(menu?.querySelector('[data-ribbon-command="mac.insert.chartColumn"]')).toBeNull();
+  });
 });

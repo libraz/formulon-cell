@@ -1,4 +1,8 @@
-import { currencySymbolForLocale, datePatternsForLocale } from '../format/locale.js';
+import {
+  currencySymbolForLocale,
+  datePatternsForLocale,
+  normalizeFormatLocale,
+} from '../format/locale.js';
 import { formatNumber } from '../format/number-format.js';
 import type { NumFmt } from '../store/types.js';
 
@@ -18,6 +22,15 @@ export type NumberFormatAction =
 
 const defaultCurrencySymbolForToolbar = currencySymbolForLocale;
 
+/** The long date as Excel's dropdown applies it: with the weekday where the locale pattern has none. */
+const withWeekday = (long: string, locale: string): string => {
+  if (long.includes('dddd')) return long;
+  const language = normalizeFormatLocale(locale).split('-')[0];
+  if (language === 'ja') return `${long} aaaa`;
+  if (language === 'en') return `dddd, ${long}`;
+  return long;
+};
+
 export const numberFormatForAction = (
   action: NumberFormatAction,
   locale: string,
@@ -36,9 +49,9 @@ export const numberFormatForAction = (
     case 'shortDate':
       return { kind: 'date', pattern: patterns.short };
     case 'longDate':
-      return { kind: 'date', pattern: patterns.long };
+      return { kind: 'date', pattern: withWeekday(patterns.long, locale) };
     case 'time':
-      return { kind: 'time', pattern: patterns.time };
+      return { kind: 'time', pattern: patterns.time.replace('MM', 'MM:ss') };
     case 'percent':
       return { kind: 'percent', decimals: 2 };
     case 'fraction':

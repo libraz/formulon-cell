@@ -1989,3 +1989,59 @@
     margin: 5px 0 6px;
   }
 }
+
+@layer fc.chrome {
+  /* Font Size list: 24 pt rows, every size visible without scrolling. */
+  [data-fc-platform="mac"] [data-ribbon-select="fontSize"] .fc-tb__rb-dd__list {
+    width: 63px;
+    min-width: 63px;
+    max-height: none;
+    padding: 5px 0;
+    overflow-y: visible;
+  }
+
+  [data-fc-platform="mac"] [data-ribbon-select="fontSize"] .fc-tb__rb-dd__opt {
+    min-height: 24px;
+    padding-block: 2px;
+  }
+}
+
+@layer fc.chrome {
+  /* Font and fill colour flyouts: 16 pt swatches in a 198 x 284 pt panel. */
+  [data-fc-platform="mac"] .fc-tb__color-flyout .fc-colorpalette {
+    gap: 4px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__color-flyout .fc-colorpalette__grid {
+    grid-template-columns: repeat(10, 16px);
+  }
+
+  [data-fc-platform="mac"] .fc-tb__color-flyout .fc-colorpalette__swatch {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@layer fc.chrome {
+  /* Mac menus: every row is a 24 pt pitch. */
+  [data-fc-platform="mac"] #menu-paste .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-copy .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-autosum-home .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-autosum-formulas .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-clear .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-sort .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-sort-home .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-find-select .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-fill .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-insert-cells .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-delete-cells .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-format-cells .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-underline .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-merge .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-wrap .fc-tb__menu-item,
+  [data-fc-platform="mac"] #menu-text-orientation .fc-tb__menu-item,
+  [data-fc-platform="mac"] .fc-tb__currency-menu .fc-tb__menu-item,
+  [data-fc-platform="mac"] .fc-tb__menu .fc-tb__menu-item {
+    min-height: 24px;
+  }
+}

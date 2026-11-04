@@ -37,8 +37,6 @@ export interface RibbonMenusStrings {
     moveOrCopySheet: string;
     hideSheet: string;
     showSheet: string;
-    formatNoHiddenRows: string;
-    formatNoHiddenCols: string;
     sheetActionUnavailable: string;
     sheetMoveAtBoundary: string;
     sheetHideRequiresVisibleSheet: string;

@@ -111,7 +111,20 @@ const createLineColorSubmenu = (label: string, deps: BordersMenuDeps): HTMLDivEl
     ariaLabel: label,
     value: deps.getBorderColor(),
     automatic: { label: deps.ribbonText.automatic, color: '#000000' },
+    moreColorsLabel: deps.ribbonText.moreColors,
     onPick: (color) => deps.onPickColor(color),
+    onMoreColors: () => {
+      const picker = document.createElement('input');
+      picker.type = 'color';
+      picker.value = deps.getBorderColor();
+      picker.style.cssText = 'position:fixed;left:-9999px;opacity:0';
+      picker.addEventListener('change', () => {
+        deps.onPickColor(picker.value);
+        picker.remove();
+      });
+      document.body.appendChild(picker);
+      picker.click();
+    },
   });
   submenu.appendChild(palette.el);
   return submenu;

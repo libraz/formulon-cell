@@ -38,8 +38,6 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     moveOrCopySheet: 'Verschieben oder Kopieren …',
     hideSheet: 'Blatt ausblenden',
     showSheet: 'Blatt einblenden …',
-    formatNoHiddenRows: 'Es sind keine ausgeblendeten Zeilen ausgewählt.',
-    formatNoHiddenCols: 'Es sind keine ausgeblendeten Spalten ausgewählt.',
     sheetActionUnavailable:
       'Die Arbeitsmappen-Engine kann Blätter nicht umbenennen, verschieben, ausblenden oder einblenden.',
     sheetMoveAtBoundary: 'Dieses Blatt kann in diese Richtung nicht weiter verschoben werden.',

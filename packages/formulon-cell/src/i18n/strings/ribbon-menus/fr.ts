@@ -38,8 +38,6 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     moveOrCopySheet: 'Déplacer ou copier la feuille…',
     hideSheet: 'Masquer la feuille',
     showSheet: 'Afficher la feuille…',
-    formatNoHiddenRows: 'Aucune ligne masquée n’est sélectionnée.',
-    formatNoHiddenCols: 'Aucune colonne masquée n’est sélectionnée.',
     sheetActionUnavailable:
       'Le moteur du classeur ne peut pas renommer, déplacer, masquer ou afficher les feuilles.',
     sheetMoveAtBoundary: 'Cette feuille ne peut pas être déplacée davantage dans cette direction.',

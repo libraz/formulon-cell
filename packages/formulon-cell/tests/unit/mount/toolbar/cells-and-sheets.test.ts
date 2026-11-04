@@ -451,10 +451,9 @@ describe('Spreadsheet.mountToolbar', () => {
     const unhideSheetButton = host.querySelector<HTMLButtonElement>(
       '[data-cell-format="unhide-sheet"]',
     );
-    expect(showRowsBeforeHide?.getAttribute('aria-disabled')).toBe('true');
-    expect(showRowsBeforeHide?.dataset.menuDisabledReason).toBe('No hidden rows are selected.');
-    expect(showColsBeforeHide?.getAttribute('aria-disabled')).toBe('true');
-    expect(showColsBeforeHide?.dataset.menuDisabledReason).toBe('No hidden columns are selected.');
+    // Unhide with nothing hidden is a harmless no-op, as in Excel, so both stay enabled.
+    expect(showRowsBeforeHide?.getAttribute('aria-disabled')).toBe('false');
+    expect(showColsBeforeHide?.getAttribute('aria-disabled')).toBe('false');
     expect(renameSheetButton?.getAttribute('aria-disabled')).toBe('true');
     expect(renameSheetButton?.dataset.menuDisabledReason).toBe(
       'This workbook engine cannot rename, move, hide, or unhide sheets.',

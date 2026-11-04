@@ -184,7 +184,9 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
                   ? { kind: 'fixed', decimals: 2, thousands: true }
                   : action === 'percent'
                     ? { kind: 'percent', decimals: 0 }
-                    : fmt,
+                    : fmt.kind === 'time'
+                      ? { ...fmt, pattern: fmt.pattern.replace(':ss', '') }
+                      : fmt,
               ),
             'numberFormat',
           );

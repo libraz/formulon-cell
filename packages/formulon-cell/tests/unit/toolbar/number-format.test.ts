@@ -19,9 +19,9 @@ describe('toolbar/number-format', () => {
     });
     expect(numberFormatForAction('longDate', 'en')).toEqual({
       kind: 'date',
-      pattern: 'mmmm d, yyyy',
+      pattern: 'dddd, mmmm d, yyyy',
     });
-    expect(numberFormatForAction('time', 'ja')).toEqual({ kind: 'time', pattern: 'H:MM' });
+    expect(numberFormatForAction('time', 'ja')).toEqual({ kind: 'time', pattern: 'H:MM:ss' });
     expect(numberFormatForAction('more', 'en')).toBeNull();
   });
 
@@ -33,6 +33,10 @@ describe('toolbar/number-format', () => {
     expect(sample('scientific')).toBe('1.23E+03');
     expect(sample('fraction')).toBe('1234 1/2');
     expect(sample('text')).toBe('1234.5');
+    expect(sample('time')).toBe('12:00:00 PM');
+    expect(sample('longDate')).toBe('Monday, May 18, 1903');
+    expect(numberFormatSample('time', 1234.5, 'ja')).toBe('12:00:00');
+    expect(numberFormatSample('longDate', 1234.5, 'ja')).toBe('1903年5月18日 月曜日');
     expect(sample('general')).toBeNull();
     expect(sample('more')).toBeNull();
   });

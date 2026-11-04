@@ -38,8 +38,6 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     moveOrCopySheet: '시트 이동 또는 복사…',
     hideSheet: '시트 숨기기',
     showSheet: '시트 숨기기 취소…',
-    formatNoHiddenRows: '숨겨진 행이 선택되지 않았습니다.',
-    formatNoHiddenCols: '숨겨진 열이 선택되지 않았습니다.',
     sheetActionUnavailable:
       '통합 문서 엔진에서 시트 이름 바꾸기, 이동, 숨기기 또는 숨기기 취소를 지원하지 않습니다.',
     sheetMoveAtBoundary: '이 시트는 해당 방향으로 더 이동할 수 없습니다.',

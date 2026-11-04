@@ -38,8 +38,6 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     moveOrCopySheet: 'シートの移動またはコピー...',
     hideSheet: 'シートを表示しない',
     showSheet: 'シートの再表示...',
-    formatNoHiddenRows: '選択範囲に非表示の行がありません。',
-    formatNoHiddenCols: '選択範囲に非表示の列がありません。',
     sheetActionUnavailable:
       'このブック エンジンではシート名の変更、移動、非表示、再表示を実行できません。',
     sheetMoveAtBoundary: 'この方向にはこれ以上シートを移動できません。',

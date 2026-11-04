@@ -24,6 +24,7 @@ import type { Range } from '../../engine/types.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators } from '../../store/store.js';
 import { resolveTheme } from '../../theme/resolve.js';
+import { showMoveCopySheetDialog } from '../dialogs/move-copy-sheet.js';
 import type { ToolbarMenuText } from '../menu-text.js';
 
 type CellFormatMenuText = ToolbarMenuText & {
@@ -96,6 +97,64 @@ export const applyCellFormatAction = async (
       moveSheet(i.store, i.workbook, sheet, target, i.history);
       deps.renderSheetTabs();
     }
+    return;
+  }
+  if (action === 'move-sheet-copy') {
+    const sheet = i.store.getState().data.sheetIndex;
+    const hidden = i.store.getState().layout.hiddenSheets;
+    const shown = Array.from({ length: i.workbook.sheetCount }, (_, index) => index).filter(
+      (index) => !hidden.has(index),
+    );
+    const sheetTabs = i.i18n.strings.sheetTabs;
+    const result = await showMoveCopySheetDialog({
+      host: i.host,
+      strings: {
+        title: sheetTabs.moveCopyTitle,
+        targetBook: sheetTabs.moveCopyTargetBook,
+        before: sheetTabs.moveCopyBefore,
+        toEnd: sheetTabs.moveCopyToEnd,
+        makeCopy: sheetTabs.moveCopyMakeCopy,
+        copyUnavailable: sheetTabs.moveCopyUnavailable,
+        ok: i.i18n.strings.hyperlinkDialog.ok,
+        cancel: i.i18n.strings.hyperlinkDialog.cancel,
+      },
+      bookName: '',
+      sheets: shown.map((index) => i.workbook.sheetName(index)),
+      current: Math.max(0, shown.indexOf(sheet)),
+    });
+    if (!result) return;
+    const beforeSheet = shown[result.before];
+    const last = shown.at(-1) ?? sheet;
+    const to =
+      beforeSheet === undefined ? last : sheet < beforeSheet ? beforeSheet - 1 : beforeSheet;
+    if (
+      moveSheet(
+        i.store,
+        i.workbook,
+        sheet,
+        Math.max(0, Math.min(i.workbook.sheetCount - 1, to)),
+        i.history,
+      )
+    ) {
+      deps.renderSheetTabs();
+    }
+    return;
+  }
+  if (action === 'tab-color-more') {
+    const sheet = i.store.getState().data.sheetIndex;
+    const picker = document.createElement('input');
+    picker.type = 'color';
+    picker.value = i.store.getState().layout.sheetTabColors.get(sheet) ?? '#c00000';
+    picker.style.cssText = 'position:fixed;left:-9999px;opacity:0';
+    picker.addEventListener('change', () => {
+      recordLayoutChange(i.history, i.store, () => {
+        mutators.setSheetTabColor(i.store, sheet, picker.value);
+      });
+      deps.renderSheetTabs();
+      picker.remove();
+    });
+    document.body.appendChild(picker);
+    picker.click();
     return;
   }
   if (action === 'hide-sheet') {

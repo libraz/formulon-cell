@@ -38,8 +38,6 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     moveOrCopySheet: '移动或复制工作表…',
     hideSheet: '隐藏工作表',
     showSheet: '取消隐藏工作表…',
-    formatNoHiddenRows: '未选择隐藏行。',
-    formatNoHiddenCols: '未选择隐藏列。',
     sheetActionUnavailable: '工作簿引擎无法重命名、移动、隐藏或取消隐藏工作表。',
     sheetMoveAtBoundary: '此工作表无法继续向该方向移动。',
     sheetHideRequiresVisibleSheet: '工作簿必须至少包含一个可见工作表。',

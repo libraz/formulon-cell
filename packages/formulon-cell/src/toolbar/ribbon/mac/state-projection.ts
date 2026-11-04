@@ -106,6 +106,26 @@ const contentDisabledReason = (
     : MAC_CONTEXT_LABELS.outlineRequired[lang];
 };
 
+const hasValuesInSelection = (instance: SpreadsheetInstance): boolean => {
+  const state = instance.store.getState();
+  const { sheet, r0, r1, c0, c1 } = state.selection.range;
+  for (const [key, cell] of state.data.cells) {
+    if (cell.value.kind === 'blank') continue;
+    const addr = parseAddrKey(key);
+    if (
+      addr &&
+      addr.sheet === sheet &&
+      addr.row >= r0 &&
+      addr.row <= r1 &&
+      addr.col >= c0 &&
+      addr.col <= c1
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const hasValidationInSelection = (instance: SpreadsheetInstance): boolean => {
   const { format, selection } = instance.store.getState();
   const { sheet, r0, r1, c0, c1 } = selection.range;
@@ -287,6 +307,15 @@ export const projectMacRibbonState = (
     button.textContent = label;
     button.title = label;
     button.setAttribute('aria-label', label);
+  }
+
+  // Recommended Charts offers its action only once the selection holds data.
+  const hasData = hasValuesInSelection(instance);
+  for (const [id, shown] of [
+    ['mac.insert.recommendedChart.none', !hasData],
+    ['mac.insert.recommendedChart.apply', hasData],
+  ] as const) {
+    for (const button of buttons.get(id) ?? []) button.hidden = !shown;
   }
 
   for (const id of MAC_CONTENT_STATE_COMMANDS) {

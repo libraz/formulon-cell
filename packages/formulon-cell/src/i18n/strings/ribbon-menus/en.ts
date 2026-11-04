@@ -38,8 +38,6 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     moveOrCopySheet: 'Move or Copy Sheet...',
     hideSheet: 'Hide Sheet',
     showSheet: 'Unhide Sheet...',
-    formatNoHiddenRows: 'No hidden rows are selected.',
-    formatNoHiddenCols: 'No hidden columns are selected.',
     sheetActionUnavailable: 'This workbook engine cannot rename, move, hide, or unhide sheets.',
     sheetMoveAtBoundary: 'This sheet cannot move farther in that direction.',
     sheetHideRequiresVisibleSheet: 'A workbook must contain at least one visible sheet.',

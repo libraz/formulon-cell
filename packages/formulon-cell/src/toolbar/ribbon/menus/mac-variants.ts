@@ -10,6 +10,7 @@ export interface MenuVariant {
 
 /** Rows the Mac menu does not carry, by menu id then `dataset:value` row key. */
 const MAC_OMITTED_ROWS: Readonly<Record<string, readonly string[]>> = {
+  'menu-format-cells': ['cellFormat:tab-color-high-contrast'],
   'menu-clear': ['clear:conditional'],
   'menu-sort-home': [
     'sort:filter-by-value',
