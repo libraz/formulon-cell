@@ -46,6 +46,8 @@ interface SheetTabsControllerInput {
   sheetMenu: HTMLDivElement;
   sheetTabs: HTMLDivElement;
   store: SpreadsheetStore;
+  /** Opens the protect or unprotect flow of the active sheet. */
+  toggleSheetProtection?: () => void;
 }
 
 export interface SheetTabsController {
@@ -367,7 +369,28 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           )
         : [menuButton(strings.sheetTabs.unhideSheet, () => undefined, true, unhideReason(false))];
 
-    sheetMenu.replaceChildren(
+    const insertSheetAction = (): void => {
+      const added = addSheet(store, wb, history);
+      if (added < 0) return;
+      switchSheet(added);
+      update();
+    };
+    const deleteSheetAction = async (): Promise<void> => {
+      if (!(await confirmSheetDelete(strings, wb, idx))) return;
+      if (!removeSheet(store, wb, idx)) return;
+      hydrateActiveSheet();
+      update();
+      refreshStatusBar();
+      invalidate();
+    };
+    const hideSheetAction = (): void => {
+      if (!setSheetHidden(store, wb, history, idx, true)) return;
+      hydrateActiveSheet();
+      update();
+      refreshStatusBar();
+      invalidate();
+    };
+    const desktopItems: HTMLElement[] = [
       menuButton(
         strings.sheetTabs.rename,
         () => beginRename(idx, tab),
@@ -376,12 +399,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       ),
       menuButton(
         strings.sheetTabs.insertSheet,
-        () => {
-          const added = addSheet(store, wb, history);
-          if (added < 0) return;
-          switchSheet(added);
-          update();
-        },
+        insertSheetAction,
         structureProtected,
         strings.ribbonMenu.workbookStructureProtectedBlocked,
       ),
@@ -410,26 +428,13 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       createSheetMenuSeparator(),
       menuButton(
         strings.sheetTabs.deleteSheet,
-        async () => {
-          if (!(await confirmSheetDelete(strings, wb, idx))) return;
-          if (!removeSheet(store, wb, idx)) return;
-          hydrateActiveSheet();
-          update();
-          refreshStatusBar();
-          invalidate();
-        },
+        deleteSheetAction,
         structureProtected || !canMutate || wb.sheetCount <= 1,
         deleteReason(),
       ),
       menuButton(
         strings.sheetTabs.hideSheet,
-        () => {
-          if (!setSheetHidden(store, wb, history, idx, true)) return;
-          hydrateActiveSheet();
-          update();
-          refreshStatusBar();
-          invalidate();
-        },
+        hideSheetAction,
         structureProtected || !canHide || visibleIndexes.length <= 1,
         hideReason(),
       ),
@@ -448,7 +453,66 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         veryHideReason(),
       ),
       ...unhideButtons,
-    );
+    ];
+    // The Mac desktop's tab menu lists its own entries in its own order.
+    const macItems = (): HTMLElement[] => {
+      const m = strings.macSheetTabMenu;
+      const protectedSheet = isSheetProtected(store.getState(), idx);
+      const sheetProtection = input.toggleSheetProtection;
+      colorLabel.textContent = m.tabColor;
+      colorPalette.setAttribute('aria-label', m.tabColor);
+      return [
+        menuButton(
+          m.insertSheet,
+          insertSheetAction,
+          structureProtected,
+          strings.ribbonMenu.workbookStructureProtectedBlocked,
+        ),
+        menuButton(
+          strings.sheetTabs.deleteSheet,
+          deleteSheetAction,
+          structureProtected || !canMutate || wb.sheetCount <= 1,
+          deleteReason(),
+        ),
+        menuButton(
+          strings.sheetTabs.rename,
+          () => beginRename(idx, tab),
+          structureProtected || !canMutate,
+          sheetActionReason(),
+        ),
+        menuButton(
+          strings.sheetTabs.moveCopy,
+          () => {
+            void openMoveCopy();
+          },
+          structureProtected || !canMutate,
+          sheetActionReason(),
+        ),
+        menuButton(m.viewCode, () => undefined, true, m.unavailable),
+        menuButton(
+          protectedSheet
+            ? strings.ribbonMenu.unprotectSheetCommand
+            : strings.ribbonMenu.protectSheetCommand,
+          () => sheetProtection?.(),
+          !sheetProtection,
+          m.unavailable,
+        ),
+        colorPalette,
+        createSheetMenuSeparator(),
+        menuButton(
+          m.hideSheet,
+          hideSheetAction,
+          structureProtected || !canHide || visibleIndexes.length <= 1,
+          hideReason(),
+        ),
+        ...(hiddenIndexes.length > 0
+          ? unhideButtons
+          : [menuButton(m.unhideSheet, () => undefined, true, unhideReason(false))]),
+        createSheetMenuSeparator(),
+        menuButton(m.selectAllSheets, () => undefined, true, m.unavailable),
+      ];
+    };
+    sheetMenu.replaceChildren(...(isMacWorkbook(wb) ? macItems() : desktopItems));
     positionSheetMenu(sheetMenu, x, y);
     sheetMenu.querySelector<HTMLButtonElement>('.fc-sheetmenu__item:not([disabled])')?.focus();
   };
