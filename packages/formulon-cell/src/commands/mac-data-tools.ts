@@ -22,10 +22,12 @@ export const MAX_SUBTOTAL_GROUPS = 1_000;
 export const MAX_GOAL_SEEK_ITERATIONS = 100;
 /** Desktop default Maximum Change: Goal Seek stops once |formula - target| is below it. */
 const GOAL_SEEK_MAX_CHANGE = 0.001;
-const GOAL_SEEK_PROBE = 2 ** -20;
-/** Measured on desktop: a flat formula from x0 ends at x0 - 0.01 * 2^25. */
-const GOAL_SEEK_FLAT_STEP = 0.01;
+/** First trial offset, as a fraction of |x0| (1 when x0 is 0). A flat
+ * formula also walks down from x0 by this step doubled, up to 2^25 times. */
+const GOAL_SEEK_PROBE = 0.01;
 const GOAL_SEEK_FLAT_DOUBLINGS = 25;
+/** Secant steps are capped at this fraction of the scale, doubling per step. */
+const GOAL_SEEK_STEP_LIMIT = 0.1;
 
 export type MacDataFunction = 'sum' | 'average' | 'count' | 'min' | 'max';
 
@@ -466,75 +468,78 @@ export async function solveMacGoalSeek(
       1,
       Math.min(MAX_GOAL_SEEK_ITERATIONS, Math.trunc(requestedIterations)),
     );
+    // Returns the formula value for a trial changing value, or null when the
+    // trial or the result is not a finite number.
     const evaluate = (value: number): number | null => {
       if (!Number.isFinite(value)) return null;
       scratch?.applyCellPatchAtomic([
         { addr: request.changingCell, value: { kind: 'number', value }, formula: null },
       ]);
       scratch?.recalc();
-      const formulaValue = formulaNumber(scratch as WorkbookHandle, request.formulaCell);
-      return formulaValue === null ? null : formulaValue - request.targetValue;
+      return formulaNumber(scratch as WorkbookHandle, request.formulaCell);
     };
     const finish = (
       changingValue: number,
-      residual: number,
+      formulaValue: number,
       iterations: number,
       converged: boolean,
     ): MacDataResult<GoalSeekSolution> =>
       registerGoalSeekSolution(request, sourceBytes, {
         changingValue,
-        formulaValue: request.targetValue + residual,
+        formulaValue,
         iterations,
         converged,
       });
 
-    let x = initial;
-    let residual = evaluate(x);
-    if (residual === null) return failure('invalid', 'nonFiniteResult');
-    if (Math.abs(residual) < tolerance) return finish(x, residual, 0, true);
+    const initialValue = evaluate(initial);
+    if (initialValue === null) return failure('invalid', 'nonFiniteResult');
+    const target = request.targetValue;
+    if (Math.abs(initialValue - target) < tolerance) return finish(initial, initialValue, 0, true);
+    // Desktop Goal Seek is a secant search: a first trial 1% of |x0| away
+    // (toward whichever side lowers the residual), then secant steps whose
+    // size limit starts at 10% of |x0| and doubles every step.
+    const scale = initial === 0 ? 1 : Math.abs(initial);
+    let previous = initial;
+    let previousValue = initialValue;
+    let x = initial + GOAL_SEEK_PROBE * scale;
+    let value = evaluate(x);
+    if (value === null || !(Math.abs(value - target) < Math.abs(initialValue - target))) {
+      x = initial - GOAL_SEEK_PROBE * scale;
+      value = evaluate(x);
+    }
+    if (value === null) return finish(initial, initialValue, 0, false);
+    if (Math.abs(value - target) < tolerance) return finish(x, value, 1, true);
+    let limit = GOAL_SEEK_STEP_LIMIT * scale;
     let flatOrigin: number | null = null;
     let flatDoublings = 0;
-    for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
-      // Newton step from the current point; the forward probe is a power of
-      // two scaled to x, so linear formulas land exactly in one step.
-      const step = GOAL_SEEK_PROBE * Math.max(1, Math.abs(x));
-      const probe = evaluate(x + step);
-      const slope = probe === null ? Number.NaN : (probe - residual) / step;
+    for (let iteration = 2; iteration <= maxIterations; iteration += 1) {
       let candidate: number;
-      let next: number | null;
-      if (slope === 0 || !Number.isFinite(slope)) {
+      if (value === previousValue) {
         // Flat formula: walk down from where it went flat, doubling the step.
-        if (flatOrigin === null) {
-          flatOrigin = x;
-        } else if (flatDoublings === GOAL_SEEK_FLAT_DOUBLINGS) {
-          return finish(x, residual, iteration - 1, false);
-        } else {
-          flatDoublings += 1;
+        if (flatOrigin === null) flatOrigin = previous;
+        if (flatDoublings === GOAL_SEEK_FLAT_DOUBLINGS) {
+          return finish(x, value, iteration - 1, false);
         }
-        candidate = flatOrigin - GOAL_SEEK_FLAT_STEP * 2 ** flatDoublings;
-        next = evaluate(candidate);
+        flatDoublings += 1;
+        candidate = flatOrigin - GOAL_SEEK_PROBE * scale * 2 ** flatDoublings;
       } else {
         flatOrigin = null;
         flatDoublings = 0;
-        candidate = x - residual / slope;
-        next = evaluate(candidate);
-        // A step that overshoots (a pole, a turning point) is halved toward x
-        // until it reduces the residual.
-        for (
-          let halvings = 0;
-          (next === null || Math.abs(next) >= Math.abs(residual)) && halvings < 30;
-          halvings += 1
-        ) {
-          candidate = x + (candidate - x) / 2;
-          next = evaluate(candidate);
-        }
+        const residual = value - target;
+        let step = (-residual * (x - previous)) / (value - previousValue);
+        if (Math.abs(step) > limit) step = Math.sign(step) * limit;
+        limit *= 2;
+        candidate = x + step;
       }
-      if (next === null) return finish(x, residual, iteration - 1, false);
+      const next = evaluate(candidate);
+      if (next === null) return finish(x, value, iteration - 1, false);
+      previous = x;
+      previousValue = value;
       x = candidate;
-      residual = next;
-      if (Math.abs(residual) < tolerance) return finish(x, residual, iteration, true);
+      value = next;
+      if (Math.abs(value - target) < tolerance) return finish(x, value, iteration, true);
     }
-    return finish(x, residual, maxIterations, false);
+    return finish(x, value, maxIterations, false);
   } catch (error) {
     return failure('invalid', 'failed', thrownReason(error));
   } finally {

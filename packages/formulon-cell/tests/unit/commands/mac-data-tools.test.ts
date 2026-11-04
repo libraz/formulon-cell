@@ -761,7 +761,7 @@ describe('Mac Data command operations', () => {
   describe('Goal Seek results match desktop Excel', () => {
     const A1 = { sheet: 0, row: 0, col: 0 };
     const B1 = { sheet: 0, row: 0, col: 1 };
-    const solve = async (formula: string, target: number, start: number) => {
+    const solve = async (formula: string, target: number, start: number, tolerance?: number) => {
       const wb = await WorkbookHandle.createDefault();
       handles.push(wb);
       wb.setNumber(A1, start);
@@ -771,6 +771,7 @@ describe('Mac Data command operations', () => {
         formulaCell: B1,
         targetValue: target,
         changingCell: A1,
+        ...(tolerance === undefined ? {} : { tolerance }),
       });
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('goal seek failed');
@@ -789,20 +790,62 @@ describe('Mac Data command operations', () => {
       expect(solution.formulaValue).toBe(c.target);
     });
 
-    // Desktop stops once |B1 - target| < 0.001, so A1 is an iterate rather
-    // than the root. Measured A1 values; the host iterate stays within 1e-3.
-    it.each([
-      { formula: '=A1^2', target: 2, start: 1, a1: 1.4142112625265164 },
-      { formula: '=A1^2', target: 2, start: 5, a1: 1.4143125598316881 },
-      { formula: '=EXP(A1)', target: 10, start: 1, a1: 2.3025843910299684 },
-      { formula: '=SIN(A1)', target: 0.5, start: 0, a1: 0.5228953821747103 },
-      { formula: '=1/A1', target: 4, start: 1, a1: 0.250001813273059 },
-    ])('stops within Maximum Change for $formula = $target from $start', async (c) => {
-      const { solution } = await solve(c.formula, c.target, c.start);
-      expect(solution.converged).toBe(true);
-      expect(Math.abs(solution.formulaValue - c.target)).toBeLessThan(1e-3);
-      expect(Math.abs(solution.changingValue - c.a1)).toBeLessThan(1e-3);
-    });
+    // Desktop stops at the first secant iterate with |B1 - target| below
+    // Maximum Change, so A1 is that iterate rather than the root.
+    const nonlinear = [
+      { formula: '=A1^2', target: 2, start: 1 },
+      { formula: '=A1^2', target: 2, start: 5 },
+      { formula: '=EXP(A1)', target: 10, start: 1 },
+      { formula: '=SIN(A1)', target: 0.5, start: 0 },
+      { formula: '=1/A1', target: 4, start: 1 },
+    ] as const;
+    const measured: Record<string, readonly (readonly [number, number])[]> = {
+      // [A1, B1] for Maximum Change 0.1, 0.001 (default) and 1e-9.
+      '=A1^2 1': [
+        [1.4273140495867769, 2.037225396147804],
+        [1.4142112625265164, 1.9999934950568434],
+        [1.4142135623730947, 1.9999999999999991],
+      ],
+      '=A1^2 5': [
+        [1.4192613561082004, 2.014302796942088],
+        [1.4143125598316881, 2.0002800168976624],
+        [1.4142135623792675, 2.0000000000174585],
+      ],
+      '=EXP(A1) 1': [
+        [2.2960404709563043, 9.934767473574484],
+        [2.3025843910299684, 9.999992980361691],
+        [2.3025850929188363, 9.999999999247907],
+      ],
+      '=SIN(A1) 0': [
+        [0.5096528354494478, 0.4878742315159021],
+        [0.5228953821747103, 0.4993907197859767],
+        [0.5235987750309066, 0.49999999950862384],
+      ],
+      '=1/A1 1': [
+        [0.25317194239999996, 3.9498847720654853],
+        [0.250001813273059, 3.999970987841484],
+        [0.24999999999999248, 4.000000000000121],
+      ],
+    };
+    const tolerances = [0.1, undefined, 1e-9] as const;
+    it.each(
+      nonlinear.flatMap((c) =>
+        tolerances.map((tolerance, i) => ({
+          ...c,
+          tolerance,
+          expected: measured[`${c.formula} ${c.start}`]?.[i] ?? [Number.NaN, Number.NaN],
+        })),
+      ),
+    )(
+      'reproduces the desktop iterate for $formula = $target from $start (max change $tolerance)',
+      async (c) => {
+        const { wb, solution } = await solve(c.formula, c.target, c.start, c.tolerance);
+        expect(solution.converged).toBe(true);
+        expect(solution.changingValue).toBe(c.expected[0]);
+        expect(solution.formulaValue).toBe(c.expected[1]);
+        expect(wb.getValue(A1)).toEqual({ kind: 'number', value: c.start });
+      },
+    );
 
     it('walks a flat formula down to start - 0.01 * 2^25 and keeps it', async () => {
       const { solution } = await solve('=5', 7, 1);
