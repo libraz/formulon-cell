@@ -6,6 +6,7 @@ import { effectiveCellFormatFromEngine } from '../../engine/cell-format-projecti
 import { evaluateCfFromEngine } from '../../engine/cf-sync.js';
 import { formulaForEdit } from '../../engine/edit-seed.js';
 import { numFmtToFormatCode } from '../../engine/format-writeback.js';
+import { pivotStyleLayer } from '../../engine/pivot-style.js';
 import { makeRangeResolver, type RangeResolver } from '../../engine/range-resolver.js';
 import type { CellValue } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
@@ -26,7 +27,15 @@ import {
   rangeRects,
   type ViewState,
 } from '../geometry.js';
-import { filterButtonRect, paintFilterButton } from '../painters/filter-button.js';
+import {
+  FILTER_BUTTON_LOOK,
+  FILTER_BUTTON_SIZE,
+  filterButtonRect,
+  MAC_PIVOT_BUTTON_LOOK,
+  MAC_PIVOT_BUTTON_SIZE,
+  paintFilterButton,
+  pivotFieldButtonRect,
+} from '../painters/filter-button.js';
 import { alignedTextAnchor, cellFont, cellFontCss, visualZoom } from '../painters/text.js';
 import {
   CONDITIONAL_ICON_GUTTER,
@@ -65,7 +74,7 @@ import {
 } from './hit-state.js';
 import { gridLinesShown } from './lines.js';
 import { connectedRects } from './range-rects.js';
-import { tableCellFormat } from './table-format.js';
+import { styleElementFormatSource } from './table-format.js';
 
 export type CellDisplayResolver = (
   addr: { sheet: number; row: number; col: number },
@@ -150,6 +159,12 @@ export function paintCells(
   const rtl = layout.rtl;
   const active = selection.active;
   const wb = cellCtx.wb;
+  const pivots = pivotStyleLayer(wb, state);
+  const styleFormatAt = styleElementFormatSource(state, wb);
+  const pivotButtonSize =
+    (cellCtx.fontEffects ? MAC_PIVOT_BUTTON_SIZE : FILTER_BUTTON_SIZE) *
+    visualZoom(state.viewport.zoom);
+  const pivotButtonLook = cellCtx.fontEffects ? MAC_PIVOT_BUTTON_LOOK : FILTER_BUTTON_LOOK;
   const visibleBounds = {
     r0: state.viewport.rowStart,
     c0: state.viewport.colStart,
@@ -461,7 +476,8 @@ export function paintCells(
       // into a direct XF on the next flush.
       const engineFmt = effectiveFormatAt(r, c);
       const table = tableForCell(tables.tables, data.sheetIndex, r, c);
-      const tableFmt = table ? tableCellFormat(table, r, c) : undefined;
+      const styleFmt = styleFormatAt(r, c);
+      const pivotButton = pivots.buttons.has(key);
       const isMergeAnchor = merges.byAnchor.has(key);
       // Use the union of contiguous visible rectangles for content bounds,
       // but retain every visible quadrant for the merged surface and static
@@ -488,9 +504,9 @@ export function paintCells(
         !fmt?.fillPattern &&
         !fmt?.fillGradient &&
         !fmt?.borders &&
-        !tableFmt?.fill &&
-        !tableFmt?.fillPattern &&
-        !tableFmt?.borders &&
+        !styleFmt?.fill &&
+        !styleFmt?.fillPattern &&
+        !styleFmt?.borders &&
         !spark &&
         !hasValidationCircle &&
         !hasThreadedComment &&
@@ -506,10 +522,10 @@ export function paintCells(
 
       const overlay = conditional.get(key);
       const baseFmt: typeof fmt =
-        engineFmt || tableFmt || fmt
+        engineFmt || styleFmt || fmt
           ? {
               ...engineFmt,
-              ...tableFmt,
+              ...styleFmt,
               ...fmt,
             }
           : undefined;
@@ -672,13 +688,14 @@ export function paintCells(
       } else if (hideConditionalValue) {
         // Conditional formatting's "Show Bar/Icon Only" suppresses the
         // value text while still leaving fills, bars, and icons visible.
-      } else if (tableHeader) {
+      } else if (tableHeader || pivotButton) {
+        const reserved = tableHeader ? 20 : pivotButtonSize + 1;
         paintCellText({
           ...paintCtx,
           bounds: {
             ...bounds,
-            x: rtl ? bounds.x + 20 : bounds.x,
-            w: Math.max(0, bounds.w - 20),
+            x: rtl ? bounds.x + reserved : bounds.x,
+            w: Math.max(0, bounds.w - reserved),
           },
         });
       } else if (effectiveFmt?.align === 'centerContinuous' && !isMergeAnchor) {
@@ -710,6 +727,17 @@ export function paintCells(
           sorted: filterSorts.flatMap((spec) => spec.keys).find((key) => key.byCol === c)
             ?.direction,
         });
+      }
+      if (pivotButton && !filterHeader) {
+        const rule = ruleWidth(cellCtx.dpr ?? 1);
+        paintFilterButton(
+          ctx,
+          pivotFieldButtonRect(bounds, pivotButtonSize, rule, rtl),
+          theme,
+          {},
+          pivotButtonLook,
+          cellCtx.dpr ?? 1,
+        );
       }
       if (spark) paintCellSparkline(ctx, bounds, spark, state, cellCtx.wb);
       if (fmt?.comment || hasThreadedComment) paintCommentMarker(ctx, bounds, rtl);

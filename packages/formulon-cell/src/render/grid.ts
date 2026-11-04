@@ -2,6 +2,7 @@ import { totalsCellAt } from '../commands/format-as-table.js';
 import { paginationFor, type SheetPagination } from '../commands/pagination.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormatFromEngine } from '../engine/cell-format-projection.js';
+import { pivotStyleLayer } from '../engine/pivot-style.js';
 import { findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -47,6 +48,7 @@ import {
   paintPageRulers,
 } from './grid/page-view.js';
 import { sameRectList, trailingRect } from './grid/range-rects.js';
+import { styleElementFormatSource } from './grid/table-format.js';
 import { paintTraces } from './grid/traces.js';
 import { cellFontFamily } from './painters/text.js';
 import {
@@ -485,7 +487,8 @@ export class GridRenderer {
     cols: AxisLayout,
     rows: AxisLayout,
   ): void {
-    paintGridLines(this.chromeCtx(), state, theme, cols, rows);
+    const bare = pivotStyleLayer(this.getWb(), state).ranges;
+    paintGridLines(this.chromeCtx(), state, theme, cols, rows, bare);
   }
 
   private cellCtx(state: ViewState): CellPaintContext {
@@ -524,11 +527,14 @@ export class GridRenderer {
     const wb = this.getWb();
     const sheet = state.data.sheetIndex;
     const effective = new Map<string, Partial<CellFormat> | null>();
-    const inherited =
+    const styleFormatAt = styleElementFormatSource(state, wb);
+    const engineBorders =
       wb?.capabilities.effectiveStyle && typeof wb.getEffectiveStyle === 'function'
         ? (row: number, col: number) =>
             effectiveCellFormatFromEngine(wb, sheet, row, col, effective)?.borders
         : undefined;
+    const inherited = (row: number, col: number) =>
+      engineBorders?.(row, col) ?? styleFormatAt(row, col)?.borders;
     paintBorders(this.ctx, this.dpr, state, theme, cols, rows, inherited, this.coveredRules);
   }
 

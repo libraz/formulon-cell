@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   FILTER_BUTTON_SIZE,
   filterButtonRect,
+  MAC_PIVOT_BUTTON_LOOK,
+  MAC_PIVOT_BUTTON_SIZE,
   paintFilterButton,
+  pivotFieldButtonRect,
 } from '../../../../src/render/painters/filter-button.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
 
@@ -55,5 +58,55 @@ describe('paintFilterButton', () => {
       [11, 21, 15, 0.5],
     ]);
     expect(strokes).toEqual([[10.5, 20.5, 16, 16]]);
+  });
+});
+
+describe('PivotTable field-caption button (Mac)', () => {
+  it('is 14x14 flush with the trailing gridline, over the gridline above', () => {
+    // Column A of the measured report at 2x: content x 23..90 CSS px, gridline 90..91.
+    const rect = pivotFieldButtonRect({ x: 23, y: 55, w: 68, h: 14 }, MAC_PIVOT_BUTTON_SIZE, 1);
+    expect(rect).toEqual({ x: 76, y: 54, w: 14, h: 14 });
+    // Device px at 2x: 152..179, as measured.
+    expect([rect.x * 2, (rect.x + rect.w) * 2 - 1]).toEqual([152, 179]);
+  });
+
+  it('draws a two-ring frame at 2x and a 7 px wide arrow', () => {
+    const strokes: { color: string; rect: number[] }[] = [];
+    const path: number[][] = [];
+    let strokeStyle = '';
+    const ctx = new Proxy(
+      {},
+      {
+        get: (_t, key) =>
+          key === 'strokeRect'
+            ? (...a: number[]) => strokes.push({ color: strokeStyle, rect: a })
+            : key === 'moveTo' || key === 'lineTo'
+              ? (...a: number[]) => path.push(a)
+              : key === 'createLinearGradient'
+                ? () => ({ addColorStop: () => undefined })
+                : () => undefined,
+        set: (_t, key, value) => {
+          if (key === 'strokeStyle') strokeStyle = value;
+          return true;
+        },
+      },
+    ) as unknown as CanvasRenderingContext2D;
+    paintFilterButton(
+      ctx,
+      { x: 76, y: 54.5, w: 14, h: 14 },
+      { accent: '#217346', bg: '#fff' } as ResolvedTheme,
+      {},
+      MAC_PIVOT_BUTTON_LOOK,
+      2,
+    );
+    expect(strokes).toEqual([
+      { color: '#848a90', rect: [76.25, 54.75, 13.5, 13.5] },
+      { color: '#93989e', rect: [76.75, 55.25, 12.5, 12.5] },
+    ]);
+    expect(path).toEqual([
+      [79.5, 59.25],
+      [86.5, 59.25],
+      [83, 63.75],
+    ]);
   });
 });

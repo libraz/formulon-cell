@@ -701,7 +701,7 @@ describe('hydrateCellFormatsFromEngine', () => {
     expect(store.getState().format.formats.size).toBe(0);
   });
 
-  it('hydrates PivotTable projection formats without probing physical xf rows', () => {
+  it('hydrates only number formats onto PivotTable projection cells', () => {
     const { wb } = makeFake({
       cells: [{ sheet: 0, row: 0, col: 0 }],
       pivotCells: [
@@ -713,27 +713,13 @@ describe('hydrateCellFormatsFromEngine', () => {
     const store = createSpreadsheetStore();
     hydrateCellFormatsFromEngine(wb, store, 0);
 
-    const header = store.getState().format.formats.get(addrKey({ sheet: 0, row: 2, col: 0 }));
-    const data = store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 1 }));
-    const grandTotal = store.getState().format.formats.get(addrKey({ sheet: 0, row: 4, col: 1 }));
-    expect(header).toMatchObject({
-      bold: true,
-      color: '#1f4e79',
-      fill: '#d9eaf7',
-      borders: {
-        top: { style: 'thin', color: '#9dc3e6' },
-        bottom: { style: 'thin', color: '#9dc3e6' },
-      },
+    const formats = store.getState().format.formats;
+    // The report's look comes from its style at paint time, not from cell formats.
+    expect(formats.get(addrKey({ sheet: 0, row: 2, col: 0 }))).toBeUndefined();
+    expect(formats.get(addrKey({ sheet: 0, row: 3, col: 1 }))).toEqual({
+      numFmt: { kind: 'percent', decimals: 2 },
     });
-    expect(data?.numFmt).toEqual({ kind: 'percent', decimals: 2 });
-    expect(grandTotal).toMatchObject({
-      bold: true,
-      color: '#1f4e79',
-      fill: '#bdd7ee',
-      borders: {
-        top: { style: 'medium', color: '#5b9bd5' },
-        bottom: { style: 'medium', color: '#5b9bd5' },
-      },
+    expect(formats.get(addrKey({ sheet: 0, row: 4, col: 1 }))).toEqual({
       numFmt: { kind: 'fixed', decimals: 0, thousands: true },
     });
   });
@@ -750,43 +736,5 @@ describe('hydrateCellFormatsFromEngine', () => {
     expect(
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 1 }))?.numFmt,
     ).toEqual({ kind: 'fixed', decimals: 2 });
-  });
-
-  it('hydrates PivotTable projection formats from assigned session pivot styles', () => {
-    const { wb } = makeFake({
-      pivotCells: [
-        { addr: { sheet: 0, row: 2, col: 0 }, kind: 0, numberFormat: '', pivotIndex: 1 },
-      ],
-    });
-    const store = createSpreadsheetStore();
-    store.setState((state) => ({
-      ...state,
-      tables: {
-        ...state.tables,
-        customPivotTableStyles: [
-          {
-            id: 'custom-pivot-table:Blue',
-            label: 'Blue',
-            style: 'dark',
-            color: '#4472c4',
-            variant: 'banded',
-          },
-        ],
-        pivotTableStyles: [{ sheetIndex: 0, pivotIndex: 1, styleId: 'custom-pivot-table:Blue' }],
-      },
-    }));
-
-    hydrateCellFormatsFromEngine(wb, store, 0);
-
-    const header = store.getState().format.formats.get(addrKey({ sheet: 0, row: 2, col: 0 }));
-    expect(header).toMatchObject({
-      bold: true,
-      color: '#ffffff',
-      fill: '#253f6c',
-      borders: {
-        top: { style: 'thin', color: '#4472c4' },
-        bottom: { style: 'thin', color: '#4472c4' },
-      },
-    });
   });
 });

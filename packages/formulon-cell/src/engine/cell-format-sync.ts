@@ -1,8 +1,3 @@
-import {
-  customPivotTableStyleById,
-  pivotTableStyleAssignment,
-  tableStyleSwatch,
-} from '../commands/format-as-table.js';
 import { sameStructuredValue } from '../commands/prepared-change.js';
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
@@ -101,16 +96,6 @@ function isPlainDataTree(value: unknown, ancestors = new WeakSet<object>()): boo
     ancestors.delete(object);
   }
 }
-
-const PIVOT_KIND = {
-  Header: 0,
-  RowLabel: 1,
-  ColLabel: 2,
-  Data: 3,
-  RowSubtotal: 4,
-  ColSubtotal: 5,
-  GrandTotal: 6,
-} as const;
 
 export interface EngineSyncOptions {
   readonly strict?: boolean;
@@ -361,16 +346,11 @@ export function hydrateCellFormatsFromEngine(
       updates.push({ key: addrKey(c.addr), patch });
     }
   }
+  // A report's look comes from its PivotTable style at paint time; only the
+  // value fields' number formats land on the cells.
   if (wb.pivotCells) {
     for (const c of wb.pivotCells(sheet)) {
-      const assignment =
-        typeof c.pivotIndex === 'number'
-          ? pivotTableStyleAssignment(store.getState(), sheet, c.pivotIndex)
-          : null;
-      const style = assignment
-        ? customPivotTableStyleById(store.getState(), assignment.styleId)
-        : null;
-      const patch = pivotFormatPatch(c.kind, c.numberFormat, style);
+      const patch = pivotFormatPatch(c.numberFormat);
       if (Object.keys(patch).length > 0) updates.push({ key: addrKey(c.addr), patch });
     }
   }
@@ -392,38 +372,11 @@ export function hydrateCellFormatsFromEngine(
   });
 }
 
-function pivotFormatPatch(
-  kind: number,
-  numberFormat: string,
-  style?: ReturnType<typeof customPivotTableStyleById>,
-): Partial<CellFormat> {
+function pivotFormatPatch(numberFormat: string): Partial<CellFormat> {
   const patch: Partial<CellFormat> = {};
-  const swatch = style ? tableStyleSwatch(style.style, style.color) : null;
-  const headerFill = swatch?.header ?? '#d9eaf7';
-  const bandFill = swatch?.band ?? '#eaf3f8';
-  const totalFill = swatch ? swatch.header : '#bdd7ee';
-  const headerText = swatch?.headerText ?? '#1f4e79';
-  const blueRule = { style: 'thin' as const, color: swatch?.base ?? '#9dc3e6' };
-  const lightRule = { style: 'thin' as const, color: swatch?.band ?? '#d9eaf7' };
-  const totalRule = { style: 'medium' as const, color: swatch?.base ?? '#5b9bd5' };
   if (numberFormat) {
     const numFmt = formatCodeToNumFmt(numberFormat);
     if (numFmt) patch.numFmt = numFmt;
-  }
-  if (kind === PIVOT_KIND.Header || kind === PIVOT_KIND.RowLabel || kind === PIVOT_KIND.ColLabel) {
-    patch.bold = true;
-    patch.fill = headerFill;
-    patch.color = headerText;
-    patch.borders = { top: blueRule, bottom: blueRule };
-  } else if (kind === PIVOT_KIND.RowSubtotal || kind === PIVOT_KIND.ColSubtotal) {
-    patch.bold = true;
-    patch.fill = bandFill;
-    patch.borders = { top: lightRule, bottom: blueRule };
-  } else if (kind === PIVOT_KIND.GrandTotal) {
-    patch.bold = true;
-    patch.fill = totalFill;
-    patch.color = headerText;
-    patch.borders = { top: totalRule, bottom: totalRule };
   }
   return patch;
 }

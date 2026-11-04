@@ -14,6 +14,7 @@ import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, TablesSlice } from '../store/types.js';
 import { dxfToApply } from './cf-sync.js';
 import { dxfRecordFromApply } from './cf-writeback.js';
+import type { StyleElementFormats } from './table-style-elements.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type { CustomEngineTableStyle } from './workbook-handle-table-styles.js';
 
@@ -65,6 +66,22 @@ function dxfIdFor(wb: WorkbookHandle, apply: Partial<CellFormat>): number | null
   return id;
 }
 
+/** The elements a gallery style is written as: whole-table border in the hue,
+ *  header fill and text, bold totals, optional stripe and first-column elements. */
+export function customStyleElementFormats(style: CustomTableStyle): StyleElementFormats {
+  const color = style.color ?? DEFAULT_TABLE_COLOR;
+  const swatch = tableStyleSwatch(style.style, color);
+  const { banded, firstCol } = tableVariantOptions(style.variant);
+  const side = { style: 'thin' as const, color };
+  return {
+    wholeTable: { borders: { top: side, bottom: side, left: side, right: side } },
+    headerRow: { fill: swatch.header, color: swatch.headerText, bold: true },
+    totalRow: { bold: true },
+    ...(banded ? { firstRowStripe: { fill: swatch.band } } : {}),
+    ...(firstCol ? { firstColumn: { bold: true } } : {}),
+  };
+}
+
 /** The engine style for a gallery style; null when its differential formats cannot be authored. */
 export function engineStyleFromCustom(
   wb: WorkbookHandle,
@@ -72,24 +89,13 @@ export function engineStyleFromCustom(
   usage: { pivot: boolean; table: boolean },
 ): EngineTableStyle | null {
   if (!wb.capabilities.conditionalFormatDxf) return null;
-  const color = style.color ?? DEFAULT_TABLE_COLOR;
-  const swatch = tableStyleSwatch(style.style, color);
-  const { banded, firstCol } = tableVariantOptions(style.variant);
-  const side = { style: 'thin' as const, color };
   const elements: TableStyleElement[] = [];
-  const add = (type: TableStyleElement['type'], apply: Partial<CellFormat>): boolean => {
+  for (const [type, apply] of Object.entries(customStyleElementFormats(style))) {
     const dxfId = dxfIdFor(wb, apply);
-    if (dxfId === null) return false;
-    elements.push({ type, dxfId });
-    return true;
-  };
-  const ok =
-    add('wholeTable', { borders: { top: side, bottom: side, left: side, right: side } }) &&
-    add('headerRow', { fill: swatch.header, color: swatch.headerText, bold: true }) &&
-    add('totalRow', { bold: true }) &&
-    (!banded || add('firstRowStripe', { fill: swatch.band })) &&
-    (!firstCol || add('firstColumn', { bold: true }));
-  return ok ? { name: style.label, ...usage, elements } : null;
+    if (dxfId === null) return null;
+    elements.push({ type: type as TableStyleElement['type'], dxfId });
+  }
+  return { name: style.label, ...usage, elements };
 }
 
 const norm = (color: string | undefined): string | undefined => color?.toLowerCase();

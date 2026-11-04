@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildColLayout, buildRowLayout, layoutForView } from '../../../../src/render/geometry.js';
+import {
+  buildColLayout,
+  buildRowLayout,
+  cellRectIn,
+  layoutForView,
+} from '../../../../src/render/geometry.js';
 import { ruleWidth } from '../../../../src/render/grid/chrome-context.js';
 import {
   gridLinesShown,
@@ -45,6 +50,62 @@ describe('paintGridLines', () => {
     // Each cell owns the rule on its trailing edge: [E - 1px, E) centres half a CSS pixel before E.
     expect(moves.length).toBeGreaterThan(0);
     expect(moves.every((x) => x % 1 === 0.5 || x === 0)).toBe(true);
+  });
+});
+
+describe('paintGridLines inside a PivotTable', () => {
+  it('drops the rules the report cells own, keeping its trailing edge', () => {
+    const state = createSpreadsheetStore().getState();
+    state.viewport = { rowStart: 0, rowCount: 8, colStart: 0, colCount: 4, zoom: 1, widthPx: 400 };
+    const view = { ...state, layout: layoutForView(state) };
+    const cols = buildColLayout(view.layout, view.viewport);
+    const rows = buildRowLayout(view.layout, view.viewport);
+    const lines: [number, number, number, number][] = [];
+    let from: [number, number] = [0, 0];
+    const ctx = {
+      set strokeStyle(_v: string) {},
+      set lineWidth(_v: number) {},
+      beginPath: () => undefined,
+      moveTo: (x: number, y: number) => {
+        from = [x, y];
+      },
+      lineTo: (x: number, y: number) => lines.push([...from, x, y]),
+      stroke: () => undefined,
+    } as unknown as CanvasRenderingContext2D;
+    const pivot = { sheet: 0, r0: 2, c0: 0, r1: 4, c1: 1 };
+    paintGridLines(
+      { ctx, dpr: 1, cssWidth: 400, cssHeight: 300 },
+      view,
+      { rule: '#d4d4d4' } as ResolvedTheme,
+      cols,
+      rows,
+      [pivot],
+    );
+    const at = (r: number, c: number) => cellRectIn(view.layout, cols, rows, r, c);
+    const left = at(0, 0).x;
+    const inner = at(0, 1).x;
+    const right = at(0, 2).x;
+    const top = at(2, 0).y;
+    const bottom = at(5, 0).y;
+    const vertical = (x: number) => lines.filter((l) => l[0] === x - 0.5 && l[2] === x - 0.5);
+    const horizontal = (y: number) => lines.filter((l) => l[1] === y - 0.5 && l[3] === y - 0.5);
+    // Between the report's columns: broken over the report's rows.
+    expect(vertical(inner).map((l) => [l[1], l[3]])).toEqual([
+      [0, top],
+      [bottom, 300],
+    ]);
+    // The report's trailing edge and the rule before it run through.
+    expect(vertical(right).map((l) => [l[1], l[3]])).toEqual([[0, 300]]);
+    expect(vertical(left).map((l) => [l[1], l[3]])).toEqual([[0, 300]]);
+    // Under each report row, the bottom one included: broken across the report.
+    for (const r of [3, 4, 5]) {
+      expect(horizontal(at(r, 0).y).map((l) => [l[0], l[2]])).toEqual([
+        [0, left],
+        [right, 400],
+      ]);
+    }
+    // The rule above the report belongs to the row before it.
+    expect(horizontal(top).map((l) => [l[0], l[2]])).toEqual([[0, 400]]);
   });
 });
 

@@ -1,6 +1,7 @@
 // Gridline + freeze-divider painters. Both run after cell painting so they
 // sit above the cell rectangles but below the active selection outline.
 
+import type { Range } from '../../engine/types.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
   type AxisLayout,
@@ -8,6 +9,8 @@ import {
   gridOriginX,
   gridOriginY,
   mirrorX,
+  type Rect,
+  rangeRects,
   type ViewState,
 } from '../geometry.js';
 import { wholePointAdvances } from '../text-metrics.js';
@@ -26,12 +29,37 @@ export function gridLinesShown(state: {
   return !wholePointAdvances(state.layout) || state.viewport.zoom >= MAC_GRIDLINE_MIN_ZOOM;
 }
 
+/** Draw `from..to` minus the `gaps` intervals along one rule. */
+function segments(
+  ctx: CanvasRenderingContext2D,
+  from: number,
+  to: number,
+  gaps: readonly [number, number][],
+  at: (along: number) => [number, number],
+): void {
+  let start = from;
+  for (const [a, b] of [...gaps].sort((p, q) => p[0] - q[0])) {
+    if (a > start) {
+      ctx.moveTo(...at(start));
+      ctx.lineTo(...at(Math.min(a, to)));
+    }
+    start = Math.max(start, b);
+  }
+  if (start < to) {
+    ctx.moveTo(...at(start));
+    ctx.lineTo(...at(to));
+  }
+}
+
+/** Paint the sheet's gridlines. Cells of a `bare` range (a PivotTable) drop
+ *  the rules they own, except the one on the range's trailing edge. */
 export function paintGridLines(
   pc: ChromePaintContext,
   state: ViewState,
   theme: ResolvedTheme,
   cols: AxisLayout,
   rows: AxisLayout,
+  bare: readonly Range[] = [],
 ): void {
   const { ctx, dpr, cssWidth, cssHeight } = pc;
   const { layout } = state;
@@ -53,10 +81,15 @@ export function paintGridLines(
     xs.add(rect.x);
     xs.add(rect.x + rect.w);
   }
+  const bareRects: Rect[] = bare
+    .filter((range) => range.sheet === state.data.sheetIndex)
+    .flatMap((range) => rangeRects(layout, state.viewport, range));
   for (const x of xs) {
     const xx = ruleCenter(x, dpr, rtl);
-    ctx.moveTo(xx, 0);
-    ctx.lineTo(xx, cssHeight);
+    const gaps = bareRects
+      .filter((r) => x > r.x && x < r.x + r.w)
+      .map((r): [number, number] => [r.y, r.y + r.h]);
+    segments(ctx, 0, cssHeight, gaps, (y) => [xx, y]);
   }
   const ys = new Set<number>();
   for (const r of rows.visible) {
@@ -66,8 +99,10 @@ export function paintGridLines(
   }
   for (const y of ys) {
     const yy = ruleCenter(y, dpr);
-    ctx.moveTo(0, yy);
-    ctx.lineTo(cssWidth, yy);
+    const gaps = bareRects
+      .filter((r) => y > r.y && y <= r.y + r.h)
+      .map((r): [number, number] => [r.x, r.x + r.w]);
+    segments(ctx, 0, cssWidth, gaps, (x) => [x, yy]);
   }
 
   ctx.stroke();
