@@ -246,7 +246,11 @@ export const pivotTableDialog = (): Extension => ({
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
       history: ctx.history,
-      onAfterCreate: () => refreshCells(ctx),
+      onAfterCreate: () => {
+        refreshCells(ctx);
+        const wb = ctx.getWb();
+        if (wb) autofitPivotTableColumns(ctx.store, wb, { theme: resolveTheme(ctx.host) });
+      },
       invalidate: () => ctx.invalidate(),
     });
     return {

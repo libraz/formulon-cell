@@ -39,12 +39,24 @@ export interface PivotStyleLayer {
   readonly buttons: ReadonlySet<string>;
   /** The style format of a report cell; undefined outside every report. */
   formatAt(row: number, col: number): CellFormat | undefined;
+  /** Outline placement of a compact row label cell; undefined elsewhere. */
+  outlineAt(row: number, col: number): PivotRowOutline | undefined;
+}
+
+/** Where a compact row label sits in the outline. */
+export interface PivotRowOutline {
+  /** Outline steps the label text is pushed in by: its depth, plus one when
+   *  the report shows collapse buttons. */
+  steps: number;
+  /** The item heads a group of deeper items and carries a collapse button. */
+  collapse: boolean;
 }
 
 const EMPTY_LAYER: PivotStyleLayer = {
   ranges: [],
   buttons: new Set(),
   formatAt: () => undefined,
+  outlineAt: () => undefined,
 };
 
 type PivotStyleReader = Pick<
@@ -91,6 +103,47 @@ export interface PivotLayoutCell {
 const SUBHEADINGS = ['firstRowSubheading', 'secondRowSubheading', 'thirdRowSubheading'] as const;
 const SUBTOTALS = ['firstSubtotalRow', 'secondSubtotalRow', 'thirdSubtotalRow'] as const;
 
+/** The leftmost cell of each row. */
+function leadCells(cells: readonly PivotLayoutCell[]): Map<number, PivotLayoutCell> {
+  const lead = new Map<number, PivotLayoutCell>();
+  for (const cell of cells) {
+    const seen = lead.get(cell.row);
+    if (!seen || cell.col < seen.col) lead.set(cell.row, cell);
+  }
+  return lead;
+}
+
+/** Depth of the innermost row field's items. */
+const leafDepthOf = (cells: readonly PivotLayoutCell[]): number =>
+  Math.max(0, ...cells.filter((c) => c.kind === PIVOT_CELL_KIND.RowLabel).map((c) => c.depth));
+
+/** A subtotal row followed by deeper items heads its group (subtotals at the
+ *  top); otherwise it closes the group. */
+const closesGroup = (cell: PivotLayoutCell, next: PivotLayoutCell | undefined): boolean =>
+  cell.kind === PIVOT_CELL_KIND.RowSubtotal && (!next || next.depth <= cell.depth);
+
+/** Outline placement of the row labels in a report's first column. */
+export function pivotRowOutline(
+  range: Range,
+  cells: readonly PivotLayoutCell[],
+): { row: number; col: number; outline: PivotRowOutline }[] {
+  const lead = leadCells(cells);
+  const leafDepth = leafDepthOf(cells);
+  const labels = cells.filter(
+    (c) =>
+      c.col === range.c0 &&
+      (c.kind === PIVOT_CELL_KIND.RowLabel || c.kind === PIVOT_CELL_KIND.RowSubtotal),
+  );
+  const heads = (c: PivotLayoutCell): boolean =>
+    c.depth < leafDepth && !closesGroup(c, lead.get(c.row + 1));
+  const gutter = labels.some(heads) ? 1 : 0;
+  return labels.map((c) => ({
+    row: c.row,
+    col: c.col,
+    outline: { steps: c.depth + gutter, collapse: heads(c) },
+  }));
+}
+
 const isRowLabelKind = (kind: number): boolean =>
   kind === PIVOT_CELL_KIND.RowLabel ||
   kind === PIVOT_CELL_KIND.RowSubtotal ||
@@ -104,11 +157,7 @@ export function pivotStyleRegions(
   info: Pick<PivotStyleDefinition, 'showRowHeaders' | 'showColHeaders' | 'showRowStripes'>,
 ): { regions: StyleElementRegion[]; buttons: { row: number; col: number }[] } {
   const { r0, r1, c0, c1 } = range;
-  const lead = new Map<number, PivotLayoutCell>();
-  for (const cell of cells) {
-    const seen = lead.get(cell.row);
-    if (!seen || cell.col < seen.col) lead.set(cell.row, cell);
-  }
+  const lead = leadCells(cells);
   let bodyTop = r1 + 1;
   for (let row = r0; row <= r1; row += 1) {
     const kind = lead.get(row)?.kind;
@@ -117,10 +166,7 @@ export function pivotStyleRegions(
       break;
     }
   }
-  const leafDepth = Math.max(
-    0,
-    ...cells.filter((c) => c.kind === PIVOT_CELL_KIND.RowLabel).map((c) => c.depth),
-  );
+  const leafDepth = leafDepthOf(cells);
   const full = (type: StyleElementRegion['type'], row: number): StyleElementRegion => ({
     type,
     r0: row,
@@ -145,12 +191,8 @@ export function pivotStyleRegions(
     }
     if (!cell || cell.depth >= leafDepth) continue;
     const level = Math.min(cell.depth, 2);
-    const next = lead.get(row + 1);
-    // A subtotal row followed by deeper items heads its group (subtotals at
-    // the top); otherwise it closes the group.
-    const closesGroup =
-      cell.kind === PIVOT_CELL_KIND.RowSubtotal && (!next || next.depth <= cell.depth);
-    if (closesGroup) regions.push(full(SUBTOTALS[level] ?? 'thirdSubtotalRow', row));
+    if (closesGroup(cell, lead.get(row + 1)))
+      regions.push(full(SUBTOTALS[level] ?? 'thirdSubtotalRow', row));
     else if (info.showRowHeaders) {
       regions.push(full(SUBHEADINGS[level] ?? 'thirdRowSubheading', row));
     }
@@ -220,7 +262,11 @@ export function buildPivotStyleLayer(
   const themeColors = wb.getTheme()?.colors;
   const formats = new Map<string, CellFormat>();
   const buttons = new Set<string>();
+  const outlines = new Map<string, PivotRowOutline>();
   for (const { pivotIndex, range } of bounds) {
+    for (const label of pivotRowOutline(range, cellsByPivot.get(pivotIndex) ?? [])) {
+      outlines.set(addrKey({ sheet, row: label.row, col: label.col }), label.outline);
+    }
     const info = wb.getPivotStyleInfo(sheet, pivotIndex);
     if (!info) continue;
     const layout = pivotStyleRegions(range, cellsByPivot.get(pivotIndex) ?? [], info);
@@ -244,6 +290,7 @@ export function buildPivotStyleLayer(
     ranges: bounds.map((b) => b.range),
     buttons,
     formatAt: (row, col) => formats.get(addrKey({ sheet, row, col })),
+    outlineAt: (row, col) => outlines.get(addrKey({ sheet, row, col })),
   };
 }
 

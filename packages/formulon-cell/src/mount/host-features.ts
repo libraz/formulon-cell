@@ -554,6 +554,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
               input.store,
               input.wb().cells(input.store.getState().data.sheetIndex),
             );
+            autofitPivotTableColumns(input.store, input.wb(), { theme: resolveTheme(input.host) });
           },
           invalidate: () => input.renderer.invalidate(),
         });

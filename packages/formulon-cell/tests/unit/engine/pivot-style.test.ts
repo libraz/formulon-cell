@@ -5,6 +5,7 @@ import {
   buildPivotStyleLayer,
   builtinPivotStyleElements,
   type PivotLayoutCell,
+  pivotRowOutline,
   pivotStyleRegions,
 } from '../../../src/engine/pivot-style.js';
 import {
@@ -107,6 +108,23 @@ describe('PivotStyleLight16', () => {
   it('tints the other members of the family from their theme colour', () => {
     expect(builtinPivotStyleElements('PivotStyleLight17', THEME)?.headerRow?.fill).toBe('#f2dcdb');
     expect(builtinPivotStyleElements('Custom', THEME)).toBeNull();
+  });
+});
+
+describe('pivotRowOutline', () => {
+  it('pushes outer items one step in with a collapse button, inner items two', () => {
+    const outline = new Map(pivotRowOutline(S2_RANGE, S2).map((l) => [l.row, l.outline] as const));
+    expect(outline.get(3)).toEqual({ steps: 1, collapse: true });
+    expect(outline.get(4)).toEqual({ steps: 2, collapse: false });
+    expect(outline.get(7)).toEqual({ steps: 1, collapse: true });
+    expect(outline.has(2)).toBe(false);
+    expect(outline.has(10)).toBe(false);
+  });
+
+  it('leaves single-field items at the cell padding', () => {
+    for (const l of pivotRowOutline(S1_RANGE, S1)) {
+      expect(l.outline).toEqual({ steps: 0, collapse: false });
+    }
   });
 });
 

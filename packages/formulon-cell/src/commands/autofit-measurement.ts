@@ -18,6 +18,7 @@ import {
   TABLE_HEADER_CHEVRON_INSET,
   TABLE_HEADER_CHEVRON_SIZE,
 } from '../render/painters/markers.js';
+import { pivotOutlineIndent } from '../render/painters/pivot-outline-button.js';
 import {
   type CellFont,
   type CellFontTheme,
@@ -109,7 +110,11 @@ export function computeAutofitColWidth(
     const font = cellFont(format, theme, formulaDisplay);
     const width =
       maxExplicitLineWidth(text, textMeasure(ctx, font, state.layout)) +
-      headerButtonWidth(state, parsed.sheet, parsed.row, parsed.col, pivots.buttons.has(key));
+      headerButtonWidth(state, parsed.sheet, parsed.row, parsed.col, pivots.buttons.has(key)) +
+      pivotOutlineIndent(
+        pivots.outlineAt(parsed.row, parsed.col)?.steps ?? 0,
+        fontPointsToCssPx(1),
+      );
     if (max === null || width > max) max = width;
   }
 
