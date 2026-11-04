@@ -290,4 +290,55 @@ describe('attachHover', () => {
     );
     expect(css).not.toContain('box-shadow: var(--fc-shadow-4)');
   });
+
+  describe('Mac profile note card', () => {
+    const move = (x: number, y: number): void => {
+      grid.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, pointerId: 1 }));
+    };
+
+    it('anchors the card right of the cell with its top at the row above, ignoring the pointer', () => {
+      grid.dataset.fcPlatform = 'mac';
+      mutators.setCellFormat(store, { sheet: 0, row: 2, col: 1 }, { comment: 'note' });
+      const handle = attachHover({ grid, store });
+      const { headerColWidth, headerRowHeight, defaultColWidth, defaultRowHeight } =
+        store.getState().layout;
+      const { x, y } = cellPoint(store, 2, 1);
+      move(x, y);
+      const left = tip()?.style.left;
+      const top = tip()?.style.top;
+      expect(left).toBe(`${headerColWidth + 2 * defaultColWidth}px`);
+      expect(top).toBe(`${headerRowHeight + defaultRowHeight}px`);
+      move(x - 3, y + 2);
+      expect(tip()?.style.left).toBe(left);
+      expect(tip()?.style.top).toBe(top);
+      handle.detach();
+    });
+
+    it('applies the measured card size and class (105 x 77 pt)', () => {
+      grid.dataset.fcPlatform = 'mac';
+      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { comment: 'note' });
+      const handle = attachHover({ grid, store });
+      const { x, y } = cellPoint(store, 0, 0);
+      move(x, y);
+      expect(tip()?.classList.contains('fc-hover-tip--note')).toBe(true);
+      expect(Number.parseFloat(tip()?.style.width ?? '')).toBeCloseTo((105 * 96) / 72, 6);
+      expect(Number.parseFloat(tip()?.style.minHeight ?? '')).toBeCloseTo((77 * 96) / 72, 6);
+      handle.detach();
+    });
+
+    it('keeps hyperlink tooltips pointer-anchored and unstyled as a note', () => {
+      grid.dataset.fcPlatform = 'mac';
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 0 },
+        { hyperlink: 'https://example.test/', hyperlinkTooltip: 'Open' },
+      );
+      const handle = attachHover({ grid, store });
+      const { x, y } = cellPoint(store, 0, 0);
+      move(x, y);
+      expect(tip()?.classList.contains('fc-hover-tip--note')).toBe(false);
+      expect(tip()?.style.left).toBe(`${x + 12}px`);
+      handle.detach();
+    });
+  });
 });

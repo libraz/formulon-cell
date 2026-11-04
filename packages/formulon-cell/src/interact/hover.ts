@@ -1,9 +1,14 @@
 import { hyperlinkCoverAt, isFollowableHyperlinkTarget } from '../commands/hyperlinks.js';
 import { addrKey } from '../engine/address.js';
-import { hitTest, layoutForView } from '../render/geometry.js';
+import { isMacHost } from '../extensions/ui-options.js';
+import { cellRect, hitTest, layoutForView, pointPx } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
+
+/** Measured desktop note card size, in points. */
+const NOTE_CARD_W_PT = 105;
+const NOTE_CARD_H_PT = 77;
 
 export interface HoverDeps {
   /** The grid surface hosting pointer events. */
@@ -110,14 +115,38 @@ export function attachHover(deps: HoverDeps): HoverHandle {
       last = null;
     }
     // A shown note is already on the canvas; hovering it adds no popup.
-    const tooltip = (fmt?.commentVisible ? undefined : fmt?.comment) || fmt?.hyperlinkTooltip;
+    const note = fmt?.commentVisible ? undefined : fmt?.comment;
+    const tooltip = note || fmt?.hyperlinkTooltip;
     if (tooltip) {
       if (tooltip !== shownText) {
         tip.textContent = tooltip;
         tip.hidden = false;
         shownText = tooltip;
       }
-      const position = clampPanelToViewport(tip, e.clientX + 12, e.clientY + 14, {
+      // The Mac note card hangs off the cell, so it stays put while the pointer moves inside it.
+      const anchored = !!note && !!at && isMacHost(grid);
+      if (tip.classList.contains('fc-hover-tip--note') !== anchored) {
+        tip.classList.toggle('fc-hover-tip--note', anchored);
+      }
+      let px = e.clientX + 12;
+      let py = e.clientY + 14;
+      tip.style.width = '';
+      tip.style.minHeight = '';
+      tip.style.borderWidth = '';
+      if (anchored && at) {
+        const s = store.getState();
+        const layout = layoutForView(s);
+        const pt = pointPx(layout, s.viewport);
+        tip.style.width = `${NOTE_CARD_W_PT * pt}px`;
+        tip.style.minHeight = `${NOTE_CARD_H_PT * pt}px`;
+        tip.style.borderWidth = `${pt}px`;
+        const cell = cellRect(layout, s.viewport, at.row, at.col);
+        const above = cellRect(layout, s.viewport, Math.max(0, at.row - 1), at.col);
+        const gridBox = grid.getBoundingClientRect();
+        px = gridBox.left + cell.x + cell.w;
+        py = gridBox.top + above.y;
+      }
+      const position = clampPanelToViewport(tip, px, py, {
         pad: 8,
         fallbackWidth: 280,
         fallbackHeight: 32,

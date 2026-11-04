@@ -19,4 +19,15 @@
     overflow-wrap: anywhere;
     white-space: pre-wrap;
   }
+
+  /* Desktop note card: (255,255,225) fill, 1pt black border, bold black text. */
+  .fc-hover-tip--note {
+    background: #ffffe1;
+    color: #000;
+    border: 1px solid #000;
+    border-radius: 0;
+    box-shadow: none;
+    font-weight: 700;
+    max-width: none;
+  }
 }
