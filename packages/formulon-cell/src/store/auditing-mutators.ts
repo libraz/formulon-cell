@@ -80,6 +80,13 @@ export const auditingMutators = {
     );
   },
 
+  /** Record whether the Workbook Objects panel is open in its general use. */
+  setWorkbookObjectsOpen(store: SpreadsheetStore, open: boolean): void {
+    store.setState((s) =>
+      s.ui.workbookObjectsOpen === open ? s : { ...s, ui: { ...s.ui, workbookObjectsOpen: open } },
+    );
+  },
+
   /** Append a trace arrow to the visible set. Duplicates (same kind +
    *  identical endpoints) are dropped so repeated `tracePrecedents()` calls
    *  on the same active cell don't pile up overlapping arrows. */

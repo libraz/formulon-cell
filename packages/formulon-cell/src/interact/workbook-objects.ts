@@ -21,7 +21,7 @@ import {
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
+import { mutators, type SessionIllustration, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogIconButton } from './dialog-shell.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
@@ -133,6 +133,14 @@ export function attachWorkbookObjectsPanel(
     syncTaskpaneDock(dock);
   };
 
+  // The store mirrors the panel's general (selection pane) open state, so the
+  // ribbon toggle follows every open and close path; a field list is not it.
+  const syncOpenFlag = (): void => {
+    if (deps.store) {
+      mutators.setWorkbookObjectsOpen(deps.store, open && activePivotFieldListKey === '');
+    }
+  };
+
   const close = (restoreFocus = false): void => {
     const wasOpen = open;
     open = false;
@@ -140,6 +148,7 @@ export function attachWorkbookObjectsPanel(
     restoreFocusEl = null;
     root.hidden = true;
     placeRoot(false);
+    syncOpenFlag();
     if (
       wasOpen &&
       restoreFocus &&
@@ -347,6 +356,7 @@ export function attachWorkbookObjectsPanel(
         )
       : undefined;
     if (activePivotFieldListKey && !activeFieldListPivot) activePivotFieldListKey = '';
+    syncOpenFlag();
     root.replaceChildren();
     root.className = `fc-objects${activeFieldListPivot ? ' fc-objects--taskpane' : ''}`;
     if (open) placeRoot(activeFieldListPivot !== undefined);
@@ -620,6 +630,7 @@ export function attachWorkbookObjectsPanel(
     root.hidden = false;
     open = true;
     placeRoot(root.classList.contains('fc-objects--taskpane'));
+    syncOpenFlag();
     root.focus({ preventScroll: true });
   };
 

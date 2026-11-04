@@ -270,7 +270,12 @@ export const projectMacRibbonState = (
     'mac.draw.highlighter': inkTool === 'highlighter',
     'mac.draw.trackpad': ink?.isActive() === true && ink.getTrackpadMode(),
   };
-  for (const [command, pressed] of Object.entries(drawingStates)) {
+  // Task-pane toggles show pressed while their pane is open.
+  const paneStates: Readonly<Record<string, boolean>> = {
+    'mac.formulas.watch': instance.store.getState().ui.watchPanelOpen,
+    objectSelectionPane: instance.store.getState().ui.workbookObjectsOpen,
+  };
+  for (const [command, pressed] of Object.entries({ ...drawingStates, ...paneStates })) {
     for (const button of buttons.get(command) ?? []) {
       button.classList.toggle('fc-tb__rb--active', pressed);
       button.setAttribute('aria-pressed', String(pressed));

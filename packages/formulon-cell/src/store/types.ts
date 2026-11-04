@@ -262,6 +262,9 @@ export interface UiSlice {
   /** Visibility flag for the Watch Window panel. Session-only state — the
    *  panel itself reads `watch.watches` for content. */
   watchPanelOpen: boolean;
+  /** Visibility flag for the Workbook Objects panel in its general (selection
+   *  pane) use; false while it shows a PivotTable field list. Session-only. */
+  workbookObjectsOpen: boolean;
   /** Excel-style sheet background image URLs keyed by sheet index. These are
    *  painted behind cells for on-screen use and intentionally excluded from print. */
   sheetBackgroundImages: Map<number, string>;
