@@ -47,4 +47,33 @@ describe('Mac Home add-in button', () => {
     expect(byId('mac.home.addins')?.disabled).toBeFalsy();
     expect(MAC_RIBBON_DISABLED_COMMAND_IDS.has('mac.home.addins')).toBe(false);
   });
+
+  describe('Mac Home dropdown lists', () => {
+    it('lists font sizes from 6 as the desktop list does', () => {
+      expect(byId('fontSize')?.options?.map((o) => o.value)).toEqual([
+        '6',
+        '8',
+        '9',
+        '10',
+        '11',
+        '12',
+        '14',
+        '16',
+        '18',
+        '20',
+        '22',
+        '24',
+        '26',
+        '28',
+        '36',
+        '48',
+        '72',
+      ]);
+    });
+
+    it('names the percent number format as the desktop does', () => {
+      const percent = byId('numberFormat')?.options?.find((o) => o.value === 'percent');
+      expect(percent?.label).toBe('パーセンテージ');
+    });
+  });
 });

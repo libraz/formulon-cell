@@ -776,6 +776,19 @@ const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonComm
     ? { ...commandWithMacTitle, title: macHomeTitle(homeLabel), label: homeLabel }
     : commandWithMacTitle;
   if (measuredHelp) commandWithMacHomeLabel.title = measuredHelp;
+  // The desktop font-size list starts at 6, and its percent row reads パーセンテージ.
+  if (
+    candidate.id === 'fontSize' &&
+    candidate.options &&
+    !candidate.options.some((o) => o.value === '6')
+  ) {
+    commandWithMacHomeLabel.options = [{ value: '6', label: '6' }, ...candidate.options];
+  }
+  if (candidate.id === 'numberFormat' && candidate.options && lang === 'ja') {
+    commandWithMacHomeLabel.options = candidate.options.map((option) =>
+      option.value === 'percent' ? { ...option, label: 'パーセンテージ' } : option,
+    );
+  }
   if (MAC_HOME_WIDE_STACKED_COMMAND_IDS.has(candidate.id)) {
     return {
       ...commandWithMacHomeLabel,

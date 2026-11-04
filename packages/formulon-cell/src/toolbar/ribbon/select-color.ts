@@ -517,7 +517,11 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         ariaLabel: command.title,
         theme: themeColorColumns(getInst()?.workbook.getTheme()?.colors),
         value: currentRibbonControlValue(command.id),
-        highContrastOnlyLabel: command.id === 'fillColor' ? ribbonText.highContrastOnly : null,
+        // The Mac palettes both carry the high-contrast option; elsewhere only the fill does.
+        highContrastOnlyLabel:
+          command.id === 'fillColor' || getInst()?.host.dataset.fcPlatform === 'mac'
+            ? ribbonText.highContrastOnly
+            : null,
         automatic:
           command.id === 'fontColor' ? { label: ribbonText.automatic, color: '#000000' } : null,
         onPick: (color) => {

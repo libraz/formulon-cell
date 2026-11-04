@@ -26,6 +26,7 @@ import {
   menuSeparator,
   menuSubmenuTrigger,
 } from './general.js';
+import { applyMenuVariant, type MenuVariant } from './mac-variants.js';
 
 export interface HomeMenuDeps {
   ribbonLang: ToolbarLang;
@@ -40,17 +41,17 @@ export interface HomeMenuFactories {
   createCopyMenu: () => HTMLDivElement;
   createUnderlineMenu: () => HTMLDivElement;
   createPhoneticMenu: () => HTMLDivElement;
-  createWrapMenu: () => HTMLDivElement;
+  createWrapMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
   createMergeMenu: () => HTMLDivElement;
   createFreezeMenu: () => HTMLDivElement;
   createFillMenu: () => HTMLDivElement;
-  createClearMenu: () => HTMLDivElement;
-  createInsertCellsMenu: () => HTMLDivElement;
-  createDeleteCellsMenu: () => HTMLDivElement;
-  createFormatCellsMenu: () => HTMLDivElement;
-  createSortMenu: (id: string) => HTMLDivElement;
+  createClearMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
+  createInsertCellsMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
+  createDeleteCellsMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
+  createFormatCellsMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
+  createSortMenu: (id: string, variant?: MenuVariant) => HTMLDivElement;
   createTextToColumnsMenu: () => HTMLDivElement;
-  createFindSelectMenu: () => HTMLDivElement;
+  createFindSelectMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
 }
 
 type HomeMenuText = ToolbarMenuText & {
@@ -178,13 +179,13 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
     return menu;
   };
 
-  const createWrapMenu = (): HTMLDivElement => {
+  const createWrapMenu = (_commandId?: string, variant?: MenuVariant): HTMLDivElement => {
     const menu = createMenu('menu-wrap');
     menu.append(
       menuIconButton(ribbonText.wrapText, 'wrapAction', 'wrapText', 'wrap'),
       menuPresetButton(formatDialog.shrinkToFit, 'wrapAction', 'shrinkToFit', menuIconSpacer()),
     );
-    return menu;
+    return applyMenuVariant(menu, deps.ribbonLang, variant);
   };
 
   const createFillMenu = (): HTMLDivElement => {
@@ -203,7 +204,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
     return menu;
   };
 
-  const createClearMenu = (): HTMLDivElement => {
+  const createClearMenu = (_commandId?: string, variant?: MenuVariant): HTMLDivElement => {
     const menu = createMenu('menu-clear');
     menu.append(
       menuIconButton(t.clearAll, 'clear', 'all', 'clear-all'),
@@ -214,10 +215,10 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       menuIconButton(t.removeHyperlinks, 'clear', 'remove-hyperlinks', 'clear-hyperlinks'),
       menuIconButton(t.clearConditional, 'clear', 'conditional', 'clear-conditional'),
     );
-    return menu;
+    return applyMenuVariant(menu, deps.ribbonLang, variant);
   };
 
-  const createInsertCellsMenu = (): HTMLDivElement => {
+  const createInsertCellsMenu = (_commandId?: string, variant?: MenuVariant): HTMLDivElement => {
     const menu = createMenu('menu-insert-cells');
     menu.append(
       menuIconButton(t.insertCells, 'cellInsert', 'cells', 'insert-cells'),
@@ -227,10 +228,10 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       menuSeparator(),
       menuIconButton(sheetTabs.insertSheet, 'cellInsert', 'sheet', 'insert-sheet'),
     );
-    return menu;
+    return applyMenuVariant(menu, deps.ribbonLang, variant);
   };
 
-  const createDeleteCellsMenu = (): HTMLDivElement => {
+  const createDeleteCellsMenu = (_commandId?: string, variant?: MenuVariant): HTMLDivElement => {
     const menu = createMenu('menu-delete-cells');
     menu.append(
       menuIconButton(t.deleteCells, 'cellDelete', 'cells', 'delete-cells'),
@@ -243,10 +244,10 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       menuSeparator(),
       menuIconButton(t.deleteSheet, 'cellDelete', 'sheet', 'delete-sheet'),
     );
-    return menu;
+    return applyMenuVariant(menu, deps.ribbonLang, variant);
   };
 
-  const createFormatCellsMenu = (): HTMLDivElement => {
+  const createFormatCellsMenu = (_commandId?: string, variant?: MenuVariant): HTMLDivElement => {
     const menu = createMenu('menu-format-cells');
     const visibilitySubmenu = createSubmenu({
       id: formatSubmenuId('visibility'),
@@ -294,10 +295,10 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       menuSeparator(),
       menuIconButton(t.formatCells, 'cellFormat', 'dialog', 'format-dialog'),
     );
-    return menu;
+    return applyMenuVariant(menu, deps.ribbonLang, variant);
   };
 
-  const createSortMenu = (id: string): HTMLDivElement => {
+  const createSortMenu = (id: string, variant?: MenuVariant): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
     menu.append(
       menuIconButton(t.sortAscendingMenu, 'sort', 'asc', 'sort-asc'),
@@ -314,7 +315,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       menuIconButton(ribbonText.conditionalFormatting, 'sort', 'conditional', 'conditional'),
       menuIconButton(t.nameManager, 'sort', 'named', 'name-manager'),
     );
-    return menu;
+    return applyMenuVariant(menu, deps.ribbonLang, variant);
   };
 
   const createTextToColumnsMenu = (): HTMLDivElement => {
@@ -340,7 +341,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
     return menu;
   };
 
-  const createFindSelectMenu = (): HTMLDivElement => {
+  const createFindSelectMenu = (_commandId?: string, variant?: MenuVariant): HTMLDivElement => {
     const menu = createMenu('menu-find-select');
     menu.append(
       menuIconButton(t.find, 'findSelect', 'find', 'find'),
@@ -362,7 +363,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       menuIconButton(t.objectSelect, 'findSelect', 'object-select', 'object-select'),
       menuIconButton(t.selectionPane, 'findSelect', 'selection-pane', 'selection-pane'),
     );
-    return menu;
+    return applyMenuVariant(menu, deps.ribbonLang, variant);
   };
 
   return {

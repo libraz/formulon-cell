@@ -197,21 +197,16 @@ describe('Spreadsheet.mountToolbar', () => {
     sheet = await mountStubSheet({ locale: 'ja', ui: { platform: 'mac' } });
     for (let r = 0; r < 7; r += 1) for (let c = 0; c < 4; c += 1) seedNumber(sheet, r, c, r + c);
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 6, c1: 3 });
+    // The Data tab's Advanced button is the Mac entry for this dialog.
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,
       helpers: stubHelpers(),
+      activeTab: 'data',
     });
-    const sortButton = host.querySelector<HTMLButtonElement>(
-      '[data-ribbon-command="sortFilterHome"]',
-    );
-    tb.dropdownsApi?.openDynamicRibbonDropdown(
-      { command: 'sortFilterHome', menuId: 'menu-sort-home' },
-      sortButton as HTMLButtonElement,
-    );
-    const button = host.querySelector<HTMLButtonElement>('[data-sort="filter-advanced"]');
-    const event = new MouseEvent('click', { bubbles: true });
-    Object.defineProperty(event, 'target', { value: button });
-    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+    host
+      .querySelector<HTMLButtonElement>('[data-ribbon-command="mac.data.advancedFilter"]')
+      ?.click();
+    await Promise.resolve();
     const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const labels = [...(dialog?.querySelectorAll('.fc-advfilter__row') ?? [])].map(
       (row) => row.firstElementChild?.textContent,

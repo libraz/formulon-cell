@@ -35,6 +35,7 @@ import {
 import { createRibbonButton } from './button.js';
 import { createMacCellStylesGallery } from './mac/home-styles-gallery.js';
 import { createMacRibbonMenuFactory, type MacRibbonMenuFactory } from './mac/menus.js';
+import type { MenuVariant } from './menus/mac-variants.js';
 import { createTableNameInput } from './table-design.js';
 
 export type RibbonDisplayMode = 'full' | 'singleLine' | 'tabsOnly' | 'autoHide';
@@ -81,7 +82,7 @@ export const projectRibbonShell = (
 /** Submenu factory invoked when the user clicks a split-button. Receives the
  *  ribbon command id so a single factory can serve multiple panels (e.g.
  *  `menu-autosum-home` vs. `menu-autosum-formulas`). */
-export type RibbonMenuFactory = (commandId: string) => HTMLDivElement;
+export type RibbonMenuFactory = (commandId: string, variant?: MenuVariant) => HTMLDivElement;
 
 /** All known submenu slots. Missing entries are silently skipped — the
  *  split-button still renders but its menu is empty until the host wires it. */
@@ -435,7 +436,8 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     const routeKey = RIBBON_MENU_FACTORY_FOR_COMMAND[commandId] as keyof RibbonMenus | undefined;
     if (!routeKey) return null;
     const factory = menus[routeKey];
-    return factory ? () => factory(commandId) : null;
+    if (!factory) return null;
+    return () => factory(commandId, { mac: profile === 'excel365Mac' });
   };
 
   const renderRibbon = (): void => {
