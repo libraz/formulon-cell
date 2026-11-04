@@ -387,6 +387,19 @@ export const cellFormatFr: CellFormatStrings = {
     showIconOnly: 'Afficher uniquement l’icône',
     topBottomMode: 'Mode',
     topMode: 'Haut',
+    macTypeCells: 'Appliquer une mise en forme uniquement aux cellules qui contiennent',
+    macTypeTopBottom:
+      'Appliquer une mise en forme uniquement aux valeurs classées premières ou dernières',
+    macTypeAverage:
+      'Appliquer une mise en forme uniquement aux valeurs au-dessus ou en dessous de la moyenne',
+    macTypeUnique: 'Appliquer une mise en forme uniquement aux valeurs uniques ou aux doublons',
+    macTypeFormula:
+      'Utiliser une formule pour déterminer pour quelles cellules le format sera appliqué',
+    macCondCellValue: 'Valeur de la cellule',
+    macCondText: 'Texte spécifique',
+    macCondDate: 'Dates se produisant',
+    macCondDuplicate: 'Doublons',
+    macCondUnique: 'Uniques',
     bottomMode: 'Bas',
     averageModeLabel: 'Règle de moyenne',
     averageAbove: 'Au-dessus de la moyenne',

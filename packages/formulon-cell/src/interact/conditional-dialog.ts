@@ -199,7 +199,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
 
   // Kind
   const kindRow = document.createElement('label');
-  kindRow.className = 'fc-fmtdlg__row';
+  kindRow.className = 'fc-fmtdlg__row fc-conddlg__kind-row';
   const kindLabel = document.createElement('span');
   kindLabel.textContent = t.kindLabel;
   const kindOptions: { id: RuleKind; label: string }[] = [
@@ -220,8 +220,31 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     { id: 'no-errors', label: t.kindNoErrors },
   ];
   const kindSelect = conditionalSelect(kindOptions.map((o) => ({ value: o.id, label: o.label })));
+  kindSelect.setAttribute('data-cf-kind', '');
   kindRow.append(kindLabel, kindSelect);
   form.appendChild(kindRow);
+
+  // ── Excel for Mac: five rule types, each with a condition popup ─────────
+  // The two popups are a front for the rule model above: they set the kind and the
+  // sub-form fields that the model already has.
+  type MacRuleType = 'cells' | 'topBottom' | 'average' | 'unique' | 'formula';
+  const macTypes = document.createElement('div');
+  macTypes.className = 'fc-conddlg__mac-types';
+  macTypes.hidden = true;
+  const macTypeSelect = conditionalSelect([
+    { value: 'cells', label: t.macTypeCells },
+    { value: 'topBottom', label: t.macTypeTopBottom },
+    { value: 'average', label: t.macTypeAverage },
+    { value: 'unique', label: t.macTypeUnique },
+    { value: 'formula', label: t.macTypeFormula },
+  ]);
+  macTypeSelect.setAttribute('data-cf-mac-type', '');
+  macTypeSelect.setAttribute('aria-label', t.kindLabel);
+  const macCondSelect = conditionalSelect([{ value: 'cell-value', label: t.macCondCellValue }]);
+  macCondSelect.setAttribute('data-cf-mac-cond', '');
+  macCondSelect.setAttribute('aria-label', t.opLabel);
+  macTypes.append(macTypeSelect, macCondSelect);
+  form.appendChild(macTypes);
 
   // ── Cell-value subform ─────────────────────────────────────────────────
   const cellValueGroup = document.createElement('div');
@@ -515,6 +538,87 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     'errors',
     'no-errors',
   ]);
+  const MAC_TYPE_OF_KIND: Partial<Record<RuleKind, MacRuleType>> = {
+    'cell-value': 'cells',
+    'text-contains': 'cells',
+    'date-occurring': 'cells',
+    blanks: 'cells',
+    'non-blanks': 'cells',
+    errors: 'cells',
+    'no-errors': 'cells',
+    'top-bottom': 'topBottom',
+    average: 'average',
+    duplicates: 'unique',
+    unique: 'unique',
+    formula: 'formula',
+  };
+  const macCondOptions = (type: MacRuleType): { value: string; label: string }[] => {
+    switch (type) {
+      case 'cells':
+        return [
+          { value: 'cell-value', label: t.macCondCellValue },
+          { value: 'text-contains', label: t.macCondText },
+          { value: 'date-occurring', label: t.macCondDate },
+          { value: 'blanks', label: t.kindBlanks },
+          { value: 'non-blanks', label: t.kindNonBlanks },
+          { value: 'errors', label: t.kindErrors },
+          { value: 'no-errors', label: t.kindNoErrors },
+        ];
+      case 'topBottom':
+        return [
+          { value: 'top', label: t.topMode },
+          { value: 'bottom', label: t.bottomMode },
+        ];
+      case 'average':
+        return averageModeOptions.map((option) => ({ value: option.id, label: option.label }));
+      case 'unique':
+        return [
+          { value: 'duplicates', label: t.macCondDuplicate },
+          { value: 'unique', label: t.macCondUnique },
+        ];
+      case 'formula':
+        return [];
+    }
+  };
+  const macCondValue = (type: MacRuleType): string =>
+    type === 'topBottom'
+      ? tbModeSelect.value
+      : type === 'average'
+        ? averageModeSelect.value
+        : kindSelect.value;
+  const macSyncFromModel = (): void => {
+    const type = MAC_TYPE_OF_KIND[kindSelect.value as RuleKind] ?? 'cells';
+    macTypeSelect.value = type;
+    macCondSelect.replaceChildren(
+      ...macCondOptions(type).map((option) => {
+        const el = document.createElement('option');
+        el.value = option.value;
+        el.textContent = option.label;
+        return el;
+      }),
+    );
+    macCondSelect.value = macCondValue(type);
+    macCondSelect.hidden = type === 'formula';
+  };
+  const MAC_KIND_OF_TYPE: Record<MacRuleType, RuleKind> = {
+    cells: 'cell-value',
+    topBottom: 'top-bottom',
+    average: 'average',
+    unique: 'duplicates',
+    formula: 'formula',
+  };
+  const onMacTypeChange = (): void => {
+    kindSelect.value = MAC_KIND_OF_TYPE[macTypeSelect.value as MacRuleType];
+    syncSubforms();
+    macSyncFromModel();
+  };
+  const onMacCondChange = (): void => {
+    const type = macTypeSelect.value as MacRuleType;
+    if (type === 'topBottom') tbModeSelect.value = macCondSelect.value;
+    else if (type === 'average') averageModeSelect.value = macCondSelect.value;
+    else kindSelect.value = macCondSelect.value;
+    syncSubforms();
+  };
   const syncSubforms = (): void => {
     const kind = kindSelect.value as RuleKind;
     cellValueGroup.hidden = kind !== 'cell-value';
@@ -539,7 +643,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     } else if (style === 'data-bar' || style === 'icon-set') {
       kindSelect.value = style;
     }
-    kindRow.hidden = style !== 'classic';
+    kindRow.hidden = style !== 'classic' || macLayout();
+    macTypes.hidden = style !== 'classic' || !macLayout();
     syncSubforms();
   };
   const syncCellValueOp = (): void => {
@@ -610,6 +715,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
 
   let currentMode: 'manage' | 'new' | 'edit' = 'manage';
   let currentEditIndex: number | null = null;
+  // The Mac layout applies to a new rule only; editing keeps the full form.
+  const macLayout = (): boolean => currentMode === 'new' && isMacPlatform();
   const syncDialogMode = (): void => {
     const isNew = currentMode === 'new';
     const isEdit = currentMode === 'edit';
@@ -620,6 +727,12 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     const macNew = isNew && isMacPlatform();
     overlay.classList.toggle('fc-conddlg--mac', macNew);
     rangeRow.hidden = macNew;
+    kindRow.hidden = styleSelect.value !== 'classic' || macNew;
+    macTypes.hidden = styleSelect.value !== 'classic' || !macNew;
+    if (macNew) macSyncFromModel();
+    // Excel for Mac lines Cancel and OK up in the footer.
+    (macNew ? footer : addRow).appendChild(addBtn);
+    addRow.hidden = macNew;
     cellValueApplyBox.hidden = macNew;
     sharedApplyBox.hidden = macNew;
     shell.panel.classList.toggle('fc-conddlg__panel--new', isNew);
@@ -927,6 +1040,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   };
 
   shell.on(kindSelect, 'change', syncSubforms);
+  shell.on(macTypeSelect, 'change', onMacTypeChange);
+  shell.on(macCondSelect, 'change', onMacCondChange);
   shell.on(styleSelect, 'change', syncRuleStyle);
   shell.on(opSelect, 'change', syncCellValueOp);
   shell.on(colorScale.useThreeCk, 'change', colorScale.syncThreeStops);

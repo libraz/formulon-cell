@@ -381,6 +381,16 @@ export interface CellFormatStrings {
     showIconOnly: string;
     topBottomMode: string;
     topMode: string;
+    macTypeCells: string;
+    macTypeTopBottom: string;
+    macTypeAverage: string;
+    macTypeUnique: string;
+    macTypeFormula: string;
+    macCondCellValue: string;
+    macCondText: string;
+    macCondDate: string;
+    macCondDuplicate: string;
+    macCondUnique: string;
     bottomMode: string;
     averageModeLabel: string;
     averageAbove: string;

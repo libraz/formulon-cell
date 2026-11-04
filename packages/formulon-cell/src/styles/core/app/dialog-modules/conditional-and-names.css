@@ -618,4 +618,79 @@
   .fc-namedlg-define__body {
     padding-bottom: 5px;
   }
+
+  /* Excel for Mac New Formatting Rule: the rule type over one row of condition popup,
+     operator popup and value, then the format popup. */
+  .fc-conddlg--mac .fc-conddlg__panel--new {
+    width: 505px;
+    max-width: 505px;
+  }
+  .fc-conddlg--mac .fc-conddlg__form {
+    display: grid;
+    grid-template-columns: 189px 197px 67px 26px;
+    gap: 6px;
+    align-items: center;
+  }
+  .fc-conddlg--mac .fc-conddlg__mac-types,
+  .fc-conddlg--mac .fc-conddlg__sub,
+  .fc-conddlg--mac .fc-conddlg__sub > .fc-fmtdlg__row:not(.fc-conddlg__format-row) {
+    display: contents;
+  }
+  .fc-conddlg--mac .fc-conddlg__mac-types[hidden],
+  .fc-conddlg--mac .fc-conddlg__sub[hidden] {
+    display: none;
+  }
+  .fc-conddlg--mac .fc-conddlg__style-row,
+  .fc-conddlg--mac .fc-conddlg__mac-types > :first-child,
+  .fc-conddlg--mac .fc-conddlg__format-row,
+  .fc-conddlg--mac .fc-conddlg__addrow {
+    grid-column: 1 / -1;
+  }
+  .fc-conddlg--mac .fc-conddlg__style-row,
+  .fc-conddlg--mac .fc-conddlg__format-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  /* Excel draws no captions beside the condition controls; the names stay for assistive tech. */
+  .fc-conddlg--mac
+    .fc-conddlg__sub
+    > .fc-fmtdlg__row:not(.fc-conddlg__format-row)
+    > span:first-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .fc-conddlg--mac .fc-conddlg__sub > .fc-fmtdlg__row > input,
+  .fc-conddlg--mac .fc-conddlg__sub > .fc-fmtdlg__row > select {
+    min-width: 0;
+    width: 100%;
+  }
+  .fc-conddlg--mac .fc-conddlg__sub .fc-fmtdlg__check {
+    grid-column: 1 / -1;
+  }
+  .fc-conddlg--mac .fc-conddlg__format-row > span:first-child,
+  .fc-conddlg--mac .fc-conddlg__style-row > span:first-child {
+    flex: 0 0 auto;
+    width: auto;
+  }
+  .fc-conddlg--mac .fc-conddlg__format-picker {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 10px;
+  }
+  .fc-conddlg--mac .fc-conddlg__format-picker > :first-child {
+    width: 265px;
+  }
+  .fc-conddlg--mac .fc-conddlg__preview {
+    width: 160px;
+    text-align: center;
+  }
+  .fc-conddlg--mac .fc-conddlg__addrow {
+    display: flex;
+    justify-content: flex-end;
+  }
 }
