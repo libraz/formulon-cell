@@ -6,6 +6,11 @@
     background: var(--fc-bg);
     cursor: cell;
   }
+  /* The active-cell frame is the focus indicator; no ring around the sheet. */
+  .fc-host__grid:focus,
+  .fc-host__grid:focus-visible {
+    outline: none;
+  }
 
   .fc-viewbar {
     display: flex;
