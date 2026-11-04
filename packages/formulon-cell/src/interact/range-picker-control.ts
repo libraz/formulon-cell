@@ -29,6 +29,9 @@ export const attachRangePickerButton = (
   let unsubscribe: (() => void) | null = null;
   let observer: MutationObserver | null = null;
   let activeDialog: HTMLElement | null = null;
+  // Armed: the focused field receives grid picks, but the dialog stays expanded.
+  let collapsed = false;
+  let lastSeen = '';
   const dialog = (): HTMLElement | null => input.closest('.fc-fmtdlg');
   const shouldStopForDialogState = (): boolean => {
     const dlg = dialog();
@@ -58,32 +61,51 @@ export const attachRangePickerButton = (
     activeDialog = null;
     observer?.disconnect();
     observer = null;
-    wrap.classList.remove('fc-range-picker--picking');
+    collapsed = false;
+    wrap.classList.remove('fc-range-picker--picking', 'fc-range-picker--armed');
     button.dataset.rangePickerActive = 'false';
     button.setAttribute('aria-pressed', 'false');
-    dialog()?.classList.toggle(
-      'fc-fmtdlg--range-picking',
-      !!dialog()?.querySelector('.fc-range-picker__btn[data-range-picker-active="true"]'),
-    );
+    syncDialogClasses();
   };
-  const startPicking = (): void => {
+  const syncDialogClasses = (): void => {
+    const dlg = dialog();
+    if (!dlg) return;
+    dlg.classList.toggle(
+      'fc-fmtdlg--range-picking',
+      !!dlg.querySelector('.fc-range-picker__btn[data-range-picker-active="true"]'),
+    );
+    dlg.classList.toggle('fc-fmtdlg--range-armed', !!dlg.querySelector('.fc-range-picker--armed'));
+  };
+  const startPicking = (collapse: boolean): void => {
     if (!opts.subscribeToRangeChanges || unsubscribe) return;
     dialog()
-      ?.querySelectorAll<HTMLElement>('.fc-range-picker--picking')
+      ?.querySelectorAll<HTMLElement>('.fc-range-picker--picking, .fc-range-picker--armed')
       .forEach((picker) => {
         if (picker !== wrap) picker.dispatchEvent(new CustomEvent('fc-range-picker-stop'));
       });
-    wrap.classList.add('fc-range-picker--picking');
-    dialog()?.classList.add('fc-fmtdlg--range-picking');
-    button.dataset.rangePickerActive = 'true';
-    button.setAttribute('aria-pressed', 'true');
-    document.addEventListener('keydown', onDocumentKeydown, true);
+    collapsed = collapse;
+    lastSeen = opts.getValue();
+    if (collapse) {
+      wrap.classList.add('fc-range-picker--picking');
+      button.dataset.rangePickerActive = 'true';
+      button.setAttribute('aria-pressed', 'true');
+      document.addEventListener('keydown', onDocumentKeydown, true);
+    } else {
+      wrap.classList.add('fc-range-picker--armed');
+    }
+    syncDialogClasses();
     activeDialog = dialog();
     activeDialog?.addEventListener('fc-range-picker-stop-all', stopPicking);
     unsubscribe = opts.subscribeToRangeChanges(() => {
       if (shouldStopForDialogState()) {
         stopPicking();
         return;
+      }
+      // Only a changed selection feeds an armed field; unrelated store writes must not.
+      if (!collapsed) {
+        const picked = opts.getValue();
+        if (picked === lastSeen) return;
+        lastSeen = picked;
       }
       applyPickedValue();
     });
@@ -98,8 +120,9 @@ export const attachRangePickerButton = (
   button.addEventListener('click', () => {
     applyPickedValue();
     if (opts.subscribeToRangeChanges) {
+      const wasCollapsed = collapsed;
       if (unsubscribe) stopPicking();
-      else startPicking();
+      if (!wasCollapsed) startPicking(true);
     }
     input.focus({ preventScroll: true });
     input.select();
@@ -109,11 +132,21 @@ export const attachRangePickerButton = (
       // An inactive picker belongs to the dialog's normal keyboard route.
       // Let its Escape handler dismiss the dialog; only an active range
       // selection owns Escape and needs to cancel itself first.
-      if (!unsubscribe) return;
+      if (!unsubscribe || !collapsed) return;
       event.preventDefault();
       event.stopPropagation();
       stopPicking();
     }
+  });
+  input.addEventListener('focus', () => {
+    if (input.disabled || input.readOnly) return;
+    startPicking(false);
+  });
+  input.addEventListener('blur', (event) => {
+    // Focus moving to the grid keeps the field armed; another dialog control ends it.
+    const next = event.relatedTarget;
+    if (collapsed || !(next instanceof Node) || !dialog()?.contains(next)) return;
+    stopPicking();
   });
   wrap.addEventListener('fc-range-picker-stop', stopPicking);
   wrap.appendChild(button);
