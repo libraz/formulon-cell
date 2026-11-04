@@ -41,6 +41,8 @@ const makeFakeWb = (state: FakeWbState): WorkbookHandle => {
       state.sheets.push(name ?? `Sheet${state.sheets.length + 1}`);
       return state.sheets.length - 1;
     },
+    recalcAuto(): void {},
+    cells: () => [],
     renameSheet(idx: number, name: string): boolean {
       if (state.failRename) return false;
       state.sheets[idx] = name;

@@ -29,6 +29,12 @@ interface FakeWb {
   acceptRemove: boolean;
   acceptMove: boolean;
   names: string[];
+  recalcs: number;
+  /** Cells the fake engine returns per sheet index. */
+  sheetCells: Map<
+    number,
+    { addr: { sheet: number; row: number; col: number }; value: unknown; formula: string | null }[]
+  >;
 }
 
 const makeFake = (
@@ -48,6 +54,8 @@ const makeFake = (
     acceptRemove: true,
     acceptMove: true,
     names: Array.from({ length: opts.sheetCount ?? 3 }, (_, i) => `Sheet${i + 1}`),
+    recalcs: 0,
+    sheetCells: new Map(),
   };
   const wb = {
     capabilities: fake.capabilities,
@@ -60,6 +68,10 @@ const makeFake = (
       fake.names[idx] = name;
       return true;
     },
+    recalcAuto: (): void => {
+      fake.recalcs += 1;
+    },
+    cells: (sheet: number) => fake.sheetCells.get(sheet) ?? [],
     sheetName: (idx: number): string => fake.names[idx] ?? `Sheet${idx + 1}`,
     addSheet: (name?: string): number => {
       fake.add += 1;
@@ -658,5 +670,32 @@ describe('setSheetTabVisibility', () => {
     const layout = store.getState().layout;
     expect(layout.hiddenSheets.has(1)).toBe(false);
     expect(layout.veryHiddenSheets.has(1)).toBe(false);
+  });
+});
+
+describe('sheet rename / remove refresh', () => {
+  const cell = (sheet: number, v: number) => ({
+    addr: { sheet, row: 0, col: 0 },
+    value: { kind: 'number', value: v },
+    formula: null,
+  });
+
+  it('rename recalcs through the policy and reloads the active sheet cells', () => {
+    const store = createSpreadsheetStore();
+    const { wb, fake } = makeFake();
+    fake.sheetCells.set(0, [cell(0, 205)]);
+    expect(renameSheet(wb, 1, 'Qtr1', store)).toBe(true);
+    expect(fake.recalcs).toBe(1);
+    expect(store.getState().data.cells.size).toBe(1);
+  });
+
+  it('removing the active sheet loads the cells of the sheet that takes its index', () => {
+    const store = createSpreadsheetStore();
+    const { wb, fake } = makeFake();
+    fake.sheetCells.set(0, [cell(0, 26)]);
+    expect(removeSheet(store, wb, 0)).toBe(true);
+    expect(store.getState().data.sheetIndex).toBe(0);
+    expect(fake.recalcs).toBe(1);
+    expect(store.getState().data.cells.size).toBe(1);
   });
 });

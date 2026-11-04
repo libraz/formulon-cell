@@ -438,7 +438,7 @@ function adjustFormulaForCutPasteWithContext(
       if (transformed === null) return `${originalQualifier}${renderTokenBody(tok)}`;
       const wasMoved = wholeAxisCutContainsToken(tok, cutAxis, source);
       const qualifier = wasMoved
-        ? qualifierForOutputSheet(context.destinationSheet, context)
+        ? qualifierForMovedCells(tok.sheetQual, context)
         : originalQualifier;
       return `${qualifier}${transformed}`;
     }
@@ -499,7 +499,7 @@ function adjustFormulaForCutPasteWithContext(
         context,
       );
       if (b.atom === null) return null;
-      const qualifier = qualifierForOutputSheet(context.destinationSheet, context);
+      const qualifier = qualifierForMovedCells(tok.sheetQual, context);
       return `${qualifier}${a.atom}:${b.atom}`;
     }
     if (disposition.kind === 'keep') {
@@ -694,7 +694,7 @@ function rewriteCutPasteEndpoint(
     if (atom === null) return { atom: null, qualifier: '', moved: true };
     return {
       atom,
-      qualifier: qualifierForOutputSheet(context.destinationSheet, context),
+      qualifier: qualifierForMovedCells(originalQualifier, context),
       moved: true,
     };
   }
@@ -897,6 +897,13 @@ function resolveQualifiedSheet(sheetQual: string, sheetNames: readonly string[])
   const folded = name.toLocaleLowerCase();
   const index = sheetNames.findIndex((sheetName) => sheetName.toLocaleLowerCase() === folded);
   return index >= 0 ? index : null;
+}
+
+/** Qualifier for a reference to cells that were cut. A reference that spelled
+ *  out its own sheet keeps that qualifier when the cells stay on that sheet. */
+function qualifierForMovedCells(tokenQualifier: string, context: CutPasteSheetContext): string {
+  if (tokenQualifier && context.destinationSheet === context.sourceSheet) return tokenQualifier;
+  return qualifierForOutputSheet(context.destinationSheet, context);
 }
 
 function qualifierForOutputSheet(sheet: number, context: CutPasteSheetContext): string {

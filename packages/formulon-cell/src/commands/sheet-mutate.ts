@@ -80,6 +80,14 @@ const remapWorkbookSheetLayout = (
   });
 };
 
+/** Recalculate through the workbook's policy, then reload the active sheet's
+ *  cells: a structural sheet change can alter values on sheets that were not
+ *  written to. */
+const recalcAndRefresh = (store: SpreadsheetStore | null | undefined, wb: WorkbookHandle): void => {
+  wb.recalcAuto();
+  if (store) mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+};
+
 /** Slicers name a table, which goes away with its sheet. */
 const pruneOrphanSlicers = (store: SpreadsheetStore, wb: WorkbookHandle): void => {
   if (typeof wb.getTables !== 'function') return;
@@ -196,6 +204,7 @@ export function renameSheet(
   const beforeName = 'sheetName' in wb ? wb.sheetName(idx) : null;
   const ok = wb.renameSheet(idx, name);
   if (!ok) return false;
+  recalcAndRefresh(store, wb);
   history?.begin();
   try {
     if (store && beforeName) {
@@ -215,9 +224,11 @@ export function renameSheet(
       history.push({
         undo: () => {
           wb.renameSheet(idx, beforeName);
+          recalcAndRefresh(store, wb);
         },
         redo: () => {
           wb.renameSheet(idx, name);
+          recalcAndRefresh(store, wb);
         },
       });
     }
@@ -251,6 +262,7 @@ export function removeSheet(store: SpreadsheetStore, wb: WorkbookHandle, idx: nu
     const next = nearestVisibleSheet(wb.sheetCount, store.getState().layout.hiddenSheets, idx);
     mutators.setSheetIndex(store, next < 0 ? cur : next, { discardCurrent: true });
   }
+  recalcAndRefresh(store, wb);
   return true;
 }
 

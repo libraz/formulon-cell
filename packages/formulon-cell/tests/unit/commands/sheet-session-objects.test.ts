@@ -29,6 +29,8 @@ const makeWb = (tables: TableDef[] = []): { wb: WorkbookHandle; names: string[] 
       return names.length;
     },
     sheetName: (i: number) => names[i] ?? '',
+    recalcAuto: () => {},
+    cells: () => [],
     renameSheet: (i: number, name: string) => {
       names[i] = name;
       return true;

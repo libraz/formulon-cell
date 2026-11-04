@@ -675,3 +675,38 @@ describe('adjustFormulaForCutPasteMove — external refs follow moved cells', ()
     ).toBe('=Source:Target!B1+Missing!B1');
   });
 });
+
+describe('cut-move keeps an explicit own-sheet qualifier', () => {
+  const ctx = {
+    sourceSheet: 0,
+    destinationSheet: 0,
+    formulaSheet: 0,
+    outputSheet: 0,
+    sheetNames: ['Sheet1', 'Data 1'],
+  };
+  const source = { r0: 1, c0: 1, r1: 1, c1: 1 };
+  const dest = { r0: 0, c0: 51 };
+
+  it.each([
+    ['=Sheet1!B2', '=Sheet1!AZ1'],
+    ['=Sheet1!$B$2', '=Sheet1!$AZ$1'],
+    ['=B2', '=AZ1'],
+    ["='Data 1'!B2", "='Data 1'!B2"],
+  ])('%s -> %s', (input, expected) => {
+    expect(adjustFormulaForCutPasteMove(input, source, dest, ctx)).toBe(expected);
+  });
+
+  it('keeps the qualifier on a moved range', () => {
+    const range = { r0: 0, c0: 1, r1: 4, c1: 1 };
+    expect(adjustFormulaForCutPasteMove('=SUM(Sheet1!B1:B5)', range, dest, ctx)).toBe(
+      '=SUM(Sheet1!AZ1:AZ5)',
+    );
+  });
+
+  it('keeps the qualifier on a moved whole column', () => {
+    const col = { r0: 0, c0: 1, r1: 1048575, c1: 1 };
+    expect(adjustFormulaForCutPasteMove('=SUM(Sheet1!B:B)', col, { r0: 0, c0: 51 }, ctx)).toBe(
+      '=SUM(Sheet1!AZ:AZ)',
+    );
+  });
+});
