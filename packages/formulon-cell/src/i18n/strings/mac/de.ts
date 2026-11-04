@@ -7,6 +7,7 @@ import { pageLayoutDe } from '../page-layout/de.js';
 import { ribbonDe } from '../ribbon/de.js';
 import { ribbonMenusDe } from '../ribbon-menus/de.js';
 import { workbookChromeDe } from '../workbook-chrome/de.js';
+import { macAccessibilityPaneDe } from './accessibility-pane.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
 import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
@@ -220,6 +221,7 @@ export const macDe: MacStrings = {
   macStyleDialog: macStyleDialogDe,
   macExternalLinksPane: macExternalLinksPaneDe,
   macWatchWindow: macWatchWindowDe,
+  macAccessibilityPane: macAccessibilityPaneDe,
   macCfRulesDialog: macCfRulesDialogFrom(cellFormatDe.cfRulesDialog, {
     orderLabel: 'Regelreihenfolge ändern:',
     appliesToLabel: 'Wird angewendet auf:',

@@ -1,3 +1,4 @@
+import { macAccessibilityPaneJa } from './accessibility-pane.js';
 import { macAdvancedFilterJa } from './advanced-filter.js';
 import { macAlertsJa } from './alerts.js';
 import { macCfRulesDialogJa } from './cf-rules-dialog.js';
@@ -200,6 +201,7 @@ export const macJa: MacStrings = {
   macStyleDialog: macStyleDialogJa,
   macExternalLinksPane: macExternalLinksPaneJa,
   macWatchWindow: macWatchWindowJa,
+  macAccessibilityPane: macAccessibilityPaneJa,
   macCreateTable: macCreateTableJa,
   macDataValidation: macDataValidationJa,
   macGoToDialog: macGoToDialogJa,

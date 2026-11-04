@@ -1,6 +1,7 @@
 import type { ExternalLinksPaneStrings } from '../../../interact/external-links-pane.js';
 import type { TextToColumnsWizardStrings } from '../../../toolbar/dialogs/text-to-columns.js';
 import type { CellFormatStrings } from '../cell-format/types.js';
+import type { MacAccessibilityPaneStrings } from './accessibility-pane.js';
 import type { MacAdvancedFilterStrings } from './advanced-filter.js';
 import type { MacAlertStrings } from './alerts.js';
 import type { MacCfRulesDialogStrings } from './cf-rules-dialog.js';
@@ -61,6 +62,8 @@ export interface MacStrings {
   macExternalLinksPane: ExternalLinksPaneStrings;
   /** The Mac Watch Window task pane. */
   macWatchWindow: MacWatchWindowStrings;
+  /** The Mac accessibility checker task pane. */
+  macAccessibilityPane: MacAccessibilityPaneStrings;
   /** Overrides of `cfRulesDialog`, plus its Mac-only labels, that apply on the Mac host only. */
   macCfRulesDialog: MacCfRulesDialogStrings;
   /** Overrides of `hyperlinkDialog`, plus its Mac-only labels, that apply on the Mac host only. */

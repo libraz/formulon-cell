@@ -7,6 +7,7 @@ import { pageLayoutZh } from '../page-layout/zh.js';
 import { ribbonZh } from '../ribbon/zh.js';
 import { ribbonMenusZh } from '../ribbon-menus/zh.js';
 import { workbookChromeZh } from '../workbook-chrome/zh.js';
+import { macAccessibilityPaneZh } from './accessibility-pane.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
 import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
@@ -217,6 +218,7 @@ export const macZh: MacStrings = {
   macStyleDialog: macStyleDialogZh,
   macExternalLinksPane: macExternalLinksPaneZh,
   macWatchWindow: macWatchWindowZh,
+  macAccessibilityPane: macAccessibilityPaneZh,
   macCfRulesDialog: macCfRulesDialogFrom(cellFormatZh.cfRulesDialog, {
     orderLabel: '更改规则顺序:',
     appliesToLabel: '应用于:',

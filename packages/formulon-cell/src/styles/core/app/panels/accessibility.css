@@ -1,0 +1,205 @@
+@layer fc.app {
+  /* Accessibility checker: a 300 pt task pane with a tab header, a summary
+     card, sectioned rule rows (260 x 50) and per-rule drill-in cards. */
+  .fc-a11ypane {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    border-left: 1px solid var(--fc-rule);
+    background: var(--fc-bg-rail, var(--fc-bg));
+    color: var(--fc-fg);
+    font-family: var(--fc-font-ui);
+    font-size: 13px;
+  }
+  .fc-a11ypane[hidden] {
+    display: none;
+  }
+  .fc-a11ypane__header {
+    display: flex;
+    flex: 0 0 36px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px 0 12px;
+    border-bottom: 1px solid var(--fc-rule);
+  }
+  .fc-a11ypane__title {
+    font-weight: 600;
+  }
+  .fc-a11ypane__close {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--fc-rule);
+    cursor: pointer;
+  }
+  .fc-a11ypane__body {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .fc-a11ypane__summary {
+    padding: 22px 20px;
+    border-radius: 12px;
+    background: var(--fc-bg);
+    text-align: center;
+  }
+  .fc-a11ypane__summary--clean::before {
+    content: "";
+    display: block;
+    width: 28px;
+    height: 28px;
+    margin: 0 auto 10px;
+    border-radius: 50%;
+    background: var(--fc-accent);
+    mask: radial-gradient(circle, #000 70%, transparent 71%);
+  }
+  .fc-a11ypane__summary-title {
+    margin: 0 0 12px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .fc-a11ypane__summary-text {
+    margin: 0;
+    line-height: 1.45;
+  }
+  .fc-a11ypane__section {
+    margin: 30px 10px 10px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .fc-a11ypane__group {
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    background: var(--fc-bg);
+  }
+  .fc-a11ypane__rule {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 50px;
+    padding: 0 10px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .fc-a11ypane__rule + .fc-a11ypane__rule {
+    border-top: 1px solid var(--fc-rule);
+  }
+  .fc-a11ypane__rule-name {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fc-a11ypane__rule-count {
+    font-weight: 600;
+  }
+  .fc-a11ypane__rule-pass {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--fc-accent);
+  }
+  .fc-a11ypane__chevron,
+  .fc-a11ypane__back::before {
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    color: var(--fc-fg-mute);
+    transform: rotate(-45deg);
+  }
+  .fc-a11ypane__drill-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .fc-a11ypane__back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--fc-fg);
+    cursor: pointer;
+  }
+  .fc-a11ypane__back::before {
+    content: "";
+    transform: rotate(135deg);
+  }
+  .fc-a11ypane__counter {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .fc-a11ypane__card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px;
+    border-radius: 12px;
+    background: var(--fc-bg);
+  }
+  .fc-a11ypane__card-title,
+  .fc-a11ypane__try {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .fc-a11ypane__try {
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .fc-a11ypane__card-text {
+    margin: 0;
+    line-height: 1.45;
+  }
+  .fc-a11ypane__swatches {
+    display: flex;
+    gap: 8px;
+  }
+  .fc-a11ypane__swatch {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--fc-bg);
+    outline: 1px solid var(--fc-rule);
+    cursor: pointer;
+  }
+  .fc-a11ypane__fix {
+    height: 48px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .fc-a11ypane__help {
+    align-self: flex-end;
+    width: 24px;
+    height: 24px;
+    margin-top: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--fc-bg);
+    color: var(--fc-fg-mute);
+    font: inherit;
+  }
+}

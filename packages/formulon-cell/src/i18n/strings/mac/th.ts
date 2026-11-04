@@ -7,6 +7,7 @@ import { pageLayoutTh } from '../page-layout/th.js';
 import { ribbonTh } from '../ribbon/th.js';
 import { ribbonMenusTh } from '../ribbon-menus/th.js';
 import { workbookChromeTh } from '../workbook-chrome/th.js';
+import { macAccessibilityPaneTh } from './accessibility-pane.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
 import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
@@ -217,6 +218,7 @@ export const macTh: MacStrings = {
   macStyleDialog: macStyleDialogTh,
   macExternalLinksPane: macExternalLinksPaneTh,
   macWatchWindow: macWatchWindowTh,
+  macAccessibilityPane: macAccessibilityPaneTh,
   macCfRulesDialog: macCfRulesDialogFrom(cellFormatTh.cfRulesDialog, {
     orderLabel: 'เปลี่ยนลำดับกฎ:',
     appliesToLabel: 'นำไปใช้กับ:',

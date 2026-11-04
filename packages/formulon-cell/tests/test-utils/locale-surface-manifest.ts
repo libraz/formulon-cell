@@ -66,6 +66,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'macDataValidation',
   'macExternalLinksPane',
   'macWatchWindow',
+  'macAccessibilityPane',
   'macStyleDialog',
   'macTextToColumnsWizard',
   'macFindReplace',

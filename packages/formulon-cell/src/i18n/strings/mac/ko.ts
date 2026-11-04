@@ -7,6 +7,7 @@ import { pageLayoutKo } from '../page-layout/ko.js';
 import { ribbonKo } from '../ribbon/ko.js';
 import { ribbonMenusKo } from '../ribbon-menus/ko.js';
 import { workbookChromeKo } from '../workbook-chrome/ko.js';
+import { macAccessibilityPaneKo } from './accessibility-pane.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
 import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
@@ -218,6 +219,7 @@ export const macKo: MacStrings = {
   macStyleDialog: macStyleDialogKo,
   macExternalLinksPane: macExternalLinksPaneKo,
   macWatchWindow: macWatchWindowKo,
+  macAccessibilityPane: macAccessibilityPaneKo,
   macCfRulesDialog: macCfRulesDialogFrom(cellFormatKo.cfRulesDialog, {
     orderLabel: '규칙 순서 변경:',
     appliesToLabel: '적용 대상:',
