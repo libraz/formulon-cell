@@ -37,6 +37,8 @@ interface SourceCell {
   blank: boolean;
   /** Number format family: dates step by days or months, times by hours. */
   dateKind: 'date' | 'time' | null;
+  /** The number format shows a time of day next to the date. */
+  hasTime?: boolean;
 }
 
 const MAX_FILL_RANGE_CELLS = 100_000;
@@ -79,6 +81,7 @@ function readSource(state: State, src: Range): SourceCell[][] {
             : fmtKind === 'time'
               ? 'time'
               : null,
+        hasTime: fmtKind === 'datetime',
       });
     }
     out.push(row);
@@ -144,6 +147,9 @@ const dateCell = (date: Date, fraction: number, date1904: boolean): ProjectedCel
 const daysInMonth = (year: number, month: number): number =>
   new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
+const isMonthEnd = (d: Date): boolean =>
+  d.getUTCDate() === daysInMonth(d.getUTCFullYear(), d.getUTCMonth());
+
 const addMonthsClamped = (date: Date, months: number, endOfMonth = false): Date => {
   const first = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
   const maxDay = daysInMonth(first.getUTCFullYear(), first.getUTCMonth());
@@ -173,17 +179,23 @@ function buildDateUnitProjection(
   if (line.length === 0 || !line.every((c) => c.numeric !== null && c.formula === null)) {
     return null;
   }
-  const last = line[line.length - 1]?.numeric ?? 0;
-  const fraction = last - Math.floor(last);
+  const lastCell = line[line.length - 1] as SourceCell;
+  const last = lastCell.numeric ?? 0;
+  // An explicit unit on a date-time drops the time of day from the filled cells.
+  const fraction = lastCell.dateKind === 'date' ? 0 : last - Math.floor(last);
   const lastDate = serialToDate(last, date1904);
   return {
     at: (i) => {
       const step = i * sign;
-      if (unit === 'days') return { kind: 'number', value: last + step };
+      if (unit === 'days') return { kind: 'number', value: Math.floor(last) + fraction + step };
       const date =
         unit === 'weekdays'
           ? addWeekdays(lastDate, step)
-          : addMonthsClamped(lastDate, unit === 'months' ? step : step * 12);
+          : addMonthsClamped(
+              lastDate,
+              unit === 'months' ? step : step * 12,
+              unit === 'months' && isMonthEnd(lastDate),
+            );
       return dateCell(date, fraction, date1904);
     },
   };
@@ -239,8 +251,6 @@ function dateRun(cells: SourceCell[], ctx: ProjectionContext): Run {
   }
   const dates = values.map((v) => serialToDate(v, ctx.date1904));
   const monthIndex = (d: Date): number => d.getUTCFullYear() * 12 + d.getUTCMonth();
-  const isMonthEnd = (d: Date): boolean =>
-    d.getUTCDate() === daysInMonth(d.getUTCFullYear(), d.getUTCMonth());
   const months = dates.slice(1).map((d, i) => monthIndex(d) - monthIndex(dates[i] as Date));
   const monthStep = months[0] ?? 0;
   const endOfMonth = dates.every(isMonthEnd);
@@ -257,7 +267,12 @@ function dateRun(cells: SourceCell[], ctx: ProjectionContext): Run {
         dateCell(addMonthsClamped(anchor, monthStep * x, endOfMonth), fraction, ctx.date1904),
     };
   }
-  const days = values.slice(1).map((v, i) => Math.trunc(v - (values[i] ?? 0)));
+  const gaps = values.slice(1).map((v, i) => v - (values[i] ?? 0));
+  if (cells.every((c) => c.hasTime) && gaps.some((g) => Math.abs(g - Math.round(g)) > 1e-9)) {
+    const trend = linearFit(values);
+    return { length: k, at: (x) => ({ kind: 'number', value: trend(x) }) };
+  }
+  const days = gaps.map(Math.trunc);
   const dayStep = days[0] ?? 0;
   if (days.every((d) => d === dayStep)) {
     const last = values[k - 1] ?? 0;
@@ -340,6 +355,20 @@ function buildProjection(line: SourceCell[], ctx: ProjectionContext): SeriesProj
   if (ctx.dateUnit) {
     const projection = buildDateUnitProjection(line, ctx.dateUnit, ctx.sign, ctx.date1904);
     if (projection) return projection;
+  }
+  const filled = line.filter((cell) => !cell.blank);
+  if (filled.length >= 2 && filled.length < line.length) {
+    // Blank cells keep their place but do not take part in the series.
+    const inner = buildProjection(filled, ctx);
+    const ordinal = line.map((_, i) => line.slice(0, i).filter((cell) => !cell.blank).length);
+    return {
+      at: (i) => {
+        const slot = (i - 1) % line.length;
+        if (line[slot]?.blank) return { kind: 'blank' };
+        const cycle = Math.floor((i - 1) / line.length);
+        return inner.at(cycle * filled.length + (ordinal[slot] ?? 0) + 1);
+      },
+    };
   }
   const kinds = line.map((cell) => slotKind(cell, ctx.locale));
   const slots: { run: Run; offset: number }[] = [];
