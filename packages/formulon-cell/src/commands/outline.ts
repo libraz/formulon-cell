@@ -220,7 +220,17 @@ export function expandRowGroup(
       for (const row of s.layout.hiddenRows) {
         if (row >= r0 && row <= r1) next.delete(row);
       }
-      const summary = summaryIndex(!outlineSummaryFor(s.layout, s.data.sheetIndex).below, r0, r1);
+      const summaryBefore = !outlineSummaryFor(s.layout, s.data.sheetIndex).below;
+      for (const row of collapsedInner(
+        s.layout.outlineRows,
+        s.layout.collapsedRows,
+        summaryBefore,
+        r0,
+        r1,
+      )) {
+        next.add(row);
+      }
+      const summary = summaryIndex(summaryBefore, r0, r1);
       const collapsedRows = withFlag(s.layout.collapsedRows, summary, false);
       return { ...s, layout: { ...s.layout, hiddenRows: next, collapsedRows } };
     });
@@ -258,11 +268,45 @@ export function expandColGroup(
     store.setState((s) => {
       const next = new Set(s.layout.hiddenCols);
       for (let c = c0; c <= c1; c += 1) next.delete(c);
-      const summary = summaryIndex(!outlineSummaryFor(s.layout, s.data.sheetIndex).right, c0, c1);
+      const summaryBefore = !outlineSummaryFor(s.layout, s.data.sheetIndex).right;
+      for (const col of collapsedInner(
+        s.layout.outlineCols,
+        s.layout.collapsedCols,
+        summaryBefore,
+        c0,
+        c1,
+      )) {
+        next.add(col);
+      }
+      const summary = summaryIndex(summaryBefore, c0, c1);
       const collapsedCols = withFlag(s.layout.collapsedCols, summary, false);
       return { ...s, layout: { ...s.layout, hiddenCols: next, collapsedCols } };
     });
   });
+}
+
+/** Indices inside `[i0, i1]` that belong to a deeper group which is itself
+ *  collapsed: expanding the outer group leaves them hidden. */
+function collapsedInner(
+  levels: ReadonlyMap<number, number>,
+  collapsed: ReadonlySet<number> | undefined,
+  summaryBefore: boolean,
+  i0: number,
+  i1: number,
+): number[] {
+  if (!collapsed || collapsed.size === 0 || spanSize(i0, i1) > MAX_MATERIALIZED_OUTLINE_ROWS) {
+    return [];
+  }
+  let outer = Number.POSITIVE_INFINITY;
+  for (let i = i0; i <= i1; i += 1) outer = Math.min(outer, levels.get(i) ?? 0);
+  const kept: number[] = [];
+  for (const run of outlineRuns(levels)) {
+    if (run.level <= outer || run.i0 < i0 || run.i1 > i1) continue;
+    const summary = summaryIndex(summaryBefore, run.i0, run.i1);
+    if (summary === null || !collapsed.has(summary)) continue;
+    for (let i = run.i0; i <= run.i1; i += 1) kept.push(i);
+  }
+  return kept;
 }
 
 /** Every group on an axis: each contiguous run of indices at or past a level. */

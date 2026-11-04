@@ -60,6 +60,23 @@
     font-weight: 600;
     margin-bottom: 4px;
   }
+  /* Desktop-app note: flat pale-yellow card, fixed width, square corners. */
+  :is(.fc-host, .fc-overlay-portal)[data-fc-platform="mac"] .fc-validation-prompt {
+    box-sizing: border-box;
+    width: 90px;
+    max-width: none;
+    padding: 2px 5px;
+    border: 1px solid rgb(100, 100, 100);
+    border-radius: 0;
+    background: rgb(255, 255, 227);
+    box-shadow: none;
+    color: rgb(93, 93, 93);
+    font-size: 12px;
+    line-height: 12.2px;
+  }
+  :is(.fc-host, .fc-overlay-portal)[data-fc-platform="mac"] .fc-validation-prompt__title {
+    margin-bottom: 0;
+  }
 
   .fc-valdlg__panel {
     width: min(360px, calc(100vw - 48px));

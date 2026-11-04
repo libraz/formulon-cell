@@ -8,6 +8,13 @@ export interface RangeInsertTarget {
   /** Cell whose formula is being edited; the base for relative references. */
   editedCell: () => Addr;
   insertRefAtCaret: (ref: string, options?: { phase: 'start' | 'update' }) => void;
+  /** Rewrite the `index`th reference of the draft (the order of `ui.editorRefs`)
+   *  to `ref`, keeping its sheet qualifier; `phase` groups a drag into one undo step. */
+  replaceReferenceAt?: (
+    index: number,
+    ref: string,
+    options?: { phase: 'start' | 'update' },
+  ) => void;
 }
 
 const r1c1Axis = (prefix: 'R' | 'C', target: number, base: number): string => {

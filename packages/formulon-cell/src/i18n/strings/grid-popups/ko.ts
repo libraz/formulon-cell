@@ -160,6 +160,20 @@ export const gridPopupsKo: GridPopupsStrings = {
       flashFill: '빠른 채우기',
       seriesDialog: '계열...',
     },
+    /** Entries of the menu a right-button selection drag opens. */
+    dropMenu: {
+      move: '여기로 이동',
+      copy: '여기에 복사',
+      copyValues: '값만 여기에 복사',
+      copyFormats: '서식만 여기에 복사',
+      link: '여기에 연결',
+      hyperlink: '여기에 하이퍼링크 만들기',
+      copyShiftDown: '아래로 밀고 복사',
+      copyShiftRight: '오른쪽으로 밀고 복사',
+      moveShiftDown: '아래로 밀고 이동',
+      moveShiftRight: '오른쪽으로 밀고 이동',
+      cancel: '취소',
+    },
   },
   pasteOptions: {
     title: '붙여넣기 옵션',

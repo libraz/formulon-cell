@@ -2032,6 +2032,24 @@ describe('attachSessionCharts', () => {
     handle.detach();
   });
 
+  it('selects the title as its own part and drops the outer handles', () => {
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'line', title: 'Trend' });
+    const handle = attach();
+    const title = host.querySelector<SVGElement>('[data-chart-role="title"]');
+    if (!title) throw new Error('missing chart title');
+
+    firePointer(title, 'pointerdown', { clientX: 10, clientY: 10 });
+    expect(panel().classList.contains('fc-chart--part-focus')).toBe(true);
+    expect(host.querySelectorAll('.fc-chart__parts circle')).toHaveLength(4);
+
+    const plot = host.querySelector<SVGSVGElement>('.fc-chart__plot');
+    if (plot) firePointer(plot, 'pointerdown', { clientX: 10, clientY: 10 });
+    expect(host.querySelector('.fc-chart__parts')).toBeNull();
+    expect(panel().classList.contains('fc-chart--part-focus')).toBe(false);
+    handle.detach();
+  });
+
   it('moves and resizes chart overlays through pointer interactions', () => {
     put([[1, 2]]);
     create(range(0, 0, 0, 1), { kind: 'line', title: 'Trend' });

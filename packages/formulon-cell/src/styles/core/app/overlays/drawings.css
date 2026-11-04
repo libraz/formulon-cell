@@ -76,6 +76,27 @@
     display: block;
   }
 
+  /* A title selected on its own takes the outer sizing handles away. */
+  .fc-chart--part-focus .fc-drawing-handle {
+    display: none;
+  }
+
+  /* Selected chart parts: a hairline frame and blue-ringed white handles. */
+  .fc-chart__part-frame {
+    fill: none;
+    stroke: var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
+    stroke-width: 1;
+  }
+  .fc-chart__part-handle {
+    fill: #fff;
+    stroke: var(--fc-accent, #2f6fd0);
+    stroke-width: 1.5;
+  }
+  .fc-chart__part-handle--square {
+    stroke: var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
+    stroke-width: 1;
+  }
+
   .fc-drawing-handle[data-handle="nw"] {
     left: 0;
     top: 0;

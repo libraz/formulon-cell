@@ -270,6 +270,49 @@ describe('auto fill options', () => {
     expect(Number.parseFloat(menu.style.top)).toBeCloseTo(102.7 + 22 + 5, 5);
   });
 
+  describe('right-button selection drag menu', () => {
+    it('lists the drop actions, shows the dropped address and copies on choice', async () => {
+      seedAndMirror(store, wb, [{ row: 0, col: 0, value: 5 }]);
+      const src = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+      const dest = { sheet: 0, r0: 3, c0: 3, r1: 3, c1: 3 };
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      const handle = attachAutoFillOptions({
+        host,
+        store,
+        wb,
+        strings: en,
+        onAfterCommit: () => mutators.replaceCells(store, wb.cells(0)),
+      });
+      detach = () => handle.detach();
+      host.dispatchEvent(
+        new CustomEvent('fc:movemenu', { detail: { src, dest, clientX: 200, clientY: 200 } }),
+      );
+      const items = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item'));
+      expect(items.map((i) => i.dataset.fcAction)).toEqual([
+        'move',
+        'copy',
+        'copyValues',
+        'copyFormats',
+        'link',
+        'hyperlink',
+        'copyShiftDown',
+        'copyShiftRight',
+        'moveShiftDown',
+        'moveShiftRight',
+        'cancel',
+      ]);
+      expect(items.map((i) => i.textContent).slice(0, 2)).toEqual(['Move Here', 'Copy Here']);
+      expect(document.querySelector('.fc-fill-tooltip')?.textContent).toBe('D4');
+      expect(store.getState().ui.movePreview).toEqual(dest);
+      items[1]?.click();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(num(wb, 3, 3)).toBe(5);
+      expect(num(wb, 0, 0)).toBe(5);
+      expect(store.getState().ui.movePreview).toBeNull();
+      expect(document.querySelector('.fc-fill-tooltip:not([hidden])')).toBeNull();
+    });
+  });
+
   describe('right-button drag menu', () => {
     const open = (src: object, dest: object): HTMLButtonElement[] => {
       const handle = attachAutoFillOptions({

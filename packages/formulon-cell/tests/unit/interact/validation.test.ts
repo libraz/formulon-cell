@@ -9,6 +9,7 @@ import {
   attachValidationList,
   attachValidationPrompt,
 } from '../../../src/interact/validation.js';
+import { cellRect, layoutForView } from '../../../src/render/geometry.js';
 import { gridHitState } from '../../../src/render/grid/hit-state.js';
 import {
   createSpreadsheetStore,
@@ -426,6 +427,32 @@ describe('attachValidationPrompt', () => {
     expect(prompt()?.textContent).toContain('Status');
     expect(prompt()?.textContent).toContain('Choose a workflow state.');
     handle.detach();
+  });
+
+  it('hangs the card from the cell centre, 6px below the cell', () => {
+    const addr = { sheet: 0, row: 1, col: 1 };
+    mutators.setCellFormat(store, addr, {
+      validation: { kind: 'whole', op: 'between', a: 1, b: 10, promptMessage: 'Whole number.' },
+    });
+    mutators.setActive(store, addr);
+    const handle = attachValidationPrompt({ grid, store });
+    const state = store.getState();
+    const rect = cellRect(layoutForView(state), state.viewport, addr.row, addr.col);
+
+    expect(prompt()?.style.left).toBe(`${rect.x + rect.w / 2}px`);
+    expect(prompt()?.style.top).toBe(`${rect.y + rect.h + 6}px`);
+    handle.detach();
+  });
+
+  it('draws the Mac card as a flat pale-yellow note with a fixed width', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/popups/validation-and-chooser.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\[data-fc-platform="mac"\] \.fc-validation-prompt\s*\{[\s\S]*?width: 90px;[\s\S]*?border: 1px solid rgb\(100, 100, 100\);[\s\S]*?background: rgb\(255, 255, 227\);[\s\S]*?box-shadow: none;[\s\S]*?color: rgb\(93, 93, 93\);/,
+    );
   });
 
   it('hides when showInputMessage is false or the selection moves away', () => {

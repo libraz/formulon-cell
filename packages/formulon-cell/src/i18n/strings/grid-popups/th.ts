@@ -160,6 +160,20 @@ export const gridPopupsTh: GridPopupsStrings = {
       flashFill: 'การเติมแบบแฟลช',
       seriesDialog: 'ชุดข้อมูล...',
     },
+    /** Entries of the menu a right-button selection drag opens. */
+    dropMenu: {
+      move: 'ย้ายมาที่นี่',
+      copy: 'คัดลอกมาที่นี่',
+      copyValues: 'คัดลอกเฉพาะค่ามาที่นี่',
+      copyFormats: 'คัดลอกเฉพาะรูปแบบมาที่นี่',
+      link: 'เชื่อมโยงที่นี่',
+      hyperlink: 'สร้างไฮเปอร์ลิงก์ที่นี่',
+      copyShiftDown: 'เลื่อนลงและคัดลอก',
+      copyShiftRight: 'เลื่อนไปทางขวาและคัดลอก',
+      moveShiftDown: 'เลื่อนลงและย้าย',
+      moveShiftRight: 'เลื่อนไปทางขวาและย้าย',
+      cancel: 'ยกเลิก',
+    },
   },
   pasteOptions: {
     title: 'ตัวเลือกการวาง',

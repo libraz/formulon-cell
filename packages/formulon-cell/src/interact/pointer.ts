@@ -1,7 +1,15 @@
 import type { AutofitOptions } from '../commands/autofit-measurement.js';
+import { clearSelectedContents } from '../commands/clear-contents.js';
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { isPopulated } from '../commands/current-region.js';
-import { fillDestFor, fillLastValue, fillOutputRange, fillRange } from '../commands/fill.js';
+import {
+  fillDestFor,
+  fillLastValue,
+  fillOutputRange,
+  fillRange,
+  fillShrinkDropped,
+  fillShrinkFor,
+} from '../commands/fill.js';
 import { autoFillDownExtent, restrictedFillChanges } from '../commands/fill-plan.js';
 import { headerFilterRanges } from '../commands/filter-ranges.js';
 import { tableOverlayById } from '../commands/format-as-table.js';
@@ -81,6 +89,7 @@ import {
 import { jumpToDataEdge } from './data-edge-navigation.js';
 import { type AutoscrollBounds, createDragAutoscroll } from './drag-autoscroll.js';
 import { createFillValueTooltip } from './fill-value-tooltip.js';
+import { resizeCursor } from './grid-cursors.js';
 import { followHyperlink, type HyperlinkFollowDeps } from './hyperlink-follow.js';
 import {
   isNavigationAddrAllowed,
@@ -95,6 +104,8 @@ import {
   marginInchesFor,
   pageBandAt,
   pageBreakHandleAt,
+  type RefBoxCorner,
+  refBoxHitAt,
   rulerHandleAt,
   updateCursor,
 } from './pointer-targets.js';
@@ -146,9 +157,21 @@ type DragMode =
     }
   | { kind: 'fill'; src: Range; menu?: boolean }
   | { kind: 'table-resize'; id: string }
+  /** Moving or resizing a formula-edit reference box; `press` is the cell grabbed. */
+  | {
+      kind: 'ref-box';
+      index: number;
+      part: 'edge' | 'corner';
+      corner?: RefBoxCorner;
+      orig: Range;
+      press: { row: number; col: number };
+      base: { row: number; col: number };
+      r1c1: boolean;
+      started: boolean;
+    }
   /** Moving the selection by its frame; `grab` is the grabbed cell's offset
    *  from the block's top-left. */
-  | { kind: 'move'; src: Range; grab: { row: number; col: number } }
+  | { kind: 'move'; src: Range; grab: { row: number; col: number }; menu?: boolean }
   | { kind: 'page-break'; handle: PageBreakHandle; target: number }
   | { kind: 'ruler-margin'; handle: RulerHandle; inches: number }
   | {
@@ -315,6 +338,36 @@ function selectionBorderEdgeAt(
   if (withinY && near(x, left)) return 'left';
   return null;
 }
+
+/** The range a reference-box drag produces with the pointer over `cell`: an edge
+ *  drag shifts the box by the cell delta from the press, a corner drag keeps the
+ *  opposite corner fixed. */
+const refBoxRangeFor = (
+  drag: Extract<DragMode, { kind: 'ref-box' }>,
+  cell: { row: number; col: number },
+): Range => {
+  const { orig } = drag;
+  if (drag.part === 'edge') {
+    const dRow = Math.max(-orig.r0, Math.min(MAX_ROW - orig.r1, cell.row - drag.press.row));
+    const dCol = Math.max(-orig.c0, Math.min(MAX_COL - orig.c1, cell.col - drag.press.col));
+    return {
+      sheet: orig.sheet,
+      r0: orig.r0 + dRow,
+      c0: orig.c0 + dCol,
+      r1: orig.r1 + dRow,
+      c1: orig.c1 + dCol,
+    };
+  }
+  const fixedRow = drag.corner === 'nw' || drag.corner === 'ne' ? orig.r1 : orig.r0;
+  const fixedCol = drag.corner === 'nw' || drag.corner === 'sw' ? orig.c1 : orig.c0;
+  return {
+    sheet: orig.sheet,
+    r0: Math.min(fixedRow, cell.row),
+    c0: Math.min(fixedCol, cell.col),
+    r1: Math.max(fixedRow, cell.row),
+    c1: Math.max(fixedCol, cell.col),
+  };
+};
 
 export function attachPointer(
   host: HTMLElement,
@@ -530,6 +583,25 @@ export function attachPointer(
     return { applied, restricted };
   };
 
+  /** Pulling the fill handle back inside the source clears the dropped cells'
+   *  contents (formats stay) and shrinks the selection to what is kept. */
+  const commitFillShrink = (s: State, src: Range, kept: Range): void => {
+    const dropped = fillShrinkDropped(src, kept);
+    const active = s.selection.active;
+    mutators.setActive(store, { sheet: dropped.sheet, row: dropped.r0, col: dropped.c0 });
+    mutators.extendRangeTo(store, { sheet: dropped.sheet, row: dropped.r1, col: dropped.c1 });
+    const result = clearSelectedContents({
+      store,
+      workbook: wb,
+      history,
+      origin: 'fillHandle',
+      commandId: 'fill-shrink',
+    });
+    mutators.setActive(store, active);
+    mutators.setRange(store, kept);
+    if (result.status === 'applied') onAfterCommit?.();
+  };
+
   let releaseContextMenuSwallow: (() => void) | null = null;
   const swallowContextMenu = (): void => {
     releaseContextMenuSwallow?.();
@@ -568,6 +640,28 @@ export function attachPointer(
       host.style.cursor = 'crosshair';
       swallowContextMenu();
       return;
+    }
+    // A right-button drag by the selection frame ends in a menu of drop actions.
+    if (controller?.policy === undefined && isSelectionBorderHit(s, x, y)) {
+      const grabbed = hitTest(geometryLayout(s), s.viewport, x, y);
+      if (grabbed) {
+        host.focus();
+        try {
+          host.setPointerCapture(e.pointerId);
+        } catch {
+          /* no-op: in-host drags still work without capture */
+        }
+        const src = { ...s.selection.range };
+        drag = {
+          kind: 'move',
+          src,
+          grab: { row: grabbed.row - src.r0, col: grabbed.col - src.c0 },
+          menu: true,
+        };
+        host.style.cursor = 'move';
+        swallowContextMenu();
+        return;
+      }
     }
     const zone = hitZone(geometryLayout(s), s.viewport, x, y, [], { resizeHandles: false });
     if (!zone) return;
@@ -767,6 +861,31 @@ export function attachPointer(
           grab: { row: grabbed.row - src.r0, col: grabbed.col - src.c0 },
         };
         host.style.cursor = 'move';
+        return;
+      }
+    }
+
+    // A reference box of the formula being edited moves by its edge and
+    // resizes by its corner handles.
+    if (inFormula && editor?.replaceReferenceAt) {
+      const box = refBoxHitAt(s, x, y);
+      const ref = box ? s.ui.editorRefs[box.index] : undefined;
+      const pressed = box ? hitTest(geometryLayout(s), s.viewport, x, y) : null;
+      if (box && ref && pressed) {
+        e.preventDefault();
+        tryCapture();
+        const orig = { sheet: s.data.sheetIndex, r0: ref.r0, c0: ref.c0, r1: ref.r1, c1: ref.c1 };
+        drag = {
+          kind: 'ref-box',
+          index: box.index,
+          part: box.part,
+          corner: box.corner,
+          orig,
+          press: { row: pressed.row, col: pressed.col },
+          base: { ...editor.editedCell() },
+          r1c1: s.ui.r1c1 === true,
+          started: false,
+        };
         return;
       }
     }
@@ -1141,7 +1260,7 @@ export function attachPointer(
           w / scale,
           Math.max(0, -w) / scale,
         );
-        host.style.cursor = 'col-resize';
+        host.style.cursor = resizeCursor(host, 'col');
         showResizeTip('col', drag.col, e);
         return;
       }
@@ -1156,7 +1275,7 @@ export function attachPointer(
           h / scale,
           Math.max(0, -h) / scale,
         );
-        host.style.cursor = 'row-resize';
+        host.style.cursor = resizeCursor(host, 'row');
         showResizeTip('row', drag.row, e);
         return;
       }
@@ -1200,6 +1319,21 @@ export function attachPointer(
       case 'fill': {
         const cell = hitTest(geometryLayout(s), s.viewport, x, y);
         if (!cell) return;
+        const corner = cellRect(geometryLayout(s), s.viewport, drag.src.r1, drag.src.c1);
+        const kept = drag.menu
+          ? null
+          : fillShrinkFor(
+              drag.src,
+              { row: cell.row, col: cell.col },
+              { dx: x - (corner.x + corner.w), dy: y - (corner.y + corner.h) },
+            );
+        // Pulling back inside the source drops its trailing cells; no value tip.
+        if (kept) {
+          mutators.setFillPreview(store, kept);
+          host.style.cursor = 'crosshair';
+          fillTooltip.hide();
+          return;
+        }
         const dest = fillDestFor(drag.src, { row: cell.row, col: cell.col });
         if (!isNavigationRangeAllowed(store, dest)) {
           mutators.setFillPreview(store, null);
@@ -1208,8 +1342,13 @@ export function attachPointer(
         mutators.setFillPreview(store, dest);
         host.style.cursor = 'crosshair';
         const last = fillLastValue(s, drag.src, dest, inputLocaleForWorkbook(wb));
-        if (last === null || !e) fillTooltip.hide();
-        else fillTooltip.show(last, e.clientX, e.clientY);
+        if (last === null || !e) {
+          fillTooltip.hide();
+        } else {
+          const edge = cellRect(geometryLayout(s), s.viewport, dest.r1, dest.c1);
+          const at = localXY(e);
+          fillTooltip.show(last, e.clientX - at.x + edge.x + edge.w, e.clientY);
+        }
         return;
       }
       case 'table-resize': {
@@ -1245,6 +1384,23 @@ export function attachPointer(
         mutators.setPageBreakDrag(store, { axis, position: axis === 'row' ? y : x });
         const at = indexAt(s, x, y);
         if (at) drag.target = axis === 'row' ? at.row : at.col;
+        return;
+      }
+      case 'ref-box': {
+        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
+        const editor = getEditor();
+        if (!cell || !editor?.replaceReferenceAt) return;
+        const next = refBoxRangeFor(drag, cell);
+        editor.replaceReferenceAt(
+          drag.index,
+          rangeRefOf(
+            { row: next.r0, col: next.c0 },
+            { row: next.r1, col: next.c1 },
+            { r1c1: drag.r1c1, base: drag.base },
+          ),
+          { phase: drag.started ? 'update' : 'start' },
+        );
+        drag.started = true;
         return;
       }
       case 'range-insert': {
@@ -1368,8 +1524,21 @@ export function attachPointer(
     if (drag.kind === 'move') {
       const target = store.getState().ui.movePreview;
       mutators.setMovePreview(store, null);
+      const { src, menu } = drag;
       drag = { kind: 'none' };
       host.style.cursor = '';
+      if (menu) {
+        finishSecondaryDrag();
+        if (target) {
+          host.dispatchEvent(
+            new CustomEvent('fc:movemenu', {
+              bubbles: true,
+              detail: { src, dest: { ...target }, clientX: e.clientX, clientY: e.clientY },
+            }),
+          );
+        }
+        return;
+      }
       if (target) {
         void moveSelectionTo(
           { store, wb, history, confirmOverwrite: confirmMoveOverwrite },
@@ -1406,7 +1575,15 @@ export function attachPointer(
         dest.c0 === drag.src.c0 &&
         dest.r1 === drag.src.r1 &&
         dest.c1 === drag.src.c1;
-      if (dest && !unchanged) {
+      const shrunk =
+        dest !== null &&
+        !drag.menu &&
+        dest.r0 === drag.src.r0 &&
+        dest.c0 === drag.src.c0 &&
+        (dest.r1 < drag.src.r1 || dest.c1 < drag.src.c1);
+      if (dest && shrunk) {
+        commitFillShrink(s, drag.src, dest);
+      } else if (dest && !unchanged) {
         if (!isNavigationRangeAllowed(store, dest)) {
           drag = { kind: 'none' };
           const { x, y } = localXY(e);

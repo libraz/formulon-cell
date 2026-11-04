@@ -1,6 +1,8 @@
 export interface WorkbookChromeStrings {
   statusBar: {
     ready: string;
+    /** Filter result count; `{found}` and `{total}` are replaced. */
+    filterRecords: string;
     endMode: string;
     enter: string;
     edit: string;

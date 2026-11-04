@@ -19,6 +19,7 @@ export const workbookChromeTh: WorkbookChromeStrings = {
     pageLayoutView: 'เค้าโครงหน้ากระดาษ',
     pageBreakPreview: 'แสดงตัวอย่างตัวแบ่งหน้า',
     ready: 'พร้อม',
+    filterRecords: 'พบ {found} จาก {total} ระเบียน',
     endMode: 'โหมด End',
     enter: 'ป้อน',
     edit: 'แก้ไข',

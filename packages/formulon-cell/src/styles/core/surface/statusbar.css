@@ -21,6 +21,11 @@
     flex: 0 0 auto;
   }
 
+  .fc-host__statusbar-filter {
+    margin-left: 16px;
+    white-space: nowrap;
+  }
+
   /* The accessibility status beside Ready: a borderless text button that
      opens the checker. */
   .fc-host__statusbar-a11y {

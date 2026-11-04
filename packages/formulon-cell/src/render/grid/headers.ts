@@ -1,6 +1,7 @@
 // Row + column header bar and outline gutters. Drawn in
 // a single pass after cell painting so headers sit above the gridlines.
 
+import { activeFilterRanges } from '../../commands/filter-state.js';
 import { colLetter } from '../../engine/address.js';
 import { headerDigitPitch } from '../../store/header-strip.js';
 import { renderScale } from '../../store/render-scale.js';
@@ -25,6 +26,9 @@ import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context
  *  label font's descent plus one px above the row's bottom edge (6 device px
  *  at DPR 2 for the default font, 8 for Courier New 11, 14 for Courier 20). */
 const ROW_LABEL_PAD_Y = 1;
+
+/** Row-number colour of the data rows a filter lets through (desktop app, dark appearance). */
+export const FILTERED_ROW_LABEL_COLOR = '#f88200';
 
 /** Screen extent of each page's visible columns in Page Layout view, or null
  *  in the views whose column strip runs unbroken. */
@@ -270,11 +274,17 @@ export function paintHeaders(
     ctx.lineTo(rowSepX1, sepY);
   }
   ctx.stroke();
+  const filters = activeFilterRanges(state);
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
     const lit = isLitRow(r);
-    ctx.fillStyle = lit ? theme.headerFgActive : theme.headerFg;
+    const filtered = filters.some(({ range }) => r > range.r0 && r <= range.r1);
+    ctx.fillStyle = filtered
+      ? FILTERED_ROW_LABEL_COLOR
+      : lit
+        ? theme.headerFgActive
+        : theme.headerFg;
     setFont(lit ? litFont : plainFont);
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
     const rowLabelY = textBaselineY({ ...rect, h }, labelBox, 'bottom', ROW_LABEL_PAD_Y);

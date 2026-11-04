@@ -119,6 +119,16 @@ export function autoFillDownExtent(state: State, src: Range): Range | null {
     const last = r - 1;
     if (last > endRow) endRow = last;
   }
+  // The fill stops before the first occupied cell of the destination block.
+  for (let r = start; r <= endRow; r += 1) {
+    for (let c = src.c0; c <= src.c1; c += 1) {
+      if (hasCellAt(state, sheet, r, c)) {
+        endRow = r - 1;
+        break;
+      }
+    }
+    if (endRow < r) break;
+  }
   if (endRow < start) return null;
   return { sheet, r0: src.r0, c0: src.c0, r1: endRow, c1: src.c1 };
 }

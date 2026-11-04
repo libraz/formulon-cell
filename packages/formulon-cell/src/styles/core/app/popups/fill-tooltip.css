@@ -1,18 +1,20 @@
 /* Fill-handle drag tooltip: the value the furthest target cell receives,
-   in a small dark box beside the pointer (Excel Mac: white text, rounded). */
+   in a small dark box right of the drag range (Excel Mac: #1e1e1e, white text,
+   3 px radius, 18.5 px tall, soft shadow). */
 
 @layer fc.app {
   .fc-fill-tooltip {
     position: fixed;
     z-index: var(--fc-z-tooltip, 2147483030);
     pointer-events: none;
-    padding: 2px 5px;
-    border-radius: 4px;
-    background: rgba(40, 40, 40, 0.92);
+    padding: 0 9px;
+    border-radius: 3px;
+    background: rgb(30, 30, 30);
+    box-shadow: 0 1px 4px rgba(5, 5, 5, 0.5);
     color: #ffffff;
     font-family: var(--fc-font-ui, system-ui);
-    font-size: 12px;
-    line-height: 14px;
+    font-size: 13px;
+    line-height: 18.5px;
     white-space: nowrap;
   }
   .fc-fill-tooltip[hidden] {

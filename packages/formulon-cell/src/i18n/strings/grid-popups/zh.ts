@@ -160,6 +160,20 @@ export const gridPopupsZh: GridPopupsStrings = {
       flashFill: '快速填充',
       seriesDialog: '序列...',
     },
+    /** Entries of the menu a right-button selection drag opens. */
+    dropMenu: {
+      move: '移动到此位置',
+      copy: '复制到此位置',
+      copyValues: '仅将值复制到此位置',
+      copyFormats: '仅将格式复制到此位置',
+      link: '在此处创建链接',
+      hyperlink: '在此处创建超链接',
+      copyShiftDown: '下移并复制',
+      copyShiftRight: '右移并复制',
+      moveShiftDown: '下移并移动',
+      moveShiftRight: '右移并移动',
+      cancel: '取消',
+    },
   },
   pasteOptions: {
     title: '粘贴选项',

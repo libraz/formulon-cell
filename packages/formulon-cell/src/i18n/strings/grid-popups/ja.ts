@@ -161,6 +161,20 @@ export const gridPopupsJa: GridPopupsStrings = {
       flashFill: 'フラッシュ フィル',
       seriesDialog: '連続データの作成...',
     },
+    /** Entries of the menu a right-button selection drag opens. */
+    dropMenu: {
+      move: 'ここへ移動',
+      copy: 'ここへコピー',
+      copyValues: 'ここへ値のみをコピー',
+      copyFormats: 'ここへ書式のみをコピー',
+      link: 'ここにリンク',
+      hyperlink: 'ここにハイパーリンクを作成',
+      copyShiftDown: '下へシフトしてコピー',
+      copyShiftRight: '右へシフトしてコピー',
+      moveShiftDown: '下へシフトして移動',
+      moveShiftRight: '右へシフトして移動',
+      cancel: 'キャンセル',
+    },
   },
   pasteOptions: {
     title: '貼り付けのオプション',

@@ -162,6 +162,20 @@ export const gridPopupsDe: GridPopupsStrings = {
       flashFill: 'Blitzvorschau',
       seriesDialog: 'Datenreihe...',
     },
+    /** Entries of the menu a right-button selection drag opens. */
+    dropMenu: {
+      move: 'Hierher verschieben',
+      copy: 'Hierher kopieren',
+      copyValues: 'Nur Werte hierher kopieren',
+      copyFormats: 'Nur Formate hierher kopieren',
+      link: 'Hier verknüpfen',
+      hyperlink: 'Hier Hyperlink erstellen',
+      copyShiftDown: 'Nach unten verschieben und kopieren',
+      copyShiftRight: 'Nach rechts verschieben und kopieren',
+      moveShiftDown: 'Nach unten verschieben und verschieben',
+      moveShiftRight: 'Nach rechts verschieben und verschieben',
+      cancel: 'Abbrechen',
+    },
   },
   pasteOptions: {
     title: 'Einfügeoptionen',

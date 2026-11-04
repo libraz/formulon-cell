@@ -514,7 +514,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         },
         wb,
       );
-      close();
+      // The desktop panel stays open on a cleared column, showing the idle state.
+      if (mac) open(range, col, anchor);
+      else close();
     });
     if (mac) {
       const autoApplyRow = ownerDocument.createElement('label');
@@ -549,7 +551,6 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
             range: activeRange,
             options: { byCol: activeCol, direction, hasHeader: true },
           });
-          close();
         });
         projectDisabledState(button, !deps.getWb || !deps.history, m.unavailable);
         sortRow.append(button);

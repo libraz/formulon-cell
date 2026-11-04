@@ -19,6 +19,7 @@ export const workbookChromeZh: WorkbookChromeStrings = {
     pageLayoutView: '页面布局',
     pageBreakPreview: '分页预览',
     ready: '就绪',
+    filterRecords: '在 {total} 条记录中找到 {found} 个',
     endMode: '结束模式',
     enter: '输入',
     edit: '编辑',

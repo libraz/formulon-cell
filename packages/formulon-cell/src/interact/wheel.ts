@@ -51,6 +51,35 @@ function splitPaneAt(
   };
 }
 
+/** Where the pointer sits relative to frozen panes (not splits), in screen px. */
+function frozenRegionAt(
+  grid: HTMLElement,
+  state: ReturnType<SpreadsheetStore['getState']>,
+  e: WheelEvent,
+): { blockY: boolean; blockX: boolean } {
+  const layout = layoutForView(state);
+  if (state.layout.splitPanes === true || (layout.freezeRows === 0 && layout.freezeCols === 0)) {
+    return { blockY: false, blockX: false };
+  }
+  const rect = grid.getBoundingClientRect();
+  const x = mirrorX(layout, e.clientX - rect.left);
+  const y = e.clientY - rect.top;
+  const originX = gridOriginX(layout);
+  const originY = gridOriginY(layout);
+  // Headers and the frozen rows take no wheel input; the frozen columns scroll rows only.
+  if (x < originX || y < originY) return { blockY: true, blockX: true };
+  if (layout.freezeRows > 0 && y < originY + frozenRowsHeight(layout, state.viewport)) {
+    return { blockY: true, blockX: true };
+  }
+  const inFrozenCols =
+    layout.freezeCols > 0 && x < originX + frozenColsWidth(layout, state.viewport);
+  return { blockY: false, blockX: inFrozenCols };
+}
+
+/** Mac line-wheel rates, in rows and columns per line; rows round half down, columns truncate. */
+const MAC_ROWS_PER_LINE = 0.7;
+const MAC_COLS_PER_LINE = 0.15;
+
 const DOM_DELTA_LINE = 1;
 const DOM_DELTA_PAGE = 2;
 
@@ -100,11 +129,18 @@ export function attachWheel(deps: WheelDeps): () => void {
         : e.deltaMode === DOM_DELTA_PAGE
           ? cw * state.viewport.colCount
           : 1;
-    const dx = (e.shiftKey ? e.deltaY : e.deltaX) * unitX * dirX;
-    const dy = e.shiftKey ? 0 : e.deltaY * unitY;
+    const mac =
+      e.deltaMode === DOM_DELTA_LINE &&
+      (grid.closest<HTMLElement>('.fc-host') ?? grid).dataset.fcPlatform === 'mac';
+    const frozen = mac ? frozenRegionAt(grid, state, e) : { blockY: false, blockX: false };
+    if (frozen.blockY && frozen.blockX) return;
+    const rowRate = mac ? MAC_ROWS_PER_LINE : 1;
+    const colRate = mac ? MAC_COLS_PER_LINE : 1;
+    const dx = frozen.blockX ? 0 : (e.shiftKey ? e.deltaY : e.deltaX) * unitX * dirX * colRate;
+    const dy = e.shiftKey || frozen.blockY ? 0 : e.deltaY * unitY * rowRate;
     accY += dy;
     accX += dx;
-    const dRow = Math.trunc(accY / rh);
+    const dRow = mac ? -Math.round(-accY / rh) : Math.trunc(accY / rh);
     const dCol = Math.trunc(accX / cw);
     if (dRow === 0 && dCol === 0) return;
     accY -= dRow * rh;

@@ -133,6 +133,32 @@ describe('InlineEditor', () => {
     expect(input.value).toBe('=SUM(B1:A4:C5)+D1');
   });
 
+  it('rewrites one reference of the draft and refreshes the highlights', () => {
+    editor.begin('=SUM(A1:A3)+Sheet2!B1');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+
+    editor.replaceReferenceAt(0, 'D1:D3', { phase: 'start' });
+    expect(input.value).toBe('=SUM(D1:D3)+Sheet2!B1');
+    editor.replaceReferenceAt(0, 'D1:D5', { phase: 'update' });
+    expect(input.value).toBe('=SUM(D1:D5)+Sheet2!B1');
+    expect(store.getState().ui.editorRefs[0]).toMatchObject({ r0: 0, c0: 3, r1: 4, c1: 3 });
+
+    editor.replaceReferenceAt(1, 'C2');
+    expect(input.value).toBe('=SUM(D1:D5)+Sheet2!C2');
+  });
+
+  it('keeps the $ pins of a reference it moves or resizes', () => {
+    editor.begin('=SUM($A$1:A$3)+$B2');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+
+    editor.replaceReferenceAt(0, 'C1:C3', { phase: 'start' });
+    expect(input.value).toBe('=SUM($C$1:C$3)+$B2');
+    editor.replaceReferenceAt(0, 'C1:C5', { phase: 'update' });
+    expect(input.value).toBe('=SUM($C$1:C$5)+$B2');
+    editor.replaceReferenceAt(1, 'D4:E5');
+    expect(input.value).toBe('=SUM($C$1:C$5)+$D4:$E5');
+  });
+
   it('rejects a stale drag update after ordinary formula input', () => {
     editor.begin('=SUM(B1:B2)+D1');
     const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;

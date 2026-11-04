@@ -12,6 +12,7 @@ import { drawingClipPath, sessionPosition } from '../engine/drawing-geometry.js'
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionChipButton } from './chip-button.js';
 import { appendDialogButton } from './dialog-shell.js';
 
@@ -59,6 +60,7 @@ interface PanelEntry {
   root: HTMLDivElement;
   body: HTMLDivElement;
   title: HTMLSpanElement;
+  clearBtn: HTMLButtonElement;
   closeBtn: HTMLButtonElement;
   /** Detach DOM listeners specific to this panel. */
   dispose(): void;
@@ -142,6 +144,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       root,
       body,
       title,
+      clearBtn,
       closeBtn,
       dispose(): void {
         clearBtn.removeEventListener('click', onClear);
@@ -162,6 +165,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       entry.body.appendChild(empty);
       return;
     }
+    projectDisabledState(entry.clearBtn, spec.selected.length === 0, null);
     const distinct = listSlicerValues(store, wb, spec);
     const selected = new Set(spec.selected);
     const focusChip = (idx: number): void => {
@@ -195,17 +199,12 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       //  the unselected ones dim.
       chip.classList.toggle('fc-slicer__chip--on', isOn);
 
-      chip.addEventListener('click', () => {
-        const current = new Set(spec.selected);
-        if (current.size === 0) {
-          // First chip toggle: start with the clicked value as the only
-          //  enabled item.
-          current.add(value);
-        } else if (current.has(value)) {
-          current.delete(value);
-        } else {
-          current.add(value);
-        }
+      chip.addEventListener('click', (event) => {
+        // A plain click replaces the selection; a modifier click toggles the item.
+        const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+        const current = new Set(additive ? spec.selected : []);
+        if (additive && current.has(value)) current.delete(value);
+        else current.add(value);
         // If the new set covers every distinct value, collapse back to
         //  "all" so the next click can re-narrow without going through
         //  every chip.

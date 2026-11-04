@@ -56,12 +56,14 @@ import { paintTraces } from './grid/traces.js';
 import { cellFontFamily } from './painters/text.js';
 import {
   copyMarqueePhase,
+  isFillShrinkPreview,
   paintActiveCellBox,
   paintChartSourceHighlight,
   paintCopyMarquee,
   paintErrorSmartTag,
   paintFillHandle,
   paintFillPreview,
+  paintFillShrinkShade,
   paintMoveBand,
   paintRangeOutlineThin,
   paintRefHighlight,
@@ -898,7 +900,13 @@ export class GridRenderer {
     this.paintErrorTag(state, activeAnchor, activeRects);
 
     const preview = ui.fillPreview;
-    if (preview) {
+    if (preview && isFillShrinkPreview(r, preview)) {
+      // A fill pulled back inside its source lightens the cells it will drop.
+      const dropped =
+        preview.r1 < r.r1 ? { ...r, r0: preview.r1 + 1 } : { ...r, c0: preview.c1 + 1 };
+      for (const rect of rangeRects(layout, viewport, dropped))
+        paintFillShrinkShade(this.ctx, rect);
+    } else if (preview) {
       const rects = rangeRects(layout, viewport, preview);
       // The Mac desktop shows the fill target as its green drag band.
       for (const r of rects) {

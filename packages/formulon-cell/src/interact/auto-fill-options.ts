@@ -8,13 +8,15 @@ import {
 
 import type { History } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import { addrKey, parseAddrKey } from '../engine/address.js';
+import { applyRangeDrop, type RangeDropAction } from '../commands/range-drop.js';
+import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { createFillValueTooltip } from './fill-value-tooltip.js';
 import {
   createFloatingOptionsButton,
   createFloatingOptionsMenuItem,
@@ -46,6 +48,13 @@ interface AutoFillMenuDetail {
   clientY: number;
   anchorX: number;
   anchorY: number;
+}
+
+interface MoveMenuDetail {
+  src: Range;
+  dest: Range;
+  clientX: number;
+  clientY: number;
 }
 
 interface AutoFillOptionsDetail {
@@ -365,6 +374,48 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
     });
   };
 
+  const dropTip = createFillValueTooltip(host);
+
+  /** The menu a right-button selection drag ends in, with the dropped range's address beside it. */
+  const onMoveMenuRequest = (e: Event): void => {
+    const next = (e as CustomEvent<MoveMenuDetail>).detail;
+    if (!next) return;
+    const { src, dest } = next;
+    const t = strings.autoFillOptions;
+    const act = (action: RangeDropAction) => (): void => {
+      void applyRangeDrop({ store, wb, history }, src, dest, action).then((done) => {
+        if (done) deps.onAfterCommit?.();
+      });
+    };
+    const m = t.dropMenu;
+    const entries: ObjectMenuEntry[] = [
+      { id: 'move', label: m.move, run: act('move') },
+      { id: 'copy', label: m.copy, run: act('copy') },
+      { id: 'copyValues', label: m.copyValues, run: act('copyValues') },
+      { id: 'copyFormats', label: m.copyFormats, run: act('copyFormats') },
+      { id: 'link', label: m.link, run: act('link') },
+      { id: 'hyperlink', label: m.hyperlink, run: act('hyperlink') },
+      { separator: true },
+      { id: 'copyShiftDown', label: m.copyShiftDown, run: act('copyShiftDown') },
+      { id: 'copyShiftRight', label: m.copyShiftRight, run: act('copyShiftRight') },
+      { id: 'moveShiftDown', label: m.moveShiftDown, run: act('moveShiftDown') },
+      { id: 'moveShiftRight', label: m.moveShiftRight, run: act('moveShiftRight') },
+      { separator: true },
+      { id: 'cancel', label: m.cancel, run: () => undefined },
+    ];
+    hide();
+    mutators.setMovePreview(store, dest);
+    dragMenu.open(next.clientX + 1, next.clientY - 1, entries, {
+      label: t.title,
+      restoreFocusTo: host,
+      onClose: () => {
+        dropTip.hide();
+        mutators.setMovePreview(store, null);
+      },
+    });
+    dropTip.show(formatA1Range(dest), next.clientX + 1 - 5, next.clientY - 1 + 2.5);
+  };
+
   const onOpen = (e: Event): void => {
     const next = (e as CustomEvent<AutoFillOptionsDetail>).detail;
     if (!next) return;
@@ -415,6 +466,7 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   applyLabels();
   host.addEventListener('fc:autofilloptions', onOpen);
   host.addEventListener('fc:autofillmenu', onMenuRequest);
+  host.addEventListener('fc:movemenu', onMoveMenuRequest);
   button.addEventListener('click', onButtonClick);
   menu.addEventListener('click', onMenuClick);
   document.addEventListener('mousedown', onDocPointerDown, true);
@@ -425,6 +477,8 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
     detach(): void {
       host.removeEventListener('fc:autofilloptions', onOpen);
       host.removeEventListener('fc:autofillmenu', onMenuRequest);
+      host.removeEventListener('fc:movemenu', onMoveMenuRequest);
+      dropTip.dispose();
       dragMenu.detach();
       button.removeEventListener('click', onButtonClick);
       menu.removeEventListener('click', onMenuClick);

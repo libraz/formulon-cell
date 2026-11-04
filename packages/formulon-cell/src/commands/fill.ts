@@ -659,6 +659,11 @@ const fillDestinationWritable = (state: State, src: Range, dest: Range): boolean
   return true;
 };
 
+/** Whether a filter on `sheet` hides `row`; a fill leaves such rows untouched. */
+const rowHiddenByFilter = (state: State, sheet: number, row: number): boolean =>
+  state.layout.hiddenRows.has(row) &&
+  state.ui.filterRanges.some((r) => r.sheet === sheet && row > r.r0 && row <= r.r1);
+
 function applyFillRange(
   state: State,
   wb: WorkbookHandle,
@@ -699,6 +704,7 @@ function applyFillRange(
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r1 + i;
           const destCol = src.c0 + c;
+          if (rowHiddenByFilter(state, sheet, destRow)) continue;
           if (writeValues && writeProjected(wb, sheet, destRow, destCol, proj.at(i)))
             wroteValues = true;
         }
@@ -710,6 +716,7 @@ function applyFillRange(
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r0 - i;
           const destCol = src.c0 + c;
+          if (rowHiddenByFilter(state, sheet, destRow)) continue;
           if (writeValues && writeProjected(wb, sheet, destRow, destCol, projUp.at(i)))
             wroteValues = true;
         }
@@ -758,6 +765,7 @@ function applyFillRange(
   for (let r = dest.r0; r <= dest.r1; r += 1) {
     for (let c = dest.c0; c <= dest.c1; c += 1) {
       if (r >= src.r0 && r <= src.r1 && c >= src.c0 && c <= src.c1) continue; // skip source
+      if (rowHiddenByFilter(state, sheet, r)) continue;
       const sr = (((r - src.r0) % sR) + sR) % sR;
       const sc = (((c - src.c0) % sC) + sC) % sC;
       const cell = source[sr]?.[sc];
@@ -831,6 +839,31 @@ export function fillDestFor(src: Range, target: { row: number; col: number }): R
   return target.col > src.c1
     ? { sheet: src.sheet, r0: src.r0, c0: src.c0, r1: src.r1, c1: target.col }
     : { sheet: src.sheet, r0: src.r0, c0: target.col, r1: src.r1, c1: src.c1 };
+}
+
+/**
+ * The range a fill-handle drag keeps when it is pulled back inside the source.
+ * `target` is the cell under the pointer; `dx`/`dy` are the pointer's pixel offsets
+ * from the handle, and the larger one decides the axis (vertical on a tie).
+ * Null when the pointer is outside the source or leaves it unchanged.
+ */
+export function fillShrinkFor(
+  src: Range,
+  target: { row: number; col: number },
+  delta: { dx: number; dy: number },
+): Range | null {
+  if (target.row < src.r0 || target.row > src.r1 || target.col < src.c0 || target.col > src.c1) {
+    return null;
+  }
+  if (Math.abs(delta.dy) >= Math.abs(delta.dx)) {
+    return target.row === src.r1 ? null : { ...src, r1: target.row };
+  }
+  return target.col === src.c1 ? null : { ...src, c1: target.col };
+}
+
+/** The cells a shrink from `src` down to `kept` drops: the trailing rows or columns. */
+export function fillShrinkDropped(src: Range, kept: Range): Range {
+  return kept.r1 < src.r1 ? { ...src, r0: kept.r1 + 1 } : { ...src, c0: kept.c1 + 1 };
 }
 
 /** The cells a fill of `src` into `dest` writes: `dest` without the source rows or columns. */

@@ -162,6 +162,20 @@ export interface GridPopupsStrings {
       flashFill: string;
       seriesDialog: string;
     };
+    /** Entries of the menu a right-button selection drag opens. */
+    dropMenu: {
+      move: string;
+      copy: string;
+      copyValues: string;
+      copyFormats: string;
+      link: string;
+      hyperlink: string;
+      copyShiftDown: string;
+      copyShiftRight: string;
+      moveShiftDown: string;
+      moveShiftRight: string;
+      cancel: string;
+    };
   };
   pasteOptions: {
     title: string;

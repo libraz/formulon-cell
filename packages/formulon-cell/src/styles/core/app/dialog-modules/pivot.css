@@ -108,6 +108,41 @@
   }
   .fc-pivotdlg__area[data-pivot-drag-over="true"] {
     border-color: var(--fc-accent, #217346);
+    outline: 2px solid var(--fc-fg, CanvasText);
+    outline-offset: -2px;
+  }
+  /* The box a field is dragged out of keeps a green outline for the drag. */
+  [data-pivot-drag-source="true"] {
+    outline: 2px solid #2fa84f;
+    outline-offset: -2px;
+  }
+  .fc-pivotdlg__drag-ghost {
+    position: fixed;
+    top: -1000px;
+    left: -1000px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: rgb(160, 160, 160);
+    color: #1c1c1c;
+    font:
+      12px system-ui,
+      sans-serif;
+  }
+  .fc-pivotdlg__drag-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #2fa84f;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
   }
   .fc-pivotdlg__area-grid {
     display: grid;

@@ -20,6 +20,7 @@ export const workbookChromeKo: WorkbookChromeStrings = {
     pageLayoutView: '페이지 레이아웃',
     pageBreakPreview: '페이지 나누기 미리 보기',
     ready: '준비',
+    filterRecords: '{total}개 레코드 중 {found}개 찾음',
     endMode: 'End 모드',
     enter: '입력',
     edit: '편집',

@@ -31,6 +31,12 @@ import type { SessionChart, SpreadsheetStore } from '../store/store.js';
 import type { ChartSourceHighlight, State } from '../store/types.js';
 import { SVG_NS } from '../svg-namespace.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
+import {
+  type ChartPart,
+  chartPartAt,
+  paintChartPart,
+  partKeepsChartHandles,
+} from './chart-part-selection.js';
 import { createInteractionButton } from './chip-button.js';
 import {
   appendDrawingHandles,
@@ -388,6 +394,18 @@ export function attachSessionCharts(deps: {
     );
   };
 
+  /** The selected chart's selected part, drawn over its plot. */
+  let selectedPart: ChartPart | null = null;
+  const syncParts = (): void => {
+    if (selectedId === null) selectedPart = null;
+    for (const panel of root.querySelectorAll<HTMLElement>('.fc-chart')) {
+      const own = panel.dataset.chartId === selectedId ? selectedPart : null;
+      panel.classList.toggle('fc-chart--part-focus', !partKeepsChartHandles(own));
+      const plot = panel.querySelector<SVGSVGElement>('.fc-chart__plot');
+      if (plot) paintChartPart(plot, own);
+    }
+  };
+
   const updateSelectionClasses = (): void => {
     syncSelection();
     const panels = Array.from(root.querySelectorAll<HTMLElement>('.fc-chart'));
@@ -397,9 +415,11 @@ export function attachSessionCharts(deps: {
       panel.setAttribute('aria-selected', selected ? 'true' : 'false');
       panel.style.zIndex = selected ? String(panels.length + 1) : String(index + 1);
     }
+    syncParts();
   };
 
   const selectChart = (chartId: string, panel: HTMLElement): void => {
+    if (selectedId !== chartId) selectedPart = null;
     selectedId = chartId;
     updateSelectionClasses();
     if (document.activeElement !== panel) panel.focus({ preventScroll: true });
@@ -416,6 +436,7 @@ export function attachSessionCharts(deps: {
   const adoptSelection = (state: State, charts: readonly SessionChart[]): string | null => {
     const wanted = state.ui.selectedObject?.id;
     if (wanted === undefined || wanted === selectedId) return null;
+    selectedPart = null;
     if (!charts.some((chart) => chart.id === wanted)) {
       selectedId = null;
       return null;
@@ -741,7 +762,10 @@ export function attachSessionCharts(deps: {
       });
       panel.addEventListener('pointerdown', (e) => {
         if (e.target instanceof Element && e.target.closest(INTERACTIVE)) return;
+        const part = chartPartAt(e.target, selectedId === chart.id ? selectedPart : null);
         selectChart(chart.id, panel);
+        selectedPart = part;
+        syncParts();
         applyDrag(e, chart, panel);
       });
       panel.addEventListener('keydown', (e) => applyKeyboard(e, chart, panel));
@@ -837,6 +861,7 @@ export function attachSessionCharts(deps: {
     }
     // The selected chart may have been removed or given another data range.
     syncSelection();
+    syncParts();
     // Rebuilding the panels drops focus; keep it on the chart, or on the sheet.
     const refocus = adopted ?? (left ? undefined : focusedId);
     if (refocus !== undefined) focusPanel(root, '.fc-chart', 'chartId', refocus, host);

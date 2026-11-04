@@ -1,3 +1,4 @@
+import type { Range } from '../../engine/types.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
 import { FALLBACK_ACCENT } from './markers.js';
@@ -177,6 +178,28 @@ export function paintFillPreview(
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(bounds.x + 0.5, bounds.y + 0.5, bounds.w - 1, bounds.h - 1);
+  ctx.restore();
+}
+
+/** Whether a fill preview is the kept part of `selection`: a fill pulled back
+ *  inside its source rather than an extension. */
+export function isFillShrinkPreview(selection: Range, preview: Range): boolean {
+  return (
+    preview.sheet === selection.sheet &&
+    preview.r0 === selection.r0 &&
+    preview.c0 === selection.c0 &&
+    preview.r1 <= selection.r1 &&
+    preview.c1 <= selection.c1 &&
+    (preview.r1 < selection.r1 || preview.c1 < selection.c1)
+  );
+}
+
+/** White veil over the cells a shrinking fill drops: the selection tint seen
+ *  through it reads about a quarter lighter, as measured on the desktop app. */
+export function paintFillShrinkShade(ctx: CanvasRenderingContext2D, bounds: Rect): void {
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.245)';
+  ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
   ctx.restore();
 }
 

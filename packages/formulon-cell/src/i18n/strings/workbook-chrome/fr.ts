@@ -20,6 +20,7 @@ export const workbookChromeFr: WorkbookChromeStrings = {
     pageLayoutView: 'Mise en page',
     pageBreakPreview: 'Aperçu des sauts de page',
     ready: 'Prêt',
+    filterRecords: '{found} enregistrements trouvés sur {total}',
     endMode: 'Mode Fin',
     enter: 'Entrée',
     edit: 'Modifier',

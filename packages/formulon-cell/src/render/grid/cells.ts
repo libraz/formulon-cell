@@ -1,5 +1,6 @@
 import { inputLocaleForWorkbook } from '../../commands/coerce-input.js';
 import { errorCheckFlagged } from '../../commands/error-indicators.js';
+import { activeFilterRanges } from '../../commands/filter-state.js';
 import {
   isHeaderRow,
   showsHeaderFilterButton,
@@ -257,6 +258,7 @@ export function paintCells(
   }
 
   const filterRanges = state.ui.filterRanges.filter((fr) => fr.sheet === data.sheetIndex);
+  const activeFilters = activeFilterRanges(state);
   const filterSorts = (state.ui.filterSorts ?? []).filter(
     (spec) =>
       spec.range.sheet === data.sheetIndex && filterRanges.some((fr) => sameRange(fr, spec.range)),
@@ -762,7 +764,7 @@ export function paintCells(
       if (headerButton) paintTableHeaderChevron(ctx, bounds, theme, rtl);
       if (filterHeader) {
         paintFilterButton(ctx, filterButtonRect(bounds, rtl), theme, {
-          active: layout.hiddenRows.size > 0,
+          filtered: activeFilters.some(({ range, cols }) => range.r0 === r && cols.has(c)),
           sorted: filterSorts.flatMap((spec) => spec.keys).find((key) => key.byCol === c)
             ?.direction,
         });

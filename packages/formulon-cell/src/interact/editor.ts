@@ -7,7 +7,7 @@ import {
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { deferForAllowedRangeUnlock, isCellWritable } from '../commands/protection.js';
-import { dblClickRange, editorRefHighlights, rotateRefAt } from '../commands/refs.js';
+import { dblClickRange, editorRefHighlights, extractRefs, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -121,6 +121,25 @@ export interface CellEditorHandle {
  * cell. Begins on Enter / F2 / printable key. Commits on Enter or Tab,
  * cancels on Escape. Click-outside also commits.
  */
+
+const A1_ATOM = /^(\$?)([A-Za-z]+)(\$?)(\d+)$/;
+
+/** Re-apply the `$` pins of an A1 reference to its moved or resized
+ *  replacement: the first corner keeps the first corner's pins, the last the
+ *  last's. Text that is not a plain cell or range passes through. */
+function keepAbsolutePins(previous: string, next: string): string {
+  const pins = previous.split(':').map((atom) => A1_ATOM.exec(atom));
+  const parts = next.split(':');
+  if (pins.some((m) => !m) || parts.length > 2) return next;
+  return parts
+    .map((atom, i) => {
+      const pin = (i === 0 ? pins[0] : pins[pins.length - 1]) as RegExpExecArray;
+      const m = A1_ATOM.exec(atom);
+      return m ? `${pin[1]}${m[2]}${pin[3]}${m[4]}` : atom;
+    })
+    .join(':');
+}
+
 export class InlineEditor {
   private readonly deps: EditorDeps;
 
@@ -240,6 +259,35 @@ export class InlineEditor {
     el.value = result.text;
     el.setSelectionRange(result.caret, result.caret);
     el.focus();
+    this.syncInputState();
+  }
+
+  replaceReferenceAt(index: number, ref: string, options?: { phase: 'start' | 'update' }): void {
+    const el = this.input;
+    if (!el || !this.editingAddr) return;
+    const r1c1 = this.deps.store.getState().ui.r1c1 === true;
+    const target = extractRefs(el.value, { r1c1, base: this.editingAddr })[index];
+    if (!target) return;
+    const historyBefore = this.captureDraftSnapshot();
+    if (options?.phase === 'start') this.draftHistory.beginGroup(historyBefore, 'reference');
+    const current = el.value.slice(target.start, target.end);
+    const qualifier = /^(?:'(?:[^']|'')*'|[^'!\s]+)!/.exec(current);
+    const pinned = r1c1 ? ref : keepAbsolutePins(current.slice(qualifier?.[0].length ?? 0), ref);
+    const text = `${el.value.slice(0, target.start)}${qualifier?.[0] ?? ''}${pinned}${el.value.slice(target.end)}`;
+    const caret = target.start + (qualifier?.[0].length ?? 0) + pinned.length;
+    this.referenceGesture = null;
+    this.pointNavigation = null;
+    const after: FormulaDraftSnapshot = {
+      value: text,
+      start: caret,
+      end: caret,
+      direction: 'none',
+      mode: this.arrowMode,
+    };
+    if (options?.phase) this.draftHistory.updateGroup(after, 'reference', historyBefore);
+    else this.draftHistory.finishCommand(after);
+    el.value = text;
+    el.setSelectionRange(caret, caret);
     this.syncInputState();
   }
 

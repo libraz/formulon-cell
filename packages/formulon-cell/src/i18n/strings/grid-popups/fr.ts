@@ -162,6 +162,20 @@ export const gridPopupsFr: GridPopupsStrings = {
       flashFill: 'Remplissage instantané',
       seriesDialog: 'Série...',
     },
+    /** Entries of the menu a right-button selection drag opens. */
+    dropMenu: {
+      move: 'Déplacer ici',
+      copy: 'Copier ici',
+      copyValues: 'Copier ici les valeurs uniquement',
+      copyFormats: 'Copier ici les formats uniquement',
+      link: 'Lier ici',
+      hyperlink: 'Créer un lien hypertexte ici',
+      copyShiftDown: 'Décaler vers le bas et copier',
+      copyShiftRight: 'Décaler vers la droite et copier',
+      moveShiftDown: 'Décaler vers le bas et déplacer',
+      moveShiftRight: 'Décaler vers la droite et déplacer',
+      cancel: 'Annuler',
+    },
   },
   pasteOptions: {
     title: 'Options de collage',

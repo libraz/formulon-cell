@@ -19,6 +19,7 @@ export const workbookChromeJa: WorkbookChromeStrings = {
     pageLayoutView: 'ページ レイアウト',
     pageBreakPreview: '改ページ プレビュー',
     ready: '準備完了',
+    filterRecords: '{total} レコード中 {found} 個が見つかりました',
     endMode: 'End モード',
     enter: '入力',
     edit: '編集',

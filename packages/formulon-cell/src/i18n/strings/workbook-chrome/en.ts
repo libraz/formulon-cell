@@ -19,6 +19,7 @@ export const workbookChromeEn: WorkbookChromeStrings = {
     pageLayoutView: 'Page Layout',
     pageBreakPreview: 'Page Break Preview',
     ready: 'Ready',
+    filterRecords: '{found} of {total} records found',
     endMode: 'End Mode',
     enter: 'Enter',
     edit: 'Edit',

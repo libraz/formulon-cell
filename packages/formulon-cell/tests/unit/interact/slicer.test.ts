@@ -268,17 +268,39 @@ describe('attachSlicer', () => {
     handle.detach();
   });
 
-  it('toggling all chips off restores the include-all state', () => {
+  it('a plain click replaces the selection and never toggles the only selected item off', () => {
     const handle = attachSlicer({ host, store, getWb: () => wb });
-    const spec = handle.addSlicer({ tableName: 'Sales', column: 'Region' });
-    // Manually set selection to ['East'] so the West row hides.
-    mutators.setSlicerSelected(store, spec.id, ['East']);
-    handle.refresh();
-    // Now click "East" again — selection becomes empty → no rows hidden.
-    const east = host.querySelector<HTMLButtonElement>('.fc-slicer__chip[data-fc-value="East"]');
-    east?.click();
+    handle.addSlicer({ tableName: 'Sales', column: 'Region' });
+    const chip = (value: string) =>
+      host.querySelector<HTMLButtonElement>(`.fc-slicer__chip[data-fc-value="${value}"]`);
+    chip('East')?.click();
+    expect(store.getState().slicers.slicers[0]?.selected).toEqual(['East']);
+    chip('West')?.click();
+    expect(store.getState().slicers.slicers[0]?.selected).toEqual(['West']);
+    chip('West')?.click();
+    expect(store.getState().slicers.slicers[0]?.selected).toEqual(['West']);
+    expect(store.getState().layout.hiddenRows.has(1)).toBe(true);
+    handle.detach();
+  });
+
+  it('a modifier click adds or removes one item and the clear button restores every item', () => {
+    const handle = attachSlicer({ host, store, getWb: () => wb });
+    handle.addSlicer({ tableName: 'Sales', column: 'Region' });
+    const chip = (value: string) =>
+      host.querySelector<HTMLButtonElement>(`.fc-slicer__chip[data-fc-value="${value}"]`);
+    const clear = () => host.querySelector<HTMLButtonElement>('.fc-slicer__clear');
+    expect(clear()?.disabled).toBe(true);
+
+    chip('East')?.click();
+    expect(clear()?.disabled).toBe(false);
+    chip('West')?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true }));
+    expect(store.getState().slicers.slicers[0]?.selected).toEqual([]);
+
+    chip('East')?.click();
+    clear()?.click();
     expect(store.getState().slicers.slicers[0]?.selected).toEqual([]);
     expect(store.getState().layout.hiddenRows.size).toBe(0);
+    expect(clear()?.disabled).toBe(true);
     handle.detach();
   });
 
@@ -368,6 +390,16 @@ describe('attachSlicer', () => {
     const source = readFileSync(join(root, 'src/interact/slicer.ts'), 'utf8');
     expect(source).toContain('createInteractionChipButton({');
     expect(source).not.toContain("const chip = document.createElement('button')");
+  });
+
+  it('colours the Mac slicer items as the desktop app does', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/panels/slicer.css'), 'utf8');
+
+    expect(css).toMatch(/\.fc-slicer\s*\{[\s\S]*?border: 1px solid rgb\(48, 94, 128\);/);
+    expect(css).toMatch(/\.fc-slicer__chip--on\s*\{[\s\S]*?background: rgb\(149, 201, 233\);/);
+    expect(css).toMatch(
+      /\.fc-slicer__chip--on:hover\s*\{[\s\S]*?rgb\(245, 230, 133\), rgb\(251, 246, 219\)/,
+    );
   });
 
   it('keeps slicer panels aligned with compact desktop panel chrome', () => {

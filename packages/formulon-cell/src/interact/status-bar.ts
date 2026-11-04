@@ -5,6 +5,7 @@ import {
   STATUS_AGGREGATE_KEYS,
   statusAggregateValue,
 } from '../commands/aggregate.js';
+import { filterRecordCounts } from '../commands/filter-state.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import { formatGeneralNumber } from '../engine/value.js';
 import { isMacHost } from '../extensions/ui-options.js';
@@ -240,6 +241,10 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   left.appendChild(dot);
   const readyText = document.createTextNode('');
   left.appendChild(readyText);
+  const filterCount = document.createElement('span');
+  filterCount.className = 'fc-host__statusbar-filter';
+  filterCount.hidden = true;
+  left.appendChild(filterCount);
   const accessibilityStatus = deps.accessibility
     ? createStatusBarButton('fc-host__statusbar-a11y')
     : null;
@@ -369,6 +374,16 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const pageBreak = mac ? strings.macChrome.pageBreakPreview : t.pageBreakPreview;
     viewButtons.pageBreakPreview.setAttribute('aria-label', pageBreak);
     viewButtons.pageBreakPreview.title = pageBreak;
+  };
+
+  const refreshFilterCount = (): void => {
+    const counts = filterRecordCounts(store.getState());
+    filterCount.hidden = counts === null;
+    filterCount.textContent = counts
+      ? strings.statusBar.filterRecords
+          .replace('{found}', String(counts.found))
+          .replace('{total}', String(counts.total))
+      : '';
   };
 
   const refreshModeLabel = (): void => {
@@ -545,6 +560,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     }
     refreshStaticLabels();
     refreshModeLabel();
+    refreshFilterCount();
     const ranges = aggregateRangeKeys(s);
     let stats: SelectionStats;
     if (sameAggregateKey(aggregateCache, s, ranges)) {

@@ -345,3 +345,60 @@ describe('showOutlineLevel', () => {
     expect(sorted(store.getState().layout.hiddenRows)).toEqual([]);
   });
 });
+
+describe('expanding an outer group around a collapsed inner group', () => {
+  // Rows 2:5 level 1 with rows 3:4 level 2 (zero-based 1..4 and 2..3).
+  const nested = () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        outlineRows: new Map([
+          [1, 1],
+          [2, 2],
+          [3, 2],
+          [4, 1],
+        ]),
+      },
+    }));
+    return store;
+  };
+  const hidden = (store: ReturnType<typeof nested>) =>
+    [...store.getState().layout.hiddenRows].sort((a, b) => a - b);
+
+  it('shows every row when the inner group was expanded', () => {
+    const store = nested();
+    collapseRowGroup(store, null, 1, 4);
+    expect(hidden(store)).toEqual([1, 2, 3, 4]);
+    expandRowGroup(store, null, 1, 4);
+    expect(hidden(store)).toEqual([]);
+  });
+
+  it('keeps the collapsed inner rows hidden', () => {
+    const store = nested();
+    collapseRowGroup(store, null, 2, 3);
+    collapseRowGroup(store, null, 1, 4);
+    expandRowGroup(store, null, 1, 4);
+    expect(hidden(store)).toEqual([2, 3]);
+  });
+
+  it('does the same for columns', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        outlineCols: new Map([
+          [1, 1],
+          [2, 2],
+          [3, 1],
+        ]),
+      },
+    }));
+    collapseColGroup(store, null, 2, 2);
+    collapseColGroup(store, null, 1, 3);
+    expandColGroup(store, null, 1, 3);
+    expect([...store.getState().layout.hiddenCols]).toEqual([2]);
+  });
+});

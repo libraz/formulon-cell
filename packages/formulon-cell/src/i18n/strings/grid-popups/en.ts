@@ -160,6 +160,20 @@ export const gridPopupsEn: GridPopupsStrings = {
       flashFill: 'Flash Fill',
       seriesDialog: 'Series...',
     },
+    /** Entries of the menu a right-button selection drag opens. */
+    dropMenu: {
+      move: 'Move Here',
+      copy: 'Copy Here',
+      copyValues: 'Copy Here as Values Only',
+      copyFormats: 'Copy Here as Formats Only',
+      link: 'Link Here',
+      hyperlink: 'Create Hyperlink Here',
+      copyShiftDown: 'Shift Down and Copy',
+      copyShiftRight: 'Shift Right and Copy',
+      moveShiftDown: 'Shift Down and Move',
+      moveShiftRight: 'Shift Right and Move',
+      cancel: 'Cancel',
+    },
   },
   pasteOptions: {
     title: 'Paste Options',

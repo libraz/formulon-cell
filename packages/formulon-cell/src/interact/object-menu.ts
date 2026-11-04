@@ -16,7 +16,7 @@ export interface ObjectMenuHandle {
     x: number,
     y: number,
     entries: readonly ObjectMenuEntry[],
-    options: { label: string; restoreFocusTo: HTMLElement },
+    options: { label: string; restoreFocusTo: HTMLElement; onClose?: () => void },
   ): void;
   close(restoreFocus?: boolean): void;
   isOpen(): boolean;
@@ -37,6 +37,7 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
   root.setAttribute('role', 'menu');
   root.tabIndex = -1;
   let restoreFocusTo: HTMLElement | null = null;
+  let onClose: (() => void) | null = null;
 
   const clearActiveItem = (): void => {
     for (const item of root.querySelectorAll('.fc-ctxmenu__item--active')) {
@@ -78,6 +79,9 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
     root.replaceChildren();
     const target = restoreFocusTo;
     restoreFocusTo = null;
+    const closed = onClose;
+    onClose = null;
+    closed?.();
     if (restoreFocus && target?.isConnected) target.focus({ preventScroll: true });
   };
 
@@ -102,7 +106,9 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
     open(x, y, entries, options) {
       clearActiveItem();
       root.replaceChildren();
+      onClose?.();
       restoreFocusTo = options.restoreFocusTo;
+      onClose = options.onClose ?? null;
       root.setAttribute('aria-label', options.label);
       for (const entry of entries) {
         if ('separator' in entry) {

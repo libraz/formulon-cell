@@ -79,6 +79,8 @@ interface PivotDrag {
   /** The area the dragged chip came from; null for a field-list row. */
   from: PivotAreaKind | null;
   dropped: boolean;
+  /** The list or area box outlined while its field is dragged out. */
+  source: HTMLElement | null;
 }
 
 const pivotDrags = new WeakMap<PivotFieldAreasModel, PivotDrag>();
@@ -90,13 +92,38 @@ const pivotDragData = (event: DragEvent, model: PivotFieldAreasModel): string =>
   pivotDrags.get(model)?.fieldName ||
   '';
 
+/** The drag image: a grey chip with the field name and a green add badge. */
+const setPivotDragImage = (event: DragEvent, fieldName: string): void => {
+  const transfer = event.dataTransfer;
+  if (!transfer || typeof transfer.setDragImage !== 'function') return;
+  const ghost = document.createElement('div');
+  ghost.className = 'fc-pivotdlg__drag-ghost';
+  const name = document.createElement('span');
+  name.textContent = fieldName;
+  const badge = document.createElement('span');
+  badge.className = 'fc-pivotdlg__drag-badge';
+  badge.textContent = '+';
+  ghost.append(name, badge);
+  document.body.appendChild(ghost);
+  transfer.setDragImage(ghost, 8, 8);
+  setTimeout(() => ghost.remove(), 0);
+};
+
 const startPivotDrag = (
   event: DragEvent,
   model: PivotFieldAreasModel,
   fieldName: string,
   from: PivotAreaKind | null,
 ): void => {
-  pivotDrags.set(model, { fieldName, from, dropped: false });
+  const source =
+    event.currentTarget instanceof Element
+      ? event.currentTarget.closest<HTMLElement>(
+          '.fc-pivotdlg__field-list-available, .fc-pivotdlg__area',
+        )
+      : null;
+  source?.setAttribute('data-pivot-drag-source', 'true');
+  pivotDrags.set(model, { fieldName, from, dropped: false, source });
+  setPivotDragImage(event, fieldName);
   event.dataTransfer?.setData('text/plain', fieldName);
   event.dataTransfer?.setData(PIVOT_DRAG_TYPE, fieldName);
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
@@ -106,6 +133,7 @@ const startPivotDrag = (
 const endPivotDrag = (model: PivotFieldAreasModel, refresh: () => void): void => {
   const drag = pivotDrags.get(model);
   pivotDrags.delete(model);
+  drag?.source?.removeAttribute('data-pivot-drag-source');
   if (!drag || drag.dropped || drag.from === null) return;
   model.remove(drag.fieldName);
   refresh();

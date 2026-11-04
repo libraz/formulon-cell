@@ -187,3 +187,97 @@ describe('attachWheel', () => {
     expect(store.getState().layout.freezeOriginRow).toBe(3);
   });
 });
+
+describe('attachWheel on the Mac profile with frozen panes', () => {
+  let host: HTMLElement;
+  let grid: HTMLElement;
+  let store: SpreadsheetStore;
+  let detach: () => void;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.className = 'fc-host';
+    host.dataset.fcPlatform = 'mac';
+    grid = document.createElement('div');
+    host.appendChild(grid);
+    document.body.appendChild(host);
+    store = createSpreadsheetStore();
+    store.setState((s) => ({ ...s, layout: { ...s.layout, freezeRows: 1, freezeCols: 1 } }));
+    mutators.scrollBy(store, 1, 1);
+    detach = attachWheel({ grid, store });
+  });
+
+  afterEach(() => {
+    detach();
+    host.remove();
+  });
+
+  const row = (): number => store.getState().viewport.rowStart;
+  const col = (): number => store.getState().viewport.colStart;
+  const body = { clientX: 400, clientY: 330 };
+
+  it('scrolls 0.7 rows per line, rounding half down', () => {
+    const start = row();
+    for (const [lines, rows] of [
+      [1, 1],
+      [3, 2],
+      [5, 3],
+      [10, 7],
+      [20, 14],
+    ] as const) {
+      detach();
+      detach = attachWheel({ grid, store });
+      const before = row();
+      fire(grid, { deltaY: lines, deltaMode: 1, ...body });
+      expect(row() - before).toBe(rows);
+    }
+    expect(row()).toBeGreaterThan(start);
+  });
+
+  it('accumulates single-line events: five of them move three rows', () => {
+    const before = row();
+    for (let i = 0; i < 5; i += 1) fire(grid, { deltaY: 1, deltaMode: 1, ...body });
+    expect(row() - before).toBe(3);
+  });
+
+  it('scrolls 0.15 columns per line with a dead zone for one small event', () => {
+    const before = col();
+    fire(grid, { deltaX: 5, deltaMode: 1, ...body });
+    expect(col()).toBe(before);
+    fire(grid, { deltaX: 20, deltaMode: 1, ...body });
+    expect(col() - before).toBeGreaterThanOrEqual(3);
+  });
+
+  it('scrolls both axes in one event', () => {
+    const r = row();
+    const c = col();
+    fire(grid, { deltaY: 20, deltaX: 20, deltaMode: 1, ...body });
+    expect(row() - r).toBe(14);
+    expect(col() - c).toBe(3);
+  });
+
+  it('scrolls rows only over the frozen column', () => {
+    const r = row();
+    const c = col();
+    const { headerColWidth } = store.getState().layout;
+    fire(grid, { deltaY: 20, deltaX: 20, deltaMode: 1, clientX: headerColWidth + 5, clientY: 330 });
+    expect(row() - r).toBe(14);
+    expect(col()).toBe(c);
+  });
+
+  it('ignores the frozen row, the corner and the headers', () => {
+    const r = row();
+    const c = col();
+    const { headerColWidth, headerRowHeight, defaultRowHeight } = store.getState().layout;
+    for (const at of [
+      { clientX: 400, clientY: headerRowHeight + 2 },
+      { clientX: headerColWidth + 2, clientY: headerRowHeight + 2 },
+      { clientX: 400, clientY: 5 },
+      { clientX: 5, clientY: headerRowHeight + defaultRowHeight * 4 },
+    ]) {
+      fire(grid, { deltaY: 20, deltaX: 20, deltaMode: 1, ...at });
+    }
+    expect(row()).toBe(r);
+    expect(col()).toBe(c);
+  });
+});

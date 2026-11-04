@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildColLayout, buildRowLayout, layoutForView } from '../../../../src/render/geometry.js';
-import { paintHeaders } from '../../../../src/render/grid/headers.js';
+import { FILTERED_ROW_LABEL_COLOR, paintHeaders } from '../../../../src/render/grid/headers.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
 
@@ -69,5 +69,55 @@ describe('paintHeaders draw state', () => {
     expect(fontSets).toBeLessThanOrEqual(6);
     // Border rule, column separators, row separators, plus outline gutters.
     expect(strokes).toBeLessThanOrEqual(6);
+  });
+
+  it('paints the row numbers of the rows a filter lets through in the filtered colour', () => {
+    const base = createSpreadsheetStore().getState();
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 };
+    const state = {
+      ...base,
+      viewport: { rowStart: 0, rowCount: 8, colStart: 0, colCount: 4, zoom: 1, widthPx: 700 },
+      ui: {
+        ...base.ui,
+        filterRanges: [range],
+        filterCriteria: [{ range, byCol: 1, hiddenValues: ['Y'] }],
+      },
+    };
+    const layout = layoutForView({
+      ...state,
+      layout: { ...base.layout, hiddenRows: new Set([4]) },
+    });
+    const cols = buildColLayout(layout, state.viewport);
+    const rows = buildRowLayout(layout, state.viewport);
+    const colourAt = new Map<string, string>();
+    let fill = '';
+    const ctx = new Proxy({} as Record<string, unknown>, {
+      get(t, k: string) {
+        if (k in t) return t[k];
+        if (k === 'fillText') return (text: string) => colourAt.set(text, fill);
+        if (k === 'measureText') {
+          return () => ({ width: 0, fontBoundingBoxAscent: 9, fontBoundingBoxDescent: 2 });
+        }
+        return () => ({ addColorStop() {} });
+      },
+      set(t, k: string, v) {
+        if (k === 'fillStyle' && typeof v === 'string') fill = v;
+        t[k] = v;
+        return true;
+      },
+    }) as unknown as CanvasRenderingContext2D;
+
+    paintHeaders(
+      { ctx, dpr: 1, cssWidth: 700, cssHeight: 500 },
+      { ...state, layout },
+      theme,
+      cols,
+      rows,
+    );
+
+    expect(colourAt.get('1')).not.toBe(FILTERED_ROW_LABEL_COLOR);
+    expect(colourAt.get('2')).toBe(FILTERED_ROW_LABEL_COLOR);
+    expect(colourAt.get('4')).toBe(FILTERED_ROW_LABEL_COLOR);
+    expect(colourAt.get('6')).not.toBe(FILTERED_ROW_LABEL_COLOR);
   });
 });

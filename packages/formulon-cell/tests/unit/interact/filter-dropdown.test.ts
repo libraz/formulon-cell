@@ -587,10 +587,35 @@ describe('attachFilterDropdown', () => {
           { kind: 'number', value: 2 },
           { kind: 'number', value: 3 },
         ]);
-        expect(document.querySelector('.fc-filter-dropdown')).toBeNull();
+        expect(handle.isOpen()).toBe(true);
       } finally {
         wb.dispose();
       }
+    });
+
+    it('applies a checklist toggle at once and stays open after clearing', () => {
+      const handle = openMac();
+      const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
+      const boxes = () =>
+        Array.from(
+          document.querySelectorAll<HTMLInputElement>(
+            '.fc-filter-dropdown__list input[type="checkbox"]',
+          ),
+        );
+      const second = boxes()[2];
+      if (second) {
+        second.checked = false;
+        second.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      expect(store.getState().ui.filterCriteria).toHaveLength(1);
+      expect([...store.getState().layout.hiddenRows]).toEqual([2]);
+
+      panel?.querySelector<HTMLButtonElement>('.fc-filter-dropdown__clear')?.click();
+      expect(handle.isOpen()).toBe(true);
+      expect(store.getState().ui.filterCriteria).toHaveLength(0);
+      expect(store.getState().layout.hiddenRows.size).toBe(0);
+      expect(boxes().every((b) => b.checked)).toBe(true);
+      handle.detach();
     });
 
     it('filters the top 10 with an inline count and unit', () => {

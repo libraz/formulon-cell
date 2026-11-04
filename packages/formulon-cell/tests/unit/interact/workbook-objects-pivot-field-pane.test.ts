@@ -191,6 +191,32 @@ describe('PivotTable Fields pane', () => {
     wb.dispose();
   });
 
+  it('outlines the box a field is dragged out of until the drag ends', async () => {
+    const wb = await setup();
+    const { handle } = open(wb);
+    const row = area('rows').querySelector('[data-pivot-area-field="Region"]');
+    if (!row) throw new Error('missing Region chip');
+    const data = new Map<string, string>();
+    row.dispatchEvent(dragEvent('dragstart', data));
+    expect(area('rows').getAttribute('data-pivot-drag-source')).toBe('true');
+    expect(area('columns').hasAttribute('data-pivot-drag-source')).toBe(false);
+    area('columns').dispatchEvent(dragEvent('dragover', data));
+    expect(area('columns').dataset.pivotDragOver).toBe('true');
+    row.dispatchEvent(dragEvent('dragend', data));
+    expect(document.querySelector('[data-pivot-drag-source]')).toBeNull();
+
+    const field = host.querySelector('.fc-pivotdlg__field-list-grid .fc-pivotdlg__field-chip');
+    field?.dispatchEvent(dragEvent('dragstart', data));
+    expect(
+      host
+        .querySelector('.fc-pivotdlg__field-list-available')
+        ?.getAttribute('data-pivot-drag-source'),
+    ).toBe('true');
+    field?.dispatchEvent(dragEvent('dragend', data));
+    handle.detach();
+    wb.dispose();
+  });
+
   it('reorders fields within an area by dropping on a chip', async () => {
     const wb = await setup();
     const { handle } = open(wb);

@@ -337,10 +337,11 @@ export function attachValidationPrompt(deps: ValidationPromptDeps): ValidationPr
 
     const gridBounds = grid.getBoundingClientRect();
     const rect = cellRect(layoutForView(state), state.viewport, addr.row, addr.col);
-    const left = gridBounds.left + rect.x;
-    const top = gridBounds.top + rect.y + rect.h + 4;
+    // The card hangs from the cell's horizontal centre, 6px below its bottom edge.
+    const left = gridBounds.left + rect.x + rect.w / 2;
+    const top = gridBounds.top + rect.y + rect.h + 6;
     if (
-      left + Math.min(rect.w, 24) < gridBounds.left ||
+      left < gridBounds.left ||
       left > gridBounds.right ||
       top < gridBounds.top ||
       top > gridBounds.bottom + 24

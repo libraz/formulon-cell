@@ -140,3 +140,44 @@ describe('status bar clicks on the Mac host', () => {
     ]);
   });
 });
+
+describe('status bar filter record count', () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('shows how many records a filter found and hides the count when cleared', () => {
+    const { bar, handle } = seed('mac');
+    const filterText = () => bar.querySelector<HTMLElement>('.fc-host__statusbar-filter');
+    expect(filterText()?.hidden).toBe(true);
+
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 1 };
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        filterRanges: [range],
+        filterCriteria: [{ range, byCol: 1, hiddenValues: ['Y'] }],
+      },
+      layout: { ...s.layout, hiddenRows: new Set([7, 8, 9]) },
+    }));
+    const filteredBar = document.createElement('div');
+    document.body.appendChild(filteredBar);
+    const filteredHandle = attachStatusBar({
+      statusbar: filteredBar,
+      store,
+      getEngineLabel: () => 'engine',
+      strings: ja,
+    });
+    filteredHandle.refresh?.();
+    const text = filteredBar.querySelector<HTMLElement>('.fc-host__statusbar-filter');
+    expect(text?.hidden).toBe(false);
+    expect(text?.textContent).toBe('9 レコード中 6 個が見つかりました');
+
+    store.setState((s) => ({ ...s, ui: { ...s.ui, filterCriteria: [] } }));
+    filteredHandle.refresh?.();
+    expect(text?.hidden).toBe(true);
+    handle.detach?.();
+  });
+});
