@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import { cellFormatFromXf } from '../engine/cell-format-projection.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
+import { resolveCellInput } from '../engine/range-input.js';
 import type { Addr, Range } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -43,11 +44,13 @@ import type {
   CellBatchOperation,
   CellChangeInput,
   ChangeBatchResult,
+  HostCellChangeInput,
   InteractionOrigin,
   InteractionPolicy,
   OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
+import { validateInteractionPolicy } from './interaction-policy.js';
 import {
   changedFormatAddresses,
   effectivePendingFormatAddresses,
@@ -213,6 +216,7 @@ export class InteractionController {
   }
 
   setPolicy(next?: InteractionPolicy): void {
+    if (next) validateInteractionPolicy(next, this.getWb());
     resetTabNavigationSession(this.store);
     this.authorizer.policy = next;
     if (this.manageHistoryGuard) this.installHistoryGuard();
@@ -422,7 +426,7 @@ export class InteractionController {
   }
 
   applyChanges(
-    changes: readonly CellChangeInput[],
+    changes: readonly HostCellChangeInput[],
     options: ApplyChangesOptions = {},
   ): ChangeBatchResult {
     if (this.disposed)
@@ -439,7 +443,20 @@ export class InteractionController {
     const prepared: PreparedChange[] = [];
     const rejections: BatchRejection[] = [];
     let includesFormula = false;
-    for (const change of changes) {
+    for (const [index, hostChange] of changes.entries()) {
+      let change: CellChangeInput;
+      try {
+        const addr = resolveCellInput(
+          hostChange.addr,
+          wb,
+          state.data.sheetIndex,
+          `applyChanges[${index}].addr`,
+        );
+        change = { ...hostChange, addr } as CellChangeInput;
+      } catch (error) {
+        rejections.push({ code: 'invalid', reason: (error as Error).message });
+        continue;
+      }
       // Host refreshes address the physical workbook and may intentionally
       // update cells outside the current navigation/viewport rectangle.
       const next = this.prepareChange(state, change, 'valueEdit', wb, false, inputLocale);

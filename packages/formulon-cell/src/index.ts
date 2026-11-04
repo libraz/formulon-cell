@@ -158,6 +158,7 @@ export type {
   ChangeBatchResult,
   EditableCells,
   EditablePredicateContext,
+  HostCellChangeInput,
   InteractionOperation,
   InteractionOrigin,
   InteractionPolicy,
@@ -365,6 +366,7 @@ export {
   workbookObjectName,
   workbookObjectsByKind,
 } from './engine/passthrough-sync.js';
+export type { CellInput, RangeInput } from './engine/range-input.js';
 export { hydrateTableOverlaysFromEngine, tableOverlaysFromEngine } from './engine/table-sync.js';
 export type {
   Addr,

@@ -383,7 +383,7 @@ export class InteractionAuthorizer {
         };
       }
       if (isMutatingInteraction(intent.operation)) {
-        if (!isPolicyCellEligible(policy, addr, intent.operation, intent.origin)) {
+        if (!isPolicyCellEligible(policy, addr, intent.operation, intent.origin, this.getWb())) {
           return {
             allowed: false,
             code: 'cellIneligible',

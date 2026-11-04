@@ -1,5 +1,14 @@
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import {
+  assertPatternSheet,
+  compileRangeInput,
+  patternOnSheet,
+  type RangeInput,
+  type RangePattern,
+  resolveRangeInput,
+} from '../engine/range-input.js';
+import { sheetIndexByName } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
@@ -19,15 +28,16 @@ import { isCellVisible } from './visible-navigation.js';
 /**
  * View and keyboard-navigation restrictions for an embedded grid.
  *
- * `range` is a sheet-qualified rectangle. It limits the visible and
- * selectable rectangle while leaving workbook data and calculation untouched.
- * `selectable` is an additional allow-list (or predicate) for cursor
- * movement. It is deliberately kept separate from the interaction policy:
- * this module only decides where navigation may go.
+ * `range` limits the visible and selectable rectangle on the active sheet
+ * while leaving workbook data and calculation untouched; A1 text without a
+ * sheet name resolves on the active sheet. `selectable` is an additional
+ * allow-list (or predicate) for cursor movement; A1 text without a sheet name
+ * there applies to every sheet. It is deliberately kept separate from the
+ * interaction policy: this module only decides where navigation may go.
  */
 export interface ViewportOptions {
-  range?: Range;
-  selectable?: readonly Range[] | ((addr: Addr) => boolean);
+  range?: RangeInput;
+  selectable?: readonly RangeInput[] | ((addr: Addr) => boolean);
   tabNavigation?: 'normal' | 'editable';
   tabBoundary?: 'stop' | 'leave';
   autoExpand?: boolean;
@@ -41,7 +51,10 @@ export interface NavigationPolicyHandle {
 
 type NavigationOptions = Readonly<{
   range?: Range;
-  selectable?: readonly Range[] | ((addr: Addr) => boolean);
+  selectable?: readonly RangePattern[] | ((addr: Addr) => boolean);
+  /** The host's inputs as given, returned by the options getter. */
+  rangeInput?: RangeInput;
+  selectableInput?: readonly RangeInput[];
   tabNavigation: 'normal' | 'editable';
   tabBoundary: 'stop' | 'leave';
   autoExpand: boolean;
@@ -68,6 +81,9 @@ const cloneRange = (range: Range): Range => ({
   r1: range.r1,
   c1: range.c1,
 });
+
+const cloneRangeInput = (input: RangeInput): RangeInput =>
+  typeof input === 'string' ? input : cloneRange(input);
 
 const addressInSheet = (addr: Addr): boolean =>
   validInteger(addr.sheet) &&
@@ -123,17 +139,23 @@ export function validateViewportOptions(
   state?: State,
 ): void {
   if (!options) return;
+  const activeSheet = state?.data.sheetIndex ?? 0;
   if (options.range) {
-    validateRange(options.range, wb.sheetCount, 'range');
-    assertNoPartialMerge(state, options.range, 'range');
-    if (state && state.data.sheetIndex !== options.range.sheet) {
+    const range = resolveRangeInput(options.range, wb, activeSheet, 'ViewportOptions.range');
+    validateRange(range, wb.sheetCount, 'range');
+    assertNoPartialMerge(state, range, 'range');
+    if (state && state.data.sheetIndex !== range.sheet) {
       throw new Error('ViewportOptions.range must target the active sheet');
     }
   }
   if (options.selectable && Array.isArray(options.selectable)) {
-    for (const [index, range] of options.selectable.entries()) {
-      validateRange(range, wb.sheetCount, `selectable[${index}]`);
-      assertNoPartialMerge(state, range, `selectable[${index}]`);
+    for (const [index, input] of options.selectable.entries()) {
+      const label = `selectable[${index}]`;
+      const pattern = compileRangeInput(input, `ViewportOptions.${label}`);
+      if (pattern.kind === 'range') validateRange(pattern.range, wb.sheetCount, label);
+      else assertPatternSheet(pattern, wb, `ViewportOptions.${label}`);
+      const onActive = patternOnSheet(pattern, activeSheet, wb);
+      if (onActive) assertNoPartialMerge(state, onActive, label);
     }
   }
   if (options.autoExpand === true && options.range) {
@@ -164,16 +186,45 @@ function normalizeOptions(
   state: State,
 ): NavigationOptions {
   validateViewportOptions(options, wb, state);
-  const selectable = Array.isArray(options.selectable)
-    ? options.selectable.map(cloneRange)
-    : options.selectable;
+  const list = Array.isArray(options.selectable)
+    ? (options.selectable as readonly RangeInput[])
+    : undefined;
+  const selectable = list
+    ? list.map((input) => {
+        const pattern = compileRangeInput(input, 'ViewportOptions.selectable');
+        return pattern.kind === 'range'
+          ? { kind: 'range' as const, range: cloneRange(pattern.range) }
+          : pattern;
+      })
+    : (options.selectable as ((addr: Addr) => boolean) | undefined);
+  const range = options.range
+    ? resolveRangeInput(options.range, wb, state.data.sheetIndex, 'ViewportOptions.range')
+    : undefined;
   return Object.freeze({
-    ...(options.range ? { range: cloneRange(options.range) } : {}),
+    ...(range ? { range: cloneRange(range) } : {}),
+    ...(options.range ? { rangeInput: cloneRangeInput(options.range) } : {}),
     ...(selectable ? { selectable } : {}),
+    ...(list ? { selectableInput: list.map(cloneRangeInput) } : {}),
     tabNavigation: options.tabNavigation ?? 'normal',
     tabBoundary: options.tabBoundary ?? 'stop',
     autoExpand: options.autoExpand ?? false,
   });
+}
+
+/** The sheet a viewport range pins: a numeric range's sheet or a qualified
+ * text range's sheet. Unqualified text (and an unknown sheet name, which
+ * validation rejects) pins none, so the active sheet stays. */
+export function viewportRangeSheet(
+  options: ViewportOptions | undefined,
+  wb: WorkbookHandle,
+): number | undefined {
+  const range = options?.range;
+  if (range === undefined) return undefined;
+  const pattern = compileRangeInput(range, 'ViewportOptions.range');
+  if (pattern.kind === 'range') return pattern.range.sheet;
+  if (pattern.ref.sheetName === null) return undefined;
+  const sheet = sheetIndexByName(wb, pattern.ref.sheetName);
+  return sheet < 0 ? undefined : sheet;
 }
 
 /** Return the registered navigation policy, if this store has one. */
@@ -239,14 +290,12 @@ export function attachNavigationPolicy(
 
 function clonePublicOptions(options: NavigationOptions): ViewportOptions {
   return {
-    ...(options.range ? { range: cloneRange(options.range) } : {}),
-    ...(options.selectable
-      ? {
-          selectable: Array.isArray(options.selectable)
-            ? options.selectable.map(cloneRange)
-            : options.selectable,
-        }
-      : {}),
+    ...(options.rangeInput ? { range: cloneRangeInput(options.rangeInput) } : {}),
+    ...(options.selectableInput
+      ? { selectable: options.selectableInput.map(cloneRangeInput) }
+      : typeof options.selectable === 'function'
+        ? { selectable: options.selectable }
+        : {}),
     tabNavigation: options.tabNavigation,
     tabBoundary: options.tabBoundary,
     autoExpand: options.autoExpand,
@@ -265,10 +314,26 @@ export function navigationBoundsFor(store: SpreadsheetStore): Range | undefined 
   return range ? cloneRange(range) : undefined;
 }
 
+/** The selectable list's rectangles on `sheet`, or null when no entry
+ * applies to that sheet (a list only constrains the sheets it reaches). */
+function selectableOnSheet(
+  options: NavigationOptions,
+  sheet: number,
+  wb: WorkbookHandle,
+): Range[] | null {
+  if (!Array.isArray(options.selectable)) return null;
+  const ranges: Range[] = [];
+  for (const pattern of options.selectable as readonly RangePattern[]) {
+    const range = patternOnSheet(pattern, sheet, wb);
+    if (range) ranges.push(cloneRange(range));
+  }
+  return ranges.length > 0 ? ranges : null;
+}
+
 function selectableRangesFor(store: SpreadsheetStore, options: NavigationOptions): Range[] {
-  if (!Array.isArray(options.selectable)) return [];
-  const sheet = store.getState().data.sheetIndex;
-  return options.selectable.filter((range) => range.sheet === sheet).map(cloneRange);
+  const record = recordFor(store);
+  if (!record) return [];
+  return selectableOnSheet(options, store.getState().data.sheetIndex, record.getWb()) ?? [];
 }
 
 /** Bounding rectangle used by full-row/full-column/select-all operations. */
@@ -287,13 +352,13 @@ export function navigationSelectionBoundsFor(store: SpreadsheetStore): Range | u
   };
 }
 
-function selectorAllows(addr: Addr, options: NavigationOptions): boolean {
+function selectorAllows(addr: Addr, options: NavigationOptions, wb: WorkbookHandle): boolean {
   if (!options.selectable) return true;
   if (Array.isArray(options.selectable)) {
     // A selectable list only constrains the sheet(s) it mentions. This lets a
     // host configure one embedded sheet without making other sheets unusable.
-    const sameSheet = options.selectable.some((range) => range.sheet === addr.sheet);
-    return !sameSheet || options.selectable.some((range) => rangeContainsAddr(range, addr));
+    const ranges = selectableOnSheet(options, addr.sheet, wb);
+    return !ranges || ranges.some((range) => rangeContainsAddr(range, addr));
   }
   const predicate = options.selectable;
   return typeof predicate === 'function' ? predicate(addr) : true;
@@ -361,12 +426,13 @@ function syncNavigationSelection(store: SpreadsheetStore): void {
  * authorization check; callers still route writes through the controller. */
 export function isNavigationAddrAllowed(store: SpreadsheetStore, addr: Addr): boolean {
   if (!addressInSheet(addr)) return false;
-  const options = recordFor(store)?.options;
-  if (!options) return true;
+  const record = recordFor(store);
+  const options = record?.options;
+  if (!record || !options) return true;
   if (options.range) {
     if (addr.sheet !== options.range.sheet || !rangeContainsAddr(options.range, addr)) return false;
   }
-  return selectorAllows(addr, options);
+  return selectorAllows(addr, options, record.getWb());
 }
 
 /** Clamp an address to a fixed range. Predicate/list restrictions reject an
@@ -374,8 +440,9 @@ export function isNavigationAddrAllowed(store: SpreadsheetStore, addr: Addr): bo
  * an arbitrary last cell. */
 export function clampNavigationAddr(store: SpreadsheetStore, addr: Addr): Addr | null {
   if (!addressInSheet(addr)) return null;
-  const options = recordFor(store)?.options;
-  if (!options) return { sheet: addr.sheet, row: addr.row, col: addr.col };
+  const record = recordFor(store);
+  const options = record?.options;
+  if (!record || !options) return { sheet: addr.sheet, row: addr.row, col: addr.col };
   let next: Addr = { sheet: addr.sheet, row: addr.row, col: addr.col };
   if (options.range) {
     if (options.range.sheet !== addr.sheet) return null;
@@ -385,13 +452,14 @@ export function clampNavigationAddr(store: SpreadsheetStore, addr: Addr): Addr |
       col: Math.max(options.range.c0, Math.min(options.range.c1, addr.col)),
     };
   }
-  return selectorAllows(next, options) ? next : null;
+  return selectorAllows(next, options, record.getWb()) ? next : null;
 }
 
 /** Clamp a selection range to the active fixed rectangle. */
 export function clampNavigationRange(store: SpreadsheetStore, input: Range): Range | null {
-  const options = recordFor(store)?.options;
-  if (!options) return cloneRange(input);
+  const record = recordFor(store);
+  const options = record?.options;
+  if (!record || !options) return cloneRange(input);
   const bound = options.range;
   if (bound && bound.sheet !== input.sheet) return null;
   const range = bound
@@ -407,8 +475,8 @@ export function clampNavigationRange(store: SpreadsheetStore, input: Range): Ran
   // A fixed selectable list is a range allow-list. A selection crossing two
   // disjoint entries remains ambiguous, so only accept a fully covered entry.
   if (Array.isArray(options.selectable)) {
-    const sameSheet = options.selectable.some((r) => r.sheet === range.sheet);
-    if (sameSheet && !options.selectable.some((r) => rangeContainsRange(r, range))) return null;
+    const ranges = selectableOnSheet(options, range.sheet, record.getWb());
+    if (ranges && !ranges.some((r) => rangeContainsRange(r, range))) return null;
   }
   if (typeof options.selectable === 'function') {
     const area = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);

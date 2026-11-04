@@ -31,7 +31,11 @@ import { createI18nController } from './i18n/controller.js';
 import { dictionaryLocaleFor, type Strings } from './i18n/strings.js';
 import { disposeCellShiftDialog } from './interact/cell-shift-dialog.js';
 import { deactivateMacInk, disposeMacInk } from './interact/mac-ink.js';
-import { attachNavigationPolicy, navigationBoundsFor } from './interact/navigation-policy.js';
+import {
+  attachNavigationPolicy,
+  navigationBoundsFor,
+  viewportRangeSheet,
+} from './interact/navigation-policy.js';
 import {
   disposeOverlayPortal,
   ensureOverlayPortal,
@@ -243,7 +247,7 @@ export const Spreadsheet = {
       wb.fontScriptProfile = wb.spreadsheetProfileId();
       if (opts.seed && ownsWb) opts.seed(wb);
       if (opts.viewport) {
-        validateViewportAgainstWorkbook(opts.viewport, wb, opts.viewport.range?.sheet);
+        validateViewportAgainstWorkbook(opts.viewport, wb, viewportRangeSheet(opts.viewport, wb));
       }
     } catch (err) {
       // The default workbook is owned before the mount promise resolves.  A
@@ -302,7 +306,8 @@ export const Spreadsheet = {
     });
 
     const store = createSpreadsheetStore();
-    if (opts.viewport?.range) mutators.setSheetIndex(store, opts.viewport.range.sheet);
+    const viewportSheet = viewportRangeSheet(opts.viewport, wb);
+    if (viewportSheet !== undefined) mutators.setSheetIndex(store, viewportSheet);
     mutators.setTheme(store, initialTheme);
     applyPlatformChrome(store, ui.platform);
 
@@ -843,7 +848,7 @@ export const Spreadsheet = {
       setViewportOptions(next) {
         if (disposed) return;
         discardMacPalette();
-        const targetSheet = next?.range?.sheet;
+        const targetSheet = viewportRangeSheet(next, wb);
         if (targetSheet !== undefined && targetSheet !== store.getState().data.sheetIndex) {
           validateViewportAgainstWorkbook(next, wb, targetSheet);
           const previousState = store.getState();
@@ -1108,7 +1113,7 @@ export const Spreadsheet = {
           validateViewportAgainstWorkbook(
             navigation.options,
             next,
-            navigation.options.range?.sheet ??
+            viewportRangeSheet(navigation.options, next) ??
               Math.min(store.getState().data.sheetIndex, Math.max(0, next.sheetCount - 1)),
           );
         }
@@ -1136,7 +1141,7 @@ export const Spreadsheet = {
         attachWorkbookHistory(wb, history);
         history.clear();
         const nextSheet =
-          navigation.options?.range?.sheet ??
+          viewportRangeSheet(navigation.options, wb) ??
           Math.min(store.getState().data.sheetIndex, Math.max(0, wb.sheetCount - 1));
         mutators.setSheetIndex(store, nextSheet);
         // Per-sheet selection and scroll belong to the previous workbook; the

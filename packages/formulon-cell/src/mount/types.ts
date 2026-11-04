@@ -3,8 +3,8 @@ import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js
 import type { History } from '../commands/history.js';
 import type { InteractionController } from '../commands/interaction-controller.js';
 import type {
-  CellChangeInput,
   ChangeBatchResult,
+  HostCellChangeInput,
   InteractionPolicy,
 } from '../commands/interaction-policy.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
@@ -142,7 +142,7 @@ export interface SpreadsheetInstance {
   setToolbar(next: boolean | MountToolbarOptions): void;
   /** Trusted host update; defaults to resetting user history after success. */
   applyChanges(
-    changes: readonly CellChangeInput[],
+    changes: readonly HostCellChangeInput[],
     options?: { history?: 'reset' | 'record'; origin?: string },
   ): ChangeBatchResult;
   readonly i18n: I18nController;

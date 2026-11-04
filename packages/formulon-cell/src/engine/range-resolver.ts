@@ -1,4 +1,4 @@
-import { parseA1Atom } from './address.js';
+import { colFromLetters, MAX_COL, MAX_ROW, parseA1Atom } from './address.js';
 import type { Range } from './types.js';
 import { formatCell } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -45,7 +45,7 @@ export function resolveRangeRef(wb: WorkbookHandle, ref: string, fallbackSheet: 
   return out;
 }
 
-interface ParsedRangeRef {
+export interface ParsedRangeRef {
   sheetName: string | null;
   r0: number;
   c0: number;
@@ -53,22 +53,33 @@ interface ParsedRangeRef {
   c1: number;
 }
 
-/** Parse `Sheet1!$A$1:$B$5`, `'Sheet 1'!A1:B5`, `A1:B5`, `A1`, `$A$1`. */
-export function parseRangeRef(raw: string): ParsedRangeRef | null {
+function splitSheetPrefix(raw: string): { sheetName: string | null; body: string } | null {
   const trimmed = raw.trim().replace(/^=/, '');
   if (!trimmed) return null;
-  let body = trimmed;
-  let sheetName: string | null = null;
-  const bang = trimmed.indexOf('!');
-  if (bang !== -1) {
-    let prefix = trimmed.slice(0, bang);
-    body = trimmed.slice(bang + 1);
-    if (prefix.startsWith("'") && prefix.endsWith("'")) {
-      prefix = prefix.slice(1, -1).replace(/''/g, "'");
+  if (trimmed.startsWith("'")) {
+    // A quoted name may hold "!" and doubles any "'" it contains.
+    let i = 1;
+    while (i < trimmed.length) {
+      if (trimmed[i] !== "'") i += 1;
+      else if (trimmed[i + 1] === "'") i += 2;
+      else break;
     }
-    if (!prefix) return null;
-    sheetName = prefix;
+    if (i >= trimmed.length || trimmed[i + 1] !== '!') return null;
+    const name = trimmed.slice(1, i).replace(/''/g, "'");
+    return name ? { sheetName: name, body: trimmed.slice(i + 2) } : null;
   }
+  const bang = trimmed.indexOf('!');
+  if (bang === -1) return { sheetName: null, body: trimmed };
+  const prefix = trimmed.slice(0, bang);
+  if (!prefix) return null;
+  return { sheetName: prefix, body: trimmed.slice(bang + 1) };
+}
+
+/** Parse `Sheet1!$A$1:$B$5`, `'Sheet 1'!A1:B5`, `A1:B5`, `A1`, `$A$1`. */
+export function parseRangeRef(raw: string): ParsedRangeRef | null {
+  const split = splitSheetPrefix(raw);
+  if (!split) return null;
+  const { sheetName, body } = split;
   const parts = body.split(':');
   if (parts.length === 0 || parts.length > 2) return null;
   const head = parseA1Atom(parts[0] ?? '');
@@ -84,7 +95,35 @@ export function parseRangeRef(raw: string): ParsedRangeRef | null {
   };
 }
 
-function sheetIndexByName(wb: WorkbookHandle, name: string): number {
+const WHOLE_COLUMNS = /^\$?([A-Za-z]+):\$?([A-Za-z]+)$/;
+const WHOLE_ROWS = /^\$?(\d+):\$?(\d+)$/;
+
+/** `parseRangeRef` plus whole columns (`B:D`) and whole rows (`2:11`), the
+ *  grammar accepted for host-supplied range text. */
+export function parseA1RangeText(raw: string): ParsedRangeRef | null {
+  const cells = parseRangeRef(raw);
+  if (cells) return cells;
+  const split = splitSheetPrefix(raw);
+  if (!split) return null;
+  const { sheetName, body } = split;
+  const cols = body.match(WHOLE_COLUMNS);
+  if (cols) {
+    const a = colFromLetters(cols[1] ?? '');
+    const b = colFromLetters(cols[2] ?? '');
+    if (a < 0 || b < 0 || a > MAX_COL || b > MAX_COL) return null;
+    return { sheetName, r0: 0, c0: Math.min(a, b), r1: MAX_ROW, c1: Math.max(a, b) };
+  }
+  const rows = body.match(WHOLE_ROWS);
+  if (rows) {
+    const a = Number.parseInt(rows[1] ?? '', 10) - 1;
+    const b = Number.parseInt(rows[2] ?? '', 10) - 1;
+    if (a < 0 || b < 0 || a > MAX_ROW || b > MAX_ROW) return null;
+    return { sheetName, r0: Math.min(a, b), c0: 0, r1: Math.max(a, b), c1: MAX_COL };
+  }
+  return null;
+}
+
+export function sheetIndexByName(wb: WorkbookHandle, name: string): number {
   const n = wb.sheetCount;
   const target = name.toLowerCase();
   for (let i = 0; i < n; i += 1) {

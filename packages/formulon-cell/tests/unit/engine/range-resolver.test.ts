@@ -41,6 +41,14 @@ describe('parseRangeRef', () => {
       c1: 0,
     });
   });
+  it('keeps "!" and doubled quotes inside a quoted sheet name', () => {
+    expect(parseRangeRef("'a!b'!B2")).toEqual({ sheetName: 'a!b', r0: 1, c0: 1, r1: 1, c1: 1 });
+    expect(parseRangeRef("'it''s!'!A1:A2")?.sheetName).toBe("it's!");
+  });
+  it('rejects a quoted sheet name that is not closed before "!"', () => {
+    expect(parseRangeRef("'a!b!A1")).toBeNull();
+    expect(parseRangeRef("'a'b'!A1")).toBeNull();
+  });
   it('strips a leading equals sign', () => {
     expect(parseRangeRef('=Sheet1!A1')).not.toBeNull();
   });

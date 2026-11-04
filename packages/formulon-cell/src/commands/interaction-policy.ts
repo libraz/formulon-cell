@@ -1,5 +1,13 @@
+import {
+  assertPatternSheet,
+  type CellInput,
+  compileRangeInput,
+  patternContainsAddr,
+  type RangeInput,
+  type RangePattern,
+} from '../engine/range-input.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { rangeContainsAddr } from '../store/selection-geometry.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 
 /** Operations that can be authorized by an embedded instance. Keep this list
  * finite: a new command must be classified before a restricted profile can
@@ -69,12 +77,13 @@ export interface EditablePredicateContext {
   readonly origin: InteractionOrigin;
 }
 
-/** A range list or a synchronous cell predicate. The array/function shorthands
- * are accepted by fixedFormPolicy for ergonomic form configuration. */
+/** A range list or a synchronous cell predicate. Ranges may be A1 text
+ * (`'B2:B11'`, `'Input!B2:B11'`); text without a sheet name applies to every
+ * sheet. The array/function shorthands are accepted by fixedFormPolicy. */
 export type EditableCells =
-  | { readonly ranges: readonly Range[] }
+  | { readonly ranges: readonly RangeInput[] }
   | { readonly predicate: (ctx: EditablePredicateContext) => boolean }
-  | readonly Range[]
+  | readonly RangeInput[]
   | ((ctx: EditablePredicateContext) => boolean);
 
 export interface InteractionRestrictionContext {
@@ -120,6 +129,12 @@ export interface OperationIntent {
 export type CellChangeInput =
   | { readonly addr: Addr; readonly input: string }
   | { readonly addr: Addr; readonly value: CellValue; readonly formula?: string | null };
+
+/** A trusted host update for `applyChanges`. `addr` may be A1 text (`'B2'`,
+ * `'Input!B2'`); text without a sheet name targets the active sheet. */
+export type HostCellChangeInput =
+  | { readonly addr: CellInput; readonly input: string }
+  | { readonly addr: CellInput; readonly value: CellValue; readonly formula?: string | null };
 
 export type CellBatchOperation =
   | 'valueEdit'
@@ -183,18 +198,45 @@ export const isMutatingInteraction = (operation: InteractionOperation): boolean 
   MUTATING_OPERATIONS.has(operation);
 
 type NormalizedEditable =
-  | { readonly ranges: readonly Range[] }
+  | { readonly ranges: readonly RangeInput[] }
   | { readonly predicate: (ctx: EditablePredicateContext) => boolean };
 
 const normalizeEditable = (editable: EditableCells): NormalizedEditable => {
   if (Array.isArray(editable)) return { ranges: editable };
   if (typeof editable === 'function') return { predicate: editable };
   const object = editable as
-    | { readonly ranges: readonly Range[] }
+    | { readonly ranges: readonly RangeInput[] }
     | { readonly predicate: (ctx: EditablePredicateContext) => boolean };
   if ('ranges' in object) return { ranges: object.ranges };
   return { predicate: object.predicate };
 };
+
+const compiledEditable = new WeakMap<readonly RangeInput[], readonly RangePattern[]>();
+
+const editablePatterns = (ranges: readonly RangeInput[]): readonly RangePattern[] => {
+  let patterns = compiledEditable.get(ranges);
+  if (!patterns) {
+    patterns = ranges.map((range, index) =>
+      compileRangeInput(range, `InteractionPolicy.editable[${index}]`),
+    );
+    compiledEditable.set(ranges, patterns);
+  }
+  return patterns;
+};
+
+/** Throw when the policy's editable ranges hold bad A1 text or name a sheet
+ * the workbook does not have. */
+export function validateInteractionPolicy(
+  policy: InteractionPolicy | undefined,
+  wb: WorkbookHandle,
+): void {
+  if (!policy?.editable) return;
+  const editable = normalizeEditable(policy.editable);
+  if (!('ranges' in editable)) return;
+  editablePatterns(editable.ranges).forEach((pattern, index) => {
+    assertPatternSheet(pattern, wb, `InteractionPolicy.editable[${index}]`);
+  });
+}
 
 /** Return whether a cell is eligible under the host policy. Operation
  * permissions and workbook protection are deliberately handled by the
@@ -204,10 +246,15 @@ export function isPolicyCellEligible(
   addr: Addr,
   operation: InteractionOperation,
   origin: InteractionOrigin,
+  wb: WorkbookHandle,
 ): boolean {
   if (!policy.editable) return true;
   const editable = normalizeEditable(policy.editable);
-  if ('ranges' in editable) return editable.ranges.some((range) => rangeContainsAddr(range, addr));
+  if ('ranges' in editable) {
+    return editablePatterns(editable.ranges).some((pattern) =>
+      patternContainsAddr(pattern, addr, wb),
+    );
+  }
   return editable.predicate({ addr, operation, origin });
 }
 
@@ -237,8 +284,10 @@ export function viewerPolicy(): InteractionPolicy {
  * conservative value-entry surface. Formula, format, structure, and object
  * operations stay denied until explicitly configured by the host. */
 export function fixedFormPolicy(editable: EditableCells): InteractionPolicy {
+  const normalized = normalizeEditable(editable);
+  if ('ranges' in normalized) editablePatterns(normalized.ranges);
   return {
-    editable: normalizeEditable(editable),
+    editable: normalized,
     defaultOperation: 'deny',
     operations: {
       valueEdit: true,
