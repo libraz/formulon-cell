@@ -429,3 +429,66 @@ describe('aggregateSelection', () => {
     ]);
   });
 });
+
+describe('status bar aggregate rules', () => {
+  let store: SpreadsheetStore;
+
+  beforeEach(() => {
+    store = createSpreadsheetStore();
+  });
+
+  const put = (row: number, value: CellValue): void => {
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.set(addrKey({ sheet: 0, row, col: 0 }), { value, formula: null });
+      return { ...s, data: { ...s.data, cells } };
+    });
+  };
+  const num = (value: number): CellValue => ({ kind: 'number', value });
+
+  it('keeps only the count when the selection holds an error value', () => {
+    put(0, num(1));
+    put(1, num(2));
+    put(2, { kind: 'error', code: 2, text: '#DIV/0!' } as CellValue);
+    setRange(store, 0, 0, 2, 0);
+    const stats = aggregateSelection(store.getState());
+    expect(statusAggregateValue('count', stats)).toBe(3);
+    expect(statusAggregateValue('sum', stats)).toBeNull();
+    expect(statusAggregateValue('average', stats)).toBeNull();
+    expect(statusAggregateValue('min', stats)).toBeNull();
+    expect(statusAggregateValue('max', stats)).toBeNull();
+  });
+
+  it('leaves hidden rows and columns out of every aggregate', () => {
+    put(0, num(10));
+    put(1, num(20));
+    put(2, num(30));
+    put(3, num(40));
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([2]) },
+    }));
+    setRange(store, 0, 0, 3, 0);
+    const stats = aggregateSelection(store.getState());
+    expect(stats.nonBlankCount).toBe(3);
+    expect(stats.sum).toBe(70);
+    expect(stats.avg).toBeCloseTo(70 / 3);
+  });
+
+  it('shows no aggregates for a single-cell selection', () => {
+    put(0, num(5));
+    setRange(store, 0, 0, 0, 0);
+    const stats = aggregateSelection(store.getState());
+    for (const key of ['count', 'sum', 'average', 'min', 'max', 'countNumbers'] as const) {
+      expect(statusAggregateValue(key, stats)).toBeNull();
+    }
+  });
+
+  it('reports the first numeric cell so its number format can be used', () => {
+    put(0, { kind: 'text', value: 'x' });
+    put(1, num(7));
+    put(2, num(8));
+    setRange(store, 0, 0, 2, 0);
+    expect(aggregateSelection(store.getState()).firstNumeric).toEqual({ sheet: 0, row: 1, col: 0 });
+  });
+});

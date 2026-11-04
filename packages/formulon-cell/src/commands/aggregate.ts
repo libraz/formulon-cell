@@ -23,6 +23,10 @@ export interface SelectionStats {
   avg: number;
   min: number;
   max: number;
+  /** The selection holds an error value; every numeric aggregate is withheld. */
+  hasError?: boolean;
+  /** First numeric cell in row-major order; its number format styles the results. */
+  firstNumeric?: { sheet: number; row: number; col: number };
 }
 
 export interface StatusAggregateEntry {
@@ -66,17 +70,30 @@ export function aggregateSelectionFromEntries(
   const cells = countUniqueRangeCells(ranges);
   if (cells <= 0) return EMPTY;
 
+  const { hiddenRows, hiddenCols, defaultRowsHidden, shownRows } = state.layout;
+  const isHidden = (row: number, col: number): boolean =>
+    hiddenCols.has(col) || (defaultRowsHidden ? !shownRows?.has(row) : hiddenRows.has(row));
+  let hasError = false;
+  let firstNumeric: { sheet: number; row: number; col: number } | undefined;
   let numericCount = 0;
   let nonBlankCount = 0;
   let sum = 0;
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
 
-  const accumulate = (cell: { value: CellValue }): void => {
-    if (cell.value.kind === 'blank') return;
+  const accumulate = (cell: { value: CellValue }, row: number, col: number): void => {
+    if (cell.value.kind === 'blank' || isHidden(row, col)) return;
     nonBlankCount += 1;
+    if (cell.value.kind === 'error') hasError = true;
     if (cell.value.kind !== 'number') return;
     const n = cell.value.value;
+    if (
+      !firstNumeric ||
+      row < firstNumeric.row ||
+      (row === firstNumeric.row && col < firstNumeric.col)
+    ) {
+      firstNumeric = { sheet, row, col };
+    }
     numericCount += 1;
     sum += n;
     if (n < min) min = n;
@@ -91,7 +108,7 @@ export function aggregateSelectionFromEntries(
     onlyRange.c0 === onlyRange.c1
   ) {
     const cell = state.data.cells.get(addrKey({ sheet, row: onlyRange.r0, col: onlyRange.c0 }));
-    if (cell) accumulate(cell);
+    if (cell) accumulate(cell, onlyRange.r0, onlyRange.c0);
   } else {
     const visited = new Set<string>();
     // Iterate the populated cell map rather than the range. selectAll() can
@@ -110,20 +127,41 @@ export function aggregateSelectionFromEntries(
       if (!inAny) continue;
       if (visited.has(key)) continue;
       visited.add(key);
-      accumulate(cell);
+      accumulate(cell, row, col);
     }
   }
 
   if (numericCount === 0) {
-    return { cells, numericCount: 0, nonBlankCount, sum: 0, avg: 0, min: 0, max: 0 };
+    return {
+      cells,
+      numericCount: 0,
+      nonBlankCount,
+      sum: 0,
+      avg: 0,
+      min: 0,
+      max: 0,
+      ...(hasError ? { hasError } : {}),
+    };
   }
-  return { cells, numericCount, nonBlankCount, sum, avg: sum / numericCount, min, max };
+  return {
+    cells,
+    numericCount,
+    nonBlankCount,
+    sum,
+    avg: sum / numericCount,
+    min,
+    max,
+    ...(hasError ? { hasError } : {}),
+    firstNumeric,
+  };
 }
 
 export function statusAggregateValue(key: StatusAggKey, stats: SelectionStats): number | null {
+  // A single cell shows nothing, and an error value hides every numeric aggregate.
+  if (stats.cells <= 1) return null;
   if (key === 'count') return stats.nonBlankCount > 0 ? stats.nonBlankCount : null;
   if (key === 'countNumbers') return stats.numericCount > 0 ? stats.numericCount : null;
-  if (stats.numericCount === 0) return null;
+  if (stats.numericCount === 0 || stats.hasError) return null;
   switch (key) {
     case 'sum':
       return stats.sum;
