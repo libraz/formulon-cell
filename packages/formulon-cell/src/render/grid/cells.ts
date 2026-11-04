@@ -802,11 +802,22 @@ export function paintCells(
           (spill) => spill.anchor.row === r && spill.anchor.col === c,
         );
         if (
-          errorCheckFlagged(value, storedFormula, pivotSpill, {
-            macNa: cellCtx.fontEffects,
-            numberAsText: cellCtx.fontEffects,
-            locale: inputLocale,
-          })
+          errorCheckFlagged(
+            value,
+            storedFormula,
+            pivotSpill,
+            {
+              macNa: cellCtx.fontEffects,
+              numberAsText: cellCtx.fontEffects,
+              formulaRules: cellCtx.fontEffects,
+              locale: inputLocale,
+            },
+            {
+              addr: cellAddr,
+              ...(effectiveFmt?.locked !== undefined ? { locked: effectiveFmt.locked } : {}),
+              cellAt: (row, col) => data.cells.get(addrKey({ sheet: data.sheetIndex, row, col })),
+            },
+          )
         ) {
           const hit = cellCtx.fontEffects
             ? paintErrorTriangle(

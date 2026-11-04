@@ -399,3 +399,29 @@ describe('Error Checking finds numbers stored as text on the Mac profile', () =>
     expect(formulaErrorCellsInRange(store, all)).toEqual([]);
   });
 });
+
+describe('Error Checking walks the formula rules on the Mac profile', () => {
+  it('visits the inconsistent formula, the short sum and the unlocked formula', () => {
+    const store = createSpreadsheetStore();
+    const num = (value: number) => ({ kind: 'number', value }) as const;
+    for (let row = 1; row <= 3; row += 1) {
+      mutators.setCell(store, { sheet: 0, row, col: 1 }, num(row), null);
+      const formula = row === 2 ? `=B${row + 1}+1` : `=B${row + 1}*2`;
+      mutators.setCell(store, { sheet: 0, row, col: 3 }, num(row), formula);
+    }
+    for (let row = 1; row <= 4; row += 1) {
+      mutators.setCell(store, { sheet: 0, row, col: 5 }, num(row), null);
+    }
+    mutators.setCell(store, { sheet: 0, row: 5, col: 5 }, num(6), '=SUM(F2:F4)');
+    mutators.setCell(store, { sheet: 0, row: 7, col: 7 }, num(2), '=1+1');
+    mutators.setCellFormat(store, { sheet: 0, row: 7, col: 7 }, { locked: false });
+    const all = { sheet: 0, r0: 0, c0: 0, r1: 20, c1: 20 };
+    const mac = { macNa: true, numberAsText: true, formulaRules: true };
+    expect(formulaErrorCellsInRange(store, all, mac)).toEqual([
+      { sheet: 0, row: 2, col: 3 },
+      { sheet: 0, row: 5, col: 5 },
+      { sheet: 0, row: 7, col: 7 },
+    ]);
+    expect(formulaErrorCellsInRange(store, all)).toEqual([]);
+  });
+});

@@ -189,3 +189,42 @@ describe('number stored as text (Mac desktop)', () => {
     expect(paint(store, true).result.errorTriangles[0]?.rect.w).toBe(12);
   });
 });
+
+describe('formula rules of the default error check (Mac desktop)', () => {
+  const num = (value: number): CellValue => ({ kind: 'number', value });
+  /** The measured sheet: B/C inputs, D2:D6 products with an odd D4, F2:F5 numbers
+   *  summed short by F6, an unlocked =1+1, a formula on an empty cell, a
+   *  two-digit-year text date and a number stored as text. */
+  const sheet = (): SpreadsheetStore => {
+    const store = createSpreadsheetStore();
+    for (let row = 1; row <= 5; row += 1) {
+      mutators.setCell(store, { sheet: 0, row, col: 1 }, num(row), null);
+      mutators.setCell(store, { sheet: 0, row, col: 2 }, num(2), null);
+      const formula = row === 3 ? `=B${row + 1}+C${row + 1}` : `=B${row + 1}*C${row + 1}`;
+      mutators.setCell(store, { sheet: 0, row, col: 3 }, num(row * 2), formula);
+    }
+    for (let row = 1; row <= 4; row += 1) {
+      mutators.setCell(store, { sheet: 0, row, col: 5 }, num(row * 10), null);
+    }
+    mutators.setCell(store, { sheet: 0, row: 5, col: 5 }, num(60), '=SUM(F2:F4)');
+    mutators.setCell(store, { sheet: 0, row: 1, col: 7 }, num(2), '=1+1');
+    mutators.setCellFormat(store, { sheet: 0, row: 1, col: 7 }, { locked: false });
+    mutators.setCell(store, { sheet: 0, row: 3, col: 7 }, num(1), '=J4+1');
+    mutators.setCell(store, { sheet: 0, row: 5, col: 7 }, { kind: 'text', value: '25/1/1' }, null);
+    mutators.setCell(store, { sheet: 0, row: 7, col: 7 }, { kind: 'text', value: '123' }, null);
+    return store;
+  };
+  const marked = (store: SpreadsheetStore) =>
+    paint(store, true)
+      .result.errorTriangles.map((t) => `${t.addr.row}:${t.addr.col}`)
+      .sort();
+
+  it('marks the odd formula, the short sum, the unlocked formula and the number as text', () => {
+    // D4, F6, H2, H8 - and nothing else.
+    expect(marked(sheet())).toEqual(['1:7', '3:3', '5:5', '7:7']);
+  });
+
+  it('applies none of them on the other profiles', () => {
+    expect(paint(sheet(), false).result.errorTriangles).toEqual([]);
+  });
+});

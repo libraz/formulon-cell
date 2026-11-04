@@ -1,5 +1,6 @@
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
+import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeValidationCells } from '../store/range-validations.js';
@@ -7,6 +8,7 @@ import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { type CellValidation, mutators, type SpreadsheetStore } from '../store/store.js';
 import { parseLocalizedNumericInput } from './coerce-input.js';
 import type { History } from './history.js';
+import { formatA1FormulaAsR1C1 } from './refs.js';
 import { cellValueViolatesValidation } from './validate.js';
 
 const ERROR_SENTINELS: ReadonlySet<string> = new Set([
@@ -111,8 +113,85 @@ const rowMajor = (left: Addr, right: Addr): number =>
 export interface FormulaErrorCheckOptions {
   macNa?: boolean;
   numberAsText?: boolean;
+  /** The formula rules of the desktop's default check: a formula inconsistent
+   *  with its neighbours, one that omits adjacent data, an unlocked formula. */
+  formulaRules?: boolean;
   locale?: string;
   workbook?: Pick<WorkbookHandle, 'pivotSpills'> | null;
+}
+
+/** A neighbour's content, for the rules that compare a cell with its region. */
+export type ErrorCheckCellAt = (
+  row: number,
+  col: number,
+) => { value: CellValue; formula: string | null } | undefined;
+
+/** The cell being checked, as far as the formula rules need it. */
+export interface ErrorCheckCell {
+  addr: Addr;
+  locked?: boolean;
+  cellAt: ErrorCheckCellAt;
+}
+
+const relativeForm = (formula: string, addr: Addr): string =>
+  formatA1FormulaAsR1C1(formula, addr).replace(/\s+/g, '').toUpperCase();
+
+/** The formula differs from neighbours on both sides that agree with each
+ *  other, down its column or across its row. */
+function inconsistentWithRegion(formula: string, cell: ErrorCheckCell): boolean {
+  const { row, col } = cell.addr;
+  const own = relativeForm(formula, cell.addr);
+  const formOf = (r: number, c: number): string | null => {
+    const f = r >= 0 && c >= 0 ? cell.cellAt(r, c)?.formula : null;
+    return f ? relativeForm(f, { sheet: cell.addr.sheet, row: r, col: c }) : null;
+  };
+  for (const [a, b] of [
+    [formOf(row - 1, col), formOf(row + 1, col)],
+    [formOf(row, col - 1), formOf(row, col + 1)],
+  ] as const) {
+    if (a !== null && a === b && a !== own) return true;
+  }
+  return false;
+}
+
+const isNumber = (cell: ReturnType<ErrorCheckCellAt>): boolean =>
+  cell?.value.kind === 'number' && !cell.formula;
+
+/** A range the formula refers to stops short of numbers between it and the
+ *  formula, down the formula's column or across its row. */
+function omitsAdjacentCells(formula: string, cell: ErrorCheckCell): boolean {
+  const { row, col } = cell.addr;
+  for (const match of formula.matchAll(/(?<![!\w$])\$?[A-Z]{1,3}\$?\d+:\$?[A-Z]{1,3}\$?\d+/gi)) {
+    const ref = parseRangeRef(match[0]);
+    if (!ref) continue;
+    if (
+      ref.c0 === col &&
+      ref.c1 === col &&
+      ref.r1 < row - 1 &&
+      isNumber(cell.cellAt(ref.r1 + 1, col))
+    ) {
+      return true;
+    }
+    if (
+      ref.r0 === row &&
+      ref.r1 === row &&
+      ref.c1 < col - 1 &&
+      isNumber(cell.cellAt(row, ref.c1 + 1))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The formula rules of the default error check, for a formula whose value is
+ *  not an error. */
+function formulaRuleFlagged(formula: string, cell: ErrorCheckCell): boolean {
+  return (
+    cell.locked === false ||
+    inconsistentWithRegion(formula, cell) ||
+    omitsAdjacentCells(formula, cell)
+  );
 }
 
 /** A text constant that typing would have entered as a number: the desktop's
@@ -132,12 +211,18 @@ export function errorCheckFlagged(
   value: CellValue,
   formula: string | null | undefined,
   pivotSpill: boolean,
-  opts: Pick<FormulaErrorCheckOptions, 'macNa' | 'numberAsText' | 'locale'> = {},
+  opts: Pick<FormulaErrorCheckOptions, 'macNa' | 'numberAsText' | 'formulaRules' | 'locale'> = {},
+  cell?: ErrorCheckCell,
 ): boolean {
   return (
     pivotSpill ||
     formulaErrorIsFlagged(value, formula, opts) ||
-    (opts.numberAsText === true && numberStoredAsText(value, formula, opts.locale))
+    (opts.numberAsText === true && numberStoredAsText(value, formula, opts.locale)) ||
+    (opts.formulaRules === true &&
+      !!formula &&
+      value.kind !== 'error' &&
+      cell !== undefined &&
+      formulaRuleFlagged(formula, cell))
   );
 }
 
@@ -155,11 +240,23 @@ export function formulaErrorCellsInRange(
     ).map((spill) => addrKey(spill.anchor)),
   );
   const out: Addr[] = [];
+  const cellAt: ErrorCheckCellAt = (row, col) =>
+    state.data.cells.get(addrKey({ sheet: state.data.sheetIndex, row, col }));
   for (const [key, cell] of state.data.cells) {
-    if (!errorCheckFlagged(cell.value, cell.formula, anchors.has(key), opts)) continue;
-    if (state.errorIndicators.ignoredErrors.has(key)) continue;
     const addr = parseAddrKey(key);
-    if (addr && rangeContainsAddr(target, addr)) out.push(addr);
+    if (!addr) continue;
+    const locked = state.format.formats.get(key)?.locked;
+    if (
+      !errorCheckFlagged(cell.value, cell.formula, anchors.has(key), opts, {
+        addr,
+        ...(locked !== undefined ? { locked } : {}),
+        cellAt,
+      })
+    ) {
+      continue;
+    }
+    if (state.errorIndicators.ignoredErrors.has(key)) continue;
+    if (rangeContainsAddr(target, addr)) out.push(addr);
   }
   return out.sort(rowMajor);
 }
