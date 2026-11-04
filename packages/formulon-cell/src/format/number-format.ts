@@ -2,7 +2,7 @@ import { formatGeneralNumber, formatScientificNumber } from '../engine/value.js'
 import type { NegativeStyle, NumFmt } from '../store/store.js';
 import { excelSerialToDate, excelSerialToDateParts } from './date-serial.js';
 import { intlFormatterCache } from './intl-cache.js';
-import { normalizeFormatLocale } from './locale.js';
+import { datePatternsForLocale, normalizeFormatLocale } from './locale.js';
 
 const DATE_NAME_CACHE_LIMIT = 128;
 type DateNameKind = 'weekday' | 'month';
@@ -111,7 +111,12 @@ export function formatNumber(
     return value < 0 ? `(${placed})` : `${placed} `;
   }
   if (fmt.kind === 'date') {
-    return renderDateTimePattern(value, fmt.pattern, locale, date1904);
+    return renderDateTimePattern(
+      value,
+      localeShortDatePattern(fmt.pattern, locale),
+      locale,
+      date1904,
+    );
   }
   if (fmt.kind === 'time') {
     return renderDateTimePattern(value, fmt.pattern, locale, date1904);
@@ -126,6 +131,14 @@ export function formatNumber(
     return formatCustomPattern(value, fmt.pattern, locale, date1904);
   }
   return String(value);
+}
+
+/** The built-in short-date code (numFmt 14) shows the locale's short date
+ *  under ja (measured); other locales keep the code. */
+function localeShortDatePattern(pattern: string, locale: string): string {
+  if (pattern !== 'm/d/yy' && pattern !== 'mm-dd-yy') return pattern;
+  const language = normalizeFormatLocale(locale).split('-')[0];
+  return language === 'ja' ? datePatternsForLocale(locale).short : pattern;
 }
 
 /** Use the locale's currency position and spacing with the cell's chosen symbol. */
@@ -192,11 +205,13 @@ function formatCustomPattern(
     return renderDateTimePattern(value, active, locale, date1904);
   }
 
-  return renderNumericPattern(
-    selected.useAbs ? Math.abs(value) : value,
-    active.replace(/\[\$-[^\]]+\]/g, ''),
-    locale,
-  );
+  const numericPattern = active.replace(/\[\$-[^\]]+\]/g, '');
+  // A section that does not supply its own sign puts the minus before the
+  // whole text, literals included.
+  if (!selected.useAbs && value < 0) {
+    return `-${renderNumericPattern(Math.abs(value), numericPattern, locale)}`;
+  }
+  return renderNumericPattern(selected.useAbs ? Math.abs(value) : value, numericPattern, locale);
 }
 
 /** Pick the section of `pattern` that renders `value`. Spreadsheets allow

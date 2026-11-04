@@ -362,3 +362,17 @@ describe('formatNumber date names under ja', () => {
     expect(f('dddd', 'de-DE')).toBe('Dienstag');
   });
 });
+
+describe('formatNumber against measured desktop output', () => {
+  it('puts the minus of an unsigned custom section before its literals', () => {
+    const fmt = { kind: 'custom', pattern: '"No."000' } as const;
+    expect(formatNumber(-15, fmt, 'ja-JP')).toBe('-No.015');
+    expect(formatNumber(15, fmt, 'ja-JP')).toBe('No.015');
+  });
+
+  it('shows the built-in short date as the year-first short date in ja', () => {
+    const fmt = { kind: 'date', pattern: 'm/d/yy' } as const;
+    expect(formatNumber(45292, fmt, 'ja-JP')).toBe('2024/1/1');
+    expect(formatNumber(45292, fmt, 'en-US')).toBe('1/1/24');
+  });
+});

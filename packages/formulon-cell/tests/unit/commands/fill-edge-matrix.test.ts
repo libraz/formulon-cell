@@ -140,10 +140,8 @@ describe('fillRange matches the measured AutoFill edge matrix (ja-JP)', () => {
             ? Math.abs(ev - gv) <= 1e-9 * Math.max(1, Math.abs(ev))
             : (ev ?? null) === gv || (ev === '' && gv === null);
         const okF = JSON.stringify(gotFmt ?? null) === JSON.stringify(wantFmt ?? null);
-        // Display text is checked where the number formatter, not the fill, decides it: General
-        // depends on column width, the built-in m/d/yy follows the locale, and a negative value
-        // under a literal-prefixed code puts its sign in front of the literal.
-        const okT = enf === 'General' || enf === 'm/d/yy' || et.startsWith('-') || text === et;
+        // General-format text depends on column width, which is not a fill concern.
+        const okT = enf === 'General' || text === et;
         if (!okV || !okF || !okT)
           diffs.push(
             `@${p}: want v=${ev} nf=${enf} t=${JSON.stringify(et)} | got v=${gv} nf=${JSON.stringify(gotFmt ?? null)} t=${JSON.stringify(text)}`,
