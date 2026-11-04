@@ -39,6 +39,10 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   cellRect,
   colLeadingEdge,
+  frozenColsWidth,
+  frozenRowsHeight,
+  gridOriginX,
+  gridOriginY,
   hitTest,
   hitZone,
   layoutForView,
@@ -70,6 +74,7 @@ import {
   type State,
 } from '../store/store.js';
 import { jumpToDataEdge } from './data-edge-navigation.js';
+import { type AutoscrollBounds, createDragAutoscroll } from './drag-autoscroll.js';
 import { createFillValueTooltip } from './fill-value-tooltip.js';
 import { followHyperlink, type HyperlinkFollowDeps } from './hyperlink-follow.js';
 import {
@@ -848,6 +853,72 @@ export function attachPointer(
     }
   };
 
+  /** Re-apply the active drag at a point, as a pointer move there would. */
+  let applyDragAt: (x: number, y: number) => void = () => {};
+
+  const autoscroll = createDragAutoscroll({
+    scrollBy: (dRow, dCol) => mutators.scrollBy(store, dRow, dCol),
+    onScrolled: ({ x, y }) => {
+      const point = autoscrollTarget(x, y);
+      if (point) applyDragAt(point.x, point.y);
+      else autoscroll.stop();
+    },
+  });
+
+  /** Directions the active drag may scroll in, or null when it never autoscrolls. */
+  const autoscrollAxes = (): { row: boolean; col: boolean } | null => {
+    if (drag.kind === 'cell') return { row: true, col: true };
+    if (drag.kind === 'col-header') return { row: false, col: true };
+    if (drag.kind === 'row-header') return { row: true, col: false };
+    if (drag.kind === 'selection-marquee') {
+      return {
+        row: drag.axis !== 'col',
+        col: drag.axis !== 'row',
+      };
+    }
+    return null;
+  };
+
+  /** Body area the pointer must stay inside to avoid scrolling, in host coordinates. */
+  const autoscrollBounds = (): AutoscrollBounds | null => {
+    const rect = host.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const s = store.getState();
+    const layout = geometryLayout(s);
+    const originX = gridOriginX(layout) + frozenColsWidth(layout, s.viewport);
+    return {
+      left: layout.rtl ? 0 : originX,
+      right: layout.rtl ? rect.width - originX : rect.width,
+      top: gridOriginY(layout) + frozenRowsHeight(layout, s.viewport),
+      bottom: rect.height,
+    };
+  };
+
+  /** The pointer pulled back into the grid body (header strip on the axis a header drag keeps). */
+  const autoscrollTarget = (x: number, y: number): { x: number; y: number } | null => {
+    const axes = autoscrollAxes();
+    const bounds = autoscrollBounds();
+    if (!axes || !bounds) return null;
+    const s = store.getState();
+    const layout = geometryLayout(s);
+    const clampX = Math.min(bounds.right - 1, Math.max(bounds.left, x));
+    const clampY = Math.min(bounds.bottom - 1, Math.max(bounds.top, y));
+    return {
+      x: axes.col ? clampX : gridOriginX(layout) - 1,
+      y: axes.row ? clampY : gridOriginY(layout) - 1,
+    };
+  };
+
+  const updateAutoscroll = (x: number, y: number): void => {
+    const axes = autoscrollAxes();
+    const bounds = autoscrollBounds();
+    if (!axes || !bounds) {
+      autoscroll.stop();
+      return;
+    }
+    autoscroll.update({ x, y }, bounds, axes);
+  };
+
   const onMove = (e: PointerEvent): void => {
     const { x, y } = localXY(e);
 
@@ -862,10 +933,16 @@ export function attachPointer(
     }
 
     if (drag.kind === 'none') {
+      autoscroll.stop();
       updateCursor(host, store, x, y);
       return;
     }
 
+    updateAutoscroll(x, y);
+    applyDrag(e, x, y);
+  };
+
+  const applyDrag = (e: PointerEvent | null, x: number, y: number): void => {
     const s = store.getState();
 
     switch (drag.kind) {
@@ -934,7 +1011,7 @@ export function attachPointer(
         mutators.setFillPreview(store, dest);
         host.style.cursor = 'crosshair';
         const last = fillLastValue(s, drag.src, dest, inputLocaleForWorkbook(wb));
-        if (last === null) fillTooltip.hide();
+        if (last === null || !e) fillTooltip.hide();
         else fillTooltip.show(last, e.clientX, e.clientY);
         return;
       }
@@ -1007,7 +1084,10 @@ export function attachPointer(
     movePageBreak(store, sheet, handle.axis, handle.index, target, history);
   };
 
+  applyDragAt = (x, y) => applyDrag(null, x, y);
+
   const onUp = (e: PointerEvent): void => {
+    autoscroll.stop();
     if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
     if (
       interactionControllerFor(store)?.policy?.selection === false &&
@@ -1121,6 +1201,7 @@ export function attachPointer(
 
   /** An interrupted gesture is abandoned: live previews revert and nothing is committed. */
   const onCancel = (e: PointerEvent): void => {
+    autoscroll.stop();
     if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
     if (drag.kind === 'selection-marquee') {
       const base = drag.base;
@@ -1212,6 +1293,7 @@ export function attachPointer(
 
   return () => {
     unsubscribeSheetChange();
+    autoscroll.stop();
     host.removeEventListener('pointerdown', onDown);
     host.removeEventListener('pointermove', onMove);
     host.removeEventListener('pointerup', onUp);
