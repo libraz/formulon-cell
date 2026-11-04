@@ -4,6 +4,7 @@ import {
   type PivotEditField,
   restorePivotFieldLayout,
 } from '../commands/pivot-edit.js';
+import type { Addr } from '../engine/types.js';
 import {
   PivotAggregation,
   PivotAxis,
@@ -14,10 +15,13 @@ import {
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
+import type { Strings } from '../i18n/strings.js';
 import { pivotShowAsNeedsBaseField, pivotShowAsNeedsBaseItem } from './pivot-field-settings.js';
-import type {
-  PivotFieldSettingsResult,
-  PivotFieldSettingsTarget,
+import {
+  type PivotFieldSettingsResult,
+  type PivotFieldSettingsTarget,
+  type PivotNumberFormatPicker,
+  showPivotFieldSettingsDialog,
 } from './pivot-field-settings-dialog.js';
 
 /** Where a pivot rewrite records its undo step and announces itself. */
@@ -287,4 +291,64 @@ export function applyPivotFieldSettings(
       list.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0)
     );
   });
+}
+
+/** Everything opening the PivotTable Field dialog on a report needs. */
+export interface PivotFieldSettingsOpenContext extends PivotCommitContext {
+  host: HTMLElement;
+  strings: Strings;
+  pickNumberFormat?: PivotNumberFormatPicker;
+}
+
+type PivotCellInfo = NonNullable<ReturnType<WorkbookHandle['pivotCellInfo']>>;
+
+/** The field a report cell belongs to: a value cell's data field, or the row,
+ *  column or filter field of a label. Null for a cell that names no field. */
+function pivotFieldForCell(
+  definition: PivotDefinition,
+  info: PivotCellInfo,
+): { kind: 'value'; dataFieldIndex: number } | { kind: 'field'; fieldIndex: number } | null {
+  if (info.isValue) {
+    // A value cell carries its data field's caption; a source index is a fallback.
+    const byName = definition.dataFields.findIndex((spec) => spec.name === info.fieldName);
+    const bySource = definition.dataFields.findIndex(
+      (spec) => definition.fields[spec.fieldIndex]?.cacheFieldIndex === info.fieldIndex,
+    );
+    const dataFieldIndex = byName >= 0 ? byName : bySource;
+    return definition.dataFields.length > 0
+      ? { kind: 'value', dataFieldIndex: Math.max(dataFieldIndex, 0) }
+      : null;
+  }
+  const field = definition.fields.find((f) => f.cacheFieldIndex === info.fieldIndex);
+  return field ? { kind: 'field', fieldIndex: field.index } : null;
+}
+
+/** Opens the PivotTable Field dialog on the field of the report cell at `addr`
+ *  and applies its result as one undo step. False when the cell is in no report
+ *  or names no field. The context menu, the panel and the instance all open it here. */
+export function openPivotFieldSettingsAt(ctx: PivotFieldSettingsOpenContext, addr: Addr): boolean {
+  const { wb } = ctx;
+  const info = wb.pivotCellInfo(addr);
+  if (!info) return false;
+  const definition = wb.getPivotDefinition(addr.sheet, info.pivotIndex);
+  if (!definition) return false;
+  const which = pivotFieldForCell(definition, info);
+  if (!which) return false;
+  const target = pivotFieldSettingsTarget(wb, addr.sheet, info.pivotIndex, which);
+  if (!target) return false;
+  void showPivotFieldSettingsDialog({
+    host: ctx.host,
+    strings: ctx.strings,
+    target,
+    ...(ctx.pickNumberFormat ? { pickNumberFormat: ctx.pickNumberFormat } : {}),
+  }).then((result) => {
+    if (!result) return;
+    applyPivotFieldSettings(
+      ctx,
+      { sheetIndex: addr.sheet, pivotIndex: info.pivotIndex, rows: 0, cols: 0 },
+      which,
+      result,
+    );
+  });
+  return true;
 }

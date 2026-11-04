@@ -208,6 +208,10 @@ export interface SpreadsheetInstance {
   openChartSettings(tab?: import('../interact/session-chart-settings.js').SettingsTab): boolean;
   openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
   openActivePivotFieldList(): boolean;
+  /** Open the PivotTable Field dialog on the field of the active cell: a value
+   *  cell's data field, or a label's row, column or filter field. False when the
+   *  active cell names no field. Ribbon command id `pivotFieldSettings`. */
+  openPivotFieldSettings(): boolean;
   /** Open the PivotTable Options dialog on a report, by default the one under
    *  the active cell; false when there is none. Ribbon command id `pivotOptions`. */
   openPivotOptions(sheetIndex?: number, pivotIndex?: number): boolean;

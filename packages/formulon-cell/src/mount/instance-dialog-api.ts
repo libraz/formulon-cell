@@ -1,5 +1,6 @@
 import { hyperlinkAt } from '../commands/hyperlinks.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ExtensionHandle } from '../extensions/index.js';
 import type { FxDialogOpenOptions } from '../interact/fx-dialog.js';
@@ -42,6 +43,7 @@ export type InstanceDialogApi = Pick<
   | 'openPivotFieldList'
   | 'openActivePivotFieldList'
   | 'openPivotOptions'
+  | 'openPivotFieldSettings'
   | 'openPivotTableDialog'
   | 'addSlicer'
   | 'removeSlicer'
@@ -212,6 +214,15 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
         featureState.workbookObjects?.openPivotFieldList(pivot.sheetIndex, pivot.pivotIndex) ??
         false
       );
+    },
+    openPivotFieldSettings() {
+      if (isRestricted()) return false;
+      const addr = store.getState().selection.active;
+      const userObjects = getUserHandle('workbookObjects') as
+        | (ExtensionHandle & { openPivotFieldSettings?: (addr: Addr) => boolean })
+        | undefined;
+      if (userObjects?.openPivotFieldSettings) return userObjects.openPivotFieldSettings(addr);
+      return featureState.workbookObjects?.openPivotFieldSettings(addr) ?? false;
     },
     openPivotOptions(sheetIndex, pivotIndex) {
       if (isRestricted()) return false;

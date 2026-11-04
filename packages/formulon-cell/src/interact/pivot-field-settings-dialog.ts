@@ -337,10 +337,12 @@ export const showPivotFieldSettingsDialog = (
         String(target.aggregation),
         (value) => {
           const next = Number(value) as PivotAggregation;
-          const follows = !nameEdited && nameInput.value === target.autoNames?.[shownAggregation];
-          const nextName = target.autoNames?.[next];
-          if (follows && nextName) nameInput.value = nextName;
+          if (next === shownAggregation) return;
           shownAggregation = next;
+          // An untouched name, stored caption or default alike, is regenerated
+          // for the chosen function, as the desktop renames it on every change.
+          const nextName = target.autoNames?.[next];
+          if (!nameEdited && nextName) nameInput.value = nextName;
         },
       );
       aggregation.root.dataset.pvfsAggregation = '';

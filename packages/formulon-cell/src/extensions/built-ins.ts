@@ -26,6 +26,7 @@ import {
 } from '../commands/session-illustration.js';
 import { setSheetZoom, setWorkbookView } from '../commands/view.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import type { Addr } from '../engine/types.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
 import { attachClipboard } from '../interact/clipboard.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
@@ -308,6 +309,7 @@ export const workbookObjects = (): Extension => ({
         handle.openPivotFieldList(sheetIndex, pivotIndex),
       openPivotOptions: (sheetIndex: number, pivotIndex: number) =>
         handle.openPivotOptions(sheetIndex, pivotIndex),
+      openPivotFieldSettings: (addr: Addr) => handle.openPivotFieldSettings(addr),
       close: () => handle.close(),
       refresh: () => handle.refresh(),
       rebindWorkbook: (wb) => handle.bindWorkbook(wb),

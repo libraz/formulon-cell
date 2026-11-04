@@ -18,12 +18,14 @@ import {
   WORKBOOK_OBJECT_KINDS,
   workbookObjectKindCounts,
 } from '../engine/passthrough-sync.js';
+import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogIconButton } from './dialog-shell.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
+import { openPivotFieldSettingsAt } from './pivot-field-settings-dialog-apply.js';
 import { openPivotOptions } from './pivot-options-dialog.js';
 import { compatibilityLabelKey } from './spreadsheet-compatibility-report.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
@@ -72,6 +74,9 @@ export interface WorkbookObjectsPanelDeps {
 export interface WorkbookObjectsPanelHandle {
   open(): void;
   openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
+  /** Opens the PivotTable Field dialog on the field of the report cell at `addr`;
+   *  false when the cell names no field. */
+  openPivotFieldSettings(addr: Addr): boolean;
   /** Opens the PivotTable Options dialog on a report; false when there is no such report. */
   openPivotOptions(sheetIndex: number, pivotIndex: number): boolean;
   isPivotFieldListOpen(): boolean;
@@ -637,6 +642,21 @@ export function attachWorkbookObjectsPanel(
   return {
     open: openPanel,
     openPivotFieldList,
+    openPivotFieldSettings: (addr) =>
+      openPivotFieldSettingsAt(
+        {
+          host,
+          strings,
+          wb,
+          history: deps.history ?? null,
+          ...(numberFormatPicker ? { pickNumberFormat: numberFormatPicker.pick } : {}),
+          onChanged: () => {
+            deps.onAfterPivotEdit?.();
+            refresh();
+          },
+        },
+        addr,
+      ),
     openPivotOptions: (sheetIndex, pivotIndex) => {
       if (wb.pivotTableName(sheetIndex, pivotIndex) === null) return false;
       void openPivotOptions(

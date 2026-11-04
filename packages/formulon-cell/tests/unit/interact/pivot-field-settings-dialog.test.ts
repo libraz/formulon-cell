@@ -5,6 +5,9 @@ import { PivotAggregation, PivotAxis, PivotShowValuesAs } from '../../../src/eng
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
+import { mutators } from '../../../src/store/store.js';
+import { mountStubSheet } from '../../test-utils/index.js';
+import { loadFixture, pivotGrid } from '../engine/pivot-excel-parity/fixture.js';
 
 const setup = async () => {
   const wb = await WorkbookHandle.createDefault();
@@ -377,6 +380,104 @@ describe('PivotTable Field dialog', () => {
     await flush();
     expect(JSON.stringify(wb.getPivotDefinition(0, 0))).toBe(before);
     expect(document.querySelector('.fc-pvfsdlg')).toBeNull();
+    handle.detach();
+    wb.dispose();
+  });
+
+  it('opens from the instance on the active cell: a value cell, a label, or nothing', async () => {
+    const wb = await setup();
+    const sheet = await mountStubSheet({ workbook: wb });
+    const { instance } = sheet;
+    const at = (row: number, col: number) =>
+      mutators.setActive(instance.store, { sheet: 0, row, col });
+    at(0, 6);
+    expect(instance.openPivotFieldSettings()).toBe(false);
+    // The report starts at row 9: a header row, then East and West with their sums.
+    at(9, 1);
+    expect(instance.openPivotFieldSettings()).toBe(true);
+    expect(dialog().dataset.pvfsKind).toBe('value');
+    expect(dialog().querySelector('[data-pvfs-source]')?.textContent).toBe('Amt');
+    click(`[data-pvfs-aggregation] [data-pvfs-value="${PivotAggregation.Max}"]`);
+    click('[data-pvfs-ok]');
+    await flush();
+    expect(wb.getPivotDefinition(0, 0)?.dataFields[0]?.aggregation).toBe(PivotAggregation.Max);
+    at(9, 0);
+    expect(instance.openPivotFieldSettings()).toBe(true);
+    expect(dialog().dataset.pvfsKind).toBe('field');
+    expect(dialog().querySelector<HTMLInputElement>('[data-pvfs-name]')?.value).toBe('Region');
+    click('[data-pvfs-cancel]');
+    sheet.dispose();
+  });
+
+  it('renames a stored caption after each function change and keeps the number format', async () => {
+    // Saved by the Japanese app: rows Region, data field "Summe von Amt".
+    const wb = await loadFixture('ja_c0_rows.xlsx');
+    const pivot = wb.getPivotTables()[0];
+    if (!pivot) throw new Error('missing pivot');
+    const { sheetIndex } = pivot;
+    const spec = wb.getPivotDefinition(sheetIndex, 0)?.dataFields[0];
+    if (!spec) throw new Error('missing data field');
+    expect(spec.name).toBe('Summe von Amt');
+    expect(wb.setPivotDataField(sheetIndex, 0, 0, { ...spec, numberFormat: '#,##0.0' })).toBe(true);
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: ja });
+    expect(handle.openPivotFieldList(sheetIndex, 0)).toBe(true);
+    const change = async (aggregation: number): Promise<string> => {
+      host
+        .querySelector<HTMLButtonElement>('[data-pivot-area="values"] .fc-pivotdlg__area-settings')
+        ?.click();
+      click(`[data-pvfs-aggregation] [data-pvfs-value="${aggregation}"]`);
+      const shown = dialog().querySelector<HTMLInputElement>('[data-pvfs-name]')?.value ?? '';
+      click('[data-pvfs-ok]');
+      await flush();
+      return shown;
+    };
+    const header = () => wb.getPivotDefinition(sheetIndex, 0)?.dataFields[0];
+    const amounts = () => {
+      const grid = pivotGrid(wb, sheetIndex);
+      return Object.entries(grid)
+        .filter(([ref]) => ref.startsWith('B'))
+        .map(([, value]) => value);
+    };
+
+    expect(await change(PivotAggregation.Average), 'the name box follows the function').toBe(
+      '平均 / Amt',
+    );
+    expect(header()).toMatchObject({ name: '平均 / Amt', numberFormat: '#,##0.0' });
+    expect(amounts()).toEqual(['平均 / Amt', 500, 150, 350, 300]);
+
+    expect(await change(PivotAggregation.Count)).toBe('個数 / Amt');
+    expect(header()).toMatchObject({ name: '個数 / Amt', numberFormat: '#,##0.0' });
+    expect(amounts()).toEqual(['個数 / Amt', 1, 2, 2, 5]);
+
+    expect(await change(PivotAggregation.Sum), 'Sum comes back as the profile caption').toBe(
+      '合計 / Amt',
+    );
+    expect(header()).toMatchObject({ name: '合計 / Amt', numberFormat: '#,##0.0' });
+    expect(amounts()).toEqual(['合計 / Amt', 500, 300, 700, 1500]);
+    handle.detach();
+    wb.dispose();
+  });
+
+  it('keeps a name typed in the dialog across a function change', async () => {
+    const wb = await loadFixture('ja_c0_rows.xlsx');
+    const sheetIndex = wb.getPivotTables()[0]?.sheetIndex ?? 0;
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: ja });
+    expect(handle.openPivotFieldList(sheetIndex, 0)).toBe(true);
+    host
+      .querySelector<HTMLButtonElement>('[data-pivot-area="values"] .fc-pivotdlg__area-settings')
+      ?.click();
+    const name = dialog().querySelector<HTMLInputElement>('[data-pvfs-name]');
+    if (!name) throw new Error('missing name');
+    name.value = '売上合計';
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    click(`[data-pvfs-aggregation] [data-pvfs-value="${PivotAggregation.Average}"]`);
+    expect(name.value).toBe('売上合計');
+    click('[data-pvfs-ok]');
+    await flush();
+    expect(wb.getPivotDefinition(sheetIndex, 0)?.dataFields[0]).toMatchObject({
+      name: '売上合計',
+      aggregation: PivotAggregation.Average,
+    });
     handle.detach();
     wb.dispose();
   });

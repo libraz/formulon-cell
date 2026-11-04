@@ -79,14 +79,8 @@ import {
 import { type MenuTarget, resolveContextMenuTarget } from './context-menu-target.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
-import {
-  createPivotNumberFormatPicker,
-  showPivotFieldSettingsDialog,
-} from './pivot-field-settings-dialog.js';
-import {
-  applyPivotFieldSettings,
-  pivotFieldSettingsTarget,
-} from './pivot-field-settings-dialog-apply.js';
+import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
+import { openPivotFieldSettingsAt } from './pivot-field-settings-dialog-apply.js';
 
 export interface ContextMenuDeps {
   host: HTMLElement;
@@ -1165,46 +1159,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     getStrings: () => strings,
     getWb: () => wb,
   });
-  /** Opens the PivotTable Field dialog on the field under the cell; false when
-   *  the cell names no field the dialog can show. */
-  const openPivotFieldSettings = (pivot: NonNullable<typeof activePivot>): boolean => {
-    const definition = wb.getPivotDefinition(pivot.sheet, pivot.pivotIndex);
-    if (!definition) return false;
-    const field = definition.fields.find((f) => f.cacheFieldIndex === pivot.fieldIndex);
-    // A value cell carries its data field's caption; a source index is a fallback.
-    const byName = definition.dataFields.findIndex((spec) => spec.name === pivot.fieldName);
-    const dataFieldIndex =
-      byName >= 0
-        ? byName
-        : definition.dataFields.findIndex(
-            (spec) => definition.fields[spec.fieldIndex]?.cacheFieldIndex === pivot.fieldIndex,
-          );
-    const which = pivot.isValue
-      ? { kind: 'value' as const, dataFieldIndex: Math.max(dataFieldIndex, 0) }
-      : field
-        ? { kind: 'field' as const, fieldIndex: field.index }
-        : null;
-    if (!which) return false;
-    const target = pivotFieldSettingsTarget(wb, pivot.sheet, pivot.pivotIndex, which);
-    if (!target) return false;
-    const sheet = pivot.sheet;
-    void showPivotFieldSettingsDialog({
-      host,
-      strings,
-      target,
-      pickNumberFormat: pivotNumberFormat.pick,
-    }).then((result) => {
-      if (!result) return;
-      applyPivotFieldSettings(
-        { wb, history: deps.history ?? null, onChanged: () => refreshPivotCells(sheet) },
-        { sheetIndex: sheet, pivotIndex: pivot.pivotIndex, rows: 0, cols: 0 },
-        which,
-        result,
-      );
-    });
-    return true;
-  };
-
   function run(id: string): void {
     if (!isBuiltinItemId(id)) return;
     if (!decisionForItem(id).allowed) return;
@@ -1344,7 +1298,23 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         return;
       }
       case 'pivotFieldSettings': {
-        if (activePivot && openPivotFieldSettings(activePivot)) return;
+        const sheet = activePivot?.sheet;
+        if (
+          sheet !== undefined &&
+          openPivotFieldSettingsAt(
+            {
+              host,
+              strings,
+              wb,
+              history: deps.history ?? null,
+              pickNumberFormat: pivotNumberFormat.pick,
+              onChanged: () => refreshPivotCells(sheet),
+            },
+            store.getState().selection.active,
+          )
+        ) {
+          return;
+        }
         if (activePivot) deps.onOpenPivotFieldList?.(activePivot.sheet, activePivot.pivotIndex);
         return;
       }
