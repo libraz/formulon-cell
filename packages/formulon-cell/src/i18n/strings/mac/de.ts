@@ -8,6 +8,7 @@ import { ribbonDe } from '../ribbon/de.js';
 import { ribbonMenusDe } from '../ribbon-menus/de.js';
 import { workbookChromeDe } from '../workbook-chrome/de.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneDe } from './external-links-pane.js';
@@ -203,6 +204,11 @@ export const macDe: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsDe.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonDe.ribbon, cellFormatDe.formatDialog),
+  macAlerts: macAlertsFrom(ribbonDe.ribbon, {
+    message: 'Dieses Blatt wird endgültig gelöscht. Möchten Sie fortfahren?',
+    confirm: 'Löschen',
+    cancel: 'Abbrechen',
+  }),
   macProtectSheet: macProtectSheetFrom(editDialogsDe.protection, {
     heading: 'Arbeitsblatt und Inhalt gesperrter Zellen schützen',
     note: 'Standardmäßig sind alle Zellen gesperrt, die Sperre kann aber aufgehoben werden.',

@@ -8,6 +8,7 @@ import { ribbonTh } from '../ribbon/th.js';
 import { ribbonMenusTh } from '../ribbon-menus/th.js';
 import { workbookChromeTh } from '../workbook-chrome/th.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneTh } from './external-links-pane.js';
@@ -200,6 +201,11 @@ export const macTh: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonTh.ribbon, cellFormatTh.formatDialog),
+  macAlerts: macAlertsFrom(ribbonTh.ribbon, {
+    message: 'แผ่นงานนี้จะถูกลบอย่างถาวร คุณต้องการดำเนินการต่อหรือไม่',
+    confirm: 'ลบ',
+    cancel: 'ยกเลิก',
+  }),
   macProtectSheet: macProtectSheetFrom(editDialogsTh.protection, {
     heading: 'ป้องกันเวิร์กชีตและเนื้อหาของเซลล์ที่ถูกล็อก',
     note: 'ตามค่าเริ่มต้น เซลล์ทั้งหมดถูกล็อก แต่สามารถปลดล็อกได้',

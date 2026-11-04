@@ -8,6 +8,7 @@ import { ribbonEn } from '../ribbon/en.js';
 import { ribbonMenusEn } from '../ribbon-menus/en.js';
 import { workbookChromeEn } from '../workbook-chrome/en.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneEn } from './external-links-pane.js';
@@ -201,6 +202,11 @@ export const macEn: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsEn.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonEn.ribbon, cellFormatEn.formatDialog),
+  macAlerts: macAlertsFrom(ribbonEn.ribbon, {
+    message: 'This sheet will be permanently deleted. Do you want to continue?',
+    confirm: 'Delete',
+    cancel: 'Cancel',
+  }),
   macProtectSheet: macProtectSheetFrom(editDialogsEn.protection, {
     heading: 'Protect worksheet and contents of locked cells',
     note: 'By default, all cells are locked, but you can unlock them.',

@@ -8,6 +8,7 @@ import { ribbonKo } from '../ribbon/ko.js';
 import { ribbonMenusKo } from '../ribbon-menus/ko.js';
 import { workbookChromeKo } from '../workbook-chrome/ko.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneKo } from './external-links-pane.js';
@@ -201,6 +202,11 @@ export const macKo: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsKo.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonKo.ribbon, cellFormatKo.formatDialog),
+  macAlerts: macAlertsFrom(ribbonKo.ribbon, {
+    message: '이 시트는 영구적으로 삭제됩니다. 계속하시겠습니까?',
+    confirm: '삭제',
+    cancel: '취소',
+  }),
   macProtectSheet: macProtectSheetFrom(editDialogsKo.protection, {
     heading: '워크시트 및 잠긴 셀의 내용 보호',
     note: '기본적으로 모든 셀이 잠겨 있지만 잠금을 해제할 수 있습니다.',

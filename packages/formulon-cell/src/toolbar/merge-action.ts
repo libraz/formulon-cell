@@ -65,7 +65,7 @@ export async function applyMergeAction(
   if (action === 'mergeAcross') {
     const state = store.getState();
     if (mergeAcrossWillLoseData(state, selection)) {
-      const confirmed = await confirmMergeLoseData(strings, state, selection, true);
+      const confirmed = await confirmMergeLoseData(strings, state, selection, true, workbook);
       if (!confirmed) return false;
     }
     return applyMergeAcross(store, workbook, history, selection);
@@ -77,7 +77,7 @@ export async function applyMergeAction(
   // for the warning and the mutation prevents a false-negative prompt.
   const range = expandRangeWithMerges(state, selection);
   if (mergeWillLoseData(state, range)) {
-    const confirmed = await confirmMergeLoseData(strings, state, range);
+    const confirmed = await confirmMergeLoseData(strings, state, range, false, workbook);
     if (!confirmed) return false;
   }
 

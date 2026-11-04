@@ -15,6 +15,7 @@ import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { showMoveCopySheetDialog } from '../toolbar/dialogs/move-copy-sheet.js';
+import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { hiddenSheetIndexes, visibleSheetIndexes } from './sheet-indexes.js';
 import {
@@ -408,7 +409,8 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       createSheetMenuSeparator(),
       menuButton(
         strings.sheetTabs.deleteSheet,
-        () => {
+        async () => {
+          if (!(await confirmSheetDelete(strings, wb, idx))) return;
           if (!removeSheet(store, wb, idx)) return;
           hydrateActiveSheet();
           update();

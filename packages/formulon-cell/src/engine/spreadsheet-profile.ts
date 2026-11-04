@@ -46,6 +46,12 @@ export const publicProfileToEngine = (profileId: SpreadsheetProfileId): ExcelPro
 /** Desktop platform whose defaults and screen geometry a workbook follows. */
 export type SpreadsheetPlatform = 'mac' | 'default';
 
+/** Whether a workbook runs on a Mac desktop profile. */
+export const isMacWorkbook = (wb: { spreadsheetProfileId?: () => string | null } | null): boolean =>
+  (typeof wb?.spreadsheetProfileId === 'function' ? wb.spreadsheetProfileId() : null)?.startsWith(
+    'mac-',
+  ) ?? false;
+
 /** The locale suffixes that have a corresponding formulon profile. */
 export type ProfileLocale =
   | 'ja_JP'

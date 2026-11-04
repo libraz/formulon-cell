@@ -2,6 +2,7 @@ import type { ExternalLinksPaneStrings } from '../../../interact/external-links-
 import type { TextToColumnsWizardStrings } from '../../../toolbar/dialogs/text-to-columns.js';
 import type { CellFormatStrings } from '../cell-format/types.js';
 import type { MacAdvancedFilterStrings } from './advanced-filter.js';
+import type { MacAlertStrings } from './alerts.js';
 import type { MacCfRulesDialogStrings } from './cf-rules-dialog.js';
 import type { MacChromeStrings } from './chrome.js';
 import type { MacCreateTableStrings } from './create-table.js';
@@ -72,6 +73,8 @@ export interface MacStrings {
   macCreateTable: MacCreateTableStrings;
   /** Labels of the Mac Zoom dialog. */
   macZoomDialog: MacZoomDialogStrings;
+  /** Texts of the Mac compact alert panels. */
+  macAlerts: MacAlertStrings;
   macData: {
     goalSeek: {
       title: string;

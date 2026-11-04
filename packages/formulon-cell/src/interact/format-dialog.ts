@@ -587,7 +587,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if (mergeAction === 'merge' && !liveWb && mergeHasNonAnchorContent(state, mergeRange)) return;
     if (mergeAction === 'merge' && mergeWillLoseData(state, mergeRange)) {
       waitingForConfirmation = true;
-      if (!(await confirmMergeLoseData(strings, state, mergeRange))) return;
+      if (!(await confirmMergeLoseData(strings, state, mergeRange, false, liveWb))) return;
     }
 
     const touchedPatch = buildTouchedDialogPatch(

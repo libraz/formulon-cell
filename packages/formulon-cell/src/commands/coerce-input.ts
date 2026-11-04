@@ -5,6 +5,7 @@ import {
   localeOrdinalForSpreadsheetProfile,
 } from '../engine/function-locale.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
+import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import type { Addr, CellValue, SpreadsheetProfileId } from '../engine/types.js';
 import { formatError, fromEngineValue, writeCell } from '../engine/value.js';
 import type { CellPatch, WorkbookHandle } from '../engine/workbook-handle.js';
@@ -165,12 +166,6 @@ export function inputLocaleForWorkbook(wb: WorkbookHandle): string | undefined {
   return undefined;
 }
 
-/** Whether the workbook runs on the Mac desktop profile. */
-const isMacProfile = (wb: WorkbookHandle): boolean =>
-  (typeof wb.spreadsheetProfileId === 'function' ? wb.spreadsheetProfileId() : null)?.startsWith(
-    'mac-',
-  ) ?? false;
-
 /** The workbook's date system, for callers that hold no store. */
 export function workbookDate1904(wb: WorkbookHandle): boolean {
   return (typeof wb.calcSettings === 'function' && wb.calcSettings()?.date1904) || false;
@@ -232,7 +227,7 @@ export function coerceInputForCell(
     forceText: format?.numFmt?.kind === 'text',
     locale,
     date1904: state.ui.date1904 === true,
-    mac: wb ? isMacProfile(wb) : false,
+    mac: isMacWorkbook(wb ?? null),
   });
   if (coerced.kind === 'formula') {
     let text = wb ? canonicalizeLocalizedFormulaForInput(wb, coerced.text, locale) : coerced.text;

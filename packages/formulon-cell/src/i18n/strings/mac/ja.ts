@@ -1,4 +1,5 @@
 import { macAdvancedFilterJa } from './advanced-filter.js';
+import { macAlertsJa } from './alerts.js';
 import { macCfRulesDialogJa } from './cf-rules-dialog.js';
 import { macChromeJa } from './chrome.js';
 import { macCreateTableJa } from './create-table.js';
@@ -192,6 +193,7 @@ export const macJa: MacStrings = {
   macPageSetup: macPageSetupJa,
   macPasteSpecial: macPasteSpecialJa,
   macZoomDialog: macZoomDialogJa,
+  macAlerts: macAlertsJa,
   macProtectSheet: macProtectSheetJa,
   macAdvancedFilter: macAdvancedFilterJa,
   macCfRulesDialog: macCfRulesDialogJa,

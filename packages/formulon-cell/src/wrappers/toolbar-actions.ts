@@ -29,6 +29,7 @@ import { recordConditionalRulesChange } from '../commands/slice-history.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { mutators } from '../store/store.js';
+import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
 import { applyMergeAction, type MergeAction } from '../toolbar/merge-action.js';
 
 export type AutoSumAction = AutoSumFunction | 'MORE';
@@ -276,7 +277,10 @@ export const handleDeleteCellsAction = (
     return;
   }
   if (action === 'sheet') {
-    removeSheet(instance.store, instance.workbook, instance.store.getState().data.sheetIndex);
+    const sheet = instance.store.getState().data.sheetIndex;
+    void confirmSheetDelete(instance.i18n.strings, instance.workbook, sheet).then((ok) => {
+      if (ok) removeSheet(instance.store, instance.workbook, sheet);
+    });
     return;
   }
   deleteCells(

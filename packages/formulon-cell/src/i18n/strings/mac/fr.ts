@@ -8,6 +8,7 @@ import { ribbonFr } from '../ribbon/fr.js';
 import { ribbonMenusFr } from '../ribbon-menus/fr.js';
 import { workbookChromeFr } from '../workbook-chrome/fr.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneFr } from './external-links-pane.js';
@@ -202,6 +203,11 @@ export const macFr: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsFr.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonFr.ribbon, cellFormatFr.formatDialog),
+  macAlerts: macAlertsFrom(ribbonFr.ribbon, {
+    message: 'Cette feuille sera définitivement supprimée. Voulez-vous continuer ?',
+    confirm: 'Supprimer',
+    cancel: 'Annuler',
+  }),
   macProtectSheet: macProtectSheetFrom(editDialogsFr.protection, {
     heading: 'Protéger la feuille et le contenu des cellules verrouillées',
     note: 'Par défaut, toutes les cellules sont verrouillées, mais vous pouvez les déverrouiller.',

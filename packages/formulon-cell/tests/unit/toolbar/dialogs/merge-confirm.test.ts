@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Range } from '../../../../src/engine/types.js';
-import { defaultStrings } from '../../../../src/i18n/strings.js';
+import { defaultStrings, ja } from '../../../../src/i18n/strings.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import { confirmMergeLoseData } from '../../../../src/toolbar/dialogs/merge-confirm.js';
 
@@ -50,5 +50,25 @@ describe('confirmMergeLoseData', () => {
     await Promise.resolve();
     clickButton(defaultStrings.ribbon.mergeLoseDataCancel);
     expect(await pending).toBe(false);
+  });
+
+  it('words the Mac warning as the desktop does, Cancel left of OK', async () => {
+    // Excel (Mac, ja): 「セルを結合すると、左上の値のみが保持され、他のセルの値は破棄されます。」
+    // with キャンセル / OK (default, right).
+    const store = createSpreadsheetStore();
+    seedText(store, '0:0:0');
+    seedText(store, '0:0:1');
+    const mac = { spreadsheetProfileId: () => 'mac-ja_JP' };
+    const pending = confirmMergeLoseData(ja, store.getState(), RANGE, false, mac);
+    await Promise.resolve();
+    expect(document.body.querySelector('.fc-tb__dlg__message')?.textContent).toBe(
+      'セルを結合すると、左上の値のみが保持され、他のセルの値は破棄されます。',
+    );
+    const labels = [...document.body.querySelectorAll('button')]
+      .map((b) => b.textContent)
+      .filter((t) => t === 'キャンセル' || t === 'OK');
+    expect(labels).toEqual(['キャンセル', 'OK']);
+    clickButton('OK');
+    expect(await pending).toBe(true);
   });
 });
