@@ -4,13 +4,13 @@
 // workbook path serves only controller-less (standalone) hosts.
 
 import { addrKey } from '../engine/address.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
-import { formatWithPending, sameFormatTarget } from '../store/pending-format.js';
+import { directCellFormat } from '../store/direct-format.js';
 import { validationAt } from '../store/range-validations.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { extendTablesForEntry } from './clipboard/table-extension.js';
@@ -68,7 +68,7 @@ export interface CellInputCommit {
 export const inputOperation = (raw: string, forceText = false): CellInputOperation =>
   !forceText && raw.trimStart().startsWith('=') ? 'formulaEdit' : 'valueEdit';
 
-/** Write one typed entry and settle the cell's pending format. */
+/** Write one typed entry to the active cell. */
 export function commitCellInput({
   store,
   wb,
@@ -78,7 +78,7 @@ export function commitCellInput({
 }: CellInputCommit): CellInputCommitResult {
   const state = store.getState();
   const anchor = mergeAnchorFor(state, addr);
-  const fmt = formatWithPending(state, anchor);
+  const fmt = directCellFormat(state, anchor);
   const ruleValidation = fmt?.validation ?? validationAt(state.format, anchor);
   let operation = inputOperation(raw, fmt?.numFmt?.kind === 'text');
   const controller = interactionControllerFor(store);
@@ -91,7 +91,7 @@ export function commitCellInput({
     // caller races a commit with WorkbookHandle.dispose(). Keep them inside
     // the same failure boundary as the write so the editor retains its raw
     // caret/input state instead of escaping through the preflight.
-    const effectiveFormat = effectiveCellFormatWithPending(wb, state, anchor) ?? fmt;
+    const effectiveFormat = effectiveCellFormat(wb, state, anchor) ?? fmt;
     operation = inputOperation(raw, effectiveFormat?.numFmt?.kind === 'text');
     inputLocale = inputLocaleForWorkbook(wb);
     directInputAxis = controller ? undefined : nativeAxisFontFormatFor(wb, anchor);
@@ -105,22 +105,11 @@ export function commitCellInput({
           if (!patch || directInputAxis) return undefined;
           const candidate = patch;
           const direct = state.format.formats.get(addrKey(anchor));
-          const pending = state.ui.pendingFormat;
-          const pendingFormat =
-            pending && sameFormatTarget(state, pending.addr, anchor) ? pending.format : undefined;
           const inherited: { fontFamily?: string; fontSize?: number } = {};
-          if (
-            candidate.fontFamily !== undefined &&
-            direct?.fontFamily === undefined &&
-            pendingFormat?.fontFamily === undefined
-          ) {
+          if (candidate.fontFamily !== undefined && direct?.fontFamily === undefined) {
             inherited.fontFamily = candidate.fontFamily;
           }
-          if (
-            candidate.fontSize !== undefined &&
-            direct?.fontSize === undefined &&
-            pendingFormat?.fontSize === undefined
-          ) {
+          if (candidate.fontSize !== undefined && direct?.fontSize === undefined) {
             inherited.fontSize = candidate.fontSize;
           }
           return Object.keys(inherited).length > 0 ? inherited : undefined;
@@ -204,11 +193,6 @@ export function commitCellInput({
           alert: reason ? { severity: 'stop', message: reason } : null,
         };
       }
-      // The controller already applied the pending format to the written cell.
-      const currentState = store.getState();
-      const currentPending = currentState.ui.pendingFormat;
-      if (currentPending && sameFormatTarget(currentState, currentPending.addr, anchor))
-        mutators.setPendingFormat(store, null);
       if (raw !== '') extendTablesForEntry(store, wb, controller.history, anchor);
       return { status: 'applied', notice };
     }
@@ -238,21 +222,9 @@ export function commitCellInput({
       return { status: 'failed', operation, error };
     }
   }
-  const currentState = store.getState();
-  const currentPending = currentState.ui.pendingFormat;
-  if (directInputFont || currentPending) {
-    const currentFormat = currentState.format.formats.get(addrKey(anchor));
-    const nextFormat = {
-      ...(directInputFont ?? {}),
-      ...(currentFormat ?? {}),
-      ...(currentPending && sameFormatTarget(currentState, currentPending.addr, anchor)
-        ? currentPending.format
-        : {}),
-    };
-    if (Object.keys(nextFormat).length > 0) mutators.setCellFormat(store, anchor, nextFormat);
-  }
-  if (currentPending && sameFormatTarget(currentState, currentPending.addr, anchor)) {
-    mutators.setPendingFormat(store, null);
+  if (directInputFont) {
+    const currentFormat = store.getState().format.formats.get(addrKey(anchor));
+    mutators.setCellFormat(store, anchor, { ...directInputFont, ...(currentFormat ?? {}) });
   }
   if (directInputAxis) flushFormatToEngine(wb, store, anchor.sheet);
   if (raw !== '') extendTablesForEntry(store, wb, null, anchor);

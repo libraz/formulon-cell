@@ -1,5 +1,5 @@
 import { addrKey } from '../../engine/address.js';
-import { effectiveCellFormatWithPending } from '../../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../../engine/cell-format-projection.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { styleElementFormatSource } from '../../render/grid/table-format.js';
 import type { CellFormat, State } from '../../store/store.js';
@@ -41,7 +41,7 @@ export function createCopyFormatResolver(
     if (byAddress.has(key)) return byAddress.get(key);
     const format =
       wb.capabilities.effectiveStyle && !wb.isStub
-        ? effectiveCellFormatWithPending(wb, state, addr, effectiveByXf)
+        ? effectiveCellFormat(wb, state, addr, effectiveByXf)
         : state.format.formats.get(key);
     const flattened =
       addr.sheet === state.data.sheetIndex

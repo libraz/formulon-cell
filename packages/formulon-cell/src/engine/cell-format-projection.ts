@@ -1,4 +1,4 @@
-import { formatWithPending } from '../store/pending-format.js';
+import { directCellFormat } from '../store/direct-format.js';
 import type { CellFormat } from '../store/store.js';
 import { fontPointsToCssPx } from './font-units.js';
 import {
@@ -203,14 +203,14 @@ function projectDisplayCellFormatFromXf(
  * and column inheritance) is the base; direct and pending store fields then
  * take precedence. The result must never be written back to the format slice.
  */
-export function effectiveCellFormatWithPending(
+export function effectiveCellFormat(
   wb: WorkbookHandle,
   state: import('../store/store.js').State,
   addr: Addr,
   cache?: Map<string, Partial<CellFormat> | null>,
 ): Partial<CellFormat> | null {
   const effective = effectiveCellFormatFromEngine(wb, addr.sheet, addr.row, addr.col, cache);
-  const direct = formatWithPending(state, addr);
+  const direct = directCellFormat(state, addr);
   if (!effective && !direct) return null;
   return { ...(effective ?? {}), ...(direct ?? {}) };
 }

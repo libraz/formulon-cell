@@ -56,11 +56,11 @@ const buildFillDirection =
   (direction) => {
     const range = normalizedSelectionRange(instance);
     // A fill writes everything but its source row or column; Flash Fill may reach the whole selection.
-    const worked = direction === 'flash' ? range : fillDirectionRange(range, direction);
-    const target =
-      direction === 'flash'
-        ? range
-        : fillOutputRange(fillSeriesSourceRange(worked, direction), worked);
+    const wholeSelection = direction === 'flash' || direction === 'justify';
+    const worked = wholeSelection ? range : fillDirectionRange(range, direction);
+    const target = wholeSelection
+      ? range
+      : fillOutputRange(fillSeriesSourceRange(worked, direction), worked);
     runAfterAllowedRangeUnlock(instance.store, [target], () => {
       executeRibbonFillAction({
         store: instance.store,
@@ -86,13 +86,12 @@ const updateFillMenu =
       const action = button.dataset.fill;
       const disabled =
         action === 'group' ||
-        action === 'justify' ||
         (action === 'down' && !canFillDown) ||
         (action === 'up' && !canFillUp) ||
         (action === 'right' && !canFillRight) ||
         (action === 'left' && !canFillLeft);
       const reason =
-        action === 'group' || action === 'justify'
+        action === 'group'
           ? button.textContent?.trim()
           : action === 'down' || action === 'up'
             ? strings.fillRequiresMultipleRows
@@ -232,22 +231,6 @@ const updateClearMenu =
     let hasFormats = false;
     let hasComments = false;
     let hasHyperlinks = false;
-    const pending = (
-      state.ui as typeof state.ui & {
-        pendingFormat?: {
-          addr: { sheet: number; row: number; col: number };
-          format: object;
-        } | null;
-      }
-    ).pendingFormat;
-    if (
-      pending &&
-      pending.addr.sheet === range.sheet &&
-      selectionContainsAddr(state.selection, pending.addr) &&
-      Object.keys(pending.format).length > 0
-    ) {
-      hasFormats = true;
-    }
     for (const [key, format] of state.format.formats) {
       const addr = parseAddrKey(key);
       if (!addr || addr.sheet !== range.sheet || !selectionContainsAddr(state.selection, addr)) {

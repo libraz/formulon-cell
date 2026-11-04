@@ -278,17 +278,12 @@ const applyCellStyleToRange = (
     workbook,
     sheet: range.sheet,
     targets: plan.cells,
-    pendingBefore: state.ui.pendingFormat,
     mutate: () =>
       applySelectionFormatAction(
         scopedState,
         store,
         { patch },
-        {
-          allowPending: false,
-          origin: 'instanceApi',
-          commandId: 'cellStyles',
-        },
+        { origin: 'instanceApi', commandId: 'cellStyles' },
       ),
     repeat,
   });
@@ -320,18 +315,8 @@ export function applyCellStyleToSelection(
     workbook,
     sheet: plan.ranges[0]?.sheet ?? state.selection.range.sheet,
     targets: plan.cells,
-    pendingBefore: state.ui.pendingFormat,
     mutate: () =>
-      applySelectionFormatAction(
-        store.getState(),
-        store,
-        { patch },
-        {
-          allowPending: false,
-          origin,
-          commandId,
-        },
-      ),
+      applySelectionFormatAction(store.getState(), store, { patch }, { origin, commandId }),
     repeat: () => applyCellStyleToSelection(store, history, style.id, context),
   });
 }

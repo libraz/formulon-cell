@@ -8,7 +8,7 @@ import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
 import { isCellFormattable, isCellWritable, protectedCellMessage } from '../commands/protection.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { fontCssPxToDisplayPoints, fontPointsToCssPx } from '../engine/font-units.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
@@ -381,7 +381,7 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
   const formatAddr = activeMerge
     ? { sheet: activeMerge.sheet, row: activeMerge.r0, col: activeMerge.c0 }
     : a;
-  const f = effectiveCellFormatWithPending(inst.workbook, s, formatAddr);
+  const f = effectiveCellFormat(inst.workbook, s, formatAddr);
   const displayFont = inst.workbook.workbookDisplayFont;
   const displayFamily = displayFont?.name ?? 'Aptos';
   const displaySize = displayFont ? fontPointsToCssPx(displayFont.size) : 11;

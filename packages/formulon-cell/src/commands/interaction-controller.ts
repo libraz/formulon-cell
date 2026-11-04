@@ -7,7 +7,7 @@ import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
 import { resetTabNavigationSession } from '../interact/tab-navigation-session.js';
-import { formatWithPending } from '../store/pending-format.js';
+import { directCellFormat } from '../store/direct-format.js';
 import { validationAt } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -53,7 +53,6 @@ import type {
 import { validateInteractionPolicy } from './interaction-policy.js';
 import {
   changedFormatAddresses,
-  effectivePendingFormatAddresses,
   type PreparedChange,
   projectPreparedFormats,
   sameStructuredValue,
@@ -260,12 +259,6 @@ export class InteractionController {
     const globalRejections: BatchRejection[] = [];
     let includesFormula = false;
     let typedUrlCandidate: TypedUrlCandidate | undefined;
-    const pending = state.ui.pendingFormat;
-    const mayApplyPendingFormat =
-      (command.origin === 'editor' || command.origin === 'formulaBar') &&
-      (command.operation === 'valueEdit' || command.operation === 'formulaEdit');
-    const pendingAnchorKey =
-      mayApplyPendingFormat && pending ? addrKey(mergeAnchorFor(state, pending.addr)) : undefined;
     for (const change of command.changes) {
       const preparedChange = this.prepareChange(
         state,
@@ -303,14 +296,7 @@ export class InteractionController {
         }
       }
       if (preparedChange.patch.formula !== null) includesFormula = true;
-      if (pendingAnchorKey === addrKey(preparedChange.patch.addr) && pending) {
-        prepared.push({
-          ...preparedChange,
-          pendingFormat: structuredClone(pending.format),
-        });
-      } else {
-        prepared.push(preparedChange);
-      }
+      prepared.push(preparedChange);
     }
     if (globalRejections.length > 0) return this.rejectResult(globalRejections);
     const lockedByDataTable = dataTableCellAmong(
@@ -356,38 +342,17 @@ export class InteractionController {
       if (!formulaDecision.allowed) return this.rejectResult([this.asRejection(formulaDecision)]);
     }
 
-    const beforeFormats = new Map(state.format.formats);
-    const pendingFormatAddresses = effectivePendingFormatAddresses(beforeFormats, prepared);
-    const pendingFormatAddressKeys = new Set(pendingFormatAddresses.map(addrKey));
-    if (pendingFormatAddresses.length > 0) {
-      const formatGlobal = this.canExecute({
-        operation: 'format',
-        origin: command.origin,
-        commandId: command.commandId,
-        effects: [{ kind: 'workbook' }],
-      });
-      if (!formatGlobal.allowed) return this.rejectResult([this.asRejection(formatGlobal)]);
-    }
-
     const denied = command.denied ?? this.authorizer.policy?.batchDenied ?? 'reject';
     const eligible: PreparedChange[] = [];
     const rejected: BatchRejection[] = [];
     for (const change of prepared) {
-      let decision = this.canExecute({
+      const decision = this.canExecute({
         ...intent,
         effects: cellEffects(
           [change.patch.addr],
           change.patch.formula !== null ? [change.patch.addr] : [],
         ),
       });
-      if (decision.allowed && pendingFormatAddressKeys.has(addrKey(change.patch.addr))) {
-        decision = this.canExecute({
-          operation: 'format',
-          origin: command.origin,
-          commandId: command.commandId,
-          effects: [{ kind: 'cells', cells: [change.patch.addr] }],
-        });
-      }
       if (decision.allowed) {
         eligible.push(change);
         continue;
@@ -580,7 +545,7 @@ export class InteractionController {
       }
       const prepared = this.patchFromCoerced(target, input);
       const validation =
-        formatWithPending(state, target)?.validation ?? validationAt(state.format, target);
+        directCellFormat(state, target)?.validation ?? validationAt(state.format, target);
       if (validation) {
         const outcome = validateCoercedInput(wb, target, input, validation);
         if (!outcome.ok && outcome.severity === 'stop') {
@@ -597,7 +562,7 @@ export class InteractionController {
       return { rejection: { addr, code: 'invalid', reason: 'number value must be finite' } };
     }
     const validation =
-      formatWithPending(state, target)?.validation ?? validationAt(state.format, target);
+      directCellFormat(state, target)?.validation ?? validationAt(state.format, target);
     if (formula === null && validation && change.value.kind !== 'error') {
       const outcome = validateCoercedInput(wb, target, coerceCellValue(change.value), validation);
       if (!outcome.ok && outcome.severity === 'stop') {
@@ -623,23 +588,12 @@ export class InteractionController {
     const patch = sheetFontPatchFor(state, addr.sheet);
     const key = addrKey(addr);
     const direct = state.format.formats.get(key);
-    const pending = state.ui.pendingFormat;
-    const pendingFormat =
-      pending && addrKey(mergeAnchorFor(state, pending.addr)) === key ? pending.format : undefined;
     const inherited: Partial<CellFormat> = {};
     if (patch) {
-      if (
-        patch.fontFamily !== undefined &&
-        direct?.fontFamily === undefined &&
-        pendingFormat?.fontFamily === undefined
-      ) {
+      if (patch.fontFamily !== undefined && direct?.fontFamily === undefined) {
         inherited.fontFamily = patch.fontFamily;
       }
-      if (
-        patch.fontSize !== undefined &&
-        direct?.fontSize === undefined &&
-        pendingFormat?.fontSize === undefined
-      ) {
+      if (patch.fontSize !== undefined && direct?.fontSize === undefined) {
         inherited.fontSize = patch.fontSize;
       }
     }
@@ -654,7 +608,6 @@ export class InteractionController {
       if (
         inherited.fontFamily === undefined &&
         direct?.fontFamily === undefined &&
-        pendingFormat?.fontFamily === undefined &&
         projected.fontFamily !== undefined
       ) {
         inherited.fontFamily = projected.fontFamily;
@@ -662,7 +615,6 @@ export class InteractionController {
       if (
         inherited.fontSize === undefined &&
         direct?.fontSize === undefined &&
-        pendingFormat?.fontSize === undefined &&
         projected.fontSize !== undefined
       ) {
         inherited.fontSize = projected.fontSize;
@@ -751,31 +703,6 @@ export class InteractionController {
       origin: 'undo',
       effects: cellEffects(cells, beforeFormulaCells),
     };
-    const beforeFormats = new Map(this.store.getState().format.formats);
-    const formatCells = effectivePendingFormatAddresses(beforeFormats, prepared);
-    const replayAuthorization =
-      formatCells.length > 0
-        ? {
-            undo: [
-              undo,
-              {
-                ...intent,
-                operation: 'format',
-                origin: 'undo',
-                effects: [{ kind: 'cells', cells: formatCells }],
-              } satisfies OperationIntent,
-            ],
-            redo: [
-              redo,
-              {
-                ...intent,
-                operation: 'format',
-                origin: 'redo',
-                effects: [{ kind: 'cells', cells: formatCells }],
-              } satisfies OperationIntent,
-            ],
-          }
-        : undefined;
     if (!forwardAlreadyAuthorized) {
       const forward = this.authorizer.preflightIntent(
         requireInverseAuthorization ? redo : intent,
@@ -787,7 +714,7 @@ export class InteractionController {
       const inverse = this.authorizer.preflightIntent(undo, this.routeCanExecute);
       if (!inverse.allowed) return { decision: inverse };
     }
-    return { plan: { redo, undo, replayAuthorization } };
+    return { plan: { redo, undo } };
   }
 
   // Authorizer-internal checks re-enter through the controller so a host that

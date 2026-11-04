@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { addrKey } from '../../src/engine/address.js';
 import type { WorkbookHandle as WorkbookHandleType } from '../../src/engine/workbook-handle.js';
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
 import { overlayPortalFor } from '../../src/interact/overlay-portal.js';
@@ -115,7 +116,10 @@ describe('integration: locale profile switching', () => {
       const dispatchKey = (event: KeyboardEventInit): void => {
         sheet?.host.dispatchEvent(new KeyboardEvent('keydown', { ...event, bubbles: true }));
       };
-      const numberFormat = () => sheet?.instance.store.getState().ui.pendingFormat?.format.numFmt;
+      const numberFormat = () => {
+        const state = sheet?.instance.store.getState();
+        return state?.format.formats.get(addrKey(state.selection.active))?.numFmt;
+      };
 
       dispatchKey({ key: '$', code: 'Digit4', ctrlKey: true, shiftKey: true });
       expect(numberFormat()).toEqual({ kind: 'currency', symbol: '$', decimals: 2 });

@@ -19,7 +19,6 @@ describe('recordDialogFormatChange', () => {
         workbook: null,
         sheet: 0,
         targets: [target],
-        pendingBefore: null,
         mutate: () => true,
         repeat,
       }),
@@ -41,12 +40,10 @@ describe('recordDialogFormatChange', () => {
         workbook: null,
         sheet: 0,
         targets: [target],
-        pendingBefore: null,
         mutate: () => false,
       }),
     ).toBe(false);
     expect(store.getState().format.formats).toEqual(before.format.formats);
-    expect(store.getState().ui.pendingFormat).toBe(before.ui.pendingFormat);
     expect(history.canUndo()).toBe(false);
   });
 
@@ -66,7 +63,6 @@ describe('recordDialogFormatChange', () => {
         workbook: null,
         sheet: 0,
         targets: [target],
-        pendingBefore: null,
         mutate: () => {
           mutators.setCellFormat(store, target, {
             validation: { source: ['A', 'B'], kind: 'list' },
@@ -100,7 +96,6 @@ describe('recordDialogFormatChange', () => {
         workbook,
         sheet: 0,
         targets: [target],
-        pendingBefore: null,
         mutate: () => {
           mutators.setCellFormat(store, target, { bold: false, fill: '#ffeeaa' });
           return true;
@@ -113,62 +108,54 @@ describe('recordDialogFormatChange', () => {
       fill: '#ffeeaa',
     });
     expect(store.getState().format.formats.get('0:1:1')?.italic).toBe(true);
-    const laterPending = { addr: outside, format: { fill: '#abc' } };
-    mutators.setPendingFormat(store, laterPending);
+    mutators.setCellFormat(store, outside, { fill: '#abc' });
     expect(history.undo()).toBe(true);
     expect(store.getState().format.formats.get('0:0:0')).toMatchObject({ bold: true });
     expect(store.getState().format.formats.get('0:0:0')?.fill).toBeUndefined();
-    expect(store.getState().ui.pendingFormat).toEqual(laterPending);
+    expect(store.getState().format.formats.get('0:1:1')?.fill).toBe('#abc');
     expect(history.redo()).toBe(true);
     expect(store.getState().format.formats.get('0:0:0')?.fill).toBe('#ffeeaa');
-    expect(store.getState().ui.pendingFormat).toEqual(laterPending);
+    expect(store.getState().format.formats.get('0:1:1')?.fill).toBe('#abc');
     workbook.dispose();
   });
 
-  it.each([null, undefined, { addr: { sheet: 0, row: 0, col: 0 }, format: { fill: '#ff0' } }])(
-    'restores the scoped map and pending format %j when the forward flush fails',
-    async (pending) => {
-      const store = createSpreadsheetStore();
-      const workbook = await WorkbookHandle.createDefault();
-      const history = new History();
-      const target = { sheet: 0, row: 0, col: 0 };
-      workbook.setNumber(target, 1);
-      mutators.setCellFormat(store, target, { bold: true });
-      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
-      mutators.setPendingFormat(store, pending);
-      flushFormatToEngine(workbook, store, 0);
-      const original = workbook.addXfRecord.bind(workbook);
-      let injected = false;
-      vi.spyOn(workbook, 'addXfRecord').mockImplementation((record) => {
-        if (!injected) {
-          injected = true;
-          throw new Error('injected dialog flush failure');
-        }
-        return original(record);
-      });
+  it('restores the scoped map when the forward flush fails', async () => {
+    const store = createSpreadsheetStore();
+    const workbook = await WorkbookHandle.createDefault();
+    const history = new History();
+    const target = { sheet: 0, row: 0, col: 0 };
+    workbook.setNumber(target, 1);
+    mutators.setCellFormat(store, target, { bold: true });
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    flushFormatToEngine(workbook, store, 0);
+    const original = workbook.addXfRecord.bind(workbook);
+    let injected = false;
+    vi.spyOn(workbook, 'addXfRecord').mockImplementation((record) => {
+      if (!injected) {
+        injected = true;
+        throw new Error('injected dialog flush failure');
+      }
+      return original(record);
+    });
 
-      expect(() =>
-        recordDialogFormatChange({
-          history,
-          store,
-          workbook,
-          sheet: 0,
-          targets: [target],
-          pendingBefore: pending,
-          mutate: () => {
-            mutators.setCellFormat(store, target, { bold: false });
-            mutators.setPendingFormat(store, null);
-            return true;
-          },
-          repeat: vi.fn(),
-        }),
-      ).toThrow('injected dialog flush failure');
-      expect(store.getState().format.formats.get('0:0:0')?.bold).toBe(true);
-      expect(store.getState().ui.pendingFormat).toEqual(pending);
-      expect(history.canUndo()).toBe(false);
-      workbook.dispose();
-    },
-  );
+    expect(() =>
+      recordDialogFormatChange({
+        history,
+        store,
+        workbook,
+        sheet: 0,
+        targets: [target],
+        mutate: () => {
+          mutators.setCellFormat(store, target, { bold: false });
+          return true;
+        },
+        repeat: vi.fn(),
+      }),
+    ).toThrow('injected dialog flush failure');
+    expect(store.getState().format.formats.get('0:0:0')?.bold).toBe(true);
+    expect(history.canUndo()).toBe(false);
+    workbook.dispose();
+  });
 
   it('surfaces a forward rollback failure instead of claiming atomic recovery', async () => {
     const store = createSpreadsheetStore();
@@ -188,7 +175,6 @@ describe('recordDialogFormatChange', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, { bold: false });
             return true;
@@ -217,7 +203,6 @@ describe('recordDialogFormatChange', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, { bold: false });
             return true;

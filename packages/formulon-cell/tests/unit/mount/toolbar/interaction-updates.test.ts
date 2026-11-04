@@ -57,9 +57,9 @@ describe('mounted toolbar interaction updates', () => {
         active: A1,
         range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
       },
-      ui: {
-        ...state.ui,
-        pendingFormat: { addr: A1, format: { bold: true } },
+      format: {
+        ...state.format,
+        formats: new Map(state.format.formats).set(addrKey(A1), { bold: true }),
       },
     }));
 

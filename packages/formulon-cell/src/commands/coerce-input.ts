@@ -1,4 +1,4 @@
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { formatCodeToNumFmt } from '../engine/format-writeback.js';
 import {
   canonicalizeFormula,
@@ -10,7 +10,7 @@ import type { Addr, CellValue, SpreadsheetProfileId } from '../engine/types.js';
 import { formatError, fromEngineValue, writeCell } from '../engine/value.js';
 import type { CellPatch, WorkbookHandle } from '../engine/workbook-handle.js';
 import { spreadsheetProfileForLocale } from '../mount/locale-profile.js';
-import { formatWithPending } from '../store/pending-format.js';
+import { directCellFormat } from '../store/direct-format.js';
 import {
   type CellValidation,
   mutators,
@@ -222,7 +222,7 @@ export function coerceInputForCell(
   locale?: string,
   wb?: WorkbookHandle,
 ): CoercedInput {
-  const format = wb ? effectiveCellFormatWithPending(wb, state, a) : formatWithPending(state, a);
+  const format = wb ? effectiveCellFormat(wb, state, a) : directCellFormat(state, a);
   const coerced = coerceInput(raw, {
     forceText: format?.numFmt?.kind === 'text',
     locale,
@@ -281,7 +281,7 @@ export function coercedInputToPatch(a: Addr, c: CoercedInput): CellPatch {
  *  format, so an explicit user format is never clobbered. */
 function applyImplicitFormat(store: SpreadsheetStore, a: Addr, c: CoercedInput): void {
   if (c.kind !== 'number' || !c.implicitFormat) return;
-  const current = formatWithPending(store.getState(), a)?.numFmt;
+  const current = directCellFormat(store.getState(), a)?.numFmt;
   if (current && current.kind !== 'general') return;
   mutators.setCellFormat(store, a, { numFmt: c.implicitFormat });
 }

@@ -14,10 +14,10 @@ import { normalizeR1C1Formula, shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { formatWithPending, sameAddr } from '../store/pending-format.js';
+import { directCellFormat, sameAddr } from '../store/direct-format.js';
 import { validationAt } from '../store/range-validations.js';
 import { rangeArea, subtractRange } from '../store/selection-geometry.js';
-import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import type { SpreadsheetStore, State } from '../store/store.js';
 
 export interface SelectionInputChange {
   readonly addr: Addr;
@@ -95,7 +95,7 @@ export function buildSelectionInputBatch(
         if (merge && (merge.r0 !== row || merge.c0 !== col)) continue;
 
         seen.add(key);
-        const format = formatWithPending(state, addr);
+        const format = directCellFormat(state, addr);
         const forceText = format?.numFmt?.kind === 'text';
         const isFormula = formula && !forceText;
         hasFormula ||= isFormula;
@@ -134,7 +134,7 @@ export type SelectionInputWriteResult =
  * Write `raw` to every selected cell without an interaction controller,
  * shifting relative formula refs from `anchor`. Atomic: a `stop` validation on
  * any writable value cell rejects the fill with nothing written. Protected
- * cells are skipped. On success the anchor's pending format is applied.
+ * cells are skipped.
  */
 export function writeSelectionInput(
   wb: WorkbookHandle,
@@ -163,7 +163,7 @@ export function writeSelectionInput(
       for (let col = r.c0; col <= r.c1; col += 1) {
         const target = { sheet, row, col };
         const fmt = sameAddr(target, anchor)
-          ? formatWithPending(store.getState(), target)
+          ? directCellFormat(store.getState(), target)
           : state.format.formats.get(addrKey(target));
         if (isFormula && fmt?.numFmt?.kind !== 'text') {
           // Formula results aren't run through DV (Excel validates the typed entry).
@@ -222,10 +222,5 @@ export function writeSelectionInput(
       }
     }
   });
-  const pending = store.getState().ui.pendingFormat;
-  if (pending && sameAddr(pending.addr, anchor)) {
-    mutators.setCellFormat(store, anchor, pending.format);
-    mutators.setPendingFormat(store, null);
-  }
   return { status: 'applied' };
 }

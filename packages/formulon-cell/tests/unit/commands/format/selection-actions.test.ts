@@ -35,24 +35,13 @@ describe('selection format actions', () => {
     expect(store.getState().format.sheetAxisOverrides).toBeUndefined();
   });
 
-  it('does not stage a locked blank cell and only stages an unlocked blank cell', () => {
+  it('leaves a locked blank cell unformatted and formats an unlocked one', () => {
     const locked = createSpreadsheetStore();
     setSelection(locked, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     setProtectedSheet(locked, 0, true);
     expect(applySelectionFormatAction(locked.getState(), locked, { patch: { bold: true } })).toBe(
       false,
     );
-    expect(locked.getState().ui.pendingFormat).toBeNull();
-    expect(locked.getState().format.formats.size).toBe(0);
-    expect(
-      applySelectionFormatAction(
-        locked.getState(),
-        locked,
-        { patch: { bold: true } },
-        { allowPending: false },
-      ),
-    ).toBe(false);
-    expect(locked.getState().ui.pendingFormat).toBeNull();
     expect(locked.getState().format.formats.size).toBe(0);
 
     const unlocked = createSpreadsheetStore();
@@ -60,7 +49,7 @@ describe('selection format actions', () => {
     expect(
       applySelectionFormatAction(unlocked.getState(), unlocked, { patch: { bold: true } }),
     ).toBe(true);
-    expect(unlocked.getState().ui.pendingFormat?.format).toEqual({ bold: true });
+    expect(unlocked.getState().format.formats.get('0:0:0')).toEqual({ bold: true });
   });
 
   it('plans the disjoint union and preserves untouched mixed metadata', () => {

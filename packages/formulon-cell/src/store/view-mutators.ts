@@ -32,10 +32,6 @@ export const viewMutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, editor: mode } }));
   },
 
-  setPendingFormat(store: SpreadsheetStore, pending: State['ui']['pendingFormat']): void {
-    store.setState((s) => ({ ...s, ui: { ...s.ui, pendingFormat: pending } }));
-  },
-
   setHover(store: SpreadsheetStore, addr: Addr | null): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, hover: addr } }));
   },

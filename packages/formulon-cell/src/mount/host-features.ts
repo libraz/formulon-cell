@@ -10,7 +10,7 @@ import {
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
 import { setSheetZoom, setWorkbookView } from '../commands/view.js';
 import { formatA1Range } from '../engine/address.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -353,7 +353,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           formatResolver: (addr) => {
             const wb = input.wb();
             return !wb.isStub && wb.capabilities.effectiveStyle
-              ? effectiveCellFormatWithPending(wb, input.store.getState(), addr)
+              ? effectiveCellFormat(wb, input.store.getState(), addr)
               : input.store.getState().format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`);
           },
         });

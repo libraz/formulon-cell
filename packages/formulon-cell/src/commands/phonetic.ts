@@ -9,7 +9,7 @@ import {
 import type { Addr, PhoneticRun, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { KanaForm } from '../format/kana.js';
-import { formatWithPending } from '../store/pending-format.js';
+import { directCellFormat } from '../store/direct-format.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { applySelectionFormatPatchWhere } from './format.js';
@@ -126,9 +126,9 @@ export function setPhoneticSettings(
   return changed;
 }
 
-/** Whether Show Phonetic is on for `addr`, pending format included. */
+/** Whether Show Phonetic is on for `addr`. */
 export const showPhoneticAt = (store: SpreadsheetStore, addr: Addr): boolean =>
-  formatWithPending(store.getState(), addr)?.showPhonetic === true;
+  directCellFormat(store.getState(), addr)?.showPhonetic === true;
 
 /**
  * Toggle Show Phonetic over the selection. The active cell decides the

@@ -1,5 +1,5 @@
 import { parseAddrKey } from '../engine/address.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
 import { macDefaultRowPt, macWrapLinePt } from '../engine/mac-row-model.js';
 import { phoneticGuideSize } from '../engine/phonetic-sync.js';
@@ -284,7 +284,7 @@ function measurementFormat(
 ): CellFormat | undefined {
   const formulaDisplay = showsFormula(state, cell);
   const direct = opts.workbook
-    ? effectiveCellFormatWithPending(opts.workbook, state, addr)
+    ? effectiveCellFormat(opts.workbook, state, addr)
     : state.format.formats.get(key);
   // A table or PivotTable style's bold measures as the cell paints it.
   const style = styleAt(addr.row, addr.col);

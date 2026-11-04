@@ -20,7 +20,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../../src/store/store.js';
-import { effectiveFmtAt, fmtAt, setRange, setSelection } from './fixtures.js';
+import { fmtAt, setRange, setSelection } from './fixtures.js';
 
 describe('borders', () => {
   let store: SpreadsheetStore;
@@ -39,7 +39,7 @@ describe('borders', () => {
     setRange(store, 0, 0, 0, 0);
     setBorderPreset(store.getState(), store, 'outline', 'thick', '#c00000');
 
-    expect(effectiveFmtAt(store, 0, 0)?.borders).toEqual({
+    expect(fmtAt(store, 0, 0)?.borders).toEqual({
       top: { style: 'thick', color: '#c00000' },
       bottom: { style: 'thick', color: '#c00000' },
       left: { style: 'thick', color: '#c00000' },
@@ -69,43 +69,35 @@ describe('borders', () => {
     setBorderPreset(store.getState(), store, 'diagonalDown', 'dashed', '#4472c4');
     setBorderPreset(store.getState(), store, 'diagonalUp', 'double', '#c00000');
 
-    expect(effectiveFmtAt(store, 0, 0)?.borders).toEqual({
+    expect(fmtAt(store, 0, 0)?.borders).toEqual({
       diagonalDown: { style: 'dashed', color: '#4472c4' },
       diagonalUp: { style: 'double', color: '#c00000' },
     });
   });
 
-  it('setBorderPreset merges with pending input format for a single empty active cell', () => {
+  it('setBorderPreset merges with the format already written to a single empty active cell', () => {
     setRange(store, 0, 0, 0, 0);
     toggleBold(store.getState(), store);
     setBorderPreset(store.getState(), store, 'bottom', 'thin', '#4472c4');
 
-    expect(fmtAt(store, 0, 0)).toBeUndefined();
-    expect(store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: {
-        bold: true,
-        borders: { bottom: { style: 'thin', color: '#4472c4' } },
-      },
+    expect(fmtAt(store, 0, 0)).toEqual({
+      bold: true,
+      borders: { bottom: { style: 'thin', color: '#4472c4' } },
     });
-    expect(effectiveFmtAt(store, 0, 0)?.borders?.bottom).toEqual({
+    expect(fmtAt(store, 0, 0)?.borders?.bottom).toEqual({
       style: 'thin',
       color: '#4472c4',
     });
   });
 
-  it('cycleBorders uses pending input format for a single empty active cell', () => {
+  it('cycleBorders writes to a single empty active cell', () => {
     setRange(store, 0, 0, 0, 0);
     toggleItalic(store.getState(), store);
     cycleBorders(store.getState(), store);
 
-    expect(fmtAt(store, 0, 0)).toBeUndefined();
-    expect(store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: {
-        italic: true,
-        borders: { top: true, right: true, bottom: true, left: true },
-      },
+    expect(fmtAt(store, 0, 0)).toEqual({
+      italic: true,
+      borders: { top: true, right: true, bottom: true, left: true },
     });
   });
 
@@ -265,17 +257,11 @@ describe('borders', () => {
       { sheet: 0, r0: 1000, c0: 0, r1: 1000, c1: 0 },
     ]);
     mutators.setCellFormat(capped, { sheet: 0, row: 0, col: 0 }, { bold: true });
-    mutators.setPendingFormat(capped, {
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { italic: true },
-    });
     const beforeFormats = new Map(capped.getState().format.formats);
-    const beforePending = capped.getState().ui.pendingFormat;
 
     setBorderPreset(capped.getState(), capped, 'outline');
 
     expect(capped.getState().format.formats).toEqual(beforeFormats);
-    expect(capped.getState().ui.pendingFormat).toEqual(beforePending);
 
     const published = createSpreadsheetStore();
     setSelection(published, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 }, [
@@ -348,21 +334,18 @@ describe('borders', () => {
     expect(fmtAt(complete, 0, 3)?.borders?.top).toEqual({ style: 'thin' });
   });
 
-  it('keeps one-cell inside borders pending and materializes a selection with extras', () => {
+  it('leaves a one-cell format unchanged by inside borders and formats a selection with extras', () => {
     const single = createSpreadsheetStore();
     setSelection(single, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     toggleBold(single.getState(), single);
-    const pendingBefore = single.getState().ui.pendingFormat;
     setBorderPreset(single.getState(), single, 'inside');
-    expect(single.getState().ui.pendingFormat).toEqual(pendingBefore);
-    expect(single.getState().format.formats.size).toBe(0);
+    expect(fmtAt(single, 0, 0)).toEqual({ bold: true });
 
     const multi = createSpreadsheetStore();
     setSelection(multi, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, [
       { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
     ]);
     setBorderPreset(multi.getState(), multi, 'outline');
-    expect(multi.getState().ui.pendingFormat).toBeNull();
     expect(fmtAt(multi, 0, 0)?.borders).toBeDefined();
     expect(fmtAt(multi, 0, 1)?.borders).toBeDefined();
   });

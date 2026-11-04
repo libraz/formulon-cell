@@ -105,7 +105,7 @@ describe('interact/format-dialog native font mixed summary', () => {
     expect(summary.mixed.has('fontSize')).toBe(false);
   });
 
-  it('ignores formats outside the selected axis and gates samples for selected formats or pending input', () => {
+  it('ignores formats outside the selected axis and gates samples for selected formats', () => {
     const store = createSpreadsheetStore();
     selectRange(store, columnA);
     const outside = { sheet: 0, row: 0, col: 1 };
@@ -121,18 +121,6 @@ describe('interact/format-dialog native font mixed summary', () => {
     const authored = makeWorkbook();
     expect(nativeFontSamplesForDialog(store.getState(), plan, authored.workbook)).toHaveLength(2);
     expect(authored.calls).toEqual([
-      { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 },
-      { sheet: 0, r0: 6, c0: 0, r1: MAX_ROW, c1: 0 },
-    ]);
-
-    store.setState((state) => ({
-      ...state,
-      format: { ...state.format, formats: new Map([[addrKey(outside), { italic: true }]]) },
-      ui: { ...state.ui, pendingFormat: { addr: selected, format: { bold: false } } },
-    }));
-    const pending = makeWorkbook();
-    expect(nativeFontSamplesForDialog(store.getState(), plan, pending.workbook)).toHaveLength(2);
-    expect(pending.calls).toEqual([
       { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 },
       { sheet: 0, r0: 6, c0: 0, r1: MAX_ROW, c1: 0 },
     ]);

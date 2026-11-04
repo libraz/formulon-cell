@@ -1,5 +1,5 @@
 import { coerceInput, inputLocaleForWorkbook, workbookDate1904 } from '../commands/coerce-input.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView, type Rect } from '../render/geometry.js';
@@ -111,7 +111,7 @@ export const alignEditorText = (
   // Explicit cell alignment wins over the type-based defaults below — once
   // a user sets center/right/justify on a cell, the editor honors it even
   // for formula edits so the visual position stays anchored.
-  const fmt = effectiveCellFormatWithPending(s.wb, s.store.getState(), addr);
+  const fmt = effectiveCellFormat(s.wb, s.store.getState(), addr);
   if (fmt?.align) {
     input.style.textAlign = fmt.align;
     return;
@@ -141,7 +141,7 @@ export const paintEditorCellFormat = (
 ): void => {
   if (!input || !addr) return;
   const state = s.store.getState();
-  const fmt = effectiveCellFormatWithPending(s.wb, state, addr);
+  const fmt = effectiveCellFormat(s.wb, state, addr);
   const zoom = renderScale(state.layout, state.viewport);
   // Cell colors stay explicit when authored; a missing family falls through
   // to the host UI stack so an unavailable workbook font cannot switch the

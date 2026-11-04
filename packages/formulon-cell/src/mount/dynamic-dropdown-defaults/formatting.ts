@@ -7,7 +7,7 @@ import {
 import { toggleShowPhonetic } from '../../commands/phonetic.js';
 import { recordRepeatableFormatChange } from '../../commands/slice-history.js';
 import type { SpreadsheetInstance } from '../../mount.js';
-import { formatWithPending } from '../../store/pending-format.js';
+import { directCellFormat } from '../../store/direct-format.js';
 import type { CellFormat } from '../../store/store.js';
 import { applyMergeAction } from '../../toolbar/merge-action.js';
 import { openPhoneticEditor, openPhoneticSettings } from '../../toolbar/phonetic-actions.js';
@@ -123,7 +123,7 @@ const updateTextOrientationMenu =
   (menu) => {
     const state = instance.store.getState();
     const active = state.selection.active;
-    const rotation = formatWithPending(state, active)?.rotation ?? 0;
+    const rotation = directCellFormat(state, active)?.rotation ?? 0;
     const current =
       rotation === 'vertical'
         ? 'vertical'
@@ -175,7 +175,7 @@ const updateCurrencyMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateCurrencyMenu'] =>
   (menu) => {
     const state = instance.store.getState();
-    const current = formatWithPending(state, state.selection.active)?.numFmt;
+    const current = directCellFormat(state, state.selection.active)?.numFmt;
     const activeSymbol = current?.kind === 'currency' ? current.symbol : null;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-currency-preset]')) {
       const active = button.dataset.currencyPreset === activeSymbol;

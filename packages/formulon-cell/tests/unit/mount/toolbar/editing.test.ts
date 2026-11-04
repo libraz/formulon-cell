@@ -190,7 +190,7 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('enables Clear Formats when the active empty cell only has pending input format', () => {
+  it('enables Clear Formats once an empty cell carries a format', () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
@@ -200,10 +200,7 @@ describe('Spreadsheet.mountToolbar', () => {
 
     const bold = host.querySelector<HTMLButtonElement>('[data-ribbon-command="bold"]');
     bold?.click();
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { bold: true },
-    });
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toEqual({ bold: true });
 
     const clearButton = host.querySelector<HTMLButtonElement>(
       '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
@@ -220,13 +217,12 @@ describe('Spreadsheet.mountToolbar', () => {
     const event = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(event, 'target', { value: clearFormats });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toBeNull();
     expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
 
     tb.dispose();
   });
 
-  it('enables Clear All when the active empty cell only has pending input format', () => {
+  it('enables Clear All once an empty cell carries a format', () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
@@ -236,9 +232,9 @@ describe('Spreadsheet.mountToolbar', () => {
 
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="bold"]')?.click();
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="italic"]')?.click();
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { bold: true, italic: true },
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toEqual({
+      bold: true,
+      italic: true,
     });
 
     const clearButton = host.querySelector<HTMLButtonElement>(
@@ -256,14 +252,13 @@ describe('Spreadsheet.mountToolbar', () => {
     const event = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(event, 'target', { value: clearAll });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toBeNull();
     expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
     expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
 
     tb.dispose();
   });
 
-  it('clears pending Borders formatting through the shared Clear Formats dropdown', () => {
+  it("clears an empty cell's Borders through the shared Clear Formats dropdown", () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
@@ -279,11 +274,9 @@ describe('Spreadsheet.mountToolbar', () => {
     const bottomBorder = host.querySelector<HTMLButtonElement>('[data-border-preset="bottom"]');
     expect(bottomBorder).toBeTruthy();
     bottomBorder?.click();
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { borders: { bottom: { style: 'thin' } } },
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toEqual({
+      borders: { bottom: { style: 'thin' } },
     });
-    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
 
     const clearButton = host.querySelector<HTMLButtonElement>(
       '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
@@ -299,7 +292,6 @@ describe('Spreadsheet.mountToolbar', () => {
     const event = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(event, 'target', { value: clearFormats });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toBeNull();
     expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
 
     tb.dispose();
@@ -391,7 +383,7 @@ describe('Spreadsheet.mountToolbar', () => {
       'Select more than one column to fill left or right.',
     );
     expect(fillGroupButton?.disabled).toBe(true);
-    expect(fillJustifyButton?.disabled).toBe(true);
+    expect(fillJustifyButton?.disabled).toBe(false);
     expect(flashFillButton).toBeTruthy();
     const seriesButton = host.querySelector<HTMLButtonElement>('[data-fill="series"]');
     expect(seriesButton).toBeTruthy();

@@ -1168,7 +1168,6 @@ export const Spreadsheet = {
           watch: { watches: [] },
           traces: { items: [] },
           errorIndicators: { ignoredErrors: new Set(), validationCircles: new Set() },
-          ui: { ...state.ui, pendingFormat: null },
         }));
         hydrateActiveSheet();
         hydrateWorkbookMetadataFromEngine(wb, store);

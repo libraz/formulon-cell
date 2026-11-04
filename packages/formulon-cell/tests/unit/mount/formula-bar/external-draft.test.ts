@@ -93,7 +93,7 @@ describe('mount/formula-bar — native commit result', () => {
     expect(values).toEqual(['42']);
 
     mutators.setActive(sheet.instance.store, moved);
-    mutators.setPendingFormat(sheet.instance.store, { addr, format: { bold: true } });
+    mutators.setCellFormat(sheet.instance.store, addr, { bold: true });
     harness.fxInput.dispatchEvent(new FocusEvent('blur'));
     expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'number', value: 1 });
     expect(sheet.instance.history.canUndo()).toBe(false);
@@ -103,7 +103,6 @@ describe('mount/formula-bar — native commit result', () => {
     expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'number', value: 42 });
     expect(sheet.instance.store.getState().selection.active).toEqual(moved);
     expect(sheet.instance.store.getState().format.formats.get('0:0:0')?.bold).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toBeNull();
     expect(sheet.instance.history.canUndo()).toBe(true);
     expect(harness.controller.isEditing()).toBe(false);
     expect(outcomes).toEqual(['committed']);
@@ -148,14 +147,9 @@ describe('mount/formula-bar — native commit result', () => {
   it('does not clear a newer editor when a rejected commit discards its adopted draft', () => {
     let contextCurrent = true;
     let draft: ExternalDraftTestHandle | null = null;
-    const newerPending = {
-      addr: { sheet: 0, row: 3, col: 3 },
-      format: { italic: true },
-    };
     const newerRefs = [{ r0: 3, c0: 3, r1: 3, c1: 3, colorIndex: 1 }];
     const onValidation = vi.fn(() => {
       contextCurrent = false;
-      mutators.setPendingFormat(sheet.instance.store, newerPending);
       mutators.setEditorRefs(sheet.instance.store, newerRefs);
       draft?.discard();
       draft?.cancel();
@@ -180,7 +174,6 @@ describe('mount/formula-bar — native commit result', () => {
     sheet.instance.setPolicy({ readOnly: true });
     expect(draft.commit()).toBe(false);
     expect(onValidation).toHaveBeenCalledOnce();
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual(newerPending);
     expect(sheet.instance.store.getState().ui.editorRefs).toEqual(newerRefs);
     expect(sheet.instance.store.getState().ui.editorRefs).toBe(newerRefs);
     expect(harness.controller.isEditing()).toBe(false);
@@ -230,7 +223,7 @@ describe('mount/formula-bar — native commit result', () => {
     const anchor = { sheet: 0, row: 0, col: 0 };
     const moved = { sheet: 0, row: 4, col: 4 };
     mutators.setActive(sheet.instance.store, anchor);
-    mutators.setPendingFormat(sheet.instance.store, { addr: anchor, format: { bold: true } });
+    mutators.setCellFormat(sheet.instance.store, anchor, { bold: true });
     sheet.instance.history.clear();
     harness.fxInput.value = '=1';
     harness.fxInput.focus();

@@ -14,10 +14,7 @@ import {
 import { recordFormatChange } from '../commands/slice-history.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../components/color-palette.js';
 import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
-import {
-  displayCellFormatFromXf,
-  effectiveCellFormatWithPending,
-} from '../engine/cell-format-projection.js';
+import { displayCellFormatFromXf, effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -179,8 +176,6 @@ export function nativeFontSamplesForDialog(
     const addr = parseAddrKey(key);
     if (addr) storeAddrs.push(addr);
   }
-  const pendingAddr = state.ui.pendingFormat?.addr;
-  if (pendingAddr) storeAddrs.push(pendingAddr);
   if (
     plan.ranges.some(
       ({ sheet }) =>
@@ -355,7 +350,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
           state,
           selectionPlanForDialog,
           dialogWb
-            ? (addr) => effectiveCellFormatWithPending(dialogWb, state, addr, effectiveFormatCache)
+            ? (addr) => effectiveCellFormat(dialogWb, state, addr, effectiveFormatCache)
             : undefined,
           nativeFontSamples,
         );
@@ -366,7 +361,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       : active;
     const displayFormat =
       !applyDxf && dialogWb
-        ? effectiveCellFormatWithPending(dialogWb, state, displayAddr, effectiveFormatCache)
+        ? effectiveCellFormat(dialogWb, state, displayAddr, effectiveFormatCache)
         : null;
     const merged = displayFormat
       ? { ...displayFormat, ...summary.activeFormat }

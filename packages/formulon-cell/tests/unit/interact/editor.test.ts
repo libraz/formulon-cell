@@ -765,7 +765,7 @@ describe('InlineEditor', () => {
     expect(input.style.fontSize).toBe('7px');
   });
 
-  it('keeps the raw edit, caret and pending style when the workbook write fails', async () => {
+  it('keeps the raw edit and caret when the workbook write fails', async () => {
     const realWorkbook = await WorkbookHandle.createDefault();
     expect(realWorkbook.isStub).toBe(false);
     const localStore = createSpreadsheetStore();
@@ -788,8 +788,6 @@ describe('InlineEditor', () => {
     localEditor.begin('17');
     const input = localGrid.querySelector('textarea') as HTMLTextAreaElement;
     input.setSelectionRange(1, 2, 'backward');
-    const pending = { addr: anchor, format: { bold: true } };
-    mutators.setPendingFormat(localStore, pending);
     realWorkbook.dispose();
     try {
       localEditor.commit('down');
@@ -801,7 +799,6 @@ describe('InlineEditor', () => {
       expect(input.selectionDirection).toBe('backward');
       expect(document.activeElement).toBe(input);
       expect(localStore.getState().selection.active).toEqual(anchor);
-      expect(localStore.getState().ui.pendingFormat).toEqual(pending);
       expect(committed).not.toHaveBeenCalled();
       expect(validation).toHaveBeenCalledWith(expect.objectContaining({ severity: 'stop' }));
     } finally {
@@ -1008,13 +1005,10 @@ describe('InlineEditor', () => {
     expect(wb.getValue(b1)).toEqual({ kind: 'number', value: 50 });
   });
 
-  it('commit applies pending empty-cell format to the typed cell and then clears it', () => {
+  it("commit keeps an empty cell's format on the typed value", () => {
     const addr = { sheet: 0, row: 0, col: 0 };
     mutators.setActive(store, addr);
-    mutators.setPendingFormat(store, {
-      addr,
-      format: { align: 'center', bold: true, numFmt: { kind: 'text' } },
-    });
+    mutators.setCellFormat(store, addr, { align: 'center', bold: true, numFmt: { kind: 'text' } });
     editor.begin('');
     const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
     input.value = '00123';
@@ -1028,19 +1022,17 @@ describe('InlineEditor', () => {
       bold: true,
       numFmt: { kind: 'text' },
     });
-    expect(store.getState().ui.pendingFormat).toBeNull();
   });
 
-  it('cancel clears pending empty-cell format without writing it to the cell', () => {
+  it("cancel leaves an empty cell's format in place", () => {
     const addr = { sheet: 0, row: 0, col: 0 };
     mutators.setActive(store, addr);
-    mutators.setPendingFormat(store, { addr, format: { bold: true } });
+    mutators.setCellFormat(store, addr, { bold: true });
     editor.begin('');
 
     editor.cancel();
 
-    expect(store.getState().format.formats.get('0:0:0')).toBeUndefined();
-    expect(store.getState().ui.pendingFormat).toBeNull();
+    expect(store.getState().format.formats.get('0:0:0')).toEqual({ bold: true });
   });
 
   it('commit preserves numeric-looking input as text for cells formatted as Text', () => {
@@ -1099,7 +1091,7 @@ describe('InlineEditor', () => {
       const anchor = { sheet: 0, row: 2, col: 3 };
       mutators.setActive(localStore, anchor);
       mutators.setRange(localStore, { sheet: 0, r0: 2, c0: 3, r1: 4, c1: 5 });
-      mutators.setPendingFormat(localStore, { addr: anchor, format: { bold: true } });
+      mutators.setCellFormat(localStore, anchor, { bold: true });
       mutators.setR1C1(localStore, true);
       localEditor.begin('=SUM(A1:B2)');
       mutators.setCopyRanges(
@@ -1124,7 +1116,6 @@ describe('InlineEditor', () => {
       expect(localEditor.isFormulaEdit()).toBe(false);
       expect(localGrid.querySelector('textarea.fc-host__editor')).toBeNull();
       expect(localStore.getState().ui.editor.kind).toBe('idle');
-      expect(localStore.getState().ui.pendingFormat).toEqual(before.ui.pendingFormat);
       expect(localStore.getState().ui.editorRefs).toEqual([]);
       expect(realWorkbook.getValue(anchor)).toEqual({ kind: 'blank' });
 
@@ -1147,7 +1138,6 @@ describe('InlineEditor', () => {
       expect(restored?.selectionEnd).toBe(10);
       expect(restored?.selectionDirection).toBe('backward');
       expect(localStore.getState().selection).toEqual(before.selection);
-      expect(localStore.getState().ui.pendingFormat).toEqual(before.ui.pendingFormat);
       expect(localStore.getState().ui.copyRanges).toEqual(before.ui.copyRanges);
       expect(localStore.getState().ui.copyMode).toBe(before.ui.copyMode);
       expect(localStore.getState().ui.editor).toEqual(before.ui.editor);

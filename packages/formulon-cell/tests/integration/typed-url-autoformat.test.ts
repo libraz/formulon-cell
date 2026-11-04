@@ -248,21 +248,6 @@ describe('typed URL autoformat', () => {
         expect(result.status).toBe('applied');
         expect(workbook.getValue(A1)).toEqual({ kind: 'text', value: URL });
         expect(hyperlinkAt(mounted.instance.store.getState(), A1)).toBeNull();
-
-        controller?.setPolicy({
-          operations: { valueEdit: true, format: false, hyperlink: true },
-        });
-        mutators.setPendingFormat(mounted.instance.store, { addr: B1, format: { bold: true } });
-        const explicitDenied = commitCellInput({
-          store: mounted.instance.store,
-          wb: workbook,
-          addr: B1,
-          raw: URL,
-          origin: 'editor',
-        });
-        expect(explicitDenied.status).toBe('rejected');
-        expect(workbook.getValue(B1)).toEqual({ kind: 'blank' });
-        expect(hyperlinkAt(mounted.instance.store.getState(), B1)).toBeNull();
       } finally {
         mounted.dispose();
         workbook.dispose();
@@ -530,7 +515,6 @@ describe('typed URL autoformat', () => {
             restoredMount.instance.store.getState(),
             restoredMount.instance.store,
             { patch: { fill: '#fff2cc' } },
-            { allowPending: false },
           ),
         ).toBe(true);
         flushFormatToEngine(firstReload, restoredMount.instance.store, 0);

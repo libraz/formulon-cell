@@ -2,7 +2,7 @@
 // raw draft over the anchor cell, hiding itself whenever the cell is off-sheet,
 // scrolled behind a frozen band, or outside the grid.
 
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView } from '../render/geometry.js';
@@ -12,8 +12,8 @@ import {
   cssCellFontSize,
   fontSizeWithVerticalAlign,
 } from '../render/painters/text.js';
+import { directCellFormat } from '../store/direct-format.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
-import { formatWithPending } from '../store/pending-format.js';
 import { renderScale } from '../store/render-scale.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
@@ -77,8 +77,8 @@ export function attachFormulaDraftMirror(deps: FormulaDraftMirrorDeps): FormulaD
       return;
     }
     const format = wb
-      ? effectiveCellFormatWithPending(wb, state, mirrorState.anchor)
-      : formatWithPending(state, mirrorState.anchor);
+      ? effectiveCellFormat(wb, state, mirrorState.anchor)
+      : directCellFormat(state, mirrorState.anchor);
     el.textContent = mirrorState.raw;
     el.style.left = `${rect.x}px`;
     el.style.top = `${rect.y}px`;

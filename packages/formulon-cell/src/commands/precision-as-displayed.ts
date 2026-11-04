@@ -1,4 +1,4 @@
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { NumFmt, SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
@@ -49,7 +49,7 @@ export function applyPrecisionAsDisplayed(
   for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
     for (const cell of wb.physicalCells(sheet)) {
       if (cell.formula !== null || cell.value.kind !== 'number') continue;
-      const numFmt = effectiveCellFormatWithPending(wb, state, cell.addr)?.numFmt;
+      const numFmt = effectiveCellFormat(wb, state, cell.addr)?.numFmt;
       const rounded = displayedPrecisionValue(cell.value.value, numFmt);
       if (Number.isFinite(rounded) && rounded !== cell.value.value) {
         writes.push({ addr: cell.addr, value: rounded });

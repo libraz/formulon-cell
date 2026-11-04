@@ -1,6 +1,6 @@
 import type { PaginationPage, PaginationResult } from '@libraz/formulon';
 import { colLetter, formatA1Cell, parseAddrKey } from '../engine/address.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { numFmtToFormatCode } from '../engine/format-writeback.js';
 import type { CellValue } from '../engine/types.js';
 // Print / PDF export.
@@ -21,7 +21,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { numberFormatPaint } from '../format/number-format.js';
 import { gradientFillCss } from '../render/gradient-fill-css.js';
 import { cellFontFamily } from '../render/painters/text.js';
-import { formatWithPending } from '../store/pending-format.js';
+import { directCellFormat } from '../store/direct-format.js';
 import { hiddenRowsOf } from '../store/row-visibility.js';
 import {
   type CellFormat,
@@ -530,9 +530,9 @@ export function buildPrintDocument(
   // the last data cell.
   const cellMap = new Map<string, CellSnap>();
   const formatAt = (row: number, col: number): CellFormat | undefined => {
-    const direct = formatWithPending(state, { sheet, row, col });
+    const direct = directCellFormat(state, { sheet, row, col });
     if (wb.capabilities.effectiveStyle === true && !wb.isStub) {
-      return (effectiveCellFormatWithPending(wb, state, { sheet, row, col }) ?? direct) as
+      return (effectiveCellFormat(wb, state, { sheet, row, col }) ?? direct) as
         | CellFormat
         | undefined;
     }

@@ -282,7 +282,6 @@ describe('real WASM axis selection font size', () => {
           workbook,
           sheet: 0,
           targets: [],
-          pendingBefore: null,
           mutate: () =>
             applySelectionFormatAction(mounted.instance.store.getState(), mounted.instance.store, {
               patch: { fontSize: 24 },
@@ -321,7 +320,6 @@ describe('real WASM axis selection font size', () => {
           workbook,
           sheet: 0,
           targets: [],
-          pendingBefore: null,
           mutate: () =>
             applySelectionFormatAction(mounted.instance.store.getState(), mounted.instance.store, {
               patch: { fontSize: 24 },

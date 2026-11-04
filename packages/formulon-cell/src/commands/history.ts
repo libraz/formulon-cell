@@ -219,7 +219,7 @@ export class History {
   }
 
   /** Register a selection-aware repeat operation for an action that has no
-   *  material undo snapshot (for example a pending format on a blank cell). */
+   *  material undo snapshot (for example a format that changed nothing). */
   setRepeat(repeat: (() => void) | null): void {
     this.lastRepeat = repeat;
   }

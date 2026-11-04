@@ -127,23 +127,20 @@ describe('toolbar/ribbon-active-state', () => {
     expect(projectActiveState(instance).italic).toBe(true);
   });
 
-  it('projects pending empty-cell format without creating a stored cell format', () => {
+  it('projects the format written to an empty cell, and keeps it after moving away and back', () => {
     const { instance } = sheet;
     mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
 
     toggleBold(instance.store.getState(), instance.store);
 
     expect(projectActiveState(instance).bold).toBe(true);
-    expect(instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { bold: true },
-    });
-    expect(instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
+    expect(instance.store.getState().format.formats.get('0:0:0')).toEqual({ bold: true });
 
     mutators.setActive(instance.store, { sheet: 0, row: 1, col: 0 });
-
     expect(projectActiveState(instance).bold).toBe(false);
-    expect(instance.store.getState().ui.pendingFormat).toBeNull();
+
+    mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
+    expect(projectActiveState(instance).bold).toBe(true);
   });
 
   it('mirrors alignment as exclusive booleans', () => {
@@ -272,15 +269,6 @@ describe('toolbar/ribbon-active-state', () => {
     expect(projectActiveState(instance)).toMatchObject({
       fontColor: '#123456',
       fillColor: '#abcdef',
-    });
-
-    mutators.setPendingFormat(instance.store, {
-      addr: member,
-      format: { color: '#fedcba', fill: '#654321' },
-    });
-    expect(projectActiveState(instance)).toMatchObject({
-      fontColor: '#fedcba',
-      fillColor: '#654321',
     });
   });
 

@@ -15,7 +15,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../../src/store/store.js';
-import { effectiveFmtAt, fmtAt, setRange } from './fixtures.js';
+import { fmtAt, setRange } from './fixtures.js';
 
 describe('toggle flags', () => {
   let store: SpreadsheetStore;
@@ -131,7 +131,7 @@ describe('alignment ribbon formatting', () => {
     expect(fmtAt(store, 2, 2)?.indent).toBe(0);
   });
 
-  it('stages indent as pending input format for a single empty active cell', () => {
+  it('writes indent to a single empty active cell', () => {
     const single = createSpreadsheetStore();
     setRange(single, 0, 0, 0, 0);
     mutators.setActive(single, { sheet: 0, row: 0, col: 0 });
@@ -139,12 +139,8 @@ describe('alignment ribbon formatting', () => {
     bumpIndent(single.getState(), single, 1);
     bumpIndent(single.getState(), single, 1);
 
-    expect(single.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { indent: 2 },
-    });
-    expect(fmtAt(single, 0, 0)).toBeUndefined();
-    expect(effectiveFmtAt(single, 0, 0)?.indent).toBe(2);
+    expect(fmtAt(single, 0, 0)).toEqual({ indent: 2 });
+    expect(fmtAt(single, 0, 0)?.indent).toBe(2);
   });
 
   it('sets text rotation across the range and clamps to the supported angle range', () => {

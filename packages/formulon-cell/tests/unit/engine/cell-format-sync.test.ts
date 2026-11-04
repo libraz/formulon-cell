@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveCellFormatWithPending } from '../../../src/engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../../../src/engine/cell-format-projection.js';
 import {
   flushFormatToEngine,
   hydrateCellFormatsFromEngine,
@@ -549,9 +549,7 @@ describe('effective format projection cache', () => {
     const operationCache = new Map<string, Partial<CellFormat> | null>();
     const projected: (Partial<CellFormat> | null)[] = [];
     for (let row = 0; row < 1000; row += 1) {
-      projected.push(
-        effectiveCellFormatWithPending(wb, state, { sheet: 0, row, col: 0 }, operationCache),
-      );
+      projected.push(effectiveCellFormat(wb, state, { sheet: 0, row, col: 0 }, operationCache));
     }
 
     expect(projected[0]).toMatchObject({ bold: true, align: 'center', locked: true });
@@ -566,12 +564,7 @@ describe('effective format projection cache', () => {
     // A later copy operation receives a new cache and sees fresh engine data
     // even when the selected XF index is unchanged.
     bold = false;
-    const nextOperation = effectiveCellFormatWithPending(
-      wb,
-      state,
-      { sheet: 0, row: 2, col: 0 },
-      new Map(),
-    );
+    const nextOperation = effectiveCellFormat(wb, state, { sheet: 0, row: 2, col: 0 }, new Map());
     expect(nextOperation?.bold).toBeUndefined();
     expect(calls.xf).toBe(2);
     expect(calls.font).toBe(2);

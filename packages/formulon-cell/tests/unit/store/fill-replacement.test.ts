@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { applySelectionFormatPatch, setFillColor } from '../../../src/commands/format.js';
 import { patchXfIndexFromBase } from '../../../src/engine/cell-xf-writeback.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { formatWithPending } from '../../../src/store/pending-format.js';
 import {
   type CellFormat,
   createSpreadsheetStore,
@@ -75,23 +74,13 @@ describe('a fill kind replaces the others', () => {
     expect(formatAt(store, B1)?.fillGradient).toBeUndefined();
   });
 
-  it('selection commands and the pending format follow the same rule', () => {
+  it('selection commands follow the same rule', () => {
     const store = createSpreadsheetStore();
     selectA1(store);
     mutators.setCellFormat(store, A1, { fillGradient: GRADIENT });
-    applySelectionFormatPatch(
-      store.getState(),
-      store,
-      { fill: '#123456' },
-      { allowPending: false },
-    );
+    applySelectionFormatPatch(store.getState(), store, { fill: '#123456' });
     expect(formatAt(store)?.fillGradient).toBeUndefined();
 
-    mutators.setCellFormat(store, A1, { fillGradient: GRADIENT });
-    mutators.setPendingFormat(store, { addr: A1, format: { fill: '#654321' } });
-    expect(formatWithPending(store.getState(), A1)?.fillGradient).toBeUndefined();
-
-    mutators.setPendingFormat(store, null);
     mutators.setCellFormat(store, A1, { fillGradient: GRADIENT });
     setFillColor(store.getState(), store, null);
     expect(formatAt(store)?.fillGradient).toBeUndefined();

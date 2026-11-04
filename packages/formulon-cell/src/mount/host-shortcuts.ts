@@ -36,7 +36,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialFromParts } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
 import { openCellShiftDialog, runCellShiftChoice } from '../interact/cell-shift-dialog.js';
-import { formatWithPending } from '../store/pending-format.js';
+import { directCellFormat } from '../store/direct-format.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
@@ -232,7 +232,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
               },
             );
           applied =
-            formatWithPending(input.store.getState(), input.store.getState().selection.active)?.[
+            directCellFormat(input.store.getState(), input.store.getState().selection.active)?.[
               key
             ] === true;
         },

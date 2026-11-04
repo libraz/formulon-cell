@@ -638,53 +638,8 @@ describe('InteractionController', () => {
     },
   );
 
-  it('keeps pending editor format out of foreign-origin writes', async () => {
-    const { store, controller: service, workbook: wb, history } = await createController();
-    const pending = {
-      addr: A1,
-      format: { bold: true, borders: { bottom: { style: 'thin' as const } } },
-    };
-    mutators.setPendingFormat(store, pending);
-
-    const result = service.execute({
-      type: 'cellBatch',
-      operation: 'valueEdit',
-      origin: 'keyboard',
-      changes: [{ addr: A1, input: '42' }],
-    });
-
-    expect(result.status).toBe('applied');
-    expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 42 });
-    expect(store.getState().format.formats.get(addrKey(A1))).toBeUndefined();
-    expect(store.getState().ui.pendingFormat).toEqual(pending);
-    expect(history.canUndo()).toBe(true);
-  });
-
-  it('denies a pending format before a value write when the format operation is restricted', async () => {
-    const { store, controller: service, workbook: wb, history } = await createController();
-    mutators.setPendingFormat(store, { addr: A1, format: { italic: true } });
-    service.setPolicy({
-      operations: { valueEdit: true, format: true },
-      restrict: ({ operation, addr }) => operation !== 'format' || addr === undefined,
-    });
-
-    const result = service.execute({
-      type: 'cellBatch',
-      operation: 'valueEdit',
-      origin: 'editor',
-      changes: [{ addr: A1, input: '42' }],
-    });
-
-    expect(result.status).toBe('rejected');
-    expect(result.rejected[0]?.code).toBe('operationDenied');
-    expect(wb.getValue(A1)).toEqual({ kind: 'blank' });
-    expect(store.getState().format.formats.get(addrKey(A1))).toBeUndefined();
-    expect(store.getState().ui.pendingFormat).toEqual({ addr: A1, format: { italic: true } });
-    expect(history.canUndo()).toBe(false);
-  });
-
   it.each(['editor', 'formulaBar', 'keyboard'] as const)(
-    'keeps implicit percent coercion working for %s without pending format',
+    'keeps implicit percent coercion working for %s',
     async (origin) => {
       const { store, controller: service, workbook: wb, history } = await createController();
       service.setPolicy(fixedFormPolicy({ ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }] }));

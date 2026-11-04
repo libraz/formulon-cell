@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   changedFormatAddresses,
-  effectivePendingFormatAddresses,
   type PreparedChange,
   projectPreparedFormats,
   sameStructuredValue,
@@ -48,22 +47,6 @@ describe('projectPreparedFormats', () => {
     expect(out.get('0:5:5')).toEqual({ numFmt: percent });
   });
 
-  it('lets a pending format override the implicit format and merges borders', () => {
-    const before = new Map<string, CellFormat>([
-      [addrKey(a1), { bold: true, borders: { top: { style: 'thin' } } }],
-    ]);
-    const out = projectPreparedFormats(before, [
-      change(a1, {
-        implicitFormat: percent,
-        pendingFormat: { numFmt: { kind: 'general' }, borders: { bottom: { style: 'thin' } } },
-      }),
-    ]);
-    const next = out.get(addrKey(a1));
-    expect(next?.bold).toBe(true);
-    expect(next?.numFmt).toEqual({ kind: 'general' });
-    expect(next?.borders).toEqual({ top: { style: 'thin' }, bottom: { style: 'thin' } });
-  });
-
   it('does not mutate the input map and leaves untouched cells absent', () => {
     const before = new Map<string, CellFormat>();
     const out = projectPreparedFormats(before, [change(a1)]);
@@ -76,32 +59,6 @@ describe('projectPreparedFormats', () => {
       change(a1, { inheritedFormat: { fontFamily: '游ゴシック', fontSize: 18 } }),
     ]);
     expect(out.get(addrKey(a1))).toEqual({ fontFamily: '游ゴシック', fontSize: 24 });
-  });
-});
-
-describe('effectivePendingFormatAddresses', () => {
-  it('ignores implicit formats on their own', () => {
-    const prepared = [change(a1, { implicitFormat: percent })];
-    expect(effectivePendingFormatAddresses(new Map(), prepared)).toEqual([]);
-  });
-
-  it('reports a pending format that changes the projected result', () => {
-    const prepared = [
-      change(a1, { pendingFormat: { bold: true } }),
-      change(b1, { implicitFormat: percent }),
-    ];
-    expect(effectivePendingFormatAddresses(new Map(), prepared)).toEqual([a1]);
-  });
-
-  it('drops a pending format that matches the implicit format already projected', () => {
-    const prepared = [change(a1, { implicitFormat: percent, pendingFormat: { numFmt: percent } })];
-    expect(effectivePendingFormatAddresses(new Map(), prepared)).toEqual([]);
-  });
-
-  it('drops a pending format that equals the existing format', () => {
-    const before = new Map<string, CellFormat>([[addrKey(a1), { bold: true }]]);
-    const prepared = [change(a1, { pendingFormat: { bold: true } })];
-    expect(effectivePendingFormatAddresses(before, prepared)).toEqual([]);
   });
 });
 

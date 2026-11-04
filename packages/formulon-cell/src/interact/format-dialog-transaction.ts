@@ -70,10 +70,8 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
         workbook: currentWb,
         sheet: current.selection.range.sheet,
         targets: currentPlan.cells,
-        pendingBefore: current.ui.pendingFormat,
         mutate: () =>
           applySelectionFormatAction(current, store, repeatAction, {
-            allowPending: false,
             origin: 'instanceApi',
             commandId: 'formatCells',
           }),
@@ -91,14 +89,7 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
   const abortTransaction = (): void => {
     if (!transaction || !actionHistory || !transactionOpen) return;
     transactionOpen = false;
-    try {
-      actionHistory.abort(transaction);
-    } finally {
-      // Scoped material replay intentionally preserves a later pending
-      // format. A failed composite dialog action instead restores the exact
-      // pre-action pending snapshot.
-      mutators.setPendingFormat(store, state.ui.pendingFormat);
-    }
+    actionHistory.abort(transaction);
   };
   try {
     if (hasFormatAction) {
@@ -108,10 +99,8 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
         workbook: liveWb,
         sheet: range.sheet,
         targets: plan.cells,
-        pendingBefore: state.ui.pendingFormat,
         mutate: () =>
           applySelectionFormatAction(store.getState(), store, action, {
-            allowPending: false,
             origin: 'instanceApi',
             commandId: 'formatCells',
           }),

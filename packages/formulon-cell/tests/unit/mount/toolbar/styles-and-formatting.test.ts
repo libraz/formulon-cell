@@ -45,7 +45,7 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('keeps an empty-cell format toggle visually active as pending input format', () => {
+  it('keeps an empty-cell format toggle visually active with the format written to the cell', () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
 
@@ -56,11 +56,7 @@ describe('Spreadsheet.mountToolbar', () => {
 
     expect(bold?.classList.contains('fc-tb__rb--active')).toBe(true);
     expect(bold?.getAttribute('aria-pressed')).toBe('true');
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { bold: true },
-    });
-    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toEqual({ bold: true });
 
     tb.dispose();
   });
@@ -132,9 +128,8 @@ describe('Spreadsheet.mountToolbar', () => {
     const singleEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(singleEvent, 'target', { value: single });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(singleEvent)).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { underline: true },
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toEqual({
+      underline: true,
     });
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
@@ -147,9 +142,8 @@ describe('Spreadsheet.mountToolbar', () => {
     const doubleEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(doubleEvent, 'target', { value: double });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(doubleEvent)).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { underline: 'double' },
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toEqual({
+      underline: 'double',
     });
 
     tb.dispose();
@@ -185,9 +179,8 @@ describe('Spreadsheet.mountToolbar', () => {
     const event = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(event, 'target', { value: double });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { underline: 'double' },
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toEqual({
+      underline: 'double',
     });
 
     tb.dispose();
@@ -805,10 +798,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const event = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(event, 'target', { value: ccwButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 1, col: 1 },
-      format: { rotation: 45 },
-    });
+    expect(sheet.instance.store.getState().format.formats.get('0:1:1')).toEqual({ rotation: 45 });
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'textOrientation', menuId: 'menu-text-orientation' },
@@ -851,12 +841,8 @@ describe('Spreadsheet.mountToolbar', () => {
       .querySelector<HTMLButtonElement>(`#${RIBBON_BORDERS_MENU_ID} [data-border-preset="bottom"]`)
       ?.click();
 
-    expect(
-      sheet.instance.store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
-    ).toBeUndefined();
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { borders: { bottom: { style: 'thin' } } },
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toEqual({
+      borders: { bottom: { style: 'thin' } },
     });
 
     tb.dispose();

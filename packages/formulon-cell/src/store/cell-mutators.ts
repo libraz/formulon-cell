@@ -63,7 +63,6 @@ export const cellMutators = {
         data: { ...s.data, sheetIndex: idx, cells: new Map() },
         ui: {
           ...s.ui,
-          pendingFormat: null,
           sheetViewMemos: memos,
           ...(switching && {
             workbookView: memo?.workbookView ?? 'normal',

@@ -25,7 +25,7 @@ import {
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import { setSheetZoom, setWorkbookView } from '../commands/view.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
 import { attachClipboard } from '../interact/clipboard.js';
@@ -78,7 +78,7 @@ export const formatPainter = (): Extension => ({
       formatResolver: (addr) => {
         const wb = ctx.getWb();
         return !wb.isStub && wb.capabilities.effectiveStyle
-          ? effectiveCellFormatWithPending(wb, ctx.store.getState(), addr)
+          ? effectiveCellFormat(wb, ctx.store.getState(), addr)
           : ctx.store.getState().format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`);
       },
     });

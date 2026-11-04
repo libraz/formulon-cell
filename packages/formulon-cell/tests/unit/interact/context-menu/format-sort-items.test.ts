@@ -51,37 +51,38 @@ describe('attachContextMenu', () => {
 
       fireContextMenu(host, 200, 70);
       miniItem('bold')?.click();
-      expect(store.getState().ui.pendingFormat?.format.bold).toBe(true);
-      expect(
-        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
-      ).toBeUndefined();
+      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.bold).toBe(
+        true,
+      );
 
       fireContextMenu(host, 200, 70);
       miniItem('italic')?.click();
-      expect(store.getState().ui.pendingFormat).toEqual({
-        addr: { sheet: 0, row: 0, col: 0 },
-        format: { bold: true, italic: true },
+      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual({
+        bold: true,
+        italic: true,
       });
-      expect(history.undo()).toBe(false);
+      // Each format is its own undo step, as on the desktop.
+      expect(history.undo()).toBe(true);
+      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual({
+        bold: true,
+      });
     });
 
     it('Align Left / Center / Right set the alignment', () => {
       detach = attachContextMenu({ host, store, wb });
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
+      const a1 = () => store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
       miniItem('alignLeft')?.click();
-      expect(store.getState().ui.pendingFormat?.format.align).toBe('left');
-      expect(
-        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
-      ).toBeUndefined();
+      expect(a1()?.align).toBe('left');
 
       fireContextMenu(host, 200, 70);
       miniItem('alignCenter')?.click();
-      expect(store.getState().ui.pendingFormat?.format.align).toBe('center');
+      expect(a1()?.align).toBe('center');
 
       fireContextMenu(host, 200, 70);
       miniItem('alignRight')?.click();
-      expect(store.getState().ui.pendingFormat?.format.align).toBe('right');
+      expect(a1()?.align).toBe('right');
     });
 
     it('Borders cycles through outline → all → clear', () => {
@@ -89,10 +90,9 @@ describe('attachContextMenu', () => {
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
       miniItem('borders')?.click();
-      expect(store.getState().ui.pendingFormat?.format.borders).toBeDefined();
       expect(
-        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
-      ).toBeUndefined();
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders,
+      ).toBeDefined();
     });
 
     it('repeats Borders on the selection active when F4 runs', () => {
@@ -136,7 +136,8 @@ describe('attachContextMenu', () => {
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
       item('underline')?.click();
-      expect(store.getState().ui.pendingFormat?.format.underline).toBe(true);
+      const active = store.getState().selection.active;
+      expect(store.getState().format.formats.get(addrKey(active))?.underline).toBe(true);
     });
 
     it('Edit Phonetic writes the prompted reading through the engine', async () => {

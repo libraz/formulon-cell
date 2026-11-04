@@ -36,16 +36,3 @@ export const setSelection = (
 
 export const fmtAt = (store: SpreadsheetStore, row: number, col: number): CellFormat | undefined =>
   store.getState().format.formats.get(addrKey({ sheet: 0, row, col }));
-
-export const effectiveFmtAt = (
-  store: SpreadsheetStore,
-  row: number,
-  col: number,
-): CellFormat | undefined => {
-  const stored = fmtAt(store, row, col);
-  const pending = store.getState().ui.pendingFormat;
-  if (pending?.addr.sheet !== 0 || pending.addr.row !== row || pending.addr.col !== col) {
-    return stored;
-  }
-  return { ...(stored ?? {}), ...pending.format };
-};

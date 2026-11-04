@@ -50,7 +50,7 @@ import {
   writeSelectionInput,
 } from '../interact/selection-input.js';
 import { advanceAfterCommit } from '../interact/selection-navigation.js';
-import { sameAddr } from '../store/pending-format.js';
+import { sameAddr } from '../store/direct-format.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import type { EditorRefHighlight } from '../store/types.js';
@@ -341,7 +341,6 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       ui: {
         ...current.ui,
         editor: snapshot.editorMode,
-        pendingFormat: snapshot.pendingFormat,
         editorRefs: restoredRefs,
         copyRange: snapshot.copy.copyRange,
         copyRanges: snapshot.copy.copyRanges,
@@ -403,7 +402,6 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       },
       selection: state.selection,
       editorMode: state.ui.editor,
-      pendingFormat: state.ui.pendingFormat ?? null,
       editorRefs: state.ui.editorRefs,
       copy: {
         copyRange: state.ui.copyRange ?? null,
@@ -562,7 +560,6 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     } else {
       if (outcome === 'cancelled' && restore) {
         fxInput.value = draft.restoreValue;
-        mutators.setPendingFormat(store, null);
       }
       finishEditing();
       if (focusHost && !detached) {
@@ -753,8 +750,6 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
 
     const currentWb = wb();
-    const pending = store.getState().ui.pendingFormat;
-    if (pending && sameAddr(pending.addr, anchor)) mutators.setPendingFormat(store, null);
     mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
     finishEditing();
     host.focus();
@@ -919,7 +914,6 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     fxInput.value = baseline;
     fxEditing = false;
     commitRejected = false;
-    mutators.setPendingFormat(store, null);
     clearFxRefs();
     closeFormulaHelpers();
     refreshActions();
@@ -941,8 +935,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     if (!fxEditing && !suspended) return;
     invalidateLease();
     // System boundaries abandon a regular formula-bar edit in place. Do not
-    // restore the old pending format or move focus while the host replaces the
-    // context; clear only refs still owned by this edit.
+    // move focus while the host replaces the context; clear only refs still
+    // owned by this edit.
     fxEditing = false;
     editingAnchor = null;
     commitRejected = false;

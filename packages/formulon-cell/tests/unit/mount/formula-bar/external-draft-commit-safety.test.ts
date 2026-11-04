@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { addrKey } from '../../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/index.js';
@@ -445,7 +446,7 @@ describe('mount/formula-bar — native commit result', () => {
     harness.detach();
   });
 
-  it('keeps rejected external drafts open with raw input and pending format intact', () => {
+  it('keeps rejected external drafts open with raw input and the cell format intact', () => {
     const harness = attachFormulaBarHarness(
       sheet,
       vi.fn(),
@@ -463,15 +464,14 @@ describe('mount/formula-bar — native commit result', () => {
     });
     if (!draft) throw new Error('External draft did not start.');
     draft.setValue('denied');
-    mutators.setPendingFormat(sheet.instance.store, { addr, format: { italic: true } });
+    mutators.setCellFormat(sheet.instance.store, addr, { italic: true });
 
     expect(draft.commit()).toBe(false);
     expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'number', value: 1 });
     expect(draft.value()).toBe('denied');
     expect(harness.controller.isEditing()).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr,
-      format: { italic: true },
+    expect(sheet.instance.store.getState().format.formats.get(addrKey(addr))).toMatchObject({
+      italic: true,
     });
     expect(sheet.instance.history.canUndo()).toBe(false);
     draft.cancel();
@@ -490,7 +490,7 @@ describe('mount/formula-bar — native commit result', () => {
     sheet.workbook.setNumber(addr, 1);
     mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
     mutators.setActive(sheet.instance.store, addr);
-    mutators.setPendingFormat(sheet.instance.store, { addr, format: { underline: true } });
+    mutators.setCellFormat(sheet.instance.store, addr, { underline: true });
     const execute = vi.spyOn(sheet.instance.commands, 'execute').mockImplementation(() => {
       throw new Error('controller failed');
     });
@@ -502,9 +502,8 @@ describe('mount/formula-bar — native commit result', () => {
     draft.setValue('throw');
     expect(draft.commit()).toBe(false);
     expect(draft.value()).toBe('throw');
-    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
-      addr,
-      format: { underline: true },
+    expect(sheet.instance.store.getState().format.formats.get(addrKey(addr))).toMatchObject({
+      underline: true,
     });
     expect(harness.controller.isEditing()).toBe(true);
     draft.cancel();
@@ -526,7 +525,7 @@ describe('mount/formula-bar — native commit result', () => {
         showErrorMessage: true,
       },
     });
-    mutators.setPendingFormat(store, { addr, format: { italic: true } });
+    mutators.setCellFormat(store, addr, { italic: true });
     fallback.fxInput.value = '1';
     const stopDraft = asExternalDraftController(fallback.controller).beginExternalDraft(addr, '=', {
       onFinish: vi.fn(),
@@ -536,7 +535,7 @@ describe('mount/formula-bar — native commit result', () => {
     expect(stopDraft.commit()).toBe(false);
     expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'number', value: 1 });
     expect(stopDraft.value()).toBe('4');
-    expect(store.getState().ui.pendingFormat).toEqual({ addr, format: { italic: true } });
+    expect(store.getState().format.formats.get(addrKey(addr))).toMatchObject({ italic: true });
     expect(fallback.controller.isEditing()).toBe(true);
     expect(onValidation).toHaveBeenCalledWith(
       expect.objectContaining({ severity: 'stop', message: 'Value must be five.' }),

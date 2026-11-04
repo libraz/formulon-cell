@@ -4,17 +4,14 @@ import {
   type AxisFormatPatchResolver,
   prepareAxisFormatOverrideWithWorkbook,
 } from '../engine/axis-format-sync.js';
-import {
-  cellFormatFromXf,
-  effectiveCellFormatWithPending,
-} from '../engine/cell-format-projection.js';
+import { cellFormatFromXf, effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import { numFmtWithDecimals } from '../engine/format-writeback.js';
 import type { Addr, Range } from '../engine/types.js';
 import { activeSheetFontBaseline, isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import { currencySymbolForLocale } from '../format/locale.js';
+import { directCellFormat } from '../store/direct-format.js';
 import { mergeFormatPatch } from '../store/format-merge.js';
-import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import { subtractFromRangeValidations } from '../store/range-validations.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import {
@@ -46,7 +43,6 @@ export { formatNumber } from '../format/number-format.js';
 type ToggleKey = 'bold' | 'italic' | 'underline' | 'strike';
 
 export interface SelectionFormatOptions {
-  allowPending?: boolean;
   origin?: InteractionOrigin;
   commandId?: string;
 }
@@ -96,37 +92,6 @@ const authorizeSelection = (
   return decision.allowed;
 };
 
-const singleCellAddr = (range: Range): { sheet: number; row: number; col: number } | null =>
-  range.r0 === range.r1 && range.c0 === range.c1
-    ? { sheet: range.sheet, row: range.r0, col: range.c0 }
-    : null;
-
-const canStagePendingFormat = (state: State, range: Range): boolean => {
-  if ((state.selection.extraRanges?.length ?? 0) > 0 || state.ui.editor.kind !== 'idle') {
-    return false;
-  }
-  const addr = singleCellAddr(range);
-  if (!addr || !sameAddr(addr, state.selection.active)) return false;
-  const key = addrKey(addr);
-  if (state.format.formats.has(key)) return false;
-  const cell = state.data.cells.get(key);
-  return !cell || (cell.value.kind === 'blank' && !cell.formula);
-};
-
-const stagePendingFormat = (
-  state: State,
-  store: SpreadsheetStore,
-  range: Range,
-  patch: Partial<CellFormat>,
-): void => {
-  const addr = singleCellAddr(range);
-  if (!addr) return;
-  const previous = sameAddr(state.ui.pendingFormat?.addr ?? addr, addr)
-    ? (state.ui.pendingFormat?.format ?? {})
-    : {};
-  mutators.setPendingFormat(store, { addr, format: mergeFormatPatch(previous, patch) });
-};
-
 const mergeCellFormat = (
   previous: CellFormat | undefined,
   patch: Partial<CellFormat> | null,
@@ -144,20 +109,6 @@ const commitSelectionFormatEntries = (
   options: SelectionFormatOptions,
 ): boolean => {
   if (!authorizeSelection(store, ranges, cells, options)) return false;
-  const pendingEntry = entries.length === 1 ? entries[0] : undefined;
-  const pendingAddr = singleCellAddr(ranges[0] as Range);
-  if (
-    pendingEntry &&
-    pendingEntry.patch !== null &&
-    options.allowPending !== false &&
-    pendingAddr !== null &&
-    isCellFormattable(state, pendingAddr) &&
-    canStagePendingFormat(state, ranges[0] as Range)
-  ) {
-    stagePendingFormat(state, store, ranges[0] as Range, pendingEntry.patch);
-    return true;
-  }
-
   const writable = entries.filter((entry) => isCellFormattable(state, entry.addr));
   if (writable.length === 0) return false;
   store.setState((current) => {
@@ -171,7 +122,6 @@ const commitSelectionFormatEntries = (
     return {
       ...current,
       format: { ...current.format, formats },
-      ui: { ...current.ui, pendingFormat: null },
     };
   });
   return true;
@@ -294,7 +244,6 @@ const applyAxisFormatPatch = (
         sheetAxisOverrides: axisOverrides,
         sheetFontOverrides: sheetFonts,
       },
-      ui: { ...current.ui, pendingFormat: null },
     };
   });
   return true;
@@ -424,7 +373,6 @@ const clearSelectionFormat = (
       return {
         ...current,
         format: { ...current.format, formats },
-        ui: { ...current.ui, pendingFormat: null },
       };
     });
     return true;
@@ -466,7 +414,6 @@ const clearSelectionFormat = (
       return {
         ...current,
         format: { ...current.format, formats, sheetFontOverrides: overrides },
-        ui: { ...current.ui, pendingFormat: null },
       };
     });
     return true;
@@ -485,18 +432,7 @@ const clearSelectionFormat = (
         else formats.delete(key);
       }
     }
-    const pending = current.ui.pendingFormat?.addr;
-    const pendingSelected = pending
-      ? selectionIncludes(plan.ranges, pending) && isCellFormattable(current, pending)
-      : false;
-    return {
-      ...current,
-      format: { ...current.format, formats },
-      ui: {
-        ...current.ui,
-        ...(pendingSelected ? { pendingFormat: null } : {}),
-      },
-    };
+    return { ...current, format: { ...current.format, formats } };
   });
   return true;
 };
@@ -512,7 +448,6 @@ export function applyFormatPatch(
   store: SpreadsheetStore,
   range: Range,
   patch: Partial<CellFormat> | null,
-  opts: { allowPending?: boolean } = {},
 ): boolean {
   const allowed = sheetPermits(state, range.sheet, 'formatCells')
     ? range
@@ -541,11 +476,6 @@ export function applyFormatPatch(
       patch ?? {},
     );
   }
-  if (patch !== null && opts.allowPending !== false && canStagePendingFormat(state, range)) {
-    stagePendingFormat(state, store, range, patch);
-    return true;
-  }
-  if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
   // Fast path: sheet unprotected, or entire range writable.
   // We can still use the bulk mutator because per-cell-locked cells inside
   // a partially-unlocked range need to be skipped — fall through to the
@@ -572,31 +502,13 @@ const selectionAllHave = (
   state: State,
   cells: readonly Addr[],
   predicate: (f: CellFormat | undefined) => boolean,
-): boolean =>
-  cells.every((addr) => {
-    const pending = state.ui.pendingFormat;
-    const key = addrKey(addr);
-    const format =
-      pending && sameAddr(pending.addr, addr) && !state.format.formats.has(key)
-        ? formatWithPending(state, addr)
-        : state.format.formats.get(key);
-    return predicate(format);
-  });
+): boolean => cells.every((addr) => predicate(state.format.formats.get(addrKey(addr))));
 
 const selectionAnyHave = (
   state: State,
   cells: readonly Addr[],
   predicate: (f: CellFormat | undefined) => boolean,
-): boolean =>
-  cells.some((addr) => {
-    const pending = state.ui.pendingFormat;
-    const key = addrKey(addr);
-    const format =
-      pending && sameAddr(pending.addr, addr) && !state.format.formats.has(key)
-        ? formatWithPending(state, addr)
-        : state.format.formats.get(key);
-    return predicate(format);
-  });
+): boolean => cells.some((addr) => predicate(state.format.formats.get(addrKey(addr))));
 
 const effectiveSelectionFormat = (
   state: State,
@@ -604,8 +516,8 @@ const effectiveSelectionFormat = (
   addr: Addr,
 ): Partial<CellFormat> | undefined => {
   const workbook = formatHistoryBridgeFor(store)?.workbook;
-  if (workbook) return effectiveCellFormatWithPending(workbook, state, addr) ?? undefined;
-  return formatWithPending(state, addr);
+  if (workbook) return effectiveCellFormat(workbook, state, addr) ?? undefined;
+  return directCellFormat(state, addr);
 };
 
 const selectionAllHaveEffective = (
@@ -685,7 +597,7 @@ export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1)
   if (plan.axisBands.length > 0) {
     const resolveIndent: AxisFormatPatchResolver = (wb, baseXfIndex, addr) => {
       const current = addr
-        ? effectiveCellFormatWithPending(wb, state, addr)
+        ? effectiveCellFormat(wb, state, addr)
         : (() => {
             const xf = wb.getCellXf(baseXfIndex);
             return xf ? cellFormatFromXf(wb, xf, wb.workbookDefaultFont) : null;
@@ -697,7 +609,7 @@ export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1)
     return;
   }
   const entries = plan.cells.map((addr) => {
-    const cur = formatWithPending(state, addr)?.indent ?? 0;
+    const cur = directCellFormat(state, addr)?.indent ?? 0;
     return {
       addr,
       patch: { indent: clampIndent(cur + delta) },
@@ -772,7 +684,7 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
   if (plan.axisBands.length > 0) {
     const resolveDecimals: AxisFormatPatchResolver = (wb, baseXfIndex, addr) => {
       const current = addr
-        ? effectiveCellFormatWithPending(wb, state, addr)
+        ? effectiveCellFormat(wb, state, addr)
         : (() => {
             const xf = wb.getCellXf(baseXfIndex);
             return xf ? cellFormatFromXf(wb, xf, wb.workbookDefaultFont) : null;
@@ -785,7 +697,7 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
   }
   const entries: SelectionFormatEntry[] = [];
   for (const addr of plan.cells) {
-    const nextFmt = bumpedNumFmt(formatWithPending(state, addr)?.numFmt, delta);
+    const nextFmt = bumpedNumFmt(directCellFormat(state, addr)?.numFmt, delta);
     if (nextFmt) entries.push({ addr, patch: { numFmt: nextFmt } });
   }
   if (entries.length > 0)
@@ -917,19 +829,6 @@ export function applySelectionFormatAction(
     return applyAxisFormatPatch(state, store, plan, action.patch, options);
   }
 
-  if (
-    !action.border &&
-    options.allowPending !== false &&
-    plan.cells.length === 1 &&
-    plan.ranges.length === 1 &&
-    plan.cells[0] !== undefined &&
-    isCellFormattable(state, plan.cells[0]) &&
-    canStagePendingFormat(state, plan.ranges[0] as Range)
-  ) {
-    stagePendingFormat(state, store, plan.ranges[0] as Range, action.patch);
-    return true;
-  }
-
   const entries = new Map<string, Partial<CellFormat>>();
   for (const addr of plan.cells) entries.set(addrKey(addr), { ...action.patch });
   if (action.border) {
@@ -961,7 +860,7 @@ export function applySelectionFormatAction(
       const key = addrKey(addr);
       const patch = entries.get(key);
       if (!patch) continue;
-      const next = mergeActionCellFormat(formatWithPending(state, addr), patch);
+      const next = mergeActionCellFormat(directCellFormat(state, addr), patch);
       if (next) formats.set(key, next);
       else formats.delete(key);
     }
@@ -975,7 +874,6 @@ export function applySelectionFormatAction(
     return {
       ...current,
       format: { ...current.format, formats, rangeValidations },
-      ui: { ...current.ui, pendingFormat: null },
     };
   });
   return true;
@@ -1271,7 +1169,6 @@ function applyWholeSheetFontPatch(
         formats,
         sheetFontOverrides: overrides,
       },
-      ui: { ...current.ui, pendingFormat: null },
     };
   });
   return true;

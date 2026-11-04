@@ -16,7 +16,7 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { executeRibbonHyperlinkAction } from '../../../src/interact/ribbon-hyperlink.js';
 import { createHostShortcutHandler } from '../../../src/mount/host-shortcuts.js';
-import { formatWithPending } from '../../../src/store/pending-format.js';
+import { directCellFormat } from '../../../src/store/direct-format.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -59,7 +59,7 @@ const select = (store: SpreadsheetStore, range: Range): void => {
 };
 
 const bold = (store: SpreadsheetStore): boolean | undefined =>
-  formatWithPending(store.getState(), A1)?.bold;
+  directCellFormat(store.getState(), A1)?.bold;
 
 describe('format paths', () => {
   let store: SpreadsheetStore;

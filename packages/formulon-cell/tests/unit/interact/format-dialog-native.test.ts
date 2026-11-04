@@ -73,7 +73,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target, second],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, { align: 'center' });
             mutators.setCellFormat(store, second, { align: 'right' });
@@ -169,7 +168,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, { align: 'center' });
             throw new Error('dialog mutation failed before native publication');
@@ -210,7 +208,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, { align: 'center' });
             return true;
@@ -260,7 +257,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, { align: 'center' });
             return true;
@@ -308,7 +304,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, { fill: '#ffeeaa' });
             return true;
@@ -376,16 +371,7 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
-          mutate: () =>
-            applySelectionFormatAction(
-              store.getState(),
-              store,
-              { patch: after },
-              {
-                allowPending: false,
-              },
-            ),
+          mutate: () => applySelectionFormatAction(store.getState(), store, { patch: after }),
         }),
       ).toBe(true);
 
@@ -442,7 +428,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, { bold: false });
             return true;
@@ -486,7 +471,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target, other],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, {
               bold: false,
@@ -541,7 +525,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target, other],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, { bold: false });
             mutators.setCellFormat(store, other, { bold: false });
@@ -587,7 +570,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, {
               comment: 'new',
@@ -632,7 +614,6 @@ describe('Format Cells dialog native engine contract', () => {
           workbook,
           sheet: 0,
           targets: [target],
-          pendingBefore: null,
           mutate: () => {
             mutators.setCellFormat(store, target, {
               comment: 'new',

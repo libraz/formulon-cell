@@ -252,38 +252,6 @@ describe('store/selection — mutators', () => {
     expect(store.getState()).toBe(before);
   });
 
-  it('clears pending format only when a marquee moves the active cell', () => {
-    const store = createSpreadsheetStore();
-    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
-    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
-    mutators.setPendingFormat(store, {
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { bold: true },
-    });
-    mutators.applySelectionRectangle(
-      store,
-      store.getState().selection,
-      { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
-      'subtract',
-      { sheet: 0, row: 1, col: 1 },
-      { sheet: 0, row: 1, col: 1 },
-    );
-    expect(store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 0 },
-      format: { bold: true },
-    });
-
-    mutators.applySelectionRectangle(
-      store,
-      store.getState().selection,
-      { sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 },
-      'add',
-      { sheet: 0, row: 4, col: 4 },
-      { sheet: 0, row: 4, col: 4 },
-    );
-    expect(store.getState().ui.pendingFormat).toBeNull();
-  });
-
   it('rejects clamped, list-denied, predicate-denied, and partial-merge gestures without mutation', () => {
     const store = createSpreadsheetStore();
     mutators.setActive(store, { sheet: 0, row: 1, col: 1 });

@@ -861,14 +861,6 @@ describe('buildPrintDocument', () => {
       expect(doc.html).toContain('font-family:&quot;Aptos Display&quot;, system-ui');
       expect(doc.html).toContain('font-size:32px');
       expect(store.getState().format.formats.size).toBe(0);
-
-      mutators.setPendingFormat(store, {
-        addr: { sheet: 0, row: 0, col: 0 },
-        format: { fontSize: 8 },
-      });
-      const pendingDoc = buildPrintDocument(wb, store, 0, 'Print', { printableBounds: null });
-      expect(pendingDoc.html).toContain('font-size:8px');
-      expect(store.getState().format.formats.size).toBe(0);
     } finally {
       wb.dispose();
     }

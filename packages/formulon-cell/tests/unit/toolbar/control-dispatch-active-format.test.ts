@@ -40,12 +40,5 @@ describe('toolbar/ribbon control dispatch active format', () => {
 
     expect(dispatch.currentRibbonControlValue('fontColor')).toBe('#123456');
     expect(dispatch.currentRibbonControlValue('fillColor')).toBe('#abcdef');
-
-    mutators.setPendingFormat(instance.store, {
-      addr: member,
-      format: { color: '#fedcba', fill: '#654321' },
-    });
-    expect(dispatch.currentRibbonControlValue('fontColor')).toBe('#fedcba');
-    expect(dispatch.currentRibbonControlValue('fillColor')).toBe('#654321');
   });
 });

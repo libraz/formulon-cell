@@ -107,13 +107,10 @@ describe('mount/formula-bar — edit lifecycle', () => {
     expect(formulabar.dataset.fcEditing).toBe('0');
   });
 
-  it('Enter applies pending empty-cell format to the committed formula-bar value', () => {
+  it("Enter keeps an empty cell's format on the committed formula-bar value", () => {
     const addr = { sheet: 0, row: 0, col: 0 };
     mutators.setActive(sheet.instance.store, addr);
-    mutators.setPendingFormat(sheet.instance.store, {
-      addr,
-      format: { bold: true, numFmt: { kind: 'text' } },
-    });
+    mutators.setCellFormat(sheet.instance.store, addr, { bold: true, numFmt: { kind: 'text' } });
     fxInput.focus();
     fxInput.dispatchEvent(new FocusEvent('focus'));
     fxInput.value = 'typed';
@@ -121,7 +118,6 @@ describe('mount/formula-bar — edit lifecycle', () => {
     fxInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     expect(sheet.instance.store.getState().format.formats.get('0:0:0')?.bold).toBe(true);
-    expect(sheet.instance.store.getState().ui.pendingFormat).toBeNull();
   });
 
   it('Enter preserves numeric-looking input as text for cells formatted as Text', () => {

@@ -337,7 +337,7 @@ describe('executeRibbonClearAction', () => {
       validation: { kind: 'whole', op: 'between', a: 1, b: 9 },
       italic: true,
     });
-    mutators.setPendingFormat(store, { addr: extra, format: { fill: '#ff0' } });
+    mutators.setCellFormat(store, extra, { fill: '#ff0' });
     store.setState((s) => ({
       ...s,
       conditional: {
@@ -360,7 +360,6 @@ describe('executeRibbonClearAction', () => {
       expect(commentAt(store.getState(), extra)).toBeNull();
       expect(store.getState().format.formats.get(key(primary))).toBeUndefined();
       expect(store.getState().format.formats.get(key(extra))).toBeUndefined();
-      expect(store.getState().ui.pendingFormat).toBeNull();
       expect(store.getState().conditional.rules).toHaveLength(0);
       expect(history.undo()).toBe(true);
       expect(workbook.getValue(primary)).toEqual({ kind: 'number', value: 7 });
@@ -469,9 +468,7 @@ describe('executeRibbonClearAction', () => {
           ...state.selection,
           extraRanges: [{ sheet: 0, r0: extra.row, c0: extra.col, r1: extra.row, c1: extra.col }],
         },
-        ui: { ...state.ui, pendingFormat: { addr: extra, format: { fill: '#ff0' } } },
       }));
-      const beforePending = structuredClone(store.getState().ui.pendingFormat);
       const beforePrimary = workbook.getComment(0, primary.row, primary.col);
       const beforeExtra = workbook.getComment(0, extra.row, extra.col);
       const originalSetCommentEntry = workbook.setCommentEntry.bind(workbook);
@@ -490,7 +487,6 @@ describe('executeRibbonClearAction', () => {
       expect(workbook.getComment(0, extra.row, extra.col)).toEqual(beforeExtra);
       expect(commentAt(store.getState(), primary)).toBe('primary');
       expect(commentAt(store.getState(), extra)).toBe('extra');
-      expect(store.getState().ui.pendingFormat).toEqual(beforePending);
       expect(history.canUndo()).toBe(false);
     } finally {
       workbook.dispose();
@@ -925,7 +921,7 @@ describe('executeRibbonClearAction', () => {
     );
   });
 
-  it('keeps metadata, pending format, and history unchanged when the content batch is rejected', async () => {
+  it('keeps metadata, formats, and history unchanged when the content batch is rejected', async () => {
     const store = createSpreadsheetStore();
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const history = new History();
@@ -935,7 +931,7 @@ describe('executeRibbonClearAction', () => {
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     setComment(store, addr, 'keep');
     mutators.setCellFormat(store, addr, { bold: true });
-    mutators.setPendingFormat(store, { addr, format: { fill: '#ff0' } });
+    mutators.setCellFormat(store, addr, { fill: '#ff0' });
     vi.spyOn(workbook, 'applyCellPatchAtomic').mockImplementation(() => {
       throw new Error('injected content failure');
     });
@@ -944,14 +940,14 @@ describe('executeRibbonClearAction', () => {
       expect(workbook.getValue(addr)).toEqual({ kind: 'number', value: 7 });
       expect(commentAt(store.getState(), addr)).toBe('keep');
       expect(store.getState().format.formats.get(key(addr))?.bold).toBe(true);
-      expect(store.getState().ui.pendingFormat).toEqual({ addr, format: { fill: '#ff0' } });
+      expect(store.getState().format.formats.get(key(addr))?.fill).toBe('#ff0');
       expect(history.canUndo()).toBe(false);
     } finally {
       workbook.dispose();
     }
   });
 
-  it('restores pending and scoped formats when a later engine flush fails', async () => {
+  it('restores scoped formats when a later engine flush fails', async () => {
     const store = createSpreadsheetStore();
     const workbook = await WorkbookHandle.createDefault();
     const history = new History();
@@ -961,7 +957,7 @@ describe('executeRibbonClearAction', () => {
     mutators.setCellFormat(store, target, { bold: true });
     mutators.setCellFormat(store, outside, { italic: true });
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
-    mutators.setPendingFormat(store, { addr: target, format: { fill: '#ff0' } });
+    mutators.setCellFormat(store, target, { fill: '#ff0' });
     flushFormatToEngine(workbook, store, 0);
     const beforeTargetXf = workbook.getCellXfIndex(0, target.row, target.col);
     const beforeOutsideXf = workbook.getCellXfIndex(0, outside.row, outside.col);
@@ -974,14 +970,11 @@ describe('executeRibbonClearAction', () => {
     };
     expect(fontFor(target)?.bold).toBe(true);
     expect(fontFor(outside)?.italic).toBe(true);
-    const beforePending = structuredClone(store.getState().ui.pendingFormat);
     const originalAddXfRecord = workbook.addXfRecord.bind(workbook);
-    let sawPendingCleared = false;
     let injected = false;
     vi.spyOn(workbook, 'addXfRecord').mockImplementation((record) => {
-      if (!injected && store.getState().ui.pendingFormat === null) {
+      if (!injected) {
         injected = true;
-        sawPendingCleared = true;
         throw new Error('injected format flush failure');
       }
       return originalAddXfRecord(record);
@@ -990,14 +983,12 @@ describe('executeRibbonClearAction', () => {
       expect(() => executeRibbonClearAction({ store, workbook, history, action: 'all' })).toThrow(
         'injected format flush failure',
       );
-      expect(sawPendingCleared).toBe(true);
       expect(workbook.getCellXfIndex(0, target.row, target.col)).toBe(beforeTargetXf);
       expect(workbook.getCellXfIndex(0, outside.row, outside.col)).toBe(beforeOutsideXf);
       expect(fontFor(target)?.bold).toBe(true);
       expect(fontFor(outside)?.italic).toBe(true);
       expect(store.getState().format.formats.get(key(target))?.bold).toBe(true);
       expect(store.getState().format.formats.get(key(outside))?.italic).toBe(true);
-      expect(store.getState().ui.pendingFormat).toEqual(beforePending);
       expect(history.canUndo()).toBe(false);
     } finally {
       workbook.dispose();

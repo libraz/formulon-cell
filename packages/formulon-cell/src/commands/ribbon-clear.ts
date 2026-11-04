@@ -88,8 +88,6 @@ type SelectionClearPlan = {
   readonly comments: readonly Addr[];
   readonly hyperlinks: readonly Addr[];
   readonly validations: readonly Addr[];
-  readonly pendingTarget: Addr | null;
-  readonly pendingBefore: State['ui']['pendingFormat'];
   readonly conditionalRuleIndexes: readonly number[];
   readonly writableConditionalRuleIndexes: readonly number[];
 };
@@ -182,9 +180,6 @@ const buildPlan = (
     if (format.validation !== undefined) validations.push(addr);
   }
 
-  const pending = state.ui.pendingFormat;
-  const pendingTarget =
-    pending && selectionContainsAddr(selection, pending.addr) ? cloneAddr(pending.addr) : null;
   const conditionalRuleIndexes: number[] = [];
   const writableConditionalRuleIndexes: number[] = [];
   state.conditional.rules.forEach((rule, index) => {
@@ -203,8 +198,6 @@ const buildPlan = (
     comments: uniqueAddrs(comments),
     hyperlinks: uniqueAddrs(hyperlinks),
     validations: uniqueAddrs(validations),
-    pendingTarget,
-    pendingBefore: cloneValue(pending),
     conditionalRuleIndexes,
     writableConditionalRuleIndexes,
   };
@@ -267,7 +260,6 @@ const recordClearFormatEntries = (
 ): void => {
   const tracked = uniqueAddrs(addrs);
   const before = snapshotScopedFormats(store.getState(), tracked);
-  const pendingBefore = cloneValue(store.getState().ui.pendingFormat);
   try {
     mutate();
     flushFormatToEngine(workbook, store, sheet);
@@ -276,9 +268,8 @@ const recordClearFormatEntries = (
       applyScopedFormats(store, workbook, sheet, before);
     } catch {
       // Preserve the original engine/mutation error; the outer transaction
-      // still restores its material children and pending state.
+      // still restores its material children.
     }
-    mutators.setPendingFormat(store, pendingBefore);
     throw error;
   }
   const after = snapshotScopedFormats(store.getState(), tracked);
@@ -300,28 +291,12 @@ const recordClearFormatEntries = (
   history.push(entry);
 };
 
-const selectionForPlan = (plan: SelectionClearPlan): State['selection'] => ({
-  active: {
-    sheet: plan.sheet,
-    row: plan.ranges[0]?.r0 ?? 0,
-    col: plan.ranges[0]?.c0 ?? 0,
-  },
-  anchor: {
-    sheet: plan.sheet,
-    row: plan.ranges[0]?.r0 ?? 0,
-    col: plan.ranges[0]?.c0 ?? 0,
-  },
-  range: plan.ranges[0] ?? { sheet: plan.sheet, r0: 0, c0: 0, r1: 0, c1: 0 },
-  extraRanges: plan.ranges.slice(1),
-});
-
 const clearPlannedFormats = (
   store: SpreadsheetStore,
   plan: SelectionClearPlan,
   visualOnly: boolean,
 ): void => {
   const selected = new Set(plan.formatEntries.map(addrKey));
-  const selection = selectionForPlan(plan);
   store.setState((state) => {
     const formats = new Map(state.format.formats);
     for (const key of selected) {
@@ -337,12 +312,6 @@ const clearPlannedFormats = (
       if (Object.keys(next).length === 0) formats.delete(key);
       else formats.set(key, next);
     }
-    const pending = state.ui.pendingFormat;
-    const pendingSelected =
-      pending !== null &&
-      pending !== undefined &&
-      selectionContainsAddr(selection, pending.addr) &&
-      isCellWritable(state, pending.addr);
     let rangeValidations = state.format.rangeValidations;
     if (!visualOnly) {
       for (const range of plan.ranges) {
@@ -352,7 +321,6 @@ const clearPlannedFormats = (
     return {
       ...state,
       format: { ...state.format, formats, rangeValidations },
-      ui: { ...state.ui, ...(pendingSelected ? { pendingFormat: null } : {}) },
     };
   });
 };
@@ -483,21 +451,15 @@ const preflightPlan = (
   }
   if (!preflight(controller, 'validation', commandId, effectsForCells(plan.validations)))
     return false;
-  const fullFormat = uniqueAddrs([
-    ...plan.formatEntries,
-    ...(plan.pendingTarget ? [plan.pendingTarget] : []),
-  ]);
-  if (!preflight(controller, 'format', commandId, effectsForCells(fullFormat))) return false;
+  if (!preflight(controller, 'format', commandId, effectsForCells(plan.formatEntries))) {
+    return false;
+  }
   return preflight(
     controller,
     'format',
     commandId,
     effectsForRanges(rangesForRuleIndexes(deps.store.getState(), plan.conditionalRuleIndexes)),
   );
-};
-
-const restorePending = (store: SpreadsheetStore, pending: State['ui']['pendingFormat']): void => {
-  mutators.setPendingFormat(store, cloneValue(pending));
 };
 
 const refreshCells = (store: SpreadsheetStore, workbook: WorkbookHandle, sheet: number): void => {
@@ -550,7 +512,6 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
             content: [],
             formatEntries: [],
             visualEntries: [],
-            pendingTarget: null,
             conditionalRuleIndexes: [],
           }
         : action === 'hyperlinks'
@@ -561,7 +522,6 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
               content: [],
               formatEntries: [],
               visualEntries: [],
-              pendingTarget: null,
               conditionalRuleIndexes: [],
             }
           : action === 'conditional'
@@ -573,7 +533,6 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
                 content: [],
                 formatEntries: [],
                 visualEntries: [],
-                pendingTarget: null,
                 conditionalRuleIndexes: plan.conditionalRuleIndexes,
               }
             : plan;
@@ -599,10 +558,7 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
 
   try {
     if (action === 'formats') {
-      const targets = uniqueAddrs([
-        ...plan.visualEntries,
-        ...(plan.pendingTarget ? [plan.pendingTarget] : []),
-      ]);
+      const targets = plan.visualEntries;
       recordClearFormatEntries(
         history,
         store,
@@ -639,7 +595,6 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       return;
     }
 
-    const pendingBefore = cloneValue(plan.pendingBefore);
     const token = history.begin();
     try {
       const result = clearSelectedContents({
@@ -662,10 +617,7 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
         });
       }
 
-      const formatTargets = uniqueAddrs([
-        ...plan.formatEntries,
-        ...(plan.pendingTarget ? [plan.pendingTarget] : []),
-      ]);
+      const formatTargets = plan.formatEntries;
       if (formatTargets.length > 0) {
         recordClearFormatEntries(history, store, workbook, plan.sheet, formatTargets, () =>
           withSelectionFormatOrigin(
@@ -689,7 +641,6 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       try {
         history.abort(token);
       } finally {
-        restorePending(store, pendingBefore);
         refreshCells(store, workbook, plan.sheet);
       }
       throw error;

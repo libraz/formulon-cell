@@ -22,7 +22,7 @@ import { executeNoteVisibilityAction } from '../commands/ribbon-comment.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -544,7 +544,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const activeAddr = state.selection.active;
     const merge = mergeAt(state, activeAddr);
     const formatAddr = merge ? { sheet: merge.sheet, row: merge.r0, col: merge.c0 } : activeAddr;
-    const format = effectiveCellFormatWithPending(wb, state, formatAddr);
+    const format = effectiveCellFormat(wb, state, formatAddr);
     const pressedById: Partial<Record<ItemId, boolean>> = {
       bold: format?.bold === true,
       italic: format?.italic === true,

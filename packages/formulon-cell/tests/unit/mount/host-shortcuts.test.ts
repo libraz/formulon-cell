@@ -4,6 +4,7 @@ import { copy } from '../../../src/commands/clipboard/copy.js';
 import type { ClipboardSnapshot } from '../../../src/commands/clipboard/snapshot.js';
 import { captureSnapshotFromCopyResult } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
+import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { disposeCellShiftDialog } from '../../../src/interact/cell-shift-dialog.js';
@@ -353,6 +354,10 @@ describe('mount/host-shortcuts', () => {
     expect(document.querySelector('.fc-cellshift')).not.toBeNull();
   });
 
+  /** The format written to the active cell. */
+  const activeFormat = () =>
+    s.store.getState().format.formats.get(addrKey(s.store.getState().selection.active));
+
   it.each([
     { event: { key: '~', code: 'Backquote', ctrlKey: true, shiftKey: true }, expected: 'general' },
     { event: { key: '!', code: 'Digit1', ctrlKey: true, shiftKey: true }, expected: 'fixed' },
@@ -364,7 +369,7 @@ describe('mount/host-shortcuts', () => {
   ])('Ctrl+Shift+$key applies the $expected number format', ({ event, expected }) => {
     const e = key(event);
     s.handler(e);
-    expect(s.store.getState().ui.pendingFormat?.format.numFmt?.kind).toBe(expected);
+    expect(activeFormat()?.numFmt?.kind).toBe(expected);
     expect(e.defaultPrevented).toBe(true);
   });
 
@@ -375,10 +380,7 @@ describe('mount/host-shortcuts', () => {
     const e = key({ key: 'F4' });
     s.handler(e);
 
-    expect(s.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 1 },
-      format: { numFmt: { kind: 'currency', symbol: '$', decimals: 2 } },
-    });
+    expect(activeFormat()).toEqual({ numFmt: { kind: 'currency', symbol: '$', decimals: 2 } });
     expect(e.defaultPrevented).toBe(true);
   });
 
@@ -388,15 +390,12 @@ describe('mount/host-shortcuts', () => {
 
     s.handler(key({ key: 'F4' }));
 
-    expect(s.store.getState().ui.pendingFormat).toEqual({
-      addr: { sheet: 0, row: 0, col: 1 },
-      format: { bold: true },
-    });
+    expect(activeFormat()).toEqual({ bold: true });
   });
 
   it('reads the current locale for direct and repeated number formats', () => {
     s.handler(key({ key: '$', code: 'Digit4', ctrlKey: true, shiftKey: true }));
-    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+    expect(activeFormat()?.numFmt).toEqual({
       kind: 'currency',
       symbol: '$',
       decimals: 2,
@@ -405,34 +404,34 @@ describe('mount/host-shortcuts', () => {
     s.setLocale('ja-JP');
     mutators.setActive(s.store, { sheet: 0, row: 0, col: 1 });
     s.handler(key({ key: 'F4' }));
-    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+    expect(activeFormat()?.numFmt).toEqual({
       kind: 'currency',
       symbol: '¥',
       decimals: 2,
     });
 
     s.handler(key({ key: '#', code: 'Digit3', ctrlKey: true, shiftKey: true }));
-    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+    expect(activeFormat()?.numFmt).toEqual({
       kind: 'date',
       pattern: 'yyyy/m/d',
     });
     s.setLocale('en-US');
     mutators.setActive(s.store, { sheet: 0, row: 0, col: 2 });
     s.handler(key({ key: 'F4' }));
-    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+    expect(activeFormat()?.numFmt).toEqual({
       kind: 'date',
       pattern: 'm/d/yyyy',
     });
 
     s.handler(key({ key: '@', code: 'Digit2', ctrlKey: true, shiftKey: true }));
-    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+    expect(activeFormat()?.numFmt).toEqual({
       kind: 'time',
       pattern: 'h:MM AM/PM',
     });
     s.setLocale('ja-JP');
     mutators.setActive(s.store, { sheet: 0, row: 0, col: 3 });
     s.handler(key({ key: 'F4' }));
-    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+    expect(activeFormat()?.numFmt).toEqual({
       kind: 'time',
       pattern: 'H:MM',
     });
@@ -465,7 +464,7 @@ describe('mount/host-shortcuts', () => {
     expect(s.recalc).not.toHaveBeenCalled();
     expect(s.addSheet).not.toHaveBeenCalled();
     expect(s.invalidate).not.toHaveBeenCalled();
-    expect(s.store.getState().ui.pendingFormat).toBeNull();
+    expect(s.store.getState().format.formats.size).toBe(0);
   });
 
   it('Ctrl+Shift+V opens paste-special', () => {

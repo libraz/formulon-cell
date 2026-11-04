@@ -116,11 +116,7 @@ const captureFormats = (
   return result;
 };
 
-const applyFormats = (
-  store: SpreadsheetStore,
-  formats: FormatMapSnapshot,
-  pending?: { readonly value: State['ui']['pendingFormat'] },
-): void => {
+const applyFormats = (store: SpreadsheetStore, formats: FormatMapSnapshot): void => {
   store.setState((state) => {
     const next = new Map(state.format.formats);
     for (const [key, format] of formats) {
@@ -130,7 +126,6 @@ const applyFormats = (
     return {
       ...state,
       format: { ...state.format, formats: next },
-      ui: pending === undefined ? state.ui : { ...state.ui, pendingFormat: clone(pending.value) },
     };
   });
 };
@@ -315,13 +310,12 @@ const restoreAfterFailure = (
   formats: FormatMapSnapshot,
   sheetFont: SheetFontSnapshot,
   axis: AxisSnapshot,
-  pending: State['ui']['pendingFormat'],
   comments: CommentSnapshot,
   nativeXfs: NativeXfSnapshot,
   tracking: ReadonlyMap<string, boolean>,
 ): void => {
   withEngineSyncMuted(workbook, () => {
-    applyFormats(store, formats, { value: pending });
+    applyFormats(store, formats);
     applySheetFont(store, sheet, sheetFont);
     applyAxis(store, sheet, axis);
     if (!workbook) return;
@@ -363,10 +357,9 @@ const restoreStoreAfterFailure = (
   formats: FormatMapSnapshot,
   sheetFont: SheetFontSnapshot,
   axis: AxisSnapshot,
-  pending: State['ui']['pendingFormat'],
 ): void => {
   withEngineSyncMuted(workbook, () => {
-    applyFormats(store, formats, { value: pending });
+    applyFormats(store, formats);
     applySheetFont(store, sheet, sheetFont);
     applyAxis(store, sheet, axis);
   });
@@ -378,7 +371,6 @@ export interface RecordDialogFormatChangeOptions {
   readonly workbook: WorkbookHandle | null;
   readonly sheet: number;
   readonly targets: readonly Addr[];
-  readonly pendingBefore: State['ui']['pendingFormat'];
   readonly mutate: () => boolean;
   readonly repeat?: () => void;
   /** Defer repeat registration when this entry is inside an outer transaction. */
@@ -393,7 +385,6 @@ export function recordDialogFormatChange(options: RecordDialogFormatChangeOption
     workbook: suppliedWorkbook,
     sheet,
     targets,
-    pendingBefore,
     mutate,
     repeat,
     registerRepeat = true,
@@ -402,7 +393,6 @@ export function recordDialogFormatChange(options: RecordDialogFormatChangeOption
   const beforeFormats = captureFormats(store.getState(), targets);
   const beforeSheetFont = cloneSheetFont(store.getState().format.sheetFontOverrides?.get(sheet));
   const beforeAxis = cloneAxis(store.getState().format.sheetAxisOverrides?.get(sheet));
-  const beforePending = clone(pendingBefore);
   const beforeComments = captureComments(workbook, targets);
 
   let afterFormats: Map<string, CellFormat | undefined>;
@@ -419,8 +409,8 @@ export function recordDialogFormatChange(options: RecordDialogFormatChangeOption
     const sheetFontChanged = !same(beforeSheetFont, afterSheetFont);
     const axisChanged = !same(beforeAxis, afterAxis);
     if (changed.size === 0 && !sheetFontChanged && !axisChanged) {
-      // Accepted no-op and pending-only formats are UI-side repeat seeds. They
-      // have no engine publication or material history entry.
+      // An accepted no-op is a UI-side repeat seed with no engine publication
+      // or material history entry.
       if (registerRepeat) history?.setRepeat(repeat ?? null);
       return true;
     }
@@ -476,7 +466,6 @@ export function recordDialogFormatChange(options: RecordDialogFormatChangeOption
           beforeFormats,
           beforeSheetFont,
           beforeAxis,
-          beforePending,
           beforeComments,
           beforeNativeXfs,
           beforeTracking,
@@ -489,7 +478,6 @@ export function recordDialogFormatChange(options: RecordDialogFormatChangeOption
           beforeFormats,
           beforeSheetFont,
           beforeAxis,
-          beforePending,
         );
       }
     } catch (rollbackError) {
@@ -514,7 +502,6 @@ export function recordDialogFormatChange(options: RecordDialogFormatChangeOption
       store.getState().format.sheetFontOverrides?.get(sheet),
     );
     const immediateAxis = cloneAxis(store.getState().format.sheetAxisOverrides?.get(sheet));
-    const immediatePending = clone(store.getState().ui.pendingFormat);
     const immediateComments = captureComments(workbook, targets);
     const nativeKeys = new Set(nativeXfs.keys());
     const immediateNativeXfs = captureNativeXfs(workbook, nativeKeys);
@@ -522,8 +509,6 @@ export function recordDialogFormatChange(options: RecordDialogFormatChangeOption
       ? captureSyncedFormatKeyMembership(workbook, nativeKeys)
       : new Map<string, boolean>();
     try {
-      // A material dialog history entry must not overwrite a later pending
-      // format created by an unrelated blank-cell edit.
       withEngineSyncMuted(workbook, () => {
         applyFormats(store, formats);
         applySheetFont(store, sheet, sheetFont);
@@ -543,7 +528,6 @@ export function recordDialogFormatChange(options: RecordDialogFormatChangeOption
           immediateFormats,
           immediateSheetFont,
           immediateAxis,
-          immediatePending,
           immediateComments,
           immediateNativeXfs,
           immediateTracking,

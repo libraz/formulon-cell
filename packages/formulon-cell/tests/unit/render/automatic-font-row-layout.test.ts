@@ -97,7 +97,8 @@ describe('automatic font row layout', () => {
     }
   });
 
-  it('waits for an authored format instead of measuring a pending blank-cell format', async () => {
+  it('grows the row as soon as a larger font is set on an empty cell', async () => {
+    // Excel: 24 pt on an empty A1 heightens row 1 at once, before any input.
     const workbook = await WorkbookHandle.createDefault({ locale: 'en-US' });
     const mounted = await mountStubSheet({ workbook });
     try {
@@ -106,13 +107,20 @@ describe('automatic font row layout', () => {
       const original = layoutForView(store.getState()).defaultRowHeight;
 
       expect(setFont(store.getState(), store, { fontSize: fontPointsToCssPx(24) })).toBe(true);
-      const pending = layoutForView(store.getState());
-      expect(store.getState().ui.pendingFormat?.format.fontSize).toBe(fontPointsToCssPx(24));
-      expect(pending.rowHeights.get(0)).toBeUndefined();
-      expect(pending.defaultRowHeight).toBe(original);
+      expect(store.getState().format.formats.get('0:0:0')?.fontSize).toBe(fontPointsToCssPx(24));
+      const grown = layoutForView(store.getState()).rowHeights.get(0);
+      expect(grown).toBeGreaterThan(original);
 
-      mutators.setCellFormat(store, A1, { fontSize: fontPointsToCssPx(24) });
-      expect(layoutForView(store.getState()).rowHeights.get(0)).toBeGreaterThan(original);
+      // The same height an authored format gives the row.
+      const authored = await WorkbookHandle.createDefault({ locale: 'en-US' });
+      const reference = await mountStubSheet({ workbook: authored });
+      try {
+        mutators.setCellFormat(reference.instance.store, A1, { fontSize: fontPointsToCssPx(24) });
+        expect(grown).toBe(layoutForView(reference.instance.store.getState()).rowHeights.get(0));
+      } finally {
+        reference.dispose();
+        authored.dispose();
+      }
     } finally {
       mounted.dispose();
       workbook.dispose();

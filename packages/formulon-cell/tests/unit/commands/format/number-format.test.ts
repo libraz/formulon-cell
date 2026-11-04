@@ -6,7 +6,7 @@ import {
   setNumFmt,
 } from '../../../../src/commands/format.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
-import { effectiveFmtAt, setRange } from './fixtures.js';
+import { fmtAt, setRange } from './fixtures.js';
 
 describe('setNumFmt / cycleCurrency / cyclePercent', () => {
   let store: SpreadsheetStore;
@@ -18,12 +18,12 @@ describe('setNumFmt / cycleCurrency / cyclePercent', () => {
 
   it('setNumFmt installs the supplied format', () => {
     setNumFmt(store.getState(), store, { kind: 'fixed', decimals: 3 });
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 3 });
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 3 });
   });
 
   it('cycleCurrency turns currency on when none is set', () => {
     cycleCurrency(store.getState(), store);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({
       kind: 'currency',
       decimals: 2,
       symbol: '$',
@@ -32,7 +32,7 @@ describe('setNumFmt / cycleCurrency / cyclePercent', () => {
 
   it('cycleCurrency uses the active locale currency symbol', () => {
     cycleCurrency(store.getState(), store, 'ja');
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({
       kind: 'currency',
       decimals: 2,
       symbol: '¥',
@@ -42,14 +42,14 @@ describe('setNumFmt / cycleCurrency / cyclePercent', () => {
   it('cycleCurrency clears back to general when at least one cell is currency', () => {
     cycleCurrency(store.getState(), store); // on
     cycleCurrency(store.getState(), store); // off
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'general' });
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'general' });
   });
 
   it('cyclePercent toggles percent on / off', () => {
     cyclePercent(store.getState(), store);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'percent', decimals: 0 });
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'percent', decimals: 0 });
     cyclePercent(store.getState(), store);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'general' });
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'general' });
   });
 });
 
@@ -63,26 +63,26 @@ describe('bumpDecimals', () => {
 
   it('promotes a general cell to fixed:2 on +1', () => {
     bumpDecimals(store.getState(), store, 1);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 2 });
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 2 });
   });
 
   it('does nothing on -1 when the cell is general', () => {
     bumpDecimals(store.getState(), store, -1);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toBeUndefined();
+    expect(fmtAt(store, 0, 0)?.numFmt).toBeUndefined();
   });
 
   it('walks fixed decimals up and down with clamping', () => {
     setNumFmt(store.getState(), store, { kind: 'fixed', decimals: 0 });
     bumpDecimals(store.getState(), store, -1);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 0 });
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 0 });
     for (let i = 0; i < 12; i += 1) bumpDecimals(store.getState(), store, 1);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 10 });
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 10 });
   });
 
   it('preserves currency symbol while bumping decimals', () => {
     setNumFmt(store.getState(), store, { kind: 'currency', decimals: 2, symbol: '€' });
     bumpDecimals(store.getState(), store, 1);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({
       kind: 'currency',
       decimals: 3,
       symbol: '€',
@@ -93,7 +93,7 @@ describe('bumpDecimals', () => {
     const pattern = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "€"_-;_-@_-';
     setNumFmt(store.getState(), store, { kind: 'accounting', decimals: 2, symbol: '€', pattern });
     bumpDecimals(store.getState(), store, -1);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({
       kind: 'accounting',
       decimals: 1,
       symbol: '€',
@@ -101,7 +101,7 @@ describe('bumpDecimals', () => {
     });
     bumpDecimals(store.getState(), store, -1);
     bumpDecimals(store.getState(), store, -1);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({
       kind: 'accounting',
       decimals: 0,
       symbol: '€',
@@ -118,7 +118,7 @@ describe('bumpDecimals', () => {
       pattern: '"¥"#,##0;[Red]"¥"\\-#,##0',
     });
     bumpDecimals(store.getState(), store, 1);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({
       kind: 'currency',
       decimals: 1,
       symbol: '¥',
@@ -130,6 +130,6 @@ describe('bumpDecimals', () => {
   it('walks percent decimals', () => {
     setNumFmt(store.getState(), store, { kind: 'percent', decimals: 0 });
     bumpDecimals(store.getState(), store, 1);
-    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'percent', decimals: 1 });
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'percent', decimals: 1 });
   });
 });

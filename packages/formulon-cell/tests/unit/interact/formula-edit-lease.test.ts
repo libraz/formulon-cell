@@ -21,7 +21,6 @@ const snapshot = (workbook: WorkbookHandle): FormulaEditLeaseSnapshot => ({
     extraRanges: [{ sheet: 0, r0: 8, c0: 1, r1: 8, c1: 2 }],
   },
   editorMode: { kind: 'edit', raw: '=SUM(A1:B2)', caret: 10 },
-  pendingFormat: { addr: { ...addr }, format: { bold: true } },
   editorRefs: [{ r0: 0, c0: 0, r1: 1, c1: 1, colorIndex: 2 }],
   copy: {
     copyRange: { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 },
@@ -55,11 +54,9 @@ describe('formula edit lease', () => {
     });
 
     (original.selection.active as { row: number }).row = 99;
-    if (original.pendingFormat?.format) original.pendingFormat.format.bold = false;
     expect(lease.valid()).toBe(true);
     expect(lease.snapshot.workbook).toBe(workbook);
     expect(lease.snapshot.selection.active.row).toBe(2);
-    expect(lease.snapshot.pendingFormat?.format.bold).toBe(true);
 
     lease.finalize();
     lease.finalize();

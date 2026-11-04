@@ -164,7 +164,5 @@ export const sparseSelectionGeometry = (
     const addr = parseAddrKey(key);
     if (addr && selectionIncludes(normalized, addr)) cells.push(addr);
   }
-  const pending = state.ui.pendingFormat?.addr;
-  if (pending && selectionIncludes(normalized, pending)) cells.push(pending);
   return { ranges: normalized, cells };
 };

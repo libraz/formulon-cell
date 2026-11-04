@@ -7,7 +7,7 @@ import {
   navigationPolicyFor,
   navigationSelectionBoundsFor,
 } from '../interact/navigation-policy.js';
-import { sameAddr } from './pending-format.js';
+import { sameAddr } from './direct-format.js';
 import {
   applySelectionRectangle,
   rangeContainsAddr,
@@ -18,11 +18,6 @@ import {
 } from './selection-geometry.js';
 import type { SpreadsheetStore } from './store.js';
 import type { State } from './types.js';
-
-const clearPendingFormatOnMove = (s: State, nextActive: Addr): State['ui'] =>
-  s.ui.pendingFormat && !sameAddr(s.ui.pendingFormat.addr, nextActive)
-    ? { ...s.ui, pendingFormat: null }
-    : s.ui;
 
 /** Navigation is optional. Keep legacy mutator behavior until a policy is
  * registered for the store. */
@@ -181,7 +176,6 @@ export const selectionMutators = {
       if (!active || !range) return s;
       return {
         ...s,
-        ui: clearPendingFormatOnMove(s, active),
         selection: {
           active,
           anchor: active,
@@ -216,7 +210,6 @@ export const selectionMutators = {
       }
       return {
         ...s,
-        ui: clearPendingFormatOnMove(s, active),
         selection: { ...s.selection, active },
       };
     });
@@ -243,7 +236,6 @@ export const selectionMutators = {
       // cell to primary so future shift-extends widen the new band.
       return {
         ...s,
-        ui: clearPendingFormatOnMove(s, next),
         selection: {
           active: next,
           anchor: next,
@@ -276,7 +268,6 @@ export const selectionMutators = {
       if (sameAsPrimary) return s;
       return {
         ...s,
-        ui: clearPendingFormatOnMove(s, nextActive),
         selection: {
           active: nextActive,
           anchor: nextActive,
@@ -341,7 +332,6 @@ export const selectionMutators = {
       changed = true;
       return {
         ...s,
-        ui: sameAddr(s.selection.active, active) ? s.ui : clearPendingFormatOnMove(s, active),
         selection: {
           active,
           anchor: anchorAddr,
@@ -370,7 +360,6 @@ export const selectionMutators = {
       if (!bounded) return s;
       return {
         ...s,
-        ui: clearPendingFormatOnMove(s, a),
         selection: {
           ...s.selection,
           active: a,
@@ -388,7 +377,6 @@ export const selectionMutators = {
     if (!range) return;
     store.setState((s) => ({
       ...s,
-      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: { sheet: range.sheet, row: range.r0, col: range.c0 },
         anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
@@ -405,7 +393,6 @@ export const selectionMutators = {
     if (!range) return;
     store.setState((s) => ({
       ...s,
-      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: {
           sheet: range.sheet,
@@ -428,7 +415,6 @@ export const selectionMutators = {
     if (!range) return;
     store.setState((s) => ({
       ...s,
-      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: { sheet: range.sheet, row: range.r0, col: range.c0 },
         anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
@@ -445,7 +431,6 @@ export const selectionMutators = {
     if (!range) return;
     store.setState((s) => ({
       ...s,
-      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: {
           sheet: range.sheet,
@@ -470,7 +455,6 @@ export const selectionMutators = {
     if (!range) return;
     store.setState((s) => ({
       ...s,
-      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: { sheet: range.sheet, row: range.r0, col: range.c0 },
         anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
@@ -488,7 +472,6 @@ export const selectionMutators = {
     if (!next) return;
     store.setState((s) => ({
       ...s,
-      ui: { ...s.ui, pendingFormat: null },
       selection: { ...s.selection, range: { ...next } },
     }));
   },

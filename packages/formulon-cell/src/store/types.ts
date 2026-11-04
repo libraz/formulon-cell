@@ -165,21 +165,12 @@ export interface SelectedObject {
   name: string;
 }
 
-export interface PendingFormat {
-  addr: Addr;
-  format: Partial<CellFormat>;
-}
-
 /** Which clipboard command raised the marquee. */
 export type CopyMode = 'copy' | 'cut';
 
 export interface UiSlice {
   editor: EditorMode;
   hover: Addr | null;
-  /** Excel-style input format staged for a single empty active cell. It is
-   *  committed only when the user enters a value in that cell and is cleared
-   *  on cancel or navigation away. */
-  pendingFormat?: PendingFormat | null;
   /** Theme id stamped on the host (`data-fc-theme`). Built-ins ship `paper`,
    *  `ink`, and `contrast`; consumers can register additional themes via
    *  custom CSS keyed off the same attribute. */

@@ -115,14 +115,9 @@ describe('axis format structure history', () => {
     wb.attachStore(store);
     try {
       mutators.setActive(store, { sheet: 0, row: 4, col: 2 });
-      expect(
-        applySelectionFormatAction(
-          store.getState(),
-          store,
-          { patch: { fontSize: 24 } },
-          { allowPending: false },
-        ),
-      ).toBe(true);
+      expect(applySelectionFormatAction(store.getState(), store, { patch: { fontSize: 24 } })).toBe(
+        true,
+      );
       expect(store.getState().format.formats.has('0:4:2')).toBe(true);
       expect(appearance(wb, 4, 2).size).toBe(18);
       expect(insertRows(store, wb, history, 3, 1)).toBe(true);

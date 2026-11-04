@@ -171,11 +171,12 @@ describe('attachContextMenu', () => {
       expect(miniItem('formatCells')?.hasAttribute('aria-pressed')).toBe(false);
     });
 
-    it('reflects pending formatting on a blank active cell', () => {
-      mutators.setPendingFormat(store, {
-        addr: { sheet: 0, row: 0, col: 0 },
-        format: { bold: true, italic: true, underline: 'double', align: 'right' },
-      });
+    it('reflects the formatting of a blank active cell', () => {
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 0 },
+        { bold: true, italic: true, underline: 'double', align: 'right' },
+      );
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       fireContextMenu(host, -100, -100);
 
@@ -640,11 +641,7 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       miniItem('bold')?.click();
 
-      expect(store.getState().ui.pendingFormat).toEqual({
-        addr: { sheet: 0, row: 0, col: 0 },
-        format: { bold: true },
-      });
-      expect(store.getState().format.formats.get('0:0:0')).toBeUndefined();
+      expect(store.getState().format.formats.get('0:0:0')).toEqual({ bold: true });
       expect(visibleMenu()).toBeNull();
 
       fireContextMenu(host, 200, 70);

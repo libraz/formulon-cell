@@ -19,8 +19,6 @@ export type PreparedChange = {
     readonly xfIndex: number;
     readonly projected: CellFormat;
   };
-  /** A format staged by the editor/formula bar for this resolved anchor. */
-  readonly pendingFormat?: Partial<CellFormat>;
 };
 
 export const snapshotToPatch = (snapshot: CellSnapshot): CellPatch => ({
@@ -48,16 +46,6 @@ export const sameStructuredValue = (left: unknown, right: unknown): boolean => {
   );
 };
 
-const mergeFormatPatch = (
-  current: CellFormat | undefined,
-  patch: Partial<CellFormat> | undefined,
-): CellFormat | undefined => {
-  if (!patch) return current;
-  const next: CellFormat = { ...(current ?? {}), ...patch };
-  if (patch.borders) next.borders = { ...(current?.borders ?? {}), ...patch.borders };
-  return next;
-};
-
 const mergeInheritedFormat = (
   current: CellFormat | undefined,
   inherited: Partial<CellFormat> | undefined,
@@ -76,7 +64,6 @@ const projectPreparedFormat = (
   let next = current;
   const needsStoredFormat =
     current !== undefined ||
-    change.pendingFormat !== undefined ||
     change.implicitFormat !== undefined ||
     (change.inheritedAxisXf === undefined && change.inheritedFormat !== undefined);
   if (needsStoredFormat) {
@@ -89,7 +76,7 @@ const projectPreparedFormat = (
   if (change.implicitFormat && (next?.numFmt === undefined || next.numFmt.kind === 'general')) {
     next = { ...(next ?? {}), numFmt: change.implicitFormat };
   }
-  return mergeFormatPatch(next, change.pendingFormat);
+  return next;
 };
 
 export const projectPreparedFormats = (
@@ -104,24 +91,6 @@ export const projectPreparedFormats = (
     else next.set(key, projected);
   }
   return next;
-};
-
-/** Return only addresses whose matching pending patch changes the format after
- * implicit input coercion has been projected. Implicit formats alone retain
- * the value-edit authorization path used before pending-format integration. */
-export const effectivePendingFormatAddresses = (
-  before: ReadonlyMap<string, CellFormat>,
-  prepared: readonly PreparedChange[],
-): readonly Addr[] => {
-  const implicitBase = projectPreparedFormats(
-    before,
-    prepared.map((change) => ({ ...change, pendingFormat: undefined })),
-  );
-  const pendingPrepared = prepared
-    .filter((change) => change.pendingFormat !== undefined)
-    .map((change) => ({ ...change, implicitFormat: undefined }));
-  const pendingApplied = projectPreparedFormats(implicitBase, pendingPrepared);
-  return changedFormatAddresses(implicitBase, pendingApplied, pendingPrepared);
 };
 
 export const changedFormatAddresses = (

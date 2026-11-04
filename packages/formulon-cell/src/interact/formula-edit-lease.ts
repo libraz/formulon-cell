@@ -1,12 +1,6 @@
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type {
-  EditorMode,
-  EditorRefHighlight,
-  PendingFormat,
-  SelectionSlice,
-  UiSlice,
-} from '../store/types.js';
+import type { EditorMode, EditorRefHighlight, SelectionSlice, UiSlice } from '../store/types.js';
 
 /** Session that borrows a suspended edit; a locale switch or a stale session invalidates the lease. */
 export interface FormulaEditLeaseContext {
@@ -27,7 +21,6 @@ export interface FormulaEditLeaseSnapshot {
   };
   readonly selection: SelectionSlice;
   readonly editorMode: EditorMode;
-  readonly pendingFormat: PendingFormat | null;
   readonly editorRefs: readonly EditorRefHighlight[];
   readonly copy: Pick<UiSlice, 'copyRange' | 'copyRanges' | 'copyMode' | 'copyRevision'>;
   readonly r1c1: boolean;
@@ -72,7 +65,6 @@ const cloneSnapshot = (snapshot: FormulaEditLeaseSnapshot): FormulaEditLeaseSnap
   caret: cloneValue(snapshot.caret),
   selection: cloneValue(snapshot.selection),
   editorMode: cloneValue(snapshot.editorMode),
-  pendingFormat: cloneValue(snapshot.pendingFormat),
   editorRefs: cloneValue(snapshot.editorRefs),
   copy: cloneValue(snapshot.copy),
   r1c1: snapshot.r1c1,

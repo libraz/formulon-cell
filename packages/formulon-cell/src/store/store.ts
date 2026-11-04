@@ -47,7 +47,6 @@ export const createSpreadsheetStore = () =>
     ui: {
       editor: { kind: 'idle' },
       hover: null,
-      pendingFormat: null,
       theme: 'paper',
       fillPreview: null,
       copyRange: null,

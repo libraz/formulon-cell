@@ -57,20 +57,18 @@ describe('non-contiguous selection formatting', () => {
     expect(store.getState().format.formats.size).toBe(0);
   });
 
-  it('stages one blank cell but materializes a blank extra selection', () => {
+  it('formats one blank cell and a blank extra selection alike', () => {
     const single = createSpreadsheetStore();
     setSelection(single, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     mutators.setActive(single, { sheet: 0, row: 0, col: 0 });
     toggleBold(single.getState(), single);
-    expect(single.getState().ui.pendingFormat?.format.bold).toBe(true);
-    expect(single.getState().format.formats.size).toBe(0);
+    expect(fmtAt(single, 0, 0)?.bold).toBe(true);
 
     const multi = createSpreadsheetStore();
     setSelection(multi, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, [
       { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
     ]);
     toggleBold(multi.getState(), multi);
-    expect(multi.getState().ui.pendingFormat).toBeNull();
     expect(fmtAt(multi, 0, 0)?.bold).toBe(true);
     expect(fmtAt(multi, 0, 1)?.bold).toBe(true);
   });
@@ -162,12 +160,10 @@ describe('non-contiguous selection formatting', () => {
         operations: { ...policy.operations, format: true },
       });
       const before = new Map(store.getState().format.formats);
-      const pendingBefore = store.getState().ui.pendingFormat;
 
       toggleBold(store.getState(), store);
 
       expect(store.getState().format.formats).toEqual(before);
-      expect(store.getState().ui.pendingFormat).toBe(pendingBefore);
     } finally {
       unregister();
       controller.dispose();
@@ -207,19 +203,17 @@ describe('non-contiguous selection formatting', () => {
     expect(store.getState().format.formats.get('1:4:2')?.fill).toBe('#000000');
   });
 
-  it('does not clear a protected pending format', () => {
+  it('does not clear the format of a locked cell on a protected sheet', () => {
     for (const clear of [clearFormat, clearVisualFormat]) {
       const store = createSpreadsheetStore();
       setSelection(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
       mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { italic: true });
       toggleBold(store.getState(), store);
-      const pendingBefore = store.getState().ui.pendingFormat;
       const formatsBefore = new Map(store.getState().format.formats);
 
       setProtectedSheet(store, 0, true);
       clear(store.getState(), store);
 
-      expect(store.getState().ui.pendingFormat).toEqual(pendingBefore);
       expect(store.getState().format.formats).toEqual(formatsBefore);
     }
   });

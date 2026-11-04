@@ -4,7 +4,7 @@ import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { formatWithPending } from '../store/pending-format.js';
+import { directCellFormat } from '../store/direct-format.js';
 import type {
   CellBorderSide,
   CellBorders,
@@ -289,7 +289,7 @@ export function summarizeDialogFormats(
     const target = formatTargetAddr(state, addr);
     const key = addrKey(target);
     if (resolvedFormats.has(key)) return resolvedFormats.get(key) ?? undefined;
-    const format = resolveFormat?.(target) ?? formatWithPending(state, target);
+    const format = resolveFormat?.(target) ?? directCellFormat(state, target);
     resolvedFormats.set(key, format ?? null);
     return format;
   };

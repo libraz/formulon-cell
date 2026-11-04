@@ -15,7 +15,7 @@ import {
   setDraftSide,
   summarizeDialogFormats,
 } from '../../../src/interact/format-dialog-state.js';
-import { formatWithPending } from '../../../src/store/pending-format.js';
+import { directCellFormat } from '../../../src/store/direct-format.js';
 import type { CellFormat, SpreadsheetStore } from '../../../src/store/store.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -129,10 +129,8 @@ describe('interact/format-dialog-state', () => {
     expect(inherited.mixed.has('bold')).toBe(false);
 
     const anchor = { sheet: 0, row: 0, col: 0 };
-    const body = { sheet: 0, row: 0, col: 1 };
     mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
-    mutators.setCellFormat(store, anchor, { bold: true });
-    mutators.setPendingFormat(store, { addr: body, format: { bold: false } });
+    mutators.setCellFormat(store, anchor, { bold: false });
     selectRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     const state = store.getState();
     const plan = planSelectionFormat(state);
@@ -140,7 +138,7 @@ describe('interact/format-dialog-state', () => {
     const resolved: Array<{ sheet: number; row: number; col: number }> = [];
     const summary = summarizeDialogFormats(state, plan, (addr) => {
       resolved.push(addr);
-      return { bold: true, ...formatWithPending(state, addr) };
+      return { bold: true, ...directCellFormat(state, addr) };
     });
     expect(resolved).toHaveLength(1);
     expect(resolved.every((addr) => addr.row === 0 && addr.col === 0)).toBe(true);

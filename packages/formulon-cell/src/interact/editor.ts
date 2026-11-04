@@ -264,7 +264,6 @@ export class InlineEditor {
       },
       selection: state.selection,
       editorMode: state.ui.editor,
-      pendingFormat: state.ui.pendingFormat ?? null,
       editorRefs: state.ui.editorRefs,
       copy: {
         copyRange: state.ui.copyRange ?? null,
@@ -376,7 +375,6 @@ export class InlineEditor {
       this.editingAddr = null;
       this.composing = false;
       mutators.setEditor(this.deps.store, { kind: 'idle' });
-      mutators.setPendingFormat(this.deps.store, null);
       mutators.setEditorRefs(this.deps.store, []);
       return;
     }
@@ -384,7 +382,6 @@ export class InlineEditor {
     this.editingAddr = null;
     this.composing = false;
     mutators.setEditor(this.deps.store, { kind: 'idle' });
-    mutators.setPendingFormat(this.deps.store, null);
     mutators.setEditorRefs(this.deps.store, []);
     // Removing the focused input drops focus to <body>; without this, the
     // host's keydown listener stops receiving navigation keys until the
@@ -486,7 +483,6 @@ export class InlineEditor {
         });
         return;
       }
-      mutators.setPendingFormat(this.deps.store, null);
       this.deps.onAfterCommit();
       this.cancel();
       return;
@@ -1050,7 +1046,6 @@ export class InlineEditor {
       ui: {
         ...current.ui,
         editor: snapshot.editorMode,
-        pendingFormat: snapshot.pendingFormat,
         editorRefs: [...snapshot.editorRefs],
         copyRange: snapshot.copy.copyRange,
         copyRanges: snapshot.copy.copyRanges,
@@ -1144,7 +1139,7 @@ export class InlineEditor {
         fitEditorToContent(this.input, this.editingAddr, this.deps);
         paintEditorCellFormat(this.input, this.editingAddr, this.deps);
       }
-      if (state.format !== prev.format || state.ui.pendingFormat !== prev.ui.pendingFormat) {
+      if (state.format !== prev.format) {
         paintEditorCellFormat(this.input, this.editingAddr, this.deps);
         if (this.input) alignEditorText(this.input, this.editingAddr, this.deps, this.input.value);
       }
