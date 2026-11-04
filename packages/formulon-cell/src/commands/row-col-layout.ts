@@ -514,7 +514,8 @@ export type FreezeMode = 'none' | 'topRow' | 'firstColumn' | 'panes';
 
 /** Where Freeze Panes and Split divide the window: above and left of the
  *  active cell, or through the middle of the window when the active cell is
- *  its top-left. Moves the window to the band's origin. */
+ *  its top-left. An active cell above or left of the window puts the band at
+ *  A1. Moves the window to the band's origin. */
 export function panesAtActiveCell(store: SpreadsheetStore): {
   rows: number;
   cols: number;
@@ -524,10 +525,10 @@ export function panesAtActiveCell(store: SpreadsheetStore): {
   let originRow = frozenRowEnd(layout) > 0 ? frozenRowStart(layout) : viewport.rowStart;
   let originCol = frozenColEnd(layout) > 0 ? frozenColStart(layout) : viewport.colStart;
   const a = selection.active;
-  // An active cell that is scrolled out of view becomes the top-left first.
+  // An active cell above or left of the window resets the window to A1.
   if (a.row < originRow || a.col < originCol) {
-    originRow = a.row;
-    originCol = a.col;
+    originRow = 0;
+    originCol = 0;
   }
   const middle = a.row === originRow && a.col === originCol;
   const rows = middle ? Math.max(1, Math.floor(viewport.rowCount / 2)) : a.row - originRow;

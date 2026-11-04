@@ -72,11 +72,26 @@ describe('applyFreezeMode', () => {
     expect(band(store)).toMatchObject({ rows: 0, cols: 3 });
   });
 
-  it('scrolls an off-screen active cell to the top-left before splitting', () => {
+  it('splits in half at an off-screen A1, once the window is back at A1', () => {
     scrollTo(store, 9, 2);
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
     applyFreezeMode(store, 'panes');
     expect(band(store)).toMatchObject({ rows: 15, cols: 9, originRow: 0, originCol: 0 });
+  });
+
+  it('resets the window to A1 and freezes at an active cell above and left of it', () => {
+    // Scrolled to row 10 / column D with C5 active: the band runs from A1 to C5.
+    scrollTo(store, 9, 3);
+    mutators.setActive(store, { sheet: 0, row: 4, col: 2 });
+    applyFreezeMode(store, 'panes');
+    expect(band(store)).toEqual({
+      rows: 4,
+      cols: 2,
+      originRow: 0,
+      originCol: 0,
+      rowStart: 4,
+      colStart: 2,
+    });
   });
 
   it('freezes the top row and the first column at the visible origin', () => {
