@@ -28,6 +28,7 @@ const TOKEN_KEYS: (keyof ResolvedTheme)[] = [
   'hoverStripe',
   'headerFg',
   'headerFgActive',
+  'headerFgFiltered',
   'fontUi',
   'fontMono',
   'textCell',
@@ -77,6 +78,14 @@ describe('theme/resolve — token completeness', () => {
     const theme = resolveTheme(host);
     expect(theme.bg).toBe('#101010');
     expect(theme.accent).toBe('#abcdef');
+  });
+
+  it('colours filtered row numbers blue unless a theme overrides it', () => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    expect(resolveTheme(host).headerFgFiltered).toBe('#1c00ff');
+    host.style.setProperty('--fc-header-fg-filtered', '#f88200');
+    expect(resolveTheme(host).headerFgFiltered).toBe('#f88200');
   });
 
   it('survives empty-string custom property values by falling back', () => {

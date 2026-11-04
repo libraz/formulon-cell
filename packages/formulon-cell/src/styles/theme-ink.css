@@ -37,6 +37,7 @@
 
     --fc-header-fg: #c8c6c4;
     --fc-header-fg-active: #6dd587;
+    --fc-header-fg-filtered: #f88200;
     --fc-header-bg: var(--fc-bg-rail);
     --fc-header-rule: var(--fc-rule);
 

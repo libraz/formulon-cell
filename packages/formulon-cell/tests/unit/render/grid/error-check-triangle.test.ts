@@ -40,6 +40,7 @@ const theme = {
   headerRule: '#ccc',
   headerFg: '#666',
   headerFgActive: '#000',
+  headerFgFiltered: '#1c00ff',
   pageBackdrop: '#aaa',
   pagePaper: '#fff',
   pageEdge: '#999',

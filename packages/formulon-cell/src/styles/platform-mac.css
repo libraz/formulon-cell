@@ -43,6 +43,10 @@
     /* A selected header is only refilled and recoloured: no bar, same weight. */
     --fc-header-active-bar: transparent;
     --fc-header-fg-active-weight: 400;
+    /* Ribbon buttons: hover 242, checked 229, pressed 204. */
+    --fc-tb-ribbon-hover: #f2f2f2;
+    --fc-tb-ribbon-checked: #e5e5e5;
+    --fc-tb-ribbon-pressed: #cccccc;
     /* Outline gutter 230; level buttons 198 border (top and left ramp
      * 209 -> 190), 239 top highlight, face 251 -> 234, digit 102, 247 shadow. */
     --fc-outline-gutter-bg: #e6e6e6;

@@ -38,6 +38,8 @@ export interface ResolvedTheme {
   headerRuleOuter: string;
   headerFg: string;
   headerFgActive: string;
+  /** Row-number colour of the data rows a filter lets through. */
+  headerFgFiltered: string;
   /** Bar under a selected row/column header; `transparent` draws none. */
   headerActiveBar: string;
   /** Font weight of a selected header label. */
@@ -139,6 +141,7 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     headerRuleOuter: v('--fc-header-rule-outer', headerRule),
     headerFg,
     headerFgActive: v('--fc-header-fg-active', '#15171c'),
+    headerFgFiltered: v('--fc-header-fg-filtered', '#1c00ff'),
     headerActiveBar: v('--fc-header-active-bar', accent),
     headerFgActiveWeight: num(v('--fc-header-fg-active-weight', '600'), 600),
     outlineGutterBg: v('--fc-outline-gutter-bg', headerBg),

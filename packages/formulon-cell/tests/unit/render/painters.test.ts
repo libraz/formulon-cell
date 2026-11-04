@@ -179,6 +179,7 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     headerRule: '#ccc',
     headerFg: '#666',
     headerFgActive: '#000',
+    headerFgFiltered: '#1c00ff',
     fontUi: 'sans-serif',
     fontMono: 'monospace',
     textCell: 13,

@@ -56,6 +56,7 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     headerRuleOuter: '#d9d9d9',
     headerFg: '#605e5c',
     headerFgActive: '#107c41',
+    headerFgFiltered: '#1c00ff',
     fontUi: 'Aptos, sans-serif',
     fontMono: 'ui-monospace, monospace',
     textCell: 13,

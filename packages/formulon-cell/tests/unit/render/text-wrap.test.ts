@@ -38,6 +38,7 @@ const theme: ResolvedTheme = {
   headerRule: '#ccc',
   headerFg: '#666',
   headerFgActive: '#000',
+  headerFgFiltered: '#1c00ff',
   headerActiveBar: '#06c',
   outlineGutterBg: '#eee',
   outlineButtonFaceTop: '#eee',

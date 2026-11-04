@@ -80,6 +80,8 @@
     --fc-header-fg: initial;
     /* Active row/column letter — same hue as accent. */
     --fc-header-fg-active: initial;
+    /* Row numbers of the rows a filter lets through. */
+    --fc-header-fg-filtered: initial;
     /* Header background — usually equal to --fc-bg-rail. */
     --fc-header-bg: initial;
     /* Header strip gradient, outer edge to grid side. Both default to --fc-header-bg. */

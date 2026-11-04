@@ -32,6 +32,16 @@ describe('Mac light header palette', () => {
   });
 });
 
+// Ribbon buttons, light appearance: idle 255, hover 242, checked 229, pressed 204.
+describe('Mac light ribbon button states', () => {
+  it('fills hover, checked and pressed buttons with the measured greys', () => {
+    const block = macLightPalette();
+    expect(token(block, '--fc-tb-ribbon-hover')).toBe('#f2f2f2');
+    expect(token(block, '--fc-tb-ribbon-checked')).toBe('#e5e5e5');
+    expect(token(block, '--fc-tb-ribbon-pressed')).toBe('#cccccc');
+  });
+});
+
 // Selected headers: flat 243 fill, green label
 // ink 35,115,68 (sRGB), no accent line, label geometry unchanged (not bold).
 describe('Mac light selected header', () => {

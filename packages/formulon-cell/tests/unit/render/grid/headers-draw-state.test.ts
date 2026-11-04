@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildColLayout, buildRowLayout, layoutForView } from '../../../../src/render/geometry.js';
-import { FILTERED_ROW_LABEL_COLOR, paintHeaders } from '../../../../src/render/grid/headers.js';
+import { paintHeaders } from '../../../../src/render/grid/headers.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
 
@@ -14,6 +14,7 @@ const theme = {
   headerRuleOuter: '#d9d9d9',
   headerFg: '#605e5c',
   headerFgActive: '#107c41',
+  headerFgFiltered: '#1c00ff',
   headerFgActiveWeight: 600,
   headerActiveBar: '#107c41',
   headerStripOuter: '#faf9f8',
@@ -115,9 +116,9 @@ describe('paintHeaders draw state', () => {
       rows,
     );
 
-    expect(colourAt.get('1')).not.toBe(FILTERED_ROW_LABEL_COLOR);
-    expect(colourAt.get('2')).toBe(FILTERED_ROW_LABEL_COLOR);
-    expect(colourAt.get('4')).toBe(FILTERED_ROW_LABEL_COLOR);
-    expect(colourAt.get('6')).not.toBe(FILTERED_ROW_LABEL_COLOR);
+    expect(colourAt.get('1')).not.toBe('#1c00ff');
+    expect(colourAt.get('2')).toBe('#1c00ff');
+    expect(colourAt.get('4')).toBe('#1c00ff');
+    expect(colourAt.get('6')).not.toBe('#1c00ff');
   });
 });

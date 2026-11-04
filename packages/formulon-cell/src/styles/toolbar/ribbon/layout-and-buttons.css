@@ -331,7 +331,7 @@
     cursor: not-allowed;
   }
   .fc-tb__rb--active {
-    background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));
+    background: var(--fc-tb-ribbon-checked, var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover)));
     border-color: var(--fc-tb-ribbon-line);
     color: var(--fc-tb-fg);
   }
