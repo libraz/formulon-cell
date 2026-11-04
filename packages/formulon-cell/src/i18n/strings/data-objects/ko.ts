@@ -143,6 +143,7 @@ export const dataObjectsKo: DataObjectsStrings = {
     pivotSpillBody:
       '피벗 테이블의 #SPILL!은 피벗 테이블 업데이트를 방해하는 항목이 있다는 뜻입니다. 피벗 테이블을 차단하는 셀을 지우거나 이동하세요.',
     pivotSpillOk: '확인',
+    pivotSpillLearnMore: '자세한 정보',
     pivotFilterPanel: {
       sortHeading: '정렬',
       sortAscending: '오름차순',

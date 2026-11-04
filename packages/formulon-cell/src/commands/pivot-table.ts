@@ -906,6 +906,8 @@ export function settlePivotAnchor(wb: WorkbookHandle, sheet: number, pivotIndex:
   const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
   if (filterRows === 0) return;
   const row = bounds.r0 + filterRows + 1;
+  // A report held at #SPILL! shows only its anchor; leave it where it is.
+  if (row > bounds.r1) return;
   wb.setPivotTableAnchor(sheet, pivotIndex, {
     row,
     col: bounds.c0,
@@ -923,12 +925,17 @@ function clearVacatedReportCells(
   extents: readonly Range[],
 ): void {
   if (extents.length === 0) return;
-  const shown = new Set<string>();
-  for (const cell of wb.pivotCells(sheet)) shown.add(`${cell.addr.row}:${cell.addr.col}`);
+  const shown = new Map<string, string>();
+  for (const cell of wb.pivotCells(sheet)) {
+    shown.set(`${cell.addr.row}:${cell.addr.col}`, JSON.stringify(cell.value));
+  }
   const stale: { row: number; col: number }[] = [];
   for (const cell of wb.physicalCells(sheet)) {
     const { row, col } = cell.addr;
-    if (shown.has(`${row}:${col}`)) continue;
+    // A cached value matching what the report shows there stays; any other
+    // shows through wherever the grid reads the sheet's own cell.
+    if (cell.formula === null && shown.get(`${row}:${col}`) === JSON.stringify(cell.value))
+      continue;
     if (extents.some((e) => row >= e.r0 && row <= e.r1 && col >= e.c0 && col <= e.c1)) {
       stale.push({ row, col });
     }
@@ -949,8 +956,9 @@ export function refreshPivotReportsAfterEdit(
 ): { spilled: PivotSpill[] } {
   const sheet = store.getState().data.sheetIndex;
   const before = lastPivotStyleLayer(wb, sheet);
+  const owned = wb.pivotOwnedAreas(sheet);
   for (const { pivotIndex } of wb.pivotBounds(sheet)) settlePivotAnchor(wb, sheet, pivotIndex);
-  clearVacatedReportCells(wb, sheet, before?.reports.map((r) => r.range) ?? []);
+  clearVacatedReportCells(wb, sheet, [...(before?.reports.map((r) => r.range) ?? []), ...owned]);
   wb.releasePivotCachedArea(sheet);
   mutators.replaceCells(store, wb.cells(sheet));
   reflowPivotFormats(store, wb);

@@ -145,6 +145,7 @@ export const dataObjectsJa: DataObjectsStrings = {
     pivotSpillBody:
       'ピボットテーブルの #SPILL! は、途中に何かあってもピボットテーブルを更新できることを意味します。ピボットテーブルをブロックしているセルをクリアまたは移動して、スムーズな動作を維持します。',
     pivotSpillOk: 'OK',
+    pivotSpillLearnMore: '詳細情報',
     pivotFilterPanel: {
       sortHeading: '並べ替え',
       sortAscending: '昇順',

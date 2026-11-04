@@ -143,6 +143,7 @@ export const dataObjectsZh: DataObjectsStrings = {
     pivotSpillBody:
       '数据透视表中的 #SPILL! 表示有内容妨碍数据透视表更新。请清除或移动阻挡数据透视表的单元格。',
     pivotSpillOk: '确定',
+    pivotSpillLearnMore: '了解详细信息',
     pivotFilterPanel: {
       sortHeading: '排序',
       sortAscending: '升序',

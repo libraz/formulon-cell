@@ -6,10 +6,10 @@
     pointer-events: auto;
     box-sizing: border-box;
     width: 384px;
-    padding: 14px 16px 12px;
+    padding: 18px 18px 16px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
     border-radius: 10px;
@@ -26,6 +26,10 @@
   }
   .fc-pivot-spill-callout__body {
     line-height: 1.45;
+  }
+  .fc-pivot-spill-callout__link {
+    color: var(--fc-accent, LinkText);
+    text-decoration: underline;
   }
   .fc-pivot-spill-callout__ok {
     width: 100%;

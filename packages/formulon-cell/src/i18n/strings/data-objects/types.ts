@@ -143,6 +143,7 @@ export interface DataObjectsStrings {
     pivotSpillTitle: string;
     pivotSpillBody: string;
     pivotSpillOk: string;
+    pivotSpillLearnMore: string;
     /** The filter panel a report's drop-down button opens. */
     pivotFilterPanel: {
       sortHeading: string;

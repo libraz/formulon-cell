@@ -150,6 +150,7 @@ export const dataObjectsDe: DataObjectsStrings = {
     pivotSpillBody:
       'Ein #SPILL! in einer PivotTable bedeutet, dass etwas der Aktualisierung der PivotTable im Weg ist. Löschen oder verschieben Sie die Zellen, die die PivotTable blockieren.',
     pivotSpillOk: 'OK',
+    pivotSpillLearnMore: 'Weitere Informationen',
     pivotFilterPanel: {
       sortHeading: 'Sortieren',
       sortAscending: 'Aufsteigend',

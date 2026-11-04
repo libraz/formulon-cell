@@ -143,6 +143,7 @@ export const dataObjectsTh: DataObjectsStrings = {
     pivotSpillBody:
       '#SPILL! ใน PivotTable หมายความว่ามีบางอย่างขวางการอัปเดต PivotTable ให้ล้างหรือย้ายเซลล์ที่บล็อก PivotTable',
     pivotSpillOk: 'ตกลง',
+    pivotSpillLearnMore: 'เรียนรู้เพิ่มเติม',
     pivotFilterPanel: {
       sortHeading: 'เรียงลำดับ',
       sortAscending: 'จากน้อยไปหามาก',

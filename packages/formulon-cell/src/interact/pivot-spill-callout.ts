@@ -38,7 +38,11 @@ export function showPivotSpillCallout(
     className: 'fc-pivot-spill-callout__ok',
     text: t.pivotSpillOk,
   });
-  callout.append(title, body, ok);
+  // The desktop's help link; the host has no help page to open, so it is shown inert.
+  const more = doc.createElement('span');
+  more.className = 'fc-pivot-spill-callout__link';
+  more.textContent = t.pivotSpillLearnMore;
+  callout.append(title, body, more, ok);
 
   const close = (): void => {
     callout.remove();
@@ -56,13 +60,16 @@ export function showPivotSpillCallout(
 
   overlayPortalFor(host).appendChild(callout);
   const cell = cellRect(layoutForView(state), state.viewport, spill.anchor.row, spill.anchor.col);
-  const hostRect = host.getBoundingClientRect();
-  // The callout points down at the anchor cell from above it.
+  // Cell rectangles are relative to the grid, not to the whole host.
+  const grid = host.querySelector<HTMLElement>('.fc-host__grid') ?? host;
+  const hostRect = grid.getBoundingClientRect();
   const height = callout.getBoundingClientRect().height || 241;
+  // Above the cell when there is room, else below it, so the cell stays in view.
+  const above = hostRect.top + cell.y - height - 8;
   const position = clampPanelToViewport(
     callout,
     hostRect.left + cell.x + cell.w / 2 - 192,
-    hostRect.top + cell.y - height - 8,
+    above >= 4 ? above : hostRect.top + cell.y + cell.h + 8,
     { pad: 4, fallbackWidth: 384, fallbackHeight: 241 },
   );
   callout.style.left = `${position.x}px`;

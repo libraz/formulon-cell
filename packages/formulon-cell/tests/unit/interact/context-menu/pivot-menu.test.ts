@@ -212,10 +212,10 @@ describe('PivotTable context menu, as measured on the Mac app', () => {
       '"Region" の折りたたみ (dis)',
     ]);
     expect(submenu('pivotMoveMenu')).toEqual([
-      '"North" を先頭へ移動 (dis)',
-      '"North" を上へ移動 (dis)',
-      '"North" を下へ移動 (dis)',
-      '"North" を末尾へ移動 (dis)',
+      '"North" を先頭へ移動',
+      '"North" を上へ移動',
+      '"North" を下へ移動',
+      '"North" を末尾へ移動',
       '"Region" を先頭へ移動 (dis)',
       '"Region" を左へ移動 (dis)',
       '"Region" を右へ移動 (dis)',
@@ -406,6 +406,37 @@ describe('PivotTable context menu, as measured on the Mac app', () => {
     submenu('pivotFilterMenu');
     run('pivotFilterLabel');
     expect(document.querySelector('.fc-pivot-filter-panel')).toBeTruthy();
+  });
+
+  it('moves an item within its field as one undo step', () => {
+    const order = () =>
+      Array.from(wb.pivotCells(0))
+        .filter((cell) => cell.addr.col === 0 && cell.addr.row > 2)
+        .map((cell) => (cell.value.kind === 'text' ? cell.value.value : ''))
+        .filter((label) => label !== '総計');
+    open(CELL.item);
+    submenu('pivotMoveMenu');
+    run('pivotMoveItemUp');
+    expect(order()).toEqual(['North', 'East', 'South']);
+    open([3, 0]);
+    submenu('pivotMoveMenu');
+    expect(item('pivotMoveItemFirst')?.getAttribute('aria-disabled')).toBe('true');
+    run('pivotMoveItemLast');
+    expect(order()).toEqual(['East', 'South', 'North']);
+    expect(history.undo()).toBe(true);
+    expect(order()).toEqual(['North', 'East', 'South']);
+    expect(history.undo()).toBe(true);
+    expect(order()).toEqual(['East', 'North', 'South']);
+  });
+
+  it('builds the menu for the clicked cell, not the active one', async () => {
+    const { layoutForView, cellRect } = await import('../../../../src/render/geometry.js');
+    setRange(store, CELL.header[0], CELL.header[1], CELL.header[0], CELL.header[1]);
+    const s = store.getState();
+    const rect = cellRect(layoutForView(s), s.viewport, CELL.total[0], CELL.total[1]);
+    fireContextMenu(host, rect.x + 4, rect.y + 4);
+    expect(menu()).toContain('総計の削除');
+    expect(menu()).toContain('値の集計方法 >');
   });
 });
 

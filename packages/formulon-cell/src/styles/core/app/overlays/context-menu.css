@@ -542,3 +542,37 @@
     margin-top: -4px;
   }
 }
+
+/* Measured Mac PivotTable submenu widths, in pt taken as px. A label set in a
+ * wider fallback font widens its panel rather than being cut off. */
+@layer fc.app {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__sub[data-fc-menu="pivot"] {
+    min-width: var(--fc-ctxmenu-sub-width, 200px);
+    width: max-content;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu__sub[data-fc-menu="pivot"]
+    .fc-ctxmenu__item {
+    column-gap: 8px;
+    padding-inline: 20px 6px;
+  }
+  .fc-ctxmenu__sub[data-fc-submenu="pivotSelectMenu"],
+  .fc-ctxmenu__sub[data-fc-submenu="pivotShowAsMenu"] {
+    --fc-ctxmenu-sub-width: 167px;
+  }
+  .fc-ctxmenu__sub[data-fc-submenu="pivotFormulasMenu"] {
+    --fc-ctxmenu-sub-width: 128px;
+  }
+  .fc-ctxmenu__sub[data-fc-submenu="pivotSummarizeMenu"] {
+    --fc-ctxmenu-sub-width: 166px;
+  }
+  .fc-ctxmenu__sub[data-fc-submenu="pivotExpandMenu"] {
+    --fc-ctxmenu-sub-width: 189px;
+  }
+  .fc-ctxmenu__sub[data-fc-submenu="pivotMoveMenu"] {
+    --fc-ctxmenu-sub-width: 162px;
+  }
+  .fc-ctxmenu__sub[data-fc-submenu="pivotFilterMenu"] {
+    --fc-ctxmenu-sub-width: 177px;
+  }
+}

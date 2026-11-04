@@ -76,19 +76,30 @@ export function pivotMenuTarget(
       break;
     }
   }
+  const itemName =
+    value.kind === 'text' ? value.value : value.kind === 'number' ? String(value.value) : '';
+  const model = field ? pivotFieldFilterModel(wb, addr.sheet, info.pivotIndex, field.index) : null;
+  const axisOrder =
+    field?.axis === PivotAxis.Col
+      ? (definition?.colFieldOrder ?? [])
+      : field?.axis === PivotAxis.Row
+        ? (definition?.rowFieldOrder ?? [])
+        : [];
   return {
     cell,
     fieldName: field ? field.customName || field.sourceName : info.fieldName,
-    itemName:
-      value.kind === 'text' ? value.value : value.kind === 'number' ? String(value.value) : '',
+    itemName,
     dataFieldName: dataField?.name ?? info.fieldName,
     itemOnColumns: field?.axis === PivotAxis.Col,
     ...(dataField ? { aggregation: dataField.aggregation } : {}),
     ...(dataField?.showValuesAs !== undefined ? { showValuesAs: dataField.showValuesAs } : {}),
     subtotalOn: field ? field.defaultSubtotal || field.subtotalFns.length > 0 : false,
-    filtered:
-      field !== undefined &&
-      (pivotFieldFilterModel(wb, addr.sheet, info.pivotIndex, field.index)?.filtered ?? false),
+    filtered: model?.filtered ?? false,
+    itemPosition: model ? model.items.findIndex((entry) => entry.value === itemName) : -1,
+    itemCount: model?.items.length ?? 0,
+    fieldPosition: axisOrder.indexOf(field?.index ?? -1),
+    fieldCount: axisOrder.length,
+    grouped: field?.dateGroup !== null && field?.dateGroup !== undefined,
     ...(fieldListHidden === undefined ? {} : { fieldListHidden }),
     canRefresh: info.cacheId >= 0,
     canOpenFieldList,
@@ -100,7 +111,12 @@ function selectedItemsOf(ctx: PivotMenuContext, ref: PivotMenuCellRef): Set<stri
   const { wb } = ctx;
   const out = new Set<string>();
   const selection = ctx.store.getState().selection;
-  const ranges = [selection.range, ...(selection.extraRanges ?? [])];
+  const { row: r, col: c, sheet } = ref.addr;
+  const selected = [selection.range, ...(selection.extraRanges ?? [])];
+  // A right-click outside the selection acts on the clicked cell alone.
+  const ranges = selected.some((x) => r >= x.r0 && r <= x.r1 && c >= x.c0 && c <= x.c1)
+    ? selected
+    : [{ sheet, r0: r, c0: c, r1: r, c1: c }];
   for (const entry of wb.pivotCells(ref.addr.sheet)) {
     if (entry.pivotIndex !== ref.info.pivotIndex) continue;
     const { row, col } = entry.addr;
@@ -196,11 +212,74 @@ export function runContextMenuPivotItem(
           ? info.fieldIndex
           : definition?.rowFieldOrder.at(-1));
       const byField = pivotField ? '' : (definition?.dataFields[dataFieldIndex()]?.name ?? '');
-      if (
-        target !== undefined &&
-        wb.setPivotFieldSort(sheet, info.pivotIndex, target, order, byField)
-      ) {
-        ctx.refresh(sheet);
+      if (target !== undefined) {
+        commitPivotChange(commit, sheet, info.pivotIndex, () =>
+          wb.setPivotFieldSort(sheet, info.pivotIndex, target, order, byField),
+        );
+      }
+      return true;
+    }
+    case 'pivotMoveItemFirst':
+    case 'pivotMoveItemUp':
+    case 'pivotMoveItemDown':
+    case 'pivotMoveItemLast': {
+      const index = pivotField?.index;
+      const model =
+        index === undefined ? null : pivotFieldFilterModel(wb, sheet, info.pivotIndex, index);
+      const label = pivotMenuTarget(wb, ref, false).itemName;
+      const from = model ? model.items.findIndex((entry) => entry.value === label) : -1;
+      if (index === undefined || !model || from < 0) return true;
+      const order = [...model.items];
+      const [moved] = order.splice(from, 1);
+      if (!moved) return true;
+      const to =
+        id === 'pivotMoveItemFirst'
+          ? 0
+          : id === 'pivotMoveItemLast'
+            ? order.length
+            : Math.max(0, Math.min(order.length, from + (id === 'pivotMoveItemUp' ? -1 : 1)));
+      order.splice(to, 0, moved);
+      // The items show in list order once the field is in manual order.
+      commitPivotChange(commit, sheet, info.pivotIndex, () => {
+        const field = wb.getPivotField(sheet, info.pivotIndex, index);
+        const manual =
+          field?.sortOrder === PivotSortOrder.Manual ||
+          wb.setPivotFieldSort(sheet, info.pivotIndex, index, PivotSortOrder.Manual, '');
+        return manual && setPivotFieldItemsChecked(wb, sheet, info.pivotIndex, index, order);
+      });
+      return true;
+    }
+    case 'pivotMoveFieldFirst':
+    case 'pivotMoveFieldLeft':
+    case 'pivotMoveFieldRight':
+    case 'pivotMoveFieldLast': {
+      const index = pivotField?.index;
+      if (index === undefined || !definition) return true;
+      const onColumns = pivotField?.axis === PivotAxis.Col;
+      const order = [...(onColumns ? definition.colFieldOrder : definition.rowFieldOrder)];
+      const from = order.indexOf(index);
+      if (from < 0) return true;
+      order.splice(from, 1);
+      const to =
+        id === 'pivotMoveFieldFirst'
+          ? 0
+          : id === 'pivotMoveFieldLast'
+            ? order.length
+            : Math.max(0, Math.min(order.length, from + (id === 'pivotMoveFieldLeft' ? -1 : 1)));
+      order.splice(to, 0, index);
+      commitPivotChange(commit, sheet, info.pivotIndex, () =>
+        onColumns
+          ? wb.setPivotColFieldOrder(sheet, info.pivotIndex, order)
+          : wb.setPivotRowFieldOrder(sheet, info.pivotIndex, order),
+      );
+      return true;
+    }
+    case 'pivotUngroup': {
+      const index = pivotField?.index;
+      if (index !== undefined && pivotField?.dateGroup) {
+        commitPivotChange(commit, sheet, info.pivotIndex, () =>
+          wb.clearPivotFieldDateGroup(sheet, info.pivotIndex, index),
+        );
       }
       return true;
     }

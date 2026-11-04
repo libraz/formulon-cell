@@ -237,6 +237,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     | (NonNullable<ReturnType<WorkbookHandle['pivotCellInfo']>> & { sheet: number })
     | null = null;
   let activeTarget: MenuTarget | null = null;
+  let activePivotAddr: Addr | null = null;
   let activeEvent: MouseEvent | KeyboardEvent | null = null;
   const activeItemSources = new Map<string, ContextMenuItem>();
   let explicitDisabledSources = new WeakSet<ContextMenuItem>();
@@ -428,6 +429,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       for (const d of PASTE_QUICK_IDS) disabled.add(d);
     }
     sub.replaceChildren();
+    sub.dataset.fcSubmenu = id;
     for (const child of children) appendEntry('sub', sub, child, disabled);
     sub.style.display = 'block';
     sub.style.left = '-9999px';
@@ -595,8 +597,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     pasteBtnRef = null;
     const mac = isMacPlatform();
     const activeAddr = store.getState().selection.active;
-    const pivot = kind === 'cell' ? wb.pivotCellInfo(activeAddr) : null;
-    activePivot = pivot ? { ...pivot, sheet: activeAddr.sheet } : null;
+    // The report cell under the pointer, which a right-click does not always make active.
+    const pivotAddr = kind === 'cell' && activeTarget ? activeTarget.cell : activeAddr;
+    const pivot = kind === 'cell' ? wb.pivotCellInfo(pivotAddr) : null;
+    activePivot = pivot ? { ...pivot, sheet: pivotAddr.sheet } : null;
+    activePivotAddr = pivot ? { ...pivotAddr } : null;
     // Menus measured apart may differ in metrics; the stylesheet tells them apart by this.
     root.dataset.fcMenu = pivot ? 'pivot' : kind;
     sub.dataset.fcMenu = root.dataset.fcMenu;
@@ -605,7 +610,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           strings,
           pivotMenuTarget(
             wb,
-            { addr: activeAddr, info: pivot },
+            { addr: pivotAddr, info: pivot },
             !!deps.onOpenPivotFieldList,
             deps.isPivotFieldListOpen ? !deps.isPivotFieldListOpen() : undefined,
           ),
@@ -1175,14 +1180,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (permissions.navigationBlocks(id)) return;
     const state = store.getState();
     if (activePivot && id !== 'pivotRefresh') {
-      const ref = {
-        addr: {
-          sheet: activePivot.sheet,
-          row: state.selection.active.row,
-          col: state.selection.active.col,
-        },
-        info: activePivot,
-      };
+      const ref = { addr: activePivotAddr ?? state.selection.active, info: activePivot };
       const pivotContext = {
         host,
         store,

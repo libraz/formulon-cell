@@ -124,3 +124,34 @@ describe('a report growing back over the cells it cached', () => {
     wb.dispose();
   });
 });
+
+describe('a report moved by a row deletion', () => {
+  it('moves with its cached cells and takes a report filter afterwards', async () => {
+    const { wb, store } = await setup();
+    wb.setBlank({ sheet: 0, row: 9, col: 0 });
+    // The report's values are also in the sheet's own cells, as in a saved file.
+    for (const c of [...wb.pivotCells(0)]) {
+      if (c.value.kind === 'text') wb.setText(c.addr, c.value.value);
+      else if (c.value.kind === 'number') wb.setNumber(c.addr, c.value.value);
+    }
+    expect(wb.engineDeleteRows(0, 0, 2)).toBe(true);
+    expect(wb.pivotSpills(0)).toEqual([]);
+    expect(wb.pivotBounds(0)[0]?.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 });
+    mutators.replaceCells(store, wb.cells(0));
+    pivotStyleLayer(wb, store.getState());
+    expect(wb.setPivotFieldAxis(0, 0, PRODUCT, PivotAxis.Page)).toBe(true);
+    expect(() => refreshPivotReportsAfterEdit(store, wb)).not.toThrow();
+    // Filter block A1:B1, blank row 2, report proper from A3.
+    expect(wb.pivotBounds(0)[0]?.range.r0).toBe(0);
+    expect(wb.pivotCellInfo({ sheet: 0, row: 2, col: 0 })?.kind).toBe(0);
+    // The cells the report cached at A1:B2 before moving down are gone.
+    for (const [row, col] of [
+      [0, 2],
+      [1, 0],
+      [1, 1],
+    ] as const) {
+      expect(wb.getValue({ sheet: 0, row, col })).toEqual({ kind: 'blank' });
+    }
+    wb.dispose();
+  });
+});

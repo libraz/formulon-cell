@@ -63,6 +63,7 @@ import {
   paintSpillBlocker,
   paintSpillOutline,
   paintSpillTarget,
+  paintSpillWarningTag,
   paintValidationChevron,
 } from './painters.js';
 
@@ -618,9 +619,21 @@ export class GridRenderer {
         paintSpillOutline(this.ctx, rect, theme);
       }
     }
+    const active = state.selection.active;
     for (const spill of pivotStyleLayer(wb, state).spills) {
       for (const rect of rangeRects(layout, viewport, spill.needed)) {
-        paintSpillTarget(this.ctx, rect, theme);
+        paintSpillTarget(this.ctx, rect);
+      }
+      // The warning tag sits beside the anchor while it is the active cell.
+      const { anchor } = spill;
+      if (active.sheet === anchor.sheet && active.row === anchor.row && active.col === anchor.col) {
+        const cell = rangeRects(layout, viewport, {
+          r0: anchor.row,
+          c0: anchor.col,
+          r1: anchor.row,
+          c1: anchor.col,
+        })[0];
+        if (cell) paintSpillWarningTag(this.ctx, cell);
       }
     }
 

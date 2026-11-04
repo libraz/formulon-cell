@@ -235,8 +235,9 @@ export function applyPivotEdit(
 }
 
 /** Write a field layout read back with `getPivotDefinition` onto the same
- *  report: axes, axis orders, subtotals, items, data fields and filters. Parts
- *  already equal are left alone. Returns true only when every write succeeds. */
+ *  report: axes, axis orders, subtotals, items, sort, date grouping, data
+ *  fields and filters. Parts already equal are left alone. Returns true only
+ *  when every write succeeds. */
 export function restorePivotFieldLayout(
   wb: WorkbookHandle,
   sheetIndex: number,
@@ -279,6 +280,32 @@ export function restorePivotFieldLayout(
             : wb.addPivotFieldItem(sheetIndex, pivotIndex, field.index, item.label, item.visible),
         ) &&
         ok;
+    }
+    if (now.sortOrder !== field.sortOrder || now.sortByField !== field.sortByField) {
+      ok =
+        wb.setPivotFieldSort(
+          sheetIndex,
+          pivotIndex,
+          field.index,
+          field.sortOrder,
+          field.sortByField,
+        ) && ok;
+    }
+    if (!same(now.dateGroup, field.dateGroup)) {
+      if (field.dateGroup) {
+        const { granularity, calendar, ...bounds } = field.dateGroup;
+        ok =
+          wb.setPivotFieldDateGroup(
+            sheetIndex,
+            pivotIndex,
+            field.index,
+            granularity,
+            calendar,
+            bounds,
+          ) && ok;
+      } else {
+        ok = wb.clearPivotFieldDateGroup(sheetIndex, pivotIndex, field.index) && ok;
+      }
     }
   }
   ok =

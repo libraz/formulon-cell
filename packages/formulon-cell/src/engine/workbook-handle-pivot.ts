@@ -198,6 +198,9 @@ const ownedExtents = new WeakMap<object, Map<string, Range>>();
 
 const SPILL_ERROR = 8;
 
+const sameCellValue = (a: CellValue, b: CellValue): boolean =>
+  a.kind === b.kind && JSON.stringify(a) === JSON.stringify(b);
+
 const inside = (range: Range, row: number, col: number): boolean =>
   row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1;
 
@@ -208,6 +211,7 @@ function pivotBlockers(
   sheet: number,
   pivotIndex: number,
   needed: Range,
+  projected: readonly PivotCell[],
 ): Addr[] {
   let owned = ownedExtents.get(handle);
   if (!owned) {
@@ -227,11 +231,16 @@ function pivotBlockers(
     return [];
   }
   if (within) return [];
+  // A sheet cell holding the very value the report shows there is a copy the
+  // report cached, wherever a row or column edit has since moved it.
+  const shown = new Map(projected.map((c) => [`${c.row}:${c.col}`, c.value] as const));
   const blockers: Addr[] = [];
   for (const cell of handle.physicalCells(sheet)) {
     const { row, col } = cell.addr;
     if (!inside(needed, row, col) || inside(previous, row, col)) continue;
     if (cell.formula === null && cell.value.kind === 'blank') continue;
+    const own = shown.get(`${row}:${col}`);
+    if (cell.formula === null && own && sameCellValue(fromEngineValue(own), cell.value)) continue;
     blockers.push({ sheet, row, col });
   }
   // A report that shrank still owns the cells it cached there until they are
@@ -264,7 +273,7 @@ function effectiveLayout(
     r1: layout.top + layout.rows - 1,
     c1: layout.left + layout.cols - 1,
   };
-  if (pivotBlockers(handle, sheet, pivotIndex, needed).length === 0) return layout;
+  if (pivotBlockers(handle, sheet, pivotIndex, needed, layout.cells).length === 0) return layout;
   return {
     ...layout,
     rows: 1,
@@ -308,7 +317,7 @@ export abstract class WorkbookHandlePivotMethods {
         r1: layout.top + layout.rows - 1,
         c1: layout.left + layout.cols - 1,
       };
-      const blockers = pivotBlockers(this, sheet, pivotIndex, needed);
+      const blockers = pivotBlockers(this, sheet, pivotIndex, needed, layout.cells);
       if (blockers.length > 0) {
         out.push({
           pivotIndex,
@@ -411,6 +420,18 @@ export abstract class WorkbookHandlePivotMethods {
       };
     }
     return null;
+  }
+
+  /** The areas reports on `sheet` own: where they laid out, and where cells
+   *  they cached may still sit until they are cleared. */
+  pivotOwnedAreas(sheet: number): Range[] {
+    assertAlive(this);
+    if (!this.capabilities.pivotTables) return [];
+    pivotWb(this);
+    const owned = ownedExtents.get(this);
+    return owned
+      ? [...owned.entries()].filter(([k]) => k.startsWith(`${sheet}:`)).map(([, r]) => r)
+      : [];
   }
 
   /** Forget the cells reports on `sheet` owned beyond their current areas,

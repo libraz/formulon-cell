@@ -191,18 +191,40 @@ export function paintSpillOutline(
   ctx.restore();
 }
 
+/** The dashed box around a blocked PivotTable's area (measured sRGB 48,101,192). */
+const SPILL_TARGET = '#3065c0';
+
 /** Outline the area a PivotTable held at #SPILL! needs, with the dashed blue
  *  box the spreadsheet draws around it. */
-export function paintSpillTarget(
-  ctx: CanvasRenderingContext2D,
-  bounds: Rect,
-  theme: ResolvedTheme,
-): void {
+export function paintSpillTarget(ctx: CanvasRenderingContext2D, bounds: Rect): void {
   ctx.save();
-  ctx.strokeStyle = theme.accent;
+  ctx.strokeStyle = SPILL_TARGET;
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(bounds.x + 0.5, bounds.y + 0.5, bounds.w - 1, bounds.h - 1);
+  ctx.restore();
+}
+
+/** The warning smart tag beside a blocked PivotTable's anchor: a yellow
+ *  triangle with an exclamation mark, just past the cell's trailing edge. */
+export function paintSpillWarningTag(ctx: CanvasRenderingContext2D, cell: Rect): void {
+  const size = 12;
+  const x = cell.x + cell.w + 2;
+  const y = cell.y + (cell.h - size) / 2;
+  ctx.save();
+  ctx.fillStyle = '#f5c242';
+  ctx.strokeStyle = '#a77d10';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + size / 2, y + 0.5);
+  ctx.lineTo(x + size - 0.5, y + size - 0.5);
+  ctx.lineTo(x + 0.5, y + size - 0.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#1f1f1f';
+  ctx.fillRect(x + size / 2 - 0.75, y + 4, 1.5, 4);
+  ctx.fillRect(x + size / 2 - 0.75, y + 9, 1.5, 1.5);
   ctx.restore();
 }
 

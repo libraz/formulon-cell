@@ -80,6 +80,14 @@
     flex: 0 0 167px;
     width: 167px;
   }
+  /* The panel's pop-up buttons are 22 pt, not the 26 pt dialog ones. */
+  .fc-pivot-filter-panel .fc-select__button {
+    min-height: 22px;
+    height: 22px;
+  }
+  .fc-pivot-filter-panel__heading + .fc-pivot-filter-panel__row {
+    margin-top: 8px;
+  }
   .fc-pivot-filter-panel__select {
     flex: 0 1 167px;
     min-width: 0;
@@ -88,7 +96,7 @@
     font: inherit;
   }
   .fc-pivot-filter-panel__separator {
-    margin: 10px 19px 10px;
+    margin: 4px 19px 0;
     border: 0;
     border-top: var(--fc-hairline, 1px) solid var(--fc-rule);
   }
@@ -141,7 +149,9 @@
     margin: 8px 19px 0;
   }
   .fc-pivot-filter-panel__clear {
-    width: 113px;
+    min-width: 113px;
     height: 22px;
+    padding: 0 8px;
+    white-space: nowrap;
   }
 }

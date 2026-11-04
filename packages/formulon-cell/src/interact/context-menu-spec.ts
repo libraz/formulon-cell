@@ -434,6 +434,14 @@ export interface PivotMenuTarget {
   subtotalOn: boolean;
   /** The item's field hides an item or carries a label / value filter. */
   filtered: boolean;
+  /** Where the item sits among its field's items, and how many there are. */
+  itemPosition: number;
+  itemCount: number;
+  /** Where the item's field sits on its axis, and how many fields share it. */
+  fieldPosition: number;
+  fieldCount: number;
+  /** The item's field is grouped by date. */
+  grouped: boolean;
   /** Whether the field list is hidden, when the host can tell; draws the Hide
    *  Field List check mark. */
   fieldListHidden?: boolean;
@@ -500,6 +508,9 @@ export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntr
     label,
     ...(checked === undefined ? {} : { checked }),
   });
+  // A move that has nowhere to go is drawn disabled, as on the desktop.
+  const onIf = (id: ItemId, label: string, enabled: boolean): MenuEntry =>
+    enabled ? on(id, label) : { kind: 'item', id, label, disabled: true };
   const field = (template: string): string => template.replace('{field}', target.fieldName);
   const item = (template: string): string => template.replace('{item}', target.itemName);
   const dataField = (template: string): string => template.replace('{field}', target.dataFieldName);
@@ -609,14 +620,30 @@ export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntr
     id: 'pivotMoveMenu',
     label: t.pivotMove,
     children: [
-      off('pivotMoveItemFirst', item(t.pivotMoveItemFirst)),
-      off('pivotMoveItemUp', item(t.pivotMoveItemUp)),
-      off('pivotMoveItemDown', item(t.pivotMoveItemDown)),
-      off('pivotMoveItemLast', item(t.pivotMoveItemLast)),
-      off('pivotMoveFieldFirst', field(t.pivotMoveFieldFirst)),
-      off('pivotMoveFieldLeft', field(t.pivotMoveFieldLeft)),
-      off('pivotMoveFieldRight', field(t.pivotMoveFieldRight)),
-      off('pivotMoveFieldLast', field(t.pivotMoveFieldLast)),
+      onIf('pivotMoveItemFirst', item(t.pivotMoveItemFirst), target.itemPosition > 0),
+      onIf('pivotMoveItemUp', item(t.pivotMoveItemUp), target.itemPosition > 0),
+      onIf(
+        'pivotMoveItemDown',
+        item(t.pivotMoveItemDown),
+        target.itemPosition < target.itemCount - 1,
+      ),
+      onIf(
+        'pivotMoveItemLast',
+        item(t.pivotMoveItemLast),
+        target.itemPosition < target.itemCount - 1,
+      ),
+      onIf('pivotMoveFieldFirst', field(t.pivotMoveFieldFirst), target.fieldPosition > 0),
+      onIf('pivotMoveFieldLeft', field(t.pivotMoveFieldLeft), target.fieldPosition > 0),
+      onIf(
+        'pivotMoveFieldRight',
+        field(t.pivotMoveFieldRight),
+        target.fieldPosition < target.fieldCount - 1,
+      ),
+      onIf(
+        'pivotMoveFieldLast',
+        field(t.pivotMoveFieldLast),
+        target.fieldPosition < target.fieldCount - 1,
+      ),
       separator(),
       target.itemOnColumns
         ? on('pivotMoveFieldToRows', field(t.pivotMoveFieldToRows))
@@ -642,7 +669,7 @@ export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntr
       expandMenu,
       separator(),
       off('pivotGroup', t.pivotGroup),
-      off('pivotUngroup', t.pivotUngroup),
+      onIf('pivotUngroup', t.pivotUngroup, target.grouped),
       separator(),
       moveMenu,
       on('pivotRemoveField', field(t.pivotRemoveField)),

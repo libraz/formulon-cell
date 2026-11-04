@@ -148,6 +148,7 @@ export const dataObjectsFr: DataObjectsStrings = {
     pivotSpillBody:
       'Un #SPILL! dans un tableau croisé dynamique signifie que quelque chose empêche sa mise à jour. Effacez ou déplacez les cellules qui le bloquent.',
     pivotSpillOk: 'OK',
+    pivotSpillLearnMore: 'En savoir plus',
     pivotFilterPanel: {
       sortHeading: 'Trier',
       sortAscending: 'Croissant',
