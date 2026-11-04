@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   applyCellStyleToSelection,
+  cellStyleFallbackProfileForPlatform,
   cellStyleGroupMatches,
 } from '../../../src/commands/cell-styles.js';
 import {
@@ -896,5 +897,77 @@ describe('named-style engine publication', () => {
     } finally {
       wb.dispose();
     }
+  });
+
+  // The Mac Normal carries vertical centering, so the cell keeps a format entry
+  // and its XF is rebuilt rather than reset.
+  describe.each(['default', 'mac'] as const)('replacing a native named style (%s)', (platform) => {
+    const setup = async () => {
+      const wb = await WorkbookHandle.createDefault({
+        locale: 'ja-JP',
+        ...(platform === 'mac' ? { platform } : {}),
+      });
+      const store = createSpreadsheetStore();
+      const addr = { sheet: 0, row: 2, col: 1 };
+      wb.setText(addr, 'x');
+      store.setState((s) => ({
+        ...s,
+        selection: {
+          ...s.selection,
+          active: addr,
+          anchor: addr,
+          range: { sheet: 0, r0: 2, c0: 1, r1: 2, c1: 1 },
+        },
+      }));
+      const apply = (id: string) =>
+        applyCellStyleToSelection(store, null, id, {
+          getWorkbook: () => wb,
+          getFallbackProfile: () => cellStyleFallbackProfileForPlatform(platform),
+        });
+      const effective = () => {
+        const style = wb.getEffectiveStyle(0, 2, 1);
+        const xf = wb.getCellXf(style?.xfIndex ?? -1);
+        return {
+          fill: wb.getFillRecord(xf?.fillIndex ?? -1),
+          border: wb.getBorderRecord(xf?.borderIndex ?? -1),
+          fontIndex: xf?.fontIndex,
+        };
+      };
+      return { wb, apply, effective };
+    };
+
+    it('resets fill, border and font to Normal when Normal follows Note', async () => {
+      const { wb, apply, effective } = await setup();
+      try {
+        const normal = effective();
+        expect(apply('note')).toBe(true);
+        const note = effective();
+        expect(note.fill).not.toEqual(normal.fill);
+        expect(note.border).not.toEqual(normal.border);
+        expect(apply('normal')).toBe(true);
+        const after = effective();
+        expect(after.fill).toEqual(normal.fill);
+        expect(after.border).toEqual(normal.border);
+        expect(wb.getFontRecord(after.fontIndex ?? -1)).toEqual(
+          wb.getFontRecord(normal.fontIndex ?? -1),
+        );
+      } finally {
+        wb.dispose();
+      }
+    });
+
+    it('keeps the Note border when a style without the border group follows it', async () => {
+      const { wb, apply, effective } = await setup();
+      try {
+        expect(apply('note')).toBe(true);
+        const note = effective();
+        expect(apply('good')).toBe(true);
+        const good = effective();
+        expect(good.border).toEqual(note.border);
+        expect(good.fill).not.toEqual(note.fill);
+      } finally {
+        wb.dispose();
+      }
+    });
   });
 });

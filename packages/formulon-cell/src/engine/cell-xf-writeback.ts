@@ -497,6 +497,13 @@ export function resolveXfForFormat(
     'fill',
     'protection',
   ];
+  // A cell returning to Normal from another named style takes Normal's raw group
+  // wherever the format leaves the group unset, never the old style's.
+  const leavesNamedStyle =
+    fmt.cellStyle === undefined &&
+    currentRaw !== null &&
+    mappedXfId !== undefined &&
+    (currentRaw.xfId ?? 0) !== mappedXfId;
   for (const group of groups) {
     const namedMatch =
       namedXf?.groups.includes(group) === true &&
@@ -517,6 +524,12 @@ export function resolveXfForFormat(
     // its current XF may carry meaningful source metadata (apply flags,
     // explicit defaults), which must survive an unrelated edit.
     if (fmt.cellStyle !== undefined && namedMatch) copyRawGroup(record, namedXf.raw, group);
+    else if (
+      leavesNamedStyle &&
+      namedXf?.groups.includes(group) === true &&
+      !formatHasGroupFields(effectiveFormat, group)
+    )
+      copyRawGroup(record, namedXf.raw, group);
     else if (!formatHasGroupFields(effectiveFormat, group) && currentRaw !== null)
       copyRawGroup(record, currentRaw, group);
     else if (currentMatch) copyRawGroup(record, currentRaw, group);
