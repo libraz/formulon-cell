@@ -42,6 +42,8 @@ export interface CoerceInputOptions {
   locale?: string;
   /** Read typed dates in the 1904 date system. */
   date1904?: boolean;
+  /** The Mac profile, which keeps a typed #GETTING_DATA as text. */
+  mac?: boolean;
 }
 
 /** Boolean spellings typed input accepts, per input language. */
@@ -55,7 +57,7 @@ const booleanText = (locale: string | undefined): readonly [string, string] =>
 
 /** Error literals typed input stores as error values, by ErrorCode ordinal.
  *  German and French accept only their localized spellings. #GETTING_DATA is
- *  accepted but saved as #N/A. */
+ *  accepted but saved as #N/A, except on the Mac desktop, where it stays text. */
 const ERROR_LITERALS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   en: {
     '#NULL!': 0,
@@ -87,9 +89,11 @@ const ERROR_LITERALS: Readonly<Record<string, Readonly<Record<string, number>>>>
   },
 };
 
-const errorLiteral = (text: string, locale: string | undefined): number | null => {
+const errorLiteral = (text: string, locale: string | undefined, mac = false): number | null => {
+  const upper = text.toUpperCase();
+  if (mac && upper === '#GETTING_DATA') return null;
   const literals = ERROR_LITERALS[inputLanguage(locale)] ?? ERROR_LITERALS.en;
-  return literals?.[text.toUpperCase()] ?? null;
+  return literals?.[upper] ?? null;
 };
 
 const PROFILE_LOCALE_TO_INPUT_LOCALE: Readonly<Record<string, string>> = {
@@ -161,6 +165,12 @@ export function inputLocaleForWorkbook(wb: WorkbookHandle): string | undefined {
   return undefined;
 }
 
+/** Whether the workbook runs on the Mac desktop profile. */
+const isMacProfile = (wb: WorkbookHandle): boolean =>
+  (typeof wb.spreadsheetProfileId === 'function' ? wb.spreadsheetProfileId() : null)?.startsWith(
+    'mac-',
+  ) ?? false;
+
 /** The workbook's date system, for callers that hold no store. */
 export function workbookDate1904(wb: WorkbookHandle): boolean {
   return (typeof wb.calcSettings === 'function' && wb.calcSettings()?.date1904) || false;
@@ -198,7 +208,7 @@ export function coerceInput(raw: string, options?: CoerceInputOptions): CoercedI
   const upper = raw.normalize('NFKC').toUpperCase();
   if (upper === trueText) return { kind: 'bool', value: true };
   if (upper === falseText) return { kind: 'bool', value: false };
-  const errorCode = errorLiteral(raw, locale);
+  const errorCode = errorLiteral(raw, locale, options?.mac === true);
   if (errorCode !== null) {
     return { kind: 'error', code: errorCode, text: formatError(errorCode, raw) };
   }
@@ -222,6 +232,7 @@ export function coerceInputForCell(
     forceText: format?.numFmt?.kind === 'text',
     locale,
     date1904: state.ui.date1904 === true,
+    mac: wb ? isMacProfile(wb) : false,
   });
   if (coerced.kind === 'formula') {
     let text = wb ? canonicalizeLocalizedFormulaForInput(wb, coerced.text, locale) : coerced.text;

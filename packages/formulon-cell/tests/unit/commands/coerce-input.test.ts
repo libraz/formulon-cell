@@ -377,3 +377,14 @@ describe('coerceInputForCell under Set precision as displayed', () => {
     });
   });
 });
+
+describe('#GETTING_DATA typed on the Mac profile', () => {
+  it('stays text, as the Mac desktop keeps it; other profiles still store #N/A', () => {
+    expect(coerceInput('#GETTING_DATA', { mac: true })).toEqual({
+      kind: 'text',
+      value: '#GETTING_DATA',
+    });
+    expect(coerceInput('#GETTING_DATA')).toMatchObject({ kind: 'error', code: 6 });
+    expect(coerceInput('#N/A', { mac: true })).toMatchObject({ kind: 'error', code: 6 });
+  });
+});
