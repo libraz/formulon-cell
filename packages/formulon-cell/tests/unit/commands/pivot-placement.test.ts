@@ -4,6 +4,7 @@ import {
   createPivotTableAtPlacement,
   executeRibbonPivotTableAction,
   pivotSourceForSelection,
+  refreshPivotReportsAfterEdit,
 } from '../../../src/commands/pivot-table.js';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -66,6 +67,21 @@ describe('pivot source for a single cell', () => {
 });
 
 describe('new-sheet placement', () => {
+  it('names the new sheet with the lowest unused SheetN', async () => {
+    const { wb, store } = await setup();
+    expect(wb.renameSheet(0, 'Tabelle1')).toBe(true);
+    expect(wb.addSheet('Sheet1')).toBe(1);
+    // Source stays on the first sheet; the new sheet lands left of it.
+    const result = createPivotTableAtPlacement(
+      { store, workbook: wb },
+      { source: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 }, rowField: 'Region', valueField: 'Sales' },
+      'new-sheet',
+    );
+    expect(result.ok).toBe(true);
+    expect(names(wb)).toEqual(['Sheet2', 'Tabelle1', 'Sheet1']);
+    wb.dispose();
+  });
+
   it('inserts the sheet before the source, anchors at A3 and undoes as one step', async () => {
     const { wb, store } = await setup();
     const history = new History();
@@ -154,6 +170,25 @@ describe('ribbon one-click', () => {
       kind: 'text',
       value: '合計 / Sales',
     });
+    wb.dispose();
+  });
+
+  it('leaves the ribbon path as refreshed as an explicit report refresh', async () => {
+    const { wb, store } = await setup();
+    mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
+    executeRibbonPivotTableAction({
+      store,
+      workbook: wb,
+      action: 'new-sheet',
+      strings,
+      history: new History(),
+    });
+    const settled = JSON.stringify([...store.getState().layout.colWidths]);
+    const cells = store.getState().data.cells.size;
+    refreshPivotReportsAfterEdit(store, wb);
+    expect(JSON.stringify([...store.getState().layout.colWidths])).toBe(settled);
+    expect(store.getState().data.cells.size).toBe(cells);
+    expect(cells).toBeGreaterThan(0);
     wb.dispose();
   });
 

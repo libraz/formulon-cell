@@ -100,8 +100,8 @@ function structureAllowed(store: SpreadsheetStore | null | undefined, op: string
 }
 
 /** Highest `SheetN` number handed out per workbook. Excel keeps this counter
- *  rising for the session: a deleted sheet's number is not reused. It starts
- *  from the sheet count the first time a sheet is added. */
+ *  rising for the session: a deleted sheet's number is not reused. The first
+ *  add takes the lowest free number. */
 const sheetNumbers = new WeakMap<WorkbookHandle, number>();
 
 /** The next default sheet number: the counter's next value that no sheet
@@ -109,7 +109,7 @@ const sheetNumbers = new WeakMap<WorkbookHandle, number>();
 function nextSheetNumber(wb: WorkbookHandle): number {
   const taken = new Set<string>();
   for (let i = 0; i < wb.sheetCount; i += 1) taken.add(wb.sheetName(i).toLocaleLowerCase());
-  let n = (sheetNumbers.get(wb) ?? wb.sheetCount) + 1;
+  let n = (sheetNumbers.get(wb) ?? 0) + 1;
   while (taken.has(`sheet${n}`)) n += 1;
   return n;
 }

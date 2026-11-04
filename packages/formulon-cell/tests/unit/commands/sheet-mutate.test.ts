@@ -112,13 +112,29 @@ describe('addSheet', () => {
     fake.names = ['a', 'fb'];
     addSheet(store, wb);
     addSheet(store, wb);
-    expect(fake.names).toEqual(['a', 'fb', 'Sheet3', 'Sheet4']);
+    expect(fake.names).toEqual(['a', 'fb', 'Sheet1', 'Sheet2']);
     removeSheet(store, wb, 3);
     addSheet(store, wb);
-    expect(fake.names).toEqual(['a', 'fb', 'Sheet3', 'Sheet5']);
-    wb.renameSheet(1, 'sheet6');
+    expect(fake.names).toEqual(['a', 'fb', 'Sheet1', 'Sheet3']);
+    wb.renameSheet(1, 'sheet4');
     addSheet(store, wb);
-    expect(fake.names.at(-1)).toBe('Sheet7');
+    expect(fake.names.at(-1)).toBe('Sheet5');
+  });
+
+  it('takes the lowest unused SheetN on a first add', () => {
+    const cases: [string[], string][] = [
+      [['Tabelle1', 'Sheet1'], 'Sheet2'],
+      [['Sheet1', 'Sheet3'], 'Sheet2'],
+      [['Sheet2'], 'Sheet1'],
+      [['Data'], 'Sheet1'],
+      [['Sheet1', 'Sheet2', 'Sheet3'], 'Sheet4'],
+    ];
+    for (const [names, expected] of cases) {
+      const { wb, fake } = makeFake({ sheetCount: names.length });
+      fake.names = [...names];
+      addSheet(createSpreadsheetStore(), wb);
+      expect(fake.names.at(-1)).toBe(expected);
+    }
   });
 
   it('records sheet insertion as an undoable workbook action', () => {

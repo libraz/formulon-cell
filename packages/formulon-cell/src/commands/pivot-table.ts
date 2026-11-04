@@ -1326,8 +1326,8 @@ export const executeRibbonPivotTableAction = (
   );
   if (result.ok) {
     const { destination } = result;
-    mutators.replaceCells(store, workbook.cells(destination.sheet));
     mutators.setSheetIndex(store, destination.sheet);
+    refreshPivotReportsAfterEdit(store, workbook);
     mutators.setActive(store, destination);
     return { kind: 'created', destinationSheet: destination.sheet, destination };
   }
