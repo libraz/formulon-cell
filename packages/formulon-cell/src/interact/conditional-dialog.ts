@@ -730,6 +730,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     kindRow.hidden = styleSelect.value !== 'classic' || macNew;
     macTypes.hidden = styleSelect.value !== 'classic' || !macNew;
     if (macNew) macSyncFromModel();
+    dataBar.setMacLayout(macNew);
+    colorScale.setMacLayout(macNew);
     // Excel for Mac lines Cancel and OK up in the footer.
     (macNew ? footer : addRow).appendChild(addBtn);
     addRow.hidden = macNew;

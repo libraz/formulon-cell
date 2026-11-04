@@ -7,6 +7,7 @@ import { formatEditableNumber } from '../engine/value.js';
 import type { Strings } from '../i18n/strings.js';
 import type { ConditionalScalePoint } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 
 type ConditionalStrings = Strings['conditionalDialog'];
 
@@ -31,13 +32,21 @@ export const scaleTypeOptions = (t: ConditionalStrings) =>
     { id: 'percentile', label: t.scaleTypePercentile },
   ] as const;
 
-/** Min/max points carry no value, so their value input hides itself. */
+/**
+ * Min/max points carry no value, so their value input hides itself. Where the Mac layout asks for
+ * it (`data-mac-auto`), the input stays as a disabled field named in parentheses instead.
+ */
 export const bindScalePointValueVisibility = (
   type: HTMLSelectElement,
   value: HTMLInputElement,
+  autoNames: { min: string; max: string } = { min: '', max: '' },
 ): void => {
   const syncValue = (): void => {
-    value.hidden = type.value === 'min' || type.value === 'max';
+    const automatic = type.value === 'min' || type.value === 'max';
+    const shown = automatic && value.dataset.macAuto === 'true';
+    value.hidden = automatic && !shown;
+    projectDisabledState(value, shown, null);
+    value.placeholder = shown ? `(${type.value === 'min' ? autoNames.min : autoNames.max})` : '';
   };
   type.addEventListener('change', syncValue);
   syncValue();
@@ -70,7 +79,8 @@ export function appendScalePointRow(
   value.inputMode = 'decimal';
   value.value = defaultValue;
   value.setAttribute('aria-label', `${label} ${t.scaleValue}`);
-  bindScalePointValueVisibility(type, value);
+  value.setAttribute('data-scale-value', '');
+  bindScalePointValueVisibility(type, value, { min: t.scaleTypeMin, max: t.scaleTypeMax });
   row.append(span, type, value);
   parent.appendChild(row);
   return { row, type, value };
@@ -104,4 +114,12 @@ export const applyScalePoint = (
     'value' in next ? localizedScalePointValue(next.value, locale) : fallbackValue;
   if (control.operator) control.operator.value = next.gte === false ? '>' : '>=';
   control.type.dispatchEvent(new Event('change'));
+};
+
+/** Switch the automatic bounds under `root` between hidden and the Mac disabled field. */
+export const setMacScaleFields = (root: HTMLElement, on: boolean): void => {
+  for (const value of root.querySelectorAll<HTMLInputElement>('input[data-scale-value]')) {
+    value.dataset.macAuto = String(on);
+    value.closest('label')?.querySelector('select')?.dispatchEvent(new Event('change'));
+  }
 };

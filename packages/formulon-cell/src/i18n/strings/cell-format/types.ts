@@ -391,6 +391,11 @@ export interface CellFormatStrings {
     macCondDate: string;
     macCondDuplicate: string;
     macCondUnique: string;
+    macPositive: string;
+    macNegative: string;
+    macFill: string;
+    macBorder: string;
+    macBarOnly: string;
     bottomMode: string;
     averageModeLabel: string;
     averageAbove: string;

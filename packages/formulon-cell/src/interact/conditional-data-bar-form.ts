@@ -12,6 +12,7 @@ import {
   applyScalePoint,
   collectScalePoint,
   conditionalSelect,
+  setMacScaleFields,
 } from './conditional-form-controls.js';
 
 type DataBarRule = Extract<ConditionalRule, { kind: 'data-bar' }>;
@@ -73,6 +74,8 @@ const cssColorToHex = (color: string | undefined, fallback: string): string => {
 
 export interface DataBarForm {
   readonly group: HTMLDivElement;
+  /** Switch to the Mac layout: signed fill and border sections, "bar only", named automatic bounds. */
+  setMacLayout(on: boolean): void;
   /** Restore the defaults a new rule starts from. */
   reset(): void;
   populate(rule: DataBarRule): void;
@@ -113,6 +116,16 @@ export function appendDataBarForm(
   barDirectionRow.append(barDirectionLabel, barDirectionSelect);
   group.appendChild(barDirectionRow);
 
+  const macHeading = (text: string): HTMLDivElement => {
+    const heading = document.createElement('div');
+    heading.className = 'fc-conddlg__mac-heading';
+    heading.textContent = text;
+    heading.hidden = true;
+    return heading;
+  };
+  const fillHeading = macHeading(t.macFill);
+  const borderHeading = macHeading(t.macBorder);
+  group.appendChild(fillHeading);
   const barFillStyleRow = document.createElement('label');
   barFillStyleRow.className = 'fc-fmtdlg__row';
   const barFillStyleLabel = document.createElement('span');
@@ -127,6 +140,7 @@ export function appendDataBarForm(
   const barColorRow = document.createElement('label');
   barColorRow.className = 'fc-fmtdlg__row';
   const barColorLabel = document.createElement('span');
+  barColorLabel.className = 'fc-conddlg__bar-sign';
   barColorLabel.textContent = t.barColor;
   const barColorInput = document.createElement('input');
   barColorInput.type = 'color';
@@ -139,6 +153,7 @@ export function appendDataBarForm(
   const barNegativeColorRow = document.createElement('label');
   barNegativeColorRow.className = 'fc-fmtdlg__row';
   const barNegativeColorLabel = document.createElement('span');
+  barNegativeColorLabel.className = 'fc-conddlg__bar-sign';
   barNegativeColorLabel.textContent = t.barNegativeColor;
   const barNegativeColorInput = document.createElement('input');
   barNegativeColorInput.type = 'color';
@@ -148,6 +163,7 @@ export function appendDataBarForm(
   barNegativeColorRow.append(barNegativeColorLabel, barNegativeColorInput);
   group.appendChild(barNegativeColorRow);
 
+  group.appendChild(borderHeading);
   const barBorderStyleRow = document.createElement('label');
   barBorderStyleRow.className = 'fc-fmtdlg__row';
   const barBorderStyleLabel = document.createElement('span');
@@ -164,6 +180,7 @@ export function appendDataBarForm(
   const barBorderColorRow = document.createElement('label');
   barBorderColorRow.className = 'fc-fmtdlg__row';
   const barBorderColorLabel = document.createElement('span');
+  barBorderColorLabel.className = 'fc-conddlg__bar-sign';
   barBorderColorLabel.textContent = t.barBorderColor;
   const barBorderColorInput = document.createElement('input');
   barBorderColorInput.type = 'color';
@@ -176,6 +193,7 @@ export function appendDataBarForm(
   const barNegativeBorderColorRow = document.createElement('label');
   barNegativeBorderColorRow.className = 'fc-fmtdlg__row';
   const barNegativeBorderColorLabel = document.createElement('span');
+  barNegativeBorderColorLabel.className = 'fc-conddlg__bar-sign';
   barNegativeBorderColorLabel.textContent = t.barNegativeBorderColor;
   const barNegativeBorderColorInput = document.createElement('input');
   barNegativeBorderColorInput.type = 'color';
@@ -216,10 +234,42 @@ export function appendDataBarForm(
   const showValueCk = document.createElement('input');
   showValueCk.type = 'checkbox';
   showValueCk.checked = true;
+  showValueCk.setAttribute('data-cf-bar-show-value', '');
   const showValueText = document.createElement('span');
   showValueText.textContent = t.showValue;
   showValueRow.append(showValueCk, showValueText);
   group.appendChild(showValueRow);
+  // Excel for Mac words the same flag the other way round: "show the bar only".
+  const barOnlyRow = document.createElement('label');
+  barOnlyRow.className = 'fc-fmtdlg__check';
+  barOnlyRow.hidden = true;
+  const barOnlyCk = document.createElement('input');
+  barOnlyCk.type = 'checkbox';
+  barOnlyCk.setAttribute('data-cf-bar-only', '');
+  const barOnlyText = document.createElement('span');
+  barOnlyText.textContent = t.macBarOnly;
+  barOnlyRow.append(barOnlyCk, barOnlyText);
+  group.appendChild(barOnlyRow);
+  const syncBarOnly = (): void => {
+    barOnlyCk.checked = !showValueCk.checked;
+  };
+  barOnlyCk.addEventListener('change', () => {
+    showValueCk.checked = !barOnlyCk.checked;
+  });
+  const setMacLayout = (on: boolean): void => {
+    for (const heading of [fillHeading, borderHeading]) heading.hidden = !on;
+    barOnlyRow.hidden = !on;
+    showValueRow.hidden = on;
+    const signLabels: [HTMLElement, string, string][] = [
+      [barColorLabel, t.macPositive, t.barColor],
+      [barNegativeColorLabel, t.macNegative, t.barNegativeColor],
+      [barBorderColorLabel, t.macPositive, t.barBorderColor],
+      [barNegativeBorderColorLabel, t.macNegative, t.barNegativeBorderColor],
+    ];
+    for (const [label, mac, desktop] of signLabels) label.textContent = on ? mac : desktop;
+    setMacScaleFields(group, on);
+    syncBarOnly();
+  };
 
   const dataBarColorDrafts = {
     positive: { original: undefined, changed: false } as DataBarColorDraft,
@@ -334,6 +384,7 @@ export function appendDataBarForm(
     barFillStyleSelect.value = 'gradient';
     resetDataBarAppearance();
     showValueCk.checked = true;
+    syncBarOnly();
     barDirectionSelect.value = 'context';
   };
 
@@ -376,6 +427,7 @@ export function appendDataBarForm(
     barBorderStyleSelect.value =
       rule.borderColor !== undefined || rule.negativeBorderColor !== undefined ? 'solid' : 'none';
     showValueCk.checked = rule.showValue !== false;
+    syncBarOnly();
     applyScalePoint(dataBarMin, rule.min, { kind: 'min' }, '0', getLocale());
     applyScalePoint(dataBarMax, rule.max, { kind: 'max' }, '100', getLocale());
     barDirectionSelect.value = rule.direction ?? 'context';
@@ -444,5 +496,5 @@ export function appendDataBarForm(
     return dataBarRule;
   };
 
-  return { group, reset, populate, collect };
+  return { group, setMacLayout, reset, populate, collect };
 }

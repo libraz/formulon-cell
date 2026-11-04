@@ -8,6 +8,7 @@ import {
   appendScalePointRow,
   collectScalePoint,
   localizedScalePointValue,
+  setMacScaleFields,
 } from './conditional-form-controls.js';
 
 type ColorScaleRule = Extract<ConditionalRule, { kind: 'color-scale' }>;
@@ -19,6 +20,8 @@ export interface ColorScaleForm {
   syncThreeStops(): void;
   /** Re-run each threshold type's change handling (value visibility). */
   refreshScaleTypes(): void;
+  /** Show the automatic bounds as disabled fields named in parentheses, as Excel for Mac does. */
+  setMacLayout(on: boolean): void;
   reset(): void;
   populate(rule: ColorScaleRule): void;
   /** Null when a threshold value is not a number. */
@@ -145,5 +148,15 @@ export function appendColorScaleForm(
     return { kind: 'color-scale', range, stops, thresholds: [minPoint, maxPoint] };
   };
 
-  return { group, useThreeCk, syncThreeStops, refreshScaleTypes, reset, populate, collect };
+  const setMacLayout = (on: boolean): void => setMacScaleFields(group, on);
+  return {
+    group,
+    useThreeCk,
+    syncThreeStops,
+    refreshScaleTypes,
+    setMacLayout,
+    reset,
+    populate,
+    collect,
+  };
 }
