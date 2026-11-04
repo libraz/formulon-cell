@@ -5,6 +5,7 @@ import { excelSerialFromDate, excelSerialToDate } from '../format/date-serial.js
 import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
+  retargetTextSeries,
   sameTextSeries,
   type TextSeriesAtom,
   textSeriesAtom,
@@ -169,7 +170,28 @@ const addWeekdays = (date: Date, weekdays: number): Date => {
   return next;
 };
 
-/** Auto Fill Options' explicit date units step from the last source cell. */
+const monthIndex = (d: Date): number => d.getUTCFullYear() * 12 + d.getUTCMonth();
+
+/** Dates a constant number of months apart that share a day of the month (or are all month ends). */
+function monthSeries(dates: Date[]): { monthStep: number; endOfMonth: boolean } | null {
+  const months = dates.slice(1).map((d, i) => monthIndex(d) - monthIndex(dates[i] as Date));
+  const monthStep = months[0] ?? 0;
+  const endOfMonth = dates.every(isMonthEnd);
+  const aligned =
+    endOfMonth || dates.every((d) => d.getUTCDate() === (dates[0] as Date).getUTCDate());
+  return monthStep !== 0 && months.every((m) => m === monthStep) && aligned
+    ? { monthStep, endOfMonth }
+    : null;
+}
+
+const allEqual = (xs: readonly number[]): boolean =>
+  xs.every((x) => Math.abs(x - (xs[0] ?? 0)) < 1e-9);
+
+/**
+ * Auto Fill Options' explicit date units. One seed steps from itself; several seeds step each
+ * by the unit (a week of weekdays per cycle), repeat when they are irregular, or fall back to
+ * the default series for days and for month-aligned dates.
+ */
 function buildDateUnitProjection(
   line: SourceCell[],
   unit: DateFillUnit,
@@ -178,6 +200,45 @@ function buildDateUnitProjection(
 ): SeriesProjection | null {
   if (line.length === 0 || !line.every((c) => c.numeric !== null && c.formula === null)) {
     return null;
+  }
+  const copy = (): SeriesProjection => ({
+    at: (i) => projectedCell(line[(i - 1) % line.length]),
+  });
+  // Time-of-day values are not dates: the date units leave them as they are.
+  if (line.every((c) => c.dateKind !== 'date' && Math.abs(c.numeric ?? 0) < 1)) return copy();
+  if (line.length > 1) {
+    if (unit === 'days') return null;
+    const values = line.map((c) => c.numeric ?? 0);
+    const dates = values.map((v) => serialToDate(v, date1904));
+    if (unit === 'months' && monthSeries(dates)) return null;
+    const gaps = (xs: readonly number[]): number[] => xs.slice(1).map((x, i) => x - (xs[i] ?? 0));
+    const regular =
+      unit === 'weekdays'
+        ? allEqual(gaps(values))
+        : allEqual(gaps(dates.map(unit === 'months' ? monthIndex : (d) => d.getUTCFullYear())));
+    if (!regular) {
+      return {
+        at: (i) => {
+          const cell = line[(i - 1) % line.length] as SourceCell;
+          return cell.dateKind === 'date'
+            ? { kind: 'number', value: Math.floor(cell.numeric ?? 0) }
+            : projectedCell(cell);
+        },
+      };
+    }
+    return {
+      at: (i) => {
+        const cell = line[(i - 1) % line.length] as SourceCell;
+        const date = dates[(i - 1) % line.length] as Date;
+        const cycle = (Math.floor((i - 1) / line.length) + 1) * sign;
+        const fraction = cell.dateKind === 'date' ? 0 : (cell.numeric ?? 0) % 1;
+        const stepped =
+          unit === 'weekdays'
+            ? addWeekdays(date, cycle * 5)
+            : addMonthsClamped(date, unit === 'months' ? cycle : cycle * 12, isMonthEnd(date));
+        return dateCell(stepped, fraction, date1904);
+      },
+    };
   }
   const lastCell = line[line.length - 1] as SourceCell;
   const last = lastCell.numeric ?? 0;
@@ -237,7 +298,11 @@ const copyRun = (cells: SourceCell[]): Run => ({
 
 /** Dates with one day of the month (or all month ends) step by months; dates a
  *  whole number of days apart step by days; any other dates repeat. */
-function dateRun(cells: SourceCell[], ctx: ProjectionContext): Run {
+function dateRun(source: SourceCell[], ctx: ProjectionContext): Run {
+  // A date-only format works on the day, whatever time of day the value carries.
+  const cells = source.map((c) =>
+    c.dateKind === 'date' && !c.hasTime ? { ...c, numeric: Math.floor(c.numeric ?? 0) } : c,
+  );
   const values = cells.map((c) => c.numeric ?? 0);
   const k = values.length;
   const first = values[0] ?? 0;
@@ -250,21 +315,18 @@ function dateRun(cells: SourceCell[], ctx: ProjectionContext): Run {
     return { length: k, at: (x) => ({ kind: 'number', value: trend(x) }) };
   }
   const dates = values.map((v) => serialToDate(v, ctx.date1904));
-  const monthIndex = (d: Date): number => d.getUTCFullYear() * 12 + d.getUTCMonth();
-  const months = dates.slice(1).map((d, i) => monthIndex(d) - monthIndex(dates[i] as Date));
-  const monthStep = months[0] ?? 0;
-  const endOfMonth = dates.every(isMonthEnd);
-  if (
-    monthStep !== 0 &&
-    months.every((m) => m === monthStep) &&
-    (endOfMonth || dates.every((d) => d.getUTCDate() === dates[0]?.getUTCDate()))
-  ) {
+  const series = monthSeries(dates);
+  if (series) {
     const anchor = dates[0] as Date;
     const fraction = first - Math.floor(first);
     return {
       length: k,
       at: (x) =>
-        dateCell(addMonthsClamped(anchor, monthStep * x, endOfMonth), fraction, ctx.date1904),
+        dateCell(
+          addMonthsClamped(anchor, series.monthStep * x, series.endOfMonth),
+          fraction,
+          ctx.date1904,
+        ),
     };
   }
   const gaps = values.slice(1).map((v, i) => v - (values[i] ?? 0));
@@ -312,6 +374,8 @@ function textRun(cells: SourceCell[], atoms: TextSeriesAtom[], ctx: ProjectionCo
     positions.push(prev + diff);
   });
   const start = positions[0] ?? 0;
+  const gaps = positions.slice(1).map((p, i) => p - (positions[i] ?? 0));
+  if (gaps.length > 1 && !allEqual(gaps)) return copyRun(cells);
   const trend = positions.length === 1 ? (x: number) => start + ctx.sign * x : linearFit(positions);
   return {
     length: atoms.length,
@@ -371,6 +435,12 @@ function buildProjection(line: SourceCell[], ctx: ProjectionContext): SeriesProj
     };
   }
   const kinds = line.map((cell) => slotKind(cell, ctx.locale));
+  kinds.forEach((kind, i) => {
+    const prev = kinds[i - 1];
+    if (kind.type !== 'text' || prev?.type !== 'text') return;
+    const joined = retargetTextSeries(kind.atom, prev.atom, ctx.locale);
+    if (joined) kinds[i] = { type: 'text', atom: joined };
+  });
   const slots: { run: Run; offset: number }[] = [];
   let start = 0;
   while (start < line.length) {

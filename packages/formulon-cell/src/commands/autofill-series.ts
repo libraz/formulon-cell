@@ -438,6 +438,23 @@ export function textSeriesAtom(text: string, locale: string | undefined): TextSe
   return null;
 }
 
+/** `atom` re-read inside the list of `to` when its text is an item there too, else null. A text
+ *  that sits in several lists joins its neighbour's list so a pair like 一月 and 二月 steps on. */
+export function retargetTextSeries(
+  atom: TextSeriesAtom,
+  to: TextSeriesAtom,
+  locale: string | undefined,
+): TextSeriesAtom | null {
+  if (atom.kind !== 'list' || to.kind !== 'list' || atom.list === to.list) return null;
+  const profile = profileFor(locale);
+  const key = matchKey(atom.source, profile);
+  const keys = to.list.map((item) => matchKey(item, profile));
+  const index = keys.indexOf(key);
+  return index < 0
+    ? null
+    : { kind: 'list', list: to.list, listIndex: to.listIndex, index, source: atom.source };
+}
+
 /** Whether two atoms belong to one series, so AutoFill steps them together. */
 export const sameTextSeries = (a: TextSeriesAtom, b: TextSeriesAtom): boolean => {
   if (a.kind === 'list' || b.kind === 'list') {

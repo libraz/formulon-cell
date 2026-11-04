@@ -775,7 +775,7 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
   const tokens = dateTimeTokens(firstFormatSection(original));
   const hasTime = /[hs]/i.test(tokens);
   // `m` is minutes next to hours or seconds, and a month otherwise.
-  const hasDate = /[yd]/i.test(tokens) || (/m/i.test(tokens) && !hasTime);
+  const hasDate = /[yd]|g{1,3}e/i.test(tokens) || (/m/i.test(tokens) && !hasTime);
   if (hasDate && hasTime) return { kind: 'datetime', pattern: original };
   if (hasTime) return { kind: 'time', pattern: original };
   if (hasDate) return { kind: 'date', pattern: original };

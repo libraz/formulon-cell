@@ -50,6 +50,8 @@ export function formatNumber(
   if (!fmt || fmt.kind === 'general') return formatGeneralNumber(value, locale);
   if (fmt.kind === 'text') return String(value);
   if (fmt.kind === 'fixed') {
+    // A value that rounds to zero carries no sign.
+    if (Math.round(Math.abs(value) * 10 ** fmt.decimals) === 0) value = 0;
     const negStyle = fmt.negativeStyle ?? 'minus';
     const body = intlFormatterCache
       .numberFormat(locale, {
@@ -122,7 +124,11 @@ export function formatNumber(
     return renderDateTimePattern(value, fmt.pattern, locale, date1904);
   }
   if (fmt.kind === 'datetime') {
-    return renderDateTimePattern(value, fmt.pattern, locale, date1904);
+    const pattern =
+      fmt.pattern === 'm/d/yy h:mm'
+        ? `${localeShortDatePattern('m/d/yy', locale)} h:mm`
+        : fmt.pattern;
+    return renderDateTimePattern(value, pattern, locale, date1904);
   }
   if (fmt.kind === 'special') {
     return formatSpecialPattern(value, fmt.pattern);
@@ -201,7 +207,7 @@ function formatCustomPattern(
   const active = stripFormatDirectives(selected.section, true);
 
   // If the section contains date/time tokens, render as date.
-  if (/y|m|d|h|s|aaa/i.test(stripLiterals(active))) {
+  if (/y|m|d|h|s|aaa|g{1,3}e/i.test(stripLiterals(active))) {
     return renderDateTimePattern(value, active, locale, date1904);
   }
 
@@ -209,7 +215,8 @@ function formatCustomPattern(
   // A section that does not supply its own sign puts the minus before the
   // whole text, literals included.
   if (!selected.useAbs && value < 0) {
-    return `-${renderNumericPattern(Math.abs(value), numericPattern, locale)}`;
+    const body = renderNumericPattern(Math.abs(value), numericPattern, locale);
+    return body === renderNumericPattern(0, numericPattern, locale) ? body : `-${body}`;
   }
   return renderNumericPattern(selected.useAbs ? Math.abs(value) : value, numericPattern, locale);
 }
@@ -516,6 +523,45 @@ function hasUnquotedPercent(s: string): boolean {
   return false;
 }
 
+/** Japanese eras by first day (year, month, day) with their kanji names and Latin initials. */
+const JAPANESE_ERAS = [
+  { start: [2019, 5, 1], name: '令和', initial: 'R' },
+  { start: [1989, 1, 8], name: '平成', initial: 'H' },
+  { start: [1926, 12, 25], name: '昭和', initial: 'S' },
+  { start: [1912, 7, 30], name: '大正', initial: 'T' },
+  { start: [1868, 9, 8], name: '明治', initial: 'M' },
+] as const;
+
+const japaneseEraOf = (
+  year: number,
+  month: number,
+  day: number,
+): (typeof JAPANESE_ERAS)[number] | null =>
+  JAPANESE_ERAS.find(({ start }) => {
+    const [y, m, d] = start;
+    return year !== y ? year > y : month !== m ? month > m : day >= d;
+  }) ?? null;
+
+/** Locale of a `[$-xxx]` tag: a hexadecimal language id or a BCP 47 tag, plus the `x-gannen` flag. */
+const LCID_LOCALES: Record<string, string> = {
+  '404': 'zh-TW',
+  '407': 'de-DE',
+  '409': 'en-US',
+  '40c': 'fr-FR',
+  '411': 'ja-JP',
+  '412': 'ko-KR',
+  '41e': 'th-TH',
+  '804': 'zh-CN',
+};
+
+function parseLocaleTag(inner: string): { locale: string; gannen: boolean } | null {
+  const match = /^\$-([0-9a-f]{3,4}|[a-z]{2,3}(?:-[a-z]{2})?)(?:-x-([a-z]+))?$/i.exec(inner);
+  if (!match) return null;
+  const id = (match[1] ?? '').toLowerCase();
+  const locale = LCID_LOCALES[id] ?? (/^[0-9a-f]+$/.test(id) ? null : (match[1] ?? null));
+  return locale ? { locale, gannen: match[2]?.toLowerCase() === 'gannen' } : null;
+}
+
 function renderDateTimePattern(
   serial: number,
   pattern: string,
@@ -544,6 +590,9 @@ function renderDateTimePattern(
   // Unlabelled month/day names are English under a ja host; a [$-411]-style
   // tag switches the names that follow, and aaa/aaaa are always Japanese.
   let nameLocale = normalizeFormatLocale(locale).split('-')[0] === 'ja' ? 'en-US' : locale;
+  let gannen = false;
+  const era = japaneseEraOf(yyyy, mm, dd);
+  const eraYear = era ? yyyy - era.start[0] + 1 : yyyy;
   const getDaysLong = (): readonly string[] => dateNameTable(nameLocale, 'weekday', 'long');
   const getDaysShort = (): readonly string[] => dateNameTable(nameLocale, 'weekday', 'short');
   const getMonthsLong = (): readonly string[] => dateNameTable(nameLocale, 'month', 'long');
@@ -574,9 +623,10 @@ function renderDateTimePattern(
       const close = pattern.indexOf(']', i + 1);
       if (close > i) {
         const inner = pattern.slice(i + 1, close);
-        const tag = /^\$-(411|ja-JP|409|en-US)$/i.exec(inner);
+        const tag = parseLocaleTag(inner);
         if (tag) {
-          nameLocale = /^(411|ja-JP)$/i.test(tag[1] ?? '') ? 'ja-JP' : 'en-US';
+          nameLocale = tag.locale;
+          gannen = tag.gannen;
           i = close + 1;
           continue;
         }
@@ -604,7 +654,13 @@ function renderDateTimePattern(
     //  minutes, not month — track prevWasH to disambiguate.
     let tok = '';
     const lowerRest = rest.toLowerCase();
-    if (lowerRest.startsWith('yyyy')) tok = 'yyyy';
+    if (lowerRest.startsWith('ggg')) tok = 'ggg';
+    else if (lowerRest.startsWith('gg')) tok = 'gg';
+    else if (lowerRest[0] === 'g') tok = 'g';
+    else if (lowerRest.startsWith('ee')) tok = 'ee';
+    else if (lowerRest[0] === 'e') tok = 'e';
+    else if (lowerRest.startsWith('bbbb')) tok = 'bbbb';
+    else if (lowerRest.startsWith('yyyy')) tok = 'yyyy';
     else if (lowerRest.startsWith('yy')) tok = 'yy';
     else if (lowerRest.startsWith('mmmmm')) tok = 'mmmmm';
     else if (lowerRest.startsWith('mmmm')) tok = 'mmmm';
@@ -632,6 +688,25 @@ function renderDateTimePattern(
       continue;
     }
     switch (tok) {
+      case 'ggg':
+        out += era?.name ?? '';
+        break;
+      case 'gg':
+        out += Array.from(era?.name ?? '')[0] ?? '';
+        break;
+      case 'g':
+        out += era?.initial ?? '';
+        break;
+      case 'ee':
+      case 'e':
+        // The zh-TW calendar tag keeps the Gregorian year in this host.
+        if (nameLocale === 'zh-TW') out += String(yyyy);
+        else if (gannen && eraYear === 1) out += '元';
+        else out += tok === 'ee' ? pad2(eraYear) : String(eraYear);
+        break;
+      case 'bbbb':
+        out += String(yyyy);
+        break;
       case 'yyyy':
         out += String(yyyy);
         break;

@@ -376,3 +376,34 @@ describe('formatNumber against measured desktop output', () => {
     expect(formatNumber(45292, fmt, 'en-US')).toBe('1/1/24');
   });
 });
+
+describe('formatNumber Japanese eras and locale tags', () => {
+  const date = { kind: 'date', pattern: 'ggge"年"m"月"d"日"' } as const;
+  it('names the era from the serial and counts its years', () => {
+    expect(formatNumber(43585, date, 'ja-JP')).toBe('平成31年4月30日');
+    expect(formatNumber(43586, date, 'ja-JP')).toBe('令和1年5月1日');
+    expect(formatNumber(32516, date, 'ja-JP')).toBe('平成1年1月8日');
+    expect(formatNumber(32515, date, 'ja-JP')).toBe('昭和64年1月7日');
+  });
+  it('prints one-letter eras and the first year as 元 only under the gannen tag', () => {
+    expect(formatNumber(43586, { kind: 'date', pattern: 'gge.m.d' }, 'ja-JP')).toBe('令1.5.1');
+    expect(formatNumber(43586, { kind: 'date', pattern: 'ge.m.d' }, 'ja-JP')).toBe('R1.5.1');
+    const gannen = { kind: 'date', pattern: '[$-ja-JP-x-gannen]ggge"年"' } as const;
+    expect(formatNumber(43586, gannen, 'ja-JP')).toBe('令和元年');
+    expect(formatNumber(43832, gannen, 'ja-JP')).toBe('令和2年');
+  });
+  it('keeps the Gregorian year under zh-TW and Thai tags', () => {
+    expect(formatNumber(43586, { kind: 'date', pattern: '[$-404]e/m/d' }, 'ja-JP')).toBe(
+      '2019/5/1',
+    );
+    expect(formatNumber(43586, { kind: 'date', pattern: '[$-41E]d/m/bbbb' }, 'ja-JP')).toBe(
+      '1/5/2019',
+    );
+  });
+  it('names months and weekdays in the tagged language', () => {
+    const de = { kind: 'date', pattern: '[$-407]dddd, d. mmmm yyyy' } as const;
+    expect(formatNumber(45322, de, 'ja-JP')).toBe('Mittwoch, 31. Januar 2024');
+    const fr = { kind: 'date', pattern: '[$-40C]d mmmm yyyy' } as const;
+    expect(formatNumber(45322, fr, 'ja-JP')).toBe('31 janvier 2024');
+  });
+});
