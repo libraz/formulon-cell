@@ -340,6 +340,211 @@
   .fc-fmtdlg:not(.fc-fmtdlg--data-validation) [data-fc-validation-clear-all] {
     display: none;
   }
+  /* Excel for Mac Data Validation (pt): a 600x433 window. 設定 stacks each
+   * label over a 228 pt pop-up with 空白を無視する beside 許可: and the
+   * apply-to-all option at the tab bottom; the message tabs caption their
+   * fields, the error tab splits スタイル: (167) from タイトル / メッセージ (310). */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__panel {
+    width: 600px;
+    height: 433px;
+    max-height: none;
+  }
+  /* The Mac sheet places the tab box at (13, 38), 574x349, and the buttons on y 388. */
+  .fc-fmtdlg--mac.fc-fmtdlg--data-validation .fc-fmtdlg__body {
+    width: 574px;
+    height: 337px;
+    max-height: none;
+    overflow: hidden;
+  }
+  .fc-fmtdlg--mac.fc-fmtdlg--data-validation .fc-fmtdlg__panel .fc-fmtdlg__footer .fc-fmtdlg__btn {
+    top: 388px;
+  }
+  .fc-fmtdlg--mac.fc-fmtdlg--data-validation
+    .fc-fmtdlg__panel
+    .fc-fmtdlg__footer
+    .fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary):not([data-fc-validation-clear-all]) {
+    left: 398px;
+  }
+  .fc-fmtdlg--mac.fc-fmtdlg--data-validation
+    .fc-fmtdlg__panel
+    .fc-fmtdlg__footer
+    .fc-fmtdlg__btn--primary {
+    left: 494px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__vpane {
+    position: relative;
+    min-height: 268px;
+    padding: 0 18px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__vpane[hidden] {
+    display: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane
+    .fc-fmtdlg__row
+    > span:first-child {
+    min-width: 0;
+    font-weight: 400;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="settings"] {
+    display: grid;
+    grid-template-columns: 228px 1fr;
+    column-gap: 60px;
+    row-gap: 6px;
+    align-content: start;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="settings"]
+    > * {
+    grid-column: 1 / -1;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="settings"]
+    > .fc-fmtdlg__row {
+    display: grid;
+    grid-column: 1;
+    gap: 6px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="settings"]
+    .fc-select,
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="settings"]
+    .fc-select__button {
+    width: 228px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__vallowblank {
+    grid-column: 2 !important;
+    grid-row: 2;
+    align-self: end;
+    margin-bottom: 4px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__vapplyall {
+    position: absolute;
+    left: 18px;
+    bottom: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="input"] {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="input"]
+    > .fc-fmtdlg__row {
+    display: grid;
+    gap: 6px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="input"]
+    input[type="text"] {
+    width: 510px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="input"]
+    textarea {
+    width: 510px;
+    height: 140px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="error"] {
+    display: grid;
+    grid-template-columns: 167px 310px;
+    grid-template-areas:
+      "check check"
+      "caption caption"
+      "style title"
+      "style message";
+    column-gap: 33px;
+    row-gap: 6px;
+    align-content: start;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="error"]
+    > .fc-fmtdlg__check {
+    grid-area: check;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="error"]
+    > .fc-fmtdlg__vmsg-caption {
+    grid-area: caption;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="error"]
+    > .fc-fmtdlg__row:has(select) {
+    display: grid;
+    grid-area: style;
+    align-content: start;
+    gap: 6px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="error"]
+    > .fc-fmtdlg__row:has(input[type="text"]) {
+    display: grid;
+    grid-area: title;
+    gap: 6px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="error"]
+    > .fc-fmtdlg__row--block {
+    grid-area: message;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="error"]
+    .fc-select,
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="error"]
+    .fc-select__button {
+    width: 167px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__vpane[data-fc-pane="error"]
+    textarea {
+    height: 144px;
+  }
+  /* The style's alert mark: a 34 pt box under the pop-up, the mark itself about 14 pt. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__valert-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    margin-top: 70px;
+    justify-self: center;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-fmtdlg--data-validation
+    .fc-fmtdlg__valert-icon[hidden] {
+    display: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__valert-svg {
+    width: 14px;
+    height: 14px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__vmsg-caption {
+    margin-top: 6px;
+  }
+
   .fc-fmtdlg__vcaption {
     margin-bottom: 6px;
     font-weight: 600;

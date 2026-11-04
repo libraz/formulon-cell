@@ -27,6 +27,7 @@ import { rangeValidationAt } from '../store/range-validations.js';
 import { rangeContainsAddr, sameRange } from '../store/selection-geometry.js';
 import type { CellFormat, NumFmt, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
+import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { syncCustomSelects } from './custom-select.js';
 import { deferInitialFocus } from './dialog-shell.js';
 import {
@@ -450,6 +451,67 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
   };
 
+  // The Mac message tabs caption their fields; the caption follows the
+  // show-message checkbox of each pane.
+  const validationCaptions = new Map<'input' | 'error', HTMLDivElement>();
+  const syncValidationCaptions = (show: boolean): void => {
+    const text = strings.macDataValidation;
+    for (const pane of ['input', 'error'] as const) {
+      let caption = validationCaptions.get(pane);
+      if (!caption && show) {
+        const host = validationSection.querySelector<HTMLElement>(
+          `.fc-fmtdlg__vpane[data-fc-pane="${pane}"]`,
+        );
+        const check = host?.querySelector(':scope > .fc-fmtdlg__check');
+        if (!host || !check) continue;
+        caption = document.createElement('div');
+        caption.className = 'fc-fmtdlg__vmsg-caption';
+        check.after(caption);
+        validationCaptions.set(pane, caption);
+      }
+      if (!caption) continue;
+      caption.hidden = !show;
+      caption.textContent = pane === 'input' ? text.inputCaption : text.errorCaption;
+    }
+    syncValidationAlertIcon(show);
+  };
+
+  // The Mac error tab shows the chosen style's alert mark below the pop-up.
+  const ALERT_GLYPHS = {
+    stop: 'alertStop',
+    warning: 'alertWarning',
+    information: 'alertInformation',
+  } as const;
+  let validationAlertIcon: HTMLDivElement | null = null;
+  const renderValidationAlertIcon = (): void => {
+    if (!validationAlertIcon) return;
+    const select = validationAlertIcon.parentElement?.querySelector('select');
+    const style = (select?.value ?? 'stop') as keyof typeof ALERT_GLYPHS;
+    validationAlertIcon.dataset.style = style;
+    const svg = createExcelRibbonSvg(
+      ALERT_GLYPHS[style] ?? ALERT_GLYPHS.stop,
+      'fc-fmtdlg__valert-svg',
+    );
+    validationAlertIcon.replaceChildren(...(svg ? [svg] : []));
+  };
+  const syncValidationAlertIcon = (show: boolean): void => {
+    if (!validationAlertIcon && show) {
+      const row = validationSection.querySelector<HTMLElement>(
+        '.fc-fmtdlg__vpane[data-fc-pane="error"] > .fc-fmtdlg__row:has(select)',
+      );
+      const select = row?.querySelector('select');
+      if (!row || !select) return;
+      validationAlertIcon = document.createElement('div');
+      validationAlertIcon.className = 'fc-fmtdlg__valert-icon';
+      validationAlertIcon.setAttribute('aria-hidden', 'true');
+      row.appendChild(validationAlertIcon);
+      select.addEventListener('change', renderValidationAlertIcon);
+    }
+    if (!validationAlertIcon) return;
+    validationAlertIcon.hidden = !show;
+    renderValidationAlertIcon();
+  };
+
   let showMoreTab = false;
   let dialogMode: NonNullable<FormatDialogOpenOptions['mode']> = 'format';
   const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
@@ -468,6 +530,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     hyperlinkSection.hidden = dataValidationMode;
     commentSection.hidden = dataValidationMode;
     validationSection.classList.toggle('fc-fmtdlg__section--standalone', dataValidationMode);
+    syncValidationCaptions(dataValidationMode && isMacHost());
     for (const [tabId, button] of tabButtons) {
       // The Mac app has no seventh tab; it opens only when asked for by name.
       const macHidden = isMacHost() && tabId === 'more' && !showMoreTab;

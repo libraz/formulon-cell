@@ -69,4 +69,11 @@
   .fc-fmtdlg__hintbar:empty {
     display: none;
   }
+  /* Mac dialogs: push buttons are 26 pt tall and at least 86 wide, sized from
+   * a 12 pt inset. Kept at single-class weight so a dialog's own sizes win. */
+  :where(.fc-overlay-portal[data-fc-platform="mac"]) .fc-fmtdlg__btn {
+    min-width: 86px;
+    min-height: 26px;
+    padding-inline: 12px;
+  }
 }

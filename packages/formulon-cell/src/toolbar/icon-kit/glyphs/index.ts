@@ -2,6 +2,7 @@ import { ALIGN_ICONS } from './align.js';
 import { CHART_ICONS } from './chart.js';
 import { CLEAR_ICONS } from './clear.js';
 import { CLIPBOARD_ICONS } from './clipboard.js';
+import { DIALOG_ALERT_ICONS } from './dialog-alerts.js';
 import { FILE_ICONS } from './file.js';
 import { FILL_ICONS } from './fill.js';
 import { FIND_ICONS } from './find.js';
@@ -34,6 +35,7 @@ export const RIBBON_GLYPHS = {
   ...MAC_ICONS,
   ...PIVOT_ICONS,
   ...PAGE_SETUP_ICONS,
+  ...DIALOG_ALERT_ICONS,
   ...REVIEW_ICONS,
   ...VIEW_ICONS,
   ...FILE_ICONS,

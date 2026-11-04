@@ -118,4 +118,8 @@
     background: var(--fc-fmtdlg-list-selected-bg, color-mix(in srgb, Highlight 16%, transparent));
     color: var(--fc-fmtdlg-list-selected-fg, var(--fc-fg-strong, CanvasText));
   }
+  /* Mac pop-up buttons are 26 pt tall. */
+  :where(.fc-overlay-portal[data-fc-platform="mac"]) .fc-select__button {
+    min-height: 26px;
+  }
 }

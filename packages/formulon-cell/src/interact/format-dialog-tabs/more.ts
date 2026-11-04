@@ -270,7 +270,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
 
   // Allow-blank checkbox + error-style selector.
   const validationAllowBlankRow = document.createElement('label');
-  validationAllowBlankRow.className = 'fc-fmtdlg__check';
+  validationAllowBlankRow.className = 'fc-fmtdlg__check fc-fmtdlg__vallowblank';
   const validationAllowBlankInput = document.createElement('input');
   validationAllowBlankInput.type = 'checkbox';
   const validationAllowBlankSpan = document.createElement('span');

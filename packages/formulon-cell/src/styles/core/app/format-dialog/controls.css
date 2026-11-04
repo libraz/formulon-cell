@@ -147,4 +147,11 @@
       linear-gradient(45deg, transparent 0 42%, #185abd 43% 57%, transparent 58%);
     content: "";
   }
+  /* Mac dialogs: text fields, pop-ups and range pickers are 26 pt tall. */
+  :where(.fc-overlay-portal[data-fc-platform="mac"]) .fc-fmtdlg input[type="text"],
+  :where(.fc-overlay-portal[data-fc-platform="mac"]) .fc-fmtdlg input[type="number"],
+  :where(.fc-overlay-portal[data-fc-platform="mac"]) .fc-fmtdlg select,
+  :where(.fc-overlay-portal[data-fc-platform="mac"]) .fc-range-picker__btn {
+    min-height: 26px;
+  }
 }

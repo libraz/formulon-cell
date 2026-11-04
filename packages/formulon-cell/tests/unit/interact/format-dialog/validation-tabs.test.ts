@@ -103,4 +103,31 @@ describe('Data Validation dialog tabs', () => {
       2,
     );
   });
+
+  it('captions the Mac message tabs like the desktop app', () => {
+    document.body.innerHTML = '';
+    const macHost = document.createElement('div');
+    macHost.className = 'fc-host';
+    macHost.dataset.fcPlatform = 'mac';
+    document.body.appendChild(macHost);
+    const store = createSpreadsheetStore();
+    setActive(store, 0, 0);
+    attachFormatDialog({ host: macHost, store }).open('more', { mode: 'dataValidation' });
+    const caption = (pane: string): string | null | undefined =>
+      document.querySelector(`.fc-fmtdlg__vpane[data-fc-pane="${pane}"] .fc-fmtdlg__vmsg-caption`)
+        ?.textContent;
+    expect(caption('input')).toBe('セルを選択したときに、この入力時メッセージを表示:');
+    expect(caption('error')).toBe('無効なデータが入力されたときに表示するエラー メッセージ:');
+    const icon = (): string | undefined =>
+      document.querySelector<HTMLElement>('.fc-fmtdlg__valert-icon')?.dataset.style;
+    expect(icon()).toBe('stop');
+    const style = document.querySelector<HTMLSelectElement>(
+      '.fc-fmtdlg__vpane[data-fc-pane="error"] select',
+    );
+    if (!style) throw new Error('missing style select');
+    style.value = 'warning';
+    style.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(icon()).toBe('warning');
+    expect(document.querySelector('.fc-fmtdlg__valert-icon svg')).not.toBeNull();
+  });
 });

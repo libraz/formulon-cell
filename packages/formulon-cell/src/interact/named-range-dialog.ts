@@ -889,7 +889,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     defineRange.text.textContent = m.defineRangePrompt;
     defineSelected = null;
     defineName.input.value = '';
-    defineRange.input.value = deps.getSelectedRangeFormula?.() ?? '';
+    // The range seeds as an absolute, sheet-qualified reference: =Sheet!$A$1:$D$7.
+    defineRange.input.value = newNameSeed().formula;
     clearDialogError(defineError);
     renderDefineNames();
     defineShell.open();

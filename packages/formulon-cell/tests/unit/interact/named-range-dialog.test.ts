@@ -1210,7 +1210,11 @@ describe('Define Name on the Mac host', () => {
     const handle = attachNamedRangeDialog({
       host,
       wb: mutable.wb,
-      getSelectedRangeFormula: () => '=Sheet1!$A$1:$D$7',
+      getSelectedRangeFormula: () => '=A1',
+      getSelection: () => ({
+        active: { sheet: 0, row: 0, col: 0 },
+        range: { sheet: 0, r0: 0, c0: 0, r1: 6, c1: 3 },
+      }),
       subscribeToRangeChanges: () => () => {},
     });
     handle.openNew();
