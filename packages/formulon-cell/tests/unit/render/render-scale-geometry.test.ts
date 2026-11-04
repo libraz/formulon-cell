@@ -247,3 +247,19 @@ describe('render geometry on the Mac point model below 100%', () => {
     expect(colWidth(plain, 0, makeViewport({ zoom: 0.33 }))).toBeCloseTo(39.6, 9);
   });
 });
+
+describe('render geometry on the Mac point model above 100%', () => {
+  // Excel for Mac (DPR 2): a 24 pt row paints 44/52/60/72/84/96 device px at
+  // 90/110/125/150/175/200% - the zoomed height rounded to whole points.
+  const layout = makeLayout({ screenScale: 0.75, defaultRowHeight: 32 });
+  it.each([
+    [0.9, 22],
+    [1.1, 26],
+    [1.25, 30],
+    [1.5, 36],
+    [1.75, 42],
+    [2, 48],
+  ])('rounds the zoomed row height to whole points (zoom %s)', (zoom, h) => {
+    expect(rowHeight(layout, 0, makeViewport({ zoom }))).toBe(h);
+  });
+});
