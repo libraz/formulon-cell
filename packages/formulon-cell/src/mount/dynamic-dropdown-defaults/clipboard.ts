@@ -53,6 +53,11 @@ const buildPasteAction =
       formats: 'pasteFormatsOnly',
       transpose: 'pasteTranspose',
     };
+    // Keep Text Only pastes the clipboard's text as the host's ordinary paste does.
+    if (action === 'text-only') {
+      dispatchHostClipboard(instance, 'paste');
+      return;
+    }
     const mapped = map[action];
     if (mapped === 'paste') {
       dispatchHostClipboard(instance, 'paste');
@@ -66,14 +71,27 @@ const updatePasteMenu =
   (menu) => {
     const hasSnapshot = instance.clipboard?.getSnapshot() != null;
     const disabledReason = instance.i18n.strings.ribbon.pasteRequiresClipboard;
+    // On the Mac, cells on the clipboard and plain text give two different menus.
+    const textMenu = menu.querySelector('[data-paste-action="text-only"]') !== null;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-paste-action]')) {
       const action = button.dataset.pasteAction;
-      button.hidden = !hasSnapshot && action !== 'all' && action !== 'dialog';
+      const textRow = action === 'text-only' || action === 'text-wizard';
+      if (textRow) {
+        button.hidden = hasSnapshot;
+        // The wizard needs the host to import text into columns, which it does not do.
+        setMenuControlDisabled(
+          button,
+          action === 'text-wizard',
+          instance.i18n.strings.ribbon.disabled,
+        );
+        continue;
+      }
+      button.hidden = !hasSnapshot && action !== 'dialog' && !(action === 'all' && !textMenu);
       const disabled = action !== 'all' && action !== 'dialog' && !hasSnapshot;
       setMenuControlDisabled(button, disabled, disabledReason);
     }
     for (const separator of menu.querySelectorAll<HTMLElement>('.fc-tb__menu-sep')) {
-      separator.hidden = !hasSnapshot;
+      separator.hidden = separator.dataset.pasteText === 'true' ? hasSnapshot : !hasSnapshot;
     }
   };
 

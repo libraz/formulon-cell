@@ -36,5 +36,27 @@ export const createPasteMenu = (
     menuIconButton(pasteText.pasteTranspose, 'pasteAction', 'transpose', 'paste-transpose'),
     menuIconButton(pasteText.pasteSpecialDialog, 'pasteAction', 'dialog', 'paste-special'),
   );
+  if (variant?.mac) {
+    // With only text on the clipboard the Mac menu offers these two ahead of the dialog row.
+    const dialog = menu.querySelector('[data-paste-action="dialog"]');
+    const textSeparator = menuSeparator();
+    textSeparator.dataset.pasteText = 'true';
+    const textRows = [
+      menuIconButton(
+        lang === 'ja' ? 'テキストのみ保持' : 'Keep Text Only',
+        'pasteAction',
+        'text-only',
+        'paste-values',
+      ),
+      textSeparator,
+      menuIconButton(
+        lang === 'ja' ? 'テキスト ファイル ウィザードを使用する...' : 'Use Text Import Wizard...',
+        'pasteAction',
+        'text-wizard',
+        'paste-values',
+      ),
+    ];
+    for (const row of textRows) menu.insertBefore(row, dialog);
+  }
   return applyMenuVariant(menu, lang, variant);
 };
