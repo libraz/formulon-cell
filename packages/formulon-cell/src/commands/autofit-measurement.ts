@@ -1,7 +1,7 @@
 import { parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
-import { macDefaultRowPt } from '../engine/mac-row-model.js';
+import { macDefaultRowPt, macWrapLinePt } from '../engine/mac-row-model.js';
 import { phoneticGuideSize } from '../engine/phonetic-sync.js';
 import { pivotStyleLayer } from '../engine/pivot-style.js';
 /** Content-fit column widths and row heights. Every autofit entry point — header
@@ -131,7 +131,8 @@ export function computeAutofitRowHeight(
   const locale = normalizeFormatLocale(opts.locale ?? '');
   const theme = opts.theme ?? DEFAULT_CELL_FONT_THEME;
   const defaultHeight = state.layout.defaultRowHeight;
-  let max = defaultHeight;
+  let max: number | null = null;
+  let wrapped = false;
   // The default height is one Normal-font line plus the row's padding, so a
   // single line of the Normal font fits back to exactly the default height.
   const normalFont = cellFont(
@@ -174,21 +175,27 @@ export function computeAutofitRowHeight(
       lineHeight,
       textMeasure(ctx, font, state.layout),
     );
+    const family = format?.fontFamily ?? opts.workbookDisplayFont?.name ?? '';
+    const sizePt = Math.round(font.size * POINTS_PER_CSS_PX * 100) / 100;
     const tabulated =
-      mac && !format?.rotation && guide === 0
-        ? macDefaultRowPt(
-            format?.fontFamily ?? opts.workbookDisplayFont?.name ?? '',
-            Math.round(font.size * POINTS_PER_CSS_PX * 100) / 100,
-          )
-        : null;
+      mac && !format?.rotation && guide === 0 ? macDefaultRowPt(family, sizePt) : null;
+    // Wrapped text takes whole lines of the font's wrap pitch, one line included.
+    const wrapPitch =
+      tabulated !== null && format?.wrap === true ? macWrapLinePt(family, sizePt) : null;
     const height =
       tabulated === null
         ? Math.ceil(extent) + padding
-        : macLinesHeight(fontPointsToCssPx(tabulated), lines);
-    if (height > max) max = height;
+        : wrapPitch !== null
+          ? Math.max(1, lines) * fontPointsToCssPx(wrapPitch)
+          : macLinesHeight(fontPointsToCssPx(tabulated), lines);
+    if (wrapPitch !== null) wrapped = true;
+    if (max === null || height > max) max = height;
   }
 
-  return max;
+  // A Mac row holding wrapped text fits its cells' own lines, even below the
+  // default row; any other row keeps the default height as its floor.
+  if (max === null) return defaultHeight;
+  return mac && wrapped ? max : Math.max(defaultHeight, max);
 }
 
 /** Fitted width of `col`, measuring only rows `r0..r1` in the host's theme font. */

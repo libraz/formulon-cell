@@ -62,3 +62,16 @@ export function macDefaultRowPt(fontName: string, sizePt: number): number | null
   const key = normalizeFontName(fontName);
   return ROW_PT_BY_FAMILY.get(FAMILY_ALIASES.get(key) ?? key)?.[sizePt] ?? null;
 }
+
+/** Families whose wrapped lines advance by the default row itself; the rest
+ *  add one point per line (Arial 11: 14 pt row, 15 pt per wrapped line). */
+const WRAP_LINE_AT_ROW: ReadonlySet<string> = new Set([normalizeFontName('Calibri')]);
+
+/** Point pitch of one wrapped line for a font, or null when not tabulated.
+ *  Measured on Mac Excel 16.x: Arial 8 / 11 / 14 / 20 give 12 / 15 / 19 / 26,
+ *  Courier New 11 16, ＭＳ Ｐゴシック 11 15, Calibri 11 15. */
+export function macWrapLinePt(fontName: string, sizePt: number): number | null {
+  const row = macDefaultRowPt(fontName, sizePt);
+  if (row === null) return null;
+  return WRAP_LINE_AT_ROW.has(normalizeFontName(fontName)) ? row : row + 1;
+}

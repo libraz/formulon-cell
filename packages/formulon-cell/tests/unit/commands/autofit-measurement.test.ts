@@ -231,6 +231,17 @@ describe('computeAutofitRowHeight on the Mac point model', () => {
     expect(computeAutofitRowHeight(store.getState(), 1, null)).toBeCloseTo(pt(35), 6);
   });
 
+  it('floors only rows of wrapped text below the default row', () => {
+    const store = macStore([
+      [0, 0, 'small'],
+      [1, 0, 'small'],
+    ]);
+    arial(store, 0, 8);
+    arial(store, 1, 8, true);
+    expect(computeAutofitRowHeight(store.getState(), 0, null)).toBeCloseTo(pt(14), 6);
+    expect(computeAutofitRowHeight(store.getState(), 1, null)).toBeCloseTo(pt(12), 6);
+  });
+
   it('gives each wrapped Arial 11 line 15 pt', () => {
     const store = macStore([
       [0, 0, 'line1\nline2'],
@@ -240,6 +251,59 @@ describe('computeAutofitRowHeight on the Mac point model', () => {
     arial(store, 1, 11, true);
     expect(computeAutofitRowHeight(store.getState(), 0, null)).toBeCloseTo(pt(30), 6);
     expect(computeAutofitRowHeight(store.getState(), 1, null)).toBeCloseTo(pt(45), 6);
+  });
+
+  it('word-wraps Arial 11 at width 16 to the line counts the desktop picks', () => {
+    // Arial advance widths per 1000 em for the letters and space in the sample text.
+    const advance: Record<string, number> = {
+      ' ': 278,
+      a: 556,
+      b: 556,
+      c: 500,
+      d: 556,
+      e: 556,
+      f: 278,
+      g: 556,
+      h: 556,
+      i: 222,
+      j: 222,
+      k: 500,
+      l: 222,
+      m: 833,
+      n: 556,
+      o: 556,
+      p: 556,
+      q: 556,
+      r: 333,
+      s: 500,
+      t: 278,
+      u: 556,
+      v: 500,
+      w: 722,
+      x: 500,
+      y: 500,
+      z: 500,
+    };
+    const ctx = {
+      font: '',
+      measureText(this: { font: string }, text: string) {
+        const size = Number(this.font.match(/([\d.]+)px/)?.[1] ?? 0);
+        const em = [...text].reduce((sum, ch) => sum + (advance[ch] ?? 556), 0);
+        return { width: (em / 1000) * size } as TextMetrics;
+      },
+    } as unknown as CanvasRenderingContext2D;
+    const sample = 'abcd efgh ijkl mnop qrst uvwx yzab cdef ghij klmn opqr stuv';
+    const lengths = [8, 20, 33, 47];
+    const store = macStore(lengths.map((n, row): Seed => [row, 0, sample.slice(0, n)]));
+    // Width 16 characters of the 7 px Normal digit plus the 5 px cell margin.
+    mutators.setColWidth(store, 0, 16 * 7 + 5);
+    lengths.forEach((_, row) => {
+      arial(store, row, 11, true);
+    });
+    const lines = lengths.map(
+      (_, row) => computeAutofitRowHeight(store.getState(), row, ctx) / pt(15),
+    );
+    expect(lines.map((n) => Math.round(n * 1e6) / 1e6)).toEqual([1, 2, 3, 3]);
   });
 });
 

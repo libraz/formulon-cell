@@ -468,4 +468,52 @@ describe('automatic font row layout on the mac profile', () => {
       workbook.dispose();
     }
   });
+
+  it('autofits rows of wrapped text at load to whole lines of the font pitch', async () => {
+    // Excel for Mac (no stored row heights): a wrapped cell's row is n lines of
+    // the font's pitch - Arial 11 15 pt, Arial 20 26, Courier New 11 16,
+    // Calibri 11 15 - and a single wrapped line already takes one pitch.
+    const workbook = await WorkbookHandle.createDefault({ locale: 'en-US', platform: 'mac' });
+    const mounted = await mountStubSheet({ workbook, locale: 'en', ui: { platform: 'mac' } });
+    try {
+      const store = mounted.instance.store;
+      const wrapped = (row: number, text: string, fontFamily: string, points: number) => {
+        const addr = { sheet: 0, row, col: 1 };
+        mutators.setCell(store, addr, { kind: 'text', value: text });
+        mutators.setCellFormat(store, addr, {
+          wrap: true,
+          fontFamily,
+          fontSize: fontPointsToCssPx(points),
+        });
+      };
+      wrapped(0, 'ab\nab\nab\nab', 'Arial', 11);
+      wrapped(1, 'ab\nab\nab', 'Arial', 20);
+      wrapped(2, 'ab\nab', 'Courier New', 11);
+      wrapped(3, 'ab\nab', 'Calibri', 11);
+      wrapped(4, 'ab', 'Arial', 11);
+      mutators.setRowHeight(store, 5, fontPointsToCssPx(40));
+      wrapped(5, 'ab\nab\nab\nab', 'Arial', 11);
+      wrapped(6, 'ab', 'Arial', 8);
+      wrapped(7, 'ab', 'Arial', 8);
+      mutators.setCell(store, { sheet: 0, row: 7, col: 0 }, { kind: 'text', value: 'label' });
+      const layout = layoutForView(store.getState());
+      const pt = (row: number) =>
+        (layout.rowHeights.get(row) ?? layout.defaultRowHeight) / fontPointsToCssPx(1);
+      expect(pt(0)).toBeCloseTo(60, 6);
+      expect(pt(1)).toBeCloseTo(78, 6);
+      expect(pt(2)).toBeCloseTo(32, 6);
+      expect(pt(3)).toBeCloseTo(30, 6);
+      // One wrapped line is a full pitch, floored only by the row's other cells.
+      expect(pt(4)).toBeCloseTo(15, 6);
+      expect(pt(6)).toBeCloseTo(12, 6);
+      const normal = workbook.workbookDisplayFont;
+      const normalRowPt = macDefaultRowPt(normal?.name ?? '', normal?.size ?? 0) ?? 0;
+      expect(pt(7)).toBeCloseTo(Math.max(12, normalRowPt), 6);
+      // A row with its own height keeps it.
+      expect(pt(5)).toBeCloseTo(40, 6);
+    } finally {
+      mounted.dispose();
+      workbook.dispose();
+    }
+  });
 });

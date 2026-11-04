@@ -1,3 +1,4 @@
+import { computeAutofitRowHeight } from '../commands/autofit-measurement.js';
 import { associatedPaginationEngine } from '../commands/pagination.js';
 import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
@@ -30,6 +31,15 @@ interface ProjectionCache {
   readonly nativeFormatEpoch: number;
   readonly layout: LayoutSlice;
 }
+
+let measureContext: CanvasRenderingContext2D | null | undefined;
+/** A detached canvas for measuring wrapped text; null where canvas is unavailable. */
+const textMeasureContext = (): CanvasRenderingContext2D | null => {
+  if (measureContext !== undefined) return measureContext;
+  measureContext =
+    typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  return measureContext;
+};
 
 const validFontSize = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
@@ -228,6 +238,7 @@ export function automaticFontRowLayout(state: State): LayoutSlice {
     if (height == null || !canProjectRow(entry.row)) continue;
     rowFontHeights.set(entry.row, Math.max(rowFontHeights.get(entry.row) ?? height, height));
   }
+  const rowAxisHeights = new Map(rowFontHeights);
 
   const includeCellFont = (row: number, fontSizeCss: number, family: string | undefined): void => {
     if (!canProjectRow(row) || !validFontSize(fontSizeCss)) {
@@ -266,6 +277,48 @@ export function automaticFontRowLayout(state: State): LayoutSlice {
     // A size equal to the Normal font's is left off the stored format.
     if (validFontSize(size)) includeCellFont(addr.row, size, family);
     else if (family) includeCellFont(addr.row, normalFontCss, family);
+  }
+
+  // Mac Excel also autofits rows of wrapped text at load: the row takes the
+  // wrapped cell's lines at its font's line pitch, floored only by its other
+  // cells, so one wrapped line can sit above the Normal row.
+  if (macRows) {
+    const wrappedRows = new Set<number>();
+    for (const [key, format] of state.format.formats) {
+      if ((format as CellFormat | undefined)?.wrap !== true) continue;
+      const addr = parseAddrKey(key);
+      if (!addr || addr.sheet !== sheet || !canProjectRow(addr.row)) continue;
+      if (state.merges.byCell.has(key) || state.merges.byAnchor.has(key)) continue;
+      if (state.data.cells.has(key)) wrappedRows.add(addr.row);
+    }
+    // Measure each row against its own cells only, so the pass stays linear.
+    const cellsByRow = new Map<number, State['data']['cells']>();
+    if (wrappedRows.size > 0) {
+      for (const [key, cell] of state.data.cells) {
+        const addr = parseAddrKey(key);
+        if (!addr || addr.sheet !== sheet || !wrappedRows.has(addr.row)) continue;
+        let rowCells = cellsByRow.get(addr.row);
+        if (!rowCells) {
+          rowCells = new Map();
+          cellsByRow.set(addr.row, rowCells);
+        }
+        rowCells.set(key, cell);
+      }
+    }
+    for (const row of wrappedRows) {
+      const rowState: State = {
+        ...state,
+        data: { ...state.data, cells: cellsByRow.get(row) ?? new Map() },
+      };
+      const height = Math.min(
+        MAX_ROW_HEIGHT_PX,
+        computeAutofitRowHeight(rowState, row, textMeasureContext(), {
+          workbookDisplayFont: displayFont,
+          workbook,
+        }),
+      );
+      rowFontHeights.set(row, Math.max(rowAxisHeights.get(row) ?? 0, height));
+    }
   }
 
   const rowHeights = new Map(state.layout.rowHeights);
