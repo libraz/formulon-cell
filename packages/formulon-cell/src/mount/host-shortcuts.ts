@@ -29,7 +29,7 @@ import {
   showRowsAroundSelection,
 } from '../commands/row-col-layout.js';
 import { recordFormatChange, recordTablesChange } from '../commands/slice-history.js';
-import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
+import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../commands/structure.js';
 import { setOutlineSymbolsVisible, setShowFormulas } from '../commands/view.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -323,7 +323,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         if (isWholeRowRange(range)) {
           const count = range.r1 - range.r0 + 1;
           if (kind === 'insert') insertRows(input.store, currentWb, input.history, range.r0, count);
-          else deleteRows(input.store, currentWb, input.history, range.r0, count);
+          else deleteVisibleRows(input.store, currentWb, input.history, range.r0, count);
         } else {
           const count = range.c1 - range.c0 + 1;
           if (kind === 'insert') insertCols(input.store, currentWb, input.history, range.c0, count);

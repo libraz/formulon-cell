@@ -37,7 +37,7 @@ import {
   recordFormatChange,
   recordMergesChangeWithEngine,
 } from './slice-history.js';
-import { deleteCols, deleteRows, insertCols, insertRows } from './structure.js';
+import { deleteCols, deleteVisibleRows, insertCols, insertRows } from './structure.js';
 
 export type InsertCellsDirection = 'down' | 'right';
 export type DeleteCellsDirection = 'up' | 'left';
@@ -205,7 +205,7 @@ export function deleteCells(
   const lines = wholeLineEdit(store, range);
   if (lines) {
     return lines.axis === 'row'
-      ? deleteRows(store, wb, history, lines.at, lines.count)
+      ? deleteVisibleRows(store, wb, history, lines.at, lines.count)
       : deleteCols(store, wb, history, lines.at, lines.count);
   }
   if (blockedByProtection(store, sheet, 'delete cells')) return false;

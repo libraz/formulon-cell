@@ -15,7 +15,7 @@ import { recordRecentFunction } from '../commands/function-history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { applyFreezeMode, type FreezeMode } from '../commands/row-col-layout.js';
 import { addSheet, removeSheet } from '../commands/sheet-mutate.js';
-import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
+import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../commands/structure.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { mutators } from '../store/store.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
@@ -174,7 +174,7 @@ const insertSelectedRows = (instance: SpreadsheetInstance | null): void => {
 const deleteSelectedRows = (instance: SpreadsheetInstance | null): void => {
   if (!instance) return;
   const r = instance.store.getState().selection.range;
-  deleteRows(instance.store, instance.workbook, instance.history, r.r0, r.r1 - r.r0 + 1);
+  deleteVisibleRows(instance.store, instance.workbook, instance.history, r.r0, r.r1 - r.r0 + 1);
 };
 
 const insertSelectedCols = (instance: SpreadsheetInstance | null): void => {

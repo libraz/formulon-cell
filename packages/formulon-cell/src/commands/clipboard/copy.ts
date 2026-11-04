@@ -4,6 +4,7 @@ import { formatBoolean, formatEditableNumber, formatError } from '../../engine/v
 import { isDataTableFormula } from '../../engine/workbook-handle-data-tables.js';
 import { isWholeColumnRange, isWholeRowRange, sameRange } from '../../store/selection-geometry.js';
 import type { State } from '../../store/store.js';
+import { rowsVisibleToFilter } from '../filter-visible.js';
 import { encodeTSV } from './tsv.js';
 
 export interface CopyResult {
@@ -47,8 +48,16 @@ export function copy(
   const payloadRanges = plan.payloadRanges ?? [plan.range];
   const sheet = state.data.sheetIndex;
   const grid: string[][] = [];
+  const logical = plan.logicalRange ?? plan.range;
+  // A filtered list copies the rows its filter leaves visible.
+  const filtered = !isWholeRowRange(logical) && !isWholeColumnRange(logical);
   for (const range of payloadRanges) {
-    for (let row = range.r0; row <= range.r1; row += 1) {
+    const visible = filtered ? rowsVisibleToFilter(state, sheet, range.r0, range.r1) : [];
+    const rows =
+      visible.length > 0 && visible.length < range.r1 - range.r0 + 1
+        ? visible
+        : Array.from({ length: range.r1 - range.r0 + 1 }, (_, i) => range.r0 + i);
+    for (const row of rows) {
       const line: string[] = [];
       for (let col = range.c0; col <= range.c1; col += 1) {
         line.push(displayValue(state, sheet, row, col, locale, localizeFormula));

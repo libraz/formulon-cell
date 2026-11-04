@@ -75,6 +75,7 @@ import {
 } from './axis-shift.js';
 import { alertDataTableEdit, axisEditSplitsDataTable } from './data-table-guard.js';
 import { recordFilterChange } from './filter.js';
+import { filterVisibleRowRuns } from './filter-visible.js';
 import { collectAllFormulas, type FormulaRecord } from './formula-records.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
 import type { History } from './history.js';
@@ -1421,6 +1422,37 @@ export function deleteRows(
   replayCheckpoint?: StructureReplayCheckpointRef,
 ): boolean {
   return editAxis(store, wb, history, 'row', 'delete', atRow, count, replayCheckpoint);
+}
+
+/**
+ * The user's Delete Sheet Rows: rows an AutoFilter hides survive, only the
+ * visible runs go, bottom-up so the earlier runs keep their indices.
+ */
+export function deleteVisibleRows(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  atRow: number,
+  count = 1,
+  replayCheckpoint?: StructureReplayCheckpointRef,
+): boolean {
+  const sheet = store.getState().data.sheetIndex;
+  const runs = filterVisibleRowRuns(store.getState(), sheet, atRow, atRow + count - 1);
+  const [first] = runs;
+  if (runs.length === 0) return false;
+  if (runs.length === 1 && first && first[0] === atRow && first[1] === atRow + count - 1) {
+    return editAxis(store, wb, history, 'row', 'delete', atRow, count, replayCheckpoint);
+  }
+  const txn = history?.begin();
+  let ok = true;
+  try {
+    for (const [r0, r1] of [...runs].reverse()) {
+      ok = editAxis(store, wb, history, 'row', 'delete', r0, r1 - r0 + 1) && ok;
+    }
+  } finally {
+    if (txn !== undefined) history?.end(txn);
+  }
+  return ok;
 }
 
 export function insertCols(

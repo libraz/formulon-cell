@@ -14,6 +14,7 @@ import {
 import { createAutofitMeasureContext } from './autofit-measurement.js';
 import { inputLocaleForWorkbook } from './coerce-input.js';
 import { blockDataTableEdit } from './data-table-guard.js';
+import { rowHiddenByFilter, rowsVisibleToFilter } from './filter-visible.js';
 import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
 import type { History } from './history.js';
 import { isCellWritable } from './protection.js';
@@ -663,11 +664,6 @@ const fillDestinationWritable = (state: State, src: Range, dest: Range): boolean
   return true;
 };
 
-/** Whether a filter on `sheet` hides `row`; a fill leaves such rows untouched. */
-const rowHiddenByFilter = (state: State, sheet: number, row: number): boolean =>
-  state.layout.hiddenRows.has(row) &&
-  state.ui.filterRanges.some((r) => r.sheet === sheet && row > r.r0 && row <= r.r1);
-
 function applyFillRange(
   state: State,
   wb: WorkbookHandle,
@@ -1104,7 +1100,18 @@ export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): bool
     action === 'down' || action === 'right' || action === 'up' || action === 'left'
       ? action
       : 'down';
+  const singleRow = range.r0 === range.r1;
   if (action === direction) range = fillDirectionRange(range, direction);
+  // Over a filtered list the source is the first (last, for Up) row the filter
+  // leaves visible. A one-row selection copies the adjacent row even when the
+  // filter hides it, as the desktop app does.
+  if ((direction === 'down' || direction === 'up') && !singleRow) {
+    const visible = rowsVisibleToFilter(store.getState(), range.sheet, range.r0, range.r1);
+    const edge = direction === 'down' ? visible[0] : visible[visible.length - 1];
+    if (edge !== undefined && visible.length < range.r1 - range.r0 + 1) {
+      range = direction === 'down' ? { ...range, r0: edge } : { ...range, r1: edge };
+    }
+  }
   let src = range;
   if (direction === 'down') src = { ...range, r1: range.r0 };
   else if (direction === 'up') src = { ...range, r0: range.r1 };

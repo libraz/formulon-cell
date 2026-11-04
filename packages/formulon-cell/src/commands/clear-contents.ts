@@ -9,6 +9,7 @@ import {
   dataTableGuardAlert,
   planDataTableSelection,
 } from './data-table-guard.js';
+import { rowHiddenByFilter } from './filter-visible.js';
 import { History } from './history.js';
 import { InteractionController, interactionControllerFor } from './interaction-controller.js';
 import {
@@ -61,6 +62,8 @@ export const collectSelectedContentAddresses = (
 
   for (const cell of workbook.physicalCells(primarySheet)) {
     if (!isContentCell(cell)) continue;
+    // Rows an AutoFilter hides keep their contents, as in the desktop app.
+    if (rowHiddenByFilter(state, primarySheet, cell.addr.row)) continue;
 
     const merge = rangeForMergeAt(state, cell.addr);
     let selected = false;

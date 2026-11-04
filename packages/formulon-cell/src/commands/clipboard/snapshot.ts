@@ -3,6 +3,7 @@ import type { Addr, CellValue, Range } from '../../engine/types.js';
 import { isDataTableFormula } from '../../engine/workbook-handle-data-tables.js';
 import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
 import type { CellFormat, ConditionalRule, State } from '../../store/store.js';
+import { rowsVisibleToFilter } from '../filter-visible.js';
 import { shiftFormulaRefs } from '../formula-refs.js';
 import type { CopyRangePlan, CopyResult } from './copy.js';
 
@@ -56,6 +57,9 @@ export interface ClipboardSnapshot {
   /** Captured column widths keyed by offset from `logicalRange.c0`. These are
    *  populated for whole-column copies; ordinary snapshots leave them empty. */
   colWidths?: Map<number, number>;
+  /** Source sheet row of each captured row when rows an AutoFilter hides were
+   *  left out; absent when the rows are `range.r0` onward. */
+  sourceRows?: number[];
   /** The part of each conditional-format rule that covers `range`, in sheet
    *  coordinates; a formula rule is re-anchored to its clipped top-left. */
   conditional?: ConditionalRule[];
@@ -118,9 +122,24 @@ export function captureSnapshot(
   options: {
     ignorePartialMerges?: boolean;
     formatResolver?: ClipboardFormatResolver;
+    /** Leave out the rows an AutoFilter hides (a copy of a filtered list). */
+    visibleRowsOnly?: boolean;
   } = {},
 ): ClipboardSnapshot | null {
-  const rows = range.r1 - range.r0 + 1;
+  // Merge rectangles are relative to the contiguous range, so a range holding
+  // one is captured whole.
+  const holdsMerge = [...state.merges.byAnchor.values()].some(
+    (m) => m.sheet === range.sheet && m.r1 >= range.r0 && m.r0 <= range.r1,
+  );
+  const visibleRows =
+    options.visibleRowsOnly && !holdsMerge
+      ? rowsVisibleToFilter(state, range.sheet, range.r0, range.r1)
+      : [];
+  const sourceRows =
+    visibleRows.length > 0 && visibleRows.length < range.r1 - range.r0 + 1 && mode === 'copy'
+      ? visibleRows
+      : null;
+  const rows = sourceRows ? sourceRows.length : range.r1 - range.r0 + 1;
   const cols = range.c1 - range.c0 + 1;
   if (rows <= 0 || cols <= 0) return null;
   // Cap at ~1M cells like the TSV copy path.
@@ -156,10 +175,11 @@ export function captureSnapshot(
   for (let r = 0; r < rows; r += 1) {
     const line: ClipboardCell[] = [];
     for (let c = 0; c < cols; c += 1) {
-      const key = addrKey({ sheet, row: range.r0 + r, col: range.c0 + c });
+      const row = sourceRows ? (sourceRows[r] as number) : range.r0 + r;
+      const key = addrKey({ sheet, row, col: range.c0 + c });
       const cell = state.data.cells.get(key);
       const fmt = options.formatResolver
-        ? options.formatResolver({ sheet, row: range.r0 + r, col: range.c0 + c })
+        ? options.formatResolver({ sheet, row, col: range.c0 + c })
         : state.format.formats.get(key);
       if (!cell && !fmt) {
         line.push(blankCell());
@@ -181,6 +201,7 @@ export function captureSnapshot(
     cols,
     cells: grid,
     merges,
+    ...(sourceRows ? { sourceRows } : {}),
     conditional: clippedConditionalRules(state, range),
     mode,
     rowHeights: new Map(),
@@ -221,6 +242,7 @@ export function captureSnapshotFromCopyPlan(
     // partial merge into the destination.
     ignorePartialMerges: logicalIsBand,
     formatResolver,
+    visibleRowsOnly: !logicalIsBand,
   });
   if (!snapshot) return null;
   const rowHeights = new Map<number, number>();
@@ -246,3 +268,7 @@ export function captureSnapshotFromCopyPlan(
     colWidths,
   };
 }
+
+/** Sheet row a captured row was read from. */
+export const snapshotSourceRow = (snap: ClipboardSnapshot, index: number): number =>
+  snap.sourceRows?.[index] ?? snap.range.r0 + index;

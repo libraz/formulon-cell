@@ -29,6 +29,7 @@ import {
 import { recordCommentChange } from '../comment.js';
 import { DEFAULT_COMMENT_AUTHOR } from '../comment-author.js';
 import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
+import { rowHiddenByFilter } from '../filter-visible.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
@@ -49,7 +50,7 @@ import {
   materializedPasteCells,
   resolvePasteDestination,
 } from './paste-destination.js';
-import type { ClipboardCell, ClipboardSnapshot } from './snapshot.js';
+import { type ClipboardCell, type ClipboardSnapshot, snapshotSourceRow } from './snapshot.js';
 import { extendTablesForPaste } from './table-extension.js';
 import { transposeFormulaRefs } from './transpose-refs.js';
 
@@ -661,14 +662,14 @@ const spilledSourceCells = (wb: WorkbookHandle, snap: ClipboardSnapshot): Set<nu
     for (let sc = 0; sc < snap.cols; sc += 1) {
       const cell = snap.cells[sr]?.[sc];
       if (!cell || cell.formula || cell.value.kind === 'blank') continue;
-      const spill = wb.spillInfo(sheet, r0 + sr, c0 + sc);
+      const spill = wb.spillInfo(sheet, snapshotSourceRow(snap, sr), c0 + sc);
       if (!spill) continue;
       const anchorInside =
         spill.anchorRow >= r0 &&
         spill.anchorRow <= r1 &&
         spill.anchorCol >= c0 &&
         spill.anchorCol <= c1 &&
-        (spill.anchorRow !== r0 + sr || spill.anchorCol !== c0 + sc);
+        (spill.anchorRow !== snapshotSourceRow(snap, sr) || spill.anchorCol !== c0 + sc);
       if (anchorInside) out.add(sr * snap.cols + sc);
     }
   }
@@ -990,7 +991,7 @@ function applyPaste(
   // A copied formula re-anchors to its destination; under Transpose the
   // references into the copied block follow their cells to the transposed tile.
   const copiedFormula = (formula: string, row: number, col: number, sr: number, sc: number) => {
-    const from = { row: snap.range.r0 + sr, col: snap.range.c0 + sc };
+    const from = { row: snapshotSourceRow(snap, sr), col: snap.range.c0 + sc };
     return opt.transpose
       ? transposeFormulaRefs(
           formula,
@@ -1030,7 +1031,7 @@ function applyPaste(
       if (opt.what === 'link') {
         wb.setFormula(
           addr,
-          linkFormula(snap.range.sheet, sheet, wb, snap.range.r0 + sr, snap.range.c0 + sc),
+          linkFormula(snap.range.sheet, sheet, wb, snapshotSourceRow(snap, sr), snap.range.c0 + sc),
         );
         return;
       }
@@ -1155,7 +1156,10 @@ function applyPaste(
         applyCell(cell.row, cell.col, cell.sourceRowIndex, cell.sourceColIndex);
       }
     } else {
+      // One copied cell over a filtered selection lands on the visible rows only.
+      const scalarOverFilter = snap.rows === 1 && snap.cols === 1 && snap.mode === 'copy';
       for (let dr = 0; dr < destRows; dr += 1) {
+        if (scalarOverFilter && rowHiddenByFilter(current, sheet, destination.r0 + dr)) continue;
         for (let dc = 0; dc < destCols; dc += 1) {
           applyCell(
             destination.r0 + dr,

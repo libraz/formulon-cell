@@ -7,7 +7,7 @@ import {
   showCols,
   showRows,
 } from '../commands/row-col-layout.js';
-import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
+import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../commands/structure.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
@@ -70,7 +70,7 @@ export function runContextMenuStructureItem(
     }
     case 'rowDelete': {
       const r = state.selection.range;
-      deleteRows(store, wb, history, r.r0, r.r1 - r.r0 + 1);
+      deleteVisibleRows(store, wb, history, r.r0, r.r1 - r.r0 + 1);
       ctx.afterCommit();
       return true;
     }

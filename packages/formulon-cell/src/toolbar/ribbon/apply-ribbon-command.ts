@@ -29,7 +29,7 @@ import {
   selectedSessionIllustration,
 } from '../../commands/session-illustration.js';
 import { toggleSplitPanes } from '../../commands/split-panes.js';
-import { deleteCols, deleteRows, insertCols, insertRows } from '../../commands/structure.js';
+import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../../commands/structure.js';
 import {
   TABLE_OPTION_COMMANDS,
   type TableOption,
@@ -438,7 +438,7 @@ const applyGenericRibbonCommand = (
       runtime.focusSheet();
       return true;
     case 'deleteRows':
-      deleteRows(i.store, i.workbook, i.history, range.r0, rowCount);
+      deleteVisibleRows(i.store, i.workbook, i.history, range.r0, rowCount);
       runtime.refreshCells();
       runtime.focusSheet();
       return true;
