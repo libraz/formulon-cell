@@ -7,7 +7,31 @@
 
   .fc-cellstyledlg {
     width: 431px;
+    min-height: 330px;
     max-width: 96vw;
+  }
+
+  .fc-cellstyledlg .fc-cellstyledlg__namerow input {
+    width: 102px;
+    flex: none;
+  }
+
+  .fc-cellstyledlg .fc-fmtdlg__footer {
+    gap: 10px;
+    padding: 0 20px 19px;
+  }
+
+  .fc-cellstyledlg .fc-fmtdlg__btn {
+    box-sizing: border-box;
+    width: 86px;
+    min-width: 0;
+    height: 26px;
+    padding: 0;
+    white-space: nowrap;
+  }
+
+  .fc-cellstyledlg .fc-fmtdlg__footer > :first-child {
+    width: 61px;
   }
 
   .fc-cellstyledlg__preview {
@@ -20,6 +44,8 @@
   }
 
   .fc-cellstyledlg__table {
+    box-sizing: border-box;
+    height: 163px;
     min-height: 163px;
     border: 1px solid var(--fc-rule);
     border-radius: 4px;
@@ -31,7 +57,8 @@
     display: grid;
     grid-template-columns: 130px minmax(0, 1fr);
     align-items: center;
-    padding: 2px 8px;
+    height: 22px;
+    padding: 0 8px;
   }
 
   .fc-cellstyledlg__head {
@@ -171,6 +198,53 @@
     white-space: nowrap;
   }
 
+  /* Excel for Mac geometry (pt): Subtotal popups 278x26 with a 56 pt row
+   * pitch, option rows 22 pt apart; footer buttons 86 / 86 / 72; Consolidate
+   * footer buttons 62. The status line only shows when it has a message. */
+  .fc-mac-subtotal__status:empty,
+  .fc-mac-consolidate__status:empty {
+    display: none;
+  }
+  .fc-mac-subtotal__body {
+    gap: 0;
+  }
+  .fc-mac-subtotal__row {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .fc-mac-subtotal__row .fc-select,
+  .fc-mac-subtotal__row .fc-select__button,
+  .fc-mac-subtotal__row .fc-fmtdlg__select {
+    width: 278px;
+    min-height: 26px;
+  }
+  .fc-mac-subtotal__fields-label {
+    margin: 0 0 6px;
+  }
+  .fc-mac-subtotal__fields {
+    width: 276px;
+    margin-bottom: 2px;
+  }
+  .fc-mac-subtotal__option {
+    min-height: 22px;
+    margin: 0;
+  }
+  .fc-mac-subtotal__footer > .fc-mac-subtotal__btn.fc-fmtdlg__btn {
+    flex: none;
+    width: 86px;
+    min-width: 0;
+    padding-inline: 0;
+  }
+  .fc-mac-subtotal__footer > .fc-fmtdlg__btn[data-fc-mac-action="subtotal-ok"] {
+    width: 72px;
+  }
+  .fc-mac-consolidate__footer > .fc-mac-consolidate__btn.fc-fmtdlg__btn {
+    flex: none;
+    width: 62px;
+    min-width: 0;
+    padding-inline: 0;
+  }
+
   .fc-textcols__fixed {
     font-family: var(--fc-font-mono, ui-monospace, monospace);
     overflow-x: auto;
@@ -222,5 +296,52 @@
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .fc-textcols-wizard {
+    display: flex;
+    flex-direction: column;
+    width: 622px;
+    min-height: 449px;
+    max-width: 96vw;
+  }
+  .fc-textcols-wizard .fc-fmtdlg__body {
+    flex: 1 1 auto;
+  }
+  .fc-textcols-wizard .fc-textcols__step {
+    min-height: 199px;
+  }
+  .fc-textcols-wizard .fc-textcols__prompt {
+    margin: 0 0 6px;
+    line-height: 18px;
+  }
+  .fc-textcols-wizard .fc-textcols__type-row {
+    min-height: 0;
+    margin: 0 0 1px;
+    padding: 0;
+    line-height: 18px;
+  }
+  .fc-textcols-wizard .fc-textcols__prompt:nth-child(2) {
+    margin-bottom: 14px;
+  }
+  .fc-textcols-wizard .fc-textcols__preview pre {
+    box-sizing: border-box;
+    width: 582px;
+    max-width: 100%;
+    height: 123px;
+    margin: 0;
+    overflow: auto;
+  }
+  .fc-textcols-wizard .fc-fmtdlg__footer {
+    gap: 10px;
+    padding: 0 20px 19px;
+  }
+  .fc-textcols-wizard .fc-fmtdlg__btn {
+    box-sizing: border-box;
+    width: 86px;
+    min-width: 0;
+    height: 26px;
+    padding: 0;
+    white-space: nowrap;
   }
 }

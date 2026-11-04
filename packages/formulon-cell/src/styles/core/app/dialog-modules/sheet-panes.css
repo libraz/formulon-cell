@@ -2,10 +2,31 @@
   /* Move or Copy sheet. */
   .fc-movecopy {
     width: 227px;
+    min-height: 354px;
     max-width: 96vw;
   }
 
+  .fc-movecopy.fc-fmtdlg__panel:not(:has(> .fc-fmtdlg__tabs)) > .fc-fmtdlg__body {
+    padding-inline: 0;
+  }
+
+  .fc-movecopy .fc-fmtdlg__footer {
+    gap: 10px;
+    padding: 12px 20px 20px;
+  }
+
+  .fc-movecopy .fc-fmtdlg__btn {
+    box-sizing: border-box;
+    width: 86px;
+    min-width: 0;
+    height: 26px;
+    padding: 0;
+    white-space: nowrap;
+  }
+
   .fc-movecopy__book {
+    box-sizing: border-box;
+    height: 26px;
     padding: 3px 8px;
     border: 1px solid var(--fc-rule);
     border-radius: 4px;

@@ -166,6 +166,9 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
           refit();
         });
   observer?.observe(root);
+  // A toolbar root laid out with `display: contents` has no box and never reports a
+  // size change, so its parent stands in for it.
+  if (root.parentElement) observer?.observe(root.parentElement);
   // Label widths depend on the loaded web font, which can settle after mount.
   void root.ownerDocument.fonts?.ready.then(refit);
   return {

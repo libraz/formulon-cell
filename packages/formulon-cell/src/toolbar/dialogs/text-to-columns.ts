@@ -119,6 +119,7 @@ const showTextToColumnsWizard = (
     const { strings, wizard } = opts;
     const stepTitle = (n: number): string => wizard.title.replace('{step}', String(n));
     const shell = createDialogShell({ title: stepTitle(1), bodyVariant: 'app' });
+    shell.panel.classList.add('fc-textcols-wizard');
     const prompt = (text: string): HTMLParagraphElement => {
       const p = document.createElement('p');
       p.className = 'fc-textcols__prompt';

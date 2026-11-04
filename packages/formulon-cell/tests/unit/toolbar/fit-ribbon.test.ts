@@ -117,6 +117,30 @@ describe('toolbar/ribbon fit', () => {
   });
 });
 
+describe('toolbar/ribbon refit on resize', () => {
+  it('watches the root and its parent, since a display: contents root never reports a size', () => {
+    const observed: Element[] = [];
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      observe(el: Element): void {
+        observed.push(el);
+      }
+      disconnect(): void {}
+      unobserve(): void {}
+    } as unknown as typeof ResizeObserver;
+    try {
+      const parent = document.createElement('div');
+      const root = document.createElement('div');
+      parent.appendChild(root);
+      const fit = attachRibbonFit(root);
+      expect(observed).toEqual([root, parent]);
+      fit.detach();
+    } finally {
+      globalThis.ResizeObserver = original;
+    }
+  });
+});
+
 describe('toolbar/ribbon two-line label width', () => {
   // A label of 120px set in words; lines = ceil(120 / width) stands in for layout.
   const linesAt = (width: number): number => Math.ceil(120 / width);
