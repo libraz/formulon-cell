@@ -1,6 +1,6 @@
 /** Title-bar quick access and search-panel glyphs. */
 
-import { arc, circle, hLine, join, n, type Point, poly, roundRect } from '../path.js';
+import { arc, circle, hLine, join, line, n, type Point, poly, roundRect } from '../path.js';
 import { arcArrow, filled, loopArrow, outlined, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
@@ -153,6 +153,17 @@ export const SHELL_ICONS = {
       'regular',
     ),
     stroked(hLine(2.8, 10.2, 18.4), PALETTE.info, 'thin'),
+  ],
+  // A task pane's close button: a filled disc with an X cut out of it. The
+  // paper role takes the pane header colour, so the X reads as a hole.
+  paneClose: [
+    filled(circle(12, 12, 10.5), PALETTE.ink),
+    stroked(
+      join(line([6.75, 6.75], [17.25, 17.25]), line([17.25, 6.75], [6.75, 17.25])),
+      PALETTE.paper,
+      'heavy',
+      { cap: 'butt' },
+    ),
   ],
   // Earlier versions: a clock face wound back by a counter-clockwise arrow.
   versionHistory: [...historyClock(12.2, 12, 8.6)],

@@ -52,6 +52,16 @@ describe('Mac external links pane', () => {
     handle.detach();
   });
 
+  it('draws the close button as a filled disc with an X cut out of it', () => {
+    const handle = attachExternalLinksDialog({ host, getWb: () => fakeWb([]), strings });
+    handle.open();
+    const svg = host.querySelector('.fc-extlinkpane__close svg');
+    expect(svg?.querySelectorAll('path')).toHaveLength(2);
+    expect(svg?.querySelector<SVGPathElement>('path[fill="none"]')?.style.stroke).toContain(
+      '--fc-tb-icon-paper',
+    );
+  });
+
   it('closes from the round X button and reopens', () => {
     const handle = attachExternalLinksDialog({ host, getWb: () => fakeWb([]), strings });
     handle.open();

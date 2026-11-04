@@ -85,6 +85,17 @@ describe('Mac accessibility checker pane', () => {
     pane.detach();
   });
 
+  it('draws the close button as a filled disc with an X cut out of it', () => {
+    const pane = attach();
+    pane.open();
+    const svg = dock.querySelector('.fc-a11ypane__close svg');
+    expect(svg?.querySelectorAll('path')).toHaveLength(2);
+    expect(svg?.querySelector<SVGPathElement>('path[fill="none"]')?.style.stroke).toContain(
+      '--fc-tb-icon-paper',
+    );
+    pane.detach();
+  });
+
   it('counts the failing rules in desktop order and drills into contrast', async () => {
     seedFailingBook();
     const pane = attach();

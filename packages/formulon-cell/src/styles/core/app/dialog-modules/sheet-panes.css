@@ -98,13 +98,20 @@
   }
 
   .fc-extlinkpane__close {
+    --fc-tb-icon-paper: var(--fc-bg-rail, var(--fc-bg));
+    display: flex;
     width: 16px;
     height: 16px;
     padding: 0;
     border: 0;
-    border-radius: 50%;
-    background: var(--fc-rule);
+    background: transparent;
+    color: var(--fc-fg-mute);
     cursor: pointer;
+  }
+
+  .fc-pane-close__glyph {
+    width: 100%;
+    height: 100%;
   }
 
   .fc-extlinkpane__body {

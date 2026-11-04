@@ -1,6 +1,7 @@
 import { type ExternalLinkKind, listExternalLinks } from '../commands/external-links.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { appendDialogButton } from './dialog-shell.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
@@ -60,6 +61,7 @@ export function attachExternalLinksPane(deps: ExternalLinksPaneDeps): ExternalLi
   const title = document.createElement('span');
   title.className = 'fc-extlinkpane__title';
   const closeBtn = appendDialogButton(header, { label: '', baseClass: 'fc-extlinkpane__close' });
+  closeBtn.append(createExcelRibbonSvg('paneClose', 'fc-pane-close__glyph') ?? '');
   header.prepend(title);
 
   const body = document.createElement('div');
@@ -99,7 +101,6 @@ export function attachExternalLinksPane(deps: ExternalLinksPaneDeps): ExternalLi
 
   const render = (): void => {
     title.textContent = wording.title;
-    closeBtn.textContent = '';
     closeBtn.setAttribute('aria-label', wording.close);
     closeBtn.title = wording.close;
     empty.textContent = wording.empty;

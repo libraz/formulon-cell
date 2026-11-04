@@ -17,6 +17,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { MacAccessibilityPaneStrings } from '../i18n/strings/mac/accessibility-pane.js';
 import type { Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogButton } from './dialog-shell.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
@@ -75,6 +76,7 @@ export function attachAccessibilityPane(deps: AccessibilityPaneDeps): Accessibil
   const title = document.createElement('span');
   title.className = 'fc-a11ypane__title';
   const closeBtn = appendDialogButton(header, { label: '', baseClass: 'fc-a11ypane__close' });
+  closeBtn.append(createExcelRibbonSvg('paneClose', 'fc-pane-close__glyph') ?? '');
   header.prepend(title);
   const body = document.createElement('div');
   body.className = 'fc-a11ypane__body';

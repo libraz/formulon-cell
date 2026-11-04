@@ -27,13 +27,15 @@
     font-weight: 600;
   }
   .fc-a11ypane__close {
+    --fc-tb-icon-paper: var(--fc-bg-rail, var(--fc-bg));
     position: relative;
+    display: flex;
     width: 16px;
     height: 16px;
     padding: 0;
     border: 0;
-    border-radius: 50%;
-    background: var(--fc-rule);
+    background: transparent;
+    color: var(--fc-fg-mute);
     cursor: pointer;
   }
   .fc-a11ypane__body {
