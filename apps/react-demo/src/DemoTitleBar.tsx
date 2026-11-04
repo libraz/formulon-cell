@@ -25,6 +25,7 @@ import {
   resolveDemoSearchKey,
   saveDemoSearchUsagePrior,
 } from '../../demo-shared/index.js';
+import { DemoDocumentMenu } from './DemoDocumentMenu.js';
 import { DemoGlyph } from './DemoGlyph.js';
 import { DemoIcon } from './DemoIcon.js';
 import { DemoQuickAccess } from './DemoQuickAccess.js';
@@ -40,6 +41,7 @@ interface DemoTitleBarProps {
   quickAccessRef: RefObject<HTMLDivElement | null>;
   onSave: () => void;
   onSaveAs: () => void;
+  onRename: (name: string) => void;
   onNewWorkbook: () => void;
   /** Runs a ribbon command id through the toolbar; false when none matched. */
   applyCommand: (commandId: string) => boolean;
@@ -58,6 +60,7 @@ export const DemoTitleBar = ({
   quickAccessRef,
   onSave,
   onSaveAs,
+  onRename,
   onNewWorkbook,
   applyCommand,
   onOpenBackstage,
@@ -207,10 +210,14 @@ export const DemoTitleBar = ({
             </>
           )}
         </div>
-        <div className="fc-tb__title">
-          <strong>{bookName}</strong>
-          <span>{ui.saved}</span>
-        </div>
+        {mac ? (
+          <DemoDocumentMenu ui={ui} bookName={bookName} onRename={onRename} />
+        ) : (
+          <div className="fc-tb__title">
+            <strong>{bookName}</strong>
+            <span>{ui.saved}</span>
+          </div>
+        )}
         {mac && !searchActive ? (
           <button
             type="button"
@@ -343,20 +350,41 @@ export const DemoTitleBar = ({
           </div>
         )}
         <div className="demo__account">
-          <button type="button" className="demo__share">
-            {ui.share}
-          </button>
+          {mac ? null : (
+            <button type="button" className="demo__share">
+              {ui.share}
+            </button>
+          )}
           <button
             type="button"
-            className={`demo__share${showPanel ? ' demo__share--active' : ''}`}
+            className={`demo__share demo__pane-toggle${showPanel ? ' demo__share--active' : ''}`}
             onClick={onTogglePanel}
             aria-pressed={showPanel}
           >
             {ui.demoPane}
           </button>
-          <span className="demo__avatar" role="img" aria-label={ui.signedInUser}>
-            FC
-          </span>
+          {mac ? (
+            <>
+              <button
+                type="button"
+                className="demo__title-icon demo__comments"
+                aria-label={ui.comments}
+                title={ui.comments}
+                onClick={() => applyCommand('mac.review.showComments')}
+              >
+                <DemoGlyph name="comments" />
+              </button>
+              <button type="button" className="demo__share-pill">
+                <DemoGlyph name="share" />
+                <span>{ui.share}</span>
+                <span className="demo__share-caret" aria-hidden="true" />
+              </button>
+            </>
+          ) : (
+            <span className="demo__avatar" role="img" aria-label={ui.signedInUser}>
+              FC
+            </span>
+          )}
         </div>
       </div>
     </header>

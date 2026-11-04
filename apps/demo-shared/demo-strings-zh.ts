@@ -121,6 +121,13 @@ export const zhUi: DemoUiStrings = {
   options: '选项',
   optionsDesc: '显示集成窗格和功能切换。',
   noCommands: '未找到命令',
+  documentMenu: {
+    button: '文档操作',
+    name: '名称:',
+    location: '位置:',
+    versionHistory: '浏览版本历史记录',
+  },
+  comments: '批注',
   quickAccess: {
     customize: '自定义快速访问工具栏',
     moreCommands: '其他命令...',

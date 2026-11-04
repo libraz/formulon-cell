@@ -49,6 +49,7 @@ import { nextDemoSearchIndex } from './demo-search.js';
 import type { DemoCommandStrings, DemoStrings, DemoUiStrings } from './demo-strings.js';
 
 export * from './demo-backstage.js';
+export * from './demo-document-menu.js';
 export * from './demo-function-help.js';
 export * from './demo-glyphs.js';
 export * from './demo-quick-access.js';

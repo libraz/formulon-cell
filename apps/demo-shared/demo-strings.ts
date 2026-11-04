@@ -87,6 +87,14 @@ export interface DemoUiStrings {
   options: string;
   optionsDesc: string;
   noCommands: string;
+  /** Mac title bar: the document-actions popover under the book name. */
+  documentMenu: {
+    button: string;
+    name: string;
+    location: string;
+    versionHistory: string;
+  };
+  comments: string;
   /** Mac Quick Access Toolbar: button names, customize-menu rows and the chevron. */
   quickAccess: {
     customize: string;
@@ -328,6 +336,13 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       options: 'Options',
       optionsDesc: 'Show the integration panel and feature toggles.',
       noCommands: 'No commands found',
+      documentMenu: {
+        button: 'Document Actions',
+        name: 'Name:',
+        location: 'Where:',
+        versionHistory: 'Browse Version History',
+      },
+      comments: 'Comments',
       quickAccess: {
         customize: 'Customize Quick Access Toolbar',
         moreCommands: 'More Commands...',
@@ -506,6 +521,13 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       options: 'オプション',
       optionsDesc: '統合パネルと機能トグルを表示します。',
       noCommands: 'コマンドが見つかりません',
+      documentMenu: {
+        button: 'ドキュメントの操作',
+        name: '名前:',
+        location: '場所:',
+        versionHistory: 'バージョン履歴の表示',
+      },
+      comments: 'コメント',
       quickAccess: {
         customize: 'クイック アクセス ツールバーのカスタマイズ',
         moreCommands: 'その他のコマンド...',

@@ -121,6 +121,13 @@ export const thUi: DemoUiStrings = {
   options: 'ตัวเลือก',
   optionsDesc: 'แสดงบานหน้าต่างการผสานรวมและตัวสลับฟีเจอร์',
   noCommands: 'ไม่พบคำสั่ง',
+  documentMenu: {
+    button: 'การดำเนินการกับเอกสาร',
+    name: 'ชื่อ:',
+    location: 'ตำแหน่งที่ตั้ง:',
+    versionHistory: 'เรียกดูประวัติเวอร์ชัน',
+  },
+  comments: 'ข้อคิดเห็น',
   quickAccess: {
     customize: 'กำหนดแถบเครื่องมือด่วนเอง',
     moreCommands: 'คำสั่งเพิ่มเติม...',

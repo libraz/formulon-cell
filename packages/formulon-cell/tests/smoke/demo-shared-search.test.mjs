@@ -6,6 +6,7 @@ import {
   buildDemoPrintPreviewModel,
   buildDemoSearchItems,
   buildDemoSearchSuggestions,
+  commitDemoBookName,
   createDemoStrings,
   DEFAULT_DEMO_QUICK_ACCESS,
   DEMO_ICONS,
@@ -683,5 +684,25 @@ describe('demo-shared Search/Tell me items', () => {
       'moreCommands',
     ];
     expect(names.filter((name) => createExcelRibbonSvg(name, 'x') === null)).toEqual([]);
+  });
+
+  it('commits a document-menu rename as the bare book name', () => {
+    expect(commitDemoBookName('  Budget.xlsx ', 'Book1')).toBe('Budget');
+    expect(commitDemoBookName('Q3 report.XLSM', 'Book1')).toBe('Q3 report');
+    expect(commitDemoBookName('   ', 'Book1')).toBe('Book1');
+    expect(commitDemoBookName('.xlsx', 'Book1')).toBe('Book1');
+    const ui = createDemoStrings('React').ja;
+    expect(ui.documentMenu).toEqual({
+      button: 'ドキュメントの操作',
+      name: '名前:',
+      location: '場所:',
+      versionHistory: 'バージョン履歴の表示',
+    });
+    expect(ui.comments).toBe('コメント');
+    expect(
+      ['comments', 'folder', 'versionHistory', 'share'].filter(
+        (name) => createExcelRibbonSvg(name, 'x') === null,
+      ),
+    ).toEqual([]);
   });
 });

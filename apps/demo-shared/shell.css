@@ -73,13 +73,13 @@
   cursor: pointer;
 }
 
-.demo__account .demo__share:first-child {
+.demo__account .demo__share:not(.demo__pane-toggle) {
   border-color: var(--fc-tb-title-strong);
   background: var(--fc-tb-title-strong);
   color: #ffffff;
 }
 
-.demo__account .demo__share:first-child:hover {
+.demo__account .demo__share:not(.demo__pane-toggle):hover {
   border-color: var(--fc-tb-accent-strong);
   background: var(--fc-tb-accent);
   color: #ffffff;
@@ -184,6 +184,172 @@
 [data-fc-platform="mac"] .demo__brand-mark:focus-visible {
   background: var(--fc-tb-ribbon-hover);
   color: var(--fc-tb-fg);
+}
+
+/* Mac title: the bare book name with the document-actions chevron, and on
+ * the right Comments, the Share pill and the search button. */
+[data-fc-platform="mac"] .fc-tb__titlebar {
+  column-gap: 6px;
+  padding-right: 7px;
+}
+
+[data-fc-platform="mac"] .demo__account {
+  grid-row: 1;
+  grid-column: 3;
+  gap: 6px;
+}
+
+[data-fc-platform="mac"] .fc-tb__search,
+[data-fc-platform="mac"] .demo__search-button {
+  grid-row: 1;
+  grid-column: 4;
+}
+
+/* The centred title is its own stacking context, so it lifts its popover
+ * above the ribbon. */
+.demo__document {
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.demo__document strong {
+  font-weight: 600;
+}
+
+.demo__document-chevron {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fc-tb-fg-soft);
+  cursor: pointer;
+}
+
+.demo__document-chevron::before {
+  content: "";
+  display: block;
+  width: 5px;
+  height: 5px;
+  margin: 3px auto 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.demo__document-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 346px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--fc-tb-line-soft);
+  border-radius: 12px;
+  background: var(--fc-tb-card);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  font-size: 13px;
+  font-weight: 400;
+  transform: translateX(-50%);
+}
+
+.demo__document-row {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+}
+
+/* The Mac title hides its saved-status span; the popover's spans stay. */
+[data-fc-platform="mac"] .demo__document .demo__document-menu span {
+  display: inline-flex;
+}
+
+[data-fc-platform="mac"] .demo__document .demo__document-row > span {
+  display: block;
+  color: var(--fc-tb-fg);
+}
+
+.demo__document-row input,
+.demo__document-location {
+  height: 24px;
+  border: 1px solid var(--fc-tb-line-soft);
+  border-radius: 6px;
+  background: var(--fc-tb-input-bg);
+  color: var(--fc-tb-fg);
+  font: inherit;
+}
+
+.demo__document-row input {
+  padding: 0 6px;
+}
+
+/* A browser demo has no folder to pick, so the location stays a disabled
+ * popup carrying only its folder icon. */
+.demo__document-location {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.demo__document-location .fc-tb__rb-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.demo__document-separator {
+  height: 1px;
+  margin: 8px -14px 4px;
+  background: var(--fc-tb-line-soft);
+}
+
+.demo__document-history {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 37px;
+  padding: 0 0 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--fc-tb-fg-soft);
+  font: inherit;
+  text-align: left;
+}
+
+.demo__share-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 83px;
+  height: 30px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--fc-tb-title-strong);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.demo__share-pill:hover {
+  background: var(--fc-tb-accent);
+}
+
+.demo__share-caret {
+  width: 5px;
+  height: 5px;
+  margin: -3px 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
 }
 
 /* Mac Quick Access Toolbar: 30 px buttons, the AutoSave switch and the

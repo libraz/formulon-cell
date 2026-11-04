@@ -19,6 +19,7 @@ import {
   resolveDemoSearchKey,
   saveDemoSearchUsagePrior,
 } from '../../demo-shared/index.js';
+import DemoDocumentMenu from './DemoDocumentMenu.vue';
 import DemoGlyph from './DemoGlyph.vue';
 import DemoIcon from './DemoIcon.vue';
 import DemoQuickAccess from './DemoQuickAccess.vue';
@@ -36,6 +37,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   save: [];
   saveAs: [];
+  rename: [name: string];
   newWorkbook: [];
   openBackstage: [];
   togglePanel: [];
@@ -192,7 +194,8 @@ onBeforeUnmount(() => {
           </button>
         </template>
       </div>
-      <div class="fc-tb__title">
+      <DemoDocumentMenu v-if="mac" :ui="ui" :book-name="bookName" @rename="emit('rename', $event)" />
+      <div v-else class="fc-tb__title">
         <strong>{{ bookName }}</strong>
         <span>{{ ui.saved }}</span>
       </div>
@@ -294,18 +297,34 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="demo__account">
-        <button type="button" class="demo__share">
+        <button v-if="!mac" type="button" class="demo__share">
           {{ ui.share }}
         </button>
         <button
           type="button"
-          :class="['demo__share', { 'demo__share--active': showPanel }]"
+          :class="['demo__share', 'demo__pane-toggle', { 'demo__share--active': showPanel }]"
           :aria-pressed="showPanel"
           @click="emit('togglePanel')"
         >
           {{ ui.demoPane }}
         </button>
-        <span class="demo__avatar" role="img" :aria-label="ui.signedInUser">FC</span>
+        <template v-if="mac">
+          <button
+            type="button"
+            class="demo__title-icon demo__comments"
+            :aria-label="ui.comments"
+            :title="ui.comments"
+            @click="applyCommand('mac.review.showComments')"
+          >
+            <DemoGlyph name="comments" />
+          </button>
+          <button type="button" class="demo__share-pill">
+            <DemoGlyph name="share" />
+            <span>{{ ui.share }}</span>
+            <span class="demo__share-caret" aria-hidden="true" />
+          </button>
+        </template>
+        <span v-else class="demo__avatar" role="img" :aria-label="ui.signedInUser">FC</span>
       </div>
     </div>
   </header>

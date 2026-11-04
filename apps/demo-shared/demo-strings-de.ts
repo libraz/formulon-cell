@@ -122,6 +122,13 @@ export const deUi: DemoUiStrings = {
   options: 'Optionen',
   optionsDesc: 'Integrationsbereich und Funktionsumschalter anzeigen.',
   noCommands: 'Keine Befehle gefunden',
+  documentMenu: {
+    button: 'Dokumentaktionen',
+    name: 'Name:',
+    location: 'Ort:',
+    versionHistory: 'Versionsverlauf durchsuchen',
+  },
+  comments: 'Kommentare',
   quickAccess: {
     customize: 'Symbolleiste für den Schnellzugriff anpassen',
     moreCommands: 'Weitere Befehle...',

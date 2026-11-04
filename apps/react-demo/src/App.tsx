@@ -398,6 +398,7 @@ export const App = (): ReactElement => {
         quickAccessRef={quickAccessRef}
         onSave={onSave}
         onSaveAs={onSaveAs}
+        onRename={setBookName}
         onNewWorkbook={() => void onNewWorkbook()}
         applyCommand={applyToolbarCommand}
         onOpenBackstage={openBackstage}

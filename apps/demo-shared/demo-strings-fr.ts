@@ -124,6 +124,13 @@ export const frUi: DemoUiStrings = {
   options: 'Options',
   optionsDesc: 'Afficher le volet d’intégration et les bascules de fonctionnalités.',
   noCommands: 'Aucune commande trouvée',
+  documentMenu: {
+    button: 'Actions du document',
+    name: 'Nom :',
+    location: 'Emplacement :',
+    versionHistory: 'Parcourir l’historique des versions',
+  },
+  comments: 'Commentaires',
   quickAccess: {
     customize: 'Personnaliser la barre d’outils Accès rapide',
     moreCommands: 'Autres commandes...',

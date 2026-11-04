@@ -122,6 +122,13 @@ export const koUi: DemoUiStrings = {
   options: '옵션',
   optionsDesc: '통합 창과 기능 토글을 표시합니다.',
   noCommands: '명령을 찾을 수 없음',
+  documentMenu: {
+    button: '문서 작업',
+    name: '이름:',
+    location: '위치:',
+    versionHistory: '버전 기록 찾아보기',
+  },
+  comments: '메모',
   quickAccess: {
     customize: '빠른 실행 도구 모음 사용자 지정',
     moreCommands: '기타 명령...',

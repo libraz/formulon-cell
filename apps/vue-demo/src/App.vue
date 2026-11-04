@@ -451,6 +451,7 @@ onBeforeUnmount(() => {
       :apply-command="applyToolbarCommand"
       @save="onSave"
       @save-as="onSaveAs"
+      @rename="bookName = $event"
       @new-workbook="void onNewWorkbook()"
       @open-backstage="openBackstage"
       @toggle-panel="showPanel = !showPanel"
