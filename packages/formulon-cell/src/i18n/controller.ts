@@ -5,6 +5,7 @@
 //
 // Inspired by Handsontable's `registerLanguageDictionary` API: locales can
 // be added at runtime, then activated by id.
+import { DEFAULT_LOCALE } from './locales.js';
 import {
   type DeepPartial,
   defaultStrings,
@@ -16,7 +17,7 @@ import {
 } from './strings.js';
 
 export interface I18nControllerInit {
-  /** Locale to start with. Defaults to 'ja' (matches `defaultStrings`). */
+  /** Locale to start with. Defaults to `DEFAULT_LOCALE` (matches `defaultStrings`). */
   locale?: Locale | (string & {});
   /** Initial overlay (deep-merged on top of the chosen locale). */
   overlay?: DeepPartial<Strings>;
@@ -43,7 +44,7 @@ export const createI18nController = (init: I18nControllerInit = {}): I18nControl
   for (const [k, v] of Object.entries(dictionaries)) registry.set(k, v);
 
   const overlays = new Map<string, DeepPartial<Strings>>();
-  let current = init.locale ?? 'ja';
+  let current = init.locale ?? DEFAULT_LOCALE;
   if (init.overlay) overlays.set(current, init.overlay);
 
   const listeners = new Set<(s: Strings) => void>();

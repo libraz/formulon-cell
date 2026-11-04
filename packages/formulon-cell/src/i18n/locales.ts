@@ -5,6 +5,9 @@ export type BuiltInLocale = (typeof BUILT_IN_LOCALES)[number];
 /** Short locale id used by the built-in dictionaries and profile adapter. */
 export type Locale = BuiltInLocale;
 
+/** Locale used when none is given or the requested one has no dictionary. */
+export const DEFAULT_LOCALE: BuiltInLocale = 'ja';
+
 export const isBuiltInLocale = (locale: string): locale is BuiltInLocale =>
   (BUILT_IN_LOCALES as readonly string[]).includes(locale);
 

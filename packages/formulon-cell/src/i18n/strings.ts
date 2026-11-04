@@ -1,4 +1,4 @@
-import { builtInLocaleFor } from './locales.js';
+import { builtInLocaleFor, DEFAULT_LOCALE } from './locales.js';
 import { de } from './strings/de.js';
 import { en } from './strings/en.js';
 import { fr } from './strings/fr.js';
@@ -16,7 +16,7 @@ export const dictionaries: Record<Locale, Strings> = { ja, en, de, fr, zh, ko, t
 export const defaultStrings: Strings = ja;
 
 export const dictionaryLocaleFor = (locale: string): Locale => {
-  return builtInLocaleFor(locale) ?? 'ja';
+  return builtInLocaleFor(locale) ?? DEFAULT_LOCALE;
 };
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
@@ -43,7 +43,9 @@ export function mergeStrings(
   for (const sectionKey of Object.keys(overlay) as (keyof Strings)[]) {
     const section = overlay[sectionKey];
     if (!section) continue;
-    applyOverlay(out[sectionKey] as Record<string, unknown>, section as Record<string, unknown>);
+    const target = out[sectionKey] as unknown;
+    if (isPlainRecord(target)) applyOverlay(target, section as Record<string, unknown>);
+    else (out as unknown as Record<string, unknown>)[sectionKey] = structuredClone(section);
   }
   return out;
 }
