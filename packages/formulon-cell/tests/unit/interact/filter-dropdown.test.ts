@@ -478,7 +478,9 @@ describe('attachFilterDropdown', () => {
       const wb = await WorkbookHandle.createDefault();
       try {
         wb.setText({ sheet: 0, row: 0, col: 0 }, 'N');
-        [3, 1, 2].forEach((v, k) => wb.setNumber({ sheet: 0, row: k + 1, col: 0 }, v));
+        [3, 1, 2].forEach((v, k) => {
+          wb.setNumber({ sheet: 0, row: k + 1, col: 0 }, v);
+        });
         const host = document.createElement('div');
         host.className = 'fc-host';
         host.dataset.fcPlatform = 'mac';
