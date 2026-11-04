@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialFromDate, excelSerialToDate } from '../format/date-serial.js';
@@ -667,6 +667,29 @@ export function fillOutputRange(src: Range, dest: Range): Range {
   return dest;
 }
 
+/**
+ * The range a directional fill works on. A single row or column has no source inside the
+ * selection, so the fill takes the adjacent cell on the source side, as Ctrl+D / Ctrl+R do.
+ */
+export function fillDirectionRange(
+  range: Range,
+  direction: 'down' | 'right' | 'up' | 'left',
+): Range {
+  if (direction === 'down' && range.r0 === range.r1 && range.r0 > 0) {
+    return { ...range, r0: range.r0 - 1 };
+  }
+  if (direction === 'up' && range.r0 === range.r1 && range.r1 < MAX_ROW) {
+    return { ...range, r1: range.r1 + 1 };
+  }
+  if (direction === 'right' && range.c0 === range.c1 && range.c0 > 0) {
+    return { ...range, c0: range.c0 - 1 };
+  }
+  if (direction === 'left' && range.c0 === range.c1 && range.c1 < MAX_COL) {
+    return { ...range, c1: range.c1 + 1 };
+  }
+  return range;
+}
+
 export type RibbonFillAction =
   | 'down'
   | 'right'
@@ -777,7 +800,7 @@ const DATE_SERIES_ACTIONS = new Set(['days', 'weekdays', 'months', 'years']);
 export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): boolean => {
   const { store, workbook, history, action } = deps;
   const selected = store.getState().selection.range;
-  const range: Range = {
+  let range: Range = {
     sheet: selected.sheet,
     r0: Math.min(selected.r0, selected.r1),
     c0: Math.min(selected.c0, selected.c1),
@@ -790,6 +813,7 @@ export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): bool
     action === 'down' || action === 'right' || action === 'up' || action === 'left'
       ? action
       : 'down';
+  if (action === direction) range = fillDirectionRange(range, direction);
   let src = range;
   if (direction === 'down') src = { ...range, r1: range.r0 };
   else if (direction === 'up') src = { ...range, r0: range.r1 };

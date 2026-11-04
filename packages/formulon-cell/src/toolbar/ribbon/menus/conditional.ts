@@ -226,19 +226,19 @@ export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
     dataBarSolidRed: t.dataBarSolidRed,
     dataBarSolidOrange: t.dataBarSolidOrange,
     dataBarSolidPurple: t.dataBarSolidPurple,
-    dataBarSolidGray: t.dataBarSolidGray,
+    dataBarSolidTeal: t.dataBarSolidTeal,
     colorScaleGreenYellowRed: t.colorScaleGreenYellowRed,
     colorScaleRedYellowGreen: t.colorScaleRedYellowGreen,
     colorScaleGreenWhite: t.colorScaleGreenWhite,
     colorScaleRedWhite: t.colorScaleRedWhite,
     colorScaleBlueWhiteRed: t.colorScaleBlueWhiteRed,
     colorScaleRedWhiteBlue: t.colorScaleRedWhiteBlue,
-    colorScaleGreenWhiteGreen: t.colorScaleGreenWhiteGreen,
-    colorScaleYellowWhiteGreen: t.colorScaleYellowWhiteGreen,
-    colorScaleRedWhiteRed: t.colorScaleRedWhiteRed,
-    colorScaleBlueWhiteBlue: t.colorScaleBlueWhiteBlue,
-    colorScaleYellowRedGreen: t.colorScaleYellowRedGreen,
-    colorScaleGreenYellowGreen: t.colorScaleGreenYellowGreen,
+    colorScaleGreenWhiteRed: t.colorScaleGreenWhiteRed,
+    colorScaleRedWhiteGreen: t.colorScaleRedWhiteGreen,
+    colorScaleWhiteRed: t.colorScaleWhiteRed,
+    colorScaleWhiteGreen: t.colorScaleWhiteGreen,
+    colorScaleGreenYellow: t.colorScaleGreenYellow,
+    colorScaleYellowGreen: t.colorScaleYellowGreen,
     iconArrows3: t.iconArrows3,
     iconArrows5: t.iconArrows5,
     iconTriangles3: t.iconTriangles3,
@@ -298,51 +298,54 @@ const buildTopBottomSubmenu = (submenu: HTMLDivElement, t: CfMenuText, mac: bool
   );
 };
 
+type CfSwatch = readonly [action: string, colors: readonly string[], label: string];
+
 const buildDataBarSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
-  submenu.append(menuSectionHeader(t.gradient));
-  const gradientBars: readonly (readonly [string, string, string])[] = [
-    ['data-blue', '#638ec6', t.dataBarGradientBlue],
-    ['data-green', '#63a95c', t.dataBarGradientGreen],
-    ['data-red', '#c45a5a', t.dataBarGradientRed],
-    ['data-orange', '#d6a440', t.dataBarGradientOrange],
-    ['data-purple', '#8a74b9', t.dataBarGradientPurple],
-    ['data-teal', '#4ba1a8', t.dataBarGradientTeal],
+  const gradientBars: readonly CfSwatch[] = [
+    ['data-blue', ['#fff', '#638ec6'], t.dataBarGradientBlue],
+    ['data-green', ['#fff', '#63a95c'], t.dataBarGradientGreen],
+    ['data-red', ['#fff', '#c45a5a'], t.dataBarGradientRed],
+    ['data-orange', ['#fff', '#d6a440'], t.dataBarGradientOrange],
+    ['data-teal', ['#fff', '#4ba1a8'], t.dataBarGradientTeal],
+    ['data-purple', ['#fff', '#8a74b9'], t.dataBarGradientPurple],
   ];
-  const gradient = cfPanel(
-    'fc-tb__cf-choice-row',
-    gradientBars.map(([action, color, label]) => cfSwatchButton(action, ['#fff', color], label)),
-  );
-  submenu.appendChild(gradient);
-  submenu.append(menuSectionHeader(t.solid));
-  const solidBars: readonly (readonly [string, string, string])[] = [
-    ['data-solid-blue', '#4472c4', t.dataBarSolidBlue],
-    ['data-solid-green', '#70ad47', t.dataBarSolidGreen],
-    ['data-solid-red', '#c00000', t.dataBarSolidRed],
-    ['data-solid-orange', '#ed7d31', t.dataBarSolidOrange],
-    ['data-solid-purple', '#8064a2', t.dataBarSolidPurple],
-    ['data-solid-gray', '#7f7f7f', t.dataBarSolidGray],
+  const solidBars: readonly CfSwatch[] = [
+    ['data-solid-blue', ['#4472c4', '#4472c4'], t.dataBarSolidBlue],
+    ['data-solid-green', ['#70ad47', '#70ad47'], t.dataBarSolidGreen],
+    ['data-solid-red', ['#c00000', '#c00000'], t.dataBarSolidRed],
+    ['data-solid-orange', ['#ed7d31', '#ed7d31'], t.dataBarSolidOrange],
+    ['data-solid-teal', ['#31a9bd', '#31a9bd'], t.dataBarSolidTeal],
+    ['data-solid-purple', ['#8064a2', '#8064a2'], t.dataBarSolidPurple],
   ];
-  const solid = cfPanel(
-    'fc-tb__cf-choice-row',
-    solidBars.map(([action, color, label]) => cfSwatchButton(action, [color, color], label)),
+  const row = (bars: readonly CfSwatch[]): HTMLDivElement =>
+    cfPanel(
+      'fc-tb__cf-choice-row',
+      bars.map(([action, colors, label]) => cfSwatchButton(action, [...colors], label)),
+    );
+  submenu.append(
+    menuSectionHeader(t.gradient),
+    row(gradientBars),
+    menuSectionHeader(t.solid),
+    row(solidBars),
+    menuSeparator(),
+    cfMenuItem(t.otherRules, 'new-rule', 'manage'),
   );
-  submenu.append(solid, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
 };
 
 const buildColorScaleSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
-  const colorScales: readonly (readonly [string, readonly string[], string])[] = [
+  const colorScales: readonly CfSwatch[] = [
     ['scale-gyr', ['#63be7b', '#ffeb84', '#f8696b'], t.colorScaleGreenYellowRed],
     ['scale-ryg', ['#f8696b', '#ffeb84', '#63be7b'], t.colorScaleRedYellowGreen],
-    ['scale-gw', ['#63be7b', '#ffffff'], t.colorScaleGreenWhite],
-    ['scale-rw', ['#f8696b', '#ffffff'], t.colorScaleRedWhite],
+    ['scale-gwr', ['#63be7b', '#ffffff', '#f8696b'], t.colorScaleGreenWhiteRed],
+    ['scale-rwg', ['#f8696b', '#ffffff', '#63be7b'], t.colorScaleRedWhiteGreen],
     ['scale-bwr', ['#5a8dee', '#ffffff', '#f8696b'], t.colorScaleBlueWhiteRed],
     ['scale-rwb', ['#f8696b', '#ffffff', '#5a8dee'], t.colorScaleRedWhiteBlue],
-    ['scale-gwg', ['#63be7b', '#ffffff', '#00a651'], t.colorScaleGreenWhiteGreen],
-    ['scale-ywg', ['#ffeb84', '#ffffff', '#63be7b'], t.colorScaleYellowWhiteGreen],
-    ['scale-rwr', ['#f8696b', '#ffffff', '#c00000'], t.colorScaleRedWhiteRed],
-    ['scale-bwb', ['#5a8dee', '#ffffff', '#4472c4'], t.colorScaleBlueWhiteBlue],
-    ['scale-yry', ['#ffeb84', '#f8696b', '#63be7b'], t.colorScaleYellowRedGreen],
-    ['scale-gyg', ['#63be7b', '#ffeb84', '#00a651'], t.colorScaleGreenYellowGreen],
+    ['scale-wr', ['#ffffff', '#f8696b'], t.colorScaleWhiteRed],
+    ['scale-rw', ['#f8696b', '#ffffff'], t.colorScaleRedWhite],
+    ['scale-gw', ['#63be7b', '#ffffff'], t.colorScaleGreenWhite],
+    ['scale-wg', ['#ffffff', '#63be7b'], t.colorScaleWhiteGreen],
+    ['scale-gy', ['#63be7b', '#ffeb84'], t.colorScaleGreenYellow],
+    ['scale-yg', ['#ffeb84', '#63be7b'], t.colorScaleYellowGreen],
   ];
   const scales = cfPanel(
     'fc-tb__cf-choice-grid-panel',

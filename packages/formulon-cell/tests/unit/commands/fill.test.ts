@@ -395,6 +395,38 @@ describe('fillRange', () => {
     expect(getFormat(store, 2, 0)).toEqual({ bold: true });
   });
 
+  it('ribbon Fill on a single cell copies from the adjacent cell on the source side', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 1, value: 'above' },
+      { row: 1, col: 0, value: 'left' },
+      { row: 2, col: 1, value: 'below' },
+      { row: 1, col: 2, value: 'right' },
+    ]);
+    const select = (row: number, col: number): void =>
+      store.setState((s) => ({
+        ...s,
+        selection: {
+          ...s.selection,
+          range: { sheet: 0, r0: row, c0: col, r1: row, c1: col },
+          active: { sheet: 0, row, col },
+          anchor: { sheet: 0, row, col },
+        },
+      }));
+    const run = (action: 'down' | 'right' | 'up' | 'left'): boolean =>
+      executeRibbonFillAction({ store, workbook: wb, history: new History(), action });
+    select(1, 1);
+    expect(run('down')).toBe(true);
+    expect(text(wb, 0, 1, 1)).toBe('above');
+    expect(run('right')).toBe(true);
+    expect(text(wb, 0, 1, 1)).toBe('left');
+    expect(run('up')).toBe(true);
+    expect(text(wb, 0, 1, 1)).toBe('below');
+    expect(run('left')).toBe(true);
+    expect(text(wb, 0, 1, 1)).toBe('right');
+    select(0, 0);
+    expect(run('down')).toBe(false);
+  });
+
   it('flash fill can infer from the nearest populated column on the right', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 'John' },

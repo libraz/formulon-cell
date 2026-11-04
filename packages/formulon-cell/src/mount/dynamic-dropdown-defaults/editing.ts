@@ -1,6 +1,7 @@
 import { conditionalRulesForRange } from '../../commands/conditional-format.js';
 import {
   executeRibbonFillAction,
+  fillDirectionRange,
   fillOutputRange,
   fillRange,
   type RibbonFillAction,
@@ -26,6 +27,8 @@ import {
   colLetter,
   formatA1Cell,
   formatA1Range,
+  MAX_COL,
+  MAX_ROW,
   parseAddrKey,
 } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
@@ -53,10 +56,11 @@ const buildFillDirection =
   (direction) => {
     const range = normalizedSelectionRange(instance);
     // A fill writes everything but its source row or column; Flash Fill may reach the whole selection.
+    const worked = direction === 'flash' ? range : fillDirectionRange(range, direction);
     const target =
       direction === 'flash'
         ? range
-        : fillOutputRange(fillSeriesSourceRange(range, direction), range);
+        : fillOutputRange(fillSeriesSourceRange(worked, direction), worked);
     runAfterAllowedRangeUnlock(instance.store, [target], () => {
       executeRibbonFillAction({
         store: instance.store,
@@ -72,16 +76,21 @@ const updateFillMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateFillMenu'] =>
   (menu) => {
     const range = normalizedSelectionRange(instance);
-    const hasMultipleRows = range.r1 > range.r0;
-    const hasMultipleCols = range.c1 > range.c0;
+    // A single row or column copies from its neighbour, so only the sheet edge leaves nothing to copy.
+    const canFillDown = range.r1 > range.r0 || range.r0 > 0;
+    const canFillUp = range.r1 > range.r0 || range.r1 < MAX_ROW;
+    const canFillRight = range.c1 > range.c0 || range.c0 > 0;
+    const canFillLeft = range.c1 > range.c0 || range.c1 < MAX_COL;
     const strings = instance.i18n.strings.ribbonMenu;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-fill]')) {
       const action = button.dataset.fill;
       const disabled =
         action === 'group' ||
         action === 'justify' ||
-        ((action === 'down' || action === 'up') && !hasMultipleRows) ||
-        ((action === 'right' || action === 'left') && !hasMultipleCols);
+        (action === 'down' && !canFillDown) ||
+        (action === 'up' && !canFillUp) ||
+        (action === 'right' && !canFillRight) ||
+        (action === 'left' && !canFillLeft);
       const reason =
         action === 'group' || action === 'justify'
           ? button.textContent?.trim()

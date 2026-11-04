@@ -2,7 +2,9 @@ import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js'
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
 import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
+import { activeTableOverlay } from '../../../commands/table-design.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
+import { findPivotTableAtCell } from '../../../engine/passthrough-sync.js';
 import { getMacInk } from '../../../interact/mac-ink.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { rangeValidationsIntersect } from '../../../store/range-validations.js';
@@ -74,6 +76,8 @@ const MAC_CONTENT_STATE_COMMANDS = [
   'mac.data.showDetail',
   'mac.data.hideDetail',
   'mac.data.workbookLinks',
+  'mac.insert.slicer',
+  'mac.formulas.useInFormula',
 ] as const;
 
 const contentDisabledReason = (
@@ -82,8 +86,19 @@ const contentDisabledReason = (
 ): string | null => {
   const lang = toolbarLangForLocale(instance.i18n.locale);
   if (id === 'mac.data.workbookLinks') {
-    return (instance.workbook?.getExternalLinks?.() ?? []).length === 0
+    return instance.workbook.getExternalLinks().length === 0
       ? MAC_CONTEXT_LABELS.externalLinksRequired[lang]
+      : null;
+  }
+  if (id === 'mac.insert.slicer') {
+    const state = instance.store.getState();
+    const onTable = activeTableOverlay(state) != null;
+    const onPivot = findPivotTableAtCell(instance.workbook, state.selection.active);
+    return onTable || onPivot ? null : MAC_CONTEXT_LABELS.slicerRequired[lang];
+  }
+  if (id === 'mac.formulas.useInFormula') {
+    return instance.workbook.definedNames().next().done === true
+      ? MAC_CONTEXT_LABELS.namesRequired[lang]
       : null;
   }
   return hasOutlineDetail(instance.store, instance.store.getState().selection.range)

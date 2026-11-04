@@ -37,8 +37,8 @@ export const conditionalDataBarLabel = (
       return labels.dataBarSolidOrange;
     case 'data-solid-purple':
       return labels.dataBarSolidPurple;
-    case 'data-solid-gray':
-      return labels.dataBarSolidGray;
+    case 'data-solid-teal':
+      return labels.dataBarSolidTeal;
     default:
       return labels.dataBars;
   }
@@ -61,18 +61,18 @@ export const conditionalColorScaleLabel = (
       return labels.colorScaleBlueWhiteRed;
     case 'scale-rwb':
       return labels.colorScaleRedWhiteBlue;
-    case 'scale-gwg':
-      return labels.colorScaleGreenWhiteGreen;
-    case 'scale-ywg':
-      return labels.colorScaleYellowWhiteGreen;
-    case 'scale-rwr':
-      return labels.colorScaleRedWhiteRed;
-    case 'scale-bwb':
-      return labels.colorScaleBlueWhiteBlue;
-    case 'scale-yry':
-      return labels.colorScaleYellowRedGreen;
-    case 'scale-gyg':
-      return labels.colorScaleGreenYellowGreen;
+    case 'scale-gwr':
+      return labels.colorScaleGreenWhiteRed;
+    case 'scale-rwg':
+      return labels.colorScaleRedWhiteGreen;
+    case 'scale-wr':
+      return labels.colorScaleWhiteRed;
+    case 'scale-wg':
+      return labels.colorScaleWhiteGreen;
+    case 'scale-gy':
+      return labels.colorScaleGreenYellow;
+    case 'scale-yg':
+      return labels.colorScaleYellowGreen;
     default:
       return labels.colorScales;
   }
@@ -118,8 +118,7 @@ export const conditionalDataBarSwatchColor = (action: string): string => {
   if (action.includes('red')) return '#c00000';
   if (action.includes('orange')) return '#ed7d31';
   if (action.includes('purple')) return '#8064a2';
-  if (action.includes('teal')) return '#4ba1a8';
-  if (action.includes('gray')) return '#7f7f7f';
+  if (action.includes('teal')) return action.includes('solid') ? '#31a9bd' : '#4ba1a8';
   return '#4472c4';
 };
 
@@ -132,12 +131,12 @@ export const conditionalColorScaleSwatchColors = (action: string): readonly stri
     'scale-rw': ['#f8696b', '#ffffff'],
     'scale-bwr': ['#5a8dee', '#ffffff', '#f8696b'],
     'scale-rwb': ['#f8696b', '#ffffff', '#5a8dee'],
-    'scale-gwg': ['#63be7b', '#ffffff', '#00a651'],
-    'scale-ywg': ['#ffeb84', '#ffffff', '#63be7b'],
-    'scale-rwr': ['#f8696b', '#ffffff', '#c00000'],
-    'scale-bwb': ['#5a8dee', '#ffffff', '#4472c4'],
-    'scale-yry': ['#ffeb84', '#f8696b', '#63be7b'],
-    'scale-gyg': ['#63be7b', '#ffeb84', '#00a651'],
+    'scale-gwr': ['#63be7b', '#ffffff', '#f8696b'],
+    'scale-rwg': ['#f8696b', '#ffffff', '#63be7b'],
+    'scale-wr': ['#ffffff', '#f8696b'],
+    'scale-wg': ['#ffffff', '#63be7b'],
+    'scale-gy': ['#63be7b', '#ffeb84'],
+    'scale-yg': ['#ffeb84', '#63be7b'],
   };
   return map[action] ?? ['#63be7b', '#ffeb84', '#f8696b'];
 };

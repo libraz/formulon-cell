@@ -33,19 +33,19 @@ export type ConditionalPresetAction =
   | 'data-solid-red'
   | 'data-solid-orange'
   | 'data-solid-purple'
-  | 'data-solid-gray'
+  | 'data-solid-teal'
   | 'scale-gyr'
   | 'scale-ryg'
   | 'scale-gw'
   | 'scale-rw'
   | 'scale-bwr'
   | 'scale-rwb'
-  | 'scale-gwg'
-  | 'scale-ywg'
-  | 'scale-rwr'
-  | 'scale-bwb'
-  | 'scale-yry'
-  | 'scale-gyg'
+  | 'scale-gwr'
+  | 'scale-rwg'
+  | 'scale-wr'
+  | 'scale-wg'
+  | 'scale-gy'
+  | 'scale-yg'
   | 'icons-arrows3'
   | 'icons-arrows5'
   | 'icons-triangles3'
@@ -114,7 +114,7 @@ const dataBarColor = (action: ConditionalPresetAction): string => {
     'data-solid-red': '#c00000',
     'data-solid-orange': '#ed7d31',
     'data-solid-purple': '#8064a2',
-    'data-solid-gray': '#7f7f7f',
+    'data-solid-teal': '#31a9bd',
   };
   return map[action] ?? '#638ec6';
 };
@@ -138,12 +138,12 @@ const colorScaleStops = (
       'scale-rw': ['#f8696b', '#ffffff'],
       'scale-bwr': ['#5a8dee', '#ffffff', '#f8696b'],
       'scale-rwb': ['#f8696b', '#ffffff', '#5a8dee'],
-      'scale-gwg': ['#63be7b', '#ffffff', '#00a651'],
-      'scale-ywg': ['#ffeb84', '#ffffff', '#63be7b'],
-      'scale-rwr': ['#f8696b', '#ffffff', '#c00000'],
-      'scale-bwb': ['#5a8dee', '#ffffff', '#4472c4'],
-      'scale-yry': ['#ffeb84', '#f8696b', '#63be7b'],
-      'scale-gyg': ['#63be7b', '#ffeb84', '#00a651'],
+      'scale-gwr': ['#63be7b', '#ffffff', '#f8696b'],
+      'scale-rwg': ['#f8696b', '#ffffff', '#63be7b'],
+      'scale-wr': ['#ffffff', '#f8696b'],
+      'scale-wg': ['#ffffff', '#63be7b'],
+      'scale-gy': ['#63be7b', '#ffeb84'],
+      'scale-yg': ['#ffeb84', '#63be7b'],
     };
   return map[action] ?? ['#63be7b', '#ffeb84', '#f8696b'];
 };

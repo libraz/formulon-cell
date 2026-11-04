@@ -50,4 +50,43 @@ describe('Mac conditional formatting menu', () => {
     expect(panelItems(shared, 'highlight')).toContain('一意の値...');
     expect(panelItems(shared, 'clear')).toHaveLength(2);
   });
+
+  it('lists the data bars and colour scales in the Excel set and order', () => {
+    const swatches = (panel: string): string[] =>
+      Array.from(
+        mac.querySelectorAll<HTMLElement>(`[data-cf-panel="${panel}"] [data-cf-action]`),
+        (el) => el.dataset.cfAction ?? '',
+      );
+    expect(swatches('dataBar')).toEqual([
+      'data-blue',
+      'data-green',
+      'data-red',
+      'data-orange',
+      'data-teal',
+      'data-purple',
+      'data-solid-blue',
+      'data-solid-green',
+      'data-solid-red',
+      'data-solid-orange',
+      'data-solid-teal',
+      'data-solid-purple',
+      'new-rule',
+    ]);
+    expect(swatches('colorScale').slice(0, 12)).toEqual([
+      'scale-gyr',
+      'scale-ryg',
+      'scale-gwr',
+      'scale-rwg',
+      'scale-bwr',
+      'scale-rwb',
+      'scale-wr',
+      'scale-rw',
+      'scale-gw',
+      'scale-wg',
+      'scale-gy',
+      'scale-yg',
+    ]);
+    const first = mac.querySelector<HTMLElement>('[data-cf-action="scale-gyr"]');
+    expect(first?.getAttribute('aria-label') ?? first?.title).toBe('緑、黄、赤のカラー スケール');
+  });
 });

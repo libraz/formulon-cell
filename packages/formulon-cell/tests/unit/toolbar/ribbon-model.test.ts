@@ -889,11 +889,9 @@ describe('toolbar/ribbon-model', () => {
     expect(conditionalMenuText('en').top10Percent).toBe('Top 10%');
     expect(conditionalMenuText('ja').dataBarSolidGreen).toBe('塗りつぶし (単色)、緑のデータ バー');
     expect(conditionalMenuText('en').dataBarSolidGreen).toBe('Solid Fill, Green Data Bar');
-    expect(conditionalMenuText('ja').colorScaleGreenWhiteGreen).toBe(
-      '緑 - 白 - 緑のカラー スケール',
-    );
-    expect(conditionalMenuText('en').colorScaleGreenWhiteGreen).toBe(
-      'Green - White - Green Color Scale',
+    expect(conditionalMenuText('ja').colorScaleGreenWhiteRed).toBe('緑、白、赤のカラー スケール');
+    expect(conditionalMenuText('en').colorScaleGreenWhiteRed).toBe(
+      'Green - White - Red Color Scale',
     );
     expect(conditionalMenuText('ja').iconTraffic3).toBe('3 色の信号');
     expect(conditionalMenuText('en').iconStars3).toBe('3 Stars');

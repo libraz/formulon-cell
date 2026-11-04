@@ -56,7 +56,12 @@ const testInstance = () => {
   const instance = {
     store,
     i18n,
-    workbook: { calcMode: () => 'auto' },
+    workbook: {
+      calcMode: () => 'auto',
+      getExternalLinks: () => [],
+      getPivotTables: () => [],
+      definedNames: function* () {},
+    },
     isSheetProtected: () => false,
   } as unknown as SpreadsheetInstance;
   return { store, i18n, instance };
@@ -813,13 +818,19 @@ describe('Mac Excel ribbon profile', () => {
     i18n.dispose();
   });
 
-  it('disables Show Detail, Hide Detail and Workbook Links when the document has nothing for them', () => {
+  it('disables commands whose target the document does not have', () => {
     const { instance, i18n } = testInstance();
     const host = document.createElement('div');
-    const ids = ['mac.data.showDetail', 'mac.data.hideDetail', 'mac.data.workbookLinks'];
+    const ids = [
+      'mac.data.showDetail',
+      'mac.data.hideDetail',
+      'mac.data.workbookLinks',
+      'mac.insert.slicer',
+      'mac.formulas.useInFormula',
+    ];
     const buttons = ids.map((id) => projectedButton(host, id));
     projectMacRibbonState(host, instance);
-    expect(buttons.map((button) => button.disabled)).toEqual([true, true, true]);
+    expect(buttons.map((button) => button.disabled)).toEqual(ids.map(() => true));
     i18n.dispose();
   });
 
