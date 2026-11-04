@@ -45,19 +45,25 @@ const writeCellSnapshot = (
   addr: Addr,
   cell: { value: CellValue; formula: string | null } | null,
   sourceRow = addr.row,
+  sourceCol = addr.col,
 ): void => {
   if (!cell) {
     wb.setBlank(addr);
     return;
   }
-  const formula = cell.formula ? shiftFormulaRefs(cell.formula, addr.row - sourceRow, 0) : null;
+  const formula = cell.formula
+    ? shiftFormulaRefs(cell.formula, addr.row - sourceRow, addr.col - sourceCol)
+    : null;
   writeCell(wb, addr, cell.value, formula);
 };
 
 export type SortDirection = 'asc' | 'desc';
 
+export type SortOrientation = 'topToBottom' | 'leftToRight';
+
 export interface SortKey {
-  /** Column to sort by, in absolute sheet coords. Must lie within `range`. */
+  /** Column to sort by, in absolute sheet coords. Must lie within `range`.
+   *  For `orientation: 'leftToRight'` this is the key row instead. */
   byCol: number;
   direction: SortDirection;
   /** Sort by values by default, or by cell/font color when specified. */
@@ -75,8 +81,15 @@ export interface SortOptions {
   /** Additional Excel-style sort levels. When present, these keys are applied
    *  in order and `byCol`/`direction` are used only as a fallback. */
   keys?: readonly SortKey[];
-  /** When true, the first row is treated as a header and not moved. */
+  /** When true, the first row is treated as a header and not moved. Ignored
+   *  for `leftToRight`, which never keeps a header column. */
   hasHeader?: boolean;
+  /** `leftToRight` sorts columns by the key row(s) named in `byCol`.
+   *  Defaults to `topToBottom`. */
+  orientation?: SortOrientation;
+  /** Case-sensitive text order: lower case sorts before upper case among
+   *  otherwise equal text (reversed for descending). Defaults to false. */
+  matchCase?: boolean;
 }
 
 export interface RemoveDuplicatesOptions {
@@ -172,7 +185,24 @@ const absoluteColumnRange = (column: number, firstRow: number, lastRow: number):
   return `$${name}$${firstRow + 1}:$${name}$${lastRow + 1}`;
 };
 
-const verticalNumberArray = (values: readonly number[]): string => `{${values.join(';')}}`;
+const absoluteRowRange = (row: number, firstCol: number, lastCol: number): string =>
+  `$${colLetter(firstCol)}$${row + 1}:$${colLetter(lastCol)}$${row + 1}`;
+
+const numberArray = (values: readonly number[], horizontal: boolean): string =>
+  `{${values.join(horizontal ? ',' : ';')}}`;
+
+const compareCaseVariants = (left: string, right: string): number => {
+  const n = Math.min(left.length, right.length);
+  for (let i = 0; i < n; i += 1) {
+    const l = left.charAt(i);
+    const r = right.charAt(i);
+    if (l === r) continue;
+    const leftUpper = l !== l.toLowerCase();
+    const rightUpper = r !== r.toLowerCase();
+    if (leftUpper !== rightUpper) return leftUpper ? 1 : -1;
+  }
+  return 0;
+};
 
 const nativeEvaluationAnchor = (
   state: State,
@@ -210,10 +240,13 @@ const nativeSortPermutation = (
   state: State,
   wb: WorkbookHandle,
   range: Range,
-  startRow: number,
+  start: number,
   sortKeys: readonly SortKey[],
+  horizontal: boolean,
+  matchCase: boolean,
 ): number[] | null => {
-  const count = range.r1 - startRow + 1;
+  const last = horizontal ? range.c1 : range.r1;
+  const count = last - start + 1;
   if (count <= 0) return [];
   if (count > MAX_NATIVE_SORT_ROWS) return null;
 
@@ -222,11 +255,29 @@ const nativeSortPermutation = (
     const direction = key.direction === 'desc' ? -1 : 1;
     const sortOn = key.sortOn ?? 'value';
     if (sortOn === 'value') {
-      return `${absoluteColumnRange(key.byCol, startRow, range.r1)},${direction}`;
+      const keyRange = horizontal
+        ? absoluteRowRange(key.byCol, start, last)
+        : absoluteColumnRange(key.byCol, start, last);
+      if (!matchCase) return `${keyRange},${direction}`;
+      // SORTBY compares text without case; a second key of per-text ranks
+      // orders the case variants that tie (lower case first).
+      const texts: string[] = [];
+      for (let line = start; line <= last; line += 1) {
+        const v = sortKeyForCell(state, range.sheet, line, key, builtInLists, horizontal);
+        texts.push(v.kind === 'text' ? (v.s ?? '') : '');
+      }
+      const distinct = [...new Set(texts)].sort(
+        (a, b) =>
+          (a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0) ||
+          compareCaseVariants(a, b),
+      );
+      const rank = new Map(distinct.map((text, index) => [text, index]));
+      const caseRanks = texts.map((text) => rank.get(text) ?? 0);
+      return `${keyRange},${direction},${numberArray(caseRanks, horizontal)},${direction}`;
     }
     const ranks: number[] = [];
-    for (let row = startRow; row <= range.r1; row += 1) {
-      const sortValue = sortKeyForCell(state, range.sheet, row, key, builtInLists);
+    for (let line = start; line <= last; line += 1) {
+      const sortValue = sortKeyForCell(state, range.sheet, line, key, builtInLists, horizontal);
       if (sortOn === 'cellColor' || sortOn === 'fontColor') {
         ranks.push(sortValue.match === true ? 0 : 1);
       } else {
@@ -235,20 +286,27 @@ const nativeSortPermutation = (
         ranks.push(sortValue.customIndex ?? sortKeys.length + count);
       }
     }
-    return `${verticalNumberArray(ranks)},${direction}`;
+    return `${numberArray(ranks, horizontal)},${direction}`;
   });
-  const formula = `=SORTBY(SEQUENCE(${count}),${byKey.join(',')})`;
+  const sequence = horizontal ? `SEQUENCE(1,${count})` : `SEQUENCE(${count})`;
+  const formula = `=SORTBY(${sequence},${byKey.join(',')})`;
   try {
-    const anchor = nativeEvaluationAnchor(state, range, count);
+    const anchor = horizontal
+      ? nativeEvaluationAnchor(state, range, 1, count)
+      : nativeEvaluationAnchor(state, range, count);
     if (!anchor) return null;
     const result = wb.evaluateFormulaArray(anchor, formula);
-    if (!result.status.ok || result.rows !== count || result.cols !== 1) return null;
-    if (result.cells.length !== count) return null;
+    const rows = horizontal ? 1 : count;
+    const cols = horizontal ? count : 1;
+    if (!result.status.ok || result.rows !== rows || result.cols !== cols) return null;
+    if (result.cells.length !== rows) return null;
     const permutation: number[] = [];
     const seen = new Set<number>();
-    for (const row of result.cells) {
-      if (row?.length !== 1) return null;
-      const raw = row?.[0];
+    const flat = horizontal ? (result.cells[0] ?? []) : result.cells.map((row) => row?.[0]);
+    if (flat.length !== count || (!horizontal && result.cells.some((row) => row?.length !== 1))) {
+      return null;
+    }
+    for (const raw of flat) {
       if (!raw) return null;
       const value = fromEngineValue(raw);
       if (value.kind !== 'number' || !Number.isInteger(value.value)) return null;
@@ -389,20 +447,22 @@ interface CellSortKey {
 const sortKeyForCell = (
   state: State,
   sheet: number,
-  row: number,
+  line: number,
   key: SortKey,
   builtInLists: readonly (readonly string[])[],
+  horizontal = false,
 ): CellSortKey => {
   const sortOn = key.sortOn ?? 'value';
+  const row = horizontal ? key.byCol : line;
+  const col = horizontal ? line : key.byCol;
   if (sortOn === 'cellColor' || sortOn === 'fontColor') {
-    const fmt = state.format.formats.get(addrKey({ sheet, row, col: key.byCol }));
+    const fmt = state.format.formats.get(addrKey({ sheet, row, col }));
     const actual = sortOn === 'cellColor' ? fmt?.fill : fmt?.color;
     return {
       kind: 'color',
       match: !!actual && !!key.color && normalizeColorKey(actual) === normalizeColorKey(key.color),
     };
   }
-  const col = key.byCol;
   const keyCell = state.data.cells.get(addrKey({ sheet, row, col }));
   if (!keyCell) return { kind: 'blank' };
   const v = keyCell.value;
@@ -427,6 +487,7 @@ const compareSortKeys = (
   b: CellSortKey,
   direction: SortDirection,
   compareText: (left: string, right: string) => number,
+  matchCase = false,
 ): number => {
   const dir = direction === 'desc' ? -1 : 1;
   if (a.kind === 'color' || b.kind === 'color') {
@@ -457,7 +518,11 @@ const compareSortKeys = (
     case 'bool':
       return dir * ((a.n ?? 0) - (b.n ?? 0));
     case 'text':
-      return dir * compareText(a.s ?? '', b.s ?? '');
+      return (
+        dir *
+        (compareText(a.s ?? '', b.s ?? '') ||
+          (matchCase ? compareCaseVariants(a.s ?? '', b.s ?? '') : 0))
+      );
     case 'error':
       // Errors retain their source order, matching Excel's stable sort.
       return 0;
@@ -495,7 +560,13 @@ const hasDistinctHeaderFormat = (
  * plain numeric selections never moved their first row. We only infer a header
  * when the first row looks label-like and differs from the data row below.
  */
-export function inferSortHasHeader(state: State, range: Range): boolean {
+export function inferSortHasHeader(
+  state: State,
+  range: Range,
+  orientation: SortOrientation = 'topToBottom',
+): boolean {
+  // Excel never guesses a header column for a left-to-right sort.
+  if (orientation === 'leftToRight') return false;
   if (range.r0 >= range.r1) return false;
   let firstRowText = 0;
   let firstRowNonBlank = 0;
@@ -587,15 +658,25 @@ export function sortRange(
   opts: SortOptions,
   history: History | null = null,
 ): boolean {
-  const start = opts.hasHeader ? range.r0 + 1 : range.r0;
-  if (start > range.r1) return false;
+  const horizontal = opts.orientation === 'leftToRight';
+  const matchCase = opts.matchCase === true;
+  // A "line" is one sortable unit: a row, or a column when sorting left to
+  // right. `pos` walks across the line.
+  const first = horizontal ? range.c0 : range.r0;
+  // Excel ignores the header flag for left-to-right sorts.
+  const start = opts.hasHeader && !horizontal ? first + 1 : first;
+  const last = horizontal ? range.c1 : range.r1;
+  if (start > last) return false;
+  const dataRange: Range = horizontal ? { ...range, c0: start } : { ...range, r0: start };
   const sortKeys = normalizedSortKeys(opts);
   if (sortKeys.length === 0) return false;
-  if (sortKeys.some((key) => key.byCol < range.c0 || key.byCol > range.c1)) return false;
-  if (!canRewriteExactRange(range, start)) return false;
+  const keyLo = horizontal ? range.r0 : range.c0;
+  const keyHi = horizontal ? range.r1 : range.c1;
+  if (sortKeys.some((key) => key.byCol < keyLo || key.byCol > keyHi)) return false;
+  if (!canRewriteExactRange(dataRange)) return false;
   if (rangeIntersectsMerges(state, range)) return false;
-  if (!ensureWritableRange(state, { ...range, r0: start })) return false;
-  if (blockDataTableEdit(wb, { ...range, r0: start })) return false;
+  if (!ensureWritableRange(state, dataRange)) return false;
+  if (blockDataTableEdit(wb, dataRange)) return false;
 
   // A real formulon bundle owns the comparison semantics for formula-driven
   // sorts. Do this before hydrating comments or touching any cell so an
@@ -603,47 +684,55 @@ export function sortRange(
   // intentionally use the explicit-locale JS comparator below.
   const nativeBundle = wb.isStub === false && wb.capabilities.arrayFormulaEvaluation === true;
   const nativeOrder = nativeBundle
-    ? nativeSortPermutation(state, wb, range, start, sortKeys)
+    ? nativeSortPermutation(state, wb, range, start, sortKeys, horizontal, matchCase)
     : null;
   if (nativeBundle && nativeOrder === null) return false;
 
-  state = hydrateSortComments(store, wb, range, start);
+  state = hydrateSortComments(store, wb, dataRange, horizontal ? range.r0 : start);
   const builtInLists = customListsFor(localeForWorkbook(wb));
+  const addrAt = (line: number, pos: number): Addr =>
+    horizontal
+      ? { sheet: range.sheet, row: pos, col: line }
+      : { sheet: range.sheet, row: line, col: pos };
+  const posLo = horizontal ? range.r0 : range.c0;
+  const posHi = horizontal ? range.r1 : range.c1;
 
-  // Snapshot the rows we'll move, including formula text so we can write it back.
-  interface RowSnap {
+  // Snapshot the lines we'll move, including formula text so we can write it back.
+  interface LineSnap {
     cells: Array<{
       value: CellValue;
       formula: string | null;
-      col: number;
+      pos: number;
       format?: CellFormat;
     }>;
     sortKeys: CellSortKey[];
   }
-  const snaps: { row: number; snap: RowSnap }[] = [];
-  for (let r = start; r <= range.r1; r += 1) {
-    const cells: RowSnap['cells'] = [];
-    for (let c = range.c0; c <= range.c1; c += 1) {
-      const key = addrKey({ sheet: range.sheet, row: r, col: c });
+  const snaps: { line: number; snap: LineSnap }[] = [];
+  for (let l = start; l <= last; l += 1) {
+    const cells: LineSnap['cells'] = [];
+    for (let p = posLo; p <= posHi; p += 1) {
+      const key = addrKey(addrAt(l, p));
       const cell = state.data.cells.get(key);
       cells.push({
         value: cell?.value ?? { kind: 'blank' },
         formula: cell?.formula ?? null,
-        col: c,
+        pos: p,
         format: cloneFormat(state.format.formats.get(key)),
       });
     }
     snaps.push({
-      row: r,
+      line: l,
       snap: {
         cells,
-        sortKeys: sortKeys.map((key) => sortKeyForCell(state, range.sheet, r, key, builtInLists)),
+        sortKeys: sortKeys.map((key) =>
+          sortKeyForCell(state, range.sheet, l, key, builtInLists, horizontal),
+        ),
       },
     });
   }
 
   if (nativeOrder) {
-    const bySourceIndex = new Map(snaps.map((entry, index) => [entry.row, index]));
+    const bySourceIndex = new Map(snaps.map((entry, index) => [entry.line, index]));
     const ordered = nativeOrder.map((sourceIndex) => snaps[sourceIndex - 1]);
     // nativeSortPermutation validates the sequence, but retain a defensive
     // check at this boundary so a future result-shape change still cannot
@@ -663,30 +752,30 @@ export function sortRange(
           b.snap.sortKeys[i] ?? { kind: 'blank' },
           sortKeys[i]?.direction ?? 'asc',
           textSemantics.compare,
+          matchCase,
         );
         if (result !== 0) return result;
       }
-      return a.row - b.row;
+      return a.line - b.line;
     });
   }
 
   // Write back into wb in sorted order.
   wb.withBatchedRecalc(() => {
     for (let i = 0; i < snaps.length; i += 1) {
-      const dstRow = start + i;
-      const snap = snaps[i]?.snap;
-      if (!snap) continue;
-      for (const cell of snap.cells) {
-        const addr = { sheet: range.sheet, row: dstRow, col: cell.col };
-        writeCellSnapshot(wb, addr, cell, snaps[i]?.row ?? dstRow);
+      const dstLine = start + i;
+      const entry = snaps[i];
+      if (!entry) continue;
+      for (const cell of entry.snap.cells) {
+        const addr = addrAt(dstLine, cell.pos);
+        const from = addrAt(entry.line, cell.pos);
+        writeCellSnapshot(wb, addr, cell, from.row, from.col);
       }
     }
   });
   const affected: Addr[] = [];
-  for (let r = start; r <= range.r1; r += 1) {
-    for (let c = range.c0; c <= range.c1; c += 1) {
-      affected.push({ sheet: range.sheet, row: r, col: c });
-    }
+  for (let l = start; l <= last; l += 1) {
+    for (let p = posLo; p <= posHi; p += 1) affected.push(addrAt(l, p));
   }
   const placed: PlacedFormat[] = [];
   for (let i = 0; i < snaps.length; i += 1) {
@@ -694,15 +783,14 @@ export function sortRange(
     if (!snap) continue;
     for (const cell of snap.cells) {
       if (!cell.format) continue;
-      placed.push({
-        addr: { sheet: range.sheet, row: start + i, col: cell.col },
-        format: cell.format,
-      });
+      placed.push({ addr: addrAt(start + i, cell.pos), format: cell.format });
     }
   }
   rewriteRangeFormats(state, store, wb, history, affected, placed);
   wb.recalcAuto();
-  const filterRange = filterRangeForSort(store.getState(), range, opts.hasHeader === true);
+  const filterRange = horizontal
+    ? null
+    : filterRangeForSort(store.getState(), range, opts.hasHeader === true);
   if (filterRange) {
     const keys = sortKeys
       .filter((key) => key.sortOn === undefined || key.sortOn === 'value')
