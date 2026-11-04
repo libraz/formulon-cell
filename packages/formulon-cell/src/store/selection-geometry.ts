@@ -25,6 +25,9 @@ export const isWholeColumnRange = (range: Pick<Range, 'r0' | 'r1'>): boolean =>
 export const sameRange = (a: Range, b: Range): boolean =>
   a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
 
+export const sameRangeList = (a: readonly Range[], b: readonly Range[]): boolean =>
+  a.length === b.length && a.every((range, i) => sameRange(range, b[i] as Range));
+
 export const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
   range.sheet === addr.sheet &&
   addr.row >= range.r0 &&

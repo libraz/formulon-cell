@@ -138,11 +138,16 @@ export function syncValidationsToEngine(
   const strict = options?.strict === true;
   const buckets = new Map<string, { validation: CellValidation; cells: Addr[] }>();
   const formats = store.getState().format.formats;
+  const signatures = new WeakMap<CellValidation, string>();
   for (const [key, fmt] of formats) {
     if (!fmt.validation) continue;
     const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet) continue;
-    const sig = JSON.stringify(fmt.validation);
+    let sig = signatures.get(fmt.validation);
+    if (sig === undefined) {
+      sig = JSON.stringify(fmt.validation);
+      signatures.set(fmt.validation, sig);
+    }
     let bucket = buckets.get(sig);
     if (!bucket) {
       bucket = { validation: fmt.validation, cells: [] };
@@ -188,24 +193,24 @@ function coalesceCells(sheet: number, cells: readonly Addr[]): Range[] {
     if (cols) cols.push(col);
     else byRow.set(row, [col]);
   }
-  const open = new Map<string, Range>();
+  const open = new Map<string, { range: Range; index: number }>();
   const out: Range[] = [];
   let prevRow = -2;
   for (const row of [...byRow.keys()].sort((a, b) => a - b)) {
     const cols = (byRow.get(row) as number[]).sort((a, b) => a - b);
-    const next = new Map<string, Range>();
+    const next = new Map<string, { range: Range; index: number }>();
     let c0 = cols[0] as number;
     let c1 = c0;
     const flush = (): void => {
       const runKey = `${c0}:${c1}`;
       const stacked = row === prevRow + 1 ? open.get(runKey) : undefined;
       if (stacked) {
-        const grown = { ...stacked, r1: row };
-        next.set(runKey, grown);
-        out[out.indexOf(stacked)] = grown;
+        const grown = { ...stacked.range, r1: row };
+        next.set(runKey, { range: grown, index: stacked.index });
+        out[stacked.index] = grown;
       } else {
         const fresh: Range = { sheet, r0: row, c0, r1: row, c1 };
-        next.set(runKey, fresh);
+        next.set(runKey, { range: fresh, index: out.length });
         out.push(fresh);
       }
     };

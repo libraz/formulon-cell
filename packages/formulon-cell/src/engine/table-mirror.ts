@@ -7,7 +7,7 @@ import {
   tableColumns,
   totalsCellAt,
 } from '../commands/format-as-table.js';
-import { sameRange } from '../store/selection-geometry.js';
+import { sameRange, sameRangeList } from '../store/selection-geometry.js';
 import {
   mutators,
   type SpreadsheetStore,
@@ -242,9 +242,6 @@ const tableUpdate = (before: TableOverlay, after: TableOverlay): TableUpdateInpu
   return patch;
 };
 
-const sameRangeList = (a: readonly Range[], b: readonly Range[]): boolean =>
-  a.length === b.length && a.every((range, i) => sameRange(range, b[i] as Range));
-
 /** Apply `edits` to the filter slices; returns `state` itself when nothing changes. */
 function applyFilterEdits(state: State, edits: FilterEdits): State {
   const dropped = (range: Range): boolean =>
@@ -344,7 +341,8 @@ export class TableMirror {
     this.last = slice;
     this.applying = true;
     try {
-      return this.apply(store, previousSlice, slice);
+      // One recalc for all per-cell header/totals edits of the pass.
+      return this.handle.withBatchedRecalc(() => this.apply(store, previousSlice, slice));
     } catch (error) {
       // Nothing is known to have reached the engine; retry from the old baseline.
       this.last = previousSlice;

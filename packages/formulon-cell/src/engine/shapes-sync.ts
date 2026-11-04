@@ -16,6 +16,7 @@ import {
   ANCHOR_KIND_ABSOLUTE,
   drawingAnchorOf,
   placementForPixels,
+  sameAnchor,
   sessionPosition,
   twoCellAnchorForPixels,
 } from './drawing-geometry.js';
@@ -76,9 +77,6 @@ const anchorInput = (anchor: EngineDrawingAnchor): EngineShapeInput => ({
   cx: anchor.cx,
   cy: anchor.cy,
 });
-
-const sameAnchor = (a: EngineDrawingAnchor | undefined, b: EngineDrawingAnchor | undefined) =>
-  a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
 
 /** The fill and outline fields that write `item`'s paint. */
 const paintInput = (item: SessionIllustration): EngineShapeInput => {

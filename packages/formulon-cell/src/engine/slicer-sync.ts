@@ -1,6 +1,6 @@
 import { AnchorEditAs, AnchorKind, FilterKind } from '@libraz/formulon';
 import type { SlicerSpec, SpreadsheetStore, State } from '../store/store.js';
-import { sessionPosition, twoCellAnchorForPixels } from './drawing-geometry.js';
+import { sameAnchor, sessionPosition, twoCellAnchorForPixels } from './drawing-geometry.js';
 import type { EngineDrawingAnchor } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type { EngineSlicer, EngineSlicerInput } from './workbook-handle-drawing-objects.js';
@@ -47,9 +47,6 @@ const anchorOf = (slicer: EngineSlicer): EngineDrawingAnchor | null =>
         cy: 0,
       }
     : null;
-
-const sameAnchor = (a: EngineDrawingAnchor | undefined, b: EngineDrawingAnchor | undefined) =>
-  a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
 
 const anchorFields = (anchor: EngineDrawingAnchor): EngineSlicerInput => ({
   fromRow: anchor.fromRow,

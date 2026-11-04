@@ -38,7 +38,7 @@ import type {
   SpreadsheetProfileId,
   Workbook,
 } from './types.js';
-import { fromEngineValue } from './value.js';
+import { fromEngineValue, writeCell } from './value.js';
 import {
   installAnnotationsMethods,
   type WorkbookHandleAnnotationsMethods,
@@ -1257,26 +1257,7 @@ export class WorkbookHandle {
   private replay(snap: CellSnapshot): void {
     this.replaying = true;
     try {
-      if (snap.formula) {
-        this.setFormula(snap.addr, snap.formula);
-        return;
-      }
-      switch (snap.value.kind) {
-        case 'number':
-          this.setNumber(snap.addr, snap.value.value);
-          return;
-        case 'text':
-          this.setText(snap.addr, snap.value.value);
-          return;
-        case 'bool':
-          this.setBool(snap.addr, snap.value.value);
-          return;
-        case 'error':
-          this.setError(snap.addr, snap.value.code);
-          return;
-        default:
-          this.setBlank(snap.addr);
-      }
+      writeCell(this, snap.addr, snap.value, snap.formula);
     } finally {
       this.replaying = false;
     }

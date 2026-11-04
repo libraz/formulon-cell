@@ -1,12 +1,7 @@
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
-import {
-  type AxisStructureShift,
-  remapAxisFormatOverride,
-  remapAxisSnapshot,
-} from './axis-structure-remap.js';
+import { type AxisStructureShift, remapAxisFormatOverride } from './axis-structure-remap.js';
 import { patchXfIndexFromBase } from './cell-xf-writeback.js';
-import { formatHistoryBridgeFor } from './format-history-bridge.js';
 import type {
   Addr,
   Range,
@@ -16,6 +11,27 @@ import type {
   SheetFontPatch,
 } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+
+/** Most rows, columns or cells one axis format operation may expand to. */
+const AXIS_FORMAT_LIMIT = 100_000;
+
+/** Patched XF for `baseXf`, memoized per (source XF, resolved patch); negative on engine refusal. */
+const patchedXf = (
+  wb: WorkbookHandle,
+  cache: Map<string, number>,
+  baseXf: number,
+  patch: Partial<CellFormat>,
+  resolvePatch: AxisFormatPatchResolver | undefined,
+  addr?: Addr,
+): number => {
+  const resolved = resolvePatch?.(wb, baseXf, addr) ?? patch;
+  const key = `${baseXf}|${JSON.stringify(resolved)}`;
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+  const xf = patchXfIndexFromBase(wb, baseXf, resolved);
+  if (xf >= 0) cache.set(key, xf);
+  return xf;
+};
 
 export interface AxisFormatBand {
   readonly axis: 'row' | 'column';
@@ -145,11 +161,8 @@ const splitColumns = (
       while (end < segment.last && intersectsBand(bands, 'column', end + 1) === selected) end += 1;
       let styleXf = segment.styleXf;
       if (selected && wb) {
-        const resolvedPatch = resolvePatch?.(wb, styleXf) ?? patch;
-        const cacheKey = `${styleXf}|${JSON.stringify(resolvedPatch)}`;
-        styleXf = cache.get(cacheKey) ?? patchXfIndexFromBase(wb, styleXf, resolvedPatch);
+        styleXf = patchedXf(wb, cache, styleXf, patch, resolvePatch);
         if (styleXf < 0) return null;
-        cache.set(cacheKey, styleXf);
       }
       // An implicit default gap is a computation base, not an authored
       // column record. Preserve that distinction from explicit Normal XF0.
@@ -196,7 +209,7 @@ const splitRows = (
   for (const band of bands) {
     if (band.axis !== 'row') continue;
     selectedCount += band.last - band.first + 1;
-    if (selectedCount > 100_000) return null;
+    if (selectedCount > AXIS_FORMAT_LIMIT) return null;
     for (let row = band.first; row <= band.last; row += 1) selectedRows.add(row);
   }
   const cache = new Map<string, number>();
@@ -214,11 +227,8 @@ const splitRows = (
     baseByRow.set(row, base);
     let styleXf = base;
     if (wb) {
-      const resolvedPatch = resolvePatch?.(wb, base) ?? patch;
-      const cacheKey = `${base}|${JSON.stringify(resolvedPatch)}`;
-      styleXf = cache.get(cacheKey) ?? patchXfIndexFromBase(wb, base, resolvedPatch);
+      styleXf = patchedXf(wb, cache, base, patch, resolvePatch);
       if (styleXf < 0) return null;
-      cache.set(cacheKey, styleXf);
     }
     rows.set(row, styleXf);
   }
@@ -284,7 +294,7 @@ const axisBudgetAvailable = (
   baseUsed: number,
   baseKeys: ReadonlySet<string>,
 ): boolean => {
-  if (!Number.isInteger(baseUsed) || baseUsed < 0 || baseUsed > 100_000) return false;
+  if (!Number.isInteger(baseUsed) || baseUsed < 0 || baseUsed > AXIS_FORMAT_LIMIT) return false;
   if (exceptions.some((addr) => addr.sheet !== sheet)) return false;
   let used = baseUsed;
   const countedKeys = new Set(baseKeys);
@@ -293,7 +303,7 @@ const axisBudgetAvailable = (
     if (countedKeys.has(key)) return true;
     countedKeys.add(key);
     used += 1;
-    return used <= 100_000;
+    return used <= AXIS_FORMAT_LIMIT;
   };
   const addDirect = (key: string): boolean => {
     directKeys.add(key);
@@ -308,7 +318,7 @@ const axisBudgetAvailable = (
   for (const band of bands) {
     if (band.axis !== 'row') continue;
     const count = band.last - band.first + 1;
-    if (count > 100_000 || used + count > 100_000) return false;
+    if (count > AXIS_FORMAT_LIMIT || used + count > AXIS_FORMAT_LIMIT) return false;
     used += count;
     for (let row = band.first; row <= band.last; row += 1) selectedRows.add(row);
   }
@@ -352,7 +362,7 @@ const axisBudgetAvailable = (
       }
     }
   }
-  return used <= 100_000;
+  return used <= AXIS_FORMAT_LIMIT;
 };
 
 type EffectiveStyle = NonNullable<ReturnType<WorkbookHandle['getEffectiveStyle']>>;
@@ -375,33 +385,6 @@ const directSnapshot = (
     afterXfIndex: directXfIndex,
   };
 };
-
-/**
- * Prepare one compact axis override. The caller applies the returned map in a
- * single store publication. Native XF records are allocated before that
- * publication while StoreMirror is muted, so the subsequent flush is atomic
- * from the store's point of view.
- */
-export function prepareAxisFormatOverride(
-  state: State,
-  store: SpreadsheetStore,
-  ranges: readonly Range[],
-  bands: readonly AxisFormatBand[],
-  patch: Partial<CellFormat>,
-): AxisFormatPreparation | null {
-  const sheet = ranges[0]?.sheet;
-  if (sheet === undefined || ranges.some((range) => range.sheet !== sheet)) return null;
-  const normalized = normalizedBands(bands);
-  if (normalized.length === 0) return null;
-  return prepareAxisFormatOverrideWithWorkbook(
-    state,
-    store,
-    ranges,
-    normalized,
-    patch,
-    formatHistoryBridgeFor(store)?.workbook ?? null,
-  );
-}
 
 /** Workbook-aware variant used by mounted commands. Exported separately so
  * tests and host adapters can prepare an override without reaching into the
@@ -456,7 +439,7 @@ export function prepareAxisFormatOverrideWithWorkbook(
   const direct = new Map<string, SheetAxisDirectXf>(
     (existing?.directXfs ?? []).map((entry) => [entry.key, cloneDirect(entry)]),
   );
-  if (exceptions.length > 100_000) return null;
+  if (exceptions.length > AXIS_FORMAT_LIMIT) return null;
   const exceptionKeys = new Set(exceptions.map(addrKey));
   // Resolvers run during the splits above may mutate the workbook, so re-read
   // instead of reusing the budget-check snapshot.
@@ -549,7 +532,7 @@ export function prepareAxisFormatOverrideWithWorkbook(
         if (band.axis !== 'column') continue;
         const count = band.last - band.first + 1;
         derivedCount += count;
-        if (derivedCount > 100_000) return null;
+        if (derivedCount > AXIS_FORMAT_LIMIT) return null;
         for (let col = band.first; col <= band.last; col += 1) {
           const addr = { sheet, row: rowEntry.row, col };
           const effective = wb.getEffectiveStyle(sheet, rowEntry.row, col);
@@ -564,12 +547,8 @@ export function prepareAxisFormatOverrideWithWorkbook(
           if (!before) return null;
           const baseXf =
             effective && effective.source !== 0 ? effective.xfIndex : before.before.directXfIndex;
-          const resolvedPatch = resolvePatch?.(wb, baseXf, addr) ?? patch;
-          const cacheKey = `${baseXf}|${JSON.stringify(resolvedPatch)}`;
-          const afterXfIndex =
-            patchCache.get(cacheKey) ?? patchXfIndexFromBase(wb, baseXf, resolvedPatch);
+          const afterXfIndex = patchedXf(wb, patchCache, baseXf, patch, resolvePatch, addr);
           if (afterXfIndex < 0) return null;
-          patchCache.set(cacheKey, afterXfIndex);
           direct.set(key, {
             key,
             before: priorDirect?.before ?? before.before,
@@ -589,15 +568,16 @@ export function prepareAxisFormatOverrideWithWorkbook(
     const segments = columnSegments(current);
     let derivedCount = direct.size;
     const selectedRows = [...rowPreparation.baseByRow.keys()];
+    const currentRows = rowsForSnapshot(current);
     for (const row of selectedRows) {
       const rowBase = rowPreparation.baseByRow.get(row) ?? 0;
-      const explicitRow = rowsForSnapshot(current).has(row);
+      const explicitRow = currentRows.has(row);
       if (explicitRow) continue;
       for (const segment of segments) {
         if (!explicitRow && segment.styleXf === rowBase) continue;
         const count = segment.last - segment.first + 1;
         derivedCount += count;
-        if (derivedCount > 100_000) return null;
+        if (derivedCount > AXIS_FORMAT_LIMIT) return null;
         for (let col = segment.first; col <= segment.last; col += 1) {
           const addr = { sheet, row, col };
           const key = addrKey(addr);
@@ -608,12 +588,8 @@ export function prepareAxisFormatOverrideWithWorkbook(
           const before = directSnapshot(wb, addr, effective ?? undefined);
           if (!before) return null;
           const baseXf = effective?.xfIndex ?? before.before.directXfIndex;
-          const resolvedPatch = resolvePatch?.(wb, baseXf, addr) ?? patch;
-          const cacheKey = `${baseXf}|${JSON.stringify(resolvedPatch)}`;
-          const afterXfIndex =
-            patchCache.get(cacheKey) ?? patchXfIndexFromBase(wb, baseXf, resolvedPatch);
+          const afterXfIndex = patchedXf(wb, patchCache, baseXf, patch, resolvePatch, addr);
           if (afterXfIndex < 0) return null;
-          patchCache.set(cacheKey, afterXfIndex);
           direct.set(key, {
             key,
             before: priorDirect?.before ?? before.before,
@@ -637,12 +613,8 @@ export function prepareAxisFormatOverrideWithWorkbook(
       const effective = wb.getEffectiveStyle(sheet, addr.row, addr.col);
       const before = directSnapshot(wb, addr, effective ?? undefined);
       if (!effective || !before) return null;
-      const resolvedPatch = resolvePatch?.(wb, effective.xfIndex, addr) ?? patch;
-      const cacheKey = `${effective.xfIndex}|${JSON.stringify(resolvedPatch)}`;
-      const afterXfIndex =
-        patchCache.get(cacheKey) ?? patchXfIndexFromBase(wb, effective.xfIndex, resolvedPatch);
+      const afterXfIndex = patchedXf(wb, patchCache, effective.xfIndex, patch, resolvePatch, addr);
       if (afterXfIndex < 0) return null;
-      patchCache.set(cacheKey, afterXfIndex);
       direct.set(key, { key, before: priorDirect.before, afterXfIndex });
     }
   }
@@ -665,12 +637,8 @@ export function prepareAxisFormatOverrideWithWorkbook(
       const current = directSnapshot(wb, addr);
       if (!current) return null;
       const effectiveXf = current.before.effectiveXfIndex ?? current.before.directXfIndex;
-      const resolvedPatch = resolvePatch?.(wb, effectiveXf, addr) ?? patch;
-      const cacheKey = `${effectiveXf}|${JSON.stringify(resolvedPatch)}`;
-      const afterXfIndex =
-        patchCache.get(cacheKey) ?? patchXfIndexFromBase(wb, effectiveXf, resolvedPatch);
+      const afterXfIndex = patchedXf(wb, patchCache, effectiveXf, patch, resolvePatch, addr);
       if (afterXfIndex < 0) return null;
-      patchCache.set(cacheKey, afterXfIndex);
       direct.set(key, { key, before: priorDirect.before, afterXfIndex });
     }
 
@@ -699,12 +667,8 @@ export function prepareAxisFormatOverrideWithWorkbook(
         effectiveXfIndex !== null && effectiveSource !== 0
           ? effectiveXfIndex
           : before.before.directXfIndex;
-      const resolvedPatch = resolvePatch?.(wb, baseXf, addr) ?? patch;
-      const cacheKey = `${baseXf}|${JSON.stringify(resolvedPatch)}`;
-      const afterXfIndex =
-        patchCache.get(cacheKey) ?? patchXfIndexFromBase(wb, baseXf, resolvedPatch);
+      const afterXfIndex = patchedXf(wb, patchCache, baseXf, patch, resolvePatch, addr);
       if (afterXfIndex < 0) return null;
-      patchCache.set(cacheKey, afterXfIndex);
       direct.set(key, {
         key,
         before: priorDirect?.before ?? before.before,
@@ -712,7 +676,7 @@ export function prepareAxisFormatOverrideWithWorkbook(
       });
     }
   }
-  if (direct.size > 100_000) return null;
+  if (direct.size > AXIS_FORMAT_LIMIT) return null;
 
   const fontPatch: SheetFontPatch = {
     ...(patch.fontFamily !== undefined ? { fontFamily: patch.fontFamily } : {}),
@@ -1020,10 +984,6 @@ export const restoreActiveAxisFormatOverrideForStructure = (
   if (active.size === 0) activeOverrides.delete(wb);
 };
 
-/** Expose the same pure transformation used by the active cache for callers
- * that need to inspect a before/after state without mutating the workbook. */
-export const remapAxisSnapshotForStructure = remapAxisSnapshot;
-
 export const remapAxisFormatOverrides = (
   store: SpreadsheetStore,
   mapIndex: (index: number) => number | null,
@@ -1060,8 +1020,3 @@ export const remapAxisFormatOverrides = (
     return changed ? { ...state, format: { ...state.format, sheetAxisOverrides: next } } : state;
   });
 };
-
-export const axisFormatOverrideFor = (
-  state: State,
-  sheet: number,
-): SheetAxisFormatOverride | undefined => state.format.sheetAxisOverrides?.get(sheet);

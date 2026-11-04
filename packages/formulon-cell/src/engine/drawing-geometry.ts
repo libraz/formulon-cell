@@ -28,6 +28,12 @@ export const viewportZoom = (store: SpreadsheetStore | undefined): number => {
   return renderScale(layout, viewport);
 };
 
+/** True when both anchors are absent or carry identical fields. */
+export const sameAnchor = (
+  a: EngineDrawingAnchor | undefined,
+  b: EngineDrawingAnchor | undefined,
+) => a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
+
 /** The anchor fields of a drawing object, as the store keeps them. */
 export const drawingAnchorOf = (object: EngineDrawingAnchor): EngineDrawingAnchor => ({
   anchorKind: object.anchorKind,

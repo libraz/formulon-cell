@@ -9,7 +9,7 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell, fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
-import { sameRange } from '../store/selection-geometry.js';
+import { sameRange, sameRangeList } from '../store/selection-geometry.js';
 import type {
   FilterConditionSpec,
   FilterSortSpec,
@@ -157,10 +157,6 @@ function applyFilterSnapshot(
   if (wb) {
     syncHiddenRowsToEngine(wb, store.getState().data.sheetIndex, beforeHidden, snap.hiddenRows);
   }
-}
-
-function sameRangeList(a: readonly Range[], b: readonly Range[]): boolean {
-  return a.length === b.length && a.every((range, i) => sameRange(range, b[i] as Range));
 }
 
 function sameFilterSnapshot(a: FilterSnapshot, b: FilterSnapshot): boolean {
