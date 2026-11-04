@@ -1,5 +1,5 @@
 import { addrKey, parseAddrKey } from '../engine/address.js';
-import type { Addr, CellValue } from '../engine/types.js';
+import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
@@ -24,6 +24,11 @@ export interface FindOptions {
   searchBy?: 'rows' | 'columns';
   /** Excel's "Look in" option. Defaults to displayed values. */
   lookIn?: 'formulas' | 'values' | 'comments' | 'notes';
+  /** List matches in the desktop app's Find All order: sheets from the active
+   *  one, and per sheet the cells after the active cell first, wrapping to it
+   *  last. Off keeps plain sheet/row order, which stepping through matches
+   *  relies on. */
+  listFromActive?: boolean;
   /** Workbook used for locale-aware display text and threaded comments.
    *  Optional so the command remains usable against a store-only snapshot. */
   workbook?: WorkbookHandle;
@@ -241,9 +246,7 @@ const cellDisplayForSearch = (
       }
     }
     // A constant is its own content in the formula bar, as in Excel's "Formulas".
-    return formula
-      ? formulaDisplay(formula, opts)
-      : workbookDisplay(opts.workbook, addr, valueDisplay(cell.value, opts));
+    return formula ? formulaDisplay(formula, opts) : valueDisplay(cell.value, opts);
   }
   return workbookDisplay(opts.workbook, addr, valueDisplay(cell.value, opts));
 };
@@ -324,8 +327,9 @@ const foldText = (text: string, caseSensitive: boolean): string => {
 const kanaAlternatives = (composed: string, split: string, own: string, matchByte: boolean) =>
   matchByte ? escapeRegExp(own) : `(?:${escapeRegExp(composed)}|${escapeRegExp(split)})`;
 
-/** The query as a pattern over folded text: `?` is one character, `*` any
- *  run, and `~` makes the next character literal. */
+/** The query as a pattern over folded text: `?` is one character, `*` the
+ *  shortest run that lets the rest match, and `~` makes the next character
+ *  literal (a tilde before any other character is dropped). */
 function queryPattern(opts: FindOptions): RegExp {
   const caseSensitive = opts.caseSensitive ?? false;
   const matchByte = opts.matchWidth === true;
@@ -334,7 +338,7 @@ function queryPattern(opts: FindOptions): RegExp {
   for (let i = 0; i < query.length; i += 1) {
     let ch = query[i] ?? '';
     if (ch === '*' || ch === '?') {
-      source += ch === '*' ? '[\\s\\S]*' : '[\\s\\S]';
+      source += ch === '*' ? '[\\s\\S]*?' : '[\\s\\S]';
       continue;
     }
     if (ch === '~' && i + 1 < query.length) {
@@ -370,14 +374,56 @@ function matcherFor(opts: FindOptions): (display: string) => boolean {
   };
 }
 
-export function findAll(state: State, opts: FindOptions): FindMatch[] {
-  if (opts.query === '') return [];
+const inRanges = (ranges: readonly Range[], addr: Addr): boolean =>
+  ranges.some(
+    (r) =>
+      r.sheet === addr.sheet &&
+      addr.row >= r.r0 &&
+      addr.row <= r.r1 &&
+      addr.col >= r.c0 &&
+      addr.col <= r.c1,
+  );
+
+/** Matches in the order the desktop app lists them: sheets from the active
+ *  one, and within each sheet the cells after the active cell first, then
+ *  the cells up to and including it. */
+const fromActiveCell = (state: State, opts: FindOptions, matches: CellEntry[]): FindMatch[] => {
+  const byRows = opts.searchBy !== 'columns';
+  const active = state.selection.active;
+  const key = (a: Addr): number[] => (byRows ? [a.row, a.col] : [a.col, a.row]);
+  const after = (a: Addr): boolean => {
+    const [k0 = 0, k1 = 0] = key(a);
+    const [a0 = 0, a1 = 0] = key(active);
+    return k0 > a0 || (k0 === a0 && k1 > a1);
+  };
+  const sheets = [...new Set(matches.map((m) => m.addr.sheet))];
+  const first = sheets.findIndex((sheet) => sheet >= state.data.sheetIndex);
+  const order = first < 0 ? sheets : [...sheets.slice(first), ...sheets.slice(0, first)];
   const out: FindMatch[] = [];
-  const isMatch = matcherFor(opts);
-  for (const entry of cellsForSearch(state, opts)) {
-    if (isMatch(entry.display)) out.push({ addr: entry.addr });
+  for (const sheet of order) {
+    const own = matches.filter((m) => m.addr.sheet === sheet);
+    for (const m of own) if (after(m.addr)) out.push({ addr: m.addr });
+    for (const m of own) if (!after(m.addr)) out.push({ addr: m.addr });
   }
   return out;
+};
+
+/** Every match, in sheet order unless `listFromActive`. A multi-cell selection narrows a sheet search to itself, as
+ *  in the desktop app. */
+export function findAll(state: State, opts: FindOptions): FindMatch[] {
+  if (opts.query === '') return [];
+  const isMatch = matcherFor(opts);
+  const { range, extraRanges } = state.selection;
+  const scoped =
+    (opts.within ?? 'sheet') === 'sheet' && (range.r0 !== range.r1 || range.c0 !== range.c1)
+      ? [range, ...(extraRanges ?? [])]
+      : null;
+  const hits = cellsForSearch(state, opts).filter(
+    (entry) => isMatch(entry.display) && (!scoped || inRanges(scoped, entry.addr)),
+  );
+  return opts.listFromActive
+    ? fromActiveCell(state, opts, hits)
+    : hits.map((m) => ({ addr: m.addr }));
 }
 
 export function findNext(
@@ -543,13 +589,21 @@ export function replaceAll(
         warnProtected(m.addr);
         continue;
       }
+      const value = wb.getValue(m.addr);
       const cur =
-        opts.lookIn === 'formulas' && formula !== null
-          ? formulaDisplay(formula, opts)
-          : workbookDisplay(wb, m.addr, valueDisplay(wb.getValue(m.addr), opts));
+        opts.lookIn === 'formulas'
+          ? formula !== null
+            ? formulaDisplay(formula, opts)
+            : valueDisplay(value, opts)
+          : workbookDisplay(wb, m.addr, valueDisplay(value, opts));
       const next = applySubstitution(cur, opts, replacement);
       if (next === cur) continue;
-      writeInput(wb, m.addr, next, store, opts.locale);
+      // A replacement that is not a valid formula leaves the cell as it was.
+      try {
+        writeInput(wb, m.addr, next, store, opts.locale);
+      } catch {
+        continue;
+      }
       count += 1;
     }
   });

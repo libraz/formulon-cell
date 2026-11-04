@@ -365,7 +365,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 
   const renderResults = (): void => {
     const t = copy();
-    const all = matchesForNavigation(store.getState(), opts());
+    const all = matchesForNavigation(store.getState(), { ...opts(), listFromActive: true });
     resultsBody.replaceChildren();
     const displayOf = findDisplayResolver(store.getState(), opts());
     for (const match of all) {
