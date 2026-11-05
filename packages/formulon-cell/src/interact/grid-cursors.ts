@@ -4,10 +4,10 @@
  * boundaries, each with a white outline. Cells use the platform's cell cross.
  */
 
-const svgCursor = (body: string, fallback: string): string => {
+const svgCursor = (pathData: string, fallback: string): string => {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">` +
-    `<g fill="#000" stroke="#fff" stroke-width="1" stroke-linejoin="round">${body}</g></svg>`;
+    `<path d="${pathData}" fill="#000" stroke="#fff" stroke-width="1" stroke-linejoin="round"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 10 10, ${fallback}`;
 };
 
