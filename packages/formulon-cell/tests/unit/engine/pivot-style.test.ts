@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
+import { findPivotTableAtCell } from '../../../src/engine/passthrough-sync.js';
 import { PIVOT_CELL_KIND as K } from '../../../src/engine/pivot-cell-kind.js';
 import {
   buildPivotStyleLayer,
@@ -188,6 +189,46 @@ describe('empty report placeholder', () => {
     expect(layer.ranges).toEqual([{ sheet: 0, r0: 4, c0: 0, r1: 21, c1: 2 }]);
     expect(layer.formatAt(4, 0)).toBeUndefined();
     expect(layer.buttons.size).toBe(0);
+    wb.dispose();
+  });
+
+  it('projects no caption cell, so the anchor reads blank', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    wb.setText({ sheet: 0, row: 0, col: 0 }, 'Region');
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'Amt');
+    wb.setText({ sheet: 0, row: 1, col: 0 }, 'East');
+    wb.setNumber({ sheet: 0, row: 1, col: 1 }, 5);
+    const created = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
+      destination: { sheet: 0, row: 4, col: 0 },
+      rowField: '',
+      valueField: '',
+    });
+    expect(created.ok).toBe(true);
+    expect([...wb.pivotCells(0)]).toEqual([]);
+    expect([...wb.cells(0)].some((c) => c.addr.row === 4 && c.addr.col === 0)).toBe(false);
+    wb.dispose();
+  });
+
+  it('counts every cell of the placeholder area as inside the report', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    wb.setText({ sheet: 0, row: 0, col: 0 }, 'Region');
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'Amt');
+    wb.setText({ sheet: 0, row: 1, col: 0 }, 'East');
+    wb.setNumber({ sheet: 0, row: 1, col: 1 }, 5);
+    const created = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
+      destination: { sheet: 0, row: 2, col: 0 },
+      rowField: '',
+      valueField: '',
+    });
+    expect(created.ok).toBe(true);
+    const at = (row: number, col: number) => findPivotTableAtCell(wb, { sheet: 0, row, col });
+    expect(at(2, 0)).not.toBeNull();
+    expect(at(9, 1)).not.toBeNull();
+    expect(at(19, 2)).not.toBeNull();
+    expect(at(2, 3)).toBeNull();
+    expect(at(20, 0)).toBeNull();
     wb.dispose();
   });
 });

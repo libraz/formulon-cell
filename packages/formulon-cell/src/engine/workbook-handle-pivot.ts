@@ -1,4 +1,9 @@
-import { PIVOT_CELL_KIND } from './pivot-cell-kind.js';
+import {
+  isEmptyPivotLayout,
+  PIVOT_CELL_KIND,
+  PIVOT_PLACEHOLDER_COLS,
+  PIVOT_PLACEHOLDER_ROWS,
+} from './pivot-cell-kind.js';
 import type { PivotMutationWorkbook } from './pivot-mutation.js';
 import type {
   Addr,
@@ -518,14 +523,20 @@ export abstract class WorkbookHandlePivotMethods {
     if (!this.capabilities.pivotTables) return;
     const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
     if (n === null) return;
+    const blocked = new Set(this.pivotSpills(sheet).map((spill) => spill.pivotIndex));
     for (let i = 0; i < n; i += 1) {
       const layout = effectiveLayout(this, sheet, i);
       if (!layout.status.ok) continue;
+      const entries = [];
       for (const cell of layout.cells) {
         const value = fromEngineValue(cell.value);
         if (value.kind === 'blank') continue;
-        yield pivotCellEntry(this, sheet, i, cell, value);
+        entries.push(pivotCellEntry(this, sheet, i, cell, value));
       }
+      // The engine captions a report with no fields; the sheet shows it empty.
+      // A report held at #SPILL! keeps its marker.
+      if (isEmptyPivotLayout(entries) && !blocked.has(i)) continue;
+      yield* entries;
     }
   }
 
@@ -567,6 +578,7 @@ export abstract class WorkbookHandlePivotMethods {
     for (let sheet = 0; sheet < this.sheetCount; sheet += 1) {
       const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
       if (n === null) continue;
+      const blocked = new Set(this.pivotSpills(sheet).map((spill) => spill.pivotIndex));
       for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
         const layout = effectiveLayout(this, sheet, pivotIndex);
         if (!layout.status.ok) continue;
@@ -600,13 +612,18 @@ export abstract class WorkbookHandlePivotMethods {
           );
         }
         const pivotFilters = pivotFilterSpecs(this, sheet, pivotIndex);
+        // An empty report occupies its placeholder area, not the engine's
+        // caption extent; a report held at #SPILL! keeps its own.
+        const empty =
+          !blocked.has(pivotIndex) &&
+          isEmptyPivotLayout(layout.cells.filter((c) => fromEngineValue(c.value).kind !== 'blank'));
         out.push({
           sheetIndex: sheet,
           pivotIndex,
           top: layout.top,
           left: layout.left,
-          rows: layout.rows,
-          cols: layout.cols,
+          rows: empty ? PIVOT_PLACEHOLDER_ROWS : layout.rows,
+          cols: empty ? PIVOT_PLACEHOLDER_COLS : layout.cols,
           cells: layout.cells.length,
           fields: [...fields],
           fieldItems: Object.fromEntries(

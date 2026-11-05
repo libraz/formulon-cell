@@ -37,7 +37,12 @@ import {
   type ViewState,
 } from './geometry.js';
 import { paintBorders } from './grid/borders.js';
-import { type CellDisplayResolver, type CellPaintContext, paintCells } from './grid/cells.js';
+import {
+  type CellDisplayResolver,
+  type CellPaintContext,
+  paintCells,
+  paintPivotPlaceholders,
+} from './grid/cells.js';
 import type { ChromePaintContext } from './grid/chrome-context.js';
 import { paintHeaders } from './grid/headers.js';
 import { type GridHitState, gridHitState, shouldShowValidationChevron } from './grid/hit-state.js';
@@ -375,6 +380,7 @@ export class GridRenderer {
     if (pagination) this.paintPageChrome(state, theme, pagination, cols, rows);
     this.paintSpills(state, theme, cols, rows);
     this.paintActive(state, theme, cols, rows);
+    this.paintPivotPlaceholders(state, theme);
     this.paintEditorRefs(state);
     this.paintChartSourceRefs(state);
     paintVisibleNotes(this.ctx, state, cols, rows);
@@ -616,6 +622,20 @@ export class GridRenderer {
     this.coveredRules = result.coveredRules;
   }
 
+  /** Empty-report placeholders cover the selection, clipped below the headers. */
+  private paintPivotPlaceholders(state: ViewState, theme: ResolvedTheme): void {
+    const { layout } = state;
+    const ctx = this.ctx;
+    const x = layout.rtl ? 0 : gridOriginX(layout);
+    const y = gridOriginY(layout);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, this.cssWidth - x, this.cssHeight - y);
+    ctx.clip();
+    paintPivotPlaceholders(this.cellCtx(state), state, theme);
+    ctx.restore();
+  }
+
   private paintBorders(
     state: ViewState,
     theme: ResolvedTheme,
@@ -836,6 +856,15 @@ export class GridRenderer {
       c1: a.col,
     };
     const activeRects = rangeRects(layout, viewport, activeVisualRange);
+    // An empty report's placeholder covers its own cursor; an outline drawn
+    // around it would stick out of the box's edge.
+    const underPlaceholder =
+      r.r0 === r.r1 &&
+      r.c0 === r.c1 &&
+      pivotStyleLayer(this.getWb(), state).placeholders.some(
+        ({ range }) =>
+          range.r0 <= a.row && a.row <= range.r1 && range.c0 <= a.col && a.col <= range.c1,
+      );
     // A multi-cell range carries the one outline; the active cell inside it is
     // only left unshaded, as in Excel. A merge selected alone is its own range.
     const multiCell = r.r0 !== r.r1 || r.c0 !== r.c1;
@@ -852,7 +881,7 @@ export class GridRenderer {
         }
       }
       for (const bounds of activeRects) paintActiveCellBox(this.ctx, bounds, theme, layout.rtl);
-    } else {
+    } else if (!underPlaceholder) {
       const limit = {
         x: layout.headerColWidth === 0 && !layout.rtl ? gridOriginX(layout) : undefined,
         y: layout.headerRowHeight === 0 ? gridOriginY(layout) : undefined,
@@ -954,7 +983,7 @@ export class GridRenderer {
       handleBounds = { ...handleBounds, x: Math.min(...handleRects.map((rect) => rect.x)), w: 4 };
       handleRing = true;
     }
-    if (handleBounds && !multiRange) {
+    if (handleBounds && !multiRange && !underPlaceholder) {
       this.hits.fillHandle = paintFillHandle(this.ctx, handleBounds, theme, layout.rtl, handleRing);
     }
   }

@@ -845,23 +845,34 @@ export function paintCells(
     }
   }
   for (const paint of deferredOverflow) paint();
-  if (cellCtx.pivotEmptyPrompt !== undefined) {
-    const normalFont = wb?.workbookDisplayFont;
-    for (const placeholder of pivots.placeholders) {
-      const { r0, c0, r1, c1 } = placeholder.range;
-      const first = cellRectUnclamped(layout, state.viewport, r0, c0);
-      const last = cellRectUnclamped(layout, state.viewport, r1, c1);
-      paintPivotPlaceholder(ctx, {
-        box: { x: first.x, y: first.y, w: last.x + last.w - first.x, h: last.y + last.h - first.y },
-        name: placeholder.name,
-        prompt: cellCtx.pivotEmptyPrompt,
-        ptPx,
-        fontFamily: cellFontFamily(normalFont?.name, theme.fontUi),
-        fontSizePt: normalFont?.size ?? 11,
-        bg: theme.bg,
-        ink: theme.cellAutoFg,
-      });
-    }
-  }
   return { errorTriangles: triangleHits, coveredRules };
+}
+
+/** Paint the empty-report placeholders. They sit above the selection, so the
+ *  caller runs this after the selection pass, with the cells' clip in place. */
+export function paintPivotPlaceholders(
+  cellCtx: CellPaintContext,
+  state: ViewState,
+  theme: ResolvedTheme,
+): void {
+  const { ctx, wb } = cellCtx;
+  if (cellCtx.pivotEmptyPrompt === undefined) return;
+  const { layout } = state;
+  const ptPx = pointPx(layout, state.viewport);
+  const normalFont = wb?.workbookDisplayFont;
+  for (const placeholder of pivotStyleLayer(wb, state).placeholders) {
+    const { r0, c0, r1, c1 } = placeholder.range;
+    const first = cellRectUnclamped(layout, state.viewport, r0, c0);
+    const last = cellRectUnclamped(layout, state.viewport, r1, c1);
+    paintPivotPlaceholder(ctx, {
+      box: { x: first.x, y: first.y, w: last.x + last.w - first.x, h: last.y + last.h - first.y },
+      name: placeholder.name,
+      prompt: cellCtx.pivotEmptyPrompt,
+      ptPx,
+      fontFamily: cellFontFamily(normalFont?.name, theme.fontUi),
+      fontSizePt: normalFont?.size ?? 11,
+      bg: theme.bg,
+      ink: theme.cellAutoFg,
+    });
+  }
 }

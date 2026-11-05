@@ -6,7 +6,12 @@ import {
 } from '../commands/format-as-table.js';
 import type { CellFormat, TablesSlice } from '../store/types.js';
 import { addrKey } from './address.js';
-import { PIVOT_CELL_KIND } from './pivot-cell-kind.js';
+import {
+  isEmptyPivotLayout,
+  PIVOT_CELL_KIND,
+  PIVOT_PLACEHOLDER_COLS,
+  PIVOT_PLACEHOLDER_ROWS,
+} from './pivot-cell-kind.js';
 import {
   composeStyleElements,
   PIVOT_ELEMENT_ORDER,
@@ -59,10 +64,6 @@ export interface PivotReportCells {
   readonly range: Range;
   readonly cells: readonly PivotLayoutCell[];
 }
-
-/** An empty report reserves this many columns and rows from its anchor. */
-export const PIVOT_PLACEHOLDER_COLS = 3;
-export const PIVOT_PLACEHOLDER_ROWS = 18;
 
 /** An empty report's reserved area and name. */
 export interface PivotPlaceholder {
@@ -408,7 +409,7 @@ export function buildPivotStyleLayer(
     // The engine still projects a caption for a report with no fields.
     const cells = cellsByPivot.get(pivotIndex) ?? [];
     if (spills.some((p) => p.pivotIndex === pivotIndex)) continue;
-    if (cells.every((c) => c.kind === PIVOT_CELL_KIND.Header)) {
+    if (isEmptyPivotLayout(cells)) {
       placeholders.push({
         pivotIndex,
         range: {
