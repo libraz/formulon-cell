@@ -130,8 +130,6 @@ export interface CellPatchAtomicResult {
 const UNDO_LIMIT = 100;
 
 /** Functions whose result depends on which rows are hidden. */
-const HIDDEN_SENSITIVE_FORMULA = /\b(?:SUBTOTAL|AGGREGATE)\s*\(/i;
-
 /** `WorkbookFormat` ordinals accepted by the engine's `saveWithDiagnostics`. */
 const SAVE_FORMAT_ORDINAL = { xlsx: 1, xlsb: 2 } as const;
 
@@ -266,8 +264,6 @@ export class WorkbookHandle {
   private recalcBatchDepth = 0;
 
   private pendingRecalc = false;
-  /** A row/column visibility change is waiting for the enclosing batch to exit. */
-  private hiddenStatePending = false;
 
   /** Cells written since the last recalc pass — the `recalc` event's payload. */
   private dirtySinceRecalc = new Set<string>();
@@ -721,48 +717,19 @@ export class WorkbookHandle {
   }
 
   private settleBatchedRecalc(): void {
-    if (this.recalcBatchDepth === 0 && this.hiddenStatePending && !this.disposed) {
-      this.hiddenStatePending = false;
-      this.dirtyHiddenSensitiveFormulas();
-    }
     if (this.recalcBatchDepth === 0 && this.pendingRecalc && !this.disposed) this.recalcAuto();
   }
 
-  /** Hiding or showing rows/columns changes SUBTOTAL(101-111) and AGGREGATE
-   *  results, but the engine does not dirty their cells. Called after a
-   *  visibility change; inside a batch the work waits for the outermost exit. */
+  /** Recompute after a row/column visibility change. The engine dirties
+   *  SUBTOTAL/AGGREGATE cells itself but never recalcs on its own; inside a
+   *  batch the pass waits for the outermost exit. */
   noteVisibilityChanged(): void {
     this.assertAlive();
     if (this.recalcBatchDepth > 0) {
-      this.hiddenStatePending = true;
       this.pendingRecalc = true;
       return;
     }
-    this.dirtyHiddenSensitiveFormulas();
     this.recalcAuto();
-  }
-
-  /** Rewrite each SUBTOTAL/AGGREGATE formula in place so the next pass
-   *  recomputes it. */
-  private dirtyHiddenSensitiveFormulas(): void {
-    for (let sheet = 0; sheet < this.sheetCount; sheet += 1) {
-      const targets: { addr: Addr; formula: string }[] = [];
-      for (const cell of this.physicalCells(sheet)) {
-        if (cell.formula && HIDDEN_SENSITIVE_FORMULA.test(cell.formula)) {
-          targets.push({ addr: cell.addr, formula: cell.formula });
-        }
-      }
-      for (const { addr, formula } of targets) {
-        const status = this.wb.setFormula(
-          addr.sheet,
-          addr.row,
-          addr.col,
-          formula.startsWith('=') ? formula : `=${formula}`,
-        );
-        if (!status.ok) throw new Error(`setFormula: ${status.message}`);
-        this.dirtySinceRecalc.add(addrKey(addr));
-      }
-    }
   }
 
   /** Recompute after a write at `a`, or leave it to the enclosing batch.
