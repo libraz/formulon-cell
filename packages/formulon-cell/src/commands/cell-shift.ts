@@ -38,6 +38,7 @@ import {
   recordMergesChangeWithEngine,
 } from './slice-history.js';
 import { deleteCols, deleteVisibleRows, insertCols, insertRows } from './structure.js';
+import { shiftTablesForRows } from './table-rows.js';
 
 export type InsertCellsDirection = 'down' | 'right';
 export type DeleteCellsDirection = 'up' | 'left';
@@ -274,6 +275,12 @@ function shiftCellBand(
     });
     shiftMerges(store, wb, history, affected, axis, delta);
     shiftConditionalRules(store, history, affected, axis, delta);
+    if (axis === 'down') {
+      shiftTablesForRows(store, wb, history, affected.sheet, affected.r0, delta, {
+        c0: affected.c0,
+        c1: affected.c1,
+      });
+    }
     wb.recalcAuto();
     if (history && !history.isReplaying()) {
       replayRecovery.restore = (phase) => {

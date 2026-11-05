@@ -91,6 +91,7 @@ import {
   recordSparklineChange,
 } from './slice-history.js';
 import { shiftSparklinesForAxisEdit } from './sparkline.js';
+import { shiftTablesForRows } from './table-rows.js';
 
 interface CellRecord {
   addr: Addr;
@@ -1336,6 +1337,7 @@ function editAxis(
 
     // 5. re-point merges, conditional formats, and the autofilter region.
     shiftAnchoredRanges(store, wb, history, sheet, axis, split, delta, nativeAxisOp);
+    if (axis === 'row') shiftTablesForRows(store, wb, history, sheet, split, delta);
     if (history && captureStructureCaches && outerReplayCheckpoint === undefined) {
       // Undo visits children in reverse order. This final marker therefore
       // arms the committed after-state immediately before the other children
