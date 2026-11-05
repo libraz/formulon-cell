@@ -38,6 +38,8 @@ export function createContextMenuPermissions(
   const navigationUnsupportedIds = new Set<ItemId>([
     'insertCopiedCells',
     'insertCells',
+    'insertTableRows',
+    'insertTableColumns',
     'deleteCells',
     'rowInsertAbove',
     'rowInsertBelow',
@@ -111,6 +113,8 @@ export function createContextMenuPermissions(
       id === 'cut' ||
       id === 'insertCopiedCells' ||
       id === 'insertCells' ||
+      id === 'insertTableRows' ||
+      id === 'insertTableColumns' ||
       id === 'deleteCells'
     ) {
       return 'moveCells';

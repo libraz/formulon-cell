@@ -8,6 +8,8 @@ export const gridPopupsTh: GridPopupsStrings = {
     paste: 'วาง',
     pasteSpecial: 'วางแบบพิเศษ…',
     insertCopiedCells: 'แทรกเซลล์ที่คัดลอก…',
+    tableColumnsLeft: 'คอลัมน์ตารางทางซ้าย',
+    tableRowsAbove: 'แถวตารางด้านบน',
     insertCopiedBand: 'แทรกเซลล์ที่คัดลอก',
     insertCutCells: 'แทรกเซลล์ที่ตัด',
     clear: 'ล้าง',

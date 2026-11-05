@@ -91,7 +91,13 @@ import {
   recordSparklineChange,
 } from './slice-history.js';
 import { shiftSparklinesForAxisEdit } from './sparkline.js';
-import { shiftTablesForRows } from './table-rows.js';
+import {
+  clearTableRow,
+  keptTableDataRow,
+  rowDeleteHitsTableHeader,
+  shiftTablesForCols,
+  shiftTablesForRows,
+} from './table-rows.js';
 
 interface CellRecord {
   addr: Addr;
@@ -1166,6 +1172,24 @@ function editAxis(
     alertPivotEdit(wb);
     return false;
   }
+  if (axis === 'row' && kind === 'delete') {
+    // Excel offers no delete over a table's header row, and keeps one blank
+    // data row when every data row goes.
+    if (rowDeleteHitsTableHeader(store, sheet, split, n)) return false;
+    const kept = keptTableDataRow(store, sheet, split, n);
+    if (kept) {
+      const txn = history?.begin();
+      try {
+        clearTableRow(wb, history, kept.range, kept.row);
+        return (
+          n === 1 ||
+          editAxis(store, wb, history, axis, kind, split + 1, n - 1, outerReplayCheckpoint)
+        );
+      } finally {
+        if (txn !== undefined) history?.end(txn);
+      }
+    }
+  }
   const selectionGrown = selectionGrownByMerges(store.getState(), sheet);
   const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
   const structureShift: AxisStructureShift = { axis, split, delta };
@@ -1338,6 +1362,7 @@ function editAxis(
     // 5. re-point merges, conditional formats, and the autofilter region.
     shiftAnchoredRanges(store, wb, history, sheet, axis, split, delta, nativeAxisOp);
     if (axis === 'row') shiftTablesForRows(store, wb, history, sheet, split, delta);
+    else if (kind === 'insert') shiftTablesForCols(store, wb, history, sheet, split, n);
     if (history && captureStructureCaches && outerReplayCheckpoint === undefined) {
       // Undo visits children in reverse order. This final marker therefore
       // arms the committed after-state immediately before the other children

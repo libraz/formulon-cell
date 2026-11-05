@@ -46,7 +46,7 @@ const isBlank = (wb: WorkbookHandle, addr: Addr): boolean => wb.getValue(addr).k
 
 /** Header for a column added to the right: the last header's trailing number
  *  continued (`k2` -> `k3`), else the first free default column name. */
-function nextHeaderName(wb: WorkbookHandle, t: Range): string {
+export function nextHeaderName(wb: WorkbookHandle, t: Range): string {
   const headers: string[] = [];
   for (let col = t.c0; col <= t.c1; col += 1) {
     const value = wb.getValue({ sheet: t.sheet, row: t.r0, col });

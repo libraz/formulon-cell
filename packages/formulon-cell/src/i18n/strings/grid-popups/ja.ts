@@ -8,6 +8,8 @@ export const gridPopupsJa: GridPopupsStrings = {
     paste: '貼り付け',
     pasteSpecial: '形式を選択して貼り付け…',
     insertCopiedCells: 'コピーしたセルの挿入…',
+    tableColumnsLeft: 'テーブルの列 (左)',
+    tableRowsAbove: 'テーブルの行 (上)',
     insertCopiedBand: 'コピーしたセルの挿入',
     insertCutCells: '切り取ったセルの挿入',
     clear: 'クリア',

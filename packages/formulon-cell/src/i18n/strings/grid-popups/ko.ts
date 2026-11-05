@@ -8,6 +8,8 @@ export const gridPopupsKo: GridPopupsStrings = {
     paste: '붙여넣기',
     pasteSpecial: '선택하여 붙여넣기…',
     insertCopiedCells: '복사한 셀 삽입…',
+    tableColumnsLeft: '표 열 (왼쪽)',
+    tableRowsAbove: '표 행 (위)',
     insertCopiedBand: '복사한 셀 삽입',
     insertCutCells: '잘라낸 셀 삽입',
     clear: '지우기',

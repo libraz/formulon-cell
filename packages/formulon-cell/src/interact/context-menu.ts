@@ -6,6 +6,7 @@ import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
 import { clearComment, commentAt } from '../commands/comment.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
+import { tableForCell } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
 import { hyperlinkAt, isFollowableHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
@@ -22,6 +23,7 @@ import { executeNoteVisibilityAction } from '../commands/ribbon-comment.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
+import { rowDeleteHitsTableHeader } from '../commands/table-rows.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -77,6 +79,7 @@ import {
   PASTE_QUICK_IDS,
   PLAIN_INSERT_IDS,
   toMacBandEntries,
+  withTableInsertMenu,
 } from './context-menu-spec.js';
 import {
   type ContextMenuStructureContext,
@@ -653,7 +656,18 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
                 commentAt(store.getState(), activeAddr) !== null,
               )
             : buildCellEntries(strings);
-    const platformEntries = mac && pivot ? toMacBandEntries(raw, strings) : raw;
+    const stateNow = store.getState();
+    const bandRange = stateNow.selection.range;
+    const inTable =
+      kind === 'cell' && !pivot && !stateNow.ui.copyRange
+        ? tableForCell(stateNow.tables.tables, activeAddr.sheet, activeAddr.row, activeAddr.col)
+        : null;
+    const baseEntries = mac && pivot ? toMacBandEntries(raw, strings) : raw;
+    const platformEntries = inTable
+      ? withTableInsertMenu(baseEntries, strings, {
+          rows: !(inTable.showHeader && bandRange.r0 === inTable.range.r0),
+        })
+      : baseEntries;
     const hasCopiedCells = !!store.getState().ui.copyRange;
     const pendingSnapshot = hasCopiedCells ? clipboard.snapshot() : null;
     const pendingCutBand =
@@ -686,6 +700,19 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
               ...e,
               label: watched ? strings.contextMenu.removeWatch : strings.contextMenu.addWatch,
             };
+          }
+          // No delete is offered over a table's header row.
+          if (
+            e.kind === 'item' &&
+            e.id === 'rowDelete' &&
+            rowDeleteHitsTableHeader(
+              store,
+              bandRange.sheet,
+              bandRange.r0,
+              bandRange.r1 - bandRange.r0 + 1,
+            )
+          ) {
+            return { ...e, disabled: true };
           }
           if (e.kind === 'item' && e.id === 'insertCopiedCells' && pendingCutBand) {
             return { ...e, label: strings.contextMenu.insertCutCells };

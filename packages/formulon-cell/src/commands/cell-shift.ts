@@ -28,6 +28,7 @@ import {
 } from '../store/store.js';
 import { listComments, recordCommentChange } from './comment.js';
 import { blockDataTableShift } from './data-table-guard.js';
+import { tableForCell } from './format-as-table.js';
 import { adjustFormulaForCellBandShift } from './formula-refs.js';
 import type { History } from './history.js';
 import { blockPivotEdit } from './pivot-guard.js';
@@ -38,7 +39,7 @@ import {
   recordMergesChangeWithEngine,
 } from './slice-history.js';
 import { deleteCols, deleteVisibleRows, insertCols, insertRows } from './structure.js';
-import { shiftTablesForRows } from './table-rows.js';
+import { shiftTablesForCols, shiftTablesForRows } from './table-rows.js';
 
 export type InsertCellsDirection = 'down' | 'right';
 export type DeleteCellsDirection = 'up' | 'left';
@@ -195,6 +196,32 @@ export function insertCells(
   return shiftCellBand(store, wb, history, affected, direction, delta);
 }
 
+/** Table Rows Above: insert as many rows as `range` spans, within the table's columns only. */
+export function insertTableRows(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  range: Range,
+): boolean {
+  const table = tableForCell(store.getState().tables.tables, range.sheet, range.r0, range.c0);
+  if (!table || (table.showHeader && range.r0 === table.range.r0)) return false;
+  const { c0, c1 } = table.range;
+  return insertCells(store, wb, history, { ...range, c0, c1 }, 'down');
+}
+
+/** Table Columns to the Left: shift the table's rows right by as many columns as `range` spans. */
+export function insertTableColumns(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  range: Range,
+): boolean {
+  const table = tableForCell(store.getState().tables.tables, range.sheet, range.r0, range.c0);
+  if (!table) return false;
+  const { r0, r1 } = table.range;
+  return insertCells(store, wb, history, { ...range, r0, r1 }, 'right');
+}
+
 export function deleteCells(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
@@ -279,6 +306,11 @@ function shiftCellBand(
       shiftTablesForRows(store, wb, history, affected.sheet, affected.r0, delta, {
         c0: affected.c0,
         c1: affected.c1,
+      });
+    } else if (delta > 0) {
+      shiftTablesForCols(store, wb, history, affected.sheet, affected.c0, delta, {
+        r0: affected.r0,
+        r1: affected.r1,
       });
     }
     wb.recalcAuto();

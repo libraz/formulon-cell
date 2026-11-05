@@ -8,6 +8,8 @@ export const gridPopupsZh: GridPopupsStrings = {
     paste: '粘贴',
     pasteSpecial: '选择性粘贴…',
     insertCopiedCells: '插入复制的单元格…',
+    tableColumnsLeft: '表列(左侧)',
+    tableRowsAbove: '表行(上方)',
     insertCopiedBand: '插入复制的单元格',
     insertCutCells: '插入剪切的单元格',
     clear: '清除',

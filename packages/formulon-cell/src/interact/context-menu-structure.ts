@@ -1,3 +1,4 @@
+import { insertTableColumns, insertTableRows } from '../commands/cell-shift.js';
 import type { History } from '../commands/history.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import {
@@ -43,6 +44,12 @@ export function runContextMenuStructureItem(
           if (runCellShiftChoice(ctx, 'insert', state.selection.range, choice)) ctx.afterCommit();
         },
       });
+      return true;
+    }
+    case 'insertTableRows':
+    case 'insertTableColumns': {
+      const insert = id === 'insertTableRows' ? insertTableRows : insertTableColumns;
+      if (insert(store, wb, history, state.selection.range)) ctx.afterCommit();
       return true;
     }
     case 'deleteCells': {

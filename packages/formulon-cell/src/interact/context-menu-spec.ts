@@ -25,6 +25,8 @@ export type ItemId =
   | 'pasteLink'
   | 'insertCopiedCells'
   | 'insertCells'
+  | 'insertTableRows'
+  | 'insertTableColumns'
   | 'deleteCells'
   | 'clear'
   | 'bold'
@@ -134,6 +136,7 @@ export type MenuContainerId =
   | 'pasteSpecialMenu'
   | 'filterMenu'
   | 'sortMenu'
+  | 'insertTableMenu'
   | 'pivotSortMenu'
   | 'pivotFilterMenu'
   | 'pivotSelectMenu'
@@ -190,6 +193,8 @@ export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
   'pasteLink',
   'insertCopiedCells',
   'insertCells',
+  'insertTableRows',
+  'insertTableColumns',
   'deleteCells',
   'clear',
   'bold',
@@ -391,6 +396,37 @@ function sortSubmenu(s: Strings): MenuEntry {
       { kind: 'item', id: 'sortDesc', label: t.sortDesc },
     ],
   };
+}
+
+/**
+ * Inside a table the flat Insert entry becomes a submenu of the table
+ * insertions. `rows` is false where Table Rows Above has no row to go above
+ * (the header row), which draws it disabled.
+ */
+export function withTableInsertMenu(
+  entries: readonly MenuEntry[],
+  s: Strings,
+  { rows }: { rows: boolean },
+): MenuEntry[] {
+  const t = s.contextMenu;
+  return entries.map((e) =>
+    e.kind === 'item' && e.id === 'insertCells'
+      ? {
+          kind: 'submenu',
+          id: 'insertTableMenu',
+          label: e.label,
+          children: [
+            { kind: 'item', id: 'insertTableColumns', label: t.tableColumnsLeft },
+            {
+              kind: 'item',
+              id: 'insertTableRows',
+              label: t.tableRowsAbove,
+              ...(rows ? {} : { disabled: true }),
+            },
+          ],
+        }
+      : e,
+  );
 }
 
 export function buildCellEntries(s: Strings): MenuEntry[] {

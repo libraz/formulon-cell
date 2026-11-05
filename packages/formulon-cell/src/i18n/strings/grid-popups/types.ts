@@ -6,6 +6,9 @@ export interface GridPopupsStrings {
     paste: string;
     pasteSpecial: string;
     insertCopiedCells: string;
+    /** Insert submenu entries shown when the cell is inside a table. */
+    tableColumnsLeft: string;
+    tableRowsAbove: string;
     /** Row/column-header variant. Inserts whole rows/columns straight away, so
      *  unlike `insertCopiedCells` it carries no dialog ellipsis. */
     insertCopiedBand: string;
