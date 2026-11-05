@@ -89,6 +89,12 @@ const inFilteredList = (state: State, range: Range): boolean =>
       range.c1 <= f.c1,
   );
 
+/** Whether the cell lies in a filter range with a criterion applied (header row excluded). */
+const inFilteredListCell = (state: State, sheet: number, row: number, col: number): boolean =>
+  state.ui.filterCriteria.some(
+    ({ range: f }) => f.sheet === sheet && row > f.r0 && row <= f.r1 && col >= f.c0 && col <= f.c1,
+  );
+
 const aggregateFormula = (state: State, fn: AutoSumFunction, range: Range): string => {
   const ref = formatA1Range(range, { collapse: false });
   return inFilteredList(state, range) ? `=SUBTOTAL(${SUBTOTAL_CODE[fn]},${ref})` : `=${fn}(${ref})`;
@@ -97,7 +103,10 @@ const aggregateFormula = (state: State, fn: AutoSumFunction, range: Range): stri
 /**
  * The formula AutoSum proposes for an empty single-cell selection: the
  * contiguous numbers above (preferred) or to the left, as SUBTOTAL over a
- * filtered list. Nothing is written; hosts open it in the cell editor.
+ * filtered list. Inside a filtered list an active number cell is replaced by
+ * the SUBTOTAL of the numbers above it, and a selection starting directly
+ * below the list opens `=SUBTOTAL(9,)` at its active cell when nothing
+ * numeric sits above. Nothing is written; hosts open it in the cell editor.
  * Returns null for any other selection, or when there is nothing to sum.
  */
 export function autoSumSuggestion(
@@ -107,7 +116,35 @@ export function autoSumSuggestion(
   const r = state.selection.range;
   const sheet = state.data.sheetIndex;
   const a = state.selection.active;
-  if (r.r0 !== r.r1 || r.c0 !== r.c1 || !isEmpty(state, sheet, a.row, a.col)) return null;
+  const single = r.r0 === r.r1 && r.c0 === r.c1;
+  if (
+    single &&
+    isNum(state, sheet, a.row, a.col) &&
+    inFilteredListCell(state, sheet, a.row, a.col)
+  ) {
+    const bottom = a.row - 1;
+    if (!isNum(state, sheet, bottom, a.col)) return null;
+    let top = bottom;
+    while (top - 1 >= 0 && isNum(state, sheet, top - 1, a.col)) top -= 1;
+    return {
+      addr: a,
+      formula: aggregateFormula(state, functionName, {
+        sheet,
+        r0: top,
+        c0: a.col,
+        r1: bottom,
+        c1: a.col,
+      }),
+    };
+  }
+  if (!isEmpty(state, sheet, a.row, a.col)) return null;
+  if (!single) {
+    const below = state.ui.filterCriteria.some(
+      ({ range: f }) => f.sheet === sheet && r.r0 === f.r1 + 1 && r.c0 >= f.c0 && r.c1 <= f.c1,
+    );
+    if (!below || isNum(state, sheet, a.row - 1, a.col)) return null;
+    return { addr: a, formula: `=SUBTOTAL(${SUBTOTAL_CODE[functionName]},)` };
+  }
   const r1 = a.row - 1;
   if (r1 >= 0 && isNum(state, sheet, r1, a.col)) {
     let r0 = r1;
