@@ -37,6 +37,27 @@ describe('Mac column filter panel', () => {
     expect(block(css, `${panel}__condition-op`)).toContain('width: 143px');
     expect(block(css, `${panel}__condition-value`)).toContain('width: 90px');
   });
+
+  it('fits the condition popup text inside its 22px height', () => {
+    expect(block(css, `${panel}__condition-op`)).toContain('padding: 0 6px');
+  });
+
+  it('keeps the apply and clear buttons on one row at 103 and 113', () => {
+    expect(block(css, `${panel}__actions button`)).toContain('padding: 0');
+    expect(block(css, `${panel}__apply`)).toContain('width: 103px');
+    expect(block(css, `${panel}__clear`)).toContain('width: 113px');
+  });
+
+  it('sets the colour, condition and footer controls in the 11px small-control size', () => {
+    for (const part of ['__color', '__condition-op', '__auto', '__actions button']) {
+      expect(block(css, `${panel}${part}`)).toContain('font-size: 11px');
+    }
+  });
+
+  it('right-aligns the 193px colour popups to the panel content edge', () => {
+    expect(block(css, `${panel}__color`)).toContain('justify-content: space-between');
+    expect(block(css, `${panel}__color select`)).toContain('width: 193px');
+  });
 });
 
 describe('Mac context menu panel', () => {

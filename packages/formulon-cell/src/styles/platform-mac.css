@@ -2244,9 +2244,18 @@
     display: flex;
     flex: none;
     align-items: center;
+    justify-content: space-between;
     gap: 6px;
     height: 22px;
+    font-size: 11px;
     margin-top: 6px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__color select {
+    box-sizing: border-box;
+    width: 193px;
+    height: 22px;
+    font-size: inherit;
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__rule {
@@ -2270,6 +2279,8 @@
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__condition-op {
     width: 143px;
     height: 22px;
+    padding: 0 6px;
+    font-size: 11px;
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__condition-value {
@@ -2297,6 +2308,7 @@
     flex: none;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: 3px 6px;
     margin-top: 6px;
     padding: 0;
@@ -2309,10 +2321,23 @@
     align-items: center;
     gap: 6px;
     height: 16px;
+    font-size: 11px;
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__actions button {
+    box-sizing: border-box;
     height: 22px;
+    padding: 0;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__apply {
+    width: 103px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__clear {
+    width: 113px;
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__apply:disabled {
