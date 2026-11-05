@@ -19,6 +19,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { deferInitialFocus } from './dialog-shell.js';
@@ -351,7 +352,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         const op = conditionSelect.value;
         const ranked = op === 'top10' || op === 'bottom10';
         const average = op === 'aboveAverage' || op === 'belowAverage';
-        conditionInput.hidden = !op || average;
+        conditionInput.hidden = average;
         upperInput.hidden = op !== 'between';
         unitSelect.hidden = !ranked;
         conditionInput.type = ranked ? 'number' : 'text';
@@ -530,8 +531,18 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       const syncApply = (): void => projectDisabledState(apply, autoApplyBox.checked, null);
       autoApplyBox.addEventListener('change', syncApply);
       syncApply();
+      // The clear button is live only while the column carries a filter.
+      const syncClear = (): void =>
+        projectDisabledState(
+          clear,
+          !findColumnCriteria(deps.store.getState().ui.filterCriteria, range, col),
+          null,
+        );
+      syncClear();
       autoApplyIfOn = () => {
-        if (autoApplyBox.checked) applyActiveFilter(false);
+        if (!autoApplyBox.checked) return;
+        applyActiveFilter(false);
+        syncClear();
       };
       actions.append(autoApplyRow, apply, clear);
       const sortRow = ownerDocument.createElement('div');
@@ -599,7 +610,15 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     }
 
     if (colorBy) r.append(colorBy);
-    r.append(conditionPanel, search, list, actions);
+    let searchHost: HTMLElement = search;
+    if (mac) {
+      searchHost = ownerDocument.createElement('div');
+      searchHost.className = 'fc-filter-dropdown__search-field';
+      const icon = createExcelRibbonSvg('find', 'fc-filter-dropdown__search-icon');
+      if (icon) searchHost.append(icon);
+      searchHost.append(search);
+    }
+    r.append(conditionPanel, searchHost, list, actions);
     overlayPortalFor(deps.host).appendChild(r);
     root = r;
     const position = clampPanelToViewport(r, anchor.x, anchor.y + anchor.h, {

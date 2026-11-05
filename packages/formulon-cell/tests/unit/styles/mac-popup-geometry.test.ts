@@ -42,6 +42,23 @@ describe('Mac column filter panel', () => {
     expect(block(css, `${panel}__condition-op`)).toContain('padding: 0 6px');
   });
 
+  it('seats the checklist checkboxes 45pt from the panel edge on a 20pt pitch with no rule under select-all', () => {
+    const row = block(css, `${panel}__row`);
+    expect(row).toContain('padding: 0 8px 0 26px');
+    expect(row).toContain('height: 20px');
+    const all = block(css, `${panel}__row--all`);
+    expect(all).toContain('border-bottom: 0');
+    expect(all).toContain('margin-bottom: 0');
+  });
+
+  it('draws a chevron on the value box and room for the search magnifier', () => {
+    expect(block(css, `${panel}__condition-value`)).toContain('background-image');
+    const field = block(css, `${panel}__search-field`);
+    expect(field).toContain('position: relative');
+    expect(block(css, `${panel}__search-icon`)).toContain('position: absolute');
+    expect(block(css, `${panel}__search`)).toContain('padding-left');
+  });
+
   it('keeps the apply and clear buttons on one row at 103 and 113', () => {
     expect(block(css, `${panel}__actions button`)).toContain('padding: 0');
     expect(block(css, `${panel}__apply`)).toContain('width: 103px');

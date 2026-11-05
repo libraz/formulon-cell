@@ -2261,7 +2261,7 @@
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__rule {
     flex: none;
     height: 0;
-    margin: 7px -19px 3px;
+    margin: 3px -19px 1px;
     border: 0;
     border-top: var(--fc-hairline, 1px) solid var(--fc-rule);
   }
@@ -2284,15 +2284,58 @@
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__condition-value {
+    box-sizing: border-box;
     width: 90px;
     height: 28px;
+    padding-right: 18px;
+    background-image:
+      linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(-45deg, transparent 50%, currentColor 50%);
+    background-size: 4px 4px;
+    background-position:
+      right 9px center,
+      right 5px center;
+    background-repeat: no-repeat;
   }
 
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__search {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__condition-value[hidden] {
+    display: none;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__search-field {
+    position: relative;
     flex: none;
     height: 22px;
     margin: 6px 0 0;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__search-icon {
+    position: absolute;
+    left: 5px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__search {
+    width: 100%;
+    height: 22px;
+    margin: 0;
+    padding-left: 22px;
     box-sizing: border-box;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__row {
+    height: 20px;
+    min-height: 0;
+    padding: 0 8px 0 26px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__row--all {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__list {
@@ -2340,6 +2383,7 @@
     width: 113px;
   }
 
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__clear:disabled,
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__apply:disabled {
     opacity: 0.45;
   }

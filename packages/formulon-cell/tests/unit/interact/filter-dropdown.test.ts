@@ -620,6 +620,47 @@ describe('attachFilterDropdown', () => {
       handle.detach();
     });
 
+    it('shows the value box at idle and hides it only for operand-free operators', () => {
+      const handle = openMac();
+      const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
+      const op = panel?.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
+      const value = panel?.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value');
+      expect(op?.value).toBe('');
+      expect(value?.hidden).toBe(false);
+      if (op) {
+        op.value = 'belowAverage';
+        op.dispatchEvent(new Event('change'));
+      }
+      expect(value?.hidden).toBe(true);
+      handle.detach();
+    });
+
+    it('disables the clear button until the column has a filter', () => {
+      const handle = openMac();
+      const clear = () =>
+        document.querySelector<HTMLButtonElement>(
+          '.fc-filter-dropdown__clear',
+        ) as HTMLButtonElement;
+      expect(clear().disabled).toBe(true);
+      const second = document.querySelectorAll<HTMLInputElement>(
+        '.fc-filter-dropdown__list input[type="checkbox"]',
+      )[2];
+      if (second) {
+        second.checked = false;
+        second.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      expect(clear().disabled).toBe(false);
+      handle.detach();
+    });
+
+    it('puts a magnifier beside the search field', () => {
+      const handle = openMac();
+      const field = document.querySelector('.fc-filter-dropdown__search')?.parentElement;
+      expect(field?.classList.contains('fc-filter-dropdown__search-field')).toBe(true);
+      expect(field?.querySelector('svg')).not.toBeNull();
+      handle.detach();
+    });
+
     it('filters the top 10 with an inline count and unit', () => {
       const handle = openMac();
       const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
@@ -680,7 +721,7 @@ describe('attachFilterDropdown', () => {
       const value = panel?.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value');
       const apply = panel?.querySelector<HTMLButtonElement>('.fc-filter-dropdown__apply');
       const auto = panel?.querySelector<HTMLInputElement>('.fc-filter-dropdown__auto input');
-      expect(value?.hidden).toBe(true);
+      expect(value?.hidden).toBe(false);
       expect(auto?.checked).toBe(true);
       expect(apply?.disabled).toBe(true);
       if (op) {
