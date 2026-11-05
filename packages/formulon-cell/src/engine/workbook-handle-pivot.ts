@@ -294,7 +294,9 @@ export function shiftPivotOwnedAreas(
 }
 
 /** The engine's layout of a report, collapsed to a #SPILL! anchor while
- *  cells it does not own are in the way. */
+ *  cells it does not own are in the way. A report with no fields occupies its
+ *  placeholder area rather than the engine's caption extent; every extent
+ *  consumer reads it from here. */
 function effectiveLayout(
   handle: WorkbookHandlePivotMethods,
   sheet: number,
@@ -309,7 +311,14 @@ function effectiveLayout(
     r1: layout.top + layout.rows - 1,
     c1: layout.left + layout.cols - 1,
   };
-  if (pivotBlockers(handle, sheet, pivotIndex, needed).length === 0) return layout;
+  if (pivotBlockers(handle, sheet, pivotIndex, needed).length === 0) {
+    const empty = isEmptyPivotLayout(
+      layout.cells.filter((c) => fromEngineValue(c.value).kind !== 'blank'),
+    );
+    return empty
+      ? { ...layout, rows: PIVOT_PLACEHOLDER_ROWS, cols: PIVOT_PLACEHOLDER_COLS }
+      : layout;
+  }
   return {
     ...layout,
     rows: 1,
@@ -578,7 +587,6 @@ export abstract class WorkbookHandlePivotMethods {
     for (let sheet = 0; sheet < this.sheetCount; sheet += 1) {
       const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
       if (n === null) continue;
-      const blocked = new Set(this.pivotSpills(sheet).map((spill) => spill.pivotIndex));
       for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
         const layout = effectiveLayout(this, sheet, pivotIndex);
         if (!layout.status.ok) continue;
@@ -612,18 +620,13 @@ export abstract class WorkbookHandlePivotMethods {
           );
         }
         const pivotFilters = pivotFilterSpecs(this, sheet, pivotIndex);
-        // An empty report occupies its placeholder area, not the engine's
-        // caption extent; a report held at #SPILL! keeps its own.
-        const empty =
-          !blocked.has(pivotIndex) &&
-          isEmptyPivotLayout(layout.cells.filter((c) => fromEngineValue(c.value).kind !== 'blank'));
         out.push({
           sheetIndex: sheet,
           pivotIndex,
           top: layout.top,
           left: layout.left,
-          rows: empty ? PIVOT_PLACEHOLDER_ROWS : layout.rows,
-          cols: empty ? PIVOT_PLACEHOLDER_COLS : layout.cols,
+          rows: layout.rows,
+          cols: layout.cols,
           cells: layout.cells.length,
           fields: [...fields],
           fieldItems: Object.fromEntries(
