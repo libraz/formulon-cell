@@ -32,6 +32,7 @@ import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import { rowHiddenByFilter } from '../filter-visible.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
+import { moveDefinedNamesForCut } from '../named-ranges.js';
 import { blockPivotEdit } from '../pivot-guard.js';
 import { pastePivotTableCopy, pivotTableAtRange } from '../pivot-table.js';
 import { blockedByProtection, isCellWritable, isRangeInAllowedEditRange } from '../protection.js';
@@ -1364,6 +1365,7 @@ function applyPaste(
   if (!bandDestination) extendTablesForPaste(store, history, writtenRange);
   if (snap.mode === 'cut') {
     updateExternalRefsForCutPaste(wb, sourceLogical, writtenRange);
+    moveDefinedNamesForCut(history, wb, sourceLogical, writtenRange);
     consumeCutMarquee(store);
   }
   return { writtenRange, skippedNonFiniteOperations };

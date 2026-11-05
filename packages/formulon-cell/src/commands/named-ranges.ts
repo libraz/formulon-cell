@@ -7,11 +7,12 @@ import {
   MAX_ROW,
 } from '../engine/address.js';
 import { rangeForRef } from '../engine/range-resolver.js';
-import type { Addr, CellValue } from '../engine/types.js';
+import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell, fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { blockDataTableCells } from './data-table-guard.js';
+import { adjustFormulaForCutPasteMove } from './formula-refs.js';
 import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
@@ -229,6 +230,55 @@ export function recordDefinedNamesChange<T>(
     });
   }
   return result;
+}
+
+/**
+ * Re-point defined names at cells a cut-paste moved: a name whose references
+ * lie entirely inside `source` follows the move, one that only partly overlaps
+ * it is left alone. Recorded as one undoable step. Returns true when a name
+ * changed.
+ */
+export function moveDefinedNamesForCut(
+  history: History | null,
+  wb: WorkbookHandle,
+  source: Range,
+  destination: Range,
+): boolean {
+  if (!wb.capabilities.definedNameMutate) return false;
+  const sheetNames = Array.from({ length: wb.sheetCount }, (_, i) => wb.sheetName(i));
+  // Unqualified references in a name have no home sheet (formulaSheet -1), so only
+  // qualified ones move, and moved ones always render with an explicit sheet.
+  const context = {
+    sourceSheet: source.sheet,
+    destinationSheet: destination.sheet,
+    formulaSheet: -1,
+    outputSheet: -1,
+    sheetNames,
+  };
+  let changed = false;
+  recordDefinedNamesChange(history, wb, () => {
+    for (const entry of [...wb.definedNames()]) {
+      // The ref rewriter only tokenizes formula text, which starts with `=`.
+      const hasEquals = entry.formula.startsWith('=');
+      const moved = adjustFormulaForCutPasteMove(
+        hasEquals ? entry.formula : `=${entry.formula}`,
+        source,
+        destination,
+        context,
+      );
+      const next = hasEquals ? moved : moved.slice(1);
+      if (next === entry.formula) continue;
+      if (wb.setDefinedNameEntry(entry.name, next, entry.localSheetId)) changed = true;
+      if (wb.capabilities.definedNameAttrs && (entry.comment || entry.hidden)) {
+        wb.setDefinedNameAttrs(entry.name, entry.localSheetId, {
+          comment: entry.comment ?? '',
+          hidden: !!entry.hidden,
+        });
+      }
+    }
+  });
+  if (changed) wb.recalcAuto();
+  return changed;
 }
 
 /** A stored defined-name formula as name lists show it: with a leading `=`. */
