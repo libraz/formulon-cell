@@ -462,6 +462,17 @@ describe('default table and header names follow the workbook language', () => {
     });
   });
 
+  it.each([
+    ['mac-de_DE', 'Tabelle', 'Spalte'],
+    ['mac-fr_FR', 'Tableau', 'Colonne'],
+    ['mac-zh_CN', '表', '列'],
+    ['mac-ko_KR', '표', '열'],
+    ['mac-th_TH', 'Table', 'คอลัมน์'],
+    ['mac-en_US', 'Table', 'Column'],
+  ])('names tables and blank headers as the %s desktop app does', (profile, table, column) => {
+    expect(defaultObjectNames(wbFor(profile))).toMatchObject({ table, column });
+  });
+
   it('numbers blank headers with the localized label', () => {
     const blank = { getValue: () => ({ kind: 'blank' as const }) };
     const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 };

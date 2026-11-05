@@ -271,18 +271,22 @@ interface DefaultObjectNames {
   pivot: string;
 }
 
+const ENGLISH_NAMES: DefaultObjectNames = { table: 'Table', column: 'Column', pivot: 'PivotTable' };
+
 /** Names a new table, its blank headers and a new PivotTable start with, as the
- *  workbook's language spells them. */
+ *  desktop app in the workbook's language spells them. PivotTable names are
+ *  measured for ja only; zh-TW is unmeasured and stays English. */
 const DEFAULT_NAMES: Record<string, DefaultObjectNames> = {
-  ja: { table: 'テーブル', column: '列', pivot: 'ピボットテーブル' },
+  'ja-JP': { table: 'テーブル', column: '列', pivot: 'ピボットテーブル' },
+  'de-DE': { ...ENGLISH_NAMES, table: 'Tabelle', column: 'Spalte' },
+  'fr-FR': { ...ENGLISH_NAMES, table: 'Tableau', column: 'Colonne' },
+  'zh-CN': { ...ENGLISH_NAMES, table: '表', column: '列' },
+  'ko-KR': { ...ENGLISH_NAMES, table: '표', column: '열' },
+  'th-TH': { ...ENGLISH_NAMES, column: 'คอลัมน์' },
 };
 
 export const defaultObjectNames = (wb: WorkbookHandle): DefaultObjectNames =>
-  DEFAULT_NAMES[inputLocaleForWorkbook(wb)?.split('-')[0] ?? ''] ?? {
-    table: 'Table',
-    column: 'Column',
-    pivot: 'PivotTable',
-  };
+  DEFAULT_NAMES[inputLocaleForWorkbook(wb) ?? ''] ?? ENGLISH_NAMES;
 
 /** Unique column names for a table over `range`, from its header row when present. */
 export const tableColumns = (
