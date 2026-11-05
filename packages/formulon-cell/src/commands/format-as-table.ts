@@ -275,12 +275,13 @@ const ENGLISH_NAMES: DefaultObjectNames = { table: 'Table', column: 'Column', pi
 
 /** Names a new table, its blank headers and a new PivotTable start with, as the
  *  desktop app in the workbook's language spells them. PivotTable names are
- *  measured for ja only; zh-TW is unmeasured and stays English. */
+ *  measured for ja only, and the zh-TW table name stays English unmeasured. */
 const DEFAULT_NAMES: Record<string, DefaultObjectNames> = {
   'ja-JP': { table: 'テーブル', column: '列', pivot: 'ピボットテーブル' },
   'de-DE': { ...ENGLISH_NAMES, table: 'Tabelle', column: 'Spalte' },
   'fr-FR': { ...ENGLISH_NAMES, table: 'Tableau', column: 'Colonne' },
   'zh-CN': { ...ENGLISH_NAMES, table: '表', column: '列' },
+  'zh-TW': { ...ENGLISH_NAMES, column: '欄' },
   'ko-KR': { ...ENGLISH_NAMES, table: '표', column: '열' },
   'th-TH': { ...ENGLISH_NAMES, column: 'คอลัมน์' },
 };

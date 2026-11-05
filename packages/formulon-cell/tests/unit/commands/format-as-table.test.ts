@@ -467,6 +467,7 @@ describe('default table and header names follow the workbook language', () => {
     ['mac-fr_FR', 'Tableau', 'Colonne'],
     ['mac-zh_CN', '表', '列'],
     ['mac-ko_KR', '표', '열'],
+    ['mac-zh_TW', 'Table', '欄'],
     ['mac-th_TH', 'Table', 'คอลัมน์'],
     ['mac-en_US', 'Table', 'Column'],
   ])('names tables and blank headers as the %s desktop app does', (profile, table, column) => {
