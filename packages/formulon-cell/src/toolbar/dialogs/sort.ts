@@ -1,6 +1,6 @@
 import type { MacSortDialogLabels } from '../../i18n/strings/mac/sort-dialog.js';
 import { projectDisabledState } from '../menu-a11y.js';
-import { createDialogSelect } from './form-controls.js';
+import { appendDialogSelectOptions, createDialogSelect } from './form-controls.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -35,6 +35,9 @@ export interface SortDialogOptions {
   ascendingLabel: string;
   descendingLabel: string;
   columns: readonly SortDialogColumn[];
+  /** Key choices once the sort runs left to right (Mac options sheet); values
+   *  are absolute row indexes. Without them the column list stays. */
+  rows?: readonly SortDialogColumn[];
   initialColumn: string;
   initialDirection: 'asc' | 'desc';
   initialHasHeader: boolean;
@@ -47,6 +50,8 @@ export interface SortDialogResult {
   direction: 'asc' | 'desc';
   levels: Array<{ column: string; direction: 'asc' | 'desc' }>;
   hasHeader: boolean;
+  orientation: 'topToBottom' | 'leftToRight';
+  matchCase: boolean;
 }
 
 const buildColumnSelect = (
@@ -81,6 +86,7 @@ const appendSortLevelRow = (
   body: HTMLElement,
   opts: SortDialogOptions,
   mac: MacSortDialogLabels | undefined,
+  keys: readonly SortDialogColumn[],
   rowLabel: string,
   columnValue: string,
   directionValue: 'asc' | 'desc',
@@ -94,7 +100,7 @@ const appendSortLevelRow = (
   label.textContent = rowLabel;
   label.setAttribute('role', 'rowheader');
 
-  const column = buildColumnSelect(opts.columns, columnValue);
+  const column = buildColumnSelect(keys, columnValue);
   column.classList.add('fc-sortdlg__column');
   column.setAttribute('aria-label', rowLabel);
   column.setAttribute('role', 'cell');
@@ -121,6 +127,98 @@ const appendSortLevelRow = (
   body.appendChild(row);
   return { row, label, column, direction };
 };
+
+interface SortOptionsChoice {
+  orientation: SortDialogResult['orientation'];
+  matchCase: boolean;
+}
+
+/** The Mac options sheet layered over the Sort dialog. Resolves the choices on
+ *  OK and `null` on Cancel. The phonetic radios are shown as measured but do
+ *  not affect order: the workbook carries no phonetic guide text. */
+const showSortOptionsSheet = (
+  host: HTMLElement | undefined,
+  mac: MacSortDialogLabels,
+  actions: { okLabel: string; cancelLabel: string },
+  initial: SortOptionsChoice,
+): Promise<SortOptionsChoice | null> =>
+  new Promise<SortOptionsChoice | null>((resolve) => {
+    const shell = createDialogShell({ host, title: mac.options });
+    shell.panel.classList.add('fc-sortdlg-options');
+    const doc = shell.body.ownerDocument;
+
+    const group = (title: string): HTMLDivElement => {
+      const box = doc.createElement('div');
+      box.className = 'fc-sortdlg-options__group';
+      box.setAttribute('role', 'group');
+      box.setAttribute('aria-label', title);
+      const heading = doc.createElement('span');
+      heading.className = 'fc-sortdlg-options__heading';
+      heading.textContent = title;
+      box.appendChild(heading);
+      return box;
+    };
+    const control = (
+      box: HTMLElement,
+      type: 'radio' | 'checkbox',
+      name: string,
+      text: string,
+      checked: boolean,
+    ): HTMLInputElement => {
+      const label = doc.createElement('label');
+      label.className = 'fc-sortdlg-options__choice';
+      const input = doc.createElement('input');
+      input.type = type;
+      input.name = name;
+      input.checked = checked;
+      label.append(input, doc.createTextNode(text));
+      box.appendChild(label);
+      return input;
+    };
+
+    const orientationBox = group(mac.orientation);
+    const topToBottom = control(
+      orientationBox,
+      'radio',
+      'fc-sort-orientation',
+      mac.sortTopToBottom,
+      initial.orientation === 'topToBottom',
+    );
+    const leftToRight = control(
+      orientationBox,
+      'radio',
+      'fc-sort-orientation',
+      mac.sortLeftToRight,
+      initial.orientation === 'leftToRight',
+    );
+    const caseBox = doc.createElement('div');
+    caseBox.className = 'fc-sortdlg-options__case';
+    const caseSensitive = control(caseBox, 'checkbox', '', mac.caseSensitive, initial.matchCase);
+    orientationBox.appendChild(caseBox);
+
+    const methodBox = group(mac.method);
+    control(methodBox, 'radio', 'fc-sort-method', mac.usePhonetic, true);
+    control(methodBox, 'radio', 'fc-sort-method', mac.noPhonetic, false);
+    shell.body.append(orientationBox, methodBox);
+
+    const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
+      cancelLabel: actions.cancelLabel,
+      okLabel: actions.okLabel,
+    });
+    const lifecycle = installDialogLifecycle<SortOptionsChoice | null>({
+      shell,
+      resolve,
+      onCancel: () => null,
+      onSubmit: () => lifecycle.finish(choice()),
+    });
+    const choice = (): SortOptionsChoice => ({
+      orientation: leftToRight.checked && !topToBottom.checked ? 'leftToRight' : 'topToBottom',
+      matchCase: caseSensitive.checked,
+    });
+    okBtn.addEventListener('click', () => lifecycle.finish(choice()));
+    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
+    mountDialog(shell, topToBottom, { immediate: true });
+  });
 
 export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResult | null> =>
   new Promise<SortDialogResult | null>((resolve) => {
@@ -160,11 +258,13 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     const headings = mac
       ? ['', mac.columnHeading, mac.sortOnHeading, opts.orderLabel, mac.colorHeading]
       : ['', opts.columnLabel, opts.orderLabel];
+    const headCells: HTMLSpanElement[] = [];
     for (const label of headings) {
       const cell = document.createElement('span');
       cell.setAttribute('role', 'columnheader');
       cell.textContent = label;
       headerRow.appendChild(cell);
+      headCells.push(cell);
     }
     shell.body.appendChild(headerRow);
 
@@ -176,6 +276,11 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
 
     const levels: SortLevelControls[] = [];
     let selectedLevelIndex = 0;
+    let orientation: SortDialogResult['orientation'] = 'topToBottom';
+    let matchCase = false;
+    // The key list names rows once the sort runs left to right.
+    const keyItems = (): readonly SortDialogColumn[] =>
+      orientation === 'leftToRight' && opts.rows ? opts.rows : opts.columns;
 
     const dataHeaderRow = document.createElement('label');
     dataHeaderRow.className = 'fc-fmtdlg__row fc-tb__dlg__label fc-sortdlg__header';
@@ -187,7 +292,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     // On the Mac host header text names the columns while the first row counts as headers.
     const relabelColumns = (level: SortLevelControls): void => {
       if (!mac) return;
-      opts.columns.forEach((item, index) => {
+      keyItems().forEach((item, index) => {
         const option = level.column.options[index];
         if (option) option.text = hasHeader.checked && item.heading ? item.heading : item.label;
       });
@@ -232,6 +337,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
         levelsWrap,
         opts,
         mac,
+        keyItems(),
         levels.length === 0 ? opts.columnLabel : opts.thenByLabel,
         columnValue,
         directionValue,
@@ -271,10 +377,28 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     shell.body.appendChild(dataHeaderRow);
 
     if (mac) {
-      // Case-sensitive and left-to-right sorts are not offered.
       const optionsBtn = appendDialogButton(shell.footer, { label: mac.options });
       optionsBtn.classList.add('fc-sortdlg__options');
-      projectDisabledState(optionsBtn, true, null);
+      optionsBtn.addEventListener('click', () => {
+        void showSortOptionsSheet(opts.host, mac, opts, { orientation, matchCase }).then(
+          (choice) => {
+            if (!choice) return;
+            const flipped = choice.orientation !== orientation;
+            ({ orientation, matchCase } = choice);
+            if (!flipped) return;
+            headCells[1]?.replaceChildren(
+              orientation === 'leftToRight' && opts.rows ? mac.rowHeading : mac.columnHeading,
+            );
+            const items = keyItems();
+            for (const level of levels) {
+              level.column.replaceChildren();
+              appendDialogSelectOptions(level.column, items);
+              level.column.value = items[0]?.value ?? '';
+              relabelColumns(level);
+            }
+          },
+        );
+      });
     }
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
       cancelLabel: opts.cancelLabel,
@@ -289,6 +413,8 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
         direction: level.direction.value === 'desc' ? 'desc' : 'asc',
       })),
       hasHeader: hasHeader.checked,
+      orientation,
+      matchCase,
     });
 
     const lifecycle = installDialogLifecycle<SortDialogResult | null>({

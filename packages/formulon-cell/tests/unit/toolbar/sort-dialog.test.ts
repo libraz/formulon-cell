@@ -76,6 +76,8 @@ describe('showSortDialog', () => {
         { column: '1', direction: 'desc' },
       ],
       hasHeader: true,
+      orientation: 'topToBottom',
+      matchCase: false,
     });
   });
 
@@ -201,7 +203,7 @@ describe('showSortDialog', () => {
       ]).toEqual(['レベルの追加', 'レベルの削除', 'レベルのコピー']);
       const options = dialog?.querySelector<HTMLButtonElement>('.fc-sortdlg__options');
       expect(options?.textContent).toBe('オプション...');
-      expect(options?.disabled).toBe(true);
+      expect(options?.disabled).toBe(false);
       expect(
         Array.from(
           dialog?.querySelectorAll('.fc-fmtdlg__footer button') ?? [],
@@ -218,6 +220,8 @@ describe('showSortDialog', () => {
         direction: 'asc',
         levels: [{ column: '0', direction: 'asc' }],
         hasHeader: false,
+        orientation: 'topToBottom',
+        matchCase: false,
       });
     });
 

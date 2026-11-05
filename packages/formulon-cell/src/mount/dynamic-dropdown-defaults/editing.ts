@@ -366,6 +366,12 @@ const buildSortMenuAction =
         ascendingLabel: strings.sortDialogAscending,
         descendingLabel: strings.sortDialogDescending,
         columns,
+        rows: mac
+          ? Array.from({ length: range.r1 - range.r0 + 1 }, (_, i) => ({
+              value: String(range.r0 + i),
+              label: `${instance.i18n.strings.macSortDialog.rowHeading} ${range.r0 + i + 1}`,
+            }))
+          : undefined,
         initialColumn: String(Math.min(Math.max(state.selection.active.col, range.c0), range.c1)),
         initialDirection: 'asc',
         initialHasHeader: inferSortHasHeader(state, range),
@@ -390,6 +396,8 @@ const buildSortMenuAction =
               direction: level.direction,
             })),
             hasHeader: result.hasHeader,
+            orientation: result.orientation,
+            matchCase: result.matchCase,
           },
         });
         instance.host.focus();

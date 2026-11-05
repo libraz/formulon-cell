@@ -12,6 +12,15 @@ export interface MacSortDialogLabels {
   colorHeading: string;
   copyLevel: string;
   options: string;
+  /** Caption of the key list's first column once the sort runs left to right. */
+  rowHeading: string;
+  orientation: string;
+  sortTopToBottom: string;
+  sortLeftToRight: string;
+  method: string;
+  usePhonetic: string;
+  noPhonetic: string;
+  caseSensitive: string;
 }
 
 /** Overrides of the Sort wording in `ribbonMenu`, plus the Mac-only labels,
@@ -46,4 +55,12 @@ export const macSortDialogJa: MacSortDialogStrings = {
   colorHeading: '色/アイコン',
   copyLevel: 'コピー',
   options: 'オプション...',
+  rowHeading: '行',
+  orientation: '方向',
+  sortTopToBottom: '行単位',
+  sortLeftToRight: '列単位',
+  method: '方法',
+  usePhonetic: 'ふりがなを使う',
+  noPhonetic: 'ふりがなを使わない',
+  caseSensitive: '大文字と小文字を区別する',
 };

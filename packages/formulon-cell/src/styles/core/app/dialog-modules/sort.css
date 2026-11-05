@@ -55,6 +55,80 @@
     min-width: 0;
   }
 
+  /* Options sheet of the Mac Sort dialog: 419 x 183 pt, two groups split by a rule. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg-options {
+    position: relative;
+    width: 419px;
+    min-width: 0;
+    max-width: none;
+    height: 183px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    outline: 1px solid var(--fc-fmtdlg-rule, var(--fc-rule-strong));
+    outline-offset: -1px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg-options .fc-fmtdlg__header {
+    display: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg-options .fc-fmtdlg__body,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg-options .fc-fmtdlg__footer {
+    position: static;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg-options__group {
+    position: absolute;
+    top: 18px;
+    left: 20px;
+    width: 190px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-sortdlg-options__group
+    + .fc-sortdlg-options__group {
+    left: 230px;
+    height: 88px;
+    padding-left: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg-options__group:first-child {
+    height: 88px;
+    border-right: 1px solid var(--fc-rule);
+  }
+  .fc-sortdlg-options__heading {
+    display: block;
+    height: 18px;
+    margin-bottom: 7px;
+    line-height: 18px;
+  }
+  /* The case checkbox sits below the rule, level with the buttons. */
+  .fc-sortdlg-options__case {
+    margin-top: 18px;
+  }
+  .fc-sortdlg-options__choice {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 27px;
+  }
+  .fc-sortdlg-options__choice input {
+    margin: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg-options .fc-fmtdlg__btn {
+    position: absolute;
+    top: 138px;
+    min-width: 0;
+    width: 86px;
+    height: 26px;
+    margin: 0;
+    padding: 0;
+    left: 217px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg-options .fc-fmtdlg__btn--primary {
+    left: 314px;
+  }
+
   @media (max-width: 560px) {
     .fc-sortdlg__grid-head {
       display: none;
