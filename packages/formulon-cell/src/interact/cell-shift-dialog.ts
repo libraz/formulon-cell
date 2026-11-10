@@ -14,6 +14,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogActions, createDialogShell } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 
@@ -102,7 +103,7 @@ export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
   for (const [value, label] of options) {
     const row = radio(ownerDocument, name, value, label, value === defaultChoice);
     const input = row.querySelector('input');
-    if (input && !permitted(value)) input.disabled = true;
+    if (input && !permitted(value)) projectDisabledState(input, true, null);
     choices.appendChild(row);
   }
 
