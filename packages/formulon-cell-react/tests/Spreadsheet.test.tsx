@@ -1,15 +1,11 @@
-import * as Core from '@libraz/formulon-cell';
-import type { ReactNode } from 'react';
+import type * as Core from '@libraz/formulon-cell';
+import { Workbook } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ScreenClipCapture, ScreenClipResult } from '../src';
-import * as ReactPackage from '../src';
 import { type MountedReactSpreadsheet, mountReactSpreadsheet } from './test-utils/mount';
 
 /**
- * End-to-end tests for the React `<Spreadsheet>` wrapper. These use the real
- * core (with the stub WASM engine) instead of mocking `Spreadsheet.mount`, so
- * they catch regressions in the prop → instance plumbing in addition to the
- * React layer itself.
+ * End-to-end tests for the React `<Spreadsheet>` component against the real core (stub engine),
+ * so they cover the prop to instance plumbing as well as the React layer.
  */
 describe('React <Spreadsheet>', () => {
   let mounted: MountedReactSpreadsheet | null = null;
@@ -22,329 +18,129 @@ describe('React <Spreadsheet>', () => {
     document.body.replaceChildren();
   });
 
-  it('invokes onReady with a live SpreadsheetInstance after mount completes', async () => {
+  it('invokes onReady with a live SpreadsheetInstance and exposes it through the ref', async () => {
     const onReady = vi.fn();
     mounted = await mountReactSpreadsheet({ onReady });
 
     expect(onReady).toHaveBeenCalledTimes(1);
-    const inst = onReady.mock.calls[0]?.[0];
-    expect(inst).toBeDefined();
-    expect(typeof inst?.dispose).toBe('function');
-    expect(typeof inst?.setTheme).toBe('function');
-    expect(typeof inst?.on).toBe('function');
-    // The forwarded ref should resolve to the same instance.
-    expect(mounted.refValue.instance).toBe(inst);
+    const inst = onReady.mock.calls[0]?.[0] as Core.SpreadsheetInstance;
+    expect(inst.disposed).toBe(false);
+    expect(typeof inst.update).toBe('function');
+    expect(mounted.refValue.spreadsheet).toBe(inst);
   });
 
-  it('renders a render-prop child after the async instance mount completes', async () => {
+  it('defaults the locale to en', async () => {
+    mounted = await mountReactSpreadsheet();
+    expect(mounted.instance.i18n.locale).toBe('en');
+  });
+
+  it('renders a render-prop child once the instance is mounted', async () => {
     const renderChild = vi.fn((instance: Core.SpreadsheetInstance) => (
       <span data-testid="render-prop-child">{instance.i18n.locale}</span>
     ));
-    mounted = await mountReactSpreadsheet({}, renderChild as unknown as ReactNode);
+    mounted = await mountReactSpreadsheet({ locale: 'ja' }, renderChild as never);
 
     expect(renderChild).toHaveBeenCalledTimes(1);
     expect(mounted.host.querySelector('[data-testid="render-prop-child"]')?.textContent).toBe('ja');
   });
 
-  it('forwards cellChange events from the underlying engine to the onCellChange prop', async () => {
-    const onCellChange = vi.fn();
-    mounted = await mountReactSpreadsheet({ onCellChange });
+  it('forwards cell events from the workbook to onCell', async () => {
+    const onCell = vi.fn();
+    mounted = await mountReactSpreadsheet({ onCell });
 
-    mounted.instance.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 42);
+    mounted.instance.workbook.sheet(0).setNumber(0, 0, 42);
 
-    expect(onCellChange).toHaveBeenCalledTimes(1);
-    const event = onCellChange.mock.calls[0]?.[0];
-    expect(event?.addr).toEqual({ sheet: 0, row: 0, col: 0 });
-    expect(event?.value).toEqual({ kind: 'number', value: 42 });
+    expect(onCell).toHaveBeenCalledTimes(1);
+    const event = onCell.mock.calls[0]?.[0];
+    expect(event).toMatchObject({ sheet: 0, at: { row: 0, col: 0 } });
+    expect(event.value).toMatchObject({ number: 42 });
   });
 
-  it('forwards selectionChange events when the active selection moves', async () => {
+  it('forwards change and recalc events', async () => {
+    const onChange = vi.fn();
+    const onRecalc = vi.fn();
+    mounted = await mountReactSpreadsheet({ onChange, onRecalc });
+
+    const result = mounted.instance.applyChanges([{ at: { row: 0, col: 0 }, input: '7' }], {
+      history: 'record',
+    });
+
+    expect(result.applied.length).toBeGreaterThan(0);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0]?.[0].origin).toBe('instanceApi');
+    expect(onRecalc).toHaveBeenCalled();
+  });
+
+  it('forwards selection changes to onSelectionChange', async () => {
     const onSelectionChange = vi.fn();
     mounted = await mountReactSpreadsheet({ onSelectionChange });
 
-    const { mutators } = await import('@libraz/formulon-cell');
-    mutators.setActive(mounted.instance.store, { sheet: 0, row: 3, col: 2 });
+    mounted.instance.selection.set('C4');
 
     expect(onSelectionChange).toHaveBeenCalled();
     const last = onSelectionChange.mock.calls.at(-1)?.[0];
-    expect(last?.active).toEqual({ sheet: 0, row: 3, col: 2 });
-    expect(last?.range).toMatchObject({ sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 });
+    expect(last.active).toMatchObject({ row: 3, col: 2 });
   });
 
-  it('forwards workbookChange events when the workbook prop swaps to a new handle', async () => {
-    const onWorkbookChange = vi.fn();
-    mounted = await mountReactSpreadsheet({ onWorkbookChange });
-    const original = mounted.instance.workbook;
-
-    const next = await Core.WorkbookHandle.createDefault({ preferStub: true });
-    expect(next).not.toBe(original);
-    await mounted.rerender({ workbook: next, onWorkbookChange });
-
-    // setWorkbook is async — wait one extra tick for the inner promise.
-    for (let i = 0; i < 10; i += 1) {
-      if (onWorkbookChange.mock.calls.length > 0) break;
-      await Promise.resolve();
-    }
-
-    expect(onWorkbookChange).toHaveBeenCalled();
-    const event = onWorkbookChange.mock.calls.at(-1)?.[0];
-    expect(event?.workbook).toBe(next);
-    expect(mounted.instance.workbook).toBe(next);
-  });
-
-  it('reports a rejected controlled workbook replacement without losing the old instance', async () => {
-    const onError = vi.fn();
-    mounted = await mountReactSpreadsheet({ onError });
-    const original = mounted.instance.workbook;
-    const next = await Core.WorkbookHandle.createDefault({ preferStub: true });
-    const failure = new Error('viewport rejected');
-    const setWorkbook = vi.spyOn(mounted.instance, 'setWorkbook').mockRejectedValueOnce(failure);
+  it('forwards a workbook swap to onWorkbook and the instance', async () => {
+    const onWorkbook = vi.fn();
+    mounted = await mountReactSpreadsheet({ onWorkbook });
+    const next = await Workbook.createDefault({ engine: 'stub' });
 
     try {
-      await mounted.rerender({ workbook: next, onError });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(failure);
-      expect(mounted.instance.workbook).toBe(original);
+      await mounted.rerender({ workbook: next, onWorkbook });
+      for (let i = 0; i < 10 && onWorkbook.mock.calls.length === 0; i += 1) await Promise.resolve();
+
+      expect(onWorkbook).toHaveBeenCalled();
+      expect(onWorkbook.mock.calls.at(-1)?.[0].workbook).toBe(next);
+      expect(mounted.instance.workbook).toBe(next);
     } finally {
-      setWorkbook.mockRestore();
+      await mounted.rerender({ workbook: mounted.workbook });
       next.dispose();
     }
   });
 
-  it('forwards a theme prop change to instance.setTheme without remounting', async () => {
-    const onThemeChange = vi.fn();
-    mounted = await mountReactSpreadsheet({ theme: 'paper', onThemeChange });
+  it('applies a theme prop change with update and reports it through onUpdate', async () => {
+    const onUpdate = vi.fn();
+    mounted = await mountReactSpreadsheet({ theme: 'paper', onUpdate });
     const original = mounted.instance;
     expect(mounted.host.querySelector<HTMLElement>('[data-fc-theme]')?.dataset.fcTheme).toBe(
       'paper',
     );
 
-    await mounted.rerender({ theme: 'ink', onThemeChange });
+    await mounted.rerender({ theme: 'ink', onUpdate });
 
-    expect(mounted.instance).toBe(original); // no remount
-    expect(onThemeChange).toHaveBeenCalledTimes(1);
-    expect(onThemeChange.mock.calls[0]?.[0]).toEqual({ theme: 'ink' });
+    expect(mounted.refValue.spreadsheet).toBe(original);
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate.mock.calls[0]?.[0]).toEqual({ keys: ['theme'] });
     expect(mounted.host.querySelector<HTMLElement>('[data-fc-theme]')?.dataset.fcTheme).toBe('ink');
   });
 
-  it('forwards a locale prop change to instance.setLocale without remounting', async () => {
+  it('applies a locale prop change and reports it through onLocaleChange', async () => {
     const onLocaleChange = vi.fn();
     mounted = await mountReactSpreadsheet({ locale: 'en', onLocaleChange });
     const original = mounted.instance;
-    expect(mounted.instance.i18n.locale).toBe('en');
 
     await mounted.rerender({ locale: 'ja', onLocaleChange });
 
-    expect(mounted.instance).toBe(original);
-    expect(mounted.instance.i18n.locale).toBe('ja');
+    expect(mounted.refValue.spreadsheet).toBe(original);
+    expect(original.i18n.locale).toBe('ja');
     expect(onLocaleChange).toHaveBeenCalled();
-    const event = onLocaleChange.mock.calls.at(-1)?.[0];
-    expect(event?.locale).toBe('ja');
+    expect(onLocaleChange.mock.calls.at(-1)?.[0].locale).toBe('ja');
   });
 
-  it('keeps the Screen Clipping capture hook current without remounting', async () => {
-    const firstCapture = vi.fn(() => 'data:image/png;base64,react-first');
-    const secondCapture = vi.fn(() => ({
-      src: 'data:image/png;base64,react-second',
-      alt: 'React clip',
-    }));
-    mounted = await mountReactSpreadsheet({ captureScreenClip: firstCapture });
-    const original = mounted.instance;
-
-    expect(await mounted.instance.captureScreenClip()).toEqual({
-      src: 'data:image/png;base64,react-first',
-    });
-
-    await mounted.rerender({ captureScreenClip: secondCapture });
-
-    expect(mounted.instance).toBe(original);
-    expect(await mounted.instance.captureScreenClip()).toEqual({
-      src: 'data:image/png;base64,react-second',
-      alt: 'React clip',
-    });
-    expect(firstCapture).toHaveBeenCalledTimes(1);
-    expect(secondCapture).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps the function argument help provider current without remounting', async () => {
-    const firstHelp = vi.fn(() => ({ description: 'React first hint.' }));
-    const secondHelp = vi.fn((_name: string, _index: number, locale: string) => ({
-      description: `React second hint (${locale}).`,
-    }));
-    mounted = await mountReactSpreadsheet({
-      ui: { platform: 'mac' },
-      features: { fxDialog: true },
-      locale: 'en',
-      getFunctionArgumentHelp: firstHelp,
-    });
-    const original = mounted.instance;
-    const hint = (): string | null | undefined =>
-      document.querySelector('.fc-mac-formula-palette__argument small')?.textContent;
-
-    mounted.instance.openFunctionArguments('ACOS');
-    expect(hint()).toBe('React first hint.');
-    document
-      .querySelector<HTMLButtonElement>('.fc-mac-formula-palette [data-action="close"]')
-      ?.click();
-
-    await mounted.rerender({
-      ui: { platform: 'mac' },
-      features: { fxDialog: true },
-      locale: 'en',
-      getFunctionArgumentHelp: secondHelp,
-    });
-    mounted.instance.openFunctionArguments('ACOS');
-
-    expect(mounted.instance).toBe(original);
-    expect(hint()).toBe('React second hint (en).');
-    expect(secondHelp).toHaveBeenCalledWith('ACOS', 0, 'en');
-  });
-
-  it('keeps the printer profile refresh hook current without remounting', async () => {
-    const firstProfile = {
-      id: 'react-first',
-      paperSize: 'A4' as const,
-      orientation: 'portrait' as const,
-      printableBounds: { top: 0.1, right: 0.1, bottom: 0.1, left: 0.1 },
-    };
-    const secondProfile = {
-      id: 'react-second',
-      paperSize: 'letter' as const,
-      orientation: 'landscape' as const,
-      printableBounds: { top: 0.2, right: 0.3, bottom: 0.2, left: 0.3 },
-    };
-    const firstRefresh = vi.fn(() => [firstProfile]);
-    const secondRefresh = vi.fn(() => [secondProfile]);
-    mounted = await mountReactSpreadsheet({ refreshPrinterProfiles: firstRefresh });
-    const original = mounted.instance;
-
-    await expect(mounted.instance.refreshPrinterProfiles()).resolves.toEqual([firstProfile]);
-
-    await mounted.rerender({ refreshPrinterProfiles: secondRefresh });
-
-    expect(mounted.instance).toBe(original);
-    await expect(mounted.instance.refreshPrinterProfiles()).resolves.toEqual([secondProfile]);
-    expect(firstRefresh).toHaveBeenCalledTimes(1);
-    expect(secondRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('applies printer profile prop updates to the built-in print flow without remounting', async () => {
-    const fallback = {
-      id: 'fallback',
-      paperSize: 'A4' as const,
-      orientation: 'portrait' as const,
-      printableBounds: { top: 0.2, right: 0.2, bottom: 0.2, left: 0.2 },
-    };
-    const selected = {
-      id: 'selected',
-      paperSize: 'A4' as const,
-      orientation: 'portrait' as const,
-      printableBounds: { top: 1.2, right: 1.1, bottom: 1.2, left: 1.1 },
-    };
-    const print = vi.fn();
-    const originalPrint = (window as unknown as { print?: () => void }).print;
-    (window as unknown as { print: () => void }).print = print;
-    try {
-      mounted = await mountReactSpreadsheet({
-        printerProfiles: [fallback, selected],
-        printerProfileId: 'fallback',
-      });
-      const original = mounted.instance;
-
-      await mounted.rerender({
-        printerProfiles: [fallback, selected],
-        printerProfileId: ' selected ',
-      });
-      mounted.instance.print('print');
-
-      const iframe = mounted.host.querySelector<HTMLIFrameElement>('iframe[data-fc-print-mode]');
-      expect(mounted.instance).toBe(original);
-      expect(iframe?.srcdoc).toContain(
-        '@page { size: A4 portrait; margin: 1.2in 1.1in 1.2in 1.1in; }',
-      );
-      iframe?.dispatchEvent(new Event('load'));
-      iframe?.remove();
-    } finally {
-      if (originalPrint) (window as unknown as { print: () => void }).print = originalPrint;
-      else delete (window as unknown as { print?: () => void }).print;
-    }
-  });
-
-  it('forwards host status bar prop updates without remounting', async () => {
-    mounted = await mountReactSpreadsheet({
-      uploadStatus: 'saving',
-      macroRecording: false,
-    });
-    const original = mounted.instance;
-    mounted.instance.store.setState((state) => ({
-      ...state,
-      ui: {
-        ...state.ui,
-        statusOptions: { ...state.ui.statusOptions, uploadStatus: true, macroRecording: true },
-      },
-    }));
-
-    await mounted.rerender({
-      uploadStatus: 'error',
-      macroRecording: true,
-    });
-
-    expect(mounted.instance).toBe(original);
-    expect(
-      mounted.host.querySelector<HTMLElement>('.fc-host__statusbar-upload')?.dataset.uploadStatus,
-    ).toBe('error');
-    expect(
-      mounted.host.querySelector<HTMLElement>('.fc-host__statusbar-macro')?.dataset.macroRecording,
-    ).toBe('true');
-  });
-
-  it('re-exports Screen Clipping host hook types from the React package', async () => {
-    const capture: ScreenClipCapture = () => ({
-      src: 'data:image/png;base64,react-export',
-      alt: 'React export',
-    });
-    const result = (await capture()) as ScreenClipResult;
-
-    expect(result).toEqual({
-      src: 'data:image/png;base64,react-export',
-      alt: 'React export',
-    });
-  });
-
-  it('re-exports shared ribbon and dialog helpers from the React package', () => {
-    expect(ReactPackage.ribbonActivationEntries).toBe(Core.ribbonActivationEntries);
-    expect(ReactPackage.ribbonSurfaceCommandIds).toBe(Core.ribbonSurfaceCommandIds);
-    expect(ReactPackage.DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS).toBe(
-      Core.DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS,
-    );
-    expect(ReactPackage.attachRangePickerButton).toBe(Core.attachRangePickerButton);
-    expect(ReactPackage.appendConditionalApplyFormatControls).toBe(
-      Core.appendConditionalApplyFormatControls,
-    );
-    expect(ReactPackage.conditionalStyleOptions).toBe(Core.conditionalStyleOptions);
-    expect(ReactPackage.reportDialogLabels).toBe(Core.reportDialogLabels);
-    expect(ReactPackage.projectDisabledReason).toBe(Core.projectDisabledReason);
-    expect(ReactPackage.projectDisabledState).toBe(Core.projectDisabledState);
-  });
-
-  it('disposes the engine instance on unmount and unwires event subscriptions', async () => {
-    const onCellChange = vi.fn();
-    mounted = await mountReactSpreadsheet({ onCellChange });
+  it('disposes the instance on unmount and clears the ref', async () => {
+    const onCell = vi.fn();
+    mounted = await mountReactSpreadsheet({ onCell });
     const inst = mounted.instance;
-
-    // Sanity: events flow before unmount.
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
-    expect(onCellChange).toHaveBeenCalledTimes(1);
+    const refValue = mounted.refValue;
+    inst.workbook.sheet(0).setNumber(0, 0, 1);
+    expect(onCell).toHaveBeenCalledTimes(1);
 
     await mounted.dispose();
     mounted = null;
 
-    // After unmount the React-bound subscription is gone, so the user-supplied
-    // callback no longer fires regardless of what the workbook reports back.
-    onCellChange.mockClear();
-    inst.workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 2);
-    // Drain microtasks so any straggling listeners have a chance to fire.
-    for (let i = 0; i < 5; i += 1) await Promise.resolve();
-    expect(onCellChange).not.toHaveBeenCalled();
+    expect(inst.disposed).toBe(true);
+    expect(refValue.spreadsheet).toBeNull();
   });
 });

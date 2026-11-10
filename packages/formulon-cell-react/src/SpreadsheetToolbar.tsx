@@ -1,145 +1,99 @@
-// React adapter on top of `Spreadsheet.mountToolbar`. The wrapper owns just
-// three concerns: mounting / disposing the core toolbar against a host div,
-// keeping `activeTab` reactive in both directions, and forwarding the
-// optional review/automation/drawing/file callbacks as hooks.
-//
-// Everything else — DOM, helpers, menus, hook defaults — is provided by core
-// so this file stays small. The ribbon is the core's DOM; select it through
-// the core's `data-ribbon-*` attributes rather than internal class names.
+import type { SpreadsheetInstance } from '@libraz/formulon-cell';
+import { sameProp } from '@libraz/formulon-cell/adapter';
 import {
-  buildAdapterRibbonWiring,
-  dictionaryLocaleFor,
-  openHostMenuFirstDropdown,
-  Spreadsheet,
-  type LegacySpreadsheetInstance as SpreadsheetInstance,
-  type ToolbarInstance,
-} from '@libraz/formulon-cell';
+  mountToolbar,
+  type RibbonHooks,
+  type RibbonTab,
+  type Toolbar,
+} from '@libraz/formulon-cell/toolbar';
 import { type ReactElement, useEffect, useRef } from 'react';
+import { forwardRibbonHooks, ribbonHooksShape } from './ribbon-hooks.js';
 
-import type { RibbonTab, SpreadsheetToolbarProps } from './toolbar/model.js';
-
-export type { RibbonTab, SpreadsheetToolbarProps } from './toolbar/model.js';
-
-type CallbackBag = {
-  onSpellingReview?: () => void;
-  onAccessibilityCheck?: () => void;
-  onRunScript?: () => void;
-  onDrawPen?: () => void;
-  onDrawEraser?: () => void;
-  onTranslate?: () => void;
-  onAddIn?: () => void;
+/** Props of {@link SpreadsheetToolbar}. */
+export interface SpreadsheetToolbarProps {
+  /** The spreadsheet the ribbon drives; nothing is mounted while it is `null`. */
+  spreadsheet: SpreadsheetInstance | null;
+  /** The selected tab, controlled; follow `onTabChange` to keep it in step. */
+  activeTab?: RibbonTab;
+  /** The tab selected at mount when `activeTab` is omitted. */
+  defaultActiveTab?: RibbonTab;
+  onTabChange?: (tab: RibbonTab) => void;
+  /** Host actions for the commands the ribbon cannot run on its own. Only adding or removing a
+   *  hook remounts the ribbon; a new function identity is picked up in place. */
+  hooks?: RibbonHooks;
+  /** The tab surface; defaults to the platform's standard tabs. */
+  ribbonTabs?: readonly RibbonTab[];
+  /** Receives the mounted toolbar, and `null` once it is disposed. */
+  onReady?: (toolbar: Toolbar | null) => void;
+  /** Receives a failed toolbar mount. */
   onError?: (error: unknown) => void;
-  onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
-  onTabChange: (tab: RibbonTab) => void;
+}
+
+/** Returns the previous value while `value` is structurally the same. */
+const useSameProp = <T,>(value: T): T => {
+  const ref = useRef(value);
+  if (!sameProp(ref.current, value)) ref.current = value;
+  return ref.current;
 };
 
-export const SpreadsheetToolbar = ({
-  instance,
-  activeTab,
-  onTabChange,
-  locale,
-  onSpellingReview,
-  onAccessibilityCheck,
-  onRunScript,
-  onDrawPen,
-  onDrawEraser,
-  onTranslate,
-  onAddIn,
-  onError,
-  onToolbarReady,
-  dropdownActions,
-  ribbonTabs,
-}: SpreadsheetToolbarProps): ReactElement => {
+/** The ribbon of `spreadsheet`, placed apart from the grid. */
+export const SpreadsheetToolbar = (props: SpreadsheetToolbarProps): ReactElement => {
+  const { spreadsheet, activeTab } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const toolbarRef = useRef<ToolbarInstance | null>(null);
+  const toolbarRef = useRef<Toolbar | null>(null);
+  const reportedTabRef = useRef<RibbonTab | undefined>(undefined);
+  const propsRef = useRef(props);
+  propsRef.current = props;
+  const ribbonTabs = useSameProp(props.ribbonTabs);
+  const hooksShape = ribbonHooksShape(props.hooks);
 
-  // Keep the latest callbacks in a ref so the mount effect only re-runs on
-  // instance / locale change. Hook implementations close over the ref so a
-  // late-mutated callback still fires on the next click.
-  const callbacks: CallbackBag = {
-    onTabChange,
-    onSpellingReview,
-    onAccessibilityCheck,
-    onRunScript,
-    onDrawPen,
-    onDrawEraser,
-    onTranslate,
-    onAddIn,
-    onError,
-    onToolbarReady,
-  };
-  const callbacksRef = useRef<CallbackBag>(callbacks);
-  callbacksRef.current = callbacks;
-
-  // Presence (not identity) of these props decides whether core defaults are
-  // overridden, so only a change in presence re-mounts the toolbar.
-  const hasSpelling = Boolean(onSpellingReview);
-  const hasAccessibility = Boolean(onAccessibilityCheck);
-  const hasTranslate = Boolean(onTranslate);
-  const hasRunScript = Boolean(onRunScript);
-  const hasAddIn = Boolean(onAddIn);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: activeTab handled by the tab-switch effect below; including it would re-mount the toolbar on every tab click
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hooksShape stands for the hooks present; the hooks themselves are read at call time
   useEffect(() => {
     const host = hostRef.current;
-    if (!host || !instance) return undefined;
-    // Provided callbacks override only their own items; host `dropdownActions`
-    // win. Pass a memoized object to avoid re-mounting on every render.
-    const wiring = buildAdapterRibbonWiring(
-      instance as SpreadsheetInstance,
-      () => callbacksRef.current,
-      dropdownActions,
+    if (!host || !spreadsheet) return undefined;
+    let disposed = false;
+    let mounted: Toolbar | null = null;
+    const initialTab = propsRef.current.activeTab ?? propsRef.current.defaultActiveTab;
+    mountToolbar(host, spreadsheet, {
+      hooks: forwardRibbonHooks(() => propsRef.current.hooks),
+      ...(ribbonTabs ? { ribbonTabs } : {}),
+      ...(initialTab ? { activeTab: initialTab } : {}),
+    }).then(
+      (toolbar) => {
+        if (disposed) {
+          toolbar.dispose();
+          return;
+        }
+        mounted = toolbar;
+        toolbarRef.current = toolbar;
+        reportedTabRef.current = toolbar.activeTab;
+        toolbar.on('change', (state) => {
+          if (state.activeTab === reportedTabRef.current) return;
+          reportedTabRef.current = state.activeTab;
+          propsRef.current.onTabChange?.(state.activeTab);
+        });
+        propsRef.current.onReady?.(toolbar);
+      },
+      (error: unknown) => {
+        if (!disposed) propsRef.current.onError?.(error);
+      },
     );
-    let tb: ToolbarInstance;
-    try {
-      tb = Spreadsheet.mountToolbar(host as HTMLElement, instance as SpreadsheetInstance, {
-        lang: dictionaryLocaleFor(locale),
-        activeTab,
-        ribbonTabs,
-        onTabChange: (tab) => callbacksRef.current.onTabChange(tab),
-        interceptCommand: (id, button) => openHostMenuFirstDropdown(toolbarRef.current, id, button),
-        // Opt into core's default dropdown-menu click delegator so Fill / Clear
-        // / AutoSum / etc. work without each consumer reimplementing the
-        // playground's `createDynamicDropdowns` wiring.
-        dynamicDropdowns: wiring.dynamicDropdowns,
-        hooks: wiring.hooks,
-      });
-    } catch (error) {
-      callbacksRef.current.onToolbarReady?.(null);
-      callbacksRef.current.onError?.(error);
-      return undefined;
-    }
-    toolbarRef.current = tb;
-    callbacksRef.current.onToolbarReady?.(tb);
     return () => {
-      callbacksRef.current.onToolbarReady?.(null);
-      tb.dispose();
+      disposed = true;
+      if (!mounted) return;
       toolbarRef.current = null;
+      mounted.dispose();
+      propsRef.current.onReady?.(null);
     };
-  }, [
-    instance,
-    locale,
-    dropdownActions,
-    ribbonTabs,
-    hasSpelling,
-    hasAccessibility,
-    hasTranslate,
-    hasRunScript,
-    hasAddIn,
-  ]);
+  }, [spreadsheet, ribbonTabs, hooksShape]);
 
-  // Forward external tab changes into the toolbar without re-mounting.
   useEffect(() => {
-    const tb = toolbarRef.current;
-    if (!tb) return;
-    if (tb.getActiveTab() !== activeTab) tb.setActiveTab(activeTab);
+    const toolbar = toolbarRef.current;
+    if (!toolbar || activeTab === undefined || toolbar.activeTab === activeTab) return;
+    reportedTabRef.current = activeTab;
+    toolbar.update({ activeTab });
   }, [activeTab]);
 
-  // `display: contents` keeps the wrapper out of the layout tree so the
-  // core ribbon-shell (`flex: 0 0 auto`) sees the parent flex column
-  // directly. Without this the extra div breaks the flex chain and the
-  // sibling sheet element collapses to zero height.
+  // `display: contents` keeps the wrapper out of the flex chain the ribbon shell sits in.
   return <div ref={hostRef} style={{ display: 'contents' }} />;
 };
-
-export const Toolbar = SpreadsheetToolbar;

@@ -1,5 +1,5 @@
-import type { SpreadsheetEventName, SpreadsheetInstance } from '@libraz/formulon-cell';
-import { act, type ReactNode, useEffect, useMemo } from 'react';
+import type { SpreadsheetInstance } from '@libraz/formulon-cell';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -91,6 +91,8 @@ function renderHook<T, P>(
   };
 }
 
+type Props = { instance: SpreadsheetInstance | null };
+
 describe('useSelection', () => {
   let mounted: MountedReactSpreadsheet | null = null;
 
@@ -103,56 +105,54 @@ describe('useSelection', () => {
   it('returns the live selection and re-renders when the active cell moves', async () => {
     mounted = await mountReactSpreadsheet();
     const inst = mounted.instance;
-    const harness = renderHook(
-      (p: { instance: SpreadsheetInstance | null }) => useSelection(p.instance),
-      {
-        instance: inst,
-      },
-    );
+    const harness = renderHook((p: Props) => useSelection(p.instance), { instance: inst });
     await harness.rerender();
 
-    expect(harness.value().active).toEqual({ sheet: 0, row: 0, col: 0 });
+    expect(harness.value()?.active).toMatchObject({ row: 0, col: 0 });
     const startRenders = harness.renderCount();
 
-    const { mutators } = await import('@libraz/formulon-cell');
     await act(async () => {
-      mutators.setActive(inst.store, { sheet: 0, row: 7, col: 4 });
+      inst.selection.set('E8');
       await flush();
     });
 
-    expect(harness.value().active).toEqual({ sheet: 0, row: 7, col: 4 });
+    expect(harness.value()?.active).toMatchObject({ row: 7, col: 4 });
     expect(harness.renderCount()).toBeGreaterThan(startRenders);
     await harness.unmount();
   });
 
-  it('falls back to the zero-selection when instance is null and unsubscribes on unmount', async () => {
+  it('is null while the spreadsheet is null and stops listening once it is dropped', async () => {
     mounted = await mountReactSpreadsheet();
     const inst = mounted.instance;
-
-    const harness = renderHook(
-      (p: { instance: SpreadsheetInstance | null }) => useSelection(p.instance),
-      { instance: inst as SpreadsheetInstance | null },
-    );
-    await harness.rerender();
-
-    // Swap to null — the hook should fall back to the placeholder selection.
-    await harness.setProps({ instance: null });
-    expect(harness.value()).toEqual({
-      active: { sheet: 0, row: 0, col: 0 },
-      anchor: { sheet: 0, row: 0, col: 0 },
-      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+    const harness = renderHook((p: Props) => useSelection(p.instance), {
+      instance: inst as SpreadsheetInstance | null,
     });
+    await harness.rerender();
+    expect(harness.value()).not.toBeNull();
 
-    // Mutating the original instance after the hook detaches must not throw
-    // and must not bring the hook back to life.
-    const { mutators } = await import('@libraz/formulon-cell');
+    await harness.setProps({ instance: null });
+    expect(harness.value()).toBeNull();
+
     const before = harness.renderCount();
     await act(async () => {
-      mutators.setActive(inst.store, { sheet: 0, row: 9, col: 9 });
+      inst.selection.set('J10');
       await flush();
     });
     expect(harness.renderCount()).toBe(before);
+    await harness.unmount();
+  });
 
+  it('is null once the spreadsheet is disposed', async () => {
+    mounted = await mountReactSpreadsheet();
+    const inst = mounted.instance;
+    const harness = renderHook((p: Props) => useSelection(p.instance), { instance: inst });
+    await harness.rerender();
+
+    await mounted.dispose();
+    mounted = null;
+    await harness.rerender();
+
+    expect(harness.value()).toBeNull();
     await harness.unmount();
   });
 });
@@ -166,65 +166,88 @@ describe('useSpreadsheet', () => {
     document.body.replaceChildren();
   });
 
-  it('runs the selector against live state and re-runs on store changes', async () => {
+  const a1 = (s: SpreadsheetInstance): number | null => {
+    const v = s.workbook.sheet(0).getTypedValue(0, 0) as { number?: number };
+    return v.number ?? null;
+  };
+
+  it('runs the selector against live state and re-runs on cell changes', async () => {
     mounted = await mountReactSpreadsheet();
     const inst = mounted.instance;
-    const harness = renderHook(
-      (p: { instance: SpreadsheetInstance | null }) =>
-        useSpreadsheet(p.instance, (s) => s.data.cells.size, -1),
-      { instance: inst },
-    );
+    const harness = renderHook((p: Props) => useSpreadsheet(p.instance, a1), { instance: inst });
     await harness.rerender();
 
-    expect(harness.value()).toBe(0);
+    expect(harness.value()).toBeNull();
 
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 5);
-    inst.workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 6);
     await act(async () => {
+      inst.workbook.sheet(0).setNumber(0, 0, 5);
       await flush();
     });
 
-    expect(harness.value()).toBe(2);
+    expect(harness.value()).toBe(5);
     await harness.unmount();
   });
 
-  it('keeps fresh object selector results from causing a snapshot loop', async () => {
+  it('re-runs the selector on selection and locale changes', async () => {
+    mounted = await mountReactSpreadsheet({ locale: 'en' });
+    const inst = mounted.instance;
+    const harness = renderHook(
+      (p: Props) =>
+        useSpreadsheet(p.instance, (s) => `${s.selection.get().active.row}:${s.i18n.locale}`),
+      { instance: inst },
+    );
+    await harness.rerender();
+    expect(harness.value()).toBe('0:en');
+
+    await act(async () => {
+      inst.selection.set('A3');
+      await flush();
+    });
+    expect(harness.value()).toBe('2:en');
+
+    await act(async () => {
+      inst.update({ locale: 'ja' });
+      await flush();
+    });
+    expect(harness.value()).toBe('2:ja');
+    await harness.unmount();
+  });
+
+  it('keeps fresh object selector results from causing a render loop', async () => {
     mounted = await mountReactSpreadsheet();
     const inst = mounted.instance;
     const harness = renderHook(
-      (p: { instance: SpreadsheetInstance | null }) =>
-        useSpreadsheet(p.instance, (s) => ({ cells: s.data.cells.size }), { cells: -1 }),
+      (p: Props) => useSpreadsheet(p.instance, (s) => ({ row: s.selection.get().active.row })),
       { instance: inst },
     );
     await harness.rerender();
 
-    expect(harness.value()).toEqual({ cells: 0 });
+    expect(harness.value()).toEqual({ row: 0 });
     expect(harness.renderCount()).toBeLessThan(5);
     await harness.unmount();
   });
 
-  it('returns the supplied fallback while instance is null and stops listening on unmount', async () => {
+  it('is null while the spreadsheet is null and stops listening on unmount', async () => {
     mounted = await mountReactSpreadsheet();
     const inst = mounted.instance;
-
-    const harness = renderHook(
-      (p: { instance: SpreadsheetInstance | null }) =>
-        useSpreadsheet<number | 'fallback'>(p.instance, (s) => s.data.cells.size, 'fallback'),
-      { instance: null as SpreadsheetInstance | null },
-    );
+    const harness = renderHook((p: Props) => useSpreadsheet(p.instance, a1), {
+      instance: null as SpreadsheetInstance | null,
+    });
     await harness.rerender();
-    expect(harness.value()).toBe('fallback');
+    expect(harness.value()).toBeNull();
 
     await harness.setProps({ instance: inst });
-    expect(harness.value()).toBe(0);
+    inst.workbook.sheet(0).setNumber(0, 0, 3);
+    await act(async () => {
+      await flush();
+    });
+    expect(harness.value()).toBe(3);
 
+    const before = harness.renderCount();
     await harness.unmount();
-
-    // Post-unmount: changes to the store no longer reach the (gone) hook.
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+    inst.workbook.sheet(0).setNumber(0, 0, 4);
     await flush();
-    // No assertion failures means the unsubscribe ran cleanly.
-    expect(inst.store.getState().data.cells.size).toBe(1);
+    expect(harness.renderCount()).toBe(before);
   });
 });
 
@@ -237,47 +260,41 @@ describe('useI18n', () => {
     document.body.replaceChildren();
   });
 
-  it('mirrors the live locale and re-renders when setLocale fires', async () => {
+  it('mirrors the live locale and re-renders when the locale is updated', async () => {
     mounted = await mountReactSpreadsheet({ locale: 'ja' });
     const inst = mounted.instance;
-
-    const harness = renderHook(
-      (p: { instance: SpreadsheetInstance | null }) => useI18n(p.instance),
-      { instance: inst },
-    );
+    const harness = renderHook((p: Props) => useI18n(p.instance), { instance: inst });
     await harness.rerender();
 
-    expect(harness.value().locale).toBe('ja');
-    expect(harness.value().strings).not.toBeNull();
+    expect(harness.value()?.locale).toBe('ja');
+    expect(harness.value()?.strings).toBe(inst.i18n.strings);
 
     await act(async () => {
-      inst.i18n.setLocale('en');
+      inst.update({ locale: 'en' });
       await flush();
     });
 
-    expect(harness.value().locale).toBe('en');
+    expect(harness.value()?.locale).toBe('en');
+    expect(harness.value()?.strings).toBe(inst.i18n.strings);
     await harness.unmount();
   });
 
-  it('returns the placeholder when instance is null and unsubscribes on unmount', async () => {
+  it('is null while the spreadsheet is null and does not re-render after unmount', async () => {
     mounted = await mountReactSpreadsheet();
     const inst = mounted.instance;
-
-    const harness = renderHook(
-      (p: { instance: SpreadsheetInstance | null }) => useI18n(p.instance),
-      { instance: null as SpreadsheetInstance | null },
-    );
+    const harness = renderHook((p: Props) => useI18n(p.instance), {
+      instance: null as SpreadsheetInstance | null,
+    });
     await harness.rerender();
-    expect(harness.value()).toEqual({ locale: 'ja', strings: null });
+    expect(harness.value()).toBeNull();
 
     await harness.setProps({ instance: inst });
-    expect(harness.value().locale).toBe(inst.i18n.locale);
+    expect(harness.value()?.locale).toBe(inst.i18n.locale);
 
     const beforeUnmount = harness.renderCount();
     await harness.unmount();
 
-    // Triggering an i18n change after unmount must not re-render the hook.
-    inst.i18n.setLocale('en');
+    inst.update({ locale: 'ja' });
     await flush();
     expect(harness.renderCount()).toBe(beforeUnmount);
   });
@@ -304,75 +321,54 @@ describe('useSpreadsheetEvent', () => {
     document.body.replaceChildren();
   });
 
-  it('subscribes to the named event and invokes the latest handler reference', async () => {
+  interface ProbeProps {
+    instance: SpreadsheetInstance | null;
+    handler: (e: unknown) => void;
+  }
+  // biome-ignore lint/correctness/noComponentHookFactories: a probe shared by this block hosts the hook under test.
+  const Probe = ({ instance, handler }: ProbeProps): ReactNode => {
+    useSpreadsheetEvent(instance, 'cell', handler);
+    return null;
+  };
+
+  const render = async (props: ProbeProps): Promise<void> => {
+    if (!outerRoot) {
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      outerRoot = createRoot(host);
+    }
+    await act(async () => {
+      outerRoot?.render(<Probe {...props} />);
+      await flush();
+    });
+  };
+
+  it('subscribes to the named event and invokes the latest handler without resubscribing', async () => {
     mounted = await mountReactSpreadsheet();
     const inst = mounted.instance;
-
+    const on = vi.spyOn(inst, 'on');
     const handlerA = vi.fn();
     const handlerB = vi.fn();
 
-    interface ProbeProps {
-      instance: SpreadsheetInstance | null;
-      handler: (e: unknown) => void;
-    }
-    // biome-ignore lint/correctness/noComponentHookFactories: a probe built per render root hosts the hook under test and mounts once.
-    const Probe = ({ instance, handler }: ProbeProps): ReactNode => {
-      useSpreadsheetEvent(instance, 'cellChange' as SpreadsheetEventName, handler as never);
-      return null;
-    };
-
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    outerRoot = createRoot(host);
-
-    await act(async () => {
-      outerRoot?.render(<Probe instance={inst} handler={handlerA} />);
-      await flush();
-    });
-
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+    await render({ instance: inst, handler: handlerA });
+    inst.workbook.sheet(0).setNumber(0, 0, 1);
     expect(handlerA).toHaveBeenCalledTimes(1);
+    expect(handlerA.mock.calls[0]?.[0]).toMatchObject({ sheet: 0, at: { row: 0, col: 0 } });
 
-    // Swap handler without remounting → re-render should not re-subscribe but
-    // the new handler must still receive the next event.
-    await act(async () => {
-      outerRoot?.render(<Probe instance={inst} handler={handlerB} />);
-      await flush();
-    });
-
-    inst.workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 2);
+    await render({ instance: inst, handler: handlerB });
+    inst.workbook.sheet(0).setNumber(1, 0, 2);
     expect(handlerB).toHaveBeenCalledTimes(1);
-    expect(handlerA).toHaveBeenCalledTimes(1); // not re-invoked
+    expect(handlerA).toHaveBeenCalledTimes(1);
+    expect(on).toHaveBeenCalledTimes(1);
   });
 
-  it('cleans up the subscription on unmount so handler stops firing', async () => {
+  it('cleans up the subscription on unmount so the handler stops firing', async () => {
     mounted = await mountReactSpreadsheet();
     const inst = mounted.instance;
-
     const handler = vi.fn();
-    interface ProbeProps {
-      instance: SpreadsheetInstance | null;
-      handler: (e: unknown) => void;
-    }
-    // biome-ignore lint/correctness/noComponentHookFactories: a probe built per render root hosts the hook under test and mounts once.
-    const Probe = ({ instance, handler: h }: ProbeProps): ReactNode => {
-      useSpreadsheetEvent(instance, 'cellChange' as SpreadsheetEventName, h as never);
-      // Touch a memo so the test can assert the component actually mounted.
-      useEffect(() => undefined, []);
-      useMemo(() => 0, []);
-      return null;
-    };
 
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    outerRoot = createRoot(host);
-
-    await act(async () => {
-      outerRoot?.render(<Probe instance={inst} handler={handler} />);
-      await flush();
-    });
-
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+    await render({ instance: inst, handler });
+    inst.workbook.sheet(0).setNumber(0, 0, 1);
     expect(handler).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -382,8 +378,14 @@ describe('useSpreadsheetEvent', () => {
     outerRoot = null;
 
     handler.mockClear();
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 1 }, 2);
+    inst.workbook.sheet(0).setNumber(0, 1, 2);
     await flush();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('does nothing while the spreadsheet is null', async () => {
+    const handler = vi.fn();
+    await render({ instance: null, handler });
     expect(handler).not.toHaveBeenCalled();
   });
 });

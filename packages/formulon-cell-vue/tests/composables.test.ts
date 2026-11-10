@@ -1,403 +1,231 @@
-import { createSpreadsheetStore, mutators, type SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { SpreadsheetInstance } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  type App,
-  type ComponentPublicInstance,
-  createApp,
-  defineComponent,
-  nextTick,
-  type Ref,
-  shallowRef,
-} from 'vue';
-import { useI18n, useSelection, useSpreadsheet, useSpreadsheetEvent } from '../src/composables';
-import {
-  installVueDomStubs,
-  type MountedVueSpreadsheet,
-  mountVueSpreadsheet,
-  uninstallVueDomStubs,
-} from './test-utils/mount';
+import { type EffectScope, effectScope, nextTick, shallowRef, watch } from 'vue';
+import { useI18n, useSelection, useSpreadsheet, useSpreadsheetEvent } from '../src';
+import { flush, mountStub } from './test-utils/mount';
 
-const flush = async (): Promise<void> => {
-  for (let i = 0; i < 8; i += 1) await Promise.resolve();
-  await nextTick();
+const scopes: EffectScope[] = [];
+const instances: SpreadsheetInstance[] = [];
+
+const mountInstance = async (
+  options: Parameters<typeof mountStub>[0] = {},
+): Promise<SpreadsheetInstance> => {
+  const inst = await mountStub(options);
+  instances.push(inst);
+  return inst;
 };
 
-interface ComposableHarness<T> {
-  /** Latest composable return value. */
-  readonly value: () => T;
-  /** Update the wrapped instance ref the composable depends on. */
-  setInstance(next: SpreadsheetInstance | null): Promise<void>;
-  unmount(): Promise<void>;
-}
+/** Runs `fn` in a scope the test stops itself or `afterEach` does. */
+const inScope = <T>(fn: () => T): { value: T; scope: EffectScope } => {
+  const scope = effectScope();
+  scopes.push(scope);
+  return { value: scope.run(fn) as T, scope };
+};
 
-/** Mount a tiny Vue app whose `setup()` calls the supplied composable and
- *  exposes its return value via a captured ref. */
-function renderComposable<T>(
-  factory: (instance: Ref<SpreadsheetInstance | null>) => T,
-  initial: SpreadsheetInstance | null,
-): ComposableHarness<T> & { app: App } {
-  installVueDomStubs();
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-
-  const instanceRef = shallowRef<SpreadsheetInstance | null>(initial);
-  let captured: T | undefined;
-  const Probe = defineComponent({
-    setup() {
-      captured = factory(instanceRef);
-      return () => null;
-    },
-  });
-
-  const app = createApp(Probe);
-  app.mount(host);
-
-  return {
-    app,
-    value: () => {
-      if (captured === undefined) throw new Error('composable never produced a value');
-      return captured;
-    },
-    async setInstance(next) {
-      instanceRef.value = next;
-      await flush();
-    },
-    async unmount() {
-      app.unmount();
-      await flush();
-      host.remove();
-      uninstallVueDomStubs();
-    },
-  };
-}
+afterEach(() => {
+  for (const scope of scopes.splice(0)) scope.stop();
+  for (const inst of instances.splice(0).reverse()) inst.dispose();
+  document.body.replaceChildren();
+});
 
 describe('useSelection', () => {
-  let mounted: MountedVueSpreadsheet | null = null;
-
-  afterEach(async () => {
-    if (mounted) await mounted.dispose();
-    mounted = null;
-    document.body.replaceChildren();
+  it('is null for a null source and mirrors the live selection after', async () => {
+    const inst = await mountInstance();
+    const source = shallowRef<SpreadsheetInstance | null>(null);
+    const { value: selection } = inScope(() => useSelection(source));
+    expect(selection.value).toBeNull();
+    source.value = inst;
+    await nextTick();
+    expect(selection.value?.active).toEqual({ row: 0, col: 0 });
+    inst.selection.set('C3');
+    expect(selection.value?.active).toEqual({ row: 2, col: 2 });
   });
 
-  it('mirrors the live selection and updates when the active cell moves', async () => {
-    mounted = await mountVueSpreadsheet();
-    const inst = mounted.instance;
-    const harness = renderComposable((r) => useSelection(r), inst);
-    await flush();
-
-    expect(harness.value().value.active).toEqual({ sheet: 0, row: 0, col: 0 });
-
-    mutators.setActive(inst.store, { sheet: 0, row: 5, col: 2 });
-    await flush();
-
-    expect(harness.value().value.active).toEqual({ sheet: 0, row: 5, col: 2 });
-
-    await harness.unmount();
+  it('accepts a plain value, a ref and a getter', async () => {
+    const inst = await mountInstance();
+    const holder = shallowRef<SpreadsheetInstance | null>(inst);
+    const { value } = inScope(() => ({
+      plain: useSelection(inst),
+      byRef: useSelection(shallowRef<SpreadsheetInstance | null>(inst)),
+      byGetter: useSelection(() => holder.value),
+    }));
+    inst.selection.set('B2');
+    for (const selection of Object.values(value)) {
+      expect(selection.value?.active).toEqual({ row: 1, col: 1 });
+    }
   });
 
-  it('cleans up its store subscription on unmount', async () => {
-    mounted = await mountVueSpreadsheet();
-    const inst = mounted.instance;
-    const harness = renderComposable((r) => useSelection(r), inst);
-    await flush();
-
-    const refValue = harness.value();
-    const before = refValue.value.active;
-    expect(before).toEqual({ sheet: 0, row: 0, col: 0 });
-
-    await harness.unmount();
-
-    // Mutating after unmount must not throw and must not crash subscribers.
-    mutators.setActive(inst.store, { sheet: 0, row: 6, col: 6 });
-    await flush();
-    // The captured ref's last value reflects pre-unmount state — proves the
-    // subscription was severed (otherwise it'd track the mutation).
-    expect(refValue.value.active).toEqual(before);
+  it('follows a new instance and ignores the old one', async () => {
+    const a = await mountInstance();
+    const b = await mountInstance();
+    const source = shallowRef<SpreadsheetInstance | null>(a);
+    const { value: selection } = inScope(() => useSelection(source));
+    source.value = b;
+    await nextTick();
+    a.selection.set('D4');
+    expect(selection.value?.active).toEqual({ row: 0, col: 0 });
+    b.selection.set('E5');
+    expect(selection.value?.active).toEqual({ row: 4, col: 4 });
   });
 
-  it('resets on null, follows a new instance, and ignores the old instance', async () => {
-    mounted = await mountVueSpreadsheet();
-    const first = mounted.instance;
-    const otherStore = createSpreadsheetStore();
-    const other = { store: otherStore } as unknown as SpreadsheetInstance;
-    const harness = renderComposable((r) => useSelection(r), first);
-    await flush();
-
-    mutators.setActive(first.store, { sheet: 0, row: 2, col: 3 });
-    await flush();
-    await harness.setInstance(null);
-    expect(harness.value().value.active).toEqual({ sheet: 0, row: 0, col: 0 });
-
-    await harness.setInstance(other);
-    mutators.setActive(otherStore, { sheet: 0, row: 4, col: 5 });
-    await flush();
-    expect(harness.value().value.active).toEqual({ sheet: 0, row: 4, col: 5 });
-
-    mutators.setActive(first.store, { sheet: 0, row: 8, col: 9 });
-    await flush();
-    expect(harness.value().value.active).toEqual({ sheet: 0, row: 4, col: 5 });
-
-    await harness.unmount();
+  it('goes null after the instance is disposed', async () => {
+    const inst = await mountInstance();
+    const { value: selection } = inScope(() => useSelection(inst));
+    expect(selection.value).not.toBeNull();
+    inst.dispose();
+    const source = shallowRef<SpreadsheetInstance | null>(inst);
+    const { value: afterDispose } = inScope(() => useSelection(source));
+    expect(afterDispose.value).toBeNull();
   });
 
-  it('does not invoke a detached store unsubscribe again on scope dispose', async () => {
-    const store = createSpreadsheetStore();
-    const off = vi.fn();
-    const fake = {
-      store: {
-        getState: () => store.getState(),
-        subscribe: () => off,
-      },
-    } as unknown as SpreadsheetInstance;
-    const harness = renderComposable((r) => useSelection(r), fake);
-    await flush();
-
-    await harness.setInstance(null);
-    await harness.unmount();
-
-    expect(off).toHaveBeenCalledTimes(1);
+  it('stops listening when its scope stops', async () => {
+    const inst = await mountInstance();
+    const { value: selection, scope } = inScope(() => useSelection(inst));
+    scope.stop();
+    inst.selection.set('F6');
+    expect(selection.value?.active).toEqual({ row: 0, col: 0 });
   });
 });
 
 describe('useSpreadsheet', () => {
-  let mounted: MountedVueSpreadsheet | null = null;
-
-  afterEach(async () => {
-    if (mounted) await mounted.dispose();
-    mounted = null;
-    document.body.replaceChildren();
+  it('runs the selector now and again after a selection move and an update', async () => {
+    const inst = await mountInstance();
+    const selector = vi.fn((s: SpreadsheetInstance) => s.selection.get().active.row);
+    const { value } = inScope(() => useSpreadsheet(inst, selector));
+    expect(value.value).toBe(0);
+    inst.selection.set('A5');
+    expect(value.value).toBe(4);
+    const calls = selector.mock.calls.length;
+    inst.update({ theme: 'ink' });
+    expect(selector.mock.calls.length).toBeGreaterThan(calls);
   });
 
-  it('runs the selector against the live store and re-runs on changes', async () => {
-    mounted = await mountVueSpreadsheet();
-    const inst = mounted.instance;
-
-    const harness = renderComposable((r) => useSpreadsheet(r, (s) => s.data.cells.size, -1), inst);
-    await flush();
-
-    expect(harness.value().value).toBe(0);
-
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 7);
-    inst.workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 8);
-    await flush();
-
-    expect(harness.value().value).toBe(2);
-    await harness.unmount();
-  });
-
-  it('returns the supplied fallback when instance is null and stops listening on unmount', async () => {
-    mounted = await mountVueSpreadsheet();
-    const inst = mounted.instance;
-
-    const harness = renderComposable(
-      (r) => useSpreadsheet<number | 'fallback'>(r, (s) => s.data.cells.size, 'fallback'),
-      null,
+  it('re-runs after a cell change', async () => {
+    const inst = await mountInstance();
+    const { value } = inScope(() =>
+      useSpreadsheet(inst, (s) => s.workbook.sheet(0).getTypedValue(0, 0)),
     );
-    await flush();
+    expect(value.value).not.toMatchObject({ number: 9 });
+    inst.workbook.sheet(0).setNumber(0, 0, 9);
+    expect(value.value).toMatchObject({ number: 9 });
+  });
 
-    expect(harness.value().value).toBe('fallback');
+  it('is null for a null source and after its scope stops', async () => {
+    const inst = await mountInstance();
+    const source = shallowRef<SpreadsheetInstance | null>(null);
+    const selector = vi.fn((s: SpreadsheetInstance) => s.selection.get().active.row);
+    const { value, scope } = inScope(() => useSpreadsheet(source, selector));
+    expect(value.value).toBeNull();
+    expect(selector).not.toHaveBeenCalled();
+    source.value = inst;
+    await nextTick();
+    expect(value.value).toBe(0);
+    scope.stop();
+    const calls = selector.mock.calls.length;
+    inst.selection.set('A9');
+    expect(selector.mock.calls.length).toBe(calls);
+  });
 
-    await harness.setInstance(inst);
-    expect(harness.value().value).toBe(0);
-
-    await harness.unmount();
-
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
-    await flush();
-    // The stored ref doesn't update post-unmount.
-    expect(harness.value().value).toBe(0);
+  it('notifies watchers even when the selector returns the same object', async () => {
+    const inst = await mountInstance();
+    const shared = { n: 0 };
+    const { value } = inScope(() => useSpreadsheet(inst, () => shared));
+    const seen = vi.fn();
+    inScope(() => watch(value, seen));
+    inst.selection.set('B3');
+    await nextTick();
+    expect(seen).toHaveBeenCalled();
   });
 });
 
 describe('useI18n', () => {
-  let mounted: MountedVueSpreadsheet | null = null;
-
-  afterEach(async () => {
-    if (mounted) await mounted.dispose();
-    mounted = null;
-    document.body.replaceChildren();
+  it('is null before ready, then the active locale and strings', async () => {
+    const inst = await mountInstance({ locale: 'en' });
+    const source = shallowRef<SpreadsheetInstance | null>(null);
+    const { value } = inScope(() => useI18n(source));
+    expect(value.value).toBeNull();
+    source.value = inst;
+    await nextTick();
+    expect(value.value?.locale).toBe('en');
+    expect(value.value?.strings).toBe(inst.i18n.strings);
   });
 
-  it('mirrors the live locale and updates when setLocale fires', async () => {
-    mounted = await mountVueSpreadsheet({ props: { locale: 'ja' } });
-    const inst = mounted.instance;
-
-    const harness = renderComposable((r) => useI18n(r), inst);
+  it('updates when the locale changes through update', async () => {
+    const inst = await mountInstance({ locale: 'en' });
+    const { value } = inScope(() => useI18n(inst));
+    inst.update({ locale: 'ja' });
     await flush();
-
-    expect(harness.value().locale.value).toBe('ja');
-    expect(harness.value().strings.value).toBeTruthy();
-
-    inst.i18n.setLocale('en');
-    await flush();
-
-    expect(harness.value().locale.value).toBe('en');
-    await harness.unmount();
+    expect(value.value?.locale).toBe('ja');
+    expect(value.value?.strings).toBe(inst.i18n.strings);
   });
 
-  it('cleans up its i18n subscription on unmount', async () => {
-    mounted = await mountVueSpreadsheet({ props: { locale: 'ja' } });
-    const inst = mounted.instance;
-
-    const harness = renderComposable((r) => useI18n(r), inst);
+  it('follows a new instance, ignores the old one, and stops with its scope', async () => {
+    const a = await mountInstance({ locale: 'en' });
+    const b = await mountInstance({ locale: 'ja' });
+    const source = shallowRef<SpreadsheetInstance | null>(a);
+    const { value, scope } = inScope(() => useI18n(source));
+    source.value = b;
+    await nextTick();
+    expect(value.value?.locale).toBe('ja');
+    a.update({ locale: 'ko' });
     await flush();
-
-    const localeRef = harness.value().locale;
-    expect(localeRef.value).toBe('ja');
-
-    await harness.unmount();
-
-    // Mutating the locale after unmount must not propagate to the captured
-    // ref (proves the subscription was severed).
-    inst.i18n.setLocale('en');
+    expect(value.value?.locale).toBe('ja');
+    scope.stop();
+    b.update({ locale: 'en' });
     await flush();
-    expect(localeRef.value).toBe('ja');
-  });
-
-  it('resets on null, follows a new instance, and ignores the old instance', async () => {
-    mounted = await mountVueSpreadsheet({ props: { locale: 'ja' } });
-    const first = mounted.instance;
-    let otherLocale = 'en';
-    const otherStrings = first.i18n.strings;
-    const listeners = new Set<(strings: typeof otherStrings) => void>();
-    const other = {
-      i18n: {
-        get locale() {
-          return otherLocale;
-        },
-        get strings() {
-          return otherStrings;
-        },
-        subscribe(listener: (strings: typeof otherStrings) => void) {
-          listeners.add(listener);
-          return () => listeners.delete(listener);
-        },
-      },
-    } as unknown as SpreadsheetInstance;
-    const harness = renderComposable((r) => useI18n(r), first);
-    await flush();
-
-    first.i18n.setLocale('en');
-    await flush();
-    await harness.setInstance(null);
-    expect(harness.value().locale.value).toBe('ja');
-    expect(harness.value().strings.value).toEqual({});
-
-    await harness.setInstance(other);
-    expect(harness.value().locale.value).toBe('en');
-    otherLocale = 'fr';
-    for (const listener of listeners) listener(otherStrings);
-    await flush();
-    expect(harness.value().locale.value).toBe('fr');
-
-    first.i18n.setLocale('ja');
-    await flush();
-    expect(harness.value().locale.value).toBe('fr');
-
-    await harness.unmount();
-  });
-
-  it('does not invoke a detached i18n unsubscribe again on scope dispose', async () => {
-    const strings = {} as SpreadsheetInstance['i18n']['strings'];
-    const off = vi.fn();
-    const fake = {
-      i18n: {
-        locale: 'ja',
-        strings,
-        subscribe: () => off,
-      },
-    } as unknown as SpreadsheetInstance;
-    const harness = renderComposable((r) => useI18n(r), fake);
-    await flush();
-
-    await harness.setInstance(null);
-    await harness.unmount();
-
-    expect(off).toHaveBeenCalledTimes(1);
+    expect(value.value?.locale).toBe('ja');
   });
 });
 
 describe('useSpreadsheetEvent', () => {
-  let mounted: MountedVueSpreadsheet | null = null;
-  let helperApp: { app: App; host: HTMLElement } | null = null;
-
-  afterEach(async () => {
-    if (helperApp) {
-      helperApp.app.unmount();
-      helperApp.host.remove();
-      uninstallVueDomStubs();
-      helperApp = null;
-    }
-    if (mounted) await mounted.dispose();
-    mounted = null;
-    document.body.replaceChildren();
-  });
-
-  it('subscribes to the named event and forwards payloads to the handler', async () => {
-    mounted = await mountVueSpreadsheet();
-    const inst = mounted.instance;
-
+  it('forwards payloads to the handler and follows the source', async () => {
+    const a = await mountInstance();
+    const b = await mountInstance();
+    const source = shallowRef<SpreadsheetInstance | null>(null);
     const handler = vi.fn();
-    installVueDomStubs();
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-
-    const instanceRef = shallowRef<SpreadsheetInstance | null>(inst);
-    const Probe = defineComponent({
-      setup() {
-        useSpreadsheetEvent(instanceRef, 'cellChange', handler);
-        return () => null;
-      },
-    });
-    const app = createApp(Probe);
-    app.mount(host);
-    helperApp = { app, host };
-    await flush();
-
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 9);
-    await flush();
-
-    expect(handler).toHaveBeenCalledTimes(1);
-    const event = handler.mock.calls[0]?.[0];
-    expect((event as { value: { kind: string; value: number } } | undefined)?.value).toEqual({
-      kind: 'number',
-      value: 9,
-    });
-  });
-
-  it('cleans up on unmount and stops invoking the handler afterwards', async () => {
-    mounted = await mountVueSpreadsheet();
-    const inst = mounted.instance;
-
-    const handler = vi.fn();
-    installVueDomStubs();
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-
-    const instanceRef = shallowRef<SpreadsheetInstance | null>(inst);
-    const Probe = defineComponent({
-      setup() {
-        useSpreadsheetEvent(instanceRef, 'cellChange', handler);
-        return () => null;
-      },
-    });
-    const app = createApp(Probe);
-    const probeMount = app.mount(host) as ComponentPublicInstance;
-    expect(probeMount).toBeDefined();
-    await flush();
-
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
-    await flush();
-    expect(handler).toHaveBeenCalledTimes(1);
-
-    app.unmount();
-    host.remove();
-    uninstallVueDomStubs();
-
+    inScope(() => useSpreadsheetEvent(source, 'update', handler));
+    a.update({ theme: 'ink' });
+    expect(handler).not.toHaveBeenCalled();
+    source.value = a;
+    await nextTick();
+    a.update({ theme: 'paper' });
+    expect(handler).toHaveBeenCalledWith({ keys: ['theme'] });
+    source.value = b;
+    await nextTick();
     handler.mockClear();
-    inst.workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 2);
-    await flush();
+    a.update({ theme: 'ink' });
+    expect(handler).not.toHaveBeenCalled();
+    b.update({ theme: 'ink' });
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a getter and a plain instance', async () => {
+    const inst = await mountInstance();
+    const byGetter = vi.fn();
+    const byValue = vi.fn();
+    inScope(() => {
+      useSpreadsheetEvent(() => inst, 'update', byGetter);
+      useSpreadsheetEvent(inst, 'update', byValue);
+    });
+    inst.update({ theme: 'ink' });
+    expect(byGetter).toHaveBeenCalledTimes(1);
+    expect(byValue).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops invoking the handler once its scope stops', async () => {
+    const inst = await mountInstance();
+    const handler = vi.fn();
+    const { scope } = inScope(() => useSpreadsheetEvent(inst, 'update', handler));
+    scope.stop();
+    inst.update({ theme: 'ink' });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('does not subscribe to a disposed instance', async () => {
+    const inst = await mountInstance();
+    inst.dispose();
+    const handler = vi.fn();
+    expect(() => inScope(() => useSpreadsheetEvent(inst, 'update', handler))).not.toThrow();
     expect(handler).not.toHaveBeenCalled();
   });
 });

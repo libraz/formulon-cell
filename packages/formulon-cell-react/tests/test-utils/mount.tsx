@@ -1,4 +1,4 @@
-import { type SpreadsheetInstance, WorkbookHandle } from '@libraz/formulon-cell';
+import { type SpreadsheetInstance, Workbook } from '@libraz/formulon-cell';
 import { act, type ReactElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { vi } from 'vitest';
@@ -18,6 +18,8 @@ export interface MountedReactSpreadsheet {
   root: Root;
   /** Live core instance after mount completes. Throws if mount failed. */
   instance: SpreadsheetInstance;
+  /** The stub workbook the helper created when the props carry none. */
+  workbook: Workbook;
   /** The React ref forwarded to `<Spreadsheet>` so callers can re-use it. */
   refValue: SpreadsheetRef;
   /** Re-render with a new set of props. */
@@ -80,7 +82,8 @@ export async function mountReactSpreadsheet(
   const root = createRoot(host);
   // Pre-create a workbook so the test never accidentally races a default-
   // workbook load that requires the real WASM engine.
-  const workbook = props.workbook ?? (await WorkbookHandle.createDefault({ preferStub: true }));
+  const ownedWorkbook = props.workbook ? null : await Workbook.createDefault({ engine: 'stub' });
+  const workbook = props.workbook ?? (ownedWorkbook as Workbook);
 
   const refHolder: { current: SpreadsheetRef | null } = { current: null };
   const setRef = (next: SpreadsheetRef | null): void => {
@@ -118,7 +121,7 @@ export async function mountReactSpreadsheet(
     });
   }
 
-  const instance = refHolder.current?.instance;
+  const instance = refHolder.current?.spreadsheet;
   if (!instance) {
     throw new Error('mountReactSpreadsheet: instance never became available');
   }
@@ -130,6 +133,7 @@ export async function mountReactSpreadsheet(
     host,
     root,
     instance,
+    workbook,
     refValue: refHolder.current,
     async rerender(next, kids) {
       await act(async () => {
@@ -143,6 +147,7 @@ export async function mountReactSpreadsheet(
         await flush();
       });
       host.remove();
+      ownedWorkbook?.dispose();
       uninstallReactDomStubs();
     },
   };

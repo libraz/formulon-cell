@@ -1,395 +1,180 @@
-import { act, type ReactNode } from 'react';
+import { type SpreadsheetInstance, Workbook } from '@libraz/formulon-cell';
+import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Spreadsheet, type SpreadsheetProps } from '../src/Spreadsheet';
+import { installReactDomStubs, uninstallReactDomStubs } from './test-utils/mount';
 
-const mountCore = vi.fn();
-const resolveUi = vi.fn(
-  (options: { profile?: string; theme?: string; features?: Record<string, boolean> } = {}) => ({
-    profile: options.profile ?? 'excel365',
-    theme: options.theme ?? 'paper',
-    ribbon: options.features?.ribbon ?? options.profile !== 'embedded',
-    print: true,
-    features: options.features ?? {},
-  }),
-);
+const mountSpy = vi.hoisted(() => vi.fn());
 
 vi.mock('@libraz/formulon-cell', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@libraz/formulon-cell')>();
-  return {
-    // Shared adapter reconcile helpers run for real against the fake instance.
-    ADAPTER_FALLBACK_LOCALE: actual.ADAPTER_FALLBACK_LOCALE,
-    ADAPTER_FALLBACK_SELECTION: actual.ADAPTER_FALLBACK_SELECTION,
-    applyControlledLocale: actual.applyControlledLocale,
-    applyControlledProps: actual.applyControlledProps,
-    applyUiFeaturesToolbar: actual.applyUiFeaturesToolbar,
-    resolveAdapterTheme: actual.resolveAdapterTheme,
-    Spreadsheet: { mount: mountCore },
-    resolveSpreadsheetUiOptions: resolveUi,
-  };
+  return { ...actual, mount: mountSpy };
 });
 
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 8; i += 1) await Promise.resolve();
 };
 
-const makeInstance = () => ({
-  workbook: {},
-  locale: 'ja',
-  i18n: { locale: 'ja', strings: {}, setLocale: vi.fn(), extend: vi.fn() },
-  setLocale: vi.fn(() => true),
-  on: vi.fn(() => vi.fn()),
-  dispose: vi.fn(),
-  setWorkbook: vi.fn(async () => undefined),
-  setTheme: vi.fn(),
-  setFeatures: vi.fn(),
-  setExtensions: vi.fn(),
-  setPrinterProfiles: vi.fn(),
-  setPrinterProfileId: vi.fn(),
-  setUploadStatus: vi.fn(),
-  setMacroRecording: vi.fn(),
-  setPolicy: vi.fn(),
-  setViewportOptions: vi.fn(),
-  setContextMenu: vi.fn(),
-  setOverlayOptions: vi.fn(),
-  setUi: vi.fn(),
-  setToolbar: vi.fn(),
-});
-
-describe('React Spreadsheet embedding props', () => {
-  let root: Root | undefined;
+describe('React Spreadsheet option props', () => {
+  let root: Root;
   let host: HTMLDivElement;
-  let Spreadsheet: (props: Record<string, unknown>) => ReactNode;
+  let workbook: Workbook;
+  let instance: SpreadsheetInstance | null;
+  let gate: Promise<void> | null;
 
   beforeEach(async () => {
-    mountCore.mockReset();
-    resolveUi.mockClear();
-    ({ Spreadsheet } = await import('../src/Spreadsheet'));
+    installReactDomStubs();
+    const actual =
+      await vi.importActual<typeof import('@libraz/formulon-cell')>('@libraz/formulon-cell');
+    gate = null;
+    instance = null;
+    mountSpy.mockReset();
+    mountSpy.mockImplementation(async (el: HTMLElement, options: never) => {
+      if (gate) await gate;
+      return actual.mount(el, options);
+    });
+    workbook = await Workbook.createDefault({ engine: 'stub' });
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
   });
 
   afterEach(async () => {
-    if (root) {
-      await act(async () => {
-        root?.unmount();
-        await flush();
-      });
-    }
-    root = undefined;
+    await act(async () => {
+      root.unmount();
+      await flush();
+    });
     host.remove();
-    vi.restoreAllMocks();
+    workbook.dispose();
+    uninstallReactDomStubs();
   });
 
-  const render = async (props: Record<string, unknown>): Promise<void> => {
+  const render = async (props: SpreadsheetProps): Promise<void> => {
     await act(async () => {
-      root?.render(<Spreadsheet {...props} />);
+      root.render(
+        <Spreadsheet
+          workbook={workbook}
+          {...props}
+          onReady={(i) => {
+            instance = i;
+            props.onReady?.(i);
+          }}
+        />,
+      );
       await flush();
     });
   };
 
-  it('passes embedding options through mount, including an explicit toolbar false', async () => {
-    mountCore.mockResolvedValue(makeInstance());
-    const policy = { readOnly: true };
-    const viewport = { tabBoundary: 'leave' };
-    const contextMenu = { mode: 'disabled' };
-    const overlays = { root: document.createElement('section') };
-    await render({ policy, viewport, contextMenu, overlays, toolbar: false });
+  const ready = async (): Promise<SpreadsheetInstance> => {
+    for (let i = 0; i < 20 && !instance; i += 1) await act(flush);
+    if (!instance) throw new Error('the spreadsheet never became ready');
+    return instance;
+  };
 
-    expect(mountCore).toHaveBeenCalledWith(
-      expect.any(HTMLElement),
-      expect.objectContaining({ policy, viewport, contextMenu, overlays, toolbar: false }),
-    );
+  it('mounts with the option props and leaves the callbacks out of the options', async () => {
+    const viewport = { mode: 'fixed', range: 'A1:D20' } as const;
+    await render({ viewport, theme: 'ink', locale: 'ja', onChange: () => {} });
+    await ready();
+
+    expect(mountSpy).toHaveBeenCalledTimes(1);
+    const options = mountSpy.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(options).toMatchObject({ viewport, theme: 'ink', locale: 'ja', workbook });
+    expect(Object.keys(options).filter((k) => k.startsWith('on'))).toEqual([]);
+    expect(options).not.toHaveProperty('policy');
   });
 
-  it('forwards policy-aware change batches to the latest callback', async () => {
-    const instance = makeInstance();
-    mountCore.mockResolvedValue(instance);
-    const onChangeBatch = vi.fn();
-    await render({ onChangeBatch });
+  it('does not update for structurally equal inline objects', async () => {
+    await render({ viewport: { mode: 'fixed', range: 'A1:D20' }, theme: 'ink' });
+    const inst = await ready();
+    const update = vi.spyOn(inst, 'update');
 
-    const listener = instance.on.mock.calls.find(([name]) => name === 'changeBatch')?.[1];
-    const result = { status: 'applied', applied: [], rejected: [], revision: 1 };
-    listener?.(result);
+    await render({ viewport: { mode: 'fixed', range: 'A1:D20' }, theme: 'ink' });
+    expect(update).not.toHaveBeenCalled();
 
-    expect(onChangeBatch).toHaveBeenCalledWith(result);
+    await render({ viewport: { mode: 'fixed', range: 'A1:E30' }, theme: 'ink' });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith({ viewport: { mode: 'fixed', range: 'A1:E30' } });
   });
 
-  it('forwards runtime option removal as undefined and keeps explicit toolbar precedence', async () => {
-    const instance = makeInstance();
-    mountCore.mockResolvedValue(instance);
-    const policy = { readOnly: true };
-    const viewport = { tabBoundary: 'stop' };
-    const contextMenu = { mode: 'disabled' };
-    const overlays = { root: document.createElement('section') };
-    await render({
-      policy,
-      viewport,
-      contextMenu,
-      overlays,
-      ui: { profile: 'embedded' },
-      toolbar: true,
-    });
-    instance.setPolicy.mockClear();
-    instance.setViewportOptions.mockClear();
-    instance.setContextMenu.mockClear();
-    instance.setOverlayOptions.mockClear();
-    instance.setUi.mockClear();
-    instance.setToolbar.mockClear();
+  it('resets an option that is no longer set', async () => {
+    await render({ theme: 'ink' });
+    const inst = await ready();
+    const update = vi.spyOn(inst, 'update');
 
     await render({});
 
-    expect(instance.setPolicy).toHaveBeenCalledWith(undefined);
-    expect(instance.setViewportOptions).toHaveBeenCalledWith(undefined);
-    expect(instance.setContextMenu).toHaveBeenCalledWith(undefined);
-    expect(instance.setOverlayOptions).toHaveBeenCalledWith(undefined);
-    expect(instance.setUi).toHaveBeenCalledWith(undefined);
-    expect(instance.setToolbar).toHaveBeenCalledWith(false);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith({ theme: null });
   });
 
-  it('reconciles props changed while the async core mount is pending', async () => {
-    const instance = makeInstance();
-    let resolveMount: ((value: typeof instance) => void) | undefined;
-    mountCore.mockImplementation(
-      () =>
-        new Promise<typeof instance>((resolve) => {
-          resolveMount = resolve;
-        }),
-    );
-    const initialPolicy = { readOnly: true };
-    const latestPolicy = { defaultOperation: 'allow' };
-    await render({ policy: initialPolicy, toolbar: true });
-    expect(mountCore).toHaveBeenCalledWith(
-      expect.any(HTMLElement),
-      expect.objectContaining({ policy: initialPolicy, toolbar: true }),
-    );
-
-    await render({ policy: latestPolicy, toolbar: false });
-    await act(async () => {
-      resolveMount?.(instance);
-      await flush();
-    });
-
-    expect(instance.setPolicy).toHaveBeenCalledWith(latestPolicy);
-    expect(instance.setToolbar).toHaveBeenCalledWith(false);
-  });
-
-  it('keeps the original workbook usable after a pending controlled replacement rejects', async () => {
-    const original = {
-      getValue: vi.fn(() => ({ kind: 'text', value: 'original' })),
-      dispose: vi.fn(),
-    };
-    const next = { getValue: vi.fn(() => ({ kind: 'text', value: 'next' })), dispose: vi.fn() };
-    const instance = makeInstance();
-    instance.workbook = original;
-    const failure = new Error('controlled workbook rejected');
-    instance.setWorkbook.mockRejectedValueOnce(failure);
-    let resolveMount: ((value: typeof instance) => void) | undefined;
-    mountCore.mockImplementation(
-      () =>
-        new Promise<typeof instance>((resolve) => {
-          resolveMount = resolve;
-        }),
-    );
+  it('applies one update per changed key and reports a refused key without blocking the rest', async () => {
     const onError = vi.fn();
-
-    await render({ workbook: original, onError });
-    await render({ workbook: next, onError });
-    await act(async () => {
-      resolveMount?.(instance);
-      await flush();
+    await render({ theme: 'paper', locale: 'en', onError });
+    const inst = await ready();
+    const refusal = new Error('theme refused');
+    const realUpdate = inst.update.bind(inst);
+    const update = vi.spyOn(inst, 'update').mockImplementation((patch) => {
+      if ('theme' in patch) throw refusal;
+      realUpdate(patch);
     });
 
-    expect(instance.setWorkbook).toHaveBeenCalledTimes(1);
-    expect(instance.setWorkbook).toHaveBeenCalledWith(next);
+    await render({ theme: 'ink', locale: 'ja', onError });
+
+    expect(update).toHaveBeenCalledTimes(2);
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(failure);
-    expect(instance.workbook).toBe(original);
-    expect(original.getValue()).toEqual({ kind: 'text', value: 'original' });
-    expect(original.dispose).not.toHaveBeenCalled();
-    expect(next.dispose).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(refusal);
+    expect(inst.i18n.locale).toBe('ja');
+  });
+
+  it('reconciles props changed while the mount is pending', async () => {
+    let open: () => void = () => {};
+    gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    await render({ theme: 'paper', locale: 'en' });
+    await render({ theme: 'ink', locale: 'ja' });
+    expect(instance).toBeNull();
 
     await act(async () => {
-      root?.unmount();
+      open();
       await flush();
     });
-    root = undefined;
-    expect(original.dispose).not.toHaveBeenCalled();
-    expect(next.dispose).not.toHaveBeenCalled();
+    const inst = await ready();
+
+    expect(inst.i18n.locale).toBe('ja');
+    expect(host.querySelector<HTMLElement>('[data-fc-theme]')?.dataset.fcTheme).toBe('ink');
+    expect(mountSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('continues pending controlled prop reconciliation after workbook rejection', async () => {
-    const original = {
-      getValue: vi.fn(() => ({ kind: 'text', value: 'original' })),
-      dispose: vi.fn(),
-    };
-    const next = { getValue: vi.fn(() => ({ kind: 'text', value: 'next' })), dispose: vi.fn() };
-    const instance = makeInstance();
-    instance.workbook = original;
-    const failure = new Error('controlled workbook rejected');
-    instance.setWorkbook.mockRejectedValueOnce(failure);
-    instance.setLocale.mockImplementation((nextLocale) => {
-      instance.locale = nextLocale;
-      instance.i18n.locale = nextLocale;
-      return true;
+  it('disposes an instance that finishes mounting after the component unmounted', async () => {
+    let open: () => void = () => {};
+    gate = new Promise<void>((resolve) => {
+      open = resolve;
     });
-    let resolveMount: ((value: typeof instance) => void) | undefined;
-    mountCore.mockImplementation(
-      () =>
-        new Promise<typeof instance>((resolve) => {
-          resolveMount = resolve;
-        }),
-    );
-    const onError = vi.fn();
-    const initialPolicy = { readOnly: true };
-    const latestPolicy = { defaultOperation: 'allow' };
-    const strings = { ribbon: { bold: 'Stable bold' } };
-    const features = { ribbon: false };
+    const actual =
+      await vi.importActual<typeof import('@libraz/formulon-cell')>('@libraz/formulon-cell');
+    let created: SpreadsheetInstance | null = null;
+    mountSpy.mockImplementation(async (el: HTMLElement, options: never) => {
+      await gate;
+      created = await actual.mount(el, options);
+      return created;
+    });
+    const onReady = vi.fn();
+    await render({ onReady });
 
-    await render({ workbook: original, policy: initialPolicy, locale: 'ja', onError });
-    await render({
-      workbook: next,
-      policy: latestPolicy,
-      locale: 'en',
-      strings,
-      features,
-      onError,
-    });
     await act(async () => {
-      resolveMount?.(instance);
+      root.unmount();
       await flush();
     });
-
-    expect(instance.setWorkbook).toHaveBeenCalledTimes(1);
-    expect(instance.setWorkbook).toHaveBeenCalledWith(next);
-    expect(instance.setPolicy).toHaveBeenCalledWith(latestPolicy);
-    expect(instance.setLocale).toHaveBeenCalledWith('en');
-    expect(instance.i18n.extend).toHaveBeenCalledWith('en', strings);
-    expect(instance.setFeatures).toHaveBeenCalledWith(expect.objectContaining(features));
-    expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(failure);
-    expect(instance.workbook).toBe(original);
-    expect(original.getValue()).toEqual({ kind: 'text', value: 'original' });
-    expect(original.dispose).not.toHaveBeenCalled();
-    expect(next.dispose).not.toHaveBeenCalled();
-  });
-
-  it('uses the ui ribbon default only when toolbar is omitted', async () => {
-    const instance = makeInstance();
-    mountCore.mockResolvedValue(instance);
-    await render({ ui: { profile: 'standard' } });
-    instance.setToolbar.mockClear();
-
-    await render({ ui: { profile: 'standard' }, toolbar: false });
-    expect(instance.setToolbar).toHaveBeenLastCalledWith(false);
-
-    await render({ ui: { profile: 'standard' }, toolbar: true });
-    expect(instance.setToolbar).toHaveBeenLastCalledWith(true);
-  });
-
-  it('uses the public locale setter and reconciles a rejected controlled update', async () => {
-    const instance = makeInstance();
-    mountCore.mockResolvedValue(instance);
-    const onLocaleChange = vi.fn();
-    const onError = vi.fn();
-
-    await render({ locale: 'en', onLocaleChange, onError });
-    instance.setLocale.mockReturnValue(false);
-    await render({ locale: 'fr', onLocaleChange, onError });
-
-    expect(instance.setLocale).toHaveBeenCalledWith('fr');
-    expect(onLocaleChange).toHaveBeenCalledWith({ locale: 'ja', strings: instance.i18n.strings });
-    expect(onError).toHaveBeenCalledWith(expect.any(Error));
-  });
-
-  it('delivers a rollback event after a prior successful switch to the same locale', async () => {
-    const instance = makeInstance();
-    mountCore.mockResolvedValue(instance);
-    let localeHandler: ((event: { locale: string; strings: object }) => void) | undefined;
-    instance.on.mockImplementation((name, handler) => {
-      if (name === 'localeChange') {
-        localeHandler = handler as (event: { locale: string; strings: object }) => void;
-      }
-      return vi.fn();
+    root = createRoot(host);
+    await act(async () => {
+      open();
+      await flush();
     });
-    instance.setLocale.mockImplementation((next) => {
-      if (next === 'ja') {
-        localeHandler?.({ locale: 'ja', strings: instance.i18n.strings });
-      }
-      return next !== 'fr';
-    });
-    const onLocaleChange = vi.fn();
+    for (let i = 0; i < 20 && !created; i += 1) await act(flush);
 
-    await render({ locale: 'en', onLocaleChange });
-    onLocaleChange.mockClear();
-    await render({ locale: 'ja', onLocaleChange });
-    expect(onLocaleChange).toHaveBeenCalledTimes(1);
-
-    onLocaleChange.mockClear();
-    await render({ locale: 'fr', onLocaleChange });
-
-    expect(onLocaleChange).toHaveBeenCalledTimes(1);
-    expect(onLocaleChange).toHaveBeenCalledWith({
-      locale: 'ja',
-      strings: instance.i18n.strings,
-    });
-  });
-
-  it('reapplies a stable strings overlay after each accepted locale switch', async () => {
-    const instance = makeInstance();
-    mountCore.mockResolvedValue(instance);
-    const strings = { ribbon: { bold: 'Stable bold' } };
-    instance.setLocale.mockImplementation((next) => {
-      instance.locale = next;
-      instance.i18n.locale = next;
-      return true;
-    });
-
-    await render({ locale: 'en', strings });
-    instance.setLocale.mockClear();
-    instance.i18n.extend.mockClear();
-
-    for (const locale of ['ja', 'de', 'fr', 'zh', 'ko', 'th', 'en']) {
-      await render({ locale, strings });
-    }
-
-    expect(instance.setLocale.mock.calls.map(([locale]) => locale)).toEqual([
-      'ja',
-      'de',
-      'fr',
-      'zh',
-      'ko',
-      'th',
-      'en',
-    ]);
-    expect(instance.i18n.extend.mock.calls).toEqual(
-      ['ja', 'de', 'fr', 'zh', 'ko', 'th', 'en'].map((locale) => [locale, strings]),
-    );
-  });
-
-  it('does not reapply a stable strings overlay after a rejected locale switch', async () => {
-    const instance = makeInstance();
-    mountCore.mockResolvedValue(instance);
-    const strings = { ribbon: { bold: 'Stable bold' } };
-    const failure = new Error('locale rejected');
-    const onError = vi.fn();
-    instance.setLocale.mockImplementation((next) => {
-      if (next === 'fr') return false;
-      instance.locale = next;
-      instance.i18n.locale = next;
-      return true;
-    });
-
-    await render({ locale: 'en', strings, onError });
-    instance.i18n.extend.mockClear();
-    instance.setLocale.mockImplementationOnce(() => {
-      throw failure;
-    });
-
-    await render({ locale: 'fr', strings, onError });
-
-    expect(instance.i18n.extend).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(failure);
+    expect(onReady).not.toHaveBeenCalled();
+    expect((created as SpreadsheetInstance | null)?.disposed).toBe(true);
   });
 });

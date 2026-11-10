@@ -568,40 +568,25 @@ describe('toolbar/ribbon shared data', () => {
   });
 
   it('keeps framework toolbar wrappers delegated to the core toolbar implementation', () => {
-    const reactToolbarFiles = sourceFilesUnder('../formulon-cell-react/src/toolbar');
-    const vueToolbarFiles = sourceFilesUnder('../formulon-cell-vue/src/toolbar');
-    const reactToolbarSource = source('../formulon-cell-react/src/SpreadsheetToolbar.tsx');
-    const vueToolbarSource = source('../formulon-cell-vue/src/SpreadsheetToolbar.vue');
-    const vueToolbarDts = source('../formulon-cell-vue/src/SpreadsheetToolbar.vue.d.ts');
-    const vueToolbarExports = source('../formulon-cell-vue/src/toolbar.ts');
-    const reactIndexSource = source('../formulon-cell-react/src/index.ts');
-    const vueIndexSource = source('../formulon-cell-vue/src/index.ts');
+    const wrappers = [
+      source('../formulon-cell-react/src/SpreadsheetToolbar.tsx'),
+      source('../formulon-cell-vue/src/SpreadsheetToolbar.ts'),
+    ];
+    const indexes = [
+      source('../formulon-cell-react/src/index.ts'),
+      source('../formulon-cell-vue/src/index.ts'),
+    ];
 
-    expect(reactToolbarFiles).toEqual(['../formulon-cell-react/src/toolbar/model.ts']);
-    expect(vueToolbarFiles).toEqual([]);
-    expect(reactToolbarSource).toContain('Spreadsheet.mountToolbar');
-    expect(vueToolbarSource).toContain('Spreadsheet.mountToolbar');
-    expect(reactToolbarSource).toContain('callbacksRef.current.onError?.(error)');
-    expect(vueToolbarSource).toContain("emit('error', error)");
-    expect(reactToolbarSource).toContain('export const Toolbar = SpreadsheetToolbar');
-    expect(vueToolbarSource).toContain(
-      "export { default as Toolbar } from './SpreadsheetToolbar.vue'",
-    );
-    expect(vueToolbarDts).toContain('export const Toolbar: typeof SpreadsheetToolbar');
-    for (const symbol of ['DynamicDropdownsCtx', 'RibbonTab', 'ToolbarInstance']) {
-      expect(vueToolbarExports).toContain(symbol);
-      expect(reactIndexSource).toContain(symbol);
-      expect(vueIndexSource).toContain(symbol);
+    expect(sourceFilesUnder('../formulon-cell-react/src/toolbar')).toEqual([]);
+    expect(sourceFilesUnder('../formulon-cell-vue/src/toolbar')).toEqual([]);
+    for (const wrapper of wrappers) {
+      expect(wrapper).toContain("from '@libraz/formulon-cell/toolbar'");
+      expect(wrapper).toContain('mountToolbar(host, spreadsheet');
+      expect(wrapper).not.toMatch(/\bToolbar = SpreadsheetToolbar\b/);
     }
-    for (const symbol of [
-      'EXCEL365_STANDARD_RIBBON_TABS',
-      'OPTIONAL_RIBBON_TABS',
-      'RIBBON_TAB_LABELS',
-      'RIBBON_TABS',
-    ]) {
-      expect(reactIndexSource).toContain(symbol);
-      expect(vueIndexSource).toContain(symbol);
+    for (const index of indexes) {
+      expect(index).toContain('SpreadsheetToolbar');
+      expect(index).not.toContain("from '@libraz/formulon-cell'");
     }
-    expect(vueIndexSource).toContain('SpreadsheetToolbarProps');
   });
 });

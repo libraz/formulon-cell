@@ -1,114 +1,103 @@
-import {
-  ADAPTER_FALLBACK_LOCALE,
-  ADAPTER_FALLBACK_SELECTION,
-  type SpreadsheetEventHandler,
-  type SpreadsheetEventName,
-  type LegacySpreadsheetInstance as SpreadsheetInstance,
+import type {
+  Disposer,
+  I18n,
+  SelectionState,
+  SpreadsheetInstance,
+  SpreadsheetInstanceEvents,
 } from '@libraz/formulon-cell';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
-type State = ReturnType<SpreadsheetInstance['store']['getState']>;
-type Selection = State['selection'];
+type Subscribe = (spreadsheet: SpreadsheetInstance, notify: () => void) => Disposer;
 
-const FALLBACK_SELECTION: Selection = ADAPTER_FALLBACK_SELECTION;
+const usable = (spreadsheet: SpreadsheetInstance | null): spreadsheet is SpreadsheetInstance =>
+  spreadsheet !== null && !spreadsheet.disposed;
 
-/** Stable subscribe per instance, so `useSyncExternalStore` does not resubscribe each render. */
-const useStoreSubscribe = (instance: SpreadsheetInstance | null) =>
-  useMemo(
+/** A counter that moves whenever `subscribe` notifies; subscribes once per spreadsheet. */
+const useVersion = (spreadsheet: SpreadsheetInstance | null, subscribe: Subscribe): number => {
+  const version = useRef(0);
+  const listen = useMemo(
     () =>
-      (cb: () => void): (() => void) =>
-        instance ? instance.store.subscribe(cb) : () => {},
-    [instance],
-  );
-
-/** Subscribe a React component to the spreadsheet's selection state. */
-export const useSelection = (instance: SpreadsheetInstance | null): Selection => {
-  return useSyncExternalStore(
-    useStoreSubscribe(instance),
-    () => instance?.store.getState().selection ?? FALLBACK_SELECTION,
-    () => FALLBACK_SELECTION,
-  );
-};
-
-/** Subscribe to the active sheet's currently-selected aggregate strings
- *  (sum / avg / count / min / max). Re-runs the supplied selector whenever
- *  the store changes. SSR-safe. */
-export const useSpreadsheet = <T>(
-  instance: SpreadsheetInstance | null,
-  selector: (state: State) => T,
-  fallback: T,
-): T => {
-  const state = useSyncExternalStore(
-    useStoreSubscribe(instance),
-    () => instance?.store.getState() ?? null,
-    () => null,
-  );
-  return state ? selector(state) : fallback;
-};
-
-interface I18nSnapshot {
-  locale: string;
-  strings: SpreadsheetInstance['i18n']['strings'] | null;
-}
-
-const FALLBACK_I18N: I18nSnapshot = { locale: ADAPTER_FALLBACK_LOCALE, strings: null };
-
-/** Subscribe to the i18n locale. Returns the current locale id and the
- *  active strings dictionary; re-renders when `setLocale` / `extend` /
- *  `register` fires.
- *
- *  Note: `useSyncExternalStore` requires snapshot identity to be stable
- *  between calls when nothing has changed, otherwise React loops forever
- *  trying to "stabilise" the store. We cache the last `(locale, strings)`
- *  pair per-instance and only allocate a new wrapper when one of them
- *  actually changes.
- */
-export const useI18n = (instance: SpreadsheetInstance | null): I18nSnapshot => {
-  // Cache lives across renders for a stable instance reference. When the
-  // instance swaps we reset the cache via the dependency on `instance`.
-  const cacheRef = useRef<I18nSnapshot | null>(null);
-  const lastInstanceRef = useRef<SpreadsheetInstance | null>(null);
-  if (lastInstanceRef.current !== instance) {
-    lastInstanceRef.current = instance;
-    cacheRef.current = null;
-  }
-  const subscribe = useMemo(
-    () =>
-      (cb: () => void): (() => void) => {
-        if (!instance) return () => {};
-        return instance.i18n.subscribe(() => {
-          cacheRef.current = null; // invalidate so next snapshot rebuilds
-          cb();
+      (notify: () => void): (() => void) => {
+        if (!usable(spreadsheet)) return () => {};
+        return subscribe(spreadsheet, () => {
+          version.current += 1;
+          notify();
         });
       },
-    [instance],
+    [spreadsheet, subscribe],
   );
-  const getSnapshot = (): I18nSnapshot => {
-    if (!instance) return FALLBACK_I18N;
-    const cur = cacheRef.current;
-    const locale = instance.i18n.locale;
-    const strings = instance.i18n.strings;
-    if (cur && cur.locale === locale && cur.strings === strings) return cur;
-    const next: I18nSnapshot = { locale, strings };
-    cacheRef.current = next;
-    return next;
-  };
-  return useSyncExternalStore(subscribe, getSnapshot, () => FALLBACK_I18N);
+  return useSyncExternalStore(
+    listen,
+    () => version.current,
+    () => 0,
+  );
 };
 
-/** Subscribe to one of the spreadsheet's lifecycle events (`cellChange`,
- *  `selectionChange`, `workbookChange`, `localeChange`, `themeChange`,
- *  `recalc`). The handler is stored in a ref, so callers can pass an
- *  inline function without re-subscribing on every render. */
-export const useSpreadsheetEvent = <K extends SpreadsheetEventName>(
-  instance: SpreadsheetInstance | null,
+const subscribeAll: Subscribe = (s, notify) => {
+  const offs = [
+    s.on('change', notify),
+    s.on('cell', notify),
+    s.on('workbook', notify),
+    s.on('recalc', notify),
+    s.on('update', notify),
+    s.selection.on('change', notify),
+    s.i18n.on('change', notify),
+  ];
+  return () => {
+    for (const off of offs) off();
+  };
+};
+const subscribeSelection: Subscribe = (s, notify) => s.selection.on('change', notify);
+const subscribeI18n: Subscribe = (s, notify) => s.i18n.on('change', notify);
+
+/** Derives a value from the spreadsheet, re-run after every change, selection move, locale change
+ *  and `update`. `null` while `spreadsheet` is `null` or disposed. */
+export const useSpreadsheet = <T>(
+  spreadsheet: SpreadsheetInstance | null,
+  selector: (spreadsheet: SpreadsheetInstance) => T,
+): T | null => {
+  useVersion(spreadsheet, subscribeAll);
+  return usable(spreadsheet) ? selector(spreadsheet) : null;
+};
+
+/** The current selection; `null` while `spreadsheet` is `null` or disposed. */
+export const useSelection = (spreadsheet: SpreadsheetInstance | null): SelectionState | null => {
+  const version = useVersion(spreadsheet, subscribeSelection);
+  const live = usable(spreadsheet);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version marks a selection change
+  return useMemo(
+    () => (live && spreadsheet ? spreadsheet.selection.get() : null),
+    [spreadsheet, live, version],
+  );
+};
+
+/** The active locale and strings; `null` while `spreadsheet` is `null` or disposed. */
+export const useI18n = (
+  spreadsheet: SpreadsheetInstance | null,
+): { readonly locale: I18n['locale']; readonly strings: I18n['strings'] } | null => {
+  const version = useVersion(spreadsheet, subscribeI18n);
+  const live = usable(spreadsheet);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version marks a locale change
+  return useMemo(
+    () =>
+      live && spreadsheet
+        ? { locale: spreadsheet.i18n.locale, strings: spreadsheet.i18n.strings }
+        : null,
+    [spreadsheet, live, version],
+  );
+};
+
+/** Subscribes `handler` to an instance event while `spreadsheet` is set. The latest `handler` is
+ *  called, so an inline function does not resubscribe. */
+export const useSpreadsheetEvent = <K extends keyof SpreadsheetInstanceEvents>(
+  spreadsheet: SpreadsheetInstance | null,
   event: K,
-  handler: SpreadsheetEventHandler<K>,
+  handler: (event: SpreadsheetInstanceEvents[K]) => void,
 ): void => {
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
   useEffect(() => {
-    if (!instance) return undefined;
-    return instance.on(event, (e) => handlerRef.current(e));
-  }, [instance, event]);
+    if (!usable(spreadsheet)) return undefined;
+    return spreadsheet.on(event, (e) => handlerRef.current(e));
+  }, [spreadsheet, event]);
 };

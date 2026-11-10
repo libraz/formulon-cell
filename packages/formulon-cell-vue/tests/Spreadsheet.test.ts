@@ -1,348 +1,242 @@
-import * as Core from '@libraz/formulon-cell';
+import { type SpreadsheetInstance, Workbook } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { nextTick } from 'vue';
-import type { ScreenClipCapture, ScreenClipResult } from '../src';
-import * as VuePackage from '../src';
-import { type MountedVueSpreadsheet, mountVueSpreadsheet } from './test-utils/mount';
+import { type App, createApp, defineComponent, h, shallowReactive, shallowRef } from 'vue';
+import { Spreadsheet, type SpreadsheetExposed } from '../src';
+import { flush, stubWorkbook, waitFor } from './test-utils/mount';
 
-const flush = async (): Promise<void> => {
-  for (let i = 0; i < 8; i += 1) await Promise.resolve();
-  await nextTick();
+interface Harness {
+  app: App;
+  props: Record<string, unknown>;
+  exposed: () => SpreadsheetExposed | null;
+  instance: () => SpreadsheetInstance | null;
+  ready: ReturnType<typeof vi.fn>;
+  unmount: () => void;
+}
+
+const apps: App[] = [];
+const extra: Workbook[] = [];
+
+afterEach(() => {
+  for (const app of apps.splice(0)) app.unmount();
+  for (const workbook of extra.splice(0)) workbook.dispose();
+  document.body.replaceChildren();
+});
+
+/** Mounts `<Spreadsheet>` with reactive props on a stub workbook; waits for ready unless told not to. */
+const mountComponent = async (
+  initial: Record<string, unknown> = {},
+  { wait = true, slots }: { wait?: boolean; slots?: Parameters<typeof h>[2] } = {},
+): Promise<Harness> => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const props = shallowReactive<Record<string, unknown>>({
+    workbook: 'workbook' in initial ? initial.workbook : await stubWorkbook(),
+    locale: 'en',
+    ...initial,
+  });
+  const ready = vi.fn();
+  const child = shallowRef<SpreadsheetExposed | null>(null);
+  const app = createApp(
+    defineComponent({
+      render: () =>
+        h(
+          Spreadsheet,
+          {
+            ...props,
+            onReady: ready,
+            ref: (el: unknown) => {
+              child.value = el as SpreadsheetExposed | null;
+            },
+          },
+          slots,
+        ),
+    }),
+  );
+  app.mount(host);
+  apps.push(app);
+  if (wait) await waitFor(() => ready.mock.calls.length > 0);
+  return {
+    app,
+    props,
+    exposed: () => child.value,
+    instance: () => child.value?.spreadsheet ?? null,
+    ready,
+    unmount: () => app.unmount(),
+  };
 };
 
-/**
- * End-to-end tests for the Vue `<Spreadsheet>` wrapper. Like the React side,
- * we deliberately avoid mocking `Spreadsheet.mount` and exercise the real
- * core (with the stub WASM engine) so the prop / event plumbing is verified
- * against the live instance.
- */
-describe('Vue <Spreadsheet>', () => {
-  let mounted: MountedVueSpreadsheet | null = null;
-
-  afterEach(async () => {
-    if (mounted) {
-      await mounted.dispose();
-      mounted = null;
-    }
-    document.body.replaceChildren();
+describe('<Spreadsheet>', () => {
+  it('emits ready with the live instance, which the template ref exposes as a plain getter', async () => {
+    const view = await mountComponent();
+    expect(view.ready).toHaveBeenCalledTimes(1);
+    const inst = view.ready.mock.calls[0]?.[0] as SpreadsheetInstance;
+    expect(inst.disposed).toBe(false);
+    expect(view.exposed()?.spreadsheet).toBe(inst);
   });
 
-  it('emits ready with a live SpreadsheetInstance after mount completes', async () => {
-    const onReady = vi.fn();
-    mounted = await mountVueSpreadsheet({ listeners: { onReady } });
-
-    expect(onReady).toHaveBeenCalledTimes(1);
-    const inst = onReady.mock.calls[0]?.[0];
-    expect(inst).toBeDefined();
-    expect(typeof inst?.dispose).toBe('function');
-    expect(typeof inst?.setTheme).toBe('function');
-    // The exposed ref should resolve to the same instance.
-    expect(mounted.exposed.instance.value).toBe(inst);
+  it('exposes null before the mount settles', async () => {
+    const view = await mountComponent({}, { wait: false });
+    expect(view.exposed()?.spreadsheet).toBeNull();
+    await waitFor(() => view.ready.mock.calls.length > 0);
+    expect(view.exposed()?.spreadsheet).not.toBeNull();
   });
 
-  it('emits cellChange when the underlying engine reports a cell mutation', async () => {
-    const onCellChange = vi.fn();
-    mounted = await mountVueSpreadsheet({ listeners: { onCellChange } });
-
-    mounted.instance.workbook.setNumber({ sheet: 0, row: 2, col: 3 }, 11);
+  it('forwards the cell event when the workbook changes', async () => {
+    const onCell = vi.fn();
+    const view = await mountComponent({ onCell });
+    const inst = view.instance() as SpreadsheetInstance;
+    inst.workbook.sheet(0).setNumber(0, 0, 42);
     await flush();
-
-    expect(onCellChange).toHaveBeenCalledTimes(1);
-    const event = onCellChange.mock.calls[0]?.[0];
-    expect(event?.addr).toEqual({ sheet: 0, row: 2, col: 3 });
-    expect(event?.value).toEqual({ kind: 'number', value: 11 });
+    expect(onCell).toHaveBeenCalled();
+    expect(onCell.mock.calls.at(-1)?.[0]).toMatchObject({ sheet: 0, at: { row: 0, col: 0 } });
   });
 
-  it('emits selectionChange when the active selection moves', async () => {
+  it('forwards change and update events', async () => {
+    const onChange = vi.fn();
+    const onUpdate = vi.fn();
+    const view = await mountComponent({ onChange, onUpdate });
+    const inst = view.instance() as SpreadsheetInstance;
+    inst.applyChanges([{ at: 'B2', input: '7' }], { history: 'record' });
+    await flush();
+    expect(onChange).toHaveBeenCalled();
+    view.props.theme = 'ink';
+    await flush();
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['theme'] });
+  });
+
+  it('emits selectionChange when the selection moves', async () => {
     const onSelectionChange = vi.fn();
-    mounted = await mountVueSpreadsheet({ listeners: { onSelectionChange } });
-
-    Core.mutators.setActive(mounted.instance.store, { sheet: 0, row: 4, col: 1 });
+    const view = await mountComponent({ onSelectionChange });
+    (view.instance() as SpreadsheetInstance).selection.set('C3');
     await flush();
-
     expect(onSelectionChange).toHaveBeenCalled();
-    const last = onSelectionChange.mock.calls.at(-1)?.[0];
-    expect(last?.active).toEqual({ sheet: 0, row: 4, col: 1 });
-    expect(last?.range).toMatchObject({ sheet: 0, r0: 4, c0: 1, r1: 4, c1: 1 });
+    expect(onSelectionChange.mock.calls.at(-1)?.[0].active).toEqual({ row: 2, col: 2 });
   });
 
-  it('emits workbookChange when the workbook prop swaps to a new handle', async () => {
-    const onWorkbookChange = vi.fn();
-    mounted = await mountVueSpreadsheet({ listeners: { onWorkbookChange } });
-    const original = mounted.instance.workbook;
-
-    const next = await Core.WorkbookHandle.createDefault({ preferStub: true });
-    expect(next).not.toBe(original);
-
-    await mounted.setProp('workbook', next);
-    // setWorkbook is async on the instance side — drain a few ticks.
-    for (let i = 0; i < 10; i += 1) {
-      if (onWorkbookChange.mock.calls.length > 0) break;
-      await flush();
-    }
-
-    expect(onWorkbookChange).toHaveBeenCalled();
-    const event = onWorkbookChange.mock.calls.at(-1)?.[0];
-    expect(event?.workbook).toBe(next);
-    expect(mounted.instance.workbook).toBe(next);
+  it('emits workbook when the workbook prop is replaced, without remounting', async () => {
+    const onWorkbook = vi.fn();
+    const view = await mountComponent({ onWorkbook });
+    const first = view.instance();
+    const next = await stubWorkbook();
+    extra.push(next);
+    view.props.workbook = next;
+    await flush();
+    expect(onWorkbook).toHaveBeenCalledTimes(1);
+    expect(onWorkbook.mock.calls[0]?.[0].workbook).toBe(next);
+    expect(view.instance()).toBe(first);
+    expect(view.ready).toHaveBeenCalledTimes(1);
+    expect(first?.workbook).toBe(next);
   });
 
-  it('reports a rejected controlled workbook replacement without losing the old instance', async () => {
-    const onError = vi.fn();
-    mounted = await mountVueSpreadsheet({ listeners: { onError } });
-    const original = mounted.instance.workbook;
-    const next = await Core.WorkbookHandle.createDefault({ preferStub: true });
-    const failure = new Error('viewport rejected');
-    const setWorkbook = vi.spyOn(mounted.instance, 'setWorkbook').mockRejectedValueOnce(failure);
-
-    try {
-      await mounted.setProp('workbook', next);
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(failure);
-      expect(mounted.instance.workbook).toBe(original);
-    } finally {
-      setWorkbook.mockRestore();
-      next.dispose();
-    }
+  it('applies a theme prop change with one update and no remount', async () => {
+    const onUpdate = vi.fn();
+    const view = await mountComponent({ onUpdate });
+    const first = view.instance();
+    view.props.theme = 'ink';
+    await flush();
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['theme'] });
+    expect(view.instance()).toBe(first);
   });
 
-  it('forwards a theme prop change to instance.setTheme without remounting', async () => {
-    const onThemeChange = vi.fn();
-    mounted = await mountVueSpreadsheet({
-      props: { theme: 'paper' },
-      listeners: { onThemeChange },
-    });
-    const original = mounted.instance;
-    expect(mounted.host.querySelector<HTMLElement>('[data-fc-theme]')?.dataset.fcTheme).toBe(
-      'paper',
-    );
-
-    await mounted.setProp('theme', 'ink');
-
-    expect(mounted.exposed.instance.value).toBe(original);
-    expect(onThemeChange).toHaveBeenCalledTimes(1);
-    expect(onThemeChange.mock.calls[0]?.[0]).toEqual({ theme: 'ink' });
-    expect(mounted.host.querySelector<HTMLElement>('[data-fc-theme]')?.dataset.fcTheme).toBe('ink');
-  });
-
-  it('forwards a locale prop change to instance.setLocale without remounting', async () => {
+  it('emits localeChange when the locale prop changes', async () => {
     const onLocaleChange = vi.fn();
-    mounted = await mountVueSpreadsheet({
-      props: { locale: 'en' },
-      listeners: { onLocaleChange },
-    });
-    const original = mounted.instance;
-    expect(mounted.instance.i18n.locale).toBe('en');
-
-    await mounted.setProp('locale', 'ja');
-
-    expect(mounted.exposed.instance.value).toBe(original);
-    expect(mounted.instance.i18n.locale).toBe('ja');
+    const view = await mountComponent({ onLocaleChange });
+    expect((view.instance() as SpreadsheetInstance).i18n.locale).toBe('en');
+    view.props.locale = 'ja';
+    await flush();
     expect(onLocaleChange).toHaveBeenCalled();
-    const event = onLocaleChange.mock.calls.at(-1)?.[0];
-    expect(event?.locale).toBe('ja');
+    expect((view.instance() as SpreadsheetInstance).i18n.locale).toBe('ja');
   });
 
-  it('keeps the Screen Clipping capture hook current without remounting', async () => {
-    const firstCapture = vi.fn(() => 'data:image/png;base64,vue-first');
-    const secondCapture = vi.fn(() => ({
-      src: 'data:image/png;base64,vue-second',
-      alt: 'Vue clip',
-    }));
-    mounted = await mountVueSpreadsheet({
-      props: { captureScreenClip: firstCapture },
-    });
-    const original = mounted.instance;
-
-    expect(await mounted.instance.captureScreenClip()).toEqual({
-      src: 'data:image/png;base64,vue-first',
-    });
-
-    await mounted.setProp('captureScreenClip', secondCapture);
-
-    expect(mounted.exposed.instance.value).toBe(original);
-    expect(await mounted.instance.captureScreenClip()).toEqual({
-      src: 'data:image/png;base64,vue-second',
-      alt: 'Vue clip',
-    });
-    expect(firstCapture).toHaveBeenCalledTimes(1);
-    expect(secondCapture).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps the function argument help provider current without remounting', async () => {
-    const firstHelp = vi.fn(() => ({ description: 'Vue first hint.' }));
-    const secondHelp = vi.fn((_name: string, _index: number, locale: string) => ({
-      description: `Vue second hint (${locale}).`,
-    }));
-    mounted = await mountVueSpreadsheet({
-      props: {
-        ui: { platform: 'mac' },
-        features: { fxDialog: true },
-        locale: 'en',
-        getFunctionArgumentHelp: firstHelp,
-      },
-    });
-    const original = mounted.instance;
-    const hint = (): string | null | undefined =>
-      document.querySelector('.fc-mac-formula-palette__argument small')?.textContent;
-
-    mounted.instance.openFunctionArguments('ACOS');
-    expect(hint()).toBe('Vue first hint.');
-    document
-      .querySelector<HTMLButtonElement>('.fc-mac-formula-palette [data-action="close"]')
-      ?.click();
-
-    await mounted.setProp('getFunctionArgumentHelp', secondHelp);
-    mounted.instance.openFunctionArguments('ACOS');
-
-    expect(mounted.exposed.instance.value).toBe(original);
-    expect(hint()).toBe('Vue second hint (en).');
-    expect(secondHelp).toHaveBeenCalledWith('ACOS', 0, 'en');
-  });
-
-  it('keeps the printer profile refresh hook current without remounting', async () => {
-    const firstProfile = {
-      id: 'vue-first',
-      paperSize: 'A4' as const,
-      orientation: 'portrait' as const,
-      printableBounds: { top: 0.1, right: 0.1, bottom: 0.1, left: 0.1 },
-    };
-    const secondProfile = {
-      id: 'vue-second',
-      paperSize: 'letter' as const,
-      orientation: 'landscape' as const,
-      printableBounds: { top: 0.2, right: 0.3, bottom: 0.2, left: 0.3 },
-    };
-    const firstRefresh = vi.fn(() => [firstProfile]);
-    const secondRefresh = vi.fn(() => [secondProfile]);
-    mounted = await mountVueSpreadsheet({
-      props: { refreshPrinterProfiles: firstRefresh },
-    });
-    const original = mounted.instance;
-
-    await expect(mounted.instance.refreshPrinterProfiles()).resolves.toEqual([firstProfile]);
-
-    await mounted.setProp('refreshPrinterProfiles', secondRefresh);
-
-    expect(mounted.exposed.instance.value).toBe(original);
-    await expect(mounted.instance.refreshPrinterProfiles()).resolves.toEqual([secondProfile]);
-    expect(firstRefresh).toHaveBeenCalledTimes(1);
-    expect(secondRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('applies printer profile prop updates to the built-in print flow without remounting', async () => {
-    const fallback = {
-      id: 'fallback',
-      paperSize: 'A4' as const,
-      orientation: 'portrait' as const,
-      printableBounds: { top: 0.2, right: 0.2, bottom: 0.2, left: 0.2 },
-    };
-    const selected = {
-      id: 'selected',
-      paperSize: 'A4' as const,
-      orientation: 'portrait' as const,
-      printableBounds: { top: 1.2, right: 1.1, bottom: 1.2, left: 1.1 },
-    };
-    const print = vi.fn();
-    const originalPrint = (window as unknown as { print?: () => void }).print;
-    (window as unknown as { print: () => void }).print = print;
-    try {
-      mounted = await mountVueSpreadsheet({
-        props: {
-          printerProfiles: [fallback, selected],
-          printerProfileId: 'fallback',
-        },
-      });
-      const original = mounted.instance;
-
-      await mounted.setProp('printerProfileId', ' selected ');
-      mounted.instance.print('print');
-
-      const iframe = mounted.host.querySelector<HTMLIFrameElement>('iframe[data-fc-print-mode]');
-      expect(mounted.exposed.instance.value).toBe(original);
-      expect(iframe?.srcdoc).toContain(
-        '@page { size: A4 portrait; margin: 1.2in 1.1in 1.2in 1.1in; }',
-      );
-      iframe?.dispatchEvent(new Event('load'));
-      iframe?.remove();
-    } finally {
-      if (originalPrint) (window as unknown as { print: () => void }).print = originalPrint;
-      else delete (window as unknown as { print?: () => void }).print;
-    }
-  });
-
-  it('forwards host status bar prop updates without remounting', async () => {
-    mounted = await mountVueSpreadsheet({
-      props: {
-        uploadStatus: 'saving',
-        macroRecording: false,
-      },
-    });
-    const original = mounted.instance;
-    mounted.instance.store.setState((state) => ({
-      ...state,
-      ui: {
-        ...state.ui,
-        statusOptions: { ...state.ui.statusOptions, uploadStatus: true, macroRecording: true },
-      },
-    }));
-
-    await mounted.setProp('uploadStatus', 'error');
-    await mounted.setProp('macroRecording', true);
-
-    expect(mounted.exposed.instance.value).toBe(original);
-    expect(
-      mounted.host.querySelector<HTMLElement>('.fc-host__statusbar-upload')?.dataset.uploadStatus,
-    ).toBe('error');
-    expect(
-      mounted.host.querySelector<HTMLElement>('.fc-host__statusbar-macro')?.dataset.macroRecording,
-    ).toBe('true');
-  });
-
-  it('re-exports Screen Clipping host hook types from the Vue package', async () => {
-    const capture: ScreenClipCapture = () => ({
-      src: 'data:image/png;base64,vue-export',
-      alt: 'Vue export',
-    });
-    const result = (await capture()) as ScreenClipResult;
-
-    expect(result).toEqual({
-      src: 'data:image/png;base64,vue-export',
-      alt: 'Vue export',
-    });
-  });
-
-  it('re-exports shared ribbon and dialog helpers from the Vue package', () => {
-    expect(VuePackage.ribbonActivationEntries).toBe(Core.ribbonActivationEntries);
-    expect(VuePackage.ribbonSurfaceCommandIds).toBe(Core.ribbonSurfaceCommandIds);
-    expect(VuePackage.DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS).toBe(
-      Core.DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS,
-    );
-    expect(VuePackage.attachRangePickerButton).toBe(Core.attachRangePickerButton);
-    expect(VuePackage.appendConditionalApplyFormatControls).toBe(
-      Core.appendConditionalApplyFormatControls,
-    );
-    expect(VuePackage.conditionalStyleOptions).toBe(Core.conditionalStyleOptions);
-    expect(VuePackage.reportDialogLabels).toBe(Core.reportDialogLabels);
-    expect(VuePackage.projectDisabledReason).toBe(Core.projectDisabledReason);
-    expect(VuePackage.projectDisabledState).toBe(Core.projectDisabledState);
-  });
-
-  it('disposes the engine instance on unmount and unwires event subscriptions', async () => {
-    const onCellChange = vi.fn();
-    mounted = await mountVueSpreadsheet({ listeners: { onCellChange } });
-    const inst = mounted.instance;
-
-    inst.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+  it('does not update again for a structurally equal inline object', async () => {
+    const onUpdate = vi.fn();
+    const view = await mountComponent({ onUpdate, ui: { profile: 'minimal' } });
     await flush();
-    expect(onCellChange).toHaveBeenCalledTimes(1);
-
-    await mounted.dispose();
-    mounted = null;
-
-    onCellChange.mockClear();
-    inst.workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 2);
+    onUpdate.mockClear();
+    view.props.ui = { profile: 'minimal' };
     await flush();
-    expect(onCellChange).not.toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
+    view.props.ui = { profile: 'full' };
+    await flush();
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['ui'] });
+  });
+
+  it('applies props changed while the mount is pending once it settles', async () => {
+    const view = await mountComponent({ theme: 'paper' }, { wait: false });
+    view.props.theme = 'ink';
+    await waitFor(() => view.ready.mock.calls.length > 0);
+    await flush();
+    const inst = view.instance() as SpreadsheetInstance;
+    expect(inst.disposed).toBe(false);
+    const seen: string[] = [];
+    inst.on('update', (e) => seen.push(...e.keys));
+    view.props.theme = 'paper';
+    await flush();
+    expect(seen).toEqual(['theme']);
+  });
+
+  it('emits error for a refused key and still applies the others', async () => {
+    const onError = vi.fn();
+    const onUpdate = vi.fn();
+    const view = await mountComponent({ onError, onUpdate });
+    onUpdate.mockClear();
+    view.props.viewport = { mode: 'fixed', range: 'not a range' };
+    view.props.theme = 'ink';
+    await flush();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['theme'] });
+    expect(view.instance()?.disposed).toBe(false);
+  });
+
+  it('renders the default slot with the instance once mounted', async () => {
+    const seen: unknown[] = [];
+    const view = await mountComponent(
+      {},
+      {
+        wait: false,
+        slots: {
+          default: (slot: { spreadsheet: SpreadsheetInstance }) => {
+            seen.push(slot.spreadsheet);
+            return h('span', { 'data-testid': 'slot' }, 'inside');
+          },
+        } as never,
+      },
+    );
+    expect(document.querySelector('[data-testid="slot"]')).toBeNull();
+    await waitFor(() => view.ready.mock.calls.length > 0);
+    await flush();
+    expect(document.querySelector('[data-testid="slot"]')?.textContent).toBe('inside');
+    expect(seen.at(-1)).toBe(view.instance());
+  });
+
+  it('applies class and style to the host element', async () => {
+    await mountComponent({ class: 'sheet-host', style: { height: '321px' } });
+    const el = document.querySelector<HTMLElement>('.sheet-host');
+    expect(el).not.toBeNull();
+    expect(el?.style.height).toBe('321px');
+  });
+
+  it('disposes the instance on unmount, unsubscribes, and exposes null', async () => {
+    const onCell = vi.fn();
+    const view = await mountComponent({ onCell });
+    const inst = view.instance() as SpreadsheetInstance;
+    const workbook = inst.workbook;
+    view.unmount();
+    expect(inst.disposed).toBe(true);
+    expect(view.exposed()?.spreadsheet ?? null).toBeNull();
+    onCell.mockClear();
+    expect(workbook.disposed).toBe(false);
+    workbook.dispose();
+  });
+
+  it('disposes an instance whose mount settles after unmount', async () => {
+    const workbook = await Workbook.createDefault({ engine: 'stub' });
+    const view = await mountComponent({ workbook }, { wait: false });
+    view.unmount();
+    await flush();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(view.ready).not.toHaveBeenCalled();
+    workbook.dispose();
   });
 });

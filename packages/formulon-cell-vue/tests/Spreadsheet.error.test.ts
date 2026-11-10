@@ -1,62 +1,77 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createApp, h, nextTick } from 'vue';
+import { createApp, h } from 'vue';
+import { flush, waitFor } from './test-utils/mount';
 
-const mountCore = vi.fn();
+const mountCore = vi.hoisted(() => vi.fn());
 
 vi.mock('@libraz/formulon-cell', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@libraz/formulon-cell')>();
-  return {
-    // Shared adapter reconcile helpers run for real against the fake instance.
-    ADAPTER_FALLBACK_LOCALE: actual.ADAPTER_FALLBACK_LOCALE,
-    ADAPTER_FALLBACK_SELECTION: actual.ADAPTER_FALLBACK_SELECTION,
-    applyControlledLocale: actual.applyControlledLocale,
-    applyControlledProps: actual.applyControlledProps,
-    applyUiFeaturesToolbar: actual.applyUiFeaturesToolbar,
-    Spreadsheet: {
-      mount: mountCore,
-    },
-  };
+  return { ...actual, mount: mountCore };
 });
 
-describe('Vue Spreadsheet error boundary', () => {
+describe('<Spreadsheet> mount failure', () => {
   afterEach(() => {
     mountCore.mockReset();
     document.body.replaceChildren();
   });
 
-  it('emits error and renders the custom fallback when core mount fails', async () => {
+  it('emits error and renders errorFallback when the core mount rejects', async () => {
     const err = new Error('engine failed');
-    mountCore.mockImplementation(
-      (_host: HTMLElement, opts: { onError?: (error: unknown) => void }) => {
-        opts.onError?.(err);
-        return Promise.reject(err);
-      },
-    );
-    const { Spreadsheet } = await import('../src/Spreadsheet');
+    mountCore.mockRejectedValue(err);
+    const { Spreadsheet } = await import('../src');
     const host = document.createElement('div');
     document.body.appendChild(host);
     const onError = vi.fn();
+    const onReady = vi.fn();
 
     const app = createApp({
       render: () =>
         h(Spreadsheet, {
           onError,
+          onReady,
           errorFallback: (error: unknown) =>
             h('div', { 'data-testid': 'fallback' }, String((error as Error).message)),
         }),
     });
-
     app.mount(host);
-    await Promise.resolve();
-    await nextTick();
+    await waitFor(() => onError.mock.calls.length > 0);
+    await flush();
 
+    expect(onError).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith(err);
-    expect(mountCore).toHaveBeenCalledWith(
-      expect.any(HTMLElement),
-      expect.objectContaining({ renderError: false }),
-    );
+    expect(onReady).not.toHaveBeenCalled();
     expect(host.querySelector('[data-testid="fallback"]')?.textContent).toBe('engine failed');
+    app.unmount();
+  });
 
+  it('renders no fallback when none is given and the mount rejects', async () => {
+    mountCore.mockRejectedValue(new Error('boom'));
+    const { Spreadsheet } = await import('../src');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const onError = vi.fn();
+    const app = createApp({ render: () => h(Spreadsheet, { onError }) });
+    app.mount(host);
+    await waitFor(() => onError.mock.calls.length > 0);
+    expect(host.querySelector('[data-testid="fallback"]')).toBeNull();
+    app.unmount();
+  });
+
+  it('passes the host element and only the options that were given to mount', async () => {
+    mountCore.mockRejectedValue(new Error('x'));
+    const { Spreadsheet } = await import('../src');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const onError = vi.fn();
+    const app = createApp({
+      render: () => h(Spreadsheet, { onError, locale: 'ja', theme: 'ink' }),
+    });
+    app.mount(host);
+    await waitFor(() => onError.mock.calls.length > 0);
+    expect(mountCore).toHaveBeenCalledTimes(1);
+    const [el, options] = mountCore.mock.calls[0] as [HTMLElement, Record<string, unknown>];
+    expect(el).toBeInstanceOf(HTMLElement);
+    expect(options).toEqual({ locale: 'ja', theme: 'ink' });
     app.unmount();
   });
 });

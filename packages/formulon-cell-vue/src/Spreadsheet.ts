@@ -1,343 +1,211 @@
 import {
-  applyControlledLocale,
-  applyControlledProps,
-  applyUiFeaturesToolbar,
-  type CellChangeEvent,
-  type ChangeBatchResult,
-  type ExtensionInput,
-  type FeatureFlags,
-  type LocaleChangeEvent,
-  type MountOptions,
-  type PrinterProfile,
-  type LegacyRecalcEvent as RecalcEvent,
-  resolveAdapterTheme,
-  type SelectionChangeEvent,
-  Spreadsheet as SpreadsheetCore,
-  type LegacySpreadsheetInstance as SpreadsheetInstance,
-  type SpreadsheetUiOptions,
-  type ThemeChangeEvent,
-  type WorkbookChangeEvent,
-  type WorkbookHandle,
+  type CellEvent,
+  type ChangeEvent,
+  type I18n,
+  mount,
+  type RecalcEvent,
+  type SelectionState,
+  type SpreadsheetInstance,
+  type SpreadsheetOptions,
+  type SpreadsheetPatch,
+  type UpdateEvent,
+  type WorkbookEvent,
 } from '@libraz/formulon-cell';
+import { reconcileProps } from '@libraz/formulon-cell/adapter';
 import {
+  type ComponentOptionsMixin,
   type CSSProperties,
-  computed,
+  type DefineComponent,
   defineComponent,
   h,
   onBeforeUnmount,
   onMounted,
   type PropType,
-  type Ref,
   ref,
   shallowRef,
   type VNodeChild,
   watch,
 } from 'vue';
+import { optionsOf, patchOf } from './options.js';
 
-export type SpreadsheetExposed = {
-  readonly instance: Ref<SpreadsheetInstance | null>;
+type LocaleChangeEvent = Parameters<Parameters<I18n['on']>[1]>[0];
+type Options = SpreadsheetOptions;
+
+/**
+ * Props of {@link Spreadsheet}: every `SpreadsheetOptions` key plus the Vue-only rendering props.
+ * `seed` and `signal` are read at mount; every other option is applied to the live instance with
+ * `update` when it changes structurally, so an inline object literal does not remount.
+ */
+export interface SpreadsheetProps extends SpreadsheetOptions {
+  /** Rendered in place of the grid when the mount rejects. */
+  errorFallback?: (error: unknown) => VNodeChild;
+  class?: string | string[] | Record<string, boolean>;
+  style?: CSSProperties;
+}
+
+/** Events of {@link Spreadsheet}. `error` carries a mount rejection, an option `update` refused,
+ *  or an instance `error` event's `error`. */
+export type SpreadsheetEmits = {
+  ready: (spreadsheet: SpreadsheetInstance) => true;
+  change: (event: ChangeEvent) => true;
+  cell: (event: CellEvent) => true;
+  workbook: (event: WorkbookEvent) => true;
+  recalc: (event: RecalcEvent) => true;
+  update: (event: UpdateEvent) => true;
+  selectionChange: (selection: SelectionState) => true;
+  localeChange: (event: LocaleChangeEvent) => true;
+  error: (error: unknown) => true;
 };
 
-export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
+/** What a template ref to {@link Spreadsheet} exposes. */
+export interface SpreadsheetExposed {
+  /** The mounted spreadsheet; `null` before it is ready and after unmount. */
+  readonly spreadsheet: SpreadsheetInstance | null;
+}
+
+const option = <K extends keyof Options>(type: PropType<Options[K]> | null) => ({
+  type: type as PropType<Options[K]>,
+  default: undefined,
+});
+
+const component = defineComponent({
   name: 'Spreadsheet',
   props: {
-    ui: { type: Object as PropType<SpreadsheetUiOptions>, default: undefined },
-    workbook: { type: Object as PropType<WorkbookHandle>, default: undefined },
-    getWorkbookName: {
-      type: Function as PropType<MountOptions['getWorkbookName']>,
-      default: undefined,
-    },
-    policy: { type: Object as PropType<MountOptions['policy']>, default: undefined },
-    viewport: { type: Object as PropType<MountOptions['viewport']>, default: undefined },
-    contextMenu: { type: Object as PropType<MountOptions['contextMenu']>, default: undefined },
-    overlays: { type: Object as PropType<MountOptions['overlays']>, default: undefined },
-    toolbar: {
-      type: [Boolean, Object] as PropType<MountOptions['toolbar']>,
-      default: undefined,
-    },
-    theme: { type: String as PropType<MountOptions['theme']>, default: undefined },
-    locale: { type: String as PropType<MountOptions['locale']>, default: undefined },
-    strings: { type: Object as PropType<MountOptions['strings']>, default: undefined },
-    features: { type: Object as PropType<FeatureFlags>, default: undefined },
-    extensions: { type: Array as PropType<ExtensionInput[]>, default: undefined },
-    printerProfiles: { type: Array as PropType<readonly PrinterProfile[]>, default: undefined },
-    printerProfileId: { type: String, default: undefined },
-    refreshPrinterProfiles: {
-      type: Function as PropType<MountOptions['refreshPrinterProfiles']>,
-      default: undefined,
-    },
-    captureScreenClip: {
-      type: Function as PropType<MountOptions['captureScreenClip']>,
-      default: undefined,
-    },
-    getFunctionArgumentHelp: {
-      type: Function as PropType<MountOptions['getFunctionArgumentHelp']>,
-      default: undefined,
-    },
-    uploadStatus: { type: String as PropType<MountOptions['uploadStatus']>, default: undefined },
-    macroRecording: {
-      type: Boolean as PropType<MountOptions['macroRecording']>,
-      default: undefined,
-    },
-    functions: { type: Array as PropType<MountOptions['functions']>, default: undefined },
-    seed: { type: Function as PropType<MountOptions['seed']>, default: undefined },
+    workbook: option<'workbook'>(Object as PropType<Options['workbook']>),
+    seed: option<'seed'>(Function as PropType<Options['seed']>),
+    ui: option<'ui'>(Object as PropType<Options['ui']>),
+    policy: option<'policy'>(Object as PropType<Options['policy']>),
+    viewport: option<'viewport'>(Object as PropType<Options['viewport']>),
+    contextMenu: option<'contextMenu'>(Object as PropType<Options['contextMenu']>),
+    overlays: option<'overlays'>(Object as PropType<Options['overlays']>),
+    toolbar: option<'toolbar'>(Object as PropType<Options['toolbar']>),
+    theme: option<'theme'>(String as PropType<Options['theme']>),
+    locale: option<'locale'>(String as PropType<Options['locale']>),
+    strings: option<'strings'>(Object as PropType<Options['strings']>),
+    extensions: option<'extensions'>(Array as PropType<Options['extensions']>),
+    formulaHints: option<'formulaHints'>(Array as PropType<Options['formulaHints']>),
+    host: option<'host'>(Object as PropType<Options['host']>),
+    uploadStatus: option<'uploadStatus'>(String as PropType<Options['uploadStatus']>),
+    macroRecording: option<'macroRecording'>(Boolean as PropType<Options['macroRecording']>),
+    signal: option<'signal'>(null),
     errorFallback: {
       type: Function as PropType<(error: unknown) => VNodeChild>,
       default: undefined,
     },
-    class: { type: [String, Array, Object] as PropType<string | string[] | object>, default: '' },
+    class: {
+      type: [String, Array, Object] as PropType<SpreadsheetProps['class']>,
+      default: undefined,
+    },
     style: { type: Object as PropType<CSSProperties>, default: undefined },
   },
   emits: {
-    ready: (_inst: SpreadsheetInstance) => true,
-    'change-batch': (_e: ChangeBatchResult) => true,
-    cellChange: (_e: CellChangeEvent) => true,
-    selectionChange: (_e: SelectionChangeEvent) => true,
-    workbookChange: (_e: WorkbookChangeEvent) => true,
-    localeChange: (_e: LocaleChangeEvent) => true,
-    themeChange: (_e: ThemeChangeEvent) => true,
-    recalc: (_e: RecalcEvent) => true,
-    error: (_e: unknown) => true,
+    ready: (_spreadsheet: SpreadsheetInstance) => true,
+    change: (_event: ChangeEvent) => true,
+    cell: (_event: CellEvent) => true,
+    workbook: (_event: WorkbookEvent) => true,
+    recalc: (_event: RecalcEvent) => true,
+    update: (_event: UpdateEvent) => true,
+    selectionChange: (_selection: SelectionState) => true,
+    localeChange: (_event: LocaleChangeEvent) => true,
+    error: (_error: unknown) => true,
   },
-  setup(props, { emit, expose }) {
+  setup(props, { emit, expose, slots }) {
     const hostEl = ref<HTMLDivElement | null>(null);
-    // shallowRef so Vue doesn't deep-walk the spreadsheet's internal state.
+    // shallowRef so Vue does not walk the instance.
     const instance = shallowRef<SpreadsheetInstance | null>(null);
-    const mountError = shallowRef<unknown>(null);
-    const eventDisposers: (() => void)[] = [];
+    const mountError = shallowRef<{ error: unknown } | null>(null);
+    const offs: (() => void)[] = [];
+    // The options the live instance was last brought to.
+    let applied: Partial<SpreadsheetPatch> = {};
     let disposed = false;
-    let localeEventGeneration = 0;
-    const notifyLocaleChange = (event: LocaleChangeEvent): void => {
-      localeEventGeneration += 1;
-      emit('localeChange', event);
+    const report = (error: unknown): void => {
+      if (!disposed) emit('error', error);
     };
-    const getLocaleEventGeneration = (): number => localeEventGeneration;
+    const currentOptions = (): SpreadsheetOptions => optionsOf(props as SpreadsheetOptions);
 
-    onMounted(async () => {
+    onMounted(() => {
       const host = hostEl.value;
       if (!host) return;
-      const opts: MountOptions = {};
-      if (props.ui) opts.ui = props.ui;
-      if (props.workbook) opts.workbook = props.workbook;
-      if (props.policy !== undefined) opts.policy = props.policy;
-      if (props.viewport !== undefined) opts.viewport = props.viewport;
-      if (props.contextMenu !== undefined) opts.contextMenu = props.contextMenu;
-      if (props.overlays !== undefined) opts.overlays = props.overlays;
-      if (props.toolbar !== undefined) opts.toolbar = props.toolbar;
-      if (props.theme) opts.theme = props.theme;
-      if (props.locale) opts.locale = props.locale;
-      if (props.strings) opts.strings = props.strings;
-      if (props.features) opts.features = props.features;
-      if (props.extensions) opts.extensions = props.extensions;
-      if (props.printerProfiles) opts.printerProfiles = props.printerProfiles;
-      if (props.printerProfileId) opts.printerProfileId = props.printerProfileId;
-      opts.refreshPrinterProfiles = () => props.refreshPrinterProfiles?.();
-      opts.getWorkbookName = () => props.getWorkbookName?.();
-      opts.captureScreenClip = () => props.captureScreenClip?.();
-      opts.getFunctionArgumentHelp = (name, index, locale) =>
-        props.getFunctionArgumentHelp?.(name, index, locale);
-      if (props.uploadStatus !== undefined) opts.uploadStatus = props.uploadStatus;
-      if (props.macroRecording !== undefined) opts.macroRecording = props.macroRecording;
-      if (props.functions) opts.functions = props.functions;
-      if (props.seed) opts.seed = props.seed;
-      opts.renderError = !props.errorFallback;
-      opts.onError = (error) => {
-        if (disposed) return;
-        mountError.value = error;
-        emit('error', error);
-      };
-      const mountedWith = {
-        workbook: opts.workbook,
-        policy: opts.policy,
-        viewport: opts.viewport,
-        contextMenu: opts.contextMenu,
-        overlays: opts.overlays,
-        toolbar: opts.toolbar,
-        ui: opts.ui,
-        theme: opts.theme,
-        locale: opts.locale,
-        strings: opts.strings,
-        features: opts.features,
-        extensions: opts.extensions,
-        printerProfiles: opts.printerProfiles,
-        printerProfileId: opts.printerProfileId,
-        captureScreenClip: opts.captureScreenClip,
-        uploadStatus: opts.uploadStatus,
-        macroRecording: opts.macroRecording,
-      };
-      let inst: SpreadsheetInstance;
-      try {
-        inst = await SpreadsheetCore.mount(host, opts);
-      } catch (error) {
-        if (!disposed) mountError.value = error;
-        return;
-      }
-      if (disposed) {
-        inst.dispose();
-        return;
-      }
-      mountError.value = null;
-      instance.value = inst;
-      eventDisposers.push(
-        inst.on('changeBatch', (e) => emit('change-batch', e)),
-        inst.on('cellChange', (e) => emit('cellChange', e)),
-        inst.on('selectionChange', (e) => emit('selectionChange', e)),
-        inst.on('workbookChange', (e) => emit('workbookChange', e)),
-        inst.on('localeChange', notifyLocaleChange),
-        inst.on('themeChange', (e) => emit('themeChange', e)),
-        inst.on('recalc', (e) => emit('recalc', e)),
+      const options = currentOptions();
+      mount(host, options).then(
+        (inst) => {
+          if (disposed) {
+            inst.dispose();
+            return;
+          }
+          offs.push(
+            inst.on('change', (e) => emit('change', e)),
+            inst.on('cell', (e) => emit('cell', e)),
+            inst.on('workbook', (e) => emit('workbook', e)),
+            inst.on('recalc', (e) => emit('recalc', e)),
+            inst.on('update', (e) => emit('update', e)),
+            inst.on('error', (e) => report(e.error)),
+            inst.selection.on('change', (s) => emit('selectionChange', s)),
+            inst.i18n.on('change', (e) => emit('localeChange', e)),
+          );
+          instance.value = inst;
+          // Props that changed while the mount was pending.
+          const latest = patchOf(currentOptions());
+          reconcileProps(inst, patchOf(options), latest, report);
+          applied = latest;
+          emit('ready', inst);
+        },
+        (error: unknown) => {
+          if (disposed) return;
+          mountError.value = { error };
+          report(error);
+        },
       );
-      try {
-        await applyControlledProps(inst, props, mountedWith, {
-          onLocaleChange: notifyLocaleChange,
-          onError: (error) => emit('error', error),
-          getLocaleEventGeneration,
-        });
-      } catch (error) {
-        // Runtime prop reconciliation can fail while the already-mounted
-        // instance remains usable. Keep it live and let the specific
-        // reconciliation path report its cause through `error`.
-        if (!disposed) emit('error', error);
-      }
-      if (disposed) return;
-      emit('ready', inst);
     });
 
-    // Theme / locale / workbook are all cheap to swap via the imperative
-    // API — react to prop changes without re-mounting.
     watch(
-      () => props.theme,
-      () => {
-        const theme = resolveAdapterTheme(props);
-        if (theme && instance.value) instance.value.setTheme(theme);
-      },
-    );
-    watch(
-      () => props.locale,
-      (next) => {
-        if (next && instance.value) {
-          const accepted = applyControlledLocale(instance.value, next, {
-            onLocaleChange: notifyLocaleChange,
-            onError: (error) => emit('error', error),
-            getLocaleEventGeneration,
-          });
-          if (accepted && props.strings) {
-            instance.value.i18n.extend(instance.value.i18n.locale, props.strings);
-          }
-        }
-      },
-    );
-    watch(
-      () => props.strings,
-      (next) => {
-        if (next && instance.value) instance.value.i18n.extend(instance.value.i18n.locale, next);
-      },
-      { deep: true },
-    );
-    watch(
-      () => props.workbook,
+      () => patchOf(currentOptions()),
       (next) => {
         const inst = instance.value;
-        if (next && inst && next !== inst.workbook) {
-          void inst.setWorkbook(next).catch((error: unknown) => {
-            if (!disposed && instance.value === inst) emit('error', error);
-          });
-        }
-      },
-    );
-    watch(
-      () => [props.features, props.ui, props.toolbar] as const,
-      ([nextFeatures, nextUi, nextToolbar], previous) => {
-        if (instance.value) {
-          const uiChanged = nextUi !== previous?.[1];
-          applyUiFeaturesToolbar(
-            instance.value,
-            { ui: nextUi, features: nextFeatures, toolbar: nextToolbar },
-            uiChanged,
-          );
-          if (uiChanged) {
-            const theme = resolveAdapterTheme({ theme: props.theme, ui: nextUi });
-            if (theme) instance.value.setTheme(theme);
-          }
-        }
-      },
-      { deep: true },
-    );
-    watch(
-      () => props.policy,
-      (next) => {
-        if (instance.value) instance.value.setPolicy(next);
-      },
-      { deep: true },
-    );
-    watch(
-      () => props.viewport,
-      (next) => {
-        if (instance.value) instance.value.setViewportOptions(next);
-      },
-      { deep: true },
-    );
-    watch(
-      () => props.contextMenu,
-      (next) => {
-        if (instance.value) instance.value.setContextMenu(next);
-      },
-      { deep: true },
-    );
-    watch(
-      () => props.overlays,
-      (next) => {
-        if (instance.value) instance.value.setOverlayOptions(next);
-      },
-      { deep: true },
-    );
-    watch(
-      () => props.extensions,
-      (next) => {
-        if (instance.value) instance.value.setExtensions(next);
-      },
-    );
-    watch(
-      () => props.printerProfiles,
-      (next) => {
-        if (instance.value) instance.value.setPrinterProfiles(next);
-      },
-    );
-    watch(
-      () => props.printerProfileId,
-      (next) => {
-        if (instance.value) instance.value.setPrinterProfileId(next);
-      },
-    );
-    watch(
-      () => props.uploadStatus,
-      (next) => {
-        if (instance.value) instance.value.setUploadStatus(next ?? null);
-      },
-    );
-    watch(
-      () => props.macroRecording,
-      (next) => {
-        if (instance.value) instance.value.setMacroRecording(next ?? null);
+        if (!inst) return;
+        const previous = applied;
+        applied = next;
+        reconcileProps(inst, previous, next, report);
       },
     );
 
     onBeforeUnmount(() => {
       disposed = true;
-      for (const d of eventDisposers) d();
+      for (const off of offs) off();
       instance.value?.dispose();
       instance.value = null;
     });
 
-    expose({ instance });
+    expose({
+      get spreadsheet() {
+        return instance.value;
+      },
+    } satisfies SpreadsheetExposed);
 
-    const renderHost = computed(() =>
-      h('div', { ref: hostEl, class: props.class, style: props.style }),
-    );
     return () => {
-      const fallback =
-        mountError.value && props.errorFallback ? props.errorFallback(mountError.value) : null;
-      return fallback ? [renderHost.value, fallback] : renderHost.value;
+      const failed = mountError.value;
+      const live = instance.value;
+      return [
+        h('div', { ref: hostEl, class: props.class, style: props.style }),
+        failed && props.errorFallback ? props.errorFallback(failed.error) : null,
+        live ? slots.default?.({ spreadsheet: live }) : null,
+      ];
     };
   },
 });
+
+/**
+ * The spreadsheet as a Vue component. It mounts once; option props are applied to the live
+ * instance with `update`, and the instance is disposed on unmount. The default slot receives
+ * `{ spreadsheet }` once it is mounted.
+ */
+export const Spreadsheet: DefineComponent<
+  SpreadsheetProps,
+  SpreadsheetExposed,
+  Record<string, never>,
+  Record<string, never>,
+  Record<string, never>,
+  ComponentOptionsMixin,
+  ComponentOptionsMixin,
+  SpreadsheetEmits
+> = component as never;

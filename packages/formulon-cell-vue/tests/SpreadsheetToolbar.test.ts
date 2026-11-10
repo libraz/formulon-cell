@@ -1,576 +1,201 @@
-// `SpreadsheetToolbar.vue` is now a ~100 LOC adapter on top of
-// `Spreadsheet.mountToolbar`. The prior 3754 LOC of Vue-internal ribbon and
-// the matching 1260 LOC test suite were retired.
-//
-// happy-dom + vitest can't compile `.vue` SFCs without `@vitejs/plugin-vue`,
-// which the project deliberately avoids. We mirror the SFC's `<script setup>`
-// inline as a `defineComponent` so the same `mountToolbar` wiring is
-// exercised through Vue's reactivity. The smoke tests parallel the React
-// adapter's coverage: DOM mount, tab forwarding both ways, ribbon-command
-// hooks, and dispose on unmount.
-import {
-  createDefaultDynamicDropdownsCtx,
-  type DynamicDropdownsCtx,
-  RIBBON_TABS,
-  type RibbonHooks,
-  Spreadsheet,
-  type SpreadsheetInstance,
-  type ToolbarInstance,
-} from '@libraz/formulon-cell';
+import type { SpreadsheetInstance } from '@libraz/formulon-cell';
+import { RIBBON_TABS, type RibbonHooks, type RibbonTab } from '@libraz/formulon-cell/toolbar';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  createApp,
-  defineComponent,
-  h,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from 'vue';
-import type { RibbonTab } from '../src/toolbar.js';
-import {
-  installVueDomStubs,
-  type MountedVueSpreadsheet,
-  mountVueSpreadsheet,
-  uninstallVueDomStubs,
-} from './test-utils/mount';
-
-vi.setConfig({ testTimeout: 20_000 });
-
-interface AdapterProps {
-  instance: SpreadsheetInstance | null;
-  activeTab: RibbonTab;
-  locale: string;
-  onSpellingReview?: () => void;
-  onAccessibilityCheck?: () => void;
-  onRunScript?: () => void;
-  onDrawPen?: () => void;
-  onDrawEraser?: () => void;
-  onTranslate?: () => void;
-  onAddIn?: () => void;
-  onError?: (error: unknown) => void;
-  onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
-  dropdownActions?: Partial<DynamicDropdownsCtx>;
-  ribbonTabs?: readonly RibbonTab[];
-}
-
-// Verbatim copy of the SFC's `<script setup>` body, expressed as a
-// `defineComponent` so happy-dom can mount it without the Vue compiler.
-const AdapterComponent = defineComponent({
-  name: 'SpreadsheetToolbarAdapter',
-  props: {
-    instance: { type: Object as () => SpreadsheetInstance | null, required: true },
-    activeTab: { type: String as () => RibbonTab, required: true },
-    locale: { type: String, required: true },
-    onSpellingReview: { type: Function as unknown as () => () => void, default: undefined },
-    onAccessibilityCheck: { type: Function as unknown as () => () => void, default: undefined },
-    onRunScript: { type: Function as unknown as () => () => void, default: undefined },
-    onDrawPen: { type: Function as unknown as () => () => void, default: undefined },
-    onDrawEraser: { type: Function as unknown as () => () => void, default: undefined },
-    onTranslate: { type: Function as unknown as () => () => void, default: undefined },
-    onAddIn: { type: Function as unknown as () => () => void, default: undefined },
-    onError: {
-      type: Function as unknown as () => (error: unknown) => void,
-      default: undefined,
-    },
-    onToolbarReady: {
-      type: Function as unknown as () => (toolbar: ToolbarInstance | null) => void,
-      default: undefined,
-    },
-    dropdownActions: {
-      type: Object as () => Partial<DynamicDropdownsCtx> | undefined,
-      default: undefined,
-    },
-    ribbonTabs: { type: Array as unknown as () => readonly RibbonTab[], default: undefined },
-  },
-  emits: ['tabChange', 'error'],
-  setup(props: AdapterProps, { emit }) {
-    const hostEl = ref<HTMLDivElement | null>(null);
-    let toolbar: ToolbarInstance | null = null;
-
-    const mountToolbarFor = (instance: SpreadsheetInstance): void => {
-      const host = hostEl.value;
-      if (!host) return;
-      if (toolbar) props.onToolbarReady?.(null);
-      toolbar?.dispose();
-      let coreDefaults: DynamicDropdownsCtx | null = null;
-      const getCoreDefaults = (): DynamicDropdownsCtx => {
-        coreDefaults ??= createDefaultDynamicDropdownsCtx(instance);
-        return coreDefaults;
-      };
-      const dropdownOverrides: Partial<DynamicDropdownsCtx> = {};
-      if (props.onRunScript) {
-        dropdownOverrides.applyScriptAction = (action) =>
-          action === 'custom' ? props.onRunScript?.() : getCoreDefaults().applyScriptAction(action);
-      }
-      if (props.onAddIn) {
-        dropdownOverrides.applyAddInAction = (action) =>
-          action === 'manage' ? props.onAddIn?.() : getCoreDefaults().applyAddInAction(action);
-      }
-      Object.assign(dropdownOverrides, props.dropdownActions);
-      const review: NonNullable<RibbonHooks['review']> = {};
-      if (props.onSpellingReview) review.spelling = () => props.onSpellingReview?.();
-      if (props.onAccessibilityCheck) review.accessibility = () => props.onAccessibilityCheck?.();
-      if (props.onTranslate) review.translate = () => props.onTranslate?.();
-      try {
-        toolbar = Spreadsheet.mountToolbar(host, instance, {
-          lang: props.locale === 'en' ? 'en' : 'ja',
-          activeTab: props.activeTab,
-          ribbonTabs: props.ribbonTabs,
-          onTabChange: (tab) => emit('tabChange', tab),
-          dynamicDropdowns: dropdownOverrides,
-          hooks: {
-            review,
-            drawing: {
-              setInkMode: (mode) => {
-                if (mode === 'pen') props.onDrawPen?.();
-                else props.onDrawEraser?.();
-              },
-            },
-          },
-        });
-      } catch (error) {
-        props.onToolbarReady?.(null);
-        props.onError?.(error);
-        emit('error', error);
-        return;
-      }
-      props.onToolbarReady?.(toolbar);
-    };
-
-    onMounted(() => {
-      if (props.instance) mountToolbarFor(props.instance);
-    });
-
-    watch(
-      [
-        () => props.instance,
-        () => props.locale,
-        () => Boolean(props.onSpellingReview),
-        () => Boolean(props.onAccessibilityCheck),
-        () => Boolean(props.onTranslate),
-        () => Boolean(props.onRunScript),
-        () => Boolean(props.onAddIn),
-      ],
-      ([instance], _prev, onCleanup) => {
-        if (!hostEl.value) return;
-        if (instance) mountToolbarFor(instance);
-        else {
-          props.onToolbarReady?.(null);
-          toolbar?.dispose();
-          toolbar = null;
-        }
-        onCleanup(() => {});
-      },
-      { flush: 'post' },
-    );
-
-    watch(
-      () => props.activeTab,
-      (next) => {
-        if (toolbar && toolbar.getActiveTab() !== next) toolbar.setActiveTab(next);
-      },
-    );
-
-    onBeforeUnmount(() => {
-      props.onToolbarReady?.(null);
-      toolbar?.dispose();
-      toolbar = null;
-    });
-
-    return () => h('div', { ref: hostEl, style: { display: 'contents' } });
-  },
-});
-
-const flush = async (): Promise<void> => {
-  for (let i = 0; i < 8; i += 1) await Promise.resolve();
-  await nextTick();
-};
+import { type App, createApp, defineComponent, h, shallowReactive } from 'vue';
+import { SpreadsheetToolbar } from '../src';
+import { flush, mountStub, waitFor } from './test-utils/mount';
 
 interface Harness {
   host: HTMLElement;
-  tabChange: ReturnType<typeof vi.fn>;
+  props: Record<string, unknown>;
+  ready: ReturnType<typeof vi.fn>;
   error: ReturnType<typeof vi.fn>;
-  setActiveTab: (tab: RibbonTab) => Promise<void>;
-  unmount: () => Promise<void>;
+  tab: ReturnType<typeof vi.fn>;
+  unmount: () => void;
 }
 
-async function mountAdapter(
-  instance: SpreadsheetInstance,
-  callbacks: Omit<AdapterProps, 'instance' | 'activeTab' | 'locale'> = {},
-  initialTab: RibbonTab = 'home',
-): Promise<Harness> {
+let instance: SpreadsheetInstance;
+const apps: App[] = [];
+
+beforeEach(async () => {
+  instance = await mountStub();
+});
+
+afterEach(() => {
+  for (const app of apps.splice(0)) app.unmount();
+  instance.dispose();
+  document.body.replaceChildren();
+});
+
+/** Mounts `<SpreadsheetToolbar>` with reactive props; `activeTab` is bound two-way like `v-model`. */
+const mountToolbar = async (
+  initial: Record<string, unknown> = {},
+  { wait = true }: { wait?: boolean } = {},
+): Promise<Harness> => {
   const host = document.createElement('div');
   document.body.appendChild(host);
-  const activeTabRef = ref<RibbonTab>(initialTab);
-  const tabChange = vi.fn();
+  const props = shallowReactive<Record<string, unknown>>({ spreadsheet: instance, ...initial });
+  const ready = vi.fn();
   const error = vi.fn();
-
-  const root = defineComponent({
-    setup() {
-      return () =>
-        h(AdapterComponent, {
-          instance,
-          activeTab: activeTabRef.value,
-          locale: 'en',
-          ...callbacks,
-          onTabChange: (tab: RibbonTab) => tabChange(tab),
-          onError: (err: unknown) => {
-            callbacks.onError?.(err);
-            error(err);
+  const tab = vi.fn();
+  const app = createApp(
+    defineComponent({
+      render: () =>
+        h(SpreadsheetToolbar, {
+          ...props,
+          onReady: ready,
+          onError: error,
+          'onUpdate:activeTab': (next: RibbonTab) => {
+            tab(next);
+            props.activeTab = next;
           },
-        });
-    },
-  });
-
-  const app = createApp(root);
+        }),
+    }),
+  );
   app.mount(host);
-  await flush();
+  apps.push(app);
+  if (wait && props.spreadsheet) await waitFor(() => ready.mock.calls.length > 0);
+  return { host, props, ready, error, tab, unmount: () => app.unmount() };
+};
 
-  return {
-    host,
-    tabChange,
-    error,
-    setActiveTab: async (tab) => {
-      activeTabRef.value = tab;
+const panel = (host: HTMLElement, name: string): Element | null =>
+  host.querySelector(`[data-ribbon-panel="${name}"]:not([hidden])`);
+
+describe('<SpreadsheetToolbar>', () => {
+  it('mounts the ribbon into its host and emits ready with the toolbar', async () => {
+    const view = await mountToolbar();
+    expect(view.host.querySelectorAll('[data-ribbon-tab]').length).toBeGreaterThan(0);
+    expect(panel(view.host, 'home')).toBeTruthy();
+    expect(view.ready).toHaveBeenCalledTimes(1);
+    expect(view.ready.mock.calls[0]?.[0]).toMatchObject({ activeTab: 'home' });
+  });
+
+  it('mounts nothing while the spreadsheet is null, then mounts when it arrives', async () => {
+    const view = await mountToolbar({ spreadsheet: null });
+    await flush();
+    expect(view.host.querySelector('[data-ribbon-tab]')).toBeNull();
+    expect(view.ready).not.toHaveBeenCalled();
+    view.props.spreadsheet = instance;
+    await waitFor(() => view.ready.mock.calls.length > 0);
+    expect(view.host.querySelector('[data-ribbon-tab]')).not.toBeNull();
+  });
+
+  it('emits update:activeTab when a tab button is clicked', async () => {
+    const view = await mountToolbar();
+    view.host.querySelector<HTMLButtonElement>('[data-ribbon-tab="insert"]')?.click();
+    await flush();
+    expect(view.tab).toHaveBeenCalledWith('insert');
+    expect(panel(view.host, 'insert')).toBeTruthy();
+  });
+
+  it('applies an external activeTab change without remounting', async () => {
+    const view = await mountToolbar();
+    view.props.activeTab = 'data';
+    await flush();
+    expect(panel(view.host, 'data')).toBeTruthy();
+    expect(panel(view.host, 'home')).toBeFalsy();
+    expect(view.ready).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not echo an externally set tab back as update:activeTab', async () => {
+    const view = await mountToolbar();
+    view.props.activeTab = 'data';
+    await flush();
+    expect(view.tab).not.toHaveBeenCalled();
+  });
+
+  it('starts on the given activeTab', async () => {
+    const view = await mountToolbar({ activeTab: 'review', ribbonTabs: RIBBON_TABS });
+    expect(panel(view.host, 'review')).toBeTruthy();
+  });
+
+  it('emits error when the toolbar mount fails and mounts nothing', async () => {
+    const disposed = await mountStub();
+    disposed.dispose();
+    const view = await mountToolbar({ spreadsheet: disposed }, { wait: false });
+    await waitFor(() => view.error.mock.calls.length > 0);
+    expect(view.ready).not.toHaveBeenCalled();
+    expect(view.host.querySelector('[data-ribbon-tab]')).toBeNull();
+  });
+
+  it('emits ready(null) and clears the ribbon when unmounted', async () => {
+    const view = await mountToolbar();
+    const toolbar = view.ready.mock.calls[0]?.[0] as { disposed: boolean };
+    view.unmount();
+    expect(toolbar.disposed).toBe(true);
+    expect(view.ready).toHaveBeenLastCalledWith(null);
+  });
+
+  describe('hooks', () => {
+    const clickPen = async (host: HTMLElement): Promise<void> => {
+      host.querySelector<HTMLButtonElement>('[data-ribbon-command="drawPen"]')?.click();
       await flush();
-    },
-    unmount: async () => {
-      app.unmount();
-      await flush();
-      host.remove();
-    },
-  };
-}
+    };
+    const hooksOf = (setInkMode: () => void): RibbonHooks => ({ drawing: { setInkMode } });
 
-describe('<SpreadsheetToolbar> Vue adapter (thin)', () => {
-  let mounted: MountedVueSpreadsheet;
-
-  beforeEach(async () => {
-    installVueDomStubs();
-    mounted = await mountVueSpreadsheet({ props: { locale: 'en' } });
-  });
-
-  afterEach(async () => {
-    await mounted.dispose();
-    document.body.querySelectorAll('.fc-tb__dlg').forEach((el) => {
-      el.remove();
-    });
-    uninstallVueDomStubs();
-  });
-
-  it('mounts the core ribbon DOM into the wrapping host element', async () => {
-    const onToolbarReady = vi.fn();
-    const harness = await mountAdapter(mounted.instance, { onToolbarReady });
-    expect(harness.host.querySelectorAll('[data-ribbon-tab]').length).toBeGreaterThan(0);
-    expect(harness.host.querySelector('[data-ribbon-panel="home"]:not([hidden])')).toBeTruthy();
-    expect(onToolbarReady).toHaveBeenCalledWith(
-      expect.objectContaining({ applyCommand: expect.any(Function) }),
-    );
-    await harness.unmount();
-    expect(onToolbarReady).toHaveBeenLastCalledWith(null);
-  });
-
-  it('forwards core toolbar mount failures to onError and error emit', async () => {
-    const err = new Error('toolbar mount failed');
-    const onError = vi.fn();
-    const onToolbarReady = vi.fn();
-    const spy = vi.spyOn(Spreadsheet, 'mountToolbar').mockImplementationOnce(() => {
-      throw err;
-    });
-    const harness = await mountAdapter(mounted.instance, { onError, onToolbarReady });
-
-    expect(onToolbarReady).toHaveBeenCalledWith(null);
-    expect(onError).toHaveBeenCalledWith(err);
-    expect(harness.error).toHaveBeenCalledWith(err);
-    expect(harness.host.querySelector('[data-ribbon-tab]')).toBeNull();
-    await harness.unmount();
-    spy.mockRestore();
-  });
-
-  it('forwards tab-button clicks via tabChange emit', async () => {
-    const harness = await mountAdapter(mounted.instance);
-    const insertTab = harness.host.querySelector<HTMLButtonElement>('[data-ribbon-tab="insert"]');
-    expect(insertTab).toBeTruthy();
-    insertTab?.click();
-    await flush();
-    expect(harness.tabChange).toHaveBeenCalledWith('insert');
-    await harness.unmount();
-  });
-
-  it('keeps the mounted ribbon when the host re-renders with fresh inline callbacks', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const activeTab = ref<RibbonTab>('home');
-    const instance = mounted.instance;
-    const app = createApp(
-      defineComponent({
-        setup() {
-          return () =>
-            h(AdapterComponent, {
-              instance,
-              activeTab: activeTab.value,
-              locale: 'en',
-              onTranslate: () => {},
-              onAddIn: () => {},
-            });
-        },
-      }),
-    );
-    app.mount(host);
-    await flush();
-    const spy = vi.spyOn(Spreadsheet, 'mountToolbar');
-    activeTab.value = 'insert';
-    await flush();
-    expect(spy).not.toHaveBeenCalled();
-    expect(host.querySelector('[data-ribbon-tab="insert"]')?.getAttribute('aria-selected')).toBe(
-      'true',
-    );
-    spy.mockRestore();
-    app.unmount();
-    host.remove();
-  });
-
-  it('routes ribbon review/automation/drawing commands to the matching host callback', async () => {
-    const onSpellingReview = vi.fn();
-    const onAccessibilityCheck = vi.fn();
-    const onTranslate = vi.fn();
-    const onRunScript = vi.fn();
-    const onAddIn = vi.fn();
-    const onDrawPen = vi.fn();
-    const onDrawEraser = vi.fn();
-    const harness = await mountAdapter(
-      mounted.instance,
-      {
-        onSpellingReview,
-        onAccessibilityCheck,
-        onTranslate,
-        onRunScript,
-        onAddIn,
-        onDrawPen,
-        onDrawEraser,
+    it('calls the hook given for a ribbon command', async () => {
+      const setInkMode = vi.fn();
+      const view = await mountToolbar({
+        activeTab: 'review',
         ribbonTabs: RIBBON_TABS,
-      },
-      'review',
-    );
-    const clickCommand = (cmd: string): void => {
-      harness.host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${cmd}"]`)?.click();
-    };
-    const clickAttr = (attr: string, value: string): void => {
-      harness.host.querySelector<HTMLButtonElement>(`[data-${attr}="${value}"]`)?.click();
-    };
-    clickCommand('spellingReview');
-    clickCommand('accessibility');
-    clickCommand('translateReview');
-    // Script / AddIn ribbon buttons open a menu on plain click; the host
-    // callback fires only when the user picks the action wired to its prop.
-    clickCommand('script');
-    clickAttr('script-action', 'custom');
-    clickCommand('addIn');
-    clickAttr('add-in-action', 'manage');
-    clickCommand('drawPen');
-    clickCommand('drawErase');
-    await flush();
-    expect(onSpellingReview).toHaveBeenCalledTimes(1);
-    expect(onAccessibilityCheck).toHaveBeenCalledTimes(1);
-    expect(onTranslate).toHaveBeenCalledTimes(1);
-    expect(onRunScript).toHaveBeenCalledTimes(1);
-    expect(onAddIn).toHaveBeenCalledTimes(1);
-    expect(onDrawPen).toHaveBeenCalledTimes(1);
-    expect(onDrawEraser).toHaveBeenCalledTimes(1);
-    await harness.unmount();
-  });
-
-  describe('core default fallback', () => {
-    const click = async (harness: Harness, selector: string): Promise<void> => {
-      harness.host.querySelector<HTMLButtonElement>(selector)?.click();
-      await flush();
-    };
-    const clearDialogs = (): void => {
-      document.body.querySelectorAll('.fc-tb__dlg').forEach((el) => {
-        el.remove();
+        hooks: hooksOf(setInkMode),
       });
-    };
-    const dialogs = (): number => document.body.querySelectorAll('.fc-tb__dlg').length;
-
-    it('falls back to the core review reports when review props are omitted', async () => {
-      const harness = await mountAdapter(mounted.instance, {}, 'review');
-      for (const cmd of ['spellingReview', 'accessibility', 'translateReview']) {
-        clearDialogs();
-        await click(harness, `[data-ribbon-command="${cmd}"]`);
-        expect(dialogs()).toBeGreaterThan(0);
-      }
-      await harness.unmount();
+      await clickPen(view.host);
+      expect(setInkMode).toHaveBeenCalledWith('pen');
     });
 
-    it('lets a provided review prop replace the core report', async () => {
-      const onSpellingReview = vi.fn();
-      const harness = await mountAdapter(mounted.instance, { onSpellingReview }, 'review');
-      await click(harness, '[data-ribbon-command="spellingReview"]');
-      expect(onSpellingReview).toHaveBeenCalledTimes(1);
-      expect(dialogs()).toBe(0);
-      // Sibling review commands without a prop still use the core default.
-      await click(harness, '[data-ribbon-command="accessibility"]');
-      expect(dialogs()).toBeGreaterThan(0);
-      await harness.unmount();
+    it('calls the latest function at click time and keeps the ribbon mounted', async () => {
+      const first = vi.fn();
+      const second = vi.fn();
+      const view = await mountToolbar({
+        activeTab: 'review',
+        ribbonTabs: RIBBON_TABS,
+        hooks: hooksOf(first),
+      });
+      view.props.hooks = hooksOf(second);
+      await flush();
+      expect(view.ready).toHaveBeenCalledTimes(1);
+      await clickPen(view.host);
+      expect(first).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledWith('pen');
     });
 
-    it('reaches the core script/add-in defaults when onRunScript/onAddIn are omitted', async () => {
-      const harness = await mountAdapter(mounted.instance, { ribbonTabs: RIBBON_TABS }, 'review');
-      await click(harness, '[data-ribbon-command="addIn"]');
-      await click(harness, '[data-add-in-action="get"]');
-      expect(dialogs()).toBeGreaterThan(0);
-      await harness.unmount();
-    });
-
-    it('keeps non-custom script and non-manage add-in actions on the core default', async () => {
-      const onRunScript = vi.fn();
-      const onAddIn = vi.fn();
-      const harness = await mountAdapter(
-        mounted.instance,
-        { onRunScript, onAddIn, ribbonTabs: RIBBON_TABS },
-        'review',
-      );
-      await click(harness, '[data-ribbon-command="addIn"]');
-      await click(harness, '[data-add-in-action="get"]');
-      expect(onAddIn).not.toHaveBeenCalled();
-      expect(dialogs()).toBeGreaterThan(0);
-      clearDialogs();
-
-      await click(harness, '[data-ribbon-command="script"]');
-      await click(harness, '[data-script-action="uppercase"]');
-      expect(onRunScript).not.toHaveBeenCalled();
-      expect(dialogs()).toBeGreaterThan(0);
-
-      await click(harness, '[data-script-action="custom"]');
-      await click(harness, '[data-add-in-action="manage"]');
-      expect(onRunScript).toHaveBeenCalledTimes(1);
-      expect(onAddIn).toHaveBeenCalledTimes(1);
-      await harness.unmount();
+    it('remounts when a hook is added or removed', async () => {
+      const view = await mountToolbar({ activeTab: 'review', ribbonTabs: RIBBON_TABS });
+      const setInkMode = vi.fn();
+      view.props.hooks = hooksOf(setInkMode);
+      await waitFor(() => view.ready.mock.calls.length >= 3);
+      expect(view.ready).toHaveBeenNthCalledWith(2, null);
+      await clickPen(view.host);
+      expect(setInkMode).toHaveBeenCalledWith('pen');
     });
   });
 
-  it('routes dropdownActions overrides through core dynamic-dropdowns dispatcher', async () => {
-    const onProtect = vi.fn();
-    const harness = await mountAdapter(
-      mounted.instance,
-      { dropdownActions: { applyProtectAction: onProtect } },
-      'review',
-    );
-    harness.host.querySelector<HTMLButtonElement>('[data-protect-action="lock-cell"]')?.click();
-    await flush();
-    expect(onProtect).toHaveBeenCalledWith('lock-cell');
-    await harness.unmount();
+  describe('ribbonTabs', () => {
+    it('does not remount for a structurally equal array', async () => {
+      const view = await mountToolbar({ ribbonTabs: ['home', 'insert'] });
+      view.props.ribbonTabs = ['home', 'insert'];
+      await flush();
+      expect(view.ready).toHaveBeenCalledTimes(1);
+    });
+
+    it('remounts with the new tab surface when the tabs differ', async () => {
+      const view = await mountToolbar({ ribbonTabs: ['home', 'insert'] });
+      expect(view.host.querySelector('[data-ribbon-tab="data"]')).toBeNull();
+      view.props.ribbonTabs = ['home', 'insert', 'data'];
+      await waitFor(() => view.host.querySelector('[data-ribbon-tab="data"]') !== null);
+    });
   });
 
-  it('preserves core Insert activation parity for PivotTable, Table, and Pictures', async () => {
-    mounted.instance.setFeatures({ pivotTableDialog: true, illustrations: true });
-    await flush();
-    const openPivotTableDialog = vi.spyOn(mounted.instance, 'openPivotTableDialog');
-    const onToolbarReady = vi.fn();
-    const harness = await mountAdapter(mounted.instance, { onToolbarReady }, 'insert');
-    const toolbar = onToolbarReady.mock.calls
-      .map((call) => call[0])
-      .find((candidate) => candidate?.applyCommand);
-    expect(toolbar).toBeTruthy();
-    const pivotButton = harness.host.querySelector<HTMLButtonElement>(
-      '[data-ribbon-command="pivotTableInsert"]',
-    );
-    const tableButton = harness.host.querySelector<HTMLButtonElement>(
-      '[data-ribbon-command="formatTableInsert"]',
-    );
-    const pictureButton = harness.host.querySelector<HTMLButtonElement>(
-      '[data-ribbon-command="pictureInsert"]',
-    );
-    expect(pivotButton?.dataset.ribbonActivation).toBe('splitPrimary');
-    expect(tableButton?.dataset.ribbonActivation).toBe('dialog');
-    expect(tableButton?.dataset.ribbonMenuId).toBeUndefined();
-    expect(pictureButton?.dataset.ribbonActivation).toBe('gallery');
-
-    expect(toolbar?.applyCommand('pivotTableInsert')).toBe(true);
-    await flush();
-    expect(openPivotTableDialog).toHaveBeenCalledTimes(1);
-
-    expect(toolbar?.applyCommand('formatTableInsert')).toBe(true);
-    await flush();
-    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
-      'Create Table',
-    );
-    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn')?.click();
-    await flush();
-
-    pictureButton?.click();
-    await flush();
-    const pictureMenu = harness.host.querySelector<HTMLElement>('#menu-picture-insert');
-    expect(pictureMenu?.hidden).toBe(false);
-    expect(pictureMenu?.classList.contains('fc-tb__menu--visual')).toBe(true);
-    expect(
-      pictureMenu?.querySelector<HTMLButtonElement>('[data-picture-insert="stock"]'),
-    ).toBeTruthy();
-
-    await harness.unmount();
-    openPivotTableDialog.mockRestore();
-  });
-
-  it('preserves core Home split/dropdown parity for Underline and Fill', async () => {
-    const onToolbarReady = vi.fn();
-    const harness = await mountAdapter(mounted.instance, { onToolbarReady });
-    const toolbar = onToolbarReady.mock.calls
-      .map((call) => call[0])
-      .find((candidate): candidate is ToolbarInstance => !!candidate?.dropdownsApi);
-    expect(toolbar).toBeTruthy();
-
-    const underline = harness.host.querySelector<HTMLButtonElement>(
-      '[data-ribbon-command="underline"]',
-    );
-    const underlineMenu = harness.host.querySelector<HTMLDivElement>('#menu-underline');
-    expect(underline?.dataset.ribbonActivation).toBe('splitToggle');
-    expect(underline?.dataset.ribbonMenuId).toBe('menu-underline');
-    expect(underline?.getAttribute('aria-pressed')).toBe('false');
-    underline?.click();
-    await flush();
-    expect(underline?.getAttribute('aria-pressed')).toBe('true');
-    expect(underlineMenu?.hidden).toBe(true);
-    toolbar.dropdownsApi?.openDynamicRibbonDropdown(
-      { command: 'underline', menuId: 'menu-underline' },
-      underline as HTMLButtonElement,
-    );
-    await flush();
-    expect(underlineMenu?.hidden).toBe(false);
-    expect(
-      Array.from(
-        harness.host.querySelectorAll<HTMLButtonElement>(
-          '#menu-underline .fc-tb__menu-item--iconic',
-        ),
-      ).map((item) => item.textContent),
-    ).toEqual(['Underline', 'Double Underline']);
-
-    const fill = harness.host.querySelector<HTMLButtonElement>('[data-ribbon-command="fillHome"]');
-    fill?.click();
-    await flush();
-    expect(
-      Array.from(harness.host.querySelectorAll<HTMLButtonElement>('#menu-fill [data-fill]')).map(
-        (item) => item.dataset.fill,
-      ),
-    ).toEqual(['down', 'right', 'up', 'left', 'group', 'series', 'justify', 'flash']);
-
-    await harness.unmount();
-  });
-
-  it('reacts to external activeTab prop changes without re-mounting the core toolbar', async () => {
-    const harness = await mountAdapter(mounted.instance);
-    expect(harness.host.querySelector('[data-ribbon-panel="home"]:not([hidden])')).toBeTruthy();
-    await harness.setActiveTab('data');
-    expect(harness.host.querySelector('[data-ribbon-panel="data"]:not([hidden])')).toBeTruthy();
-    expect(harness.host.querySelector('[data-ribbon-panel="home"]:not([hidden])')).toBeFalsy();
-    await harness.unmount();
-  });
-
-  it('cleans up the core toolbar when Vue unmounts the component', async () => {
-    const harness = await mountAdapter(mounted.instance);
-    expect(harness.host.querySelectorAll('[data-ribbon-tab]').length).toBeGreaterThan(0);
-    await harness.unmount();
-    expect(document.body.contains(harness.host)).toBe(false);
+  it('remounts for another spreadsheet and disposes the previous toolbar', async () => {
+    const view = await mountToolbar();
+    const first = view.ready.mock.calls[0]?.[0] as { disposed: boolean };
+    const other = await mountStub();
+    view.props.spreadsheet = other;
+    await waitFor(() => view.ready.mock.calls.filter((c) => c[0] !== null).length >= 2);
+    expect(first.disposed).toBe(true);
+    expect(view.host.querySelectorAll('[data-ribbon-tab="home"]').length).toBe(1);
+    view.unmount();
+    other.dispose();
   });
 });
