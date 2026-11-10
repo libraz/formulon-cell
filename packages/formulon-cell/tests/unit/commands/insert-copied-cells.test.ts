@@ -4,6 +4,7 @@ import {
   type ClipboardSnapshot,
   captureSnapshot,
 } from '../../../src/commands/clipboard/snapshot.js';
+import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -204,5 +205,45 @@ describe('insertCopiedCellsFromTSV', () => {
 
     expect(insertCopiedCellsFromTSV(store, wb, null, '', 'down', hugeSnapshot)).toBeNull();
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'keep' });
+  });
+
+  it('inserts copied cells to the right of the target on the real engine and shifts the tail', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await WorkbookHandle.createDefault();
+    wb.attachStore(store);
+    const put = (row: number, col: number, value: string | number): void => {
+      if (typeof value === 'number') wb.setNumber({ sheet: 0, row, col }, value);
+      else wb.setText({ sheet: 0, row, col }, value);
+    };
+    put(0, 0, 'Product');
+    put(0, 1, 10);
+    put(1, 0, 'Widget');
+    put(1, 1, 4);
+    put(2, 3, 'tail');
+    put(2, 2, 'keep');
+    mutators.replaceCells(store, wb.cells(0));
+    const snap = captureSnapshot(
+      store.getState(),
+      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
+      'copy',
+    );
+    assertSnap(snap);
+    setActive(store, 2, 3);
+    const history = new History();
+    wb.attachHistory(history);
+    const result = insertCopiedCellsFromTSV(
+      store,
+      wb,
+      history,
+      'Product\t10\nWidget\t4',
+      'right',
+      snap,
+    );
+    expect(result).not.toBeNull();
+    expect(wb.getValue({ sheet: 0, row: 2, col: 3 })).toEqual({ kind: 'text', value: 'Product' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 4 })).toEqual({ kind: 'number', value: 10 });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 5 })).toEqual({ kind: 'text', value: 'tail' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 2 })).toEqual({ kind: 'text', value: 'keep' });
+    wb.dispose();
   });
 });
