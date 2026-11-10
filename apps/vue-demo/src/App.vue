@@ -104,7 +104,6 @@ const resolvedUi = computed(() =>
     preset: preset.value,
     overrides: overrides.value,
     showRibbon: showRibbon.value,
-    theme: theme.value,
     platform: platform.value,
   }),
 );

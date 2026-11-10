@@ -89,8 +89,8 @@ export const App = (): ReactElement => {
   const aliveRef = useRef(true);
 
   const resolvedUi = useMemo(
-    () => composeDemoUiOptions({ preset, overrides, showRibbon, theme, platform }),
-    [overrides, platform, preset, showRibbon, theme],
+    () => composeDemoUiOptions({ preset, overrides, showRibbon, platform }),
+    [overrides, platform, preset, showRibbon],
   );
   const ribbonTabs = platform === 'mac' ? DEMO_MAC_RIBBON_TABS : DEMO_RIBBON_TABS;
   const features = resolvedUi.features;

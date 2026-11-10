@@ -23,7 +23,6 @@ import type {
   RibbonTab,
   ScriptCommand,
   LegacySpreadsheetInstance as SpreadsheetInstance,
-  SpreadsheetUiOptions,
   ThemeName,
   ToolbarInstance,
   WorkbookSaveFormat,
@@ -370,19 +369,13 @@ export const composeDemoUiOptions = (input: {
   preset: PresetKey;
   overrides: FeatureFlags;
   showRibbon: boolean;
-  theme: ThemeName;
   platform?: DemoPlatformInput;
-}): ReturnType<typeof resolveSpreadsheetUiOptions> => {
-  const profile: SpreadsheetUiOptions['profile'] =
-    input.preset === 'full' ? 'excel365' : input.preset;
-  return resolveSpreadsheetUiOptions({
-    profile,
-    theme: input.theme,
+}): ReturnType<typeof resolveSpreadsheetUiOptions> =>
+  resolveSpreadsheetUiOptions({
+    profile: input.preset,
     platform: input.platform,
-    features: { ribbon: input.showRibbon },
-    advancedFeatures: input.overrides,
+    features: { ...input.overrides, ribbon: input.showRibbon },
   });
-};
 
 export const FEATURE_GROUPS: {
   title: string;
