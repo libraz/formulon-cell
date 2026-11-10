@@ -42,7 +42,7 @@ import { attachFormatDialog, type FormatDialogHandle } from '../interact/format-
 import { attachFormatPainter } from '../interact/format-painter.js';
 import { attachGoToDialog } from '../interact/goto-dialog.js';
 import { attachHover } from '../interact/hover.js';
-import { attachHyperlinkDialog } from '../interact/hyperlink-dialog.js';
+import { attachHyperlinkDialog, type HyperlinkDialogHandle } from '../interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from '../interact/iterative-dialog.js';
 import {
   attachNamedRangeDialog,
@@ -555,7 +555,7 @@ export const hyperlink = (): Extension =>
         });
       let handle = buildHandle(ctx.i18n.strings);
       return {
-        open: () => handle.open(),
+        open: (entry?: DialogEntry) => handle.open(entry),
         close: () => handle.close(),
         setStrings: (next) => {
           handle.detach();
@@ -781,7 +781,10 @@ export const contextMenu = (): Extension =>
               .resolve<ExtensionHandle & FormatDialogHandle>('formatDialog')
               ?.open(undefined, { entry: { origin: 'contextMenu', commandId: 'formatCells' } }),
           onPasteSpecial: () => callOpen('pasteSpecial'),
-          onInsertHyperlink: () => callOpen('hyperlink'),
+          onInsertHyperlink: () =>
+            ctx
+              .resolve<ExtensionHandle & HyperlinkDialogHandle>('hyperlink')
+              ?.open({ origin: 'contextMenu', commandId: 'insertHyperlink' }),
           onEditComment: () => callOpen('commentDialog'),
           onDefineName: () =>
             ctx

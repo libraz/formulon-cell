@@ -8,6 +8,7 @@ import {
   type DialogOpeners,
   INSTANCE_API_DEFINE_NAME_ENTRY,
   INSTANCE_API_FORMAT_ENTRY,
+  INSTANCE_API_HYPERLINK_ENTRY,
   INSTANCE_API_NAME_MANAGER_ENTRY,
   INSTANCE_API_PAGE_SETUP_ENTRY,
   INSTANCE_API_VALIDATION_ENTRY,
@@ -104,7 +105,11 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
   const openPageSetupDialog: DialogOpeners['pageSetupDialog'] = (tab, entry) => {
     featureState.pageSetupDialog?.open(tab, entry);
   };
+  const openHyperlinkDialog: DialogOpeners['hyperlinkDialog'] = (entry) => {
+    featureState.hyperlinkDialog?.open(entry);
+  };
   registerDialogOpeners(store, {
+    hyperlinkDialog: openHyperlinkDialog,
     pageSetupDialog: openPageSetupDialog,
     formatDialog: openFormatDialog,
     dataValidationDialog: openDataValidationDialog,
@@ -136,7 +141,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       featureState.fxDialog?.open(seedName, options);
     },
     openHyperlinkDialog() {
-      featureState.hyperlinkDialog?.open();
+      openHyperlinkDialog(INSTANCE_API_HYPERLINK_ENTRY);
     },
     followActiveHyperlink() {
       const state = store.getState();

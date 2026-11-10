@@ -114,6 +114,8 @@ const UNLOCKED_CELLS_OPTION: Partial<
   Record<InteractionOperation, keyof SheetProtectionPermissions>
 > = {
   sort: 'sort',
+  // Insert hyperlinks: new links, even in unlocked cells, need the option; locked cells never.
+  hyperlink: 'insertHyperlinks',
 };
 
 /** The Protect Sheet option that makes `operation` available on unlocked cells, if it has one. */

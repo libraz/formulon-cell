@@ -3,17 +3,10 @@
 // a URL (the host owns `window.open` to satisfy CSP and tracking concerns),
 // clear the hyperlink on the active cell, or surface a "no link here" report.
 
-import type { History } from '../commands/history.js';
-import {
-  clearHyperlink,
-  hyperlinkAt,
-  isFollowableHyperlinkTarget,
-} from '../commands/hyperlinks.js';
+import { type HyperlinkActionContext, setHyperlinkAction } from '../commands/hyperlink-actions.js';
+import { hyperlinkAt, isFollowableHyperlinkTarget } from '../commands/hyperlinks.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import { recordFormatChange } from '../commands/slice-history.js';
-import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import type { SpreadsheetStore } from '../store/store.js';
 
 type HyperlinkStrings = Pick<Strings['ribbonMenu'], 'linkOpen' | 'linkNoHyperlink'> &
   Partial<Pick<Strings['ribbonMenu'], 'linkUnsupportedTarget'>>;
@@ -35,9 +28,8 @@ export type RibbonHyperlinkActionResult =
   | { kind: 'report'; report: RibbonHyperlinkReport };
 
 export interface ExecuteRibbonHyperlinkActionDeps {
-  store: SpreadsheetStore;
-  workbook: WorkbookHandle;
-  history: History;
+  /** The store, history, workbook and entry point a removal runs under. */
+  context: HyperlinkActionContext;
   action: RibbonHyperlinkAction;
   strings: HyperlinkStrings;
 }
@@ -51,7 +43,8 @@ export interface ExecuteRibbonHyperlinkActionDeps {
 export const executeRibbonHyperlinkAction = (
   deps: ExecuteRibbonHyperlinkActionDeps,
 ): RibbonHyperlinkActionResult => {
-  const { store, workbook, history, action, strings } = deps;
+  const { context, action, strings } = deps;
+  const { store } = context;
   if (action === 'edit') return { kind: 'open-hyperlink-dialog' };
   if (action === 'external') return { kind: 'open-external-dialog' };
   const state = store.getState();
@@ -93,9 +86,7 @@ export const executeRibbonHyperlinkAction = (
     c1: active.col,
   };
   const clear = (): void => {
-    recordFormatChange(history, store, () => {
-      clearHyperlink(store, active, workbook);
-    });
+    setHyperlinkAction(context, active, undefined);
   };
   // A password prompt makes the removal asynchronous; the caller hears `deferred`.
   if (deferForAllowedRangeUnlock(store, [cell], clear)) return { kind: 'deferred' };

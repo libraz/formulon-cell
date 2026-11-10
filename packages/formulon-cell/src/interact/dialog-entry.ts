@@ -40,6 +40,12 @@ export const INSTANCE_API_PAGE_SETUP_ENTRY: DialogEntry = {
   commandId: 'pageSetup',
 };
 
+/** The entry of an Insert Hyperlink open through the public instance method. */
+export const INSTANCE_API_HYPERLINK_ENTRY: DialogEntry = {
+  origin: 'instanceApi',
+  commandId: 'insertHyperlink',
+};
+
 /** The mount's dialog openers that take the entry of an internal UI caller. */
 export interface DialogOpeners {
   readonly formatDialog: (tab: TabId | undefined, entry: DialogEntry) => void;
@@ -47,6 +53,7 @@ export interface DialogOpeners {
   readonly namedRangeDialog: (entry: DialogEntry) => void;
   readonly defineNameDialog: (entry: DialogEntry) => void;
   readonly pageSetupDialog: (tab: PageSetupDialogTab | undefined, entry: DialogEntry) => void;
+  readonly hyperlinkDialog: (entry: DialogEntry) => void;
 }
 
 const openers = new WeakMap<SpreadsheetStore, DialogOpeners>();
@@ -87,4 +94,9 @@ export function openPageSetupDialogFrom(
   entry: DialogEntry,
 ): void {
   openers.get(store)?.pageSetupDialog(tab, entry);
+}
+
+/** Open Insert Hyperlink on behalf of an internal UI entry point. */
+export function openHyperlinkDialogFrom(store: SpreadsheetStore, entry: DialogEntry): void {
+  openers.get(store)?.hyperlinkDialog(entry);
 }

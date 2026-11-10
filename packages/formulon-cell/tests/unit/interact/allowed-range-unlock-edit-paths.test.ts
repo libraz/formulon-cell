@@ -149,9 +149,13 @@ describe('hyperlinks', () => {
     select(store, area(0, 0, 0, 0));
     const ui = guard(store, area(0, 0, 0, 0), [PASSWORD]);
     const result = executeRibbonHyperlinkAction({
-      store,
-      workbook: wb,
-      history: new History(),
+      context: {
+        store,
+        workbook: wb,
+        history: new History(),
+        origin: 'ribbon',
+        commandId: 'hyperlinkInsert',
+      },
       action: 'clear',
       strings: en.ribbonMenu,
     });
@@ -167,9 +171,13 @@ describe('hyperlink outcome', () => {
   it('reports cleared when the link is removed at once and refused on a locked cell', async () => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     const deps = (store: SpreadsheetStore) => ({
-      store,
-      workbook: wb,
-      history: new History(),
+      context: {
+        store,
+        workbook: wb,
+        history: new History(),
+        origin: 'ribbon' as const,
+        commandId: 'hyperlinkInsert',
+      },
       action: 'clear' as const,
       strings: en.ribbonMenu,
     });

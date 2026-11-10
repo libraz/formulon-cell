@@ -1,7 +1,7 @@
 import type { History } from '../commands/history.js';
-import { clearHyperlink, hyperlinkAt, setHyperlink } from '../commands/hyperlinks.js';
+import { setHyperlinkAction } from '../commands/hyperlink-actions.js';
+import { hyperlinkAt } from '../commands/hyperlinks.js';
 import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
-import { recordFormatChange } from '../commands/slice-history.js';
 import { quoteSheetName } from '../engine/address.js';
 import { addrKey, type WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
@@ -9,6 +9,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { showPrompt } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { type DialogEntry, INSTANCE_API_HYPERLINK_ENTRY } from './dialog-entry.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -34,7 +35,8 @@ export interface HyperlinkDialogDeps {
 }
 
 export interface HyperlinkDialogHandle {
-  open(): void;
+  /** `entry` names the entry point OK and Remove are authorized under; the instance API when absent. */
+  open(entry?: DialogEntry): void;
   close(): void;
   detach(): void;
 }
@@ -47,6 +49,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
   const { host, store } = deps;
   const history = deps.history ?? null;
   const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
+  let dialogEntry: DialogEntry = INSTANCE_API_HYPERLINK_ENTRY;
   const strings = deps.strings ?? defaultStrings;
   // The Mac dialog adds display text, a ScreenTip and Web / document / e-mail tabs.
   const mac = isMacHost(host);
@@ -192,10 +195,18 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
     const wb = getWb() ?? undefined;
     const cell = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
     runAfterAllowedRangeUnlock(store, [cell], () => {
-      recordFormatChange(history, store, () => {
-        if (next) setHyperlink(store, addr, next, wb, options);
-        else clearHyperlink(store, addr, wb);
-      });
+      setHyperlinkAction(
+        {
+          store,
+          history,
+          ...(wb ? { workbook: wb } : {}),
+          origin: dialogEntry.origin,
+          commandId: dialogEntry.commandId,
+        },
+        addr,
+        next,
+        options,
+      );
     });
   };
 
@@ -373,7 +384,8 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
   };
 
   const api: HyperlinkDialogHandle = {
-    open(): void {
+    open(entry = INSTANCE_API_HYPERLINK_ENTRY): void {
+      dialogEntry = entry;
       const state = store.getState();
       const addr = state.selection.active;
       const current = hyperlinkAt(state, addr) ?? '';

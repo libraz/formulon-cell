@@ -5,15 +5,11 @@ import { en } from '../../../src/i18n/strings.js';
 import { executeRibbonHyperlinkAction } from '../../../src/interact/ribbon-hyperlink.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
-const workbook = {} as Parameters<typeof executeRibbonHyperlinkAction>[0]['workbook'];
-
 const runOpen = (url: string) => {
   const store = createSpreadsheetStore();
   setHyperlink(store, { sheet: 0, row: 0, col: 0 }, url);
   return executeRibbonHyperlinkAction({
-    store,
-    workbook,
-    history: new History(),
+    context: { store, history: new History(), origin: 'ribbon', commandId: 'hyperlinkInsert' },
     action: 'open',
     strings: {
       linkOpen: en.ribbonMenu.linkOpen,

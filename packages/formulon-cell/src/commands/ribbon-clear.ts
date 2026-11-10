@@ -1,3 +1,4 @@
+import { hyperlinkWrite } from './hyperlink-actions.js';
 // Shared "Clear" ribbon split-button action — invoked by every host wrapper.
 // The command owns selection planning, policy preflight, sparse metadata
 // mutation, and the history boundary so all ribbon hosts have the same
@@ -586,9 +587,15 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       return;
     }
     if (action === 'hyperlinks') {
-      recordClearFormatEntries(history, store, workbook, plan.sheet, plan.hyperlinks, () => {
-        clearPlannedHyperlinks(store, plan);
-      });
+      hyperlinkWrite(
+        { store, history, workbook, origin: 'ribbon', commandId: 'clear-hyperlinks' },
+        plan.hyperlinks,
+        undefined,
+        () =>
+          recordClearFormatEntries(history, store, workbook, plan.sheet, plan.hyperlinks, () => {
+            clearPlannedHyperlinks(store, plan);
+          }),
+      );
       return;
     }
     if (action === 'conditional') {

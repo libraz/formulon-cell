@@ -10,7 +10,7 @@ import { type PasteWhat, pasteLink, pasteSpecial } from './clipboard/paste-speci
 import { captureSnapshotFromCopyResult } from './clipboard/snapshot.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from './coerce-input.js';
 import { History } from './history.js';
-import { setHyperlink } from './hyperlinks.js';
+import { setHyperlinkAction } from './hyperlink-actions.js';
 import { moveSelectionTo } from './move-cells.js';
 import { executeRibbonClearAction } from './ribbon-clear.js';
 
@@ -78,13 +78,17 @@ export async function applyRangeDrop(
     const target = `#${quoteSheetName(wb.sheetName(src.sheet))}!${formatA1Cell(src.r0, src.c0)}`;
     mutators.setActive(store, first);
     mutators.setRange(store, dest);
-    history?.begin();
-    try {
-      setHyperlink(store, first, target, wb);
-    } finally {
-      history?.end();
-    }
-    return true;
+    return setHyperlinkAction(
+      {
+        store,
+        history: history ?? null,
+        workbook: wb,
+        origin: 'editor',
+        commandId: 'insertHyperlink',
+      },
+      first,
+      target,
+    );
   }
 
   const shift =

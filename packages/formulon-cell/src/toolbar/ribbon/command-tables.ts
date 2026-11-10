@@ -1,6 +1,7 @@
 import {
   openDataValidationDialogFrom,
   openFormatDialogFrom,
+  openHyperlinkDialogFrom,
   openNamedRangeDialogFrom,
   openPageSetupDialogFrom,
 } from '../../interact/dialog-entry.js';
@@ -56,7 +57,8 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
     openFormatDialogFrom(i.store, 'more', { origin: 'ribbon', commandId: 'windowVisibility' }),
   gotoSpecial: (i) => i.openGoToSpecial(),
   gotoSpecialHome: (i) => i.openGoToSpecial(),
-  hyperlinkInsert: (i) => i.openHyperlinkDialog(),
+  hyperlinkInsert: (i) =>
+    openHyperlinkDialogFrom(i.store, { origin: 'ribbon', commandId: 'hyperlinkInsert' }),
   commentInsert: (i) => i.openCommentDialog({ mode: 'note' }),
   newCommentReview: (i) => i.openCommentDialog({ mode: 'note' }),
   dataValidation: (i) =>

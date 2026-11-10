@@ -51,6 +51,7 @@ import type {
 import { InlineEditor } from '../interact/editor.js';
 import { attachFindReplace } from '../interact/find-replace.js';
 import type { FormatDialogHandle } from '../interact/format-dialog.js';
+import type { HyperlinkDialogHandle } from '../interact/hyperlink-dialog.js';
 import { followHyperlink, type HyperlinkFollowDeps } from '../interact/hyperlink-follow.js';
 import { attachKeyboard } from '../interact/keyboard.js';
 import type { NamedRangeDialogHandle } from '../interact/named-range-dialog.js';
@@ -149,7 +150,7 @@ interface AttachEngineBindingInput {
   /** UI/data-format locale, the same one the renderer formats cells with. */
   getLocale: () => string;
   getGoToDialog: () => { open(mode?: 'go-to' | 'special'): void } | null;
-  getHyperlinkDialog: () => { open(): void } | null;
+  getHyperlinkDialog: () => Pick<HyperlinkDialogHandle, 'open'> | null;
   getNamedRangeDialog: () => Pick<NamedRangeDialogHandle, 'open'> | null;
   getPivotTableDialog: () => { open(): void } | null;
   getWorkbookObjects?: () => {
@@ -419,7 +420,8 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
             entry: { origin: 'contextMenu', commandId: 'formatCells' },
           }),
         onPasteSpecial: () => pasteSpecialDialog?.open(),
-        onInsertHyperlink: () => getHyperlinkDialog()?.open(),
+        onInsertHyperlink: () =>
+          getHyperlinkDialog()?.open({ origin: 'contextMenu', commandId: 'insertHyperlink' }),
         onOpenHyperlink: (url) => {
           followHyperlink({ store, wb, ...hyperlinkFollow }, url);
         },

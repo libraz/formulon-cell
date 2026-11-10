@@ -36,6 +36,7 @@ import { excelSerialFromParts } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
 import { openCellShiftDialog, runCellShiftChoice } from '../interact/cell-shift-dialog.js';
 import type { FormatDialogHandle } from '../interact/format-dialog.js';
+import type { HyperlinkDialogHandle } from '../interact/hyperlink-dialog.js';
 import { toggleAutoFilterFromSelection } from '../interact/ribbon-filter-data.js';
 import { directCellFormat } from '../store/direct-format.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
@@ -88,7 +89,7 @@ interface HostShortcutInput {
   history: History;
   host: HTMLElement;
   hostTag: HTMLInputElement;
-  hyperlinkDialog: () => { open(): void } | null;
+  hyperlinkDialog: () => Pick<HyperlinkDialogHandle, 'open'> | null;
   invalidate: () => void;
   namedRangeDialog: () => { open(): void } | null;
   pasteSpecialDialog: () => { open(): void } | null;
@@ -456,7 +457,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       if (!dialog) return;
       e.preventDefault();
       if (restricted) return;
-      dialog.open();
+      dialog.open({ origin: 'keyboard', commandId: 'hyperlinkInsert' });
     } else if (matchesRibbonShortcut(e, 'formatCells', 'formatCellsHome')) {
       const dialog = input.formatDialog();
       if (!dialog) return;

@@ -11,6 +11,7 @@ import {
   warnProtected,
 } from '../../commands/protection.js';
 import { createRibbonChartFromSelection } from '../../commands/session-chart.js';
+import { openHyperlinkDialogFrom } from '../../interact/dialog-entry.js';
 import { executeRibbonHyperlinkAction } from '../../interact/ribbon-hyperlink.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators, type SessionChartKind } from '../../store/store.js';
@@ -31,9 +32,13 @@ const buildLinksAction =
     if (!linkAction) return;
     const strings = instance.i18n.strings;
     const result = executeRibbonHyperlinkAction({
-      store: instance.store,
-      workbook: instance.workbook,
-      history: instance.history,
+      context: {
+        store: instance.store,
+        history: instance.history,
+        workbook: instance.workbook,
+        origin: 'ribbon',
+        commandId: 'hyperlinkInsert',
+      },
       action: linkAction,
       strings: {
         linkOpen: strings.ribbonMenu.linkOpen,
@@ -42,7 +47,7 @@ const buildLinksAction =
       },
     });
     if (result.kind === 'open-hyperlink-dialog') {
-      instance.openHyperlinkDialog();
+      openHyperlinkDialogFrom(instance.store, { origin: 'ribbon', commandId: 'hyperlinkInsert' });
       return;
     }
     if (result.kind === 'open-external-dialog') {
