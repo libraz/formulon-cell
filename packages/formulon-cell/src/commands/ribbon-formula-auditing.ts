@@ -11,22 +11,18 @@
 // shell.
 
 import { addrKey } from '../engine/address.js';
-import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { inputLocaleForWorkbook } from './coerce-input.js';
 import {
   cellValueIsFormulaError,
-  circleInvalidValidationData,
-  clearValidationCircles,
   ignoreCellError,
   recordIgnoredErrorsChange,
-  recordValidationCirclesChange,
   selectNextFormulaError,
 } from './error-indicators.js';
 import type { History } from './history.js';
-import { circleInvalidValidationDataWithEngine } from './validate.js';
+import { circleInvalidData, clearValidationCirclesAction } from './validation-actions.js';
 
 type FormulaAuditingStrings = Pick<Strings['ribbonMenu'], 'errorChecking'>;
 
@@ -66,9 +62,8 @@ const noErrorReport = (strings: FormulaAuditingStrings): RibbonFormulaAuditingRe
  *  - `traceError` → host runs `tracePrecedents` (visual arrow drawing).
  *  - `ignoreError` → on a formula-error cell, mark ignored; otherwise advance
  *    to the next formula error and report "all clear" when none remain.
- *  - `circleInvalid` → draw invalid-data-validation circles for the active
- *    range, scoped via [[makeRangeResolver]].
- *  - `clearCircles` → wipe every validation circle on the sheet.
+ *  - `circleInvalid` / `clearCircles` → the shared Data Validation circle
+ *    actions over the active range (validation-actions.ts).
  *  - `errorChecking` (default) → advance to the next formula error or report. */
 export const executeRibbonFormulaAuditingAction = (
   deps: ExecuteRibbonFormulaAuditingActionDeps,
@@ -95,29 +90,17 @@ export const executeRibbonFormulaAuditingAction = (
       ? { kind: 'mutated' }
       : { kind: 'report', report: noErrorReport(strings) };
   }
-  if (action === 'clearCircles') {
-    recordValidationCirclesChange(history, store, () => {
-      clearValidationCircles(store);
-    });
-    return { kind: 'mutated' };
-  }
-  if (action === 'circleInvalid') {
-    const state = store.getState();
-    recordValidationCirclesChange(history, store, () => {
-      const nativeCount = circleInvalidValidationDataWithEngine(
-        store,
-        workbook,
-        state.selection.range.sheet,
-        state.selection.range,
-      );
-      if (nativeCount === null) {
-        circleInvalidValidationData(
-          store,
-          state.selection.range,
-          makeRangeResolver(workbook, state.data.sheetIndex),
-        );
-      }
-    });
+  if (action === 'clearCircles' || action === 'circleInvalid') {
+    const range = store.getState().selection.range;
+    const ctx = {
+      store,
+      history,
+      workbook,
+      origin: 'ribbon' as const,
+      commandId: 'dataValidation',
+    };
+    if (action === 'clearCircles') clearValidationCirclesAction(ctx, range);
+    else circleInvalidData(ctx, range);
     return { kind: 'mutated' };
   }
   return selectNextFormulaError(store, undefined, undefined, {

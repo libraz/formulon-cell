@@ -1,15 +1,12 @@
-import {
-  circleInvalidValidationData,
-  recordValidationCirclesChange,
-} from '../../commands/error-indicators.js';
 import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
 import { textToColumns, textToColumnsTargets } from '../../commands/text-to-columns.js';
 import {
-  circleInvalidValidationDataWithEngine,
-  clearValidationInRangeWithEngine,
-} from '../../commands/validate.js';
+  circleInvalidData,
+  clearValidationCirclesAction,
+  clearValidationRules,
+  type ValidationActionContext,
+} from '../../commands/validation-actions.js';
 import { parseAddrKey } from '../../engine/address.js';
-import { makeRangeResolver } from '../../engine/range-resolver.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { rangeValidationsIntersect } from '../../store/range-validations.js';
 import { rangeContainsAddr } from '../../store/selection-geometry.js';
@@ -129,42 +126,28 @@ const buildDataValidationAction =
       instance.openDataValidationDialog();
       return;
     }
+    const ctx: ValidationActionContext = {
+      store: instance.store,
+      history: instance.history,
+      workbook: instance.workbook,
+      origin: 'ribbon',
+      commandId: 'dataValidation',
+    };
+    const range = normalizedSelectionRange(instance);
     if (action === 'clear-circles') {
-      mutators.clearValidationCircles(instance.store);
+      clearValidationCirclesAction(ctx, range);
       instance.host.focus();
       return;
     }
     if (action === 'clear-rules') {
-      const range = normalizedSelectionRange(instance);
       runAfterAllowedRangeUnlock(instance.store, [range], () => {
-        clearValidationInRangeWithEngine(
-          instance.store,
-          instance.history,
-          instance.workbook,
-          range,
-        );
-        mutators.clearValidationCircles(instance.store);
+        clearValidationRules(ctx, range);
         instance.host.focus();
       });
       return;
     }
     if (action !== 'circle-invalid') return;
-    const range = normalizedSelectionRange(instance);
-    recordValidationCirclesChange(instance.history, instance.store, () => {
-      const nativeCount = circleInvalidValidationDataWithEngine(
-        instance.store,
-        instance.workbook,
-        range.sheet,
-        range,
-      );
-      if (nativeCount === null) {
-        circleInvalidValidationData(
-          instance.store,
-          range,
-          makeRangeResolver(instance.workbook, range.sheet),
-        );
-      }
-    });
+    circleInvalidData(ctx, range);
     instance.host.focus();
   };
 

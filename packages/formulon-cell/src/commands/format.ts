@@ -739,6 +739,17 @@ const operationsForFormatPatch = (patch: Partial<CellFormat>): Set<InteractionOp
   return operations;
 };
 
+/** The operations a touched dialog action performs: one per field family it
+ *  writes, plus any the action declares itself. */
+export const selectionFormatActionOperations = (
+  action: SelectionFormatAction,
+): Set<InteractionOperation> => {
+  const operations = operationsForFormatPatch(action.patch);
+  for (const operation of action.operations ?? []) operations.add(operation);
+  if (action.border) operations.add('format');
+  return operations;
+};
+
 const mergeActionCellFormat = (
   previous: CellFormat | undefined,
   patch: Partial<CellFormat>,
@@ -814,9 +825,7 @@ export function applySelectionFormatAction(
   const plan = selectionPlan(state);
   if (!plan) return false;
 
-  const operations = operationsForFormatPatch(action.patch);
-  for (const operation of action.operations ?? []) operations.add(operation);
-  if (action.border) operations.add('format');
+  const operations = selectionFormatActionOperations(action);
   if (operations.size === 0) return false;
   if (!authorizeSelectionOperations(store, plan.ranges, operations, options)) return false;
 

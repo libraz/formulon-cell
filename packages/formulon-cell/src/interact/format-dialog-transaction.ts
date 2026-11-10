@@ -3,9 +3,15 @@
 // format-only F4 repeat. A merge failure aborts the whole composite so a
 // half-applied dialog never reaches history.
 
+import { type AuthorizedIntentFactory, authorizedWrite } from '../commands/authorized-write.js';
 import { recordDialogFormatChange } from '../commands/dialog-format-history.js';
-import { applySelectionFormatAction, type SelectionFormatAction } from '../commands/format.js';
+import {
+  applySelectionFormatAction,
+  type SelectionFormatAction,
+  selectionFormatActionOperations,
+} from '../commands/format.js';
 import { History } from '../commands/history.js';
+import type { InteractionOperation } from '../commands/interaction-policy.js';
 import { applyMerge, applyUnmerge } from '../commands/merge.js';
 import {
   planSelectionFormat,
@@ -29,7 +35,40 @@ export interface FormatDialogTransaction {
   readonly merge: { action: 'merge' | 'unmerge' | null; range: Range };
 }
 
-/** Returns true when every step applied; false when one was rejected and the
+/** Origin and command id the dialog commit, its F4 repeat and their replay are decided under. */
+const DIALOG_ORIGIN = 'instanceApi';
+const DIALOG_COMMAND_ID = 'formatCells';
+
+/** A step refused after the write started: the composite is rolled back and reported as false. */
+class StepRejected extends Error {}
+
+const dialogIntents = (
+  operations: readonly InteractionOperation[],
+  ranges: readonly Range[],
+  mergeRange: Range | null,
+): AuthorizedIntentFactory => {
+  const effects = ranges.map((range) => ({ kind: 'range' as const, range: { ...range } }));
+  return (origin) => [
+    ...operations.map((operation) => ({
+      operation,
+      origin,
+      commandId: DIALOG_COMMAND_ID,
+      effects,
+    })),
+    ...(mergeRange
+      ? [
+          {
+            operation: 'merge' as const,
+            origin,
+            commandId: DIALOG_COMMAND_ID,
+            effects: [{ kind: 'range' as const, range: { ...mergeRange } }],
+          },
+        ]
+      : []),
+  ];
+};
+
+/** Returns true when every step applied; false when one was refused and the
  *  composite rolled back. Rethrows (after rollback) if a step throws. */
 export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean {
   const { store, history, getWb, state, liveWb, plan, action } = tx;
@@ -37,6 +76,9 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
   const mergeAction = tx.merge.action;
   const mergeRange = tx.merge.range;
   const hasFormatAction = Object.keys(action.patch).length > 0 || action.border !== undefined;
+  // Without a caller history the composite still runs as one transaction, so a
+  // later refusal can roll back the steps already applied.
+  const actionHistory = history ?? new History();
 
   // F4 repeats only formatting, never cell-identity metadata. It resolves a
   // fresh selection, workbook, policy, and plan at invocation time.
@@ -64,34 +106,34 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
       const currentPlan = planSelectionFormat(current);
       if (!currentPlan) return;
       const currentWb = getWb();
-      recordDialogFormatChange({
-        history,
+      authorizedWrite({
         store,
-        workbook: currentWb,
-        sheet: current.selection.range.sheet,
-        targets: currentPlan.cells,
-        mutate: () =>
-          applySelectionFormatAction(current, store, repeatAction, {
-            origin: 'instanceApi',
-            commandId: 'formatCells',
+        history: actionHistory,
+        intents: dialogIntents(
+          [...selectionFormatActionOperations(repeatAction)],
+          currentPlan.ranges,
+          null,
+        ),
+        origin: DIALOG_ORIGIN,
+        write: () =>
+          recordDialogFormatChange({
+            history: actionHistory,
+            store,
+            workbook: currentWb,
+            sheet: current.selection.range.sheet,
+            targets: currentPlan.cells,
+            mutate: () =>
+              applySelectionFormatAction(current, store, repeatAction, {
+                origin: DIALOG_ORIGIN,
+                commandId: DIALOG_COMMAND_ID,
+              }),
+            repeat: repeatFormatting,
           }),
-        repeat: repeatFormatting,
       });
     };
   }
 
-  // A merge is a legacy multi-child history action. Use an ephemeral history
-  // when the caller did not provide one so a later merge failure can abort
-  // the already-applied format child atomically.
-  const actionHistory = mergeAction && !history ? new History() : history;
-  const transaction = mergeAction && actionHistory ? actionHistory.begin() : undefined;
-  let transactionOpen = transaction !== undefined;
-  const abortTransaction = (): void => {
-    if (!transaction || !actionHistory || !transactionOpen) return;
-    transactionOpen = false;
-    actionHistory.abort(transaction);
-  };
-  try {
+  const write = (): void => {
     if (hasFormatAction) {
       const wrote = recordDialogFormatChange({
         history: actionHistory,
@@ -101,16 +143,13 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
         targets: plan.cells,
         mutate: () =>
           applySelectionFormatAction(store.getState(), store, action, {
-            origin: 'instanceApi',
-            commandId: 'formatCells',
+            origin: DIALOG_ORIGIN,
+            commandId: DIALOG_COMMAND_ID,
           }),
         repeat: repeatFormatting,
-        registerRepeat: !transaction,
+        registerRepeat: false,
       });
-      if (!wrote) {
-        abortTransaction();
-        return false;
-      }
+      if (!wrote) throw new StepRejected();
     }
     if (mergeAction === 'merge') {
       if (mergeRange.r0 !== mergeRange.r1 || mergeRange.c0 !== mergeRange.c1) {
@@ -122,33 +161,31 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
               });
               return true;
             })();
-        if (!merged) {
-          abortTransaction();
-          return false;
-        }
+        if (!merged) throw new StepRejected();
       }
     } else if (mergeAction === 'unmerge') {
-      if (!applyUnmerge(store, liveWb, actionHistory, range)) {
-        abortTransaction();
-        return false;
-      }
+      if (!applyUnmerge(store, liveWb, actionHistory, range)) throw new StepRejected();
     }
-    if (transaction && actionHistory) {
-      actionHistory.end(transaction);
-      transactionOpen = false;
-      if (hasFormatAction && repeatFormatting) actionHistory.setRepeat(repeatFormatting);
-    }
-    return true;
+  };
+
+  let result: ReturnType<typeof authorizedWrite<void>>;
+  try {
+    result = authorizedWrite({
+      store,
+      history: actionHistory,
+      intents: dialogIntents(
+        hasFormatAction ? [...selectionFormatActionOperations(action)] : [],
+        plan.ranges,
+        mergeAction === 'merge' ? mergeRange : mergeAction === 'unmerge' ? range : null,
+      ),
+      origin: DIALOG_ORIGIN,
+      write,
+    });
   } catch (error) {
-    try {
-      abortTransaction();
-    } catch (abortError) {
-      throw new AggregateError(
-        [error, abortError],
-        'Format dialog transaction failed and its rollback failed',
-        { cause: error },
-      );
-    }
+    if (error instanceof StepRejected) return false;
     throw error;
   }
+  if (!result.ok) return false;
+  if (hasFormatAction) actionHistory.setRepeat(repeatFormatting ?? null);
+  return true;
 }
