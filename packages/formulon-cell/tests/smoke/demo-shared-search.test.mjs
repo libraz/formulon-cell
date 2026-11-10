@@ -550,7 +550,8 @@ describe('demo-shared Search/Tell me items', () => {
     });
     expect(demoChangeLogEntry(event(0))).toMatchObject({ cell: 'A1', preview: '0' });
     let log = [];
-    for (let row = 0; row < 12; row += 1) log = pushDemoChangeLog(log, event(row));
+    for (let row = 0; row < 12; row += 1)
+      log = pushDemoChangeLog(log, demoChangeLogEntry(event(row)));
     expect(log).toHaveLength(8);
     expect(log[0]?.cell).toBe('A12');
   });
