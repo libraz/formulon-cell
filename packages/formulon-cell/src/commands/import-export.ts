@@ -25,7 +25,8 @@ import { blockDataTableEdit, blockTableFunction } from './data-table-guard.js';
 import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
-const MAX_EXACT_EXPORT_CELLS = 100_000;
+/** The most cells one CSV import or export covers. */
+export const MAX_CSV_CELLS = 100_000;
 
 export interface ImportResult {
   /** Range that received writes. r0/c0 = anchor; r1/c1 = far corner. */
@@ -139,11 +140,9 @@ export interface ExportOptions extends CSVEncodeOptions {
 export function exportCSV(state: State, opts: ExportOptions = {}): string {
   const selected = opts.range ?? selectionOrUsed(state);
   const range =
-    selected && rangeArea(selected) > MAX_EXACT_EXPORT_CELLS
-      ? usedRangeInRange(state, selected)
-      : selected;
+    selected && rangeArea(selected) > MAX_CSV_CELLS ? usedRangeInRange(state, selected) : selected;
   if (!range) return '';
-  if (rangeArea(range) > MAX_EXACT_EXPORT_CELLS) return '';
+  if (rangeArea(range) > MAX_CSV_CELLS) return '';
   const { sheet } = range;
 
   const grid: string[][] = [];

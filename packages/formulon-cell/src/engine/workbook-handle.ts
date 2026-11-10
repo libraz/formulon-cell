@@ -1201,10 +1201,17 @@ export class WorkbookHandle {
   /** Runs an engine write of the cell at `a` that the caller journals itself, then schedules the
    *  recalc and announces the new value. */
   writeCellUnjournaled(a: Addr, write: () => void): void {
+    this.writeCellsUnjournaled([a], write);
+  }
+
+  /** `writeCellUnjournaled` for one engine write that covers every cell of `cells`. */
+  writeCellsUnjournaled(cells: readonly Addr[], write: () => void): void {
     this.assertAlive();
     write();
-    this.scheduleRecalc(a);
-    this.emit({ kind: 'value', addr: a, next: this.getValue(a) });
+    for (const a of cells) {
+      this.scheduleRecalc(a);
+      this.emit({ kind: 'value', addr: a, next: this.getValue(a) });
+    }
   }
 
   /** Writes cells back to snapshots without journaling, announcing each value. */

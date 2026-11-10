@@ -1,4 +1,9 @@
-import type { Sheet as EngineSheet, Workbook as EngineWorkbook } from '@libraz/formulon';
+import type {
+  CellAddress,
+  CellRect,
+  Sheet as EngineSheet,
+  Workbook as EngineWorkbook,
+} from '@libraz/formulon';
 import type { FacadeChangeKind, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Sheet, Workbook } from './workbook.js';
 
@@ -25,6 +30,12 @@ export interface SheetContext extends WorkbookContext {
   readonly sheetEngine: EngineSheet;
   /** Writes the one cell named by `args` (`(row, col, ...)` or `(a1, ...)`) through `write`. */
   cellWrite(args: readonly unknown[], write: () => void): void;
+  /** Writes every cell of `range` through one engine call. */
+  rangeWrite<T>(range: CellRect, write: () => T): T;
+  /** The cell an A1 address or a `{ row, col }` names, on this sheet. */
+  cellAt(at: string | CellAddress): CellAddress;
+  /** The rectangle an A1 range or a `CellRect` names, on this sheet. */
+  rectOf(range: string | CellRect): CellRect;
   /** `change` on this sheet. */
   sheetChange<T>(kind: FacadeChangeKind, fn: () => T): T;
 }

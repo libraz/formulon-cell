@@ -1,7 +1,7 @@
 import { ChartPlotType, FormulonError, StatusCode, ValueKind } from '@libraz/formulon';
 import { SAVE_FORMATS, Workbook } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it } from 'vitest';
-import { expectFormulonError } from './helpers.js';
+import { expectFailure, expectFormulonError } from './helpers.js';
 
 const open: Workbook[] = [];
 
@@ -114,6 +114,28 @@ describe('sheet cells', () => {
     expect(s.getTypedValue(0, 1)).toEqual({ kind: ValueKind.Number, number: 20 });
     expect(s.getFormula('B1')).toBe('=A1*2');
   });
+
+  it('writes a block with setValues that a failed batch restores as a whole', async () => {
+    const wb = await createWorkbook();
+    const s = wb.sheet(0);
+    s.setValues('A1', [
+      [1, 2],
+      [3, 4],
+    ]);
+    expect(s.getTypedValue('B2')).toEqual({ kind: ValueKind.Number, number: 4 });
+    const boom = new Error('abort');
+    expect(() =>
+      wb.batch(() => {
+        s.setValues(0, 0, [
+          [9, 9],
+          [9, 9],
+        ]);
+        throw boom;
+      }),
+    ).toThrow(boom);
+    expect(s.getTypedValue('A1')).toEqual({ kind: ValueKind.Number, number: 1 });
+    expect(s.getTypedValue('B2')).toEqual({ kind: ValueKind.Number, number: 4 });
+  });
 });
 
 describe('evaluate', () => {
@@ -145,6 +167,20 @@ describe('csv', () => {
     expect(result.rejections).toEqual([]);
     expect(s.getTypedValue('C3')).toEqual({ kind: ValueKind.Number, number: 2 });
     expect(s.exportCsv({ range: 'B2:C3' })).toBe('a,1\r\nb,2');
+  });
+
+  it('exports an empty sheet as empty text', async () => {
+    const wb = await createWorkbook();
+    expect(wb.sheet(0).exportCsv()).toBe('');
+  });
+
+  it('refuses more cells than the limit without writing any', async () => {
+    const wb = await createWorkbook();
+    const s = wb.sheet(0);
+    const wide = Array.from({ length: 100_001 }, () => '1').join(',');
+    expectFailure(() => s.importCsv(wide, { at: 'A1' }), 'limit-exceeded');
+    expect(s.getTypedValue('A1').kind).toBe(ValueKind.Blank);
+    expectFailure(() => s.exportCsv({ range: 'A1:XFD100' }), 'limit-exceeded');
   });
 });
 

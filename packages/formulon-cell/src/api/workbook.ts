@@ -1,6 +1,7 @@
 import {
   type AddSheetOptions,
   type CellAddress,
+  type CellRect,
   type CellValueInput,
   type DisplayText,
   type Sheet as EngineSheet,
@@ -558,26 +559,47 @@ const sheetContext = (sheet: Sheet): SheetContext => {
       return base.engine;
     },
     sheetEngine: engine,
-    cellWrite: (args, write) =>
-      base.run(() => {
-        const addr = resolveCell(base.engine, engine, args);
-        const key = cellKey(addr);
-        if (!state.batch.cells.has(key)) state.batch.cells.set(key, state.handle.captureCell(addr));
-        state.handle.writeCellUnjournaled(addr, write);
-      }),
+    cellWrite: (args, write) => {
+      const [first, second] = args;
+      const at =
+        typeof first === 'string'
+          ? first
+          : ({ row: first as number, col: second as number } satisfies CellAddress);
+      const { row, col } = cellOf(base.engine, at);
+      const cell = { firstRow: row, firstCol: col, lastRow: row, lastCol: col };
+      base.run(() => writeCells(state, engine.index, cell, write));
+    },
+    rangeWrite: (range, write) => base.run(() => writeCells(state, engine.index, range, write)),
+    cellAt: (at) => cellOf(base.engine, at),
+    rectOf: (range) =>
+      typeof range === 'string' ? base.engine.parseReference(range).range : range,
     sheetChange: (kind, fn) => base.change(kind, engine.index, fn),
   };
 };
 
-/** The cell `args` start with: an A1 address, or a `(row, col)` pair. */
-const resolveCell = (wb: EngineWorkbook, sheet: EngineSheet, args: readonly unknown[]): Addr => {
-  const index = sheet.index;
-  const [first, second] = args;
-  if (typeof first === 'string') {
-    const { range } = wb.parseReference(first);
-    return { sheet: index, row: range.firstRow, col: range.firstCol };
+/** Journals the cells of `range` for the running batch, then writes them through `write`. */
+const writeCells = <T>(state: WorkbookState, sheet: number, range: CellRect, write: () => T): T => {
+  const addrs: Addr[] = [];
+  for (let row = range.firstRow; row <= range.lastRow; row += 1) {
+    for (let col = range.firstCol; col <= range.lastCol; col += 1) {
+      const addr = { sheet, row, col };
+      addrs.push(addr);
+      const key = cellKey(addr);
+      if (!state.batch.cells.has(key)) state.batch.cells.set(key, state.handle.captureCell(addr));
+    }
   }
-  return { sheet: index, row: first as number, col: second as number };
+  let result: T | undefined;
+  state.handle.writeCellsUnjournaled(addrs, () => {
+    result = write();
+  });
+  return result as T;
+};
+
+/** An A1 address or a `{ row, col }` pair as a cell address. */
+const cellOf = (wb: EngineWorkbook, at: string | CellAddress): CellAddress => {
+  if (typeof at !== 'string') return { row: at.row, col: at.col };
+  const { range } = wb.parseReference(at);
+  return { row: range.firstRow, col: range.firstCol };
 };
 
 type Method = (...args: unknown[]) => unknown;
