@@ -35,7 +35,13 @@ export function hydrateSheetProtectionFromEngine(
   hydrateProtectedRangesFromEngine(wb, store, sheet);
   if (!wb.capabilities.sheetProtectionRoundtrip) return;
   const p = wb.getSheetProtection(sheet);
-  if (!p?.enabled) return;
+  if (!p?.enabled) {
+    // The engine holds no protection for the sheet, so none may linger in the store.
+    if (store.getState().protection.protectedSheets.has(sheet)) {
+      mutators.setSheetProtected(store, sheet, false);
+    }
+    return;
+  }
   mutators.setSheetProtected(store, sheet, true, {
     ...(p.legacyPassword ? { legacyPasswordHash: p.legacyPassword } : {}),
     ...(sheetProtectionPasswordHashFromEngine(p)
