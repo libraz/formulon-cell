@@ -65,8 +65,13 @@ export function defineDemoAppConfig(app: DemoApp) {
         use: { ...devices['Desktop Safari'], permissions: [] },
       },
     ],
+    // A production build served by `vite preview`, so edits to the sources during a run cannot
+    // hot-update the app under test. FC_E2E_DEV=1 serves the dev server instead, for debugging.
     webServer: {
-      command: `yarn workspace ${app.workspace} dev --host 127.0.0.1 --port ${port} --strictPort`,
+      command:
+        process.env.FC_E2E_DEV === '1'
+          ? `yarn workspace ${app.workspace} dev --host 127.0.0.1 --port ${port} --strictPort`
+          : `yarn workspace ${app.workspace} build && yarn workspace ${app.workspace} preview --host 127.0.0.1 --port ${port} --strictPort`,
       url: baseURL,
       // Reuse only when explicitly requested. Otherwise Playwright can attach
       // to an unrelated app already listening on the demo port and report
@@ -74,7 +79,8 @@ export function defineDemoAppConfig(app: DemoApp) {
       reuseExistingServer,
       stdout: 'pipe',
       stderr: 'pipe',
-      timeout: 120_000,
+      // Covers the production build that precedes `vite preview`.
+      timeout: 300_000,
     },
   });
 }
