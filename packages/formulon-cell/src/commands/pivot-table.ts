@@ -870,11 +870,27 @@ export function recreatePivotTable(
       if (!wb.setPivotFieldSort(sheet, pivotIndex, added, field.sortOrder, field.sortByField)) {
         return false;
       }
-      if (field.dateGroup) {
+      // A group field comes back with the grouping of the field it groups.
+      if (field.groupBaseIndex === null && field.dateGroup) {
         const { granularity, calendar, ...bounds } = field.dateGroup;
         if (!wb.setPivotFieldDateGroup(sheet, pivotIndex, added, granularity, calendar, bounds)) {
           return false;
         }
+      }
+      if (
+        field.groupBaseIndex === null &&
+        field.numericGroup &&
+        !wb.setPivotFieldNumericGroup(sheet, pivotIndex, added, field.numericGroup)
+      ) {
+        return false;
+      }
+      if (field.groupBaseIndex !== null) {
+        // A group field's items come back with the grouping; only their visibility is the report's.
+        const hidden = field.items.flatMap((item, i) => (item.visible ? [] : [i]));
+        if (!hidden.every((i) => wb.setPivotFieldItemVisible(sheet, pivotIndex, added, i, false))) {
+          return false;
+        }
+        continue;
       }
       for (const item of field.items) {
         const placed =

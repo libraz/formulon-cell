@@ -235,7 +235,7 @@ export function applyPivotEdit(
 }
 
 /** Write a field layout read back with `getPivotDefinition` onto the same
- *  report: axes, axis orders, subtotals, items, sort, date grouping, data
+ *  report: axes, axis orders, subtotals, items, sort, date and numeric grouping, data
  *  fields and filters. Parts already equal are left alone. Returns true only
  *  when every write succeeds. */
 export function restorePivotFieldLayout(
@@ -244,10 +244,42 @@ export function restorePivotFieldLayout(
   pivotIndex: number,
   definition: PivotDefinition,
 ): boolean {
-  const current = wb.getPivotDefinition(sheetIndex, pivotIndex);
-  if (!current) return false;
+  const grouped = wb.getPivotDefinition(sheetIndex, pivotIndex);
+  if (!grouped) return false;
   const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
   let ok = true;
+  // Grouping lives on the cache and adds or removes group fields, so it is restored first, on the
+  // fields it groups.
+  for (const field of definition.fields) {
+    if (field.groupBaseIndex !== null) continue;
+    const now = grouped.fields[field.index];
+    if (!now) {
+      ok = false;
+      continue;
+    }
+    if (!same(now.dateGroup, field.dateGroup)) {
+      if (field.dateGroup) {
+        const { granularity, calendar, ...bounds } = field.dateGroup;
+        ok =
+          wb.setPivotFieldDateGroup(
+            sheetIndex,
+            pivotIndex,
+            field.index,
+            granularity,
+            calendar,
+            bounds,
+          ) && ok;
+      } else {
+        ok = wb.clearPivotFieldDateGroup(sheetIndex, pivotIndex, field.index) && ok;
+      }
+    }
+    if (!same(now.numericGroup, field.numericGroup)) {
+      ok =
+        wb.setPivotFieldNumericGroup(sheetIndex, pivotIndex, field.index, field.numericGroup) && ok;
+    }
+  }
+  const current = wb.getPivotDefinition(sheetIndex, pivotIndex);
+  if (!current) return false;
   for (const field of definition.fields) {
     const now = current.fields[field.index];
     if (!now) {
@@ -294,22 +326,6 @@ export function restorePivotFieldLayout(
     if (now.subtotalTop !== field.subtotalTop) {
       ok =
         wb.setPivotFieldSubtotalTop(sheetIndex, pivotIndex, field.index, field.subtotalTop) && ok;
-    }
-    if (!same(now.dateGroup, field.dateGroup)) {
-      if (field.dateGroup) {
-        const { granularity, calendar, ...bounds } = field.dateGroup;
-        ok =
-          wb.setPivotFieldDateGroup(
-            sheetIndex,
-            pivotIndex,
-            field.index,
-            granularity,
-            calendar,
-            bounds,
-          ) && ok;
-      } else {
-        ok = wb.clearPivotFieldDateGroup(sheetIndex, pivotIndex, field.index) && ok;
-      }
     }
   }
   if (!same(current.grandTotals, definition.grandTotals)) {

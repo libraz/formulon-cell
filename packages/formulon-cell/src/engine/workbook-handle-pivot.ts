@@ -85,7 +85,7 @@ export interface PivotFieldDefinition {
   readonly cacheFieldIndex: number;
   readonly sortOrder: PivotSortOrder;
   readonly sortByField: string;
-  /** Bounds the engine does not read back are -1 (automatic); `intervalDays` is then 1. */
+  /** A bound of -1 follows the field's data (automatic). */
   readonly dateGroup: {
     readonly granularity: PivotDateGrouping;
     readonly calendar: PivotCalendar;
@@ -95,7 +95,18 @@ export interface PivotFieldDefinition {
     readonly startSerial: number;
     readonly endSerial: number;
   } | null;
+  /** For a group field, the index of the field it groups; `null` otherwise. */
+  readonly groupBaseIndex: number | null;
+  /** Numeric grouping; a `null` bound follows the field's data. */
+  readonly numericGroup: PivotNumericGroupSpec | null;
   readonly items: readonly PivotItemDefinition[];
+}
+
+/** Numeric grouping of a pivot field into ranges of `interval`; a `null` bound is automatic. */
+export interface PivotNumericGroupSpec {
+  readonly interval: number;
+  readonly start: number | null;
+  readonly end: number | null;
 }
 
 /** Table style and toggles of a PivotTable; `name` is empty for a style element without a named style. */
@@ -932,7 +943,13 @@ export abstract class WorkbookHandlePivotMethods {
         cacheIndex: item.cacheIndex ?? -1,
         visible: item.visible,
       }));
-      const granularity = dateGroupingOf(r.datePeriods);
+      const dateGroup = pivot.getFieldDateGroup(fieldIdx);
+      const granularity = dateGroup === null ? null : dateGroupingOf(dateGroup.periods);
+      const numericGroup = pivot.getFieldNumericGroup(fieldIdx);
+      const serialOf = (date: Date): number =>
+        internals(this).module.convertCivilToSerial(date, {
+          date1904: internals(this).wb.getDate1904(),
+        });
       return {
         index: fieldIdx,
         sourceName: r.sourceName,
@@ -946,16 +963,25 @@ export abstract class WorkbookHandlePivotMethods {
         sortOrder: r.sortOrder,
         sortByField: r.sortByField ?? '',
         dateGroup:
-          granularity === null
+          dateGroup === null || granularity === null
             ? null
             : {
                 granularity,
-                calendar: r.dateCalendar,
+                calendar: dateGroup.calendar,
                 startYear: -1,
                 endYear: -1,
-                intervalDays: 1,
-                startSerial: -1,
-                endSerial: -1,
+                intervalDays: dateGroup.intervalDays,
+                startSerial: dateGroup.autoStart ? -1 : serialOf(dateGroup.start),
+                endSerial: dateGroup.autoEnd ? -1 : serialOf(dateGroup.end),
+              },
+        groupBaseIndex: r.groupBaseIndex,
+        numericGroup:
+          numericGroup === null
+            ? null
+            : {
+                interval: numericGroup.interval,
+                start: numericGroup.autoStart ? null : numericGroup.start,
+                end: numericGroup.autoEnd ? null : numericGroup.end,
               },
         items,
       };
@@ -1288,6 +1314,30 @@ export abstract class WorkbookHandlePivotMethods {
     if (!this.capabilities.pivotTableMutate) return false;
     return attempt(false, () => {
       pivotOf(this, sheet, pivotIdx).setFieldDateGroup(fieldIdx, null);
+      return true;
+    });
+  }
+
+  /** Groups a number field into ranges, or ungroups it with `null`. */
+  setPivotFieldNumericGroup(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    group: PivotNumericGroupSpec | null,
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotTableMutate) return false;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).setFieldNumericGroup(
+        fieldIdx,
+        group === null
+          ? null
+          : {
+              interval: group.interval,
+              ...(group.start !== null ? { start: group.start } : {}),
+              ...(group.end !== null ? { end: group.end } : {}),
+            },
+      );
       return true;
     });
   }
