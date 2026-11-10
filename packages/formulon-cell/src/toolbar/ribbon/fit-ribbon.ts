@@ -250,6 +250,14 @@ const fitLabelToTwoLines = (label: HTMLElement): void => {
 };
 
 /** Refit the active panel under `root` now and whenever `root` changes width. */
+/** The nearest ancestor of `el` that lays out a box, skipping `display: contents` wrappers. */
+const boxedAncestor = (el: HTMLElement): HTMLElement | null => {
+  const view = el.ownerDocument.defaultView;
+  let node = el.parentElement;
+  while (node && view?.getComputedStyle(node).display === 'contents') node = node.parentElement;
+  return node;
+};
+
 export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): void } => {
   const refit = (): void => {
     const shell = root.querySelector<HTMLElement>(':scope > .fc-tb__ribbon-shell');
@@ -286,9 +294,10 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
           refit();
         });
   observer?.observe(root);
-  // A toolbar root laid out with `display: contents` has no box and never reports a
-  // size change, so its parent stands in for it.
-  if (root.parentElement) observer?.observe(root.parentElement);
+  // A `display: contents` root (or wrapper) has no box and never reports a size change, so
+  // the nearest ancestor that lays out a box stands in for it.
+  const boxed = boxedAncestor(root);
+  if (boxed) observer?.observe(boxed);
   // Label widths depend on the loaded web font, which can settle after mount.
   void root.ownerDocument.fonts?.ready.then(refit);
   return {

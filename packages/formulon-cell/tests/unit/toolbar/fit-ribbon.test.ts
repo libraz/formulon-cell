@@ -141,6 +141,36 @@ describe('toolbar/ribbon refit on resize', () => {
       globalThis.ResizeObserver = original;
     }
   });
+
+  it('skips nested display: contents wrappers to the nearest ancestor with a box', () => {
+    const observed: Element[] = [];
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      observe(el: Element): void {
+        observed.push(el);
+      }
+      disconnect(): void {}
+      unobserve(): void {}
+    } as unknown as typeof ResizeObserver;
+    try {
+      const boxed = document.createElement('div');
+      const outer = document.createElement('div');
+      const inner = document.createElement('div');
+      const root = document.createElement('div');
+      outer.style.display = 'contents';
+      inner.style.display = 'contents';
+      boxed.append(outer);
+      outer.append(inner);
+      inner.append(root);
+      document.body.append(boxed);
+      const fit = attachRibbonFit(root);
+      expect(observed).toEqual([root, boxed]);
+      fit.detach();
+      boxed.remove();
+    } finally {
+      globalThis.ResizeObserver = original;
+    }
+  });
 });
 
 describe('toolbar/ribbon two-line label width', () => {
