@@ -1,0 +1,16 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": [],
+    "paths": {
+      "@libraz/formulon-cell/toolbar": ["../../src/toolbar/index.ts"],
+      "@libraz/formulon-cell/adapter": ["../../src/adapter/index.ts"],
+      "@libraz/formulon-cell/extensions": ["../../src/extensions/index.ts"],
+      "@libraz/formulon-cell/charts": ["../../src/charts/index.ts"],
+      "@libraz/formulon-cell/i18n/*": ["../../src/i18n/*.ts"],
+      "@libraz/formulon-cell": ["../../src/index.ts"]
+    }
+  },
+  "include": ["./**/*.ts", "../../src/vite-env.d.ts"]
+}
