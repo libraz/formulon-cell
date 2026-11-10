@@ -1,4 +1,8 @@
-import { builtInCommandIntent, canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
+import {
+  builtInCommandIntent,
+  builtInProtectionDecision,
+  canExecuteBuiltIn,
+} from '../commands/built-in-command-policy.js';
 import type {
   OperationIntent,
   PermissionCode,
@@ -124,6 +128,8 @@ export function createContextMenuPermissions(
         'This structural operation is unavailable with a bounded viewport.',
       );
     }
+    const protection = builtInProtectionDecision(store, itemId);
+    if (!protection.allowed) return protection;
     if (hasExplicitPolicy()) return canExecuteBuiltIn(store, itemId, 'contextMenu');
     const intent = builtInCommandIntent(store, itemId, 'contextMenu');
     return intent ? decisionForIntent(intent) : { allowed: true };

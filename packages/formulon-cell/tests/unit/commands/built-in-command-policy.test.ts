@@ -12,6 +12,7 @@ import {
   registerInteractionController,
 } from '../../../src/commands/interaction-controller.js';
 import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createI18nController } from '../../../src/i18n/controller.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
@@ -30,7 +31,8 @@ describe('built-in Mac command policy catalog', () => {
     expect(BUILT_IN_COMMAND_OPERATION['mac.data.sortAsc']).toBe('sort');
     expect(BUILT_IN_COMMAND_OPERATION['mac.data.filter']).toBe('filter');
     expect(BUILT_IN_COMMAND_OPERATION['mac.data.showDetail']).toBe('resizeRows');
-    expect(BUILT_IN_COMMAND_OPERATION['mac.formulas.removeArrows.all']).toBe('formulaEdit');
+    expect(BUILT_IN_COMMAND_OPERATION['mac.formulas.removeArrows.all']).toBeNull();
+    expect(BUILT_IN_COMMAND_OPERATION.pivotRefresh).toBe('pivot');
     expect(BUILT_IN_COMMAND_OPERATION['mac.autosum.SUM']).toBe('formulaEdit');
     expect(BUILT_IN_COMMAND_OPERATION['mac.insert.shapeOval']).toBe('object');
     expect(BUILT_IN_COMMAND_OPERATION['mac.insert.recommendedChart']).toBe('object');
@@ -98,7 +100,6 @@ describe('built-in Mac command policy catalog', () => {
         'mac.page.pageBreaks',
         'mac.data.validation',
         'mac.formulas.errorCheck',
-        'mac.formulas.removeArrows',
         'mac.formulas.autoSum',
       ] as const) {
         expect(canExecuteBuiltIn(store, root, 'ribbon').allowed, root).toBe(true);
@@ -139,16 +140,18 @@ describe('built-in Mac command policy catalog', () => {
         'mac.review.nextComment',
         'mac.formulas.recalc',
         'mac.formulas.sheetRecalc',
+        // Trace arrows are an overlay, not workbook state.
+        'mac.formulas.removeArrows.all',
+        'mac.formulas.errorCheck.trace',
+        'mac.formulas.precedents',
+        'mac.formulas.dependents',
       ] as const) {
         expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(true);
       }
       for (const id of [
-        'mac.formulas.removeArrows.all',
-        'mac.formulas.errorCheck.trace',
         'mac.data.validation.clearRules',
         'mac.data.sortAsc',
-        'mac.formulas.precedents',
-        'mac.formulas.dependents',
+        'pivotRefresh',
       ] as const) {
         expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(false);
       }
@@ -205,5 +208,77 @@ describe('built-in Mac command policy catalog', () => {
       controller.dispose();
       workbook.dispose();
     }
+  });
+
+  describe('on a protected sheet', () => {
+    const auditing = [
+      'precedents',
+      'dependents',
+      'clearArrows',
+      'mac.formulas.precedents',
+      'mac.formulas.dependents',
+      'mac.formulas.removeArrows.all',
+      'mac.formulas.removeArrows.precedents',
+      'mac.formulas.removeArrows.dependents',
+    ] as const;
+
+    it('refuses the auditing arrows and pivot refresh whatever the options, policy or not', () => {
+      const store = createSpreadsheetStore();
+      for (const id of [...auditing, 'pivotRefresh'] as const) {
+        expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toEqual({ allowed: true });
+      }
+      setProtectedSheet(store, 0, true, {
+        permissions: { pivotTables: true, objects: true, formatCells: true },
+      });
+      for (const id of [...auditing, 'pivotRefresh'] as const) {
+        expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toMatchObject({
+          allowed: false,
+          code: 'protected',
+        });
+      }
+    });
+
+    it('never gates the calculation mode', () => {
+      const store = createSpreadsheetStore();
+      setProtectedSheet(store, 0, true);
+      for (const id of [
+        'mac.formulas.calc.auto',
+        'mac.formulas.calc.autoNoTable',
+        'mac.formulas.calc.manual',
+        'mac.formulas.calc.iterative',
+      ] as const) {
+        expect(BUILT_IN_COMMAND_OPERATION[id], id).toBeNull();
+        expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toEqual({ allowed: true });
+      }
+    });
+
+    it('lets pivot layout changes through only with the PivotTable option', async () => {
+      const store = createSpreadsheetStore();
+      const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+      const controller = new InteractionController({
+        store,
+        getWb: () => workbook,
+        history: new History(),
+      });
+      const unregister = registerInteractionController(store, controller);
+      try {
+        controller.setPolicy({ defaultOperation: 'allow' });
+        setProtectedSheet(store, 0, true);
+        expect(canExecuteBuiltIn(store, 'pivotSortAsc', 'ribbon')).toMatchObject({
+          allowed: false,
+          code: 'protected',
+        });
+        setProtectedSheet(store, 0, true, { permissions: { pivotTables: true } });
+        expect(canExecuteBuiltIn(store, 'pivotSortAsc', 'ribbon')).toEqual({ allowed: true });
+        expect(canExecuteBuiltIn(store, 'pivotRefresh', 'ribbon')).toMatchObject({
+          allowed: false,
+          code: 'protected',
+        });
+      } finally {
+        unregister();
+        controller.dispose();
+        workbook.dispose();
+      }
+    });
   });
 });

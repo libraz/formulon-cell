@@ -192,7 +192,10 @@ describe('spreadsheet: update', () => {
     expect(denied.dialogs.canOpen('watchWindow')).toBe(true);
     expectFailure(() => denied.dialogs.open('cfRules'), 'policy-denied');
     const allowed = await mountSheet({
-      policy: { defaultOperation: 'deny', operations: { format: true, filter: true, table: true } },
+      policy: {
+        defaultOperation: 'deny',
+        operations: { format: true, filter: true, pivot: true },
+      },
     });
     expect(allowed.dialogs.canOpen('cfRules')).toBe(true);
     expect(allowed.dialogs.canOpen('filterDropdown')).toBe(true);

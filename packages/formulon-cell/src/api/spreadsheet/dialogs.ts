@@ -169,7 +169,7 @@ const ROUTES: { readonly [K in DialogId]: Route<K> } = {
   },
   pivotFieldList: {
     feature: 'workbookObjects',
-    operation: 'table',
+    operation: 'pivot',
 
     open: (l, o) =>
       o?.sheet !== undefined && o.pivotIndex !== undefined
@@ -178,25 +178,25 @@ const ROUTES: { readonly [K in DialogId]: Route<K> } = {
   },
   activePivotFieldList: {
     feature: 'workbookObjects',
-    operation: 'table',
+    operation: 'pivot',
 
     open: (l) => l.openActivePivotFieldList(),
   },
   pivotFieldSettings: {
     feature: 'workbookObjects',
-    operation: 'table',
+    operation: 'pivot',
 
     open: (l) => l.openPivotFieldSettings(),
   },
   pivotOptions: {
     feature: 'workbookObjects',
-    operation: 'table',
+    operation: 'pivot',
 
     open: (l, o) => l.openPivotOptions(o?.sheet, o?.pivotIndex),
   },
   pivotTable: {
     feature: 'pivotTableDialog',
-    operation: 'table',
+    operation: 'pivot',
 
     open: (l, o) => l.openPivotTableDialog(o),
   },

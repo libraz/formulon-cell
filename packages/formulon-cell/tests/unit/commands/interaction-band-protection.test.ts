@@ -6,7 +6,7 @@ import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
-describe('row and column shift bands on a protected sheet', () => {
+describe('Protect Sheet options on a protected sheet', () => {
   let workbook: WorkbookHandle | undefined;
 
   afterEach(() => {
@@ -51,4 +51,25 @@ describe('row and column shift bands on a protected sheet', () => {
       expect(insertRows()).toMatchObject({ allowed: false, code: 'protected' });
     });
   }
+
+  it('lets pivot report changes through a protected sheet only with the PivotTable option', async () => {
+    const { store, authorizer } = await setup();
+    authorizer.policy = { defaultOperation: 'allow' };
+    const pivot = () =>
+      authorizer.canExecute({
+        operation: 'pivot',
+        origin: 'ribbon',
+        effects: [{ kind: 'range', range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 } }],
+      });
+    expect(pivot()).toEqual({ allowed: true });
+
+    setProtectedSheet(store, 0, true);
+    expect(pivot()).toMatchObject({ allowed: false, code: 'protected' });
+
+    setProtectedSheet(store, 0, true, { permissions: { pivotTables: true } });
+    expect(pivot()).toEqual({ allowed: true });
+
+    authorizer.policy = { defaultOperation: 'allow', operations: { pivot: false } };
+    expect(pivot()).toMatchObject({ allowed: false, code: 'operationDenied' });
+  });
 });

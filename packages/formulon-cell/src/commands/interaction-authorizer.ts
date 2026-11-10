@@ -3,7 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import type { SheetProtectionPermissions } from '../store/types.js';
+import type { SheetProtectionPermissions, State } from '../store/types.js';
 import { AUTO_HYPERLINK_COMMAND_ID } from './auto-hyperlink.js';
 import type { HistoryDirection, HistoryEntry } from './history.js';
 import {
@@ -54,12 +54,20 @@ const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
     : null;
 };
 
-/** The Protect Sheet option that lets each row/column shift through on a protected sheet. */
-const SHIFT_PERMISSION: Partial<Record<InteractionOperation, keyof SheetProtectionPermissions>> = {
+/** Operations a Protect Sheet option lets through on a protected sheet, locked cells included.
+ *  Every other mutation needs an unlocked cell. */
+const PROTECTION_OPTION: Partial<Record<InteractionOperation, keyof SheetProtectionPermissions>> = {
   insertRows: 'insertRows',
   deleteRows: 'deleteRows',
   insertColumns: 'insertColumns',
   deleteColumns: 'deleteColumns',
+  pivot: 'pivotTables',
+};
+
+/** Whether sheet protection lets `operation` write `addr`. */
+const protectionPermits = (state: State, operation: InteractionOperation, addr: Addr): boolean => {
+  const option = PROTECTION_OPTION[operation];
+  return option ? sheetPermits(state, addr.sheet, option) : isCellWritable(state, addr);
 };
 
 const ownsAutomaticHyperlinkCommand = (intent: OperationIntent): boolean =>
@@ -224,7 +232,7 @@ export class InteractionAuthorizer {
             reason: 'cell is outside editable cells',
           };
         }
-        if (!isCellWritable(state, addr)) {
+        if (!protectionPermits(state, intent.operation, addr)) {
           return { allowed: false, code: 'protected', addr, reason: 'cell is protected' };
         }
       }
@@ -350,7 +358,7 @@ export class InteractionAuthorizer {
         reason: 'range is outside editable cells',
       };
     }
-    if (!sheetPermits(this.store.getState(), range.sheet, SHIFT_PERMISSION[intent.operation]))
+    if (!sheetPermits(this.store.getState(), range.sheet, PROTECTION_OPTION[intent.operation]))
       return { allowed: false, code: 'protected', addr: first, reason: 'sheet is protected' };
     return { allowed: true };
   }
@@ -373,7 +381,7 @@ export class InteractionAuthorizer {
         if (!isAddress(addr)) return { allowed: false, code: 'outOfBounds', addr };
         if (
           isMutatingInteraction(intent.operation) &&
-          !isCellWritable(this.store.getState(), addr)
+          !protectionPermits(this.store.getState(), intent.operation, addr)
         ) {
           return { allowed: false, code: 'protected', addr };
         }
