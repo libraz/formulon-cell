@@ -17,7 +17,7 @@ describe('executeRibbonProtectionAction', () => {
     }));
 
     const report = executeRibbonProtectionAction({
-      store,
+      context: { store, origin: 'ribbon', commandId: 'protectionReview' },
       action: 'allow-edit-range',
       strings: defaultStrings.ribbonMenu,
     });
@@ -48,7 +48,7 @@ describe('executeRibbonProtectionAction', () => {
       selection: { ...state.selection, range: { sheet: 1, r0: 0, c0: 0, r1: 0, c1: 0 } },
     }));
     executeRibbonProtectionAction({
-      store,
+      context: { store, origin: 'ribbon', commandId: 'protectionReview' },
       action: 'allow-edit-range',
       strings: defaultStrings.ribbonMenu,
     });
@@ -58,7 +58,7 @@ describe('executeRibbonProtectionAction', () => {
       selection: { ...state.selection, range: { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 0 } },
     }));
     executeRibbonProtectionAction({
-      store,
+      context: { store, origin: 'ribbon', commandId: 'protectionReview' },
       action: 'allow-edit-range',
       strings: defaultStrings.ribbonMenu,
     });
@@ -66,7 +66,7 @@ describe('executeRibbonProtectionAction', () => {
     expect(allowedEditRangesForSheet(store.getState(), 1)).toHaveLength(1);
 
     const report = executeRibbonProtectionAction({
-      store,
+      context: { store, origin: 'ribbon', commandId: 'protectionReview' },
       action: 'clear-allowed-edit-ranges',
       strings: defaultStrings.ribbonMenu,
     });

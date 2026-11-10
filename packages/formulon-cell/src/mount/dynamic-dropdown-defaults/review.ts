@@ -1,21 +1,21 @@
+import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import { commentAt, listComments } from '../../commands/comment.js';
 import {
-  addAllowedEditRange,
   allowedEditRangeHasPassword,
   allowedEditRangesForSheet,
   isSheetProtected,
   isWorkbookStructureProtected,
-  protectedSheetPermissions,
   protectionCheckpoint,
-  removeAllowedEditRange,
-  setWorkbookStructureProtected,
-  sheetHasPassword,
-  updateAllowedEditRange,
   verifyAllowedEditRangePassword,
-  verifySheetProtectionPassword,
   verifyWorkbookStructurePassword,
   workbookStructureHasPassword,
 } from '../../commands/protection.js';
+import {
+  addAllowedEditRangeAction,
+  removeAllowedEditRangeAction,
+  setWorkbookProtectionAction,
+  updateAllowedEditRangeAction,
+} from '../../commands/protection-actions.js';
 import { executeRibbonCommentAction } from '../../commands/ribbon-comment.js';
 import { executeRibbonProtectionAction } from '../../commands/ribbon-protection.js';
 import { formatA1Range } from '../../engine/address.js';
@@ -24,20 +24,24 @@ import {
   areasFromSqref,
   sqrefFromAreas,
 } from '../../engine/protection-sync.js';
+import type { DialogEntry } from '../../interact/dialog-entry.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
-import { showMessage } from '../../toolbar/dialogs/prompt.js';
 import {
   type AllowEditRangesManagerResult,
   showAllowEditRangeDialog,
   showAllowEditRangesManagerDialog,
-  showProtectSheetDialog,
   showProtectWorkbookDialog,
-  showUnprotectSheetDialog,
 } from '../../toolbar/dialogs/protection.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { createCellsDropdownDefaults } from './cells.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
+import {
+  confirmUnlock,
+  protectionContext,
+  protectSheetFlow,
+  unprotectSheetFlow,
+} from './protection-flows.js';
 import { normalizedSelectionRange } from './selection.js';
 
 const updateReviewCommentsMenu =
@@ -68,32 +72,6 @@ const updateReviewCommentsMenu =
     }
   };
 
-/** Ask for the password guarding a protected object; true when it is
- *  unguarded or the typed one verifies, with a message on a wrong password. */
-const confirmUnlock = async (
-  instance: SpreadsheetInstance,
-  title: string,
-  guarded: boolean,
-  verify: (password: string) => Promise<boolean>,
-): Promise<boolean> => {
-  if (!guarded) return true;
-  const strings = instance.i18n.strings;
-  const password = await showUnprotectSheetDialog({
-    title,
-    password: strings.protection.password,
-    ok: strings.pageSetup.ok,
-    cancel: strings.pageSetup.cancel,
-  });
-  if (password === null) return false;
-  if (await verify(password)) return true;
-  await showMessage({
-    title,
-    message: strings.ribbonMenu.workbookIncorrectPassword,
-    okLabel: strings.pageSetup.ok,
-  });
-  return false;
-};
-
 /** Whether the password of the allowed edit range `id` was entered (or none is set). */
 const unlockAllowedRange = (instance: SpreadsheetInstance, id: string): Promise<boolean> =>
   confirmUnlock(
@@ -108,7 +86,9 @@ const unlockAllowedRange = (instance: SpreadsheetInstance, id: string): Promise<
  *  The Windows layout's Cancel puts back the ranges as of opening or the last Apply. */
 const openAllowEditRangesManager = async (
   instance: SpreadsheetInstance,
+  entry: DialogEntry,
 ): Promise<AllowEditRangesManagerResult> => {
+  const ctx = protectionContext(instance, entry);
   const strings = instance.i18n.strings;
   const menu = strings.ribbonMenu;
   const sheet = (): number => instance.store.getState().data.sheetIndex;
@@ -147,25 +127,18 @@ const openAllowEditRangesManager = async (
     });
     if (result === null) return;
     const [range = selection, ...extraAreas] = parseAreas(result.range) ?? [];
-    const workbook = instance.workbook;
     if (current) {
-      updateAllowedEditRange(
-        instance.store,
-        current.id,
-        {
-          title: result.title,
-          range,
-          extraAreas,
-          ...(result.password !== undefined ? { password: result.password } : {}),
-        },
-        { workbook },
-      );
+      updateAllowedEditRangeAction(ctx, current.id, {
+        title: result.title,
+        range,
+        extraAreas,
+        ...(result.password !== undefined ? { password: result.password } : {}),
+      });
     } else {
-      addAllowedEditRange(instance.store, range, {
+      addAllowedEditRangeAction(ctx, range, {
         title: result.title || sqrefFromAreas([range, ...extraAreas]),
         extraAreas,
         password: result.password ?? undefined,
-        workbook,
       });
     }
   };
@@ -193,7 +166,7 @@ const openAllowEditRangesManager = async (
     },
     onDelete: async (id) => {
       if (await guard(id)) {
-        removeAllowedEditRange(instance.store, id, { workbook: instance.workbook });
+        removeAllowedEditRangeAction(ctx, id);
       }
     },
     ...(mac
@@ -216,111 +189,30 @@ const openAllowEditRangesManager = async (
   return result;
 };
 
+/** The command id a protection menu action runs under when its caller names none. */
+const PROTECT_ACTION_COMMAND: Readonly<Record<string, string>> = {
+  'protect-sheet': 'protectReview',
+  'unprotect-sheet': 'protectReview',
+  'protect-workbook': 'protectWorkbookReview',
+  'unprotect-workbook': 'protectWorkbookReview',
+  'allow-edit-ranges': 'protectionReview',
+  'clear-allowed-edit-ranges': 'protectionReview',
+};
+
+const protectActionEntry = (action: string): DialogEntry => ({
+  origin: 'ribbon',
+  commandId: PROTECT_ACTION_COMMAND[action] ?? 'protectReview',
+});
+
 const buildProtectAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyProtectAction'] =>
-  async (action) => {
+  async (action, entry = protectActionEntry(action)) => {
     if (action === 'protect-sheet') {
-      const strings = instance.i18n.strings;
-      const mac = instance.host.dataset.fcPlatform === 'mac' ? strings.mac.protectSheet : null;
-      const protectionStrings = { ...strings.protection, ...mac } as typeof strings.protection & {
-        allowAutoFilter: string;
-        allowDeleteColumns: string;
-        allowDeleteRows: string;
-        allowEditObjects: string;
-        allowEditScenarios: string;
-        allowFormatCells: string;
-        allowFormatColumns: string;
-        allowFormatRows: string;
-        allowInsertColumns: string;
-        allowInsertHyperlinks: string;
-        allowInsertRows: string;
-        allowPivotTables: string;
-        allowSelectLockedCells: string;
-        allowSelectUnlockedCells: string;
-        allowSort: string;
-        allowUsersTo: string;
-        confirmPassword: string;
-        passwordMismatch: string;
-      };
-      const result = await showProtectSheetDialog({
-        strings: {
-          title: protectionStrings.protectSheet,
-          heading: mac?.heading,
-          note: mac?.note,
-          password: protectionStrings.password,
-          // The Mac password field carries no placeholder; (省略可) is in its label.
-          passwordPlaceholder: mac ? '' : protectionStrings.passwordPlaceholder,
-          confirmPassword: protectionStrings.confirmPassword,
-          passwordMismatch: protectionStrings.passwordMismatch,
-          allowLabel: protectionStrings.allowUsersTo,
-          allowSelectLockedCells: protectionStrings.allowSelectLockedCells,
-          allowSelectUnlockedCells: protectionStrings.allowSelectUnlockedCells,
-          allowFormatCells: protectionStrings.allowFormatCells,
-          allowFormatColumns: protectionStrings.allowFormatColumns,
-          allowFormatRows: protectionStrings.allowFormatRows,
-          allowInsertColumns: protectionStrings.allowInsertColumns,
-          allowInsertRows: protectionStrings.allowInsertRows,
-          allowInsertHyperlinks: protectionStrings.allowInsertHyperlinks,
-          allowDeleteColumns: protectionStrings.allowDeleteColumns,
-          allowDeleteRows: protectionStrings.allowDeleteRows,
-          allowSort: protectionStrings.allowSort,
-          allowAutoFilter: protectionStrings.allowAutoFilter,
-          allowPivotTables: protectionStrings.allowPivotTables,
-          allowEditObjects: protectionStrings.allowEditObjects,
-          allowEditScenarios: protectionStrings.allowEditScenarios,
-          ok: strings.pageSetup.ok,
-          cancel: strings.pageSetup.cancel,
-        },
-        initial: protectedSheetPermissions(
-          instance.store.getState(),
-          instance.store.getState().data.sheetIndex,
-        ),
-      });
-      if (!result) {
-        instance.host.focus();
-        return;
-      }
-      (
-        instance.setSheetProtected as (
-          on: boolean,
-          password?: string,
-          permissions?: import('../../store/store.js').SheetProtectionPermissions,
-        ) => void
-      )(true, result.password, result.permissions);
-      instance.host.focus();
+      await protectSheetFlow(instance, entry);
       return;
     }
     if (action === 'unprotect-sheet') {
-      const strings = instance.i18n.strings;
-      const sheet = instance.store.getState().data.sheetIndex;
-      if (sheetHasPassword(instance.store.getState(), sheet)) {
-        const password = await showUnprotectSheetDialog({
-          title: strings.protection.unprotectSheet,
-          password: strings.protection.password,
-          ok: strings.pageSetup.ok,
-          cancel: strings.pageSetup.cancel,
-        });
-        if (password === null) {
-          instance.host.focus();
-          return;
-        }
-        const matches = await verifySheetProtectionPassword(
-          instance.store.getState(),
-          sheet,
-          password,
-        );
-        if (!matches) {
-          await showMessage({
-            title: strings.protection.unprotectSheet,
-            message: strings.ribbonMenu.workbookIncorrectPassword,
-            okLabel: strings.pageSetup.ok,
-          });
-          instance.host.focus();
-          return;
-        }
-      }
-      instance.setSheetProtected(false);
-      instance.host.focus();
+      await unprotectSheetFlow(instance, entry);
       return;
     }
     if (action === 'lock-cell' || action === 'unlock-cell') {
@@ -329,7 +221,6 @@ const buildProtectAction =
     }
     if (action === 'protect-workbook' || action === 'unprotect-workbook') {
       const strings = instance.i18n.strings;
-      const workbook = instance.workbook;
       if (action === 'protect-workbook') {
         const result = await showProtectWorkbookDialog({
           title: strings.ribbonMenu.protectWorkbookDialogTitle,
@@ -340,12 +231,8 @@ const buildProtectAction =
           ok: strings.pageSetup.ok,
           cancel: strings.pageSetup.cancel,
         });
-        if (result) {
-          setWorkbookStructureProtected(instance.store, true, {
-            password: result.password,
-            workbook,
-          });
-        }
+        if (result)
+          setWorkbookProtectionAction(protectionContext(instance, entry), true, result.password);
       } else if (
         await confirmUnlock(
           instance,
@@ -354,7 +241,7 @@ const buildProtectAction =
           (password) => verifyWorkbookStructurePassword(instance.store.getState(), password),
         )
       ) {
-        setWorkbookStructureProtected(instance.store, false, { workbook });
+        setWorkbookProtectionAction(protectionContext(instance, entry), false);
       }
       instance.host.focus();
       return;
@@ -367,8 +254,8 @@ const buildProtectAction =
         return;
       }
       if (action === 'allow-edit-ranges') {
-        if ((await openAllowEditRangesManager(instance)) === 'protectSheet') {
-          await buildProtectAction(instance)('protect-sheet');
+        if ((await openAllowEditRangesManager(instance, entry)) === 'protectSheet') {
+          await protectSheetFlow(instance, entry);
           return;
         }
         instance.host.focus();
@@ -387,8 +274,7 @@ const buildProtectAction =
         }
       }
       const report = executeRibbonProtectionAction({
-        store: instance.store,
-        workbook: instance.workbook,
+        context: protectionContext(instance, entry),
         action: 'clear-allowed-edit-ranges',
         strings: {
           allowEditRangesDialogTitle: strings.ribbonMenu.allowEditRangesDialogTitle,
@@ -413,7 +299,12 @@ const updateProtectMenu =
     const strings = instance.i18n.strings.ribbonMenu;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-protect-action]')) {
       const action = button.dataset.protectAction;
+      const commandId = action ? PROTECT_ACTION_COMMAND[action] : undefined;
+      const denied =
+        commandId !== undefined &&
+        !canExecuteBuiltInRequest(instance.store, commandId, 'ribbon').allowed;
       const disabled =
+        denied ||
         (action === 'protect-sheet' && sheetProtected) ||
         (action === 'unprotect-sheet' && !sheetProtected) ||
         (action === 'protect-workbook' && workbookProtected) ||
@@ -421,8 +312,9 @@ const updateProtectMenu =
         ((action === 'allow-edit-ranges' || action === 'clear-allowed-edit-ranges') &&
           sheetProtected) ||
         (action === 'clear-allowed-edit-ranges' && !hasAllowedRanges);
-      const reason =
-        action === 'protect-sheet'
+      const reason = denied
+        ? instance.i18n.strings.backstage.commandUnavailable
+        : action === 'protect-sheet'
           ? strings.protectSheetAlreadyProtected
           : action === 'unprotect-sheet'
             ? strings.unprotectSheetRequiresProtected

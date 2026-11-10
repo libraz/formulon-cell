@@ -734,6 +734,7 @@ const operationsForFormatPatch = (patch: Partial<CellFormat>): Set<InteractionOp
     ) {
       operations.add('hyperlink');
     } else if (key === 'validation') operations.add('validation');
+    else if (key === 'locked' || key === 'formulaHidden') operations.add('protection');
     else operations.add('format');
   }
   return operations;

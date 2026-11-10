@@ -11,12 +11,11 @@ import {
   PrintResourceLimitError,
   renderPrintDocument,
 } from './commands/print.js';
+import { isSheetProtected, registerAllowedRangeUnlockUi } from './commands/protection.js';
 import {
-  isSheetProtected,
-  registerAllowedRangeUnlockUi,
-  setProtectedSheet,
-  toggleProtectedSheet,
-} from './commands/protection.js';
+  type ProtectionActionContext,
+  setSheetProtectionAction,
+} from './commands/protection-actions.js';
 import { registerSheetActivationHydrator } from './commands/sheet-mutate.js';
 import {
   clearTraceArrows,
@@ -53,6 +52,7 @@ import {
 import { attachAlwaysOnDialogs } from './mount/always-on-dialogs.js';
 import { createMountChrome } from './mount/chrome.js';
 import { attachChromeSync, type ChromeSyncController } from './mount/chrome-sync.js';
+import { toggleSheetProtectionFlow } from './mount/dynamic-dropdown-defaults/protection-flows.js';
 import { attachEngineBinding, type EngineBinding } from './mount/engine-binding.js';
 import { createErrorIndicatorClickHandler } from './mount/error-indicator-click.js';
 import { createExtensionRegistry } from './mount/extension-registry.js';
@@ -361,6 +361,15 @@ export const Spreadsheet = {
       dispatchWorkbookObjectSummaries(host, wb);
     }
 
+    /** A protection change made through the public instance methods. */
+    const instanceProtection = (): ProtectionActionContext => ({
+      store,
+      workbook: wb,
+      history,
+      origin: 'instanceApi',
+      commandId: 'protect',
+    });
+
     function hydrateActiveSheet(): void {
       hydrateActiveSheetFromEngine(wb, store);
     }
@@ -396,7 +405,8 @@ export const Spreadsheet = {
       sheetMenu,
       sheetTabs,
       store,
-      toggleSheetProtection: () => instance.toggleSheetProtection(),
+      toggleSheetProtection: () =>
+        void toggleSheetProtectionFlow(instance, { origin: 'contextMenu', commandId: 'protect' }),
     });
     sheetTabsController.update();
 
@@ -1066,8 +1076,12 @@ export const Spreadsheet = {
         renderer.invalidate();
       },
       toggleSheetProtection() {
-        if (commands.policy !== undefined) return;
-        toggleProtectedSheet(store, store.getState().data.sheetIndex, { workbook: wb });
+        const sheet = store.getState().data.sheetIndex;
+        setSheetProtectionAction(
+          instanceProtection(),
+          sheet,
+          !isSheetProtected(store.getState(), sheet),
+        );
         renderer.invalidate();
       },
       setSheetProtected(
@@ -1075,9 +1089,7 @@ export const Spreadsheet = {
         password?: string,
         permissions?: import('./store/types.js').SheetProtectionPermissions,
       ) {
-        if (commands.policy !== undefined) return;
-        setProtectedSheet(store, store.getState().data.sheetIndex, on, {
-          workbook: wb,
+        setSheetProtectionAction(instanceProtection(), store.getState().data.sheetIndex, on, {
           password,
           permissions,
         });

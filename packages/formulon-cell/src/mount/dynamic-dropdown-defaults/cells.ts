@@ -19,6 +19,7 @@ import {
 } from '../../wrappers/toolbar-actions.js';
 import type { DefaultDynamicDropdownsOptions } from '../dynamic-dropdowns-defaults.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
+import { toggleSheetProtectionFlow } from './protection-flows.js';
 import { hasActiveCopy, normalizedSelectionRange } from './selection.js';
 
 const noop = (): void => undefined;
@@ -175,9 +176,8 @@ const buildCellFormatAction =
       statusMetric: null,
       ribbonMenuText: strings.ribbonMenu,
       renameSheetLabel: strings.sheetTabs.rename,
-      runSheetProtectionFlow: async () => {
-        instance.toggleSheetProtection();
-      },
+      runSheetProtectionFlow: () =>
+        toggleSheetProtectionFlow(instance, { origin: 'ribbon', commandId: 'protect' }),
       showRenameSheetDialog: (opts) =>
         showRenameSheetDialog({
           okLabel: strings.hyperlinkDialog.ok,
@@ -211,10 +211,24 @@ const buildCellFormatAction =
     instance.host.focus();
   };
 
-/** The sheet command behind a Home > Format menu action, if it is one. */
-const sheetCommandForFormatAction = (
+/** The built-in command behind a Home > Format menu action that writes sheets or protection. */
+const commandForFormatAction = (
   action: string | undefined,
-): 'renameSheet' | 'moveSheet' | 'hideSheet' | 'unhideSheet' | 'sheetTabColor' | null => {
+):
+  | 'renameSheet'
+  | 'moveSheet'
+  | 'hideSheet'
+  | 'unhideSheet'
+  | 'sheetTabColor'
+  | 'protect'
+  | null => {
+  if (
+    action === 'protect-sheet' ||
+    action === 'lock-cell' ||
+    action === 'unlock-cell' ||
+    action === 'toggle-lock'
+  )
+    return 'protect';
   if (action === 'rename-sheet') return 'renameSheet';
   if (action === 'move-sheet-left' || action === 'move-sheet-right' || action === 'move-sheet-copy')
     return 'moveSheet';
@@ -241,14 +255,16 @@ const updateFormatCellsMenu =
       state.layout.sheetTabColors.get(sheet),
     );
     const structureProtected = isWorkbookStructureProtected(state);
-    const sheetCommandDenied = (action: string | undefined): boolean => {
-      const id = sheetCommandForFormatAction(action);
+    const commandDenied = (action: string | undefined): boolean => {
+      const id = commandForFormatAction(action);
       return id !== null && !canExecuteBuiltIn(instance.store, id, 'ribbon').allowed;
     };
     const reasonForFormatAction = (action: string | undefined): string | undefined => {
       const t = instance.i18n.strings.ribbonMenu;
-      if (sheetCommandDenied(action)) {
-        return structureProtected ? t.workbookStructureProtectedBlocked : t.sheetActionUnavailable;
+      if (commandDenied(action)) {
+        return structureProtected && commandForFormatAction(action) !== 'protect'
+          ? t.workbookStructureProtectedBlocked
+          : t.sheetActionUnavailable;
       }
       if (
         (action === 'rename-sheet' ||
@@ -280,7 +296,7 @@ const updateFormatCellsMenu =
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-format]')) {
       const action = button.dataset.cellFormat;
       const disabled =
-        sheetCommandDenied(action) ||
+        commandDenied(action) ||
         ((action === 'rename-sheet' || action === 'move-sheet-copy') && !canMoveSheet) ||
         action === 'default-width' ||
         (action === 'move-sheet-left' && (sheet <= 0 || !canMoveSheet)) ||

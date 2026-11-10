@@ -1,4 +1,5 @@
 import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import { setCellsLockedAction } from '../../commands/protection-actions.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../../commands/row-col-dimension.js';
 import {
   autofitColsWidthForRanges,
@@ -13,7 +14,6 @@ import { showMessage } from '../dialogs/prompt.js';
 // doesn't carry the dispatch table in module scope. Side effects live on the
 // caller's side via the `deps` struct (status text, tab list refresh, etc).
 
-import { setCellLocked } from '../../commands/protection.js';
 import {
   hiddenExtentInSelection,
   hideCols,
@@ -29,7 +29,6 @@ import {
   setSheetHiddenAction,
   setSheetTabColorAction,
 } from '../../commands/sheet-actions.js';
-import { recordFormatChange } from '../../commands/slice-history.js';
 import type { Range } from '../../engine/types.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { resolveTheme } from '../../theme/resolve.js';
@@ -209,9 +208,14 @@ export const applyCellFormatAction = async (
       .getState()
       .format.formats.get(addrKey({ sheet: range.sheet, row: range.r0, col: range.c0 }));
     const locked = action === 'toggle-lock' ? first?.locked === false : action === 'lock-cell';
-    recordFormatChange(i.history, i.store, () => {
-      setCellLocked(i.store, range, locked);
-    });
+    if (
+      !setCellsLockedAction(
+        { store: i.store, history: i.history, origin: 'ribbon', commandId: 'formatCellsHome' },
+        range,
+        locked,
+      )
+    )
+      return;
     if (statusMetric) {
       statusMetric.textContent = locked
         ? ribbonMenuText.cellsLockedStatus

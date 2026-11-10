@@ -5,10 +5,13 @@
 // they can drop straight onto their ribbon-report shell.
 
 import { formatA1Range } from '../engine/address.js';
-import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import type { SpreadsheetStore } from '../store/store.js';
-import { addAllowedEditRange, clearAllowedEditRanges, isSheetProtected } from './protection.js';
+import { isSheetProtected } from './protection.js';
+import {
+  addAllowedEditRangeAction,
+  clearAllowedEditRangesAction,
+  type ProtectionActionContext,
+} from './protection-actions.js';
 
 type ProtectionStrings = Pick<
   Strings['ribbonMenu'],
@@ -28,9 +31,8 @@ export interface RibbonProtectionReport {
 }
 
 export interface ExecuteRibbonProtectionActionDeps {
-  store: SpreadsheetStore;
-  /** When given, range changes are written through to the engine. */
-  workbook?: WorkbookHandle;
+  /** The store, workbook and entry point the range change is authorized and written under. */
+  context: ProtectionActionContext;
   action: RibbonProtectionAction;
   strings: ProtectionStrings;
 }
@@ -41,7 +43,8 @@ export interface ExecuteRibbonProtectionActionDeps {
 export const executeRibbonProtectionAction = (
   deps: ExecuteRibbonProtectionActionDeps,
 ): RibbonProtectionReport => {
-  const { store, workbook, action, strings } = deps;
+  const { context, action, strings } = deps;
+  const { store } = context;
   const state = store.getState();
   const range = state.selection.range;
   const sheet = action === 'allow-edit-range' ? range.sheet : state.data.sheetIndex;
@@ -59,7 +62,7 @@ export const executeRibbonProtectionAction = (
   }
   if (action === 'allow-edit-range') {
     const rangeText = formatA1Range(range);
-    addAllowedEditRange(store, range, { title: rangeText, workbook });
+    addAllowedEditRangeAction(context, range, { title: rangeText });
     return {
       title: strings.allowEditRangesDialogTitle,
       items: [
@@ -71,7 +74,7 @@ export const executeRibbonProtectionAction = (
       ],
     };
   }
-  clearAllowedEditRanges(store, state.data.sheetIndex, { workbook });
+  clearAllowedEditRangesAction(context, state.data.sheetIndex);
   return {
     title: strings.allowEditRangesDialogTitle,
     items: [

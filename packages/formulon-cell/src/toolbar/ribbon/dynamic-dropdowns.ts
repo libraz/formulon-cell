@@ -1,3 +1,4 @@
+import type { DialogEntry } from '../../interact/dialog-entry.js';
 // Dynamic ribbon dropdown system: looks up which ribbon button owns which
 // `.fc-tb__menu` panel via a single inverse map, then dispatches clicks inside
 // open menus to the matching action handler. The host wires in every action
@@ -126,7 +127,8 @@ export interface DynamicDropdownsCtx {
   applyFormulaAuditAction: (action: string) => void;
   applyWatchAction: (action: string) => void;
   applyReviewCommentAction: (action: string) => void;
-  applyProtectAction: (action: string) => void | Promise<void>;
+  /** `entry` names the UI entry point; the ribbon's own command id when absent. */
+  applyProtectAction: (action: string, entry?: DialogEntry) => void | Promise<void>;
   applyCalcOptionAction: (action: string) => void;
   applyWhatIfAction: (action: string) => void;
   createRecommendedChartFromSelection: () => void | Promise<void>;

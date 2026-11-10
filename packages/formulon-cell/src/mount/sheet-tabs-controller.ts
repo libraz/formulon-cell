@@ -628,7 +628,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
             ? strings.ribbonMenu.unprotectSheetCommand
             : strings.ribbonMenu.protectSheetCommand,
           () => sheetProtection?.(),
-          !sheetProtection,
+          !sheetProtection || denied('protect'),
           m.unavailable,
         ),
         colorTrigger,

@@ -64,7 +64,7 @@ describe('Allow Edit Ranges are unavailable on a protected sheet', () => {
     const { store } = protectedStore();
     mutators.setRange(store, area(3, 3, 3, 3));
     const report = executeRibbonProtectionAction({
-      store,
+      context: { store, origin: 'ribbon', commandId: 'protectionReview' },
       action: 'allow-edit-range',
       strings: en.ribbonMenu,
     });
