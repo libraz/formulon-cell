@@ -5,8 +5,6 @@ export interface RibbonHostDeps {
   host: HTMLElement;
   getInstance: () => ToolbarInstanceRef;
   getLocale: () => string;
-  /** True while an interaction policy is active (dynamic dropdowns stay off). */
-  isRestricted: () => boolean;
 }
 
 export interface RibbonHost {
@@ -36,7 +34,7 @@ export function createRibbonHost(deps: RibbonHostDeps): RibbonHost {
       host.insertBefore(ribbonHost, host.firstChild);
       const toolbarOpts = next === true ? {} : next;
       toolbarHandle = mountToolbar(ribbonHost, deps.getInstance(), {
-        ...(deps.isRestricted() ? {} : { dynamicDropdowns: true as const }),
+        dynamicDropdowns: true,
         ...toolbarOpts,
       });
     },

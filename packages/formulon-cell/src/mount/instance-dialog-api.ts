@@ -1,4 +1,5 @@
 import { hyperlinkAt } from '../commands/hyperlinks.js';
+import type { InteractionOperation } from '../commands/interaction-policy.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -58,8 +59,8 @@ export interface InstanceDialogApiDeps {
   getWb: () => WorkbookHandle;
   getBinding: () => EngineBinding;
   getUserHandle: (id: string) => ExtensionHandle | undefined;
-  /** True while an interaction policy blocks dialog routes. */
-  isRestricted: () => boolean;
+  /** Whether the host policy allows `operation`; `null` names a dialog that edits nothing. */
+  permits: (operation: InteractionOperation | null) => boolean;
   ensureWatchWindow: () => void;
   refreshFeaturesView: () => void;
 }
@@ -73,7 +74,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
     getWb,
     getBinding,
     getUserHandle,
-    isRestricted,
+    permits,
     ensureWatchWindow,
     refreshFeaturesView,
   } = deps;
@@ -88,11 +89,11 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       alwaysOnDialogs.openExternalLinks();
     },
     openCfRulesDialog() {
-      if (isRestricted()) return;
+      if (!permits('format')) return;
       alwaysOnDialogs.openCfRules();
     },
     openCellStylesGallery() {
-      if (isRestricted()) return;
+      if (!permits('format')) return;
       alwaysOnDialogs.openCellStyles();
     },
     openEvaluateFormulaDialog() {
@@ -143,11 +144,10 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       featureState.goToDialog?.open('special');
     },
     openFilterDropdown(range, col) {
-      if (isRestricted()) return;
+      if (!permits('filter')) return;
       alwaysOnDialogs.openFilterAtHeader(range, col);
     },
     openWatchWindow() {
-      if (isRestricted()) return;
       ensureWatchWindow();
       featureState.watchPanel?.open();
       refreshFeaturesView();
@@ -156,7 +156,6 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       featureState.watchPanel?.close();
     },
     toggleWatchWindow() {
-      if (isRestricted()) return;
       ensureWatchWindow();
       featureState.watchPanel?.toggle();
       refreshFeaturesView();
@@ -204,7 +203,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       return featureState.sessionCharts?.openSettings(tab) ?? false;
     },
     openPivotFieldList(sheetIndex, pivotIndex) {
-      if (isRestricted()) return false;
+      if (!permits('table')) return false;
       const userObjects = getUserHandle('workbookObjects') as
         | (ExtensionHandle & {
             openPivotFieldList?: (sheetIndex: number, pivotIndex: number) => boolean;
@@ -216,7 +215,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       return featureState.workbookObjects?.openPivotFieldList(sheetIndex, pivotIndex) ?? false;
     },
     openActivePivotFieldList() {
-      if (isRestricted()) return false;
+      if (!permits('table')) return false;
       const pivot = findPivotTableAtCell(getWb(), store.getState().selection.active);
       if (!pivot) return false;
       const userObjects = getUserHandle('workbookObjects') as
@@ -233,7 +232,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       );
     },
     openPivotFieldSettings() {
-      if (isRestricted()) return false;
+      if (!permits('table')) return false;
       const addr = store.getState().selection.active;
       const userObjects = getUserHandle('workbookObjects') as
         | (ExtensionHandle & { openPivotFieldSettings?: (addr: Addr) => boolean })
@@ -242,7 +241,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       return featureState.workbookObjects?.openPivotFieldSettings(addr) ?? false;
     },
     openPivotOptions(sheetIndex, pivotIndex) {
-      if (isRestricted()) return false;
+      if (!permits('table')) return false;
       const pivot =
         sheetIndex !== undefined && pivotIndex !== undefined
           ? { sheetIndex, pivotIndex }
@@ -261,7 +260,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       );
     },
     openPivotTableDialog(opts) {
-      if (isRestricted()) return;
+      if (!permits('table')) return;
       const userPivot = getUserHandle('pivotTableDialog') as
         | (ExtensionHandle & { open?: (opts?: { placement?: 'new' | 'existing' }) => void })
         | undefined;

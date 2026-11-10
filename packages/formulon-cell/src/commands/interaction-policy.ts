@@ -258,6 +258,13 @@ export function isPolicyCellEligible(
   return editable.predicate({ addr, operation, origin });
 }
 
+/** Whether a dialog or command classified as `operation` may run: always without a policy or
+ *  for `null` (nothing to edit), else as the policy decides the operation. */
+export const policyPermits = (
+  policy: InteractionPolicy | undefined,
+  operation: InteractionOperation | null,
+): boolean => operation === null || policy === undefined || operationPermission(policy, operation);
+
 export function operationPermission(
   policy: InteractionPolicy,
   operation: InteractionOperation,

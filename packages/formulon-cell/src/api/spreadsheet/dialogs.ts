@@ -1,3 +1,4 @@
+import { type InteractionOperation, policyPermits } from '../../commands/interaction-policy.js';
 import type { Range } from '../../engine/types.js';
 import type { FeatureId } from '../../extensions/features.js';
 import type { ConditionalDialogOpenOptions } from '../../interact/conditional-dialog.js';
@@ -60,8 +61,9 @@ export interface Dialogs {
 interface DialogRoute {
   /** Feature the dialog belongs to; `null` for the dialogs every mount carries. */
   readonly feature: FeatureId | null;
-  /** True for the routes that do not consult the interaction policy and stay shut under one. */
-  readonly unpoliced?: boolean;
+  /** The policy operation that gates opening it, as the ribbon classifies the same action; `null`
+   *  for a dialog the feature flag alone decides (its edits are checked when they apply). */
+  readonly operation: InteractionOperation | null;
   /** Opens it; `false` when there was nothing to open it on (no chart, no pivot). */
   readonly open: (legacy: LegacyInstance, options: never) => unknown;
   readonly close?: (legacy: LegacyInstance) => void;
@@ -72,57 +74,103 @@ type Route<K extends DialogId> = Omit<DialogRoute, 'open'> & {
 };
 
 const ROUTES: { readonly [K in DialogId]: Route<K> } = {
-  conditional: { feature: 'conditional', open: (l, o) => l.openConditionalDialog(o) },
-  iterative: { feature: 'iterative', open: (l) => l.openIterativeDialog() },
-  externalLinks: { feature: null, open: (l) => l.openExternalLinksDialog() },
-  cfRules: { feature: null, unpoliced: true, open: (l) => l.openCfRulesDialog() },
-  cellStylesGallery: { feature: null, unpoliced: true, open: (l) => l.openCellStylesGallery() },
-  evaluateFormula: { feature: null, open: (l) => l.openEvaluateFormulaDialog() },
+  conditional: {
+    feature: 'conditional',
+    operation: null,
+    open: (l, o) => l.openConditionalDialog(o),
+  },
+  iterative: { feature: 'iterative', operation: null, open: (l) => l.openIterativeDialog() },
+  externalLinks: { feature: null, operation: null, open: (l) => l.openExternalLinksDialog() },
+  cfRules: { feature: null, operation: 'format', open: (l) => l.openCfRulesDialog() },
+  cellStylesGallery: { feature: null, operation: 'format', open: (l) => l.openCellStylesGallery() },
+  evaluateFormula: { feature: null, operation: null, open: (l) => l.openEvaluateFormulaDialog() },
   functionArguments: {
     feature: 'fxDialog',
+    operation: null,
     open: (l, o) => {
       const { name, ...rest } = o ?? {};
       l.openFunctionArguments(name, rest);
     },
   },
-  hyperlink: { feature: 'hyperlink', open: (l) => l.openHyperlinkDialog() },
-  comment: { feature: 'commentDialog', open: (l, o) => l.openCommentDialog(o) },
+  hyperlink: { feature: 'hyperlink', operation: null, open: (l) => l.openHyperlinkDialog() },
+  comment: {
+    feature: 'commentDialog',
+    operation: null,
+    open: (l, o) => l.openCommentDialog(o),
+  },
   findReplace: {
     feature: 'findReplace',
+    operation: null,
     open: (l, o) => l.openFindReplace(o?.tab),
     close: (l) => l.closeFindReplace(),
   },
-  pasteSpecial: { feature: 'pasteSpecial', open: (l, o) => l.openPasteSpecial(o) },
-  insertCopiedCells: { feature: null, open: (l) => l.openInsertCopiedCells() },
-  namedRange: { feature: 'namedRanges', open: (l) => l.openNamedRangeDialog() },
-  defineName: { feature: 'namedRanges', open: (l) => l.openDefineNameDialog() },
-  pageSetup: { feature: 'pageSetup', open: (l, o) => l.openPageSetup(o?.tab) },
-  format: { feature: 'formatDialog', open: (l, o) => l.openFormatDialog(o?.tab) },
-  dataValidation: { feature: 'formatDialog', open: (l) => l.openDataValidationDialog() },
-  goTo: { feature: 'gotoSpecial', open: (l) => l.openGoTo() },
-  goToSpecial: { feature: 'gotoSpecial', open: (l) => l.openGoToSpecial() },
+  pasteSpecial: {
+    feature: 'pasteSpecial',
+    operation: null,
+    open: (l, o) => l.openPasteSpecial(o),
+  },
+  insertCopiedCells: { feature: null, operation: 'paste', open: (l) => l.openInsertCopiedCells() },
+  namedRange: {
+    feature: 'namedRanges',
+    operation: null,
+    open: (l) => l.openNamedRangeDialog(),
+  },
+  defineName: {
+    feature: 'namedRanges',
+    operation: null,
+    open: (l) => l.openDefineNameDialog(),
+  },
+  pageSetup: {
+    feature: 'pageSetup',
+    operation: null,
+    open: (l, o) => l.openPageSetup(o?.tab),
+  },
+  format: {
+    feature: 'formatDialog',
+    operation: null,
+    open: (l, o) => l.openFormatDialog(o?.tab),
+  },
+  dataValidation: {
+    feature: 'formatDialog',
+    operation: null,
+    open: (l) => l.openDataValidationDialog(),
+  },
+  goTo: { feature: 'gotoSpecial', operation: null, open: (l) => l.openGoTo() },
+  goToSpecial: { feature: 'gotoSpecial', operation: null, open: (l) => l.openGoToSpecial() },
   filterDropdown: {
     feature: null,
-    unpoliced: true,
+    operation: 'filter',
+
     open: (l, o) => l.openFilterDropdown(o?.range, o?.col),
   },
   watchWindow: {
     feature: null,
-    unpoliced: true,
+    operation: null,
+
     open: (l) => l.openWatchWindow(),
     close: (l) => l.closeWatchWindow(),
   },
-  quickAnalysis: { feature: 'quickAnalysis', open: (l) => l.openQuickAnalysis() },
+  quickAnalysis: { feature: 'quickAnalysis', operation: null, open: (l) => l.openQuickAnalysis() },
   workbookObjects: {
     feature: 'workbookObjects',
+    operation: null,
     open: (l) => l.openWorkbookObjects(),
     close: (l) => l.closeWorkbookObjects(),
   },
-  accessibilityChecker: { feature: null, open: (l) => l.openAccessibilityChecker() },
-  chartSettings: { feature: 'charts', open: (l, o) => l.openChartSettings(o?.tab) },
+  accessibilityChecker: {
+    feature: null,
+    operation: null,
+    open: (l) => l.openAccessibilityChecker(),
+  },
+  chartSettings: {
+    feature: 'charts',
+    operation: null,
+    open: (l, o) => l.openChartSettings(o?.tab),
+  },
   pivotFieldList: {
     feature: 'workbookObjects',
-    unpoliced: true,
+    operation: 'table',
+
     open: (l, o) =>
       o?.sheet !== undefined && o.pivotIndex !== undefined
         ? l.openPivotFieldList(o.sheet, o.pivotIndex)
@@ -130,22 +178,26 @@ const ROUTES: { readonly [K in DialogId]: Route<K> } = {
   },
   activePivotFieldList: {
     feature: 'workbookObjects',
-    unpoliced: true,
+    operation: 'table',
+
     open: (l) => l.openActivePivotFieldList(),
   },
   pivotFieldSettings: {
     feature: 'workbookObjects',
-    unpoliced: true,
+    operation: 'table',
+
     open: (l) => l.openPivotFieldSettings(),
   },
   pivotOptions: {
     feature: 'workbookObjects',
-    unpoliced: true,
+    operation: 'table',
+
     open: (l, o) => l.openPivotOptions(o?.sheet, o?.pivotIndex),
   },
   pivotTable: {
     feature: 'pivotTableDialog',
-    unpoliced: true,
+    operation: 'table',
+
     open: (l, o) => l.openPivotTableDialog(o),
   },
 };
@@ -162,7 +214,7 @@ const refusalOf = (legacy: LegacyInstance, route: DialogRoute): DialogRefusal =>
   if (route.feature !== null && legacy.features[route.feature] === undefined) {
     return 'feature-disabled';
   }
-  if (route.unpoliced && legacy.commands.policy !== undefined) return 'policy-denied';
+  if (!policyPermits(legacy.commands.policy, route.operation)) return 'policy-denied';
   return null;
 };
 

@@ -21,7 +21,7 @@ import {
 import { ribbon } from '@libraz/formulon-cell/toolbar';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spreadsheetInternals } from '../../src/mount/internals.js';
-import { makeHost } from './helpers.js';
+import { expectFailure, makeHost } from './helpers.js';
 
 const live: Array<{ dispose(): void }> = [];
 
@@ -157,6 +157,21 @@ describe('spreadsheet: update', () => {
   it('a policy does not disable dialogs whose features are on', async () => {
     const sheet = await mountSheet({ policy: viewerPolicy() });
     expect(sheet.dialogs.canOpen('format')).toBe(true);
+  });
+
+  it('asks the policy about the dialogs that lead straight to an edit', async () => {
+    const denied = await mountSheet({ policy: viewerPolicy() });
+    expect(denied.dialogs.canOpen('cfRules')).toBe(false);
+    expect(denied.dialogs.canOpen('filterDropdown')).toBe(false);
+    expect(denied.dialogs.canOpen('pivotTable')).toBe(false);
+    expect(denied.dialogs.canOpen('watchWindow')).toBe(true);
+    expectFailure(() => denied.dialogs.open('cfRules'), 'policy-denied');
+    const allowed = await mountSheet({
+      policy: { defaultOperation: 'deny', operations: { format: true, filter: true, table: true } },
+    });
+    expect(allowed.dialogs.canOpen('cfRules')).toBe(true);
+    expect(allowed.dialogs.canOpen('filterDropdown')).toBe(true);
+    expect(allowed.dialogs.canOpen('pivotTable')).toBe(true);
   });
 
   const PAIRWISE: ReadonlyArray<

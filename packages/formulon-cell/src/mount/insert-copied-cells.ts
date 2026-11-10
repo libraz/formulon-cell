@@ -4,6 +4,7 @@ import {
 } from '../commands/clipboard/insert-copied-cells.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
+import type { InteractionOperation } from '../commands/interaction-policy.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { readClipboard } from '../interact/context-menu-clipboard.js';
@@ -17,8 +18,8 @@ export interface InsertCopiedCellsDeps {
   history: History;
   getWb: () => WorkbookHandle;
   getStrings: () => Strings;
-  /** True while an interaction policy blocks the insert. */
-  isRestricted: () => boolean;
+  /** Whether the host policy allows `operation`; `null` names a dialog that edits nothing. */
+  permits: (operation: InteractionOperation | null) => boolean;
   getClipboardSnapshot: () => ClipboardSnapshot | null;
   refreshCells: () => void;
   updateChrome: () => void;
@@ -28,7 +29,7 @@ export interface InsertCopiedCellsDeps {
 export function createInsertCopiedCellsOpener(deps: InsertCopiedCellsDeps): () => void {
   const { host, store, history, getWb, getStrings } = deps;
   return () => {
-    if (deps.isRestricted()) return;
+    if (!deps.permits('paste')) return;
     const wb = getWb();
 
     // Whole-row/whole-column internal copies and cuts use the structural insert

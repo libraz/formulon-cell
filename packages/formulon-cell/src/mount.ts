@@ -4,6 +4,7 @@ import {
   InteractionController,
   registerInteractionController,
 } from './commands/interaction-controller.js';
+import { policyPermits } from './commands/interaction-policy.js';
 import { PrintResourceLimitError, printSheet } from './commands/print.js';
 import {
   isSheetProtected,
@@ -418,7 +419,7 @@ export const Spreadsheet = {
       getSessionConditionalFormatIndexes: (sheet, currentFormats) =>
         getTrackedConditionalRuleIndexes(currentFormats, sheet, syncedSessionCfRules),
       openConditionalDialog: (options) => featureState.conditionalDialog?.open(options),
-      isRestricted: () => commands.policy !== undefined,
+      permits: (operation) => policyPermits(commands.policy, operation),
     });
 
     const refreshCells = (): void => {
@@ -778,7 +779,6 @@ export const Spreadsheet = {
       host,
       getInstance: () => instance,
       getLocale: () => i18n.locale,
-      isRestricted: () => commands.policy !== undefined,
     });
     let requestedToolbar = opts.toolbar ?? (opts.ui ? ui.ribbon : false);
 
@@ -788,7 +788,7 @@ export const Spreadsheet = {
       history,
       getWb: () => wb,
       getStrings: () => i18n.strings,
-      isRestricted: () => commands.policy !== undefined,
+      permits: (operation) => policyPermits(commands.policy, operation),
       getClipboardSnapshot: () => binding.clipboardH?.getSnapshot() ?? null,
       refreshCells,
       updateChrome,
@@ -802,7 +802,7 @@ export const Spreadsheet = {
       getWb: () => wb,
       getBinding: () => binding,
       getUserHandle: extensionRegistry.getUserHandle,
-      isRestricted: () => commands.policy !== undefined,
+      permits: (operation) => policyPermits(commands.policy, operation),
       ensureWatchWindow,
       refreshFeaturesView,
     });

@@ -4,6 +4,7 @@
 
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
+import type { InteractionOperation } from '../commands/interaction-policy.js';
 import { refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -35,8 +36,8 @@ export interface AlwaysOnDialogsDeps {
     currentFormats: ReturnType<WorkbookHandle['getConditionalFormats']>,
   ) => ReadonlySet<number>;
   openConditionalDialog: (options: ConditionalDialogOpenOptions) => void;
-  /** True while an interaction policy blocks the filter dropdown. */
-  isRestricted: () => boolean;
+  /** Whether the host policy allows `operation`; `null` names a dialog that edits nothing. */
+  permits: (operation: InteractionOperation | null) => boolean;
 }
 
 interface OpenFilterDetail {
@@ -119,7 +120,7 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
   // Filter dropdown — opens when the pointer dispatches `fc:openfilter`
   // from a clicked column-filter chevron; no public toggle.
   const onOpenFilter = (e: Event): void => {
-    if (deps.isRestricted()) return;
+    if (!deps.permits('filter')) return;
     const detail = (e as CustomEvent<OpenFilterDetail>).detail;
     if (!detail) return;
     // The dropdown is positioned with `position: fixed`, so it expects
@@ -140,7 +141,7 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
   // A report's drop-down button dispatches `fc:openpivotfilter` with the
   // button cell and the button's bottom-left corner in viewport coordinates.
   const onOpenPivotFilter = (e: Event): void => {
-    if (deps.isRestricted()) return;
+    if (!deps.permits('table')) return;
     const detail = (e as CustomEvent<{ addr: Addr; anchor: { x: number; y: number } }>).detail;
     if (!detail) return;
     const wb = getWb();
