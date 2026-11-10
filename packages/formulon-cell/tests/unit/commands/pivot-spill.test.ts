@@ -177,3 +177,48 @@ describe('a value typed where the report will put the same value', () => {
     wb.dispose();
   });
 });
+
+describe('the engine spill record of a report', () => {
+  it('does not read a drawn report as a formula spill', async () => {
+    const { wb } = await setup();
+    expect(wb.pivotSpills(0)).toEqual([]);
+    expect(wb.spillInfo(0, 2, 0)).toBeNull();
+    wb.dispose();
+  });
+
+  it('reports a report blocked past the sheet edge with the part of its range inside the grid', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const rows: (string | number)[][] = [
+      ['Region', 'Product', 'Amt'],
+      ['East', 'A', 500],
+      ['North', 'A', 100],
+      ['North', 'B', 200],
+      ['South', 'B', 300],
+    ];
+    for (const [r, row] of rows.entries()) {
+      for (const [c, v] of row.entries()) {
+        const addr = { sheet: 0, row: r, col: 10 + c };
+        if (typeof v === 'number') wb.setNumber(addr, v);
+        else wb.setText(addr, v);
+      }
+    }
+    const lastRow = 1_048_575;
+    const created = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 10, r1: 4, c1: 12 },
+      destination: { sheet: 0, row: 2, col: 0 },
+      rowField: 'Region',
+      valueField: 'Amt',
+      aggregation: PivotAggregation.Sum,
+    });
+    expect(created.ok).toBe(true);
+    // Header, three regions and the grand total fill the sheet's last five rows exactly.
+    expect(wb.setPivotTableAnchor(0, 0, { row: lastRow - 4, col: 0, rows: 5, cols: 2 })).toBe(true);
+    expect(wb.pivotSpills(0)).toEqual([]);
+    grow(wb);
+    const [spill] = wb.pivotSpills(0);
+    expect(spill?.anchor).toEqual({ sheet: 0, row: lastRow - 4, col: 0 });
+    expect(spill?.needed.r1).toBe(lastRow);
+    expect(spill?.blockers).toEqual([]);
+    wb.dispose();
+  });
+});

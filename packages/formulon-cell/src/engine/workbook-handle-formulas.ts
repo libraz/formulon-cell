@@ -189,7 +189,9 @@ export abstract class WorkbookHandleFormulasMethods {
   /** Returns the dynamic-array spill region engaged at `(sheet, row, col)`.
    *  The same struct is returned for the anchor cell and every phantom
    *  cell in the region. Returns `null` when the cell is not part of any
-   *  spill or when the engine doesn't expose `spillInfo`. */
+   *  spill, for a PivotTable report's anchor (the engine reports a report's
+   *  range there too, but its top-left holds no formula), or when the engine
+   *  doesn't expose `spillInfo`. */
   spillInfo(
     sheet: number,
     row: number,
@@ -199,6 +201,7 @@ export abstract class WorkbookHandleFormulasMethods {
     if (!this.capabilities.spillInfo) return null;
     const r = attempt(() => ws(this, sheet).getSpill(row, col));
     if (!r || r.blocked) return null;
+    if (!attempt(() => ws(this, sheet).getFormula(r.range.firstRow, r.range.firstCol))) return null;
     return {
       anchorRow: r.range.firstRow,
       anchorCol: r.range.firstCol,
@@ -208,8 +211,8 @@ export abstract class WorkbookHandleFormulasMethods {
   }
 
   /** The rectangle the formula at (`row`, `col`) tried to spill into while it is held at
-   *  #SPILL!; null when it is not a blocked anchor, when the attempt runs past the sheet edge,
-   *  or when the engine doesn't expose `spillInfo`. */
+   *  #SPILL!, clipped to the grid when the attempt runs past the sheet edge; null when it is not
+   *  a blocked anchor or when the engine doesn't expose `spillInfo`. */
   blockedSpillRange(sheet: number, row: number, col: number): Range | null {
     assertAlive(this);
     if (!this.capabilities.spillInfo) return null;

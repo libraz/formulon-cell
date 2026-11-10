@@ -289,8 +289,8 @@ export abstract class WorkbookHandlePivotMethods {
 
   abstract cellFormula(addr: Addr): string | null;
 
-  /** Reports on `sheet` held at #SPILL! by cells in the way. A report blocked past the sheet
-   *  edge has no range to need, so it is left out, as a formula spill past the edge is. */
+  /** Reports on `sheet` held at #SPILL!: by cells in the way, or by running past the sheet edge,
+   *  in which case `needed` is the part inside the grid. */
   pivotSpills(sheet: number): PivotSpill[] {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return [];
