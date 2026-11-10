@@ -36,8 +36,8 @@ const removeWithClearMenu = async (sheet: UserJourneyPage, page: Page, ref: stri
 };
 
 /** On a protected sheet, the Insert hyperlinks option lets a link reach an unlocked cell only; a
- *  locked cell keeps refusing it. Without the option the Link command is unavailable, yet removing a
- *  link still works on unlocked cells and is refused on locked ones. */
+ *  locked cell keeps refusing it. Without the option the Link command and Ctrl+K are unavailable,
+ *  yet removing a link still works on unlocked cells and is refused on locked ones. */
 export async function runProtectedSheetHyperlinkScenario(page: Page): Promise<void> {
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ locale: 'en' });
@@ -62,6 +62,8 @@ export async function runProtectedSheetHyperlinkScenario(page: Page): Promise<vo
   await protectWithUnlockedB2(page, false);
   await sheet.goTo('B2');
   await expect(link).toBeDisabled();
+  await sheet.shortcut('k');
+  await expect(page.locator('.fc-hldlg')).toBeHidden();
 
   await removeWithClearMenu(sheet, page, 'B2');
   await expect.poll(() => linkAt(sheet, 'B2')).toBeNull();
