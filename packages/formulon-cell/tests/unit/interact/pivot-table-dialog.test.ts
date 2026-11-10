@@ -139,6 +139,10 @@ const makeWb = () => {
       calls.push(`pivot-item:${itemName}:${visible}`);
       return true;
     },
+    clearPivotFieldItems: () => {
+      calls.push('clear-items');
+      return true;
+    },
     addPivotFilter: (
       _sheet: number,
       _pivot: number,

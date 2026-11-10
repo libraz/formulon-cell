@@ -139,6 +139,10 @@ const makeWb = () => {
       calls.push(`pivot-item:${fieldIdx}:${name}:${visible}`);
       return true;
     },
+    clearPivotFieldItems: (_sheet: number, _pivot: number, fieldIdx: number) => {
+      calls.push(`clear-items:${fieldIdx}`);
+      return true;
+    },
     addPivotFilter: (_sheet: number, _pivot: number, spec: { fieldName: string; type: number }) => {
       calls.push(`pivot-filter:${spec.fieldName}:${spec.type}`);
       return true;
@@ -331,7 +335,8 @@ describe('pivot-table command helpers', () => {
 
     expect(result.ok).toBe(true);
     expect(calls).toContain('pivot-field:Product:3');
-    expect(calls).toContain('pivot-item:1:Desk:true');
+    expect(calls.indexOf('clear-items:1')).toBeGreaterThanOrEqual(0);
+    expect(calls.indexOf('clear-items:1')).toBeLessThan(calls.indexOf('pivot-item:1:Desk:true'));
     expect(calls).toContain('pivot-item:1:Chair:false');
   });
 
@@ -419,7 +424,7 @@ describe('pivot-table command helpers', () => {
     expect(calls).not.toContain('data-field::1:2:#,##0.00:3');
   });
 
-  it('maps the show-as base field to its pivot field and lists base items first', () => {
+  it('maps the show-as base field to its pivot field without listing its items', () => {
     const { wb, calls } = makeWb();
     const result = createPivotTableFromRange(wb, {
       source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
@@ -437,12 +442,9 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(calls).toContain('pivot-item:0:East:true');
-    expect(calls).toContain('pivot-item:0:West:true');
+    // The field lists its items when it joins the row axis.
+    expect(calls.some((c) => c.startsWith('pivot-item:'))).toBe(false);
     expect(calls).toContain('data-field-base::0:1');
-    expect(calls.indexOf('pivot-item:0:West:true')).toBeLessThan(
-      calls.findIndex((c) => c.startsWith('data-field:')),
-    );
   });
 
   it('forwards a sentinel base item without listing items and rejects a non-axis base field', () => {

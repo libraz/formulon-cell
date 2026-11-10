@@ -3,14 +3,7 @@ import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { lastPivotStyleLayer, pivotStyleLayer } from '../engine/pivot-style.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, Range } from '../engine/types.js';
-import {
-  PIVOT_SHOW_AS_BASE_NEXT,
-  PIVOT_SHOW_AS_BASE_PREVIOUS,
-  PivotAggregation,
-  PivotAxis,
-  PivotShowValuesAs,
-  PivotSortOrder,
-} from '../engine/types.js';
+import { PivotAggregation, PivotAxis, PivotShowValuesAs, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { PivotDefinition, PivotSpill } from '../engine/workbook-handle-pivot.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -408,8 +401,14 @@ export function createPivotTableFromRange(
   for (const filterField of filterFields) {
     if (!filterField) return failAfterPivot('filter-field');
     const filterPivotField = pivotFieldByName.get(filterField.name) as number;
-    for (const item of opts.filterItems?.filter((entry) => entry.fieldName === filterField.name) ??
-      []) {
+    const filterItems = opts.filterItems?.filter((entry) => entry.fieldName === filterField.name);
+    if (
+      filterItems?.length &&
+      !wb.clearPivotFieldItems(opts.destination.sheet, pivotIndex, filterPivotField)
+    ) {
+      return failAfterPivot('filter-item');
+    }
+    for (const item of filterItems ?? []) {
       if (
         !wb.addPivotFieldItem(
           opts.destination.sheet,
@@ -431,38 +430,10 @@ export function createPivotTableFromRange(
     }
   }
 
-  // A specific base item is a position in the base field's items, so list them first.
+  // A field lists its items when it joins an axis, so a base item already has its position.
   const baseFieldIndexes = new Map<string, number>();
   if (rowField) baseFieldIndexes.set(rowField.name, rowPivotField);
   if (columnField) baseFieldIndexes.set(columnField.name, colPivotField);
-  const itemsListed = new Set<string>();
-  for (const settings of valueFieldSettings.values()) {
-    const baseName = settings.showAsBaseField;
-    const baseItem = settings.showAsBaseItem;
-    if (
-      baseName === undefined ||
-      baseItem === undefined ||
-      baseItem === PIVOT_SHOW_AS_BASE_PREVIOUS ||
-      baseItem === PIVOT_SHOW_AS_BASE_NEXT ||
-      itemsListed.has(baseName)
-    ) {
-      continue;
-    }
-    itemsListed.add(baseName);
-    for (const item of pivotCacheItemLabels(wb, cacheId, byName.get(baseName)?.index ?? -1)) {
-      if (
-        !wb.addPivotFieldItem(
-          opts.destination.sheet,
-          pivotIndex,
-          baseFieldIndexes.get(baseName) as number,
-          item,
-          true,
-        )
-      ) {
-        return failAfterPivot('base-item');
-      }
-    }
-  }
 
   for (const valueField of valueFields) {
     if (!valueField) return failAfterPivot('value-field');
@@ -721,6 +692,8 @@ export function recreatePivotTable(
         }
         continue;
       }
+      // A field lists its items when it joins an axis; the saved list replaces them, order included.
+      if (!wb.clearPivotFieldItems(sheet, pivotIndex, added)) return false;
       for (const item of field.items) {
         const placed =
           item.cacheIndex >= 0 && wb.capabilities.pivotItemByCacheIndex

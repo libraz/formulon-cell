@@ -56,10 +56,10 @@ describe('formulon 0.16 pivot show-values-as kinds', () => {
   });
 
   it('expresses each value as a fraction of the chosen base item', async () => {
-    // Item 1 is West (8) in source order East, West, North.
+    // A joined field lists its items sorted (East, North, West), so item 2 is West (8).
     const wb = await build(PivotShowValuesAs.PercentOf, {
       showAsBaseField: 'Region',
-      showAsBaseItem: 1,
+      showAsBaseItem: 2,
     });
     try {
       expect(valuesByLabel(wb, ['East', 'West', 'North'])).toEqual({
