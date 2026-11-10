@@ -207,6 +207,23 @@ export abstract class WorkbookHandleFormulasMethods {
     };
   }
 
+  /** The rectangle the formula at (`row`, `col`) tried to spill into while it is held at
+   *  #SPILL!; null when it is not a blocked anchor, when the attempt runs past the sheet edge,
+   *  or when the engine doesn't expose `spillInfo`. */
+  blockedSpillRange(sheet: number, row: number, col: number): Range | null {
+    assertAlive(this);
+    if (!this.capabilities.spillInfo) return null;
+    const r = attempt(() => ws(this, sheet).getSpill(row, col));
+    if (!r?.blocked) return null;
+    return {
+      sheet,
+      r0: r.range.firstRow,
+      c0: r.range.firstCol,
+      r1: r.range.lastRow,
+      c1: r.range.lastCol,
+    };
+  }
+
   /** Returns every spill rect on `sheet` at engine precision. Returns
    *  `null` when the engine doesn't expose `spillInfo`; callers should
    *  fall back to the heuristic in `engine/spill.ts` in that case. */

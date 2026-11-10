@@ -93,6 +93,7 @@ const makeHandle = (overrides: FakeOverrides = {}): WorkbookHandle => {
       ],
     }),
     cache: () => cache(7),
+    getSpill: () => null,
     rename: () => undefined,
     setAnchor: () => undefined,
     getGrandTotals: () => ({ rows: true, columns: true }),

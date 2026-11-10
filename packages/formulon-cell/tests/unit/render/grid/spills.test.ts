@@ -110,12 +110,18 @@ function makeWorkbook(
   spillRanges: (sheet: number) => Range[] | null,
   spillInfo: (sheet: number, row: number, col: number) => SpillInfo,
   capability: boolean | null = true,
+  blockedSpillRange: (sheet: number, row: number, col: number) => Range | null = () => null,
 ): WorkbookHandle {
   const capabilityFlags = capability === null ? {} : { capabilities: { spillInfo: capability } };
   return {
     ...capabilityFlags,
     spillRanges,
     spillInfo,
+    blockedSpillRange,
+    getMerges: () => [],
+    getTables: () => [],
+    pivotBounds: () => [],
+    dataTables: () => [],
   } as unknown as WorkbookHandle;
 }
 
@@ -198,18 +204,23 @@ describe('grid spill painting', () => {
     for (let i = 0; i < 4; i += 1)
       cells.set(addrKey({ sheet: 0, row: 200 + i, col: 1 }), numberCell(i));
 
-    const spillInfo = vi.fn(
-      (_sheet: number, row: number, col: number): SpillInfo =>
-        row === 0 && col === 0 ? { anchorRow: 0, anchorCol: 0, rows: 100, cols: 100 } : null,
+    const spillInfo = vi.fn((): SpillInfo => null);
+    const blocked = vi.fn((sheet: number, row: number, col: number): Range | null =>
+      row === 0 && col === 0 ? { sheet, r0: 0, c0: 0, r1: 99, c1: 99 } : null,
     );
     const spillRanges = vi.fn(() => []);
     const state = stateWithCells(cells);
     const canvas = canvasSpy();
-    const renderer = makeRenderer(() => state, canvas, makeWorkbook(spillRanges, spillInfo));
+    const renderer = makeRenderer(
+      () => state,
+      canvas,
+      makeWorkbook(spillRanges, spillInfo, true, blocked),
+    );
 
     paintSpills(renderer, state);
 
-    expect(spillInfo).toHaveBeenCalledTimes(5); // Four visible cells plus the offscreen error anchor.
+    expect(spillInfo).toHaveBeenCalledTimes(4); // The four visible cells.
+    expect(blocked.mock.calls).toEqual([[0, 0, 0]]); // The offscreen error anchor.
     expect(spillRanges).not.toHaveBeenCalled();
     expect(cells.reads).toBeLessThanOrEqual(4);
     expect(canvas.strokes.filter(({ dash }) => dash.join(',') === '3,3')).toHaveLength(2);
@@ -273,19 +284,24 @@ describe('grid spill painting', () => {
 
     const sheetZero = stateWithCells(cells);
     const sheetOne = { ...sheetZero, data: { ...sheetZero.data, sheetIndex: 1 } };
-    const spillInfo = vi.fn((): SpillInfo => null);
+    const blocked = vi.fn((): Range | null => null);
     const renderer = makeRenderer(
       () => sheetZero,
       canvasSpy(),
-      makeWorkbook(() => [], spillInfo),
+      makeWorkbook(
+        () => [],
+        () => null,
+        true,
+        blocked,
+      ),
     );
 
     paintSpills(renderer, sheetZero);
-    expect(spillInfo).toHaveBeenCalledWith(0, 100, 100);
+    expect(blocked).toHaveBeenCalledWith(0, 100, 100);
     expect(cells.iterations).toBe(1);
 
     paintSpills(renderer, sheetOne);
-    expect(spillInfo).toHaveBeenCalledWith(1, 200, 200);
+    expect(blocked).toHaveBeenCalledWith(1, 200, 200);
     expect(cells.iterations).toBe(2);
 
     paintSpills(renderer, sheetZero);
@@ -382,6 +398,8 @@ describe('grid spill painting', () => {
       }),
     );
     const spillRanges = vi.fn(() => []);
+    const blocked = (sheet: number, row: number, col: number): Range | null =>
+      row === 0 && col === 0 ? { sheet, r0: 0, c0: 0, r1: 19, c1: 19 } : null;
     const state = stateWithCells(cells, {
       rowStart: 10,
       rowCount: 3,
@@ -393,7 +411,11 @@ describe('grid spill painting', () => {
       hiddenCols: [5],
     });
     const canvas = canvasSpy();
-    const renderer = makeRenderer(() => state, canvas, makeWorkbook(spillRanges, spillInfo));
+    const renderer = makeRenderer(
+      () => state,
+      canvas,
+      makeWorkbook(spillRanges, spillInfo, true, blocked),
+    );
 
     const { rows, cols } = paintSpills(renderer, state);
 
@@ -450,8 +472,10 @@ describe('grid spill painting', () => {
       });
       const workbook = makeWorkbook(
         () => [],
-        (_sheet, row, col) =>
-          row === 10 && col === 5 ? { anchorRow: 10, anchorCol: 5, rows: 2, cols: 1 } : null,
+        () => null,
+        true,
+        (sheet, row, col) =>
+          row === 10 && col === 5 ? { sheet, r0: 10, c0: 5, r1: 11, c1: 5 } : null,
       );
       const anchored = withActive(stateWithCells(cells), 10, 5);
       const canvas = canvasSpy();

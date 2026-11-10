@@ -4,6 +4,7 @@ import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormatFromEngine } from '../engine/cell-format-projection.js';
 import { pivotStyleLayer } from '../engine/pivot-style.js';
 import { findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
+import { spillBlockers, spillOccupancy } from '../engine/spill-blockers.js';
 import type { CellValue, Range } from '../engine/types.js';
 import { SPILL_ERROR_CODE } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -697,7 +698,6 @@ export class GridRenderer {
       wb?.capabilities?.spillInfo === true && typeof wb.spillInfo === 'function';
     const useVisibleSpillQueries =
       supportsSpillInfo && data.cells.size > rows.visible.length * cols.visible.length;
-    const frameSpillInfo = new Map<string, ReturnType<WorkbookHandle['spillInfo']>>();
     let ranges: Range[];
 
     if (useVisibleSpillQueries && wb) {
@@ -707,9 +707,7 @@ export class GridRenderer {
       ranges = [];
       for (const row of rows.visible) {
         for (const col of cols.visible) {
-          const key = addrKey({ sheet: data.sheetIndex, row, col });
           const info = wb.spillInfo(data.sheetIndex, row, col);
-          frameSpillInfo.set(key, info);
           if (!info || (info.rows <= 1 && info.cols <= 1)) continue;
           const anchorKey = `${info.anchorRow}:${info.anchorCol}`;
           if (seenAnchors.has(anchorKey)) continue;
@@ -780,47 +778,31 @@ export class GridRenderer {
       if (cell) paintSpillWarningTag(this.ctx, cell, layout.rtl);
     }
 
-    // #SPILL! obstruction outline. The engine's `spillInfo` reports the
-    // attempted shape even when the result couldn't materialise; we use
-    // that to figure out which cells are blocking and ring them in red.
-    if (!wb || typeof wb.spillInfo !== 'function') return;
+    // #SPILL! obstruction outline: the engine reports the rectangle a blocked
+    // formula attempted, and the cells holding it back are ringed in red.
+    if (!wb || typeof wb.blockedSpillRange !== 'function') return;
+    let occupied: ((row: number, col: number) => boolean) | undefined;
     for (const { row, col } of spillErrorCandidates(data.cells, data.sheetIndex)) {
-      const key = addrKey({ sheet: data.sheetIndex, row, col });
-      const info = frameSpillInfo.has(key)
-        ? (frameSpillInfo.get(key) ?? null)
-        : wb.spillInfo(data.sheetIndex, row, col);
-      if (!info) continue;
-      const target: Range = {
-        sheet: data.sheetIndex,
-        r0: info.anchorRow,
-        c0: info.anchorCol,
-        r1: info.anchorRow + info.rows - 1,
-        c1: info.anchorCol + info.cols - 1,
-      };
+      const target = wb.blockedSpillRange(data.sheetIndex, row, col);
+      if (!target) continue;
       if (mac) {
         const isAnchor =
-          active.sheet === data.sheetIndex &&
-          active.row === info.anchorRow &&
-          active.col === info.anchorCol;
+          active.sheet === data.sheetIndex && active.row === row && active.col === col;
         if (!isAnchor) continue;
         for (const rect of rangeRects(layout, viewport, target)) {
           paintSpillTarget(this.ctx, rect, macPtPx);
         }
         continue;
       }
-      for (const visibleRow of rows.visible) {
-        if (visibleRow < target.r0 || visibleRow > target.r1) continue;
-        for (const visibleCol of cols.visible) {
-          if (visibleCol < target.c0 || visibleCol > target.c1) continue;
-          if (visibleRow === info.anchorRow && visibleCol === info.anchorCol) continue;
-          const blocker = data.cells.get(
-            addrKey({ sheet: data.sheetIndex, row: visibleRow, col: visibleCol }),
-          );
-          if (!blocker) continue;
-          if (blocker.formula === null && blocker.value.kind === 'blank') continue;
-          const rect = cellRectIn(layout, cols, rows, visibleRow, visibleCol);
-          paintSpillBlocker(this.ctx, rect);
-        }
+      occupied ??= spillOccupancy(wb, data.sheetIndex, (row, col) =>
+        data.cells.get(addrKey({ sheet: data.sheetIndex, row, col })),
+      );
+      const anchor = { sheet: data.sheetIndex, row, col };
+      for (const blocker of spillBlockers(target, anchor, occupied, {
+        rows: rows.visible,
+        cols: cols.visible,
+      })) {
+        paintSpillBlocker(this.ctx, cellRectIn(layout, cols, rows, blocker.row, blocker.col));
       }
     }
   }

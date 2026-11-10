@@ -18,6 +18,7 @@ import {
   PIVOT_PLACEHOLDER_ROWS,
 } from './pivot-cell-kind.js';
 import { isFormulonError } from './result.js';
+import { type SpillOccupantSource, spillBlockers, spillOccupancy } from './spill-blockers.js';
 import type {
   Addr,
   CellValue,
@@ -252,8 +253,8 @@ function readLayout(handle: unknown, sheet: number, pivotIndex: number): RawPivo
 }
 
 /** The engine's layout of a report. A report with no fields occupies its
- *  placeholder area rather than the engine's caption extent; every extent
- *  consumer reads it from here. */
+ *  placeholder area rather than the engine's caption extent, and a blocked
+ *  report only its #SPILL! anchor; every extent consumer reads it from here. */
 function effectiveLayout(
   handle: WorkbookHandlePivotMethods,
   sheet: number,
@@ -261,6 +262,19 @@ function effectiveLayout(
 ): RawPivotLayout | null {
   const layout = readLayout(handle, sheet, pivotIndex);
   if (!layout || layout.rows <= 0 || layout.cols <= 0) return layout;
+  if (attempt(null, () => pivotOf(handle, sheet, pivotIndex).getSpill())?.blocked) {
+    const anchor = { sheet, row: layout.top, col: layout.left };
+    const cell: LayoutCell = {
+      row: anchor.row,
+      col: anchor.col,
+      value: handle.getValue(anchor),
+      kind: PIVOT_CELL_KIND.Blank,
+      depth: 0,
+      fieldName: '',
+      numberFormat: '',
+    };
+    return { ...layout, rows: 1, cols: 1, cells: [cell] };
+  }
   const empty = isEmptyPivotLayout(layout.cells.filter((c) => c.value.kind !== 'blank'));
   return empty ? { ...layout, rows: PIVOT_PLACEHOLDER_ROWS, cols: PIVOT_PLACEHOLDER_COLS } : layout;
 }
@@ -273,11 +287,43 @@ export abstract class WorkbookHandlePivotMethods {
     sheet: number,
   ): Iterable<{ addr: Addr; value: CellValue; formula: string | null }>;
 
-  /** Reports on `sheet` held at #SPILL! by cells in the way. The engine does not expose a blocked
-   *  report yet, so none is. */
-  pivotSpills(_sheet: number): PivotSpill[] {
+  abstract cellFormula(addr: Addr): string | null;
+
+  /** Reports on `sheet` held at #SPILL! by cells in the way. A report blocked past the sheet
+   *  edge has no range to need, so it is left out, as a formula spill past the edge is. */
+  pivotSpills(sheet: number): PivotSpill[] {
     assertAlive(this);
-    return [];
+    if (!this.capabilities.pivotTables) return [];
+    const n = pivotCount(this, sheet);
+    if (n === null) return [];
+    const out: PivotSpill[] = [];
+    for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
+      const spill = attempt(null, () => pivotOf(this, sheet, pivotIndex).getSpill());
+      if (!spill?.blocked) continue;
+      const layout = readLayout(this, sheet, pivotIndex);
+      const { range } = spill;
+      const needed: Range = {
+        sheet,
+        r0: range.firstRow,
+        c0: range.firstCol,
+        r1: range.lastRow,
+        c1: range.lastCol,
+      };
+      const anchor: Addr = layout
+        ? { sheet, row: layout.top, col: layout.left }
+        : { sheet, row: needed.r0, col: needed.c0 };
+      const occupied = spillOccupancy(
+        this as unknown as SpillOccupantSource,
+        sheet,
+        (row, col) => {
+          const addr = { sheet, row, col };
+          return { value: this.getValue(addr), formula: this.cellFormula(addr) };
+        },
+        pivotIndex,
+      );
+      out.push({ pivotIndex, anchor, needed, blockers: spillBlockers(needed, anchor, occupied) });
+    }
+    return out;
   }
   abstract getPivotStyleInfo(sheet: number, pivotIndex: number): PivotStyleDefinition | null;
 
