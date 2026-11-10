@@ -3,6 +3,7 @@ import {
   authorizedWrite,
 } from '../../../commands/authorized-write.js';
 import { formatAsTable, inferTableHasHeaders } from '../../../commands/format-as-table.js';
+import { hyperlinkOperation } from '../../../commands/hyperlink-actions.js';
 import type { InteractionOperation } from '../../../commands/interaction-policy.js';
 import { applyFreezeMode, showCols, showRows } from '../../../commands/row-col-layout.js';
 import { recordTablesChange } from '../../../commands/slice-history.js';
@@ -727,7 +728,7 @@ const runRemoveHyperlinks = (instance: SpreadsheetInstance): void => {
   if (!plan || plan.cells.length === 0) return;
   const intents: AuthorizedIntentFactory = (origin) => [
     {
-      operation: 'hyperlink',
+      operation: hyperlinkOperation(true),
       origin,
       commandId: 'mac.automate.removeHyperlinks',
       effects: [{ kind: 'cells', cells: plan.cells }],

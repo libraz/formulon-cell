@@ -269,7 +269,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   'mac.automate.showScripts': null,
   'mac.automate.allRowsColumns': 'resizeRows',
   'mac.automate.makeSubtable': 'table',
-  'mac.automate.removeHyperlinks': 'hyperlink',
+  'mac.automate.removeHyperlinks': 'clear',
   'mac.automate.countEmptyRows': null,
   'mac.automate.tableToJson': 'export',
   'mac.automate.newPivotTable': 'pivot',

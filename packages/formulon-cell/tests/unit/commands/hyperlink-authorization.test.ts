@@ -105,6 +105,24 @@ describe('hyperlink writes under the interaction policy', () => {
       expect(setHyperlinkAction(ctx, B1, URL)).toBe(false);
       expect(hyperlinkAt(store.getState(), B1)).toBeNull();
     });
+
+    it(`removes a link from an unlocked cell of a protected sheet without the option ${label}`, async () => {
+      const { store, controller, ctx, link } = await setup();
+      controller.setPolicy(policy);
+      const B1 = { sheet: 0, row: 0, col: 1 };
+      setHyperlinkAction(ctx, A1, URL);
+      setHyperlinkAction(ctx, B1, URL);
+      mutators.setCellFormat(store, A1, { locked: false });
+      setProtectedSheet(store, 0, true);
+      expect(setHyperlinkAction(ctx, A1, undefined)).toBe(true);
+      expect(link()).toBeNull();
+      expect(setHyperlinkAction(ctx, B1, undefined)).toBe(false);
+      expect(hyperlinkAt(store.getState(), B1)).toBe(URL);
+      // The command stays available; a locked target is refused when it runs.
+      expect(canExecuteBuiltIn(store, 'mac.automate.removeHyperlinks', 'ribbon').allowed).toBe(
+        true,
+      );
+    });
   }
 
   it('refuses replay once the policy denies the undo or redo', async () => {
