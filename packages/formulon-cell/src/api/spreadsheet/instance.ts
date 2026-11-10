@@ -59,6 +59,7 @@ import type {
   ApplyChangesOptions,
   CellChange,
   FormulaHint,
+  HostProviders,
   RibbonToolbarConfig,
   SelectionState,
   SpreadsheetInstanceEvents,
@@ -179,6 +180,8 @@ interface InstanceState {
   workbook: Workbook;
   ownsWorkbook: boolean;
   options: SpreadsheetOptions;
+  /** The current host providers; the mounted spreadsheet reads them through it at call time. */
+  readonly host: { current: HostProviders };
   origin: ChangeOrigin | null;
   readonly life: Lifecycle;
   readonly events: Emitter<SpreadsheetInstanceEvents>;
@@ -577,7 +580,7 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
         state.formulaHints.add(hint);
       break;
     case 'host':
-      applyHostProviders(legacy, (value as SpreadsheetOptions['host'] | null) ?? {});
+      applyHostProviders(state, (value as SpreadsheetOptions['host'] | null) ?? {});
       break;
     case 'uploadStatus':
       legacy.setUploadStatus((value as SpreadsheetOptions['uploadStatus'] | null) ?? null);
@@ -589,12 +592,10 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
   state.options = next as SpreadsheetOptions;
 };
 
-const applyHostProviders = (
-  legacy: LegacyInstance,
-  host: NonNullable<SpreadsheetOptions['host']>,
-): void => {
-  legacy.setPrinterProfiles(host.printerProfiles);
-  legacy.setPrinterProfileId(host.printerProfileId);
+const applyHostProviders = (state: InstanceState, host: HostProviders): void => {
+  state.host.current = host;
+  state.legacy.setPrinterProfiles(host.printerProfiles);
+  state.legacy.setPrinterProfileId(host.printerProfileId);
 };
 
 const swapWorkbook = (state: InstanceState, next: Workbook | null): void => {
@@ -818,9 +819,12 @@ const createFormulaHints = (legacy: () => LegacyInstance): FormulaHints => {
   };
 };
 
-const legacyOptionsOf = (options: SpreadsheetOptions, handle: WorkbookHandle): MountOptions => {
+const legacyOptionsOf = (
+  options: SpreadsheetOptions,
+  handle: WorkbookHandle,
+  hostProviders: { readonly current: HostProviders },
+): MountOptions => {
   const host = options.host ?? {};
-  const refresh = host.refreshPrinterProfiles;
   return {
     workbook: handle,
     ...(options.ui ? { ui: options.ui } : {}),
@@ -835,16 +839,15 @@ const legacyOptionsOf = (options: SpreadsheetOptions, handle: WorkbookHandle): M
     locale: options.locale ?? 'en',
     ...(options.strings ? { strings: options.strings } : {}),
     ...(options.extensions ? { extensions: [...options.extensions] } : {}),
-    ...(host.workbookName ? { getWorkbookName: host.workbookName } : {}),
     ...(host.printerProfiles ? { printerProfiles: host.printerProfiles } : {}),
     ...(host.printerProfileId ? { printerProfileId: host.printerProfileId } : {}),
-    ...(refresh
-      ? {
-          refreshPrinterProfiles: async () => (await refresh()) ?? undefined,
-        }
-      : {}),
-    ...(host.captureScreenClip ? { captureScreenClip: host.captureScreenClip } : {}),
-    ...(host.functionArgumentHelp ? { getFunctionArgumentHelp: host.functionArgumentHelp } : {}),
+    // Function providers forward to the current set, so `update({ host })` replaces them.
+    getWorkbookName: () => hostProviders.current.workbookName?.() ?? null,
+    refreshPrinterProfiles: async () =>
+      (await hostProviders.current.refreshPrinterProfiles?.()) ?? undefined,
+    captureScreenClip: () => hostProviders.current.captureScreenClip?.(),
+    getFunctionArgumentHelp: (name, index, locale) =>
+      hostProviders.current.functionArgumentHelp?.(name, index, locale),
     ...(options.uploadStatus !== undefined ? { uploadStatus: options.uploadStatus } : {}),
     ...(options.macroRecording !== undefined ? { macroRecording: options.macroRecording } : {}),
     renderError: false,
@@ -883,9 +886,10 @@ export async function mount(
     }));
   const handle = workbookHandleOf(workbook);
   let legacy: LegacyInstance | null = null;
+  const hostProviders = { current: options.host ?? {} };
   try {
     if (options.seed) options.seed(workbook);
-    legacy = await Spreadsheet.mount(host, legacyOptionsOf(options, handle));
+    legacy = await Spreadsheet.mount(host, legacyOptionsOf(options, handle, hostProviders));
   } finally {
     // A failed seed or mount releases the workbook the instance created; one passed in stays.
     if (!legacy && ownsWorkbook) workbook.dispose();
@@ -921,6 +925,7 @@ export async function mount(
     workbook,
     ownsWorkbook,
     options: { ...options, locale: options.locale ?? 'en' },
+    host: hostProviders,
     origin: null,
     life,
     events,

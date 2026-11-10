@@ -154,6 +154,31 @@ describe('spreadsheet: update', () => {
     expect(sheet.commands.can('insertRows')).toBe(true);
   });
 
+  it('update({ host }) replaces the function providers and null removes them', async () => {
+    const firstRefresh = vi.fn(() => []);
+    const secondRefresh = vi.fn(() => []);
+    const firstCapture = vi.fn(() => 'data:image/png;base64,first');
+    const secondCapture = vi.fn(() => 'data:image/png;base64,second');
+    const sheet = await mountSheet({
+      host: { refreshPrinterProfiles: firstRefresh, captureScreenClip: firstCapture },
+    });
+
+    sheet.update({
+      host: { refreshPrinterProfiles: secondRefresh, captureScreenClip: secondCapture },
+    });
+    await sheet.refreshPrinterProfiles();
+    expect(await sheet.captureScreenClip()).toMatchObject({ src: 'data:image/png;base64,second' });
+    expect(firstRefresh).not.toHaveBeenCalled();
+    expect(firstCapture).not.toHaveBeenCalled();
+    expect(secondRefresh).toHaveBeenCalledTimes(1);
+
+    sheet.update({ host: null });
+    await sheet.refreshPrinterProfiles();
+    expect(await sheet.captureScreenClip()).toBeNull();
+    expect(secondRefresh).toHaveBeenCalledTimes(1);
+    expect(secondCapture).toHaveBeenCalledTimes(1);
+  });
+
   it('a policy does not disable dialogs whose features are on', async () => {
     const sheet = await mountSheet({ policy: viewerPolicy() });
     expect(sheet.dialogs.canOpen('format')).toBe(true);
