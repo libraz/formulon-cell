@@ -727,17 +727,8 @@ export abstract class WorkbookHandlePivotMethods {
     return attempt(null, () => {
       const pivot = pivotOf(this, sheet, pivotIdx);
       const r = pivot.getField(fieldIdx);
-      // An item bound only by cache index carries no label of its own; it shows the shared item's.
-      const shared =
-        r.cacheFieldIndex === null
-          ? []
-          : this.pivotCacheSharedItems(this.pivotTableCacheId(sheet, pivotIdx), r.cacheFieldIndex);
       const items: PivotItemDefinition[] = pivot.listFieldItems(fieldIdx).map((item) => ({
-        label:
-          item.name ??
-          (item.cacheIndex !== null && item.cacheIndex < shared.length
-            ? pivotCellItemLabel(shared[item.cacheIndex] as CellValue)
-            : ''),
+        label: item.name ?? '',
         cacheIndex: item.cacheIndex ?? -1,
         visible: item.visible,
       }));
