@@ -1,15 +1,9 @@
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { configDefaults, defineConfig } from 'vitest/config';
 
-const rootDir = fileURLToPath(new URL('.', import.meta.url));
+import { entryAliases } from './tests/entry-aliases.js';
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@libraz/formulon-cell': resolve(rootDir, 'src/index.ts'),
-    },
-  },
+  resolve: { alias: entryAliases },
   test: {
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.ts'],
