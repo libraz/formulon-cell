@@ -12,6 +12,8 @@ import {
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const CALC = '=tblA[[#This Row],[Qty]]*10';
+/** `CALC` as the engine reads it back inside the table (formula-bar form). */
+const CALC_READ = '=[@Qty]*10';
 
 /** tblA on A2:C7: header row 2, data rows 3-6, totals row 7; E:F beside it; B8 below; H3/H4 outside. */
 async function book() {
@@ -59,7 +61,7 @@ describe('Insert > Table Rows Above', () => {
     expect(insertTableRows(store, wb, null, sel)).toBe(true);
     expect(table(store)?.range).toEqual({ sheet: 0, r0: 1, c0: 0, r1: 7, c1: 2 });
     expect(wb.getTables()[0]?.ref).toBe('A2:C8');
-    expect(wb.cellFormula({ sheet: 0, row: 3, col: 2 })).toBe(CALC);
+    expect(wb.cellFormula({ sheet: 0, row: 3, col: 2 })).toBe(CALC_READ);
     expect(text(wb, 4, 0)).toBe('b');
     expect(num(wb, 8, 1)).toBe(99);
     expect(wb.cellFormula({ sheet: 0, row: 3, col: 7 })).toBe('=B9');
@@ -73,7 +75,7 @@ describe('Insert > Table Rows Above', () => {
     const { wb, store } = await book();
     expect(insertTableRows(store, wb, null, { sheet: 0, r0: 3, c0: 1, r1: 4, c1: 1 })).toBe(true);
     expect(table(store)?.range).toEqual({ sheet: 0, r0: 1, c0: 0, r1: 8, c1: 2 });
-    expect(wb.cellFormula({ sheet: 0, row: 4, col: 2 })).toBe(CALC);
+    expect(wb.cellFormula({ sheet: 0, row: 4, col: 2 })).toBe(CALC_READ);
     expect(num(wb, 9, 1)).toBe(99);
   });
 
@@ -104,7 +106,7 @@ describe('Insert > Table Columns to the Left', () => {
     expect(text(wb, 1, 3)).toBe('Total');
     expect(wb.getValue({ sheet: 0, row: 2, col: 1 }).kind).toBe('blank');
     expect(num(wb, 3, 2)).toBe(2);
-    expect(wb.cellFormula({ sheet: 0, row: 3, col: 3 })).toMatch(/\[Qty\]/);
+    expect(wb.cellFormula({ sheet: 0, row: 3, col: 3 })).toMatch(/\[@Qty\]/);
     expect(wb.cellFormula({ sheet: 0, row: 6, col: 2 })).toMatch(/SUBTOTAL\(109/);
     // Rows above and below the table stay put.
     expect(text(wb, 0, 1)).toBe('aboveB');

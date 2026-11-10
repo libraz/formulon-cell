@@ -595,6 +595,14 @@ export class TableMirror {
     const range = engineTableRange(this.handle, index, table.range.sheet);
     if (!range) return;
     if (!sameRange(range, table.range)) edits.ranges.set(table.id, range);
+    // The shift also moves other tables in the same columns below.
+    for (const other of store.getState().tables.tables) {
+      if (other.id === table.id || !other.name || other.range.sheet !== table.range.sheet) continue;
+      const otherIndex = this.handle.tableIndexByName(other.name);
+      const moved =
+        otherIndex === null ? null : engineTableRange(this.handle, otherIndex, other.range.sheet);
+      if (moved && !sameRange(moved, other.range)) edits.ranges.set(other.id, moved);
+    }
     const delta = range.r1 - before.r1;
     if (delta === 0) return;
     const band: Range = {

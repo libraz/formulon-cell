@@ -3,7 +3,6 @@ import { totalsFromDetails } from '../engine/table-sync.js';
 import { defaultTotals } from '../engine/table-totals-defaults.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { rangesIntersect } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { insertCells } from './cell-shift.js';
 import {
@@ -103,13 +102,6 @@ const toggleBoundaryRow = (
   const shiftRow = r.r0;
   const needsShift = turningOn && !aboveFree;
   if (turningOn && range.r1 > MAX_ROW) return 'blocked';
-  const claimed: Range = aboveFree
-    ? { ...range, r1: range.r0 }
-    : { sheet: r.sheet, r0: shiftRow, c0: r.c0, r1: MAX_ROW, c1: r.c1 };
-  const collides = store
-    .getState()
-    .tables.tables.some((t) => t.id !== table.id && rangesIntersect(t.range, claimed));
-  if (turningOn && collides) return 'blocked';
   const transaction = history && !history.isReplaying() ? history.begin() : undefined;
   let ok = false;
   try {

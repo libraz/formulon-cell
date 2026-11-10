@@ -1362,7 +1362,7 @@ function editAxis(
     // 5. re-point merges, conditional formats, and the autofilter region.
     shiftAnchoredRanges(store, wb, history, sheet, axis, split, delta, nativeAxisOp);
     if (axis === 'row') shiftTablesForRows(store, wb, history, sheet, split, delta);
-    else if (kind === 'insert') shiftTablesForCols(store, wb, history, sheet, split, n);
+    else if (kind === 'insert') shiftTablesForCols(store, history, sheet, split, n);
     if (history && captureStructureCaches && outerReplayCheckpoint === undefined) {
       // Undo visits children in reverse order. This final marker therefore
       // arms the committed after-state immediately before the other children

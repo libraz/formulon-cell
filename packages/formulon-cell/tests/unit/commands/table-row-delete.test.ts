@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { deleteRows } from '../../../src/commands/structure.js';
-import { hydrateTableOverlaysFromEngine } from '../../../src/engine/table-sync.js';
+import { setTableColumnFunction, toggleTableOption } from '../../../src/commands/table-design.js';
+import {
+  hydrateTableOverlaysFromEngine,
+  totalsFunctionFromEngine,
+} from '../../../src/engine/table-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -82,5 +86,22 @@ describe('deleting sheet rows against a table', () => {
     expect(table(store)?.showTotal).toBe(false);
     expect(wb.getTables()[0]?.ref).toBe('A2:C6');
     expect(wb.cellFormula({ sheet: 0, row: 3, col: 7 })).toMatch(/#REF!/);
+  });
+
+  it('forgets the column totals functions when the totals row is deleted', async () => {
+    const { wb, store } = await book();
+    const id = table(store)?.id ?? '';
+    expect(setTableColumnFunction(store, null, wb, id, 1, 'max')).toBe(true);
+    expect(table(store)?.totals?.[1]?.function).toBe('max');
+    expect(deleteRows(store, wb, null, 6, 1)).toBe(true);
+    expect(table(store)?.showTotal).toBe(false);
+    mutators.setActive(store, { sheet: 0, row: 2, col: 0 });
+    expect(toggleTableOption(store, null, wb, 'showTotal')).toBe('toggled');
+    expect(table(store)?.showTotal).toBe(true);
+    expect(table(store)?.totals?.[1]?.function).not.toBe('max');
+    const engineColumn = wb.getTableStyleDetails(0)?.columns[1];
+    expect(engineColumn && totalsFunctionFromEngine(engineColumn.totalsRowFunction)).not.toBe(
+      'max',
+    );
   });
 });

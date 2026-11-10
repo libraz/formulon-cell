@@ -1,20 +1,12 @@
-import type { Addr, CellValue, Range } from '../engine/types.js';
+import type { Addr, CellValue } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { shiftRangeAxis } from './axis-shift.js';
-import { applyPatchesAtomic } from './clipboard/apply-patches-atomic.js';
-import { nextHeaderName } from './clipboard/table-extension.js';
 import type { TableOverlay } from './format-as-table.js';
 import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';
 import { recordTablesChange } from './slice-history.js';
-
-/** Table columns a partial cell shift is confined to; null for whole sheet rows. */
-export interface TableBand {
-  c0: number;
-  c1: number;
-}
 
 /**
  * Re-point the tables of `sheet` after rows were inserted (`delta > 0`) or
@@ -22,9 +14,6 @@ export interface TableBand {
  * the edit lands inside grows or shrinks; deleting its totals row turns the
  * totals off. A new data row takes the calculated columns of the rows beside
  * it. A delete never reaches a header row (`rowDeleteHitsTableHeader`).
- *
- * With a `band` (Insert/Delete Cells shifting up or down), only a band that
- * covers exactly the table's columns inside its data rows edits the table.
  */
 export function shiftTablesForRows(
   store: SpreadsheetStore,
@@ -33,7 +22,6 @@ export function shiftTablesForRows(
   sheet: number,
   split: number,
   delta: number,
-  band: TableBand | null = null,
 ): void {
   const tables = store.getState().tables.tables.filter((t) => t.range.sheet === sheet);
   if (tables.length === 0 || delta === 0) return;
@@ -41,15 +29,6 @@ export function shiftTablesForRows(
   const edits: { table: TableOverlay; range: ReturnType<typeof shiftRangeAxis> }[] = [];
   for (const table of tables) {
     const t = table.range;
-    if (band) {
-      const dataEnd = table.showTotal ? t.r1 - 1 : t.r1;
-      const inBody =
-        band.c0 === t.c0 &&
-        band.c1 === t.c1 &&
-        split > t.r0 &&
-        (delta > 0 ? split <= t.r1 : split + count - 1 <= dataEnd);
-      if (!inBody) continue;
-    }
     const range = shiftRangeAxis(t, 'row', split, delta);
     if (range) {
       const totalsGone = delta < 0 && table.showTotal && split <= t.r1 && split + count - 1 >= t.r1;
@@ -176,58 +155,26 @@ export function clearTableRow(
 
 /**
  * Re-point the tables of `sheet` after `count` columns were inserted at
- * `split`. A sheet-column insert (no `band`) widens the table it lands inside
- * and moves one to its right. A band insert covering exactly a table's rows
- * widens it from its first column on, and names the new blank headers.
+ * `split`: the insert widens the table it lands inside and moves one to its
+ * right.
  */
 export function shiftTablesForCols(
   store: SpreadsheetStore,
-  wb: WorkbookHandle,
   history: History | null,
   sheet: number,
   split: number,
   count: number,
-  band: { r0: number; r1: number } | null = null,
 ): void {
   const edits: { table: TableOverlay; range: NonNullable<ReturnType<typeof shiftRangeAxis>> }[] =
     [];
   for (const table of store.getState().tables.tables) {
     const t = table.range;
     if (t.sheet !== sheet) continue;
-    if (band) {
-      if (band.r0 !== t.r0 || band.r1 !== t.r1 || split < t.c0 || split > t.c1) continue;
-      edits.push({ table, range: { ...t, c1: t.c1 + count } });
-      continue;
-    }
     const range = shiftRangeAxis(t, 'col', split, count);
     if (range && (range.c0 !== t.c0 || range.c1 !== t.c1)) edits.push({ table, range });
   }
   if (edits.length === 0) return;
-  if (band) nameNewHeaders(store, wb, history, edits, split, count);
   recordTablesChange(history, store, () => {
     for (const { table, range } of edits) mutators.upsertTableOverlay(store, { ...table, range });
   });
-}
-
-/** Give the blank header cells of freshly inserted table columns the next free default names. */
-function nameNewHeaders(
-  store: SpreadsheetStore,
-  wb: WorkbookHandle,
-  history: History | null,
-  edits: readonly { table: TableOverlay; range: Range }[],
-  split: number,
-  count: number,
-): void {
-  let named = false;
-  for (const { table, range } of edits) {
-    if (!table.showHeader) continue;
-    for (let col = split; col < split + count; col += 1) {
-      const addr = { sheet: range.sheet, row: range.r0, col };
-      if (wb.getValue(addr).kind !== 'blank') continue;
-      const value = { kind: 'text' as const, value: nextHeaderName(wb, range) };
-      applyPatchesAtomic(wb, [{ addr, value }], history);
-      named = true;
-    }
-  }
-  if (named) mutators.replaceCells(store, wb.cells(edits[0]?.range.sheet ?? 0));
 }

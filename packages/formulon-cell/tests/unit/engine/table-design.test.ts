@@ -186,13 +186,24 @@ describe('table design commands', () => {
     expect(wb.getValue({ sheet: 0, row: 4, col: 2 })).toMatchObject({ kind: 'number', value: 6 });
   });
 
-  it('refuses a total row that would run into another table', async () => {
+  // Desktop Excel moves a table below in the same columns down with the new total row.
+  it('shifts another table below down when the total row is turned on', async () => {
     const { wb, store, history } = await setup();
     formatAsTable(store, { sheet: 0, r0: 4, c0: 0, r1: 6, c1: 1 }, { workbook: wb });
-    const first = store.getState().tables.tables[0];
-    expect(toggleTableOption(store, history, wb, 'showTotal')).toBe('blocked');
-    expect(store.getState().tables.tables[0]).toMatchObject({ id: first?.id, showTotal: false });
-    expect(wb.getTables()[0]?.ref).toBe('A1:C4');
+    const [first, second] = store.getState().tables.tables;
+    expect(toggleTableOption(store, history, wb, 'showTotal')).toBe('toggled');
+    expect(store.getState().tables.tables.find((t) => t.id === first?.id)).toMatchObject({
+      showTotal: true,
+      range: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 2 },
+    });
+    expect(store.getState().tables.tables.find((t) => t.id === second?.id)?.range).toEqual({
+      sheet: 0,
+      r0: 5,
+      c0: 0,
+      r1: 7,
+      c1: 1,
+    });
+    expect(wb.getTables().map((t) => t.ref)).toEqual(['A1:C5', 'A6:B8']);
   });
 
   it('drops the header row and clears its cells', async () => {
