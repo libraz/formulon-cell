@@ -1,3 +1,4 @@
+import { CfRuleType } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
@@ -6,14 +7,15 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 type Rule = ReturnType<WorkbookHandle['getConditionalFormats']>[number];
 
-const rule = (overrides: Partial<Rule> = {}): Rule => ({
-  id: 'r1',
-  type: 1,
-  priority: 1,
-  stopIfTrue: false,
-  sqref: [{ firstRow: 0, firstCol: 0, lastRow: 4, lastCol: 0 }],
-  ...overrides,
-});
+const rule = (overrides: Partial<Rule> = {}): Rule =>
+  ({
+    id: 'r1',
+    type: CfRuleType.CellIs,
+    priority: 1,
+    stopIfTrue: false,
+    ranges: [{ firstRow: 0, firstCol: 0, lastRow: 4, lastCol: 0 }],
+    ...overrides,
+  }) as Rule;
 
 const fakeWb = (rules: Rule[]): { wb: WorkbookHandle; removed: number[] } => {
   let snapshot = [...rules];

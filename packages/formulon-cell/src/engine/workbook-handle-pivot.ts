@@ -1,18 +1,28 @@
+import type {
+  CivilTimeInput,
+  ErrorCode,
+  Formulon,
+  NativeValue,
+  Pivot,
+  PivotCache,
+  PivotFilter,
+  PivotFilterInput,
+  PivotWorksheetSourceInput,
+} from '@libraz/formulon';
+import { PivotDatePeriod } from '@libraz/formulon';
 import {
   isEmptyPivotLayout,
   PIVOT_CELL_KIND,
   PIVOT_PLACEHOLDER_COLS,
   PIVOT_PLACEHOLDER_ROWS,
 } from './pivot-cell-kind.js';
-import type { PivotMutationWorkbook } from './pivot-mutation.js';
+import { isFormulonError } from './result.js';
 import type {
   Addr,
   CellValue,
   EngineCapabilities,
   PivotCalendar,
-  PivotCell,
   PivotDataFieldSpec,
-  PivotDateGrouping,
   PivotFieldSpec,
   PivotFilterSpec,
   PivotReportLayout,
@@ -22,17 +32,21 @@ import type {
 } from './types.js';
 import {
   type PivotAggregation,
-  PivotAxis,
+  type PivotAxis,
+  PivotDateGrouping,
   PivotFilterType,
   PivotFilterValueKind,
   PivotShowValuesAs,
   type PivotSortOrder,
+  ValueKind,
 } from './types.js';
-import { fromEngineValue, SPILL_ERROR_CODE } from './value.js';
+import { formatError, SPILL_ERROR_CODE } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import type { PivotStyleInfo } from './workbook-handle-table-styles.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
+  module: Formulon;
   wb: Workbook;
   capabilities: WorkbookHandle['capabilities'];
   assertAlive(): void;
@@ -71,6 +85,7 @@ export interface PivotFieldDefinition {
   readonly cacheFieldIndex: number;
   readonly sortOrder: PivotSortOrder;
   readonly sortByField: string;
+  /** Bounds the engine does not read back are -1 (automatic); `intervalDays` is then 1. */
   readonly dateGroup: {
     readonly granularity: PivotDateGrouping;
     readonly calendar: PivotCalendar;
@@ -83,8 +98,8 @@ export interface PivotFieldDefinition {
   readonly items: readonly PivotItemDefinition[];
 }
 
-/** Table style and toggles of a PivotTable. */
-export type PivotStyleDefinition = Required<import('@libraz/formulon').PivotStyleInfo>;
+/** Table style and toggles of a PivotTable; `name` is empty for a style element without a named style. */
+export type PivotStyleDefinition = Required<PivotStyleInfo>;
 
 /** The stored definition of a PivotTable, read back from the engine. */
 export interface PivotDefinition {
@@ -118,6 +133,29 @@ function assertAlive(handle: unknown): void {
   internals(handle).assertAlive();
 }
 
+/** Run an engine call whose failure is a soft outcome: an engine error yields `fallback`. */
+function attempt<T>(fallback: T, run: () => T): T {
+  try {
+    return run();
+  } catch (e) {
+    if (!isFormulonError(e)) throw e;
+    return fallback;
+  }
+}
+
+function pivotOf(handle: unknown, sheet: number, pivotIdx: number): Pivot {
+  return rawWb(handle).sheet(sheet).pivot(pivotIdx);
+}
+
+function cacheOf(handle: unknown, cacheId: number): PivotCache {
+  return rawWb(handle).pivotCache(cacheId);
+}
+
+/** Number of reports on `sheet`; null when the sheet cannot be read. */
+function pivotCount(handle: unknown, sheet: number): number | null {
+  return attempt(null, () => rawWb(handle).sheet(sheet).listPivots().length);
+}
+
 /** Cache index of `fieldName`. When the engine cannot tie the report to its
  *  cache, a name found in exactly one cache stands in. */
 function cacheFieldIndex(handle: WorkbookHandlePivotMethods, cacheId: number, fieldName: string) {
@@ -133,11 +171,11 @@ function cacheFieldIndex(handle: WorkbookHandlePivotMethods, cacheId: number, fi
   return matches === 1 ? found : -1;
 }
 
-function pivotWb(handle: unknown): PivotMutationWorkbook {
-  const raw = internals(handle).wb as PivotMutationWorkbook;
+function rawWb(handle: unknown): Workbook {
+  const raw = internals(handle).wb;
   if (!seededHandles.has(handle as object)) {
     seededHandles.add(handle as object);
-    seedOwnedExtents(handle as WorkbookHandlePivotMethods, raw);
+    seedOwnedExtents(handle as WorkbookHandlePivotMethods);
   }
   return raw;
 }
@@ -147,7 +185,7 @@ const seededHandles = new WeakSet<object>();
 
 /** Record every report's area as the handle first meets its reports, before
  *  any edit can shrink one: a loaded report's cached cells are its own. */
-function seedOwnedExtents(handle: WorkbookHandlePivotMethods, raw: PivotMutationWorkbook): void {
+function seedOwnedExtents(handle: WorkbookHandlePivotMethods): void {
   if (!internals(handle).capabilities?.pivotTables) return;
   let owned = ownedExtents.get(handle);
   if (!owned) {
@@ -155,12 +193,12 @@ function seedOwnedExtents(handle: WorkbookHandlePivotMethods, raw: PivotMutation
     ownedExtents.set(handle, owned);
   }
   for (let sheet = 0; sheet < (handle.sheetCount ?? 0); sheet += 1) {
-    const n = unwrapNumberResult(raw.pivotCount(sheet));
+    const n = pivotCount(handle, sheet);
     if (n === null) continue;
     for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
-      const layout = raw.pivotLayout(sheet, pivotIndex);
-      if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) continue;
-      owned.set(ownedKey(raw, sheet, pivotIndex), {
+      const layout = readLayout(handle, sheet, pivotIndex);
+      if (!layout || layout.rows <= 0 || layout.cols <= 0) continue;
+      owned.set(ownedKey(handle, sheet, pivotIndex), {
         sheet,
         r0: layout.top,
         c0: layout.left,
@@ -172,19 +210,63 @@ function seedOwnedExtents(handle: WorkbookHandlePivotMethods, raw: PivotMutation
 }
 
 /** Where a report's owned area is kept: by sheet and report name. */
-function ownedKey(raw: PivotMutationWorkbook, sheet: number, pivotIndex: number): string {
-  const name = typeof raw.pivotName === 'function' ? raw.pivotName(sheet, pivotIndex) : null;
-  return `${sheet}:${name?.status.ok ? name.value : pivotIndex}`;
+function ownedKey(handle: unknown, sheet: number, pivotIndex: number): string {
+  const name = attempt<string | null>(null, () => pivotOf(handle, sheet, pivotIndex).name);
+  return `${sheet}:${name ?? pivotIndex}`;
 }
 
-/** Unwrap a 0.12 numeric result without turning an engine failure into a
- * legitimate zero count. */
-function unwrapNumberResult(result: { status: { ok: boolean }; value: number }): number | null {
-  if (!result.status.ok || !Number.isFinite(result.value) || result.value < 0) return null;
-  return result.value;
+/** One layout cell with its value converted for the cell layer. */
+interface LayoutCell {
+  row: number;
+  col: number;
+  value: CellValue;
+  kind: number;
+  depth: number;
+  fieldName: string;
+  numberFormat: string;
 }
 
-type RawPivotLayout = ReturnType<PivotMutationWorkbook['pivotLayout']>;
+/** A report's layout as an anchor and extent; an extent of 0 spans no cell. */
+interface RawPivotLayout {
+  top: number;
+  left: number;
+  rows: number;
+  cols: number;
+  cells: readonly LayoutCell[];
+}
+
+function fromNativeValue(v: NativeValue): CellValue {
+  if (v === null) return { kind: 'blank' };
+  if (typeof v === 'number') return { kind: 'number', value: v };
+  if (typeof v === 'boolean') return { kind: 'bool', value: v };
+  if (typeof v === 'string') return { kind: 'text', value: v };
+  if ('code' in v) return { kind: 'error', code: v.code, text: formatError(v.code, '#ERR!') };
+  return { kind: 'blank' };
+}
+
+/** The engine's layout of a report, or null when it cannot be read. */
+function readLayout(handle: unknown, sheet: number, pivotIndex: number): RawPivotLayout | null {
+  const layout = attempt(null, () => pivotOf(handle, sheet, pivotIndex).getLayout());
+  if (!layout) return null;
+  const cells = layout.cells.map((c) => ({
+    row: c.row,
+    col: c.col,
+    value: fromNativeValue(c.value),
+    kind: c.kind,
+    depth: c.depth,
+    fieldName: c.fieldName ?? '',
+    numberFormat: c.numberFormat ?? '',
+  }));
+  const r = layout.range;
+  if (!r) return { top: 0, left: 0, rows: 0, cols: 0, cells };
+  return {
+    top: r.firstRow,
+    left: r.firstCol,
+    rows: r.lastRow - r.firstRow + 1,
+    cols: r.lastCol - r.firstCol + 1,
+    cells,
+  };
+}
 
 /** A report that cannot lay itself out because cells outside the area it
  *  owned are in the way: it shows #SPILL! at its anchor until they clear. */
@@ -215,12 +297,12 @@ function clearGivenUp(
   from: Range,
   keep: Range,
 ): void {
-  const raw = internals(handle).wb;
+  const ws = internals(handle).wb.sheet(sheet);
   for (const cell of [...handle.physicalCells(sheet)]) {
     const { row, col } = cell.addr;
     if (!inside(from, row, col) || inside(keep, row, col)) continue;
     if (cell.formula === null && cell.value.kind === 'blank') continue;
-    raw.setBlank(sheet, row, col);
+    ws.setBlank(row, col);
   }
 }
 
@@ -238,7 +320,8 @@ function pivotBlockers(
     owned = new Map();
     ownedExtents.set(handle, owned);
   }
-  const key = ownedKey(pivotWb(handle), sheet, pivotIndex);
+  rawWb(handle);
+  const key = ownedKey(handle, sheet, pivotIndex);
   const previous = owned.get(key);
   if (!previous) {
     owned.set(key, needed);
@@ -301,9 +384,10 @@ function effectiveLayout(
   handle: WorkbookHandlePivotMethods,
   sheet: number,
   pivotIndex: number,
-): RawPivotLayout {
-  const layout = pivotWb(handle).pivotLayout(sheet, pivotIndex);
-  if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) return layout;
+): RawPivotLayout | null {
+  rawWb(handle);
+  const layout = readLayout(handle, sheet, pivotIndex);
+  if (!layout || layout.rows <= 0 || layout.cols <= 0) return layout;
   const needed = {
     sheet,
     r0: layout.top,
@@ -312,9 +396,7 @@ function effectiveLayout(
     c1: layout.left + layout.cols - 1,
   };
   if (pivotBlockers(handle, sheet, pivotIndex, needed).length === 0) {
-    const empty = isEmptyPivotLayout(
-      layout.cells.filter((c) => fromEngineValue(c.value).kind !== 'blank'),
-    );
+    const empty = isEmptyPivotLayout(layout.cells.filter((c) => c.value.kind !== 'blank'));
     return empty
       ? { ...layout, rows: PIVOT_PLACEHOLDER_ROWS, cols: PIVOT_PLACEHOLDER_COLS }
       : layout;
@@ -327,14 +409,18 @@ function effectiveLayout(
       {
         row: layout.top,
         col: layout.left,
-        value: { kind: 4, number: 0, boolean: 0, text: '', errorCode: SPILL_ERROR_CODE },
+        value: {
+          kind: 'error',
+          code: SPILL_ERROR_CODE,
+          text: formatError(SPILL_ERROR_CODE, '#SPILL!'),
+        },
         kind: PIVOT_CELL_KIND.Header,
         depth: 0,
         fieldName: '',
         numberFormat: '',
       },
     ],
-  } as RawPivotLayout;
+  };
 }
 
 export abstract class WorkbookHandlePivotMethods {
@@ -349,12 +435,13 @@ export abstract class WorkbookHandlePivotMethods {
   pivotSpills(sheet: number): PivotSpill[] {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return [];
-    const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
+    rawWb(this);
+    const n = pivotCount(this, sheet);
     if (n === null) return [];
     const out: PivotSpill[] = [];
     for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
-      const layout = pivotWb(this).pivotLayout(sheet, pivotIndex);
-      if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) continue;
+      const layout = readLayout(this, sheet, pivotIndex);
+      if (!layout || layout.rows <= 0 || layout.cols <= 0) continue;
       const needed = {
         sheet,
         r0: layout.top,
@@ -380,11 +467,12 @@ export abstract class WorkbookHandlePivotMethods {
   pivotOverlapsRange(range: Range): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return false;
-    const n = unwrapNumberResult(pivotWb(this).pivotCount(range.sheet));
+    rawWb(this);
+    const n = pivotCount(this, range.sheet);
     if (n === null) return false;
     for (let i = 0; i < n; i += 1) {
       const layout = effectiveLayout(this, range.sheet, i);
-      if (!layout.status.ok) continue;
+      if (!layout) continue;
       if (
         range.r0 < layout.top + layout.rows &&
         range.r1 >= layout.top &&
@@ -401,12 +489,13 @@ export abstract class WorkbookHandlePivotMethods {
   pivotBounds(sheet: number): { pivotIndex: number; range: Range }[] {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return [];
-    const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
+    rawWb(this);
+    const n = pivotCount(this, sheet);
     if (n === null) return [];
     const out: { pivotIndex: number; range: Range }[] = [];
     for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
       const layout = effectiveLayout(this, sheet, pivotIndex);
-      if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) continue;
+      if (!layout || layout.rows <= 0 || layout.cols <= 0) continue;
       out.push({
         pivotIndex,
         range: {
@@ -435,11 +524,12 @@ export abstract class WorkbookHandlePivotMethods {
   } | null {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return null;
-    const n = unwrapNumberResult(pivotWb(this).pivotCount(addr.sheet));
+    rawWb(this);
+    const n = pivotCount(this, addr.sheet);
     if (n === null) return null;
     for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
       const layout = effectiveLayout(this, addr.sheet, pivotIndex);
-      if (!layout.status.ok) continue;
+      if (!layout) continue;
       if (
         addr.row < layout.top ||
         addr.row >= layout.top + layout.rows ||
@@ -459,9 +549,7 @@ export abstract class WorkbookHandlePivotMethods {
         fieldName,
         fieldIndex: mutable && fieldName ? cacheFieldIndex(this, cacheId, fieldName) : -1,
         cacheId,
-        isValue:
-          kind === PIVOT_CELL_KIND.Data ||
-          (!!cell && fromEngineValue(cell.value).kind === 'number'),
+        isValue: kind === PIVOT_CELL_KIND.Data || cell?.value.kind === 'number',
       };
     }
     return null;
@@ -472,7 +560,7 @@ export abstract class WorkbookHandlePivotMethods {
   pivotOwnedAreas(sheet: number): Range[] {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return [];
-    pivotWb(this);
+    rawWb(this);
     const owned = ownedExtents.get(this);
     return owned
       ? [...owned.entries()].filter(([k]) => k.startsWith(`${sheet}:`)).map(([, r]) => r)
@@ -485,16 +573,16 @@ export abstract class WorkbookHandlePivotMethods {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return;
     const owned = ownedExtents.get(this);
-    const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
+    rawWb(this);
+    const n = pivotCount(this, sheet);
     if (!owned || n === null) return;
     const blocked = new Set(this.pivotSpills(sheet).map((spill) => spill.pivotIndex));
-    const raw = pivotWb(this);
     for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
       // A report held at #SPILL! keeps what it owned; the others own their area.
       if (blocked.has(pivotIndex)) continue;
-      const layout = raw.pivotLayout(sheet, pivotIndex);
-      if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) continue;
-      owned.set(ownedKey(raw, sheet, pivotIndex), {
+      const layout = readLayout(this, sheet, pivotIndex);
+      if (!layout || layout.rows <= 0 || layout.cols <= 0) continue;
+      owned.set(ownedKey(this, sheet, pivotIndex), {
         sheet,
         r0: layout.top,
         c0: layout.left,
@@ -509,8 +597,8 @@ export abstract class WorkbookHandlePivotMethods {
    *  recalculates. */
   clearPivotCachedCells(sheet: number, cells: readonly { row: number; col: number }[]): void {
     assertAlive(this);
-    const raw = internals(this).wb;
-    for (const { row, col } of cells) raw.setBlank(sheet, row, col);
+    const ws = internals(this).wb.sheet(sheet);
+    for (const { row, col } of cells) ws.setBlank(row, col);
   }
 
   /** Iterate over evaluated PivotTable layout cells on a sheet. The engine
@@ -530,17 +618,17 @@ export abstract class WorkbookHandlePivotMethods {
   }> {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return;
-    const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
+    rawWb(this);
+    const n = pivotCount(this, sheet);
     if (n === null) return;
     const blocked = new Set(this.pivotSpills(sheet).map((spill) => spill.pivotIndex));
     for (let i = 0; i < n; i += 1) {
       const layout = effectiveLayout(this, sheet, i);
-      if (!layout.status.ok) continue;
+      if (!layout) continue;
       const entries = [];
       for (const cell of layout.cells) {
-        const value = fromEngineValue(cell.value);
-        if (value.kind === 'blank') continue;
-        entries.push(pivotCellEntry(this, sheet, i, cell, value));
+        if (cell.value.kind === 'blank') continue;
+        entries.push(pivotCellEntry(sheet, i, cell));
       }
       // The engine captions a report with no fields; the sheet shows it empty.
       // A report held at #SPILL! keeps its marker.
@@ -571,6 +659,7 @@ export abstract class WorkbookHandlePivotMethods {
   }[] {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return [];
+    rawWb(this);
     const out: {
       sheetIndex: number;
       pivotIndex: number;
@@ -585,18 +674,17 @@ export abstract class WorkbookHandlePivotMethods {
       pivotFilters?: readonly PivotFilterSpec[];
     }[] = [];
     for (let sheet = 0; sheet < this.sheetCount; sheet += 1) {
-      const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
+      const n = pivotCount(this, sheet);
       if (n === null) continue;
       for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
         const layout = effectiveLayout(this, sheet, pivotIndex);
-        if (!layout.status.ok) continue;
+        if (!layout) continue;
         const fields = new Set<string>();
         const fieldItems = new Map<string, Set<string>>();
         for (const cell of layout.cells) {
           if (!cell.fieldName) continue;
           fields.add(cell.fieldName);
-          const value = fromEngineValue(cell.value);
-          const label = pivotCellItemLabel(value);
+          const label = pivotCellItemLabel(cell.value);
           if (!label) continue;
           const items = fieldItems.get(cell.fieldName) ?? new Set<string>();
           items.add(label);
@@ -643,138 +731,124 @@ export abstract class WorkbookHandlePivotMethods {
   pivotCacheCount(): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return unwrapNumberResult(pivotWb(this).pivotCacheCount()) ?? 0;
+    return attempt(0, () => rawWb(this).listPivotCaches().length);
   }
 
   pivotCacheIds(): number[] {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return [];
-    const out: number[] = [];
-    const n = unwrapNumberResult(pivotWb(this).pivotCacheCount());
-    if (n === null) return out;
-    for (let i = 0; i < n; i += 1) {
-      const r = pivotWb(this).pivotCacheIdAt(i);
-      if (r.status.ok) out.push(r.index);
-    }
-    return out;
+    return attempt([], () =>
+      rawWb(this)
+        .listPivotCaches()
+        .map((cache) => cache.cacheId),
+    );
   }
 
   createPivotCache(requestedId = 0): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    const r = pivotWb(this).pivotCacheCreate(requestedId);
-    return r.status.ok ? r.index : -1;
+    // 0 asks the engine to assign the id.
+    return attempt(-1, () => rawWb(this).addPivotCache(requestedId || null).cacheId);
   }
 
   removePivotCache(cacheId: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotCacheRemove(cacheId).ok;
+    return attempt(false, () => {
+      rawWb(this).removePivotCache(cacheId);
+      return true;
+    });
   }
 
   getPivotCacheWorksheetSource(cacheId: number): PivotWorksheetSource | null {
     assertAlive(this);
     if (!this.capabilities.pivotCacheSource) return null;
-    const r = pivotWb(this).pivotCacheGetWorksheetSource(cacheId);
-    if (!r.status.ok) return null;
-    return {
-      present: r.present,
-      ...(r.ref ? { ref: r.ref } : {}),
-      ...(r.sheet ? { sheet: r.sheet } : {}),
-      ...(r.name ? { name: r.name } : {}),
-    };
+    return attempt(null, () => cacheOf(this, cacheId).getWorksheetSource());
   }
 
-  setPivotCacheWorksheetSource(cacheId: number, source: PivotWorksheetSource): boolean {
+  setPivotCacheWorksheetSource(cacheId: number, source: PivotWorksheetSourceInput | null): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotCacheSource) return false;
-    return pivotWb(this).pivotCacheSetWorksheetSource(cacheId, source).ok;
+    return attempt(false, () => {
+      cacheOf(this, cacheId).setWorksheetSource(source);
+      return true;
+    });
   }
 
   pivotCacheFieldCount(cacheId: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return unwrapNumberResult(pivotWb(this).pivotCacheFieldCount(cacheId)) ?? 0;
+    return attempt(0, () => cacheOf(this, cacheId).listFields().length);
   }
 
   pivotCacheFieldNames(cacheId: number): string[] {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return [];
-    const out: string[] = [];
-    const n = unwrapNumberResult(pivotWb(this).pivotCacheFieldCount(cacheId));
-    if (n === null) return out;
-    for (let i = 0; i < n; i += 1) {
-      const r = pivotWb(this).pivotCacheFieldName(cacheId, i);
-      out.push(r.status.ok ? r.value : '');
-    }
-    return out;
+    return attempt([], () =>
+      cacheOf(this, cacheId)
+        .listFields()
+        .map((field) => field.name),
+    );
   }
 
   /** Shared items of a pivot cache field, in the index order `<item x="N">`
-   *  addresses. A value the engine refuses to read back is kept as a blank so
-   *  a caller can still use the array position as that cache index. */
+   *  addresses. */
   pivotCacheSharedItems(cacheId: number, fieldIdx: number): CellValue[] {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return [];
-    const wb = pivotWb(this);
-    if (!wb.pivotCacheFieldSharedItemCount || !wb.pivotCacheFieldSharedItemValue) return [];
-    const out: CellValue[] = [];
-    const n = unwrapNumberResult(wb.pivotCacheFieldSharedItemCount(cacheId, fieldIdx));
-    if (n === null) return out;
-    for (let i = 0; i < n; i += 1) {
-      const r = wb.pivotCacheFieldSharedItemValue(cacheId, fieldIdx, i);
-      out.push(r.status.ok ? fromEngineValue(r.value) : { kind: 'blank' });
-    }
-    return out;
+    return attempt([], () =>
+      cacheOf(this, cacheId)
+        .listFieldSharedItems(fieldIdx)
+        .map((item) => fromNativeValue(item.value)),
+    );
   }
 
   addPivotCacheField(cacheId: number, name: string): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    const r = pivotWb(this).pivotCacheFieldAdd(cacheId, name);
-    return r.status.ok ? r.index : -1;
+    return attempt(-1, () => cacheOf(this, cacheId).addField(name));
   }
 
   clearPivotCacheFields(cacheId: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotCacheFieldClear(cacheId).ok;
+    return attempt(false, () => {
+      cacheOf(this, cacheId).clearFields();
+      return true;
+    });
   }
 
   addPivotCacheSharedItem(cacheId: number, fieldIdx: number, value: CellValue): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    if (value.kind === 'number') {
-      return pivotWb(this).pivotCacheFieldAddSharedItemNumber(cacheId, fieldIdx, value.value).ok;
-    }
-    if (value.kind === 'text') {
-      return pivotWb(this).pivotCacheFieldAddSharedItemText(cacheId, fieldIdx, value.value).ok;
-    }
-    if (value.kind === 'bool') {
-      return pivotWb(this).pivotCacheFieldAddSharedItemBool(cacheId, fieldIdx, value.value).ok;
-    }
-    if (value.kind === 'blank')
-      return pivotWb(this).pivotCacheFieldAddSharedItemBlank(cacheId, fieldIdx).ok;
-    return pivotWb(this).pivotCacheFieldAddSharedItemError(cacheId, fieldIdx, value.code).ok;
+    return attempt(false, () => {
+      cacheOf(this, cacheId).addFieldSharedItem(fieldIdx, toCacheValue(value));
+      return true;
+    });
   }
 
   clearPivotCacheSharedItems(cacheId: number, fieldIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotCacheFieldClearSharedItems(cacheId, fieldIdx).ok;
+    return attempt(false, () => {
+      cacheOf(this, cacheId).clearFieldSharedItems(fieldIdx);
+      return true;
+    });
   }
 
   addPivotCacheRecord(cacheId: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    const r = pivotWb(this).pivotCacheRecordAdd(cacheId);
-    return r.status.ok ? r.index : -1;
+    return attempt(-1, () => cacheOf(this, cacheId).addRecord());
   }
 
   clearPivotCacheRecords(cacheId: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotCacheRecordClear(cacheId).ok;
+    return attempt(false, () => {
+      cacheOf(this, cacheId).clearRecords();
+      return true;
+    });
   }
 
   setPivotCacheRecordValue(
@@ -785,18 +859,10 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    if (value.kind === 'number') {
-      return pivotWb(this).pivotCacheRecordSetNumber(cacheId, recordIdx, fieldIdx, value.value).ok;
-    }
-    if (value.kind === 'text') {
-      return pivotWb(this).pivotCacheRecordSetText(cacheId, recordIdx, fieldIdx, value.value).ok;
-    }
-    if (value.kind === 'bool') {
-      return pivotWb(this).pivotCacheRecordSetBool(cacheId, recordIdx, fieldIdx, value.value).ok;
-    }
-    if (value.kind === 'blank')
-      return pivotWb(this).pivotCacheRecordSetBlank(cacheId, recordIdx, fieldIdx).ok;
-    return pivotWb(this).pivotCacheRecordSetError(cacheId, recordIdx, fieldIdx, value.code).ok;
+    return attempt(false, () => {
+      cacheOf(this, cacheId).setRecordValue(recordIdx, fieldIdx, toCacheValue(value));
+      return true;
+    });
   }
 
   createPivotTable(
@@ -807,25 +873,26 @@ export abstract class WorkbookHandlePivotMethods {
   ): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    const r = pivotWb(this).pivotCreate(sheet, name, cacheId, anchor.row, anchor.col);
-    return r.status.ok ? r.index : -1;
+    return attempt(
+      -1,
+      () =>
+        rawWb(this)
+          .sheet(sheet)
+          .addPivot({ name, cacheId, anchor: { row: anchor.row, col: anchor.col } }).index,
+    );
   }
 
   pivotTableCacheId(sheet: number, pivotIdx: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    const wb = pivotWb(this);
-    if (!wb.pivotCacheId) return -1;
-    const r = wb.pivotCacheId(sheet, pivotIdx);
-    return r.status.ok ? r.index : -1;
+    return attempt(-1, () => pivotOf(this, sheet, pivotIdx).cache().cacheId);
   }
 
   /** The PivotTable's stored name, or null when it cannot be read. */
   pivotTableName(sheet: number, pivotIdx: number): string | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    const r = pivotWb(this).pivotName(sheet, pivotIdx);
-    return r.status.ok ? r.value : null;
+    return attempt(null, () => pivotOf(this, sheet, pivotIdx).name);
   }
 
   getPivotTableGrandTotals(
@@ -834,64 +901,65 @@ export abstract class WorkbookHandlePivotMethods {
   ): { rows: boolean; cols: boolean } | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    const r = pivotWb(this).pivotGetGrandTotals(sheet, pivotIdx);
-    return r.status.ok ? { rows: r.rows, cols: r.cols } : null;
+    return attempt(null, () => {
+      const totals = pivotOf(this, sheet, pivotIdx).getGrandTotals();
+      return { rows: totals.rows, cols: totals.columns };
+    });
   }
 
   /** Pivot field indices on the row axis, in display order; null when unreadable. */
   pivotRowFieldOrder(sheet: number, pivotIdx: number): number[] | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    const r = pivotWb(this).pivotRowFieldOrder(sheet, pivotIdx);
-    return r.status.ok ? [...r.indices] : null;
+    return attempt(null, () => [...pivotOf(this, sheet, pivotIdx).getRowFieldOrder()]);
   }
 
   /** Pivot field indices on the column axis, in display order; null when unreadable. */
   pivotColFieldOrder(sheet: number, pivotIdx: number): number[] | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    const r = pivotWb(this).pivotColFieldOrder(sheet, pivotIdx);
-    return r.status.ok ? [...r.indices] : null;
+    return attempt(null, () => [...pivotOf(this, sheet, pivotIdx).getColumnFieldOrder()]);
   }
 
   getPivotField(sheet: number, pivotIdx: number, fieldIdx: number): PivotFieldDefinition | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    const wb = pivotWb(this);
-    const r = wb.pivotFieldAt(sheet, pivotIdx, fieldIdx);
-    if (!r.status.ok) return null;
-    const items: PivotItemDefinition[] = [];
-    const itemCount = unwrapNumberResult(wb.pivotFieldItemCount(sheet, pivotIdx, fieldIdx)) ?? 0;
-    for (let i = 0; i < itemCount; i += 1) {
-      const item = wb.pivotFieldItemAt(sheet, pivotIdx, fieldIdx, i);
-      if (!item.status.ok) continue;
-      items.push({ label: item.name, cacheIndex: item.cacheIndex, visible: item.visible });
-    }
-    return {
-      index: fieldIdx,
-      sourceName: r.sourceName,
-      customName: r.customName,
-      axis: isPivotAxis(r.axis) ? r.axis : null,
-      subtotalTop: r.subtotalTop,
-      defaultSubtotal: r.defaultSubtotal,
-      subtotalFns: [...r.subtotalFns],
-      numberFormat: pivotNumberFormatCode(this, r.numberFormat),
-      cacheFieldIndex: r.cacheFieldIndex,
-      sortOrder: r.sortOrder as PivotSortOrder,
-      sortByField: r.sortByField,
-      dateGroup: r.hasDateGroup
-        ? {
-            granularity: r.dateGranularity as PivotDateGrouping,
-            calendar: r.dateCalendar as PivotCalendar,
-            startYear: r.dateStartYear,
-            endYear: r.dateEndYear,
-            intervalDays: r.dateIntervalDays,
-            startSerial: r.dateStartSerial,
-            endSerial: r.dateEndSerial,
-          }
-        : null,
-      items,
-    };
+    return attempt(null, () => {
+      const pivot = pivotOf(this, sheet, pivotIdx);
+      const r = pivot.getField(fieldIdx);
+      const items: PivotItemDefinition[] = pivot.listFieldItems(fieldIdx).map((item) => ({
+        label: item.name ?? '',
+        cacheIndex: item.cacheIndex ?? -1,
+        visible: item.visible,
+      }));
+      const granularity = dateGroupingOf(r.datePeriods);
+      return {
+        index: fieldIdx,
+        sourceName: r.sourceName,
+        customName: r.customName ?? '',
+        axis: r.axis,
+        subtotalTop: r.subtotalTop,
+        defaultSubtotal: r.defaultSubtotal,
+        subtotalFns: [...r.subtotalFunctions],
+        numberFormat: r.numberFormat ?? '',
+        cacheFieldIndex: r.cacheFieldIndex ?? -1,
+        sortOrder: r.sortOrder,
+        sortByField: r.sortByField ?? '',
+        dateGroup:
+          granularity === null
+            ? null
+            : {
+                granularity,
+                calendar: r.dateCalendar,
+                startYear: -1,
+                endYear: -1,
+                intervalDays: 1,
+                startSerial: -1,
+                endSerial: -1,
+              },
+        items,
+      };
+    });
   }
 
   getPivotDataField(
@@ -901,22 +969,22 @@ export abstract class WorkbookHandlePivotMethods {
   ): PivotDataFieldSpec | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    const r = pivotWb(this).pivotDataFieldAt(sheet, pivotIdx, dataFieldIdx);
-    if (!r.status.ok) return null;
-    const numberFormat = pivotNumberFormatCode(this, r.numberFormat);
-    return {
-      name: r.name,
-      fieldIndex: r.fieldIndex,
-      aggregation: r.aggregation as PivotAggregation,
-      ...(numberFormat ? { numberFormat } : {}),
-      ...(r.showAs !== PivotShowValuesAs.Normal ? { showValuesAs: r.showAs } : {}),
-      ...(r.showAsBaseField >= 0 ? { showAsBaseField: r.showAsBaseField } : {}),
-      ...(r.showAsBaseItem >= 0 ? { showAsBaseItem: r.showAsBaseItem } : {}),
-    };
+    return attempt(null, () => {
+      const r = pivotOf(this, sheet, pivotIdx).getDataField(dataFieldIdx);
+      return {
+        name: r.name,
+        fieldIndex: r.fieldIndex,
+        aggregation: r.aggregation,
+        ...(r.numberFormat ? { numberFormat: r.numberFormat } : {}),
+        ...(r.showAs !== PivotShowValuesAs.Normal ? { showValuesAs: r.showAs } : {}),
+        ...(r.showAsBaseField !== null ? { showAsBaseField: r.showAsBaseField } : {}),
+        ...(r.showAsBaseItem !== null ? { showAsBaseItem: r.showAsBaseItem } : {}),
+      };
+    });
   }
 
   /** The whole stored definition of a PivotTable, or null when the engine
-   *  cannot read it back (older engine, or a pivot that does not exist). */
+   *  cannot read it back (a pivot that does not exist). */
   getPivotDefinition(sheet: number, pivotIdx: number): PivotDefinition | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
@@ -959,15 +1027,22 @@ export abstract class WorkbookHandlePivotMethods {
   removePivotTable(sheet: number, pivotIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotRemove(sheet, pivotIdx).ok;
+    return attempt(false, () => {
+      rawWb(this).sheet(sheet).removePivot(pivotIdx);
+      return true;
+    });
   }
 
   renamePivotTable(sheet: number, pivotIdx: number, name: string): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotSetName(sheet, pivotIdx, name).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).rename(name);
+      return true;
+    });
   }
 
+  /** Move a report's top-left cell to `anchor`; the report's extent follows its layout. */
   setPivotTableAnchor(
     sheet: number,
     pivotIdx: number,
@@ -975,14 +1050,10 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotSetAnchor(
-      sheet,
-      pivotIdx,
-      anchor.row,
-      anchor.col,
-      anchor.rows,
-      anchor.cols,
-    ).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).setAnchor({ row: anchor.row, col: anchor.col });
+      return true;
+    });
   }
 
   setPivotTableGrandTotals(
@@ -993,41 +1064,59 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotSetGrandTotals(sheet, pivotIdx, rowsEnabled, colsEnabled).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).updateGrandTotals({ rows: rowsEnabled, columns: colsEnabled });
+      return true;
+    });
   }
 
   getPivotReportLayout(sheet: number, pivotIdx: number): PivotReportLayout | null {
     assertAlive(this);
     if (!this.capabilities.pivotReportLayout) return null;
-    const r = pivotWb(this).pivotGetLayout(sheet, pivotIdx);
-    return r.status.ok ? r.layout : null;
+    return attempt(null, () => pivotOf(this, sheet, pivotIdx).getReportLayout());
   }
 
   setPivotReportLayout(sheet: number, pivotIdx: number, layout: PivotReportLayout): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotReportLayout) return false;
-    return pivotWb(this).pivotSetLayout(sheet, pivotIdx, layout).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).setReportLayout(layout);
+      return true;
+    });
   }
 
   pivotFieldCount(sheet: number, pivotIdx: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return unwrapNumberResult(pivotWb(this).pivotFieldCount(sheet, pivotIdx)) ?? 0;
+    return attempt(0, () => pivotOf(this, sheet, pivotIdx).listFields().length);
   }
 
+  /** Place the pivot field mirroring cache field `spec.sourceName` on `spec.axis`
+   *  with the given settings. Returns its field index, or -1 on failure. */
   addPivotField(sheet: number, pivotIdx: number, spec: PivotFieldSpec): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    const engineSpec = toEnginePivotFieldSpec(this, spec);
-    if (!engineSpec) return -1;
-    const r = pivotWb(this).pivotFieldAdd(sheet, pivotIdx, engineSpec);
-    return r.status.ok ? r.index : -1;
+    return attempt(-1, () => {
+      const pivot = pivotOf(this, sheet, pivotIdx);
+      const index = pivot.listFields().findIndex((f) => f.sourceName === spec.sourceName);
+      if (index < 0) return -1;
+      pivot.setFieldAxis(index, spec.axis);
+      pivot.updateField(index, {
+        ...(spec.customName !== undefined ? { customName: spec.customName || null } : {}),
+        ...(spec.subtotalTop !== undefined ? { subtotalTop: spec.subtotalTop } : {}),
+        ...(spec.numberFormat !== undefined ? { numberFormat: spec.numberFormat || null } : {}),
+      });
+      return index;
+    });
   }
 
   clearPivotFields(sheet: number, pivotIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldClear(sheet, pivotIdx).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).clearFields();
+      return true;
+    });
   }
 
   /** Move a field onto `axis`; null takes it off every axis, dropping its data
@@ -1040,7 +1129,10 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldSetAxis(sheet, pivotIdx, fieldIdx, axis ?? -1).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).setFieldAxis(fieldIdx, axis);
+      return true;
+    });
   }
 
   setPivotFieldSort(
@@ -1052,7 +1144,13 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldSetSort(sheet, pivotIdx, fieldIdx, order, byField).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).updateField(fieldIdx, {
+        sortOrder: order,
+        sortByField: byField || null,
+      });
+      return true;
+    });
   }
 
   setPivotFieldSubtotalTop(
@@ -1063,13 +1161,16 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldSetSubtotalTop(sheet, pivotIdx, fieldIdx, top).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).updateField(fieldIdx, { subtotalTop: top });
+      return true;
+    });
   }
 
-  /** Append a manual-filter item addressed by its rendered label. The item
-   *  carries no cache binding, so the filter engine matches source records by
-   *  comparing their label against `name`; an empty `name` therefore names
-   *  nothing. Use `addPivotFieldItemAt` for the blank member. */
+  /** Append a manual-filter item addressed by its rendered label. The filter
+   *  engine matches source records by comparing their label against `name`;
+   *  an empty `name` therefore names nothing. Use `addPivotFieldItemAt` for
+   *  the blank member. */
   addPivotFieldItem(
     sheet: number,
     pivotIdx: number,
@@ -1079,13 +1180,15 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldAddItem(sheet, pivotIdx, fieldIdx, name, visible).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).addFieldItem(fieldIdx, name, { visible });
+      return true;
+    });
   }
 
   /** Append a manual-filter item addressed by its position in the bound cache
    *  field's shared items — the index space OOXML `<item x="N">` uses. This is
-   *  the only form that can express the blank member. Returns false on an
-   *  engine that has only the by-label form. */
+   *  the only form that can express the blank member. */
   addPivotFieldItemAt(
     sheet: number,
     pivotIdx: number,
@@ -1095,15 +1198,19 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotItemByCacheIndex) return false;
-    const add = pivotWb(this).pivotFieldAddItemAt;
-    if (typeof add !== 'function') return false;
-    return add.call(pivotWb(this), sheet, pivotIdx, fieldIdx, cacheIndex, visible).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).addFieldItem(fieldIdx, { cacheIndex }, { visible });
+      return true;
+    });
   }
 
   clearPivotFieldItems(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldClearItems(sheet, pivotIdx, fieldIdx).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).clearFieldItems(fieldIdx);
+      return true;
+    });
   }
 
   setPivotFieldItemVisible(
@@ -1115,7 +1222,10 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldSetItemVisible(sheet, pivotIdx, fieldIdx, itemIdx, visible).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).updateFieldItem(fieldIdx, itemIdx, { visible });
+      return true;
+    });
   }
 
   addPivotFieldSubtotalFn(
@@ -1126,13 +1236,21 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldAddSubtotalFn(sheet, pivotIdx, fieldIdx, agg).ok;
+    return attempt(false, () => {
+      const pivot = pivotOf(this, sheet, pivotIdx);
+      const current = pivot.getField(fieldIdx).subtotalFunctions;
+      pivot.setFieldSubtotalFunctions(fieldIdx, [...current, agg]);
+      return true;
+    });
   }
 
   clearPivotFieldSubtotalFns(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldClearSubtotalFns(sheet, pivotIdx, fieldIdx).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).setFieldSubtotalFunctions(fieldIdx, []);
+      return true;
+    });
   }
 
   setPivotFieldDateGroup(
@@ -1151,24 +1269,27 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldSetDateGroup(
-      sheet,
-      pivotIdx,
-      fieldIdx,
-      granularity,
-      calendar,
-      bounds.startYear ?? -1,
-      bounds.endYear ?? -1,
-      bounds.intervalDays ?? 1,
-      bounds.startSerial ?? -1,
-      bounds.endSerial ?? -1,
-    ).ok;
+    return attempt(false, () => {
+      const start = dateBound(this, bounds.startSerial, bounds.startYear, 'start');
+      const end = dateBound(this, bounds.endSerial, bounds.endYear, 'end');
+      pivotOf(this, sheet, pivotIdx).setFieldDateGroup(fieldIdx, {
+        periods: DATE_GROUPING_PERIOD[granularity],
+        calendar,
+        ...(bounds.intervalDays !== undefined ? { intervalDays: bounds.intervalDays } : {}),
+        ...(start ? { start } : {}),
+        ...(end ? { end } : {}),
+      });
+      return true;
+    });
   }
 
   clearPivotFieldDateGroup(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldClearDateGroup(sheet, pivotIdx, fieldIdx).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).setFieldDateGroup(fieldIdx, null);
+      return true;
+    });
   }
 
   setPivotFieldNumberFormat(
@@ -1179,36 +1300,42 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    const numFmtId = registerPivotNumberFormat(this, format);
-    if (numFmtId === null) return false;
-    return pivotWb(this).pivotFieldSetNumberFormat(sheet, pivotIdx, fieldIdx, numFmtId).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).updateField(fieldIdx, {
+        numberFormat: format.trim() || null,
+      });
+      return true;
+    });
   }
 
   setPivotRowFieldOrder(sheet: number, pivotIdx: number, indices: readonly number[]): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotSetRowFieldOrder(sheet, pivotIdx, indices).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).setRowFieldOrder(indices);
+      return true;
+    });
   }
 
   setPivotColFieldOrder(sheet: number, pivotIdx: number, indices: readonly number[]): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotSetColFieldOrder(sheet, pivotIdx, indices).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).setColumnFieldOrder(indices);
+      return true;
+    });
   }
 
   pivotDataFieldCount(sheet: number, pivotIdx: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return unwrapNumberResult(pivotWb(this).pivotDataFieldCount(sheet, pivotIdx)) ?? 0;
+    return attempt(0, () => pivotOf(this, sheet, pivotIdx).listDataFields().length);
   }
 
   addPivotDataField(sheet: number, pivotIdx: number, spec: PivotDataFieldSpec): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    const engineSpec = toEnginePivotDataFieldSpec(this, spec);
-    if (!engineSpec) return -1;
-    const r = pivotWb(this).pivotDataFieldAdd(sheet, pivotIdx, engineSpec);
-    return r.status.ok ? r.index : -1;
+    return attempt(-1, () => pivotOf(this, sheet, pivotIdx).addDataField(toDataFieldInput(spec)));
   }
 
   setPivotDataField(
@@ -1219,53 +1346,53 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    const engineSpec = toEnginePivotDataFieldSpec(this, spec);
-    if (!engineSpec) return false;
-    return pivotWb(this).pivotDataFieldSet(sheet, pivotIdx, dataFieldIdx, engineSpec).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).setDataField(dataFieldIdx, toDataFieldInput(spec));
+      return true;
+    });
   }
 
   clearPivotDataFields(sheet: number, pivotIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotDataFieldClear(sheet, pivotIdx).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).clearDataFields();
+      return true;
+    });
   }
 
   pivotFilterCount(sheet: number, pivotIdx: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return unwrapNumberResult(pivotWb(this).pivotFilterCount(sheet, pivotIdx)) ?? 0;
+    return attempt(0, () => pivotOf(this, sheet, pivotIdx).listFilters().length);
   }
 
   addPivotFilter(sheet: number, pivotIdx: number, spec: PivotFilterSpec): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
     if (!isPivotFilterType(spec.type)) return false;
-    const engineSpec = {
-      axis: spec.axis,
-      fieldName: spec.fieldName,
-      type: spec.type as unknown as import('@libraz/formulon').PivotFilterType,
-      ...(spec.dataFieldIndex !== undefined ? { dataFieldIndex: spec.dataFieldIndex } : {}),
-      ...(spec.valueKind !== undefined ? { valueKind: spec.valueKind } : {}),
-      ...(spec.valueInt !== undefined ? { valueInt: spec.valueInt } : {}),
-      ...(spec.valueDouble !== undefined ? { valueDouble: spec.valueDouble } : {}),
-      ...(spec.valueText !== undefined ? { valueText: spec.valueText } : {}),
-      ...(spec.valueHighKind !== undefined ? { valueHighKind: spec.valueHighKind } : {}),
-      ...(spec.valueHighInt !== undefined ? { valueHighInt: spec.valueHighInt } : {}),
-      ...(spec.valueHighDouble !== undefined ? { valueHighDouble: spec.valueHighDouble } : {}),
-    };
-    return pivotWb(this).pivotFilterAdd(sheet, pivotIdx, engineSpec).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).addFilter(toFilterInput(spec));
+      return true;
+    });
   }
 
   clearPivotFilters(sheet: number, pivotIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFilterClear(sheet, pivotIdx).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).clearFilters();
+      return true;
+    });
   }
 
   removePivotFilter(sheet: number, pivotIdx: number, filterIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFilterRemoveAt(sheet, pivotIdx, filterIdx).ok;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).removeFilter(filterIdx);
+      return true;
+    });
   }
 }
 
@@ -1275,6 +1402,112 @@ function pivotCellItemLabel(value: CellValue): string {
   if (value.kind === 'bool') return value.value ? 'TRUE' : 'FALSE';
   if (value.kind === 'error') return `#${value.code}`;
   return '';
+}
+
+/** A cell-layer value as a pivot cache value. */
+function toCacheValue(value: CellValue):
+  | number
+  | string
+  | boolean
+  | null
+  | {
+      kind: typeof ValueKind.Error;
+      errorCode: ErrorCode;
+    } {
+  if (value.kind === 'blank') return null;
+  if (value.kind === 'error') {
+    return { kind: ValueKind.Error, errorCode: value.code as ErrorCode };
+  }
+  return value.value;
+}
+
+/** The period bit each cell-layer granularity groups by. */
+const DATE_GROUPING_PERIOD: Record<PivotDateGrouping, number> = {
+  [PivotDateGrouping.Day]: PivotDatePeriod.Days,
+  [PivotDateGrouping.Month]: PivotDatePeriod.Months,
+  [PivotDateGrouping.Quarter]: PivotDatePeriod.Quarters,
+  [PivotDateGrouping.Year]: PivotDatePeriod.Years,
+  [PivotDateGrouping.Days]: PivotDatePeriod.Days,
+  [PivotDateGrouping.Hour]: PivotDatePeriod.Hours,
+  [PivotDateGrouping.Minute]: PivotDatePeriod.Minutes,
+  [PivotDateGrouping.Second]: PivotDatePeriod.Seconds,
+};
+
+/** The granularity of a date group's finest period; null for an ungrouped field. */
+function dateGroupingOf(periods: number): PivotDateGrouping | null {
+  if (periods & PivotDatePeriod.Seconds) return PivotDateGrouping.Second;
+  if (periods & PivotDatePeriod.Minutes) return PivotDateGrouping.Minute;
+  if (periods & PivotDatePeriod.Hours) return PivotDateGrouping.Hour;
+  if (periods & PivotDatePeriod.Days) return PivotDateGrouping.Day;
+  if (periods & PivotDatePeriod.Months) return PivotDateGrouping.Month;
+  if (periods & PivotDatePeriod.Quarters) return PivotDateGrouping.Quarter;
+  if (periods & PivotDatePeriod.Years) return PivotDateGrouping.Year;
+  return null;
+}
+
+/** A date group bound from a serial, else from a year; null leaves it automatic. */
+function dateBound(
+  handle: unknown,
+  serial: number | undefined,
+  year: number | undefined,
+  edge: 'start' | 'end',
+): CivilTimeInput | null {
+  if (serial !== undefined && serial >= 0) {
+    const date1904 = internals(handle).wb.getDate1904();
+    return internals(handle).module.convertSerialToCivil(serial, { date1904 });
+  }
+  if (year !== undefined && year >= 0) {
+    return edge === 'start' ? { year, month: 1, day: 1 } : { year, month: 12, day: 31 };
+  }
+  return null;
+}
+
+function toDataFieldInput(spec: PivotDataFieldSpec) {
+  return {
+    // An empty name has the engine name the field from the workbook profile.
+    name: spec.name?.trim() ?? '',
+    fieldIndex: spec.fieldIndex,
+    aggregation: spec.aggregation,
+    ...(spec.numberFormat !== undefined ? { numberFormat: spec.numberFormat.trim() || null } : {}),
+    ...(spec.showValuesAs !== undefined ? { showAs: spec.showValuesAs } : {}),
+    ...(spec.showAsBaseField !== undefined ? { showAsBaseField: spec.showAsBaseField } : {}),
+    ...(spec.showAsBaseItem !== undefined ? { showAsBaseItem: spec.showAsBaseItem } : {}),
+  };
+}
+
+/** A cell-layer filter spec as the engine's filter input; the field is named
+ *  by its source name and the axis is the field's own. */
+function toFilterInput(spec: PivotFilterSpec): PivotFilterInput {
+  return {
+    fieldIndex: spec.fieldName,
+    kind: spec.type,
+    ...(spec.dataFieldIndex !== undefined ? { dataFieldIndex: spec.dataFieldIndex } : {}),
+    ...operandInput(spec.valueKind, spec.valueInt, spec.valueDouble, spec.valueText, 'value'),
+    ...operandInput(
+      spec.valueHighKind,
+      spec.valueHighInt,
+      spec.valueHighDouble,
+      spec.valueHighText,
+      'valueHigh',
+    ),
+  };
+}
+
+function operandInput(
+  kind: PivotFilterValueKind | undefined,
+  intValue: number | undefined,
+  doubleValue: number | undefined,
+  textValue: string | undefined,
+  key: 'value' | 'valueHigh',
+): Partial<Record<'value' | 'valueHigh', number | string>> {
+  if (kind === PivotFilterValueKind.None) return {};
+  if (kind === PivotFilterValueKind.Int || (kind === undefined && intValue !== undefined)) {
+    return intValue !== undefined ? { [key]: intValue } : {};
+  }
+  if (kind === PivotFilterValueKind.Double || (kind === undefined && doubleValue !== undefined)) {
+    return doubleValue !== undefined ? { [key]: doubleValue } : {};
+  }
+  return textValue !== undefined ? { [key]: textValue } : {};
 }
 
 /**
@@ -1319,161 +1552,56 @@ function pivotFilterSpecs(
   sheet: number,
   pivotIndex: number,
 ): PivotFilterSpec[] {
-  const wb = pivotWb(handle);
-  const count = unwrapNumberResult(wb.pivotFilterCount(sheet, pivotIndex));
-  if (count === null || count === 0) return [];
+  const read = attempt(null, () => {
+    const pivot = pivotOf(handle, sheet, pivotIndex);
+    const filters = pivot.listFilters();
+    return filters.length === 0 ? null : { filters, fields: pivot.listFields() };
+  });
+  if (!read) return [];
   const out: PivotFilterSpec[] = [];
-  for (let filterIndex = 0; filterIndex < count; filterIndex += 1) {
-    // 0.12 exposes one coherent readback envelope. The old granular readers
-    // were never part of the upstream Workbook surface and could mix values
-    // from failed calls into an apparently valid filter.
-    const direct = wb.pivotFilterAt(sheet, pivotIndex, filterIndex);
-    const spec = direct.status.ok
-      ? sanitizePivotFilterSpec(direct as unknown as Partial<PivotFilterSpec>)
-      : null;
+  for (const filter of read.filters) {
+    const field = read.fields[filter.fieldIndex];
+    const spec = field ? toFilterSpec(filter, field.axis, field.sourceName) : null;
     if (spec) out.push(spec);
   }
   return out;
 }
 
-function sanitizePivotFilterSpec(
-  spec: Partial<PivotFilterSpec> | undefined | null,
+/** A stored filter in the cell layer's shape; null for a kind the cell layer does not model. */
+function toFilterSpec(
+  filter: PivotFilter,
+  axis: PivotAxis | null,
+  fieldName: string,
 ): PivotFilterSpec | null {
-  if (!spec) return null;
-  if (
-    !isPivotAxis(spec.axis) ||
-    typeof spec.fieldName !== 'string' ||
-    spec.fieldName.trim().length === 0 ||
-    !isPivotFilterType(spec.type)
-  ) {
+  if (axis === null || !isPivotFilterType(filter.kind) || fieldName.trim().length === 0) {
     return null;
   }
-  const dataFieldIndex = spec.dataFieldIndex;
   return {
-    axis: spec.axis,
-    fieldName: spec.fieldName.trim(),
-    type: spec.type,
-    ...(typeof dataFieldIndex === 'number' && Number.isInteger(dataFieldIndex) && dataFieldIndex > 0
-      ? { dataFieldIndex }
-      : {}),
-    ...filterPayload(spec.valueKind, spec.valueInt, spec.valueDouble, spec.valueText),
-    ...filterPayload(
-      spec.valueHighKind,
-      spec.valueHighInt,
-      spec.valueHighDouble,
-      spec.valueHighText,
-      'valueHigh',
-    ),
+    axis,
+    fieldName: fieldName.trim(),
+    type: filter.kind,
+    ...(filter.dataFieldIndex > 0 ? { dataFieldIndex: filter.dataFieldIndex } : {}),
+    ...operandSpec(filter.kind, filter.value, 'value'),
+    ...operandSpec(filter.kind, filter.valueHigh, 'valueHigh'),
   };
 }
 
-function filterPayload(
-  kind: PivotFilterValueKind | undefined,
-  intValue: number | undefined,
-  doubleValue: number | undefined,
-  textValue: string | undefined,
-  prefix = 'value',
+function operandSpec(
+  type: PivotFilterType,
+  value: number | string | null,
+  prefix: 'value' | 'valueHigh',
 ): Partial<PivotFilterSpec> {
-  if (isPivotFilterValueKind(kind)) {
-    if (kind === PivotFilterValueKind.None) return {};
-    if (kind === PivotFilterValueKind.Int) {
-      return {
-        [`${prefix}Kind`]: kind,
-        [`${prefix}Int`]: Number.isFinite(intValue) ? intValue : undefined,
-      } as Partial<PivotFilterSpec>;
-    }
-    if (kind === PivotFilterValueKind.Double) {
-      return {
-        [`${prefix}Kind`]: kind,
-        [`${prefix}Double`]: Number.isFinite(doubleValue) ? doubleValue : undefined,
-      } as Partial<PivotFilterSpec>;
-    }
-    return {
-      [`${prefix}Kind`]: kind,
-      [`${prefix}Text`]: typeof textValue === 'string' ? textValue : undefined,
-    } as Partial<PivotFilterSpec>;
+  if (value === null) return {};
+  if (typeof value === 'string') {
+    return { [`${prefix}Kind`]: PivotFilterValueKind.Text, [`${prefix}Text`]: value };
   }
-  // Keep hand-authored public specs that omit the discriminator usable.
-  return {
-    ...(Number.isFinite(intValue) ? { [`${prefix}Int`]: intValue } : {}),
-    ...(Number.isFinite(doubleValue) ? { [`${prefix}Double`]: doubleValue } : {}),
-    ...(typeof textValue === 'string' ? { [`${prefix}Text`]: textValue } : {}),
-  } as Partial<PivotFilterSpec>;
+  // A top-N count is an integer; every other numeric operand is a double.
+  return type === PivotFilterType.ValueTop10
+    ? { [`${prefix}Kind`]: PivotFilterValueKind.Int, [`${prefix}Int`]: value }
+    : { [`${prefix}Kind`]: PivotFilterValueKind.Double, [`${prefix}Double`]: value };
 }
 
-function isPivotAxis(value: unknown): value is PivotAxis {
-  return typeof value === 'number' && Object.values(PivotAxis).includes(value as PivotAxis);
-}
-
-type PivotNumberFormatApi = {
-  addNumFmtCode?: (formatCode: string) => number;
-};
-
-/** Translate a public format code into the decimal id expected by 0.12. */
-function registerPivotNumberFormat(handle: unknown, format: string): string | null {
-  const code = format.trim();
-  if (code.length === 0) return '';
-  const addNumFmtCode = (handle as PivotNumberFormatApi).addNumFmtCode;
-  if (typeof addNumFmtCode !== 'function') return null;
-  const id = addNumFmtCode.call(handle, code);
-  return Number.isInteger(id) && id >= 0 ? String(id) : null;
-}
-
-function toEnginePivotFieldSpec(
-  handle: unknown,
-  spec: PivotFieldSpec,
-): {
-  sourceName: string;
-  customName?: string;
-  axis: number;
-  subtotalTop?: boolean;
-  numberFormat?: string;
-} | null {
-  let numberFormat: string | undefined;
-  if (spec.numberFormat !== undefined) {
-    const registered = registerPivotNumberFormat(handle, spec.numberFormat);
-    if (registered === null) return null;
-    numberFormat = registered || undefined;
-  }
-  return {
-    sourceName: spec.sourceName,
-    ...(spec.customName !== undefined ? { customName: spec.customName } : {}),
-    axis: spec.axis,
-    ...(spec.subtotalTop !== undefined ? { subtotalTop: spec.subtotalTop } : {}),
-    ...(numberFormat !== undefined ? { numberFormat } : {}),
-  };
-}
-
-function toEnginePivotDataFieldSpec(
-  handle: unknown,
-  spec: PivotDataFieldSpec,
-): {
-  name: string;
-  fieldIndex: number;
-  aggregation: number;
-  numberFormat?: string;
-  showAs?: number;
-  showAsBaseField?: number;
-  showAsBaseItem?: number;
-} | null {
-  let numberFormat: string | undefined;
-  if (spec.numberFormat !== undefined) {
-    const registered = registerPivotNumberFormat(handle, spec.numberFormat);
-    if (registered === null) return null;
-    numberFormat = registered || undefined;
-  }
-  return {
-    // An empty name has the engine name the field from the workbook profile.
-    name: spec.name?.trim() ?? '',
-    fieldIndex: spec.fieldIndex,
-    aggregation: spec.aggregation,
-    ...(numberFormat !== undefined ? { numberFormat } : {}),
-    ...(spec.showValuesAs !== undefined ? { showAs: spec.showValuesAs } : {}),
-    ...(spec.showAsBaseField !== undefined ? { showAsBaseField: spec.showAsBaseField } : {}),
-    ...(spec.showAsBaseItem !== undefined ? { showAsBaseItem: spec.showAsBaseItem } : {}),
-  };
-}
-
+/** The cell layer models the engine's filter kinds 0-5 under the same numbers. */
 function isPivotFilterType(value: unknown): value is PivotFilterType {
   return (
     typeof value === 'number' &&
@@ -1483,19 +1611,10 @@ function isPivotFilterType(value: unknown): value is PivotFilterType {
   );
 }
 
-function isPivotFilterValueKind(value: unknown): value is PivotFilterValueKind {
-  return (
-    typeof value === 'number' &&
-    Object.values(PivotFilterValueKind).includes(value as PivotFilterValueKind)
-  );
-}
-
 function pivotCellEntry(
-  handle: WorkbookHandlePivotMethods,
   sheet: number,
   pivotIndex: number,
-  cell: PivotCell,
-  value: CellValue,
+  cell: LayoutCell,
 ): {
   addr: Addr;
   value: CellValue;
@@ -1508,28 +1627,14 @@ function pivotCellEntry(
 } {
   return {
     addr: { sheet, row: cell.row, col: cell.col },
-    value,
+    value: cell.value,
     formula: null,
     kind: cell.kind,
-    depth: cell.depth ?? 0,
-    fieldName: cell.fieldName ?? '',
-    numberFormat: pivotNumberFormatCode(handle, cell.numberFormat),
+    depth: cell.depth,
+    fieldName: cell.fieldName,
+    numberFormat: cell.numberFormat,
     pivotIndex,
   };
-}
-
-/** PivotCell.numberFormat is a decimal numFmtId in formulon 0.12. The cell
- * layer exposes a format code to the renderer/store. Keep a non-numeric value
- * intact for lightweight hosts that already hand us decoded test data. */
-function pivotNumberFormatCode(handle: unknown, raw: string): string {
-  const value = raw.trim();
-  if (!value) return '';
-  const id = Number(value);
-  if (!Number.isInteger(id) || id < 0) return raw;
-  const getNumFmtCode = (handle as { getNumFmtCode?: (numFmtId: number) => string | null })
-    .getNumFmtCode;
-  if (typeof getNumFmtCode !== 'function') return raw;
-  return getNumFmtCode.call(handle, id) ?? '';
 }
 
 export function installPivotMethods(target: WorkbookHandleCtor): void {

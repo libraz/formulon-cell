@@ -36,11 +36,11 @@ const makeFake = (
         fillIndex: 2,
         borderIndex: 3,
         numFmtId: 49,
-        horizontalAlign: 0,
-        verticalAlign: 0,
+        horizontal: 0,
+        vertical: 0,
         wrapText: false,
         ...(opts.record ?? {}),
-      } as ReturnType<WorkbookHandle['getCellXf']>;
+      } as unknown as ReturnType<WorkbookHandle['getCellXf']>;
     },
     getCellStyleXf(xfId: number): ReturnType<WorkbookHandle['getCellStyleXf']> {
       if (!caps.cellStyles) return null;
@@ -50,10 +50,10 @@ const makeFake = (
         fillIndex: 5,
         borderIndex: 6,
         numFmtId: 0,
-        horizontalAlign: 2,
-        verticalAlign: 1,
+        horizontal: 2,
+        vertical: 1,
         wrapText: true,
-      };
+      } as unknown as ReturnType<WorkbookHandle['getCellStyleXf']>;
     },
   };
   return { wb: fake as unknown as WorkbookHandle, calls };
@@ -94,8 +94,8 @@ describe('cellFormatting wrappers', () => {
       fillIndex: 2,
       borderIndex: 3,
       numFmtId: 14,
-      horizontalAlign: 0,
-      verticalAlign: 0,
+      horizontal: 0,
+      vertical: 0,
       wrapText: true,
     });
   });
@@ -113,8 +113,8 @@ describe('cellFormatting wrappers', () => {
       fillIndex: 5,
       borderIndex: 6,
       numFmtId: 0,
-      horizontalAlign: 2,
-      verticalAlign: 1,
+      horizontal: 2,
+      vertical: 1,
       wrapText: true,
     });
     expect(calls.getStyleXf).toEqual([9]);

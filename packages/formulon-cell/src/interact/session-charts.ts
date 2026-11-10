@@ -1,3 +1,4 @@
+import { AnchorKind } from '@libraz/formulon';
 import { chartDataFromEngine, chartPreviewOverrides } from '../charts/engine-adapter.js';
 import { formatChartValue } from '../charts/format.js';
 import { chartTitleText, layoutChart, layoutUnsupportedChart } from '../charts/layout.js';
@@ -472,7 +473,20 @@ export function attachSessionCharts(deps: {
   ): boolean => {
     const wb = chartWorkbook();
     if (!wb) return false;
-    const anchor = placementForPixels(store, chart.nativeAnchor, patch);
+    // The frame's top-left marker and size; the chart keeps its anchor kind.
+    const placed = placementForPixels(
+      store,
+      { ...chart.nativeAnchor, kind: AnchorKind.OneCell },
+      patch,
+    );
+    const anchor = {
+      row: placed.fromRow,
+      col: placed.fromCol,
+      rowOffEmu: placed.fromRowOffsetEmu,
+      colOffEmu: placed.fromColOffsetEmu,
+      widthEmu: placed.widthEmu,
+      heightEmu: placed.heightEmu,
+    };
     return updateSessionChart(store, chart.id, { anchor }, history, wb) !== null;
   };
 
@@ -484,7 +498,7 @@ export function attachSessionCharts(deps: {
 
   /** The engine cannot re-anchor an absolutely positioned object. */
   const canPlace = (chart: SessionChart): boolean =>
-    chart.nativeAnchor.anchorKind !== ANCHOR_KIND_ABSOLUTE;
+    chart.nativeAnchor.kind !== ANCHOR_KIND_ABSOLUTE;
 
   /** Drag the whole chart (`handle` omitted) or one of its sizing handles. The
    *  frame follows the pointer and the workbook is changed once, on release. */

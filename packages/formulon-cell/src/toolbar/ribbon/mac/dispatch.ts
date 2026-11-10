@@ -463,7 +463,8 @@ export function dispatchMacRibbonCommand(
       case 'mac.review.deleteComment': {
         const active = state.selection.active;
         const roots = listThreadedComments(instance.store, sheet, instance.workbook).filter(
-          (entry) => !entry.parentId && entry.row === active.row && entry.col === active.col,
+          (entry) =>
+            !entry.parentId && entry.cell.row === active.row && entry.cell.col === active.col,
         );
         return recordThreadedChange(
           instance.history,
@@ -494,11 +495,15 @@ export function dispatchMacRibbonCommand(
           title: MAC_CONTEXT_LABELS.commentsTitle[toolbarLangForLocale(instance.i18n.locale)],
           items: listThreadedComments(instance.store, sheet, instance.workbook)
             .filter((entry) =>
-              isNavigationAddrAllowed(instance.store, { sheet, row: entry.row, col: entry.col }),
+              isNavigationAddrAllowed(instance.store, {
+                sheet,
+                row: entry.cell.row,
+                col: entry.cell.col,
+              }),
             )
             .map((entry) => ({
               severity: 'info' as const,
-              label: formatA1Cell(entry.row, entry.col),
+              label: formatA1Cell(entry.cell.row, entry.cell.col),
               detail: entry.text,
             })),
           ...reportDialogLabels(instance.i18n.strings),

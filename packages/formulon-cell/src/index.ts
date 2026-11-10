@@ -236,6 +236,7 @@ export { FUNCTION_SIGNATURES, findActiveSignature, suggestFunctions } from './co
 export { autofitColsWidth, autofitRowsHeight, setRowsHeight } from './commands/row-col-layout.js';
 export type {
   ChartMutationAuthorization,
+  ChartPlacement,
   CreateSessionChartOptions,
   SessionChartPatch,
   SessionChartSeriesInput,

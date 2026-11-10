@@ -1,9 +1,11 @@
+import { DrawingObjectKind } from '@libraz/formulon';
 import {
   emptyLoadDiagnostics,
   type FileLossId,
   fileLossEntries,
 } from '../engine/file-diagnostics.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { EngineDrawingObject } from '../engine/workbook-handle-annotations.js';
 
 export type WorkbookSaveFormat = 'xlsx' | 'xlsb';
 
@@ -50,6 +52,9 @@ export interface WorkbookSaveOutcome {
   losses: WorkbookSaveLoss[];
 }
 
+const isDeferredDrawing = (object: EngineDrawingObject): boolean =>
+  object.kind === DrawingObjectKind.GraphicFrame || object.kind === DrawingObjectKind.Other;
+
 const sheetIndexes = (wb: WorkbookHandle): number[] =>
   Array.from({ length: wb.sheetCount }, (_, i) => i);
 
@@ -72,7 +77,9 @@ function xlsbContentLosses(wb: WorkbookHandle, deferred: number): WorkbookSaveLo
     {
       id: 'drawings',
       count: sumSheets(wb, (s) => wb.listDrawingObjects(s).length),
-      bound: sumSheets(wb, (s) => (wb.listDrawingObjects(s).length > 0 ? 1 : 0)),
+      // Pictures, charts and shapes are written; only a drawing holding another
+      // graphic frame (SmartArt, ...) is deferred.
+      bound: sumSheets(wb, (s) => (wb.listDrawingObjects(s).some(isDeferredDrawing) ? 1 : 0)),
     },
     { id: 'pivotTables', count: wb.getPivotTables().length },
     { id: 'slicers', count: sumSheets(wb, (s) => wb.listSlicers(s).length) },

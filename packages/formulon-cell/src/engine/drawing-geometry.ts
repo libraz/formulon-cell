@@ -1,4 +1,5 @@
-import type { ImagePlacement } from '@libraz/formulon';
+import type { DrawingAnchorPatch } from '@libraz/formulon';
+import { AnchorKind } from '@libraz/formulon';
 import {
   bodyBandOrigin,
   cellRectUnclamped,
@@ -12,9 +13,7 @@ import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { EngineDrawingAnchor } from './types.js';
 
 /** `AnchorKind.Absolute`: the engine cannot re-anchor such an object. */
-export const ANCHOR_KIND_ABSOLUTE = 2;
-/** `AnchorKind.TwoCell`: the size follows the `to` marker. */
-const ANCHOR_KIND_TWO_CELL = 1;
+export const ANCHOR_KIND_ABSOLUTE = AnchorKind.Absolute;
 
 export const EMU_PER_PX = 9525;
 
@@ -35,28 +34,33 @@ export const sameAnchor = (
 ) => a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
 
 /** The anchor fields of a drawing object, as the store keeps them. */
-export const drawingAnchorOf = (object: EngineDrawingAnchor): EngineDrawingAnchor => ({
-  anchorKind: object.anchorKind,
-  editAs: object.editAs,
-  fromRow: object.fromRow,
-  fromCol: object.fromCol,
-  fromRowOff: object.fromRowOff,
-  fromColOff: object.fromColOff,
-  toRow: object.toRow,
-  toCol: object.toCol,
-  toRowOff: object.toRowOff,
-  toColOff: object.toColOff,
-  cx: object.cx,
-  cy: object.cy,
-});
+export const drawingAnchorOf = (object: {
+  readonly anchor: EngineDrawingAnchor;
+}): EngineDrawingAnchor => {
+  const { anchor } = object;
+  return {
+    kind: anchor.kind,
+    editAs: anchor.editAs,
+    fromRow: anchor.fromRow,
+    fromCol: anchor.fromCol,
+    fromRowOffsetEmu: anchor.fromRowOffsetEmu,
+    fromColOffsetEmu: anchor.fromColOffsetEmu,
+    toRow: anchor.toRow,
+    toCol: anchor.toCol,
+    toRowOffsetEmu: anchor.toRowOffsetEmu,
+    toColOffsetEmu: anchor.toColOffsetEmu,
+    widthEmu: anchor.widthEmu,
+    heightEmu: anchor.heightEmu,
+  };
+};
 
 const dimensionsForAnchor = (
   store: SpreadsheetStore | undefined,
   object: EngineDrawingAnchor,
 ): { widthEmu: number; heightEmu: number } => {
-  let widthEmu = object.cx;
-  let heightEmu = object.cy;
-  if (object.anchorKind !== ANCHOR_KIND_TWO_CELL || (widthEmu > 0 && heightEmu > 0)) {
+  let widthEmu = object.widthEmu;
+  let heightEmu = object.heightEmu;
+  if (object.kind !== AnchorKind.TwoCell || (widthEmu > 0 && heightEmu > 0)) {
     return { widthEmu: Math.max(1, widthEmu), heightEmu: Math.max(1, heightEmu) };
   }
   try {
@@ -68,12 +72,12 @@ const dimensionsForAnchor = (
     const to = cellRectUnclamped(layout, state.viewport, object.toRow, object.toCol);
     if (widthEmu <= 0) {
       widthEmu = Math.abs(
-        ((to.x - from.x) / zoom) * EMU_PER_PX + object.toColOff - object.fromColOff,
+        ((to.x - from.x) / zoom) * EMU_PER_PX + object.toColOffsetEmu - object.fromColOffsetEmu,
       );
     }
     if (heightEmu <= 0) {
       heightEmu = Math.abs(
-        ((to.y - from.y) / zoom) * EMU_PER_PX + object.toRowOff - object.fromRowOff,
+        ((to.y - from.y) / zoom) * EMU_PER_PX + object.toRowOffsetEmu - object.fromRowOffsetEmu,
       );
     }
   } catch {
@@ -83,23 +87,31 @@ const dimensionsForAnchor = (
   return { widthEmu: Math.max(1, widthEmu), heightEmu: Math.max(1, heightEmu) };
 };
 
-/** `anchor` as the placement `setDrawingAnchor` takes. A two-cell anchor that
- *  reports no size is measured on the current layout. */
+/** `anchor` as the placement `setDrawingAnchor` takes: a two-cell anchor by its
+ *  box, any other by its top-left marker and size. */
 export const placementForAnchor = (
   store: SpreadsheetStore | undefined,
   anchor: EngineDrawingAnchor,
-): ImagePlacement => {
-  const dimensions = dimensionsForAnchor(store, anchor);
-  return {
-    anchorKind: anchor.anchorKind,
-    editAs: anchor.editAs,
-    row: anchor.fromRow,
-    col: anchor.fromCol,
-    rowOffEmu: anchor.fromRowOff,
-    colOffEmu: anchor.fromColOff,
-    widthEmu: dimensions.widthEmu,
-    heightEmu: dimensions.heightEmu,
+): DrawingAnchorPatch => {
+  const from = {
+    kind: anchor.kind,
+    fromRow: anchor.fromRow,
+    fromCol: anchor.fromCol,
+    fromRowOffsetEmu: anchor.fromRowOffsetEmu,
+    fromColOffsetEmu: anchor.fromColOffsetEmu,
   };
+  if (anchor.kind === AnchorKind.TwoCell) {
+    return {
+      ...from,
+      editAs: anchor.editAs,
+      toRow: anchor.toRow,
+      toCol: anchor.toCol,
+      toRowOffsetEmu: anchor.toRowOffsetEmu,
+      toColOffsetEmu: anchor.toColOffsetEmu,
+    };
+  }
+  const dimensions = dimensionsForAnchor(store, anchor);
+  return { ...from, widthEmu: dimensions.widthEmu, heightEmu: dimensions.heightEmu };
 };
 
 type ViewLayoutOf = ReturnType<typeof layoutForView>;
@@ -151,13 +163,64 @@ export const nearestGridline = (
   return value - start <= end - value ? start : end;
 };
 
-/** `anchor` moved and resized to grid pixels; omitted values keep the anchor's. */
+/** The cell holding grid pixel (`x`, `y`) and the EMU offset of the pixel inside it. */
+const markerAt = (
+  store: SpreadsheetStore,
+  x: number,
+  y: number,
+): { row: number; col: number; rowOff: number; colOff: number } => {
+  const state = store.getState();
+  const zoom = viewportZoom(store);
+  try {
+    const layout = layoutForView(state);
+    const col = colAtX(layout, state.viewport, x, zoom);
+    const row = rowAtY(layout, state.viewport, y, zoom);
+    const rect = cellRectUnclamped(layout, state.viewport, row, col);
+    return {
+      row,
+      col,
+      rowOff: Math.max(0, Math.round(((y - rect.y) / zoom) * EMU_PER_PX)),
+      colOff: Math.max(0, Math.round(((x - rect.x) / zoom) * EMU_PER_PX)),
+    };
+  } catch {
+    const { defaultColWidth, defaultRowHeight } = state.layout;
+    return {
+      row: Math.max(0, Math.floor(y / (defaultRowHeight * zoom))),
+      col: Math.max(0, Math.floor(x / (defaultColWidth * zoom))),
+      rowOff: 0,
+      colOff: 0,
+    };
+  }
+};
+
+/** `anchor` moved and resized to grid pixels; omitted values keep the anchor's.
+ *  A two-cell anchor moves its `to` marker with the frame's far corner. */
 export const placementForPixels = (
   store: SpreadsheetStore | undefined,
   anchor: EngineDrawingAnchor,
   patch: Partial<Pick<SessionIllustration, 'x' | 'y' | 'w' | 'h'>>,
-): ImagePlacement => {
+): DrawingAnchorPatch => {
   const original = placementForAnchor(store, anchor);
+  if (anchor.kind === AnchorKind.TwoCell) {
+    if (!store) return original;
+    const frame = { ...sessionPosition(store, anchor), ...patch };
+    const from =
+      patch.x !== undefined || patch.y !== undefined ? markerAt(store, frame.x, frame.y) : null;
+    const to = markerAt(store, frame.x + frame.w, frame.y + frame.h);
+    return {
+      ...original,
+      ...(from && patch.x !== undefined
+        ? { fromCol: from.col, fromColOffsetEmu: from.colOff }
+        : {}),
+      ...(from && patch.y !== undefined
+        ? { fromRow: from.row, fromRowOffsetEmu: from.rowOff }
+        : {}),
+      toRow: to.row,
+      toCol: to.col,
+      toRowOffsetEmu: to.rowOff,
+      toColOffsetEmu: to.colOff,
+    };
+  }
   const originalWidth = original.widthEmu ?? 1;
   const originalHeight = original.heightEmu ?? 1;
   const zoom = viewportZoom(store);
@@ -181,8 +244,8 @@ export const placementForPixels = (
     const layout = layoutForView(state);
     let col = anchor.fromCol;
     let row = anchor.fromRow;
-    let colOffEmu = anchor.fromColOff;
-    let rowOffEmu = anchor.fromRowOff;
+    let colOffEmu = anchor.fromColOffsetEmu;
+    let rowOffEmu = anchor.fromRowOffsetEmu;
     if (patch.x !== undefined) {
       const targetX = patch.x;
       col = colAtX(layout, state.viewport, targetX, zoom);
@@ -197,10 +260,10 @@ export const placementForPixels = (
     }
     return {
       ...original,
-      row,
-      col,
-      rowOffEmu,
-      colOffEmu,
+      fromRow: row,
+      fromCol: col,
+      fromRowOffsetEmu: rowOffEmu,
+      fromColOffsetEmu: colOffEmu,
       widthEmu: nextWidth,
       heightEmu: nextHeight,
     };
@@ -230,8 +293,8 @@ export const sessionPosition = (
     );
     const zoom = viewportZoom(store);
     return {
-      x: rect.x + (object.fromColOff / EMU_PER_PX) * zoom,
-      y: rect.y + (object.fromRowOff / EMU_PER_PX) * zoom,
+      x: rect.x + (object.fromColOffsetEmu / EMU_PER_PX) * zoom,
+      y: rect.y + (object.fromRowOffsetEmu / EMU_PER_PX) * zoom,
       w: Math.max(1, dimensions.widthEmu / EMU_PER_PX) * zoom,
       h: Math.max(1, dimensions.heightEmu / EMU_PER_PX) * zoom,
     };
@@ -239,8 +302,8 @@ export const sessionPosition = (
     const zoom = viewportZoom(store);
     const { defaultColWidth, defaultRowHeight } = state.layout;
     return {
-      x: (object.fromCol * defaultColWidth + object.fromColOff / EMU_PER_PX) * zoom,
-      y: (object.fromRow * defaultRowHeight + object.fromRowOff / EMU_PER_PX) * zoom,
+      x: (object.fromCol * defaultColWidth + object.fromColOffsetEmu / EMU_PER_PX) * zoom,
+      y: (object.fromRow * defaultRowHeight + object.fromRowOffsetEmu / EMU_PER_PX) * zoom,
       w: Math.max(1, dimensions.widthEmu / EMU_PER_PX) * zoom,
       h: Math.max(1, dimensions.heightEmu / EMU_PER_PX) * zoom,
     };
@@ -253,45 +316,21 @@ export const twoCellAnchorForPixels = (
   frame: { x: number; y: number; w: number; h: number },
   editAs: EngineDrawingAnchor['editAs'],
 ): EngineDrawingAnchor => {
-  const state = store.getState();
-  const zoom = viewportZoom(store);
-  const point = (x: number, y: number) => {
-    try {
-      const layout = layoutForView(state);
-      const col = colAtX(layout, state.viewport, x, zoom);
-      const row = rowAtY(layout, state.viewport, y, zoom);
-      const rect = cellRectUnclamped(layout, state.viewport, row, col);
-      return {
-        row,
-        col,
-        rowOff: Math.max(0, Math.round(((y - rect.y) / zoom) * EMU_PER_PX)),
-        colOff: Math.max(0, Math.round(((x - rect.x) / zoom) * EMU_PER_PX)),
-      };
-    } catch {
-      const { defaultColWidth, defaultRowHeight } = state.layout;
-      return {
-        row: Math.max(0, Math.floor(y / (defaultRowHeight * zoom))),
-        col: Math.max(0, Math.floor(x / (defaultColWidth * zoom))),
-        rowOff: 0,
-        colOff: 0,
-      };
-    }
-  };
-  const from = point(frame.x, frame.y);
-  const to = point(frame.x + frame.w, frame.y + frame.h);
+  const from = markerAt(store, frame.x, frame.y);
+  const to = markerAt(store, frame.x + frame.w, frame.y + frame.h);
   return {
-    anchorKind: ANCHOR_KIND_TWO_CELL,
+    kind: AnchorKind.TwoCell,
     editAs,
     fromRow: from.row,
     fromCol: from.col,
-    fromRowOff: from.rowOff,
-    fromColOff: from.colOff,
+    fromRowOffsetEmu: from.rowOff,
+    fromColOffsetEmu: from.colOff,
     toRow: to.row,
     toCol: to.col,
-    toRowOff: to.rowOff,
-    toColOff: to.colOff,
-    cx: 0,
-    cy: 0,
+    toRowOffsetEmu: to.rowOff,
+    toColOffsetEmu: to.colOff,
+    widthEmu: 0,
+    heightEmu: 0,
   };
 };
 

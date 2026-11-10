@@ -1,5 +1,5 @@
 import { type BuiltInLocale, builtInLocaleFor } from '../i18n/locales.js';
-import type { ExcelProfileId, SpreadsheetProfileId } from './types.js';
+import type { ProfileId as ExcelProfileId, SpreadsheetProfileId } from './types.js';
 
 /** Raw ids are strings at the compatibility boundary so older engines can be
  * probed and unknown ids can be reported as `null` instead of rejected by

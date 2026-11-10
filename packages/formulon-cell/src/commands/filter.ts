@@ -1195,11 +1195,9 @@ const nativeDistinctFilterItems = (
   const formula = `=SORT(UNIQUE($${column}$${first}:$${column}$${last}))`;
   try {
     const result = wb.evaluateFormulaArray(nativeFilterAnchor(state, range), formula);
-    if (!result.status.ok || result.cols !== 1 || result.rows < 1 || result.rows > count)
-      return null;
-    if (result.cells.length !== result.rows || result.cells.some((row) => row.length !== 1))
-      return null;
-    const values = result.cells.map((row) => (row?.[0] ? fromEngineValue(row[0]) : null));
+    if (!result || result.length < 1 || result.length > count) return null;
+    if (result.some((row) => row.length !== 1)) return null;
+    const values = result.map((row) => (row?.[0] ? fromEngineValue(row[0]) : null));
     if (values.some((value): value is null => value === null)) return null;
     const candidates = new Map<string, number[]>();
     for (let row = range.r0 + 1; row <= range.r1; row += 1) {

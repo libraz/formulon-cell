@@ -1,29 +1,29 @@
+import { FormulonError, StatusCode, ValueKind } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
-
-import type { EvalResult, FormulonModule, Status, Workbook } from '../../../src/engine/types.js';
+import { loadFormulon } from '../../../src/engine/loader.js';
+import type { Formulon, Value, Workbook } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
-const ok: Status = { ok: true, status: 0, message: '', context: '' };
-const failed = (message: string): Status => ({ ok: false, status: 1, message, context: '' });
+const failed = (message: string): FormulonError =>
+  new FormulonError(StatusCode.InvalidArgument, message);
 
-const numberResult = (number: number): EvalResult => ({
-  status: ok,
-  value: { kind: 1, number, boolean: 0, text: '', errorCode: 0 },
-});
+const numberResult = (number: number): Value => ({ kind: ValueKind.Number, number });
 
-const textResult = (text: string): EvalResult => ({
-  status: ok,
-  value: { kind: 3, number: 0, boolean: 0, text, errorCode: 0 },
-});
+const textResult = (text: string): Value => ({ kind: ValueKind.Text, text });
 
 type RawWorkbook = Record<string, unknown> & {
-  delete: ReturnType<typeof vi.fn>;
+  dispose: ReturnType<typeof vi.fn>;
+};
+
+type FreshWorkbook = RawWorkbook & {
+  setProfileId: ReturnType<typeof vi.fn>;
+  evaluateTypedFormula: ReturnType<typeof vi.fn>;
 };
 
 type FakeEngine = {
   handle: WorkbookHandle;
   active: RawWorkbook;
-  fresh: RawWorkbook[];
+  fresh: FreshWorkbook[];
   evalFormula: ReturnType<typeof vi.fn>;
   createDefault: ReturnType<typeof vi.fn>;
 };
@@ -31,47 +31,44 @@ type FakeEngine = {
 const makeEngine = (
   opts: {
     profile?: string | null;
-    profileStatus?: Status;
-    freshSet?: (profile: string) => Status;
-    freshEvaluate?: (sheet: number, row: number, col: number, formula: string) => EvalResult;
+    profileError?: FormulonError;
+    freshSet?: (profile: string) => void;
+    freshEvaluate?: (row: number, col: number, formula: string) => Value;
     activeEvaluate?: ReturnType<typeof vi.fn>;
-    includeLegacyProfileApi?: boolean;
   } = {},
 ): FakeEngine => {
-  const fresh: RawWorkbook[] = [];
+  const fresh: FreshWorkbook[] = [];
   const evalFormula = vi.fn((formula: string) => textResult(`legacy:${formula}`));
   const createDefault = vi.fn(() => {
-    const next: RawWorkbook = {
-      delete: vi.fn(),
-      setExcelProfileId: vi.fn((profile: string) => opts.freshSet?.(profile) ?? ok),
-      evaluateFormulaText: vi.fn(
-        (sheet: number, row: number, col: number, formula: string) =>
-          opts.freshEvaluate?.(sheet, row, col, formula) ?? numberResult(42),
-      ),
+    const evaluateTypedFormula = vi.fn(
+      (row: number, col: number, formula: string) =>
+        opts.freshEvaluate?.(row, col, formula) ?? numberResult(42),
+    );
+    const next: FreshWorkbook = {
+      dispose: vi.fn(),
+      setProfileId: vi.fn((profile: string) => opts.freshSet?.(profile)),
+      evaluateTypedFormula,
+      sheet: () => ({ evaluateTypedFormula }),
     };
     fresh.push(next);
     return next;
   });
+  const activeEvaluate = opts.activeEvaluate ?? vi.fn(() => numberResult(999));
   const active: RawWorkbook = {
-    delete: vi.fn(),
-    evaluateFormulaText: opts.activeEvaluate ?? vi.fn(() => numberResult(999)),
+    dispose: vi.fn(),
+    sheet: () => ({ evaluateTypedFormula: activeEvaluate }),
+    getProfileId: vi.fn(() => {
+      if (opts.profileError) throw opts.profileError;
+      return opts.profile;
+    }),
+    setProfileId: vi.fn(),
   };
-  if (opts.includeLegacyProfileApi !== false) {
-    active.excelProfileId = vi.fn(() => ({
-      status: opts.profileStatus ?? ok,
-      value: opts.profile,
-    }));
-    active.setExcelProfileId = vi.fn(() => ok);
-  }
   const module = {
     Workbook: { createDefault },
-    evalFormula,
-    versionString: () => 'test',
-  } as unknown as FormulonModule;
-  const Ctor = WorkbookHandle as unknown as new (
-    module: FormulonModule,
-    wb: Workbook,
-  ) => WorkbookHandle;
+    evaluateTypedFormula: evalFormula,
+    getVersion: () => 'test',
+  } as unknown as Formulon;
+  const Ctor = WorkbookHandle as unknown as new (module: Formulon, wb: Workbook) => WorkbookHandle;
   return {
     handle: new Ctor(module, active as unknown as Workbook),
     active,
@@ -92,17 +89,23 @@ describe('WorkbookHandle.evalFormula profile isolation', () => {
     expect(engine.evalFormula).not.toHaveBeenCalled();
     expect(activeEvaluate).not.toHaveBeenCalled();
     expect(engine.createDefault).toHaveBeenCalledOnce();
-    expect(engine.fresh[0]?.setExcelProfileId).toHaveBeenCalledWith('mac-365-future_XY');
-    expect(engine.fresh[0]?.evaluateFormulaText).toHaveBeenCalledWith(0, 0, 0, '=A1');
-    expect(engine.fresh[0]?.delete).toHaveBeenCalledOnce();
+    expect(engine.fresh[0]?.setProfileId).toHaveBeenCalledWith('mac-365-future_XY');
+    expect(engine.fresh[0]?.evaluateTypedFormula).toHaveBeenCalledWith(0, 0, '=A1');
+    expect(engine.fresh[0]?.dispose).toHaveBeenCalledOnce();
   });
 
-  it('keeps the legacy module evaluator when the profile-aware API is absent', () => {
-    const engine = makeEngine({ includeLegacyProfileApi: false });
-
-    expect(engine.handle.evalFormula('=1+2')).toEqual(textResult('legacy:=1+2'));
-    expect(engine.evalFormula).toHaveBeenCalledWith('=1+2');
-    expect(engine.createDefault).not.toHaveBeenCalled();
+  it('does not evaluate on the stub engine, which has no formula evaluator', async () => {
+    const stub = await loadFormulon({ preferStub: true });
+    const Ctor = WorkbookHandle as unknown as new (
+      module: Formulon,
+      wb: Workbook,
+    ) => WorkbookHandle;
+    const handle = new Ctor(stub, stub.Workbook.createDefault());
+    try {
+      expect(handle.evalFormula('=1+2')).toBeNull();
+    } finally {
+      handle.dispose();
+    }
   });
 
   it('falls back when the active getter returns no profile', () => {
@@ -114,16 +117,13 @@ describe('WorkbookHandle.evalFormula profile isolation', () => {
   });
 
   it('propagates an active profile getter failure', () => {
-    const engine = makeEngine({
-      profile: null,
-      profileStatus: failed('profile read failed'),
-    });
+    const engine = makeEngine({ profile: null, profileError: failed('profile read failed') });
 
-    expect(() => engine.handle.evalFormula('=1+2')).toThrow('excelProfileId: profile read failed');
+    expect(() => engine.handle.evalFormula('=1+2')).toThrow('profile read failed');
     expect(engine.createDefault).not.toHaveBeenCalled();
   });
 
-  it('deletes the fresh workbook when evaluation throws', () => {
+  it('disposes the fresh workbook when evaluation throws', () => {
     const engine = makeEngine({
       profile: 'win-365-en_US',
       freshEvaluate: () => {
@@ -132,20 +132,20 @@ describe('WorkbookHandle.evalFormula profile isolation', () => {
     });
 
     expect(() => engine.handle.evalFormula('=1+2')).toThrow('evaluation exploded');
-    expect(engine.fresh[0]?.delete).toHaveBeenCalledOnce();
+    expect(engine.fresh[0]?.dispose).toHaveBeenCalledOnce();
   });
 
-  it('deletes the fresh workbook and rejects a failed profile setter', () => {
+  it('disposes the fresh workbook and rejects a failed profile setter', () => {
     const engine = makeEngine({
       profile: 'win-365-en_US',
-      freshSet: () => failed('profile write failed'),
+      freshSet: () => {
+        throw failed('profile write failed');
+      },
     });
 
-    expect(() => engine.handle.evalFormula('=1+2')).toThrow(
-      'setExcelProfileId: profile write failed',
-    );
-    expect(engine.fresh[0]?.delete).toHaveBeenCalledOnce();
-    expect(engine.fresh[0]?.evaluateFormulaText).not.toHaveBeenCalled();
+    expect(() => engine.handle.evalFormula('=1+2')).toThrow('profile write failed');
+    expect(engine.fresh[0]?.dispose).toHaveBeenCalledOnce();
+    expect(engine.fresh[0]?.evaluateTypedFormula).not.toHaveBeenCalled();
   });
 
   it('uses the active profile for real Mac and Windows collation', async () => {
@@ -153,9 +153,9 @@ describe('WorkbookHandle.evalFormula profile isolation', () => {
     try {
       expect(workbook.isStub).toBe(false);
       expect(workbook.setSpreadsheetProfileId('mac-en_US')).toBe(true);
-      expect(workbook.evalFormula('="ガ"="ｶﾞ"').value.boolean).toBe(1);
+      expect(workbook.evalFormula('="ガ"="ｶﾞ"')).toMatchObject({ boolean: true });
       expect(workbook.setSpreadsheetProfileId('windows-en_US')).toBe(true);
-      expect(workbook.evalFormula('="ガ"="ｶﾞ"').value.boolean).toBe(0);
+      expect(workbook.evalFormula('="ガ"="ｶﾞ"')).toMatchObject({ boolean: false });
     } finally {
       workbook.dispose();
     }
@@ -169,8 +169,8 @@ describe('WorkbookHandle.evalFormula profile isolation', () => {
       workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 99);
 
       const currency = workbook.evalFormula('=YEN(1234.5)');
-      expect(currency.value).toMatchObject({ kind: 3, text: '¥1,235' });
-      expect(workbook.evalFormula('=A1').value).toMatchObject({ kind: 1, number: 0 });
+      expect(currency).toMatchObject({ kind: ValueKind.Text, text: '¥1,235' });
+      expect(workbook.evalFormula('=A1')).toMatchObject({ kind: ValueKind.Number, number: 0 });
     } finally {
       workbook.dispose();
     }

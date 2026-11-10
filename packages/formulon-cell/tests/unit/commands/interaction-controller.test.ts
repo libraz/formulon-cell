@@ -1,3 +1,4 @@
+import { FormulonError, StatusCode } from '@libraz/formulon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { History } from '../../../src/commands/history.js';
@@ -801,24 +802,18 @@ describe('InteractionController', () => {
     const raw = (
       wb as unknown as {
         wb: {
-          setNumber: (
-            sheet: number,
-            row: number,
-            col: number,
-            value: number,
-          ) => {
-            ok: boolean;
-            message?: string;
+          sheet: (index: number) => {
+            setNumber: (row: number, col: number, value: number) => void;
           };
         };
       }
-    ).wb;
+    ).wb.sheet(0);
     const original = raw.setNumber.bind(raw);
     let writes = 0;
-    raw.setNumber = (sheet, row, col, value) => {
+    raw.setNumber = (row, col, value) => {
       writes += 1;
-      if (writes === 2) return { ok: false, message: 'forced failure' };
-      return original(sheet, row, col, value);
+      if (writes === 2) throw new FormulonError(StatusCode.InvalidArgument, 'forced failure');
+      return original(row, col, value);
     };
 
     expect(() =>
@@ -891,18 +886,14 @@ describe('InteractionController', () => {
     wb.setNumber(A1, 1);
     wb.setFormula(B1, '=A1+1');
     expect(wb.getValue(B1)).toEqual({ kind: 'number', value: 2 });
-    const raw = (
-      wb as unknown as {
-        wb: {
-          recalc: () => { ok: boolean; message?: string };
-        };
-      }
-    ).wb;
+    const raw = (wb as unknown as { wb: { recalc: () => void } }).wb;
     const original = raw.recalc.bind(raw);
     let recalculations = 0;
     raw.recalc = () => {
       recalculations += 1;
-      if (recalculations === 1) return { ok: false, message: 'forced recalc failure' };
+      if (recalculations === 1) {
+        throw new FormulonError(StatusCode.InvalidArgument, 'forced recalc failure');
+      }
       return original();
     };
     expect(() =>
@@ -1087,9 +1078,11 @@ describe('InteractionController', () => {
   it('stops exposing a workbook whose rollback recalculation also fails', async () => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     wb.setNumber(A1, 1);
-    const engine = (wb as unknown as { wb: { recalc(): { ok: boolean; message?: string } } }).wb;
+    const engine = (wb as unknown as { wb: { recalc(): void } }).wb;
     const original = engine.recalc.bind(engine);
-    engine.recalc = () => ({ ok: false, message: 'unrecoverable recalc failure' });
+    engine.recalc = () => {
+      throw new FormulonError(StatusCode.InvalidArgument, 'unrecoverable recalc failure');
+    };
     try {
       expect(() =>
         wb.applyCellPatchAtomic([{ addr: A1, value: { kind: 'number', value: 9 } }]),

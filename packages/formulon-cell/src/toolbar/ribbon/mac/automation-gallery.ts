@@ -585,10 +585,7 @@ const hyperlinkAnchorKey = (sheet: number, row: number, col: number): string =>
   `${sheet}:${row}:${col}`;
 
 const cloneHyperlinkRecord = (record: EngineHyperlinkRecord): EngineHyperlinkRecord => ({
-  row: record.row,
-  col: record.col,
-  lastRow: record.lastRow,
-  lastCol: record.lastCol,
+  range: { ...record.range },
   target: record.target,
   location: record.location,
   display: record.display,
@@ -677,17 +674,19 @@ const restoreNativeHyperlinks = (
     if (
       !instance.workbook.addHyperlinkRange(
         sheet,
-        record.row,
-        record.col,
-        record.lastRow,
-        record.lastCol,
-        record.target,
-        record.display,
-        record.tooltip,
-        record.location,
+        record.range.firstRow,
+        record.range.firstCol,
+        record.range.lastRow,
+        record.range.lastCol,
+        record.target ?? '',
+        record.display ?? '',
+        record.tooltip ?? '',
+        record.location ?? '',
       )
     )
-      throw new Error(`Could not restore hyperlink at ${record.row}:${record.col}.`);
+      throw new Error(
+        `Could not restore hyperlink at ${record.range.firstRow}:${record.range.firstCol}.`,
+      );
   }
 };
 
@@ -707,23 +706,23 @@ const planHyperlinkRemoval = (instance: SpreadsheetInstance): HyperlinkRemovalPl
     return true;
   };
 
-  for (const record of native) {
+  for (const { range: record } of native) {
     if (
-      !Number.isInteger(record.row) ||
-      !Number.isInteger(record.col) ||
+      !Number.isInteger(record.firstRow) ||
+      !Number.isInteger(record.firstCol) ||
       !Number.isInteger(record.lastRow) ||
       !Number.isInteger(record.lastCol) ||
-      record.row < 0 ||
-      record.col < 0 ||
-      record.lastRow < record.row ||
-      record.lastCol < record.col ||
+      record.firstRow < 0 ||
+      record.firstCol < 0 ||
+      record.lastRow < record.firstRow ||
+      record.lastCol < record.firstCol ||
       record.lastRow > MAX_ROW ||
       record.lastCol > MAX_COL
     )
       return null;
-    nativeAnchorKeys.add(hyperlinkAnchorKey(sheet, record.row, record.col));
-    for (let row = record.row; row <= record.lastRow; row += 1) {
-      for (let col = record.col; col <= record.lastCol; col += 1) {
+    nativeAnchorKeys.add(hyperlinkAnchorKey(sheet, record.firstRow, record.firstCol));
+    for (let row = record.firstRow; row <= record.lastRow; row += 1) {
+      for (let col = record.firstCol; col <= record.lastCol; col += 1) {
         if (cells.size >= MAX_AUTOMATION_MATERIALIZED_CELLS && !cells.has(`${sheet}:${row}:${col}`))
           return null;
         if (!addCell({ sheet, row, col })) return null;

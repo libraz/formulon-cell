@@ -29,6 +29,14 @@ const makeWb = (tables: TableDef[] = []): { wb: WorkbookHandle; names: string[] 
       return names.length;
     },
     sheetName: (i: number) => names[i] ?? '',
+    sheetIndexByName(name: string): number | null {
+      const index = names.findIndex((n) => n.toLowerCase() === name.toLowerCase());
+      return index < 0 ? null : index;
+    },
+    tableIndexByName: (name: string) => {
+      const index = live.findIndex((t) => t.name.toLowerCase() === name.toLowerCase());
+      return index < 0 ? null : index;
+    },
     recalcAuto: () => {},
     cells: () => [],
     renameSheet: (i: number, name: string) => {

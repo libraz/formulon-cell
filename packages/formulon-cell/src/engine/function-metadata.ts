@@ -1,8 +1,9 @@
-import type {
-  FunctionMetadataEntry,
-  FunctionMetadataResult,
-  MergedFunctionMetadataResult,
-} from './types.js';
+import type { FunctionMetadataEntry, FunctionMetadataResult } from './types.js';
+
+/** Engine metadata with the provider's locale alias, when one was merged. */
+export type MergedFunctionMetadataResult = FunctionMetadataResult & {
+  readonly localizedName?: string;
+};
 
 /**
  * BCP-47 display tag for each engine locale ordinal. Mirrors the ordinal
@@ -74,7 +75,7 @@ export function localeTag(locale: number): string {
 
 /**
  * Merge a host-supplied {@link FunctionMetadataEntry} over the engine's
- * structural `functionMetadata()` result.
+ * structural `getFunctionMetadata()` result.
  *
  * The engine package exports the same pure helper, but only from the entry
  * point that also pulls in the generated WASM glue. Keeping a copy here lets a
@@ -82,8 +83,8 @@ export function localeTag(locale: number): string {
  * two agree on `docs/function-metadata-schema.md`.
  *
  * Field precedence (first non-nullish wins):
- *   - `signatureTemplate`: `entry.localized[locale].signature` →
- *     `entry.signature` → `base.signatureTemplate`
+ *   - `signature`: `entry.localized[locale].signature` →
+ *     `entry.signature` → `base.signature`
  *   - `description`: `entry.localized[locale].description` →
  *     `entry.description` → `base.description`
  *   - `localizedName`: `entry.aliases[locale]` → `base.name`
@@ -99,13 +100,13 @@ export function mergeFunctionMetadata(
 ): MergedFunctionMetadataResult {
   if (!entry) return base;
   const loc = entry.localized?.[locale];
-  const signatureTemplate = loc?.signature ?? entry.signature ?? base.signatureTemplate;
+  const signature = loc?.signature ?? entry.signature ?? base.signature;
   const description = loc?.description ?? entry.description ?? base.description;
   const localizedName = entry.aliases?.[locale] ?? base.name;
   return {
     ...base,
-    ...(signatureTemplate !== undefined ? { signatureTemplate } : {}),
-    ...(description !== undefined ? { description } : {}),
+    signature,
+    description,
     ...(localizedName !== undefined ? { localizedName } : {}),
   };
 }

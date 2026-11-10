@@ -2,9 +2,10 @@ import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
-  EngineMention,
-  EnginePerson,
+  EngineMentionInput,
+  EnginePersonInput,
   EngineThreadedComment,
+  EngineThreadedCommentInput,
 } from '../engine/workbook-handle-annotations.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
@@ -110,7 +111,8 @@ export function threadedCommentsAt(
   wb?: WorkbookHandle,
 ): ThreadedCommentEntry[] {
   return listThreadedComments(store, addr.sheet, wb).filter(
-    (entry) => entry.parentId === '' && entry.row === addr.row && entry.col === addr.col,
+    (entry) =>
+      entry.parentId === null && entry.cell.row === addr.row && entry.cell.col === addr.col,
   );
 }
 
@@ -128,17 +130,12 @@ const guid = (): string => {
   return `{${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}}`.toUpperCase();
 };
 
-const timestamp = (): string => {
-  const value = new Date().toISOString();
-  return `${value.slice(0, 19)}.${value.slice(20, 22)}`;
-};
-
 const ensurePerson = (wb: WorkbookHandle, author: string): string => {
   const displayName = author.trim() || DEFAULT_COMMENT_AUTHOR;
   const existing = wb.getPersons().find((person) => person.displayName === displayName);
   if (existing) return existing.id;
   const id = guid();
-  const person: EnginePerson = { id, displayName, userId: '', providerId: 'None' };
+  const person: EnginePersonInput = { id, displayName, userId: null, providerId: 'None' };
   if (!wb.addPerson(person)) {
     const retry = wb.getPersons().find((candidate) => candidate.displayName === displayName);
     if (retry) return retry.id;
@@ -157,7 +154,7 @@ const threadedEntryAddress = (
   const opening = entry.parentId
     ? (entries.find((candidate) => candidate.id === entry.parentId) ?? entry)
     : entry;
-  return { sheet, row: opening.row, col: opening.col };
+  return { sheet, row: opening.cell.row, col: opening.cell.col };
 };
 
 const refreshThreadCache = (store: SpreadsheetStore, wb: WorkbookHandle, sheet: number): void => {
@@ -178,7 +175,7 @@ export function addThreadedComment(
   options: {
     author?: string;
     replyToThread?: string;
-    mentions?: readonly EngineMention[];
+    mentions?: readonly EngineMentionInput[];
     authorization?: ThreadedMutationAuthorization;
   } = {},
 ): ThreadedCommentEntry | null {
@@ -194,14 +191,13 @@ export function addThreadedComment(
   } catch {
     return null;
   }
-  const entry: Partial<ThreadedCommentEntry> & Pick<ThreadedCommentEntry, 'id' | 'text'> = {
+  const entry: EngineThreadedCommentInput & { id: string } = {
     id: guid(),
-    row: addr.row,
-    col: addr.col,
+    cell: { row: addr.row, col: addr.col },
     personId,
-    created: timestamp(),
+    created: new Date(),
     text,
-    parentId: options.replyToThread ?? '',
+    parentId: options.replyToThread ?? null,
     done: false,
     mentions: options.mentions ? options.mentions.map((mention) => ({ ...mention })) : [],
   };
@@ -219,7 +215,7 @@ export function editThreadedComment(
   id: string,
   text: string,
   wb: WorkbookHandle | undefined,
-  mentions: readonly EngineMention[] = [],
+  mentions: readonly EngineMentionInput[] = [],
   authorization?: ThreadedMutationAuthorization,
 ): boolean {
   if (!wb?.capabilities.threadedComments || text.length === 0) return false;
@@ -283,7 +279,7 @@ const applyThreadSnapshot = (
     // Replies must be removed before their opener: native removal of an
     // opener intentionally removes the whole thread.
     for (const entry of [...entries].sort(
-      (a, b) => Number(a.parentId === '') - Number(b.parentId === ''),
+      (a, b) => Number(a.parentId === null) - Number(b.parentId === null),
     )) {
       if (!wb.removeThreadedComment(sheet, entry.id)) {
         throw new Error('thread history remove failed');
@@ -293,7 +289,7 @@ const applyThreadSnapshot = (
   const restore = (entries: readonly ThreadedCommentEntry[]): void => {
     // The native API requires a reply's opener to exist first.
     for (const entry of [...entries].sort(
-      (a, b) => Number(a.parentId !== '') - Number(b.parentId !== ''),
+      (a, b) => Number(a.parentId !== null) - Number(b.parentId !== null),
     )) {
       if (!wb.addThreadedComment(sheet, cloneThread(entry))) {
         throw new Error('thread history restore failed');
@@ -340,7 +336,7 @@ export function recordThreadedChange<T>(
       const source = entry.parentId
         ? ([...before, ...after].find((candidate) => candidate.id === entry.parentId) ?? entry)
         : entry;
-      const address = { sheet, row: source.row, col: source.col };
+      const address = { sheet, row: source.cell.row, col: source.cell.col };
       addresses.set(addrKey(address), address);
     }
     const effects: readonly OperationEffect[] = [{ kind: 'cells', cells: [...addresses.values()] }];

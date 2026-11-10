@@ -64,10 +64,9 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         });
         const cacheId = reloaded.pivotCacheIds()[0] ?? -1;
         expect(cacheId).toBeGreaterThanOrEqual(0);
+        // Sheet1!A1:B3, as the sheet-and-rectangle record the engine reads back.
         expect(reloaded.getPivotCacheWorksheetSource(cacheId)).toMatchObject({
-          present: true,
-          ref: 'A1:B3',
-          sheet: 'Sheet1',
+          range: { sheet: 0, rect: { firstRow: 0, firstCol: 0, lastRow: 2, lastCol: 1 } },
         });
         expect(reloaded.getPivotReportLayout(0, 0)).toBe(PivotReportLayout.Tabular);
       } finally {

@@ -185,7 +185,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   const renderThread = (entries: ReturnType<typeof listThreadedComments>): void => {
     thread.replaceChildren();
-    const opening = entries.find((entry) => entry.parentId === '');
+    const opening = entries.find((entry) => entry.parentId === null);
     if (!opening) {
       thread.hidden = true;
       return;
@@ -194,7 +194,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     for (const entry of entries) {
       const item = document.createElement('article');
       item.className =
-        entry.parentId === '' ? 'fc-cmtnote__thread-opening' : 'fc-cmtnote__thread-reply';
+        entry.parentId === null ? 'fc-cmtnote__thread-opening' : 'fc-cmtnote__thread-reply';
       const body = document.createElement('p');
       body.className = 'fc-cmtnote__thread-text';
       body.textContent = entry.text;

@@ -1,3 +1,4 @@
+import { ComparisonOperator, ValidationErrorStyle, ValidationType } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
   hydrateValidationsFromEngine,
@@ -9,11 +10,19 @@ import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const canLoadWasm = (): boolean => typeof WebAssembly !== 'undefined';
 
-const entry = (ranges: [number, number, number, number][], extra: Record<string, unknown>) => ({
+const entry = (
+  ranges: [number, number, number, number][],
+  extra: Partial<{
+    type: ValidationType;
+    op: ComparisonOperator;
+    formula1: string;
+    formula2: string;
+  }>,
+) => ({
   ranges: ranges.map(([r0, c0, r1, c1]) => ({ sheet: 0, r0, c0, r1, c1 })),
-  type: 2,
-  op: 0,
-  errorStyle: 0,
+  type: ValidationType.Decimal as ValidationType,
+  op: ComparisonOperator.Between as ComparisonOperator,
+  errorStyle: ValidationErrorStyle.Stop,
   allowBlank: true,
   showInputMessage: true,
   showErrorMessage: true,
@@ -70,12 +79,30 @@ describe.skipIf(!canLoadWasm())('data validation round-trip', () => {
   it('keeps list sources given as a name or formula', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
-      wb.addValidationEntry(0, entry([[0, 0, 0, 0]], { type: 3, op: 0, formula1: 'MyList' }));
       wb.addValidationEntry(
         0,
-        entry([[1, 0, 1, 0]], { type: 3, op: 0, formula1: 'INDIRECT($D$1)' }),
+        entry([[0, 0, 0, 0]], {
+          type: ValidationType.List,
+          op: ComparisonOperator.Between,
+          formula1: 'MyList',
+        }),
       );
-      wb.addValidationEntry(0, entry([[2, 0, 2, 0]], { type: 3, op: 0, formula1: '$D$1:$D$5' }));
+      wb.addValidationEntry(
+        0,
+        entry([[1, 0, 1, 0]], {
+          type: ValidationType.List,
+          op: ComparisonOperator.Between,
+          formula1: 'INDIRECT($D$1)',
+        }),
+      );
+      wb.addValidationEntry(
+        0,
+        entry([[2, 0, 2, 0]], {
+          type: ValidationType.List,
+          op: ComparisonOperator.Between,
+          formula1: '$D$1:$D$5',
+        }),
+      );
       const { restored, store, before, after } = await roundTrip(wb);
       try {
         const fmt = store.getState().format;
@@ -101,7 +128,7 @@ describe.skipIf(!canLoadWasm())('data validation round-trip', () => {
     try {
       wb.addValidationEntry(
         0,
-        entry([[0, 0, 1048575, 0]], { type: 1, formula1: '0', formula2: '9' }),
+        entry([[0, 0, 1048575, 0]], { type: ValidationType.Whole, formula1: '0', formula2: '9' }),
       );
       const { restored, store, before, after } = await roundTrip(wb);
       try {

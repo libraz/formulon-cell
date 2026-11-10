@@ -1,3 +1,4 @@
+import type { CellXfInput } from '@libraz/formulon';
 import type { CellStyleFormatGroup } from '../commands/cell-style-catalog.js';
 import { CELL_STYLE_GROUP_FIELDS, cellStyleGroupMatches } from '../commands/cell-style-groups.js';
 import { withFillReplacement } from '../store/format-merge.js';
@@ -15,8 +16,10 @@ import {
   numFmtToFormatCode,
   readingOrderToTextDirection,
   textRotationToCellRotation,
+  type WorkbookDefaultFont,
 } from './format-writeback.js';
-import type { CellXf, ColorSpec, FontRecord, SheetFontPatch } from './types.js';
+import { colorArgb, literalColor } from './style-records.js';
+import type { CellXf, SheetFontPatch } from './types.js';
 import { formatWithSheetFontPatch } from './whole-sheet-font-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -25,36 +28,27 @@ import type { WorkbookHandle } from './workbook-handle.js';
  *  style matcher would treat absent/255/explicit-default values as equal and
  *  copy stale raw metadata over a deliberate reset. */
 function rawAlignmentHasAuthoredDifference(fmt: CellFormat, raw: CellXf): boolean {
-  if (raw.hasAlignment === false) {
-    return (
-      fmt.align !== undefined ||
-      fmt.vAlign !== undefined ||
-      fmt.wrap !== undefined ||
-      fmt.justifyLastLine !== undefined ||
-      fmt.rotation !== undefined ||
-      fmt.indent !== undefined ||
-      fmt.shrinkToFit !== undefined ||
-      fmt.textDirection !== undefined
-    );
-  }
-  if (fmt.align !== undefined && raw.hasHorizontalAlign !== true) return true;
-  if (fmt.vAlign !== undefined && raw.hasVerticalAlign !== true) return true;
-  if (fmt.wrap !== undefined && raw.hasWrapText !== true) return true;
-  if (fmt.justifyLastLine !== undefined && raw.hasJustifyLastLine !== true) return true;
+  if (fmt.align !== undefined && raw.horizontal === null) return true;
+  if (fmt.vAlign !== undefined && raw.vertical === null) return true;
+  if (fmt.wrap !== undefined && raw.wrapText === null) return true;
+  if (fmt.justifyLastLine !== undefined && raw.justifyLastLine === null) return true;
   if (fmt.rotation !== undefined) {
-    if (raw.textRotation === undefined) return true;
+    if (raw.textRotation === null) return true;
     if (textRotationToCellRotation(raw.textRotation) !== fmt.rotation) return true;
   }
   if (fmt.indent !== undefined) {
-    if (raw.indent === undefined || Math.round(fmt.indent) !== raw.indent) return true;
+    if (raw.indent === null || Math.round(fmt.indent) !== raw.indent) return true;
   }
   if (fmt.shrinkToFit !== undefined && raw.shrinkToFit !== fmt.shrinkToFit) return true;
   if (fmt.textDirection !== undefined) {
-    if (raw.readingOrder === undefined) return true;
+    if (raw.readingOrder === null) return true;
     if (readingOrderToTextDirection(raw.readingOrder) !== fmt.textDirection) return true;
   }
   return false;
 }
+
+/** An XF record under construction. */
+type XfDraft = { -readonly [K in keyof CellXfInput]: CellXfInput[K] };
 
 /** Assemble the XF record for a CellFormat, ensuring every component record
  *  exists first (the engine dedups on add). Returns null on engine failure. */
@@ -62,8 +56,8 @@ function buildXfForFormat(
   wb: WorkbookHandle,
   fmt: CellFormat,
   sheetFontPatch?: SheetFontPatch,
-  workbookDefaultFont?: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null,
-): CellXf | null {
+  workbookDefaultFont?: WorkbookDefaultFont | null,
+): XfDraft | null {
   const effectiveFormat = formatWithSheetFontPatch(fmt, sheetFontPatch);
   const defaultFont =
     workbookDefaultFont === undefined ? wb.workbookDefaultFont : workbookDefaultFont;
@@ -80,16 +74,14 @@ function buildXfForFormat(
     if (id < 0) return null;
     numFmtId = id;
   }
-  return buildXfRecord(fontIndex, fillIndex, borderIndex, numFmtId, fmt);
+  return { ...buildXfRecord(fontIndex, fillIndex, borderIndex, numFmtId, fmt) };
 }
 
-const RAW_ALIGNMENT_OPTIONAL_FIELDS = [
+const RAW_ALIGNMENT_FIELDS = [
+  'horizontal',
+  'vertical',
+  'wrapText',
   'justifyLastLine',
-  'hasAlignment',
-  'hasHorizontalAlign',
-  'hasVerticalAlign',
-  'hasWrapText',
-  'hasJustifyLastLine',
   'textRotation',
   'indent',
   'relativeIndent',
@@ -101,10 +93,10 @@ const formatHasGroupFields = (fmt: CellFormat, group: CellStyleFormatGroup): boo
   CELL_STYLE_GROUP_FIELDS[group].some((field) => Object.hasOwn(fmt, field));
 
 const FONT_EFFECT_FIELDS = [
-  ['fontOutline', 'outline', 'hasOutline'],
-  ['fontShadow', 'shadow', 'hasShadow'],
-  ['fontCondense', 'condense', 'hasCondense'],
-  ['fontExtend', 'extend', 'hasExtend'],
+  ['fontOutline', 'outline'],
+  ['fontShadow', 'shadow'],
+  ['fontCondense', 'condense'],
+  ['fontExtend', 'extend'],
 ] as const;
 
 const sameFontNonAxisField = (
@@ -144,11 +136,11 @@ const fontNonAxisMatches = (format: CellFormat, current: Partial<CellFormat>): b
  *  apply metadata that CellFormat intentionally does not model. */
 const preserveRawFontForAxisEdit = (
   wb: WorkbookHandle,
-  record: CellXf,
+  record: XfDraft,
   source: CellXf,
   currentProjected: Partial<CellFormat>,
   effectiveFormat: CellFormat,
-  workbookDefaultFont: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null,
+  workbookDefaultFont: WorkbookDefaultFont | null,
 ): boolean => {
   if (!fontNonAxisMatches(effectiveFormat, currentProjected)) return true;
   const familyChanged =
@@ -167,9 +159,10 @@ const preserveRawFontForAxisEdit = (
     font.scheme = name === workbookDefaultFont?.name ? workbookDefaultFont?.scheme : undefined;
   }
   if (sizeChanged && effectiveFormat.fontSize !== undefined) {
-    font.size = fontCssPxToPoints(effectiveFormat.fontSize);
+    font.sizePt = fontCssPxToPoints(effectiveFormat.fontSize);
   }
-  if (!font.name || !Number.isFinite(font.size) || font.size <= 0) return false;
+  if (!font.name || font.sizePt === null || !Number.isFinite(font.sizePt) || font.sizePt <= 0)
+    return false;
   const fontIndex = wb.addFontRecord(font);
   if (fontIndex < 0) return false;
   record.fontIndex = fontIndex;
@@ -177,7 +170,7 @@ const preserveRawFontForAxisEdit = (
   return true;
 };
 
-const copyRawGroup = (target: CellXf, source: CellXf, group: CellStyleFormatGroup): void => {
+const copyRawGroup = (target: XfDraft, source: CellXf, group: CellStyleFormatGroup): void => {
   if (group === 'font') {
     target.fontIndex = source.fontIndex;
     target.applyFont = source.applyFont;
@@ -191,85 +184,37 @@ const copyRawGroup = (target: CellXf, source: CellXf, group: CellStyleFormatGrou
     target.numFmtId = source.numFmtId;
     target.applyNumberFormat = source.applyNumberFormat;
   } else if (group === 'alignment') {
-    target.horizontalAlign = source.horizontalAlign;
-    target.verticalAlign = source.verticalAlign;
-    target.wrapText = source.wrapText;
     target.applyAlignment = source.applyAlignment;
-    const targetRecord = target as unknown as Record<string, unknown>;
-    const sourceRecord = source as unknown as Record<string, unknown>;
-    for (const field of RAW_ALIGNMENT_OPTIONAL_FIELDS) {
-      if (Object.hasOwn(source, field)) {
-        targetRecord[field] = sourceRecord[field];
-      } else {
-        delete targetRecord[field];
-      }
-    }
+    const targetRecord = target as Record<string, unknown>;
+    for (const field of RAW_ALIGNMENT_FIELDS) targetRecord[field] = source[field];
   } else if (group === 'protection') {
     target.applyProtection = source.applyProtection;
-    target.hasProtection = source.hasProtection;
     target.locked = source.locked;
     target.hidden = source.hidden;
   }
 };
 
-const literalColorSpec = (): ColorSpec => ({ kind: 0, rgb: 0, theme: 0, tint: 0, indexed: 0 });
-
 const copyRawAlignmentFieldsExcept = (
-  target: CellXf,
+  target: XfDraft,
   source: CellXf,
   patch: Partial<CellFormat>,
 ): void => {
-  const targetRecord = target as unknown as Record<string, unknown>;
-  const sourceRecord = source as unknown as Record<string, unknown>;
-  const owners: Readonly<Record<string, keyof CellFormat | undefined>> = {
-    horizontalAlign: 'align',
-    hasHorizontalAlign: 'align',
-    verticalAlign: 'vAlign',
-    hasVerticalAlign: 'vAlign',
+  const targetRecord = target as Record<string, unknown>;
+  const owners: Readonly<Record<(typeof RAW_ALIGNMENT_FIELDS)[number], keyof CellFormat | null>> = {
+    horizontal: 'align',
+    vertical: 'vAlign',
     wrapText: 'wrap',
-    hasWrapText: 'wrap',
     justifyLastLine: 'justifyLastLine',
-    hasJustifyLastLine: 'justifyLastLine',
     textRotation: 'rotation',
     indent: 'indent',
+    relativeIndent: null,
     shrinkToFit: 'shrinkToFit',
     readingOrder: 'textDirection',
   };
-  for (const [field, owner] of Object.entries(owners)) {
-    // `hasAlignment` is derived from all alignment fields. Once any one of
-    // them is authored, the target builder owns that flag; copying a source
-    // false would otherwise suppress the newly authored field.
-    if (Object.hasOwn(patch, owner as keyof CellFormat)) continue;
-    if (Object.hasOwn(sourceRecord, field)) targetRecord[field] = sourceRecord[field];
-    else delete targetRecord[field];
-  }
-  const alignmentPatched = [
-    'align',
-    'vAlign',
-    'wrap',
-    'justifyLastLine',
-    'shrinkToFit',
-    'indent',
-    'rotation',
-    'textDirection',
-  ].some((field) => Object.hasOwn(patch, field));
-  if (!alignmentPatched) {
-    if (Object.hasOwn(sourceRecord, 'hasAlignment')) {
-      targetRecord.hasAlignment = sourceRecord.hasAlignment;
-    } else {
-      delete targetRecord.hasAlignment;
-    }
-  } else if (targetRecord.hasAlignment === false && sourceRecord.hasAlignment === false) {
-    // Keep an explicit empty alignment child when the patch itself clears the
-    // last authored alignment field. Otherwise the target builder's `true`
-    // presence bit remains authoritative for the newly patched field.
-    targetRecord.hasAlignment = false;
-  }
-  for (const field of RAW_ALIGNMENT_OPTIONAL_FIELDS) {
-    if (Object.hasOwn(owners, field)) continue;
-    if (field === 'hasAlignment') continue;
-    if (Object.hasOwn(sourceRecord, field)) targetRecord[field] = sourceRecord[field];
-    else delete targetRecord[field];
+  for (const field of RAW_ALIGNMENT_FIELDS) {
+    const owner = owners[field];
+    if (owner !== null && Object.hasOwn(patch, owner)) continue;
+    targetRecord[field] = source[field];
   }
 };
 
@@ -327,23 +272,14 @@ export function patchXfIndexFromBase(
     if (has('fontSize')) {
       const size = patch.fontSize;
       if (size !== undefined && Number.isFinite(size) && size > 0) {
-        font.size = fontCssPxToPoints(size);
+        font.sizePt = fontCssPxToPoints(size);
       } else if (wb.workbookDefaultFont) {
-        font.size = wb.workbookDefaultFont.size;
+        font.sizePt = wb.workbookDefaultFont.size;
       }
     }
-    if (has('bold')) {
-      font.bold = patch.bold === true;
-      font.hasBold = true;
-    }
-    if (has('italic')) {
-      font.italic = patch.italic === true;
-      font.hasItalic = true;
-    }
-    if (has('strike')) {
-      font.strike = patch.strike === true;
-      font.hasStrike = true;
-    }
+    if (has('bold')) font.bold = patch.bold === true;
+    if (has('italic')) font.italic = patch.italic === true;
+    if (has('strike')) font.strike = patch.strike === true;
     if (has('underline')) {
       font.underline =
         patch.underline === true || patch.underline === 'single'
@@ -361,17 +297,15 @@ export function patchXfIndexFromBase(
         patch.fontVertAlign === 'superscript' ? 1 : patch.fontVertAlign === 'subscript' ? 2 : 0;
     }
     if (has('color')) {
-      font.colorArgb =
-        patch.color === undefined ? 0xff000000 : (cssColorToArgb(patch.color) ?? 0xff000000);
-      // A source theme/indexed selector is authoritative over colorArgb in
-      // the native writer. Replacing it with kind=0 makes an explicit UI
-      // colour win while leaving every other raw font field intact.
-      font.color = literalColorSpec();
+      // A literal selector replaces a source theme/indexed one, so an explicit
+      // UI colour wins while every other raw font field stays intact.
+      font.color = literalColor(
+        patch.color === undefined ? 0xff000000 : (cssColorToArgb(patch.color) ?? 0xff000000),
+      );
     }
-    for (const [key, flag, presence] of FONT_EFFECT_FIELDS) {
+    for (const [key, flag] of FONT_EFFECT_FIELDS) {
       if (!has(key)) continue;
       font[flag] = patch[key] === true;
-      font[presence] = true;
     }
     const fontIndex = wb.addFontRecord(font);
     if (fontIndex < 0) return -1;
@@ -386,24 +320,21 @@ export function patchXfIndexFromBase(
     // replaces a gradient, so either change takes the rebuilt record.
     const replacesFill =
       patch.fillGradient !== undefined ||
-      (sourceFill.gradient !== undefined &&
-        (has('fill') || has('fillPattern') || has('fillGradient')));
+      (sourceFill.gradient != null && (has('fill') || has('fillPattern') || has('fillGradient')));
     const fill = replacesFill ? { ...targetFill } : { ...sourceFill };
-    const fillRecord = fill as unknown as Record<string, unknown>;
-    const setLiteral = (slot: 'fg' | 'bg', argb: number): void => {
-      fillRecord[slot] = literalColorSpec();
-      fillRecord[`${slot}Argb`] = argb;
+    const setLiteral = (slot: 'foreground' | 'background', argb: number): void => {
+      fill[slot] = literalColor(argb);
     };
     if (!replacesFill) {
       if (has('fillPattern') || has('fill')) fill.pattern = targetFill.pattern;
-      if (has('fillPatternColor')) setLiteral('fg', targetFill.fgArgb);
+      if (has('fillPatternColor')) setLiteral('foreground', colorArgb(targetFill.foreground));
       // `fill` is the visible solid foreground for a solid/empty pattern and
       // the background for a patterned fill. Change only that owned colour
       // pair; the other selector stays exactly as it was in the source record.
       if (has('fill'))
         setLiteral(
-          targetFill.pattern > 1 ? 'bg' : 'fg',
-          targetFill.pattern > 1 ? targetFill.bgArgb : targetFill.fgArgb,
+          targetFill.pattern > 1 ? 'background' : 'foreground',
+          colorArgb(targetFill.pattern > 1 ? targetFill.background : targetFill.foreground),
         );
     }
     const fillIndex = wb.addFillRecord(fill);
@@ -436,12 +367,9 @@ export function patchXfIndexFromBase(
   if (touched.has('alignment')) copyRawAlignmentFieldsExcept(target, source, patch);
   // These fields are not style groups, but they are meaningful OOXML
   // metadata and must survive an axis edit verbatim.
-  const targetRecord = target as unknown as Record<string, unknown>;
-  const sourceRecord = source as unknown as Record<string, unknown>;
-  for (const key of ['quotePrefix', 'xfId'] as const) {
-    if (Object.hasOwn(sourceRecord, key)) targetRecord[key] = sourceRecord[key];
-    else delete targetRecord[key];
-  }
+  target.quotePrefix = source.quotePrefix;
+  if (source.styleXfIndex === undefined) delete target.styleXfIndex;
+  else target.styleXfIndex = source.styleXfIndex;
   return wb.addXfRecord(target);
 }
 
@@ -503,7 +431,7 @@ export function resolveXfForFormat(
     fmt.cellStyle === undefined &&
     currentRaw !== null &&
     mappedXfId !== undefined &&
-    (currentRaw.xfId ?? 0) !== mappedXfId;
+    (currentRaw.styleXfIndex ?? 0) !== mappedXfId;
   for (const group of groups) {
     const namedMatch =
       namedXf?.groups.includes(group) === true &&
@@ -516,7 +444,8 @@ export function resolveXfForFormat(
       !(
         group === 'protection' &&
         formatHasGroupFields(fmt, 'protection') &&
-        currentRaw.hasProtection !== true
+        currentRaw.locked === null &&
+        currentRaw.hidden === null
       ) &&
       cellStyleGroupMatches(effectiveFormat, currentProjected, group);
     // An explicitly named style owns the groups it declares, so prefer its
@@ -537,7 +466,7 @@ export function resolveXfForFormat(
       copyRawGroup(record, namedXf.raw, group);
   }
   const xfId = mappedXfId;
-  const xfIndex = wb.addXfRecord(xfId === undefined ? record : { ...record, xfId });
+  const xfIndex = wb.addXfRecord(xfId === undefined ? record : { ...record, styleXfIndex: xfId });
   return {
     xfIndex,
     cacheable:

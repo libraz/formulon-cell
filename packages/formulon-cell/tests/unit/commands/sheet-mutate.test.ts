@@ -73,6 +73,13 @@ const makeFake = (
     },
     cells: (sheet: number) => fake.sheetCells.get(sheet) ?? [],
     sheetName: (idx: number): string => fake.names[idx] ?? `Sheet${idx + 1}`,
+    sheetIndexByName: (name: string): number | null => {
+      for (let idx = 0; idx < fake.sheetCount; idx += 1) {
+        const current = fake.names[idx] ?? `Sheet${idx + 1}`;
+        if (current.toLocaleLowerCase() === name.toLocaleLowerCase()) return idx;
+      }
+      return null;
+    },
     addSheet: (name?: string): number => {
       fake.add += 1;
       const idx = fake.sheetCount;

@@ -12,7 +12,14 @@ import { parseA1RangeText } from '../../../src/engine/range-resolver.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
 const sheets = (...names: string[]): WorkbookHandle =>
-  ({ sheetCount: names.length, sheetName: (i: number) => names[i] ?? '' }) as WorkbookHandle;
+  ({
+    sheetCount: names.length,
+    sheetName: (i: number) => names[i] ?? '',
+    sheetIndexByName: (name: string) => {
+      const index = names.findIndex((n) => n.toLowerCase() === name.toLowerCase());
+      return index < 0 ? null : index;
+    },
+  }) as unknown as WorkbookHandle;
 
 describe('parseA1RangeText', () => {
   it('parses cells, cell ranges, whole columns and whole rows', () => {

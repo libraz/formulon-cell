@@ -14,7 +14,7 @@ describe('mounted Format Painter inherits native column fonts', () => {
         const xf = workbook.getCellXf(0);
         const font = xf && workbook.getFontRecord(xf.fontIndex);
         if (!xf || !font) throw new Error('missing real workbook Normal font');
-        const fontIndex = workbook.addFontRecord({ ...font, name: 'Consolas', size: 22 });
+        const fontIndex = workbook.addFontRecord({ ...font, name: 'Consolas', sizePt: 22 });
         const xfIndex = workbook.addXfRecord({ ...xf, fontIndex, applyFont: true });
         workbook.setText({ sheet: 0, row: 0, col: 2 }, 'destination');
         const sheet = await mountStubSheet({

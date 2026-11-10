@@ -194,18 +194,18 @@ const CATEGORY_DATA: ChartData = {
 };
 
 const PROJECTED_ANCHOR = {
-  anchorKind: AnchorKind.TwoCell,
+  kind: AnchorKind.TwoCell,
   editAs: AnchorEditAs.TwoCell,
   fromRow: 1,
   fromCol: 1,
-  fromRowOff: 0,
-  fromColOff: 0,
+  fromRowOffsetEmu: 0,
+  fromColOffsetEmu: 0,
   toRow: 16,
   toCol: 8,
-  toRowOff: 0,
-  toColOff: 0,
-  cx: 4_572_000,
-  cy: 2_743_200,
+  toRowOffsetEmu: 0,
+  toColOffsetEmu: 0,
+  widthEmu: 4_572_000,
+  heightEmu: 2_743_200,
 };
 
 describe('attachSessionCharts', () => {
@@ -587,7 +587,7 @@ describe('attachSessionCharts', () => {
     apply();
 
     const engineSeries = wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series[0];
-    expect(engineSeries?.points.map((point) => point.idx)).toEqual([1]);
+    expect(engineSeries?.points.map((point) => point.index)).toEqual([1]);
     expect(current()?.seriesStyles?.[0]?.points).toEqual([
       { pointId: 'category-1', fill: { color: '#ff0000' } },
     ]);
@@ -1943,7 +1943,7 @@ describe('attachSessionCharts', () => {
 
   it('keeps bar and column marks inside padded slots for sparse and dense series', () => {
     // 334 x 146 px leaves the 320 x 132 scene inside the frame's border and padding.
-    const sceneAnchor = { ...PROJECTED_ANCHOR, cx: 334 * 9525, cy: 146 * 9525 };
+    const sceneAnchor = { ...PROJECTED_ANCHOR, widthEmu: 334 * 9525, heightEmu: 146 * 9525 };
     for (const kind of ['bar', 'column'] as const) {
       for (const count of [1, 2, 16, 100]) {
         store = createSpreadsheetStore();
@@ -1995,11 +1995,11 @@ describe('attachSessionCharts', () => {
     // Excel's default frame is 360 x 216 pt.
     expect(before.w).toBeCloseTo(480);
     expect(before.h).toBeCloseTo(288);
-    const { fromRow, fromRowOff } = chart.nativeAnchor;
+    const { fromRow, fromRowOffsetEmu } = chart.nativeAnchor;
     updateSessionChart(
       store,
       chart.id,
-      { anchor: { row: fromRow + 2, rowOffEmu: fromRowOff } },
+      { anchor: { row: fromRow + 2, rowOffEmu: fromRowOffsetEmu } },
       null,
       wb,
     );

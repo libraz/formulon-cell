@@ -1,29 +1,35 @@
+import type { SlicerCrossFilter, SlicerSortOrder } from '@libraz/formulon';
 import { AnchorEditAs, AnchorKind, FilterKind } from '@libraz/formulon';
 import type { SlicerSpec, SpreadsheetStore, State } from '../store/store.js';
-import { sameAnchor, sessionPosition, twoCellAnchorForPixels } from './drawing-geometry.js';
+import {
+  drawingAnchorOf,
+  sameAnchor,
+  sessionPosition,
+  twoCellAnchorForPixels,
+} from './drawing-geometry.js';
 import type { EngineDrawingAnchor } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-import type { EngineSlicer, EngineSlicerInput } from './workbook-handle-drawing-objects.js';
+import type {
+  EngineSlicer,
+  EngineSlicerInput,
+  EngineSlicerPatch,
+} from './workbook-handle-drawing-objects.js';
 
 /** Where and how large a slicer panel is when its spec carries no frame, in grid pixels. */
 export const DEFAULT_SLICER_FRAME = { x: 16, y: 16, w: 192, h: 240 } as const;
 
 const nameKey = (name: string): string => name.toLocaleLowerCase();
 
-const tableOf = (wb: WorkbookHandle, tableName: string) =>
-  wb
-    .getTables()
-    .find(
-      (table) =>
-        nameKey(table.name) === nameKey(tableName) ||
-        nameKey(table.displayName) === nameKey(tableName),
-    ) ?? null;
+const tableOf = (wb: WorkbookHandle, tableName: string) => {
+  const index = wb.tableIndexByName(tableName);
+  return index === null ? null : (wb.getTables()[index] ?? null);
+};
 
 /** The items a table's AutoFilter keeps for `column`; empty when it does not
  *  filter that column by value. */
 const selectedItems = (wb: WorkbookHandle, tableIndex: number, column: number): string[] => {
   const filter = wb.getTableAutoFilter(tableIndex);
-  const entry = filter?.columns.find((candidate) => candidate.colId === column);
+  const entry = filter?.columns.find((candidate) => candidate.columnOffset === column);
   if (!entry || entry.kind !== FilterKind.Values || entry.dateGroups.length > 0) return [];
   // A slicer lists only the items the table holds; blanks matter alone.
   return entry.values.length === 0 && entry.filterBlank ? [''] : [...entry.values];
@@ -31,32 +37,23 @@ const selectedItems = (wb: WorkbookHandle, tableIndex: number, column: number): 
 
 /** The anchor of a slicer's frame; null unless it is a two-cell anchor. */
 const anchorOf = (slicer: EngineSlicer): EngineDrawingAnchor | null =>
-  slicer.anchorKind === AnchorKind.TwoCell
-    ? {
-        anchorKind: slicer.anchorKind,
-        editAs: AnchorEditAs.TwoCell,
-        fromRow: slicer.fromRow,
-        fromCol: slicer.fromCol,
-        fromRowOff: slicer.fromRowOff,
-        fromColOff: slicer.fromColOff,
-        toRow: slicer.toRow,
-        toCol: slicer.toCol,
-        toRowOff: slicer.toRowOff,
-        toColOff: slicer.toColOff,
-        cx: 0,
-        cy: 0,
-      }
+  slicer.anchor.kind === AnchorKind.TwoCell
+    ? { ...drawingAnchorOf(slicer), editAs: AnchorEditAs.TwoCell, widthEmu: 0, heightEmu: 0 }
     : null;
 
-const anchorFields = (anchor: EngineDrawingAnchor): EngineSlicerInput => ({
-  fromRow: anchor.fromRow,
-  fromCol: anchor.fromCol,
-  fromRowOff: anchor.fromRowOff,
-  fromColOff: anchor.fromColOff,
-  toRow: anchor.toRow,
-  toCol: anchor.toCol,
-  toRowOff: anchor.toRowOff,
-  toColOff: anchor.toColOff,
+/** The two-cell box of `anchor`, as a slicer input or patch takes it. */
+const anchorFields = (anchor: EngineDrawingAnchor) => ({
+  anchor: {
+    kind: AnchorKind.TwoCell,
+    fromRow: anchor.fromRow,
+    fromCol: anchor.fromCol,
+    fromRowOffsetEmu: anchor.fromRowOffsetEmu,
+    fromColOffsetEmu: anchor.fromColOffsetEmu,
+    toRow: anchor.toRow,
+    toCol: anchor.toCol,
+    toRowOffsetEmu: anchor.toRowOffsetEmu,
+    toColOffsetEmu: anchor.toColOffsetEmu,
+  },
 });
 
 const frameOf = (store: SpreadsheetStore, slicer: EngineSlicer) => {
@@ -86,12 +83,12 @@ const specOf = (
     columnCount: slicer.columnCount,
     native: {
       name: slicer.name,
-      rowHeight: slicer.rowHeight,
+      rowHeight: slicer.rowHeightPt,
       sortOrder: slicer.sortOrder,
       crossFilter: slicer.crossFilter,
     },
   };
-  if (slicer.style) spec.style = slicer.style;
+  if (slicer.styleName) spec.style = slicer.styleName;
   return spec;
 };
 
@@ -130,33 +127,18 @@ export function captureSlicerRestore(
   const input: EngineSlicerInput = {
     name: slicer.name,
     caption: slicer.caption,
-    style: slicer.style,
+    styleName: slicer.styleName,
     columnCount: slicer.columnCount,
-    rowHeight: slicer.rowHeight,
-    fromRow: slicer.fromRow,
-    fromCol: slicer.fromCol,
-    fromRowOff: slicer.fromRowOff,
-    fromColOff: slicer.fromColOff,
-    toRow: slicer.toRow,
-    toCol: slicer.toCol,
-    toRowOff: slicer.toRowOff,
-    toColOff: slicer.toColOff,
+    rowHeightPt: slicer.rowHeightPt,
+    ...anchorFields(drawingAnchorOf(slicer)),
     sortOrder: slicer.sortOrder,
     crossFilter: slicer.crossFilter,
   };
   return () => wb.addSlicer(sheet, table.index, column, input) !== null;
 }
 
-const anchorInput = (slicer: EngineSlicer): EngineSlicerInput => ({
-  fromRow: slicer.fromRow,
-  fromCol: slicer.fromCol,
-  fromRowOff: slicer.fromRowOff,
-  fromColOff: slicer.fromColOff,
-  toRow: slicer.toRow,
-  toCol: slicer.toCol,
-  toRowOff: slicer.toRowOff,
-  toColOff: slicer.toColOff,
-});
+const anchorInput = (slicer: EngineSlicer): EngineSlicerPatch =>
+  anchorFields(drawingAnchorOf(slicer));
 
 /** Capture the anchors of `sheet`'s slicers ahead of a row or column delete,
  *  which collapses the slicers it does not remove. The restorer puts the
@@ -254,13 +236,13 @@ export class SlicerMirror {
     const objectId = wb.addSlicer(sheet, table.index, column, {
       ...(spec.native ? { name: spec.native.name } : {}),
       ...(spec.caption !== undefined ? { caption: spec.caption } : {}),
-      ...(spec.style ? { style: spec.style } : {}),
+      ...(spec.style ? { styleName: spec.style } : {}),
       ...(spec.columnCount !== undefined ? { columnCount: spec.columnCount } : {}),
       ...(spec.native
         ? {
-            rowHeight: spec.native.rowHeight,
-            sortOrder: spec.native.sortOrder,
-            crossFilter: spec.native.crossFilter,
+            rowHeightPt: spec.native.rowHeight,
+            sortOrder: spec.native.sortOrder as SlicerSortOrder,
+            crossFilter: spec.native.crossFilter as SlicerCrossFilter,
           }
         : {}),
       ...anchorFields(anchor),
@@ -274,10 +256,10 @@ export class SlicerMirror {
       ...(placed ? { nativeAnchor: placed } : {}),
       caption: slicer.caption,
       columnCount: slicer.columnCount,
-      ...(slicer.style ? { style: slicer.style } : {}),
+      ...(slicer.styleName ? { style: slicer.styleName } : {}),
       native: {
         name: slicer.name,
-        rowHeight: slicer.rowHeight,
+        rowHeight: slicer.rowHeightPt,
         sortOrder: slicer.sortOrder,
         crossFilter: slicer.crossFilter,
       },
@@ -293,17 +275,19 @@ export class SlicerMirror {
   ): Partial<SlicerSpec> | null {
     const index = this.indexOf(spec);
     if (index < 0 || spec.sheet === undefined) return null;
-    const input: EngineSlicerInput = {};
+    const input: { -readonly [K in keyof EngineSlicerPatch]: EngineSlicerPatch[K] } = {};
     if (spec.caption !== old.caption && spec.caption !== undefined) input.caption = spec.caption;
-    if (spec.style !== old.style) input.style = spec.style ?? '';
+    if (spec.style !== old.style) input.styleName = spec.style || null;
     if (spec.columnCount !== old.columnCount && spec.columnCount !== undefined) {
       input.columnCount = spec.columnCount;
     }
     const native = spec.native;
-    if (native && native.rowHeight !== old.native?.rowHeight) input.rowHeight = native.rowHeight;
-    if (native && native.sortOrder !== old.native?.sortOrder) input.sortOrder = native.sortOrder;
+    if (native && native.rowHeight !== old.native?.rowHeight) input.rowHeightPt = native.rowHeight;
+    if (native && native.sortOrder !== old.native?.sortOrder) {
+      input.sortOrder = native.sortOrder as SlicerSortOrder;
+    }
     if (native && native.crossFilter !== old.native?.crossFilter) {
-      input.crossFilter = native.crossFilter;
+      input.crossFilter = native.crossFilter as SlicerCrossFilter;
     }
     const anchor = this.anchorChange(store, old, spec);
     if (anchor) Object.assign(input, anchorFields(anchor));

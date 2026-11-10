@@ -84,8 +84,16 @@ export function hydrateCommentsAndHyperlinksFromEngine(
       display: string;
       tooltip: string;
     }> =
-      (typeof wb.getHyperlinksFull === 'function' ? wb.getHyperlinksFull(sheet) : null) ??
-      wb.getHyperlinks(sheet);
+      wb.getHyperlinksFull(sheet)?.map((h) => ({
+        row: h.range.firstRow,
+        col: h.range.firstCol,
+        lastRow: h.range.lastRow,
+        lastCol: h.range.lastCol,
+        target: h.target ?? '',
+        ...(h.location === null ? {} : { location: h.location }),
+        display: h.display ?? '',
+        tooltip: h.tooltip ?? '',
+      })) ?? wb.getHyperlinks(sheet);
     for (const h of links) {
       const location = h.location ?? '';
       if (h.target.length === 0 && location.length === 0) continue;

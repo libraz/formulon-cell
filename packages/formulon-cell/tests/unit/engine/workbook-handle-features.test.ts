@@ -1,3 +1,4 @@
+import { FontScheme } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 
 import { syncCellFormatsToEngine } from '../../../src/engine/cell-format-sync.js';
@@ -79,7 +80,7 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
   it('projects a literal workbook display font in native point units', async () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'en-US' });
     try {
-      expect(wb.setWorkbookDefaultFont({ name: 'Aptos', size: 12 })).toBe(true);
+      expect(wb.setWorkbookDefaultFont({ name: 'Aptos', sizePt: 12 })).toBe(true);
       expect(wb.workbookDisplayFont).toEqual({ name: 'Aptos', size: 12 });
     } finally {
       wb.dispose();
@@ -91,11 +92,13 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
     try {
       const before = wb.getFontRecord(0);
       expect(before).not.toBeNull();
-      expect(wb.setWorkbookDefaultFont({ name: before?.name, size: 12, scheme: 2 })).toBe(true);
+      expect(
+        wb.setWorkbookDefaultFont({ name: before?.name, sizePt: 12, scheme: FontScheme.Minor }),
+      ).toBe(true);
       const resolved = wb.getResolvedFontRecord(0);
       expect(resolved).not.toBeNull();
-      expect(wb.workbookDisplayFont).toEqual({ name: resolved?.name, size: resolved?.size });
-      expect(wb.getFontRecord(0)?.scheme).toBe(2);
+      expect(wb.workbookDisplayFont).toEqual({ name: resolved?.name, size: resolved?.sizePt });
+      expect(wb.getFontRecord(0)?.scheme).toBe(FontScheme.Minor);
     } finally {
       wb.dispose();
     }
@@ -183,7 +186,7 @@ describe('engine/workbook-handle — workbook default font', () => {
       expect(wb.setWorkbookDefaultFont({ name: 'Meiryo' })).toBe(true);
       const after = wb.getFontRecord(0);
       expect(after?.name).toBe('Meiryo');
-      expect(after?.size).toBe(before?.size);
+      expect(after?.sizePt).toBe(before?.sizePt);
       expect(after?.scheme).toBe(before?.scheme);
       expect(after?.family).toBe(before?.family);
     } finally {

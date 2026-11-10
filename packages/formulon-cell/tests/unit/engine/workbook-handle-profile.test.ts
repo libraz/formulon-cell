@@ -1,33 +1,36 @@
+import { FormulonError, StatusCode } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import type { FormulonModule, Workbook } from '../../../src/engine/types.js';
+import { loadFormulon } from '../../../src/engine/loader.js';
+import type { Formulon, Workbook } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
-const makeHandle = (supportsProfile: boolean): { wb: WorkbookHandle; setCalls: string[] } => {
+const Ctor = WorkbookHandle as unknown as new (module: Formulon, wb: Workbook) => WorkbookHandle;
+
+const engineFailure = (): FormulonError =>
+  new FormulonError(StatusCode.InvalidArgument, 'unsupported');
+
+const makeHandle = async (
+  supportsProfile: boolean,
+): Promise<{ wb: WorkbookHandle; setCalls: string[] }> => {
   const setCalls: string[] = [];
   const raw = supportsProfile
     ? {
-        excelProfileId: () => ({
-          status: { ok: true, status: 0, message: '', context: '' },
-          value: 'win-365-ja_JP',
-        }),
-        setExcelProfileId: (profileId: string) => {
+        getProfileId: () => 'win-365-ja_JP',
+        setProfileId: (profileId: string) => {
           setCalls.push(profileId);
-          return { ok: true, status: 0, message: '', context: '' };
         },
       }
     : {};
-  const module = { versionString: () => 'test' } as unknown as FormulonModule;
-  const Ctor = WorkbookHandle as unknown as new (
-    module: FormulonModule,
-    wb: Workbook,
-  ) => WorkbookHandle;
+  const module = supportsProfile
+    ? ({ getVersion: () => 'test' } as unknown as Formulon)
+    : await loadFormulon({ preferStub: true });
   return { wb: new Ctor(module, raw as unknown as Workbook), setCalls };
 };
 
 describe('WorkbookHandle spreadsheet profile', () => {
-  it('reads and writes the engine formula-behaviour profile when available', () => {
-    const { wb, setCalls } = makeHandle(true);
+  it('reads and writes the engine formula-behaviour profile when available', async () => {
+    const { wb, setCalls } = await makeHandle(true);
 
     expect(wb.capabilities.spreadsheetProfile).toBe(true);
     expect(wb.spreadsheetProfileId()).toBe('windows-ja_JP');
@@ -35,8 +38,8 @@ describe('WorkbookHandle spreadsheet profile', () => {
     expect(setCalls).toEqual(['mac-365-ja_JP']);
   });
 
-  it('is a null/false no-op when the engine package is older', () => {
-    const { wb, setCalls } = makeHandle(false);
+  it('is a null/false no-op on the stub engine', async () => {
+    const { wb, setCalls } = await makeHandle(false);
 
     expect(wb.capabilities.spreadsheetProfile).toBe(false);
     expect(wb.spreadsheetProfileId()).toBeNull();
@@ -46,36 +49,23 @@ describe('WorkbookHandle spreadsheet profile', () => {
 
   it('uses full formula locale APIs with public profile overrides', () => {
     const raw = {
-      excelProfileId: () => ({
-        status: { ok: true, status: 0, message: '', context: '' },
-        value: 'win-365-de_DE',
-      }),
-      setExcelProfileId: () => ({ ok: true, status: 0, message: '', context: '' }),
-      localizeFunctionName: (name: string, profile: string) => ({
-        status: { ok: true },
-        value: profile.endsWith('de_DE') && name === 'SUM' ? 'SUMME' : name,
-      }),
-      canonicalizeFunctionName: (name: string) => ({ status: { ok: true }, value: name }),
-      localizeFormula: (formula: string, profile: string) => ({
-        status: { ok: true },
-        value: `${profile}:${formula.replace('SUM', 'SUMME').replace(',', ';')}`,
-      }),
-      canonicalizeFormula: (formula: string, profile: string) => ({
-        status: { ok: true },
-        value: `${profile}:${formula.replace('SUMME', 'SUM').replace(';', ',')}`,
-      }),
-      localeFacts: (profile: string) => ({
-        status: { ok: profile.endsWith('de_DE') },
-        facts: profile.endsWith('de_DE')
-          ? ({ decimalSeparator: ',', groupSeparator: '.', listSeparator: ';' } as never)
-          : null,
-      }),
+      getProfileId: () => 'win-365-de_DE',
+      setProfileId: () => {},
     };
-    const module = { versionString: () => 'test' } as unknown as FormulonModule;
-    const Ctor = WorkbookHandle as unknown as new (
-      module: FormulonModule,
-      wb: Workbook,
-    ) => WorkbookHandle;
+    const module = {
+      getVersion: () => 'test',
+      localizeFunctionName: (name: string, profile: string) =>
+        profile.endsWith('de_DE') && name === 'SUM' ? 'SUMME' : name,
+      canonicalizeFunctionName: (name: string) => name,
+      localizeFormula: (formula: string, profile: string) =>
+        `${profile}:${formula.replace('SUM', 'SUMME').replace(',', ';')}`,
+      canonicalizeFormula: (formula: string, profile: string) =>
+        `${profile}:${formula.replace('SUMME', 'SUM').replace(';', ',')}`,
+      getLocaleFacts: (profile: string) => {
+        if (!profile.endsWith('de_DE')) throw engineFailure();
+        return { decimalSeparator: ',', groupSeparator: '.', listSeparator: ';' } as never;
+      },
+    } as unknown as Formulon;
     const wb = new Ctor(module, raw as unknown as Workbook);
 
     expect(wb.capabilities.formulaLocale).toBe(true);
@@ -126,32 +116,31 @@ describe('WorkbookHandle spreadsheet profile', () => {
 
   it('falls back safely when a full formula locale call fails', () => {
     const raw = {
-      excelProfileId: () => ({
-        status: { ok: true },
-        value: 'win-365-de_DE',
-      }),
-      setExcelProfileId: () => ({ ok: true }),
+      getProfileId: () => 'win-365-de_DE',
+      setProfileId: () => {},
+    };
+    const module = {
+      getVersion: () => 'test',
       localizeFunctionName: (name: string, profile: string) => {
         const aliases = profile.endsWith('fr_FR')
           ? { IF: 'SI', SUM: 'SOMME' }
           : { IF: 'WENN', SUM: 'SUMME' };
-        return { status: { ok: true }, value: aliases[name as 'IF' | 'SUM'] ?? name };
+        return aliases[name as 'IF' | 'SUM'] ?? name;
       },
       canonicalizeFunctionName: (name: string) => {
         const canonical = { SI: 'IF', SOMME: 'SUM', WENN: 'IF', SUMME: 'SUM' };
-        return { status: { ok: true }, value: canonical[name as keyof typeof canonical] ?? name };
+        return canonical[name as keyof typeof canonical] ?? name;
       },
       localizeFormula: () => {
-        throw new Error('unsupported');
+        throw engineFailure();
       },
-      canonicalizeFormula: () => ({ status: { ok: false }, value: '' }),
-      localeFacts: () => ({ status: { ok: false }, facts: null }),
-    };
-    const module = { versionString: () => 'test' } as unknown as FormulonModule;
-    const Ctor = WorkbookHandle as unknown as new (
-      module: FormulonModule,
-      wb: Workbook,
-    ) => WorkbookHandle;
+      canonicalizeFormula: () => {
+        throw engineFailure();
+      },
+      getLocaleFacts: () => {
+        throw engineFailure();
+      },
+    } as unknown as Formulon;
     const wb = new Ctor(module, raw as unknown as Workbook);
 
     expect(wb.localizeFormulaText('=SUM(1,2)')).toBe('=SUMME(1,2)');
@@ -174,11 +163,11 @@ describe('WorkbookHandle spreadsheet profile', () => {
       expect(wb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe('=SUM(1,2)');
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 3 });
       const evaluated = wb.evaluateFormulaText({ sheet: 0, row: 0, col: 0 }, '=SUMME(2,3)');
-      expect(evaluated.status.ok).toBe(true);
-      expect(evaluated.value.number).toBe(5);
+      expect(evaluated).not.toBeNull();
+      expect(evaluated).toMatchObject({ number: 5 });
       const adHoc = wb.evalFormula('=SUMME(4,5)');
-      expect(adHoc.status.ok).toBe(true);
-      expect(adHoc.value.number).toBe(9);
+      expect(adHoc).not.toBeNull();
+      expect(adHoc).toMatchObject({ number: 9 });
       expect(wb.getFormulaForDisplay('=SUM(1,2)')).toBe('=SUMME(1;2)');
       expect(wb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe('=SUM(1,2)');
       wb.applyCellPatchAtomic([
@@ -209,8 +198,8 @@ describe('WorkbookHandle spreadsheet profile', () => {
       expect(wb.getValue(addr)).toEqual({ kind: 'text', value: '¥1,235' });
 
       const evaluated = wb.evaluateFormulaText(addr, '=DOLLAR(1234.5)');
-      expect(evaluated.status.ok).toBe(true);
-      expect(evaluated.value.text).toBe('¥1,235');
+      expect(evaluated).not.toBeNull();
+      expect(evaluated).toMatchObject({ text: '¥1,235' });
 
       wb.setFormula(addr, '=1+1');
       wb.applyCellPatchAtomic([

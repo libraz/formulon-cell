@@ -174,8 +174,9 @@ export const stylePayloadMatchesNative = (
   }
   if (groups.includes('fill')) {
     const fill = workbook.getFillRecord(nativeXf.fillIndex);
-    if (fill?.fg && Object.hasOwn(stored, 'fill') && !literalOrFallback(fill.fg.kind)) return false;
-    if (fill?.fg && Object.hasOwn(stored, 'fillPatternColor') && !literalOrFallback(fill.fg.kind)) {
+    const fg = fill?.foreground;
+    if (fg && Object.hasOwn(stored, 'fill') && !literalOrFallback(fg.kind)) return false;
+    if (fg && Object.hasOwn(stored, 'fillPatternColor') && !literalOrFallback(fg.kind)) {
       return false;
     }
   }

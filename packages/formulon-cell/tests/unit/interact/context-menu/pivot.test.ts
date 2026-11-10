@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPivotTableFromRange } from '../../../../src/commands/pivot-table.js';
-import { PivotAggregation } from '../../../../src/engine/types.js';
+import { PivotAggregation, PivotSortOrder } from '../../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { en } from '../../../../src/i18n/strings/en.js';
 import { ja } from '../../../../src/i18n/strings/ja.js';
@@ -135,7 +135,7 @@ describe('PivotTable context menu', () => {
       .querySelector<HTMLButtonElement>('.fc-ctxmenu__item[data-fc-submenu="pivotSortMenu"]')
       ?.click();
     item('pivotSortDesc')?.click();
-    expect(sort).toHaveBeenCalledWith(0, 0, 0, 0, '');
+    expect(sort).toHaveBeenCalledWith(0, 0, 0, PivotSortOrder.Descending, '');
   });
 
   it('keeps the normal menu outside a report', () => {

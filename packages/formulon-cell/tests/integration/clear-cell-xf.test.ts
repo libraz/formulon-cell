@@ -3,14 +3,21 @@ import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
 import { WorkbookHandleStylesMethods } from '../../src/engine/workbook-handle-styles.js';
 
 describe('clear direct native XF', () => {
-  it('returns false for an older native host without a clear method', () => {
-    const oldHost = {
+  it('returns false when the engine refuses the clear', () => {
+    const refused = Object.assign(new Error('refused'), { name: 'FormulonError' });
+    const host = {
       assertAlive() {},
-      wb: {},
+      wb: {
+        sheet: () => ({
+          ooxml: {
+            resetCellXfIndex: () => {
+              throw refused;
+            },
+          },
+        }),
+      },
     } as unknown as WorkbookHandleStylesMethods;
-    expect(WorkbookHandleStylesMethods.prototype.clearCellXfIndex.call(oldHost, 0, 2, 1)).toBe(
-      false,
-    );
+    expect(WorkbookHandleStylesMethods.prototype.clearCellXfIndex.call(host, 0, 2, 1)).toBe(false);
   });
 
   it.each(['en', 'ja', 'de', 'fr', 'zh', 'ko', 'th'])(
@@ -25,7 +32,7 @@ describe('clear direct native XF', () => {
         const font = normal && workbook.getFontRecord(normal.fontIndex);
         if (!normal || !font) throw new Error('Missing native Normal font');
         const xfForSize = (size: number) => {
-          const fontIndex = workbook.addFontRecord({ ...font, size });
+          const fontIndex = workbook.addFontRecord({ ...font, sizePt: size });
           expect(fontIndex).toBeGreaterThanOrEqual(0);
           const xf = workbook.addXfRecord({ ...normal, fontIndex, applyFont: true });
           expect(xf).toBeGreaterThan(0);

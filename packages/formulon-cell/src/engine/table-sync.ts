@@ -1,3 +1,4 @@
+import { TableTotalsRowFunction } from '@libraz/formulon';
 import {
   type CustomTableStyle,
   DEFAULT_TABLE_COLOR,
@@ -5,6 +6,7 @@ import {
   parseTableStyleName,
   type TableColumnTotals,
   type TableOverlay,
+  type TableTotalsFunction,
 } from '../commands/format-as-table.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { parseRangeRef } from './range-resolver.js';
@@ -44,12 +46,43 @@ function tableRange(sheet: number, ref: string): Range | null {
   };
 }
 
+const TOTALS_TO_ENGINE: Readonly<Record<TableTotalsFunction, TableTotalsRowFunction>> = {
+  none: TableTotalsRowFunction.None,
+  sum: TableTotalsRowFunction.Sum,
+  min: TableTotalsRowFunction.Min,
+  max: TableTotalsRowFunction.Max,
+  average: TableTotalsRowFunction.Average,
+  count: TableTotalsRowFunction.Count,
+  countNums: TableTotalsRowFunction.CountNumbers,
+  stdDev: TableTotalsRowFunction.StdDev,
+  var: TableTotalsRowFunction.Var,
+  custom: TableTotalsRowFunction.Custom,
+};
+
+/** The engine's totals-row function for the store's model name. */
+export function totalsFunctionToEngine(fn: TableTotalsFunction): TableTotalsRowFunction {
+  return TOTALS_TO_ENGINE[fn];
+}
+
+/** The store's model name for an engine totals-row function. */
+export function totalsFunctionFromEngine(fn: TableTotalsRowFunction): TableTotalsFunction {
+  for (const [name, value] of Object.entries(TOTALS_TO_ENGINE)) {
+    if (value === fn) return name as TableTotalsFunction;
+  }
+  return 'none';
+}
+
+/** A totals-row formula as the store keeps it: without the leading `=`. */
+export function totalsFormulaText(formula: string | null): string {
+  return (formula ?? '').replace(/^=/, '');
+}
+
 /** Per-column totals-row settings as the engine reports them. */
 export function totalsFromDetails(details: TableStyleDetails): TableColumnTotals[] {
   return details.columns.map((c) => ({
-    function: c.totalsRowFunction,
-    label: c.totalsRowLabel,
-    formula: c.totalsRowFormula,
+    function: totalsFunctionFromEngine(c.totalsRowFunction),
+    label: c.totalsRowLabel ?? '',
+    formula: totalsFormulaText(c.totalsRowFormula),
   }));
 }
 

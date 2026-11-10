@@ -1,28 +1,38 @@
 import type {
-  ChartAxisInfo,
+  ChartAxis,
+  ChartAxisPosition,
   ChartDataSource,
-  ChartFillInfo,
-  ChartInfo,
-  ChartLabelsInfo,
-  ChartLineInfo,
-  ChartMarkerInfo,
-  ChartPlotInfo,
-  ChartSeriesInfo,
+  ChartFill,
+  ChartLabels,
+  ChartLegend,
+  ChartLine,
+  ChartMarker,
+  ChartPlot,
+  ChartProperties,
+  ChartSeries,
+  ChartTickLabelPosition,
+  ChartTitle,
+  Color,
   ChartData as EngineChartData,
 } from '@libraz/formulon';
 import {
+  ChartAxisPosition as AxisPosition,
+  BlanksAs,
   ChartAxisCrosses,
   ChartAxisKind,
-  ChartBlanksAs,
-  ChartInsertKind,
+  ChartBarDirection,
+  ChartDomain,
   ChartLegendPosition,
   ChartLineDash,
   ChartMarkerSymbol,
   ChartPlotType,
+  ChartSourceKind,
   ChartTitleKind,
+  ColorKind,
   ChartGrouping as EngineChartGrouping,
   ChartLabelPosition as EngineChartLabelPosition,
   ChartSeriesDirection as EngineChartSeriesDirection,
+  ChartTickLabelPosition as TickLabelPosition,
 } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
@@ -55,34 +65,67 @@ import type {
 // Hand-built engine models
 // ---------------------------------------------------------------------------
 
-const NO_SOURCE: ChartDataSource = { kind: 'none', formula: '', literal: [] };
+type ChartInfo = ChartProperties;
 
-const fillInfo = (
-  color: number | null = null,
-  transparency: number | null = null,
-): ChartFillInfo => ({
-  color,
-  transparency,
+const NO_SOURCE: ChartDataSource = { kind: ChartSourceKind.None, formula: '', literal: [] };
+
+/** Excel's automatic title, as the adapter writes it. */
+const AUTO_TITLE: ChartTitle = { kind: ChartTitleKind.Auto, text: null, formula: null };
+
+/** The plot type and bar direction each kind is created with. */
+const PLOT = {
+  Column: { type: ChartPlotType.Bar, barDirection: ChartBarDirection.Column },
+  Bar: { type: ChartPlotType.Bar, barDirection: ChartBarDirection.Bar },
+  Line: { type: ChartPlotType.Line },
+  Area: { type: ChartPlotType.Area },
+  Pie: { type: ChartPlotType.Pie },
+  Doughnut: { type: ChartPlotType.Doughnut },
+  Scatter: { type: ChartPlotType.Scatter },
+} as const;
+
+/** An opaque RGB colour from `0xAARRGGBB`; null stays null. */
+const rgb = (argb: number | null): Color | null =>
+  argb === null ? null : { kind: ColorKind.Rgb, argb, theme: 0, tint: 0, indexed: 0 };
+
+const fillInfo = (color: number | null = null, transparency: number | null = null): ChartFill => ({
+  color: rgb(color),
+  transparencyPct: transparency,
+  none: false,
+  other: false,
 });
 
-const lineInfo = (overrides: Partial<ChartLineInfo> = {}): ChartLineInfo => ({
-  color: null,
-  transparency: null,
+type LineOverrides = Partial<Omit<ChartLine, 'color' | 'transparencyPct'>> & {
+  color?: number | null;
+  transparency?: number | null;
+};
+
+const lineInfo = ({
+  color = null,
+  transparency = null,
+  ...rest
+}: LineOverrides = {}): ChartLine => ({
+  color: rgb(color),
+  transparencyPct: transparency,
   widthPt: null,
   dash: null,
   none: false,
-  ...overrides,
+  other: false,
+  ...rest,
 });
 
-const markerInfo = (overrides: Partial<ChartMarkerInfo> = {}): ChartMarkerInfo => ({
+type MarkerOverrides = Partial<Omit<ChartMarker, 'sizePt'>> & { size?: number | null };
+
+const markerInfo = ({ size = null, ...rest }: MarkerOverrides = {}): ChartMarker => ({
   symbol: ChartMarkerSymbol.Circle,
-  size: null,
+  sizePt: size,
   fill: fillInfo(),
   line: lineInfo(),
-  ...overrides,
+  ...rest,
 });
 
-const labelsInfo = (overrides: Partial<ChartLabelsInfo> = {}): ChartLabelsInfo => ({
+type LabelsOverrides = Partial<Omit<ChartLabels, 'fontColor'>> & { fontColor?: number | null };
+
+const labelsInfo = ({ fontColor = null, ...rest }: LabelsOverrides = {}): ChartLabels => ({
   showValue: true,
   showCategory: false,
   showSeries: false,
@@ -92,14 +135,26 @@ const labelsInfo = (overrides: Partial<ChartLabelsInfo> = {}): ChartLabelsInfo =
   position: null,
   numberFormat: null,
   sourceLinked: true,
-  fontColor: null,
+  fontColor: rgb(fontColor),
   fontSizePt: null,
   deleted: false,
-  ...overrides,
+  ...rest,
 });
 
-const seriesInfo = (idx: number, overrides: Partial<ChartSeriesInfo> = {}): ChartSeriesInfo => ({
-  idx,
+/** A formatted point as the tests write it: `idx` is its index. */
+interface PointOverrides {
+  idx: number;
+  fill: ChartFill | null;
+  line: ChartLine | null;
+  marker: ChartMarker | null;
+}
+
+type SeriesOverrides = Partial<Omit<ChartSeries, 'points'>> & {
+  points?: readonly PointOverrides[];
+};
+
+const seriesInfo = (idx: number, { points = [], ...rest }: SeriesOverrides = {}): ChartSeries => ({
+  seriesId: idx,
   order: idx,
   filtered: false,
   name: NO_SOURCE,
@@ -112,21 +167,44 @@ const seriesInfo = (idx: number, overrides: Partial<ChartSeriesInfo> = {}): Char
   line: lineInfo(),
   marker: null,
   smooth: null,
-  points: [],
+  points: points.map(({ idx: index, ...point }) => ({ index, ...point })),
   labels: null,
-  ...overrides,
+  ...rest,
 });
+
+type Side = 'b' | 't' | 'l' | 'r';
+
+const SIDE: Record<Side, ChartAxisPosition> = {
+  b: AxisPosition.Bottom,
+  t: AxisPosition.Top,
+  l: AxisPosition.Left,
+  r: AxisPosition.Right,
+};
+
+const TICK_LABELS: Record<string, ChartTickLabelPosition> = {
+  nextTo: TickLabelPosition.NextTo,
+  high: TickLabelPosition.High,
+  low: TickLabelPosition.Low,
+  none: TickLabelPosition.None,
+};
+
+/** An axis as the tests write it: `deleted` hides it, and a tick-label position is its OOXML text
+ *  (an unknown text reads as an ordinal the adapter does not know). */
+type AxisOverrides = Partial<Omit<ChartAxis, 'tickLabelPosition'>> & {
+  deleted?: boolean;
+  tickLabelPosition?: string | null;
+};
 
 const axisInfo = (
   id: number,
   kind: ChartAxisKind,
-  position: ChartAxisInfo['position'],
-  overrides: Partial<ChartAxisInfo> = {},
-): ChartAxisInfo => ({
+  position: Side,
+  { deleted = false, tickLabelPosition = 'nextTo', ...rest }: AxisOverrides = {},
+): ChartAxis => ({
   id,
   kind,
-  position,
-  deleted: false,
+  position: SIDE[position],
+  visible: !deleted,
   crossAxis: 0,
   crosses: ChartAxisCrosses.AutoZero,
   crossesAt: null,
@@ -138,19 +216,22 @@ const axisInfo = (
   reversed: false,
   numberFormat: 'General',
   sourceLinked: true,
-  title: { kind: ChartTitleKind.None, text: '', formula: '' },
+  title: null,
   majorGridlines: false,
   minorGridlines: false,
-  tickLabelPosition: 'nextTo',
-  ...overrides,
+  tickLabelPosition:
+    tickLabelPosition === null
+      ? null
+      : (TICK_LABELS[tickLabelPosition] ?? (99 as ChartTickLabelPosition)),
+  ...rest,
 });
 
 const X_ID = 10;
 const Y_ID = 20;
 
-const PLOT_TYPE: Record<ChartKind, Pick<ChartPlotInfo, 'type' | 'barDirection'>> = {
-  column: { type: ChartPlotType.Bar, barDirection: 'col' },
-  bar: { type: ChartPlotType.Bar, barDirection: 'bar' },
+const PLOT_TYPE: Record<ChartKind, Pick<ChartPlot, 'type' | 'barDirection'>> = {
+  column: { type: ChartPlotType.Bar, barDirection: ChartBarDirection.Column },
+  bar: { type: ChartPlotType.Bar, barDirection: ChartBarDirection.Bar },
   line: { type: ChartPlotType.Line, barDirection: null },
   area: { type: ChartPlotType.Area, barDirection: null },
   pie: { type: ChartPlotType.Pie, barDirection: null },
@@ -159,11 +240,7 @@ const PLOT_TYPE: Record<ChartKind, Pick<ChartPlotInfo, 'type' | 'barDirection'>>
 };
 
 /** The x-role and y-role axes Excel gives each kind (none for pie and doughnut). */
-const axesFor = (
-  kind: ChartKind,
-  x: Partial<ChartAxisInfo> = {},
-  y: Partial<ChartAxisInfo> = {},
-): ChartAxisInfo[] => {
+const axesFor = (kind: ChartKind, x: AxisOverrides = {}, y: AxisOverrides = {}): ChartAxis[] => {
   switch (kind) {
     case 'pie':
     case 'doughnut':
@@ -186,43 +263,72 @@ const axesFor = (
   }
 };
 
-const plotInfo = (kind: ChartKind, overrides: Partial<ChartPlotInfo> = {}): ChartPlotInfo => ({
+/** A plot as the tests write it: the size and angle options by their spec names. */
+type PlotOverrides = Partial<ChartPlot> & {
+  gapWidth?: number | null;
+  overlap?: number | null;
+  holeSize?: number | null;
+  firstSliceAngle?: number | null;
+};
+
+const plotInfo = (
+  kind: ChartKind,
+  {
+    gapWidth = null,
+    overlap = null,
+    holeSize = null,
+    firstSliceAngle = null,
+    ...rest
+  }: PlotOverrides = {},
+): ChartPlot => ({
   ...PLOT_TYPE[kind],
-  chartexLayout: null,
+  extendedLayout: null,
   grouping: null,
   varyColors: false,
-  gapWidth: null,
-  overlap: null,
-  holeSize: null,
-  firstSliceAngle: null,
+  gapWidthPct: gapWidth,
+  overlapPct: overlap,
+  holeSizePct: holeSize,
+  firstSliceAngleDeg: firstSliceAngle,
   axisIds: kind === 'pie' || kind === 'doughnut' ? [] : [X_ID, Y_ID],
   series: [seriesInfo(0), seriesInfo(1)],
-  ...overrides,
+  ...rest,
 });
+
+/** A chart as the tests write it: hidden categories at the top and the legend's hidden series. */
+type InfoOverrides = Partial<Omit<ChartInfo, 'legend'>> & {
+  hiddenCategories?: readonly number[];
+  legend?: (Omit<ChartLegend, 'hiddenEntries'> & { hiddenSeries: readonly number[] }) | null;
+};
 
 const chartInfo = (
   kind: ChartKind,
-  overrides: Partial<ChartInfo> = {},
-  plot: Partial<ChartPlotInfo> = {},
+  { hiddenCategories = [], legend, ...overrides }: InfoOverrides = {},
+  plot: PlotOverrides = {},
 ): ChartInfo => ({
   objectId: 3,
-  name: 'Chart 1',
-  description: '',
-  isChartex: false,
+  isExtended: false,
   isPivotChart: false,
   onChartsheet: false,
-  title: { kind: ChartTitleKind.Auto, text: '', formula: '' },
+  title: AUTO_TITLE,
   autoTitleDeleted: false,
-  legend: { position: ChartLegendPosition.Bottom, overlay: false, hiddenSeries: [] },
-  blanksAs: ChartBlanksAs.Gap,
+  legend:
+    legend === null
+      ? null
+      : {
+          position: legend?.position ?? ChartLegendPosition.Bottom,
+          overlay: legend?.overlay ?? false,
+          hiddenEntries: legend?.hiddenSeries ?? [],
+        },
+  blanksAs: BlanksAs.Gap,
   plotVisibleOnly: true,
+  naAsBlank: null,
   date1904: false,
   style: null,
   plots: [plotInfo(kind, plot)],
   axes: axesFor(kind),
-  hiddenCategories: [],
+  filter: { hiddenSeries: [], hiddenCategories },
   source: {
-    range: 'Sheet1!$A$1:$C$4',
+    range: { sheet: 0, rect: { firstRow: 0, firstCol: 0, lastRow: 3, lastCol: 2 } },
     direction: EngineChartSeriesDirection.Columns,
     headerRow: true,
     headerColumn: true,
@@ -434,14 +540,22 @@ describe('chartSpecFromEngine', () => {
   });
 
   it('reads kind from the plot type and bar direction, grouping with standard as clustered', () => {
-    const rows: [Partial<ChartPlotInfo>, ChartKind, ChartSpec['grouping']][] = [
+    const rows: [PlotOverrides, ChartKind, ChartSpec['grouping']][] = [
       [
-        { type: ChartPlotType.Bar, barDirection: 'col', grouping: EngineChartGrouping.Clustered },
+        {
+          type: ChartPlotType.Bar,
+          barDirection: ChartBarDirection.Column,
+          grouping: EngineChartGrouping.Clustered,
+        },
         'column',
         'clustered',
       ],
       [
-        { type: ChartPlotType.Bar, barDirection: 'bar', grouping: EngineChartGrouping.Stacked },
+        {
+          type: ChartPlotType.Bar,
+          barDirection: ChartBarDirection.Bar,
+          grouping: EngineChartGrouping.Stacked,
+        },
         'bar',
         'stacked',
       ],
@@ -467,7 +581,7 @@ describe('chartSpecFromEngine', () => {
 
   it('reports charts it cannot project', () => {
     const rows: [ChartInfo, string][] = [
-      [chartInfo('column', { isChartex: true }), 'chartex'],
+      [chartInfo('column', { isExtended: true }), 'chartex'],
       [chartInfo('column', { plots: [plotInfo('column'), plotInfo('line')] }), 'multi-plot'],
       [chartInfo('column', { plots: [] }), 'multi-plot'],
       [chartInfo('column', {}, { type: ChartPlotType.Bar3D }), 'plot-type'],
@@ -487,7 +601,7 @@ describe('chartSpecFromEngine', () => {
     const spec = read(
       chartInfo('line', {
         source: {
-          range: 'Sheet1!$A$1:$D$3',
+          range: { sheet: 0, rect: { firstRow: 0, firstCol: 0, lastRow: 2, lastCol: 3 } },
           direction: EngineChartSeriesDirection.Rows,
           headerRow: false,
           headerColumn: true,
@@ -518,12 +632,7 @@ describe('chartSpecFromEngine', () => {
       doughnut: ['zero', 'gap', 'zero', 'gap'],
       scatter: ['zero', 'gap', 'zero', 'span'],
     };
-    const blanks = [
-      ChartBlanksAs.Absent,
-      ChartBlanksAs.Gap,
-      ChartBlanksAs.Zero,
-      ChartBlanksAs.Span,
-    ];
+    const blanks = [null, BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Span];
     for (const kind of KINDS) {
       const actual = blanks.map((blanksAs) => read(chartInfo(kind, { blanksAs })).emptyCells);
       expect(actual, kind).toEqual(expected[kind]);
@@ -593,7 +702,15 @@ describe('chartSpecFromEngine', () => {
 
   it('reads the title by kind', () => {
     const data = { titleText: 'Sales 2026' } as EngineChartData;
-    const title = (kind: ChartTitleKind, text = '', formula = '') => ({ kind, text, formula });
+    const title = (
+      kind: ChartTitleKind,
+      text: string | null = null,
+      formula: string | null = null,
+    ) => ({
+      kind,
+      text,
+      formula,
+    });
     expect(read(chartInfo('pie', { title: title(ChartTitleKind.Text, 'Hi') })).title).toBe('Hi');
     expect(
       read(chartInfo('pie', { title: title(ChartTitleKind.Ref, '', 'Sheet1!$A$1') }), data).title,
@@ -604,12 +721,12 @@ describe('chartSpecFromEngine', () => {
     expect(read(chartInfo('pie', { title: title(ChartTitleKind.Auto) })).title).toEqual({
       auto: true,
     });
-    expect(read(chartInfo('pie', { title: title(ChartTitleKind.None) })).title).toBe('');
+    expect(read(chartInfo('pie', { title: null })).title).toBe('');
   });
 
   it('reads the legend position, top-right as right', () => {
-    const rows: [ChartLegendPosition, ChartSpec['legend']][] = [
-      [ChartLegendPosition.None, { visible: false }],
+    const rows: [ChartLegendPosition | null, ChartSpec['legend']][] = [
+      [null, { visible: false }],
       [ChartLegendPosition.Bottom, { visible: true, position: 'bottom' }],
       [ChartLegendPosition.Top, { visible: true, position: 'top' }],
       [ChartLegendPosition.Left, { visible: true, position: 'left' }],
@@ -617,7 +734,9 @@ describe('chartSpecFromEngine', () => {
       [ChartLegendPosition.TopRight, { visible: true, position: 'right' }],
     ];
     for (const [position, legend] of rows) {
-      const info = chartInfo('column', { legend: { position, overlay: true, hiddenSeries: [] } });
+      const info = chartInfo('column', {
+        legend: position === null ? null : { position, overlay: true, hiddenSeries: [] },
+      });
       expect(read(info).legend).toEqual(legend);
     }
   });
@@ -771,7 +890,7 @@ describe('chartSpecFromEngine', () => {
   );
 
   it('reads markers: none as hidden, automatic without a shape', () => {
-    const rows: [ChartMarkerInfo | null, ChartMarkerSpec | undefined][] = [
+    const rows: [ChartMarker | null, ChartMarkerSpec | undefined][] = [
       [null, undefined],
       [markerInfo({ symbol: ChartMarkerSymbol.None }), { visible: false }],
       [markerInfo({ symbol: ChartMarkerSymbol.Auto }), { visible: true }],
@@ -962,7 +1081,7 @@ describe('chartSpecFromEngine', () => {
 
   it('reads the scatter style shared by every series', () => {
     const lineless = lineInfo({ none: true });
-    const rows: [Partial<ChartSeriesInfo>[], ChartSpec['scatterStyle']][] = [
+    const rows: [SeriesOverrides[], ChartSpec['scatterStyle']][] = [
       [[{ line: lineless, marker: markerInfo() }], 'marker'],
       [[{ line: lineless, marker: null }], 'marker'],
       [[{ marker: markerInfo({ symbol: ChartMarkerSymbol.None }) }], 'line'],
@@ -1138,7 +1257,10 @@ describe('chartSpecFromEngine', () => {
             numberFormat: '0.0',
             deleted: deleted === 'true',
           },
-          { crosses: ChartAxisCrosses[crosses], crossesAt: crosses === 'At' ? 4 : null },
+          {
+            crosses: crosses === 'Absent' ? null : ChartAxisCrosses[crosses],
+            crossesAt: crosses === 'At' ? 4 : null,
+          },
         ),
       });
       const expected: ChartAxisSpec = {
@@ -1168,7 +1290,7 @@ describe('chartSpecFromEngine', () => {
           fill: fillInfo(0xff00aa00),
           line: lineInfo({ none: true, widthPt: 1.5 }),
           marker: markerInfo({ symbol: ChartMarkerSymbol.None, size: 9 }),
-        } as ChartSeriesInfo['points'][number],
+        } as PointOverrides,
       ],
     });
     const spec = read(chartInfo('scatter', {}, { series: [hidden] }));
@@ -1217,7 +1339,7 @@ describe('chartSpecOps', () => {
         {
           op: 'setChartType',
           plot: 0,
-          kind: ChartInsertKind.Line,
+          ...PLOT.Line,
           grouping: EngineChartGrouping.Standard,
         },
       ],
@@ -1226,7 +1348,7 @@ describe('chartSpecOps', () => {
         {
           op: 'setChartType',
           plot: 0,
-          kind: ChartInsertKind.Area,
+          ...PLOT.Area,
           grouping: EngineChartGrouping.Stacked,
         },
       ],
@@ -1235,22 +1357,22 @@ describe('chartSpecOps', () => {
         {
           op: 'setChartType',
           plot: 0,
-          kind: ChartInsertKind.Bar,
+          ...PLOT.Bar,
           grouping: EngineChartGrouping.PercentStacked,
         },
       ],
-      [{ kind: 'pie' }, { op: 'setChartType', plot: 0, kind: ChartInsertKind.Pie }],
+      [{ kind: 'pie' }, { op: 'setChartType', plot: 0, ...PLOT.Pie }],
       [
         { kind: 'doughnut', grouping: 'stacked' },
-        { op: 'setChartType', plot: 0, kind: ChartInsertKind.Doughnut },
+        { op: 'setChartType', plot: 0, ...PLOT.Doughnut },
       ],
-      [{ kind: 'scatter' }, { op: 'setChartType', plot: 0, kind: ChartInsertKind.Scatter }],
+      [{ kind: 'scatter' }, { op: 'setChartType', plot: 0, ...PLOT.Scatter }],
       [
         { kind: 'column', grouping: 'stacked' },
         {
           op: 'setChartType',
           plot: 0,
-          kind: ChartInsertKind.Column,
+          ...PLOT.Column,
           grouping: EngineChartGrouping.Stacked,
         },
       ],
@@ -1279,12 +1401,12 @@ describe('chartSpecOps', () => {
       {
         op: 'setChartType',
         plot: 0,
-        kind: ChartInsertKind.Column,
+        ...PLOT.Column,
         grouping: EngineChartGrouping.Clustered,
       },
-      { op: 'setChartPlot', plot: 0, patch: { gapWidth: 219, varyColors: false } },
+      { op: 'setChartPlot', plot: 0, patch: { gapWidthPct: 219, varyColors: false } },
       { op: 'setChartAxis', axis: 'x', patch: { title: 'Month' } },
-      { op: 'setChartSeries', plot: 0, seriesIdx: 0, patch: { fill: { color: 0xff112233 } } },
+      { op: 'setChartSeries', plot: 0, seriesIdx: 0, patch: { fill: { color: '#112233' } } },
     ]);
   });
 
@@ -1299,7 +1421,7 @@ describe('chartSpecOps', () => {
     expect(ops(info, before, { ...before, seriesDirection: 'rows' })).toEqual([
       {
         op: 'setChartSource',
-        source: 'Sheet1!$A$1:$C$4',
+        source: { sheet: 0, rect: { firstRow: 0, firstCol: 0, lastRow: 3, lastCol: 2 } },
         direction: EngineChartSeriesDirection.Rows,
         headerRow: true,
         headerColumn: true,
@@ -1310,7 +1432,7 @@ describe('chartSpecOps', () => {
     ).toEqual([
       {
         op: 'setChartSource',
-        source: 'Sheet1!$A$1:$C$4',
+        source: { sheet: 0, rect: { firstRow: 0, firstCol: 0, lastRow: 3, lastCol: 2 } },
         direction: EngineChartSeriesDirection.Auto,
         headerRow: false,
       },
@@ -1321,15 +1443,15 @@ describe('chartSpecOps', () => {
   });
 
   it('writes blanks per kind, span as gap where lines do not join', () => {
-    const expected: Record<ChartKind, [ChartBlanksAs, ChartBlanksAs, ChartBlanksAs]> = {
+    const expected: Record<ChartKind, [BlanksAs, BlanksAs, BlanksAs]> = {
       // gap, zero, span
-      column: [ChartBlanksAs.Gap, ChartBlanksAs.Zero, ChartBlanksAs.Gap],
-      bar: [ChartBlanksAs.Gap, ChartBlanksAs.Zero, ChartBlanksAs.Gap],
-      line: [ChartBlanksAs.Gap, ChartBlanksAs.Zero, ChartBlanksAs.Span],
-      area: [ChartBlanksAs.Gap, ChartBlanksAs.Zero, ChartBlanksAs.Span],
-      pie: [ChartBlanksAs.Gap, ChartBlanksAs.Zero, ChartBlanksAs.Gap],
-      doughnut: [ChartBlanksAs.Gap, ChartBlanksAs.Zero, ChartBlanksAs.Gap],
-      scatter: [ChartBlanksAs.Gap, ChartBlanksAs.Zero, ChartBlanksAs.Span],
+      column: [BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Gap],
+      bar: [BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Gap],
+      line: [BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Span],
+      area: [BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Span],
+      pie: [BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Gap],
+      doughnut: [BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Gap],
+      scatter: [BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Span],
     };
     for (const kind of KINDS) {
       const info = chartInfo(kind, { plotVisibleOnly: null });
@@ -1364,12 +1486,12 @@ describe('chartSpecOps', () => {
       varyColors: true,
     };
     const expected: Record<ChartKind, object> = {
-      column: { gapWidth: 40, overlap: 25, varyColors: true },
-      bar: { gapWidth: 40, overlap: 25, varyColors: true },
+      column: { gapWidthPct: 40, overlapPct: 25, varyColors: true },
+      bar: { gapWidthPct: 40, overlapPct: 25, varyColors: true },
       line: { varyColors: true },
       area: { varyColors: true },
-      pie: { firstSliceAngle: 45, varyColors: true },
-      doughnut: { firstSliceAngle: 45, holeSize: 70, varyColors: true },
+      pie: { firstSliceAngleDeg: 45, varyColors: true },
+      doughnut: { firstSliceAngleDeg: 45, holeSizePct: 70, varyColors: true },
       scatter: { varyColors: true },
     };
     for (const kind of KINDS) {
@@ -1387,7 +1509,7 @@ describe('chartSpecOps', () => {
     const info = chartInfo('pie');
     expect(
       ops(info, { kind: 'pie', title: 'Share' }, { kind: 'pie', title: { auto: true } }),
-    ).toEqual([{ op: 'setChartTitle', title: { kind: ChartTitleKind.Auto } }]);
+    ).toEqual([{ op: 'setChartTitle', title: AUTO_TITLE }]);
     expect(
       ops(info, { kind: 'pie', title: { auto: true } }, { kind: 'pie', title: { auto: true } }),
     ).toEqual([]);
@@ -1407,7 +1529,7 @@ describe('chartSpecOps', () => {
     const patchOps = (title: string | { auto: true }, next: string | { auto: true }) =>
       ops(info, { kind: 'line', yAxis: { title } }, { kind: 'line', yAxis: { title: next } });
     expect(patchOps('Units', { auto: true })).toEqual([
-      { op: 'setChartAxis', axis: 'y', patch: { title: { kind: ChartTitleKind.Auto } } },
+      { op: 'setChartAxis', axis: 'y', patch: { title: AUTO_TITLE } },
     ]);
     expect(patchOps({ auto: true }, { auto: true })).toEqual([]);
     expect(patchOps({ auto: true }, '')).toEqual([
@@ -1435,7 +1557,7 @@ describe('chartSpecOps', () => {
       'setChartTitle',
     ]);
     expect(ops(info, before, { ...before, legend: { visible: false } })).toEqual([
-      { op: 'setChartLegend', position: ChartLegendPosition.None, overlay: true },
+      { op: 'setChartLegend', position: null, overlay: true },
     ]);
     expect(ops(info, before, { ...before, legend: { visible: true, position: 'left' } })).toEqual([
       { op: 'setChartLegend', position: ChartLegendPosition.Left, overlay: true },
@@ -1558,7 +1680,7 @@ describe('chartSpecOps', () => {
             separator: ' / ',
             position: EngineChartLabelPosition.InsideEnd,
             numberFormat: '0%',
-            fontColor: 0xffabcdef,
+            fontColor: '#abcdef',
             fontSizePt: 11,
           },
         },
@@ -1584,9 +1706,9 @@ describe('chartSpecOps', () => {
   it('writes the palette as each series fill colour, explicit colours first', () => {
     const info = chartInfo('pie', {}, { series: [seriesInfo(0), seriesInfo(1), seriesInfo(5)] });
     expect(ops(info, { kind: 'pie' }, { kind: 'pie', palette: ['#111111', '#222222'] })).toEqual([
-      { op: 'setChartSeries', plot: 0, seriesIdx: 0, patch: { fill: { color: 0xff111111 } } },
-      { op: 'setChartSeries', plot: 0, seriesIdx: 1, patch: { fill: { color: 0xff222222 } } },
-      { op: 'setChartSeries', plot: 0, seriesIdx: 5, patch: { fill: { color: 0xff111111 } } },
+      { op: 'setChartSeries', plot: 0, seriesIdx: 0, patch: { fill: { color: '#111111' } } },
+      { op: 'setChartSeries', plot: 0, seriesIdx: 1, patch: { fill: { color: '#222222' } } },
+      { op: 'setChartSeries', plot: 0, seriesIdx: 5, patch: { fill: { color: '#111111' } } },
     ]);
     expect(
       ops(
@@ -1599,7 +1721,7 @@ describe('chartSpecOps', () => {
         },
       ),
     ).toEqual([
-      { op: 'setChartSeries', plot: 0, seriesIdx: 1, patch: { fill: { color: 0xff333333 } } },
+      { op: 'setChartSeries', plot: 0, seriesIdx: 1, patch: { fill: { color: '#333333' } } },
     ]);
     // Dropping the palette clears the colours it supplied; an unstorable colour is skipped.
     expect(
@@ -1639,8 +1761,8 @@ describe('chartSpecOps', () => {
       {
         marker: {
           symbol: ChartMarkerSymbol.Circle,
-          fill: { color: 0xff123456 },
-          line: { color: 0xff123456 },
+          fill: { color: '#123456' },
+          line: { color: '#123456' },
         },
       },
     ]);
@@ -1657,14 +1779,14 @@ describe('chartSpecOps', () => {
     const colored = (pointId: string): ChartPointStyleSpec[] => [
       { pointId, fill: { color: '#00ff00', transparency: 50 } },
     ];
-    const marker = { fill: { color: 0xff00ff00 }, line: { color: 0xff00ff00 } };
+    const marker = { fill: { color: '#00ff00' }, line: { color: '#00ff00' } };
     expect(ops(chartInfo('line'), spec('line'), spec('line', colored('category-2')))).toEqual([
       {
         op: 'setChartPoint',
         plot: 0,
         seriesIdx: 0,
         pointIdx: 2,
-        patch: { line: { color: 0xff00ff00 }, marker },
+        patch: { line: { color: '#00ff00' }, marker },
       },
     ]);
     // A marker-only scatter point takes the colour on its marker alone.
@@ -1700,15 +1822,15 @@ describe('chartSpecOps', () => {
         plot: 0,
         seriesIdx: 0,
         patch: {
-          line: { color: 0xff111111 },
-          marker: { fill: { color: 0xff111111 }, line: { color: 0xff111111 } },
+          line: { color: '#111111' },
+          marker: { fill: { color: '#111111' }, line: { color: '#111111' } },
         },
       },
       {
         op: 'setChartSeries',
         plot: 0,
         seriesIdx: 1,
-        patch: { line: { color: 0xff444444 }, marker: { symbol: ChartMarkerSymbol.None } },
+        patch: { line: { color: '#444444' }, marker: { symbol: ChartMarkerSymbol.None } },
       },
     ]);
     // A marker colour of its own wins; a marker-only scatter series takes the colour on its markers alone.
@@ -1738,7 +1860,7 @@ describe('chartSpecOps', () => {
         plot: 0,
         seriesIdx: 0,
         patch: {
-          marker: { fill: { color: 0xff666666, transparency: 50 }, line: { color: 0xff555555 } },
+          marker: { fill: { color: '#666666', transparencyPct: 50 }, line: { color: '#555555' } },
         },
       },
     ]);
@@ -1782,8 +1904,8 @@ describe('chartSpecOps', () => {
         dash: dash === 'keep' ? 'dot' : dash === 'clear' ? undefined : dash,
       };
       const patch = {
-        ...({ keep: {}, set: { color: 0xffaabbcc }, clear: { color: null } } as const)[color],
-        ...({ keep: {}, set: { transparency: 60 }, clear: { transparency: null } } as const)[
+        ...({ keep: {}, set: { color: '#aabbcc' }, clear: { color: null } } as const)[color],
+        ...({ keep: {}, set: { transparencyPct: 60 }, clear: { transparencyPct: null } } as const)[
           transparency
         ],
         ...({ keep: {}, set: { widthPt: 3 }, clear: { widthPt: null } } as const)[width],
@@ -1831,7 +1953,7 @@ describe('chartSpecOps', () => {
         },
       ),
     ).toEqual([
-      { op: 'setChartSeries', plot: 0, seriesIdx: 0, patch: { fill: { transparency: 30 } } },
+      { op: 'setChartSeries', plot: 0, seriesIdx: 0, patch: { fill: { transparencyPct: 30 } } },
     ]);
     expect(
       ops(
@@ -1931,7 +2053,7 @@ describe('chartSpecOps', () => {
       const symbol = symbols[from]?.[to];
       const patch = {
         ...(symbol === undefined ? {} : { symbol }),
-        ...(size === 'set' ? { size: 7 } : {}),
+        ...(size === 'set' ? { sizePt: 7 } : {}),
       };
       marker = Object.keys(patch).length > 0 ? patch : undefined;
     }
@@ -1969,7 +2091,7 @@ describe('chartSpecOps', () => {
         plot: 0,
         seriesIdx: 0,
         pointIdx: 1,
-        patch: { marker: { fill: { color: 0xffffffff }, line: { widthPt: 2 } } },
+        patch: { marker: { fill: { color: '#ffffff' }, line: { widthPt: 2 } } },
       },
     ]);
     expect(
@@ -2173,7 +2295,7 @@ describe('chartSpecOps', () => {
         ...(
           {
             keep: {},
-            low: { tickLabelPosition: 'low' },
+            low: { tickLabelPosition: TickLabelPosition.Low },
             clear: { tickLabelPosition: null },
           } as const
         )[labelPosition],
@@ -2266,7 +2388,7 @@ describe('chartSpecOps', () => {
         op: 'setChartSeries',
         plot: 0,
         seriesIdx: 0,
-        patch: { line: { color: 0xff333333, widthPt: 2, dash: ChartLineDash.Dash } },
+        patch: { line: { color: '#333333', widthPt: 2, dash: ChartLineDash.Dash } },
       },
     ]);
   });
@@ -2327,31 +2449,31 @@ describe('series colours', () => {
 describe('chartInsertOptions', () => {
   // Line and area write Excel's standard grouping for clustered.
   it.each([
-    ['column', 'clustered', ChartInsertKind.Column, EngineChartGrouping.Clustered],
-    ['column', 'stacked', ChartInsertKind.Column, EngineChartGrouping.Stacked],
-    ['column', 'percent-stacked', ChartInsertKind.Column, EngineChartGrouping.PercentStacked],
-    ['bar', 'clustered', ChartInsertKind.Bar, EngineChartGrouping.Clustered],
-    ['bar', 'stacked', ChartInsertKind.Bar, EngineChartGrouping.Stacked],
-    ['bar', 'percent-stacked', ChartInsertKind.Bar, EngineChartGrouping.PercentStacked],
-    ['line', 'clustered', ChartInsertKind.Line, EngineChartGrouping.Standard],
-    ['line', 'stacked', ChartInsertKind.Line, EngineChartGrouping.Stacked],
-    ['line', 'percent-stacked', ChartInsertKind.Line, EngineChartGrouping.PercentStacked],
-    ['area', 'clustered', ChartInsertKind.Area, EngineChartGrouping.Standard],
-    ['area', 'stacked', ChartInsertKind.Area, EngineChartGrouping.Stacked],
-    ['area', 'percent-stacked', ChartInsertKind.Area, EngineChartGrouping.PercentStacked],
-    ['pie', undefined, ChartInsertKind.Pie, undefined],
-    ['doughnut', undefined, ChartInsertKind.Doughnut, undefined],
-    ['scatter', undefined, ChartInsertKind.Scatter, undefined],
-  ] as const)('creates %s %s', (kind, grouping, insertKind, engineGrouping) => {
+    ['column', 'clustered', PLOT.Column, EngineChartGrouping.Clustered],
+    ['column', 'stacked', PLOT.Column, EngineChartGrouping.Stacked],
+    ['column', 'percent-stacked', PLOT.Column, EngineChartGrouping.PercentStacked],
+    ['bar', 'clustered', PLOT.Bar, EngineChartGrouping.Clustered],
+    ['bar', 'stacked', PLOT.Bar, EngineChartGrouping.Stacked],
+    ['bar', 'percent-stacked', PLOT.Bar, EngineChartGrouping.PercentStacked],
+    ['line', 'clustered', PLOT.Line, EngineChartGrouping.Standard],
+    ['line', 'stacked', PLOT.Line, EngineChartGrouping.Stacked],
+    ['line', 'percent-stacked', PLOT.Line, EngineChartGrouping.PercentStacked],
+    ['area', 'clustered', PLOT.Area, EngineChartGrouping.Standard],
+    ['area', 'stacked', PLOT.Area, EngineChartGrouping.Stacked],
+    ['area', 'percent-stacked', PLOT.Area, EngineChartGrouping.PercentStacked],
+    ['pie', undefined, PLOT.Pie, undefined],
+    ['doughnut', undefined, PLOT.Doughnut, undefined],
+    ['scatter', undefined, PLOT.Scatter, undefined],
+  ] as const)('creates %s %s', (kind, grouping, plot, engineGrouping) => {
     const options = chartInsertOptions({ kind, ...(grouping ? { grouping } : {}) });
-    expect(options.kind).toBe(insertKind);
+    expect(options).toMatchObject(plot);
     expect(options.grouping).toBe(engineGrouping);
     expect('grouping' in options).toBe(engineGrouping !== undefined);
   });
 
   it('carries the split and the legend, leaving omitted ones to Excel', () => {
     expect(chartInsertOptions({ kind: 'column' })).toEqual({
-      kind: ChartInsertKind.Column,
+      ...PLOT.Column,
       grouping: EngineChartGrouping.Clustered,
       direction: EngineChartSeriesDirection.Auto,
     });
@@ -2364,11 +2486,11 @@ describe('chartInsertOptions', () => {
         legend: { visible: false },
       }),
     ).toEqual({
-      kind: ChartInsertKind.Pie,
+      ...PLOT.Pie,
       direction: EngineChartSeriesDirection.Rows,
       headerRow: false,
       headerColumn: true,
-      legend: ChartLegendPosition.None,
+      legend: null,
     });
     expect(chartInsertOptions({ kind: 'line', legend: {} }).legend).toBe(
       ChartLegendPosition.Bottom,
@@ -2384,22 +2506,22 @@ describe('chartDataFromEngine', () => {
 
   it('converts category series with their point states and format codes', () => {
     const data: EngineChartData = {
-      domain: 'category',
+      domain: ChartDomain.Category,
       pointCount: 3,
       categories: {
         labels: ['Jan', 'Feb', 'Mar'],
         levels: [],
         values: null,
-        formatCode: 'General',
+        numberFormat: 'General',
         generated: false,
       },
       series: [
         {
           plotIndex: 0,
-          idx: 4,
+          seriesId: 4,
           name: 'North',
-          formatCode: '0.0',
-          xFormatCode: '',
+          numberFormat: '0.0',
+          xNumberFormat: '',
           filtered: false,
           values: new Float64Array([1.5, Number.NaN, 0]),
           states: new Uint8Array([0, 1, 2]),
@@ -2409,10 +2531,10 @@ describe('chartDataFromEngine', () => {
         },
         {
           plotIndex: 0,
-          idx: 5,
+          seriesId: 5,
           name: null,
-          formatCode: 'General',
-          xFormatCode: '',
+          numberFormat: 'General',
+          xNumberFormat: '',
           filtered: true,
           values: new Float64Array([2, 3, 4]),
           states: new Uint8Array([0, 0, 0]),
@@ -2451,10 +2573,10 @@ describe('chartDataFromEngine', () => {
   it('converts xy series, numbering points without x values', () => {
     const series = (idx: number, x: Float64Array | null) => ({
       plotIndex: 0,
-      idx,
+      seriesId: idx,
       name: `S${idx}`,
-      formatCode: 'General',
-      xFormatCode: 'General',
+      numberFormat: 'General',
+      xNumberFormat: 'General',
       filtered: false,
       values: new Float64Array([10, 20]),
       states: new Uint8Array([0, 1]),
@@ -2463,9 +2585,15 @@ describe('chartDataFromEngine', () => {
       ranges,
     });
     const data: EngineChartData = {
-      domain: 'xy',
+      domain: ChartDomain.Xy,
       pointCount: 2,
-      categories: { labels: [], levels: [], values: null, formatCode: 'General', generated: true },
+      categories: {
+        labels: [],
+        levels: [],
+        values: null,
+        numberFormat: 'General',
+        generated: true,
+      },
       series: [series(0, new Float64Array([0.5, Number.NaN])), series(1, null)],
       titleText: null,
       axisTitleTexts: [],

@@ -164,13 +164,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     });
   };
 
-  const sheetIndexByName = (name: string): number => {
-    const target = name.toLowerCase();
-    for (let i = 0; i < wb.sheetCount; i += 1) {
-      if (wb.sheetName(i).toLowerCase() === target) return i;
-    }
-    return -1;
-  };
+  const sheetIndexByName = (name: string): number => wb.sheetIndexByName(name) ?? -1;
 
   const rangeFromSourceInput = () => {
     const parsed = parseRangeRef(sourceInput.value);

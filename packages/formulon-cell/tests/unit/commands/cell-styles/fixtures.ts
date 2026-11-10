@@ -19,6 +19,8 @@ export const macStyleOracle = JSON.parse(
   }[];
 };
 
+const rgb = (argb: number) => ({ kind: 1, argb, theme: 0, tint: 0, indexed: 0 });
+
 export const namedStyleWorkbook = (): WorkbookHandle =>
   ({
     getNamedCellStyles: () => [
@@ -46,8 +48,8 @@ export const namedStyleWorkbook = (): WorkbookHandle =>
             fillIndex: 1,
             borderIndex: 0,
             numFmtId: 0,
-            horizontalAlign: 2,
-            verticalAlign: 1,
+            horizontal: 2,
+            vertical: 1,
             wrapText: true,
           }
         : {
@@ -55,30 +57,30 @@ export const namedStyleWorkbook = (): WorkbookHandle =>
             fillIndex: 0,
             borderIndex: 0,
             numFmtId: 0,
-            horizontalAlign: 0,
-            verticalAlign: 2,
-            wrapText: false,
+            horizontal: null,
+            vertical: null,
+            wrapText: null,
           },
     getFontRecord: (fontIndex: number) => ({
       name: 'Calibri',
-      size: 11,
+      sizePt: 11,
       bold: fontIndex === 1,
       italic: false,
       strike: false,
       underline: 0,
-      colorArgb: fontIndex === 1 ? 0xff006100 : 0xff000000,
+      color: rgb(fontIndex === 1 ? 0xff006100 : 0xff000000),
     }),
     getFillRecord: (fillIndex: number) => ({
       pattern: fillIndex === 1 ? 1 : 0,
-      fgArgb: fillIndex === 1 ? 0xffc6efce : 0,
-      bgArgb: 0,
+      foreground: rgb(fillIndex === 1 ? 0xffc6efce : 0),
+      background: rgb(0),
     }),
     getBorderRecord: () => ({
-      left: { style: 0, colorArgb: 0xff000000 },
-      right: { style: 0, colorArgb: 0xff000000 },
-      top: { style: 0, colorArgb: 0xff000000 },
-      bottom: { style: 0, colorArgb: 0xff000000 },
-      diagonal: { style: 0, colorArgb: 0xff000000 },
+      left: { style: 0, color: rgb(0xff000000) },
+      right: { style: 0, color: rgb(0xff000000) },
+      top: { style: 0, color: rgb(0xff000000) },
+      bottom: { style: 0, color: rgb(0xff000000) },
+      diagonal: { style: 0, color: rgb(0xff000000) },
       diagonalUp: false,
       diagonalDown: false,
     }),

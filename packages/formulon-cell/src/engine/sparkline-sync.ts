@@ -1,21 +1,15 @@
-import { SparklineType } from '@libraz/formulon';
-import {
-  newSparklineGroupId,
-  splitSourceQualifier,
-  unquoteSheetName,
-} from '../commands/sparkline.js';
+import type { Color, ColorInput, SheetRect } from '@libraz/formulon';
+import { ColorKind, SparklineType } from '@libraz/formulon';
+import { newSparklineGroupId, splitSourceQualifier } from '../commands/sparkline.js';
 import { DEFAULT_NEGATIVE_COLOR, DEFAULT_SPARKLINE_COLOR } from '../render/painters/controls.js';
 import type { Sparkline, SparklineKind, SpreadsheetStore, State } from '../store/store.js';
-import { addrKey, formatA1Cell, parseA1Atom, parseAddrKey, quoteSheetName } from './address.js';
+import { addrKey, formatA1Cell, formatA1Range, parseAddrKey, quoteSheetName } from './address.js';
 import { argbFromCssColor, cssColorFromArgb } from './theme-color.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type {
-  EngineSparkline,
-  EngineSparklineGroup,
-  EngineSparklineGroupInput,
+  EngineSparklineGroupPatch,
+  EngineSparklineInput,
 } from './workbook-handle-drawing-objects.js';
-
-type ColorSpec = EngineSparklineGroup['colorSeries'];
 
 const TYPE_OF_KIND: Record<SparklineKind, SparklineType> = {
   line: SparklineType.Line,
@@ -33,26 +27,27 @@ const KIND_OF_TYPE: Record<SparklineType, SparklineKind> = {
 const engineFormula = (source: string, hostSheet: string): string =>
   splitSourceQualifier(source).qualifier ? source : `${quoteSheetName(hostSheet)}!${source}`;
 
-/** Source as the store keeps it: bare when it names the host sheet. */
-const storeSource = (formula: string, hostSheet: string): string => {
-  const { qualifier, body } = splitSourceQualifier(formula);
-  return qualifier && unquoteSheetName(qualifier).toLowerCase() === hostSheet.toLowerCase()
-    ? body
-    : formula;
+/** Source as the store keeps it: bare when it is on the host sheet. */
+const storeSource = (wb: WorkbookHandle, source: SheetRect, hostSheet: number): string => {
+  const { rect } = source;
+  const range = formatA1Range({
+    r0: rect.firstRow,
+    c0: rect.firstCol,
+    r1: rect.lastRow,
+    c1: rect.lastCol,
+  });
+  return source.sheet === hostSheet
+    ? range
+    : `${quoteSheetName(wb.sheetName(source.sheet))}!${range}`;
 };
 
-const colorSpecOf = (css: string): ColorSpec => ({
-  kind: 1,
-  rgb: argbFromCssColor(css) ?? 0xff000000,
-  theme: 0,
-  tint: 0,
-  indexed: 0,
-});
+const colorSpecOf = (css: string): ColorInput =>
+  cssColorFromArgb(argbFromCssColor(css) ?? 0xff000000);
 
 /** CSS colour of an engine colour; undefined when it is absent. */
-const cssOfSpec = (wb: WorkbookHandle, spec: ColorSpec): string | undefined => {
-  if (spec.kind === 0) return undefined;
-  const argb = wb.resolveColorArgb(spec) ?? (spec.kind === 1 ? spec.rgb : null);
+const cssOfSpec = (wb: WorkbookHandle, spec: Color | null): string | undefined => {
+  if (spec === null || spec.kind === ColorKind.None) return undefined;
+  const argb = wb.resolveColorArgb(spec) ?? (spec.kind === ColorKind.Rgb ? spec.argb : null);
   return argb === null ? undefined : cssColorFromArgb(argb);
 };
 
@@ -61,9 +56,9 @@ const cssOfSpec = (wb: WorkbookHandle, spec: ColorSpec): string | undefined => {
 const colorFor = (
   wb: WorkbookHandle,
   css: string | undefined,
-  base: ColorSpec | undefined,
+  base: Color | null | undefined,
   fallback: string,
-): ColorSpec => {
+): ColorInput => {
   if (css === undefined) return base ?? colorSpecOf(fallback);
   return base && cssOfSpec(wb, base) === css ? base : colorSpecOf(css);
 };
@@ -80,18 +75,17 @@ export function hydrateSparklinesFromEngine(
   const hydrate = (): void => {
     const loaded = new Map<string, Sparkline>();
     for (const index of sheets) {
-      const name = wb.sheetName(index);
       for (const group of wb.listSparklineGroups(index)) {
         const { sparklines, ...settings } = group;
         const id = newSparklineGroupId();
         const color = cssOfSpec(wb, group.colorSeries);
         const negativeColor = cssOfSpec(wb, group.colorNegative);
         for (const member of sparklines) {
-          const at = parseA1Atom(member.location);
-          if (!at) continue;
-          loaded.set(addrKey({ sheet: index, ...at }), {
+          if (!member.source) continue;
+          const { row, col } = member.location;
+          loaded.set(addrKey({ sheet: index, row, col }), {
             kind: KIND_OF_TYPE[group.type] ?? 'line',
-            source: storeSource(member.formula, name),
+            source: storeSource(wb, member.source, index),
             ...(color ? { color } : {}),
             showNegative: group.negative,
             ...(negativeColor ? { negativeColor } : {}),
@@ -142,8 +136,6 @@ const groupsOf = (map: ReadonlyMap<string, Sparkline>): Map<string, Member[]> =>
 };
 
 const locationOf = (member: Member): string => formatA1Cell(member.row, member.col);
-
-const normalizeLocation = (location: string): string => location.replace(/\$/g, '').toUpperCase();
 
 /** Whether the members in `a` and `b` are the same cells with the same sources. */
 const sameMembers = (a: readonly Member[], b: readonly Member[]): boolean =>
@@ -258,14 +250,16 @@ export class SparklineMirror {
     return this.handle
       .listSparklineGroups(sheet)
       .findIndex((group) =>
-        group.sparklines.some((sparkline) => cells.has(normalizeLocation(sparkline.location))),
+        group.sparklines.some((sparkline) =>
+          cells.has(formatA1Cell(sparkline.location.row, sparkline.location.col)),
+        ),
       );
   }
 
-  private engineMembers(members: readonly Member[]): EngineSparkline[] {
+  private engineMembers(members: readonly Member[]): EngineSparklineInput[] {
     const hostSheet = this.handle.sheetName(members[0]?.sheet as number);
     return members.map((member) => ({
-      formula: engineFormula(member.spec.source, hostSheet),
+      source: engineFormula(member.spec.source, hostSheet),
       location: locationOf(member),
     }));
   }
@@ -274,21 +268,16 @@ export class SparklineMirror {
     return this.handle.setSparklineGroupSparklines(sheet, index, this.engineMembers(members));
   }
 
-  /** Apply the style change from `from` to `to` on group `index`. An update
-   *  resets every field it leaves out, so the group's own settings go with it. */
+  /** Apply the style change from `from` to `to` on group `index`; the group's other settings stay. */
   private restyle(sheet: number, index: number, from: Sparkline, to: Sparkline): void {
-    const current = this.handle.listSparklineGroups(sheet)[index];
-    if (!current) return;
-    const { sparklines: _members, ...settings } = current;
-    this.handle.updateSparklineGroup(sheet, index, {
-      ...settings,
-      ...this.styleChange(from, to),
-    });
+    this.handle.updateSparklineGroup(sheet, index, this.styleChange(from, to));
   }
 
   /** The group fields that `to` changes from `from`. */
-  private styleChange(from: Sparkline, to: Sparkline): EngineSparklineGroupInput {
-    const change: EngineSparklineGroupInput = {};
+  private styleChange(from: Sparkline, to: Sparkline): EngineSparklineGroupPatch {
+    const change: {
+      -readonly [K in keyof EngineSparklineGroupPatch]: EngineSparklineGroupPatch[K];
+    } = {};
     if (from.kind !== to.kind) change.type = TYPE_OF_KIND[to.kind];
     if (from.color !== to.color) {
       change.colorSeries = colorSpecOf(to.color ?? DEFAULT_SPARKLINE_COLOR);
@@ -303,12 +292,14 @@ export class SparklineMirror {
   private add(members: readonly Member[]): boolean {
     const wb = this.handle;
     const style = styleOf(members);
-    const base = style.nativeGroup;
+    // The id is the read-back group's own; a new group gets one of its own.
+    const { id: _id, ...base }: Partial<NonNullable<Sparkline['nativeGroup']>> =
+      style.nativeGroup ?? {};
     return wb.addSparklineGroup(members[0]?.sheet as number, {
       ...base,
       type: TYPE_OF_KIND[style.kind],
-      colorSeries: colorFor(wb, style.color, base?.colorSeries, DEFAULT_SPARKLINE_COLOR),
-      colorNegative: colorFor(wb, style.negativeColor, base?.colorNegative, DEFAULT_NEGATIVE_COLOR),
+      colorSeries: colorFor(wb, style.color, base.colorSeries, DEFAULT_SPARKLINE_COLOR),
+      colorNegative: colorFor(wb, style.negativeColor, base.colorNegative, DEFAULT_NEGATIVE_COLOR),
       negative: !!style.showNegative,
       sparklines: this.engineMembers(members),
     });

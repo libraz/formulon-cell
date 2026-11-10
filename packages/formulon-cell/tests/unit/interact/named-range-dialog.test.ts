@@ -88,6 +88,7 @@ interface MutableWb {
   readonly sheetCount: number;
   definedNames(): IterableIterator<{ name: string; formula: string; localSheetId: number }>;
   sheetName(index: number): string;
+  sheetIndexByName(name: string): number | null;
   getValue(addr: { sheet: number; row: number; col: number }): FakeCellValue;
   setDefinedNameEntry(name: string, formula: string, localSheetId?: number): boolean;
   recalc(): void;
@@ -118,6 +119,12 @@ const makeMutableWb = (): {
     },
     sheetName(index: number): string {
       return index === 0 ? 'Sheet1' : `Sheet${index + 1}`;
+    },
+    sheetIndexByName(name: string): number | null {
+      for (let i = 0; i < this.sheetCount; i += 1) {
+        if (this.sheetName(i).toLowerCase() === name.toLowerCase()) return i;
+      }
+      return null;
     },
     getValue(addr) {
       return values.get(`${addr.sheet}:${addr.row}:${addr.col}`) ?? { kind: 'blank' };

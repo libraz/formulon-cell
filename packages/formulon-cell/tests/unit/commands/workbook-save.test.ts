@@ -1,4 +1,4 @@
-import { AnchorEditAs, AnchorKind, ShapePaint } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WORKBOOK_SAVE_FORMATS, writeWorkbook } from '../../../src/commands/workbook-save.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -86,15 +86,16 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
     try {
       wb.insertShape(0, {
         name: 'Box',
-        prst: 'rect',
-        anchorKind: AnchorKind.TwoCell,
-        editAs: AnchorEditAs.TwoCell,
-        fromRow: 1,
-        fromCol: 1,
-        toRow: 3,
-        toCol: 3,
-        fillKind: ShapePaint.Solid,
-        fillRgb: 0x336699,
+        presetGeometry: 'rect',
+        anchor: {
+          kind: AnchorKind.TwoCell,
+          editAs: AnchorEditAs.TwoCell,
+          fromRow: 1,
+          fromCol: 1,
+          toRow: 3,
+          toCol: 3,
+        },
+        fill: { color: '#336699' },
       });
       wb.setSheetHeaderFooter(0, { oddHeader: 'Title' });
       const outcome = writeWorkbook(wb, 'xlsb');

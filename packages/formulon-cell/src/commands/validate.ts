@@ -1,3 +1,4 @@
+import { ComparisonOperator, ValidationErrorStyle, ValidationType } from '@libraz/formulon';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
@@ -59,7 +60,11 @@ export function nativeValidationOutcome(
   if (result.valid) return { ok: true };
   const local = validateAgainst(validation, input);
   const severity =
-    result.errorStyle === 1 ? 'warning' : result.errorStyle === 2 ? 'information' : 'stop';
+    result.errorStyle === ValidationErrorStyle.Warning
+      ? 'warning'
+      : result.errorStyle === ValidationErrorStyle.Information
+        ? 'information'
+        : 'stop';
   return {
     ok: false,
     severity,
@@ -79,21 +84,25 @@ function validationMatchesEngineRule(
   if (!entry?.ranges.some((range) => rangeContainsAddr(range, addr))) return false;
   const type =
     validation.kind === 'whole'
-      ? 1
+      ? ValidationType.Whole
       : validation.kind === 'decimal'
-        ? 2
+        ? ValidationType.Decimal
         : validation.kind === 'list'
-          ? 3
+          ? ValidationType.List
           : validation.kind === 'date'
-            ? 4
+            ? ValidationType.Date
             : validation.kind === 'time'
-              ? 5
+              ? ValidationType.Time
               : validation.kind === 'textLength'
-                ? 6
-                : 7;
+                ? ValidationType.TextLength
+                : ValidationType.Custom;
   if (entry.type !== type) return false;
   const expectedErrorStyle =
-    validation.errorStyle === 'warning' ? 1 : validation.errorStyle === 'information' ? 2 : 0;
+    validation.errorStyle === 'warning'
+      ? ValidationErrorStyle.Warning
+      : validation.errorStyle === 'information'
+        ? ValidationErrorStyle.Information
+        : ValidationErrorStyle.Stop;
   if (entry.errorStyle !== expectedErrorStyle) return false;
   if (entry.allowBlank !== (validation.allowBlank !== false)) return false;
   if (entry.showErrorMessage !== (validation.showErrorMessage !== false)) return false;
@@ -108,20 +117,20 @@ function validationMatchesEngineRule(
   }
   const op =
     validation.op === 'between'
-      ? 0
+      ? ComparisonOperator.Between
       : validation.op === 'notBetween'
-        ? 1
+        ? ComparisonOperator.NotBetween
         : validation.op === '='
-          ? 2
+          ? ComparisonOperator.Equal
           : validation.op === '<>'
-            ? 3
+            ? ComparisonOperator.NotEqual
             : validation.op === '>'
-              ? 4
+              ? ComparisonOperator.GreaterThan
               : validation.op === '<'
-                ? 5
+                ? ComparisonOperator.LessThan
                 : validation.op === '>='
-                  ? 6
-                  : 7;
+                  ? ComparisonOperator.GreaterThanOrEqual
+                  : ComparisonOperator.LessThanOrEqual;
   if (entry.op !== op || !boundMatches(entry.formula1, validation.aFormula, validation.a)) {
     return false;
   }

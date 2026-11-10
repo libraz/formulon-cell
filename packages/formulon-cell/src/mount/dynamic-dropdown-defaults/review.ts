@@ -48,8 +48,8 @@ const updateReviewCommentsMenu =
       threads.some(
         (entry) =>
           !entry.parentId &&
-          entry.row === state.selection.active.row &&
-          entry.col === state.selection.active.col,
+          entry.cell.row === state.selection.active.row &&
+          entry.cell.col === state.selection.active.col,
       );
     const hasAnyComment =
       listComments(state, state.data.sheetIndex).length > 0 || threads.length > 0;

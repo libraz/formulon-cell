@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setWorkbookStructureProtected } from '../../../../src/commands/protection.js';
 import { addrKey } from '../../../../src/engine/address.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
@@ -23,7 +24,10 @@ describe('Spreadsheet.mountToolbar', () => {
     host.remove();
   });
 
-  it('inserts and deletes cells through the Home Cells dropdowns', () => {
+  it('inserts and deletes cells through the Home Cells dropdowns', async () => {
+    // Shifting cells is an engine operation; the stub engine refuses it.
+    sheet.dispose();
+    sheet = await mountStubSheet({ locale: 'en', workbook: await WorkbookHandle.createDefault() });
     seedNumber(sheet, 1, 1, 10);
     seedNumber(sheet, 2, 1, 20);
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 });

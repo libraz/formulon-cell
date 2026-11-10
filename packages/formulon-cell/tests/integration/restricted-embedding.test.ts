@@ -274,12 +274,18 @@ describe('restricted embedding public API', () => {
     let toolbar: ReturnType<typeof mountToolbar> | undefined;
     try {
       sheet.instance.openFunctionArguments('ACCRINT');
-      const input = document.querySelector<HTMLInputElement>('.fc-fxdialog__arg-input');
-      if (!input) throw new Error('expected ACCRINT argument input');
-      input.value = '0';
-      input.dispatchEvent(new Event('input'));
+      // issue, first_interest, settlement, rate, par, frequency: the required arguments.
+      const args = ['44562', '44652', '44743', '0.05', '1000', '2'];
+      const inputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
+      expect(inputs.length).toBeGreaterThanOrEqual(args.length);
+      args.forEach((value, index) => {
+        const input = inputs[index];
+        if (!input) throw new Error('expected ACCRINT argument input');
+        input.value = value;
+        input.dispatchEvent(new Event('input'));
+      });
       document.querySelector<HTMLButtonElement>('.fc-fxdialog .fc-fmtdlg__btn--primary')?.click();
-      expect(workbook.cellFormula(a1)).toBe('=ACCRINT(0)');
+      expect(workbook.cellFormula(a1)).toBe('=ACCRINT(44562, 44652, 44743, 0.05, 1000, 2)');
       toolbarHost = document.createElement('div');
       document.body.append(toolbarHost);
       toolbar = mountToolbar(toolbarHost, sheet.instance, { platform: 'mac', lang: 'en' });

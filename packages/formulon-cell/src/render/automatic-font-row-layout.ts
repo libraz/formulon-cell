@@ -70,7 +70,8 @@ function fontForStyleXf(
   if (cache.has(styleXf)) return cache.get(styleXf) ?? null;
   const xf = workbook.getCellXf(styleXf);
   const font = xf ? workbook.getResolvedFontRecord(xf.fontIndex) : null;
-  const size = font && validFontSize(font.size) ? fontPointsToCssPx(font.size) : null;
+  const size =
+    font?.sizePt != null && validFontSize(font.sizePt) ? fontPointsToCssPx(font.sizePt) : null;
   const result = validFontSize(size)
     ? { size, family: font?.name }
     : styleXf === 0

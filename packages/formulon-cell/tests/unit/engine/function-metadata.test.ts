@@ -1,3 +1,4 @@
+import { FunctionAvailability } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
   displayLocaleTag,
@@ -8,11 +9,11 @@ import {
 import type { FunctionMetadataEntry, FunctionMetadataResult } from '../../../src/engine/types.js';
 
 const base: FunctionMetadataResult = {
-  ok: true,
   name: 'SUM',
   minArity: 1,
   maxArity: null,
-  signatureTemplate: 'SUM(number1, [number2], ...)',
+  availability: FunctionAvailability.Implemented,
+  signature: 'SUM(number1, [number2], ...)',
   description: 'Adds its arguments.',
 };
 
@@ -63,7 +64,7 @@ describe('mergeFunctionMetadata', () => {
     };
     expect(mergeFunctionMetadata(base, entry, 'ja-JP')).toEqual({
       ...base,
-      signatureTemplate: 'SUM(数値1, ...)',
+      signature: 'SUM(数値1, ...)',
       description: '引数を合計します。',
       localizedName: '合計',
     });
@@ -78,7 +79,7 @@ describe('mergeFunctionMetadata', () => {
     // en-US has no localized block, so entry-level defaults win over the base.
     expect(mergeFunctionMetadata(base, entry, 'en-US')).toEqual({
       ...base,
-      signatureTemplate: 'SUM(default)',
+      signature: 'SUM(default)',
       description: 'default description',
       localizedName: 'SUM',
     });

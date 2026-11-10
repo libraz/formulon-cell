@@ -105,11 +105,7 @@ export function splitAreas(raw: string): string[] {
 }
 
 function sheetIndexByName(wb: WorkbookHandle, name: string): number | null {
-  const q = name.toLowerCase();
-  for (let i = 0; i < wb.sheetCount; i += 1) {
-    if (wb.sheetName(i).toLowerCase() === q) return i;
-  }
-  return null;
+  return wb.sheetIndexByName(name);
 }
 
 /** Options for reading a Go To / Name Box reference. */

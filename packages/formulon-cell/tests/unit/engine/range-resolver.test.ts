@@ -6,6 +6,10 @@ const fakeWb = (cells: Record<string, string | number>): WorkbookHandle => {
   return {
     sheetCount: 2,
     sheetName: (idx: number) => (idx === 0 ? 'Sheet1' : 'Sheet2'),
+    sheetIndexByName: (name: string) => {
+      const index = ['Sheet1', 'Sheet2'].findIndex((n) => n.toLowerCase() === name.toLowerCase());
+      return index < 0 ? null : index;
+    },
     getValue: ({ sheet, row, col }: { sheet: number; row: number; col: number }) => {
       const key = `${sheet}:${row}:${col}`;
       const v = cells[key];

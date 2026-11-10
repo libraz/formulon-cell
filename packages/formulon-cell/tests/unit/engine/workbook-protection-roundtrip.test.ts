@@ -32,8 +32,8 @@ describe.skipIf(!canLoadWasm())('workbook structure protection round-trip', () =
       expect(entry?.passwordHash?.algorithmName).toBe('SHA-512');
       expect(entry?.password).toBeUndefined();
       const record = wb.getWorkbookProtection();
-      expect(record).toMatchObject({ lockStructure: 1, workbookAlgorithmName: 'SHA-512' });
-      expect(record?.workbookPassword).toBe('');
+      expect(record).toMatchObject({ lockStructure: true, workbookAlgorithmName: 'SHA-512' });
+      expect(record?.workbookLegacyPasswordHash).toBeNull();
 
       const { restored, store: next } = await reload(wb);
       try {
@@ -58,9 +58,11 @@ describe.skipIf(!canLoadWasm())('workbook structure protection round-trip', () =
     try {
       const store = createSpreadsheetStore();
       setWorkbookStructureProtected(store, true, { password: 'abc', workbook: wb });
-      expect(wb.getWorkbookProtection()?.workbookPassword).toBe(legacySheetPasswordHash('abc'));
+      expect(wb.getWorkbookProtection()?.workbookLegacyPasswordHash).toBe(
+        legacySheetPasswordHash('abc'),
+      );
       await whenSheetPasswordsHashed();
-      expect(wb.getWorkbookProtection()?.workbookPassword).toBe('');
+      expect(wb.getWorkbookProtection()?.workbookLegacyPasswordHash).toBeNull();
     } finally {
       wb.dispose();
     }
@@ -69,12 +71,11 @@ describe.skipIf(!canLoadWasm())('workbook structure protection round-trip', () =
   it('verifies a legacy verifier loaded from a file and an unguarded lock', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
-      const base = wb.getWorkbookProtection();
-      if (!base) throw new Error('expected a workbook protection record');
+      const base = wb.getWorkbookProtection() ?? {};
       wb.setWorkbookProtection({
         ...base,
-        lockStructure: 1,
-        workbookPassword: legacySheetPasswordHash('abc'),
+        lockStructure: true,
+        workbookLegacyPasswordHash: legacySheetPasswordHash('abc'),
       });
       const { restored, store } = await reload(wb);
       try {
@@ -87,7 +88,10 @@ describe.skipIf(!canLoadWasm())('workbook structure protection round-trip', () =
 
       const open = createSpreadsheetStore();
       setWorkbookStructureProtected(open, true, { workbook: wb });
-      expect(wb.getWorkbookProtection()).toMatchObject({ lockStructure: 1, workbookPassword: '' });
+      expect(wb.getWorkbookProtection()).toMatchObject({
+        lockStructure: true,
+        workbookLegacyPasswordHash: null,
+      });
       const again = await reload(wb);
       try {
         expect(isWorkbookStructureProtected(again.store.getState())).toBe(true);
@@ -103,13 +107,12 @@ describe.skipIf(!canLoadWasm())('workbook structure protection round-trip', () =
   it('keeps window and revision locks untouched across protect and unprotect', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
-      const base = wb.getWorkbookProtection();
-      if (!base) throw new Error('expected a workbook protection record');
+      const base = wb.getWorkbookProtection() ?? {};
       wb.setWorkbookProtection({
         ...base,
-        lockWindows: 1,
-        lockRevision: 1,
-        revisionsPassword: 'CC3B',
+        lockWindows: true,
+        lockRevision: true,
+        revisionsLegacyPasswordHash: 'CC3B',
         revisionsAlgorithmName: 'SHA-512',
         revisionsHashValue: 'aGFzaA==',
         revisionsSaltValue: 'c2FsdA==',
@@ -120,10 +123,10 @@ describe.skipIf(!canLoadWasm())('workbook structure protection round-trip', () =
       await whenSheetPasswordsHashed();
       const locked = { ...wb.getWorkbookProtection() };
       expect(locked).toMatchObject({
-        lockStructure: 1,
-        lockWindows: 1,
-        lockRevision: 1,
-        revisionsPassword: 'CC3B',
+        lockStructure: true,
+        lockWindows: true,
+        lockRevision: true,
+        revisionsLegacyPasswordHash: 'CC3B',
         revisionsAlgorithmName: 'SHA-512',
         revisionsHashValue: 'aGFzaA==',
         revisionsSaltValue: 'c2FsdA==',
@@ -133,10 +136,10 @@ describe.skipIf(!canLoadWasm())('workbook structure protection round-trip', () =
       setWorkbookStructureProtected(store, false, { workbook: wb });
       const unlocked = wb.getWorkbookProtection();
       expect(unlocked).toMatchObject({
-        lockStructure: 0,
-        lockWindows: 1,
-        lockRevision: 1,
-        revisionsPassword: 'CC3B',
+        lockStructure: false,
+        lockWindows: true,
+        lockRevision: true,
+        revisionsLegacyPasswordHash: 'CC3B',
         revisionsSpinCount: 7,
       });
       // The password still guards the windows lock.
@@ -165,11 +168,11 @@ describe.skipIf(!canLoadWasm())('workbook structure protection round-trip', () =
       setWorkbookStructureProtected(store, true, { password: 'pw', workbook: wb });
       await whenSheetPasswordsHashed();
       setWorkbookStructureProtected(store, false, { workbook: wb });
-      expect(wb.getWorkbookProtection()).toMatchObject({
-        lockStructure: 0,
-        workbookHashValue: '',
-        workbookPassword: '',
-      });
+      // With nothing left locked the engine drops the element altogether.
+      const record = wb.getWorkbookProtection();
+      expect(record?.lockStructure ?? false).toBe(false);
+      expect(record?.workbookHashValue ?? null).toBeNull();
+      expect(record?.workbookLegacyPasswordHash ?? null).toBeNull();
       const { restored, store: next } = await reload(wb);
       try {
         expect(isWorkbookStructureProtected(next.getState())).toBe(false);

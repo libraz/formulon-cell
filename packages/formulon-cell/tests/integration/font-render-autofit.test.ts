@@ -30,7 +30,7 @@ describe('real WASM inherited typography in AutoFit', () => {
         fontIndex: workbook.addFontRecord({
           ...baseFont,
           name: 'Aptos Display',
-          size: 24,
+          sizePt: 24,
         }),
       });
       expect(workbook.setColumnStyle(0, 0, MAX_COL, inheritedXf)).toBe(true);

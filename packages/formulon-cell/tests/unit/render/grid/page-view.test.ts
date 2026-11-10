@@ -435,7 +435,7 @@ describe('Page Break Preview painting', () => {
         lastNativePage && printable ? Math.max(0, lastNativePage.originYPt - printable.y) : 0;
       const centerOffset =
         lastNativePage && printable
-          ? Math.max(0, (printable.height - titleOffset - lastNativePage.heightPt) / 2)
+          ? Math.max(0, (printable.heightPt - titleOffset - lastNativePage.heightPt) / 2)
           : 0;
       const carriedOriginPt = (lastNativePage?.originYPt ?? 0) + centerOffset;
       const factor = 96 / 72 / tailPagination.scale;

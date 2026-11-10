@@ -149,7 +149,10 @@ describe('undo and redo of protection changes', () => {
       history.undo();
       history.redo();
       await whenSheetPasswordsHashed();
-      expect(wb.getProtectedRanges(0)[0]).toMatchObject({ password: '', algorithmName: 'SHA-512' });
+      expect(wb.getProtectedRanges(0)[0]).toMatchObject({
+        legacyPasswordHash: null,
+        algorithmName: 'SHA-512',
+      });
       expect(store.getState().protection.allowedEditRanges[0]?.password).toBeUndefined();
     } finally {
       wb.dispose();

@@ -1,8 +1,10 @@
+import { TableTotalsRowFunction } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
 import { commitCellInput } from '../../../src/commands/cell-input-commit.js';
 import {
   formatAsTable,
   type TableOverlay,
+  type TableTotalsFunction,
   totalsCellAt,
   updateTableOverlay,
 } from '../../../src/commands/format-as-table.js';
@@ -12,7 +14,11 @@ import {
   setTableColumnFunction,
   toggleTableOption,
 } from '../../../src/commands/table-design.js';
-import { hydrateTableOverlaysFromEngine, totalsFromCell } from '../../../src/engine/table-sync.js';
+import {
+  hydrateTableOverlaysFromEngine,
+  totalsFromCell,
+  totalsFunctionToEngine,
+} from '../../../src/engine/table-sync.js';
 import type { Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -282,7 +288,9 @@ describe('table design commands', () => {
     const id = only(store).id;
     expect(setTableColumnFunction(store, history, wb, id, 2, 'average')).toBe(true);
     expect(only(store).totals?.[2]?.function).toBe('average');
-    expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe('average');
+    expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe(
+      TableTotalsRowFunction.Average,
+    );
     expect(wb.getValue({ sheet: 0, row: 4, col: 2 })).toMatchObject({ kind: 'number', value: 2 });
 
     const loaded = await WorkbookHandle.loadBytes(wb.save());
@@ -296,17 +304,23 @@ describe('table design commands', () => {
 
     history.undo();
     expect(only(store).totals?.[2]?.function).toBe('sum');
-    expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe('sum');
+    expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe(
+      TableTotalsRowFunction.Sum,
+    );
     history.redo();
     expect(only(store).totals?.[2]?.function).toBe('average');
-    expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe('average');
+    expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe(
+      TableTotalsRowFunction.Average,
+    );
   });
 
   it('picks None for a column and clears its totals cell', async () => {
     const { wb, store, history } = await setup();
     toggleTableOption(store, history, wb, 'showTotal');
     expect(setTableColumnFunction(store, history, wb, only(store).id, 2, 'none')).toBe(true);
-    expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe('none');
+    expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe(
+      TableTotalsRowFunction.None,
+    );
     expect(wb.getValue({ sheet: 0, row: 4, col: 2 }).kind).toBe('blank');
   });
 
@@ -342,12 +356,14 @@ describe('table design commands', () => {
       });
       const loaded = await reloaded(wb);
       expect(loaded.getTableStyleDetails(0)?.columns[2]).toMatchObject({
-        totalsRowFunction: 'custom',
+        totalsRowFunction: TableTotalsRowFunction.Custom,
         totalsRowFormula: 'SUM(C2:C4)*10',
       });
       expect(loaded.getValue({ sheet: 0, row: 4, col: 2 })).toMatchObject({ value: 60 });
       history.undo();
-      expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe('sum');
+      expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe(
+        TableTotalsRowFunction.Sum,
+      );
     });
 
     it('keeps typed text as the column label', async () => {
@@ -355,7 +371,7 @@ describe('table design commands', () => {
       expect(only(store).totals?.[2]).toMatchObject({ function: 'none', label: 'Subtotal' });
       const loaded = await reloaded(wb);
       expect(loaded.getTableStyleDetails(0)?.columns[2]).toMatchObject({
-        totalsRowFunction: 'none',
+        totalsRowFunction: TableTotalsRowFunction.None,
         totalsRowLabel: 'Subtotal',
       });
       expect(loaded.getValue({ sheet: 0, row: 4, col: 2 })).toMatchObject({ value: 'Subtotal' });
@@ -365,7 +381,7 @@ describe('table design commands', () => {
       const { wb } = await commit('42');
       const loaded = await reloaded(wb);
       expect(loaded.getTableStyleDetails(0)?.columns[2]).toMatchObject({
-        totalsRowFunction: 'custom',
+        totalsRowFunction: TableTotalsRowFunction.Custom,
         totalsRowFormula: '42',
       });
     });
@@ -374,7 +390,9 @@ describe('table design commands', () => {
       const { wb, store, history } = await setup();
       toggleTableOption(store, history, wb, 'showTotal');
       for (const fn of ['average', 'count', 'countNums', 'max', 'min', 'stdDev', 'sum', 'var']) {
-        wb.setTableColumnTotals(0, 2, { function: fn as never });
+        wb.setTableColumnTotals(0, 2, {
+          totalsRowFunction: totalsFunctionToEngine(fn as TableTotalsFunction),
+        });
         expect(totalsFromCell(wb, { sheet: 0, row: 4, col: 2 }).function).toBe(fn);
       }
     });
@@ -384,7 +402,9 @@ describe('table design commands', () => {
       expect(only(store).totals?.[2]?.function).toBe('custom');
       history.undo();
       expect(only(store).totals?.[2]?.function).toBe('sum');
-      expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe('sum');
+      expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe(
+        TableTotalsRowFunction.Sum,
+      );
       history.redo();
       expect(only(store).totals?.[2]?.function).toBe('custom');
       expect(wb.getTableStyleDetails(0)?.columns[2]?.totalsRowFormula).toBe('SUM(C2:C4)*10');
@@ -405,7 +425,9 @@ describe('table design commands', () => {
       const { wb, store } = await commit('');
       expect(only(store).totals?.[2]).toMatchObject({ function: 'none', label: '' });
       const loaded = await reloaded(wb);
-      expect(loaded.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe('none');
+      expect(loaded.getTableStyleDetails(0)?.columns[2]?.totalsRowFunction).toBe(
+        TableTotalsRowFunction.None,
+      );
       expect(loaded.getValue({ sheet: 0, row: 4, col: 2 }).kind).toBe('blank');
     });
   });

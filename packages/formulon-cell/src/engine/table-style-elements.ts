@@ -1,5 +1,78 @@
-import type { TableStyleElementType } from '@libraz/formulon';
+import { TableStyleElementType as EngineElementType } from '@libraz/formulon';
 import type { CellBorders, CellFormat } from '../store/types.js';
+
+/** A `<tableStyleElement>` type, by its OOXML name. */
+export type TableStyleElementType =
+  | 'wholeTable'
+  | 'headerRow'
+  | 'totalRow'
+  | 'firstColumn'
+  | 'lastColumn'
+  | 'firstRowStripe'
+  | 'secondRowStripe'
+  | 'firstColumnStripe'
+  | 'secondColumnStripe'
+  | 'firstHeaderCell'
+  | 'lastHeaderCell'
+  | 'firstTotalCell'
+  | 'lastTotalCell'
+  | 'firstSubtotalColumn'
+  | 'secondSubtotalColumn'
+  | 'thirdSubtotalColumn'
+  | 'firstSubtotalRow'
+  | 'secondSubtotalRow'
+  | 'thirdSubtotalRow'
+  | 'blankRow'
+  | 'firstColumnSubheading'
+  | 'secondColumnSubheading'
+  | 'thirdColumnSubheading'
+  | 'firstRowSubheading'
+  | 'secondRowSubheading'
+  | 'thirdRowSubheading'
+  | 'pageFieldLabels'
+  | 'pageFieldValues';
+
+/** The engine ordinal of each element type. */
+export const ENGINE_ELEMENT_TYPE: Readonly<Record<TableStyleElementType, EngineElementType>> = {
+  wholeTable: EngineElementType.WholeTable,
+  headerRow: EngineElementType.HeaderRow,
+  totalRow: EngineElementType.TotalRow,
+  firstColumn: EngineElementType.FirstColumn,
+  lastColumn: EngineElementType.LastColumn,
+  firstRowStripe: EngineElementType.FirstRowStripe,
+  secondRowStripe: EngineElementType.SecondRowStripe,
+  firstColumnStripe: EngineElementType.FirstColumnStripe,
+  secondColumnStripe: EngineElementType.SecondColumnStripe,
+  firstHeaderCell: EngineElementType.FirstHeaderCell,
+  lastHeaderCell: EngineElementType.LastHeaderCell,
+  firstTotalCell: EngineElementType.FirstTotalCell,
+  lastTotalCell: EngineElementType.LastTotalCell,
+  firstSubtotalColumn: EngineElementType.FirstSubtotalColumn,
+  secondSubtotalColumn: EngineElementType.SecondSubtotalColumn,
+  thirdSubtotalColumn: EngineElementType.ThirdSubtotalColumn,
+  firstSubtotalRow: EngineElementType.FirstSubtotalRow,
+  secondSubtotalRow: EngineElementType.SecondSubtotalRow,
+  thirdSubtotalRow: EngineElementType.ThirdSubtotalRow,
+  blankRow: EngineElementType.BlankRow,
+  firstColumnSubheading: EngineElementType.FirstColumnSubheading,
+  secondColumnSubheading: EngineElementType.SecondColumnSubheading,
+  thirdColumnSubheading: EngineElementType.ThirdColumnSubheading,
+  firstRowSubheading: EngineElementType.FirstRowSubheading,
+  secondRowSubheading: EngineElementType.SecondRowSubheading,
+  thirdRowSubheading: EngineElementType.ThirdRowSubheading,
+  pageFieldLabels: EngineElementType.PageFieldLabels,
+  pageFieldValues: EngineElementType.PageFieldValues,
+};
+
+/** The element type of an engine ordinal; undefined for an unknown one. */
+export const elementTypeFromEngine = (type: number): TableStyleElementType | undefined =>
+  ELEMENT_TYPE_BY_ORDINAL.get(type);
+
+const ELEMENT_TYPE_BY_ORDINAL: ReadonlyMap<number, TableStyleElementType> = new Map(
+  (Object.entries(ENGINE_ELEMENT_TYPE) as [TableStyleElementType, number][]).map(
+    ([name, ordinal]) => [ordinal, name],
+  ),
+);
 
 /**
  * The style-element model shared by table and PivotTable styles: a style is a

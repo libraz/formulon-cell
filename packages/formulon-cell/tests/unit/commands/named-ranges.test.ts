@@ -306,6 +306,8 @@ describe('named range commands', () => {
       capabilities: {},
       sheetCount: 2,
       sheetName: (i: number) => (i === 0 ? 'Sheet1' : 'My Sheet'),
+      sheetIndexByName: (name: string) =>
+        ({ sheet1: 0, 'my sheet': 1 })[name.toLowerCase()] ?? null,
       getValue: (a: Addr) => cells[`${a.sheet}:${a.row}:${a.col}`] ?? { kind: 'blank' },
     } as unknown as WorkbookHandle;
     const text = (formula: string, localSheetId = -1): string =>

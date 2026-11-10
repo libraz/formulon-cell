@@ -3,7 +3,7 @@ import { insertCopiedCellsFromTSV } from '../../../../../src/commands/clipboard/
 import { pasteLink, pasteSpecial } from '../../../../../src/commands/clipboard/paste-special.js';
 import { captureSnapshot } from '../../../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../../../src/commands/history.js';
-import { addrKey, type WorkbookHandle } from '../../../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../../../src/engine/workbook-handle.js';
 import {
   type CellFormat,
   createSpreadsheetStore,
@@ -286,7 +286,9 @@ describe('paste special as Excel measures it', () => {
 describe('insert cut cells as Excel measures it', () => {
   it('moves the cut cells: AD1:AD2 cut and inserted at AD4 leaves 3,1,2,4', async () => {
     const store = createSpreadsheetStore();
-    const wb = await newWb();
+    // Insert Cut Cells closes up the source through the engine; the stub refuses it.
+    const wb = await WorkbookHandle.createDefault();
+    wb.attachStore(store);
     seedAndMirror(store, wb, [
       { row: 0, col: 29, value: 1 },
       { row: 1, col: 29, value: 2 },

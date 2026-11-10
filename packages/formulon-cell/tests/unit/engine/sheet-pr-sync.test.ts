@@ -86,13 +86,13 @@ describe('sheetPr persistence through the engine', () => {
   it('keeps the other sheetPr content when the tab colour changes', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
-      const raw = (wb as unknown as { wb: { getSheetSheetPrXml(s: number): { xml: string } } }).wb;
+      const raw = (wb as unknown as { wb: import('@libraz/formulon').Workbook }).wb;
       expect(wb.setSheetPageSetup(0, { fitToPage: true, fitToWidth: 1, fitToHeight: 1 })).toBe(
         true,
       );
-      expect(raw.getSheetSheetPrXml(0).xml).toContain('fitToPage');
+      expect(raw.sheet(0).ooxml.getSheetPrXml()).toContain('fitToPage');
       expect(wb.setSheetPr(0, { tabColor: { rgb: 'FF00B050' } })).toBe(true);
-      expect(raw.getSheetSheetPrXml(0).xml).toContain('fitToPage');
+      expect(raw.sheet(0).ooxml.getSheetPrXml()).toContain('fitToPage');
       expect(wb.getSheetPr(0)?.tabColor).toEqual({ rgb: 'FF00B050' });
     } finally {
       wb.dispose();

@@ -1,3 +1,4 @@
+import { type Color, ColorKind, ComparisonOperator } from '@libraz/formulon';
 import type { ConditionalCellOverlay } from '../render/conditional.js';
 import { iconSetSlotCount } from '../render/conditional.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -66,14 +67,14 @@ const ENGINE_DATA_BAR_AXIS_POSITIONS = ['automatic', 'middle', 'none'] as const;
 type DataBarAxisPosition = (typeof ENGINE_DATA_BAR_AXIS_POSITIONS)[number];
 
 const ENGINE_CELL_IS_OP: Record<number, Extract<ConditionalRule, { kind: 'cell-value' }>['op']> = {
-  0: '<',
-  1: '<=',
-  2: '=',
-  3: '<>',
-  4: '>=',
-  5: '>',
-  6: 'between',
-  7: 'not-between',
+  [ComparisonOperator.LessThan]: '<',
+  [ComparisonOperator.LessThanOrEqual]: '<=',
+  [ComparisonOperator.Equal]: '=',
+  [ComparisonOperator.NotEqual]: '<>',
+  [ComparisonOperator.GreaterThanOrEqual]: '>=',
+  [ComparisonOperator.GreaterThan]: '>',
+  [ComparisonOperator.Between]: 'between',
+  [ComparisonOperator.NotBetween]: 'not-between',
 };
 
 type ConditionalFormatEntry = ReturnType<WorkbookHandle['getConditionalFormats']>[number];
@@ -83,13 +84,27 @@ type ConditionalFormatEntry = ReturnType<WorkbookHandle['getConditionalFormats']
 const rgba = (c: { r: number; g: number; b: number; a: number }): string =>
   `rgb(${c.r}, ${c.g}, ${c.b})`;
 
-const sameColor = (
-  a: { r: number; g: number; b: number; a: number },
-  b: { r: number; g: number; b: number; a: number },
-): boolean => a.r === b.r && a.g === b.g && a.b === b.b && a.a === b.a;
+/** CSS colour of a rule colour read back from the engine; a theme or indexed
+ *  selector is resolved against the workbook. */
+const ruleColor = (wb: WorkbookHandle, color: Color): string => {
+  const argb =
+    color.kind === ColorKind.Rgb ? color.argb : (wb.resolveColorArgb(color) ?? color.argb);
+  return rgba({ r: (argb >>> 16) & 0xff, g: (argb >>> 8) & 0xff, b: argb & 0xff, a: 0xff });
+};
 
-const isOpaqueBlack = (c: { r: number; g: number; b: number; a: number }): boolean =>
-  c.r === 0 && c.g === 0 && c.b === 0 && c.a === 255;
+const sameColor = (a: Color, b: Color): boolean =>
+  a.kind === b.kind &&
+  a.argb === b.argb &&
+  a.theme === b.theme &&
+  a.tint === b.tint &&
+  a.indexed === b.indexed;
+
+const isOpaqueBlack = (c: Color): boolean =>
+  c.kind === ColorKind.Rgb && c.argb >>> 0 === 0xff000000;
+
+/** Formula text without the leading `=` a read carries. */
+const bareFormula = (formula: string | null): string | undefined =>
+  formula === null ? undefined : formula.startsWith('=') ? formula.slice(1) : formula;
 
 const engineDataBarDirection = (ordinal: number): DataBarDirection | undefined =>
   Number.isInteger(ordinal) && ordinal >= 0 && ordinal < ENGINE_DATA_BAR_DIRECTIONS.length
@@ -127,7 +142,7 @@ const maybeNumber = (raw: string | undefined): number | string => {
 };
 
 const rangesOf = (sheet: number, entry: ConditionalFormatEntry): ConditionalRule['range'][] =>
-  entry.sqref.map((range) => ({
+  entry.ranges.map((range) => ({
     sheet,
     r0: range.firstRow,
     c0: range.firstCol,
@@ -174,7 +189,7 @@ const rangeContainsCell = (range: unknown, row: number, col: number): boolean =>
 };
 
 const entryContainsCell = (entry: ConditionalFormatEntry, row: number, col: number): boolean =>
-  Array.isArray(entry.sqref) && entry.sqref.some((range) => rangeContainsCell(range, row, col));
+  Array.isArray(entry.ranges) && entry.ranges.some((range) => rangeContainsCell(range, row, col));
 
 /** Resolve one engine data-bar payload for a match. A priority is preferred,
  * but the containing range is a safe fallback for older match projections
@@ -221,8 +236,8 @@ function dataBarHasMixedPopulation(
   sheet: number,
   entry: ConditionalFormatEntry | undefined,
 ): boolean | undefined {
-  if (!entry || !Array.isArray(entry.sqref)) return undefined;
-  const ranges = entry.sqref.map(validEngineRange);
+  if (!entry || !Array.isArray(entry.ranges)) return undefined;
+  const ranges = entry.ranges.map(validEngineRange);
   if (ranges.some((range) => range === null)) return undefined;
   const validRanges = ranges as EngineRange[];
   if (typeof wb.physicalCells === 'function') {
@@ -244,16 +259,19 @@ function dataBarHasMixedPopulation(
   return undefined;
 }
 
-export function dxfToApply(wb: WorkbookHandle, dxfId: number | undefined): Partial<CellFormat> {
-  if (dxfId === undefined || !wb.capabilities.conditionalFormatDxf) return {};
+export function dxfToApply(
+  wb: WorkbookHandle,
+  dxfId: number | null | undefined,
+): Partial<CellFormat> {
+  if (dxfId === undefined || dxfId === null || !wb.capabilities.conditionalFormatDxf) return {};
   const dxf = wb.getDxf(dxfId);
   if (!dxf) return {};
   const apply: Partial<CellFormat> = {};
   if (dxf.font) Object.assign(apply, fontRecordToFormat(dxf.font));
   if (dxf.fill) Object.assign(apply, fillRecordToFormat(dxf.fill));
   if (dxf.border) Object.assign(apply, borderRecordToFormat(dxf.border));
-  if (dxf.numFmt) {
-    const numberFormat = formatCodeToNumFmt(dxf.numFmt.formatCode);
+  if (dxf.numberFormat) {
+    const numberFormat = formatCodeToNumFmt(dxf.numberFormat);
     if (numberFormat) apply.numFmt = numberFormat;
   }
   return apply;
@@ -277,7 +295,7 @@ function engineConditionalFormatToRules(
   entry: ConditionalFormatEntry,
 ): ConditionalRule[] {
   const ranges = rangesOf(sheet, entry);
-  const apply = dxfToApply(wb, entry.dxfId);
+  const apply = dxfToApply(wb, entry.dxfIndex);
   const common = {
     ...(entry.stopIfTrue ? { stopIfTrue: true } : {}),
     engineId: entry.id,
@@ -285,27 +303,35 @@ function engineConditionalFormatToRules(
   const out: ConditionalRule[] = [];
   for (const range of ranges) {
     if (entry.type === ENGINE_RULE_TYPE.cellIs) {
-      const op = entry.op === undefined ? undefined : ENGINE_CELL_IS_OP[entry.op];
-      if (!op || entry.formula1 === undefined) continue;
+      const op = entry.operator === null ? undefined : ENGINE_CELL_IS_OP[entry.operator];
+      if (!op || entry.formula1 === null) continue;
       out.push({
         ...common,
         kind: 'cell-value',
         range,
         op,
-        a: maybeNumber(entry.formula1),
-        ...(op === 'between' || op === 'not-between' ? { b: maybeNumber(entry.formula2) } : {}),
+        a: maybeNumber(bareFormula(entry.formula1)),
+        ...(op === 'between' || op === 'not-between'
+          ? { b: maybeNumber(bareFormula(entry.formula2)) }
+          : {}),
         apply,
       });
     } else if (entry.type === ENGINE_RULE_TYPE.expression) {
       if (!entry.formula1) continue;
-      out.push({ ...common, kind: 'formula', range, formula: `=${entry.formula1}`, apply });
+      out.push({
+        ...common,
+        kind: 'formula',
+        range,
+        formula: `=${bareFormula(entry.formula1)}`,
+        apply,
+      });
     } else if (
       entry.type === ENGINE_RULE_TYPE.containsText ||
       entry.type === ENGINE_RULE_TYPE.notContainsText ||
       entry.type === ENGINE_RULE_TYPE.beginsWith ||
       entry.type === ENGINE_RULE_TYPE.endsWith
     ) {
-      if (entry.text === undefined) continue;
+      if (entry.text === null) continue;
       out.push({
         ...common,
         kind: 'text-contains',
@@ -368,7 +394,7 @@ function engineConditionalFormatToRules(
       });
     } else if (entry.type === ENGINE_RULE_TYPE.colorScale) {
       if (!entry.colorScale) continue;
-      const colors = entry.colorScale.colors.map(rgba);
+      const colors = entry.colorScale.colors.map((color) => ruleColor(wb, color));
       if (colors.length !== 2 && colors.length !== 3) continue;
       const thresholds = entry.colorScale.thresholds.map(engineScalePoint);
       out.push({
@@ -402,25 +428,25 @@ function engineConditionalFormatToRules(
         ...common,
         kind: 'data-bar',
         range,
-        color: rgba(fillColor),
+        color: ruleColor(wb, fillColor),
         showValue: entry.dataBar.showValue !== false,
         ...(min.kind !== 'min' || min.gte === false ? { min } : {}),
         ...(max.kind !== 'max' || max.gte === false ? { max } : {}),
         ...(axisPosition && axisPosition !== 'automatic' ? { axisPosition } : {}),
         ...(negativeFill && !sameColor(negativeFill, fillColor)
-          ? { negativeColor: rgba(negativeFill) }
+          ? { negativeColor: ruleColor(wb, negativeFill) }
           : {}),
-        ...(border ? { borderColor: rgba(border) } : {}),
-        ...(negativeBorder ? { negativeBorderColor: rgba(negativeBorder) } : {}),
+        ...(border ? { borderColor: ruleColor(wb, border) } : {}),
+        ...(negativeBorder ? { negativeBorderColor: ruleColor(wb, negativeBorder) } : {}),
         ...(entry.dataBar.axisColor && !isOpaqueBlack(entry.dataBar.axisColor)
-          ? { axisColor: rgba(entry.dataBar.axisColor) }
+          ? { axisColor: ruleColor(wb, entry.dataBar.axisColor) }
           : {}),
         ...(direction ? { direction } : {}),
-        ...(entry.dataBar.gradient !== undefined ? { gradient: entry.dataBar.gradient } : {}),
+        ...(entry.dataBar.gradient !== null ? { gradient: entry.dataBar.gradient } : {}),
       });
     } else if (entry.type === ENGINE_RULE_TYPE.iconSet) {
       if (!entry.iconSet) continue;
-      const iconSet = iconSetFromEngine(entry.iconSet.name, entry.iconSet.icons);
+      const iconSet = iconSetFromEngine(entry.iconSet.name, entry.iconSet.icons ?? undefined);
       if (!iconSet) continue;
       const { icons } = iconSet;
       const slots = iconSetSlotCount(icons);
@@ -542,7 +568,7 @@ export function evaluateCfFromEngine(
         overlay.barColor = rgba(m.barFill);
         overlay.barBorderColor = m.barBorderEngaged ? rgba(m.barBorder) : undefined;
         if (metadata) {
-          overlay.barAxisColor = metadata.axisColor ? rgba(metadata.axisColor) : '#000000';
+          overlay.barAxisColor = metadata.axisColor ? ruleColor(wb, metadata.axisColor) : '#000000';
           if (axisPosition === 'none') {
             overlay.barAxisVisible = false;
           } else if (axisPosition === 'middle') {

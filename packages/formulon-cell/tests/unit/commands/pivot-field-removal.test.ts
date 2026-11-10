@@ -187,7 +187,10 @@ describe('pivot field removal', () => {
       editOf({ fields: [fieldEdit(3, null)] }),
     );
     const raw = (wb as unknown as { wb: import('@libraz/formulon').Workbook }).wb;
-    raw.pivotSetStyleInfo(SHEET, 0, { name: 'PivotStyleMedium9', showRowStripes: true });
+    raw.sheet(SHEET).pivot(0).updateStyleOptions({
+      styleName: 'PivotStyleMedium9',
+      showRowStripes: true,
+    });
 
     const before = wb.getPivotDefinition(SHEET, 0);
     expect(before?.fields[3]?.axis).toBeNull();

@@ -1,3 +1,4 @@
+import { type ChartDataSource, ChartSourceKind } from '@libraz/formulon';
 import type { ChartEmptyCellMode } from '../charts/types.js';
 import type { History, HistoryTransaction } from '../commands/history.js';
 import { parseMacRange } from '../commands/mac-data-tools.js';
@@ -116,8 +117,8 @@ interface SeriesRow {
 
 const AUTH = { origin: 'instanceApi' as const, commandId: 'chartSelectData' };
 
-const refText = (source: { kind: string; formula: string } | undefined): string =>
-  source && source.kind === 'ref' && source.formula ? `=${source.formula}` : '';
+const refText = (source: ChartDataSource | undefined): string =>
+  source && source.kind === ChartSourceKind.Ref && source.formula ? `=${source.formula}` : '';
 
 /**
  * The Mac Select Data Source dialog. Edits apply to the chart as they are
@@ -334,7 +335,7 @@ export function attachMacChartSelectDataDialog(
     const pending = rows.filter((row) => row.idx === null);
     rows = [
       ...engineSeries.map((entry, i) => ({
-        idx: entry.idx,
+        idx: entry.seriesId,
         label: current.data.series[i]?.name ?? t.selectDataNewSeries.replace('{n}', String(i + 1)),
         name: refText(entry.name),
         values: refText(scatter ? entry.y : entry.values),

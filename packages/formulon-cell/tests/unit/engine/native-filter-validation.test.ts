@@ -1,3 +1,4 @@
+import { ComparisonOperator } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import { writeInputValidated } from '../../../src/commands/coerce-input.js';
 import { listInvalidValidationCells } from '../../../src/commands/validate.js';
@@ -16,10 +17,22 @@ describe('formulon 0.13 native filter and validation surfaces', () => {
     try {
       expect(wb.capabilities.validationEvaluation).toBe(true);
       const rules = [
-        { col: 0, op: '>' as const, ordinal: 4, good: 11, bad: 10 },
-        { col: 1, op: '<' as const, ordinal: 5, good: 9, bad: 10 },
-        { col: 2, op: '>=' as const, ordinal: 6, good: 10, bad: 9 },
-        { col: 3, op: '<=' as const, ordinal: 7, good: 10, bad: 11 },
+        { col: 0, op: '>' as const, ordinal: ComparisonOperator.GreaterThan, good: 11, bad: 10 },
+        { col: 1, op: '<' as const, ordinal: ComparisonOperator.LessThan, good: 9, bad: 10 },
+        {
+          col: 2,
+          op: '>=' as const,
+          ordinal: ComparisonOperator.GreaterThanOrEqual,
+          good: 10,
+          bad: 9,
+        },
+        {
+          col: 3,
+          op: '<=' as const,
+          ordinal: ComparisonOperator.LessThanOrEqual,
+          good: 10,
+          bad: 11,
+        },
       ];
       store.setState((state) => ({
         ...state,
@@ -42,7 +55,9 @@ describe('formulon 0.13 native filter and validation surfaces', () => {
         },
       }));
       syncValidationsToEngine(wb, store, 0);
-      expect(wb.getValidationsForSheet(0).map((entry) => entry.op)).toEqual([4, 5, 6, 7]);
+      expect(wb.getValidationsForSheet(0).map((entry) => entry.op)).toEqual(
+        rules.map((rule) => rule.ordinal),
+      );
       for (const rule of rules) {
         expect(
           wb.validateValue(0, 0, rule.col, { kind: 'number', value: rule.good }),
@@ -82,7 +97,9 @@ describe('formulon 0.13 native filter and validation surfaces', () => {
 
       const restored = await WorkbookHandle.loadBytes(wb.save());
       try {
-        expect(restored.getValidationsForSheet(0).map((entry) => entry.op)).toEqual([4, 5, 6, 7]);
+        expect(restored.getValidationsForSheet(0).map((entry) => entry.op)).toEqual(
+          rules.map((rule) => rule.ordinal),
+        );
       } finally {
         restored.dispose();
       }
@@ -129,7 +146,7 @@ describe('formulon 0.13 native filter and validation surfaces', () => {
     }
   });
 
-  it('keeps custom validation formulas in the raw no-equals API form', async () => {
+  it('keeps custom validation formulas in the leading-equals form the engine returns', async () => {
     const wb = await WorkbookHandle.createDefault();
     const store = createSpreadsheetStore();
     try {
@@ -143,10 +160,10 @@ describe('formulon 0.13 native filter and validation surfaces', () => {
         },
       }));
       syncValidationsToEngine(wb, store, 0);
-      expect(wb.getValidationsForSheet(0)[0]?.formula1).toBe('A1>10');
+      expect(wb.getValidationsForSheet(0)[0]?.formula1).toBe('=A1>10');
       const restored = await WorkbookHandle.loadBytes(wb.save());
       try {
-        expect(restored.getValidationsForSheet(0)[0]?.formula1).toBe('A1>10');
+        expect(restored.getValidationsForSheet(0)[0]?.formula1).toBe('=A1>10');
         const restoredStore = createSpreadsheetStore();
         hydrateValidationsFromEngine(restored, restoredStore, 0);
         expect(restoredStore.getState().format.formats.get('0:0:0')?.validation).toEqual({

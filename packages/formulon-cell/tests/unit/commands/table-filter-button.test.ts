@@ -27,9 +27,7 @@ async function tableBook() {
     wb.setText({ sheet: 0, row, col: 0 }, item as string);
     wb.setText({ sheet: 0, row, col: 1 }, region as string);
   });
-  expect(
-    wb.createTable({ sheetIndex: 0, ref: 'A1:B4', name: 'Sales', columns: ['Item', 'Region'] }),
-  ).toBe(0);
+  expect(wb.createTable(0, { range: 'A1:B4', name: 'Sales', columns: ['Item', 'Region'] })).toBe(0);
   const store = createSpreadsheetStore();
   mutators.replaceCells(store, wb.cells(0));
   hydrateTableOverlaysFromEngine(wb, store);

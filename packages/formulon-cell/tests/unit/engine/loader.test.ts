@@ -8,7 +8,7 @@ describe('engine/loader', () => {
   });
 
   it('loads the serial WASM without SharedArrayBuffer or cross-origin isolation', async () => {
-    const realModule = { versionString: () => 'wasm' };
+    const realModule = { getVersion: () => 'wasm' };
     const createFormulon = vi.fn(() => Promise.resolve(realModule));
     vi.doMock('@libraz/formulon', () => ({ default: createFormulon }));
     vi.stubGlobal('SharedArrayBuffer', undefined);
@@ -22,7 +22,7 @@ describe('engine/loader', () => {
   });
 
   it('passes the host wasm resolver to the engine factory', async () => {
-    const createFormulon = vi.fn(() => Promise.resolve({ versionString: () => 'wasm' }));
+    const createFormulon = vi.fn(() => Promise.resolve({ getVersion: () => 'wasm' }));
     vi.doMock('@libraz/formulon', () => ({ default: createFormulon }));
     vi.resetModules();
     const { loadFormulon } = await import('../../../src/engine/loader.js');
@@ -44,7 +44,7 @@ describe('engine/loader', () => {
   });
 
   it('shares initialization and retries after a rejected attempt', async () => {
-    const realModule = { versionString: () => 'wasm' };
+    const realModule = { getVersion: () => 'wasm' };
     const createFormulon = vi
       .fn()
       .mockRejectedValueOnce(new Error('temporary failure'))
@@ -84,14 +84,14 @@ describe('engine/loader', () => {
 
     const module = await loadFormulon({ preferStub: true, onFallback });
 
-    expect(module.versionString()).toBe('stub');
+    expect(module.getVersion()).toBe('stub');
     expect(isUsingStub()).toBe(true);
     expect(onFallback).toHaveBeenCalledWith('preferStub set — using stub engine');
     expect(createFormulon).not.toHaveBeenCalled();
   });
 
   it('does not let an explicit stub load poison the normal WASM cache or module checks', async () => {
-    const realModule = { versionString: () => 'wasm' };
+    const realModule = { getVersion: () => 'wasm' };
     const createFormulon = vi.fn(() => Promise.resolve(realModule));
     vi.doMock('@libraz/formulon', () => ({ default: createFormulon }));
     vi.stubGlobal('SharedArrayBuffer', class FakeSharedArrayBuffer {});
@@ -102,7 +102,7 @@ describe('engine/loader', () => {
     const stubModule = await loadFormulon({ preferStub: true });
     const loadedRealModule = await loadFormulon();
 
-    expect(stubModule.versionString()).toBe('stub');
+    expect(stubModule.getVersion()).toBe('stub');
     expect(loadedRealModule).toBe(realModule);
     expect(createFormulon).toHaveBeenCalledTimes(1);
     expect(isUsingStub(stubModule)).toBe(true);

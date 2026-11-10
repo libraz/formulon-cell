@@ -1,3 +1,9 @@
+import {
+  type TableColumnTotalsInput,
+  type TableStyleOptionsPatch,
+  TableTotalsRowFunction,
+} from '@libraz/formulon';
+import { mirrorBandFormatsDown } from '../commands/cell-shift.js';
 import { withFilterRange } from '../commands/filter-ranges.js';
 import {
   defaultObjectNames,
@@ -15,12 +21,20 @@ import {
   type ValueFilterCriteria,
 } from '../store/store.js';
 import type { TablesSlice } from '../store/types.js';
-import { formatA1Range } from './address.js';
+import { formatA1Range, MAX_ROW } from './address.js';
 import { forgetTableAutoFilterImport } from './auto-filter-sync.js';
+import { parseRangeRef } from './range-resolver.js';
 import { TableStyleMirror } from './table-style-sync.js';
-import { sameTotals, totalsFromCell, totalsFromDetails } from './table-sync.js';
+import {
+  sameTotals,
+  totalsFormulaText,
+  totalsFromCell,
+  totalsFromDetails,
+  totalsFunctionFromEngine,
+  totalsFunctionToEngine,
+} from './table-sync.js';
 import { defaultTotals } from './table-totals-defaults.js';
-import type { Addr, Range, TableUpdateInput } from './types.js';
+import type { Addr, Range, TablePatch } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /**
@@ -49,6 +63,8 @@ interface FilterEdits {
   /** Overlays the engine refused, by id: restored to their previous shape, or
    *  removed (null) when they had none, so screen and file agree. */
   rejected: Map<string, TableOverlay | null>;
+  /** Ranges the engine gave a table when it added or removed its totals row, by overlay id. */
+  ranges: Map<string, Range>;
 }
 
 const nameKey = (name: string): string => name.toLocaleLowerCase();
@@ -67,8 +83,10 @@ const isFilterOfTable = (table: Range, filter: Range): boolean =>
   table.c1 === filter.c1 &&
   filter.r1 <= table.r1;
 
-const engineTable = (wb: WorkbookHandle, name: string) =>
-  wb.getTables().find((table) => nameKey(table.name) === nameKey(name)) ?? null;
+const engineTable = (wb: WorkbookHandle, name: string) => {
+  const index = wb.tableIndexByName(name);
+  return index === null ? null : (wb.getTables()[index] ?? null);
+};
 
 const tableFilterRange = (wb: WorkbookHandle, index: number, sheet: number): Range | null => {
   const filter = wb.capabilities.typedTableAutoFilter ? wb.getTableAutoFilter(index) : null;
@@ -99,18 +117,13 @@ const syncTableFilterButton = (wb: WorkbookHandle, index: number, table: TableOv
   });
 };
 
-const createEngineTable = (
-  wb: WorkbookHandle,
-  table: TableOverlay & { name: string },
-  displayName = table.name,
-): number =>
-  wb.createTable({
-    sheetIndex: table.range.sheet,
-    ref: formatA1Range(table.range, { collapse: false }),
+const createEngineTable = (wb: WorkbookHandle, table: TableOverlay & { name: string }): number => {
+  const styleName = overlayStyleName(table);
+  const index = wb.createTable(table.range.sheet, {
+    range: formatA1Range(table.range, { collapse: false }),
     name: table.name,
-    displayName,
     columns: tableColumns(wb, table.range, table.showHeader, defaultObjectNames(wb).column),
-    styleName: overlayStyleName(table),
+    ...(styleName ? { styleName } : {}),
     showRowStripes: table.banded,
     showFirstColumn: !!table.firstCol,
     showLastColumn: !!table.lastCol,
@@ -118,6 +131,10 @@ const createEngineTable = (
     headerRow: table.showHeader,
     totalsRow: table.showTotal,
   });
+  // An empty style name keeps the style element and its flags, unnamed.
+  if (index >= 0 && !styleName) wb.updateTableStyleOptions(index, { styleName: null });
+  return index;
+};
 
 /** Label the totals row of a new total row carries in its first column. */
 const TOTALS_LABEL = 'Total';
@@ -131,7 +148,13 @@ const applyDefaultTotals = (
 ): void => {
   const details = wb.getTableStyleDetails(index);
   if (!details || details.columns.length === 0) return;
-  if (details.columns.some((c) => c.totalsRowFunction !== 'none' || c.totalsRowLabel)) return;
+  if (
+    details.columns.some(
+      (c) => c.totalsRowFunction !== TableTotalsRowFunction.None || c.totalsRowLabel,
+    )
+  ) {
+    return;
+  }
   writeTotals(
     wb,
     index,
@@ -142,8 +165,13 @@ const applyDefaultTotals = (
 /** Put `label` on the first column when the re-created table lost every label. */
 const keepLabel = (wb: WorkbookHandle, index: number, label: string): void => {
   const columns = wb.getTableStyleDetails(index)?.columns ?? [];
-  if (columns.some((c) => c.totalsRowLabel) || columns[0]?.totalsRowFunction !== 'none') return;
-  wb.setTableColumnTotals(index, 0, { label });
+  if (
+    columns.some((c) => c.totalsRowLabel) ||
+    columns[0]?.totalsRowFunction !== TableTotalsRowFunction.None
+  ) {
+    return;
+  }
+  wb.setTableColumnTotals(index, 0, { totalsRowLabel: label });
 };
 
 /** Write the columns of `desired` the engine holds differently. True when any
@@ -159,14 +187,15 @@ const writeTotals = (
     const want = desired?.[i];
     if (!want) return;
     const same =
-      want.function === c.totalsRowFunction &&
-      (want.label ?? '') === c.totalsRowLabel &&
-      (want.function !== 'custom' || (want.formula ?? '') === c.totalsRowFormula);
+      want.function === totalsFunctionFromEngine(c.totalsRowFunction) &&
+      (want.label ?? '') === (c.totalsRowLabel ?? '') &&
+      (want.function !== 'custom' ||
+        (want.formula ?? '') === totalsFormulaText(c.totalsRowFormula));
     if (same) return;
     const ok = wb.setTableColumnTotals(index, i, {
-      function: want.function,
-      label: want.label ?? '',
-      ...(want.function === 'custom' ? { formula: want.formula ?? '' } : {}),
+      totalsRowFunction: totalsFunctionToEngine(want.function),
+      totalsRowLabel: want.label ? want.label : null,
+      ...(want.function === 'custom' ? { totalsRowFormula: want.formula ?? '' } : {}),
     });
     wrote = wrote || ok;
   });
@@ -188,13 +217,13 @@ const writeHeaderNames = (wb: WorkbookHandle, index: number, range: Range): void
 
 /** Totals settings of the table at `index` by lower-cased column name. */
 const captureTotals = (wb: WorkbookHandle, index: number) => {
-  const out = new Map<string, { function: string; label: string; formula: string }>();
+  const out = new Map<string, TableColumnTotalsInput>();
   for (const c of wb.getTableStyleDetails(index)?.columns ?? []) {
-    if (c.totalsRowFunction === 'none' && !c.totalsRowLabel) continue;
+    if (c.totalsRowFunction === TableTotalsRowFunction.None && !c.totalsRowLabel) continue;
     out.set(nameKey(c.name), {
-      function: c.totalsRowFunction,
-      label: c.totalsRowLabel,
-      formula: c.totalsRowFormula,
+      totalsRowFunction: c.totalsRowFunction,
+      totalsRowLabel: c.totalsRowLabel,
+      ...(c.totalsRowFormula ? { totalsRowFormula: c.totalsRowFormula } : {}),
     });
   }
   return out;
@@ -210,11 +239,7 @@ const restoreTotals = (
   columns.forEach((c, i) => {
     const saved = totals.get(nameKey(c.name));
     if (!saved) return;
-    wb.setTableColumnTotals(index, i, {
-      function: saved.function as (typeof columns)[number]['totalsRowFunction'],
-      label: saved.label,
-      ...(saved.formula ? { formula: saved.formula } : {}),
-    });
+    wb.setTableColumnTotals(index, i, saved);
   });
 };
 
@@ -224,23 +249,43 @@ const removeEngineTable = (wb: WorkbookHandle, index: number): boolean => {
   return true;
 };
 
-const tableUpdate = (before: TableOverlay, after: TableOverlay): TableUpdateInput => {
-  const patch: TableUpdateInput = {};
+/** The writes that turn engine table `before` into `after`: a rename, a
+ *  range / header / totals patch and a style patch. */
+interface TableUpdate {
+  name?: string;
+  patch: TablePatch & { range?: string };
+  style: { -readonly [K in keyof TableStyleOptionsPatch]: TableStyleOptionsPatch[K] };
+}
+
+const tableUpdate = (before: TableOverlay, after: TableOverlay): TableUpdate => {
+  const update: TableUpdate = { patch: {}, style: {} };
+  const { patch, style } = update;
   if (!sameRange(before.range, after.range)) {
-    patch.ref = formatA1Range(after.range, { collapse: false });
+    patch.range = formatA1Range(after.range, { collapse: false });
   }
-  if (before.name !== after.name) patch.name = after.name;
+  if (before.name !== after.name && after.name) update.name = after.name;
   if (overlayStyleName(before) !== overlayStyleName(after)) {
-    patch.styleName = overlayStyleName(after);
+    style.styleName = overlayStyleName(after) || null;
   }
-  if (before.banded !== after.banded) patch.showRowStripes = after.banded;
-  if (!!before.firstCol !== !!after.firstCol) patch.showFirstColumn = !!after.firstCol;
-  if (!!before.lastCol !== !!after.lastCol) patch.showLastColumn = !!after.lastCol;
-  if (!!before.colStripes !== !!after.colStripes) patch.showColumnStripes = !!after.colStripes;
+  if (before.banded !== after.banded) style.showRowStripes = after.banded;
+  if (!!before.firstCol !== !!after.firstCol) style.showFirstColumn = !!after.firstCol;
+  if (!!before.lastCol !== !!after.lastCol) style.showLastColumn = !!after.lastCol;
+  if (!!before.colStripes !== !!after.colStripes) style.showColumnStripes = !!after.colStripes;
   if (before.showHeader !== after.showHeader) patch.headerRow = after.showHeader;
   if (before.showTotal !== after.showTotal) patch.totalsRow = after.showTotal;
-  return patch;
+  return update;
 };
+
+const isEmptyUpdate = (update: TableUpdate): boolean =>
+  update.name === undefined &&
+  Object.keys(update.patch).length === 0 &&
+  Object.keys(update.style).length === 0;
+
+/** Apply `update` to the table at `index`; false when the engine refuses a part. */
+const applyTableUpdate = (wb: WorkbookHandle, index: number, update: TableUpdate): boolean =>
+  (update.name === undefined || wb.renameTable(index, update.name)) &&
+  (Object.keys(update.patch).length === 0 || wb.updateTable(index, update.patch)) &&
+  (Object.keys(update.style).length === 0 || wb.updateTableStyleOptions(index, update.style));
 
 /** Apply `edits` to the filter slices; returns `state` itself when nothing changes. */
 function applyFilterEdits(state: State, edits: FilterEdits): State {
@@ -257,14 +302,15 @@ function applyFilterEdits(state: State, edits: FilterEdits): State {
     }
   }
   const tables =
-    edits.rejected.size > 0 || edits.totals.size > 0
+    edits.rejected.size > 0 || edits.totals.size > 0 || edits.ranges.size > 0
       ? state.tables.tables.flatMap((table) => {
           if (edits.rejected.has(table.id)) {
             const restored = edits.rejected.get(table.id);
             return restored ? [restored] : [];
           }
           const totals = edits.totals.get(table.id);
-          return [totals ? { ...table, totals } : table];
+          const range = edits.ranges.get(table.id);
+          return [{ ...table, ...(totals ? { totals } : {}), ...(range ? { range } : {}) }];
         })
       : state.tables.tables;
   let next: State = {
@@ -365,7 +411,13 @@ export class TableMirror {
     if (!wb.capabilities.tableMutate) return false;
     const before = namedOverlays(previous ?? []);
     const after = namedOverlays(tables);
-    const edits: FilterEdits = { dropped: [], added: [], totals: new Map(), rejected: new Map() };
+    const edits: FilterEdits = {
+      dropped: [],
+      added: [],
+      totals: new Map(),
+      rejected: new Map(),
+      ranges: new Map(),
+    };
     // An overlay keeping its id under a new name is a rename, not a removal.
     const beforeById = new Map<string, TableOverlay>();
     for (const table of before.values()) beforeById.set(table.id, table);
@@ -396,36 +448,55 @@ export class TableMirror {
       let index = existing?.index ?? -1;
       let from: Range | null = null;
       if (existing && old) {
-        const patch = tableUpdate(old, table);
+        const update = tableUpdate(old, table);
+        const { patch } = update;
         const totalsChanged = !sameTotals(old.totals, table.totals);
         const filterToggled = (old.filterButton !== false) !== (table.filterButton !== false);
-        if (Object.keys(patch).length === 0 && !totalsChanged && !filterToggled) continue;
+        if (isEmptyUpdate(update) && !totalsChanged && !filterToggled) continue;
         from = tableFilterRangeIn(store.getState(), old.range);
         const reshaped =
           old.range.sheet !== table.range.sheet ||
           old.range.c1 - old.range.c0 !== table.range.c1 - table.range.c0;
         if (!reshaped) {
-          if (Object.keys(patch).length > 0 && !wb.updateTable(existing.index, patch)) {
+          // A totals-row flip the engine has not applied yet grows or shrinks
+          // the range there; a range the engine already holds (a row edit
+          // removed the totals row) only sets the flag.
+          if (
+            patch.totalsRow !== undefined &&
+            patch.range !== undefined &&
+            sameRange(
+              engineTableRange(wb, existing.index, old.range.sheet) ?? table.range,
+              old.range,
+            )
+          ) {
+            delete patch.range;
+          }
+          const below = patch.totalsRow !== undefined ? cellsBelow(wb, old.range) : null;
+          if (!isEmptyUpdate(update) && !applyTableUpdate(wb, existing.index, update)) {
             edits.rejected.set(table.id, old);
             continue;
           }
-          if (patch.totalsRow === false && old.showTotal) clearRow(wb, old.range, old.range.r1);
+          if (below)
+            this.adoptTotalsRowRange(store, edits, table, existing.index, old.range, below);
           if (patch.headerRow === false && old.showHeader) clearRow(wb, old.range, old.range.r0);
           if (patch.headerRow === true) writeHeaderNames(wb, existing.index, table.range);
           if (patch.headerRow !== undefined) cellsChanged = true;
           const wroteTotals = totalsChanged && writeTotals(wb, existing.index, table.totals);
           if (patch.totalsRow === true) {
-            applyDefaultTotals(wb, existing.index, table);
+            applyDefaultTotals(wb, existing.index, {
+              ...table,
+              range: edits.ranges.get(table.id) ?? table.range,
+            });
             cellsChanged = true;
           } else if (patch.totalsRow === false || (wroteTotals && table.showTotal)) {
             cellsChanged = true;
           }
           this.adoptTotals(edits, table, existing.index);
           // Rewritten structured references hold no value until the next recalc.
-          if (patch.name !== undefined) cellsChanged = true;
+          if (update.name !== undefined) cellsChanged = true;
           if (filterToggled) syncTableFilterButton(wb, existing.index, table);
           const filterMoved =
-            patch.ref !== undefined ||
+            patch.range !== undefined ||
             patch.headerRow !== undefined ||
             patch.totalsRow !== undefined ||
             filterToggled;
@@ -435,12 +506,10 @@ export class TableMirror {
           // refuses it, the old table comes back.
           const totals = captureTotals(wb, existing.index);
           removeEngineTable(wb, existing.index);
-          const displayName = renamedOld ? name : existing.displayName;
-          index = createEngineTable(wb, { ...table, name }, displayName);
+          index = createEngineTable(wb, { ...table, name });
           if (index < 0) {
             const oldName = old.name as string;
-            const restored =
-              createEngineTable(wb, { ...old, name: oldName }, existing.displayName) >= 0;
+            const restored = createEngineTable(wb, { ...old, name: oldName }) >= 0;
             if (restored) restoreTotals(wb, engineTable(wb, oldName)?.index ?? -1, totals);
             if (!restored) edits.dropped.push(old.range);
             edits.rejected.set(table.id, restored ? old : null);
@@ -481,7 +550,8 @@ export class TableMirror {
       edits.dropped.length === 0 &&
       edits.added.length === 0 &&
       edits.totals.size === 0 &&
-      edits.rejected.size === 0
+      edits.rejected.size === 0 &&
+      edits.ranges.size === 0
     ) {
       return false;
     }
@@ -511,6 +581,33 @@ export class TableMirror {
     });
   }
 
+  /** Take the range the engine gave the table at `index` for its totals row, and
+   *  move the store's formats below it when the engine shifted those cells
+   *  (rather than using a free row further down). */
+  private adoptTotalsRowRange(
+    store: SpreadsheetStore,
+    edits: FilterEdits,
+    table: TableOverlay,
+    index: number,
+    before: Range,
+    below: ReadonlyMap<string, string>,
+  ): void {
+    const range = engineTableRange(this.handle, index, table.range.sheet);
+    if (!range) return;
+    if (!sameRange(range, table.range)) edits.ranges.set(table.id, range);
+    const delta = range.r1 - before.r1;
+    if (delta === 0) return;
+    const band: Range = {
+      sheet: before.sheet,
+      r0: before.r1 + (delta > 0 ? 1 : 0),
+      c0: before.c0,
+      r1: MAX_ROW,
+      c1: before.c1,
+    };
+    if (below.size > 0 && !sameShiftedCells(below, cellsBelow(this.handle, range), delta)) return;
+    mirrorBandFormatsDown(store, this.handle, band, delta);
+  }
+
   /** Queue the engine's totals of the table at `index` for the overlay when its model differs. */
   private adoptTotals(edits: FilterEdits, table: TableOverlay, index: number): void {
     const details = this.handle.getTableStyleDetails(index);
@@ -527,6 +624,36 @@ export class TableMirror {
       mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex)),
     );
   }
+}
+
+/** The engine's current range of the table at workbook-wide `index`. */
+function engineTableRange(wb: WorkbookHandle, index: number, sheet: number): Range | null {
+  const parsed = wb.getTables()[index] ? parseRangeRef(wb.getTables()[index]?.ref ?? '') : null;
+  return parsed ? { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 } : null;
+}
+
+/** Value signatures of the populated cells below `table` across its columns. */
+function cellsBelow(wb: WorkbookHandle, table: Range): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const cell of wb.physicalCells(table.sheet)) {
+    const { row, col } = cell.addr;
+    if (row <= table.r1 || col < table.c0 || col > table.c1) continue;
+    out.set(`${row}:${col}`, JSON.stringify([cell.value, cell.formula]));
+  }
+  return out;
+}
+
+/** Whether every cell of `before` reappears `delta` rows away in `after`. */
+function sameShiftedCells(
+  before: ReadonlyMap<string, string>,
+  after: ReadonlyMap<string, string>,
+  delta: number,
+): boolean {
+  for (const [key, signature] of before) {
+    const [row = 0, col = 0] = key.split(':').map(Number);
+    if (after.get(`${row + delta}:${col}`) !== signature) return false;
+  }
+  return true;
 }
 
 /** The store filter range belonging to the table spanning `table`, if any. */

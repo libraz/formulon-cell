@@ -1,3 +1,4 @@
+import type { PivotWorksheetSourceInput } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
   createPivotTableFromRange,
@@ -8,6 +9,7 @@ import {
   refreshPivotTable,
   refreshPivotTableFromRange,
 } from '../../../src/commands/pivot-table.js';
+import { formatA1Range } from '../../../src/engine/address.js';
 import {
   type CellValue,
   PIVOT_SHOW_AS_BASE_PREVIOUS,
@@ -48,11 +50,22 @@ const makeWb = () => {
       return 4;
     },
     removePivotCache: () => true,
-    setPivotCacheWorksheetSource: (
-      _cache: number,
-      source: { present: boolean; ref?: string; sheet?: string; name?: string },
-    ) => {
-      calls.push(`cache-source:${source.present}:${source.sheet ?? ''}:${source.ref ?? ''}`);
+    setPivotCacheWorksheetSource: (_cache: number, source: PivotWorksheetSourceInput | null) => {
+      const range = typeof source?.range === 'object' ? source.range : null;
+      const ref = range
+        ? formatA1Range(
+            {
+              r0: range.rect.firstRow,
+              c0: range.rect.firstCol,
+              r1: range.rect.lastRow,
+              c1: range.rect.lastCol,
+            },
+            { collapse: false },
+          )
+        : '';
+      calls.push(
+        `cache-source:${source !== null}:${range ? `Sheet${range.sheet + 1}` : ''}:${ref}`,
+      );
       return true;
     },
     addPivotCacheField: (_cache: number, name: string) => {
@@ -103,9 +116,8 @@ const makeWb = () => {
     ],
     cells: () => [],
     getPivotCacheWorksheetSource: (_cache: number) => ({
-      present: true,
-      sheet: 'Sheet1',
-      ref: 'A1:C3',
+      range: { sheet: 0, rect: { firstRow: 0, firstCol: 0, lastRow: 2, lastCol: 2 } },
+      name: null,
     }),
     createPivotTable: (_sheet: number, name: string, cacheId: number, anchor: unknown) => {
       calls.push(`pivot:${name}:${cacheId}:${JSON.stringify(anchor)}`);
@@ -577,7 +589,7 @@ describe('pivot-table command helpers', () => {
 
   it('rejects stored-source pivot refresh when metadata is unavailable', () => {
     const { wb, calls } = makeWb();
-    wb.getPivotCacheWorksheetSource = () => ({ present: false });
+    wb.getPivotCacheWorksheetSource = () => null;
     const result = refreshPivotTable(wb, {
       sheet: 0,
       pivotIndex: 2,

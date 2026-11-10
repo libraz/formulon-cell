@@ -6,20 +6,16 @@ import { engineProfileIdFor } from '../../../src/engine/spreadsheet-profile.js';
 import { defaultFontForLocale, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
-type RawStatus = { ok: boolean };
-type RawWorkbook = {
-  getSheetColumns(sheet: number): {
-    status: RawStatus;
-    columns: ReadonlyArray<{ first: number; last: number; width: number }>;
+type RawSheet = {
+  listColumnOverrides(): ReadonlyArray<{ first: number; last: number; widthChars: number | null }>;
+  getFormatDefaults(): {
+    baseColumnWidthChars: number;
+    defaultRowHeightPt: number | null;
   };
-  getSheetFormatDefaults(sheet: number): {
-    status: RawStatus;
-    baseColWidth: number;
-    defaultRowHeight: number;
-    hasDefaultRowHeight: boolean;
-  };
-  getRowHeightPt(sheet: number, row: number): { status: RawStatus; value: number };
+  updateFormatDefaults(patch: object): void;
+  getRowHeightPt(row: number): number;
 };
+type RawWorkbook = { sheet(index: number): RawSheet };
 
 const rawWorkbook = (handle: WorkbookHandle): RawWorkbook =>
   (handle as unknown as { wb: RawWorkbook }).wb;
@@ -78,7 +74,7 @@ describe('WorkbookHandle.createDefault platform', () => {
       expect(wb.geometryPlatform).toBe('mac');
       expect(wb.workbookDefaultFont).toMatchObject({ name: '游ゴシック', size: 12 });
       const raw = rawWorkbook(wb);
-      expect(raw.getRowHeightPt(0, 0).value).toBe(20);
+      expect(raw.sheet(0).getRowHeightPt(0)).toBe(20);
       // 游ゴシック 12: digit advance 0.56 x 12 pt rounds to 7, so 10 x 7 + 5 = 75 pt columns.
       expect(wb.getSheetDefaultLayoutPx(0)).toEqual({
         defaultColWidth: 75 * PX_PER_PT,
@@ -88,11 +84,11 @@ describe('WorkbookHandle.createDefault platform', () => {
 
       const added = wb.addSheet();
       expect(added).toBe(1);
-      const defaults = raw.getSheetFormatDefaults(1);
-      expect(defaults.baseColWidth).toBe(10);
-      expect(defaults.hasDefaultRowHeight).toBe(true);
-      expect(defaults.defaultRowHeight).toBe(20);
-      expect(raw.getRowHeightPt(1, 0).value).toBe(20);
+      const defaults = raw.sheet(1).getFormatDefaults();
+      expect(defaults.baseColumnWidthChars).toBe(10);
+      expect(defaults.defaultRowHeightPt).not.toBeNull();
+      expect(defaults.defaultRowHeightPt).toBe(20);
+      expect(raw.sheet(1).getRowHeightPt(0)).toBe(20);
       expect(wb.getSheetDefaultLayoutPx(1)).toEqual(wb.getSheetDefaultLayoutPx(0));
     } finally {
       wb.dispose();
@@ -124,8 +120,11 @@ describe('WorkbookHandle.createDefault platform', () => {
         [145, 20.7109375],
       ] as const) {
         expect(wb.setColumnWidth(0, 2, 2, pt * PX_PER_PT)).toBe(true);
-        const column = raw.getSheetColumns(0).columns.find((entry) => entry.first === 2);
-        expect(column?.width).toBe(savedRaw);
+        const column = raw
+          .sheet(0)
+          .listColumnOverrides()
+          .find((entry) => entry.first === 2);
+        expect(column?.widthChars).toBe(savedRaw);
         expect(wb.getColumnLayouts(0).find((entry) => entry.first === 2)?.width).toBe(
           pt * PX_PER_PT,
         );
@@ -141,20 +140,20 @@ describe('WorkbookHandle.createDefault platform', () => {
       expect(en.geometryPlatform).toBe('default');
       expect(en.workbookDefaultFont).toMatchObject({ name: 'Calibri', size: 11 });
       const raw = rawWorkbook(en);
-      expect(raw.getSheetFormatDefaults(0).defaultRowHeight).toBe(15);
-      expect(raw.getRowHeightPt(0, 0).value).toBe(15);
+      expect(raw.sheet(0).getFormatDefaults().defaultRowHeightPt).toBe(15);
+      expect(raw.sheet(0).getRowHeightPt(0)).toBe(15);
       expect(en.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBe(20);
       expect(en.getSheetDefaultLayoutPx(0)?.defaultColWidth).toBeCloseTo(64, 1);
       expect(en.addSheet()).toBe(1);
-      expect(raw.getRowHeightPt(1, 0).value).toBe(15);
-      expect(raw.getSheetFormatDefaults(1).baseColWidth).toBe(8);
+      expect(raw.sheet(1).getRowHeightPt(0)).toBe(15);
+      expect(raw.sheet(1).getFormatDefaults().baseColumnWidthChars).toBe(8);
     } finally {
       en.dispose();
     }
 
     const ja = await WorkbookHandle.createDefault({ locale: 'ja' });
     try {
-      expect(rawWorkbook(ja).getRowHeightPt(0, 0).value).toBe(18.75);
+      expect(rawWorkbook(ja).sheet(0).getRowHeightPt(0)).toBe(18.75);
       expect(ja.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBe(25);
       // 游ゴシック 11, base 8: 69 px rounded up to 72 px (8.38 characters).
       expect(ja.getSheetDefaultLayoutPx(0)?.defaultColWidth).toBe(72);
@@ -166,14 +165,12 @@ describe('WorkbookHandle.createDefault platform', () => {
   it('keeps a Mac sheet default row height only when customHeight pins it', async () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'ja', platform: 'mac' });
     try {
-      const raw = wb as unknown as {
-        wb: { setSheetFormatDefaults(sheet: number, d: object): RawStatus };
-      };
-      const stated = { baseColWidth: 10, defaultRowHeight: 30, hasDefaultRowHeight: true };
-      raw.wb.setSheetFormatDefaults(0, { ...stated, customHeight: false });
+      const raw = rawWorkbook(wb).sheet(0);
+      const stated = { baseColumnWidthChars: 10, defaultRowHeightPt: 30 };
+      raw.updateFormatDefaults({ ...stated, customHeight: false });
       // 游ゴシック 12 recomputes to 20 pt, as Mac Excel does on load.
       expect(wb.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBeCloseTo(20 * PX_PER_PT, 8);
-      raw.wb.setSheetFormatDefaults(0, { ...stated, customHeight: true });
+      raw.updateFormatDefaults({ ...stated, customHeight: true });
       expect(wb.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBeCloseTo(30 * PX_PER_PT, 8);
     } finally {
       wb.dispose();
@@ -187,8 +184,8 @@ describe('WorkbookHandle.createDefault platform', () => {
     try {
       expect(loaded.addSheet()).toBe(1);
       const raw = rawWorkbook(loaded);
-      expect(raw.getSheetFormatDefaults(0).hasDefaultRowHeight).toBe(true);
-      expect(raw.getSheetFormatDefaults(1).hasDefaultRowHeight).toBe(false);
+      expect(raw.sheet(0).getFormatDefaults().defaultRowHeightPt).not.toBeNull();
+      expect(raw.sheet(1).getFormatDefaults().defaultRowHeightPt).toBeNull();
     } finally {
       loaded.dispose();
     }

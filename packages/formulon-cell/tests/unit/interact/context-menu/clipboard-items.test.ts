@@ -609,7 +609,11 @@ describe('attachContextMenu', () => {
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
-    it('opens Insert Cells and Delete Cells direction dialogs from the cell menu', () => {
+    it('opens Insert Cells and Delete Cells direction dialogs from the cell menu', async () => {
+      // Shifting cells is an engine operation; the stub engine refuses it.
+      wb.dispose();
+      wb = await WorkbookHandle.createDefault();
+      wb.attachStore(store);
       seed(store, wb, [
         { row: 1, col: 1, value: 'first' },
         { row: 2, col: 1, value: 'second' },

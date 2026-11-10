@@ -12,7 +12,9 @@ import {
   whenSheetPasswordsHashed,
 } from '../../../src/commands/protection.js';
 import { deleteRows, insertRows } from '../../../src/commands/structure.js';
+import { formatA1Range } from '../../../src/engine/address.js';
 import { hydrateProtectionFromEngine } from '../../../src/engine/protection-sync.js';
+import type { ProtectedRange } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -20,6 +22,11 @@ const addRange = (...args: Parameters<typeof addAllowedEditRange>): string =>
   addAllowedEditRange(...args) as string;
 
 const canLoadWasm = (): boolean => typeof WebAssembly !== 'undefined';
+
+const sqrefOf = (record: ProtectedRange | undefined): string =>
+  (record?.ranges ?? [])
+    .map((r) => formatA1Range({ r0: r.firstRow, c0: r.firstCol, r1: r.lastRow, c1: r.lastCol }))
+    .join(' ');
 
 const reload = async (wb: WorkbookHandle) => {
   const restored = await WorkbookHandle.loadBytes(wb.save());
@@ -46,13 +53,15 @@ describe.skipIf(!canLoadWasm())('protected ranges round-trip', () => {
         password: 'open',
         workbook: wb,
       });
-      expect(wb.getProtectedRanges(0)).toMatchObject([{ name: 'Inputs', sqref: 'B2:C3' }]);
+      expect(wb.getProtectedRanges(0)).toMatchObject([
+        { name: 'Inputs', ranges: [{ firstRow: 1, firstCol: 1, lastRow: 2, lastCol: 2 }] },
+      ]);
       await whenSheetPasswordsHashed();
       const stored = store.getState().protection.allowedEditRanges[0];
       expect(stored?.passwordHash?.algorithmName).toBe('SHA-512');
       expect(stored?.password).toBeUndefined();
       expect(wb.getProtectedRanges(0)[0]).toMatchObject({
-        password: '',
+        legacyPasswordHash: null,
         algorithmName: 'SHA-512',
       });
 
@@ -88,7 +97,7 @@ describe.skipIf(!canLoadWasm())('protected ranges round-trip', () => {
       const store = createSpreadsheetStore();
       const first = addRange(store, rect(0, 0, 0, 0), { title: 'A', workbook: wb });
       const second = addRange(store, rect(4, 4, 5, 5), { title: 'B', workbook: wb });
-      expect(wb.getProtectedRanges(0).map((r) => [r.name, r.sqref])).toEqual([
+      expect(wb.getProtectedRanges(0).map((r) => [r.name, sqrefOf(r)])).toEqual([
         ['A', 'A1'],
         ['B', 'E5:F6'],
       ]);
@@ -99,7 +108,7 @@ describe.skipIf(!canLoadWasm())('protected ranges round-trip', () => {
         { title: 'Renamed', range: rect(1, 0, 2, 0), extraAreas: [rect(9, 9, 9, 9)] },
         { workbook: wb },
       );
-      expect(wb.getProtectedRanges(0).map((r) => [r.name, r.sqref])).toEqual([
+      expect(wb.getProtectedRanges(0).map((r) => [r.name, sqrefOf(r)])).toEqual([
         ['Renamed', 'A2:A3 J10'],
         ['B', 'E5:F6'],
       ]);
@@ -132,12 +141,8 @@ describe.skipIf(!canLoadWasm())('protected ranges round-trip', () => {
       expect(
         wb.addProtectedRange(0, {
           name: 'Locked',
-          sqref: 'C3',
-          password: 'CC3B',
-          algorithmName: '',
-          hashValue: '',
-          saltValue: '',
-          spinCount: 0,
+          ranges: 'C3',
+          legacyPasswordHash: 'CC3B',
           securityDescriptor: 'O:BAG:BAD:(A;;GA;;;WD)',
         }),
       ).toBe(true);
@@ -150,8 +155,8 @@ describe.skipIf(!canLoadWasm())('protected ranges round-trip', () => {
       updateAllowedEditRange(store, entry.id, { range: rect(2, 2, 3, 3) }, { workbook: wb });
       expect(wb.getProtectedRanges(0)[0]).toMatchObject({
         name: 'Locked',
-        sqref: 'C3:D4',
-        password: 'CC3B',
+        ranges: [{ firstRow: 2, firstCol: 2, lastRow: 3, lastCol: 3 }],
+        legacyPasswordHash: 'CC3B',
         securityDescriptor: 'O:BAG:BAD:(A;;GA;;;WD)',
       });
     } finally {
@@ -177,9 +182,9 @@ describe.skipIf(!canLoadWasm())('protected ranges round-trip', () => {
       expect(allowedEditRangeHasPassword(store.getState(), id)).toBe(false);
       expect(wb.getProtectedRanges(0)[0]).toMatchObject({
         name: 'Renamed',
-        password: '',
-        algorithmName: '',
-        hashValue: '',
+        legacyPasswordHash: null,
+        algorithmName: null,
+        hashValue: null,
         spinCount: 0,
       });
     } finally {
@@ -198,11 +203,11 @@ describe.skipIf(!canLoadWasm())('protected ranges round-trip', () => {
       expect(insertRows(store, wb, history, 0, 2)).toBe(true);
       const [moved] = allowedEditRangesForSheet(store.getState(), 0);
       expect(moved).toMatchObject({ id, title: 'Moves', range: rect(6, 1, 7, 2) });
-      expect(wb.getProtectedRanges(0)[0]?.sqref).toBe('B7:C8');
+      expect(sqrefOf(wb.getProtectedRanges(0)[0])).toBe('B7:C8');
 
       history.undo();
       expect(allowedEditRangesForSheet(store.getState(), 0)[0]?.range).toEqual(rect(4, 1, 5, 2));
-      expect(wb.getProtectedRanges(0)[0]?.sqref).toBe('B5:C6');
+      expect(sqrefOf(wb.getProtectedRanges(0)[0])).toBe('B5:C6');
     } finally {
       wb.dispose();
     }

@@ -8,7 +8,7 @@ import { pivotStyleLayer } from '../engine/pivot-style.js';
  *  double-click, the structure commands, the ribbon AutoFit items and the
  *  public `autofitColWidth` / `autofitRowHeight` helpers — measures here.
  *  Results are unclamped; the store's size mutators own the min/max bounds. */
-import type { CellValue, FontRecord } from '../engine/types.js';
+import type { CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { normalizeFormatLocale } from '../format/locale.js';
@@ -66,7 +66,7 @@ export interface AutofitOptions {
   /** Workbook Normal/display font in native points. When supplied, missing
    *  cell family/size fields are measured with this font instead of the UI
    *  theme fallback. */
-  workbookDisplayFont?: Pick<FontRecord, 'name' | 'size'> | null;
+  workbookDisplayFont?: { name: string; size: number } | null;
   /** Workbook used to resolve row/column/whole-sheet inherited formatting.
    *  The resolved projection is read-only and is never written into the
    *  store's direct format map. */

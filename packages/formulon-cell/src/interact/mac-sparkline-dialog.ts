@@ -49,13 +49,7 @@ const formatSheetRange = (sheetName: string, range: Range): string => {
   return `'${sheetName.replace(/'/g, "''")}'!${body}`;
 };
 
-const sheetIndex = (wb: WorkbookHandle, name: string): number => {
-  const target = name.toLocaleLowerCase();
-  for (let i = 0; i < wb.sheetCount; i += 1) {
-    if (wb.sheetName(i).toLocaleLowerCase() === target) return i;
-  }
-  return -1;
-};
+const sheetIndex = (wb: WorkbookHandle, name: string): number => wb.sheetIndexByName(name) ?? -1;
 
 const resolveRange = (
   raw: string,

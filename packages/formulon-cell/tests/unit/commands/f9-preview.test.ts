@@ -4,13 +4,10 @@ import {
   renderCellValueForF9,
   replaceFormulaSelectionWithF9Preview,
 } from '../../../src/commands/f9-preview.js';
-import {
-  type CellValue,
-  type EvalArrayResult,
-  type EvalResult,
-  type Value,
-  ValueKind,
-} from '../../../src/engine/types.js';
+import { type CellValue, type Value, ValueKind } from '../../../src/engine/types.js';
+
+type EvalResult = Value | null;
+type EvalArrayResult = readonly (readonly Value[])[] | null;
 
 const numCell = (value: number): { value: CellValue; formula: string | null } => ({
   value: { kind: 'number', value },
@@ -26,10 +23,7 @@ const evalNumber =
   (expectedFormula: string, value: number) =>
   (formula: string): EvalResult => {
     expect(formula).toBe(expectedFormula);
-    return {
-      status: { status: 0 },
-      value: { kind: ValueKind.Number, number: value },
-    } as EvalResult;
+    return { kind: ValueKind.Number, number: value };
   };
 
 const numV = (n: number): Value => ({ kind: ValueKind.Number, number: n }) as Value;
@@ -39,12 +33,7 @@ const evalArray =
   (expectedFormula: string, cells: Value[][]) =>
   (formula: string): EvalArrayResult => {
     expect(formula).toBe(expectedFormula);
-    return {
-      status: { status: 0 },
-      rows: cells.length,
-      cols: cells[0]?.length ?? 0,
-      cells,
-    } as EvalArrayResult;
+    return cells;
   };
 
 describe('renderCellValueForF9', () => {
@@ -103,10 +92,7 @@ describe('computeF9Preview', () => {
       undefined,
       (formula) => {
         evaluated.push(formula);
-        return {
-          status: { status: 0 },
-          value: { kind: ValueKind.Number, number: 3 },
-        } as EvalResult;
+        return { kind: ValueKind.Number, number: 3 };
       },
       true,
       undefined,
@@ -348,7 +334,7 @@ describe('computeF9Preview', () => {
     const arrErr =
       () =>
       (_formula: string): EvalArrayResult =>
-        ({ status: { status: 1 }, rows: 0, cols: 0, cells: [] as Value[][] }) as EvalArrayResult;
+        null;
     expect(
       computeF9Preview(
         '=A1+B1',

@@ -38,27 +38,20 @@ function installImportedAxisFont(workbook: WorkbookHandle): FontRecord {
   const imported: FontRecord = {
     ...baseFont,
     name: 'Consolas',
-    size: 15,
+    sizePt: 15,
     bold: true,
-    hasBold: true,
     charset: 128,
-    hasCharset: true,
   };
   const xfIndex = workbook.addXfRecord({
     ...baseXf,
     fontIndex: workbook.addFontRecord(imported),
     numFmtId: 14,
-    horizontalAlign: 2,
-    verticalAlign: 1,
+    horizontal: 2,
+    vertical: 1,
     wrapText: true,
-    hasAlignment: true,
-    hasHorizontalAlign: true,
-    hasVerticalAlign: true,
-    hasWrapText: true,
     applyNumberFormat: true,
     applyAlignment: true,
     applyProtection: true,
-    hasProtection: true,
     locked: false,
     hidden: true,
     quotePrefix: true,
@@ -77,7 +70,7 @@ function seedDistinctOtherCell(mounted: MountedStubSheet): void {
   });
   expect(fontAt(mounted.workbook, other)).toMatchObject({
     name: 'Consolas',
-    size: 15,
+    sizePt: 15,
     bold: true,
   });
 }
@@ -100,15 +93,15 @@ describe('whole-sheet font structure remap regression', () => {
       expect(
         setFont(mounted.instance.store.getState(), mounted.instance.store, { fontSize: 24 }),
       ).toBe(true);
-      expect(fontAt(mounted.workbook, target)).toMatchObject({ size: 18 });
+      expect(fontAt(mounted.workbook, target)).toMatchObject({ sizePt: 18 });
 
       expect(mounted.workbook.moveSheet(0, 1)).toBe(true);
       expect(fontAt(mounted.workbook, { ...target, sheet: 0 })).toMatchObject({
         name: 'Consolas',
-        size: 15,
+        sizePt: 15,
         bold: true,
       });
-      expect(fontAt(mounted.workbook, { ...target, sheet: 1 })).toMatchObject({ size: 18 });
+      expect(fontAt(mounted.workbook, { ...target, sheet: 1 })).toMatchObject({ sizePt: 18 });
       const formats = mounted.instance.store.getState().format.formats;
       expect(formats.get('0:0:0')).toMatchObject({ fontFamily: 'Consolas', fontSize: 20 });
       expect(formats.get('1:0:0')).toMatchObject({ fontSize: 24 });
@@ -120,19 +113,19 @@ describe('whole-sheet font structure remap regression', () => {
       flushFormatToEngine(mounted.workbook, mounted.instance.store, 1);
       expect(fontAt(mounted.workbook, { ...target, sheet: 0 })).toMatchObject({
         name: 'Consolas',
-        size: 15,
+        sizePt: 15,
         bold: true,
       });
-      expect(fontAt(mounted.workbook, { ...target, sheet: 1 })).toMatchObject({ size: 18 });
+      expect(fontAt(mounted.workbook, { ...target, sheet: 1 })).toMatchObject({ sizePt: 18 });
 
       const reloaded = await WorkbookHandle.loadBytes(mounted.workbook.save());
       try {
         expect(fontAt(reloaded, { ...target, sheet: 0 })).toMatchObject({
           name: 'Consolas',
-          size: 15,
+          sizePt: 15,
           bold: true,
         });
-        expect(fontAt(reloaded, { ...target, sheet: 1 })).toMatchObject({ size: 18 });
+        expect(fontAt(reloaded, { ...target, sheet: 1 })).toMatchObject({ sizePt: 18 });
       } finally {
         reloaded.dispose();
       }
@@ -154,7 +147,7 @@ describe('whole-sheet font structure remap regression', () => {
       expect(mounted.workbook.removeSheet(0)).toBe(true);
       expect(fontAt(mounted.workbook, { ...target, sheet: 0 })).toMatchObject({
         name: 'Consolas',
-        size: 15,
+        sizePt: 15,
         bold: true,
       });
       expect(mounted.instance.store.getState().format.formats.get('0:0:0')).toMatchObject({
@@ -165,7 +158,7 @@ describe('whole-sheet font structure remap regression', () => {
       flushFormatToEngine(mounted.workbook, mounted.instance.store, 0);
       expect(fontAt(mounted.workbook, { ...target, sheet: 0 })).toMatchObject({
         name: 'Consolas',
-        size: 15,
+        sizePt: 15,
         bold: true,
       });
 
@@ -173,7 +166,7 @@ describe('whole-sheet font structure remap regression', () => {
       try {
         expect(fontAt(reloaded, { ...target, sheet: 0 })).toMatchObject({
           name: 'Consolas',
-          size: 15,
+          sizePt: 15,
           bold: true,
         });
       } finally {
@@ -198,10 +191,10 @@ describe('whole-sheet font structure remap regression', () => {
       flushFormatToEngine(mounted.workbook, mounted.instance.store, 1);
       expect(fontAt(mounted.workbook, { ...target, sheet: 0 })).toMatchObject({
         name: 'Consolas',
-        size: 15,
+        sizePt: 15,
         bold: true,
       });
-      expect(fontAt(mounted.workbook, { ...target, sheet: 1 })).toMatchObject({ size: 18 });
+      expect(fontAt(mounted.workbook, { ...target, sheet: 1 })).toMatchObject({ sizePt: 18 });
     } finally {
       mounted.dispose();
       mounted.workbook.dispose();
@@ -220,7 +213,7 @@ describe('whole-sheet font structure remap regression', () => {
       flushFormatToEngine(mounted.workbook, mounted.instance.store, 0);
       expect(fontAt(mounted.workbook, { ...target, sheet: 0 })).toMatchObject({
         name: 'Consolas',
-        size: 15,
+        sizePt: 15,
         bold: true,
       });
     } finally {
@@ -239,30 +232,30 @@ describe('whole-sheet font structure remap regression', () => {
     try {
       const defaultFont = loaded.getFontRecord(0);
       if (!defaultFont) throw new Error('missing default font');
-      expect(rawAt(loaded).font).toMatchObject({ name: 'Consolas', size: 15, bold: true });
+      expect(rawAt(loaded).font).toMatchObject({ name: 'Consolas', sizePt: 15, bold: true });
       mutators.selectAll(mounted.instance.store);
       recordFormatChange(history, mounted.instance.store, () => {
         clearVisualFormat(mounted.instance.store.getState(), mounted.instance.store);
       });
       expect(rawAt(loaded).font).toMatchObject({
         name: defaultFont.name,
-        size: defaultFont.size,
-        bold: false,
+        sizePt: defaultFont.sizePt,
+        bold: null,
       });
       expect(history.undo()).toBe(true);
-      expect(rawAt(loaded).font).toMatchObject({ name: 'Consolas', size: 15, bold: true });
+      expect(rawAt(loaded).font).toMatchObject({ name: 'Consolas', sizePt: 15, bold: true });
       expect(history.redo()).toBe(true);
       expect(rawAt(loaded).font).toMatchObject({
         name: defaultFont.name,
-        size: defaultFont.size,
-        bold: false,
+        sizePt: defaultFont.sizePt,
+        bold: null,
       });
       const reloaded = await WorkbookHandle.loadBytes(loaded.save());
       try {
         expect(rawAt(reloaded).font).toMatchObject({
           name: defaultFont.name,
-          size: defaultFont.size,
-          bold: false,
+          sizePt: defaultFont.sizePt,
+          bold: null,
         });
       } finally {
         reloaded.dispose();
@@ -287,18 +280,17 @@ describe('whole-sheet font structure remap regression', () => {
       clearVisualFormat(mounted.instance.store.getState(), mounted.instance.store);
       expect(rawAt(loaded).font).toMatchObject({
         name: defaultFont.name,
-        size: defaultFont.size,
-        bold: false,
+        sizePt: defaultFont.sizePt,
+        bold: null,
       });
       expect(rawAt(loaded).xf).toMatchObject({
         fillIndex: defaultXf.fillIndex,
         borderIndex: defaultXf.borderIndex,
         numFmtId: defaultXf.numFmtId,
-        horizontalAlign: defaultXf.horizontalAlign,
-        verticalAlign: defaultXf.verticalAlign,
+        horizontal: defaultXf.horizontal,
+        vertical: defaultXf.vertical,
         wrapText: defaultXf.wrapText,
         applyProtection: true,
-        hasProtection: true,
         locked: false,
         hidden: true,
         quotePrefix: true,
@@ -310,18 +302,17 @@ describe('whole-sheet font structure remap regression', () => {
       ).toBe(true);
       expect(rawAt(loaded).font).toMatchObject({
         name: 'Arial',
-        size: defaultFont.size,
-        bold: false,
+        sizePt: defaultFont.sizePt,
+        bold: null,
       });
       expect(rawAt(loaded).xf).toMatchObject({
         fillIndex: defaultXf.fillIndex,
         borderIndex: defaultXf.borderIndex,
         numFmtId: defaultXf.numFmtId,
-        horizontalAlign: defaultXf.horizontalAlign,
-        verticalAlign: defaultXf.verticalAlign,
+        horizontal: defaultXf.horizontal,
+        vertical: defaultXf.vertical,
         wrapText: defaultXf.wrapText,
         applyProtection: true,
-        hasProtection: true,
         locked: false,
         hidden: true,
         quotePrefix: true,

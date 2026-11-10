@@ -5,13 +5,12 @@
 // The default formulon entry is single-threaded and needs no cross-origin
 // isolation. Initialization errors still reject: the in-memory stub is
 // intentionally opt-in for tests and demos.
-import createFormulon, { type FormulonModuleOptions } from '@libraz/formulon';
+import createFormulon, { type Formulon, type FormulonOptions } from '@libraz/formulon';
 import { createStubModule } from './stub-engine.js';
-import type { FormulonModule } from './types.js';
 
-let cachedWasm: Promise<FormulonModule> | null = null;
-let cachedStub: Promise<FormulonModule> | null = null;
-const stubModules = new WeakSet<FormulonModule>();
+let cachedWasm: Promise<Formulon> | null = null;
+let cachedStub: Promise<Formulon> | null = null;
+const stubModules = new WeakSet<Formulon>();
 
 export interface LoadOptions {
   /** Force the JS stub even if the WASM could load. Useful for tests and
@@ -22,10 +21,10 @@ export interface LoadOptions {
   /** Resolve the URL of the engine's `.wasm` file, for hosts that serve it
    *  from a CDN or a sub-path. The engine is loaded once per page, so only
    *  the first load's resolver takes effect; later loads reuse that module. */
-  locateFile?: FormulonModuleOptions['locateFile'];
+  locateFile?: FormulonOptions['locateFile'];
 }
 
-export function loadFormulon(opts: LoadOptions = {}): Promise<FormulonModule> {
+export function loadFormulon(opts: LoadOptions = {}): Promise<Formulon> {
   if (opts.preferStub) {
     opts.onFallback?.('preferStub set — using stub engine');
     if (!cachedStub) {
@@ -43,21 +42,17 @@ export function loadFormulon(opts: LoadOptions = {}): Promise<FormulonModule> {
     return Promise.reject(new Error(unavailableReason));
   }
 
-  const moduleOptions: FormulonModuleOptions = opts.locateFile
-    ? { locateFile: opts.locateFile }
-    : {};
-  const promise: Promise<FormulonModule> = createFormulon(moduleOptions).catch(
-    (reason: unknown) => {
-      cachedWasm = null;
-      throw new Error(`formulon WASM init failed: ${String(reason)}`);
-    },
-  );
+  const moduleOptions: FormulonOptions = opts.locateFile ? { locateFile: opts.locateFile } : {};
+  const promise: Promise<Formulon> = createFormulon(moduleOptions).catch((reason: unknown) => {
+    cachedWasm = null;
+    throw new Error(`formulon WASM init failed: ${String(reason)}`);
+  });
   cachedWasm = promise;
 
   return promise;
 }
 
-export function isUsingStub(module?: FormulonModule): boolean {
+export function isUsingStub(module?: Formulon): boolean {
   if (module) return stubModules.has(module);
   return cachedStub !== null && cachedWasm === null;
 }

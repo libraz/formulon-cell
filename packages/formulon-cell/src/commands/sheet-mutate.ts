@@ -182,11 +182,8 @@ const MAX_SHEET_NAME_LENGTH = 31;
 export function isValidSheetName(wb: WorkbookHandle, idx: number, name: string): boolean {
   if (name.length === 0 || name.length > MAX_SHEET_NAME_LENGTH) return false;
   if (/[\\/?*[\]:]/.test(name) || name.startsWith("'") || name.endsWith("'")) return false;
-  const folded = name.toLocaleLowerCase();
-  for (let i = 0; i < wb.sheetCount; i += 1) {
-    if (i !== idx && wb.sheetName(i).toLocaleLowerCase() === folded) return false;
-  }
-  return true;
+  const existing = wb.sheetIndexByName(name);
+  return existing === null || existing === idx;
 }
 
 /** Rename the sheet at `idx`. Returns true on success. The store has no

@@ -20,7 +20,12 @@ const savedWorkbookWithCustomStyle = async (): Promise<{ bytes: Uint8Array; xfId
     const boldFont = wb.addFontRecord({ ...font, bold: true });
     const xfId = wb.addCellStyleXfRecord({ ...normal, fontIndex: boldFont, applyFont: true });
     expect(wb.setNamedCellStyle('Probe Custom', xfId, null)).toBe(true);
-    const cellXf = wb.addXfRecord({ ...normal, fontIndex: boldFont, applyFont: true, xfId });
+    const cellXf = wb.addXfRecord({
+      ...normal,
+      fontIndex: boldFont,
+      applyFont: true,
+      styleXfIndex: xfId,
+    });
     expect(wb.setCellXfIndex(0, 0, 0, cellXf)).toBe(true);
     return { bytes: wb.save(), xfId };
   } finally {
@@ -41,13 +46,15 @@ describe('named style persistence', () => {
 
       syncCellFormatsToEngine(wb, store, 0, { strict: true });
       const xf = wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1);
-      expect(xf?.xfId).toBe(style?.xfId);
+      expect(xf?.styleXfIndex).toBe(style?.xfId);
 
       const again = await WorkbookHandle.loadBytes(wb.save());
       try {
         const reStyle = again.getNamedCellStyles().find((s) => s.name === 'Probe Custom');
         expect(reStyle).toBeDefined();
-        expect(again.getCellXf(again.getCellXfIndex(0, 0, 0) ?? -1)?.xfId).toBe(reStyle?.xfId);
+        expect(again.getCellXf(again.getCellXfIndex(0, 0, 0) ?? -1)?.styleXfIndex).toBe(
+          reStyle?.xfId,
+        );
       } finally {
         again.dispose();
       }

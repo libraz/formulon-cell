@@ -136,6 +136,12 @@ describe('attachEvaluateFormulaDialog', () => {
       getValue,
       sheetCount: 3,
       sheetName: (sheet: number) => ['Sheet1', 'Data Sheet', 'Sheet3'][sheet] ?? '',
+      sheetIndexByName: (name: string) => {
+        const index = ['Sheet1', 'Data Sheet', 'Sheet3'].findIndex(
+          (n) => n.toLowerCase() === name.toLowerCase(),
+        );
+        return index < 0 ? null : index;
+      },
       getFormulaForDisplay: (formula: string) => formula,
       getDisplayText: () => '1235',
     } as unknown as WorkbookHandle;
@@ -189,6 +195,10 @@ describe('attachEvaluateFormulaDialog', () => {
       getValue,
       sheetCount: 2,
       sheetName: (sheet: number) => ['Sheet1', 'Data'][sheet] ?? '',
+      sheetIndexByName: (name: string) => {
+        const index = ['Sheet1', 'Data'].findIndex((n) => n.toLowerCase() === name.toLowerCase());
+        return index < 0 ? null : index;
+      },
       getFormulaForDisplay: (formula: string) => formula,
       getDisplayText: () => '20',
     } as unknown as WorkbookHandle;

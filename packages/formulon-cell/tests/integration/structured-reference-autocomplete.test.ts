@@ -24,9 +24,8 @@ describe('integration: structured-reference autocomplete', () => {
     workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 7);
     workbook.setNumber({ sheet: 0, row: 2, col: 0 }, 8);
     expect(
-      workbook.createTable({
-        sheetIndex: 0,
-        ref: 'A1:A3',
+      workbook.createTable(0, {
+        range: 'A1:A3',
         name: 'Sales',
         columns: ['A]B'],
       }),

@@ -392,11 +392,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
           ? workbook.canonicalizeLocalizedFormula(currentRaw)
           : currentRaw;
       const result = workbook.evaluateFormulaText(currentAnchor(), canonicalRaw);
-      if (!result.status.ok) {
+      if (!result) {
         preview.textContent = labels.pending;
         return;
       }
-      preview.textContent = formatCell(fromEngineValue(result.value), deps.getLocale());
+      preview.textContent = formatCell(fromEngineValue(result), deps.getLocale());
     } catch {
       preview.textContent = labels.pending;
     }

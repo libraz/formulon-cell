@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { recordSlicersChange } from '../../../src/commands/slice-history.js';
@@ -52,6 +53,13 @@ const makeFakeWb = (table: {
         columns: [...table.columns],
       },
     ],
+    // The engine's name identity rule compares without regard to case.
+    tableIndexByName: (name: string) =>
+      [table.name, table.displayName ?? table.name].some(
+        (candidate) => candidate.toLowerCase() === name.toLowerCase(),
+      )
+        ? 0
+        : null,
   } as unknown as WorkbookHandle;
 };
 
@@ -186,18 +194,18 @@ describe('attachSlicer', () => {
       x: -500,
       y: -500,
       nativeAnchor: {
-        anchorKind: 1,
-        editAs: 0,
+        kind: AnchorKind.TwoCell,
+        editAs: AnchorEditAs.TwoCell,
         fromRow: 6,
         fromCol: 2,
-        fromRowOff: 0,
-        fromColOff: 0,
+        fromRowOffsetEmu: 0,
+        fromColOffsetEmu: 0,
         toRow: 16,
         toCol: 5,
-        toRowOff: 0,
-        toColOff: 0,
-        cx: 0,
-        cy: 0,
+        toRowOffsetEmu: 0,
+        toColOffsetEmu: 0,
+        widthEmu: 0,
+        heightEmu: 0,
       },
     });
     const panel = () => host.querySelector<HTMLElement>('.fc-slicer');

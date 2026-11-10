@@ -299,7 +299,7 @@ export const selectAdjacentComment = (
       : (state.threadedComments.bySheet.get(state.data.sheetIndex) ?? [])
           .filter((entry) => !entry.parentId)
           .map((entry) => ({
-            addr: { sheet: state.data.sheetIndex, row: entry.row, col: entry.col },
+            addr: { sheet: state.data.sheetIndex, row: entry.cell.row, col: entry.cell.col },
             mode: 'thread' as const,
           }))),
   ]

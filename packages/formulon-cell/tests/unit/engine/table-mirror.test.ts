@@ -147,11 +147,11 @@ describe('table mirror', () => {
     const store = boundStore(wb);
     const overlay = formatAsTable(store, salesRange, { workbook: wb });
     const createTable = vi.spyOn(wb, 'createTable');
-    const updateTable = vi.spyOn(wb, 'updateTable');
+    const updateTableStyleOptions = vi.spyOn(wb, 'updateTableStyleOptions');
 
     expect(updateTableOverlay(store, overlay?.id ?? '', { style: 'dark' })).not.toBeNull();
 
-    expect(updateTable).toHaveBeenCalledWith(0, { styleName: 'TableStyleDark2' });
+    expect(updateTableStyleOptions).toHaveBeenCalledWith(0, { styleName: 'TableStyleDark2' });
     expect(createTable).not.toHaveBeenCalled();
     expect(wb.getTables()).toHaveLength(1);
     expect(tableXml(wb)).toContain('TableStyleDark2');

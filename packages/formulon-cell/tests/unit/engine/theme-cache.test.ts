@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
-const nativeOf = (handle: WorkbookHandle): { getTheme: () => unknown } =>
-  (handle as unknown as { wb: { getTheme: () => unknown } }).wb;
+const nativeOf = (handle: WorkbookHandle): { getThemeFonts: () => unknown } =>
+  (handle as unknown as { wb: { getThemeFonts: () => unknown } }).wb;
 
 describe('workbook theme cache', () => {
   it('reads the engine theme once for repeated theme-linked font resolution', async () => {
@@ -11,7 +11,7 @@ describe('workbook theme cache', () => {
     try {
       const font = wb.getFontRecord(0);
       expect(font?.scheme === 1 || font?.scheme === 2).toBe(true);
-      const spy = vi.spyOn(nativeOf(wb), 'getTheme');
+      const spy = vi.spyOn(nativeOf(wb), 'getThemeFonts');
       const first = wb.getResolvedFontRecord(0);
       for (let i = 0; i < 50; i += 1) wb.getResolvedFontRecord(0);
       expect(spy.mock.calls.length).toBeLessThanOrEqual(1);
@@ -46,7 +46,7 @@ describe('workbook theme cache', () => {
       const theme = wb.getWorkbookTheme();
       if (!theme) return;
       const before = theme.fonts.minorLatin;
-      theme.fonts.minorLatin = 'Mutated';
+      (theme.fonts as { minorLatin: string }).minorLatin = 'Mutated';
       expect(wb.getWorkbookTheme()?.fonts.minorLatin).toBe(before);
     } finally {
       wb.dispose();

@@ -3,7 +3,11 @@ import {
   computeF9Preview,
   replaceFormulaSelectionWithF9Preview,
 } from '../../../src/commands/f9-preview.js';
-import type { CellValue, EvalArrayResult, EvalResult, Value } from '../../../src/engine/types.js';
+import { type CellValue, type Value, ValueKind } from '../../../src/engine/types.js';
+
+type EvalResult = Value | null;
+type EvalArrayResult = readonly (readonly Value[])[] | null;
+
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
 const numCell = (value: number): { value: CellValue; formula: string | null } => ({
@@ -14,10 +18,8 @@ const textCell = (value: string): { value: CellValue; formula: string | null } =
   value: { kind: 'text', value },
   formula: null,
 });
-const numberResult = (value: number): EvalResult =>
-  ({ status: { status: 0 }, value: { kind: 1, number: value } }) as EvalResult;
-const textResult = (value: string): EvalResult =>
-  ({ status: { status: 0 }, value: { kind: 3, text: value } }) as EvalResult;
+const numberResult = (value: number): EvalResult => ({ kind: ValueKind.Number, number: value });
+const textResult = (value: string): EvalResult => ({ kind: ValueKind.Text, text: value });
 
 const quotedText = 'say "hi"\\literal\nnext';
 const quotedFormulaLiteral = '"say ""hi""\\literal\nnext"';
@@ -68,12 +70,7 @@ describe('F9 formula edit boundaries', () => {
   });
 
   it('uses spreadsheet quote doubling for array evaluator results', () => {
-    const array: EvalArrayResult = {
-      status: { status: 0 },
-      rows: 1,
-      cols: 1,
-      cells: [[{ kind: 3, number: 0, boolean: 0, text: quotedText, errorCode: 0 } as Value]],
-    } as EvalArrayResult;
+    const array: EvalArrayResult = [[{ kind: ValueKind.Text, text: quotedText }]];
     expect(
       computeF9Preview('=1+0', '1+0', 0, new Map(), undefined, undefined, true, () => array),
     ).toEqual({ display: quotedFormulaLiteral, substitutable: true });

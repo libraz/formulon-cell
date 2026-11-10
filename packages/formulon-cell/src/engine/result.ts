@@ -1,12 +1,22 @@
-import type { NumberResult, Status } from '@libraz/formulon';
+import type { FormulonError, StatusCode } from '@libraz/formulon';
 
-/** Turn a failed engine call into the same error shape used by mutations. */
-export function checkStatus(status: Status, operation: string): void {
-  if (!status.ok) throw new Error(`${operation}: ${status.message}`);
+/** True for an error the engine threw. Matched by name so errors from the
+ *  stub engine and from any copy of the engine package are recognised. */
+export function isFormulonError(e: unknown): e is FormulonError {
+  return e instanceof Error && e.name === 'FormulonError';
 }
 
-/** Unwrap a required numeric result without treating a failed zero as data. */
-export function numberValue<T extends number>(result: NumberResult<T>, operation: string): T {
-  checkStatus(result.status, operation);
-  return result.value;
+/** The engine status code of `e`, or null when `e` is not an engine error. */
+export function formulonErrorCode(e: unknown): StatusCode | null {
+  return isFormulonError(e) ? e.code : null;
+}
+
+/** `call()`, or `fallback` when the engine refuses it; any other error propagates. */
+export function orFallback<T, F>(fallback: F, call: () => T): T | F {
+  try {
+    return call();
+  } catch (e) {
+    if (!isFormulonError(e)) throw e;
+    return fallback;
+  }
 }

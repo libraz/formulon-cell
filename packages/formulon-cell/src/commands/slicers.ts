@@ -37,13 +37,8 @@ export function listSlicers(store: SpreadsheetStore): readonly SlicerSpec[] {
 }
 
 export function findSlicerTable(workbook: WorkbookHandle, tableName: string): SlicerTable | null {
-  const target = tableName.toLowerCase();
-  for (const table of workbook.getTables()) {
-    if (table.name.toLowerCase() === target || table.displayName.toLowerCase() === target) {
-      return table;
-    }
-  }
-  return null;
+  const index = workbook.tableIndexByName(tableName);
+  return index === null ? null : (workbook.getTables()[index] ?? null);
 }
 
 export function resolveSlicerSpec(

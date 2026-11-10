@@ -1,51 +1,30 @@
-import type { CfIconInput } from '@libraz/formulon';
+import { type CfIconInput, IconSetName } from '@libraz/formulon';
 import { iconSetSlotCount } from '../render/conditional.js';
 import type { ConditionalIconRef, ConditionalIconSet } from '../store/store.js';
 
-/** `formulon::cf::IconSetName` ordinals, as OOXML `ST_IconSetType` spellings. */
-const ENGINE_ICON_SET_NAMES = [
-  '3Arrows',
-  '3ArrowsGray',
-  '3Flags',
-  '3TrafficLights1',
-  '3TrafficLights2',
-  '3Signs',
-  '3Symbols',
-  '3Symbols2',
-  '4Arrows',
-  '4ArrowsGray',
-  '4RedToBlack',
-  '4Rating',
-  '4TrafficLights',
-  '5Arrows',
-  '5ArrowsGray',
-  '5Rating',
-  '5Quarters',
-] as const;
-
-/** The set's file spelling; null for a family with no file form. */
-const SET_NAME: Readonly<Record<ConditionalIconSet, string | null>> = {
-  arrows3: '3Arrows',
-  arrowsGray3: '3ArrowsGray',
-  arrows4: '4Arrows',
-  arrowsGray4: '4ArrowsGray',
-  arrows5: '5Arrows',
-  arrowsGray5: '5ArrowsGray',
-  triangles3: '3Triangles',
-  traffic3: '3TrafficLights1',
-  trafficRim3: '3TrafficLights2',
-  signs3: '3Signs',
-  traffic4: '4TrafficLights',
-  redToBlack4: '4RedToBlack',
-  symbols3: '3Symbols2',
-  symbolsCircled3: '3Symbols',
-  flags3: '3Flags',
-  stars3: '3Stars',
-  ratings4: '4Rating',
-  quarters5: '5Quarters',
-  ratings5: '5Rating',
+/** The set's `IconSetName`; null for a family with no file form. */
+const SET_NAME: Readonly<Record<ConditionalIconSet, IconSetName | null>> = {
+  arrows3: IconSetName.ThreeArrows,
+  arrowsGray3: IconSetName.ThreeArrowsGray,
+  arrows4: IconSetName.FourArrows,
+  arrowsGray4: IconSetName.FourArrowsGray,
+  arrows5: IconSetName.FiveArrows,
+  arrowsGray5: IconSetName.FiveArrowsGray,
+  triangles3: IconSetName.ThreeTriangles,
+  traffic3: IconSetName.ThreeTrafficLights1,
+  trafficRim3: IconSetName.ThreeTrafficLights2,
+  signs3: IconSetName.ThreeSigns,
+  traffic4: IconSetName.FourTrafficLights,
+  redToBlack4: IconSetName.FourRedToBlack,
+  symbols3: IconSetName.ThreeSymbols2,
+  symbolsCircled3: IconSetName.ThreeSymbols,
+  flags3: IconSetName.ThreeFlags,
+  stars3: IconSetName.ThreeStars,
+  ratings4: IconSetName.FourRating,
+  quarters5: IconSetName.FiveQuarters,
+  ratings5: IconSetName.FiveRating,
   bars5: null,
-  boxes5: '5Boxes',
+  boxes5: IconSetName.FiveBoxes,
 };
 
 /** The x14-only sets have no base-set ordinal; they are written as custom
@@ -56,11 +35,13 @@ const X14_BASE: Readonly<Partial<Record<ConditionalIconSet, ConditionalIconSet>>
   boxes5: 'arrows5',
 };
 
-const NO_ICONS = 'NoIcons';
+/** A rule's own set is one of the built-in sets up to this ordinal. */
+const isBaseSetName = (name: number): boolean =>
+  Number.isInteger(name) && name >= 0 && name <= IconSetName.FiveQuarters;
 
-const FAMILY_BY_NAME: ReadonlyMap<string, ConditionalIconSet> = new Map(
-  (Object.entries(SET_NAME) as [ConditionalIconSet, string | null][])
-    .filter((entry): entry is [ConditionalIconSet, string] => entry[1] !== null)
+const FAMILY_BY_NAME: ReadonlyMap<number, ConditionalIconSet> = new Map(
+  (Object.entries(SET_NAME) as [ConditionalIconSet, IconSetName | null][])
+    .filter((entry): entry is [ConditionalIconSet, IconSetName] => entry[1] !== null)
     .map(([family, name]) => [name, family]),
 );
 
@@ -82,8 +63,8 @@ const sameIcons = (
 /** The icon a custom level draws; null for `NoIcons` or an unknown set. */
 export const customIconFromEngine = (icon: CfIconInput | undefined): ConditionalIconRef | null => {
   const set = icon ? FAMILY_BY_NAME.get(icon.iconSet) : undefined;
-  return set && icon && icon.iconId >= 0 && icon.iconId < iconSetSlotCount(set)
-    ? { set, slot: icon.iconId }
+  return set && icon && icon.iconIndex >= 0 && icon.iconIndex < iconSetSlotCount(set)
+    ? { set, slot: icon.iconIndex }
     : null;
 };
 
@@ -92,23 +73,22 @@ export const customIconFromEngine = (icon: CfIconInput | undefined): Conditional
 export function iconSetToEngine(
   icons: ConditionalIconSet,
   customIcons?: readonly (ConditionalIconRef | null)[],
-): { name: number; icons?: CfIconInput[] } | null {
+): { name: IconSetName; icons?: CfIconInput[] } | null {
   const base = X14_BASE[icons] ?? icons;
-  const baseName = SET_NAME[base];
-  const name = baseName === null ? -1 : ENGINE_ICON_SET_NAMES.indexOf(baseName as never);
-  if (name < 0 || SET_NAME[icons] === null) return null;
+  const name = SET_NAME[base];
+  if (name === null || !isBaseSetName(name) || SET_NAME[icons] === null) return null;
   const levels = customIcons ?? (base === icons ? undefined : familyIcons(icons));
   if (!levels || sameIcons(levels, familyIcons(base))) return { name };
   if (levels.length !== iconSetSlotCount(base)) return null;
   const out: CfIconInput[] = [];
   for (const icon of levels) {
     if (icon === null) {
-      out.push({ iconSet: NO_ICONS, iconId: 0 });
+      out.push({ iconSet: IconSetName.NoIcons, iconIndex: 0 });
       continue;
     }
     const setName = SET_NAME[icon.set];
     if (setName === null || icon.slot < 0 || icon.slot >= iconSetSlotCount(icon.set)) return null;
-    out.push({ iconSet: setName, iconId: icon.slot });
+    out.push({ iconSet: setName, iconIndex: icon.slot });
   }
   return { name, icons: out };
 }
@@ -119,8 +99,7 @@ export function iconSetFromEngine(
   name: number,
   icons?: readonly CfIconInput[],
 ): { icons: ConditionalIconSet; customIcons?: (ConditionalIconRef | null)[] } | null {
-  const baseName = Number.isInteger(name) ? ENGINE_ICON_SET_NAMES[name] : undefined;
-  const base = baseName === undefined ? undefined : FAMILY_BY_NAME.get(baseName);
+  const base = isBaseSetName(name) ? FAMILY_BY_NAME.get(name) : undefined;
   if (!base) return null;
   if (!icons || icons.length === 0) return { icons: base };
   const levels = icons.map(customIconFromEngine);

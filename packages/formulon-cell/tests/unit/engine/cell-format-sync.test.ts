@@ -21,6 +21,34 @@ import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { type CellFormat, createSpreadsheetStore } from '../../../src/store/store.js';
 
+/** A CellXf whose unlisted optional attributes are absent. */
+const xfRecord = (patch: Partial<CellXf>): CellXf => ({
+  fontIndex: 0,
+  fillIndex: 0,
+  borderIndex: 0,
+  numFmtId: 0,
+  horizontal: null,
+  vertical: null,
+  wrapText: null,
+  justifyLastLine: null,
+  applyNumberFormat: false,
+  applyFont: false,
+  applyFill: false,
+  applyBorder: false,
+  applyAlignment: false,
+  applyProtection: false,
+  quotePrefix: false,
+  locked: null,
+  hidden: null,
+  textRotation: null,
+  indent: null,
+  relativeIndent: null,
+  shrinkToFit: null,
+  readingOrder: null,
+  ...patch,
+});
+const rgb = (argb: number) => ({ kind: 1 as const, argb, theme: 0, tint: 0, indexed: 0 });
+
 interface FakeOpts {
   cellFormatting?: boolean;
   phonetic?: boolean;
@@ -495,27 +523,22 @@ describe('effective format projection cache', () => {
   it('reuses XF metadata per operation while preserving axis and pending format output', () => {
     const calls = { effective: 0, xf: 0, font: 0, fill: 0, border: 0, numFmt: 0 };
     let bold = true;
-    const xf = {
+    const xf = xfRecord({
       fontIndex: 1,
       fillIndex: 2,
       borderIndex: 3,
       numFmtId: 164,
-      horizontalAlign: 2,
-      verticalAlign: 1,
-      wrapText: false,
-      hasAlignment: true,
-      hasHorizontalAlign: true,
-      hasVerticalAlign: true,
-    } as CellXf;
+      horizontal: 2,
+      vertical: 1,
+    });
     const wb = {
       capabilities: { effectiveStyle: true },
       getEffectiveStyle: () => {
         calls.effective += 1;
         return {
           xfIndex: 7,
-          locked: true,
-          hidden: false,
-          numFmtCode: '#,##0.00',
+          protection: { locked: true, hidden: false },
+          numberFormat: '#,##0.00',
         };
       },
       getCellXf: () => {
@@ -524,7 +547,7 @@ describe('effective format projection cache', () => {
       },
       getResolvedFontRecord: () => {
         calls.font += 1;
-        return { name: 'Arial', size: 11, bold } as FontRecord;
+        return { name: 'Arial', sizePt: 11, bold } as FontRecord;
       },
       getResolvedFillRecord: () => {
         calls.fill += 1;
@@ -615,16 +638,16 @@ describe('hydrateCellFormatsFromEngine', () => {
     const xfTable = new Map<number, CellXf>([
       [
         7,
-        {
+        xfRecord({
           fontIndex: 1,
           fillIndex: 2,
           borderIndex: 3,
           numFmtId: 0,
-          horizontalAlign: 7,
-          verticalAlign: 0,
+          horizontal: 7,
+          vertical: 0,
           wrapText: true,
           justifyLastLine: true,
-        },
+        }),
       ],
     ]);
     const fonts = new Map<number, FontRecord>([
@@ -632,25 +655,27 @@ describe('hydrateCellFormatsFromEngine', () => {
         1,
         {
           name: 'Calibri',
-          size: 11,
+          sizePt: 11,
           bold: true,
           italic: false,
           strike: false,
           underline: 0,
-          colorArgb: 0xff000000,
+          color: rgb(0xff000000),
         },
       ],
     ]);
-    const fills = new Map<number, FillRecord>([[2, { pattern: 1, fgArgb: 0xffff00ff, bgArgb: 0 }]]);
+    const fills = new Map<number, FillRecord>([
+      [2, { pattern: 1, foreground: rgb(0xffff00ff), background: rgb(0) }],
+    ]);
     const borders = new Map<number, BorderRecord>([
       [
         3,
         {
-          left: { style: 0, colorArgb: 0xff000000 },
-          right: { style: 0, colorArgb: 0xff000000 },
-          top: { style: 0, colorArgb: 0xff000000 },
-          bottom: { style: 0, colorArgb: 0xff000000 },
-          diagonal: { style: 0, colorArgb: 0xff000000 },
+          left: { style: 0, color: rgb(0xff000000) },
+          right: { style: 0, color: rgb(0xff000000) },
+          top: { style: 0, color: rgb(0xff000000) },
+          bottom: { style: 0, color: rgb(0xff000000) },
+          diagonal: { style: 0, color: rgb(0xff000000) },
           diagonalDown: false,
           diagonalUp: false,
         },

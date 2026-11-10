@@ -7,6 +7,8 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const CALC = '=tblSales[[#This Row],[Qty]]*tblSales[[#This Row],[Price]]';
+/** `CALC` as the engine reads it back inside the table (formula-bar form). */
+const CALC_READ = '=[@Qty]*[@Price]';
 
 /** tblSales on A1:D6: header row, data rows 2-5 (Qty 1..4, Price 10), totals row 6. */
 async function book() {
@@ -20,9 +22,8 @@ async function book() {
     wb.setFormula({ sheet: 0, row: i, col: 3 }, CALC);
   }
   expect(
-    wb.createTable({
-      sheetIndex: 0,
-      ref: 'A1:D6',
+    wb.createTable(0, {
+      range: 'A1:D6',
       name: 'tblSales',
       columns: heads,
       totalsRow: true,
@@ -64,7 +65,7 @@ describe('table rows follow row edits', () => {
     expect(insertRows(store, wb, history, 5, 1)).toBe(true);
     expect(range(store)).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 6, c1: 3 });
     expect(wb.getTables()[0]?.ref).toBe('A1:D7');
-    expect(wb.cellFormula({ sheet: 0, row: 5, col: 3 })).toBe(CALC);
+    expect(wb.cellFormula({ sheet: 0, row: 5, col: 3 })).toBe(CALC_READ);
     expect(num(wb, 5, 3)).toBe(0);
     expect(wb.cellFormula({ sheet: 0, row: 6, col: 1 })).toMatch(/SUBTOTAL\(109/);
     history.undo();
@@ -85,6 +86,6 @@ describe('table rows follow row edits', () => {
     const { wb, store } = await book();
     insertCells(store, wb, null, { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 3 }, 'down');
     expect(range(store)).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 6, c1: 3 });
-    expect(wb.cellFormula({ sheet: 0, row: 2, col: 3 })).toBe(CALC);
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 3 })).toBe(CALC_READ);
   });
 });

@@ -46,7 +46,11 @@ export const executeRibbonCommentAction = (deps: ExecuteRibbonCommentActionDeps)
   if (targets.length === 0 && threaded.length === 0) return;
   const footprint = [
     ...targets.map((entry) => entry.addr),
-    ...threaded.map((entry) => ({ sheet: state.data.sheetIndex, row: entry.row, col: entry.col })),
+    ...threaded.map((entry) => ({
+      sheet: state.data.sheetIndex,
+      row: entry.cell.row,
+      col: entry.cell.col,
+    })),
   ].map((a) => ({ sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col }));
   if (deferForAllowedRangeUnlock(store, footprint, () => executeRibbonCommentAction(deps))) return;
   if (targets.length > 0) {
@@ -73,7 +77,7 @@ export const executeRibbonCommentAction = (deps: ExecuteRibbonCommentActionDeps)
       state.data.sheetIndex,
       () => {
         for (const entry of [...threaded].sort(
-          (a, b) => Number(a.parentId === '') - Number(b.parentId === ''),
+          (a, b) => Number(a.parentId === null) - Number(b.parentId === null),
         )) {
           removeThreadedComment(store, state.data.sheetIndex, entry.id, workbook, {
             origin: 'ribbon',

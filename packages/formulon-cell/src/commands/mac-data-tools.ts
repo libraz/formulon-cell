@@ -186,14 +186,7 @@ export function parseMacRange(
   if (!parsed) return null;
   let sheet = fallbackSheet;
   if (parsed.sheetName !== null) {
-    const wanted = parsed.sheetName.toLowerCase();
-    sheet = -1;
-    for (let i = 0; i < wb.sheetCount; i += 1) {
-      if (wb.sheetName(i).toLowerCase() === wanted) {
-        sheet = i;
-        break;
-      }
-    }
+    sheet = wb.sheetIndexByName(parsed.sheetName) ?? -1;
     if (sheet < 0) return null;
   }
   return {

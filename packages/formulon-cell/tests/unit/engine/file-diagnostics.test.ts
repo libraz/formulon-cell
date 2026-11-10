@@ -1,3 +1,4 @@
+import { FormulonError, StatusCode, WorkbookFormat } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
   emptyLoadDiagnostics,
@@ -7,20 +8,15 @@ import {
   loadDiagnosticsFromEngine,
   saveDiagnosticsFromEngine,
 } from '../../../src/engine/file-diagnostics.js';
-import type { FormulonModule, Status, Workbook } from '../../../src/engine/types.js';
+import type { Formulon, Workbook } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { buildFileLossReport } from '../../../src/interact/spreadsheet-compatibility-report.js';
 
-const good: Status = { ok: true, status: 0, message: '', context: '' };
-
 const makeHandle = (raw: Record<string, unknown>): WorkbookHandle => {
-  const Ctor = WorkbookHandle as unknown as new (
-    module: FormulonModule,
-    wb: Workbook,
-  ) => WorkbookHandle;
-  const module = { versionString: () => 'test' } as unknown as FormulonModule;
-  return new Ctor(module, raw as unknown as Workbook);
+  const Ctor = WorkbookHandle as unknown as new (module: Formulon, wb: Workbook) => WorkbookHandle;
+  const module = { getVersion: () => 'test' } as unknown as Formulon;
+  return new Ctor(module, { getCalcMode: () => 0, ...raw } as unknown as Workbook);
 };
 
 describe('file loss entries', () => {
@@ -55,7 +51,6 @@ describe('WorkbookHandle diagnostics wrappers', () => {
       saveWithDiagnostics: (format: unknown) => {
         formats.push(format);
         return {
-          status: good,
           bytes: new Uint8Array([1, 2]),
           downgradedFormulaCount: 4,
           deferredFeatureCount: 0,
@@ -67,21 +62,33 @@ describe('WorkbookHandle diagnostics wrappers', () => {
     });
     expect(wb.lastSaveDiagnostics().downgradedFormulaCount).toBe(0);
     expect(Array.from(wb.save())).toEqual([1, 2]);
-    expect(formats).toEqual([1]);
+    expect(formats).toEqual([WorkbookFormat.Xlsx]);
     expect(wb.lastSaveDiagnostics().downgradedFormulaCount).toBe(4);
     expect(wb.saveWithDiagnostics('xlsb').diagnostics.downgradedFormulaCount).toBe(4);
-    expect(formats).toEqual([1, 2]);
+    expect(formats).toEqual([WorkbookFormat.Xlsx, WorkbookFormat.Xlsb]);
   });
 
-  it('falls back to plain save with zero counters', () => {
-    const wb = makeHandle({ save: () => ({ status: good, bytes: new Uint8Array([9]) }) });
+  it('reports zero counters for a save without losses', () => {
+    const wb = makeHandle({
+      saveWithDiagnostics: () => ({
+        bytes: new Uint8Array([9]),
+        downgradedFormulaCount: 0,
+        deferredFeatureCount: 0,
+        droppedPartCount: 0,
+        droppedRelationshipCount: 0,
+        renumberedPartCount: 0,
+      }),
+    });
     expect(wb.saveWithDiagnostics().diagnostics).toEqual(emptySaveDiagnostics());
   });
 
   it('throws when the engine save fails', () => {
-    const bad = { ...good, ok: false, message: 'boom' };
-    const wb = makeHandle({ saveWithDiagnostics: () => ({ status: bad, bytes: null }) });
-    expect(() => wb.save()).toThrow('save: boom');
+    const wb = makeHandle({
+      saveWithDiagnostics: () => {
+        throw new FormulonError(StatusCode.InvalidArgument, 'boom');
+      },
+    });
+    expect(() => wb.save()).toThrow('boom');
   });
 
   it('reports empty load diagnostics for handles not loaded from bytes', () => {
@@ -99,7 +106,6 @@ describe('buildFileLossReport', () => {
   it('renders localized rows with occurrence counts', () => {
     const lossy = makeHandle({
       saveWithDiagnostics: () => ({
-        status: good,
         bytes: new Uint8Array(1),
         downgradedFormulaCount: 7,
       }),

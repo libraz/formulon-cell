@@ -194,7 +194,8 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
       id === 'mac.review.deleteComment' &&
       !roots.some(
         (entry) =>
-          entry.row === state.selection.active.row && entry.col === state.selection.active.col,
+          entry.cell.row === state.selection.active.row &&
+          entry.cell.col === state.selection.active.col,
       )
     )
       return strings.commentDeleteRequiresActive;

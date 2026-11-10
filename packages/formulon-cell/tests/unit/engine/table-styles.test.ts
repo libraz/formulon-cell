@@ -1,3 +1,4 @@
+import { TableTotalsRowFunction } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createPivotTableStyleFromActivePivot,
@@ -103,9 +104,8 @@ describe('table styles through the engine', () => {
   it('hydrates style, flags and rows of a table built in the engine', async () => {
     const wb = await seeded();
     expect(
-      wb.createTable({
-        sheetIndex: 0,
-        ref: 'A1:C4',
+      wb.createTable(0, {
+        range: 'A1:C4',
         name: 'Sales',
         columns: ['Item', 'Region', 'Qty'],
         styleName: 'TableStyleMedium3',
@@ -202,9 +202,8 @@ describe('table styles through the engine', () => {
 
   it('keeps an unrecognised built-in style name when only a flag changes', async () => {
     const wb = await seeded();
-    wb.createTable({
-      sheetIndex: 0,
-      ref: 'A1:C4',
+    wb.createTable(0, {
+      range: 'A1:C4',
       name: 'Sales',
       columns: ['Item', 'Region', 'Qty'],
       styleName: 'TableStyleLight16',
@@ -369,9 +368,9 @@ describe('table styles through the engine', () => {
 
     const columns = wb.getTableStyleDetails(0)?.columns ?? [];
     expect(columns.map((c) => [c.totalsRowFunction, c.totalsRowLabel])).toEqual([
-      ['none', 'Total'],
-      ['none', ''],
-      ['sum', ''],
+      [TableTotalsRowFunction.None, 'Total'],
+      [TableTotalsRowFunction.None, null],
+      [TableTotalsRowFunction.Sum, null],
     ]);
 
     // A wider range changes the column count, which re-creates the table.
@@ -380,6 +379,8 @@ describe('table styles through the engine', () => {
     ).not.toBeNull();
     const after = wb.getTableStyleDetails(0);
     expect(after?.totalsRowCount).toBe(1);
-    expect(after?.columns.find((c) => c.name === 'Qty')?.totalsRowFunction).toBe('sum');
+    expect(after?.columns.find((c) => c.name === 'Qty')?.totalsRowFunction).toBe(
+      TableTotalsRowFunction.Sum,
+    );
   });
 });

@@ -31,6 +31,10 @@ const makeFakeWb = (state: FakeWbState): WorkbookHandle => {
     sheetName(idx: number): string {
       return state.sheets[idx] ?? '';
     },
+    sheetIndexByName(name: string): number | null {
+      const index = state.sheets.findIndex((n) => n.toLowerCase() === name.toLowerCase());
+      return index < 0 ? null : index;
+    },
     capabilities: {
       sheetMutate: true,
       sheetTabHidden: true,

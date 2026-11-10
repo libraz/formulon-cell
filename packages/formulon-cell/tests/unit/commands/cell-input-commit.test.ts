@@ -117,7 +117,7 @@ describe('commands/cell-input-commit', () => {
     expect(effective?.source).toBe(0);
     const xf = effective ? loaded.getCellXf(effective.xfIndex) : null;
     const font = xf ? loaded.getFontRecord(xf.fontIndex) : null;
-    expect(font?.size).toBeCloseTo(18, 10);
+    expect(font?.sizePt).toBeCloseTo(18, 10);
 
     const roundTripped = await WorkbookHandle.loadBytes(loaded.save());
     try {
@@ -130,7 +130,7 @@ describe('commands/cell-input-commit', () => {
         ? roundTripped.getCellXf(roundTripEffective.xfIndex)
         : null;
       const roundTripFont = roundTripXf ? roundTripped.getFontRecord(roundTripXf.fontIndex) : null;
-      expect(roundTripFont?.size).toBeCloseTo(18, 10);
+      expect(roundTripFont?.sizePt).toBeCloseTo(18, 10);
     } finally {
       loaded.detachStore(loadedStore);
       loaded.dispose();

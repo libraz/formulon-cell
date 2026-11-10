@@ -1,10 +1,11 @@
+import { FormulonError, StatusCode, ValueKind } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import type { Addr, FormulonModule, Value, Workbook } from '../../../src/engine/types.js';
+import type { Addr, Formulon, Value, Workbook } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
-const good = { ok: true, status: 0, message: '', context: '' } as const;
-const failed = (message: string) => ({ ok: false, status: 1, message, context: '' }) as const;
+const failed = (message: string): FormulonError =>
+  new FormulonError(StatusCode.InvalidArgument, message);
 
 interface PhysicalCell {
   row: number;
@@ -13,24 +14,41 @@ interface PhysicalCell {
   value: Value;
 }
 
-const blank = (): Value => ({ kind: 0, number: 0, boolean: 0, text: '', errorCode: 0 });
-const numberValue = (value: number): Value => ({
-  kind: 1,
-  number: value,
-  boolean: 0,
-  text: '',
-  errorCode: 0,
-});
+const blank = (): Value => ({ kind: ValueKind.Blank });
+const numberValue = (value: number): Value => ({ kind: ValueKind.Number, number: value });
 
-const makeHandle = (raw: object): WorkbookHandle => {
-  const Ctor = WorkbookHandle as unknown as new (
-    module: FormulonModule,
-    wb: Workbook,
-  ) => WorkbookHandle;
-  return new Ctor({ versionString: () => 'test' } as unknown as FormulonModule, raw as Workbook);
+/** A raw workbook fake; `directFormulaRead` is false for an engine whose
+ *  formulas are read by enumerating the sheet's physical cells. */
+type RawFixture = { sheets: object; directFormulaRead: boolean };
+
+const makeHandle = (raw: RawFixture): WorkbookHandle => {
+  const Ctor = WorkbookHandle as unknown as new (module: Formulon, wb: Workbook) => WorkbookHandle;
+  const handle = new Ctor(
+    { getVersion: () => 'test' } as unknown as Formulon,
+    raw.sheets as Workbook,
+  );
+  if (!raw.directFormulaRead) {
+    Object.defineProperty(handle, 'capabilities', {
+      value: { ...handle.capabilities, formulaRead: false },
+    });
+  }
+  return handle;
 };
 
 const addr = (sheet: number, row: number, col: number): Addr => ({ sheet, row, col });
+
+const nativeOf = (value: Value): unknown => {
+  switch (value.kind) {
+    case ValueKind.Number:
+      return value.number;
+    case ValueKind.Bool:
+      return value.boolean;
+    case ValueKind.Text:
+      return value.text;
+    default:
+      return null;
+  }
+};
 
 const makeRaw = (
   sheets: PhysicalCell[][],
@@ -43,8 +61,9 @@ const makeRaw = (
     formulaValues?: Record<string, Value>;
     manual?: boolean;
   } = {},
+  readFormula?: (sheet: number, row: number, col: number) => string | null,
 ): {
-  raw: object;
+  raw: RawFixture;
   cellCountCalls: () => number;
   cellAtCalls: () => number;
   getValueCalls: () => number;
@@ -56,73 +75,94 @@ const makeRaw = (
   let getValueCalls = 0;
   let recalcCalls = 0;
   let setCalls = 0;
-  const raw = {
-    getValue: (sheet: number, row: number, col: number) => {
-      getValueCalls += 1;
-      if (options.failGetValueCall === getValueCalls) {
-        return { status: failed('cell value read failed'), value: blank() };
-      }
-      const entry = sheets[sheet]?.find((cell) => cell.row === row && cell.col === col);
-      return { status: good, value: entry?.value ?? blank() };
+  const sheetFake = (sheet: number) => ({
+    getUsedRange: () => {
+      const entries = sheets[sheet] ?? [];
+      if (entries.length === 0) return null;
+      const rows = entries.map((cell) => cell.row);
+      const cols = entries.map((cell) => cell.col);
+      return {
+        firstRow: Math.min(...rows),
+        firstCol: Math.min(...cols),
+        lastRow: Math.max(...rows),
+        lastCol: Math.max(...cols),
+      };
     },
-    cellCount: (sheet: number) => {
+    getTypedValue: (row: number, col: number): Value => {
+      getValueCalls += 1;
+      if (options.failGetValueCall === getValueCalls) throw failed('cell value read failed');
+      const entry = sheets[sheet]?.find((cell) => cell.row === row && cell.col === col);
+      return entry?.value ?? blank();
+    },
+    listCells: (): Iterable<unknown> => {
       cellCountCalls += 1;
       if (options.failCellCountCall === cellCountCalls) {
-        return { status: failed('post-write cell count failed'), value: 0 };
+        throw failed('post-write cell count failed');
       }
-      return { status: good, value: sheets[sheet]?.length ?? 0 };
-    },
-    cellAt: (sheet: number, index: number) => {
-      cellAtCalls += 1;
-      if (options.failCellAtCall === cellAtCalls || options.failCellAtIndex === index) {
-        return {
-          status: failed('cell entry failed'),
-          row: 0,
-          col: 0,
-          formula: null,
-          value: blank(),
-        };
-      }
-      const entry = sheets[sheet]?.[index];
-      return entry
-        ? {
-            status: good,
-            row: entry.row,
-            col: entry.col,
-            formula: entry.formula,
-            value: entry.value,
+      const entries = sheets[sheet] ?? [];
+      return {
+        *[Symbol.iterator]() {
+          for (let index = 0; index < entries.length; index += 1) {
+            cellAtCalls += 1;
+            if (options.failCellAtCall === cellAtCalls || options.failCellAtIndex === index) {
+              throw failed('cell entry failed');
+            }
+            const entry = entries[index];
+            if (!entry) return;
+            yield {
+              row: entry.row,
+              col: entry.col,
+              formula: entry.formula,
+              kind: entry.value.kind,
+              value: nativeOf(entry.value),
+            };
           }
-        : { status: failed('cell index'), row: 0, col: 0, formula: null, value: blank() };
+        },
+      };
     },
-    setNumber: (sheet: number, row: number, col: number, value: number) => {
+    ...(readFormula
+      ? { getFormula: (row: number, col: number) => readFormula(sheet, row, col) }
+      : {}),
+    setNumber: (row: number, col: number, value: number) => {
       setCalls += 1;
       const entry = sheets[sheet]?.find((cell) => cell.row === row && cell.col === col);
-      if (!entry) return failed('missing cell');
+      if (!entry) throw failed('missing cell');
       entry.value = numberValue(value);
       entry.formula = null;
-      return good;
     },
-    setFormula: (sheet: number, row: number, col: number, formula: string) => {
+    setFormula: (row: number, col: number, formula: string) => {
       setCalls += 1;
       const entry = sheets[sheet]?.find((cell) => cell.row === row && cell.col === col);
-      if (!entry) return failed('missing cell');
+      if (!entry) throw failed('missing cell');
       const canonical = options.canonicalizeFormula?.(formula) ?? formula;
       entry.formula = canonical;
       entry.value = options.formulaValues?.[canonical] ?? numberValue(8);
-      return good;
+    },
+  });
+  const handles = new Map<number, ReturnType<typeof sheetFake>>();
+  const raw = {
+    sheetCount: sheets.length,
+    hasSheet: (sheet: number) => sheet >= 0 && sheet < sheets.length,
+    sheet: (sheet: number) => {
+      let handle = handles.get(sheet);
+      if (!handle) {
+        handle = sheetFake(sheet);
+        handles.set(sheet, handle);
+      }
+      return handle;
     },
     recalc: () => {
       recalcCalls += 1;
-      return good;
     },
-    calcMode: () => ({ status: good, value: options.manual ? 1 : 0 }),
-    setCalcMode: () => good,
+    getCalcMode: () => (options.manual ? 1 : 0),
+    getProfileId: () => 'win-365-en_US',
+    setCalcMode: () => {},
     cells: () => {
       throw new Error('pivot overlay enumeration is not allowed');
     },
   };
   return {
-    raw,
+    raw: { sheets: raw, directFormulaRead: readFormula !== undefined },
     cellCountCalls: () => cellCountCalls,
     cellAtCalls: () => cellAtCalls,
     getValueCalls: () => getValueCalls,
@@ -131,10 +171,8 @@ const makeRaw = (
   };
 };
 
-type FormulaReadResult = {
-  status: typeof good | ReturnType<typeof failed>;
-  formula?: string | null;
-};
+/** A direct formula read: the formula, `null` for none, or a thrown failure. */
+type FormulaReadResult = { failure?: string; formula?: string | null };
 
 const makeFormulaReadRaw = (
   sheets: PhysicalCell[][],
@@ -144,22 +182,21 @@ const makeFormulaReadRaw = (
     col: number,
     physicalFormula: string | null,
   ) => FormulaReadResult = (_sheet, _row, _col, physicalFormula) => ({
-    status: good,
     formula: physicalFormula,
   }),
   options: Parameters<typeof makeRaw>[1] = {},
 ): ReturnType<typeof makeRaw> & { getFormulaCalls: () => number } => {
-  const fixture = makeRaw(sheets, options);
   let getFormulaCalls = 0;
-  const raw = Object.assign({}, fixture.raw, {
-    getFormula: (sheet: number, row: number, col: number): FormulaReadResult => {
-      getFormulaCalls += 1;
-      const physicalFormula =
-        sheets[sheet]?.find((cell) => cell.row === row && cell.col === col)?.formula ?? null;
-      return readFormula(sheet, row, col, physicalFormula);
-    },
+  const fixture = makeRaw(sheets, options, (sheet, row, col) => {
+    getFormulaCalls += 1;
+    const physicalFormula =
+      sheets[sheet]?.find((cell) => cell.row === row && cell.col === col)?.formula ?? null;
+    const result = readFormula(sheet, row, col, physicalFormula);
+    if (result.failure !== undefined) throw failed(result.failure);
+    if (result.formula === undefined) throw new TypeError('malformed formula read');
+    return result.formula;
   });
-  return { ...fixture, raw, getFormulaCalls: () => getFormulaCalls };
+  return { ...fixture, getFormulaCalls: () => getFormulaCalls };
 };
 
 describe('WorkbookHandle atomic cell patches', () => {
@@ -376,8 +413,9 @@ describe('WorkbookHandle atomic cell patches', () => {
       ['0:1001:0', null],
       ['0:999:0', null],
     ]);
-    expect(fixture.getFormulaCalls()).toBe(4);
-    expect(fixture.cellCountCalls()).toBe(1);
+    // Row 1001 lies outside the used range, so it is resolved without a read.
+    expect(fixture.getFormulaCalls()).toBe(3);
+    expect(fixture.cellCountCalls()).toBe(0);
     expect(fixture.cellAtCalls()).toBe(0);
   });
 
@@ -390,7 +428,6 @@ describe('WorkbookHandle atomic cell patches', () => {
         ],
       ],
       (_sheet, row, col, physicalFormula) => ({
-        status: good,
         formula: row === 9 && col === 9 ? 'TABLE()' : physicalFormula,
       }),
     );
@@ -400,9 +437,9 @@ describe('WorkbookHandle atomic cell patches', () => {
       ['0:0:0', 'TABLE()'],
       ['0:9:9', null],
     ]);
-    expect(fixture.getFormulaCalls()).toBe(2);
+    expect(fixture.getFormulaCalls()).toBe(1);
     expect(fixture.cellCountCalls()).toBe(1);
-    expect(fixture.cellAtCalls()).toBe(2);
+    expect(fixture.cellAtCalls()).toBe(1);
   });
 
   it('keeps best-effort direct formula read failures and malformed results unresolved', () => {
@@ -413,7 +450,7 @@ describe('WorkbookHandle atomic cell patches', () => {
           { row: 1, col: 0, formula: '=B1', value: numberValue(2) },
         ],
       ],
-      (_sheet, row) => (row === 0 ? { status: failed('formula read failed') } : { status: good }),
+      (_sheet, row) => (row === 0 ? { failure: 'formula read failed' } : {}),
     );
     const wb = makeHandle(fixture.raw);
 
@@ -426,7 +463,7 @@ describe('WorkbookHandle atomic cell patches', () => {
   });
 
   it('fails before writing on direct atomic formula read failure or missing formula data', () => {
-    for (const readResult of [{ status: failed('formula read failed') }, { status: good }]) {
+    for (const readResult of [{ failure: 'formula read failed' }, {}] as FormulaReadResult[]) {
       const fixture = makeFormulaReadRaw(
         [[{ row: 0, col: 0, formula: '=OLD', value: numberValue(7) }]],
         () => readResult,
@@ -451,8 +488,8 @@ describe('WorkbookHandle atomic cell patches', () => {
       (_sheet, _row, _col, physicalFormula) => {
         formulaReads += 1;
         return formulaReads === 2
-          ? { status: failed('post-write formula read failed') }
-          : { status: good, formula: physicalFormula };
+          ? { failure: 'post-write formula read failed' }
+          : { formula: physicalFormula };
       },
       { formulaValues: { '=OLD': numberValue(7), '=NEW': numberValue(8) } },
     );
@@ -470,7 +507,7 @@ describe('WorkbookHandle atomic cell patches', () => {
     expect(wb.cellFormula(addr(0, 0, 0))).toBe('=OLD');
   });
 
-  it('keeps the physical scan for sparse batches larger than the sheet', () => {
+  it('resolves targets outside the used range without reading them', () => {
     const fixture = makeFormulaReadRaw([
       [
         { row: 0, col: 0, formula: '=A1', value: numberValue(1) },
@@ -484,9 +521,9 @@ describe('WorkbookHandle atomic cell patches', () => {
       ['0:1:0', null],
       ['0:2:0', null],
     ]);
-    expect(fixture.getFormulaCalls()).toBe(0);
-    expect(fixture.cellCountCalls()).toBe(1);
-    expect(fixture.cellAtCalls()).toBe(2);
+    expect(fixture.getFormulaCalls()).toBe(2);
+    expect(fixture.cellCountCalls()).toBe(0);
+    expect(fixture.cellAtCalls()).toBe(0);
   });
 
   it('does not enumerate an empty request and skips failed physical entries', () => {

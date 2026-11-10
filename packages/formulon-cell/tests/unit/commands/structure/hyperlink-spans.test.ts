@@ -80,7 +80,10 @@ describe('hyperlink spans through row and column edits', () => {
       const saved = await WorkbookHandle.loadBytes(wb.save());
       try {
         expect(saved.getHyperlinksFull(0)).toMatchObject([
-          { row: 2, col: 1, lastRow: 7, lastCol: 3, target: 'https://example.com/' },
+          {
+            range: { firstRow: 2, firstCol: 1, lastRow: 7, lastCol: 3 },
+            target: 'https://example.com/',
+          },
         ]);
       } finally {
         saved.dispose();

@@ -13,8 +13,8 @@ const appearance = (wb: WorkbookHandle, row: number, col: number) => {
   return {
     source: effective?.source,
     direct: wb.getCellXfIndex(0, row, col),
-    size: font?.size,
-    color: font?.colorArgb,
+    size: font?.sizePt,
+    color: font?.color?.argb,
   };
 };
 

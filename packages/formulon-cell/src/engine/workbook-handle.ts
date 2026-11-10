@@ -1,4 +1,4 @@
-import type { SaveDiagnosticsResult } from '@libraz/formulon';
+import { type ErrorCode, type FontScheme, WorkbookFormat } from '@libraz/formulon';
 import type { History } from '../commands/history.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
@@ -20,7 +20,7 @@ import {
 } from './function-locale.js';
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
-import { numberValue } from './result.js';
+import { isFormulonError, orFallback } from './result.js';
 import {
   engineProfileIdFor,
   type ProfileLocale,
@@ -30,16 +30,17 @@ import {
 import { StoreMirror } from './store-mirror.js';
 import type {
   Addr,
+  CellRect,
   CellValue,
   EngineCapabilities,
-  FontRecord,
-  FormulonModule,
+  Formulon,
   FunctionMetadataProvider,
   Range,
+  Sheet,
   SpreadsheetProfileId,
   Workbook,
 } from './types.js';
-import { fromEngineValue, writeCell } from './value.js';
+import { fromEngineValue, fromRangeCell, writeCell } from './value.js';
 import {
   installAnnotationsMethods,
   type WorkbookHandleAnnotationsMethods,
@@ -130,8 +131,14 @@ export interface CellPatchAtomicResult {
 const UNDO_LIMIT = 100;
 
 /** Functions whose result depends on which rows are hidden. */
-/** `WorkbookFormat` ordinals accepted by the engine's `saveWithDiagnostics`. */
-const SAVE_FORMAT_ORDINAL = { xlsx: 1, xlsb: 2 } as const;
+/** Engine file format of each save format name. */
+const SAVE_FORMAT = { xlsx: WorkbookFormat.Xlsx, xlsb: WorkbookFormat.Xlsb } as const;
+
+/** Family and point size of a workbook font, as the public getters report it. */
+type FontFace = { name: string; size: number };
+
+/** Engine's size for a font record that states none. */
+const UNSTATED_FONT_SIZE_PT = 11;
 
 const sameCellValue = (a: CellValue, b: CellValue): boolean => {
   if (a.kind !== b.kind) return false;
@@ -179,7 +186,7 @@ const MAC_DEFAULT_FONT_FAMILY: Readonly<Partial<Record<ProfileLocale, string>>> 
 export const defaultFontForLocale = (
   locale: string | undefined,
   platform: SpreadsheetPlatform = 'default',
-): Pick<FontRecord, 'name' | 'size'> => {
+): FontFace => {
   if (platform === 'mac') {
     const family =
       locale === undefined ? undefined : MAC_DEFAULT_FONT_FAMILY[profileLocaleFor(locale)];
@@ -219,7 +226,7 @@ export class WorkbookHandle {
   /** Windows default row height `createDefault` stated, repeated on added sheets. */
   private newSheetRowHeight: number | undefined;
 
-  private readonly module: FormulonModule;
+  private readonly module: Formulon;
 
   private readonly wb: Workbook;
 
@@ -251,7 +258,7 @@ export class WorkbookHandle {
 
   /** Locale default font for a workbook this handle created on an engine that
    *  cannot state font 0. Null otherwise, since font 0 is then the baseline. */
-  private localeDefaultFont: Pick<FontRecord, 'name' | 'size'> | null = null;
+  private localeDefaultFont: FontFace | null = null;
 
   /** Host-injected localized function documentation, merged over the
    *  engine's structural `functionMetadata()` result. `null` until a host
@@ -268,10 +275,10 @@ export class WorkbookHandle {
   /** Cells written since the last recalc pass — the `recalc` event's payload. */
   private dirtySinceRecalc = new Set<string>();
 
-  private constructor(module: FormulonModule, wb: Workbook) {
+  private constructor(module: Formulon, wb: Workbook) {
     this.module = module;
     this.wb = wb;
-    this.capabilities = detectCapabilities(wb);
+    this.capabilities = detectCapabilities(module);
   }
 
   /** Create a new workbook with the defaults `platform`'s desktop spreadsheet
@@ -284,13 +291,17 @@ export class WorkbookHandle {
     const { locale, platform = 'default', ...loadOptions } = opts;
     const module = await loadFormulon(loadOptions);
     if (platform === 'mac') {
-      const profiled = module.Workbook.createForProfile(engineProfileIdFor(locale ?? 'en', 'mac'));
-      if (profiled.isValid()) {
+      let profiled: Workbook | null = null;
+      try {
+        profiled = module.Workbook.createForProfile(engineProfileIdFor(locale ?? 'en', 'mac'));
+      } catch (e) {
+        if (!isFormulonError(e)) throw e;
+      }
+      if (profiled) {
         const handle = new WorkbookHandle(module, profiled);
         handle.geometryPlatform = 'mac';
         return handle;
       }
-      profiled.delete();
     }
     const wb = module.Workbook.createDefault();
     const handle = new WorkbookHandle(module, wb);
@@ -299,7 +310,9 @@ export class WorkbookHandle {
     // Stating font 0 is what makes an untouched cell save with the locale font;
     // an engine that cannot restate its default falls back to naming the font
     // on every cell that carries a format, leaving unformatted cells behind.
-    if (!handle.setWorkbookDefaultFont(font)) handle.localeDefaultFont = font;
+    if (!handle.setWorkbookDefaultFont({ name: font.name, sizePt: font.size })) {
+      handle.localeDefaultFont = font;
+    }
     const rowHeight =
       platform === 'default'
         ? WINDOWS_DEFAULT_ROW_HEIGHT_PT.get(`${font.name} ${font.size}`)
@@ -313,16 +326,9 @@ export class WorkbookHandle {
 
   static async loadBytes(bytes: Uint8Array, opts: LoadOptions = {}): Promise<WorkbookHandle> {
     const module = await loadFormulon(opts);
-    const wb = module.Workbook.loadBytes(bytes);
-    if (!wb.isValid()) {
-      const msg = module.lastErrorMessage();
-      wb.delete();
-      throw new Error(`formulon loadBytes failed: ${msg}`);
-    }
+    const wb = module.Workbook.load(bytes);
     const handle = new WorkbookHandle(module, wb);
-    if (typeof wb.readDiagnostics === 'function') {
-      handle.loadLosses = loadDiagnosticsFromEngine(wb.readDiagnostics());
-    }
+    handle.loadLosses = loadDiagnosticsFromEngine(wb.getDiagnostics());
     return handle;
   }
 
@@ -332,7 +338,7 @@ export class WorkbookHandle {
   }
 
   get version(): string {
-    return this.module.versionString();
+    return this.module.getVersion();
   }
 
   /**
@@ -345,9 +351,12 @@ export class WorkbookHandle {
    * holds a value on an engine that cannot restate its default, where the
    * locale font has to be named on each cell instead.
    */
-  get workbookDefaultFont(): Pick<FontRecord, 'name' | 'size' | 'scheme'> | null {
+  get workbookDefaultFont(): (FontFace & { scheme?: FontScheme }) | null {
     this.assertAlive();
-    return this.localeDefaultFont ?? this.getFontRecord(0);
+    if (this.localeDefaultFont) return this.localeDefaultFont;
+    const font = this.getFontRecord(0);
+    if (!font) return null;
+    return { name: font.name, size: font.sizePt ?? UNSTATED_FONT_SIZE_PT, scheme: font.scheme };
   }
 
   /**
@@ -359,24 +368,29 @@ export class WorkbookHandle {
    * The returned size is still in native points. Callers that paint or measure
    * cells must convert it to CSS pixels at that surface boundary.
    */
-  get workbookDisplayFont(): Pick<FontRecord, 'name' | 'size'> | null {
+  get workbookDisplayFont(): FontFace | null {
     this.assertAlive();
     if (this.localeDefaultFont) return { ...this.localeDefaultFont };
     const resolved = this.getResolvedFontRecord(0);
-    if (resolved) return { name: resolved.name, size: resolved.size };
+    if (resolved) return { name: resolved.name, size: resolved.sizePt ?? UNSTATED_FONT_SIZE_PT };
     const fallback = this.workbookDefaultFont;
     return fallback ? { name: fallback.name, size: fallback.size } : null;
   }
 
   get sheetCount(): number {
     this.assertAlive();
-    return numberValue(this.wb.sheetCount(), 'sheetCount');
+    return this.wb.sheetCount;
   }
 
   sheetName(idx: number): string {
     this.assertAlive();
-    const r = this.wb.sheetName(idx);
-    return r.status.ok ? r.value : `Sheet${idx + 1}`;
+    return this.wb.hasSheet(idx) ? this.ws(idx).name : `Sheet${idx + 1}`;
+  }
+
+  /** Index of the sheet named `name` under the engine's name-identity rule; null when none. */
+  sheetIndexByName(name: string): number | null {
+    this.assertAlive();
+    return this.wb.hasSheet(name) ? this.wb.sheet(name).index : null;
   }
 
   /** Append a new empty sheet. Returns the index of the newly added sheet,
@@ -384,9 +398,13 @@ export class WorkbookHandle {
   addSheet(name?: string): number {
     this.assertAlive();
     const proposed = name ?? this.uniqueSheetName();
-    const s = this.wb.addSheet(proposed);
-    if (!s.ok) return -1;
-    const idx = numberValue(this.wb.sheetCount(), 'sheetCount') - 1;
+    let idx: number;
+    try {
+      idx = this.wb.addSheet(proposed).index;
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return -1;
+    }
     this.stateNewSheetRowHeight(idx);
     this.emit({ kind: 'sheet-add', index: idx, name: proposed });
     return idx;
@@ -396,9 +414,13 @@ export class WorkbookHandle {
    *  or when the engine doesn't expose `renameSheet`. Emits `sheet-rename`. */
   renameSheet(idx: number, name: string): boolean {
     this.assertAlive();
-    if (!this.capabilities.sheetMutate) return false;
-    const s = this.wb.renameSheet(idx, name);
-    if (!s.ok) return false;
+    if (!this.capabilities.sheetMutate || !this.wb.hasSheet(idx)) return false;
+    try {
+      this.ws(idx).rename(name);
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return false;
+    }
     this.emit({ kind: 'sheet-rename', index: idx, name });
     return true;
   }
@@ -407,9 +429,13 @@ export class WorkbookHandle {
    *  when the engine doesn't expose `removeSheet`. Emits `sheet-remove`. */
   removeSheet(idx: number): boolean {
     this.assertAlive();
-    if (!this.capabilities.sheetMutate) return false;
-    const s = this.wb.removeSheet(idx);
-    if (!s.ok) return false;
+    if (!this.capabilities.sheetMutate || !this.wb.hasSheet(idx)) return false;
+    try {
+      this.wb.removeSheet(idx);
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return false;
+    }
     this.emit({ kind: 'sheet-remove', index: idx });
     return true;
   }
@@ -419,9 +445,16 @@ export class WorkbookHandle {
    *  `sheet-move`. */
   moveSheet(from: number, to: number): boolean {
     this.assertAlive();
-    if (!this.capabilities.sheetMutate) return false;
-    const s = this.wb.moveSheet(from, to);
-    if (!s.ok) return false;
+    const count = this.wb.sheetCount;
+    if (!this.capabilities.sheetMutate || !this.wb.hasSheet(from)) return false;
+    if (!Number.isInteger(to) || to < 0 || to >= count) return false;
+    try {
+      // `move` names a position of the current list; `to` is the final one.
+      this.ws(from).move(to > from ? to + 1 : to);
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return false;
+    }
     this.emit({ kind: 'sheet-move', from, to });
     return true;
   }
@@ -430,29 +463,25 @@ export class WorkbookHandle {
    *  defaults; the Windows row height `createDefault` states is ours to repeat. */
   private stateNewSheetRowHeight(sheet: number): void {
     if (this.newSheetRowHeight === undefined) return;
-    this.patchSheetFormatDefaults(sheet, {
-      defaultRowHeight: this.newSheetRowHeight,
-      hasDefaultRowHeight: true,
-    });
+    this.patchSheetFormatDefaults(sheet, { defaultRowHeightPt: this.newSheetRowHeight });
   }
 
   private uniqueSheetName(): string {
-    const existing = new Set<string>();
-    const n = numberValue(this.wb.sheetCount(), 'sheetCount');
-    for (let i = 0; i < n; i += 1) {
-      const r = this.wb.sheetName(i);
-      if (r.status.ok) existing.add(r.value);
-    }
-    let i = n + 1;
+    const existing = new Set(this.wb.listSheets().map((ws) => ws.name));
+    let i = this.wb.sheetCount + 1;
     while (existing.has(`Sheet${i}`)) i += 1;
     return `Sheet${i}`;
   }
 
   getValue(a: Addr): CellValue {
     this.assertAlive();
-    const r = this.wb.getValue(a.sheet, a.row, a.col);
-    if (!r.status.ok) return { kind: 'blank' };
-    return fromEngineValue(r.value);
+    if (!this.wb.hasSheet(a.sheet)) return { kind: 'blank' };
+    try {
+      return fromEngineValue(this.ws(a.sheet).getTypedValue(a.row, a.col));
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return { kind: 'blank' };
+    }
   }
 
   /** Wire a shared history into cell writes. Pass `null` to detach. The local
@@ -487,8 +516,7 @@ export class WorkbookHandle {
   setNumber(a: Addr, value: number): void {
     this.assertAlive();
     this.withJournal(a, () => {
-      const s = this.wb.setNumber(a.sheet, a.row, a.col, value);
-      if (!s.ok) throw new Error(`setNumber: ${s.message}`);
+      this.ws(a.sheet).setNumber(a.row, a.col, value);
       this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: { kind: 'number', value } });
     });
@@ -497,8 +525,7 @@ export class WorkbookHandle {
   setText(a: Addr, value: string): void {
     this.assertAlive();
     this.withJournal(a, () => {
-      const s = this.wb.setText(a.sheet, a.row, a.col, value);
-      if (!s.ok) throw new Error(`setText: ${s.message}`);
+      this.ws(a.sheet).setText(a.row, a.col, value);
       this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: { kind: 'text', value } });
     });
@@ -507,8 +534,7 @@ export class WorkbookHandle {
   setBool(a: Addr, value: boolean): void {
     this.assertAlive();
     this.withJournal(a, () => {
-      const s = this.wb.setBool(a.sheet, a.row, a.col, value);
-      if (!s.ok) throw new Error(`setBool: ${s.message}`);
+      this.ws(a.sheet).setBool(a.row, a.col, value);
       this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: { kind: 'bool', value } });
     });
@@ -517,8 +543,7 @@ export class WorkbookHandle {
   setError(a: Addr, errorCode: number): void {
     this.assertAlive();
     this.withJournal(a, () => {
-      const s = this.wb.setError(a.sheet, a.row, a.col, errorCode);
-      if (!s.ok) throw new Error(`setError: ${s.message}`);
+      this.ws(a.sheet).setError(a.row, a.col, errorCode as ErrorCode);
       this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: this.getValue(a) });
     });
@@ -527,8 +552,7 @@ export class WorkbookHandle {
   setBlank(a: Addr): void {
     this.assertAlive();
     this.withJournal(a, () => {
-      const s = this.wb.setBlank(a.sheet, a.row, a.col);
-      if (!s.ok) throw new Error(`setBlank: ${s.message}`);
+      this.ws(a.sheet).setBlank(a.row, a.col);
       this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: { kind: 'blank' } });
     });
@@ -537,8 +561,7 @@ export class WorkbookHandle {
   setFormula(a: Addr, formula: string): void {
     this.assertAlive();
     this.withJournal(a, () => {
-      const s = this.wb.setFormula(a.sheet, a.row, a.col, this.formulaForEngine(formula));
-      if (!s.ok) throw new Error(`setFormula: ${s.message}`);
+      this.ws(a.sheet).setFormula(a.row, a.col, this.formulaForEngine(formula));
       this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: this.getValue(a) });
     });
@@ -622,10 +645,7 @@ export class WorkbookHandle {
       }
       // In manual calculation mode, engine dirty flags remain pending but no
       // automatic recalc event is emitted, matching ordinary setters.
-      if (!manual) {
-        const status = this.wb.recalc();
-        if (!status.ok) throw new Error(`recalc: ${status.message}`);
-      }
+      if (!manual) this.wb.recalc();
       this.pendingRecalc = false;
       after = this.captureCellSnapshots(entries.map((entry) => entry.patch.addr));
     } catch (error) {
@@ -648,8 +668,7 @@ export class WorkbookHandle {
           // A failed C++ recalc may have changed dependent caches before
           // returning an error. Restore the inputs first, then force one
           // repair pass before reporting the original transaction failure.
-          const repair = this.wb.recalc();
-          if (!repair.ok) throw new Error(`recalc repair: ${repair.message}`);
+          this.wb.recalc();
         } catch (repairError) {
           rollbackFailure ??= repairError;
         }
@@ -806,15 +825,13 @@ export class WorkbookHandle {
     this.assertAlive();
     // A full pass covers whatever a batch had queued up.
     this.pendingRecalc = false;
-    const s = this.wb.recalc();
-    if (!s.ok) throw new Error(`recalc: ${s.message}`);
+    this.wb.recalc();
     if (
       withDataTables &&
       this.capabilities.dataTables &&
       this.calcMode() === CALC_MODE_AUTO_NO_TABLE
     ) {
-      const t = this.wb.recalcDataTables();
-      if (!t.ok) throw new Error(`recalcDataTables: ${t.message}`);
+      this.wb.recalcDataTables();
     }
     this.emitRecalc();
   }
@@ -841,10 +858,9 @@ export class WorkbookHandle {
       this.recalc();
       return null;
     }
-    const r = this.wb.partialRecalc({ sheet, firstRow, firstCol, lastRow, lastCol });
-    if (!r.status.ok) throw new Error(`partialRecalc: ${r.status.message}`);
+    const recomputed = this.ws(sheet).recalcViewport({ firstRow, firstCol, lastRow, lastCol });
     this.emitRecalc();
-    return r.recomputed;
+    return recomputed;
   }
 
   /** Iterate over every populated cell on a sheet. Used for initial paint.
@@ -861,15 +877,11 @@ export class WorkbookHandle {
     sheet: number,
   ): Generator<{ addr: Addr; value: CellValue; formula: string | null }> {
     this.assertAlive();
-    const n = numberValue(this.wb.cellCount(sheet), `cellCount(${sheet})`);
-    for (let i = 0; i < n; i += 1) {
-      const e = this.wb.cellAt(sheet, i);
-      if (!e.status.ok || e.row === undefined || e.col === undefined || e.value === undefined)
-        continue;
+    for (const e of this.ws(sheet).listCells()) {
       yield {
         addr: { sheet, row: e.row, col: e.col },
-        value: fromEngineValue(e.value),
-        formula: e.formula ?? null,
+        value: fromRangeCell(e),
+        formula: e.formula,
       };
     }
   }
@@ -898,27 +910,20 @@ export class WorkbookHandle {
     let cursor: number | null = null;
     const cursors = new Set<number>();
     do {
-      const result = this.wb.getCellsInRange(
-        range.sheet,
+      const result = this.ws(range.sheet).getCellsInRange(
         {
           firstRow: range.r0,
           firstCol: range.c0,
           lastRow: range.r1,
           lastCol: range.c1,
         },
-        cursor,
-        pageSize,
+        { cursor, limit: pageSize },
       );
-      if (!result.status.ok) throw new Error(`getCellsInRange: ${result.status.message}`);
       for (const entry of result.cells) {
         yield {
           addr: { sheet: range.sheet, row: entry.row, col: entry.col },
-          value: fromEngineValue(entry.value),
-          formula: entry.formula
-            ? entry.formula.startsWith('=')
-              ? entry.formula
-              : `=${entry.formula}`
-            : null,
+          value: fromRangeCell(entry),
+          formula: entry.formula,
         };
       }
       cursor = result.nextCursor;
@@ -941,27 +946,20 @@ export class WorkbookHandle {
   /** Stored formula in relative R1C1 notation, including the leading equals sign. */
   cellFormulaR1C1(a: Addr): string | null {
     this.assertAlive();
-    if (!this.capabilities.formulaR1C1) return null;
-    const result = this.wb.getFormulaR1C1(a.sheet, a.row, a.col);
-    if (!result.status.ok) return null;
-    return result.formula
-      ? result.formula.startsWith('=')
-        ? result.formula
-        : `=${result.formula}`
-      : null;
+    if (!this.capabilities.formulaR1C1 || !this.wb.hasSheet(a.sheet)) return null;
+    try {
+      return this.ws(a.sheet).getFormulaR1C1(a.row, a.col);
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return null;
+    }
   }
 
   cellFormula(a: Addr): string | null {
     this.assertAlive();
-    if (this.capabilities.formulaRead) {
-      const result = this.wb.getFormula(a.sheet, a.row, a.col);
-      if (!result.status.ok) throw new Error(`getFormula: ${result.status.message}`);
-      return result.formula;
-    }
-    const n = numberValue(this.wb.cellCount(a.sheet), `cellCount(${a.sheet})`);
-    for (let i = 0; i < n; i += 1) {
-      const e = this.wb.cellAt(a.sheet, i);
-      if (e.status.ok && e.row === a.row && e.col === a.col) return e.formula ?? null;
+    if (this.capabilities.formulaRead) return this.ws(a.sheet).getFormula(a.row, a.col);
+    for (const e of this.ws(a.sheet).listCells()) {
+      if (e.row === a.row && e.col === a.col) return e.formula;
     }
     return null;
   }
@@ -1004,22 +1002,43 @@ export class WorkbookHandle {
     }
 
     for (const [sheet, targets] of bySheet) {
-      let n: number;
+      let ws: Sheet;
       try {
-        n = numberValue(this.wb.cellCount(sheet), `cellCount(${sheet})`);
+        ws = this.ws(sheet);
       } catch (error) {
         if (!strict) throw error;
-        const message = error instanceof Error ? error.message : 'cell count read failed';
+        const message = error instanceof Error ? error.message : 'sheet read failed';
         throw new Error(`atomic formula read at sheet:${sheet}: ${message}`);
       }
 
-      if (this.capabilities.formulaRead && targets.size <= n) {
+      if (this.capabilities.formulaRead) {
+        // A cell outside the used range holds no formula, so only the targets inside it cost a read.
+        let used: CellRect | null;
+        try {
+          used = ws.getUsedRange();
+        } catch (error) {
+          if (strict) {
+            const message = error instanceof Error ? error.message : 'used range read failed';
+            throw new Error(`atomic formula read at sheet:${sheet}: ${message}`);
+          }
+          continue;
+        }
         for (const [coordinateKey, key] of targets) {
           const a = requested.get(key);
           if (!a) continue;
-          let result: ReturnType<Workbook['getFormula']>;
+          if (
+            !used ||
+            a.row < used.firstRow ||
+            a.row > used.lastRow ||
+            a.col < used.firstCol ||
+            a.col > used.lastCol
+          ) {
+            targets.delete(coordinateKey);
+            continue;
+          }
+          let formula: string | null;
           try {
-            result = this.wb.getFormula(sheet, a.row, a.col);
+            formula = ws.getFormula(a.row, a.col);
           } catch (error) {
             if (strict) {
               const message = error instanceof Error ? error.message : 'formula read failed';
@@ -1028,47 +1047,28 @@ export class WorkbookHandle {
             targets.delete(coordinateKey);
             continue;
           }
-          if (!result.status.ok) {
-            if (strict) {
-              throw new Error(`atomic formula read at ${addrKey(a)}: ${result.status.message}`);
-            }
-            targets.delete(coordinateKey);
-            continue;
-          }
-          if (result.formula === undefined) {
-            if (strict) {
-              throw new Error(`atomic formula read at ${addrKey(a)}: malformed formula result`);
-            }
-            targets.delete(coordinateKey);
-            continue;
-          }
-          if (isDataTableFormula(result.formula)) continue;
-          formulas.set(key, result.formula);
+          if (isDataTableFormula(formula)) continue;
+          formulas.set(key, formula);
           targets.delete(coordinateKey);
         }
         if (targets.size === 0) continue;
       }
 
-      for (let i = 0; i < n; i += 1) {
-        const e = this.wb.cellAt(sheet, i);
-        if (!e.status.ok) {
-          if (strict) {
-            throw new Error(`atomic formula read at ${sheet}:${i}: ${e.status.message}`);
-          }
-          continue;
+      // The stub has no direct read, and a TABLE() cell reads its formula from the stored entry.
+      try {
+        for (const e of ws.listCells()) {
+          const coordinateKey = `${e.row}:${e.col}`;
+          const key = targets.get(coordinateKey);
+          if (key === undefined) continue;
+          formulas.set(key, e.formula);
+          targets.delete(coordinateKey);
+          if (targets.size === 0) break;
         }
-        if (e.row === undefined || e.col === undefined || (strict && e.formula === undefined)) {
-          if (strict) {
-            throw new Error(`atomic formula read at ${sheet}:${i}: malformed cell entry`);
-          }
-          continue;
+      } catch (error) {
+        if (strict) {
+          const message = error instanceof Error ? error.message : 'cell list read failed';
+          throw new Error(`atomic formula read at sheet:${sheet}: ${message}`);
         }
-        const coordinateKey = `${e.row}:${e.col}`;
-        const key = targets.get(coordinateKey);
-        if (key === undefined) continue;
-        formulas.set(key, e.formula ?? null);
-        targets.delete(coordinateKey);
-        if (targets.size === 0) break;
       }
     }
     return formulas;
@@ -1110,12 +1110,8 @@ export class WorkbookHandle {
       this.recalc();
       this.storeMirror.refreshCells();
     }
-    const raw =
-      typeof this.wb.saveWithDiagnostics === 'function'
-        ? this.wb.saveWithDiagnostics(SAVE_FORMAT_ORDINAL[format])
-        : this.wb.save();
-    if (!raw.status.ok || !raw.bytes) throw new Error(`save: ${raw.status.message}`);
-    this.saveLosses = saveDiagnosticsFromEngine(raw as Partial<SaveDiagnosticsResult>);
+    const raw = this.wb.saveWithDiagnostics(SAVE_FORMAT[format]);
+    this.saveLosses = saveDiagnosticsFromEngine(raw);
     return { bytes: raw.bytes, diagnostics: { ...this.saveLosses } };
   }
 
@@ -1133,13 +1129,11 @@ export class WorkbookHandle {
   }> {
     this.assertAlive();
     if (!this.capabilities.externalLinks) return [];
-    const arr = this.wb.getExternalLinks();
-    if (!arr.status.ok) return [];
-    return arr.map((r) => ({
-      index: r.index,
+    return orFallback([], () => this.wb.listExternalLinks()).map((r) => ({
+      index: r.bookNumber,
       relId: r.relId,
       partPath: r.partPath,
-      target: r.target,
+      target: r.target ?? '',
       targetExternal: r.targetExternal,
       kind: externalLinkKindLabel(r.kind),
     }));
@@ -1150,17 +1144,7 @@ export class WorkbookHandle {
    *  these objects exist even though the UI doesn't render them. */
   getPassthroughs(): { path: string }[] {
     this.assertAlive();
-    if (!this.wb.passthroughCount) return [];
-    const count = this.wb.passthroughCount();
-    if (!count.status.ok) return [];
-    const n = count.value;
-    const out: { path: string }[] = [];
-    for (let i = 0; i < n; i += 1) {
-      const e = this.wb.passthroughAt(i);
-      if (!e.status.ok || !e.path) continue;
-      out.push({ path: e.path });
-    }
-    return out;
+    return orFallback([], () => this.wb.ooxml.listPassthroughs()).map((path) => ({ path }));
   }
 
   subscribe(fn: ChangeListener): () => void {
@@ -1173,7 +1157,7 @@ export class WorkbookHandle {
     this.storeMirror.attach(null);
     this.disposed = true;
     this.listeners.clear();
-    this.wb.delete();
+    this.wb.dispose();
   }
 
   private emit(e: ChangeEvent): void {
@@ -1205,10 +1189,12 @@ export class WorkbookHandle {
   }
 
   private readAtomicValue(a: Addr): CellValue {
-    const r = this.wb.getValue(a.sheet, a.row, a.col);
-    if (!r.status.ok) throw new Error(`atomic value read at ${addrKey(a)}: ${r.status.message}`);
-    if (r.value === undefined) throw new Error(`atomic value read at ${addrKey(a)}: missing value`);
-    return fromEngineValue(r.value);
+    try {
+      return fromEngineValue(this.ws(a.sheet).getTypedValue(a.row, a.col));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'value read failed';
+      throw new Error(`atomic value read at ${addrKey(a)}: ${message}`);
+    }
   }
 
   private captureCellSnapshots(addrs: readonly Addr[]): CellSnapshot[] {
@@ -1221,19 +1207,18 @@ export class WorkbookHandle {
   }
 
   private writeRawCell(a: Addr, value: CellValue, formula: string | null): void {
-    const status =
-      formula !== null
-        ? this.wb.setFormula(a.sheet, a.row, a.col, formula)
-        : value.kind === 'number'
-          ? this.wb.setNumber(a.sheet, a.row, a.col, value.value)
-          : value.kind === 'bool'
-            ? this.wb.setBool(a.sheet, a.row, a.col, value.value)
-            : value.kind === 'text'
-              ? this.wb.setText(a.sheet, a.row, a.col, value.value)
-              : value.kind === 'error'
-                ? this.wb.setError(a.sheet, a.row, a.col, value.code)
-                : this.wb.setBlank(a.sheet, a.row, a.col);
-    if (!status.ok) throw new Error(`cell patch: ${status.message}`);
+    const ws = this.ws(a.sheet);
+    if (formula !== null) ws.setFormula(a.row, a.col, formula);
+    else if (value.kind === 'number') ws.setNumber(a.row, a.col, value.value);
+    else if (value.kind === 'bool') ws.setBool(a.row, a.col, value.value);
+    else if (value.kind === 'text') ws.setText(a.row, a.col, value.value);
+    else if (value.kind === 'error') ws.setError(a.row, a.col, value.code as ErrorCode);
+    else ws.setBlank(a.row, a.col);
+  }
+
+  /** Handle of the sheet at `index`. */
+  private ws(index: number): Sheet {
+    return this.wb.sheet(index);
   }
 
   /**

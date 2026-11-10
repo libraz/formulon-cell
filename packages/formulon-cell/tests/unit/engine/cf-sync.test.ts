@@ -1,3 +1,4 @@
+import { ComparisonOperator, type ConditionalFormat } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
   evaluateCfFromEngine,
@@ -18,6 +19,52 @@ const c = (
   b: number,
   a = 255,
 ): { r: number; g: number; b: number; a: number } => ({ r, g, b, a });
+
+/** An engine rule colour (`Color`), as a CF read returns it. */
+const ec = (r: number, g: number, b: number, a = 255) => ({
+  kind: 1 as const,
+  argb: ((a << 24) | (r << 16) | (g << 8) | b) >>> 0,
+  theme: 0,
+  tint: 0,
+  indexed: 0,
+});
+
+/** A full 0.19 CF read record: every key a rule kind leaves unused is `null`. */
+const cfEntry = (entry: Record<string, unknown>): ConditionalFormat =>
+  ({
+    dxfIndex: null,
+    formula1: null,
+    formula2: null,
+    operator: null,
+    rank: null,
+    percent: null,
+    bottom: null,
+    aboveAverage: null,
+    equalAverage: null,
+    stdDev: null,
+    text: null,
+    timePeriod: null,
+    colorScale: null,
+    dataBar: null,
+    iconSet: null,
+    ...entry,
+    ...(entry.dataBar
+      ? {
+          dataBar: {
+            gradient: null,
+            axisPosition: null,
+            negativeFill: null,
+            border: null,
+            negativeBorder: null,
+            axisColor: null,
+            ...(entry.dataBar as object),
+          },
+        }
+      : {}),
+    ...(entry.iconSet
+      ? { iconSet: { floor: null, icons: null, ...(entry.iconSet as object) } }
+      : {}),
+  }) as unknown as ConditionalFormat;
 
 const baseMatch = {
   kind: 0,
@@ -131,18 +178,18 @@ describe('evaluateCfFromEngine', () => {
           type: 3,
           priority: 7,
           stopIfTrue: false,
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
           dataBar: {
             min: { type: 3 },
             max: { type: 4 },
-            fill: c(0, 120, 212),
+            fill: ec(0, 120, 212),
             showValue: true,
             minLengthPct: 0,
             maxLengthPct: 100,
             gradient: false,
             axisPosition: 1,
-            border: c(31, 31, 31),
-            axisColor: c(64, 64, 64),
+            border: ec(31, 31, 31),
+            axisColor: ec(64, 64, 64),
             direction: 1,
           },
         },
@@ -193,11 +240,11 @@ describe('evaluateCfFromEngine', () => {
           type: 3,
           priority: 7,
           stopIfTrue: false,
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
           dataBar: {
             min: { type: 3 },
             max: { type: 4 },
-            fill: c(0, 120, 212),
+            fill: ec(0, 120, 212),
             showValue: true,
             minLengthPct: 0,
             maxLengthPct: 100,
@@ -243,11 +290,11 @@ describe('evaluateCfFromEngine', () => {
           type: 3,
           priority: 3,
           stopIfTrue: false,
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
           dataBar: {
             min: { type: 0, value: '0' },
             max: { type: 0, value: '100' },
-            fill: c(0, 120, 212),
+            fill: ec(0, 120, 212),
             showValue: true,
             minLengthPct: 0,
             maxLengthPct: 100,
@@ -407,16 +454,16 @@ describe('evaluateCfFromEngine', () => {
       [{ row: 0, col: 0, matches: [{ kind: KIND_DXF, dxfIdEngaged: true, dxfId: 2 }] }],
       {
         2: {
-          fill: { pattern: 1, fgArgb: 0xff112233, bgArgb: 0 },
+          fill: { pattern: 1, foreground: ec(0x11, 0x22, 0x33), background: ec(0, 0, 0, 0) },
           font: {
             name: 'Calibri',
-            size: 11,
+            sizePt: 11,
             bold: true,
             italic: false,
             strike: false,
             underline: 0,
             vertAlign: 0,
-            colorArgb: 0xff445566,
+            color: ec(0x44, 0x55, 0x66),
           },
         },
       },
@@ -508,11 +555,11 @@ describe('evaluateCfFromEngine', () => {
           type: 3,
           priority: 1,
           stopIfTrue: false,
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
           dataBar: {
             min: { type: 3 },
             max: { type: 4 },
-            fill: c(255, 0, 0),
+            fill: ec(255, 0, 0),
             showValue: true,
             minLengthPct: 0,
             maxLengthPct: 100,
@@ -526,18 +573,18 @@ describe('evaluateCfFromEngine', () => {
           type: 3,
           priority: 2,
           stopIfTrue: false,
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
           dataBar: {
             min: { type: 3 },
             max: { type: 4 },
-            fill: c(0, 255, 0),
+            fill: ec(0, 255, 0),
             showValue: true,
             minLengthPct: 0,
             maxLengthPct: 100,
             gradient: true,
             axisPosition: 2,
             direction: 2,
-            border: c(0, 0, 255),
+            border: ec(0, 0, 255),
           },
         },
       ],
@@ -560,7 +607,7 @@ describe('evaluateCfFromEngine', () => {
 
 describe('hydrateConditionalRulesFromEngine', () => {
   const importedWb = (
-    formats: ReturnType<WorkbookHandle['getConditionalFormats']>,
+    formats: readonly Record<string, unknown>[],
     dxfs: Record<number, NonNullable<ReturnType<WorkbookHandle['getDxf']>>> = {},
   ): WorkbookHandle =>
     ({
@@ -568,7 +615,7 @@ describe('hydrateConditionalRulesFromEngine', () => {
         conditionalFormatMutate: true,
         conditionalFormatDxf: Object.keys(dxfs).length > 0,
       },
-      getConditionalFormats: () => formats,
+      getConditionalFormats: () => formats.map(cfEntry),
       getDxf: (index: number) => dxfs[index] ?? null,
     }) as unknown as WorkbookHandle;
 
@@ -581,24 +628,24 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 1,
           priority: 1,
           stopIfTrue: true,
-          sqref: [{ firstRow: 1, firstCol: 2, lastRow: 3, lastCol: 4 }],
-          op: 5,
-          formula1: '10',
+          ranges: [{ firstRow: 1, firstCol: 2, lastRow: 3, lastCol: 4 }],
+          operator: ComparisonOperator.GreaterThan,
+          formula1: '=10',
         },
         {
           id: 'cf-formula',
           type: 0,
           priority: 2,
           stopIfTrue: false,
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
-          formula1: 'A1>B1',
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          formula1: '=A1>B1',
         },
         {
           id: 'cf-text',
           type: 7,
           priority: 3,
           stopIfTrue: false,
-          sqref: [{ firstRow: 4, firstCol: 1, lastRow: 5, lastCol: 1 }],
+          ranges: [{ firstRow: 4, firstCol: 1, lastRow: 5, lastCol: 1 }],
           text: 'late',
         },
         {
@@ -606,7 +653,7 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 8,
           priority: 4,
           stopIfTrue: false,
-          sqref: [{ firstRow: 6, firstCol: 1, lastRow: 6, lastCol: 1 }],
+          ranges: [{ firstRow: 6, firstCol: 1, lastRow: 6, lastCol: 1 }],
           text: 'done',
         },
         {
@@ -614,7 +661,7 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 9,
           priority: 5,
           stopIfTrue: false,
-          sqref: [{ firstRow: 7, firstCol: 1, lastRow: 7, lastCol: 1 }],
+          ranges: [{ firstRow: 7, firstCol: 1, lastRow: 7, lastCol: 1 }],
           text: 'pre',
         },
         {
@@ -622,7 +669,7 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 10,
           priority: 6,
           stopIfTrue: false,
-          sqref: [{ firstRow: 8, firstCol: 1, lastRow: 8, lastCol: 1 }],
+          ranges: [{ firstRow: 8, firstCol: 1, lastRow: 8, lastCol: 1 }],
           text: 'post',
         },
         {
@@ -630,14 +677,10 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 2,
           priority: 7,
           stopIfTrue: false,
-          sqref: [{ firstRow: 9, firstCol: 1, lastRow: 9, lastCol: 3 }],
+          ranges: [{ firstRow: 9, firstCol: 1, lastRow: 9, lastCol: 3 }],
           colorScale: {
             thresholds: [{ type: 3 }, { type: 2, value: '50' }, { type: 4 }],
-            colors: [
-              { r: 255, g: 0, b: 0, a: 255 },
-              { r: 255, g: 255, b: 255, a: 255 },
-              { r: 0, g: 128, b: 0, a: 255 },
-            ],
+            colors: [ec(255, 0, 0, 255), ec(255, 255, 255, 255), ec(0, 128, 0, 255)],
           },
         },
         {
@@ -645,11 +688,11 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 3,
           priority: 8,
           stopIfTrue: false,
-          sqref: [{ firstRow: 10, firstCol: 1, lastRow: 10, lastCol: 3 }],
+          ranges: [{ firstRow: 10, firstCol: 1, lastRow: 10, lastCol: 3 }],
           dataBar: {
             min: { type: 3, gte: true },
             max: { type: 4, gte: true },
-            fill: { r: 0, g: 120, b: 212, a: 255 },
+            fill: ec(0, 120, 212, 255),
             showValue: false,
             minLengthPct: 0,
             maxLengthPct: 100,
@@ -662,7 +705,7 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 4,
           priority: 9,
           stopIfTrue: false,
-          sqref: [{ firstRow: 11, firstCol: 1, lastRow: 11, lastCol: 3 }],
+          ranges: [{ firstRow: 11, firstCol: 1, lastRow: 11, lastCol: 3 }],
           iconSet: {
             name: 3,
             thresholds: [
@@ -769,11 +812,11 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 3,
           priority: 1,
           stopIfTrue: false,
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 }],
           dataBar: {
             min: { type: 0, value: '20', gte: false },
             max: { type: 2, value: '80', gte: true },
-            fill: { r: 0, g: 120, b: 212, a: 255 },
+            fill: ec(0, 120, 212, 255),
             showValue: true,
             minLengthPct: 0,
             maxLengthPct: 100,
@@ -802,20 +845,20 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 3,
           priority: 1,
           stopIfTrue: false,
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 }],
           dataBar: {
             min: { type: 3, gte: true },
             max: { type: 4, gte: true },
-            fill: c(0, 120, 212),
+            fill: ec(0, 120, 212),
             showValue: true,
             minLengthPct: 0,
             maxLengthPct: 100,
             gradient: true,
             axisPosition: 1,
-            negativeFill: c(192, 0, 0),
-            border: c(31, 31, 31),
-            negativeBorder: c(127, 0, 0),
-            axisColor: c(64, 64, 64),
+            negativeFill: ec(192, 0, 0),
+            border: ec(31, 31, 31),
+            negativeBorder: ec(127, 0, 0),
+            axisColor: ec(64, 64, 64),
             direction: 1,
           },
         },
@@ -842,11 +885,11 @@ describe('hydrateConditionalRulesFromEngine', () => {
         type: 1,
         priority: 1,
         stopIfTrue: false,
-        sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
-        op: 5,
-        formula1: '10',
+        ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+        operator: ComparisonOperator.GreaterThan,
+        formula1: '=10',
       },
-    ] satisfies ReturnType<WorkbookHandle['getConditionalFormats']>;
+    ];
 
     hydrateConditionalRulesFromEngine(importedWb(formats), store, 0);
     hydrateConditionalRulesFromEngine(importedWb(formats), store, 0);
@@ -890,7 +933,7 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 16,
           priority: 1,
           stopIfTrue: false,
-          sqref: [{ firstRow: 1, firstCol: 1, lastRow: 3, lastCol: 1 }],
+          ranges: [{ firstRow: 1, firstCol: 1, lastRow: 3, lastCol: 1 }],
         },
       ]),
       store,
@@ -923,7 +966,7 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 5,
           priority: 1,
           stopIfTrue: false,
-          sqref: [
+          ranges: [
             { firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 0 },
             { firstRow: 0, firstCol: 2, lastRow: 1, lastCol: 2 },
           ],
@@ -936,7 +979,7 @@ describe('hydrateConditionalRulesFromEngine', () => {
           type: 6,
           priority: 2,
           stopIfTrue: false,
-          sqref: [{ firstRow: 5, firstCol: 0, lastRow: 9, lastCol: 0 }],
+          ranges: [{ firstRow: 5, firstCol: 0, lastRow: 9, lastCol: 0 }],
           aboveAverage: false,
           stdDev: 2,
         },
@@ -962,24 +1005,24 @@ describe('hydrateConditionalRulesFromEngine', () => {
             type: 1,
             priority: 1,
             stopIfTrue: false,
-            sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
-            op: 5,
-            formula1: '10',
-            dxfId: 4,
+            ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+            operator: ComparisonOperator.GreaterThan,
+            formula1: '=10',
+            dxfIndex: 4,
           },
         ],
         {
           4: {
-            fill: { pattern: 1, fgArgb: 0xffe2f0d9, bgArgb: 0 },
+            fill: { pattern: 1, foreground: ec(0xe2, 0xf0, 0xd9), background: ec(0, 0, 0, 0) },
             font: {
               name: 'Calibri',
-              size: 11,
+              sizePt: 11,
               bold: true,
               italic: false,
               strike: false,
               underline: 0,
               vertAlign: 0,
-              colorArgb: 0xff006100,
+              color: ec(0x00, 0x61, 0x00),
             },
           },
         },

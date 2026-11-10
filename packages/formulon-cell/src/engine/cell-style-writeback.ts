@@ -16,6 +16,7 @@ import { cellFormatFromXf } from './cell-format-projection.js';
 import { localeForWorkbook } from './profile-text-semantics.js';
 import type { CellXf } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { storedCellStyleName } from './workbook-handle-styles.js';
 
 const OOXML_STYLE_NAMES: Partial<Record<CellStyleId, string>> = {
   warning: 'Warning Text',
@@ -326,9 +327,11 @@ export function planNamedCellStylesToEngine(
 
   for (const reg of registrations) {
     const existing = existingNamedStyle(catalog, reg);
-    // Native writes replace only an exact name (kept so a failed strict publication can
-    // restore it); a case-insensitive match may append a row that rollback must remove.
-    const replacement = catalog.entries.find((entry) => entry.name === reg.name);
+    // A native write replaces the row its name identity resolves to (kept so a failed
+    // strict publication can restore it).
+    const storedName = storedCellStyleName(wb, reg.name);
+    const replacement =
+      storedName === null ? undefined : catalog.entries.find((entry) => entry.name === storedName);
     if (canReuseNamedStyle(wb, reg, existing)) {
       styleXfIds.set(reg.key, existing.xfId);
       continue;

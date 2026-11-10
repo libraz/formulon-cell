@@ -1,5 +1,5 @@
 import { intlFormatterCache } from '../format/intl-cache.js';
-import type { Addr } from './types.js';
+import type { Addr, RangeCell } from './types.js';
 import { type CellValue, type Value, ValueKind } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -131,11 +131,30 @@ export function fromEngineValue(v: Value): CellValue {
     case ValueKind.Number:
       return { kind: 'number', value: v.number };
     case ValueKind.Bool:
-      return { kind: 'bool', value: v.boolean !== 0 };
+      return { kind: 'bool', value: v.boolean };
     case ValueKind.Text:
       return { kind: 'text', value: v.text };
     case ValueKind.Error:
       return { kind: 'error', code: v.errorCode, text: formatError(v.errorCode, '#ERR!') };
+    default:
+      return BLANK;
+  }
+}
+
+/** Convert one enumerated cell, whose `value` is native and tagged by `kind`. */
+export function fromRangeCell(cell: Pick<RangeCell, 'kind' | 'value'>): CellValue {
+  const v = cell.value;
+  switch (cell.kind) {
+    case ValueKind.Number:
+      return typeof v === 'number' ? { kind: 'number', value: v } : BLANK;
+    case ValueKind.Bool:
+      return typeof v === 'boolean' ? { kind: 'bool', value: v } : BLANK;
+    case ValueKind.Text:
+      return typeof v === 'string' ? { kind: 'text', value: v } : BLANK;
+    case ValueKind.Error: {
+      const code = v !== null && typeof v === 'object' && 'code' in v ? v.code : -1;
+      return { kind: 'error', code, text: formatError(code, '#ERR!') };
+    }
     default:
       return BLANK;
   }

@@ -1,3 +1,4 @@
+import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
@@ -143,18 +144,18 @@ describe('attachSessionIllustrations', () => {
       nativeObjectId: 7,
       nativeGeometryEditable: false,
       nativeAnchor: {
-        anchorKind: 0,
-        editAs: 1,
+        kind: AnchorKind.OneCell,
+        editAs: AnchorEditAs.OneCell,
         fromRow: 5,
         fromCol: 6,
-        fromRowOff: 10 * 9525,
-        fromColOff: 12 * 9525,
+        fromRowOffsetEmu: 10 * 9525,
+        fromColOffsetEmu: 12 * 9525,
         toRow: 0,
         toCol: 0,
-        toRowOff: 0,
-        toColOff: 0,
-        cx: 100 * 9525,
-        cy: 50 * 9525,
+        toRowOffsetEmu: 0,
+        toColOffsetEmu: 0,
+        widthEmu: 100 * 9525,
+        heightEmu: 50 * 9525,
       },
     });
 

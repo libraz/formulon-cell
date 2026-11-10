@@ -52,7 +52,7 @@ describe('theme-linked fonts without a charset', () => {
     try {
       const base = wb.getFontRecord(0);
       if (!base) throw new Error('font 0 missing');
-      const index = wb.addFontRecord({ ...base, name: 'Calibri', scheme: 2, hasCharset: false });
+      const index = wb.addFontRecord({ ...base, name: 'Calibri', scheme: 2, charset: null });
       expect(wb.getResolvedFontRecord(index)?.name).toBe('Aptos Narrow');
       expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
       expect(wb.getResolvedFontRecord(index)?.name).toBe('游ゴシック');
@@ -66,7 +66,7 @@ describe('theme-linked fonts without a charset', () => {
     try {
       const base = wb.getFontRecord(0);
       if (!base) throw new Error('font 0 missing');
-      const index = wb.addFontRecord({ ...base, name: 'Calibri', scheme: 2, hasCharset: false });
+      const index = wb.addFontRecord({ ...base, name: 'Calibri', scheme: 2, charset: null });
       wb.fontScriptProfile = wb.spreadsheetProfileId();
       expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
       expect(wb.getResolvedFontRecord(index)?.name).toBe('Aptos Narrow');

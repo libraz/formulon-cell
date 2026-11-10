@@ -1,3 +1,4 @@
+import { FilterKind } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
@@ -6,7 +7,7 @@ type ProfileId = Parameters<WorkbookHandle['setSpreadsheetProfileId']>[0];
 type Host = 'mac' | 'windows';
 type Scalar = string | number;
 type CellAddress = { sheet: number; row: number; col: number };
-type AutoFilter = Parameters<WorkbookHandle['setAutoFilter']>[1];
+type AutoFilterInput = Parameters<WorkbookHandle['setAutoFilter']>[1];
 
 const FORMULA_CELL: CellAddress = { sheet: 0, row: 0, col: 3 };
 
@@ -162,45 +163,25 @@ const seedKanaCountif = (workbook: WorkbookHandle): void => {
   workbook.setText({ sheet: 0, row: 2, col: 0 }, 'い');
 };
 
-const valueFilter = (value: string): AutoFilter =>
-  ({
-    range: { firstRow: 0, firstCol: 0, lastRow: 3, lastCol: 0 },
-    columns: [
-      {
-        colId: 0,
-        hiddenButton: false,
-        showButton: true,
-        kind: 1,
-        filterBlank: false,
-        values: [value],
-        dateGroups: [],
-        customAnd: false,
-        customCount: 0,
-        op1: 0,
-        val1: '',
-        op2: 0,
-        val2: '',
-        top: false,
-        percent: false,
-        hasFilterVal: false,
-        topVal: 0,
-        filterVal: 0,
-        dynamicType: 0,
-        hasDynVal: false,
-        hasDynMaxVal: false,
-        dynVal: 0,
-        dynMaxVal: 0,
-        valIso: '',
-        maxValIso: '',
-        dxfId: 0xffffffff,
-        cellColor: false,
-        iconSet: 0,
-        iconId: 0,
-        hasIconId: false,
-      },
-    ],
-    sort: null,
-  }) as AutoFilter;
+const valueFilter = (value: string): AutoFilterInput => ({
+  range: { firstRow: 0, firstCol: 0, lastRow: 3, lastCol: 0 },
+  columns: [
+    {
+      columnOffset: 0,
+      hiddenButton: false,
+      showButton: true,
+      kind: FilterKind.Values,
+      filterBlank: false,
+      values: [value],
+      dateGroups: [],
+      customAnd: false,
+      top: false,
+      percent: false,
+      cellColor: false,
+    },
+  ],
+  sort: null,
+});
 
 describe('integration: formulon 0.14 locale-aware engine refresh', () => {
   it.each(profiles)('%s keeps measured collation and scalar array results', async (profile) => {
@@ -284,13 +265,13 @@ describe('integration: formulon 0.14 locale-aware engine refresh', () => {
           FORMULA_CELL,
           '=TEXT(DATE(2024,3,5),"[$-de-DE]dddd")',
         );
-        expect(evaluated.status.ok).toBe(true);
+        expect(evaluated).not.toBeNull();
         // The measured locale_tokens lcid_names_407 golden keeps the token
         // literal under the German/French active format dialect. Native display
         // formatting above already proves the explicit de-DE override itself.
         const formulaExpected =
           profile.id.endsWith('-de_DE') || profile.id.endsWith('-fr_FR') ? 'dddd' : 'Dienstag';
-        expect(evaluated.value.text).toBe(formulaExpected);
+        expect(evaluated).toMatchObject({ text: formulaExpected });
       } finally {
         workbook.dispose();
       }

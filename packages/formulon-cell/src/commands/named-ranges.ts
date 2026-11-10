@@ -335,8 +335,8 @@ export function definedNameValueText(wb: WorkbookHandle, entry: DefinedNameEntry
   }
   try {
     const result = wb.evaluateFormulaText({ sheet: ownSheet, row: 0, col: 0 }, `=${body}`);
-    if (!result.status.ok) return '';
-    const value = fromEngineValue(result.value);
+    if (!result) return '';
+    const value = fromEngineValue(result);
     return truncateValueText(value.kind === 'text' ? quoteText(value.value) : formatCell(value));
   } catch {
     return '';

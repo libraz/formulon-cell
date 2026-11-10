@@ -36,7 +36,7 @@ describe('formulon 0.13 style projections and workbook themes', () => {
       expect(normal).not.toBeNull();
       expect(font).not.toBeNull();
       if (!normal || !font) return;
-      const boldFont = wb.addFontRecord({ ...font, bold: true, hasBold: true });
+      const boldFont = wb.addFontRecord({ ...font, bold: true });
       const xf = wb.addXfRecord({ ...normal, fontIndex: boldFont });
       expect(wb.setCellXfIndex(0, 0, 0, xf)).toBe(true);
       expect(wb.getEffectiveStyle(0, 0, 0)?.source).toBe(0);

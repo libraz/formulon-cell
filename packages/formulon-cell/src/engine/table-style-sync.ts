@@ -1,4 +1,4 @@
-import type { TableStyle as EngineTableStyle, TableStyleElement } from '@libraz/formulon';
+import type { TableStyleElementInput, TableStyleInput } from '@libraz/formulon';
 import {
   type CustomTableStyle,
   customPivotTableStyleId,
@@ -14,7 +14,11 @@ import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, TablesSlice } from '../store/types.js';
 import { dxfToApply } from './cf-sync.js';
 import { dxfRecordFromApply } from './cf-writeback.js';
-import type { StyleElementFormats } from './table-style-elements.js';
+import {
+  ENGINE_ELEMENT_TYPE,
+  type StyleElementFormats,
+  type TableStyleElementType,
+} from './table-style-elements.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type { CustomEngineTableStyle } from './workbook-handle-table-styles.js';
 
@@ -87,13 +91,13 @@ export function engineStyleFromCustom(
   wb: WorkbookHandle,
   style: CustomTableStyle,
   usage: { pivot: boolean; table: boolean },
-): EngineTableStyle | null {
+): TableStyleInput | null {
   if (!wb.capabilities.conditionalFormatDxf) return null;
-  const elements: TableStyleElement[] = [];
+  const elements: TableStyleElementInput[] = [];
   for (const [type, apply] of Object.entries(customStyleElementFormats(style))) {
-    const dxfId = dxfIdFor(wb, apply);
-    if (dxfId === null) return null;
-    elements.push({ type: type as TableStyleElement['type'], dxfId });
+    const dxfIndex = dxfIdFor(wb, apply);
+    if (dxfIndex === null) return null;
+    elements.push({ type: ENGINE_ELEMENT_TYPE[type as TableStyleElementType], dxfIndex });
   }
   return { name: style.label, ...usage, elements };
 }
@@ -112,9 +116,9 @@ export function customStyleFromEngine(
   style: CustomEngineTableStyle,
   pivot: boolean,
 ): CustomTableStyle {
-  const apply = (type: TableStyleElement['type']): Partial<CellFormat> | null => {
-    const element = style.elements.find((e) => e.type === type);
-    return element?.dxfId === undefined ? null : dxfToApply(wb, element.dxfId);
+  const apply = (type: TableStyleElementType): Partial<CellFormat> | null => {
+    const element = style.elements.find((e) => e.type === ENGINE_ELEMENT_TYPE[type]);
+    return element?.dxfIndex == null ? null : dxfToApply(wb, element.dxfIndex);
   };
   const header = apply('headerRow');
   const stripe = apply('firstRowStripe');
@@ -143,8 +147,8 @@ export function customStyleFromEngine(
     style: family,
     color,
     variant: tableVariantFromOptions({
-      banded: style.elements.some((e) => e.type === 'firstRowStripe'),
-      firstCol: style.elements.some((e) => e.type === 'firstColumn'),
+      banded: style.elements.some((e) => e.type === ENGINE_ELEMENT_TYPE.firstRowStripe),
+      firstCol: style.elements.some((e) => e.type === ENGINE_ELEMENT_TYPE.firstColumn),
     }),
   };
 }

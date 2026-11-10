@@ -1,3 +1,8 @@
+import {
+  ComparisonOperator,
+  ValidationErrorStyle as EngineErrorStyle,
+  ValidationType,
+} from '@libraz/formulon';
 import { isWideValidation } from '../store/range-validations.js';
 import type {
   CellFormat,
@@ -13,51 +18,38 @@ import type { EngineSyncOptions } from './cell-format-sync.js';
 import type { Addr, Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-/** OOXML validation `type` ordinal — 0 none, 1 whole, 2 decimal, 3 list,
- *  4 date, 5 time, 6 textLength, 7 custom. */
-const DV_TYPE: Record<Exclude<CellValidation['kind'], 'list' | 'custom'>, number> = {
-  whole: 1,
-  decimal: 2,
-  date: 4,
-  time: 5,
-  textLength: 6,
+const DV_TYPE: Record<Exclude<CellValidation['kind'], 'list' | 'custom'>, ValidationType> = {
+  whole: ValidationType.Whole,
+  decimal: ValidationType.Decimal,
+  date: ValidationType.Date,
+  time: ValidationType.Time,
+  textLength: ValidationType.TextLength,
 };
-const DV_TYPE_LIST = 3;
-const DV_TYPE_CUSTOM = 7;
+const DV_TYPE_LIST = ValidationType.List;
+const DV_TYPE_CUSTOM = ValidationType.Custom;
 
-/** OOXML op ordinal — 0 between, 1 notBetween, 2 equal, 3 notEqual,
- *  4 greaterThan, 5 lessThan, 6 greaterThanOrEqual, 7 lessThanOrEqual. */
-const OP_ORDINAL: Record<ValidationOp, number> = {
-  between: 0,
-  notBetween: 1,
-  '=': 2,
-  '<>': 3,
-  '>': 4,
-  '<': 5,
-  '>=': 6,
-  '<=': 7,
+const OP_ORDINAL: Record<ValidationOp, ComparisonOperator> = {
+  between: ComparisonOperator.Between,
+  notBetween: ComparisonOperator.NotBetween,
+  '=': ComparisonOperator.Equal,
+  '<>': ComparisonOperator.NotEqual,
+  '>': ComparisonOperator.GreaterThan,
+  '<': ComparisonOperator.LessThan,
+  '>=': ComparisonOperator.GreaterThanOrEqual,
+  '<=': ComparisonOperator.LessThanOrEqual,
 };
-const OP_FROM_ORDINAL: Record<number, ValidationOp> = {
-  0: 'between',
-  1: 'notBetween',
-  2: '=',
-  3: '<>',
-  4: '>',
-  5: '<',
-  6: '>=',
-  7: '<=',
-};
+const OP_FROM_ORDINAL = Object.fromEntries(
+  Object.entries(OP_ORDINAL).map(([op, ordinal]) => [ordinal, op]),
+) as Record<number, ValidationOp>;
 
-const ERROR_STYLE_ORDINAL: Record<ValidationErrorStyle, number> = {
-  stop: 0,
-  warning: 1,
-  information: 2,
+const ERROR_STYLE_ORDINAL: Record<ValidationErrorStyle, EngineErrorStyle> = {
+  stop: EngineErrorStyle.Stop,
+  warning: EngineErrorStyle.Warning,
+  information: EngineErrorStyle.Information,
 };
-const ERROR_STYLE_FROM_ORDINAL: Record<number, ValidationErrorStyle> = {
-  0: 'stop',
-  1: 'warning',
-  2: 'information',
-};
+const ERROR_STYLE_FROM_ORDINAL = Object.fromEntries(
+  Object.entries(ERROR_STYLE_ORDINAL).map(([style, ordinal]) => [ordinal, style]),
+) as Record<number, ValidationErrorStyle>;
 
 const strictSyncError = (operation: string, address: string): Error =>
   new Error(`Strict engine sync failed: validations ${operation} at ${address}`);
@@ -239,7 +231,7 @@ interface EngineValidationEntry {
   allowBlank: boolean;
   showInputMessage: boolean;
   showErrorMessage: boolean;
-  showDropDown?: boolean;
+  showDropDown: boolean;
   formula1: string;
   formula2: string;
   errorTitle: string;
@@ -260,8 +252,6 @@ function decodeValidation(v: EngineValidationEntry): CellValidation | null {
     // omits the field when enabled (the default) and only records the disabled
     // case, so decoding `true` must NOT emit the field.
     ...(v.showErrorMessage === false ? { showErrorMessage: false } : {}),
-    // The native API exposes the user-facing meaning (arrow shown/hidden),
-    // while the engine handles OOXML's inverted attribute internally.
     ...(v.showDropDown === false ? { showDropdown: false } : {}),
     ...(v.errorTitle ? { errorTitle: v.errorTitle } : {}),
     ...(v.errorMessage ? { errorMessage: v.errorMessage } : {}),
@@ -304,7 +294,7 @@ function decodeValidation(v: EngineValidationEntry): CellValidation | null {
 function ordinalToBoundedKind(
   ordinal: number,
 ): 'whole' | 'decimal' | 'date' | 'time' | 'textLength' | null {
-  for (const [k, v] of Object.entries(DV_TYPE) as [keyof typeof DV_TYPE, number][]) {
+  for (const [k, v] of Object.entries(DV_TYPE) as [keyof typeof DV_TYPE, ValidationType][]) {
     if (v === ordinal) return k;
   }
   return null;
@@ -315,9 +305,9 @@ function encodeValidation(
   ranges: Range[],
 ): {
   ranges: Range[];
-  type: number;
-  op?: number;
-  errorStyle?: number;
+  type: ValidationType;
+  op?: ComparisonOperator;
+  errorStyle?: EngineErrorStyle;
   allowBlank?: boolean;
   showInputMessage?: boolean;
   showErrorMessage?: boolean;
@@ -367,7 +357,7 @@ function encodeValidation(
 }
 
 function encodeMeta(validation: ValidationMeta): {
-  errorStyle?: number;
+  errorStyle?: EngineErrorStyle;
   allowBlank?: boolean;
   showInputMessage?: boolean;
   showErrorMessage?: boolean;

@@ -3,7 +3,7 @@
  *
  * The engine owns the chart; a `ChartSpec` is its projection. `CHART_SPEC_FIELDS`
  * holds one entry per `ChartSpec` field with the kinds it applies to, how it reads
- * from `ChartInfo` and which engine operations a change to it produces. A field
+ * from `ChartProperties` and which engine operations a change to it produces. A field
  * outside its kinds reads as undefined and produces no operation.
  *
  * Identities: a series is `series-${c:idx}`, a formatted point `point-${idx}`, a
@@ -18,36 +18,43 @@
  */
 
 import type {
-  ChartAxisInfo,
+  ChartAxis,
   ChartAxisPatch,
-  ChartFillInfo,
+  ChartFill,
   ChartFillPatch,
-  ChartInfo,
-  ChartInsertOptions,
-  ChartLabelsInfo,
+  ChartInput,
+  ChartLabels,
   ChartLabelsPatch,
-  ChartLineInfo,
+  ChartLine,
   ChartLinePatch,
-  ChartMarkerInfo,
+  ChartMarker,
   ChartMarkerPatch,
-  ChartPlotInfo,
+  ChartPlot,
   ChartPlotPatch,
   ChartPointPatch,
-  ChartPreviewOverrides,
-  ChartSeriesInfo,
+  ChartPreviewOverridesInput,
+  ChartProperties,
+  ChartSeries,
   ChartSeriesPatch,
+  ChartTitle,
+  Color,
   ChartData as EngineChartData,
+  SheetRect,
 } from '@libraz/formulon';
 import {
+  BlanksAs,
   ChartAxisCrosses,
   ChartAxisKind,
-  ChartBlanksAs,
-  ChartInsertKind,
+  ChartAxisPosition,
+  ChartBarDirection,
+  ChartDomain,
   ChartLegendPosition,
   ChartLineDash,
   ChartMarkerSymbol,
   ChartPlotType,
+  ChartTickLabelPosition,
   ChartTitleKind,
+  ColorKind,
   ChartGrouping as EngineChartGrouping,
   ChartLabelPosition as EngineChartLabelPosition,
   ChartPointState as EngineChartPointState,
@@ -89,12 +96,13 @@ export type ChartEngineOp =
   | {
       readonly op: 'setChartType';
       readonly plot: number;
-      readonly kind: ChartInsertKind;
+      readonly type: ChartPlotType;
+      readonly barDirection?: ChartBarDirection;
       readonly grouping?: EngineChartGrouping;
     }
   | {
       readonly op: 'setChartSource';
-      readonly source: string;
+      readonly source: SheetRect | string;
       readonly direction: EngineChartSeriesDirection;
       readonly headerRow?: boolean;
       readonly headerColumn?: boolean;
@@ -102,17 +110,18 @@ export type ChartEngineOp =
   | { readonly op: 'setChartPlot'; readonly plot: number; readonly patch: ChartPlotPatch }
   | {
       readonly op: 'setChartDisplay';
-      readonly blanksAs: ChartBlanksAs;
+      readonly blanksAs: BlanksAs | null;
       readonly plotVisibleOnly: boolean | null;
     }
   | {
       readonly op: 'setChartTitle';
       /** Text, null for no title, or Excel's automatic title. */
-      readonly title: string | null | { readonly kind: ChartTitleKind.Auto };
+      readonly title: string | null | ChartTitle;
     }
   | {
       readonly op: 'setChartLegend';
-      readonly position: ChartLegendPosition;
+      /** Null removes the legend. */
+      readonly position: ChartLegendPosition | null;
       readonly overlay: boolean;
     }
   | { readonly op: 'setChartAxis'; readonly axis: ChartAxisRole; readonly patch: ChartAxisPatch }
@@ -153,20 +162,20 @@ export interface ChartNormalizeContext {
 }
 
 interface ReadContext {
-  readonly info: ChartInfo;
+  readonly info: ChartProperties;
   readonly data: EngineChartData | null;
   readonly kind: ChartKind;
-  readonly plot: ChartPlotInfo;
+  readonly plot: ChartPlot;
 }
 
 interface WriteContext {
-  readonly info: ChartInfo;
+  readonly info: ChartProperties;
   /** The spec before the change, without the fields a type change rebuilds. */
   readonly before: ChartSpec;
   readonly after: ChartSpec;
   /** Whether `setChartType` or `setChartSource` rebuilds the series. */
   readonly rebuilt: boolean;
-  readonly series: readonly ChartSeriesInfo[];
+  readonly series: readonly ChartSeries[];
   readonly ops: OpBuilder;
 }
 
@@ -213,15 +222,20 @@ const TYPE_REBUILT_FIELDS: readonly (keyof ChartSpec)[] = [
 // Value conversions
 // ---------------------------------------------------------------------------
 
-const KIND_TO_INSERT: Readonly<Record<ChartKind, ChartInsertKind>> = {
-  column: ChartInsertKind.Column,
-  bar: ChartInsertKind.Bar,
-  line: ChartInsertKind.Line,
-  area: ChartInsertKind.Area,
-  pie: ChartInsertKind.Pie,
-  doughnut: ChartInsertKind.Doughnut,
-  scatter: ChartInsertKind.Scatter,
+const KIND_TO_PLOT: Readonly<
+  Record<ChartKind, { readonly type: ChartPlotType; readonly barDirection?: ChartBarDirection }>
+> = {
+  column: { type: ChartPlotType.Bar, barDirection: ChartBarDirection.Column },
+  bar: { type: ChartPlotType.Bar, barDirection: ChartBarDirection.Bar },
+  line: { type: ChartPlotType.Line },
+  area: { type: ChartPlotType.Area },
+  pie: { type: ChartPlotType.Pie },
+  doughnut: { type: ChartPlotType.Doughnut },
+  scatter: { type: ChartPlotType.Scatter },
 };
+
+/** Excel's automatic title, as a title input. */
+const AUTO_TITLE: ChartTitle = { kind: ChartTitleKind.Auto, text: null, formula: null };
 
 const GROUPING_TO_ENGINE: Readonly<Record<ChartGrouping, EngineChartGrouping>> = {
   clustered: EngineChartGrouping.Clustered,
@@ -277,16 +291,25 @@ const LABEL_POSITION_TO_ENGINE: Readonly<Record<ChartLabelPosition, EngineChartL
   right: EngineChartLabelPosition.Right,
 };
 
-const BLANKS_TO_ENGINE: Readonly<Record<ChartEmptyCellMode, ChartBlanksAs>> = {
-  gap: ChartBlanksAs.Gap,
-  zero: ChartBlanksAs.Zero,
-  span: ChartBlanksAs.Span,
+const BLANKS_TO_ENGINE: Readonly<Record<ChartEmptyCellMode, BlanksAs>> = {
+  gap: BlanksAs.Gap,
+  zero: BlanksAs.Zero,
+  span: BlanksAs.Span,
 };
 
 const CROSSES_TO_ENGINE: Readonly<Record<'auto' | 'min' | 'max', ChartAxisCrosses>> = {
   auto: ChartAxisCrosses.AutoZero,
   min: ChartAxisCrosses.Min,
   max: ChartAxisCrosses.Max,
+};
+
+const TICK_LABEL_TO_ENGINE: Readonly<
+  Record<NonNullable<ChartAxisSpec['labelPosition']>, ChartTickLabelPosition>
+> = {
+  nextTo: ChartTickLabelPosition.NextTo,
+  low: ChartTickLabelPosition.Low,
+  high: ChartTickLabelPosition.High,
+  none: ChartTickLabelPosition.None,
 };
 
 const invert = <K extends string, V extends number>(
@@ -298,13 +321,11 @@ const DIRECTION_FROM_ENGINE = invert(DIRECTION_TO_ENGINE);
 const DASH_FROM_ENGINE = invert(DASH_TO_ENGINE);
 const SHAPE_FROM_ENGINE = invert(SHAPE_TO_ENGINE);
 const LABEL_POSITION_FROM_ENGINE = invert(LABEL_POSITION_TO_ENGINE);
+const TICK_LABEL_FROM_ENGINE = invert(TICK_LABEL_TO_ENGINE);
 
-const TICK_LABEL_POSITIONS: readonly NonNullable<ChartAxisSpec['labelPosition']>[] = [
-  'nextTo',
-  'low',
-  'high',
-  'none',
-];
+/** `#rrggbb` of an RGB colour; undefined for none or a colour `getChart` left unrendered. */
+const cssOf = (color: Color | null): string | undefined =>
+  color !== null && color.kind === ColorKind.Rgb ? cssColorFromArgb(color.argb) : undefined;
 
 /** Lower-case `#rrggbb` for a colour the engine can store; other strings unchanged. */
 const canonicalColor = (color: string): string => {
@@ -346,10 +367,10 @@ const sameValue = (left: unknown, right: unknown): boolean =>
 // Engine → ChartSpec
 // ---------------------------------------------------------------------------
 
-const kindOfPlot = (plot: ChartPlotInfo): ChartKind | null => {
+const kindOfPlot = (plot: ChartPlot): ChartKind | null => {
   switch (plot.type) {
     case ChartPlotType.Bar:
-      return plot.barDirection === 'bar' ? 'bar' : 'column';
+      return plot.barDirection === ChartBarDirection.Bar ? 'bar' : 'column';
     case ChartPlotType.Line:
       return 'line';
     case ChartPlotType.Area:
@@ -366,44 +387,46 @@ const kindOfPlot = (plot: ChartPlotInfo): ChartKind | null => {
 };
 
 /** Why `info` cannot be shown as a `ChartSpec`, or null when it can. */
-export const unsupportedChartReason = (info: ChartInfo): UnsupportedChartReason | null => {
-  if (info.isChartex) return 'chartex';
+export const unsupportedChartReason = (info: ChartProperties): UnsupportedChartReason | null => {
+  if (info.isExtended) return 'chartex';
   if (info.plots.length !== 1) return 'multi-plot';
   const plot = info.plots[0];
   return plot && kindOfPlot(plot) !== null ? null : 'plot-type';
 };
 
-const readFill = (fill: ChartFillInfo): ChartFillSpec | undefined =>
-  defined<ChartFillSpec>({
-    color: fill.color === null ? undefined : cssColorFromArgb(fill.color),
-    transparency: fill.transparency ?? undefined,
-  });
+const readFill = (fill: ChartFill | null): ChartFillSpec | undefined =>
+  fill === null
+    ? undefined
+    : defined<ChartFillSpec>({
+        color: cssOf(fill.color),
+        transparency: fill.transparencyPct ?? undefined,
+      });
 
 // A line that is not drawn (`none`) and a marker whose symbol is None keep their
 // width, dash, size and colours in the file; the spec reads them as absent.
-const readLine = (line: ChartLineInfo): ChartLineSpec | undefined =>
-  line.none
+const readLine = (line: ChartLine | null): ChartLineSpec | undefined =>
+  line === null || line.none
     ? undefined
     : defined<ChartLineSpec>({
-        color: line.color === null ? undefined : cssColorFromArgb(line.color),
-        transparency: line.transparency ?? undefined,
+        color: cssOf(line.color),
+        transparency: line.transparencyPct ?? undefined,
         width: line.widthPt ?? undefined,
         dash: line.dash === null ? undefined : DASH_FROM_ENGINE.get(line.dash),
       });
 
-const readMarker = (marker: ChartMarkerInfo | null): ChartMarkerSpec | undefined => {
+const readMarker = (marker: ChartMarker | null): ChartMarkerSpec | undefined => {
   if (marker === null) return undefined;
   if (marker.symbol === ChartMarkerSymbol.None) return { visible: false };
   return defined<ChartMarkerSpec>({
     visible: true,
     shape: SHAPE_FROM_ENGINE.get(marker.symbol),
-    size: marker.size ?? undefined,
+    size: marker.sizePt ?? undefined,
     fill: readFill(marker.fill),
     line: readLine(marker.line),
   });
 };
 
-const readLabels = (labels: ChartLabelsInfo | null): ChartDataLabelsSpec | undefined =>
+const readLabels = (labels: ChartLabels | null): ChartDataLabelsSpec | undefined =>
   labels === null || labels.deleted
     ? undefined
     : defined<ChartDataLabelsSpec>({
@@ -417,13 +440,13 @@ const readLabels = (labels: ChartLabelsInfo | null): ChartDataLabelsSpec | undef
         position:
           labels.position === null ? undefined : LABEL_POSITION_FROM_ENGINE.get(labels.position),
         numberFormat: labels.numberFormat ?? undefined,
-        color: labels.fontColor === null ? undefined : cssColorFromArgb(labels.fontColor),
+        color: cssOf(labels.fontColor),
         fontSize: labels.fontSizePt ?? undefined,
       });
 
 /** Whether every series has the same labels, and those labels. */
 const sharedLabels = (
-  series: readonly ChartSeriesInfo[],
+  series: readonly ChartSeries[],
 ): { readonly shared: boolean; readonly labels: ChartDataLabelsSpec | undefined } => {
   const each = series.map((entry) => readLabels(entry.labels));
   const first = each[0];
@@ -432,10 +455,10 @@ const sharedLabels = (
     : { shared: false, labels: undefined };
 };
 
-const isHorizontal = (axis: ChartAxisInfo): boolean =>
-  axis.position === 'b' || axis.position === 't';
+const isHorizontal = (axis: ChartAxis): boolean =>
+  axis.position === ChartAxisPosition.Bottom || axis.position === ChartAxisPosition.Top;
 
-const hasRole = (kind: ChartKind, axis: ChartAxisInfo, role: ChartAxisRole): boolean => {
+const hasRole = (kind: ChartKind, axis: ChartAxis, role: ChartAxisRole): boolean => {
   if (kind === 'scatter') {
     return axis.kind === ChartAxisKind.Value && isHorizontal(axis) === (role === 'x');
   }
@@ -445,15 +468,15 @@ const hasRole = (kind: ChartKind, axis: ChartAxisInfo, role: ChartAxisRole): boo
 };
 
 const axisOfRole = (
-  info: ChartInfo,
-  plot: ChartPlotInfo,
+  info: ChartProperties,
+  plot: ChartPlot,
   kind: ChartKind,
   role: ChartAxisRole,
-): ChartAxisInfo | undefined =>
+): ChartAxis | undefined =>
   info.axes.find((axis) => plot.axisIds.includes(axis.id) && hasRole(kind, axis, role));
 
 /** Engine id of the axis playing `role` in `info`, or null when the chart has none. */
-export const chartAxisId = (info: ChartInfo, role: ChartAxisRole): number | null => {
+export const chartAxisId = (info: ChartProperties, role: ChartAxisRole): number | null => {
   const plot = info.plots[0];
   const kind = plot ? kindOfPlot(plot) : null;
   if (!plot || kind === null || !AXIS_KINDS.includes(kind)) return null;
@@ -464,7 +487,7 @@ const otherRole = (role: ChartAxisRole): ChartAxisRole => (role === 'x' ? 'y' : 
 
 // A ChartSpec axis' `crossing` is where the perpendicular axis crosses it; the engine stores
 // that as `crosses` on the perpendicular axis.
-const readCrossing = (cross: ChartAxisInfo | undefined): ChartAxisSpec['crossing'] => {
+const readCrossing = (cross: ChartAxis | undefined): ChartAxisSpec['crossing'] => {
   switch (cross?.crosses) {
     case ChartAxisCrosses.AutoZero:
       return 'auto';
@@ -479,13 +502,10 @@ const readCrossing = (cross: ChartAxisInfo | undefined): ChartAxisSpec['crossing
   }
 };
 
-const readAxisTitle = (
-  axis: ChartAxisInfo,
-  data: EngineChartData | null,
-): ChartAxisSpec['title'] => {
-  switch (axis.title.kind) {
+const readAxisTitle = (axis: ChartAxis, data: EngineChartData | null): ChartAxisSpec['title'] => {
+  switch (axis.title?.kind) {
     case ChartTitleKind.Text:
-      return axis.title.text;
+      return axis.title.text ?? undefined;
     case ChartTitleKind.Ref:
       return data?.axisTitleTexts.find((entry) => entry.axisId === axis.id)?.text;
     case ChartTitleKind.Auto:
@@ -500,9 +520,12 @@ const readAxis = (context: ReadContext, role: ChartAxisRole): ChartAxisSpec | un
   const axis = axisOfRole(info, plot, kind, role);
   if (!axis) return undefined;
   return defined<ChartAxisSpec>({
-    visible: !axis.deleted,
+    visible: axis.visible,
     logBase: axis.logBase ?? undefined,
-    labelPosition: TICK_LABEL_POSITIONS.find((entry) => entry === axis.tickLabelPosition),
+    labelPosition:
+      axis.tickLabelPosition === null
+        ? undefined
+        : TICK_LABEL_FROM_ENGINE.get(axis.tickLabelPosition),
     reverseOrder: axis.reversed,
     crossing: readCrossing(axisOfRole(info, plot, kind, otherRole(role))),
     title: readAxisTitle(axis, context.data),
@@ -525,7 +548,7 @@ const readSeriesStyles = (context: ReadContext): ChartSeriesStyleSpec[] | undefi
         line: readLine(point.line),
         marker: markers ? readMarker(point.marker) : undefined,
       });
-      return style ? [{ pointId: categoryId(context.kind, point.idx), ...style }] : [];
+      return style ? [{ pointId: categoryId(context.kind, point.index), ...style }] : [];
     });
     const style = defined({
       // Excel keeps no fill on a line or scatter series.
@@ -537,15 +560,15 @@ const readSeriesStyles = (context: ReadContext): ChartSeriesStyleSpec[] | undefi
       dataLabels: shared ? undefined : readLabels(series.labels),
       points: nonEmpty(points),
     });
-    return style ? [{ seriesId: seriesId(series.idx), ...style }] : [];
+    return style ? [{ seriesId: seriesId(series.seriesId), ...style }] : [];
   });
   return styles.length > 0 ? styles : undefined;
 };
 
-const readScatterStyle = (series: readonly ChartSeriesInfo[]): ChartScatterStyle | undefined => {
+const readScatterStyle = (series: readonly ChartSeries[]): ChartScatterStyle | undefined => {
   const styles = new Set(
     series.map((entry): ChartScatterStyle => {
-      if (entry.line.none) return 'marker';
+      if (entry.line?.none === true) return 'marker';
       // No marker element leaves Excel's automatic markers.
       const markers = entry.marker === null || entry.marker.symbol !== ChartMarkerSymbol.None;
       return markers ? 'lineMarker' : 'line';
@@ -554,11 +577,11 @@ const readScatterStyle = (series: readonly ChartSeriesInfo[]): ChartScatterStyle
   return styles.size === 1 ? [...styles][0] : undefined;
 };
 
-const readEmptyCells = (kind: ChartKind, blanksAs: ChartBlanksAs): ChartEmptyCellMode => {
+const readEmptyCells = (kind: ChartKind, blanksAs: BlanksAs | null): ChartEmptyCellMode => {
   switch (blanksAs) {
-    case ChartBlanksAs.Gap:
+    case BlanksAs.Gap:
       return 'gap';
-    case ChartBlanksAs.Span:
+    case BlanksAs.Span:
       return emptyCellsFor(kind, 'span');
     default:
       // An absent element plots blanks as zero.
@@ -577,13 +600,13 @@ const readGrouping = (grouping: EngineChartGrouping | null): ChartGrouping => {
   }
 };
 
-const readTitle = (info: ChartInfo, data: EngineChartData | null): ChartSpec['title'] => {
-  switch (info.title.kind) {
+const readTitle = (info: ChartProperties, data: EngineChartData | null): ChartSpec['title'] => {
+  switch (info.title?.kind) {
     case ChartTitleKind.Text:
-      return info.title.text;
+      return info.title.text ?? undefined;
     case ChartTitleKind.Ref:
       return data?.titleText ?? undefined;
-    case ChartTitleKind.None:
+    case undefined:
       return '';
     case ChartTitleKind.Auto:
       return { auto: true };
@@ -592,10 +615,9 @@ const readTitle = (info: ChartInfo, data: EngineChartData | null): ChartSpec['ti
   }
 };
 
-const readLegend = (info: ChartInfo): ChartLegendSpec => {
+const readLegend = (info: ChartProperties): ChartLegendSpec => {
+  if (info.legend === null) return { visible: false };
   switch (info.legend.position) {
-    case ChartLegendPosition.None:
-      return { visible: false };
     case ChartLegendPosition.Top:
       return { visible: true, position: 'top' };
     case ChartLegendPosition.Left:
@@ -611,10 +633,12 @@ const readLegend = (info: ChartInfo): ChartLegendSpec => {
 const readFilter = (context: ReadContext): ChartFilterSpec | undefined =>
   defined<ChartFilterSpec>({
     hiddenSeriesIds: nonEmpty(
-      context.plot.series.filter((series) => series.filtered).map((series) => seriesId(series.idx)),
+      context.plot.series
+        .filter((series) => series.filtered)
+        .map((series) => seriesId(series.seriesId)),
     ),
     hiddenCategoryIds: nonEmpty(
-      context.info.hiddenCategories.map((index) => categoryId(context.kind, index)),
+      context.info.filter.hiddenCategories.map((index) => categoryId(context.kind, index)),
     ),
   });
 
@@ -693,12 +717,12 @@ const fillPatch = (
 ): ChartFillPatch | undefined => {
   const patch: Mutable<ChartFillPatch> = {};
   if (before?.color !== after?.color) {
-    const color = after?.color === undefined ? null : argbFromCssColor(after.color);
+    if (after?.color === undefined) patch.color = null;
     // A colour the engine cannot store keeps the current one.
-    if (after?.color === undefined || color !== null) patch.color = color;
+    else if (argbFromCssColor(after.color) !== null) patch.color = canonicalColor(after.color);
   }
   if (before?.transparency !== after?.transparency) {
-    patch.transparency = after?.transparency ?? null;
+    patch.transparencyPct = after?.transparency ?? null;
   }
   return Object.keys(patch).length > 0 ? patch : undefined;
 };
@@ -738,7 +762,7 @@ const markerPatch = (
   const patch: Mutable<ChartMarkerPatch> = {};
   const symbol = markerSymbol(before, after);
   if (symbol !== undefined) patch.symbol = symbol;
-  if (before?.size !== after.size) patch.size = after.size ?? null;
+  if (before?.size !== after.size) patch.sizePt = after.size ?? null;
   const fill = fillPatch(before?.fill, after.fill);
   if (fill) patch.fill = fill;
   const line = linePatch(before?.line, after.line);
@@ -785,7 +809,10 @@ const labelsPatch = (labels: ChartDataLabelsSpec | undefined): ChartLabelsPatch 
         separator: labels.separator ?? null,
         position: labels.position === undefined ? null : LABEL_POSITION_TO_ENGINE[labels.position],
         numberFormat: labels.numberFormat ?? null,
-        fontColor: labels.color === undefined ? null : argbFromCssColor(labels.color),
+        fontColor:
+          labels.color === undefined || argbFromCssColor(labels.color) === null
+            ? null
+            : canonicalColor(labels.color),
         fontSizePt: labels.fontSize ?? null,
       };
 
@@ -918,21 +945,21 @@ const writeFillColors = (context: WriteContext): void => {
   // A line or scatter series' colour is written with its line and markers.
   if (MARKER_KINDS.includes(context.after.kind)) return;
   context.series.forEach((series, position) => {
-    const id = seriesId(series.idx);
+    const id = seriesId(series.seriesId);
     const fill = fillPatch(
       { color: effectiveFillColor(context.before, id, position) },
       { color: effectiveFillColor(context.after, id, position) },
     );
-    if (fill) context.ops.seriesPatch(series.idx, { fill });
+    if (fill) context.ops.seriesPatch(series.seriesId, { fill });
   });
 };
 
 const writeLabels = (context: WriteContext): void => {
   for (const series of context.series) {
-    const id = seriesId(series.idx);
+    const id = seriesId(series.seriesId);
     const after = effectiveLabels(context.after, id);
     if (!sameValue(effectiveLabels(context.before, id), after)) {
-      context.ops.seriesPatch(series.idx, { labels: labelsPatch(after) });
+      context.ops.seriesPatch(series.seriesId, { labels: labelsPatch(after) });
     }
   }
 };
@@ -975,7 +1002,7 @@ const writePoints = (
 const writeSeriesStyles = (context: WriteContext): void => {
   const markers = MARKER_KINDS.includes(context.after.kind);
   context.series.forEach((series, position) => {
-    const id = seriesId(series.idx);
+    const id = seriesId(series.seriesId);
     const before = styleOf(context.before, id);
     const after = styleOf(context.after, id);
     const patch: Mutable<ChartSeriesPatch> = {};
@@ -998,10 +1025,10 @@ const writeSeriesStyles = (context: WriteContext): void => {
     if (markers && (before?.smooth === true) !== (after?.smooth === true)) {
       patch.smooth = after?.smooth === true;
     }
-    if (Object.keys(patch).length > 0) context.ops.seriesPatch(series.idx, patch);
+    if (Object.keys(patch).length > 0) context.ops.seriesPatch(series.seriesId, patch);
     writePoints(
       context,
-      series.idx,
+      series.seriesId,
       before?.points?.map((point) => storedPointStyle(context.before, before, point)),
       after?.points?.map((point) => storedPointStyle(context.after, after, point)),
       markers,
@@ -1023,7 +1050,7 @@ const writeScatterStyle = (context: WriteContext): void => {
     if (before === undefined || markers(before) !== markers(after)) {
       patch.marker = { symbol: markers(after) ? ChartMarkerSymbol.Auto : ChartMarkerSymbol.None };
     }
-    context.ops.seriesPatch(series.idx, patch);
+    context.ops.seriesPatch(series.seriesId, patch);
   }
 };
 
@@ -1050,7 +1077,7 @@ const writeType = (context: WriteContext): void => {
   context.ops.type = {
     op: 'setChartType',
     plot: 0,
-    kind: KIND_TO_INSERT[after.kind],
+    ...KIND_TO_PLOT[after.kind],
     ...(GROUPED_KINDS.includes(after.kind) ? { grouping: engineGrouping(after) } : {}),
   };
 };
@@ -1069,11 +1096,14 @@ const writeSource = (context: WriteContext): void => {
 };
 
 const writePlotField =
-  (field: keyof ChartPlotPatch) =>
+  (
+    field: 'gapWidth' | 'overlap' | 'firstSliceAngle' | 'holeSize' | 'varyColors',
+    key: keyof ChartPlotPatch,
+  ) =>
   (context: WriteContext): void => {
     const after = context.after[field];
     if (after === undefined || after === context.before[field]) return;
-    (context.ops.plot as Record<keyof ChartPlotPatch, number | boolean>)[field] = after;
+    (context.ops.plot as Record<keyof ChartPlotPatch, number | boolean>)[key] = after;
   };
 
 const emptyCellsFor = (kind: ChartKind, mode: ChartEmptyCellMode): ChartEmptyCellMode =>
@@ -1105,7 +1135,7 @@ const writeTitle = (context: WriteContext): void => {
   if (after === undefined || sameValue(after, context.before.title)) return;
   context.ops.title = {
     op: 'setChartTitle',
-    title: typeof after !== 'string' ? { kind: ChartTitleKind.Auto } : after === '' ? null : after,
+    title: typeof after !== 'string' ? AUTO_TITLE : after === '' ? null : after,
   };
 };
 
@@ -1121,8 +1151,8 @@ const writeLegend = (context: WriteContext): void => {
   if (after === undefined || sameValue(canonicalLegend(context.before.legend), after)) return;
   context.ops.legend = {
     op: 'setChartLegend',
-    position: after.position ? LEGEND_TO_ENGINE[after.position] : ChartLegendPosition.None,
-    overlay: context.info.legend.overlay,
+    position: after.position ? LEGEND_TO_ENGINE[after.position] : null,
+    overlay: context.info.legend?.overlay ?? false,
   };
 };
 
@@ -1166,11 +1196,7 @@ const writeAxis =
     if (changed('visible')) patch.visible = after?.visible ?? true;
     if (changed('title'))
       patch.title =
-        typeof after?.title === 'object'
-          ? { kind: ChartTitleKind.Auto }
-          : after?.title
-            ? after.title
-            : null;
+        typeof after?.title === 'object' ? AUTO_TITLE : after?.title ? after.title : null;
     if (changed('min')) patch.min = after?.min ?? null;
     if (changed('max')) patch.max = after?.max ?? null;
     if (changed('majorUnit')) patch.majorUnit = after?.majorUnit ?? null;
@@ -1178,7 +1204,10 @@ const writeAxis =
     if (changed('majorGridlines')) patch.majorGridlines = after?.majorGridlines ?? true;
     if (changed('reverseOrder')) patch.reversed = after?.reverseOrder ?? false;
     if (changed('logBase')) patch.logBase = after?.logBase ?? null;
-    if (changed('labelPosition')) patch.tickLabelPosition = after?.labelPosition ?? null;
+    if (changed('labelPosition')) {
+      patch.tickLabelPosition =
+        after?.labelPosition === undefined ? null : TICK_LABEL_TO_ENGINE[after.labelPosition];
+    }
     context.ops.axis(role, patch);
     if (changed('crossing')) {
       const crossing = after?.crossing ?? 'auto';
@@ -1229,23 +1258,23 @@ export const CHART_SPEC_FIELDS: { readonly [K in keyof ChartSpec]-?: ChartFieldM
   },
   gapWidth: {
     kinds: BAR_KINDS,
-    read: (context) => context.plot.gapWidth ?? undefined,
-    write: writePlotField('gapWidth'),
+    read: (context) => context.plot.gapWidthPct ?? undefined,
+    write: writePlotField('gapWidth', 'gapWidthPct'),
   },
   overlap: {
     kinds: BAR_KINDS,
-    read: (context) => context.plot.overlap ?? undefined,
-    write: writePlotField('overlap'),
+    read: (context) => context.plot.overlapPct ?? undefined,
+    write: writePlotField('overlap', 'overlapPct'),
   },
   firstSliceAngle: {
     kinds: CIRCULAR_KINDS,
-    read: (context) => context.plot.firstSliceAngle ?? undefined,
-    write: writePlotField('firstSliceAngle'),
+    read: (context) => context.plot.firstSliceAngleDeg ?? undefined,
+    write: writePlotField('firstSliceAngle', 'firstSliceAngleDeg'),
   },
   holeSize: {
     kinds: ['doughnut'],
-    read: (context) => context.plot.holeSize ?? undefined,
-    write: writePlotField('holeSize'),
+    read: (context) => context.plot.holeSizePct ?? undefined,
+    write: writePlotField('holeSize', 'holeSizePct'),
   },
   headerRow: {
     kinds: ALL_KINDS,
@@ -1276,7 +1305,7 @@ export const CHART_SPEC_FIELDS: { readonly [K in keyof ChartSpec]-?: ChartFieldM
   varyColors: {
     kinds: ALL_KINDS,
     read: (context) => context.plot.varyColors,
-    write: writePlotField('varyColors'),
+    write: writePlotField('varyColors', 'varyColors'),
   },
   xAxis: { kinds: AXIS_KINDS, read: (context) => readAxis(context, 'x'), write: writeAxis('x') },
   yAxis: { kinds: AXIS_KINDS, read: (context) => readAxis(context, 'y'), write: writeAxis('y') },
@@ -1292,7 +1321,7 @@ const appliesTo = (key: keyof ChartSpec, kind: ChartKind): boolean =>
  * names a reason. `data` supplies the text of reference titles.
  */
 export const chartSpecFromEngine = (
-  info: ChartInfo,
+  info: ChartProperties,
   data: EngineChartData | null = null,
 ): ChartSpec | null => {
   const plot = info.plots[0];
@@ -1311,11 +1340,11 @@ export const chartSpecFromEngine = (
 /** The `insertChart` options that create `spec`'s plot, split and legend. */
 export const chartInsertOptions = (
   spec: ChartSpec,
-): Required<Pick<ChartInsertOptions, 'kind' | 'direction'>> &
-  Pick<ChartInsertOptions, 'grouping' | 'headerRow' | 'headerColumn' | 'legend'> => {
+): Required<Pick<ChartInput, 'type' | 'direction'>> &
+  Pick<ChartInput, 'barDirection' | 'grouping' | 'headerRow' | 'headerColumn' | 'legend'> => {
   const legend = canonicalLegend(spec.legend);
   return {
-    kind: KIND_TO_INSERT[spec.kind],
+    ...KIND_TO_PLOT[spec.kind],
     ...(GROUPED_KINDS.includes(spec.kind) ? { grouping: engineGrouping(spec) } : {}),
     direction: DIRECTION_TO_ENGINE[spec.seriesDirection ?? 'auto'],
     ...(spec.headerRow === undefined ? {} : { headerRow: spec.headerRow }),
@@ -1323,13 +1352,13 @@ export const chartInsertOptions = (
     ...(legend === undefined
       ? {}
       : {
-          legend: legend.position ? LEGEND_TO_ENGINE[legend.position] : ChartLegendPosition.None,
+          legend: legend.position ? LEGEND_TO_ENGINE[legend.position] : null,
         }),
   };
 };
 
 /** The `previewChartData` overrides that resolve the series as `spec` splits and plots them. */
-export const chartPreviewOverrides = (spec: ChartSpec): ChartPreviewOverrides => ({
+export const chartPreviewOverrides = (spec: ChartSpec): ChartPreviewOverridesInput => ({
   direction: DIRECTION_TO_ENGINE[spec.seriesDirection ?? 'auto'],
   ...(spec.headerRow === undefined ? {} : { headerRow: spec.headerRow }),
   ...(spec.headerColumn === undefined ? {} : { headerColumn: spec.headerColumn }),
@@ -1346,7 +1375,7 @@ export const chartPreviewOverrides = (spec: ChartSpec): ChartPreviewOverrides =>
  * second diff against the re-read chart.
  */
 export const chartSpecOps = (
-  info: ChartInfo,
+  info: ChartProperties,
   before: ChartSpec,
   after: ChartSpec,
 ): ChartEngineOp[] => {
@@ -1389,14 +1418,14 @@ const finite = (value: number | undefined): number | null =>
 
 /** Converts the engine's resolved series into drawing data with the adapter's ids. */
 export const chartDataFromEngine = (data: EngineChartData): ChartData => {
-  if (data.domain === 'xy') {
+  if (data.domain === ChartDomain.Xy) {
     return {
       domain: 'xy',
       series: data.series.map((series) => ({
-        id: seriesId(series.idx),
+        id: seriesId(series.seriesId),
         ...(series.name === null ? {} : { name: series.name }),
-        formatCode: series.formatCode,
-        xFormatCode: series.xFormatCode,
+        formatCode: series.numberFormat,
+        xFormatCode: series.xNumberFormat,
         points: Array.from({ length: data.pointCount }, (_, index) => {
           const state = pointState(series.states[index]);
           return {
@@ -1414,19 +1443,19 @@ export const chartDataFromEngine = (data: EngineChartData): ChartData => {
     domain: 'category',
     categories: data.categories.labels,
     categoryIds: data.categories.labels.map((_label, index) => `category-${index}`),
-    categoryFormatCode: data.categories.formatCode,
+    categoryFormatCode: data.categories.numberFormat,
     series: data.series.map((series) => {
       const states = Array.from({ length: data.pointCount }, (_, index) =>
         pointState(series.states[index]),
       );
       return {
-        id: seriesId(series.idx),
+        id: seriesId(series.seriesId),
         ...(series.name === null ? {} : { name: series.name }),
         values: states.map((state, index) =>
           state === 'value' ? finite(series.values[index]) : null,
         ),
         states,
-        formatCode: series.formatCode,
+        formatCode: series.numberFormat,
       };
     }),
   };

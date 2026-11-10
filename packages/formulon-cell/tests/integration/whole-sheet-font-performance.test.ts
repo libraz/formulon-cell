@@ -76,14 +76,14 @@ describe('whole-sheet font synchronization performance', () => {
       expect(
         sheet.instance.store.getState().format.sheetFontOverrides?.get(0)?.baseline,
       ).toBeDefined();
-      expect(fontAt(workbook, MAX_ROW, MAX_COL).size).toBe(12);
+      expect(fontAt(workbook, MAX_ROW, MAX_COL).sizePt).toBe(12);
 
       snapshot.mockRestore();
       setCellXfIndex.mockRestore();
       expect(sheet.instance.undo()).toBe(true);
-      expect(fontAt(workbook, MAX_ROW, MAX_COL).size).toBe(11);
+      expect(fontAt(workbook, MAX_ROW, MAX_COL).sizePt).toBe(11);
       expect(sheet.instance.redo()).toBe(true);
-      expect(fontAt(workbook, MAX_ROW, MAX_COL).size).toBe(12);
+      expect(fontAt(workbook, MAX_ROW, MAX_COL).sizePt).toBe(12);
     },
   );
 

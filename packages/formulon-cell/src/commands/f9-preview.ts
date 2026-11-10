@@ -1,5 +1,5 @@
 import { addrKey, colFromLetters, parseA1Atom } from '../engine/address.js';
-import type { Addr, CellValue, EvalArrayResult, EvalResult } from '../engine/types.js';
+import type { Addr, CellValue, Value } from '../engine/types.js';
 import { fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 
@@ -39,8 +39,10 @@ export interface F9Replacement {
 const REF_RE = /^(?:'((?:[^']|'')+)'!|([A-Za-z_][A-Za-z0-9_]*)!)?(\$?)([A-Za-z]+)(\$?)(\d+)$/;
 const NUMBER_RE = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
 const STRING_RE = /^"([^"]*)"$/;
-type F9FormulaEvaluator = (formula: string) => EvalResult;
-type F9ArrayEvaluator = (formula: string) => EvalArrayResult;
+/** Evaluates a formula to its value; null when it cannot be evaluated. */
+type F9FormulaEvaluator = (formula: string) => Value | null;
+/** Evaluates a formula to its row-major result grid; null when it cannot be evaluated. */
+type F9ArrayEvaluator = (formula: string) => readonly (readonly Value[])[] | null;
 export interface F9PreviewOptions {
   /** Canonicalize localized formula syntax before an evaluator sees it. */
   canonicalizeFormula?: (formula: string) => string;
@@ -56,12 +58,13 @@ const MAX_ARRAY_PREVIEW_CELLS = 4_096;
 /** Render an `evaluateFormulaArray` result as a spreadsheet-style array
  *  constant (`{a,b;c,d}` — columns by `,`, rows by `;`). A 1x1 result renders as the
  *  bare scalar. Returns `null` when the result is too large to inline. */
-function renderArrayCell(v: EvalArrayResult['cells'][number][number] | undefined): string {
+function renderArrayCell(v: Value | undefined): string {
   return renderCellValueForF9(v === undefined ? { kind: 'blank' } : fromEngineValue(v));
 }
 
-function renderArrayForF9(result: EvalArrayResult): string | null {
-  const { rows, cols, cells } = result;
+function renderArrayForF9(cells: readonly (readonly Value[])[]): string | null {
+  const rows = cells.length;
+  const cols = cells[0]?.length ?? 0;
   if (rows <= 0 || cols <= 0) return null;
   if (rows === 1 && cols === 1) {
     return renderArrayCell(cells[0]?.[0]);
@@ -117,9 +120,9 @@ export function computeF9Preview(
   options: F9PreviewOptions = {},
 ): F9Preview {
   const localize = (literal: string): string => options.localizeLiteral?.(literal) ?? literal;
-  const evaluate = (formula: string): EvalResult | null =>
+  const evaluate = (formula: string): Value | null =>
     evalFormula?.(options.canonicalizeFormula?.(formula) ?? formula) ?? null;
-  const evaluateArray = (formula: string): EvalArrayResult | null =>
+  const evaluateArray = (formula: string): readonly (readonly Value[])[] | null =>
     evalFormulaArray?.(options.canonicalizeFormula?.(formula) ?? formula) ?? null;
   const trimmed = selection.trim();
   if (!trimmed) {
@@ -157,16 +160,16 @@ export function computeF9Preview(
   }
   if (evalFormulaArray && preferContextualEvaluation) {
     const arr = evaluateArray(trimmed.startsWith('=') ? trimmed : `=${trimmed}`);
-    if (arr && arr.status.status === 0) {
+    if (arr) {
       const display = renderArrayForF9(arr);
       if (display !== null) return { display: localize(display), substitutable: true };
     }
   }
   if (evalFormula && preferContextualEvaluation) {
     const contextual = evaluate(trimmed.startsWith('=') ? trimmed : `=${trimmed}`);
-    if (contextual && contextual.status.status === 0) {
+    if (contextual) {
       return {
-        display: localize(renderCellValueForF9(fromEngineValue(contextual.value))),
+        display: localize(renderCellValueForF9(fromEngineValue(contextual))),
         substitutable: true,
       };
     }
@@ -176,9 +179,9 @@ export function computeF9Preview(
     : null;
   if (evalFormula && literalFormula) {
     const res = evaluate(literalFormula);
-    if (res && res.status.status === 0) {
+    if (res) {
       return {
-        display: localize(renderCellValueForF9(fromEngineValue(res.value))),
+        display: localize(renderCellValueForF9(fromEngineValue(res))),
         substitutable: true,
       };
     }

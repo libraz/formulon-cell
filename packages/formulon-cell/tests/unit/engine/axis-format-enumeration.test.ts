@@ -82,7 +82,7 @@ const makeWorkbook = async (
   vi.spyOn(wb, 'getCellXfIndex').mockImplementation(readCellXfIndex);
   vi.spyOn(wb, 'getEffectiveStyle').mockImplementation(readEffectiveStyle);
   vi.spyOn(wb, 'getCellXf').mockImplementation(readXf);
-  vi.spyOn(wb, 'getFontRecord').mockReturnValue({ name: 'Aptos', size: 11 } as FontRecord);
+  vi.spyOn(wb, 'getFontRecord').mockReturnValue({ name: 'Aptos', sizePt: 11 } as FontRecord);
   vi.spyOn(wb, 'getFillRecord').mockReturnValue(null);
   vi.spyOn(wb, 'getBorderRecord').mockReturnValue(null);
   vi.spyOn(wb, 'getNumFmtCode').mockReturnValue(null);
@@ -90,7 +90,7 @@ const makeWorkbook = async (
   vi.spyOn(wb, 'addFillRecord').mockReturnValue(1);
   vi.spyOn(wb, 'addBorderRecord').mockReturnValue(1);
   vi.spyOn(wb, 'addXfRecord').mockImplementation((xf) => {
-    addedXfs.push(xf);
+    addedXfs.push(xf as CellXf);
     return 100;
   });
 

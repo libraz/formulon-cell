@@ -849,7 +849,7 @@ describe('buildPrintDocument', () => {
         fontIndex: wb.addFontRecord({
           ...baseFont,
           name: 'Aptos Display',
-          size: 24,
+          sizePt: 24,
         }),
       });
       expect(wb.setColumnStyle(0, 0, MAX_COL, inheritedXf)).toBe(true);

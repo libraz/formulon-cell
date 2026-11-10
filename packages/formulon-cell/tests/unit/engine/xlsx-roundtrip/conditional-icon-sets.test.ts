@@ -1,3 +1,4 @@
+import { IconSetName } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
   evaluateCfFromEngine,
@@ -90,9 +91,9 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip of icon sets', () => {
           name: 3,
           showValue: false,
           icons: [
-            { iconSet: '3Stars', iconId: 2 },
-            { iconSet: 'NoIcons', iconId: 0 },
-            { iconSet: '4RedToBlack', iconId: 3 },
+            { iconSet: IconSetName.ThreeStars, iconIndex: 2 },
+            { iconSet: IconSetName.NoIcons, iconIndex: 0 },
+            { iconSet: IconSetName.FourRedToBlack, iconIndex: 3 },
           ],
         });
       } finally {
@@ -109,7 +110,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip of icon sets', () => {
       if (!first.capabilities.conditionalFormatMutate) return;
       expect(
         first.addConditionalFormat(0, {
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 4, lastCol: 0 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 4, lastCol: 0 }],
           type: 4,
           iconSet: {
             name: 8,
@@ -121,7 +122,8 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip of icon sets', () => {
       try {
         const [rule] = iconRules(loaded);
         expect(rule?.icons).toBe('arrows4');
-        expect(rule && conditionalRuleToEngineInput(rule)?.iconSet?.name).toBe(8);
+        const input = rule ? conditionalRuleToEngineInput(rule) : null;
+        expect(input && 'iconSet' in input ? input.iconSet.name : undefined).toBe(8);
       } finally {
         loaded.dispose();
       }

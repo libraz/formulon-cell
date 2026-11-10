@@ -211,8 +211,10 @@ export function paintCells(
   const sheetProtected = protection.protectedSheets.has(data.sheetIndex);
   const threadedRootKeys = new Set(
     (state.threadedComments?.bySheet.get(data.sheetIndex) ?? [])
-      .filter((comment) => comment.parentId.length === 0)
-      .map((comment) => addrKey({ sheet: data.sheetIndex, row: comment.row, col: comment.col })),
+      .filter((comment) => comment.parentId === null)
+      .map((comment) =>
+        addrKey({ sheet: data.sheetIndex, row: comment.cell.row, col: comment.cell.col }),
+      ),
   );
   // RangeResolver is only needed for list-validation re-resolution. We
   // build it lazily — most viewport repaints don't have a single DV cell,

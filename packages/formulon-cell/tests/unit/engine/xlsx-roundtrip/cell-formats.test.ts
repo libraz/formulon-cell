@@ -16,6 +16,9 @@ import {
 
 import { canLoadWasm } from './fixtures.js';
 
+const rgb = (argb: number) => ({ kind: 1 as const, argb, theme: 0, tint: 0, indexed: 0 });
+const NONE = { kind: 0 as const, argb: 0, theme: 0, tint: 0, indexed: 0 };
+
 describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
   it('saves and reloads authored cell XF records when supported', async () => {
     const first = await WorkbookHandle.createDefault();
@@ -27,20 +30,24 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
       first.setText({ sheet: 0, row: 0, col: 0 }, 'Formatted');
       const fontIndex = first.addFontRecord({
         name: 'Arial',
-        size: 11,
+        sizePt: 11,
         bold: true,
         italic: false,
         strike: false,
         underline: 0,
-        colorArgb: 0xff006100,
+        color: rgb(0xff006100),
       });
-      const fillIndex = first.addFillRecord({ pattern: 1, fgArgb: 0xffe2f0d9, bgArgb: 0 });
+      const fillIndex = first.addFillRecord({
+        pattern: 1,
+        foreground: rgb(0xffe2f0d9),
+        background: NONE,
+      });
       const borderIndex = first.addBorderRecord({
-        left: { style: 0, colorArgb: 0 },
-        right: { style: 0, colorArgb: 0 },
-        top: { style: 0, colorArgb: 0 },
-        bottom: { style: 0, colorArgb: 0 },
-        diagonal: { style: 0, colorArgb: 0 },
+        left: { style: 0, color: NONE },
+        right: { style: 0, color: NONE },
+        top: { style: 0, color: NONE },
+        bottom: { style: 0, color: NONE },
+        diagonal: { style: 0, color: NONE },
         diagonalUp: false,
         diagonalDown: false,
       });
@@ -49,8 +56,8 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         fillIndex,
         borderIndex,
         numFmtId: 0,
-        horizontalAlign: 2,
-        verticalAlign: 1,
+        horizontal: 2,
+        vertical: 1,
         wrapText: true,
       });
       expect(xfIndex).toBeGreaterThan(0);
@@ -65,8 +72,8 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         const reloadedXfIndex = reloaded.getCellXfIndex(0, 0, 0);
         expect(reloadedXfIndex).toBeGreaterThan(0);
         expect(reloaded.getCellXf(reloadedXfIndex ?? -1)).toMatchObject({
-          horizontalAlign: 2,
-          verticalAlign: 1,
+          horizontal: 2,
+          vertical: 1,
           wrapText: true,
         });
       } finally {

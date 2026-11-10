@@ -118,7 +118,7 @@ describe('locale-sensitive dialog boundaries', () => {
           skipped: 0,
         },
       );
-      expect(workbook.getConditionalFormats(0)[0]?.formula1).toBe('1.5');
+      expect(workbook.getConditionalFormats(0)[0]?.formula1).toBe('=1.5');
       handle.detach();
     } finally {
       workbook.dispose();
@@ -220,10 +220,10 @@ describe('locale-sensitive dialog boundaries', () => {
           written: 1,
           skipped: 0,
         });
-        expect(workbook.getConditionalFormats(0)[0]?.formula1).toBe('AND(A1>1.5,A1<3,A1<>"a;b")');
+        expect(workbook.getConditionalFormats(0)[0]?.formula1).toBe('=AND(A1>1.5,A1<3,A1<>"a;b")');
         const loaded = await WorkbookHandle.loadBytes(workbook.save());
         try {
-          expect(loaded.getConditionalFormats(0)[0]?.formula1).toBe('AND(A1>1.5,A1<3,A1<>"a;b")');
+          expect(loaded.getConditionalFormats(0)[0]?.formula1).toBe('=AND(A1>1.5,A1<3,A1<>"a;b")');
         } finally {
           loaded.dispose();
         }
@@ -273,7 +273,7 @@ describe('locale-sensitive dialog boundaries', () => {
         kind: 'custom',
         formula: '=AND(A1>1.5,A1<3,A1<>"a;b")',
       });
-      expect(workbook.getValidationsForSheet(0)[0]?.formula1).toBe('AND(A1>1.5,A1<3,A1<>"a;b")');
+      expect(workbook.getValidationsForSheet(0)[0]?.formula1).toBe('=AND(A1>1.5,A1<3,A1<>"a;b")');
 
       locale = 'fr-FR';
       expect(workbook.setSpreadsheetProfileId('windows-fr_FR')).toBe(true);
@@ -288,7 +288,7 @@ describe('locale-sensitive dialog boundaries', () => {
 
       const loaded = await WorkbookHandle.loadBytes(workbook.save());
       try {
-        expect(loaded.getValidationsForSheet(0)[0]?.formula1).toBe('AND(A1>1.5,A1<3,A1<>"a;b")');
+        expect(loaded.getValidationsForSheet(0)[0]?.formula1).toBe('=AND(A1>1.5,A1<3,A1<>"a;b")');
         const restored = createSpreadsheetStore();
         hydrateValidationsFromEngine(loaded, restored, 0);
         expect(

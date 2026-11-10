@@ -1,3 +1,10 @@
+import type {
+  ProtectedRangeInput,
+  Sheet,
+  SheetProtectionInput,
+  WorkbookProtectionInput,
+} from '@libraz/formulon';
+import { isFormulonError, orFallback } from './result.js';
 import type { EngineCapabilities, ProtectedRange, Workbook, WorkbookProtection } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -23,14 +30,28 @@ function wb(handle: unknown): Workbook {
   return internals(handle).wb;
 }
 
+function ws(handle: unknown, sheet: number): Sheet {
+  return wb(handle).sheet(sheet);
+}
+
+/** Run an engine call; an engine refusal is a soft `false`, anything else rethrows. */
+function attempt(fn: () => void): boolean {
+  try {
+    fn();
+    return true;
+  } catch (e) {
+    if (!isFormulonError(e)) throw e;
+    return false;
+  }
+}
+
 export abstract class WorkbookHandleProtectionMethods {
   declare readonly capabilities: EngineCapabilities;
 
-  /** Reads the round-trip `<sheetProtection>` flags. Returns `null` when
-   *  the engine doesn't expose `getSheetProtection`. The booleans are
-   *  reported as JS booleans (the engine wires them as 0/1 numbers); the
-   *  `enabled` flag denotes whether the protection block is emitted on
-   *  save. */
+  /** Reads the round-trip `<sheetProtection>` flags. Returns `null` under the
+   *  stub. Each permission flag is true when users may perform that action;
+   *  `enabled` is whether the sheet is protected, and an absent password
+   *  string reads empty. */
   getSheetProtection(sheet: number): {
     enabled: boolean;
     algorithmName: string;
@@ -57,38 +78,38 @@ export abstract class WorkbookHandleProtectionMethods {
   } | null {
     assertAlive(this);
     if (!this.capabilities.sheetProtectionRoundtrip) return null;
-    const r = wb(this).getSheetProtection(sheet);
-    if (!r.status.ok) return null;
-    const p = r.protection;
+    const read = orFallback(null, () => ({ p: ws(this, sheet).getSheetProtection() }));
+    if (!read) return null;
+    const { p } = read;
     return {
-      enabled: p.enabled !== 0,
-      algorithmName: p.algorithmName,
-      hashValue: p.hashValue,
-      saltValue: p.saltValue,
-      spinCount: p.spinCount,
-      legacyPassword: p.legacyPassword,
-      sheet: p.sheet !== 0,
-      objects: p.objects !== 0,
-      scenarios: p.scenarios !== 0,
-      formatCells: p.formatCells !== 0,
-      formatColumns: p.formatColumns !== 0,
-      formatRows: p.formatRows !== 0,
-      insertColumns: p.insertColumns !== 0,
-      insertRows: p.insertRows !== 0,
-      insertHyperlinks: p.insertHyperlinks !== 0,
-      deleteColumns: p.deleteColumns !== 0,
-      deleteRows: p.deleteRows !== 0,
-      selectLockedCells: p.selectLockedCells !== 0,
-      selectUnlockedCells: p.selectUnlockedCells !== 0,
-      sort: p.sort !== 0,
-      autoFilter: p.autoFilter !== 0,
-      pivotTables: p.pivotTables !== 0,
+      enabled: p !== null,
+      algorithmName: p?.algorithmName ?? '',
+      hashValue: p?.hashValue ?? '',
+      saltValue: p?.saltValue ?? '',
+      spinCount: p?.spinCount ?? 0,
+      legacyPassword: p?.legacyPasswordHash ?? '',
+      sheet: p !== null,
+      objects: p?.allowEditObjects ?? false,
+      scenarios: p?.allowEditScenarios ?? false,
+      formatCells: p?.allowFormatCells ?? false,
+      formatColumns: p?.allowFormatColumns ?? false,
+      formatRows: p?.allowFormatRows ?? false,
+      insertColumns: p?.allowInsertColumns ?? false,
+      insertRows: p?.allowInsertRows ?? false,
+      insertHyperlinks: p?.allowInsertHyperlinks ?? false,
+      deleteColumns: p?.allowDeleteColumns ?? false,
+      deleteRows: p?.allowDeleteRows ?? false,
+      selectLockedCells: p?.allowSelectLockedCells ?? true,
+      selectUnlockedCells: p?.allowSelectUnlockedCells ?? true,
+      sort: p?.allowSort ?? false,
+      autoFilter: p?.allowAutoFilter ?? false,
+      pivotTables: p?.allowPivotTables ?? false,
     };
   }
 
   /** Replaces `<sheetProtection>` flags wholesale. Setting `enabled` to
-   *  `false` clears the protection block on save. Returns `false` (no-op)
-   *  under stub mode and older engine package builds. */
+   *  `false` unprotects the sheet. A permission left out takes Excel's
+   *  dialog default. Returns `false` (no-op) under stub mode. */
   setSheetProtection(
     sheet: number,
     protection: {
@@ -118,48 +139,49 @@ export abstract class WorkbookHandleProtectionMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetProtectionRoundtrip) return false;
-    const b = (v: boolean | undefined): number => (v ? 1 : 0);
-    const s = wb(this).setSheetProtection(sheet, {
-      enabled: b(protection.enabled),
-      algorithmName: protection.algorithmName ?? '',
-      hashValue: protection.hashValue ?? '',
-      saltValue: protection.saltValue ?? '',
+    if (!protection.enabled) return attempt(() => ws(this, sheet).setSheetProtection(null));
+    const input: SheetProtectionInput = {
+      algorithmName: protection.algorithmName || null,
+      hashValue: protection.hashValue || null,
+      saltValue: protection.saltValue || null,
       spinCount: protection.spinCount ?? 0,
-      legacyPassword: protection.legacyPassword ?? '',
-      sheet: b(protection.sheet ?? true),
-      objects: b(protection.objects),
-      scenarios: b(protection.scenarios),
-      formatCells: b(protection.formatCells),
-      formatColumns: b(protection.formatColumns),
-      formatRows: b(protection.formatRows),
-      insertColumns: b(protection.insertColumns),
-      insertRows: b(protection.insertRows),
-      insertHyperlinks: b(protection.insertHyperlinks),
-      deleteColumns: b(protection.deleteColumns),
-      deleteRows: b(protection.deleteRows),
-      selectLockedCells: b(protection.selectLockedCells),
-      selectUnlockedCells: b(protection.selectUnlockedCells),
-      sort: b(protection.sort),
-      autoFilter: b(protection.autoFilter),
-      pivotTables: b(protection.pivotTables),
-    });
-    return s.ok;
+      legacyPasswordHash: protection.legacyPassword || null,
+      allowEditObjects: protection.objects,
+      allowEditScenarios: protection.scenarios,
+      allowFormatCells: protection.formatCells,
+      allowFormatColumns: protection.formatColumns,
+      allowFormatRows: protection.formatRows,
+      allowInsertColumns: protection.insertColumns,
+      allowInsertRows: protection.insertRows,
+      allowInsertHyperlinks: protection.insertHyperlinks,
+      allowDeleteColumns: protection.deleteColumns,
+      allowDeleteRows: protection.deleteRows,
+      allowSelectLockedCells: protection.selectLockedCells,
+      allowSelectUnlockedCells: protection.selectUnlockedCells,
+      allowSort: protection.sort,
+      allowAutoFilter: protection.autoFilter,
+      allowPivotTables: protection.pivotTables,
+    };
+    // An omitted permission takes the engine's dialog default; undefined is not omission.
+    const defined = Object.fromEntries(
+      Object.entries(input).filter(([, value]) => value !== undefined),
+    ) as SheetProtectionInput;
+    return attempt(() => ws(this, sheet).setSheetProtection(defined));
   }
 
-  /** Reads `<workbookProtection>` as the engine stores it (booleans as 0/1).
-   *  `null` when the workbook carries none or the engine lacks the API. */
+  /** Reads `<workbookProtection>`. `null` when the workbook carries none or
+   *  under the stub. */
   getWorkbookProtection(): WorkbookProtection | null {
     assertAlive(this);
     if (!this.capabilities.workbookProtectionRoundtrip) return null;
-    const r = wb(this).getWorkbookProtection();
-    return r.status.ok ? r.protection : null;
+    return orFallback(null, () => wb(this).getWorkbookProtection());
   }
 
   /** Replaces `<workbookProtection>`; an all-empty record removes the element. */
-  setWorkbookProtection(protection: WorkbookProtection): boolean {
+  setWorkbookProtection(protection: WorkbookProtectionInput | null): boolean {
     assertAlive(this);
     if (!this.capabilities.workbookProtectionRoundtrip) return false;
-    return wb(this).setWorkbookProtection(protection).ok;
+    return attempt(() => wb(this).setWorkbookProtection(protection));
   }
 
   /** The `<protectedRange>` records of `sheet` in file order; empty when the
@@ -167,26 +189,27 @@ export abstract class WorkbookHandleProtectionMethods {
   getProtectedRanges(sheet: number): ProtectedRange[] {
     assertAlive(this);
     if (!this.capabilities.protectedRanges) return [];
-    const r = wb(this).getProtectedRanges(sheet);
-    return r.status.ok ? [...r] : [];
+    return [...orFallback([], () => ws(this, sheet).listProtectedRanges())];
   }
 
-  addProtectedRange(sheet: number, range: ProtectedRange): boolean {
+  addProtectedRange(sheet: number, range: ProtectedRangeInput): boolean {
     assertAlive(this);
     if (!this.capabilities.protectedRanges) return false;
-    return wb(this).addProtectedRange(sheet, range).ok;
+    return attempt(() => {
+      ws(this, sheet).addProtectedRange(range);
+    });
   }
 
-  updateProtectedRange(sheet: number, index: number, range: ProtectedRange): boolean {
+  updateProtectedRange(sheet: number, index: number, range: ProtectedRangeInput): boolean {
     assertAlive(this);
     if (!this.capabilities.protectedRanges) return false;
-    return wb(this).updateProtectedRange(sheet, index, range).ok;
+    return attempt(() => ws(this, sheet).updateProtectedRange(index, range));
   }
 
   removeProtectedRange(sheet: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.protectedRanges) return false;
-    return wb(this).removeProtectedRange(sheet, index).ok;
+    return attempt(() => ws(this, sheet).removeProtectedRange(index));
   }
 }
 

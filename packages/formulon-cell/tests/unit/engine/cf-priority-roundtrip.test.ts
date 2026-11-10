@@ -62,9 +62,9 @@ describe('conditional formatting priority and stopIfTrue persistence', () => {
   it('ranks session rules after rules the mount did not write', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
-      expect(wb.addConditionalFormat(0, { sqref, type: 17, priority: 7 })).toBeGreaterThanOrEqual(
-        0,
-      );
+      expect(
+        wb.addConditionalFormat(0, { ranges: sqref, type: 17, priority: 7 }),
+      ).toBeGreaterThanOrEqual(0);
       syncTrackedConditionalRulesToEngine(wb, [blanks()], 0, { tracked: new Map() });
       expect(summary(wb).map((e) => [e.type, e.priority])).toEqual([
         [17, 7],
@@ -78,13 +78,13 @@ describe('conditional formatting priority and stopIfTrue persistence', () => {
   it('rewrites a loaded rule keeping its id, priority and stopIfTrue', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
-      wb.addConditionalFormat(0, { sqref, type: 17, priority: 3, stopIfTrue: true });
-      wb.addConditionalFormat(0, { sqref, type: 16, priority: 4 });
+      wb.addConditionalFormat(0, { ranges: sqref, type: 17, priority: 3, stopIfTrue: true });
+      wb.addConditionalFormat(0, { ranges: sqref, type: 16, priority: 4 });
       const [first] = wb.getConditionalFormats(0);
       if (!first) throw new Error('missing entry');
       expect(
         rewriteEngineConditionalFormat(wb, 0, first.id, {
-          input: { sqref, type: 11 },
+          input: { ranges: sqref, type: 11 },
         }),
       ).toBe(true);
       const after = wb.getConditionalFormats(0).find((e) => e.id === first.id);

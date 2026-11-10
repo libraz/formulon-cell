@@ -1,5 +1,6 @@
 import type { DataTable } from '@libraz/formulon';
 import { CALC_MODE_MANUAL } from './calc-mode.js';
+import { isFormulonError } from './result.js';
 import type { Addr, EngineCapabilities, Range, Workbook } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -53,20 +54,23 @@ function toInfo(sheet: number, table: DataTable): DataTableInfo {
   const input = (i: DataTable['rowInput']): Addr | null =>
     i ? { sheet, row: i.row, col: i.col } : null;
   return {
-    range: { sheet, r0: table.firstRow, c0: table.firstCol, r1: table.lastRow, c1: table.lastCol },
+    range: {
+      sheet,
+      r0: table.range.firstRow,
+      c0: table.range.firstCol,
+      r1: table.range.lastRow,
+      c1: table.range.lastCol,
+    },
     rowInput: input(table.rowInput),
-    colInput: input(table.colInput),
-    inputDeleted: !!table.rowInput?.deleted || !!table.colInput?.deleted,
+    colInput: input(table.columnInput),
+    inputDeleted: !!table.rowInput?.deleted || !!table.columnInput?.deleted,
   };
 }
 
 /** A new table reads 0 until computed; Manual leaves that to Calculate Now. */
 function computeUnlessManual(handle: unknown): void {
   const self = internals(handle);
-  if ((handle as WorkbookHandle).calcMode() !== CALC_MODE_MANUAL) {
-    const s = self.wb.recalcDataTables();
-    if (!s.ok) throw new Error(`recalcDataTables: ${s.message}`);
-  }
+  if ((handle as WorkbookHandle).calcMode() !== CALC_MODE_MANUAL) self.wb.recalcDataTables();
   self.emitRecalc();
 }
 
@@ -78,8 +82,8 @@ export abstract class WorkbookHandleDataTablesMethods {
     const self = internals(this);
     self.assertAlive();
     if (!this.capabilities.dataTables) return null;
-    const r = self.wb.getDataTable(addr.sheet, addr.row, addr.col);
-    return r.status.ok && r.dataTable ? toInfo(addr.sheet, r.dataTable) : null;
+    const table = self.wb.sheet(addr.sheet).getDataTable(addr.row, addr.col);
+    return table ? toInfo(addr.sheet, table) : null;
   }
 
   /** Data tables whose result block intersects `range`. Every result cell
@@ -118,15 +122,16 @@ export abstract class WorkbookHandleDataTablesMethods {
     self.assertAlive();
     if (!this.capabilities.dataTables) return false;
     const { range } = def;
-    const s = self.wb.addDataTable(range.sheet, {
-      firstRow: range.r0,
-      lastRow: range.r1,
-      firstCol: range.c0,
-      lastCol: range.c1,
-      rowInput: def.rowInput ? { row: def.rowInput.row, col: def.rowInput.col } : null,
-      colInput: def.colInput ? { row: def.colInput.row, col: def.colInput.col } : null,
-    });
-    if (!s.ok) return false;
+    try {
+      self.wb.sheet(range.sheet).addDataTable({
+        range: { firstRow: range.r0, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
+        rowInput: def.rowInput ? { row: def.rowInput.row, col: def.rowInput.col } : null,
+        columnInput: def.colInput ? { row: def.colInput.row, col: def.colInput.col } : null,
+      });
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return false;
+    }
     computeUnlessManual(this);
     return true;
   }
@@ -136,7 +141,12 @@ export abstract class WorkbookHandleDataTablesMethods {
     const self = internals(this);
     self.assertAlive();
     if (!this.capabilities.dataTables) return false;
-    if (!self.wb.removeDataTable(addr.sheet, addr.row, addr.col).ok) return false;
+    try {
+      self.wb.sheet(addr.sheet).removeDataTable(addr.row, addr.col);
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return false;
+    }
     self.emitRecalc();
     return true;
   }

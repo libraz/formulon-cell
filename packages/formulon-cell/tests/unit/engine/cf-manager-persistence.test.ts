@@ -67,7 +67,7 @@ describe('conditional format manager persistence', () => {
       expect(after).toHaveLength(2);
       const entry = after.find((candidate) => candidate.id === loaded.engineId);
       expect(entry?.priority).toBe(before?.priority);
-      expect(wb.getDxf(entry?.dxfId ?? -1)?.font?.italic).toBe(true);
+      expect(wb.getDxf(entry?.dxfIndex ?? -1)?.font?.italic).toBe(true);
 
       const restored = await WorkbookHandle.loadBytes(wb.save());
       try {

@@ -1,3 +1,4 @@
+import { ColorKind } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import { commitCellInput } from '../../src/commands/cell-input-commit.js';
 import { applySelectionFormatAction, setFont } from '../../src/commands/format.js';
@@ -36,14 +37,13 @@ function addLocalizedHyperlinkStyle(workbook: WorkbookHandle, hidden: boolean) {
 
   const fontIndex = workbook.addFontRecord({
     ...normalFont,
-    size: normalFont.size,
+    sizePt: normalFont.sizePt,
     bold: false,
     italic: false,
     strike: false,
     underline: 1,
     vertAlign: 0,
-    colorArgb: hyperlinkColor,
-    color: { kind: 2, rgb: 0, theme: 10, tint: 0, indexed: 0 },
+    color: { kind: ColorKind.Theme, argb: 0, theme: 10, tint: 0, indexed: 0 },
   });
   const xfId = workbook.addCellStyleXfRecord({ ...normalXf, fontIndex });
   if (fontIndex < 0 || xfId < 0) throw new Error('failed to author localized Hyperlink style');
@@ -101,15 +101,17 @@ describe('typed URL autoformat', () => {
         expect(workbook.getValue(A1)).toEqual({ kind: 'text', value: URL });
         expect(workbook.cellFormula(A1)).toBeNull();
         expect(hyperlinkAt(mounted.instance.store.getState(), A1)).toBe(URL);
-        expect(workbook.getHyperlinksFull(0)).toMatchObject([{ row: 0, col: 0, target: URL }]);
+        expect(workbook.getHyperlinksFull(0)).toMatchObject([
+          { range: { firstRow: 0, firstCol: 0 }, target: URL },
+        ]);
         expect(mounted.instance.store.getState().format.formats.get('0:0:0')).toMatchObject({
           fontFamily: hyperlinkFont.name,
-          fontSize: fontPointsToCssPx(hyperlinkFont.size),
+          fontSize: fontPointsToCssPx(hyperlinkFont.sizePt ?? 0),
           bold: hyperlinkFont.bold,
           italic: hyperlinkFont.italic,
           strike: hyperlinkFont.strike,
           underline: 'single',
-          color: cssColorFromArgb(hyperlinkFont.colorArgb),
+          color: cssColorFromArgb(hyperlinkFont.color?.argb ?? 0),
         });
         expect(notifiedHyperlinks).toEqual([URL]);
         expect(rawNamedStyleMetadata(workbook)).toEqual(beforeMountCatalog);
@@ -128,7 +130,9 @@ describe('typed URL autoformat', () => {
         expect(hyperlinkAt(mounted.instance.store.getState(), A1)).toBeNull();
         expect(mounted.instance.history.redo()).toBe(true);
         expect(hyperlinkAt(mounted.instance.store.getState(), A1)).toBe(URL);
-        expect(workbook.getHyperlinksFull(0)).toMatchObject([{ row: 0, col: 0, target: URL }]);
+        expect(workbook.getHyperlinksFull(0)).toMatchObject([
+          { range: { firstRow: 0, firstCol: 0 }, target: URL },
+        ]);
         expect(rawNamedStyleMetadata(workbook)).toEqual(beforeMountCatalog);
       } finally {
         unsubscribe?.();
@@ -348,7 +352,7 @@ describe('typed URL autoformat', () => {
       const baseXf = workbook.getCellXf(0);
       const baseFont = workbook.getFontRecord(0);
       if (!baseXf || !baseFont) throw new Error('default XF/font is unavailable');
-      const fontIndex = workbook.addFontRecord({ ...baseFont, size: 17 });
+      const fontIndex = workbook.addFontRecord({ ...baseFont, sizePt: 17 });
       const originalXf = workbook.addXfRecord({ ...baseXf, fontIndex, applyFont: true });
       if (fontIndex < 0 || originalXf < 0 || !workbook.setCellXfIndex(0, 0, 0, originalXf)) {
         throw new Error('could not create A1 native font');
@@ -379,7 +383,7 @@ describe('typed URL autoformat', () => {
       let restored: WorkbookHandle | undefined;
       try {
         expect(workbook.getCellXfIndex(A1.sheet, A1.row, A1.col)).toBe(originalXf);
-        expect(fontAt(workbook, A1).size).toBe(17);
+        expect(fontAt(workbook, A1).sizePt).toBe(17);
         expect(store.getState().format.formats.size).toBe(0);
 
         const result = commitCellInput({
@@ -393,10 +397,10 @@ describe('typed URL autoformat', () => {
         expect(result.status).toBe('applied');
         expect(workbook.getValue(A1)).toEqual({ kind: 'text', value: URL });
         expect(workbook.getCellXfIndex(A1.sheet, A1.row, A1.col)).toBe(originalXf);
-        expect(fontAt(workbook, A1).size).toBe(17);
+        expect(fontAt(workbook, A1).sizePt).toBe(17);
         expect(workbook.getHyperlinksFull(0)).toEqual(beforeLinks);
         expect(workbook.getHyperlinksFull(0)).toMatchObject([
-          { row: 0, col: 1, target: 'https://existing.example/' },
+          { range: { firstRow: 0, firstCol: 1 }, target: 'https://existing.example/' },
         ]);
         expect(workbook.getValidationsForSheet(0)).toEqual(beforeValidations);
         expect(hyperlinkAt(store.getState(), A1)).toBeNull();
@@ -406,7 +410,7 @@ describe('typed URL autoformat', () => {
 
         restored = await WorkbookHandle.loadBytes(workbook.save());
         expect(restored.getValue(A1)).toEqual({ kind: 'text', value: URL });
-        expect(fontAt(restored, A1).size).toBe(17);
+        expect(fontAt(restored, A1).sizePt).toBe(17);
         expect(restored.getHyperlinksFull(0)).toEqual(beforeLinks);
         expect(restored.getValidationsForSheet(0)).toEqual(beforeValidations);
         expect(clearHyperlinks).not.toHaveBeenCalled();
@@ -487,8 +491,8 @@ describe('typed URL autoformat', () => {
         expect(
           setFont(mounted.instance.store.getState(), mounted.instance.store, { fontSize: 32 }),
         ).toBe(true);
-        expect(fontAt(workbook, A1).size).toBe(24);
-        expect(fontAt(workbook, FAR).size).toBe(24);
+        expect(fontAt(workbook, A1).sizePt).toBe(24);
+        expect(fontAt(workbook, FAR).sizePt).toBe(24);
 
         expect(
           commitCellInput({
@@ -499,14 +503,14 @@ describe('typed URL autoformat', () => {
             origin: 'editor',
           }).status,
         ).toBe('applied');
-        expect(fontAt(workbook, A1).size).toBe(11);
-        expect(fontAt(workbook, FAR).size).toBe(24);
+        expect(fontAt(workbook, A1).sizePt).toBe(11);
+        expect(fontAt(workbook, FAR).sizePt).toBe(24);
 
         const firstReload = await WorkbookHandle.loadBytes(workbook.save());
         restored = firstReload;
         restoredMount = await mountStubSheet({ workbook: firstReload, locale: 'en' });
-        expect(fontAt(firstReload, A1).size).toBe(11);
-        expect(fontAt(firstReload, FAR).size).toBe(24);
+        expect(fontAt(firstReload, A1).sizePt).toBe(11);
+        expect(fontAt(firstReload, FAR).sizePt).toBe(24);
         expect(hyperlinkAt(restoredMount.instance.store.getState(), A1)).toBe(URL);
 
         mutators.setActive(restoredMount.instance.store, B1);
@@ -522,9 +526,9 @@ describe('typed URL autoformat', () => {
         restoredAgain = secondReload;
         const finalMount = await mountStubSheet({ workbook: secondReload, locale: 'en' });
         try {
-          expect(fontAt(secondReload, A1).size).toBe(11);
-          expect(fontAt(secondReload, FAR).size).toBe(24);
-          expect(fontAt(secondReload, B1).size).toBe(24);
+          expect(fontAt(secondReload, A1).sizePt).toBe(11);
+          expect(fontAt(secondReload, FAR).sizePt).toBe(24);
+          expect(fontAt(secondReload, B1).sizePt).toBe(24);
           expect(hyperlinkAt(finalMount.instance.store.getState(), A1)).toBe(URL);
           expect(rawNamedStyleMetadata(secondReload)).toEqual(rawNamedStyleMetadata(workbook));
         } finally {

@@ -1,8 +1,14 @@
-import type {
-  AutoFilter,
-  AutoFilterColumn,
-  AutoFilterEvalResult,
-  AutoFilterSortState,
+import {
+  type AutoFilter,
+  type AutoFilterColumnInput,
+  type AutoFilterEval,
+  type AutoFilterInput,
+  type AutoFilterSortStateInput,
+  ComparisonOperator,
+  DynamicFilterType,
+  FilterKind,
+  SortBy,
+  SortMethod,
 } from '@libraz/formulon';
 import { inputLocaleForWorkbook, parseLocalizedNumericInput } from '../commands/coerce-input.js';
 import { distinctValues, normalizeColorKey } from '../commands/filter.js';
@@ -45,21 +51,21 @@ const conditionOperator: Record<
   lessThanOrEqual: 'lessThanOrEqual',
 };
 
-const FILTER_KIND_VALUES = 1;
-const FILTER_KIND_CUSTOM = 2;
-const FILTER_KIND_TOP10 = 3;
-const FILTER_KIND_DYNAMIC = 4;
-const FILTER_KIND_COLOR = 5;
+const FILTER_KIND_VALUES = FilterKind.Values;
+const FILTER_KIND_CUSTOM = FilterKind.Custom;
+const FILTER_KIND_TOP10 = FilterKind.Top10;
+const FILTER_KIND_DYNAMIC = FilterKind.Dynamic;
+const FILTER_KIND_COLOR = FilterKind.Color;
 
-const DYNAMIC_ABOVE_AVERAGE = 1;
-const DYNAMIC_BELOW_AVERAGE = 2;
-const SORT_BY_VALUE = 0;
-const FILTER_OPERATOR_EQUAL = 0;
-const FILTER_OPERATOR_LESS_THAN = 1;
-const FILTER_OPERATOR_LESS_THAN_OR_EQUAL = 2;
-const FILTER_OPERATOR_NOT_EQUAL = 3;
-const FILTER_OPERATOR_GREATER_THAN_OR_EQUAL = 4;
-const FILTER_OPERATOR_GREATER_THAN = 5;
+const DYNAMIC_ABOVE_AVERAGE = DynamicFilterType.AboveAverage;
+const DYNAMIC_BELOW_AVERAGE = DynamicFilterType.BelowAverage;
+const SORT_BY_VALUE = SortBy.Value;
+const FILTER_OPERATOR_EQUAL = ComparisonOperator.Equal;
+const FILTER_OPERATOR_LESS_THAN = ComparisonOperator.LessThan;
+const FILTER_OPERATOR_LESS_THAN_OR_EQUAL = ComparisonOperator.LessThanOrEqual;
+const FILTER_OPERATOR_NOT_EQUAL = ComparisonOperator.NotEqual;
+const FILTER_OPERATOR_GREATER_THAN_OR_EQUAL = ComparisonOperator.GreaterThanOrEqual;
+const FILTER_OPERATOR_GREATER_THAN = ComparisonOperator.GreaterThan;
 
 export type ImportedTypedFilter = {
   filter: AutoFilter;
@@ -74,11 +80,11 @@ export type ImportedTypedFilter = {
 interface FilterTarget {
   key: string;
   get(): AutoFilter | null;
-  set(filter: AutoFilter): boolean;
+  set(filter: AutoFilterInput): boolean;
   remove(): boolean;
   apply(): boolean;
   clear(): boolean;
-  evaluate(): AutoFilterEvalResult | null;
+  evaluate(): AutoFilterEval | null;
 }
 
 const sheetFilterTarget = (wb: WorkbookHandle, sheet: number): FilterTarget => ({
@@ -141,37 +147,29 @@ function filterSlotsForSheet(wb: WorkbookHandle, state: State, sheet: number): F
 
 const importedTypedFilters = new WeakMap<WorkbookHandle, Map<string, ImportedTypedFilter>>();
 
-const emptyAutoFilterColumn = (colId: number): AutoFilterColumn => ({
-  colId,
+const emptyAutoFilterColumn = (columnOffset: number): AutoFilterColumnInput => ({
+  columnOffset,
   hiddenButton: false,
   showButton: true,
-  kind: 0,
+  kind: FilterKind.None,
   filterBlank: false,
   values: [],
   dateGroups: [],
   customAnd: false,
-  customCount: 0,
-  op1: FILTER_OPERATOR_EQUAL,
-  val1: '',
-  op2: FILTER_OPERATOR_EQUAL,
-  val2: '',
+  conditions: [],
   top: false,
   percent: false,
-  hasFilterVal: false,
-  topVal: 0,
-  filterVal: 0,
-  dynamicType: 0,
-  hasDynVal: false,
-  hasDynMaxVal: false,
-  dynVal: 0,
-  dynMaxVal: 0,
-  valIso: '',
-  maxValIso: '',
-  dxfId: 0xffffffff,
+  topValue: 0,
+  filterValue: null,
+  dynamicType: DynamicFilterType.Null,
+  dynamicValue: null,
+  dynamicMaxValue: null,
+  valueIso: '',
+  maxValueIso: '',
+  dxfIndex: null,
   cellColor: false,
   iconSet: 0,
-  iconId: 0,
-  hasIconId: false,
+  iconIndex: null,
 });
 
 const rangeFromAutoFilter = (filter: AutoFilter, sheet: number): Range => ({
@@ -292,7 +290,7 @@ function decodeAffixPattern(
 function customColumnFromCriteria(
   colId: number,
   condition: NonNullable<ValueFilterCriteria['condition']>,
-): AutoFilterColumn {
+): AutoFilterColumnInput {
   const base = emptyAutoFilterColumn(colId);
   if (condition.op === 'top10' || condition.op === 'bottom10') {
     return {
@@ -300,7 +298,7 @@ function customColumnFromCriteria(
       kind: FILTER_KIND_TOP10,
       top: condition.op === 'top10',
       percent: condition.unit === 'percent',
-      topVal: Number(condition.value),
+      topValue: Number(condition.value),
     };
   }
   if (condition.op === 'aboveAverage' || condition.op === 'belowAverage') {
@@ -314,12 +312,11 @@ function customColumnFromCriteria(
     return {
       ...base,
       kind: FILTER_KIND_CUSTOM,
-      customCount: 2,
       customAnd: true,
-      op1: FILTER_OPERATOR_GREATER_THAN_OR_EQUAL,
-      val1: condition.value,
-      op2: FILTER_OPERATOR_LESS_THAN_OR_EQUAL,
-      val2: condition.value2 ?? '',
+      conditions: [
+        { operator: FILTER_OPERATOR_GREATER_THAN_OR_EQUAL, value: condition.value },
+        { operator: FILTER_OPERATOR_LESS_THAN_OR_EQUAL, value: condition.value2 ?? '' },
+      ],
     };
   }
   const literalWildcard = condition.op === 'equals' || condition.op === 'notEquals';
@@ -344,13 +341,16 @@ function customColumnFromCriteria(
   return {
     ...base,
     kind: FILTER_KIND_CUSTOM,
-    customCount: 1,
-    op1: op,
-    val1: isPatternOp(condition.op)
-      ? wildcardPattern(condition.op, condition.value)
-      : literalWildcard
-        ? escapeAutoFilterWildcardLiteral(condition.value)
-        : condition.value,
+    conditions: [
+      {
+        operator: op,
+        value: isPatternOp(condition.op)
+          ? wildcardPattern(condition.op, condition.value)
+          : literalWildcard
+            ? escapeAutoFilterWildcardLiteral(condition.value)
+            : condition.value,
+      },
+    ],
   };
 }
 
@@ -362,7 +362,7 @@ function colorColumnFromCriteria(
   wb: WorkbookHandle | undefined,
   colId: number,
   color: NonNullable<ValueFilterCriteria['color']>,
-): AutoFilterColumn | null {
+): AutoFilterColumnInput | null {
   if (!wb?.capabilities.conditionalFormatDxf) return null;
   const cell = color.kind === 'cellColor';
   const dxf = dxfRecordFromApply(wb, cell ? { fill: color.color } : { color: color.color });
@@ -380,27 +380,32 @@ function colorColumnFromCriteria(
     if (dxfId < 0) return null;
     ids.set(key, dxfId);
   }
-  return { ...emptyAutoFilterColumn(colId), kind: FILTER_KIND_COLOR, dxfId, cellColor: cell };
+  return {
+    ...emptyAutoFilterColumn(colId),
+    kind: FILTER_KIND_COLOR,
+    dxfIndex: dxfId,
+    cellColor: cell,
+  };
 }
 
 /** The `<sortState>` for a sort of `spec.range`'s data rows by value. */
-function sortStateFromSpec(spec: FilterSortSpec): AutoFilterSortState {
+function sortStateFromSpec(spec: FilterSortSpec): AutoFilterSortStateInput {
   const { range } = spec;
   return {
-    ref: { firstRow: range.r0 + 1, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
+    range: { firstRow: range.r0 + 1, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
     columnSort: false,
     caseSensitive: false,
-    sortMethod: 0,
+    sortMethod: SortMethod.None,
     conditions: spec.keys.map((key) => ({
-      ref: { firstRow: range.r0 + 1, firstCol: key.byCol, lastRow: range.r1, lastCol: key.byCol },
+      range: {
+        firstRow: range.r0 + 1,
+        firstCol: key.byCol,
+        lastRow: range.r1,
+        lastCol: key.byCol,
+      },
       descending: key.direction === 'desc',
       sortBy: SORT_BY_VALUE,
       customList: '',
-      dxfId: 0,
-      hasDxfId: false,
-      iconSet: 0,
-      iconId: 0,
-      hasIconId: false,
     })),
   };
 }
@@ -415,11 +420,11 @@ function sortSpecFromTyped(typed: AutoFilter, range: Range): FilterSortSpec | nu
       (condition) =>
         condition.sortBy === SORT_BY_VALUE &&
         condition.customList === '' &&
-        condition.ref.firstCol >= range.c0 &&
-        condition.ref.firstCol <= range.c1,
+        condition.range.firstCol >= range.c0 &&
+        condition.range.firstCol <= range.c1,
     )
     .map((condition) => ({
-      byCol: condition.ref.firstCol,
+      byCol: condition.range.firstCol,
       direction: condition.descending ? ('desc' as const) : ('asc' as const),
     }));
   return keys.length > 0 ? { range, keys } : null;
@@ -435,12 +440,12 @@ export function typedAutoFilterFromState(
   imported?: ImportedTypedFilter,
   locale = 'en-US',
   wb?: WorkbookHandle,
-): AutoFilter | null {
+): AutoFilterInput | null {
   if (!range) return null;
   const criteria = state.ui.filterCriteria
     .filter((entry) => sameRange(entry.range, range))
     .sort((a, b) => a.byCol - b.byCol);
-  const colorColumns = new Map<number, AutoFilterColumn | null>();
+  const colorColumns = new Map<number, AutoFilterColumnInput | null>();
   for (const entry of criteria) {
     if (!entry.color) continue;
     const colId = entry.byCol - range.c0;
@@ -451,13 +456,15 @@ export function typedAutoFilterFromState(
   // the raw XML fallback is the only safe path.
   if ([...colorColumns.values()].includes(null) && !imported) return null;
 
-  const columns = new Map<number, AutoFilterColumn>();
+  const columns = new Map<number, AutoFilterColumnInput>();
   // Imported Dynamic/Top10/Icon/Color criteria are kept intact while the UI
   // edits a representable column. A subsequent clear of the whole filter
   // removes them along with the definition.
   if (imported && sameAutoFilterRange(imported.filter, range)) {
     for (const column of imported.filter.columns) {
-      if (imported.unsupportedColumns.has(column.colId)) columns.set(column.colId, column);
+      if (imported.unsupportedColumns.has(column.columnOffset)) {
+        columns.set(column.columnOffset, column);
+      }
     }
   }
 
@@ -474,13 +481,14 @@ export function typedAutoFilterFromState(
       continue;
     }
     const hidden = new Set(entry.hiddenValues.map((value) => filterMatchKey(value, locale)));
-    const column = emptyAutoFilterColumn(colId);
-    column.kind = FILTER_KIND_VALUES;
-    column.filterBlank = !hidden.has('');
-    column.values = distinctValues(state, range, entry.byCol, locale, wb).filter(
-      (value) => value !== '' && !hidden.has(filterMatchKey(value, locale)),
-    );
-    columns.set(colId, column);
+    columns.set(colId, {
+      ...emptyAutoFilterColumn(colId),
+      kind: FILTER_KIND_VALUES,
+      filterBlank: !hidden.has(''),
+      values: distinctValues(state, range, entry.byCol, locale, wb).filter(
+        (value) => value !== '' && !hidden.has(filterMatchKey(value, locale)),
+      ),
+    });
   }
 
   return {
@@ -490,7 +498,7 @@ export function typedAutoFilterFromState(
       lastRow: range.r1,
       lastCol: range.c1,
     },
-    columns: Array.from(columns.values()).sort((a, b) => a.colId - b.colId),
+    columns: Array.from(columns.values()).sort((a, b) => a.columnOffset - b.columnOffset),
     sort: sortForRange(state, range, imported),
   };
 }
@@ -499,7 +507,7 @@ function sortForRange(
   state: State,
   range: Range,
   imported: ImportedTypedFilter | undefined,
-): AutoFilterSortState | null {
+): AutoFilterSortStateInput | null {
   const spec = state.ui.filterSorts?.find((entry) => sameRange(entry.range, range));
   if (spec) return sortStateFromSpec(spec);
   // Levels the cell layer cannot show stay engine-owned until a sort replaces them.
@@ -511,7 +519,7 @@ function sortForRange(
 }
 
 function wildcardCondition(
-  op: number,
+  op: ComparisonOperator,
   value: string,
   locale = 'en-US',
 ): NonNullable<ValueFilterCriteria['condition']> | null {
@@ -583,15 +591,15 @@ function localCriteriaFromTypedFilter(
   const criteria: ValueFilterCriteria[] = [];
   const unsupportedColumns = new Set<number>();
   for (const column of filter.columns) {
-    const byCol = range.c0 + column.colId;
+    const byCol = range.c0 + column.columnOffset;
     if (byCol < range.c0 || byCol > range.c1) {
-      unsupportedColumns.add(column.colId);
+      unsupportedColumns.add(column.columnOffset);
       continue;
     }
     // The dropdown affordance flags have no cell-layer representation. Keep
     // their native column intact until that column is explicitly edited.
     if (column.hiddenButton || !column.showButton) {
-      unsupportedColumns.add(column.colId);
+      unsupportedColumns.add(column.columnOffset);
       continue;
     }
     if (column.kind === FILTER_KIND_VALUES && column.dateGroups.length === 0) {
@@ -602,8 +610,12 @@ function localCriteriaFromTypedFilter(
       criteria.push({ range, byCol, hiddenValues });
       continue;
     }
-    if (column.kind === FILTER_KIND_COLOR && wb?.capabilities.conditionalFormatDxf) {
-      const apply = dxfToApply(wb, column.dxfId);
+    if (
+      column.kind === FILTER_KIND_COLOR &&
+      column.dxfIndex !== null &&
+      wb?.capabilities.conditionalFormatDxf
+    ) {
+      const apply = dxfToApply(wb, column.dxfIndex);
       const color = column.cellColor ? apply.fill : apply.color;
       if (color) {
         criteria.push({
@@ -618,14 +630,14 @@ function localCriteriaFromTypedFilter(
         continue;
       }
     }
-    if (column.kind === FILTER_KIND_TOP10 && column.topVal > 0) {
+    if (column.kind === FILTER_KIND_TOP10 && column.topValue > 0) {
       criteria.push({
         range,
         byCol,
         hiddenValues: [],
         condition: {
           op: column.top ? 'top10' : 'bottom10',
-          value: String(column.topVal),
+          value: String(column.topValue),
           unit: column.percent ? 'percent' : 'items',
         },
       });
@@ -646,15 +658,16 @@ function localCriteriaFromTypedFilter(
       });
       continue;
     }
+    const [first, second] = column.conditions;
     if (
       column.kind === FILTER_KIND_CUSTOM &&
-      column.customCount === 2 &&
+      column.conditions.length === 2 &&
       column.customAnd &&
-      column.op1 === FILTER_OPERATOR_GREATER_THAN_OR_EQUAL &&
-      column.op2 === FILTER_OPERATOR_LESS_THAN_OR_EQUAL
+      first?.operator === FILTER_OPERATOR_GREATER_THAN_OR_EQUAL &&
+      second?.operator === FILTER_OPERATOR_LESS_THAN_OR_EQUAL
     ) {
-      const low = parseStoredNumeric(column.val1, locale);
-      const high = parseStoredNumeric(column.val2, locale);
+      const low = parseStoredNumeric(first.value, locale);
+      const high = parseStoredNumeric(second.value, locale);
       if (low !== null && high !== null) {
         criteria.push({
           range,
@@ -665,14 +678,19 @@ function localCriteriaFromTypedFilter(
         continue;
       }
     }
-    if (column.kind === FILTER_KIND_CUSTOM && column.customCount === 1 && !column.customAnd) {
-      const condition = wildcardCondition(column.op1, column.val1, locale);
+    if (
+      column.kind === FILTER_KIND_CUSTOM &&
+      column.conditions.length === 1 &&
+      first &&
+      !column.customAnd
+    ) {
+      const condition = wildcardCondition(first.operator, first.value, locale);
       if (condition) {
         criteria.push({ range, byCol, hiddenValues: [], condition });
         continue;
       }
     }
-    unsupportedColumns.add(column.colId);
+    unsupportedColumns.add(column.columnOffset);
   }
   return { range, criteria, unsupportedColumns };
 }
@@ -824,7 +842,7 @@ function syncStoreOwnedAutoFilterVisibility(
   return true;
 }
 
-const emptyTypedFilter = (range: Range): AutoFilter => ({
+const emptyTypedFilter = (range: Range): AutoFilterInput => ({
   range: { firstRow: range.r0, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
   columns: [],
   sort: null,

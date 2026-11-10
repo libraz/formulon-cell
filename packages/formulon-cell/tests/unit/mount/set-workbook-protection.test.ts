@@ -44,13 +44,8 @@ describe('setWorkbook starts from the new workbook protection', () => {
     next.setSheetProtection(0, { enabled: true });
     next.addProtectedRange(0, {
       name: 'R',
-      sqref: 'A1',
-      password: legacySheetPasswordHash('passB'),
-      algorithmName: '',
-      hashValue: '',
-      saltValue: '',
-      spinCount: 0,
-      securityDescriptor: '',
+      ranges: 'A1',
+      legacyPasswordHash: legacySheetPasswordHash('passB'),
     });
     await sheet.instance.setWorkbook(next);
 

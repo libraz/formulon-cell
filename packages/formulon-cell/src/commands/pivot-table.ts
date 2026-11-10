@@ -1,4 +1,3 @@
-import { formatA1Range, quoteSheetName } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { lastPivotStyleLayer, pivotStyleLayer } from '../engine/pivot-style.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
@@ -167,38 +166,27 @@ const writePivotCacheWorksheetSource = (
     return true;
   }
   return wb.setPivotCacheWorksheetSource(cacheId, {
-    present: true,
-    ref: formatA1Range(source, { collapse: false }),
-    sheet: wb.sheetName(source.sheet),
+    range: {
+      sheet: source.sheet,
+      rect: { firstRow: source.r0, firstCol: source.c0, lastRow: source.r1, lastCol: source.c1 },
+    },
   });
-};
-
-const sheetIndexByName = (wb: WorkbookHandle, name: string): number => {
-  const target = name.trim().toLowerCase();
-  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
-    if (wb.sheetName(sheet).toLowerCase() === target) return sheet;
-  }
-  return -1;
 };
 
 export const pivotCacheWorksheetSourceRange = (
   wb: WorkbookHandle,
   cacheId: number,
 ): Range | null => {
-  const source = wb.getPivotCacheWorksheetSource(cacheId);
-  if (!source?.present || !source.ref) return null;
-  const parsed = parseRangeRef(
-    source.sheet ? `${quoteSheetName(source.sheet)}!${source.ref}` : source.ref,
-  );
-  if (!parsed) return null;
-  const sheet =
-    parsed.sheetName !== null
-      ? sheetIndexByName(wb, parsed.sheetName)
-      : source.sheet
-        ? sheetIndexByName(wb, source.sheet)
-        : -1;
-  if (sheet < 0) return null;
-  return { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 };
+  const range = wb.getPivotCacheWorksheetSource(cacheId)?.range;
+  if (!range) return null;
+  const { rect } = range;
+  return {
+    sheet: range.sheet,
+    r0: rect.firstRow,
+    c0: rect.firstCol,
+    r1: rect.lastRow,
+    c1: rect.lastCol,
+  };
 };
 
 export function inferPivotSourceFields(wb: WorkbookHandle, range: Range): PivotSourceField[] {

@@ -1,4 +1,5 @@
-import { AnchorEditAs, AnchorKind, ShapePaint } from '@libraz/formulon';
+import type { ChartFill, ChartLine } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
@@ -18,6 +19,7 @@ import {
 import { deleteRows, insertRows } from '../../../src/commands/structure.js';
 import { hydrateImagesFromEngine } from '../../../src/engine/images-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import type { EngineShape } from '../../../src/engine/workbook-handle-drawing-objects.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -31,6 +33,105 @@ afterEach(() => {
 });
 
 const range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+
+/** How a shape paints its fill or outline, as these tests compare it. */
+const ShapePaint = { Unset: 0, Solid: 1, None: 2, Other: 3 } as const;
+type ShapePaint = (typeof ShapePaint)[keyof typeof ShapePaint];
+
+const EMU_PER_PT = 12700;
+
+const paintKind = (paint: ChartFill | ChartLine | null): ShapePaint => {
+  if (paint === null) return ShapePaint.Unset;
+  if (paint.other) return ShapePaint.Other;
+  if (paint.none) return ShapePaint.None;
+  return paint.color === null ? ShapePaint.Unset : ShapePaint.Solid;
+};
+
+/** A shape read back, flattened: anchor fields at the top, paint as kind and RGB. */
+const flat = (shape: EngineShape) => ({
+  objectId: shape.objectId,
+  name: shape.name,
+  prst: shape.presetGeometry,
+  text: shape.text,
+  textBox: shape.textBox,
+  hidden: shape.hidden,
+  rotation: shape.rotationDeg,
+  anchorKind: shape.anchor.kind,
+  editAs: shape.anchor.editAs,
+  fromRow: shape.anchor.fromRow,
+  fromCol: shape.anchor.fromCol,
+  fromRowOff: shape.anchor.fromRowOffsetEmu,
+  fromColOff: shape.anchor.fromColOffsetEmu,
+  toRow: shape.anchor.toRow,
+  toCol: shape.anchor.toCol,
+  toRowOff: shape.anchor.toRowOffsetEmu,
+  toColOff: shape.anchor.toColOffsetEmu,
+  cx: shape.anchor.widthEmu,
+  cy: shape.anchor.heightEmu,
+  fillKind: paintKind(shape.fill),
+  fillRgb: (shape.fill?.color?.argb ?? 0) & 0xffffff,
+  lineKind: paintKind(shape.line),
+  lineRgb: (shape.line?.color?.argb ?? 0) & 0xffffff,
+  lineWidthEmu: Math.round((shape.line?.widthPt ?? 0) * EMU_PER_PT),
+});
+
+const listShapes = (wb: WorkbookHandle, sheet: number) => wb.listShapes(sheet).map(flat);
+
+interface FlatShapeInput {
+  name?: string;
+  prst?: string;
+  text?: string;
+  textBox?: boolean;
+  hidden?: boolean;
+  anchorKind?: AnchorKind;
+  editAs?: AnchorEditAs;
+  fromRow?: number;
+  fromCol?: number;
+  toRow?: number;
+  toCol?: number;
+  cx?: number;
+  cy?: number;
+  fillKind?: ShapePaint;
+  fillRgb?: number;
+  lineKind?: ShapePaint;
+  lineRgb?: number;
+  lineWidthEmu?: number;
+}
+
+const hex = (rgb: number): string => `#${rgb.toString(16).padStart(6, '0')}`;
+
+/** Insert a shape described in the flattened form. */
+const insertShape = (wb: WorkbookHandle, sheet: number, input: FlatShapeInput) =>
+  wb.insertShape(sheet, {
+    ...(input.name !== undefined ? { name: input.name } : {}),
+    ...(input.prst !== undefined ? { presetGeometry: input.prst } : {}),
+    ...(input.text !== undefined ? { text: input.text } : {}),
+    ...(input.textBox !== undefined ? { textBox: input.textBox } : {}),
+    ...(input.hidden !== undefined ? { hidden: input.hidden } : {}),
+    anchor: {
+      ...(input.anchorKind !== undefined ? { kind: input.anchorKind } : {}),
+      ...(input.editAs !== undefined ? { editAs: input.editAs } : {}),
+      ...(input.fromRow !== undefined ? { fromRow: input.fromRow } : {}),
+      ...(input.fromCol !== undefined ? { fromCol: input.fromCol } : {}),
+      ...(input.toRow !== undefined ? { toRow: input.toRow } : {}),
+      ...(input.toCol !== undefined ? { toCol: input.toCol } : {}),
+      ...(input.cx !== undefined ? { widthEmu: input.cx } : {}),
+      ...(input.cy !== undefined ? { heightEmu: input.cy } : {}),
+    },
+    ...(input.fillKind === ShapePaint.Solid ? { fill: { color: hex(input.fillRgb ?? 0) } } : {}),
+    ...(input.fillKind === ShapePaint.None ? { fill: { none: true } } : {}),
+    ...(input.lineKind === ShapePaint.Solid
+      ? {
+          line: {
+            color: hex(input.lineRgb ?? 0),
+            ...(input.lineWidthEmu !== undefined
+              ? { widthPt: input.lineWidthEmu / EMU_PER_PT }
+              : {}),
+          },
+        }
+      : {}),
+    ...(input.lineKind === ShapePaint.None ? { line: { none: true } } : {}),
+  });
 
 /** A workbook with its store bound; `seed` writes the engine before hydration. */
 async function session(seed?: (wb: WorkbookHandle) => void, bytes?: Uint8Array) {
@@ -70,8 +171,8 @@ describe('shapes saved with the workbook', () => {
     const { wb, store } = await session();
     oval(store);
 
-    const [native] = wb.listShapes(0);
-    expect(wb.listShapes(0)).toHaveLength(1);
+    const [native] = listShapes(wb, 0);
+    expect(listShapes(wb, 0)).toHaveLength(1);
     expect(native).toMatchObject({
       prst: 'ellipse',
       fillKind: ShapePaint.Solid,
@@ -83,7 +184,7 @@ describe('shapes saved with the workbook', () => {
       nativeObjectId: native?.objectId,
       nativeGeometryEditable: true,
     });
-    expect(only(store).nativeAnchor?.cx).toBeGreaterThan(0);
+    expect(only(store).nativeAnchor?.widthEmu).toBeGreaterThan(0);
 
     const reopened = await saved(wb);
     expect(only(reopened.store)).toMatchObject({
@@ -116,7 +217,7 @@ describe('shapes saved with the workbook', () => {
     }
     createSessionShape(store, range, { id: 'arrow', shape: 'arrow', x: 40, y: 200, w: 90, h: 50 });
 
-    expect(wb.listShapes(0).map((shape) => shape.prst)).toEqual([
+    expect(listShapes(wb, 0).map((shape) => shape.prst)).toEqual([
       'rect',
       'roundRect',
       'ellipse',
@@ -144,18 +245,18 @@ describe('shapes saved with the workbook', () => {
     };
 
     style((item) => applySessionShapeFill(store, item, '#00ff00', history, wb));
-    expect(wb.listShapes(0)[0]).toMatchObject({ fillKind: ShapePaint.Solid, fillRgb: 0x00ff00 });
+    expect(listShapes(wb, 0)[0]).toMatchObject({ fillKind: ShapePaint.Solid, fillRgb: 0x00ff00 });
     style((item) => applySessionShapeOutline(store, item, '#0000ff', history, wb));
     style((item) => applySessionShapeOutlineWeight(store, item, 4.5, history, wb));
-    expect(wb.listShapes(0)[0]).toMatchObject({
+    expect(listShapes(wb, 0)[0]).toMatchObject({
       lineKind: ShapePaint.Solid,
       lineRgb: 0x0000ff,
       lineWidthEmu: 57150,
     });
     style((item) => applySessionShapeFill(store, item, null, history, wb));
-    expect(wb.listShapes(0)[0]?.fillKind).toBe(ShapePaint.None);
+    expect(listShapes(wb, 0)[0]?.fillKind).toBe(ShapePaint.None);
     style((item) => applySessionShapeOutline(store, item, null, history, wb));
-    expect(wb.listShapes(0)[0]?.lineKind).toBe(ShapePaint.None);
+    expect(listShapes(wb, 0)[0]?.lineKind).toBe(ShapePaint.None);
 
     const reopened = await saved(wb);
     expect(only(reopened.store)).toMatchObject({ opacity: 0, lineWidth: 0 });
@@ -174,10 +275,10 @@ describe('shapes saved with the workbook', () => {
     );
 
     expect(only(store)).toMatchObject({ radius: undefined, lineDash: undefined, opacity: 1 });
-    expect(wb.listShapes(0)[0]?.fillKind).toBe(ShapePaint.Solid);
+    expect(listShapes(wb, 0)[0]?.fillKind).toBe(ShapePaint.Solid);
     updateSessionIllustration(store, 's1', { opacity: 0 }, history, wb);
     expect(only(store).opacity).toBe(0);
-    expect(wb.listShapes(0)[0]?.fillKind).toBe(ShapePaint.None);
+    expect(listShapes(wb, 0)[0]?.fillKind).toBe(ShapePaint.None);
   });
 
   it('refuses a dash style, which the file cannot hold', async () => {
@@ -192,11 +293,11 @@ describe('shapes saved with the workbook', () => {
   it('moves and resizes a shape through its anchor', async () => {
     const { wb, store, history } = await session();
     oval(store);
-    const before = wb.listShapes(0)[0];
+    const before = listShapes(wb, 0)[0];
 
     updateSessionIllustration(store, 's1', { x: 300, y: 200, w: 120, h: 60 }, history, wb);
 
-    const after = wb.listShapes(0)[0];
+    const after = listShapes(wb, 0)[0];
     expect(after?.objectId).toBe(before?.objectId);
     expect(after?.cx).toBeCloseTo(120 * 9525, -2);
     expect(after?.cy).toBeCloseTo(60 * 9525, -2);
@@ -204,7 +305,7 @@ describe('shapes saved with the workbook', () => {
     expect(only(store).nativeAnchor).toMatchObject({
       fromRow: after?.fromRow,
       fromCol: after?.fromCol,
-      cx: after?.cx,
+      widthEmu: after?.cx,
     });
 
     const reopened = await saved(wb);
@@ -217,7 +318,7 @@ describe('shapes saved with the workbook', () => {
 
     updateSessionIllustration(store, 's1', { text: 'Total\nQ3' }, history, wb);
 
-    expect(wb.listShapes(0)[0]?.text).toBe('Total\nQ3');
+    expect(listShapes(wb, 0)[0]?.text).toBe('Total\nQ3');
     const reopened = await saved(wb);
     expect(only(reopened.store).text).toBe('Total\nQ3');
   });
@@ -228,7 +329,7 @@ describe('shapes saved with the workbook', () => {
 
     expect(clearSessionIllustration(store, 's1', history, wb)).toBe(true);
 
-    expect(wb.listShapes(0)).toEqual([]);
+    expect(listShapes(wb, 0)).toEqual([]);
     expect(shapesOf((await saved(wb)).store)).toEqual([]);
   });
 
@@ -238,8 +339,8 @@ describe('shapes saved with the workbook', () => {
 
     const copy = duplicateSessionIllustration(store, 's1', history, wb);
 
-    expect(wb.listShapes(0)).toHaveLength(2);
-    const [first, second] = wb.listShapes(0);
+    expect(listShapes(wb, 0)).toHaveLength(2);
+    const [first, second] = listShapes(wb, 0);
     expect(second?.objectId).not.toBe(first?.objectId);
     expect(second?.prst).toBe('ellipse');
     expect(sessionIllustrationById(store.getState(), copy?.id ?? '')?.nativeObjectId).toBe(
@@ -251,58 +352,58 @@ describe('shapes saved with the workbook', () => {
   it('undoes and redoes create, restyle, move and delete in the file', async () => {
     const { wb, store, history } = await session();
     oval(store, history);
-    expect(wb.listShapes(0)).toHaveLength(1);
+    expect(listShapes(wb, 0)).toHaveLength(1);
 
     applySessionShapeFill(store, only(store), '#00ff00', history, wb);
     updateSessionIllustration(store, 's1', { x: 400, y: 300 }, history, wb);
-    const moved = wb.listShapes(0)[0];
+    const moved = listShapes(wb, 0)[0];
     clearSessionIllustration(store, 's1', history, wb);
-    expect(wb.listShapes(0)).toEqual([]);
+    expect(listShapes(wb, 0)).toEqual([]);
 
     history.undo();
-    expect(wb.listShapes(0)).toHaveLength(1);
-    expect(wb.listShapes(0)[0]).toMatchObject({
+    expect(listShapes(wb, 0)).toHaveLength(1);
+    expect(listShapes(wb, 0)[0]).toMatchObject({
       fromRow: moved?.fromRow,
       fromCol: moved?.fromCol,
       fillRgb: 0x00ff00,
     });
-    expect(only(store).nativeObjectId).toBe(wb.listShapes(0)[0]?.objectId);
+    expect(only(store).nativeObjectId).toBe(listShapes(wb, 0)[0]?.objectId);
 
     history.undo();
     history.undo();
-    expect(wb.listShapes(0)[0]).toMatchObject({ fillRgb: 0xff0000 });
-    expect(wb.listShapes(0)[0]?.fromCol).not.toBe(moved?.fromCol);
+    expect(listShapes(wb, 0)[0]).toMatchObject({ fillRgb: 0xff0000 });
+    expect(listShapes(wb, 0)[0]?.fromCol).not.toBe(moved?.fromCol);
 
     history.undo();
-    expect(wb.listShapes(0)).toEqual([]);
+    expect(listShapes(wb, 0)).toEqual([]);
     expect(shapesOf(store)).toEqual([]);
 
     history.redo();
     history.redo();
     history.redo();
     history.redo();
-    expect(wb.listShapes(0)).toEqual([]);
+    expect(listShapes(wb, 0)).toEqual([]);
     history.undo();
-    expect(wb.listShapes(0)).toHaveLength(1);
+    expect(listShapes(wb, 0)).toHaveLength(1);
     expect(shapesOf((await saved(wb)).store)).toHaveLength(1);
   });
 
   it('shifts a shape once when rows are inserted, and back on undo', async () => {
     const { wb, store, history } = await session();
     oval(store);
-    const row = wb.listShapes(0)[0]?.fromRow ?? 0;
+    const row = listShapes(wb, 0)[0]?.fromRow ?? 0;
 
     expect(insertRows(store, wb, history, 0, 3)).toBe(true);
 
-    expect(wb.listShapes(0)[0]?.fromRow).toBe(row + 3);
-    expect(wb.listShapes(0)).toHaveLength(1);
+    expect(listShapes(wb, 0)[0]?.fromRow).toBe(row + 3);
+    expect(listShapes(wb, 0)).toHaveLength(1);
     expect(only(store).nativeAnchor?.fromRow).toBe(row + 3);
 
     history.undo();
-    expect(wb.listShapes(0)[0]?.fromRow).toBe(row);
+    expect(listShapes(wb, 0)[0]?.fromRow).toBe(row);
     expect(only(store).nativeAnchor?.fromRow).toBe(row);
     history.redo();
-    expect(wb.listShapes(0)[0]?.fromRow).toBe(row + 3);
+    expect(listShapes(wb, 0)[0]?.fromRow).toBe(row + 3);
   });
 
   it('keeps a shape in the file when an earlier sheet is removed', async () => {
@@ -313,24 +414,24 @@ describe('shapes saved with the workbook', () => {
       { sheet: second, r0: 0, c0: 0, r1: 0, c1: 0 },
       { id: 's2', shape: 'rectangle', x: 100, y: 60, w: 120, h: 80 },
     );
-    expect(wb.listShapes(second)).toHaveLength(1);
+    expect(listShapes(wb, second)).toHaveLength(1);
 
     expect(wb.removeSheet(0)).toBe(true);
 
-    expect(wb.listShapes(0)).toHaveLength(1);
+    expect(listShapes(wb, 0)).toHaveLength(1);
     expect(sessionIllustrationById(store.getState(), 's2')?.sheet).toBe(0);
   });
 
   it('puts a collapsed shape back where it was when a row delete is undone', async () => {
     const { wb, store, history } = await session();
     oval(store);
-    const before = wb.listShapes(0)[0];
+    const before = listShapes(wb, 0)[0];
 
     expect(deleteRows(store, wb, history, (before?.fromRow ?? 0) - 1, 4)).toBe(true);
     history.undo();
 
-    expect(wb.listShapes(0)).toHaveLength(1);
-    expect(wb.listShapes(0)[0]).toMatchObject({
+    expect(listShapes(wb, 0)).toHaveLength(1);
+    expect(listShapes(wb, 0)[0]).toMatchObject({
       fromRow: before?.fromRow,
       fromCol: before?.fromCol,
       cx: before?.cx,
@@ -341,7 +442,7 @@ describe('shapes saved with the workbook', () => {
 
   it('puts back a two-cell shape that a row delete took, and its style', async () => {
     const { wb, store, history } = await session((handle) => {
-      handle.insertShape(0, {
+      insertShape(handle, 0, {
         prst: 'rect',
         anchorKind: AnchorKind.TwoCell,
         editAs: AnchorEditAs.TwoCell,
@@ -357,12 +458,12 @@ describe('shapes saved with the workbook', () => {
     expect(shapesOf(store)).toHaveLength(1);
 
     expect(deleteRows(store, wb, history, 9, 5)).toBe(true);
-    expect(wb.listShapes(0)).toEqual([]);
+    expect(listShapes(wb, 0)).toEqual([]);
     expect(shapesOf(store)).toEqual([]);
 
     history.undo();
-    expect(wb.listShapes(0)).toHaveLength(1);
-    expect(wb.listShapes(0)[0]).toMatchObject({
+    expect(listShapes(wb, 0)).toHaveLength(1);
+    expect(listShapes(wb, 0)[0]).toMatchObject({
       fromRow: 10,
       toRow: 12,
       fillRgb: 0x336699,
@@ -374,7 +475,7 @@ describe('shapes saved with the workbook', () => {
 
 describe('deleting and restoring saved shapes', () => {
   const callout = (wb: WorkbookHandle): void => {
-    wb.insertShape(0, {
+    insertShape(wb, 0, {
       name: 'Callout',
       prst: 'rect',
       anchorKind: AnchorKind.TwoCell,
@@ -392,14 +493,14 @@ describe('deleting and restoring saved shapes', () => {
 
   it('restores a deleted shape from the engine description', async () => {
     const { wb, store, history } = await session(callout);
-    const before = wb.listShapes(0)[0];
+    const before = listShapes(wb, 0)[0];
 
     expect(clearSessionIllustration(store, only(store).id, history, wb)).toBe(true);
-    expect(wb.listShapes(0)).toEqual([]);
+    expect(listShapes(wb, 0)).toEqual([]);
     history.undo();
 
-    expect(wb.listShapes(0)).toHaveLength(1);
-    expect(wb.listShapes(0)[0]).toMatchObject({
+    expect(listShapes(wb, 0)).toHaveLength(1);
+    expect(listShapes(wb, 0)[0]).toMatchObject({
       name: 'Callout',
       textBox: true,
       text: 'note',
@@ -414,7 +515,7 @@ describe('deleting and restoring saved shapes', () => {
   it('puts a shape back at its anchor whatever the scroll position', async () => {
     const { wb, store, history } = await session();
     oval(store);
-    const before = wb.listShapes(0)[0];
+    const before = listShapes(wb, 0)[0];
 
     clearSessionIllustration(store, 's1', history, wb);
     store.setState((state) => ({
@@ -423,7 +524,7 @@ describe('deleting and restoring saved shapes', () => {
     }));
     history.undo();
 
-    expect(wb.listShapes(0)[0]).toMatchObject({
+    expect(listShapes(wb, 0)[0]).toMatchObject({
       fromRow: before?.fromRow,
       fromCol: before?.fromCol,
       fromRowOff: before?.fromRowOff,
@@ -445,7 +546,7 @@ describe('deleting and restoring saved shapes', () => {
 
 describe('loaded shapes the overlay cannot draw', () => {
   const star = (wb: WorkbookHandle): void => {
-    wb.insertShape(0, {
+    insertShape(wb, 0, {
       prst: 'star5',
       anchorKind: AnchorKind.OneCell,
       editAs: AnchorEditAs.OneCell,
@@ -466,7 +567,7 @@ describe('loaded shapes the overlay cannot draw', () => {
 
   it('treats a loaded line as a locked box, since its direction is unknown', async () => {
     const { store } = await session((wb) => {
-      wb.insertShape(0, {
+      insertShape(wb, 0, {
         prst: 'straightConnector1',
         anchorKind: AnchorKind.TwoCell,
         editAs: AnchorEditAs.TwoCell,
@@ -487,7 +588,7 @@ describe('loaded shapes the overlay cannot draw', () => {
     const { wb, store, history } = await session(star);
 
     expect(clearSessionIllustration(store, only(store).id, history, wb)).toBe(false);
-    expect(wb.listShapes(0)).toHaveLength(1);
+    expect(listShapes(wb, 0)).toHaveLength(1);
     expect(canDeleteIllustration(only(store))).toBe(false);
   });
 
@@ -498,18 +599,18 @@ describe('loaded shapes the overlay cannot draw', () => {
     expect(applySessionShapeFill(store, item, '#000000', history, wb)).toBeNull();
     updateSessionIllustration(store, item.id, { x: 500, y: 400 }, history, wb);
 
-    expect(wb.listShapes(0)[0]).toMatchObject({
+    expect(listShapes(wb, 0)[0]).toMatchObject({
       prst: 'star5',
       fillKind: ShapePaint.Solid,
       fillRgb: 0xffcc00,
     });
-    expect(wb.listShapes(0)[0]?.fromRow).not.toBe(10);
+    expect(listShapes(wb, 0)[0]?.fromRow).not.toBe(10);
   });
 
   it('cannot be copied, and leaves hidden shapes alone', async () => {
     const { wb, store, history } = await session((handle) => {
       star(handle);
-      handle.insertShape(0, {
+      insertShape(handle, 0, {
         anchorKind: AnchorKind.OneCell,
         editAs: AnchorEditAs.OneCell,
         fromRow: 1,
@@ -523,7 +624,7 @@ describe('loaded shapes the overlay cannot draw', () => {
     expect(shapesOf(store)).toHaveLength(1);
     expect(duplicateSessionIllustration(store, only(store).id, history, wb)).toBeNull();
     expect(clearSessionIllustration(store, only(store).id, history, wb)).toBe(false);
-    expect(wb.listShapes(0)).toHaveLength(2);
-    expect(wb.listShapes(0)[1]?.hidden).toBe(true);
+    expect(listShapes(wb, 0)).toHaveLength(2);
+    expect(listShapes(wb, 0)[1]?.hidden).toBe(true);
   });
 });

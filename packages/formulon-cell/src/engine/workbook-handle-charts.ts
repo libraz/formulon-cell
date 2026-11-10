@@ -1,19 +1,26 @@
 import type {
+  BlanksAs,
+  Chart,
   ChartAxisPatch,
-  ChartBlanksAs,
+  ChartBarDirection,
   ChartData,
   ChartGrouping,
-  ChartInfo,
-  ChartInsertKind,
-  ChartInsertOptions,
+  ChartInput,
   ChartLegendPosition,
   ChartPlotPatch,
+  ChartPlotType,
   ChartPointPatch,
-  ChartPreviewOverrides,
+  ChartPreviewOverridesInput,
+  ChartProperties,
   ChartSeriesDirection,
+  ChartSeriesInput,
   ChartSeriesPatch,
-  ChartTitleKind,
+  ChartTitle,
+  Color,
+  SheetRect,
 } from '@libraz/formulon';
+import { ColorContext, ColorKind } from '@libraz/formulon';
+import { isFormulonError } from './result.js';
 import type { EngineCapabilities, Workbook } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -23,9 +30,9 @@ type WorkbookHandleInternals = {
   assertAlive(): void;
 };
 
-export type EngineChartInfo = ChartInfo;
+export type EngineChartInfo = ChartProperties;
 export type EngineChartData = ChartData;
-export type EngineChartInsertOptions = ChartInsertOptions;
+export type EngineChartInsertOptions = ChartInput;
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleChartsMethods {}
@@ -39,110 +46,153 @@ function assertAlive(handle: unknown): void {
   internals(handle).assertAlive();
 }
 
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
+function chartOf(handle: unknown, sheet: number, objectId: number): Chart {
+  return internals(handle).wb.sheet(sheet).chart(objectId);
+}
+
+/** Run a chart edit; an engine error is a `false` outcome. */
+function edit(run: () => void): boolean {
+  try {
+    run();
+    return true;
+  } catch (e) {
+    if (!isFormulonError(e)) throw e;
+    return false;
+  }
+}
+
+/** Run a chart read; an engine error reads as null. */
+function read<T>(run: () => T): T | null {
+  try {
+    return run();
+  } catch (e) {
+    if (!isFormulonError(e)) throw e;
+    return null;
+  }
+}
+
+const isThemeColor = (value: object): value is Color =>
+  'kind' in value &&
+  'theme' in value &&
+  'tint' in value &&
+  'indexed' in value &&
+  value.kind === ColorKind.Theme;
+
+/** `value` with every theme colour rendered to RGB, as the chart paints it. */
+function renderThemeColors<T>(value: T, render: (color: Color) => Color): T {
+  if (value === null || typeof value !== 'object' || ArrayBuffer.isView(value)) return value;
+  if (Array.isArray(value)) return value.map((entry) => renderThemeColors(entry, render)) as T;
+  if (isThemeColor(value)) return render(value) as T;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, renderThemeColors(entry, render)]),
+  ) as T;
 }
 
 export abstract class WorkbookHandleChartsMethods {
   declare readonly capabilities: EngineCapabilities;
 
-  /** Typed view of the chart `objectId`; null on failure or capability off. */
+  /** Typed view of the chart `objectId`, theme colours rendered to RGB; null on failure. */
   getChart(sheet: number, objectId: number): EngineChartInfo | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    const result = wb(this).getChart(sheet, objectId);
-    return result.status.ok ? result.chart : null;
+    const wb = internals(this).wb;
+    const info = read(() => chartOf(this, sheet, objectId).getProperties());
+    if (!info) return null;
+    return renderThemeColors(info, (color) => ({
+      ...color,
+      kind: ColorKind.Rgb,
+      argb: wb.resolveColor(color, ColorContext.Font).argb,
+    }));
   }
 
   /** The chart's series resolved against the current cell values. */
   getChartData(sheet: number, objectId: number): EngineChartData | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    const result = wb(this).getChartData(sheet, objectId);
-    return result.status.ok ? result.data : null;
+    return read(() => chartOf(this, sheet, objectId).getData());
   }
 
   /** Resolve the series as if `overrides` were applied; the workbook is unchanged. */
   previewChartData(
     sheet: number,
     objectId: number,
-    overrides: ChartPreviewOverrides,
+    overrides: ChartPreviewOverridesInput,
   ): EngineChartData | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    const result = wb(this).previewChartData(sheet, objectId, { ...overrides });
-    return result.status.ok ? result.data : null;
+    return read(() => chartOf(this, sheet, objectId).getPreview({ ...overrides }));
   }
 
   /** Create a chart and return its object id. */
   insertChart(sheet: number, options: EngineChartInsertOptions): number | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    const result = wb(this).insertChart(sheet, { ...options });
-    return result.status.ok ? result.objectId : null;
+    return read(
+      () =>
+        internals(this)
+          .wb.sheet(sheet)
+          .addChart({ ...options }).objectId,
+    );
   }
 
   setChartType(
     sheet: number,
     objectId: number,
     plot: number,
-    kind: ChartInsertKind,
-    grouping?: ChartGrouping,
+    type: ChartPlotType,
+    options: { barDirection?: ChartBarDirection; grouping?: ChartGrouping } = {},
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    // The binding rejects an explicit undefined grouping; kinds without one take the 4-argument form.
-    const status =
-      grouping === undefined
-        ? wb(this).setChartType(sheet, objectId, plot, kind)
-        : wb(this).setChartType(sheet, objectId, plot, kind, grouping);
-    return status.ok;
+    return edit(() => chartOf(this, sheet, objectId).setType(plot, type, options));
   }
 
-  /** Set the title text; null removes the title, `{ kind: Auto }` returns it to Excel's automatic one. */
-  setChartTitle(
-    sheet: number,
-    objectId: number,
-    title: string | null | { readonly kind: ChartTitleKind },
-  ): boolean {
+  /** Set the title text; null removes the title, an `Auto` title returns it to Excel's automatic one. */
+  setChartTitle(sheet: number, objectId: number, title: string | null | ChartTitle): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).setChartTitle(sheet, objectId, title).ok;
+    return edit(() => chartOf(this, sheet, objectId).setTitle(title));
   }
 
+  /** Place the legend; a null position removes it. */
   setChartLegend(
     sheet: number,
     objectId: number,
-    position: ChartLegendPosition,
+    position: ChartLegendPosition | null,
     overlay: boolean,
     hiddenSeries?: readonly number[],
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).setChartLegend(
-      sheet,
-      objectId,
-      position,
-      overlay,
-      hiddenSeries ? [...hiddenSeries] : undefined,
-    ).ok;
+    return edit(() => {
+      const chart = chartOf(this, sheet, objectId);
+      if (position === null) chart.setLegend(null);
+      else {
+        chart.updateLegend({
+          position,
+          overlay,
+          ...(hiddenSeries ? { hiddenEntries: [...hiddenSeries] } : {}),
+        });
+      }
+    });
   }
 
   setChartAxis(sheet: number, objectId: number, axisId: number, patch: ChartAxisPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).setChartAxis(sheet, objectId, axisId, { ...patch }).ok;
+    return edit(() => chartOf(this, sheet, objectId).updateAxis(axisId, { ...patch }));
   }
 
+  /** Set how blanks plot and whether hidden cells are skipped; null removes the element. */
   setChartDisplay(
     sheet: number,
     objectId: number,
-    blanksAs: ChartBlanksAs,
+    blanksAs: BlanksAs | null,
     plotVisibleOnly: boolean | null,
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).setChartDisplay(sheet, objectId, blanksAs, plotVisibleOnly).ok;
+    return edit(() => chartOf(this, sheet, objectId).updateDisplay({ blanksAs, plotVisibleOnly }));
   }
 
   setChartSeries(
@@ -154,7 +204,7 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).setChartSeries(sheet, objectId, plot, seriesIdx, patch).ok;
+    return edit(() => chartOf(this, sheet, objectId).updateSeries(plot, seriesIdx, patch));
   }
 
   /** Patch a data point; null removes its formatting. */
@@ -168,13 +218,17 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).setChartPoint(sheet, objectId, plot, seriesIdx, pointIdx, patch).ok;
+    return edit(() => {
+      const chart = chartOf(this, sheet, objectId);
+      if (patch === null) chart.setPoint(plot, seriesIdx, pointIdx, null);
+      else chart.updatePoint(plot, seriesIdx, pointIdx, patch);
+    });
   }
 
   setChartPlot(sheet: number, objectId: number, plot: number, patch: ChartPlotPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).setChartPlot(sheet, objectId, plot, { ...patch }).ok;
+    return edit(() => chartOf(this, sheet, objectId).updatePlot(plot, { ...patch }));
   }
 
   /** Replace the chart filter: series by `c:idx`, categories by position. */
@@ -186,7 +240,12 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).setChartFilter(sheet, objectId, [...hiddenSeries], [...hiddenCategories]).ok;
+    return edit(() =>
+      chartOf(this, sheet, objectId).setFilter({
+        hiddenSeries: [...hiddenSeries],
+        hiddenCategories: [...hiddenCategories],
+      }),
+    );
   }
 
   /** Append a series and return its `c:idx`. */
@@ -194,31 +253,37 @@ export abstract class WorkbookHandleChartsMethods {
     sheet: number,
     objectId: number,
     plot: number,
-    patch: ChartSeriesPatch,
+    input: ChartSeriesInput,
   ): number | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    const result = wb(this).addChartSeries(sheet, objectId, plot, patch);
-    return result.status.ok ? result.seriesIdx : null;
+    return read(() => chartOf(this, sheet, objectId).addSeries(plot, input));
   }
 
   removeChartSeries(sheet: number, objectId: number, plot: number, seriesIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).removeChartSeries(sheet, objectId, plot, seriesIdx).ok;
+    return edit(() => chartOf(this, sheet, objectId).removeSeries(plot, seriesIdx));
   }
 
   setChartSource(
     sheet: number,
     objectId: number,
-    source: string,
+    source: SheetRect | string,
     direction: ChartSeriesDirection,
     headerRow?: boolean,
     headerColumn?: boolean,
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return wb(this).setChartSource(sheet, objectId, source, direction, headerRow, headerColumn).ok;
+    return edit(() =>
+      chartOf(this, sheet, objectId).setSource({
+        range: source,
+        direction,
+        ...(headerRow === undefined ? {} : { headerRow }),
+        ...(headerColumn === undefined ? {} : { headerColumn }),
+      }),
+    );
   }
 }
 

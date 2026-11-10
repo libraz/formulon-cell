@@ -167,7 +167,9 @@ describe.skipIf(!canLoadWasm())('data tables', () => {
   it('looks each table up once, however many result cells it has', async () => {
     const wb = await oneVariable();
     try {
-      const engine = (wb as unknown as { wb: { getDataTable: () => unknown } }).wb;
+      const engine = (
+        wb as unknown as { wb: { sheet(i: number): { getDataTable: () => unknown } } }
+      ).wb.sheet(0);
       const lookups = vi.spyOn(engine, 'getDataTable');
       expect(wb.dataTablesInRange({ sheet: 0, r0: 0, c0: 0, r1: 9, c1: 9 })).toHaveLength(1);
       expect(lookups).toHaveBeenCalledTimes(1);

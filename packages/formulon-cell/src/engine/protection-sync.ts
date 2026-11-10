@@ -1,3 +1,4 @@
+import type { CellRect, ProtectedRangeInput, WorkbookProtectionInput } from '@libraz/formulon';
 import { newAllowedEditRangeId } from '../store/sheet-settings-mutators.js';
 import {
   type AllowedEditRange,
@@ -10,7 +11,7 @@ import {
 import { colFromLetters, formatA1Range, MAX_COL, MAX_ROW } from './address.js';
 import { legacySheetPasswordHash } from './protection-password.js';
 import { parseRangeRef } from './range-resolver.js';
-import type { ProtectedRange, Range, WorkbookProtection } from './types.js';
+import type { Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /**
@@ -56,7 +57,7 @@ export function hydrateWorkbookProtectionFromEngine(
     spinCount: p.workbookSpinCount,
   });
   mutators.setWorkbookStructureProtected(store, true, {
-    ...(p.workbookPassword ? { legacyPasswordHash: p.workbookPassword } : {}),
+    ...(p.workbookLegacyPasswordHash ? { legacyPasswordHash: p.workbookLegacyPasswordHash } : {}),
     ...(passwordHash ? { passwordHash } : {}),
   });
 }
@@ -72,42 +73,33 @@ export function flushWorkbookProtectionToEngine(
   state: WorkbookStructureProtectionState | null,
 ): void {
   if (!wb.capabilities.workbookProtectionRoundtrip) return;
-  const current = wb.getWorkbookProtection() ?? emptyWorkbookProtection();
-  const next: WorkbookProtection = { ...current, lockStructure: state ? 1 : 0 };
+  const current = wb.getWorkbookProtection();
+  const next: WorkbookProtectionInput = { ...current, lockStructure: state !== null };
   if (state) {
     const hash = state.passwordHash;
-    next.workbookPassword = hash
-      ? ''
+    next.workbookLegacyPasswordHash = hash
+      ? null
       : (state.legacyPasswordHash ??
-        (state.password ? legacySheetPasswordHash(state.password) : ''));
-    next.workbookAlgorithmName = hash?.algorithmName ?? '';
-    next.workbookHashValue = hash?.hashValue ?? '';
-    next.workbookSaltValue = hash?.saltValue ?? '';
+        (state.password ? legacySheetPasswordHash(state.password) : null));
+    next.workbookAlgorithmName = hash?.algorithmName ?? null;
+    next.workbookHashValue = hash?.hashValue ?? null;
+    next.workbookSaltValue = hash?.saltValue ?? null;
     next.workbookSpinCount = hash?.spinCount ?? 0;
-  } else if (!current.lockWindows) {
-    next.workbookPassword = '';
-    next.workbookAlgorithmName = '';
-    next.workbookHashValue = '';
-    next.workbookSaltValue = '';
+  } else if (!current?.lockWindows) {
+    next.workbookLegacyPasswordHash = null;
+    next.workbookAlgorithmName = null;
+    next.workbookHashValue = null;
+    next.workbookSaltValue = null;
     next.workbookSpinCount = 0;
   }
   wb.setWorkbookProtection(next);
 }
 
-const emptyWorkbookProtection = (): WorkbookProtection => ({
-  lockStructure: 0,
-  lockWindows: 0,
-  lockRevision: 0,
-  workbookPassword: '',
-  workbookAlgorithmName: '',
-  workbookHashValue: '',
-  workbookSaltValue: '',
-  workbookSpinCount: 0,
-  revisionsPassword: '',
-  revisionsAlgorithmName: '',
-  revisionsHashValue: '',
-  revisionsSaltValue: '',
-  revisionsSpinCount: 0,
+const rectOfArea = (area: Range): CellRect => ({
+  firstRow: area.r0,
+  firstCol: area.c0,
+  lastRow: area.r1,
+  lastCol: area.c1,
 });
 
 const parseSqrefArea = (token: string, sheet: number): Range | null => {
@@ -151,20 +143,20 @@ export const allowedEditRangeAreas = (entry: AllowedEditRange): readonly Range[]
   ...(entry.extraAreas ?? []),
 ];
 
-const protectedRangeFromEntry = (entry: AllowedEditRange): ProtectedRange => {
+const protectedRangeFromEntry = (entry: AllowedEditRange): ProtectedRangeInput => {
   const hash = entry.passwordHash;
   return {
     name: entry.title,
-    sqref: sqrefFromAreas(allowedEditRangeAreas(entry)),
-    password: hash
-      ? ''
+    ranges: allowedEditRangeAreas(entry).map(rectOfArea),
+    legacyPasswordHash: hash
+      ? null
       : (entry.legacyPasswordHash ??
-        (entry.password ? legacySheetPasswordHash(entry.password) : '')),
-    algorithmName: hash?.algorithmName ?? '',
-    hashValue: hash?.hashValue ?? '',
-    saltValue: hash?.saltValue ?? '',
+        (entry.password ? legacySheetPasswordHash(entry.password) : null)),
+    algorithmName: hash?.algorithmName ?? null,
+    hashValue: hash?.hashValue ?? null,
+    saltValue: hash?.saltValue ?? null,
     spinCount: hash?.spinCount ?? 0,
-    securityDescriptor: entry.securityDescriptor ?? '',
+    securityDescriptor: entry.securityDescriptor ?? null,
   };
 };
 
@@ -179,8 +171,15 @@ export function hydrateProtectedRangesFromEngine(
   const existing = store.getState().protection.allowedEditRanges;
   const entries: AllowedEditRange[] = [];
   for (const record of wb.getProtectedRanges(sheet)) {
-    const areas = areasFromSqref(record.sqref, sheet);
-    const [range, ...extraAreas] = areas ?? [];
+    const [range, ...extraAreas] = record.ranges.map(
+      (rect): Range => ({
+        sheet,
+        r0: rect.firstRow,
+        c0: rect.firstCol,
+        r1: rect.lastRow,
+        c1: rect.lastCol,
+      }),
+    );
     if (!range) continue;
     const previous = existing.find((e) => e.range.sheet === sheet && e.title === record.name);
     const passwordHash = sheetProtectionPasswordHashFromEngine(record);
@@ -190,7 +189,7 @@ export function hydrateProtectedRangesFromEngine(
       range,
       ...(extraAreas.length > 0 ? { extraAreas } : {}),
       ...(previous?.password !== undefined ? { password: previous.password } : {}),
-      ...(record.password ? { legacyPasswordHash: record.password } : {}),
+      ...(record.legacyPasswordHash ? { legacyPasswordHash: record.legacyPasswordHash } : {}),
       ...(passwordHash ? { passwordHash } : {}),
       ...(record.securityDescriptor ? { securityDescriptor: record.securityDescriptor } : {}),
     });
@@ -237,16 +236,16 @@ export function syncAllowedEditRangesToEngine(
 }
 
 const sheetProtectionPasswordHashFromEngine = (p: {
-  algorithmName: string;
-  hashValue: string;
-  saltValue: string;
+  algorithmName: string | null;
+  hashValue: string | null;
+  saltValue: string | null;
   spinCount: number;
 }): SheetProtectionPasswordHash | undefined => {
   if (!p.algorithmName && !p.hashValue && !p.saltValue && p.spinCount === 0) return undefined;
   return {
-    algorithmName: p.algorithmName,
-    hashValue: p.hashValue,
-    saltValue: p.saltValue,
+    algorithmName: p.algorithmName ?? '',
+    hashValue: p.hashValue ?? '',
+    saltValue: p.saltValue ?? '',
     spinCount: p.spinCount,
   };
 };

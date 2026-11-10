@@ -1,5 +1,6 @@
 // @vitest-environment node
 
+import { ComparisonOperator, type Value, ValueKind } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyAdvancedFilter,
@@ -26,13 +27,7 @@ const sync = (store: SpreadsheetStore, wb: WorkbookHandle): void => {
   mutators.replaceCells(store, wb.cells(0));
 };
 
-const rawNumber = (value: number) => ({
-  kind: 1,
-  number: value,
-  boolean: 0,
-  text: '',
-  errorCode: 0,
-});
+const rawNumber = (value: number): Value => ({ kind: ValueKind.Number, number: value });
 
 const PROFILE_IDS = [
   'windows-en_US',
@@ -125,8 +120,11 @@ describe('locale sort and filter boundaries', () => {
         { sheet: 0, row: 0, col: 2 },
         '=SORTBY(SEQUENCE(3),$A$2:$A$4,1)',
       );
-      expect(direct.status.ok, profile).toBe(true);
-      const expectedIndexes = direct.cells.map((row) => row[0]?.number ?? 0);
+      expect(direct, profile).not.toBeNull();
+      const expectedIndexes = (direct ?? []).map((row) => {
+        const cell = row[0];
+        return cell?.kind === ValueKind.Number ? cell.number : 0;
+      });
       expect(
         sortRange(
           store.getState(),
@@ -198,12 +196,11 @@ describe('locale sort and filter boundaries', () => {
     seedNumber(wb, 2, 0, 2);
     sync(store, wb);
     const before = [0, 1, 2].map((row) => wb.getValue({ sheet: 0, row, col: 0 }));
-    wb.evaluateFormulaArray = (() => ({
-      status: { ok: true, status: 0, message: '', context: '' },
-      rows: 3,
-      cols: 1,
-      cells: [[rawNumber(1)], [rawNumber(1)], [rawNumber(3)]],
-    })) as WorkbookHandle['evaluateFormulaArray'];
+    wb.evaluateFormulaArray = (() => [
+      [rawNumber(1)],
+      [rawNumber(1)],
+      [rawNumber(3)],
+    ]) as WorkbookHandle['evaluateFormulaArray'];
 
     expect(
       sortRange(
@@ -307,8 +304,11 @@ describe('locale sort and filter boundaries', () => {
     ]);
     expect(store.getState().layout.hiddenRows.has(1)).toBe(true);
     expect(store.getState().layout.hiddenRows.has(2)).toBe(false);
-    expect(wb.getAutoFilter(0)?.columns[0]?.val1).toBe('1.5');
-    expect(wb.getAutoFilter(0)?.columns[0]).toMatchObject({ kind: 2, op1: 5 });
+    expect(wb.getAutoFilter(0)?.columns[0]?.conditions[0]?.value).toBe('1.5');
+    expect(wb.getAutoFilter(0)?.columns[0]).toMatchObject({
+      kind: 2,
+      conditions: [{ operator: ComparisonOperator.GreaterThan }],
+    });
     hydrateAutoFilterFromEngine(wb, store, 0);
     expect(store.getState().ui.filterCriteria).toMatchObject([
       { condition: { op: 'greaterThan', value: '1.5' } },

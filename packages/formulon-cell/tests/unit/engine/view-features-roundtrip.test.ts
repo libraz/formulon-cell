@@ -25,10 +25,8 @@ import { toggleSplitPanes } from '../../../src/commands/split-panes.js';
 import { deleteCols, insertRows } from '../../../src/commands/structure.js';
 import { setOutlineSymbolsVisible, setShowFormulas } from '../../../src/commands/view.js';
 import { MAX_ROW } from '../../../src/engine/address.js';
-import { detectCapabilities } from '../../../src/engine/capabilities.js';
 import { summarizeSpreadsheetCompatibility } from '../../../src/engine/compatibility.js';
 import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';
-import type { Workbook } from '../../../src/engine/types.js';
 import { hydrateViewStateFromEngine } from '../../../src/engine/view-state-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { scrollActiveIntoView } from '../../../src/interact/navigation-policy.js';
@@ -391,19 +389,19 @@ describe('rows hidden by default', () => {
     expect(isRowGroupCollapsed(store.getState().layout, 4, 4)).toBe(false);
   });
 
-  it('restates every sheet default when one changes', async () => {
+  it('keeps every sheet default when one changes', async () => {
     const wb = await WorkbookHandle.createDefault();
     wb.patchSheetFormatDefaults(0, {
-      baseColWidth: 10,
-      defaultColWidth: 12,
-      hasDefaultColWidth: true,
+      baseColumnWidthChars: 10,
+      defaultColumnWidthChars: 12,
     });
     wb.patchSheetFormatDefaults(0, { zeroHeight: true });
-    const raw = (wb as unknown as { wb: { getSheetFormatDefaults(s: number): unknown } }).wb;
-    expect(raw.getSheetFormatDefaults(0)).toMatchObject({
-      baseColWidth: 10,
-      defaultColWidth: 12,
-      hasDefaultColWidth: true,
+    const raw = (
+      wb as unknown as { wb: { sheet(s: number): { getFormatDefaults(): unknown } } }
+    ).wb.sheet(0);
+    expect(raw.getFormatDefaults()).toMatchObject({
+      baseColumnWidthChars: 10,
+      defaultColumnWidthChars: 12,
       zeroHeight: true,
     });
   });
@@ -447,21 +445,15 @@ describe('split panes from the Mac desktop app', () => {
   });
 });
 
-describe('view feature probes', () => {
-  it('turns each flag on only when every binding it needs is present', () => {
-    const fn = () => undefined;
-    const caps = detectCapabilities({
-      setSheetShowFormulas: fn,
-      setSheetSplit: fn,
-      setRowCollapsed: fn,
-      getSheetFormatDefaults: fn,
-    } as unknown as Workbook);
-    expect(caps).toMatchObject({
+describe('view feature capabilities', () => {
+  it('reports every view capability on the pinned engine', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    expect(wb.capabilities).toMatchObject({
       sheetShowFormulas: true,
-      outlineSymbols: false,
+      outlineSymbols: true,
       sheetSplit: true,
-      outlineCollapse: false,
-      sheetFormatDefaults: false,
+      outlineCollapse: true,
+      sheetFormatDefaults: true,
     });
   });
 });

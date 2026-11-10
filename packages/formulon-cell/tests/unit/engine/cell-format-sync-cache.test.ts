@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { syncCellFormatsToEngine } from '../../../src/engine/cell-format-sync.js';
+import type { WorkbookDefaultFont } from '../../../src/engine/format-writeback.js';
 import type {
   Addr,
   BorderRecord,
   CellXf,
-  ColorSpec,
+  Color,
   FillRecord,
   FontRecord,
   PhoneticProperties,
@@ -13,9 +14,9 @@ import type {
 import { addrKey, type WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { type CellFormat, createSpreadsheetStore } from '../../../src/store/store.js';
 
-const color = (rgb = 0xff000000): ColorSpec => ({
+const color = (argb = 0xff000000): Color => ({
   kind: 1,
-  rgb,
+  argb,
   theme: 0,
   tint: 0,
   indexed: 0,
@@ -23,43 +24,30 @@ const color = (rgb = 0xff000000): ColorSpec => ({
 
 const font = (patch: Partial<FontRecord> = {}): FontRecord => ({
   name: 'Calibri',
-  size: 11,
-  bold: false,
-  italic: false,
-  strike: false,
-  hasBold: false,
-  hasItalic: false,
-  hasStrike: false,
-  outline: false,
-  shadow: false,
-  condense: false,
-  extend: false,
-  hasOutline: false,
-  hasShadow: false,
-  hasCondense: false,
-  hasExtend: false,
+  sizePt: 11,
+  bold: null,
+  italic: null,
+  strike: null,
+  outline: null,
+  shadow: null,
+  condense: null,
+  extend: null,
   underline: 0,
   vertAlign: 0,
-  hasFamily: false,
-  family: 0,
-  hasCharset: false,
-  charset: 0,
-  hasSize: true,
+  family: null,
+  charset: null,
   scheme: 2,
-  colorArgb: 0xff000000,
   color: color(),
   ...patch,
 });
 
 const fill = (): FillRecord => ({
   pattern: 0,
-  fgArgb: 0,
-  bgArgb: 0,
-  fg: color(0),
-  bg: color(0),
+  foreground: color(0),
+  background: color(0),
 });
 
-const side = (): BorderRecord['left'] => ({ style: 0, colorArgb: 0, color: color(0) });
+const side = (): BorderRecord['left'] => ({ style: 0, color: color(0) });
 
 const border = (): BorderRecord => ({
   left: side(),
@@ -76,9 +64,24 @@ const sourceXf = (patch: Partial<CellXf> = {}): CellXf => ({
   fillIndex: 1,
   borderIndex: 1,
   numFmtId: 0,
-  horizontalAlign: 0,
-  verticalAlign: 2,
-  wrapText: false,
+  horizontal: null,
+  vertical: null,
+  wrapText: null,
+  justifyLastLine: null,
+  applyNumberFormat: false,
+  applyFont: false,
+  applyFill: false,
+  applyBorder: false,
+  applyAlignment: false,
+  applyProtection: false,
+  quotePrefix: false,
+  locked: null,
+  hidden: null,
+  textRotation: null,
+  indent: null,
+  relativeIndent: null,
+  shrinkToFit: null,
+  readingOrder: null,
   ...patch,
 });
 
@@ -124,7 +127,7 @@ interface Harness {
   readonly assignedXfs: number[];
   readonly setPhoneticRuns: Array<{ addr: Addr; runs: readonly PhoneticRun[] }>;
   readonly setProperties: Array<{ addr: Addr; properties: PhoneticProperties }>;
-  readonly defaultFont: { current: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null };
+  readonly defaultFont: { current: WorkbookDefaultFont | null };
   readonly xfs: Map<number, CellXf>;
   readonly fonts: Map<number, FontRecord>;
   readonly borders: Map<number, BorderRecord>;
@@ -152,8 +155,8 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
   const setPhoneticRuns: Array<{ addr: Addr; runs: readonly PhoneticRun[] }> = [];
   const setProperties: Array<{ addr: Addr; properties: PhoneticProperties }> = [];
   const defaultFont: {
-    current: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null;
-  } = { current: { name: 'Calibri', size: 11, scheme: 2 } };
+    current: WorkbookDefaultFont | null;
+  } = { current: { name: 'Calibri', size: 11, scheme: 2 as const } };
   const indices = new Map<string, number>();
   for (const [key, index] of options.indices ?? []) {
     if (index !== null) indices.set(key, index);
@@ -338,15 +341,13 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       fontIndex: 2,
       quotePrefix: true,
       applyAlignment: true,
-      hasAlignment: true,
-      horizontalAlign: 2,
-      verticalAlign: 1,
+      horizontal: 2,
+      vertical: 1,
       indent: 4,
       relativeIndent: 2,
       textRotation: 35,
       shrinkToFit: true,
       readingOrder: 2,
-      hasProtection: true,
       locked: false,
       hidden: true,
       applyProtection: true,
@@ -355,13 +356,11 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       fontIndex: 3,
       quotePrefix: false,
       applyAlignment: false,
-      hasAlignment: false,
-      horizontalAlign: 0,
-      verticalAlign: 2,
+      horizontal: null,
+      vertical: null,
       indent: 1,
       textRotation: 0,
       readingOrder: 1,
-      hasProtection: true,
       locked: true,
       hidden: false,
       applyProtection: false,
@@ -376,14 +375,8 @@ describe('syncCellFormatsToEngine resolution cache', () => {
         [3, rawB],
       ]),
     });
-    harness.fonts.set(
-      2,
-      font({ hasCharset: true, charset: 128, color: { ...color(), kind: 2, theme: 4 } }),
-    );
-    harness.fonts.set(
-      3,
-      font({ hasCharset: true, charset: 134, color: { ...color(), kind: 2, theme: 5 } }),
-    );
+    harness.fonts.set(2, font({ charset: 128, color: { ...color(), kind: 2, theme: 4 } }));
+    harness.fonts.set(3, font({ charset: 134, color: { ...color(), kind: 2, theme: 5 } }));
     const format = { fontSize: 16 } as CellFormat;
 
     syncCellFormatsToEngine(
@@ -399,13 +392,11 @@ describe('syncCellFormatsToEngine resolution cache', () => {
     expect(harness.addedXfs[0]).toMatchObject({
       quotePrefix: true,
       applyAlignment: true,
-      hasAlignment: true,
       indent: 4,
       relativeIndent: 2,
       textRotation: 35,
       shrinkToFit: true,
       readingOrder: 2,
-      hasProtection: true,
       locked: false,
       hidden: true,
       applyProtection: true,
@@ -421,12 +412,10 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       applyProtection: false,
     });
     expect(harness.fonts.get(harness.addedXfs[0]?.fontIndex ?? -1)).toMatchObject({
-      hasCharset: true,
       charset: 128,
       color: { kind: 2, theme: 4 },
     });
     expect(harness.fonts.get(harness.addedXfs[1]?.fontIndex ?? -1)).toMatchObject({
-      hasCharset: true,
       charset: 134,
       color: { kind: 2, theme: 5 },
     });
@@ -437,7 +426,7 @@ describe('syncCellFormatsToEngine resolution cache', () => {
     const keyB = addrKey({ sheet: 0, row: 1, col: 0 });
     const keyC = addrKey({ sheet: 0, row: 2, col: 0 });
     const harness = makeHarness({
-      xfs: new Map([[1, sourceXf({ hasProtection: true, locked: false })]]),
+      xfs: new Map([[1, sourceXf({ locked: false })]]),
     });
 
     syncCellFormatsToEngine(
@@ -615,10 +604,7 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       xfs: new Map([[1, sourceXf({ fontIndex: 2 })]]),
       addFontResult: (_record, call, allocated) => (call === 2 ? -1 : allocated),
     });
-    harness.fonts.set(
-      2,
-      font({ hasCharset: true, charset: 128, color: { ...color(), kind: 2, theme: 4 } }),
-    );
+    harness.fonts.set(2, font({ charset: 128, color: { ...color(), kind: 2, theme: 4 } }));
 
     syncCellFormatsToEngine(
       harness.wb,
@@ -631,9 +617,8 @@ describe('syncCellFormatsToEngine resolution cache', () => {
 
     expect(harness.counts.addFont).toBe(4);
     expect(harness.counts.addXf).toBe(2);
-    expect(harness.fonts.get(harness.addedXfs[0]?.fontIndex ?? -1)?.hasCharset).not.toBe(true);
+    expect(harness.fonts.get(harness.addedXfs[0]?.fontIndex ?? -1)?.charset ?? null).toBeNull();
     expect(harness.fonts.get(harness.addedXfs[1]?.fontIndex ?? -1)).toMatchObject({
-      hasCharset: true,
       charset: 128,
       color: { kind: 2, theme: 4 },
     });
@@ -647,7 +632,7 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       getBorderRecordResult: (index, call, stored) => (index === 2 && call === 1 ? null : stored),
     });
     const rawBorder = border();
-    rawBorder.top = { style: 1, colorArgb: 0xff000000, color: color() };
+    rawBorder.top = { style: 1, color: color() };
     harness.borders.set(2, rawBorder);
 
     syncCellFormatsToEngine(
@@ -693,7 +678,7 @@ describe('syncCellFormatsToEngine resolution cache', () => {
     syncCellFormatsToEngine(harness.wb, store, 0);
     const firstFontCount = harness.counts.addFont;
 
-    harness.defaultFont.current = { name: 'Aptos', size: 12, scheme: 1 };
+    harness.defaultFont.current = { name: 'Aptos', size: 12, scheme: 1 as const };
     harness.indices.set(key, 1);
     harness.xfs.set(1, sourceXf({ quotePrefix: true }));
     syncCellFormatsToEngine(harness.wb, store, 0);
@@ -782,10 +767,7 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       indices: new Map([[key, 0]]),
       xfs: new Map([[2, sourceXf({ fontIndex: 2, applyFont: false, quotePrefix: true })]]),
     });
-    harness.fonts.set(
-      2,
-      font({ hasCharset: true, charset: 128, color: { ...color(), kind: 2, theme: 4 } }),
-    );
+    harness.fonts.set(2, font({ charset: 128, color: { ...color(), kind: 2, theme: 4 } }));
 
     syncCellFormatsToEngine(
       harness.wb,
@@ -800,7 +782,6 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       quotePrefix: true,
     });
     expect(harness.fonts.get(harness.addedXfs[0]?.fontIndex ?? -1)).toMatchObject({
-      hasCharset: true,
       charset: 128,
       color: { kind: 2, theme: 4 },
     });
@@ -814,10 +795,7 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       indices: new Map([[key, 0]]),
       xfs: new Map([[3, sourceXf({ fontIndex: 3, applyFont: true, quotePrefix: false })]]),
     });
-    harness.fonts.set(
-      3,
-      font({ hasCharset: true, charset: 134, color: { ...color(), kind: 2, theme: 5 } }),
-    );
+    harness.fonts.set(3, font({ charset: 134, color: { ...color(), kind: 2, theme: 5 } }));
 
     syncCellFormatsToEngine(
       harness.wb,
@@ -832,7 +810,6 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       quotePrefix: false,
     });
     expect(harness.fonts.get(harness.addedXfs[0]?.fontIndex ?? -1)).toMatchObject({
-      hasCharset: true,
       charset: 134,
       color: { kind: 2, theme: 5 },
     });
@@ -934,7 +911,7 @@ describe('syncCellFormatsToEngine resolution cache', () => {
       indices: new Map([[key, 0]]),
       xfs: new Map([[2, sourceXf({ fontIndex: 2 })]]),
     });
-    harness.fonts.set(2, font({ size: 24 }));
+    harness.fonts.set(2, font({ sizePt: 24 }));
 
     syncCellFormatsToEngine(
       harness.wb,
@@ -945,6 +922,6 @@ describe('syncCellFormatsToEngine resolution cache', () => {
     expect(harness.counts.getEffectiveStyle).toBe(1);
     const resolved = harness.addedXfs[0];
     expect(resolved).toBeDefined();
-    expect(harness.fonts.get(resolved?.fontIndex ?? -1)?.size).toBeCloseTo(11);
+    expect(harness.fonts.get(resolved?.fontIndex ?? -1)?.sizePt).toBeCloseTo(11);
   });
 });

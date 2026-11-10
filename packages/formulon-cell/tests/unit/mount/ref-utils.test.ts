@@ -171,6 +171,10 @@ describe('mount/ref-utils', () => {
       ({
         sheetCount: sheets.length,
         sheetName: (i: number) => sheets[i],
+        sheetIndexByName: (name: string) => {
+          const index = sheets.findIndex((n) => n.toLowerCase() === name.toLowerCase());
+          return index < 0 ? null : index;
+        },
         definedNames: () => rows.map((row) => ({ ...row, localSheetId: row.localSheetId ?? -1 })),
       }) as unknown as WorkbookHandle;
 
@@ -227,6 +231,10 @@ describe('mount/ref-utils', () => {
     const wb = {
       sheetCount: 2,
       sheetName: (i: number) => ['a', 'fb'][i],
+      sheetIndexByName: (name: string) => {
+        const index = ['a', 'fb'].findIndex((n) => n.toLowerCase() === name.toLowerCase());
+        return index < 0 ? null : index;
+      },
       definedNames: () => [{ name: 'MyName', formula: 'a!$B$3:$C$4', localSheetId: -1 }],
     } as unknown as WorkbookHandle;
     const go = (text: string) => {

@@ -1,4 +1,4 @@
-import type { PaginationPage, PaginationResult } from '@libraz/formulon';
+import type { Pagination, PaginationPage } from '@libraz/formulon';
 import { colLetter, formatA1Cell, parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { numFmtToFormatCode } from '../engine/format-writeback.js';
@@ -430,20 +430,16 @@ export function headerFieldToCssContent(raw: string, ctx: HeaderFooterContext): 
   return parts.length ? parts.join(' ') : '';
 }
 
-function buildPageRule(
-  setup: PageSetup,
-  ctx: HeaderFooterContext,
-  native?: PaginationResult,
-): string {
+function buildPageRule(setup: PageSetup, ctx: HeaderFooterContext, native?: Pagination): string {
   const size = native
     ? `${native.paper.widthPt}pt ${native.paper.heightPt}pt`
     : `${PAPER_DIMENSIONS[setup.paperSize] ?? 'A4'} ${setup.orientation}`;
   const m = native
     ? {
-        top: `${native.margins.top}pt`,
-        right: `${native.margins.right}pt`,
-        bottom: `${native.margins.bottom}pt`,
-        left: `${native.margins.left}pt`,
+        top: `${native.margins.topIn * 72}pt`,
+        right: `${native.margins.rightIn * 72}pt`,
+        bottom: `${native.margins.bottomIn * 72}pt`,
+        left: `${native.margins.leftIn * 72}pt`,
       }
     : (() => {
         const margins = effectivePrintMargins(setup);
@@ -571,11 +567,13 @@ export function buildPrintDocument(
   }
 
   const nativeHasPages = (native?.pages.length ?? 0) > 0;
-  const titleRowRange = native?.printTitles.hasRows
-    ? ([native.printTitles.firstRow, native.printTitles.lastRow] as [number, number])
+  const nativeTitleRows = native?.printTitles?.rows;
+  const nativeTitleCols = native?.printTitles?.columns;
+  const titleRowRange = nativeTitleRows
+    ? ([nativeTitleRows.first, nativeTitleRows.last] as [number, number])
     : parsePrintTitleRows(setup.printTitleRows);
-  const titleColRange = native?.printTitles.hasCols
-    ? ([native.printTitles.firstCol, native.printTitles.lastCol] as [number, number])
+  const titleColRange = nativeTitleCols
+    ? ([nativeTitleCols.first, nativeTitleCols.last] as [number, number])
     : parsePrintTitleCols(setup.printTitleCols);
   const nativePrintAreas = native?.printArea.length
     ? native.printArea.map((area) => ({
@@ -632,10 +630,10 @@ export function buildPrintDocument(
       estimatedCells = cappedAdd(
         estimatedCells,
         generatedCellsForRegion({
-          row0: page.firstRow,
-          col0: page.firstCol,
-          row1: page.lastRow,
-          col1: page.lastCol,
+          row0: page.range.firstRow,
+          col0: page.range.firstCol,
+          row1: page.range.lastRow,
+          col1: page.range.lastCol,
         }),
       );
       if (estimatedCells > MAX_PRINT_MATERIALIZED_CELLS) break;
@@ -777,7 +775,9 @@ export function buildPrintDocument(
     return displayed;
   };
 
-  const nativeScale = native ? Math.max(Number.isFinite(native.scale) ? native.scale : 1, 0.01) : 1;
+  const nativeScale = native
+    ? Math.max(Number.isFinite(native.scalePct) ? native.scalePct / 100 : 1, 0.01)
+    : 1;
   // Chromium rounds collapsed table borders and fractional point row heights
   // independently. Leave a small physical reserve so the final row cannot be
   // clipped when the native extent lands exactly on a browser pixel boundary.
@@ -798,8 +798,8 @@ export function buildPrintDocument(
       // the native Windows geometry contract applies to the body height.
       // Using paper-minus-margins here would let a browser lay out one extra
       // row below a native footer band.
-      contentWidth: Math.max(1, native.printable.width),
-      contentHeight: Math.max(1, native.printable.height),
+      contentWidth: Math.max(1, native.printable.widthPt),
+      contentHeight: Math.max(1, native.printable.heightPt),
       tableWidth: Math.max(1, titleColsOffset + page.widthPt),
       tableHeight: Math.max(1, titleRowsOffset + page.heightPt),
     };
@@ -1068,7 +1068,7 @@ export function buildPrintDocument(
       const hasSeparateTitleCols =
         nativePage !== undefined &&
         titleColRange !== null &&
-        nativePage.firstCol > titleColRange[1];
+        nativePage.range.firstCol > titleColRange[1];
       const titleNaturalWidth = visibleCols
         .filter((c) => hasSeparateTitleCols && isTitleCol(c))
         .reduce((sum, c) => sum + colWidthPt(c), 0);
@@ -1142,7 +1142,7 @@ export function buildPrintDocument(
   // Fit-to-pages now derives a real scale from the content's natural size
   // instead of being ignored (which silently printed at 100%).
   const scale =
-    native?.scale ??
+    (native ? native.scalePct / 100 : undefined) ??
     computeFitToPagesScale(setup, printRegions, state.layout, hiddenRows, hiddenCols);
   const tableTransform =
     scale === 1 ? '' : ` style="transform:scale(${scale});transform-origin:top left;"`;
@@ -1150,10 +1150,10 @@ export function buildPrintDocument(
   const paginatedRegions = native?.pages.length
     ? native.pages.map((page) => ({
         region: {
-          row0: page.firstRow,
-          col0: page.firstCol,
-          row1: page.lastRow,
-          col1: page.lastCol,
+          row0: page.range.firstRow,
+          col0: page.range.firstCol,
+          row1: page.range.lastRow,
+          col1: page.range.lastCol,
         },
         nativePage: page,
       }))
@@ -1189,10 +1189,10 @@ export function buildPrintDocument(
 
   const effectiveMargins = native
     ? {
-        top: native.margins.top / 72,
-        right: native.margins.right / 72,
-        bottom: native.margins.bottom / 72,
-        left: native.margins.left / 72,
+        top: native.margins.topIn,
+        right: native.margins.rightIn,
+        bottom: native.margins.bottomIn,
+        left: native.margins.leftIn,
       }
     : effectivePrintMargins(setup);
   const cssVars: Record<string, string> = {

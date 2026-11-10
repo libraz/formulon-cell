@@ -48,7 +48,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
           expect(validations).toHaveLength(1);
           expect(validations[0]).toMatchObject({
             type: 3,
-            formula1: '"Yes,No"',
+            formula1: '="Yes,No"',
             allowBlank: false,
             showErrorMessage: false,
             ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }],
@@ -84,7 +84,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         first.addValidationEntry(0, {
           type: 3,
           ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }],
-          formula1: '"Yes,No"',
+          formula1: '="Yes,No"',
           showDropDown: true,
         }),
       ).toBe(true);
@@ -101,7 +101,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         expect(validation).toBeDefined();
         expect(validation).toMatchObject({
           type: 3,
-          formula1: '"Yes,No"',
+          formula1: '="Yes,No"',
           ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }],
         });
         expect(validation?.showDropDown).toBe(true);

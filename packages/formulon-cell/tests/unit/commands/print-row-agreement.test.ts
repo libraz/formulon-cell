@@ -8,7 +8,7 @@ import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js'
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 type RawWorkbook = {
-  getRowHeightPt(sheet: number, row: number): { status: { ok: boolean }; value: number };
+  sheet(index: number): { getRowHeightPt(row: number): number };
 };
 
 describe('printed rows on a new default-profile workbook', () => {
@@ -40,7 +40,7 @@ describe('printed rows on a new default-profile workbook', () => {
       expect(heights.length).toBeGreaterThanOrEqual(3);
       const raw = (wb as unknown as { wb: RawWorkbook }).wb;
       for (let row = 0; row < 3; row += 1) {
-        expect(heights[row]).toBeCloseTo(raw.getRowHeightPt(0, row).value, 8);
+        expect(heights[row]).toBeCloseTo(raw.sheet(0).getRowHeightPt(row), 8);
         expect(heights[row]).toBe(15);
       }
     } finally {

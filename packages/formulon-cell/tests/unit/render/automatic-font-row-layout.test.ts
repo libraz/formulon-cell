@@ -181,7 +181,7 @@ describe('automatic font row layout', () => {
       const baseFont = baseXf && workbook.getFontRecord(baseXf.fontIndex);
       expect(baseFont).not.toBeNull();
       if (!baseXf || !baseFont) throw new Error('workbook Normal style is unavailable');
-      const fontIndex = workbook.addFontRecord({ ...baseFont, size: 36 });
+      const fontIndex = workbook.addFontRecord({ ...baseFont, sizePt: 36 });
       const rowXf = workbook.addXfRecord({ ...baseXf, fontIndex });
       expect(rowXf).toBeGreaterThanOrEqual(0);
 

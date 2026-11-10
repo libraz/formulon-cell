@@ -124,12 +124,7 @@ export function parseA1RangeText(raw: string): ParsedRangeRef | null {
 }
 
 export function sheetIndexByName(wb: WorkbookHandle, name: string): number {
-  const n = wb.sheetCount;
-  const target = name.toLowerCase();
-  for (let i = 0; i < n; i += 1) {
-    if (wb.sheetName(i).toLowerCase() === target) return i;
-  }
-  return -1;
+  return wb.sheetIndexByName(name) ?? -1;
 }
 
 /** Resolve a range ref to its numeric values in source order. Non-numeric

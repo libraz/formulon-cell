@@ -26,6 +26,9 @@ const workbook = (): WorkbookHandle =>
         columns: ['Item', 'Region'],
       },
     ],
+    // The engine's name identity rule compares without regard to case.
+    tableIndexByName: (name: string) =>
+      ['salestable', 'sales'].includes(name.toLowerCase()) ? 0 : null,
   }) as unknown as WorkbookHandle;
 
 const setCell = (store: SpreadsheetStore, row: number, col: number, value: CellValue): void => {

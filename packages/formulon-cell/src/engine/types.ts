@@ -1,81 +1,73 @@
 // Re-export of the formulon-typed surface plus our adapter shapes.
+import type {
+  Border as EngineBorder,
+  BorderSide as EngineBorderSide,
+  Dxf as EngineDxf,
+  Fill as EngineFill,
+  Font as EngineFont,
+  GradientFill as EngineGradientFill,
+  GradientStop as EngineGradientStop,
+  FunctionMetadata,
+  PivotLayout,
+} from '@libraz/formulon';
+import { PivotSortOrder as EnginePivotSortOrder } from '@libraz/formulon';
+
 export type {
-  CellEntry,
-  CellResult,
+  CellRect,
   CellXf,
-  ColorSpec,
-  ConditionalFormatEntry,
+  Color,
+  ConditionalFormat,
   ConditionalFormatInput,
-  DataValidationEntry,
+  DataValidation,
   DataValidationInput,
-  DataValidationRange,
-  DxfResult,
-  EvalArrayResult,
-  EvalResult,
-  ExcelProfileId,
-  FormulonModule,
+  Formulon,
+  FormulonError,
   FunctionMetadataEntry,
   FunctionMetadataLocalized,
   FunctionMetadataProvider,
-  FunctionMetadataResult,
   LocaleDateOrder,
   LocaleErrorName,
   LocaleFacts,
-  LocaleFactsResult,
-  MergedFunctionMetadataResult,
-  NumberResult,
+  MergedFunctionMetadata,
+  NativeValue,
   PivotCell,
-  PivotLayoutResult,
-  PivotReportLayoutResult,
   PivotWorksheetSource,
-  PivotWorksheetSourceResult,
+  ProfileId,
   ProtectedRange,
-  SaveResult,
-  Status,
-  StringResult,
+  RangeCell,
+  Sheet,
+  StatusCode,
   TableInput,
-  TableUpdateInput,
+  TablePatch,
   Value,
   Workbook,
   WorkbookProtection,
 } from '@libraz/formulon';
 
+/** Function metadata as the public API names it; the engine's `FunctionMetadata`. */
+export type FunctionMetadataResult = FunctionMetadata;
+
+/** Evaluated PivotTable layout as the public API names it; the engine's `PivotLayout`. */
+export type PivotLayoutResult = PivotLayout;
+
 /** Anchor geometry of a drawing object (picture or chart), as the engine
- * reports it in `listDrawingObjects`. */
-export type EngineDrawingAnchor = Pick<
-  import('@libraz/formulon').DrawingObject,
-  | 'anchorKind'
-  | 'editAs'
-  | 'fromRow'
-  | 'fromCol'
-  | 'fromRowOff'
-  | 'fromColOff'
-  | 'toRow'
-  | 'toCol'
-  | 'toRowOff'
-  | 'toColOff'
-  | 'cx'
-  | 'cy'
->;
+ * reports it in `DrawingProperties.anchor`. */
+export type EngineDrawingAnchor = import('@libraz/formulon').DrawingAnchor;
 
 /** Marks the fields a record only carries when the engine read it back out of
- * a workbook: the original OOXML `<color>` selector and the "was this element
- * present in the source" flags. The cell layer authors records from UI state,
- * where every colour is literal RGB and no such provenance exists, so these
- * stay optional at the adapter boundary. `WorkbookHandle` fills them in on the
- * way into the engine — see `completeFontRecord` and friends. */
-type EngineFilled<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+ * a workbook: the original OOXML `<color>` selector and the optional font
+ * attributes. The cell layer authors records from UI state, where every colour
+ * is literal RGB and no such provenance exists, so these stay optional at the
+ * adapter boundary. `WorkbookHandle` fills them in on the way into the engine
+ * — see `completeFontRecord` and friends. */
+type EngineFilled<T, K extends keyof T> = Mutable<Omit<T, K>> & Partial<Mutable<Pick<T, K>>>;
+
+type Mutable<T> = { -readonly [P in keyof T]: T[P] };
 
 export type FontRecord = EngineFilled<
-  import('@libraz/formulon').FontRecord,
+  EngineFont,
   | 'vertAlign'
-  | 'hasBold'
-  | 'hasItalic'
-  | 'hasStrike'
-  | 'hasSize'
-  | 'hasFamily'
   | 'family'
-  | 'hasCharset'
   | 'charset'
   | 'scheme'
   | 'color'
@@ -83,40 +75,35 @@ export type FontRecord = EngineFilled<
   | 'shadow'
   | 'condense'
   | 'extend'
-  | 'hasOutline'
-  | 'hasShadow'
-  | 'hasCondense'
-  | 'hasExtend'
 >;
 
-export type GradientStop = EngineFilled<import('@libraz/formulon').GradientStop, 'color'>;
+export type GradientStop = EngineFilled<EngineGradientStop, 'color'>;
 
-export type GradientFill = Omit<import('@libraz/formulon').GradientFill, 'stops'> & {
+export type GradientFill = Mutable<Omit<EngineGradientFill, 'stops'>> & {
   stops: readonly GradientStop[];
 };
 
-export type FillRecord = Omit<
-  EngineFilled<import('@libraz/formulon').FillRecord, 'fg' | 'bg'>,
-  'gradient'
-> & { gradient?: GradientFill };
+export type FillRecord = Omit<EngineFilled<EngineFill, 'foreground' | 'background'>, 'gradient'> & {
+  gradient?: GradientFill | null;
+};
 
-export type BorderSide = EngineFilled<import('@libraz/formulon').BorderSide, 'color'>;
+export type BorderSide = EngineFilled<EngineBorderSide, 'color'>;
 
-export interface BorderRecord {
+export type BorderRecord = Mutable<
+  Omit<EngineBorder, 'left' | 'right' | 'top' | 'bottom' | 'diagonal'>
+> & {
   left: BorderSide;
   right: BorderSide;
   top: BorderSide;
   bottom: BorderSide;
   diagonal: BorderSide;
-  diagonalUp: boolean;
-  diagonalDown: boolean;
-}
+};
 
 /** Differential format whose sub-records use the adapter's authoring shapes. */
-export type DxfRecord = Omit<import('@libraz/formulon').DxfRecord, 'font' | 'fill' | 'border'> & {
-  font?: FontRecord;
-  fill?: FillRecord;
-  border?: BorderRecord;
+export type DxfRecord = Partial<Mutable<Omit<EngineDxf, 'font' | 'fill' | 'border'>>> & {
+  font?: FontRecord | null;
+  fill?: FillRecord | null;
+  border?: BorderRecord | null;
 };
 
 /**
@@ -155,9 +142,9 @@ export type PivotAxis = (typeof PivotAxis)[keyof typeof PivotAxis];
 
 /** Sibling item order of a pivot field. Mirrors `fm_pivot_sort_order_t`. */
 export const PivotSortOrder = {
-  Descending: 0,
-  Ascending: 1,
-  Manual: 2,
+  Descending: EnginePivotSortOrder.Descending,
+  Ascending: EnginePivotSortOrder.Ascending,
+  Manual: EnginePivotSortOrder.Manual,
 } as const;
 export type PivotSortOrder = (typeof PivotSortOrder)[keyof typeof PivotSortOrder];
 
@@ -411,18 +398,7 @@ export interface PivotFilterSpec {
   readonly valueHighText?: string;
 }
 
-/** Value kind ordinals — mirror of `fm_value_kind_t`. We redeclare here to
- *  avoid `const enum` cross-module hazards under `isolatedModules`. */
-export const ValueKind = {
-  Blank: 0,
-  Number: 1,
-  Bool: 2,
-  Text: 3,
-  Error: 4,
-  Array: 5,
-  Ref: 6,
-  Lambda: 7,
-} as const;
+export { ValueKind } from '@libraz/formulon';
 
 /** A1-style cell coordinate. Zero-indexed. */
 export interface Addr {

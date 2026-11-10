@@ -153,7 +153,6 @@ describe('Format Cells dialog native engine contract', () => {
         applyAlignment: false,
         applyProtection: true,
         quotePrefix: true,
-        hasProtection: true,
         locked: false,
         hidden: true,
       });
@@ -194,12 +193,12 @@ describe('Format Cells dialog native engine contract', () => {
       expect(normal).not.toBeNull();
       expect(defaultFont).not.toBeNull();
       if (!normal || !defaultFont) return;
-      const inheritedFont = workbook.addFontRecord({ ...defaultFont, size: 22 });
+      const inheritedFont = workbook.addFontRecord({ ...defaultFont, sizePt: 22 });
       const rowStyle = workbook.addXfRecord({ ...normal, fontIndex: inheritedFont });
       expect(rowStyle).toBeGreaterThanOrEqual(0);
       expect(workbook.setRowStyle(0, 0, rowStyle)).toBe(true);
       expect(workbook.getEffectiveStyle(0, 0, 0)?.source).toBe(1);
-      expect(effectiveFontAt(workbook)?.size).toBe(22);
+      expect(effectiveFontAt(workbook)?.sizePt).toBe(22);
 
       expect(
         recordDialogFormatChange({
@@ -214,20 +213,20 @@ describe('Format Cells dialog native engine contract', () => {
           },
         }),
       ).toBe(true);
-      expect(effectiveFontAt(workbook)?.size).toBe(22);
+      expect(effectiveFontAt(workbook)?.sizePt).toBe(22);
 
       expect(history.undo()).toBe(true);
-      expect(effectiveFontAt(workbook)?.size).toBe(22);
+      expect(effectiveFontAt(workbook)?.sizePt).toBe(22);
       // Native clear now restores the blank cell's row inheritance instead
       // of copying the effective font into a permanent direct cell XF.
       expect(workbook.getEffectiveStyle(0, 0, 0)?.source).toBe(1);
-      const laterFont = workbook.addFontRecord({ ...defaultFont, size: 26 });
+      const laterFont = workbook.addFontRecord({ ...defaultFont, sizePt: 26 });
       const laterRowStyle = workbook.addXfRecord({ ...normal, fontIndex: laterFont });
       expect(workbook.setRowStyle(0, 0, laterRowStyle)).toBe(true);
-      expect(effectiveFontAt(workbook)?.size).toBe(26);
+      expect(effectiveFontAt(workbook)?.sizePt).toBe(26);
       expect(workbook.getEffectiveStyle(0, 0, 0)?.source).toBe(1);
       expect(history.redo()).toBe(true);
-      expect(effectiveFontAt(workbook)?.size).toBe(22);
+      expect(effectiveFontAt(workbook)?.sizePt).toBe(22);
     } finally {
       workbook.detachStore(store);
       workbook.dispose();
@@ -265,7 +264,7 @@ describe('Format Cells dialog native engine contract', () => {
       ).toBe(true);
       const afterIndex = workbook.getCellXfIndex(0, 0, 0);
       const afterXf = xfAt(workbook);
-      expect(afterXf?.horizontalAlign).toBe(2);
+      expect(afterXf?.horizontal).toBe(2);
       expect(afterIndex).not.toBe(beforeIndex);
 
       expect(history.undo()).toBe(true);
@@ -354,7 +353,7 @@ describe('Format Cells dialog native engine contract', () => {
       });
       flushFormatToEngine(workbook, store, 0);
       expect(fontAt(workbook)?.bold).toBe(true);
-      expect(fontAt(workbook)?.size).toBe(9);
+      expect(fontAt(workbook)?.sizePt).toBe(9);
 
       const after = {
         bold: false,
@@ -376,7 +375,7 @@ describe('Format Cells dialog native engine contract', () => {
       ).toBe(true);
 
       expect(fontAt(workbook)?.bold).toBe(false);
-      expect(fontAt(workbook)?.size).toBe(5.25);
+      expect(fontAt(workbook)?.sizePt).toBe(5.25);
       expect(workbook.getHyperlinks(0)).toContainEqual({
         row: 0,
         col: 0,
@@ -390,7 +389,7 @@ describe('Format Cells dialog native engine contract', () => {
 
       expect(history.undo()).toBe(true);
       expect(fontAt(workbook)?.bold).toBe(true);
-      expect(fontAt(workbook)?.size).toBe(9);
+      expect(fontAt(workbook)?.sizePt).toBe(9);
       expect(workbook.getHyperlinks(0)).toContainEqual({
         row: 0,
         col: 0,
@@ -403,7 +402,7 @@ describe('Format Cells dialog native engine contract', () => {
 
       expect(history.redo()).toBe(true);
       expect(fontAt(workbook)?.bold).toBe(false);
-      expect(fontAt(workbook)?.size).toBe(5.25);
+      expect(fontAt(workbook)?.sizePt).toBe(5.25);
       expect(workbook.getComment(0, 0, 0)).toEqual({ author: 'Bob', text: 'new note' });
     } finally {
       workbook.dispose();

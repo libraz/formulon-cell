@@ -1,21 +1,29 @@
-import type {
-  DisplayTextResult,
-  EffectiveStyleResult,
-  ThemeFonts,
-  ThemeResult,
-  Value,
+import {
+  type CellXfInput,
+  type Color,
+  type ColorContext,
+  type EffectiveStyle,
+  type ErrorCode,
+  FontScheme,
+  type ThemeFonts,
+  type ThemeScriptFont,
+  type ThemeSource,
+  type Value,
+  ValueKind,
 } from '@libraz/formulon';
 import { computeNamedCellStyles, type NamedCellStyle } from './cell-styles-meta.js';
+import { orFallback } from './result.js';
 import { completeBorderRecord, completeFillRecord, completeFontRecord } from './style-records.js';
 import type {
   BorderRecord,
+  CellRect,
   CellValue,
   CellXf,
-  ColorSpec,
   EngineCapabilities,
   FillRecord,
   FontRecord,
   Range,
+  Sheet,
   SheetFontAxisSnapshot,
   Workbook,
 } from './types.js';
@@ -36,7 +44,17 @@ type NamedCellStyleRecord = {
   customBuiltin?: boolean;
 };
 
-/** `setCellStyle`'s sentinel for "this style has no OOXML built-in id". */
+/** The workbook theme as the handle reports it: colours in clrScheme order,
+ *  the Latin / East Asian faces and each font set's per-script faces. */
+export interface WorkbookTheme {
+  source: ThemeSource;
+  colors: number[];
+  fonts: ThemeFonts;
+  majorScripts: ThemeScriptFont[];
+  minorScripts: ThemeScriptFont[];
+}
+
+/** `getCellStyle`'s sentinel for "this style has no OOXML built-in id". */
 const CUSTOM_CELL_STYLE_BUILTIN_ID = 0xffffffff;
 
 declare module './workbook-handle.js' {
@@ -55,9 +73,20 @@ function wb(handle: unknown): Workbook {
   return internals(handle).wb;
 }
 
+function ws(handle: unknown, sheet: number): Sheet {
+  return internals(handle).wb.sheet(sheet);
+}
+
+const cellRect = (range: Range): CellRect => ({
+  firstRow: range.r0,
+  firstCol: range.c0,
+  lastRow: range.r1,
+  lastCol: range.c1,
+});
+
 /** Theme read per handle; the engine theme only changes through the setters
  *  below, and painting resolves a theme-linked font for every visible cell. */
-const themeCache = new WeakMap<object, ThemeResult | null>();
+const themeCache = new WeakMap<object, WorkbookTheme | null>();
 
 /** ISO 15924 theme script a font `charset` selects; any other charset takes the latin face. */
 const SCRIPT_FOR_CHARSET: ReadonlyMap<number, string> = new Map([
@@ -86,43 +115,44 @@ function profileScript(handle: WorkbookHandleStylesMethods): string | undefined 
   return locale ? SCRIPT_FOR_PROFILE_LOCALE.get(locale) : undefined;
 }
 
-function readTheme(handle: WorkbookHandleStylesMethods): ThemeResult | null {
+function readTheme(handle: WorkbookHandleStylesMethods): WorkbookTheme | null {
   if (themeCache.has(handle)) return themeCache.get(handle) ?? null;
-  const native = wb(handle) as unknown as {
-    getTheme?: () => ThemeResult;
-  };
-  const result = typeof native.getTheme === 'function' ? native.getTheme() : null;
-  const theme = result?.status.ok ? result : null;
+  const native = wb(handle);
+  const theme = orFallback(null, (): WorkbookTheme => {
+    const colors = native.getThemeColors();
+    return {
+      source: colors.source,
+      colors: [...colors.colors],
+      fonts: native.getThemeFonts(),
+      majorScripts: [...native.listThemeScriptFonts(FontScheme.Major)],
+      minorScripts: [...native.listThemeScriptFonts(FontScheme.Minor)],
+    };
+  });
   themeCache.set(handle, theme);
   return theme;
 }
 
-function resolveArgb(handle: unknown, spec: ColorSpec, context: number): number | null {
+function resolveArgb(handle: unknown, spec: Color, context: ColorContext): number | null {
   const capabilities = (handle as { capabilities?: EngineCapabilities }).capabilities;
   if (spec.kind === 0 || !capabilities?.colorResolution) return null;
-  const native = wb(handle) as unknown as {
-    resolveColor?: (
-      color: ColorSpec,
-      colorContext: number,
-    ) => { status: { ok: boolean }; argb: number };
-  };
-  if (typeof native.resolveColor !== 'function') return null;
-  const resolved = native.resolveColor(spec, context);
-  return resolved.status.ok ? resolved.argb : null;
+  return orFallback(null, () => wb(handle).resolveColor(spec, context).argb);
 }
+
+/** A resolved colour keeps its selector and carries the display ARGB in `argb`. */
+const withArgb = (color: Color, argb: number): Color => ({ ...color, argb });
 
 const engineValueFromCell = (value: CellValue): Value => {
   switch (value.kind) {
     case 'number':
-      return { kind: 1, number: value.value, boolean: 0, text: '', errorCode: 0 };
+      return { kind: ValueKind.Number, number: value.value };
     case 'bool':
-      return { kind: 2, number: 0, boolean: value.value ? 1 : 0, text: '', errorCode: 0 };
+      return { kind: ValueKind.Bool, boolean: value.value };
     case 'text':
-      return { kind: 3, number: 0, boolean: 0, text: value.value, errorCode: 0 };
+      return { kind: ValueKind.Text, text: value.value };
     case 'error':
-      return { kind: 4, number: 0, boolean: 0, text: '', errorCode: value.code };
+      return { kind: ValueKind.Error, errorCode: value.code as ErrorCode };
     default:
-      return { kind: 0, number: 0, boolean: 0, text: '', errorCode: 0 };
+      return { kind: ValueKind.Blank };
   }
 };
 
@@ -134,133 +164,98 @@ export abstract class WorkbookHandleStylesMethods {
   setColumnStyle(sheet: number, first: number, last: number, xfIndex: number): boolean {
     assertAlive(this);
     if (this.capabilities.sheetFontStyles !== true) return false;
-    const native = wb(this) as unknown as {
-      setColumnStyle?: (
-        sheetIndex: number,
-        firstColumn: number,
-        lastColumn: number,
-        styleXf: number,
-      ) => { ok: boolean };
-    };
-    if (typeof native.setColumnStyle !== 'function') return false;
-    return native.setColumnStyle(sheet, first, last, xfIndex).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).ooxml.setColumnXfIndex(first, last, xfIndex);
+      return true;
+    });
   }
 
   /** Clear the native cell-style XF for an inclusive column range. */
   clearColumnStyle(sheet: number, first: number, last: number): boolean {
     assertAlive(this);
     if (this.capabilities.sheetFontStyles !== true) return false;
-    const native = wb(this) as unknown as {
-      clearColumnStyle?: (
-        sheetIndex: number,
-        firstColumn: number,
-        lastColumn: number,
-      ) => { ok: boolean };
-    };
-    if (typeof native.clearColumnStyle !== 'function') return false;
-    return native.clearColumnStyle(sheet, first, last).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).ooxml.resetColumnXfIndex(first, last);
+      return true;
+    });
   }
 
   /** Set the native cell-style XF for one worksheet row. */
   setRowStyle(sheet: number, row: number, xfIndex: number): boolean {
     assertAlive(this);
     if (this.capabilities.sheetFontStyles !== true) return false;
-    const native = wb(this) as unknown as {
-      setRowStyle?: (...args: number[]) => { ok: boolean };
-    };
-    if (typeof native.setRowStyle !== 'function') return false;
-    return (
-      this.capabilities.rowStyleRanges
-        ? native.setRowStyle(sheet, row, row, xfIndex)
-        : native.setRowStyle(sheet, row, xfIndex)
-    ).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).ooxml.setRowXfIndex(row, row, xfIndex);
+      return true;
+    });
   }
 
   /** Clear the native cell-style XF for one worksheet row. */
   clearRowStyle(sheet: number, row: number): boolean {
     assertAlive(this);
     if (this.capabilities.sheetFontStyles !== true) return false;
-    const native = wb(this) as unknown as {
-      clearRowStyle?: (...args: number[]) => { ok: boolean };
-    };
-    if (typeof native.clearRowStyle !== 'function') return false;
-    return (
-      this.capabilities.rowStyleRanges
-        ? native.clearRowStyle(sheet, row, row)
-        : native.clearRowStyle(sheet, row)
-    ).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).ooxml.resetRowXfIndex(row, row);
+      return true;
+    });
   }
 
   setRowStyleRange(sheet: number, first: number, last: number, xfIndex: number): boolean {
     assertAlive(this);
     if (!this.capabilities.rowStyleRanges) return false;
-    const native = wb(this) as unknown as {
-      setRowStyle: (...args: number[]) => { ok: boolean };
-    };
-    return native.setRowStyle(sheet, first, last, xfIndex).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).ooxml.setRowXfIndex(first, last, xfIndex);
+      return true;
+    });
   }
 
   clearRowStyleRange(sheet: number, first: number, last: number): boolean {
     assertAlive(this);
     if (!this.capabilities.rowStyleRanges) return false;
-    const native = wb(this) as unknown as {
-      clearRowStyle: (...args: number[]) => { ok: boolean };
-    };
-    return native.clearRowStyle(sheet, first, last).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).ooxml.resetRowXfIndex(first, last);
+      return true;
+    });
   }
 
   getRangeStyleBases(range: Range): readonly number[] | null {
     assertAlive(this);
     if (!this.capabilities.rangeStylePatch) return null;
-    const native = wb(this) as unknown as {
-      rangeStyleBases: (...args: number[]) => { status: { ok: boolean }; xfIndices: number[] };
-    };
-    const result = native.rangeStyleBases(range.sheet, range.r0, range.c0, range.r1, range.c1);
-    return result.status.ok ? [...result.xfIndices] : null;
+    return orFallback(null, () => [
+      ...ws(this, range.sheet).ooxml.getRangeXfBases(cellRect(range)),
+    ]);
   }
 
   remapRangeStyle(range: Range, fromXfs: readonly number[], toXfs: readonly number[]): boolean {
     assertAlive(this);
     if (!this.capabilities.rangeStylePatch) return false;
-    const native = wb(this) as unknown as {
-      remapRangeStyle: (
-        sheet: number,
-        r0: number,
-        c0: number,
-        r1: number,
-        c1: number,
-        fromXfs: number[],
-        toXfs: number[],
-      ) => { ok: boolean };
-    };
-    return native.remapRangeStyle(
-      range.sheet,
-      range.r0,
-      range.c0,
-      range.r1,
-      range.c1,
-      [...fromXfs],
-      [...toXfs],
-    ).ok;
+    if (fromXfs.length !== toXfs.length) return false;
+    const mapping = new Map<number, number>();
+    for (const [i, from] of fromXfs.entries()) mapping.set(from, toXfs[i] as number);
+    // A repeated source XF is an ambiguous remap; refuse it rather than merge.
+    if (mapping.size !== fromXfs.length) return false;
+    return orFallback(false, () => {
+      ws(this, range.sheet).ooxml.remapRangeXfs(cellRect(range), mapping);
+      return true;
+    });
   }
 
   snapshotRangeStyle(range: Range): Uint8Array | null {
     assertAlive(this);
     if (!this.capabilities.rangeStyleSnapshot) return null;
-    const native = wb(this) as unknown as {
-      snapshotRangeStyle: (...args: number[]) => { status: { ok: boolean }; bytes: Uint8Array };
-    };
-    const result = native.snapshotRangeStyle(range.sheet, range.r0, range.c0, range.r1, range.c1);
-    return result.status.ok ? new Uint8Array(result.bytes) : null;
+    return orFallback(
+      null,
+      () => new Uint8Array(ws(this, range.sheet).ooxml.snapshotRangeXfs(cellRect(range))),
+    );
   }
 
   restoreRangeStyle(sheet: number, bytes: Uint8Array): boolean {
     assertAlive(this);
     if (!this.capabilities.rangeStyleSnapshot) return false;
-    const native = wb(this) as unknown as {
-      restoreRangeStyle: (sheet: number, bytes: Uint8Array) => { ok: boolean };
-    };
-    return native.restoreRangeStyle(sheet, bytes).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).ooxml.restoreRangeXfs(bytes);
+      return true;
+    });
   }
 
   /** Capture only style-bearing axis records. Restoring these after clearing
@@ -269,58 +264,30 @@ export abstract class WorkbookHandleStylesMethods {
   getSheetFontAxisSnapshot(sheet: number): SheetFontAxisSnapshot | null {
     assertAlive(this);
     if (this.capabilities.sheetFontStyles !== true) return null;
-    const native = wb(this) as unknown as {
-      getSheetColumns?: (sheetIndex: number) => {
-        status: { ok: boolean };
-        columns?: ReadonlyArray<{
-          first: number;
-          last: number;
-          hasStyle?: number | boolean;
-          styleXf?: number;
-        }>;
-      };
-      getSheetRowOverrides?: (sheetIndex: number) => {
-        status: { ok: boolean };
-        rows?: ReadonlyArray<{
-          row: number;
-          hasStyle?: number | boolean;
-          styleXf?: number;
-        }>;
-      };
-    };
-    if (
-      typeof native.getSheetColumns !== 'function' ||
-      typeof native.getSheetRowOverrides !== 'function'
-    )
-      return null;
-    const columnsResult = native.getSheetColumns(sheet);
-    const rowsResult = native.getSheetRowOverrides(sheet);
-    if (!columnsResult.status.ok || !rowsResult.status.ok) return null;
-    const isSet = (value: number | boolean | undefined): boolean =>
-      typeof value === 'boolean' ? value : value !== undefined && value !== 0;
-    const columns = (columnsResult.columns ?? [])
-      .filter((entry) => isSet(entry.hasStyle) && Number.isInteger(entry.styleXf))
-      .map((entry) => ({
-        first: entry.first,
-        last: entry.last,
-        styleXf: entry.styleXf as number,
-      }));
-    const rows = (rowsResult.rows ?? [])
-      .filter((entry) => isSet(entry.hasStyle) && Number.isInteger(entry.styleXf))
-      .map((entry) => ({ row: entry.row, styleXf: entry.styleXf as number }));
-    return { columns, rows };
+    return orFallback(null, (): SheetFontAxisSnapshot => {
+      const sheetHandle = ws(this, sheet);
+      const columns: { first: number; last: number; styleXf: number }[] = [];
+      // A column span is homogeneous, so its first column states the span's XF.
+      for (const span of sheetHandle.listColumnOverrides()) {
+        const styleXf = sheetHandle.ooxml.getColumnXfIndex(span.first);
+        if (styleXf !== null) columns.push({ first: span.first, last: span.last, styleXf });
+      }
+      const rows: { row: number; styleXf: number }[] = [];
+      for (const entry of sheetHandle.listRowOverrides()) {
+        const styleXf = sheetHandle.ooxml.getRowXfIndex(entry.row);
+        if (styleXf !== null) rows.push({ row: entry.row, styleXf });
+      }
+      return { columns, rows };
+    });
   }
 
   /** Read the XF (eXtended Format) table index assigned to `(sheet, row, col)`.
    *  Returns 0 (the workbook's default XF row) on missing cells. Returns null
-   *  when the engine doesn't expose `getCellXfIndex` — i.e. the stub or older
-   *  bundles. */
+   *  when cell formatting is unavailable or the engine refuses the address. */
   getCellXfIndex(sheet: number, row: number, col: number): number | null {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return null;
-    const r = wb(this).getCellXfIndex(sheet, row, col);
-    if (!r.status.ok) return null;
-    return r.xfIndex;
+    return orFallback(null, () => ws(this, sheet).ooxml.getCellXfIndex(row, col) ?? 0);
   }
 
   /** Pin the XF index of `(sheet, row, col)` to `xfIndex`. The index must
@@ -332,21 +299,21 @@ export abstract class WorkbookHandleStylesMethods {
   setCellXfIndex(sheet: number, row: number, col: number, xfIndex: number): boolean {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return false;
-    const s = wb(this).setCellXfIndex(sheet, row, col, xfIndex);
-    return s.ok;
+    return orFallback(false, () => {
+      ws(this, sheet).ooxml.setCellXfIndex(row, col, xfIndex);
+      return true;
+    });
   }
 
   /** Remove a direct XF marker. Blank cells inherit their row/column style;
    * nonblank cells retain the native Cell/Normal resolution contract.
-   * Values, formulas and annotations remain intact. Older bundles return
-   * false rather than replacing the override with the explicit Normal XF. */
+   * Values, formulas and annotations remain intact. */
   clearCellXfIndex(sheet: number, row: number, col: number): boolean {
     assertAlive(this);
-    const native = wb(this) as unknown as {
-      clearCellXfIndex?: (sheet: number, row: number, col: number) => { ok: boolean };
-    };
-    if (typeof native.clearCellXfIndex !== 'function') return false;
-    return native.clearCellXfIndex(sheet, row, col).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).ooxml.resetCellXfIndex(row, col);
+      return true;
+    });
   }
 
   /** Resolve the XF record at `xfIndex` to its component table indices
@@ -357,10 +324,7 @@ export abstract class WorkbookHandleStylesMethods {
   getCellXf(xfIndex: number): CellXf | null {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return null;
-    const r = wb(this).getCellXf(xfIndex);
-    if (!r.status.ok) return null;
-    const { status: _status, ...record } = r;
-    return record;
+    return orFallback(null, () => wb(this).ooxml.getCellXf(xfIndex));
   }
 
   /** Resolve a font index to its plain-data record. Returns null on engine
@@ -368,32 +332,30 @@ export abstract class WorkbookHandleStylesMethods {
   getFontRecord(fontIndex: number): FontRecord | null {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return null;
-    const r = wb(this).getFont(fontIndex);
-    if (!r.status.ok) return null;
-    const { status: _status, ...record } = r;
-    return record;
+    return orFallback(null, () => wb(this).ooxml.getFont(fontIndex));
   }
 
   /** Resolve a theme, indexed or automatic colour to opaque ARGB against the
    *  workbook theme and palette; null when the engine cannot resolve it. */
-  resolveColorArgb(spec: ColorSpec, context = 0): number | null {
+  resolveColorArgb(spec: Color, context: ColorContext = 0): number | null {
     assertAlive(this);
     return resolveArgb(this, spec, context);
   }
 
   /** Resolve a font record's theme, indexed, or automatic colour for display
-   *  while retaining its raw selector. Theme-linked font names are projected
-   *  from the current workbook theme for rendering; the returned `scheme`
-   *  still preserves the source link so writeback can keep it linked. */
+   *  while retaining its raw selector: the resolved ARGB is `color.argb`.
+   *  Theme-linked font names are projected from the current workbook theme
+   *  for rendering; the returned `scheme` still preserves the source link so
+   *  writeback can keep it linked. */
   getResolvedFontRecord(fontIndex: number): FontRecord | null {
     const record = this.getFontRecord(fontIndex);
     if (!record) return null;
     let resolved = record;
-    if (record.scheme === 1 || record.scheme === 2) {
+    if (record.scheme === FontScheme.Major || record.scheme === FontScheme.Minor) {
       const theme = this.capabilities.workbookTheme ? readTheme(this) : null;
-      const major = record.scheme === 1;
+      const major = record.scheme === FontScheme.Major;
       const script =
-        record.hasCharset && record.charset !== undefined
+        record.charset !== null && record.charset !== undefined
           ? SCRIPT_FOR_CHARSET.get(record.charset)
           : profileScript(this);
       const scriptFace = script
@@ -404,39 +366,41 @@ export abstract class WorkbookHandleStylesMethods {
       if (themeName) resolved = { ...resolved, name: themeName };
     }
     if (!record.color) return resolved;
-    const colorArgb = resolveArgb(this, record.color, 0);
-    return colorArgb === null ? resolved : { ...resolved, colorArgb };
+    const argb = resolveArgb(this, record.color, 0);
+    return argb === null ? resolved : { ...resolved, color: withArgb(record.color, argb) };
   }
 
   /** Resolve a fill index to its plain-data record. */
   getFillRecord(fillIndex: number): FillRecord | null {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return null;
-    const r = wb(this).getFill(fillIndex);
-    if (!r.status.ok) return null;
-    const { status: _status, ...record } = r;
-    return record;
+    return orFallback(null, () => wb(this).ooxml.getFill(fillIndex));
   }
 
   /** Resolve a fill record's theme, indexed, or automatic colours for display
-   *  while retaining both raw selectors. RGB records are returned unchanged. */
+   *  while retaining both raw selectors (the resolved ARGB is each colour's
+   *  `argb`). RGB records are returned unchanged. */
   getResolvedFillRecord(fillIndex: number): FillRecord | null {
     const record = this.getFillRecord(fillIndex);
     if (!record) return null;
-    const fgArgb = record.fg ? resolveArgb(this, record.fg, 1) : null;
-    const bgArgb = record.bg ? resolveArgb(this, record.bg, 2) : null;
+    const fgArgb = record.foreground ? resolveArgb(this, record.foreground, 1) : null;
+    const bgArgb = record.background ? resolveArgb(this, record.background, 2) : null;
     const gradient = record.gradient && {
       ...record.gradient,
       stops: record.gradient.stops.map((stop) => {
-        const colorArgb = stop.color ? resolveArgb(this, stop.color, 1) : null;
-        return colorArgb === null ? stop : { ...stop, colorArgb };
+        const argb = stop.color ? resolveArgb(this, stop.color, 1) : null;
+        return argb === null || !stop.color ? stop : { ...stop, color: withArgb(stop.color, argb) };
       }),
     };
     if (fgArgb === null && bgArgb === null && !gradient) return record;
     return {
       ...record,
-      ...(fgArgb === null ? {} : { fgArgb }),
-      ...(bgArgb === null ? {} : { bgArgb }),
+      ...(fgArgb === null || !record.foreground
+        ? {}
+        : { foreground: withArgb(record.foreground, fgArgb) }),
+      ...(bgArgb === null || !record.background
+        ? {}
+        : { background: withArgb(record.background, bgArgb) }),
       ...(gradient ? { gradient } : {}),
     };
   }
@@ -445,10 +409,7 @@ export abstract class WorkbookHandleStylesMethods {
   getBorderRecord(borderIndex: number): BorderRecord | null {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return null;
-    const r = wb(this).getBorder(borderIndex);
-    if (!r.status.ok) return null;
-    const { status: _status, ...record } = r;
-    return record;
+    return orFallback(null, () => wb(this).ooxml.getBorder(borderIndex));
   }
 
   /** Resolve a border record's theme, indexed, or automatic colours for
@@ -460,12 +421,12 @@ export abstract class WorkbookHandleStylesMethods {
     const sides = (['left', 'right', 'top', 'bottom', 'diagonal'] as const).reduce(
       (out, side) => {
         const current = record[side];
-        const colorArgb = current.color ? resolveArgb(this, current.color, 3) : null;
-        if (colorArgb === null) {
+        const argb = current.color ? resolveArgb(this, current.color, 3) : null;
+        if (argb === null || !current.color) {
           out[side] = current;
         } else {
           changed = true;
-          out[side] = { ...current, colorArgb };
+          out[side] = { ...current, color: withArgb(current.color, argb) };
         }
         return out;
       },
@@ -478,22 +439,19 @@ export abstract class WorkbookHandleStylesMethods {
   getNumFmtCode(numFmtId: number): string | null {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return null;
-    const r = wb(this).getNumFmt(numFmtId);
-    if (!r.status.ok) return null;
-    return r.formatCode;
+    return orFallback(null, () => wb(this).ooxml.getNumberFormat(numFmtId));
   }
 
   /** Read the workbook theme without exposing the raw WASM workbook. The
    *  returned selectors stay in clrScheme order so callers can edit a single
    *  preset and send the same twelve-entry array back to the engine. */
-  getWorkbookTheme(): ThemeResult | null {
+  getWorkbookTheme(): WorkbookTheme | null {
     assertAlive(this);
     if (!this.capabilities.workbookTheme) return null;
     const result = readTheme(this);
     if (!result) return null;
     return {
       ...result,
-      status: { ...result.status },
       colors: [...result.colors],
       fonts: { ...result.fonts },
       majorScripts: result.majorScripts.map((s) => ({ ...s })),
@@ -502,7 +460,7 @@ export abstract class WorkbookHandleStylesMethods {
   }
 
   /** Native-name alias for consumers that work directly with Workbook APIs. */
-  getTheme(): ThemeResult | null {
+  getTheme(): WorkbookTheme | null {
     return this.getWorkbookTheme();
   }
 
@@ -510,12 +468,12 @@ export abstract class WorkbookHandleStylesMethods {
   setWorkbookThemeColors(colors: readonly number[]): boolean {
     assertAlive(this);
     if (!this.capabilities.workbookTheme || colors.length !== 12) return false;
-    const native = wb(this) as unknown as {
-      setThemeColors?: (next: number[]) => { ok: boolean };
-    };
-    if (typeof native.setThemeColors !== 'function') return false;
     themeCache.delete(this);
-    return native.setThemeColors([...colors]).ok;
+    const hex = colors.map((argb) => `#${(argb >>> 0).toString(16).padStart(8, '0')}`);
+    return orFallback(false, () => {
+      wb(this).setThemeColors({ colors: hex });
+      return true;
+    });
   }
 
   /** Native-name alias for workbook theme editing. */
@@ -527,12 +485,11 @@ export abstract class WorkbookHandleStylesMethods {
   setWorkbookThemeFonts(fonts: ThemeFonts): boolean {
     assertAlive(this);
     if (!this.capabilities.workbookTheme) return false;
-    const native = wb(this) as unknown as {
-      setThemeFonts?: (next: ThemeFonts) => { ok: boolean };
-    };
-    if (typeof native.setThemeFonts !== 'function') return false;
     themeCache.delete(this);
-    return native.setThemeFonts({ ...fonts }).ok;
+    return orFallback(false, () => {
+      wb(this).setThemeFonts({ ...fonts });
+      return true;
+    });
   }
 
   /** Native-name alias for workbook theme editing. */
@@ -543,49 +500,17 @@ export abstract class WorkbookHandleStylesMethods {
   /** Return the XF selected by cell, row, column, or workbook default. This
    *  remains a read-only projection: callers must not feed its XF index back
    *  to `setCellXfIndex` just because a row/column supplied the formatting. */
-  getEffectiveStyle(sheet: number, row: number, col: number): EffectiveStyleResult | null {
+  getEffectiveStyle(sheet: number, row: number, col: number): EffectiveStyle | null {
     assertAlive(this);
     if (!this.capabilities.effectiveStyle) return null;
-    const native = wb(this) as unknown as {
-      getEffectiveStyle?: (
-        sheetIndex: number,
-        rowIndex: number,
-        colIndex: number,
-      ) => EffectiveStyleResult | undefined;
-    };
-    if (typeof native.getEffectiveStyle !== 'function') return null;
-    const result = native.getEffectiveStyle(sheet, row, col);
-    if (!result?.status.ok) return null;
-    return {
-      ...result,
-      status: { ...result.status },
-      font: { ...result.font },
-      fillForeground: { ...result.fillForeground },
-      fillBackground: { ...result.fillBackground },
-      borders: {
-        left: { ...result.borders.left },
-        right: { ...result.borders.right },
-        top: { ...result.borders.top },
-        bottom: { ...result.borders.bottom },
-        diagonal: { ...result.borders.diagonal },
-      },
-    };
+    return orFallback(null, () => ws(this, sheet).ooxml.getEffectiveStyle(row, col));
   }
 
   /** Use formulon's workbook-aware display renderer for an existing cell. */
   getDisplayText(sheet: number, row: number, col: number): string | null {
     assertAlive(this);
     if (!this.capabilities.displayText) return null;
-    const native = wb(this) as unknown as {
-      getDisplayText?: (
-        sheetIndex: number,
-        rowIndex: number,
-        colIndex: number,
-      ) => DisplayTextResult;
-    };
-    if (typeof native.getDisplayText !== 'function') return null;
-    const result = native.getDisplayText(sheet, row, col);
-    return result.status.ok ? result.text : null;
+    return orFallback(null, () => ws(this, sheet).getDisplayText(row, col).text);
   }
 
   /** Format a UI value with a native Excel format code. This path is used
@@ -594,12 +519,10 @@ export abstract class WorkbookHandleStylesMethods {
   formatValueForDisplay(value: CellValue, formatCode: string): string | null {
     assertAlive(this);
     if (!this.capabilities.displayText) return null;
-    const native = wb(this) as unknown as {
-      formatValue?: (next: Value, code: string) => DisplayTextResult;
-    };
-    if (typeof native.formatValue !== 'function') return null;
-    const result = native.formatValue(engineValueFromCell(value), formatCode);
-    return result.status.ok ? result.text : null;
+    return orFallback(
+      null,
+      () => wb(this).formatValue(engineValueFromCell(value), formatCode).text,
+    );
   }
 
   /** Native-name alias for callers that already have a format code. */
@@ -617,7 +540,10 @@ export abstract class WorkbookHandleStylesMethods {
     if (!this.capabilities.defaultFont || !this.capabilities.cellFormatting) return false;
     const current = this.getFontRecord(0);
     if (!current) return false;
-    return wb(this).setDefaultFont(completeFontRecord({ ...current, ...record })).ok;
+    return orFallback(false, () => {
+      wb(this).setDefaultFont(completeFontRecord({ ...current, ...record }));
+      return true;
+    });
   }
 
   /** Add or dedup a font record. Returns the resolved font index, or -1 on
@@ -625,24 +551,21 @@ export abstract class WorkbookHandleStylesMethods {
   addFontRecord(record: FontRecord): number {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return -1;
-    const r = wb(this).addFont(completeFontRecord(record));
-    return r.status.ok ? r.index : -1;
+    return orFallback(-1, () => wb(this).ooxml.addFont(completeFontRecord(record)));
   }
 
   /** Add or dedup a fill record. */
   addFillRecord(record: FillRecord): number {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return -1;
-    const r = wb(this).addFill(completeFillRecord(record));
-    return r.status.ok ? r.index : -1;
+    return orFallback(-1, () => wb(this).ooxml.addFill(completeFillRecord(record)));
   }
 
   /** Add or dedup a border record. */
   addBorderRecord(record: BorderRecord): number {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return -1;
-    const r = wb(this).addBorder(completeBorderRecord(record));
-    return r.status.ok ? r.index : -1;
+    return orFallback(-1, () => wb(this).ooxml.addBorder(completeBorderRecord(record)));
   }
 
   /** Register a number-format code. Built-in matches return the built-in id;
@@ -650,41 +573,36 @@ export abstract class WorkbookHandleStylesMethods {
   addNumFmtCode(formatCode: string): number {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return -1;
-    const r = wb(this).addNumFmt(formatCode);
-    return r.status.ok ? r.numFmtId : -1;
+    return orFallback(-1, () => wb(this).ooxml.addNumberFormat(formatCode));
   }
 
   /** Add or dedup an XF (eXtended Format) record built from existing
    *  font/fill/border indices and a registered numFmtId. Returns the resolved
    *  xf index, or -1 on failure. */
-  addXfRecord(record: CellXf): number {
+  addXfRecord(record: CellXfInput): number {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return -1;
-    const r = wb(this).addXf(record);
-    return r.status.ok ? r.index : -1;
+    return orFallback(-1, () => wb(this).ooxml.addCellXf(record));
   }
 
   /** Number of `<cellStyle>` entries (named styles) registered on the
-   *  workbook. Returns `0` under stub mode and older engine package builds. */
+   *  workbook. Returns `0` under stub mode. */
   cellStyleCount(): number {
     assertAlive(this);
     if (!this.capabilities.cellStyles) return 0;
-    const count = wb(this).cellStyleCount();
-    return count.status.ok ? count.value : 0;
+    return orFallback(0, () => wb(this).listCellStyles().length);
   }
 
   /** Number of `<cellStyleXfs>` records — the named-style xf table that
-   *  `CellStyleResult.xfId` indexes into. Returns `0` under stub mode and
-   *  older engine package builds. */
+   *  `getCellStyle(index).xfId` indexes into. Returns `0` under stub mode. */
   cellStyleXfCount(): number {
     assertAlive(this);
     if (!this.capabilities.cellStyles) return 0;
-    const count = wb(this).cellStyleXfCount();
-    return count.status.ok ? count.value : 0;
+    return orFallback(0, () => wb(this).ooxml.listCellStyleXfs().length);
   }
 
   /** Snapshot of the named cell style at `index`. Returns `null` when the
-   *  engine doesn't expose `getCellStyle` or the index is out of range. */
+   *  index is out of range. */
   getCellStyle(index: number): {
     name: string;
     xfId: number;
@@ -695,13 +613,13 @@ export abstract class WorkbookHandleStylesMethods {
   } | null {
     assertAlive(this);
     if (!this.capabilities.cellStyles) return null;
-    const r = wb(this).getCellStyle(index);
-    if (!r.status.ok) return null;
+    const r = orFallback(null, () => wb(this).listCellStyles()[index] ?? null);
+    if (!r) return null;
     return {
       name: r.name,
-      xfId: r.xfId,
-      builtinId: r.builtinId,
-      iLevel: r.iLevel,
+      xfId: r.styleXfIndex,
+      builtinId: r.builtinId ?? CUSTOM_CELL_STYLE_BUILTIN_ID,
+      iLevel: r.outlineLevel,
       hidden: r.hidden,
       customBuiltin: r.customBuiltin,
     };
@@ -712,20 +630,16 @@ export abstract class WorkbookHandleStylesMethods {
   getCellStyleXf(xfId: number): CellXf | null {
     assertAlive(this);
     if (!this.capabilities.cellStyles) return null;
-    const r = wb(this).getCellStyleXf(xfId);
-    if (!r.status.ok) return null;
-    const { status: _status, ...record } = r;
-    return record;
+    return orFallback(null, () => wb(this).ooxml.getCellStyleXf(xfId));
   }
 
   /** Append (deduplicating) a `<cellStyleXfs>` row and return its index, which
-   *  is what `setNamedCellStyle` and a cell XF's `xfId` reference. Returns -1
-   *  when the engine cannot author named styles. */
-  addCellStyleXfRecord(record: CellXf): number {
+   *  is what `setNamedCellStyle` and a cell XF's `styleXfIndex` reference.
+   *  Returns -1 when the engine cannot author named styles. */
+  addCellStyleXfRecord(record: CellXfInput): number {
     assertAlive(this);
     if (!this.capabilities.cellStyleMutate) return -1;
-    const r = wb(this).addCellStyleXf(record);
-    return r.status.ok ? r.index : -1;
+    return orFallback(-1, () => wb(this).ooxml.addCellStyleXf(record));
   }
 
   /** Add or replace the `<cellStyle>` entry named `name`. `builtinId` is an
@@ -739,25 +653,31 @@ export abstract class WorkbookHandleStylesMethods {
   setNamedCellStyleRecord(record: NamedCellStyleRecord): boolean {
     assertAlive(this);
     if (!this.capabilities.cellStyleMutate) return false;
-    return wb(this).setCellStyle({
-      name: record.name,
-      xfId: record.xfId,
-      builtinId: record.builtinId ?? CUSTOM_CELL_STYLE_BUILTIN_ID,
-      ...(record.iLevel === undefined ? {} : { iLevel: record.iLevel }),
-      ...(record.hidden === undefined ? {} : { hidden: record.hidden }),
-      ...(record.customBuiltin === undefined ? {} : { customBuiltin: record.customBuiltin }),
-    }).ok;
+    const builtinId =
+      record.builtinId === null || record.builtinId === CUSTOM_CELL_STYLE_BUILTIN_ID
+        ? null
+        : record.builtinId;
+    return orFallback(false, () => {
+      wb(this).setCellStyle({
+        name: record.name,
+        styleXfIndex: record.xfId,
+        builtinId,
+        ...(record.iLevel === undefined ? {} : { outlineLevel: record.iLevel }),
+        ...(record.hidden === undefined ? {} : { hidden: record.hidden }),
+        ...(record.customBuiltin === undefined ? {} : { customBuiltin: record.customBuiltin }),
+      });
+      return true;
+    });
   }
 
-  /** Remove a named style when the loaded engine exposes the 0.13 API. */
+  /** Remove a named style. */
   removeNamedCellStyle(name: string): boolean {
     assertAlive(this);
     if (!this.capabilities.cellStyleMutate) return false;
-    const native = wb(this) as unknown as {
-      removeCellStyle?: (styleName: string) => { ok: boolean };
-    };
-    if (typeof native.removeCellStyle !== 'function') return false;
-    return native.removeCellStyle(name).ok;
+    return orFallback(false, () => {
+      wb(this).removeCellStyle(name);
+      return true;
+    });
   }
 
   /** Enumerate every named cell style on the workbook — combines
@@ -769,6 +689,13 @@ export abstract class WorkbookHandleStylesMethods {
     if (!this.capabilities.cellStyles) return [];
     return computeNamedCellStyles(this as unknown as WorkbookHandle);
   }
+}
+
+/** The stored name of the named cell style `name` resolves to under Excel's
+ *  name identity; null when the workbook has none. */
+export function storedCellStyleName(handle: WorkbookHandle, name: string): string | null {
+  if (!handle.capabilities.cellStyles) return null;
+  return orFallback(null, () => wb(handle).getCellStyle(name)?.name ?? null);
 }
 
 export function installStylesMethods(target: WorkbookHandleCtor): void {

@@ -1,74 +1,75 @@
-import type {
-  ColorSpec,
-  BorderRecord as EngineBorderRecord,
-  BorderSide as EngineBorderSide,
-  DxfRecord as EngineDxfRecord,
-  FillRecord as EngineFillRecord,
-  FontRecord as EngineFontRecord,
+import {
+  type Color,
+  ColorKind,
+  type BorderInput as EngineBorderInput,
+  type BorderSideInput as EngineBorderSideInput,
+  type DxfInput as EngineDxfInput,
+  type FillInput as EngineFillInput,
+  type FontInput as EngineFontInput,
 } from '@libraz/formulon';
 import type { BorderRecord, BorderSide, DxfRecord, FillRecord, FontRecord } from './types.js';
 
-/** A `<color>` selector for a record the cell layer authored from UI state.
- * `kind: 0` tells the writer to emit the record's sibling `*Argb` field as
- * literal rgb, which is the only kind of colour the store can hold — theme,
- * indexed and auto selectors exist solely on records read back from a file. */
-const authoredColorSpec = (): ColorSpec => ({ kind: 0, rgb: 0, theme: 0, tint: 0, indexed: 0 });
+/** No `<color>` element: an automatic font colour, or no fill / border colour. */
+export const noColor = (): Color => ({
+  kind: ColorKind.None,
+  argb: 0,
+  theme: 0,
+  tint: 0,
+  indexed: 0,
+});
 
-/** Fill in the fields the engine expects on every font record. A caller that
- * states `bold` without stating `hasBold` means it — an omitted flag defaults
- * to "the element is present", which is what a full cell font always wants.
- * Differential fonts pass the flags explicitly so an unset property stays
- * absent and leaves the underlying cell's attribute alone. */
-export function completeFontRecord(record: FontRecord): EngineFontRecord {
+/** A literal colour the cell layer authored from UI state. ARGB 0 is "no
+ * colour", which the store cannot distinguish from an absent element. */
+export const literalColor = (argb: number): Color =>
+  argb === 0 ? noColor() : { kind: ColorKind.Rgb, argb, theme: 0, tint: 0, indexed: 0 };
+
+/** ARGB a colour displays as: the literal value, or the value a resolved
+ * record carries for a theme / indexed / automatic selector; 0 for none. */
+export const colorArgb = (color: Color | null | undefined): number =>
+  !color || color.kind === ColorKind.None ? 0 : color.argb;
+
+/** Fill in the fields the engine expects on every font record. Theme,
+ * indexed and auto selectors exist solely on records read back from a file;
+ * a record the cell layer authored carries no `<color>` selector of its own. */
+export function completeFontRecord(record: FontRecord): EngineFontInput {
   return {
     ...record,
     vertAlign: record.vertAlign ?? 0,
-    hasBold: record.hasBold ?? true,
-    hasItalic: record.hasItalic ?? true,
-    hasStrike: record.hasStrike ?? true,
-    hasSize: record.hasSize ?? true,
-    hasFamily: record.hasFamily ?? false,
-    family: record.family ?? 0,
-    hasCharset: record.hasCharset ?? false,
-    charset: record.charset ?? 0,
-    outline: record.outline ?? false,
-    shadow: record.shadow ?? false,
-    condense: record.condense ?? false,
-    extend: record.extend ?? false,
-    hasOutline: record.hasOutline ?? false,
-    hasShadow: record.hasShadow ?? false,
-    hasCondense: record.hasCondense ?? false,
-    hasExtend: record.hasExtend ?? false,
+    family: record.family ?? null,
+    charset: record.charset ?? null,
+    outline: record.outline ?? null,
+    shadow: record.shadow ?? null,
+    condense: record.condense ?? null,
+    extend: record.extend ?? null,
     // A `<scheme>` link makes the font track the workbook theme. Only a record
     // read back out of a file carries one; a font the cell layer authored from
     // a family name is a literal typeface, so it stays unlinked.
     scheme: record.scheme ?? 0,
-    color: record.color ?? authoredColorSpec(),
+    color: record.color ?? noColor(),
   };
 }
 
-export function completeFillRecord(record: FillRecord): EngineFillRecord {
+export function completeFillRecord(record: FillRecord): EngineFillInput {
   const { gradient, ...rest } = record;
-  const out: EngineFillRecord = {
+  return {
     ...rest,
-    fg: record.fg ?? authoredColorSpec(),
-    bg: record.bg ?? authoredColorSpec(),
+    foreground: record.foreground ?? noColor(),
+    background: record.background ?? noColor(),
+    gradient: gradient
+      ? {
+          ...gradient,
+          stops: gradient.stops.map((stop) => ({ ...stop, color: stop.color ?? noColor() })),
+        }
+      : null,
   };
-  if (gradient) {
-    out.gradient = {
-      ...gradient,
-      stops: gradient.stops.map((stop) => ({ ...stop, color: stop.color ?? authoredColorSpec() })),
-    };
-  }
-  return out;
 }
 
-const completeBorderSide = (side: BorderSide): EngineBorderSide => ({
+const completeBorderSide = (side: BorderSide): EngineBorderSideInput => ({
   ...side,
-  color: side.color ?? authoredColorSpec(),
+  color: side.color ?? noColor(),
 });
 
-export function completeBorderRecord(record: BorderRecord): EngineBorderRecord {
+export function completeBorderRecord(record: BorderRecord): EngineBorderInput {
   return {
     ...record,
     left: completeBorderSide(record.left),
@@ -81,11 +82,12 @@ export function completeBorderRecord(record: BorderRecord): EngineBorderRecord {
 
 /** A differential format states only the properties it overrides, so absent
  * sub-records stay absent rather than becoming an explicit `undefined`. */
-export function completeDxfRecord(record: DxfRecord): EngineDxfRecord {
+export function completeDxfRecord(record: DxfRecord): EngineDxfInput {
   const { font, fill, border, ...rest } = record;
-  const out: EngineDxfRecord = { ...rest };
-  if (font) out.font = completeFontRecord(font);
-  if (fill) out.fill = completeFillRecord(fill);
-  if (border) out.border = completeBorderRecord(border);
-  return out;
+  return {
+    ...rest,
+    ...(font ? { font: completeFontRecord(font) } : {}),
+    ...(fill ? { fill: completeFillRecord(fill) } : {}),
+    ...(border ? { border: completeBorderRecord(border) } : {}),
+  };
 }

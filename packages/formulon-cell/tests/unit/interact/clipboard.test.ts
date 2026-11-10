@@ -388,9 +388,9 @@ describe('attachClipboard', () => {
       if (!defaultXf) throw new Error('missing default XF');
       const defaultFont = formatWb.getFontRecord(defaultXf.fontIndex);
       if (!defaultFont) throw new Error('missing default font');
-      const boldFont = formatWb.addFontRecord({ ...defaultFont, bold: true, hasBold: true });
+      const boldFont = formatWb.addFontRecord({ ...defaultFont, bold: true });
       const boldXf = formatWb.addXfRecord({ ...defaultXf, fontIndex: boldFont });
-      const italicFont = formatWb.addFontRecord({ ...defaultFont, italic: true, hasItalic: true });
+      const italicFont = formatWb.addFontRecord({ ...defaultFont, italic: true });
       const italicXf = formatWb.addXfRecord({ ...defaultXf, fontIndex: italicFont });
       expect(formatWb.setColumnStyle(0, 0, 0, boldXf)).toBe(true);
       expect(formatWb.setCellXfIndex(0, 0, 0, italicXf)).toBe(true);

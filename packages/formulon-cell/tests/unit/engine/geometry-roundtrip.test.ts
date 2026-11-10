@@ -1,5 +1,6 @@
 // @vitest-environment node
 
+import type { GeometryMode, Workbook } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -53,8 +54,71 @@ type RawWorkbook = {
   getRowHeightPt(sheet: number, row: number): { status: RawStatus; value: number };
 };
 
-const rawWorkbook = (handle: WorkbookHandle): RawWorkbook =>
-  (handle as unknown as { wb: RawWorkbook }).wb;
+/** The engine's sheet geometry, read in the shapes these tests compare. */
+const rawWorkbook = (handle: WorkbookHandle): RawWorkbook => {
+  const wb = (handle as unknown as { wb: Workbook }).wb;
+  const ok = { ok: true };
+  return {
+    getSheetColumns: (sheet) => ({
+      status: ok,
+      columns: wb
+        .sheet(sheet)
+        .listColumnOverrides()
+        .map((column) => ({
+          first: column.first,
+          last: column.last,
+          width: column.widthChars ?? 0,
+          hidden: column.hidden ? 1 : 0,
+          outlineLevel: column.outlineLevel,
+          hasWidth: column.widthChars === null ? 0 : 1,
+        })),
+    }),
+    getSheetRowOverrides: (sheet) => ({
+      status: ok,
+      rows: wb
+        .sheet(sheet)
+        .listRowOverrides()
+        .map((row) => ({
+          row: row.row,
+          height: row.heightPt ?? 0,
+          hidden: row.hidden ? 1 : 0,
+          outlineLevel: row.outlineLevel,
+          hasHeight: row.heightPt === null ? 0 : 1,
+          customHeight: row.customHeight ? 1 : 0,
+        })),
+    }),
+    getSheetFormatDefaults: (sheet) => {
+      const defaults = wb.sheet(sheet).getFormatDefaults();
+      return {
+        status: ok,
+        defaultColWidth: defaults.defaultColumnWidthChars ?? 0,
+        defaultRowHeight: defaults.defaultRowHeightPt ?? 0,
+        hasDefaultColWidth: defaults.defaultColumnWidthChars !== null,
+        hasDefaultRowHeight: defaults.defaultRowHeightPt !== null,
+        effectiveDefaultColWidth: defaults.effectiveDefaultColumnWidthChars,
+      };
+    },
+    setSheetFormatDefaults: (sheet, defaults) => {
+      wb.sheet(sheet).updateFormatDefaults({
+        ...(defaults.hasDefaultRowHeight === false
+          ? { defaultRowHeightPt: null }
+          : defaults.defaultRowHeight !== undefined
+            ? { defaultRowHeightPt: defaults.defaultRowHeight }
+            : {}),
+      });
+      return ok;
+    },
+    columnCharsToPt: (sheet, mode, chars) => ({
+      status: ok,
+      value: wb.sheet(sheet).convertColumnCharsToPt(chars, mode as GeometryMode),
+    }),
+    columnPtToChars: (sheet, mode, points) => ({
+      status: ok,
+      value: wb.sheet(sheet).convertColumnPtToChars(points, mode as GeometryMode),
+    }),
+    getRowHeightPt: (sheet, row) => ({ status: ok, value: wb.sheet(sheet).getRowHeightPt(row) }),
+  };
+};
 
 describe('WorkbookHandle geometry round-trip', () => {
   it('keeps public CSS pixels while native columns use characters and rows use points', async () => {

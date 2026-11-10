@@ -47,9 +47,8 @@ interface CellEntry {
 
 interface ThreadEntry {
   id: string;
-  parentId: string;
-  row: number;
-  col: number;
+  parentId: string | null;
+  cell: { row: number; col: number };
   text: string;
 }
 
@@ -117,11 +116,11 @@ const threadedCommentCells = (state: State, opts: FindOptions): CellEntry[] => {
     const comments = entriesForThreadedSheet(state, sheet, wb);
     const byId = new Map(comments.map((entry) => [entry.id, entry]));
     const orderedComments = [...comments].sort(
-      (left, right) => Number(left.parentId !== '') - Number(right.parentId !== ''),
+      (left, right) => Number(left.parentId !== null) - Number(right.parentId !== null),
     );
     for (const comment of orderedComments) {
       const opening = comment.parentId ? (byId.get(comment.parentId) ?? comment) : comment;
-      const addr = { sheet, row: opening.row, col: opening.col };
+      const addr = { sheet, row: opening.cell.row, col: opening.cell.col };
       const key = addrKey(addr);
       const existing = entries.get(key);
       entries.set(key, {

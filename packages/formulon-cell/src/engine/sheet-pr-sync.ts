@@ -1,11 +1,9 @@
+import { ColorKind } from '@libraz/formulon';
 import { DEFAULT_OUTLINE_SUMMARY } from '../store/outline-summary.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { EngineSheetPrInput, SheetTabColorSpec } from './sheet-pr-xml.js';
 import { argbFromCssColor, cssColorFromArgb } from './theme-color.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-
-/** Colour kinds of the engine's `ColorSpec`. */
-const COLOR_KIND = { rgb: 1, theme: 2, indexed: 3 } as const;
 
 const argbHex = (argb: number): string => (argb >>> 0).toString(16).toUpperCase().padStart(8, '0');
 
@@ -14,9 +12,9 @@ function tabColorToCss(wb: WorkbookHandle, spec: SheetTabColorSpec): string | nu
   if (spec.rgb !== undefined) return cssColorFromArgb(Number.parseInt(spec.rgb, 16));
   const colorSpec =
     spec.theme !== undefined
-      ? { kind: COLOR_KIND.theme, rgb: 0, theme: spec.theme, tint: spec.tint ?? 0, indexed: 0 }
+      ? { kind: ColorKind.Theme, argb: 0, theme: spec.theme, tint: spec.tint ?? 0, indexed: 0 }
       : spec.indexed !== undefined
-        ? { kind: COLOR_KIND.indexed, rgb: 0, theme: 0, tint: 0, indexed: spec.indexed }
+        ? { kind: ColorKind.Indexed, argb: 0, theme: 0, tint: 0, indexed: spec.indexed }
         : null;
   if (!colorSpec) return null;
   const argb = wb.resolveColorArgb(colorSpec);

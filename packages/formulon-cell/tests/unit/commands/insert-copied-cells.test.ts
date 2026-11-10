@@ -151,7 +151,9 @@ describe('insertCopiedCellsFromTSV', () => {
 
   it('keeps cut formulas verbatim when inserting cut cells', async () => {
     const store = createSpreadsheetStore();
-    const wb = await newWb();
+    // Insert Cut Cells closes up the source through the engine; the stub refuses it.
+    const wb = await WorkbookHandle.createDefault();
+    wb.attachStore(store);
     seedFormula(store, wb, 0, 0, '=B1');
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, 'cut');
     assertSnap(snap);

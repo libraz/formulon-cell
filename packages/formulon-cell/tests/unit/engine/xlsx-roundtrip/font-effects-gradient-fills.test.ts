@@ -3,7 +3,7 @@ import {
   hydrateCellFormatsFromEngine,
   syncCellFormatsToEngine,
 } from '../../../../src/engine/cell-format-sync.js';
-import type { ColorSpec, FillRecord } from '../../../../src/engine/types.js';
+import type { Color, FillRecord } from '../../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import {
   type CellFormat,
@@ -16,21 +16,22 @@ import { canLoadWasm } from './fixtures.js';
 const A1 = { sheet: 0, row: 0, col: 0 };
 const B1 = { sheet: 0, row: 0, col: 1 };
 
-const literal = (rgb: number): ColorSpec => ({ kind: 1, rgb, theme: 0, tint: 0, indexed: 0 });
-const themed = (theme: number, tint: number): ColorSpec => ({
+const literal = (argb: number): Color => ({ kind: 1, argb, theme: 0, tint: 0, indexed: 0 });
+const NONE: Color = { kind: 0, argb: 0, theme: 0, tint: 0, indexed: 0 };
+const themed = (theme: number, tint: number, argb = 0): Color => ({
   kind: 2,
-  rgb: 0,
+  argb,
   theme,
   tint,
   indexed: 0,
 });
 
 const emptyBorder = {
-  left: { style: 0, colorArgb: 0 },
-  right: { style: 0, colorArgb: 0 },
-  top: { style: 0, colorArgb: 0 },
-  bottom: { style: 0, colorArgb: 0 },
-  diagonal: { style: 0, colorArgb: 0 },
+  left: { style: 0 as const, color: NONE },
+  right: { style: 0 as const, color: NONE },
+  top: { style: 0 as const, color: NONE },
+  bottom: { style: 0 as const, color: NONE },
+  diagonal: { style: 0 as const, color: NONE },
   diagonalUp: false,
   diagonalDown: false,
 };
@@ -69,24 +70,21 @@ const seedRawCell = async (
   first.setText(B1, 'y');
   const fontIndex = first.addFontRecord({
     name: 'Arial',
-    size: 11,
+    sizePt: 11,
     bold: false,
     italic: false,
     strike: false,
     underline: 0,
-    colorArgb: 0xff000000,
+    color: literal(0xff000000),
     ...font,
   });
-  const fillIndex = first.addFillRecord(fill ?? { pattern: 0, fgArgb: 0, bgArgb: 0 });
+  const fillIndex = first.addFillRecord(fill ?? { pattern: 0, foreground: NONE, background: NONE });
   const borderIndex = first.addBorderRecord(emptyBorder);
   const xf = first.addXfRecord({
     fontIndex,
     fillIndex,
     borderIndex,
     numFmtId: 0,
-    horizontalAlign: 0,
-    verticalAlign: 2,
-    wrapText: false,
   });
   first.setCellXfIndex(0, 0, 0, xf);
   try {
@@ -98,18 +96,18 @@ const seedRawCell = async (
 
 const GRADIENT: FillRecord = {
   pattern: 0,
-  fgArgb: 0,
-  bgArgb: 0,
+  foreground: NONE,
+  background: NONE,
   gradient: {
     type: 0,
-    degree: 90,
+    angleDeg: 90,
     left: 0,
     right: 0,
     top: 0,
     bottom: 0,
     stops: [
-      { position: 0, colorArgb: 0xffff0000, color: literal(0xffff0000) },
-      { position: 1, colorArgb: 0xff4472c4, color: themed(4, 0.4) },
+      { position: 0, color: literal(0xffff0000) },
+      { position: 1, color: themed(4, 0.4, 0xff4472c4) },
     ],
   },
 };
@@ -148,11 +146,8 @@ describe.skipIf(!canLoadWasm())('font effects and gradient fills through real xl
   it('keeps loaded font effects when the cell is reformatted or its format is copied', async () => {
     const wb = await seedRawCell({
       outline: true,
-      hasOutline: true,
       condense: true,
-      hasCondense: true,
       extend: true,
-      hasExtend: true,
     });
     const store = createSpreadsheetStore();
     try {
@@ -168,7 +163,8 @@ describe.skipIf(!canLoadWasm())('font effects and gradient fills through real xl
             outline: true,
             condense: true,
             extend: true,
-            shadow: false,
+            // An unstated effect is an absent element (the former `hasShadow: false`).
+            shadow: null,
           });
         }
         expect(fontAt(reloaded, A1)?.italic).toBe(true);
@@ -182,7 +178,7 @@ describe.skipIf(!canLoadWasm())('font effects and gradient fills through real xl
   });
 
   it('switching a loaded font effect off writes it off', async () => {
-    const wb = await seedRawCell({ shadow: true, hasShadow: true });
+    const wb = await seedRawCell({ shadow: true });
     const store = createSpreadsheetStore();
     try {
       hydrateCellFormatsFromEngine(wb, store, 0);
@@ -215,14 +211,14 @@ describe.skipIf(!canLoadWasm())('font effects and gradient fills through real xl
       const reloaded = await reload(wb);
       try {
         const kept = fillAt(reloaded, A1)?.gradient;
-        expect(kept?.degree).toBe(90);
+        expect(kept?.angleDeg).toBe(90);
         expect(kept?.stops[1]?.color).toMatchObject({ kind: 2, theme: 4 });
         expect(kept?.stops[1]?.color?.tint).toBeCloseTo(0.4, 5);
         expect(fontAt(reloaded, A1)?.bold).toBe(true);
         const copied = fillAt(reloaded, B1)?.gradient;
         expect(copied?.type).toBe(0);
         expect(copied?.stops.map((s) => s.position)).toEqual([0, 1]);
-        expect(copied?.stops[0]?.colorArgb).toBe(0xffff0000);
+        expect(copied?.stops[0]?.color?.argb).toBe(0xffff0000);
       } finally {
         reloaded.dispose();
       }
@@ -272,7 +268,7 @@ describe.skipIf(!canLoadWasm())('font effects and gradient fills through real xl
       setFormat(store, addrKey(A1), { ...rest, fill: '#00ff00' });
       syncCellFormatsToEngine(wb, store, 0);
       const fill = fillAt(wb, A1);
-      expect(fill?.gradient).toBeUndefined();
+      expect(fill?.gradient).toBeNull();
       expect(fill?.pattern).toBe(1);
     } finally {
       wb.dispose();

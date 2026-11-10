@@ -27,7 +27,7 @@ describe.skipIf(!canLoadWasm())('hyperlink round-trip', () => {
       flushFormatToEngine(wb, store, 0);
       const links = wb.getHyperlinksFull(0);
       expect(links).toHaveLength(1);
-      expect(links?.[0]).toMatchObject({ target: '', location: 'Sheet2!A1', display: 'Go' });
+      expect(links?.[0]).toMatchObject({ target: null, location: 'Sheet2!A1', display: 'Go' });
 
       const { restored, store: next } = await reload(wb);
       try {
@@ -82,7 +82,7 @@ describe.skipIf(!canLoadWasm())('hyperlink round-trip', () => {
       setHyperlink(store, { sheet: 0, row: 0, col: 0 }, 'https://example.com/', wb);
       const links = wb.getHyperlinksFull(0);
       expect(links).toHaveLength(1);
-      expect(links?.[0]).toMatchObject({ target: 'https://example.com/', location: '' });
+      expect(links?.[0]).toMatchObject({ target: 'https://example.com/', location: null });
     } finally {
       wb.dispose();
     }

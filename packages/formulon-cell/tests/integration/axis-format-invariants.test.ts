@@ -14,16 +14,16 @@ function nativeFormat(workbook: WorkbookHandle, row: number, col: number) {
   const font = workbook.getFontRecord(xf.fontIndex);
   const fill = workbook.getFillRecord(xf.fillIndex);
   return {
-    size: font?.size,
+    size: font?.sizePt,
     name: font?.name,
     bold: font?.bold,
     italic: font?.italic,
     underline: font?.underline,
     strike: font?.strike,
-    color: font?.colorArgb,
-    fill: fill?.fgArgb,
-    horizontal: xf.horizontalAlign,
-    vertical: xf.verticalAlign,
+    color: font?.color?.argb,
+    fill: fill?.foreground?.argb,
+    horizontal: xf.horizontal,
+    vertical: xf.vertical,
     wrap: xf.wrapText,
     rotation: xf.textRotation,
     shrink: xf.shrinkToFit,
@@ -192,7 +192,7 @@ describe('native axis format invariants', () => {
     const normal = workbook.getCellXf(0);
     const font = normal && workbook.getFontRecord(normal.fontIndex);
     if (!normal || !font) throw new Error('Missing native Normal font');
-    const fontIndex = workbook.addFontRecord({ ...font, size: 18 });
+    const fontIndex = workbook.addFontRecord({ ...font, sizePt: 18 });
     const rowXf = workbook.addXfRecord({ ...normal, fontIndex, applyFont: true });
     expect(workbook.setRowStyle(0, 2, rowXf)).toBe(true);
     const mounted = await mountStubSheet({ workbook, locale: 'ja' });

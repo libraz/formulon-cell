@@ -1,4 +1,4 @@
-import type { ReadDiagnosticsResult, SaveDiagnosticsResult } from '@libraz/formulon';
+import type { SaveDiagnostics as EngineSaveDiagnostics, ReadDiagnostics } from '@libraz/formulon';
 
 /** Loss counters the engine captured while reading a file. */
 export interface LoadDiagnostics {
@@ -57,7 +57,7 @@ export const emptySaveDiagnostics = (): SaveDiagnostics => ({
 
 const count = (n: number | undefined): number => (typeof n === 'number' && n > 0 ? n : 0);
 
-export const loadDiagnosticsFromEngine = (r: Partial<ReadDiagnosticsResult>): LoadDiagnostics => ({
+export const loadDiagnosticsFromEngine = (r: Partial<ReadDiagnostics>): LoadDiagnostics => ({
   undecodedFormulaCount: count(r.undecodedFormulaCount),
   undecodedDefinedNameCount: count(r.undecodedDefinedNameCount),
   undecodedPartCount: count(r.undecodedPartCount),
@@ -65,7 +65,7 @@ export const loadDiagnosticsFromEngine = (r: Partial<ReadDiagnosticsResult>): Lo
   unknownContentTypeCount: count(r.unknownContentTypeCount),
 });
 
-export const saveDiagnosticsFromEngine = (r: Partial<SaveDiagnosticsResult>): SaveDiagnostics => ({
+export const saveDiagnosticsFromEngine = (r: Partial<EngineSaveDiagnostics>): SaveDiagnostics => ({
   downgradedFormulaCount: count(r.downgradedFormulaCount),
   deferredFeatureCount: count(r.deferredFeatureCount),
   droppedPartCount: count(r.droppedPartCount),

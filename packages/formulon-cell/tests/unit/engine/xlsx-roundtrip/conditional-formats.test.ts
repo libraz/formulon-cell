@@ -1,3 +1,4 @@
+import { ComparisonOperator } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
   evaluateCfFromEngine,
@@ -28,16 +29,20 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
       let dxfId: number | undefined;
       if (first.capabilities.conditionalFormatDxf) {
         dxfId = first.addDxf({
-          fill: { pattern: 1, fgArgb: 0xffe2f0d9, bgArgb: 0 },
+          fill: {
+            pattern: 1,
+            foreground: { kind: 1, argb: 0xffe2f0d9, theme: 0, tint: 0, indexed: 0 },
+            background: { kind: 0, argb: 0, theme: 0, tint: 0, indexed: 0 },
+          },
           font: {
             name: 'Calibri',
-            size: 11,
+            sizePt: 11,
             bold: true,
             italic: false,
             strike: false,
             underline: 0,
             vertAlign: 0,
-            colorArgb: 0xff006100,
+            color: { kind: 1, argb: 0xff006100, theme: 0, tint: 0, indexed: 0 },
           },
         });
         expect(dxfId).toBeGreaterThanOrEqual(0);
@@ -45,23 +50,23 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
 
       expect(
         first.addConditionalFormat(0, {
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 2, lastCol: 0 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 2, lastCol: 0 }],
           type: 1,
-          op: 5,
+          operator: ComparisonOperator.GreaterThan,
           formula1: '1',
-          ...(dxfId !== undefined ? { dxfId } : {}),
+          ...(dxfId !== undefined ? { dxfIndex: dxfId } : {}),
         }),
       ).toBeGreaterThanOrEqual(0);
       if (first.capabilities.conditionalFormatVisualMutate) {
         expect(
           first.addConditionalFormat(0, {
-            sqref: [{ firstRow: 0, firstCol: 1, lastRow: 2, lastCol: 1 }],
+            ranges: [{ firstRow: 0, firstCol: 1, lastRow: 2, lastCol: 1 }],
             type: 2,
             colorScale: {
               thresholds: [{ type: 3 }, { type: 4 }],
               colors: [
-                { a: 255, r: 255, g: 0, b: 0 },
-                { a: 255, r: 0, g: 128, b: 0 },
+                { kind: 1, argb: 0xffff0000, theme: 0, tint: 0, indexed: 0 },
+                { kind: 1, argb: 0xff008000, theme: 0, tint: 0, indexed: 0 },
               ],
             },
           }),
@@ -75,13 +80,13 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
       try {
         expect(reloaded.isStub).toBe(false);
         const formats = reloaded.getConditionalFormats(0);
-        expect(formats.some((entry) => entry.type === 1 && entry.formula1 === '1')).toBe(true);
+        expect(formats.some((entry) => entry.type === 1 && entry.formula1 === '=1')).toBe(true);
         if (first.capabilities.conditionalFormatDxf) {
-          const dxfRule = formats.find((entry) => entry.type === 1 && entry.dxfId !== undefined);
-          expect(dxfRule?.dxfId).toBeGreaterThanOrEqual(0);
-          expect(reloaded.getDxf(dxfRule?.dxfId ?? -1)).toMatchObject({
-            fill: { pattern: 1, fgArgb: 0xffe2f0d9 },
-            font: { bold: true, colorArgb: 0xff006100 },
+          const dxfRule = formats.find((entry) => entry.type === 1 && entry.dxfIndex !== null);
+          expect(dxfRule?.dxfIndex).toBeGreaterThanOrEqual(0);
+          expect(reloaded.getDxf(dxfRule?.dxfIndex ?? -1)).toMatchObject({
+            fill: { pattern: 1, foreground: { argb: 0xffe2f0d9 } },
+            font: { bold: true, color: { argb: 0xff006100 } },
           });
         }
         if (first.capabilities.conditionalFormatVisualMutate) {
@@ -110,12 +115,12 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
 
       expect(
         first.addConditionalFormat(0, {
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 2, lastCol: 0 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 2, lastCol: 0 }],
           type: 3,
           dataBar: {
             min: { type: 3 },
             max: { type: 4 },
-            fill: { a: 255, r: 0, g: 120, b: 212 },
+            fill: { kind: 1, argb: 0xff0078d4, theme: 0, tint: 0, indexed: 0 },
             showValue: true,
             minLengthPct: 0,
             maxLengthPct: 100,
@@ -147,7 +152,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
       expect(engineOverlay.get('0:1:0')?.barDirection).toBe('left');
       expect(
         first.addConditionalFormat(0, {
-          sqref: [{ firstRow: 0, firstCol: 1, lastRow: 2, lastCol: 1 }],
+          ranges: [{ firstRow: 0, firstCol: 1, lastRow: 2, lastCol: 1 }],
           type: 4,
           iconSet: {
             name: 3,
@@ -237,7 +242,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
       first.setNumber({ sheet: 0, row: 0, col: 2 }, 20);
       expect(
         first.addConditionalFormat(0, {
-          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 }],
+          ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 }],
           type: 4,
           iconSet: {
             name: 3,
@@ -274,7 +279,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         });
         if (!imported) throw new Error('Expected an imported icon-set rule.');
         const input = conditionalRuleToEngineInput({ ...imported, engineId: undefined });
-        expect(input?.iconSet).toMatchObject({
+        expect(input && 'iconSet' in input ? input.iconSet : undefined).toMatchObject({
           thresholds: [
             { type: 0, value: '20', gte: false },
             { type: 0, value: '40', gte: false },
@@ -345,23 +350,25 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
       try {
         const formats = reloaded.getConditionalFormats(0);
         expect(formats).toHaveLength(7);
-        const dxfs = formats.map((format) => reloaded.getDxf(format.dxfId ?? -1));
+        const dxfs = formats.map((format) => reloaded.getDxf(format.dxfIndex ?? -1));
         expect(dxfs[0]).toMatchObject({
-          fill: { fgArgb: 0xffffc7ce },
-          font: { colorArgb: 0xff9c0006 },
+          fill: { foreground: { argb: 0xffffc7ce } },
+          font: { color: { argb: 0xff9c0006 } },
         });
         expect(dxfs[1]).toMatchObject({
-          fill: { fgArgb: 0xffffeb9c },
-          font: { colorArgb: 0xff9c6500 },
+          fill: { foreground: { argb: 0xffffeb9c } },
+          font: { color: { argb: 0xff9c6500 } },
         });
         expect(dxfs[2]).toMatchObject({
-          fill: { fgArgb: 0xffc6efce },
-          font: { colorArgb: 0xff006100 },
+          fill: { foreground: { argb: 0xffc6efce } },
+          font: { color: { argb: 0xff006100 } },
         });
-        expect(dxfs[3]).toMatchObject({ fill: { fgArgb: 0xffffc7ce } });
-        expect(dxfs[4]).toMatchObject({ font: { colorArgb: 0xffc00000 } });
-        expect(dxfs[5]).toMatchObject({ border: { top: { style: 1, colorArgb: 0xffff0000 } } });
-        expect(dxfs[6]).toMatchObject({ numFmt: { formatCode: '0%' }, font: { bold: true } });
+        expect(dxfs[3]).toMatchObject({ fill: { foreground: { argb: 0xffffc7ce } } });
+        expect(dxfs[4]).toMatchObject({ font: { color: { argb: 0xffc00000 } } });
+        expect(dxfs[5]).toMatchObject({
+          border: { top: { style: 1, color: { argb: 0xffff0000 } } },
+        });
+        expect(dxfs[6]).toMatchObject({ numberFormat: '0%', font: { bold: true } });
       } finally {
         reloaded.dispose();
       }

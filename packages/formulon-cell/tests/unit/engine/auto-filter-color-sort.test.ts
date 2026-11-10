@@ -69,8 +69,8 @@ describe.skipIf(!canLoadWasm())('AutoFilter colour criterion and sort state', ()
       );
 
       const column = wb.getAutoFilter(0)?.columns[0];
-      expect(column).toMatchObject({ colId: 0, kind: FilterKind.Color, cellColor: true });
-      expect(wb.getDxf(column?.dxfId ?? -1)?.fill).toBeDefined();
+      expect(column).toMatchObject({ columnOffset: 0, kind: FilterKind.Color, cellColor: true });
+      expect(wb.getDxf(column?.dxfIndex ?? -1)?.fill).toBeDefined();
 
       // Re-syncing the same criterion reuses its differential style.
       const dxfs = wb.dxfCount();
@@ -112,7 +112,7 @@ describe.skipIf(!canLoadWasm())('AutoFilter colour criterion and sort state', ()
         wb,
       );
       const column = wb.getAutoFilter(0)?.columns[0];
-      expect(column).toMatchObject({ colId: 1, kind: FilterKind.Color, cellColor: false });
+      expect(column).toMatchObject({ columnOffset: 1, kind: FilterKind.Color, cellColor: false });
       const restored = await WorkbookHandle.loadBytes(wb.save());
       try {
         const next = rehydrate(restored);
@@ -144,7 +144,7 @@ describe.skipIf(!canLoadWasm())('AutoFilter colour criterion and sort state', ()
       const sort = wb.getAutoFilter(0)?.sort;
       expect(sort?.conditions).toHaveLength(1);
       expect(sort?.conditions[0]).toMatchObject({ descending: true, sortBy: 0 });
-      expect(sort?.conditions[0]?.ref).toMatchObject({
+      expect(sort?.conditions[0]?.range).toMatchObject({
         firstRow: 1,
         lastRow: 4,
         firstCol: 1,

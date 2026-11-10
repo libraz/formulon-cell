@@ -9,6 +9,7 @@ import {
   sparklineAt,
 } from '../../../src/commands/sparkline.js';
 import { deleteRows, insertCols, insertRows } from '../../../src/commands/structure.js';
+import { formatA1Cell, formatA1Range } from '../../../src/engine/address.js';
 import { hydrateSparklinesFromEngine } from '../../../src/engine/sparkline-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -44,7 +45,22 @@ async function session(seed?: (wb: WorkbookHandle) => void, bytes?: Uint8Array) 
 }
 
 const saved = async (wb: WorkbookHandle) => session(undefined, wb.save());
-const groups = (wb: WorkbookHandle) => wb.listSparklineGroups(0);
+/** Sheet 0's groups, each member as its source and location text. */
+const groups = (wb: WorkbookHandle) =>
+  wb.listSparklineGroups(0).map((group) => ({
+    ...group,
+    sparklines: group.sparklines.map((member) => ({
+      formula: member.source
+        ? `${wb.sheetName(member.source.sheet)}!${formatA1Range({
+            r0: member.source.rect.firstRow,
+            c0: member.source.rect.firstCol,
+            r1: member.source.rect.lastRow,
+            c1: member.source.rect.lastCol,
+          })}`
+        : null,
+      location: formatA1Cell(member.location.row, member.location.col),
+    })),
+  }));
 const line: Sparkline = { kind: 'line', source: 'B2:B5', color: '#cc3300' };
 
 describe('sparklines saved with the workbook', () => {
@@ -58,7 +74,7 @@ describe('sparklines saved with the workbook', () => {
       negative: true,
       sparklines: [{ formula: 'Sheet1!B2:B5', location: 'E2' }],
     });
-    expect((groups(wb)[0]?.colorSeries.rgb ?? 0) & 0xffffff).toBe(0xcc3300);
+    expect((groups(wb)[0]?.colorSeries?.argb ?? 0) & 0xffffff).toBe(0xcc3300);
 
     const reopened = await saved(wb);
     expect(sparklineAt(reopened.store.getState(), at(1, 4))).toMatchObject({
@@ -112,22 +128,22 @@ describe('sparklines saved with the workbook', () => {
         type: SparklineType.Line,
         markers: true,
         high: true,
-        lineWeight: 2.25,
+        lineWidthPt: 2.25,
         displayXAxis: true,
-        sparklines: [{ formula: 'Sheet1!B2:B5', location: 'E2' }],
+        sparklines: [{ source: 'Sheet1!B2:B5', location: 'E2' }],
       });
     });
     const spec = sparklineAt(store.getState(), at(1, 4)) as Sparkline;
-    expect(spec.nativeGroup).toMatchObject({ markers: true, high: true, lineWeight: 2.25 });
+    expect(spec.nativeGroup).toMatchObject({ markers: true, high: true, lineWidthPt: 2.25 });
 
     setSparkline(store, at(1, 4), { ...spec, color: '#00aa00' }, undefined);
 
     const [group] = groups(wb);
-    expect((group?.colorSeries.rgb ?? 0) & 0xffffff).toBe(0x00aa00);
+    expect((group?.colorSeries?.argb ?? 0) & 0xffffff).toBe(0x00aa00);
     expect(group).toMatchObject({
       markers: true,
       high: true,
-      lineWeight: 2.25,
+      lineWidthPt: 2.25,
       displayXAxis: true,
     });
     expect(groups(wb)).toHaveLength(1);
@@ -138,8 +154,8 @@ describe('sparklines saved with the workbook', () => {
       handle.addSparklineGroup(0, {
         type: SparklineType.Column,
         markers: true,
-        lineWeight: 3,
-        sparklines: [{ formula: 'Sheet1!B2:B5', location: 'E2' }],
+        lineWidthPt: 3,
+        sparklines: [{ source: 'Sheet1!B2:B5', location: 'E2' }],
       });
     });
     clearSparkline(store, at(1, 4), history);
@@ -150,7 +166,7 @@ describe('sparklines saved with the workbook', () => {
     expect(groups(wb)[0]).toMatchObject({
       type: SparklineType.Column,
       markers: true,
-      lineWeight: 3,
+      lineWidthPt: 3,
     });
     history.redo();
     expect(groups(wb)).toEqual([]);
@@ -227,7 +243,7 @@ describe('sparklines saved with the workbook', () => {
 
     setSparkline(store, at(2, 4), { ...second, color: '#00aa00', group: second.group });
 
-    expect((groups(wb)[0]?.colorSeries.rgb ?? 0) & 0xffffff).toBe(0x00aa00);
+    expect((groups(wb)[0]?.colorSeries?.argb ?? 0) & 0xffffff).toBe(0x00aa00);
     expect(sparklineAt(store.getState(), at(1, 4))?.color).toBe('#00aa00');
     expect(sparklineAt(store.getState(), at(2, 4))?.color).toBe('#00aa00');
   });

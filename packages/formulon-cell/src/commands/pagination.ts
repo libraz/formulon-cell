@@ -1,4 +1,4 @@
-import type { PaginationResult } from '@libraz/formulon';
+import type { Pagination } from '@libraz/formulon';
 import { parseAddrKey } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { renderScale } from '../store/render-scale.js';
@@ -50,7 +50,7 @@ export interface SheetPagination {
   pxPerInch: number;
   /** Number of pages that actually carry content. */
   pageCount: number;
-  /** Centering is kept beside native geometry because `PaginationResult`
+  /** Centering is kept beside native geometry because `Pagination`
    *  intentionally reports the uncentered cell-block origin. Page Layout
    *  adds the setting when placing the physical paper. */
   centerHorizontally?: boolean;
@@ -60,7 +60,7 @@ export interface SheetPagination {
    *  spans because the interactive grid can only draw a rectangular band
    *  product; print requests still consume every native page directly. The
    *  fallback fields above remain populated for those cases and older engines. */
-  native?: PaginationResult;
+  native?: Pagination;
 }
 
 /** Zero-based band index containing `index`, or -1 when it sits before the
@@ -91,7 +91,7 @@ export function pageNumberOf(
   const col = cols[colBand];
   if (pagination.native && row && col) {
     const nativeIndex = pagination.native.pages.findIndex(
-      (page) => page.firstRow === row.start && page.firstCol === col.start,
+      (page) => page.range.firstRow === row.start && page.range.firstCol === col.start,
     );
     if (nativeIndex >= 0) return nativeIndex + 1;
     return 0;
@@ -177,20 +177,19 @@ function finitePositive(value: number, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
-function nativeBands(native: PaginationResult, axis: 'row' | 'col'): AxisBand[] {
+function nativeBands(native: Pagination, axis: 'row' | 'col'): AxisBand[] {
   const spans = new Map<string, { start: number; end: number }>();
   for (const page of native.pages) {
-    const start = axis === 'row' ? page.firstRow : page.firstCol;
-    const end = axis === 'row' ? page.lastRow : page.lastCol;
+    const start = axis === 'row' ? page.range.firstRow : page.range.firstCol;
+    const end = axis === 'row' ? page.range.lastRow : page.range.lastCol;
     if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) continue;
     spans.set(`${start}:${end}`, { start, end });
   }
   const manualBreaks = new Map<number, boolean>();
-  const breaks = axis === 'row' ? native.horizontalBreaks : native.verticalBreaks;
-  const manual = axis === 'row' ? native.horizontalBreakManual : native.verticalBreakManual;
-  for (let i = 0; i < breaks.length; i += 1) {
-    const at = breaks[i];
-    if (typeof at === 'number') manualBreaks.set(at, manual[i] === true);
+  if (axis === 'row') {
+    for (const brk of native.rowBreaks) manualBreaks.set(brk.row, brk.manual);
+  } else {
+    for (const brk of native.columnBreaks) manualBreaks.set(brk.col, brk.manual);
   }
   return [...spans.values()]
     .sort((a, b) => a.start - b.start || a.end - b.end)
@@ -201,11 +200,11 @@ function nativeBands(native: PaginationResult, axis: 'row' | 'col'): AxisBand[] 
     }));
 }
 
-function hasOverlappingNativeSpans(native: PaginationResult, axis: 'row' | 'col'): boolean {
+function hasOverlappingNativeSpans(native: Pagination, axis: 'row' | 'col'): boolean {
   const spans = new Map<string, [number, number]>();
   for (const page of native.pages) {
-    const first = axis === 'row' ? page.firstRow : page.firstCol;
-    const last = axis === 'row' ? page.lastRow : page.lastCol;
+    const first = axis === 'row' ? page.range.firstRow : page.range.firstCol;
+    const last = axis === 'row' ? page.range.lastRow : page.range.lastCol;
     spans.set(`${first}:${last}`, [first, last]);
   }
   const sorted = [...spans.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -217,7 +216,7 @@ function hasOverlappingNativeSpans(native: PaginationResult, axis: 'row' | 'col'
   return false;
 }
 
-function nativePreviewCompatible(native: PaginationResult): boolean {
+function nativePreviewCompatible(native: Pagination): boolean {
   return (
     native.printArea.length <= 1 &&
     !hasOverlappingNativeSpans(native, 'row') &&
@@ -272,17 +271,17 @@ function extendNativeBands(
 /** Unscaled px left on the printable area after the native page that opens
  *  at `start`, print titles included in what the page already holds. */
 function nativePageRoom(
-  native: PaginationResult,
+  native: Pagination,
   start: number,
   axis: 'row' | 'col',
   scale: number,
 ): number {
   const page = native.pages.find((candidate) =>
-    axis === 'row' ? candidate.firstRow === start : candidate.firstCol === start,
+    axis === 'row' ? candidate.range.firstRow === start : candidate.range.firstCol === start,
   );
   if (!page) return 0;
   const printableOrigin = axis === 'row' ? native.printable.y : native.printable.x;
-  const printableExtent = axis === 'row' ? native.printable.height : native.printable.width;
+  const printableExtent = axis === 'row' ? native.printable.heightPt : native.printable.widthPt;
   const origin = axis === 'row' ? page.originYPt : page.originXPt;
   const extent = axis === 'row' ? page.heightPt : page.widthPt;
   const titles = Math.max(0, origin - printableOrigin);
@@ -294,7 +293,7 @@ function nativePagination(
   sheet: number,
   setup: PageSetup,
   opts: PaginateOptions,
-  native: PaginationResult,
+  native: Pagination,
 ): SheetPagination | null {
   const rowBands = nativeBands(native, 'row');
   const colBands = nativeBands(native, 'col');
@@ -302,23 +301,23 @@ function nativePagination(
 
   const firstPage = native.pages[0];
   const origin = {
-    row: firstPage?.firstRow ?? native.printArea[0]?.firstRow ?? 0,
-    col: firstPage?.firstCol ?? native.printArea[0]?.firstCol ?? 0,
+    row: firstPage?.range.firstRow ?? native.printArea[0]?.firstRow ?? 0,
+    col: firstPage?.range.firstCol ?? native.printArea[0]?.firstCol ?? 0,
   };
   const content = {
     row: Math.max(...rowBands.map((band) => band.end)),
     col: Math.max(...colBands.map((band) => band.end)),
   };
-  const scale = finitePositive(native.scale, 1);
+  const scale = finitePositive(native.scalePct / 100, 1);
   const pagePx = {
-    width: finitePositive((native.printable.width * CSS_PX_PER_POINT) / scale, 1),
-    height: finitePositive((native.printable.height * CSS_PX_PER_POINT) / scale, 1),
+    width: finitePositive((native.printable.widthPt * CSS_PX_PER_POINT) / scale, 1),
+    height: finitePositive((native.printable.heightPt * CSS_PX_PER_POINT) / scale, 1),
   };
   const marginPx = {
-    top: Math.max(0, (native.margins.top * CSS_PX_PER_POINT) / scale),
-    right: Math.max(0, (native.margins.right * CSS_PX_PER_POINT) / scale),
-    bottom: Math.max(0, (native.margins.bottom * CSS_PX_PER_POINT) / scale),
-    left: Math.max(0, (native.margins.left * CSS_PX_PER_POINT) / scale),
+    top: Math.max(0, (native.margins.topIn * PRINT_PX_PER_INCH) / scale),
+    right: Math.max(0, (native.margins.rightIn * PRINT_PX_PER_INCH) / scale),
+    bottom: Math.max(0, (native.margins.bottomIn * PRINT_PX_PER_INCH) / scale),
+    left: Math.max(0, (native.margins.leftIn * PRINT_PX_PER_INCH) / scale),
   };
   const rows = extendNativeBands(
     rowBands,
@@ -549,7 +548,7 @@ export function pageLayoutGaps(
     const origin = axis === 'row' ? page.originYPt : page.originXPt;
     const printableOrigin = axis === 'row' ? native.printable.y : native.printable.x;
     const pageExtent = axis === 'row' ? page.heightPt : page.widthPt;
-    const printableExtent = axis === 'row' ? native.printable.height : native.printable.width;
+    const printableExtent = axis === 'row' ? native.printable.heightPt : native.printable.widthPt;
     const centered = axis === 'row' ? pagination.centerVertically : pagination.centerHorizontally;
     if (!centered) return origin;
     const titleOffset = Math.max(0, origin - printableOrigin);
@@ -558,7 +557,9 @@ export function pageLayoutGaps(
   const nativeOrigin = (axis: 'row' | 'col', band: AxisBand): number | null => {
     if (!pagination.native) return null;
     const page = pagination.native.pages.find((candidate) =>
-      axis === 'row' ? candidate.firstRow === band.start : candidate.firstCol === band.start,
+      axis === 'row'
+        ? candidate.range.firstRow === band.start
+        : candidate.range.firstCol === band.start,
     );
     const printableOrigin =
       axis === 'row' ? pagination.native.printable.y : pagination.native.printable.x;
@@ -570,9 +571,13 @@ export function pageLayoutGaps(
     // prior page's centering offset and makes the blank paper jump backward.
     const previous = pagination.native.pages
       .filter((candidate) =>
-        axis === 'row' ? candidate.lastRow < band.start : candidate.lastCol < band.start,
+        axis === 'row'
+          ? candidate.range.lastRow < band.start
+          : candidate.range.lastCol < band.start,
       )
-      .sort((a, b) => (axis === 'row' ? b.lastRow - a.lastRow : b.lastCol - a.lastCol))[0];
+      .sort((a, b) =>
+        axis === 'row' ? b.range.lastRow - a.range.lastRow : b.range.lastCol - a.range.lastCol,
+      )[0];
     return previous ? centeredNativeOrigin(previous, axis) : printableOrigin;
   };
   const axisExtent = (axis: 'row' | 'col', band: AxisBand): number => {

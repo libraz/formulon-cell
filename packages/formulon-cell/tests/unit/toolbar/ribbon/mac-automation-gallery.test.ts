@@ -358,22 +358,16 @@ describe('Mac automation gallery', () => {
     const before = workbook.getHyperlinksFull(0);
     expect(before).toEqual([
       {
-        row: 40,
-        col: 2,
-        lastRow: 41,
-        lastCol: 3,
-        target: '',
+        range: { firstRow: 40, firstCol: 2, lastRow: 41, lastCol: 3 },
+        target: null,
         location: 'Sheet1!A1',
         display: 'Jump',
         tooltip: 'Tip',
       },
       {
-        row: 40,
-        col: 2,
-        lastRow: 40,
-        lastCol: 2,
+        range: { firstRow: 40, firstCol: 2, lastRow: 40, lastCol: 2 },
         target: 'https://example.com',
-        location: '',
+        location: null,
         display: 'Alt',
         tooltip: 'Alt tip',
       },

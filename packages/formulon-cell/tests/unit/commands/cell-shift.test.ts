@@ -3,14 +3,23 @@ import { deleteCells, insertCells } from '../../../src/commands/cell-shift.js';
 import { History, undo } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 
-const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
+/** A real-engine workbook bound to `store`, as a mounted sheet has it. */
+const newWb = async (store: SpreadsheetStore): Promise<WorkbookHandle> => {
+  const wb = await WorkbookHandle.createDefault();
+  wb.attachStore(store);
+  return wb;
+};
 
 describe('cell shift commands', () => {
   it('preserves static errors through insert, delete and undo/redo', async () => {
     const store = createSpreadsheetStore();
-    const wb = await newWb();
+    const wb = await newWb(store);
     const history = new History();
     const source = { sheet: 0, row: 1, col: 0 };
     const shifted = { ...source, row: 2 };
@@ -33,7 +42,7 @@ describe('cell shift commands', () => {
 
   it('inserts cells by shifting only selected columns down', async () => {
     const store = createSpreadsheetStore();
-    const wb = await newWb();
+    const wb = await newWb(store);
     wb.setText({ sheet: 0, row: 1, col: 1 }, 'B2');
     wb.setText({ sheet: 0, row: 1, col: 2 }, 'C2');
     wb.setText({ sheet: 0, row: 1, col: 3 }, 'D2');
@@ -53,7 +62,7 @@ describe('cell shift commands', () => {
 
   it('deletes cells by shifting only selected rows left', async () => {
     const store = createSpreadsheetStore();
-    const wb = await newWb();
+    const wb = await newWb(store);
     wb.setText({ sheet: 0, row: 1, col: 1 }, 'B2');
     wb.setText({ sheet: 0, row: 1, col: 2 }, 'C2');
     wb.setText({ sheet: 0, row: 2, col: 1 }, 'B3');
@@ -68,7 +77,7 @@ describe('cell shift commands', () => {
 
   it('groups cell shift undo into one history entry', async () => {
     const store = createSpreadsheetStore();
-    const wb = await newWb();
+    const wb = await newWb(store);
     const history = new History();
     wb.setText({ sheet: 0, row: 1, col: 1 }, 'B2');
     wb.setText({ sheet: 0, row: 2, col: 1 }, 'B3');
@@ -82,7 +91,7 @@ describe('cell shift commands', () => {
 
   it('updates qualified references on every sheet and restores them as one undo step', async () => {
     const store = createSpreadsheetStore();
-    const wb = await newWb();
+    const wb = await newWb(store);
     expect(wb.addSheet('Target')).toBe(1);
     const history = new History();
     wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
@@ -125,7 +134,7 @@ describe('cell shift commands', () => {
 
   it('rejects an insert that would drop a last-row cell or format atomically', async () => {
     const store = createSpreadsheetStore();
-    const wb = await newWb();
+    const wb = await newWb(store);
     const history = new History();
     const last = { sheet: 0, row: 1048575, col: 0 };
     wb.setNumber(last, 7);
@@ -140,6 +149,18 @@ describe('cell shift commands', () => {
       comment: 'edge',
     });
     expect(history.canUndo()).toBe(false);
+    wb.dispose();
+  });
+
+  it('refuses Insert and Delete Cells on the stub engine without changing anything', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    wb.setText({ sheet: 0, row: 1, col: 1 }, 'B2');
+    const range = { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 };
+    expect(insertCells(store, wb, null, range, 'down')).toBe(false);
+    expect(deleteCells(store, wb, null, range, 'up')).toBe(false);
+    expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'B2' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 1 }).kind).toBe('blank');
     wb.dispose();
   });
 });

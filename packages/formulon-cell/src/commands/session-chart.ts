@@ -2,9 +2,10 @@ import {
   AnchorEditAs,
   AnchorKind,
   type ChartSeriesPatch,
+  type DrawingAnchorInput,
+  type DrawingAnchorPatch,
   DrawingObjectKind,
   ChartSeriesDirection as EngineSeriesDirection,
-  type ImagePlacement,
 } from '@libraz/formulon';
 import {
   type ChartEngineOp,
@@ -24,6 +25,7 @@ import {
   placementForAnchor,
   placementForPixels,
   sessionPosition,
+  twoCellAnchorForPixels,
   viewportZoom,
 } from '../engine/drawing-geometry.js';
 import type { EngineDrawingAnchor, Range } from '../engine/types.js';
@@ -45,6 +47,19 @@ import type { InteractionOrigin, OperationIntent } from './interaction-policy.js
 import { isSheetProtected } from './protection.js';
 import type { SessionIllustrationArrangeAction } from './session-illustration.js';
 
+/** Placement of a chart frame: its anchor kind, top-left cell and offset inside it, and its size, in EMU.
+ *  A zero or omitted size keeps the current one. */
+export interface ChartPlacement {
+  anchorKind?: AnchorKind;
+  editAs?: AnchorEditAs;
+  row?: number;
+  col?: number;
+  rowOffEmu?: number;
+  colOffEmu?: number;
+  widthEmu?: number;
+  heightEmu?: number;
+}
+
 export interface ChartMutationAuthorization {
   origin?: InteractionOrigin;
   commandId?: string;
@@ -56,7 +71,7 @@ export interface CreateSessionChartOptions extends Omit<ChartSpec, 'kind'> {
   kind?: SessionChartKind;
   /** Placement in the engine's units. Omitted, the chart takes Excel's default
    *  frame centred in the visible grid. */
-  anchor?: ImagePlacement;
+  anchor?: ChartPlacement;
   authorization?: ChartMutationAuthorization;
 }
 
@@ -65,7 +80,7 @@ export interface CreateSessionChartOptions extends Omit<ChartSpec, 'kind'> {
 export type SessionChartPatch = Partial<Omit<ChartSpec, 'kind'>> & {
   kind?: SessionChartKind;
   source?: Range;
-  anchor?: ImagePlacement;
+  anchor?: ChartPlacement;
 };
 
 /** The cells of a series to add; each range may lie on any sheet. */
@@ -223,7 +238,10 @@ const runChartOp = (
 ): boolean => {
   switch (op.op) {
     case 'setChartType':
-      return wb.setChartType(sheet, objectId, op.plot, op.kind, op.grouping);
+      return wb.setChartType(sheet, objectId, op.plot, op.type, {
+        ...(op.barDirection === undefined ? {} : { barDirection: op.barDirection }),
+        ...(op.grouping === undefined ? {} : { grouping: op.grouping }),
+      });
     case 'setChartSource':
       return wb.setChartSource(
         sheet,
@@ -299,11 +317,59 @@ const applyChartSpec = (
 const sourceRef = (wb: WorkbookHandle, range: Range): string =>
   formatSheetAbsoluteRange(wb.sheetName(range.sheet), range);
 
+/** A new chart's anchor: a two-cell anchor's box is sized by the placement's size. */
+const anchorInputOf = (placement: ChartPlacement): DrawingAnchorInput => ({
+  ...(placement.anchorKind === undefined ? {} : { kind: placement.anchorKind }),
+  ...(placement.editAs === undefined ? {} : { editAs: placement.editAs }),
+  fromRow: placement.row ?? 0,
+  fromCol: placement.col ?? 0,
+  fromRowOffsetEmu: placement.rowOffEmu ?? 0,
+  fromColOffsetEmu: placement.colOffEmu ?? 0,
+  widthEmu: placement.widthEmu ?? 0,
+  heightEmu: placement.heightEmu ?? 0,
+});
+
+/** `placement` applied to a chart at `current`, as an anchor update: a two-cell anchor
+ *  takes its `to` marker from the frame the placement's size spans on the current view. */
+const anchorPatchOf = (
+  store: SpreadsheetStore,
+  current: EngineDrawingAnchor,
+  placement: ChartPlacement,
+): DrawingAnchorPatch => {
+  const kind = placement.anchorKind ?? current.kind;
+  const from = {
+    fromRow: placement.row ?? current.fromRow,
+    fromCol: placement.col ?? current.fromCol,
+    fromRowOffsetEmu: placement.rowOffEmu ?? current.fromRowOffsetEmu,
+    fromColOffsetEmu: placement.colOffEmu ?? current.fromColOffsetEmu,
+  };
+  const widthEmu = placement.widthEmu || current.widthEmu;
+  const heightEmu = placement.heightEmu || current.heightEmu;
+  if (kind !== AnchorKind.TwoCell) return { kind, ...from, widthEmu, heightEmu };
+  const frame = sessionPosition(store, {
+    ...current,
+    ...from,
+    kind: AnchorKind.OneCell,
+    widthEmu,
+    heightEmu,
+  });
+  const to = twoCellAnchorForPixels(store, frame, placement.editAs ?? current.editAs);
+  return {
+    kind,
+    editAs: placement.editAs ?? current.editAs,
+    ...from,
+    toRow: to.toRow,
+    toCol: to.toCol,
+    toRowOffsetEmu: to.toRowOffsetEmu,
+    toColOffsetEmu: to.toColOffsetEmu,
+  };
+};
+
 /** Excel's default frame centred in the visible grid, as a two-cell anchor. */
-const defaultPlacement = (store: SpreadsheetStore): ImagePlacement => {
+const defaultPlacement = (store: SpreadsheetStore): ChartPlacement => {
   const state = store.getState();
   const { viewport } = state;
-  const fallback: ImagePlacement = {
+  const fallback: ChartPlacement = {
     anchorKind: AnchorKind.TwoCell,
     editAs: AnchorEditAs.TwoCell,
     row: viewport.rowStart,
@@ -326,25 +392,34 @@ const defaultPlacement = (store: SpreadsheetStore): ImagePlacement => {
     const w = (DEFAULT_FRAME_CX / EMU_PER_PX) * zoom;
     const h = (DEFAULT_FRAME_CY / EMU_PER_PX) * zoom;
     const origin: EngineDrawingAnchor = {
-      anchorKind: AnchorKind.TwoCell,
-      editAs: AnchorEditAs.TwoCell,
+      kind: AnchorKind.OneCell,
+      editAs: AnchorEditAs.OneCell,
       fromRow: viewport.rowStart,
       fromCol: viewport.colStart,
-      fromRowOff: 0,
-      fromColOff: 0,
+      fromRowOffsetEmu: 0,
+      fromColOffsetEmu: 0,
       toRow: 0,
       toCol: 0,
-      toRowOff: 0,
-      toColOff: 0,
-      cx: DEFAULT_FRAME_CX,
-      cy: DEFAULT_FRAME_CY,
+      toRowOffsetEmu: 0,
+      toColOffsetEmu: 0,
+      widthEmu: DEFAULT_FRAME_CX,
+      heightEmu: DEFAULT_FRAME_CY,
     };
-    return placementForPixels(store, origin, {
+    const placed = placementForPixels(store, origin, {
       x: Math.max(first.x, (first.x + last.x + last.w - w) / 2),
       y: Math.max(first.y, (first.y + last.y + last.h - h) / 2),
       w,
       h,
     });
+    return {
+      ...fallback,
+      row: placed.fromRow,
+      col: placed.fromCol,
+      rowOffEmu: placed.fromRowOffsetEmu,
+      colOffEmu: placed.fromColOffsetEmu,
+      widthEmu: placed.widthEmu,
+      heightEmu: placed.heightEmu,
+    };
   } catch {
     return fallback;
   }
@@ -420,10 +495,11 @@ export function createSessionChart(
   const spec: ChartSpec = { ...settings, kind };
   const objectId = wb.insertChart(sheet, {
     ...chartInsertOptions(spec),
-    source: sourceRef(wb, range),
-    // Without a title text the template's automatic title stays until the spec is applied.
-    ...(typeof spec.title === 'string' ? { title: spec.title } : {}),
-    placement,
+    range: sourceRef(wb, range),
+    // Without a title text the template's automatic title stays until the spec is applied;
+    // an empty title is none.
+    ...(typeof spec.title === 'string' ? { title: spec.title || null } : {}),
+    anchor: anchorInputOf(placement),
   });
   if (objectId === null) return null;
   const info = wb.getChart(sheet, objectId);
@@ -770,13 +846,7 @@ export function updateSessionChart(
   );
   if (!canMutateChart(store, intent)) return null;
   const { sheet, nativeObjectId } = chart;
-  const placement = anchor
-    ? {
-        anchorKind: chart.nativeAnchor.anchorKind,
-        editAs: chart.nativeAnchor.editAs,
-        ...anchor,
-      }
-    : null;
+  const placement = anchor ? anchorPatchOf(store, chart.nativeAnchor, anchor) : null;
   const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
 
   if (Object.keys(settings).length === 0 && !source) {
@@ -823,8 +893,8 @@ export function updateSessionChart(
           nativeObjectId,
           sourceRef(wb, source),
           split.direction,
-          split.headerRow,
-          split.headerColumn,
+          split.headerRow ?? undefined,
+          split.headerColumn ?? undefined,
         )) &&
       applyChartSpec(wb, sheet, nativeObjectId, target),
   );
@@ -893,8 +963,8 @@ export function setSessionChartSeries(
   if (seriesId !== null && seriesIdx === null) return null;
   const targets =
     seriesIdx === null
-      ? plotSeries.map((entry) => entry.idx)
-      : plotSeries.filter((entry) => entry.idx === seriesIdx).map((entry) => entry.idx);
+      ? plotSeries.map((entry) => entry.seriesId)
+      : plotSeries.filter((entry) => entry.seriesId === seriesIdx).map((entry) => entry.seriesId);
   if (targets.length === 0) return null;
   const { name, values, categories, x } = series;
   const refs = [name, values, categories, x].filter((range) => range !== undefined);
@@ -930,7 +1000,11 @@ export function removeSessionChartSeries(
   }
   const { sheet, nativeObjectId } = chart;
   const plot = wb.getChart(sheet, nativeObjectId)?.plots[0];
-  if (!plot || plot.series.length < 2 || !plot.series.some((entry) => entry.idx === seriesIdx)) {
+  if (
+    !plot ||
+    plot.series.length < 2 ||
+    !plot.series.some((entry) => entry.seriesId === seriesIdx)
+  ) {
     return null;
   }
   const intent = chartIntent(chartCells(chart), 'chartUpdate', authorization);

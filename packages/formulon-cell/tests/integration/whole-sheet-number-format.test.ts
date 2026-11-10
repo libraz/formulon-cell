@@ -14,7 +14,7 @@ const cells = [
 const far = { sheet: 0, row: MAX_ROW, col: MAX_COL };
 
 function numberFormatAt(workbook: WorkbookHandle, addr: (typeof cells)[number] | typeof far) {
-  return workbook.getEffectiveStyle(addr.sheet, addr.row, addr.col)?.numFmtCode;
+  return workbook.getEffectiveStyle(addr.sheet, addr.row, addr.col)?.numberFormat;
 }
 
 async function mountMixedWorkbook(): Promise<MountedStubSheet> {

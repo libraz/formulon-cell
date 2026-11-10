@@ -28,7 +28,6 @@ describe('CellXf metadata round-trip', () => {
         applyAlignment: false,
         applyProtection: true,
         quotePrefix: true,
-        hasProtection: true,
         locked: false,
         hidden: true,
       });
@@ -44,7 +43,6 @@ describe('CellXf metadata round-trip', () => {
         applyAlignment: false,
         applyProtection: true,
         quotePrefix: true,
-        hasProtection: true,
         locked: false,
         hidden: true,
       });
@@ -69,7 +67,6 @@ describe('CellXf metadata round-trip', () => {
         applyAlignment: false,
         applyProtection: true,
         quotePrefix: true,
-        hasProtection: true,
         locked: false,
         hidden: true,
       });
@@ -82,7 +79,6 @@ describe('CellXf metadata round-trip', () => {
       expect(protectionEdited).toMatchObject({
         applyProtection: true,
         quotePrefix: true,
-        hasProtection: true,
         locked: true,
         hidden: false,
       });
@@ -93,7 +89,6 @@ describe('CellXf metadata round-trip', () => {
         expect(savedXf).toMatchObject({
           applyProtection: true,
           quotePrefix: true,
-          hasProtection: true,
           locked: true,
           hidden: false,
         });
@@ -129,7 +124,7 @@ describe('CellXf metadata round-trip', () => {
       const sourceXf = wb.addXfRecord({
         ...normal,
         fontIndex: boldFont,
-        xfId: namedStyleXf,
+        styleXfIndex: namedStyleXf,
         applyNumberFormat: true,
         applyFont: false,
         applyFill: false,
@@ -137,7 +132,6 @@ describe('CellXf metadata round-trip', () => {
         applyAlignment: false,
         applyProtection: true,
         quotePrefix: true,
-        hasProtection: true,
         locked: false,
         hidden: true,
       });
@@ -164,13 +158,12 @@ describe('CellXf metadata round-trip', () => {
       syncCellFormatsToEngine(reloaded, store, 0, { strict: true });
       const edited = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 0) ?? -1);
       expect(edited).toMatchObject({
-        xfId: namedStyleXf,
+        styleXfIndex: namedStyleXf,
         applyNumberFormat: true,
         applyFont: false,
         applyBorder: true,
         applyProtection: true,
         quotePrefix: true,
-        hasProtection: true,
         locked: false,
         hidden: true,
       });
@@ -191,7 +184,8 @@ describe('CellXf metadata round-trip', () => {
       const sourceXf = wb.addXfRecord({
         ...normal,
         applyProtection: false,
-        hasProtection: false,
+        locked: null,
+        hidden: null,
         quotePrefix: true,
       });
       expect(wb.setCellXfIndex(0, 0, 0, sourceXf)).toBe(true);
@@ -205,7 +199,6 @@ describe('CellXf metadata round-trip', () => {
       const authored = wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1);
       expect(authored).toMatchObject({
         applyProtection: true,
-        hasProtection: true,
         locked: true,
         hidden: false,
         quotePrefix: true,

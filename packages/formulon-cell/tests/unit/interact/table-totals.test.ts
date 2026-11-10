@@ -1,3 +1,4 @@
+import { TableTotalsRowFunction } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatAsTable } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
@@ -112,10 +113,14 @@ describe('table totals function picker', () => {
       ?.click();
     expect(items()).toHaveLength(0);
     expect(store.getState().tables.tables[0]?.totals?.[1]?.function).toBe('max');
-    expect(wb.getTableStyleDetails(0)?.columns[1]?.totalsRowFunction).toBe('max');
+    expect(wb.getTableStyleDetails(0)?.columns[1]?.totalsRowFunction).toBe(
+      TableTotalsRowFunction.Max,
+    );
     expect(wb.getValue({ sheet: 0, row: 4, col: 1 })).toMatchObject({ kind: 'number', value: 3 });
     history.undo();
-    expect(wb.getTableStyleDetails(0)?.columns[1]?.totalsRowFunction).toBe('sum');
+    expect(wb.getTableStyleDetails(0)?.columns[1]?.totalsRowFunction).toBe(
+      TableTotalsRowFunction.Sum,
+    );
   });
 
   it('leaves the cell for typing on More Functions', () => {
@@ -124,6 +129,8 @@ describe('table totals function picker', () => {
       .find((item) => item.dataset.totalsFunction === 'custom')
       ?.click();
     expect(onMoreFunctions).toHaveBeenCalledOnce();
-    expect(wb.getTableStyleDetails(0)?.columns[1]?.totalsRowFunction).toBe('sum');
+    expect(wb.getTableStyleDetails(0)?.columns[1]?.totalsRowFunction).toBe(
+      TableTotalsRowFunction.Sum,
+    );
   });
 });

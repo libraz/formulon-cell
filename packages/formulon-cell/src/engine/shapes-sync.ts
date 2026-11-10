@@ -1,4 +1,5 @@
-import { AnchorEditAs, AnchorKind, DrawingObjectKind, ShapePaint } from '@libraz/formulon';
+import type { ChartFill, ChartLine } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind, DrawingObjectKind } from '@libraz/formulon';
 import {
   DEFAULT_SHAPE_COLOR,
   shapeFillColor,
@@ -15,6 +16,7 @@ import type {
 import {
   ANCHOR_KIND_ABSOLUTE,
   drawingAnchorOf,
+  placementForAnchor,
   placementForPixels,
   sameAnchor,
   sessionPosition,
@@ -23,12 +25,14 @@ import {
 import { argbFromCssColor, cssColorFromArgb } from './theme-color.js';
 import type { EngineDrawingAnchor } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-import type { EngineShape, EngineShapeInput } from './workbook-handle-drawing-objects.js';
+import type {
+  EngineShape,
+  EngineShapeInput,
+  EngineShapePatch,
+} from './workbook-handle-drawing-objects.js';
 
 /** Where a shape without a frame is drawn, in grid pixels. */
 export const DEFAULT_ILLUSTRATION_FRAME = { x: 300, y: 88, w: 160, h: 96 } as const;
-
-const EMU_PER_PT = 12700;
 
 /** Outline of a shape the overlay can only approximate. */
 const LOCKED_OUTLINE_COLOR = '#7f7f7f';
@@ -58,53 +62,45 @@ export const shapeIsSaved = (item: SessionIllustration): boolean =>
 const isLineKind = (kind: SessionShapeKind | undefined): boolean =>
   kind === 'line' || kind === 'arrow';
 
-const rgbOf = (color: string | null | undefined): number | null => {
+/** `#rrggbb` of a CSS colour the engine can store; null for any other. */
+const hexOf = (color: string | null | undefined): string | null => {
   const argb = color ? argbFromCssColor(color) : null;
-  return argb === null ? null : argb & 0xffffff;
+  return argb === null ? null : cssColorFromArgb(argb);
 };
 
-const anchorInput = (anchor: EngineDrawingAnchor): EngineShapeInput => ({
-  anchorKind: anchor.anchorKind,
-  editAs: anchor.editAs,
-  fromRow: anchor.fromRow,
-  fromCol: anchor.fromCol,
-  fromRowOff: anchor.fromRowOff,
-  fromColOff: anchor.fromColOff,
-  toRow: anchor.toRow,
-  toCol: anchor.toCol,
-  toRowOff: anchor.toRowOff,
-  toColOff: anchor.toColOff,
-  cx: anchor.cx,
-  cy: anchor.cy,
+/** How a shape paints its fill or outline: its style's (`unset`), a solid colour, nothing, or a paint
+ *  the overlay cannot draw. */
+type Paint = 'unset' | 'solid' | 'none' | 'other';
+
+const paintOf = (paint: ChartFill | ChartLine | null): Paint => {
+  if (paint === null) return 'unset';
+  if (paint.other) return 'other';
+  if (paint.none) return 'none';
+  return paint.color !== null ? 'solid' : 'unset';
+};
+
+/** The solid colour of a paint, as `#rrggbb`; a shape paint reads back as ARGB. */
+const paintColor = (paint: ChartFill | ChartLine | null): string =>
+  cssColorFromArgb(paint?.color?.argb ?? 0);
+
+const anchorInput = (anchor: EngineDrawingAnchor) => ({
+  anchor: placementForAnchor(undefined, anchor),
 });
 
 /** The fill and outline fields that write `item`'s paint. */
-const paintInput = (item: SessionIllustration): EngineShapeInput => {
-  const input: EngineShapeInput = {};
+const paintInput = (item: SessionIllustration): Pick<EngineShapeInput, 'fill' | 'line'> => {
+  const input: { -readonly [K in 'fill' | 'line']?: EngineShapeInput[K] } = {};
   if (shapeHasFill(item)) {
-    const rgb = rgbOf(shapeFillColor(item) ?? undefined);
-    if (item.opacity === 0 || shapeFillColor(item) === null) input.fillKind = ShapePaint.None;
-    else {
-      input.fillKind = ShapePaint.Solid;
-      input.fillRgb = rgb ?? (rgbOf(DEFAULT_SHAPE_COLOR) as number);
-    }
+    const color = hexOf(shapeFillColor(item) ?? undefined);
+    if (item.opacity === 0 || shapeFillColor(item) === null) input.fill = { none: true };
+    else input.fill = { color: color ?? (hexOf(DEFAULT_SHAPE_COLOR) as string) };
   }
   const weight = shapeOutlineWeight(item);
-  const outline = rgbOf(shapeOutlineColor(item));
-  if (weight === null || outline === null) input.lineKind = ShapePaint.None;
-  else {
-    input.lineKind = ShapePaint.Solid;
-    input.lineRgb = outline;
-    input.lineWidthEmu = Math.round(weight * EMU_PER_PT);
-  }
+  const outline = hexOf(shapeOutlineColor(item));
+  if (weight === null || outline === null) input.line = { none: true };
+  else input.line = { color: outline, widthPt: weight };
   return input;
 };
-
-const pick = <K extends keyof EngineShapeInput>(
-  input: EngineShapeInput,
-  keys: readonly K[],
-): EngineShapeInput =>
-  Object.fromEntries(keys.flatMap((key) => (input[key] === undefined ? [] : [[key, input[key]]])));
 
 /** Overlay-only settings of a saved shape, reset so the screen shows what the
  *  file holds: the file has no corner radius, dash style or partial opacity
@@ -127,16 +123,16 @@ export function shapeFromNative(
   shape: EngineShape,
 ): SessionIllustration | null {
   if (shape.hidden) return null;
-  const kind = KIND_OF_PRST.get(shape.prst);
+  const kind = KIND_OF_PRST.get(shape.presetGeometry);
   // The engine reports no flip, so a loaded line's direction is unknown.
   const locked =
     kind === undefined ||
     kind === 'line' ||
     shape.kind === DrawingObjectKind.Connector ||
     shape.kind === DrawingObjectKind.Group ||
-    shape.rotation !== 0 ||
-    shape.fillKind === ShapePaint.Other ||
-    shape.lineKind === ShapePaint.Other;
+    shape.rotationDeg !== 0 ||
+    paintOf(shape.fill) === 'other' ||
+    paintOf(shape.line) === 'other';
   const anchor = drawingAnchorOf(shape);
   const item: SessionIllustration = {
     id: `shape-native-${sheet}-${shape.objectId}`,
@@ -146,7 +142,7 @@ export function shapeFromNative(
     ...sessionPosition(store, anchor),
     nativeObjectId: shape.objectId,
     nativeAnchor: anchor,
-    nativeGeometryEditable: shape.anchorKind !== ANCHOR_KIND_ABSOLUTE,
+    nativeGeometryEditable: shape.anchor.kind !== ANCHOR_KIND_ABSOLUTE,
   };
   if (locked) {
     return {
@@ -158,12 +154,15 @@ export function shapeFromNative(
       lineDash: 'dash',
     };
   }
-  if (shape.fillKind === ShapePaint.Solid) item.color = cssColorFromArgb(shape.fillRgb);
-  else if (shape.fillKind === ShapePaint.None) item.opacity = 0;
-  if (shape.lineKind === ShapePaint.None) item.lineWidth = 0;
-  else if (shape.lineKind === ShapePaint.Solid) {
-    item.lineColor = cssColorFromArgb(shape.lineRgb);
-    if (shape.lineWidthEmu > 0) item.lineWidth = shape.lineWidthEmu / EMU_PER_PT;
+  const fill = paintOf(shape.fill);
+  const line = paintOf(shape.line);
+  if (fill === 'solid') item.color = paintColor(shape.fill);
+  else if (fill === 'none') item.opacity = 0;
+  if (line === 'none') item.lineWidth = 0;
+  else if (line === 'solid') {
+    item.lineColor = paintColor(shape.line);
+    const width = shape.line?.widthPt ?? 0;
+    if (width > 0) item.lineWidth = width;
   }
   if (shape.text) item.text = shape.text;
   return item;
@@ -172,35 +171,38 @@ export function shapeFromNative(
 /** A shape as an insert spec, or null when re-inserting it would lose paint
  *  or geometry the engine cannot take back. */
 const shapeInputOf = (shape: EngineShape): EngineShapeInput | null => {
+  const fill = paintOf(shape.fill);
+  const line = paintOf(shape.line);
   if (
-    shape.prst === '' ||
+    shape.presetGeometry === '' ||
     shape.kind === DrawingObjectKind.Group ||
-    shape.fillKind === ShapePaint.Other ||
-    shape.lineKind === ShapePaint.Other
+    fill === 'other' ||
+    line === 'other'
   ) {
     return null;
   }
-  const input: EngineShapeInput = {
+  const lineWidth = shape.line?.widthPt ?? null;
+  return {
     ...anchorInput(drawingAnchorOf(shape)),
     name: shape.name,
-    prst: shape.prst,
-    rotation: shape.rotation,
+    presetGeometry: shape.presetGeometry,
+    rotationDeg: shape.rotationDeg,
     hidden: shape.hidden,
+    ...(shape.kind !== DrawingObjectKind.Connector
+      ? { text: shape.text, textBox: shape.textBox }
+      : {}),
+    ...(fill === 'solid' ? { fill: { color: paintColor(shape.fill) } } : {}),
+    ...(fill === 'none' ? { fill: { none: true } } : {}),
+    ...(line === 'solid'
+      ? {
+          line: {
+            color: paintColor(shape.line),
+            ...(lineWidth !== null ? { widthPt: lineWidth } : {}),
+          },
+        }
+      : {}),
+    ...(line === 'none' ? { line: { none: true } } : {}),
   };
-  if (shape.kind !== DrawingObjectKind.Connector) {
-    input.text = shape.text;
-    input.textBox = shape.textBox;
-  }
-  if (shape.fillKind === ShapePaint.Solid) {
-    input.fillKind = ShapePaint.Solid;
-    input.fillRgb = shape.fillRgb;
-  } else if (shape.fillKind === ShapePaint.None) input.fillKind = ShapePaint.None;
-  if (shape.lineKind === ShapePaint.Solid) {
-    input.lineKind = ShapePaint.Solid;
-    input.lineRgb = shape.lineRgb;
-    input.lineWidthEmu = shape.lineWidthEmu;
-  } else if (shape.lineKind === ShapePaint.None) input.lineKind = ShapePaint.None;
-  return input;
 };
 
 /** Capture shape `objectId` so a row or column delete that drops it can be
@@ -225,7 +227,7 @@ export function captureShapeAnchors(wb: WorkbookHandle, sheet: number): () => vo
   const anchors = new Map(
     wb
       .listShapes(sheet)
-      .filter((shape) => shape.anchorKind !== ANCHOR_KIND_ABSOLUTE)
+      .filter((shape) => shape.anchor.kind !== ANCHOR_KIND_ABSOLUTE)
       .map((shape) => [shape.objectId, drawingAnchorOf(shape)] as const),
   );
   return () => {
@@ -336,7 +338,7 @@ export class ShapeMirror {
    *  still carries its anchor keeps it; a new one is placed from its pixel frame. */
   private newShape(store: SpreadsheetStore, item: SessionIllustration): EngineShapeInput {
     const spec: EngineShapeInput = {
-      prst: PRST_OF_KIND[item.shape as SessionShapeKind] as string,
+      presetGeometry: PRST_OF_KIND[item.shape as SessionShapeKind] as string,
       ...paintInput(item),
       ...(item.text && !isLineKind(item.shape) ? { text: item.text } : {}),
     };
@@ -350,32 +352,22 @@ export class ShapeMirror {
     const placed = placementForPixels(
       store,
       {
-        anchorKind: AnchorKind.OneCell,
+        kind: AnchorKind.OneCell,
         editAs: AnchorEditAs.OneCell,
         fromRow: 0,
         fromCol: 0,
-        fromRowOff: 0,
-        fromColOff: 0,
+        fromRowOffsetEmu: 0,
+        fromColOffsetEmu: 0,
         toRow: 0,
         toCol: 0,
-        toRowOff: 0,
-        toColOff: 0,
-        cx: 1,
-        cy: 1,
+        toRowOffsetEmu: 0,
+        toColOffsetEmu: 0,
+        widthEmu: 1,
+        heightEmu: 1,
       },
       frame,
     );
-    return {
-      ...spec,
-      anchorKind: AnchorKind.OneCell,
-      editAs: AnchorEditAs.OneCell,
-      fromRow: placed.row ?? 0,
-      fromCol: placed.col ?? 0,
-      fromRowOff: placed.rowOffEmu ?? 0,
-      fromColOff: placed.colOffEmu ?? 0,
-      cx: placed.widthEmu,
-      cy: placed.heightEmu,
-    };
+    return { ...spec, anchor: placed };
   }
 
   /** Write what changed between `old` and `item`; returns `old` when the
@@ -386,19 +378,19 @@ export class ShapeMirror {
     old: SessionIllustration,
     item: SessionIllustration,
   ): Partial<SessionIllustration> | null {
-    const input: EngineShapeInput = {};
+    const input: { -readonly [K in keyof EngineShapePatch]: EngineShapePatch[K] } = {};
     const anchor = this.anchorChange(store, old, item);
     if (anchor) Object.assign(input, anchorInput(anchor));
     if (!item.nativeLocked) {
       const paint = paintInput(item);
       const oldPaint = paintInput(old);
-      const same = (keys: readonly (keyof EngineShapeInput)[]): boolean =>
-        keys.every((key) => paint[key] === oldPaint[key]);
-      const fill = ['fillKind', 'fillRgb'] as const;
-      const line = ['lineKind', 'lineRgb', 'lineWidthEmu'] as const;
-      if (!same(fill)) Object.assign(input, pick(paint, fill));
-      if (!same(line)) Object.assign(input, pick(paint, line));
-      if (item.shape !== old.shape) input.prst = PRST_OF_KIND[item.shape as SessionShapeKind];
+      const same = (key: 'fill' | 'line'): boolean =>
+        JSON.stringify(paint[key]) === JSON.stringify(oldPaint[key]);
+      if (!same('fill') && paint.fill !== undefined) input.fill = paint.fill;
+      if (!same('line') && paint.line !== undefined) input.line = paint.line;
+      if (item.shape !== old.shape) {
+        input.presetGeometry = PRST_OF_KIND[item.shape as SessionShapeKind];
+      }
       if (item.text !== old.text) input.text = item.text ?? '';
     }
     if (Object.keys(input).length === 0) return null;
@@ -425,7 +417,7 @@ export class ShapeMirror {
     }
     const anchor = old.nativeAnchor;
     if (!anchor || Object.keys(changed).length === 0) return null;
-    if (anchor.anchorKind === AnchorKind.TwoCell) {
+    if (anchor.kind === AnchorKind.TwoCell) {
       return twoCellAnchorForPixels(
         store,
         { ...sessionPosition(store, anchor), ...changed },
@@ -435,12 +427,12 @@ export class ShapeMirror {
     const placed = placementForPixels(store, anchor, changed);
     return {
       ...anchor,
-      fromRow: placed.row ?? anchor.fromRow,
-      fromCol: placed.col ?? anchor.fromCol,
-      fromRowOff: placed.rowOffEmu ?? anchor.fromRowOff,
-      fromColOff: placed.colOffEmu ?? anchor.fromColOff,
-      cx: placed.widthEmu ?? anchor.cx,
-      cy: placed.heightEmu ?? anchor.cy,
+      fromRow: placed.fromRow ?? anchor.fromRow,
+      fromCol: placed.fromCol ?? anchor.fromCol,
+      fromRowOffsetEmu: placed.fromRowOffsetEmu ?? anchor.fromRowOffsetEmu,
+      fromColOffsetEmu: placed.fromColOffsetEmu ?? anchor.fromColOffsetEmu,
+      widthEmu: placed.widthEmu ?? anchor.widthEmu,
+      heightEmu: placed.heightEmu ?? anchor.heightEmu,
     };
   }
 
@@ -451,7 +443,7 @@ export class ShapeMirror {
       ? {
           nativeObjectId: objectId,
           nativeAnchor: drawingAnchorOf(shape),
-          nativeGeometryEditable: shape.anchorKind !== ANCHOR_KIND_ABSOLUTE,
+          nativeGeometryEditable: shape.anchor.kind !== ANCHOR_KIND_ABSOLUTE,
         }
       : { nativeObjectId: objectId };
   }

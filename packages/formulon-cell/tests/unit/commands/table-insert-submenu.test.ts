@@ -23,7 +23,7 @@ async function book() {
     wb.setNumber({ sheet: 0, row: 2 + i, col: 1 }, i + 1);
     wb.setFormula({ sheet: 0, row: 2 + i, col: 2 }, CALC);
   }
-  wb.createTable({ sheetIndex: 0, ref: 'A2:C7', name: 'tblA', columns: heads, totalsRow: true });
+  wb.createTable(0, { range: 'A2:C7', name: 'tblA', columns: heads, totalsRow: true });
   wb.setText({ sheet: 0, row: 6, col: 0 }, 'Sum');
   wb.setFormula({ sheet: 0, row: 6, col: 1 }, '=SUBTOTAL(109,tblA[Qty])');
   for (let r = 1; r <= 6; r += 1) {

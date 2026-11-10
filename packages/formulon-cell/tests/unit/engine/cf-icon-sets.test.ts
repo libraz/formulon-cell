@@ -1,3 +1,4 @@
+import { IconSetName } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 
 import { iconSetFromEngine, iconSetToEngine } from '../../../src/engine/cf-icon-sets.js';
@@ -56,20 +57,20 @@ describe('cf icon-set mapping', () => {
   it('writes the x14-only families as custom icons over a modelled base set', () => {
     expect(iconSetToEngine('triangles3')).toEqual({
       name: 0,
-      icons: [0, 1, 2].map((iconId) => ({ iconSet: '3Triangles', iconId })),
+      icons: [0, 1, 2].map((iconIndex) => ({ iconSet: IconSetName.ThreeTriangles, iconIndex })),
     });
     expect(iconSetToEngine('stars3')).toEqual({
       name: 0,
-      icons: [0, 1, 2].map((iconId) => ({ iconSet: '3Stars', iconId })),
+      icons: [0, 1, 2].map((iconIndex) => ({ iconSet: IconSetName.ThreeStars, iconIndex })),
     });
     expect(iconSetToEngine('boxes5')).toEqual({
       name: 13,
-      icons: [0, 1, 2, 3, 4].map((iconId) => ({ iconSet: '5Boxes', iconId })),
+      icons: [0, 1, 2, 3, 4].map((iconIndex) => ({ iconSet: IconSetName.FiveBoxes, iconIndex })),
     });
     expect(
       iconSetFromEngine(
         0,
-        [0, 1, 2].map((iconId) => ({ iconSet: '3Triangles', iconId })),
+        [0, 1, 2].map((iconIndex) => ({ iconSet: IconSetName.ThreeTriangles, iconIndex })),
       ),
     ).toEqual({ icons: 'triangles3' });
   });
@@ -80,9 +81,9 @@ describe('cf icon-set mapping', () => {
 
   it('round-trips per-level custom icons, with NoIcons as an empty level', () => {
     const icons = [
-      { iconSet: '3Stars', iconId: 2 },
-      { iconSet: 'NoIcons', iconId: 0 },
-      { iconSet: '4RedToBlack', iconId: 3 },
+      { iconSet: IconSetName.ThreeStars, iconIndex: 2 },
+      { iconSet: IconSetName.NoIcons, iconIndex: 0 },
+      { iconSet: IconSetName.FourRedToBlack, iconIndex: 3 },
     ];
     const hydrated = iconSetFromEngine(3, icons);
     expect(hydrated).toEqual({
@@ -103,7 +104,7 @@ describe('cf icon-set mapping', () => {
     expect(
       iconSetFromEngine(
         0,
-        [0, 1, 2].map((iconId) => ({ iconSet: '3Arrows', iconId })),
+        [0, 1, 2].map((iconIndex) => ({ iconSet: IconSetName.ThreeArrows, iconIndex })),
       ),
     ).toEqual({ icons: 'arrows3' });
   });

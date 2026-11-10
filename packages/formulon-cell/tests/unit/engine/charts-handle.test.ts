@@ -1,4 +1,4 @@
-import { AnchorKind, ChartInsertKind, ChartPlotType, DrawingObjectKind } from '@libraz/formulon';
+import { AnchorKind, ChartBarDirection, ChartPlotType, DrawingObjectKind } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
@@ -32,7 +32,11 @@ describe.skipIf(!canLoadWasm())('chart handle wrapper', () => {
         h.setNumber({ sheet: 0, row: i + 1, col: 1 }, value);
       });
 
-      const id = h.insertChart(0, { kind: ChartInsertKind.Column, source: 'Sheet1!$A$1:$B$4' });
+      const id = h.insertChart(0, {
+        type: ChartPlotType.Bar,
+        barDirection: ChartBarDirection.Column,
+        range: 'Sheet1!$A$1:$B$4',
+      });
       expect(id).not.toBeNull();
       const objectId = id ?? 0;
 
@@ -47,10 +51,10 @@ describe.skipIf(!canLoadWasm())('chart handle wrapper', () => {
       ).toBe(true);
 
       expect(
-        h.setDrawingAnchor(0, objectId, { anchorKind: AnchorKind.OneCell, row: 7, col: 3 }),
+        h.setDrawingAnchor(0, objectId, { kind: AnchorKind.OneCell, fromRow: 7, fromCol: 3 }),
       ).toBe(true);
       const moved = h.listDrawingObjects(0).find((o) => o.objectId === objectId);
-      expect(moved).toMatchObject({ fromRow: 7, fromCol: 3 });
+      expect(moved?.anchor).toMatchObject({ fromRow: 7, fromCol: 3 });
 
       const snapshot = h.snapshotDrawing(0, objectId);
       expect(snapshot?.length).toBeGreaterThan(0);
@@ -72,8 +76,12 @@ describe.skipIf(!canLoadWasm())('chart handle wrapper', () => {
       h.setText({ sheet: 0, row: 1, col: 0 }, 'b');
       h.setNumber({ sheet: 0, row: 1, col: 1 }, 2);
       const objectId =
-        h.insertChart(0, { kind: ChartInsertKind.Column, source: 'Sheet1!$A$1:$B$2' }) ?? 0;
-      expect(h.setChartType(0, objectId, 0, ChartInsertKind.Pie)).toBe(true);
+        h.insertChart(0, {
+          type: ChartPlotType.Bar,
+          barDirection: ChartBarDirection.Column,
+          range: 'Sheet1!$A$1:$B$2',
+        }) ?? 0;
+      expect(h.setChartType(0, objectId, 0, ChartPlotType.Pie)).toBe(true);
       expect(h.getChart(0, objectId)?.plots[0]?.type).toBe(ChartPlotType.Pie);
     } finally {
       h.dispose();
@@ -91,7 +99,11 @@ describe.skipIf(!canLoadWasm())('chart handle wrapper', () => {
         h.setNumber({ sheet: 0, row: i + 1, col: 2 }, i + 10);
       });
       const objectId =
-        h.insertChart(0, { kind: ChartInsertKind.Column, source: 'Sheet1!$A$1:$B$3' }) ?? 0;
+        h.insertChart(0, {
+          type: ChartPlotType.Bar,
+          barDirection: ChartBarDirection.Column,
+          range: 'Sheet1!$A$1:$B$3',
+        }) ?? 0;
       const seriesIdx = h.addChartSeries(0, objectId, 0, {
         name: 'Sheet1!$C$1',
         values: 'Sheet1!$C$2:$C$3',

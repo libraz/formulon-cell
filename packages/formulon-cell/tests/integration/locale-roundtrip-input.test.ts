@@ -24,7 +24,7 @@ const expectTextAxis = (workbook: WorkbookHandle, row: number, col: number): voi
   const effective = workbook.getEffectiveStyle(0, row, col);
   expect(effective).not.toBeNull();
   expect(effective?.source).toBe(row === 1 ? 1 : 2);
-  expect(effective?.numFmtCode).toBe('@');
+  expect(effective?.numberFormat).toBe('@');
   expect(workbook.getCellXfIndex(0, row, col)).toBe(0);
 };
 
@@ -115,7 +115,7 @@ describe('native locale input and XLSX round-trip boundaries', () => {
         explicitGeneral.col,
       );
       expect(directStyle?.source).toBe(0);
-      expect(directStyle?.numFmtCode).toBe('General');
+      expect(directStyle?.numberFormat).toBe('General');
       commit(mounted, explicitGeneral.row, explicitGeneral.col, '00123');
       expect(mounted.workbook.getValue(explicitGeneral)).toEqual({ kind: 'number', value: 123 });
       expect(mounted.instance.store.getState().data.cells.get('0:0:2')?.value).toEqual({
@@ -153,7 +153,7 @@ describe('native locale input and XLSX round-trip boundaries', () => {
         expect(reloaded.getValue(addr(0, 0))).toEqual({ kind: 'number', value: 3.5 });
         expect(reloaded.getValue(addr(0, 1))).toEqual({ kind: 'number', value: 1.5 });
         expect(reloaded.getValue(textCell)).toEqual({ kind: 'text', value: '00123' });
-        expect(reloaded.getEffectiveStyle(0, 0, 2)?.numFmtCode).toBe('@');
+        expect(reloaded.getEffectiveStyle(0, 0, 2)?.numberFormat).toBe('@');
         expect(reloaded.getFormulaForDisplay(reloaded.cellFormula(addr(0, 0)) ?? '')).toBe(
           fixture.formula,
         );

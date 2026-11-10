@@ -1,11 +1,20 @@
-import type { AutoFilter, AutoFilterEvalResult } from '@libraz/formulon';
+import type {
+  AutoFilter,
+  AutoFilterEval,
+  AutoFilterInput,
+  Sheet,
+  Table,
+  TableStyleOptionsPatch,
+} from '@libraz/formulon';
+import { formatA1Range } from './address.js';
 import { parseRangeRef as parseTableRef } from './range-resolver.js';
+import { isFormulonError } from './result.js';
 import type {
   Addr,
   CellValue,
   EngineCapabilities,
   TableInput,
-  TableUpdateInput,
+  TablePatch,
   Workbook,
 } from './types.js';
 import { formatCell } from './value.js';
@@ -17,34 +26,40 @@ type WorkbookHandleInternals = {
   assertAlive(): void;
 };
 
-type TableAuthoringWorkbook = Workbook & {
-  createTable?: (input: TableInput) => { status: { ok: boolean }; index: number };
-  updateTable?: (index: number, input: TableUpdateInput) => { ok: boolean };
-  removeTable?: (index: number) => { ok: boolean };
-};
+/** Every table of the workbook: sheet order, then each sheet's table order. A
+ *  table's position here is the workbook-wide index the handle methods take. */
+export function workbookTables(wb: Workbook): Table[] {
+  const out: Table[] = [];
+  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) out.push(...wb.sheet(sheet).listTables());
+  return out;
+}
 
-type AutoFilterWorkbook = Workbook & {
-  getSheetAutoFilterXml?: (sheet: number) => { status: { ok: boolean }; xml: string };
-  setSheetAutoFilterXml?: (sheet: number, xml: string) => { ok: boolean };
-  getAutoFilter?: (sheet: number) => { status: { ok: boolean }; autoFilter: AutoFilter | null };
-  setAutoFilter?: (sheet: number, filter: AutoFilter) => { ok: boolean };
-  removeAutoFilter?: (sheet: number) => { ok: boolean };
-  applyAutoFilter?: (sheet: number) => { ok: boolean };
-  clearAutoFilter?: (sheet: number) => { ok: boolean };
-  evaluateAutoFilter?: (sheet: number) => AutoFilterEvalResult;
-};
+/** The table at workbook-wide `index` (see {@link workbookTables}), or null. */
+export function workbookTableAt(wb: Workbook, index: number): Table | null {
+  if (index < 0) return null;
+  return workbookTables(wb)[index] ?? null;
+}
 
-type TableAutoFilterWorkbook = Workbook & {
-  getTableAutoFilter?: (table: number) => {
-    status: { ok: boolean };
-    autoFilter: AutoFilter | null;
-  };
-  setTableAutoFilter?: (table: number, filter: AutoFilter) => { ok: boolean };
-  removeTableAutoFilter?: (table: number) => { ok: boolean };
-  applyTableAutoFilter?: (table: number) => { ok: boolean };
-  clearTableAutoFilter?: (table: number) => { ok: boolean };
-  evaluateTableAutoFilter?: (table: number) => AutoFilterEvalResult;
-};
+/** Run an engine write; false when the engine rejects it. */
+function attempt(write: () => void): boolean {
+  try {
+    write();
+    return true;
+  } catch (e) {
+    if (!isFormulonError(e)) throw e;
+    return false;
+  }
+}
+
+/** Run an engine read; null when the engine rejects it. */
+function attemptRead<T>(read: () => T): T | null {
+  try {
+    return read();
+  } catch (e) {
+    if (!isFormulonError(e)) throw e;
+    return null;
+  }
+}
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleTablesMethods {}
@@ -60,6 +75,14 @@ function assertAlive(handle: unknown): void {
 
 function wb(handle: unknown): Workbook {
   return internals(handle).wb;
+}
+
+function ws(handle: unknown, sheet: number): Sheet {
+  return internals(handle).wb.sheet(sheet);
+}
+
+function tableAt(handle: unknown, index: number): Table | null {
+  return workbookTableAt(wb(handle), index);
 }
 
 /** Derive column display names from the header row of a table's `ref`.
@@ -86,40 +109,37 @@ export abstract class WorkbookHandleTablesMethods {
   declare readonly capabilities: EngineCapabilities;
   abstract getValue(addr: Addr): CellValue;
 
-  /** Returns the complete worksheet `<autoFilter>` fragment, or null when
-   * the engine does not expose the optional raw-definition seam. */
+  /** Returns the complete worksheet `<autoFilter>` fragment (`''` when the
+   * sheet has none), or null when the read fails. */
   getSheetAutoFilterXml(sheet: number): string | null {
     assertAlive(this);
     if (!this.capabilities.autoFilter) return null;
-    const r = (wb(this) as AutoFilterWorkbook).getSheetAutoFilterXml?.(sheet);
-    return r?.status.ok ? r.xml : null;
+    return attemptRead(() => ws(this, sheet).ooxml.getAutoFilterXml() ?? '');
   }
 
   /** Replaces the worksheet `<autoFilter>` fragment. Empty XML removes the
-   * definition. Returns false for old bundles and failed writes. */
+   * definition. Returns false for failed writes. */
   setSheetAutoFilterXml(sheet: number, xml: string): boolean {
     assertAlive(this);
     if (!this.capabilities.autoFilter) return false;
-    return (wb(this) as AutoFilterWorkbook).setSheetAutoFilterXml?.(sheet, xml)?.ok === true;
+    return attempt(() => ws(this, sheet).ooxml.setAutoFilterXml(xml.length > 0 ? xml : null));
   }
 
   /** Read the typed worksheet AutoFilter. `null` means that the sheet has no
-   * definition; `null` is also returned when this engine predates the typed
-   * AutoFilter surface or the read itself failed. */
+   * definition; `null` is also returned when the read itself failed. */
   getAutoFilter(sheet: number): AutoFilter | null {
     assertAlive(this);
     if (!this.capabilities.typedAutoFilter) return null;
-    const result = (wb(this) as AutoFilterWorkbook).getAutoFilter?.(sheet);
-    return result?.status.ok ? result.autoFilter : null;
+    return attemptRead(() => ws(this, sheet).getAutoFilter());
   }
 
   /** Replace the typed worksheet AutoFilter definition. This does not change
    * row visibility; callers that want Excel's Reapply behaviour should call
    * {@link applyAutoFilter} after this method. */
-  setAutoFilter(sheet: number, filter: AutoFilter): boolean {
+  setAutoFilter(sheet: number, filter: AutoFilterInput): boolean {
     assertAlive(this);
     if (!this.capabilities.typedAutoFilter) return false;
-    return (wb(this) as AutoFilterWorkbook).setAutoFilter?.(sheet, filter)?.ok === true;
+    return attempt(() => ws(this, sheet).setAutoFilter(filter));
   }
 
   /** Remove a worksheet AutoFilter definition. Row visibility is unchanged by
@@ -127,29 +147,28 @@ export abstract class WorkbookHandleTablesMethods {
   removeAutoFilter(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.typedAutoFilter) return false;
-    return (wb(this) as AutoFilterWorkbook).removeAutoFilter?.(sheet)?.ok === true;
+    return attempt(() => ws(this, sheet).setAutoFilter(null));
   }
 
   /** Apply the worksheet AutoFilter and update native row visibility. */
   applyAutoFilter(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.typedAutoFilter) return false;
-    return (wb(this) as AutoFilterWorkbook).applyAutoFilter?.(sheet)?.ok === true;
+    return attempt(() => ws(this, sheet).applyAutoFilter());
   }
 
   /** Remove all worksheet AutoFilter criteria and show every body row. */
   clearAutoFilter(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.typedAutoFilter) return false;
-    return (wb(this) as AutoFilterWorkbook).clearAutoFilter?.(sheet)?.ok === true;
+    return attempt(() => ws(this, sheet).clearAutoFilterCriteria());
   }
 
   /** Evaluate the worksheet AutoFilter without changing native visibility. */
-  evaluateAutoFilter(sheet: number): AutoFilterEvalResult | null {
+  evaluateAutoFilter(sheet: number): AutoFilterEval | null {
     assertAlive(this);
     if (!this.capabilities.typedAutoFilter) return null;
-    const result = (wb(this) as AutoFilterWorkbook).evaluateAutoFilter?.(sheet);
-    return result?.status.ok ? result : null;
+    return attemptRead(() => ws(this, sheet).evaluateAutoFilter());
   }
 
   /** Read a table's own typed AutoFilter by workbook-wide table index (the
@@ -157,73 +176,104 @@ export abstract class WorkbookHandleTablesMethods {
   getTableAutoFilter(table: number): AutoFilter | null {
     assertAlive(this);
     if (!this.capabilities.typedTableAutoFilter) return null;
-    const result = (wb(this) as TableAutoFilterWorkbook).getTableAutoFilter?.(table);
-    return result?.status.ok ? result.autoFilter : null;
+    const t = tableAt(this, table);
+    return t ? attemptRead(() => t.getAutoFilter()) : null;
   }
 
   /** Replace a table's AutoFilter. Row visibility is unchanged; follow with
    * {@link applyTableAutoFilter} to hide the excluded rows. */
-  setTableAutoFilter(table: number, filter: AutoFilter): boolean {
+  setTableAutoFilter(table: number, filter: AutoFilterInput): boolean {
     assertAlive(this);
     if (!this.capabilities.typedTableAutoFilter) return false;
-    return (wb(this) as TableAutoFilterWorkbook).setTableAutoFilter?.(table, filter)?.ok === true;
+    const t = tableAt(this, table);
+    return t ? attempt(() => t.setAutoFilter(filter)) : false;
   }
 
   /** Remove a table's AutoFilter (its header buttons). Row visibility is unchanged. */
   removeTableAutoFilter(table: number): boolean {
     assertAlive(this);
     if (!this.capabilities.typedTableAutoFilter) return false;
-    return (wb(this) as TableAutoFilterWorkbook).removeTableAutoFilter?.(table)?.ok === true;
+    const t = tableAt(this, table);
+    return t ? attempt(() => t.setAutoFilter(null)) : false;
   }
 
   /** Apply a table's AutoFilter and update native row visibility. */
   applyTableAutoFilter(table: number): boolean {
     assertAlive(this);
     if (!this.capabilities.typedTableAutoFilter) return false;
-    return (wb(this) as TableAutoFilterWorkbook).applyTableAutoFilter?.(table)?.ok === true;
+    const t = tableAt(this, table);
+    return t ? attempt(() => t.applyAutoFilter()) : false;
   }
 
   /** Drop every criterion of a table's AutoFilter and show all its body rows. */
   clearTableAutoFilter(table: number): boolean {
     assertAlive(this);
     if (!this.capabilities.typedTableAutoFilter) return false;
-    return (wb(this) as TableAutoFilterWorkbook).clearTableAutoFilter?.(table)?.ok === true;
+    const t = tableAt(this, table);
+    return t ? attempt(() => t.clearAutoFilterCriteria()) : false;
   }
 
   /** Evaluate a table's AutoFilter without changing native visibility. */
-  evaluateTableAutoFilter(table: number): AutoFilterEvalResult | null {
+  evaluateTableAutoFilter(table: number): AutoFilterEval | null {
     assertAlive(this);
     if (!this.capabilities.typedTableAutoFilter) return null;
-    const result = (wb(this) as TableAutoFilterWorkbook).evaluateTableAutoFilter?.(table);
-    return result?.status.ok ? result : null;
+    const t = tableAt(this, table);
+    return t ? attemptRead(() => t.evaluateAutoFilter()) : null;
   }
 
-  /** Creates an OOXML worksheet table and returns its index, or -1 when the
-   * loaded engine predates table authoring support. */
-  createTable(input: TableInput): number {
+  /** Creates an OOXML worksheet table on `sheet` and returns its workbook-wide
+   * index, or -1 when the engine refuses it. */
+  createTable(sheet: number, input: TableInput): number {
     assertAlive(this);
     if (!this.capabilities.tableMutate) return -1;
-    const result = (wb(this) as TableAuthoringWorkbook).createTable?.(input);
-    return result?.status.ok ? result.index : -1;
+    const created = attemptRead(() => ws(this, sheet).addTable(input));
+    return created ? workbookTables(wb(this)).indexOf(created) : -1;
   }
 
   /** Partially update the table at `index`; omitted fields keep their value.
-   * A new `ref` must keep the table's column count. */
-  updateTable(index: number, input: TableUpdateInput): boolean {
+   * A new `range` must keep the table's column count. */
+  updateTable(index: number, patch: TablePatch): boolean {
     assertAlive(this);
-    return (
-      this.capabilities.tableMutate === true &&
-      (wb(this) as TableAuthoringWorkbook).updateTable?.(index, input).ok === true
-    );
+    if (!this.capabilities.tableMutate) return false;
+    const t = tableAt(this, index);
+    return t ? attempt(() => t.update(patch)) : false;
+  }
+
+  /** Rename the table at `index`; structured references follow the new name. */
+  renameTable(index: number, name: string): boolean {
+    assertAlive(this);
+    if (!this.capabilities.tableMutate) return false;
+    const t = tableAt(this, index);
+    return t ? attempt(() => t.rename(name)) : false;
+  }
+
+  /** Update the style name and show-flags of the table at `index`; omitted
+   * keys keep their value and a `null` style name removes the name. */
+  updateTableStyleOptions(index: number, patch: TableStyleOptionsPatch): boolean {
+    assertAlive(this);
+    if (!this.capabilities.tableMutate) return false;
+    const t = tableAt(this, index);
+    return t ? attempt(() => t.updateStyleOptions(patch)) : false;
   }
 
   /** Remove the table at `index`; later tables shift down by one. */
   removeTable(index: number): boolean {
     assertAlive(this);
-    return (
-      this.capabilities.tableMutate === true &&
-      (wb(this) as TableAuthoringWorkbook).removeTable?.(index).ok === true
-    );
+    if (!this.capabilities.tableMutate) return false;
+    const t = tableAt(this, index);
+    return t ? attempt(() => t.sheet.removeTable(t)) : false;
+  }
+
+  /** Workbook-wide index of the table named `name` under the engine's name
+   * identity rule, or null when no table has it. */
+  tableIndexByName(name: string): number | null {
+    assertAlive(this);
+    if (!this.capabilities.tableMutate) return null;
+    const w = wb(this);
+    const table = attemptRead(() => w.table(name));
+    if (!table) return null;
+    const index = workbookTables(w).indexOf(table);
+    return index < 0 ? null : index;
   }
 
   /** Snapshot of every spreadsheet Table on the workbook, in index order.
@@ -238,32 +288,23 @@ export abstract class WorkbookHandleTablesMethods {
     columns: string[];
   }[] {
     assertAlive(this);
-    if (!wb(this).tableCount) return [];
-    const count = wb(this).tableCount();
-    if (!count.status.ok) return [];
-    const n = count.value;
-    const out: {
-      index: number;
-      name: string;
-      displayName: string;
-      ref: string;
-      sheetIndex: number;
-      columns: string[];
-    }[] = [];
-    for (let i = 0; i < n; i += 1) {
-      const e = wb(this).tableAt(i);
-      if (!e.status.ok || !e.name || !e.displayName || !e.ref || e.sheetIndex === undefined)
-        continue;
-      out.push({
-        index: i,
-        name: e.name,
-        displayName: e.displayName,
-        ref: e.ref,
-        sheetIndex: e.sheetIndex,
-        columns: tableColumnNames(this, e.sheetIndex, e.ref),
-      });
-    }
-    return out;
+    if (!this.capabilities.tableMutate) return [];
+    return (attemptRead(() => workbookTables(wb(this))) ?? []).map((table, index) => {
+      const { name, range } = table.getProperties();
+      const { rect } = range;
+      const ref = formatA1Range(
+        { r0: rect.firstRow, c0: rect.firstCol, r1: rect.lastRow, c1: rect.lastCol },
+        { collapse: false },
+      );
+      return {
+        index,
+        name,
+        displayName: name,
+        ref,
+        sheetIndex: range.sheet,
+        columns: tableColumnNames(this, range.sheet, ref),
+      };
+    });
   }
 }
 

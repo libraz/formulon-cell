@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { AnchorEditAs, AnchorKind, ChartInsertKind } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind, ChartBarDirection, ChartPlotType } from '@libraz/formulon';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../../../src/commands/structure.js';
@@ -83,7 +83,7 @@ describe('native row/column structure parity', () => {
     wb.attachHistory(history);
     deleteRows(store, wb, history, 1, 1);
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 3 })).toBe('=#REF!');
-    expect(wb.cellFormula({ sheet: 1, row: 0, col: 3 })).toBe('=#REF!');
+    expect(wb.cellFormula({ sheet: 1, row: 0, col: 3 })).toBe('=Sheet1!#REF!');
 
     history.undo();
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 3 })).toBe('=A2');
@@ -92,7 +92,7 @@ describe('native row/column structure parity', () => {
 
     history.redo();
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 3 })).toBe('=#REF!');
-    expect(wb.cellFormula({ sheet: 1, row: 0, col: 3 })).toBe('=#REF!');
+    expect(wb.cellFormula({ sheet: 1, row: 0, col: 3 })).toBe('=Sheet1!#REF!');
   });
 
   it('drops a vertical merge when its final row is deleted', () => {
@@ -159,13 +159,14 @@ describe('native row/column structure parity', () => {
     wb.setNumber({ sheet: 0, row: 2, col: 1 }, 2);
     const insert = (row: number, heightEmu: number): number => {
       const id = wb.insertChart(0, {
-        kind: ChartInsertKind.Column,
-        source: 'Sheet1!$A$1:$B$3',
-        placement: {
-          anchorKind: AnchorKind.TwoCell,
+        type: ChartPlotType.Bar,
+        barDirection: ChartBarDirection.Column,
+        range: 'Sheet1!$A$1:$B$3',
+        anchor: {
+          kind: AnchorKind.TwoCell,
           editAs: AnchorEditAs.TwoCell,
-          row,
-          col: 4,
+          fromRow: row,
+          fromCol: 4,
           widthEmu: 1_905_000,
           heightEmu,
         },
@@ -207,9 +208,9 @@ describe('native row/column structure parity', () => {
     wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
     wb.setNumber({ sheet: 0, row: 1, col: 0 }, 2);
     const id = wb.insertChart(0, {
-      kind: ChartInsertKind.Line,
-      source: 'Sheet1!$A$1:$A$2',
-      placement: { anchorKind: AnchorKind.TwoCell, row: 3, col: 2 },
+      type: ChartPlotType.Line,
+      range: 'Sheet1!$A$1:$A$2',
+      anchor: { kind: AnchorKind.TwoCell, fromRow: 3, fromCol: 2 },
     });
     if (id === null) throw new Error('chart was not inserted');
     hydrateChartsFromEngine(wb, store, 0);

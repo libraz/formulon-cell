@@ -25,7 +25,7 @@ describe('real WASM axis selection font size', () => {
       const sizeAt = (row: number, col: number): number | undefined => {
         const effective = workbook.getEffectiveStyle(0, row, col);
         const xf = effective && workbook.getCellXf(effective.xfIndex);
-        return xf ? workbook.getFontRecord(xf.fontIndex)?.size : undefined;
+        return xf ? (workbook.getFontRecord(xf.fontIndex)?.sizePt ?? undefined) : undefined;
       };
       try {
         expect(workbook.isStub).toBe(false);
@@ -67,14 +67,14 @@ describe('real WASM axis selection font size', () => {
       mutators.selectCol(mounted.instance.store, 1);
       setFontColor(mounted.instance.store.getState(), mounted.instance.store, '#ff0000');
       const columnFont = fontAt(3, 1);
-      expect(columnFont?.colorArgb).toBe(0xffff0000);
+      expect(columnFont?.color?.argb).toBe(0xffff0000);
 
       mutators.selectRows(mounted.instance.store, 3, 3);
       expect(
         setFont(mounted.instance.store.getState(), mounted.instance.store, { fontSize: 24 }),
       ).toBe(true);
-      expect(fontAt(3, 0)?.size).toBe(18);
-      expect(fontAt(3, 1)).toMatchObject({ size: 18, colorArgb: columnFont?.colorArgb });
+      expect(fontAt(3, 0)?.sizePt).toBe(18);
+      expect(fontAt(3, 1)).toMatchObject({ sizePt: 18, color: { argb: columnFont?.color?.argb } });
     } finally {
       mounted.dispose();
       workbook.dispose();
@@ -94,14 +94,14 @@ describe('real WASM axis selection font size', () => {
       mutators.selectCol(mounted.instance.store, 0);
       setFontColor(mounted.instance.store.getState(), mounted.instance.store, '#ff0000');
       const columnFont = fontAt(3, 0);
-      expect(columnFont?.colorArgb).toBe(0xffff0000);
+      expect(columnFont?.color?.argb).toBe(0xffff0000);
 
       mutators.selectRows(mounted.instance.store, 3, 10);
       expect(
         setFont(mounted.instance.store.getState(), mounted.instance.store, { fontSize: 24 }),
       ).toBe(true);
-      expect(fontAt(3, 0)).toMatchObject({ size: 18, colorArgb: columnFont?.colorArgb });
-      expect(fontAt(10, MAX_COL)?.size).toBe(18);
+      expect(fontAt(3, 0)).toMatchObject({ sizePt: 18, color: { argb: columnFont?.color?.argb } });
+      expect(fontAt(10, MAX_COL)?.sizePt).toBe(18);
     } finally {
       mounted.dispose();
       workbook.dispose();
@@ -120,15 +120,15 @@ describe('real WASM axis selection font size', () => {
       expect(workbook.isStub).toBe(false);
       mutators.selectCols(mounted.instance.store, 1, MAX_COL);
       setFontColor(mounted.instance.store.getState(), mounted.instance.store, '#ff0000');
-      expect(fontAt(3, 1)?.colorArgb).toBe(0xffff0000);
+      expect(fontAt(3, 1)?.color?.argb).toBe(0xffff0000);
 
       mutators.selectRow(mounted.instance.store, 3);
       expect(
         setFont(mounted.instance.store.getState(), mounted.instance.store, { fontSize: 24 }),
       ).toBe(true);
-      expect(fontAt(3, 1)).toMatchObject({ size: 18, colorArgb: 0xffff0000 });
-      expect(fontAt(3, 0)).toMatchObject({ size: 18, colorArgb: 0xff000000 });
-      expect(fontAt(2, 1)).toMatchObject({ size: 11, colorArgb: 0xffff0000 });
+      expect(fontAt(3, 1)).toMatchObject({ sizePt: 18, color: { argb: 0xffff0000 } });
+      expect(fontAt(3, 0)).toMatchObject({ sizePt: 18, color: { argb: 0xff000000 } });
+      expect(fontAt(2, 1)).toMatchObject({ sizePt: 11, color: { argb: 0xffff0000 } });
     } finally {
       mounted.dispose();
       workbook.dispose();
@@ -142,7 +142,7 @@ describe('real WASM axis selection font size', () => {
     const sizeAt = (row: number, col: number): number | undefined => {
       const effective = workbook.getEffectiveStyle(0, row, col);
       const xf = effective && workbook.getCellXf(effective.xfIndex);
-      return xf ? workbook.getFontRecord(xf.fontIndex)?.size : undefined;
+      return xf ? (workbook.getFontRecord(xf.fontIndex)?.sizePt ?? undefined) : undefined;
     };
     const setSize = (size: number): void => {
       recordFormatChange(history, mounted.instance.store, () => {
@@ -193,7 +193,7 @@ describe('real WASM axis selection font size', () => {
     const sizeAt = (row: number, col: number): number | undefined => {
       const effective = workbook.getEffectiveStyle(0, row, col);
       const xf = effective && workbook.getCellXf(effective.xfIndex);
-      return xf ? workbook.getFontRecord(xf.fontIndex)?.size : undefined;
+      return xf ? (workbook.getFontRecord(xf.fontIndex)?.sizePt ?? undefined) : undefined;
     };
     try {
       mounted.instance.store.setState((state) => ({
@@ -233,7 +233,7 @@ describe('real WASM axis selection font size', () => {
       const effective = workbook.getEffectiveStyle(0, 2, 1);
       const xf = effective && workbook.getCellXf(effective.xfIndex);
       const font = xf && workbook.getFontRecord(xf.fontIndex);
-      return { source: effective?.source, size: font?.size, colorArgb: font?.colorArgb };
+      return { source: effective?.source, size: font?.sizePt, colorArgb: font?.color?.argb };
     };
     try {
       const redXf = patchXfIndexFromBase(workbook, 0, { color: '#ff0000' });
@@ -271,7 +271,7 @@ describe('real WASM axis selection font size', () => {
     const sizeAt = (row: number, col: number): number | undefined => {
       const effective = workbook.getEffectiveStyle(0, row, col);
       const xf = effective && workbook.getCellXf(effective.xfIndex);
-      return xf ? workbook.getFontRecord(xf.fontIndex)?.size : undefined;
+      return xf ? (workbook.getFontRecord(xf.fontIndex)?.sizePt ?? undefined) : undefined;
     };
     try {
       mutators.selectCol(mounted.instance.store, 1);

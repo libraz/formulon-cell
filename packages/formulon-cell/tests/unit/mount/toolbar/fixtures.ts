@@ -1,3 +1,4 @@
+import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import { vi } from 'vitest';
 import { defaultTableOverlay } from '../../../../src/commands/format-as-table.js';
 import { createPivotTableAtPlacement } from '../../../../src/commands/pivot-table.js';
@@ -30,18 +31,18 @@ export const selectStoreChart = (store: SpreadsheetStore, id = 'chart-native-0-1
     sheet: 0,
     nativeObjectId: 1,
     nativeAnchor: {
-      anchorKind: 1,
-      editAs: 1,
+      kind: AnchorKind.TwoCell,
+      editAs: AnchorEditAs.OneCell,
       fromRow: 1,
       fromCol: 1,
-      fromRowOff: 0,
-      fromColOff: 0,
+      fromRowOffsetEmu: 0,
+      fromColOffsetEmu: 0,
       toRow: 10,
       toCol: 6,
-      toRowOff: 0,
-      toColOff: 0,
-      cx: 0,
-      cy: 0,
+      toRowOffsetEmu: 0,
+      toColOffsetEmu: 0,
+      widthEmu: 0,
+      heightEmu: 0,
     },
     kind: 'column',
     data: { domain: 'category', categories: ['Jan'], series: [{ id: 's0', values: [1] }] },

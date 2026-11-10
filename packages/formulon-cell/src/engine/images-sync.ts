@@ -1,3 +1,4 @@
+import { DrawingObjectKind } from '@libraz/formulon';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import {
@@ -59,16 +60,16 @@ const imageFromNative = (
   object: EngineDrawingObject,
   image: EngineImage,
 ): PersistedSessionImage => {
-  const position = sessionPosition(store, object);
+  const position = sessionPosition(store, object.anchor);
   return {
     id: `image-native-${sheet}-${object.objectId}`,
     kind: 'image',
     sheet,
     src: imageBytesToDataUrl(image.bytes, image.format),
-    alt: object.descr || object.name,
+    alt: object.description || object.name,
     ...position,
     nativeObjectId: object.objectId,
-    nativeGeometryEditable: object.anchorKind !== ANCHOR_KIND_ABSOLUTE,
+    nativeGeometryEditable: object.anchor.kind !== ANCHOR_KIND_ABSOLUTE,
     imageBytes: Uint8Array.from(image.bytes),
     imageFormat: image.format,
     nativeAnchor: drawingAnchorOf(object),
@@ -130,7 +131,8 @@ export function hydrateImagesFromEngine(
         if (item) mutators.upsertIllustration(store, named(item));
         continue;
       }
-      if (!wb.capabilities.images || object.kind !== 0 || object.imageFormat === 0) continue;
+      // A picture without media bytes reads no image.
+      if (!wb.capabilities.images || object.kind !== DrawingObjectKind.Picture) continue;
       const image = wb.getImage(sheet, object.objectId);
       if (!image) continue;
       mutators.upsertIllustration(
@@ -187,7 +189,7 @@ export function movePersistentImage(
   ) {
     return false;
   }
-  if (item.nativeAnchor.anchorKind === ANCHOR_KIND_ABSOLUTE) return false;
+  if (item.nativeAnchor.kind === ANCHOR_KIND_ABSOLUTE) return false;
   // History replay passes the captured native anchor. It is already in EMU
   // and must not be interpreted as screen pixels under the current zoom or
   // viewport, which may have changed since the original edit.

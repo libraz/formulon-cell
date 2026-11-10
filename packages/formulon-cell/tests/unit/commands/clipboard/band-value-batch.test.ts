@@ -1,3 +1,4 @@
+import { FormulonError, StatusCode } from '@libraz/formulon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { copy } from '../../../../src/commands/clipboard/copy.js';
 import { pasteSpecial } from '../../../../src/commands/clipboard/paste-special.js';
@@ -193,25 +194,20 @@ describe('whole-band Paste All value batching', () => {
     const raw = (
       mounted.workbook as unknown as {
         wb: {
-          setNumber: (
-            sheet: number,
-            row: number,
-            col: number,
-            input: number,
-          ) => { ok: boolean; status: number; message: string; context: string };
+          sheet: (index: number) => {
+            setNumber: (row: number, col: number, input: number) => void;
+          };
         };
       }
-    ).wb;
+    ).wb.sheet(0);
     const originalSetNumber = raw.setNumber.bind(raw);
     let setterCalls = 0;
-    const failingSetter = vi
-      .spyOn(raw, 'setNumber')
-      .mockImplementation((sheet, row, col, input) => {
-        setterCalls += 1;
-        if (setterCalls === 2)
-          return { ok: false, status: 1, message: 'injected mid-batch failure', context: '' };
-        return originalSetNumber(sheet, row, col, input);
-      });
+    const failingSetter = vi.spyOn(raw, 'setNumber').mockImplementation((row, col, input) => {
+      setterCalls += 1;
+      if (setterCalls === 2)
+        throw new FormulonError(StatusCode.InvalidArgument, 'injected mid-batch failure');
+      return originalSetNumber(row, col, input);
+    });
     const historyPush = vi.spyOn(mounted.sheet.instance.history, 'push');
     const cellsBefore = mounted.sheet.instance.store.getState().data.cells;
 

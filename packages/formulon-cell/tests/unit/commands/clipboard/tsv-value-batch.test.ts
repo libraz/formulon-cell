@@ -1,3 +1,4 @@
+import { FormulonError, StatusCode } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import { pasteTSV } from '../../../../src/commands/clipboard/paste.js';
 import { coerceInput } from '../../../../src/commands/coerce-input.js';
@@ -207,25 +208,20 @@ describe('TSV paste value batching', () => {
       const raw = (
         wb as unknown as {
           wb: {
-            setNumber: (
-              sheet: number,
-              row: number,
-              col: number,
-              input: number,
-            ) => { ok: boolean; status: number; message: string; context: string };
+            sheet: (index: number) => {
+              setNumber: (row: number, col: number, input: number) => void;
+            };
           };
         }
-      ).wb;
+      ).wb.sheet(0);
       const originalSetNumber = raw.setNumber.bind(raw);
       let setterCalls = 0;
-      const failingSetter = vi
-        .spyOn(raw, 'setNumber')
-        .mockImplementation((sheet, row, col, value) => {
-          setterCalls += 1;
-          if (setterCalls === 2)
-            return { ok: false, status: 1, message: 'injected TSV failure', context: '' };
-          return originalSetNumber(sheet, row, col, value);
-        });
+      const failingSetter = vi.spyOn(raw, 'setNumber').mockImplementation((row, col, value) => {
+        setterCalls += 1;
+        if (setterCalls === 2)
+          throw new FormulonError(StatusCode.InvalidArgument, 'injected TSV failure');
+        return originalSetNumber(row, col, value);
+      });
       const historyPush = vi.spyOn(history, 'push');
 
       try {

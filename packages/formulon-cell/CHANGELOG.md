@@ -4,6 +4,36 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- **Breaking:** Requires `@libraz/formulon` 0.19.0. `WorkbookHandle` follows the engine's 0.19 model:
+  - Engine failures surface as `FormulonError`. Optional list reads (merges, hyperlinks, conditional formats, tables, external links, passthrough parts) still fall back to an empty list.
+  - Records that `WorkbookHandle` passes through are the engine's own types and field names: font `sizePt`, fill `foreground` / `background` colours, `color.argb`, `EffectiveStyle`, `WorkbookTheme`, `Pagination`, `AutoFilterEval`.
+  - Absent values read as `null` rather than `-1` or `''`. For example, a chart without a title reads `null`.
+  - Engine enums use the engine's numbering: `PivotSortOrder`, comparison operators in validations and conditional formats, and the other renumbered pivot, chart and drawing enums.
+  - `getConditionalFormats` returns the engine's rule records, and formula operands keep their leading `=`.
+- **Breaking:** Mutations take the engine's input and patch types:
+  - `createTable(sheet, input)` takes the sheet as its first argument.
+  - `updateTable(index, patch)`, `updateShape`, `updateSlicer`, `updateSparklineGroup` and `patchSheetFormatDefaults` take partial patches.
+  - `setAutoFilter` / `setTableAutoFilter` take `AutoFilterInput`.
+  - `setWorkbookProtection` takes `null` to remove protection.
+  - Protected ranges, cell XFs and custom table styles take their `*Input` types.
+  - `setDrawingAnchor` takes a drawing-anchor patch.
+- **Breaking:** `evalFormula`, `evaluateFormulaText` and `evaluateFormulaArray` return the engine value (or a 2-D array of values) directly, and return `null` when the formula cannot be evaluated.
+- **Breaking:** `EngineCapabilities` is no longer probed from the loaded module. The engine provides every capability, and the opt-in stub engine reports them off.
+- Insert Cells and Delete Cells (shift down, right, up or left) run in the engine, which moves formulas, merges, conditional formats, validations, notes, comments and tables with the cells and refuses a shift that would push data off the sheet. The opt-in stub engine refuses these commands.
+- The Table Design total-row toggle runs through the engine's table update, which shifts the cells below the table.
+- Formulas that refer to a deleted range on another sheet keep the sheet qualifier (`=Sheet1!#REF!`), and structured references read back in their short form (`=[@Qty]*10`), both as the desktop app shows them.
+- Legacy array (Ctrl+Shift+Enter) formulas are no longer outlined as spill ranges.
+- XLSB saves keep pictures, charts and shapes.
+
+### Added
+
+- `WorkbookHandle.sheetIndexByName`, `tableIndexByName`, `renameTable` and `updateTableStyleOptions`. Sheet and table names resolve with the engine's name rules instead of ASCII-only case folding.
+- `ChartPlacement` is exported for `createSessionChart` placements.
+
 ## 0.14.0 — 2026-11-02
 
 ### Added

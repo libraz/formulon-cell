@@ -16,6 +16,10 @@ import {
   textDirectionToReadingOrder,
   textRotationToCellRotation,
 } from '../../../src/engine/format-writeback.js';
+import type { FillRecord } from '../../../src/engine/types.js';
+
+const rgb = (argb: number) => ({ kind: 1 as const, argb, theme: 0, tint: 0, indexed: 0 });
+const NONE = { kind: 0 as const, argb: 0, theme: 0, tint: 0, indexed: 0 };
 
 describe('cssColorToArgb / argbToCssColor', () => {
   it('parses #rrggbb', () => {
@@ -64,22 +68,23 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
   it('emits defaults when CellFormat is empty', () => {
     const rec = fontRecordFromFormat({});
     expect(rec.name).toBe('Calibri');
-    expect(rec.size).toBe(11);
-    expect(rec.bold).toBe(false);
-    expect(rec.italic).toBe(false);
+    expect(rec.sizePt).toBe(11);
+    // An unstated toggle is an absent element (the former `hasBold: false`).
+    expect(rec.bold).toBeNull();
+    expect(rec.italic).toBeNull();
     expect(rec.underline).toBe(0);
     expect(rec.vertAlign).toBe(0);
-    expect(rec.colorArgb).toBe(0xff000000);
+    expect(rec.color?.argb).toBe(0xff000000);
   });
 
   it('uses a supplied workbook default for unspecified family and size', () => {
     const rec = fontRecordFromFormat({}, { name: '游ゴシック', size: 11 });
     expect(rec.name).toBe('游ゴシック');
-    expect(rec.size).toBe(11);
+    expect(rec.sizePt).toBe(11);
   });
 
   it('keeps the default font’s theme link while the cell stays on that font', () => {
-    const wbDefault = { name: '游ゴシック', size: 11, scheme: 2 };
+    const wbDefault = { name: '游ゴシック', size: 11, scheme: 2 as const };
     // Bolding or resizing does not change the typeface, so the link holds.
     expect(fontRecordFromFormat({}, wbDefault).scheme).toBe(2);
     expect(fontRecordFromFormat({ bold: true, fontSize: 18 }, wbDefault).scheme).toBe(2);
@@ -89,7 +94,7 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
   it('unlinks the theme when a family is named explicitly', () => {
     const rec = fontRecordFromFormat(
       { fontFamily: 'Arial' },
-      { name: '游ゴシック', size: 11, scheme: 2 },
+      { name: '游ゴシック', size: 11, scheme: 2 as const },
     );
     expect(rec.scheme).toBeUndefined();
   });
@@ -109,8 +114,8 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(rec.underline).toBe(1);
     expect(rec.strike).toBe(true);
     expect(rec.name).toBe('Arial');
-    expect(rec.size).toBe(10.5);
-    expect(rec.colorArgb).toBe(0xffff0000);
+    expect(rec.sizePt).toBe(10.5);
+    expect(rec.color?.argb).toBe(0xffff0000);
   });
 
   it.each([
@@ -123,12 +128,12 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(
       fontRecordToFormat({
         name: 'Calibri',
-        size: 11,
+        sizePt: 11,
         bold: false,
         italic: false,
         strike: false,
         underline: ordinal,
-        colorArgb: 0xff000000,
+        color: rgb(0xff000000),
       }).underline,
     ).toBe(underline);
   });
@@ -142,17 +147,17 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
   });
 
   it('converts CSS pixels to native points and compares defaults before conversion', () => {
-    expect(fontRecordFromFormat({ fontSize: 16 }).size).toBe(12);
+    expect(fontRecordFromFormat({ fontSize: 16 }).sizePt).toBe(12);
     expect(
       fontRecordToFormat(
         {
           name: 'Aptos',
-          size: 12,
+          sizePt: 12,
           bold: false,
           italic: false,
           strike: false,
           underline: 0,
-          colorArgb: 0xff000000,
+          color: rgb(0xff000000),
         },
         { name: 'Aptos', size: 12 },
       ).fontSize,
@@ -160,12 +165,12 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(
       fontRecordToFormat({
         name: 'Aptos',
-        size: 10.5,
+        sizePt: 10.5,
         bold: false,
         italic: false,
         strike: false,
         underline: 0,
-        colorArgb: 0xff000000,
+        color: rgb(0xff000000),
       }).fontSize,
     ).toBeCloseTo(14, 10);
   });
@@ -187,13 +192,13 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(
       fontRecordToFormat({
         name: 'Calibri',
-        size: 11,
+        sizePt: 11,
         bold: false,
         italic: false,
         strike: false,
         underline: 0,
         vertAlign: ordinal,
-        colorArgb: 0xff000000,
+        color: rgb(0xff000000),
       }).fontVertAlign,
     ).toBe(fontVertAlign);
   });
@@ -201,12 +206,12 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
   it('hydrate strips workbook-default font name+size', () => {
     const fmt = fontRecordToFormat({
       name: 'Calibri',
-      size: 11,
+      sizePt: 11,
       bold: false,
       italic: false,
       strike: false,
       underline: 0,
-      colorArgb: 0xff000000,
+      color: rgb(0xff000000),
     });
     expect(fmt.fontFamily).toBeUndefined();
     expect(fmt.fontSize).toBeUndefined();
@@ -216,12 +221,12 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     const fmt = fontRecordToFormat(
       {
         name: '游ゴシック',
-        size: 11,
+        sizePt: 11,
         bold: false,
         italic: false,
         strike: false,
         underline: 0,
-        colorArgb: 0xff000000,
+        color: rgb(0xff000000),
       },
       { name: '游ゴシック', size: 11 },
     );
@@ -238,15 +243,15 @@ describe('fillRecordFromFormat / fillRecordToFormat', () => {
   it('uses pattern=1 (solid) when fill present', () => {
     const rec = fillRecordFromFormat({ fill: '#ffff00' });
     expect(rec.pattern).toBe(1);
-    expect(rec.fgArgb).toBe(0xffffff00);
+    expect(rec.foreground?.argb).toBe(0xffffff00);
   });
 
   it('paints a cell solid fill without a foreground colour black, and a dxf one not at all', () => {
-    const rec = { pattern: 1, fgArgb: 0, bgArgb: 0xffff00 };
+    const rec = { pattern: 1 as const, foreground: NONE, background: rgb(0xffff00) };
     expect(fillRecordToFormat(rec, { cell: true })).toEqual({ fill: '#000000' });
     expect(fillRecordToFormat(rec)).toEqual({});
-    const literal = { kind: 1, rgb: 0, theme: 0, tint: 0, indexed: 0 };
-    expect(fillRecordToFormat({ ...rec, fg: literal })).toEqual({ fill: '#000000' });
+    const literal = { kind: 1 as const, argb: 0, theme: 0, tint: 0, indexed: 0 };
+    expect(fillRecordToFormat({ ...rec, foreground: literal })).toEqual({ fill: '#000000' });
   });
 
   it('round-trips back to CellFormat', () => {
@@ -278,7 +283,11 @@ describe('fillRecordFromFormat / fillRecordToFormat', () => {
       fillPattern,
       fillPatternColor: '#123456',
     });
-    expect(rec).toEqual({ pattern: ordinal, fgArgb: 0xff123456, bgArgb: 0xffabcdef });
+    expect(rec).toEqual({
+      pattern: ordinal,
+      foreground: rgb(0xff123456),
+      background: rgb(0xffabcdef),
+    });
     expect(fillRecordToFormat(rec)).toEqual({
       fill: '#abcdef',
       fillPattern,
@@ -295,20 +304,26 @@ describe('fillRecordFromFormat / fillRecordToFormat', () => {
     'keeps legacy %s input writable and hydrates canonical %s',
     (fillPattern, ordinal, canonical) => {
       expect(fillRecordFromFormat({ fillPattern }).pattern).toBe(ordinal);
-      expect(fillRecordToFormat({ pattern: ordinal, fgArgb: 0, bgArgb: 0 }).fillPattern).toBe(
-        canonical,
-      );
+      expect(
+        fillRecordToFormat({ pattern: ordinal, foreground: NONE, background: NONE }).fillPattern,
+      ).toBe(canonical);
     },
   );
 
   it('preserves a colour but does not mislabel an unsupported pattern ordinal', () => {
-    expect(fillRecordToFormat({ pattern: 19, fgArgb: 0xff123456, bgArgb: 0xffabcdef })).toEqual({
+    expect(
+      fillRecordToFormat({
+        pattern: 19 as FillRecord['pattern'],
+        foreground: rgb(0xff123456),
+        background: rgb(0xffabcdef),
+      }),
+    ).toEqual({
       fill: '#abcdef',
     });
   });
 
   it('hydrate produces empty fmt when pattern=0', () => {
-    expect(fillRecordToFormat({ pattern: 0, fgArgb: 0, bgArgb: 0 })).toEqual({});
+    expect(fillRecordToFormat({ pattern: 0, foreground: NONE, background: NONE })).toEqual({});
   });
 });
 
@@ -324,7 +339,7 @@ describe('borderRecordFromFormat / borderRecordToFormat', () => {
       borders: { left: { style: 'medium', color: '#ff0000' } },
     });
     expect(rec.left.style).toBe(2);
-    expect(rec.left.colorArgb).toBe(0xffff0000);
+    expect(rec.left.color?.argb).toBe(0xffff0000);
   });
 
   it('round-trips top side back', () => {
@@ -525,31 +540,27 @@ describe('buildXfRecord', () => {
       borderIndex: 3,
       numFmtId: 4,
       applyAlignment: true,
-      horizontalAlign: 2,
-      verticalAlign: 1,
+      horizontal: 2,
+      vertical: 1,
       wrapText: true,
-      justifyLastLine: false,
-      hasAlignment: true,
-      hasHorizontalAlign: true,
-      hasVerticalAlign: true,
-      hasWrapText: true,
-      hasJustifyLastLine: false,
+      justifyLastLine: null,
     });
   });
 
   it('defaults map to general/bottom/no-wrap', () => {
+    // Unstated alignment is an absent attribute (the former `has*: false`).
     const xf = buildXfRecord(0, 0, 0, 0, {});
-    expect(xf.horizontalAlign).toBe(0);
-    expect(xf.verticalAlign).toBe(2);
-    expect(xf.wrapText).toBe(false);
-    expect(xf.justifyLastLine).toBe(false);
+    expect(xf.horizontal).toBeNull();
+    expect(xf.vertical).toBeNull();
+    expect(xf.wrapText).toBeNull();
+    expect(xf.justifyLastLine).toBeNull();
   });
 
   it('writes justify-last-line only for distributed alignment', () => {
     expect(
       buildXfRecord(0, 0, 0, 0, { align: 'distributed', justifyLastLine: true }),
     ).toMatchObject({
-      horizontalAlign: 7,
+      horizontal: 7,
       justifyLastLine: true,
     });
     expect(
@@ -570,11 +581,10 @@ describe('buildXfRecord', () => {
         textDirection: 'context',
       }),
     ).toMatchObject({
-      hasAlignment: true,
-      hasHorizontalAlign: true,
-      hasVerticalAlign: true,
-      hasWrapText: true,
-      hasJustifyLastLine: true,
+      horizontal: 1,
+      vertical: 2,
+      wrapText: false,
+      justifyLastLine: false,
       textRotation: 0,
       indent: 0,
       shrinkToFit: false,
@@ -584,11 +594,11 @@ describe('buildXfRecord', () => {
 
   it('keeps alignment absent for an otherwise empty format', () => {
     const xf = buildXfRecord(0, 0, 0, 0, {});
-    expect(xf.hasAlignment).toBe(false);
-    expect(xf.hasHorizontalAlign).toBe(false);
-    expect(xf.hasVerticalAlign).toBe(false);
-    expect(xf.hasWrapText).toBe(false);
-    expect(xf.hasJustifyLastLine).toBe(false);
+    expect(xf.applyAlignment).toBeUndefined();
+    expect(xf.horizontal).toBeNull();
+    expect(xf.vertical).toBeNull();
+    expect(xf.wrapText).toBeNull();
+    expect(xf.justifyLastLine).toBeNull();
     expect(xf).not.toHaveProperty('textRotation');
     expect(xf).not.toHaveProperty('indent');
     expect(xf).not.toHaveProperty('shrinkToFit');
@@ -611,7 +621,6 @@ describe('buildXfRecord', () => {
       applyFill: true,
       applyBorder: true,
       applyProtection: true,
-      hasProtection: true,
       locked: false,
       hidden: true,
     });
@@ -626,7 +635,7 @@ describe('buildXfRecord', () => {
     ['centerContinuous', 6],
     ['distributed', 7],
   ] as const)('maps horizontal alignment %s to ordinal %i', (align, ordinal) => {
-    expect(buildXfRecord(0, 0, 0, 0, { align }).horizontalAlign).toBe(ordinal);
+    expect(buildXfRecord(0, 0, 0, 0, { align }).horizontal).toBe(ordinal);
   });
 
   it.each([
@@ -636,7 +645,7 @@ describe('buildXfRecord', () => {
     ['justify', 3],
     ['distributed', 4],
   ] as const)('maps vertical alignment %s to ordinal %i', (vAlign, ordinal) => {
-    expect(buildXfRecord(0, 0, 0, 0, { vAlign }).verticalAlign).toBe(ordinal);
+    expect(buildXfRecord(0, 0, 0, 0, { vAlign }).vertical).toBe(ordinal);
   });
 });
 

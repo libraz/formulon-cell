@@ -463,7 +463,7 @@ const fontPatchedXf = (
   const font = {
     ...baseFont,
     ...(patch.fontFamily === undefined ? {} : { name: patch.fontFamily }),
-    ...(patch.fontSize === undefined ? {} : { size: fontCssPxToPoints(patch.fontSize) }),
+    ...(patch.fontSize === undefined ? {} : { sizePt: fontCssPxToPoints(patch.fontSize) }),
   };
   // A selected family is a literal font choice. Keeping a theme scheme from
   // the source XF would make the engine resolve the user's family back to a
@@ -475,7 +475,8 @@ const fontPatchedXf = (
         ? wb.workbookDefaultFont?.scheme
         : undefined;
   }
-  if (!font.name || !Number.isFinite(font.size) || font.size <= 0) return -1;
+  if (!font.name || font.sizePt === null || !Number.isFinite(font.sizePt) || font.sizePt <= 0)
+    return -1;
   const fontIndex = wb.addFontRecord(font);
   if (fontIndex < 0) return -1;
   const xfIndex = wb.addXfRecord({ ...xf, fontIndex });
@@ -550,13 +551,7 @@ const clearedVisualXfForSource = (
   const cleared: CellXf = { ...defaultXf };
   const target = cleared as unknown as Record<string, unknown>;
   const raw = source as unknown as Record<string, unknown>;
-  for (const field of [
-    'applyProtection',
-    'hasProtection',
-    'locked',
-    'hidden',
-    'quotePrefix',
-  ] as const) {
+  for (const field of ['applyProtection', 'locked', 'hidden', 'quotePrefix'] as const) {
     if (Object.hasOwn(raw, field)) target[field] = raw[field];
     else delete target[field];
   }

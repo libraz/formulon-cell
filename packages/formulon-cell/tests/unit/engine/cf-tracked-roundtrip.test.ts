@@ -1,3 +1,4 @@
+import { ComparisonOperator, type ConditionalFormatInput } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { hydrateConditionalRulesFromEngine } from '../../../src/engine/cf-sync.js';
 import {
@@ -21,6 +22,9 @@ const iconInput = (formats: readonly ConditionalFormatEntry[]) =>
 
 const dataBarInput = (formats: readonly ConditionalFormatEntry[]) =>
   formats.find((entry) => entry.type === 3);
+
+const dataBarOf = (input: ConditionalFormatInput | null) =>
+  input && 'dataBar' in input ? input.dataBar : undefined;
 
 describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
   it.each([
@@ -56,18 +60,17 @@ describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
       [fields.ruleField]: '#1f1f1f',
       ...(fields.bothBorders ? { negativeBorderColor: '#1f1f1f' } : {}),
     };
-    const expectedColor = { a: 255, r: 31, g: 31, b: 31 };
+    const expectedColor = { kind: 1, argb: 0xff1f1f1f, theme: 0, tint: 0, indexed: 0 };
     const assertBorders = (
-      bar:
-        | Pick<NonNullable<ConditionalFormatEntry['dataBar']>, 'border' | 'negativeBorder'>
-        | undefined,
+      bar: { readonly border?: unknown; readonly negativeBorder?: unknown } | null | undefined,
     ): void => {
       expect(bar?.[fields.engineField]).toEqual(expectedColor);
-      expect(bar?.[fields.otherEngineField]).toEqual(
+      // An unstated colour is omitted on input and `null` on a read.
+      expect(bar?.[fields.otherEngineField] ?? undefined).toEqual(
         fields.bothBorders ? expectedColor : undefined,
       );
     };
-    assertBorders(conditionalRuleToEngineInput(rule)?.dataBar);
+    assertBorders(dataBarOf(conditionalRuleToEngineInput(rule)));
     const wb = await WorkbookHandle.createDefault();
     try {
       expect(wb.isStub).toBe(false);
@@ -86,7 +89,7 @@ describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
       expect(restoredRule[fields.otherRuleField]).toBe(
         fields.bothBorders ? 'rgb(31, 31, 31)' : undefined,
       );
-      assertBorders(conditionalRuleToEngineInput(restoredRule)?.dataBar);
+      assertBorders(dataBarOf(conditionalRuleToEngineInput(restoredRule)));
       const loaded = await WorkbookHandle.loadBytes(wb.save());
       try {
         expect(loaded.isStub).toBe(false);
@@ -107,9 +110,9 @@ describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
 
       expect(
         wb.addConditionalFormat(0, {
-          sqref: importedRange,
+          ranges: importedRange,
           type: 1,
-          op: 5,
+          operator: ComparisonOperator.GreaterThan,
           formula1: '999',
         }),
       ).toBeGreaterThanOrEqual(0);
@@ -149,10 +152,10 @@ describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
       expect(wb.getConditionalFormats(0)).toHaveLength(3);
       expect(dataBarInput(wb.getConditionalFormats(0))?.dataBar).toMatchObject({
         axisPosition: 1,
-        negativeFill: { a: 255, r: 192, g: 0, b: 0 },
-        border: { a: 255, r: 31, g: 31, b: 31 },
-        negativeBorder: { a: 255, r: 127, g: 0, b: 0 },
-        axisColor: { a: 255, r: 64, g: 64, b: 64 },
+        negativeFill: { kind: 1, argb: 0xffc00000 },
+        border: { kind: 1, argb: 0xff1f1f1f },
+        negativeBorder: { kind: 1, argb: 0xff7f0000 },
+        axisColor: { kind: 1, argb: 0xff404040 },
       });
 
       const secondRules: ConditionalRule[] = [
@@ -188,7 +191,7 @@ describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
       });
       const edited = wb.getConditionalFormats(0);
       expect(edited).toHaveLength(3);
-      expect(edited.some((entry) => entry.type === 1 && entry.formula1 === '999')).toBe(true);
+      expect(edited.some((entry) => entry.type === 1 && entry.formula1 === '=999')).toBe(true);
       expect(iconInput(edited)?.iconSet).toMatchObject({
         thresholds: [
           { type: 0, value: '20' },
@@ -199,10 +202,10 @@ describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
         min: { type: 0, value: '30' },
         max: { type: 0, value: '70' },
         axisPosition: 2,
-        negativeFill: { a: 255, r: 192, g: 0, b: 0 },
-        border: { a: 255, r: 31, g: 31, b: 31 },
-        negativeBorder: { a: 255, r: 127, g: 0, b: 0 },
-        axisColor: { a: 255, r: 64, g: 64, b: 64 },
+        negativeFill: { kind: 1, argb: 0xffc00000 },
+        border: { kind: 1, argb: 0xff1f1f1f },
+        negativeBorder: { kind: 1, argb: 0xff7f0000 },
+        axisColor: { kind: 1, argb: 0xff404040 },
         direction: 1,
       });
 
@@ -211,7 +214,7 @@ describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
         expect(loaded.isStub).toBe(false);
         const restored = loaded.getConditionalFormats(0);
         expect(restored).toHaveLength(3);
-        expect(restored.some((entry) => entry.type === 1 && entry.formula1 === '999')).toBe(true);
+        expect(restored.some((entry) => entry.type === 1 && entry.formula1 === '=999')).toBe(true);
         expect(iconInput(restored)?.iconSet).toMatchObject({
           thresholds: [
             { type: 0, value: '20' },
@@ -222,10 +225,10 @@ describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
           min: { type: 0, value: '30' },
           max: { type: 0, value: '70' },
           axisPosition: 2,
-          negativeFill: { a: 255, r: 192, g: 0, b: 0 },
-          border: { a: 255, r: 31, g: 31, b: 31 },
-          negativeBorder: { a: 255, r: 127, g: 0, b: 0 },
-          axisColor: { a: 255, r: 64, g: 64, b: 64 },
+          negativeFill: { kind: 1, argb: 0xffc00000 },
+          border: { kind: 1, argb: 0xff1f1f1f },
+          negativeBorder: { kind: 1, argb: 0xff7f0000 },
+          axisColor: { kind: 1, argb: 0xff404040 },
           direction: 1,
         });
       } finally {

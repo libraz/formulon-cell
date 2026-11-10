@@ -36,7 +36,9 @@ describe('pictures follow row/column edits', () => {
     const store = createSpreadsheetStore();
     const wb = await WorkbookHandle.createDefault();
     try {
-      expect(wb.insertImage(0, PNG, { row: 4, col: 2, name: 'logo' })).not.toBeNull();
+      expect(
+        wb.insertImage(0, PNG, { anchor: { fromRow: 4, fromCol: 2 }, name: 'logo' }),
+      ).not.toBeNull();
       hydrateImagesFromEngine(wb, store, 0);
       expect(anchorOf(store)).toMatchObject({ fromRow: 4, fromCol: 2 });
 
@@ -69,7 +71,9 @@ describe('pictures follow row/column edits', () => {
     const wb = await WorkbookHandle.createDefault();
     try {
       wb.addSheet('Second');
-      expect(wb.insertImage(1, PNG, { row: 2, col: 1, name: 'logo' })).not.toBeNull();
+      expect(
+        wb.insertImage(1, PNG, { anchor: { fromRow: 2, fromCol: 1 }, name: 'logo' }),
+      ).not.toBeNull();
       mutators.setSheetIndex(store, 1);
       hydrateImagesFromEngine(wb, store, 1);
       expect(store.getState().illustrations.illustrations[0]?.sheet).toBe(1);

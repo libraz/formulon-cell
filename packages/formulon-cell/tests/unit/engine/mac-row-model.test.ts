@@ -77,7 +77,7 @@ describe('getSheetDefaultLayoutPx on a loaded book', () => {
   it('keeps the stated height for an untabulated Normal font on Mac', async () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'en' });
     try {
-      expect(wb.setWorkbookDefaultFont({ name: 'Comic Sans MS', size: 11 })).toBe(true);
+      expect(wb.setWorkbookDefaultFont({ name: 'Comic Sans MS', sizePt: 11 })).toBe(true);
       wb.geometryPlatform = 'mac';
       expect(wb.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBeCloseTo(15 * PX_PER_PT, 8);
     } finally {

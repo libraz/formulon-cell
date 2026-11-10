@@ -1,10 +1,12 @@
+import { ValueKind } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
+import { isFormulonError } from '../../../src/engine/result.js';
 import { createStubModule } from '../../../src/engine/stub-engine.js';
 import type { Workbook } from '../../../src/engine/types.js';
 
 const num = (wb: Workbook, sheet: number, row: number, col: number): number => {
-  const r = wb.getValue(sheet, row, col);
-  return r.value.kind === 1 ? r.value.number : Number.NaN;
+  const v = wb.sheet(sheet).getTypedValue(row, col);
+  return v.kind === ValueKind.Number ? v.number : Number.NaN;
 };
 
 const newWorkbook = (): Workbook => createStubModule().Workbook.createDefault();
@@ -14,14 +16,14 @@ describe('stub-engine recalc', () => {
     const wb = newWorkbook();
     try {
       // A1 = 2; A2 = A1 * 3; A3 = A2 + 1
-      wb.setNumber(0, 0, 0, 2);
-      wb.setFormula(0, 1, 0, '=A1*3');
-      wb.setFormula(0, 2, 0, '=A2+1');
+      wb.sheet(0).setNumber(0, 0, 2);
+      wb.sheet(0).setFormula(1, 0, '=A1*3');
+      wb.sheet(0).setFormula(2, 0, '=A2+1');
       wb.recalc();
       expect(num(wb, 0, 1, 0)).toBe(6);
       expect(num(wb, 0, 2, 0)).toBe(7);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 
@@ -31,150 +33,125 @@ describe('stub-engine recalc', () => {
     // call.
     const wb = newWorkbook();
     try {
-      wb.setFormula(0, 2, 0, '=A2+1'); // downstream first
-      wb.setFormula(0, 1, 0, '=A1*3');
-      wb.setNumber(0, 0, 0, 2);
+      wb.sheet(0).setFormula(2, 0, '=A2+1'); // downstream first
+      wb.sheet(0).setFormula(1, 0, '=A1*3');
+      wb.sheet(0).setNumber(0, 0, 2);
       wb.recalc();
       expect(num(wb, 0, 1, 0)).toBe(6);
       expect(num(wb, 0, 2, 0)).toBe(7);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 
   it('settles after upstream literal is replaced', () => {
     const wb = newWorkbook();
     try {
-      wb.setNumber(0, 0, 0, 2);
-      wb.setFormula(0, 1, 0, '=A1*3');
-      wb.setFormula(0, 2, 0, '=A2+1');
+      wb.sheet(0).setNumber(0, 0, 2);
+      wb.sheet(0).setFormula(1, 0, '=A1*3');
+      wb.sheet(0).setFormula(2, 0, '=A2+1');
       wb.recalc();
       expect(num(wb, 0, 2, 0)).toBe(7);
       // Replace upstream and recalc again.
-      wb.setNumber(0, 0, 0, 5);
+      wb.sheet(0).setNumber(0, 0, 5);
       wb.recalc();
       expect(num(wb, 0, 1, 0)).toBe(15);
       expect(num(wb, 0, 2, 0)).toBe(16);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 
   it('handles SUM over a range', () => {
     const wb = newWorkbook();
     try {
-      wb.setNumber(0, 0, 0, 1);
-      wb.setNumber(0, 1, 0, 2);
-      wb.setNumber(0, 2, 0, 3);
-      wb.setFormula(0, 3, 0, '=SUM(A1:A3)');
+      wb.sheet(0).setNumber(0, 0, 1);
+      wb.sheet(0).setNumber(1, 0, 2);
+      wb.sheet(0).setNumber(2, 0, 3);
+      wb.sheet(0).setFormula(3, 0, '=SUM(A1:A3)');
       wb.recalc();
       expect(num(wb, 0, 3, 0)).toBe(6);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 
   it('returns blank for unset cells', () => {
     const wb = newWorkbook();
     try {
-      const r = wb.getValue(0, 5, 5);
-      expect(r.status.ok).toBe(true);
-      expect(r.value.kind).toBe(0);
+      const v = wb.sheet(0).getTypedValue(5, 5);
+      expect(v.kind).toBe(ValueKind.Blank);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 });
 
-describe('stub-engine defensive *At() handlers', () => {
-  // The stub historically threw `not impl` from definedNameAt/tableAt/
-  // passthroughAt. Callers in workbook-handle.ts gate iteration on
-  // *Count() === 0, so the throws were unreachable in practice — but a
-  // future caller that forgets the count check (or a try/iterate-by-index
-  // pattern) would crash the page. These tests pin the safer behaviour:
-  // returning an `ok=false` status that any sane caller skips.
+describe('stub-engine defensive list handlers', () => {
+  // Enumerations on the stub are plain lists that are empty rather than
+  // throwing, so a caller iterating them never crashes the page.
 
-  it('definedNameAt returns ok=false instead of throwing', () => {
+  it('listDefinedNames returns an empty list instead of throwing', () => {
     const wb = newWorkbook();
     try {
-      expect(wb.definedNameCount()).toEqual({
-        status: { ok: true, status: 0, message: '', context: '' },
-        value: 0,
-      });
-      const e = wb.definedNameAt(0);
-      expect(e.status.ok).toBe(false);
-      expect(e.name).toBe('');
-      expect(e.formula).toBe('');
+      expect(wb.listDefinedNames()).toEqual([]);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 
-  it('tableAt returns ok=false instead of throwing', () => {
+  it('listTables returns an empty list instead of throwing', () => {
     const wb = newWorkbook();
     try {
-      expect(wb.tableCount()).toEqual({
-        status: { ok: true, status: 0, message: '', context: '' },
-        value: 0,
-      });
-      const e = wb.tableAt(0);
-      expect(e.status.ok).toBe(false);
-      expect(e.name).toBe('');
-      expect(e.displayName).toBe('');
-      expect(e.ref).toBe('');
-      expect(e.sheetIndex).toBe(0);
+      expect(wb.sheet(0).listTables()).toEqual([]);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 
-  it('passthroughAt returns ok=false instead of throwing', () => {
+  it('listPassthroughs returns an empty list instead of throwing', () => {
     const wb = newWorkbook();
     try {
-      expect(wb.passthroughCount()).toEqual({
-        status: { ok: true, status: 0, message: '', context: '' },
-        value: 0,
-      });
-      const e = wb.passthroughAt(0);
-      expect(e.status.ok).toBe(false);
-      expect(e.path).toBe('');
+      expect(wb.ooxml.listPassthroughs()).toEqual([]);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 
-  it('does NOT crash an iterate-without-count loop pattern', () => {
-    // Synthesises the kind of caller that prompted this hardening: a `for`
-    // loop that calls `*At(i)` until status.ok is false (instead of using
-    // the *Count gate). With the old `throw`, this loop would crash on
-    // i=0; now it terminates cleanly.
+  it('does NOT crash an iterate-the-list loop pattern', () => {
     const wb = newWorkbook();
     try {
       let crashed = false;
       try {
-        for (let i = 0; i < 8; i++) {
-          const e = wb.definedNameAt(i);
-          if (!e.status.ok) break;
+        for (const name of wb.listDefinedNames()) {
+          if (!name.name) break;
         }
       } catch {
         crashed = true;
       }
       expect(crashed).toBe(false);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 });
 
-describe('stub-engine 0.12 scalar result envelopes', () => {
-  it('returns status-bearing sheet and cell counts', () => {
+describe('stub-engine sheet and cell counts', () => {
+  it('reports the sheet count and refuses a missing sheet', () => {
     const wb = newWorkbook();
     try {
-      expect(wb.sheetCount()).toMatchObject({ value: 1, status: { ok: true } });
-      expect(wb.cellCount(0)).toMatchObject({ value: 0, status: { ok: true } });
-      expect(wb.cellCount(9)).toMatchObject({ value: 0, status: { ok: false } });
+      expect(wb.sheetCount).toBe(1);
+      expect(wb.sheet(0).listCells()).toHaveLength(0);
+      expect(wb.hasSheet(9)).toBe(false);
+      let error: unknown = null;
+      try {
+        wb.sheet(9);
+      } catch (e) {
+        error = e;
+      }
+      expect(isFormulonError(error)).toBe(true);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 });
@@ -204,7 +181,7 @@ describe('stub-engine physical-cell index', () => {
   it('caches enumeration and invalidates only membership changes', () => {
     const wb = newWorkbook();
     try {
-      for (let row = 0; row < 4; row += 1) wb.setNumber(0, row, 0, row + 1);
+      for (let row = 0; row < 4; row += 1) wb.sheet(0).setNumber(row, 0, row + 1);
       const internals = wb as unknown as {
         sheets: Array<{ cells: Map<string, unknown>; cellIndex: unknown }>;
       };
@@ -213,26 +190,29 @@ describe('stub-engine physical-cell index', () => {
       const counted = new CountingMap(sheet.cells);
       sheet.cells = counted;
 
-      for (let index = 0; index < 4; index += 1) expect(wb.cellAt(0, index).status.ok).toBe(true);
+      for (let index = 0; index < 4; index += 1) {
+        expect(wb.sheet(0).listCells()[index]).toBeDefined();
+      }
       expect(counted.keyEntries).toBe(4);
 
       counted.keyEntries = 0;
-      wb.setNumber(0, 0, 0, 99);
-      expect(wb.cellAt(0, 0).value?.number).toBe(99);
+      wb.sheet(0).setNumber(0, 0, 99);
+      expect(wb.sheet(0).listCells()[0]?.value).toBe(99);
       expect(counted.keyEntries).toBe(0);
 
-      wb.setNumber(0, 4, 0, 5);
+      wb.sheet(0).setNumber(4, 0, 5);
       counted.keyEntries = 0;
-      expect(wb.cellAt(0, 4).value?.number).toBe(5);
+      expect(wb.sheet(0).listCells()[4]?.value).toBe(5);
       expect(counted.keyEntries).toBe(5);
 
-      wb.setBlank(0, 1, 0);
+      wb.sheet(0).setBlank(1, 0);
       counted.keyEntries = 0;
-      expect(wb.cellAt(0, 0).row).toBe(0);
-      expect(wb.cellAt(0, 1).row).toBe(2);
+      const cells = wb.sheet(0).listCells();
+      expect(cells[0]?.row).toBe(0);
+      expect(cells[1]?.row).toBe(2);
       expect(counted.keyEntries).toBe(4);
     } finally {
-      wb.delete();
+      wb.dispose();
     }
   });
 });

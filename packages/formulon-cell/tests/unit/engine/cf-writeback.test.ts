@@ -1,3 +1,10 @@
+import {
+  type CfIconSetInput,
+  ComparisonOperator,
+  type ConditionalFormatInput,
+  DatePeriod,
+  IconSetName,
+} from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import {
   conditionalRuleToEngineInput,
@@ -11,6 +18,9 @@ import { canLoadWasm } from './xlsx-roundtrip/fixtures.js';
 
 const range = { sheet: 0, r0: 1, c0: 2, r1: 3, c1: 4 };
 const sqref = [{ firstRow: 1, firstCol: 2, lastRow: 3, lastCol: 4 }];
+const rgb = (argb: number) => ({ kind: 1, argb, theme: 0, tint: 0, indexed: 0 });
+const iconSetOf = (input: ConditionalFormatInput | null): CfIconSetInput | undefined =>
+  input && 'iconSet' in input ? input.iconSet : undefined;
 type GetTrackedConditionalRuleIndexes = (
   currentFormats: ReturnType<WorkbookHandle['getConditionalFormats']>,
   sheet: number,
@@ -78,9 +88,9 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
       apply: { bold: true },
     };
     expect(conditionalRuleToEngineInput(rule)).toEqual({
-      sqref,
+      ranges: sqref,
       type: 1,
-      op: 5,
+      operator: ComparisonOperator.GreaterThan,
       formula1: '10',
     });
     expect(
@@ -91,7 +101,12 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         a: 'Done',
         apply: {},
       }),
-    ).toEqual({ sqref, type: 1, op: 2, formula1: 'Done' });
+    ).toEqual({
+      ranges: sqref,
+      type: 1,
+      operator: ComparisonOperator.Equal,
+      formula1: 'Done',
+    });
   });
 
   it('emits formula2 for a between rule', () => {
@@ -104,7 +119,12 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
       apply: {},
     };
     const input = conditionalRuleToEngineInput(rule);
-    expect(input).toMatchObject({ type: 1, op: 6, formula1: '1', formula2: '9' });
+    expect(input).toMatchObject({
+      type: 1,
+      operator: ComparisonOperator.Between,
+      formula1: '1',
+      formula2: '9',
+    });
   });
 
   it('translates an =-prefixed formula rule to an expression rule', () => {
@@ -115,7 +135,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
       apply: {},
     };
     expect(conditionalRuleToEngineInput(rule)).toEqual({
-      sqref,
+      ranges: sqref,
       type: 0,
       formula1: 'A1>B1',
     });
@@ -129,7 +149,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
   it('translates text / blanks / errors / duplicate predicate rules', () => {
     expect(
       conditionalRuleToEngineInput({ kind: 'text-contains', range, text: 'hi', apply: {} }),
-    ).toEqual({ sqref, type: 7, text: 'hi' });
+    ).toEqual({ ranges: sqref, type: 7, text: 'hi' });
     expect(
       conditionalRuleToEngineInput({
         kind: 'text-contains',
@@ -138,7 +158,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         mode: 'begins-with',
         apply: {},
       }),
-    ).toEqual({ sqref, type: 9, text: 'hi' });
+    ).toEqual({ ranges: sqref, type: 9, text: 'hi' });
     expect(
       conditionalRuleToEngineInput({
         kind: 'text-contains',
@@ -147,7 +167,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         mode: 'ends-with',
         apply: {},
       }),
-    ).toEqual({ sqref, type: 10, text: 'hi' });
+    ).toEqual({ ranges: sqref, type: 10, text: 'hi' });
     expect(
       conditionalRuleToEngineInput({
         kind: 'text-contains',
@@ -156,21 +176,21 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         mode: 'not-contains',
         apply: {},
       }),
-    ).toEqual({ sqref, type: 8, text: 'hi' });
+    ).toEqual({ ranges: sqref, type: 8, text: 'hi' });
     expect(conditionalRuleToEngineInput({ kind: 'blanks', range, apply: {} })).toEqual({
-      sqref,
+      ranges: sqref,
       type: 11,
     });
     expect(conditionalRuleToEngineInput({ kind: 'errors', range, apply: {} })).toEqual({
-      sqref,
+      ranges: sqref,
       type: 13,
     });
     expect(conditionalRuleToEngineInput({ kind: 'duplicates', range, apply: {} })).toEqual({
-      sqref,
+      ranges: sqref,
       type: 16,
     });
     expect(conditionalRuleToEngineInput({ kind: 'unique', range, apply: {} })).toEqual({
-      sqref,
+      ranges: sqref,
       type: 17,
     });
   });
@@ -185,7 +205,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         caseSensitive: true,
       }),
     ).toEqual({
-      sqref,
+      ranges: sqref,
       type: 0,
       formula1: 'ISNUMBER(FIND("a""b",C2))',
     });
@@ -199,7 +219,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         caseSensitive: true,
       }),
     ).toEqual({
-      sqref,
+      ranges: sqref,
       type: 0,
       formula1: 'NOT(ISNUMBER(FIND("Ab",C2)))',
     });
@@ -213,7 +233,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         caseSensitive: true,
       }),
     ).toEqual({
-      sqref,
+      ranges: sqref,
       type: 0,
       formula1: 'EXACT(LEFT(C2,LEN("Ab")),"Ab")',
     });
@@ -227,7 +247,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         caseSensitive: true,
       }),
     ).toEqual({
-      sqref,
+      ranges: sqref,
       type: 0,
       formula1: 'EXACT(RIGHT(C2,LEN("Ab")),"Ab")',
     });
@@ -252,7 +272,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         percent: true,
         apply: {},
       }),
-    ).toEqual({ sqref, type: 5, rank: 5, percent: true, bottom: true });
+    ).toEqual({ ranges: sqref, type: 5, rank: 5, percent: true, bottom: true });
     expect(
       conditionalRuleToEngineInput({
         kind: 'average',
@@ -260,7 +280,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         mode: 'equal-or-above',
         apply: {},
       }),
-    ).toEqual({ sqref, type: 6, aboveAverage: true, equalAverage: true });
+    ).toEqual({ ranges: sqref, type: 6, aboveAverage: true, equalAverage: true });
     expect(
       conditionalRuleToEngineInput({
         kind: 'average',
@@ -269,7 +289,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         stdDev: 2,
         apply: {},
       }),
-    ).toEqual({ sqref, type: 6, aboveAverage: false, equalAverage: false, stdDev: 2 });
+    ).toEqual({ ranges: sqref, type: 6, aboveAverage: false, equalAverage: false, stdDev: 2 });
   });
 
   it('translates visual rules into engine payloads', () => {
@@ -281,14 +301,11 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         thresholds: [{ kind: 'min' }, { kind: 'max' }],
       }),
     ).toEqual({
-      sqref,
+      ranges: sqref,
       type: 2,
       colorScale: {
         thresholds: [{ type: 3 }, { type: 4 }],
-        colors: [
-          { a: 255, r: 255, g: 255, b: 255 },
-          { a: 255, r: 0, g: 0, b: 0 },
-        ],
+        colors: [rgb(0xffffffff), rgb(0xff000000)],
       },
     });
     expect(
@@ -299,12 +316,12 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         showValue: false,
       }),
     ).toEqual({
-      sqref,
+      ranges: sqref,
       type: 3,
       dataBar: {
         min: { type: 3 },
         max: { type: 4 },
-        fill: { a: 255, r: 0, g: 120, b: 212 },
+        fill: rgb(0xff0078d4),
         showValue: false,
       },
     });
@@ -321,7 +338,7 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         showValue: false,
       }),
     ).toEqual({
-      sqref,
+      ranges: sqref,
       type: 4,
       iconSet: {
         name: 3,
@@ -391,11 +408,11 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
       type: 3,
       dataBar: {
         axisPosition: 1,
-        fill: { a: 255, r: 0, g: 120, b: 212 },
-        negativeFill: { a: 255, r: 192, g: 0, b: 0 },
-        border: { a: 255, r: 31, g: 31, b: 31 },
-        negativeBorder: { a: 255, r: 127, g: 0, b: 0 },
-        axisColor: { a: 255, r: 64, g: 64, b: 64 },
+        fill: rgb(0xff0078d4),
+        negativeFill: rgb(0xffc00000),
+        border: rgb(0xff1f1f1f),
+        negativeBorder: rgb(0xff7f0000),
+        axisColor: rgb(0xff404040),
       },
     });
   });
@@ -457,10 +474,22 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
       'last-month',
       'next-month',
     ] as const;
-    periods.forEach((period, ordinal) => {
+    const engine = [
+      DatePeriod.Today,
+      DatePeriod.Yesterday,
+      DatePeriod.Tomorrow,
+      DatePeriod.Last7Days,
+      DatePeriod.ThisWeek,
+      DatePeriod.LastWeek,
+      DatePeriod.NextWeek,
+      DatePeriod.ThisMonth,
+      DatePeriod.LastMonth,
+      DatePeriod.NextMonth,
+    ];
+    periods.forEach((period, i) => {
       expect(
         conditionalRuleToEngineInput({ kind: 'date-occurring', range, period, apply: {} }),
-      ).toMatchObject({ type: 15, timePeriod: ordinal });
+      ).toMatchObject({ type: 15, timePeriod: engine[i] });
     });
   });
 
@@ -486,8 +515,9 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
 
   it('writes default thresholds for an icon set with an empty threshold list', () => {
     expect(
-      conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'arrows3', thresholds: [] })
-        ?.iconSet?.thresholds,
+      iconSetOf(
+        conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'arrows3', thresholds: [] }),
+      )?.thresholds,
     ).toEqual([
       { type: 1, value: '33' },
       { type: 1, value: '67' },
@@ -496,25 +526,27 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
 
   it('writes icon families under their engine set names, with custom icons per level', () => {
     expect(
-      conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'arrows5' })?.iconSet,
+      iconSetOf(conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'arrows5' })),
     ).toMatchObject({ name: 13 });
     expect(
-      conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'arrows4' })?.iconSet
+      iconSetOf(conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'arrows4' }))
         ?.thresholds,
     ).toHaveLength(3);
     expect(
-      conditionalRuleToEngineInput({
-        kind: 'icon-set',
-        range,
-        icons: 'flags3',
-        customIcons: [null, { set: 'flags3', slot: 1 }, { set: 'boxes5', slot: 4 }],
-      })?.iconSet,
+      iconSetOf(
+        conditionalRuleToEngineInput({
+          kind: 'icon-set',
+          range,
+          icons: 'flags3',
+          customIcons: [null, { set: 'flags3', slot: 1 }, { set: 'boxes5', slot: 4 }],
+        }),
+      ),
     ).toMatchObject({
       name: 2,
       icons: [
-        { iconSet: 'NoIcons', iconId: 0 },
-        { iconSet: '3Flags', iconId: 1 },
-        { iconSet: '5Boxes', iconId: 4 },
+        { iconSet: IconSetName.NoIcons, iconIndex: 0 },
+        { iconSet: IconSetName.ThreeFlags, iconIndex: 1 },
+        { iconSet: IconSetName.FiveBoxes, iconIndex: 4 },
       ],
     });
     expect(conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'bars5' })).toBeNull();
@@ -523,14 +555,14 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
 
 describe('syncConditionalRulesToEngine (H-13)', () => {
   const fakeWb = (mutate: boolean) => {
-    const added: Array<{ sheet: number; type: number; dxfId?: number }> = [];
+    const added: Array<{ sheet: number; type: number; dxfIndex?: number }> = [];
     const wb = {
       capabilities: { conditionalFormatMutate: mutate },
-      addConditionalFormat: vi.fn((sheet: number, rule: { type: number; dxfId?: number }) => {
+      addConditionalFormat: vi.fn((sheet: number, rule: { type: number; dxfIndex?: number }) => {
         added.push({
           sheet,
           type: rule.type,
-          ...(rule.dxfId !== undefined ? { dxfId: rule.dxfId } : {}),
+          ...(rule.dxfIndex !== undefined ? { dxfIndex: rule.dxfIndex } : {}),
         });
         return added.length - 1;
       }),
@@ -634,10 +666,15 @@ describe('syncConditionalRulesToEngine (H-13)', () => {
     );
 
     expect(result).toEqual({ written: 1, skipped: 0 });
-    expect(addedRules[0]).toMatchObject({ type: 1, op: 5, formula1: '10', dxfId: 7 });
+    expect(addedRules[0]).toMatchObject({
+      type: 1,
+      operator: ComparisonOperator.GreaterThan,
+      formula1: '10',
+      dxfIndex: 7,
+    });
     expect(addedDxf[0]).toMatchObject({
-      fill: { pattern: 1, fgArgb: 0xffe2f0d9 },
-      font: { bold: true, colorArgb: 0xff006100 },
+      fill: { pattern: 1, foreground: { argb: 0xffe2f0d9 } },
+      font: { bold: true, color: { argb: 0xff006100 } },
     });
   });
 });
@@ -709,7 +746,8 @@ describe.skipIf(!canLoadWasm())('case-sensitive text writeback (native)', () => 
         expect(wb.addConditionalFormat(0, input)).toBeGreaterThanOrEqual(0);
         const before = wb.getConditionalFormats(0);
         const beforeEntry = before.find((entry) => entry.type === 0);
-        expect(beforeEntry?.formula1).toBe(input.formula1);
+        // A read carries the leading `=`.
+        expect(beforeEntry?.formula1).toBe(`=${'formula1' in input ? input.formula1 : ''}`);
         if (!beforeEntry) throw new Error('Expected a native expression rule.');
         expect(matchingRows(wb, beforeEntry.priority)).toEqual(expectedRows);
 
@@ -718,7 +756,7 @@ describe.skipIf(!canLoadWasm())('case-sensitive text writeback (native)', () => 
           expect(loaded.isStub).toBe(false);
           const after = loaded.getConditionalFormats(0);
           const afterEntry = after.find((entry) => entry.type === 0);
-          expect(afterEntry?.formula1).toBe(input.formula1);
+          expect(afterEntry?.formula1).toBe(`=${'formula1' in input ? input.formula1 : ''}`);
           if (!afterEntry) throw new Error('Expected the expression rule after reload.');
           expect(matchingRows(loaded, afterEntry.priority)).toEqual(expectedRows);
         } finally {
@@ -738,20 +776,20 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
       type: number;
       priority: number;
       stopIfTrue: boolean;
-      sqref: typeof sqref;
+      ranges: typeof sqref;
       formula1?: string;
       formula2?: string;
-      op?: number;
+      operator?: number;
       text?: string;
-      dxfId?: number;
+      dxfIndex?: number;
     }> = [
       {
         id: 'imported',
         type: 1,
         priority: 1,
         stopIfTrue: false,
-        sqref,
-        op: 0,
+        ranges: sqref,
+        operator: ComparisonOperator.LessThan,
         formula1: '0',
       },
     ];
@@ -762,18 +800,24 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
       addConditionalFormat: vi.fn(
         (
           _: number,
-          rule: { type: number; op?: number; formula1?: string; text?: string; dxfId?: number },
+          rule: {
+            type: number;
+            operator?: number;
+            formula1?: string;
+            text?: string;
+            dxfIndex?: number;
+          },
         ) => {
           formats.push({
             id: `added-${formats.length}`,
             type: rule.type,
             priority: formats.length + 1,
             stopIfTrue: false,
-            sqref,
-            ...(rule.op !== undefined ? { op: rule.op } : {}),
+            ranges: sqref,
+            ...(rule.operator !== undefined ? { operator: rule.operator } : {}),
             ...(rule.formula1 !== undefined ? { formula1: rule.formula1 } : {}),
             ...(rule.text !== undefined ? { text: rule.text } : {}),
-            ...(rule.dxfId !== undefined ? { dxfId: rule.dxfId } : {}),
+            ...(rule.dxfIndex !== undefined ? { dxfIndex: rule.dxfIndex } : {}),
           });
           return formats.length - 1;
         },
@@ -804,11 +848,11 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
         type: 3,
         priority: 1,
         stopIfTrue: false,
-        sqref,
+        ranges: sqref,
         dataBar: {
           min: { type: 0, value: '20', gte: true },
           max: { type: 0, value: '80', gte: true },
-          fill: { a: 255, r: 0, g: 120, b: 212 },
+          fill: rgb(0xff0078d4),
           showValue: true,
           minLengthPct: 10,
           maxLengthPct: 90,
@@ -856,7 +900,7 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
         type: 1,
         priority: 1,
         stopIfTrue: false,
-        sqref,
+        ranges: sqref,
         op: 5,
         formula1: '10',
       },
@@ -938,9 +982,9 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
       type: 1,
       priority: 0,
       stopIfTrue: false,
-      sqref,
-      op: 2,
-      formula1: '999',
+      ranges: sqref,
+      operator: ComparisonOperator.Equal,
+      formula1: '=999',
     });
 
     expect(syncTrackedConditionalRulesToEngine(wb, remainingRules, 0, { tracked })).toEqual({
@@ -981,7 +1025,7 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
       skipped: 0,
       removed: 0,
     });
-    expect(formats[1]).toMatchObject({ id: 'added-1', dxfId: 11 });
+    expect(formats[1]).toMatchObject({ id: 'added-1', dxfIndex: 11 });
     expect(wb.addDxf).toHaveBeenCalledTimes(1);
 
     expect(syncTrackedConditionalRulesToEngine(wb, rules, 0, { tracked })).toEqual({
@@ -1011,7 +1055,7 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
     expect(formats[1]).toMatchObject({
       type: 0,
       formula1: 'ISNUMBER(FIND("Ab",C2))',
-      dxfId: 11,
+      dxfIndex: 11,
     });
   });
 });

@@ -1,3 +1,4 @@
+import type { SheetRect } from '@libraz/formulon';
 import { ChartTitleKind, DrawingObjectKind } from '@libraz/formulon';
 import {
   chartDataFromEngine,
@@ -7,7 +8,6 @@ import {
 import type { ChartData } from '../charts/types.js';
 import { mutators, type SessionChart, type SpreadsheetStore } from '../store/store.js';
 import { drawingAnchorOf } from './drawing-geometry.js';
-import { parseRangeRef } from './range-resolver.js';
 import type { Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type { EngineDrawingObject } from './workbook-handle-annotations.js';
@@ -18,22 +18,14 @@ const EMPTY_DATA: ChartData = { domain: 'category', categories: [], series: [] }
 export const chartIdFor = (sheet: number, objectId: number): string =>
   `chart-native-${sheet}-${objectId}`;
 
-const sheetIndexByName = (wb: WorkbookHandle, name: string): number => {
-  const folded = name.toLowerCase();
-  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
-    if (wb.sheetName(sheet).toLowerCase() === folded) return sheet;
-  }
-  return -1;
-};
-
-/** The sheet-qualified `ChartInfo.source.range` as a `Range`. */
-const sourceRange = (wb: WorkbookHandle, ref: string, hostSheet: number): Range | undefined => {
-  const parsed = parseRangeRef(ref);
-  if (!parsed) return undefined;
-  const sheet = parsed.sheetName === null ? hostSheet : sheetIndexByName(wb, parsed.sheetName);
-  if (sheet < 0) return undefined;
-  return { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 };
-};
+/** `ChartProperties.source.range` as a `Range`. */
+const sourceRange = ({ sheet, rect }: SheetRect): Range => ({
+  sheet,
+  r0: rect.firstRow,
+  c0: rect.firstCol,
+  r1: rect.lastRow,
+  c1: rect.lastCol,
+});
 
 /** Text the placeholder of an unsupported chart shows. */
 const placeholderTitle = (
@@ -41,8 +33,8 @@ const placeholderTitle = (
   info: EngineChartInfo | null,
   data: EngineChartData | null,
 ): string | null => {
-  if (info?.title.kind === ChartTitleKind.Text) return info.title.text;
-  if (info?.title.kind === ChartTitleKind.Ref && data?.titleText) return data.titleText;
+  if (info?.title?.kind === ChartTitleKind.Text) return info.title.text;
+  if (info?.title?.kind === ChartTitleKind.Ref && data?.titleText) return data.titleText;
   return object.name || null;
 };
 
@@ -69,7 +61,7 @@ export function projectChart(
       unsupported: { reason: 'unparseable', title: placeholderTitle(object, null, null) },
     };
   }
-  const source = info.source ? sourceRange(wb, info.source.range, sheet) : undefined;
+  const source = info.source ? sourceRange(info.source.range) : undefined;
   const extra = {
     ...(source ? { source } : {}),
     ...(info.isPivotChart ? { pivotChart: true } : {}),

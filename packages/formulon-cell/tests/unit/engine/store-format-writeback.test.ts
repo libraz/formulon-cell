@@ -218,8 +218,8 @@ describe('WorkbookHandle store format writeback', () => {
       const fillIndex = wb.addFillRecord({
         ...defaultFill,
         pattern: 1,
-        fgArgb: 0xffd9ead3,
-        bgArgb: 0,
+        foreground: { kind: 1, argb: 0xffd9ead3, theme: 0, tint: 0, indexed: 0 },
+        background: { kind: 0, argb: 0, theme: 0, tint: 0, indexed: 0 },
       });
       expect(fontIndex).toBeGreaterThanOrEqual(0);
       expect(fillIndex).toBeGreaterThanOrEqual(0);
@@ -228,15 +228,10 @@ describe('WorkbookHandle store format writeback', () => {
         ...normal,
         fontIndex,
         fillIndex,
-        horizontalAlign: 1,
-        verticalAlign: 1,
+        horizontal: 1,
+        vertical: 1,
         wrapText: true,
         justifyLastLine: false,
-        hasAlignment: true,
-        hasHorizontalAlign: true,
-        hasVerticalAlign: true,
-        hasWrapText: true,
-        hasJustifyLastLine: true,
         textRotation: 37,
         indent: 2,
         relativeIndent: -1,
@@ -273,7 +268,8 @@ describe('WorkbookHandle store format writeback', () => {
         shrinkToFit: false,
         readingOrder: 0,
       });
-      expect(reset?.hasAlignment).toBe(true);
+      // The `<alignment>` child is present: an alignment attribute is stated.
+      expect(reset?.textRotation).not.toBeNull();
 
       reloaded = await WorkbookHandle.loadBytes(wb.save());
       const loaded = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 0) ?? -1);
@@ -284,7 +280,7 @@ describe('WorkbookHandle store format writeback', () => {
         readingOrder: 0,
       });
       expect(reloaded.getFontRecord(loaded?.fontIndex ?? -1)?.name).toBe('Alignment Font');
-      expect(reloaded.getFillRecord(loaded?.fillIndex ?? -1)?.fgArgb).toBe(0xffd9ead3);
+      expect(reloaded.getFillRecord(loaded?.fillIndex ?? -1)?.foreground?.argb).toBe(0xffd9ead3);
     } finally {
       reloaded?.dispose();
       wb.dispose();
@@ -301,11 +297,10 @@ describe('WorkbookHandle store format writeback', () => {
       wb.setNumber({ sheet: 0, row: 0, col: 0 }, 7);
       const sourceXf = wb.addXfRecord({
         ...normal,
-        hasAlignment: true,
-        hasHorizontalAlign: true,
-        hasVerticalAlign: true,
-        hasWrapText: true,
-        hasJustifyLastLine: true,
+        horizontal: 0,
+        vertical: 2,
+        wrapText: false,
+        justifyLastLine: false,
         textRotation: 255,
         indent: 0,
         shrinkToFit: false,
@@ -405,11 +400,10 @@ describe('WorkbookHandle store format writeback', () => {
       wb.setNumber({ sheet: 0, row: 0, col: 1 }, 2);
       const explicit = wb.addXfRecord({
         ...normal,
-        hasAlignment: true,
-        hasHorizontalAlign: false,
-        hasVerticalAlign: false,
-        hasWrapText: false,
-        hasJustifyLastLine: false,
+        horizontal: null,
+        vertical: null,
+        wrapText: null,
+        justifyLastLine: null,
         textRotation: 0,
         indent: 0,
         shrinkToFit: false,
@@ -417,11 +411,10 @@ describe('WorkbookHandle store format writeback', () => {
       });
       const compact = wb.addXfRecord({
         ...normal,
-        hasAlignment: false,
-        hasHorizontalAlign: false,
-        hasVerticalAlign: false,
-        hasWrapText: false,
-        hasJustifyLastLine: false,
+        horizontal: null,
+        vertical: null,
+        wrapText: null,
+        justifyLastLine: null,
       });
       expect(wb.setCellXfIndex(0, 0, 0, explicit)).toBe(true);
       expect(wb.setCellXfIndex(0, 0, 1, compact)).toBe(true);
@@ -429,28 +422,27 @@ describe('WorkbookHandle store format writeback', () => {
       reloaded = await WorkbookHandle.loadBytes(wb.save());
       const explicitLoaded = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 0) ?? -1);
       expect(explicitLoaded).toMatchObject({
-        hasAlignment: true,
-        hasHorizontalAlign: false,
-        hasVerticalAlign: false,
-        hasWrapText: false,
-        hasJustifyLastLine: false,
+        horizontal: null,
+        vertical: null,
+        wrapText: null,
+        justifyLastLine: null,
         textRotation: 0,
         indent: 0,
         shrinkToFit: false,
         readingOrder: 0,
       });
       const compactLoaded = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 1) ?? -1);
+      // An absent attribute reads null (the former `has*: false` / missing key).
       expect(compactLoaded).toMatchObject({
-        hasAlignment: false,
-        hasHorizontalAlign: false,
-        hasVerticalAlign: false,
-        hasWrapText: false,
-        hasJustifyLastLine: false,
+        horizontal: null,
+        vertical: null,
+        wrapText: null,
+        justifyLastLine: null,
+        textRotation: null,
+        indent: null,
+        shrinkToFit: null,
+        readingOrder: null,
       });
-      expect(compactLoaded).not.toHaveProperty('textRotation');
-      expect(compactLoaded).not.toHaveProperty('indent');
-      expect(compactLoaded).not.toHaveProperty('shrinkToFit');
-      expect(compactLoaded).not.toHaveProperty('readingOrder');
     } finally {
       reloaded?.dispose();
       wb.dispose();

@@ -775,7 +775,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       .filter(
         ({ rule }) =>
           !scopeSelection ||
-          rule.sqref.some((range) =>
+          rule.ranges.some((range) =>
             rangesIntersect(scopeSelection, {
               sheet: scopeSelection.sheet,
               r0: range.firstRow,
@@ -803,10 +803,10 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         rule: ruleTypeLabel(rule.type, t),
         format: ruleTypeLabel(rule.type, t),
         range: formatSqref(
-          pending.range.has(index) ? [pending.range.get(index) as SqrefArea] : rule.sqref,
+          pending.range.has(index) ? [pending.range.get(index) as SqrefArea] : rule.ranges,
         ),
         stopIfTrue: rule.stopIfTrue,
-        areas: rule.sqref.length,
+        areas: rule.ranges.length,
         copies: rule.id
           ? (deps.store?.getState().conditional.rules ?? []).flatMap((candidate, copyIndex) =>
               candidate.engineId === rule.id && candidate.range.sheet === sheet ? [copyIndex] : [],
@@ -1069,7 +1069,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
                 ? {
                     input: {
                       ...(formats[index] as unknown as ConditionalFormatInput),
-                      sqref: [area],
+                      ranges: [area],
                     },
                   }
                 : {}),

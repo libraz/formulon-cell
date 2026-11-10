@@ -1,3 +1,4 @@
+import { ComparisonOperator } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addrKey } from '../../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
@@ -473,7 +474,7 @@ describe('Spreadsheet.mountToolbar', () => {
         workbook.addValidationEntry(0, {
           ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 }],
           type: 1,
-          op: 7,
+          op: ComparisonOperator.LessThanOrEqual,
           formula1: '10',
           allowBlank: false,
         }),

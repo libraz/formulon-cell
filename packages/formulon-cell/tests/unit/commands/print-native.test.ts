@@ -62,9 +62,9 @@ describe('native pagination print integration', () => {
       expect(document.html).toContain(`data-native-origin-y-pt="${titledPage?.originYPt}"`);
       expect(document.html).toContain(`data-native-height-pt="${titledPage?.heightPt}"`);
       expect(document.html).toContain(
-        `@page { size: ${native?.paper.widthPt}pt ${native?.paper.heightPt}pt; margin: ${native?.margins.top}pt`,
+        `@page { size: ${native?.paper.widthPt}pt ${native?.paper.heightPt}pt; margin: ${(native?.margins.topIn ?? 0) * 72}pt`,
       );
-      expect(document.html).toContain(`height:${native?.printable.height}pt;overflow:hidden`);
+      expect(document.html).toContain(`height:${native?.printable.heightPt}pt;overflow:hidden`);
       expect(document.html).toContain('table-layout:fixed');
       expect(document.html).not.toContain('transform:scale(0.5)');
       expect(document.html).toContain(

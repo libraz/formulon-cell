@@ -51,7 +51,7 @@ describe('automatic font row height against the native engine', () => {
       expect(reloaded.getRowLayouts(0)).toEqual([]);
       const effective = reloaded.getEffectiveStyle(0, 0, 0);
       const xf = effective && reloaded.getCellXf(effective.xfIndex);
-      expect(xf && reloaded.getFontRecord(xf.fontIndex)?.size).toBe(24);
+      expect(xf && reloaded.getFontRecord(xf.fontIndex)?.sizePt).toBe(24);
     } finally {
       reloaded?.dispose();
       mounted.dispose();
@@ -93,15 +93,15 @@ describe('automatic font row height against the native engine', () => {
       const fontAt = (source: WorkbookHandle, atRow: number, col: number): number | undefined => {
         const effective = source.getEffectiveStyle(0, atRow, col);
         const xf = effective && source.getCellXf(effective.xfIndex);
-        return xf ? source.getFontRecord(xf.fontIndex)?.size : undefined;
+        return xf ? (source.getFontRecord(xf.fontIndex)?.sizePt ?? undefined) : undefined;
       };
       const assertRowAxisCellXf = (source: WorkbookHandle): void => {
         const rowAxis = source.getSheetFontAxisSnapshot(0)?.rows.find((entry) => entry.row === row);
         expect(rowAxis?.styleXf).toBeGreaterThan(0);
         const cellXf = rowAxis && source.getCellXf(rowAxis.styleXf);
-        expect(cellXf && source.getFontRecord(cellXf.fontIndex)?.size).toBe(11);
+        expect(cellXf && source.getFontRecord(cellXf.fontIndex)?.sizePt).toBe(11);
         const namedStyleXf = rowAxis && source.getCellStyleXf(rowAxis.styleXf);
-        expect(namedStyleXf && source.getFontRecord(namedStyleXf.fontIndex)?.size).not.toBe(11);
+        expect(namedStyleXf && source.getFontRecord(namedStyleXf.fontIndex)?.sizePt).not.toBe(11);
       };
 
       mutators.selectAll(store);
@@ -187,7 +187,7 @@ describe('automatic font row height against the native engine', () => {
       const nativeFontAt = (row: number, col: number): number | undefined => {
         const effective = workbook.getEffectiveStyle(0, row, col);
         const xf = effective && workbook.getCellXf(effective.xfIndex);
-        return xf ? workbook.getFontRecord(xf.fontIndex)?.size : undefined;
+        return xf ? (workbook.getFontRecord(xf.fontIndex)?.sizePt ?? undefined) : undefined;
       };
       const originalNativeFontSize = nativeFontAt(0, MAX_COL);
       mutators.selectAll(store);

@@ -406,7 +406,8 @@ describe('attachConditionalDialog', () => {
       expect(after[0]).toMatchObject({
         id: before?.id,
         priority: before?.priority,
-        formula1: '25',
+        // A formula read carries the leading `=` (0.19 behaviour change).
+        formula1: '=25',
       });
       expect(store.getState().conditional.rules).toHaveLength(1);
       expect(store.getState().conditional.rules[0]).toMatchObject({ a: 25 });

@@ -93,7 +93,7 @@ describe('table slicers saved with the workbook', () => {
       tableName: 'Table1',
       columnName: 'Region',
       caption: 'Pick a region',
-      style: 'SlicerStyleLight2',
+      styleName: 'SlicerStyleLight2',
       columnCount: 2,
     });
     expect(only(store).native?.name).toBe(wb.listSlicers(0)[0]?.name);
@@ -113,7 +113,10 @@ describe('table slicers saved with the workbook', () => {
     const { wb, store } = await session();
     const spec = add(store, wb, { selected: ['East'] });
     expect(recomputeSlicerFilters(store, wb)).toBe(2);
-    expect(wb.getTableAutoFilter(0)?.columns[0]).toMatchObject({ colId: 1, values: ['East'] });
+    expect(wb.getTableAutoFilter(0)?.columns[0]).toMatchObject({
+      columnOffset: 1,
+      values: ['East'],
+    });
 
     const reopened = await reopen(wb);
     expect(only(reopened.store).selected).toEqual(['East']);
@@ -131,18 +134,23 @@ describe('table slicers saved with the workbook', () => {
     updateSlicer(store, spec.id, { x: 700, y: 400, caption: 'Regions', style: '', columnCount: 3 });
 
     const after = wb.listSlicers(0)[0];
-    expect(after).toMatchObject({ caption: 'Regions', style: '', columnCount: 3 });
-    expect([after?.fromRow, after?.fromCol]).not.toEqual([before?.fromRow, before?.fromCol]);
+    expect(after).toMatchObject({ caption: 'Regions', styleName: null, columnCount: 3 });
+    expect([after?.anchor.fromRow, after?.anchor.fromCol]).not.toEqual([
+      before?.anchor.fromRow,
+      before?.anchor.fromCol,
+    ]);
     // The panel keeps its size while it moves.
-    expect((after?.toRow ?? 0) - (after?.fromRow ?? 0)).toBe(
-      (before?.toRow ?? 0) - (before?.fromRow ?? 0),
+    expect((after?.anchor.toRow ?? 0) - (after?.anchor.fromRow ?? 0)).toBe(
+      (before?.anchor.toRow ?? 0) - (before?.anchor.fromRow ?? 0),
     );
     const reopened = await reopen(wb);
     expect(only(reopened.store)).toMatchObject({ caption: 'Regions', columnCount: 3 });
     expect(
-      drawingAnchorOf({ ...after, editAs: AnchorEditAs.TwoCell, cx: 0, cy: 0 } as never),
+      drawingAnchorOf({
+        anchor: { ...after?.anchor, editAs: AnchorEditAs.TwoCell, widthEmu: 0, heightEmu: 0 },
+      } as never),
     ).toMatchObject({
-      fromRow: after?.fromRow,
+      fromRow: after?.anchor.fromRow,
     });
   });
 
@@ -178,36 +186,40 @@ describe('table slicers saved with the workbook', () => {
   it('shifts the slicer once when rows are inserted, and back on undo', async () => {
     const { wb, store, history } = await session();
     add(store, wb);
-    const row = wb.listSlicers(0)[0]?.fromRow ?? 0;
+    const row = wb.listSlicers(0)[0]?.anchor.fromRow ?? 0;
 
     expect(insertRows(store, wb, history, 0, 2)).toBe(true);
-    expect(wb.listSlicers(0)[0]?.fromRow).toBe(row + 2);
+    expect(wb.listSlicers(0)[0]?.anchor.fromRow).toBe(row + 2);
     expect(wb.listSlicers(0)).toHaveLength(1);
 
     history.undo();
-    expect(wb.listSlicers(0)[0]?.fromRow).toBe(row);
+    expect(wb.listSlicers(0)[0]?.anchor.fromRow).toBe(row);
     history.redo();
-    expect(wb.listSlicers(0)[0]?.fromRow).toBe(row + 2);
+    expect(wb.listSlicers(0)[0]?.anchor.fromRow).toBe(row + 2);
   });
 
   it('puts a slicer back where it was when a row delete over it is undone', async () => {
     const { wb, store, history } = await session();
     add(store, wb, { style: 'SlicerStyleDark1' });
-    const before = wb.listSlicers(0)[0] as { fromRow: number; toRow: number; name: string };
+    const slicer = wb.listSlicers(0)[0];
+    const before = { ...slicer?.anchor, name: slicer?.name } as {
+      fromRow: number;
+      toRow: number;
+      name: string;
+    };
 
     expect(
       deleteRows(store, wb, history, before.fromRow - 1, before.toRow - before.fromRow + 2),
     ).toBe(true);
     expect(wb.listSlicers(0)).toHaveLength(1);
-    expect(wb.listSlicers(0)[0]?.toRow).toBe(wb.listSlicers(0)[0]?.fromRow);
+    expect(wb.listSlicers(0)[0]?.anchor.toRow).toBe(wb.listSlicers(0)[0]?.anchor.fromRow);
 
     history.undo();
     expect(wb.listSlicers(0)).toHaveLength(1);
     expect(wb.listSlicers(0)[0]).toMatchObject({
       name: before.name,
-      style: 'SlicerStyleDark1',
-      fromRow: before.fromRow,
-      toRow: before.toRow,
+      styleName: 'SlicerStyleDark1',
+      anchor: { fromRow: before.fromRow, toRow: before.toRow },
     });
     expect(store.getState().slicers.slicers).toHaveLength(1);
   });
@@ -232,11 +244,11 @@ describe('table slicers saved with the workbook', () => {
     const native = wb.listSlicers(0)[0];
 
     expect(only(store).nativeAnchor).toMatchObject({
-      fromRow: native?.fromRow,
-      toRow: native?.toRow,
+      fromRow: native?.anchor.fromRow,
+      toRow: native?.anchor.toRow,
     });
     const loaded = only((await reopen(wb)).store);
     expect(loaded.w).toBeGreaterThan(0);
-    expect(loaded.nativeAnchor?.toCol).toBe(native?.toCol);
+    expect(loaded.nativeAnchor?.toCol).toBe(native?.anchor.toCol);
   });
 });

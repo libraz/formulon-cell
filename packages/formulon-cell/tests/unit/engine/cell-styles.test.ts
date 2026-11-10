@@ -44,8 +44,7 @@ const importedNativeStyleFixture = async (hidden: boolean, customBuiltin = true)
   if (!normalXf || !defaultFont) throw new Error('Default style records are unavailable');
   const themeFontIndex = wb.addFontRecord({
     ...defaultFont,
-    colorArgb: 0xff4472c4,
-    color: { kind: 2, rgb: 0xff4472c4, theme: 10, tint: 0, indexed: 0 },
+    color: { kind: 2, argb: 0xff4472c4, theme: 10, tint: 0, indexed: 0 },
   });
   const styleXfId = wb.addCellStyleXfRecord({ ...normalXf, fontIndex: themeFontIndex });
   if (themeFontIndex < 0 || styleXfId < 0) throw new Error('Could not create themed style records');
@@ -61,7 +60,11 @@ const importedNativeStyleFixture = async (hidden: boolean, customBuiltin = true)
   ) {
     throw new Error('Could not create localized native style');
   }
-  const cellXfId = wb.addXfRecord({ ...normalXf, fontIndex: themeFontIndex, xfId: styleXfId });
+  const cellXfId = wb.addXfRecord({
+    ...normalXf,
+    fontIndex: themeFontIndex,
+    styleXfIndex: styleXfId,
+  });
   if (cellXfId < 0 || !wb.setCellXfIndex(0, 0, 0, cellXfId)) {
     throw new Error('Could not format native-style fixture cell');
   }
@@ -248,7 +251,7 @@ describe('named-style engine publication', () => {
         const updatedXf = wb.getCellStyleXf(updated?.xfId ?? -1);
         expect(updatedXf).toBeDefined();
         const updatedFont = wb.getFontRecord(updatedXf?.fontIndex ?? -1);
-        expect(updatedFont?.size).toBeCloseTo(editedFontSize * 0.75, 3);
+        expect(updatedFont?.sizePt).toBeCloseTo(editedFontSize * 0.75, 3);
       } finally {
         wb.dispose();
       }
@@ -444,7 +447,7 @@ describe('named-style engine publication', () => {
       const store = createSpreadsheetStore();
       mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
       syncCellFormatsToEngine(wb, store, 0);
-      expect(wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1)?.xfId).toBe(resolvedNormal);
+      expect(wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1)?.styleXfIndex).toBe(resolvedNormal);
     } finally {
       wb.dispose();
     }
@@ -558,7 +561,8 @@ describe('named-style engine publication', () => {
       const probe = wb.getNamedCellStyles().find((style) => style.name === 'Probe');
       expect(probe).toBeDefined();
       if (!probe) return;
-      expect(wb.getFontRecord(wb.getCellStyleXf(probe.xfId)?.fontIndex ?? -1)?.italic).toBe(false);
+      // An unstated toggle is an absent `<i>` (the former `hasItalic: false`).
+      expect(wb.getFontRecord(wb.getCellStyleXf(probe.xfId)?.fontIndex ?? -1)?.italic).toBeNull();
     } finally {
       wb.dispose();
     }
@@ -654,10 +658,9 @@ describe('named-style engine publication', () => {
 
       const themedFontIndex = wb.addFontRecord({
         ...defaultFont,
-        colorArgb: 0xff006100,
         color: {
           kind: 2,
-          rgb: defaultFont.color?.rgb ?? 0,
+          argb: 0xff006100,
           theme: 4,
           tint: 0.2,
           indexed: defaultFont.color?.indexed ?? 0,
@@ -666,12 +669,11 @@ describe('named-style engine publication', () => {
       const indexedFillIndex = wb.addFillRecord({
         ...defaultFill,
         pattern: 1,
-        fgArgb: 0xffc6efce,
-        fg: {
+        foreground: {
           kind: 3,
-          rgb: defaultFill.fg?.rgb ?? 0,
-          theme: defaultFill.fg?.theme ?? 0,
-          tint: defaultFill.fg?.tint ?? 0,
+          argb: 0xffc6efce,
+          theme: defaultFill.foreground?.theme ?? 0,
+          tint: defaultFill.foreground?.tint ?? 0,
           indexed: 42,
         },
       });
@@ -680,10 +682,9 @@ describe('named-style engine publication', () => {
         top: {
           ...defaultBorder.top,
           style: 2,
-          colorArgb: 0,
           color: {
             kind: 4,
-            rgb: 0,
+            argb: 0,
             theme: defaultBorder.top.color?.theme ?? 0,
             tint: defaultBorder.top.color?.tint ?? 0,
             indexed: defaultBorder.top.color?.indexed ?? 0,
@@ -702,8 +703,8 @@ describe('named-style engine publication', () => {
       expect(resolvedFont).not.toBeNull();
       expect(resolvedFill).not.toBeNull();
       if (!resolvedFont || !resolvedFill) return;
-      const hydratedFontColor = argbToCssColor(resolvedFont.colorArgb);
-      const hydratedFillColor = argbToCssColor(resolvedFill.fgArgb);
+      const hydratedFontColor = argbToCssColor(resolvedFont.color?.argb ?? 0);
+      const hydratedFillColor = argbToCssColor(resolvedFill.foreground?.argb ?? 0);
 
       const numFmtId = wb.addNumFmtCode('0.00');
       const currentXfId = wb.addXfRecord({
@@ -712,21 +713,16 @@ describe('named-style engine publication', () => {
         fillIndex: defaultFill === null ? 0 : wb.addFillRecord(defaultFill),
         borderIndex: currentBorderIndex,
         numFmtId,
-        horizontalAlign: 3,
-        verticalAlign: 1,
+        horizontal: 3,
+        vertical: 1,
         wrapText: true,
         justifyLastLine: false,
-        hasAlignment: true,
-        hasHorizontalAlign: true,
-        hasVerticalAlign: true,
-        hasWrapText: true,
-        hasJustifyLastLine: true,
         textRotation: 37,
         indent: 2,
         relativeIndent: -1,
         shrinkToFit: true,
         readingOrder: 2,
-        xfId: styleXfId,
+        styleXfIndex: styleXfId,
       });
       expect(currentXfId).toBeGreaterThanOrEqual(0);
       expect(wb.setCellXfIndex(0, 0, 0, currentXfId)).toBe(true);
@@ -754,15 +750,11 @@ describe('named-style engine publication', () => {
         fillIndex: indexedFillIndex,
         borderIndex: currentBorderIndex,
         numFmtId,
-        xfId: styleXfId,
-        horizontalAlign: 3,
-        verticalAlign: 1,
+        styleXfIndex: styleXfId,
+        horizontal: 3,
+        vertical: 1,
         wrapText: true,
-        hasAlignment: true,
-        hasHorizontalAlign: true,
-        hasVerticalAlign: true,
-        hasWrapText: true,
-        hasJustifyLastLine: true,
+        justifyLastLine: false,
         textRotation: 37,
         indent: 2,
         relativeIndent: -1,
@@ -779,20 +771,19 @@ describe('named-style engine publication', () => {
       expect(defaultCellXf).toMatchObject({
         borderIndex: currentBorderIndex,
         numFmtId,
-        xfId: styleXfId,
+        styleXfIndex: styleXfId,
         textRotation: 37,
         indent: 2,
         relativeIndent: -1,
         shrinkToFit: true,
         readingOrder: 2,
-        hasAlignment: true,
-        hasHorizontalAlign: true,
-        hasVerticalAlign: true,
-        hasWrapText: true,
-        hasJustifyLastLine: true,
       });
+      // Every alignment attribute stays stated (the former `has*: true`).
+      for (const field of ['horizontal', 'vertical', 'wrapText', 'justifyLastLine'] as const) {
+        expect(defaultCellXf?.[field]).not.toBeNull();
+      }
       expect(wb.getFontRecord(defaultCellXf?.fontIndex ?? -1)?.color?.kind).toBe(2);
-      expect(wb.getFillRecord(defaultCellXf?.fillIndex ?? -1)?.fg?.kind).toBe(3);
+      expect(wb.getFillRecord(defaultCellXf?.fillIndex ?? -1)?.foreground?.kind).toBe(3);
       expect(wb.getBorderRecord(defaultCellXf?.borderIndex ?? -1)?.top.color?.kind).toBe(4);
 
       reloaded = await WorkbookHandle.loadBytes(wb.save());
@@ -807,7 +798,7 @@ describe('named-style engine publication', () => {
         theme: 4,
         tint: 0.2,
       });
-      expect(reloaded.getFillRecord(loadedStyleXf.fillIndex)?.fg).toMatchObject({
+      expect(reloaded.getFillRecord(loadedStyleXf.fillIndex)?.foreground).toMatchObject({
         kind: 3,
         indexed: 42,
       });
@@ -817,15 +808,11 @@ describe('named-style engine publication', () => {
         fillIndex: loadedStyleXf.fillIndex,
         borderIndex: currentBorderIndex,
         numFmtId,
-        xfId: loadedGood.xfId,
-        horizontalAlign: 3,
-        verticalAlign: 1,
+        styleXfIndex: loadedGood.xfId,
+        horizontal: 3,
+        vertical: 1,
         wrapText: true,
-        hasAlignment: true,
-        hasHorizontalAlign: true,
-        hasVerticalAlign: true,
-        hasWrapText: true,
-        hasJustifyLastLine: true,
+        justifyLastLine: false,
         textRotation: 37,
         indent: 2,
         relativeIndent: -1,
@@ -837,7 +824,7 @@ describe('named-style engine publication', () => {
         theme: 4,
         tint: 0.2,
       });
-      expect(reloaded.getFillRecord(loadedCellXf?.fillIndex ?? -1)?.fg).toMatchObject({
+      expect(reloaded.getFillRecord(loadedCellXf?.fillIndex ?? -1)?.foreground).toMatchObject({
         kind: 3,
         indexed: 42,
       });
@@ -851,7 +838,7 @@ describe('named-style engine publication', () => {
       const overriddenCellXf = wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1);
       expect(overriddenCellXf?.fillIndex).toBe(indexedFillIndex);
       expect(overriddenCellXf?.fontIndex).not.toBe(themedFontIndex);
-      expect(wb.getFontRecord(overriddenCellXf?.fontIndex ?? -1)?.colorArgb).toBe(0xff000000);
+      expect(wb.getFontRecord(overriddenCellXf?.fontIndex ?? -1)?.color?.argb).toBe(0xff000000);
     } finally {
       reloaded?.dispose();
       wb.dispose();
@@ -867,11 +854,10 @@ describe('named-style engine publication', () => {
       if (!normal) return;
       const raw255Style = wb.addCellStyleXfRecord({
         ...normal,
-        hasAlignment: true,
-        hasHorizontalAlign: true,
-        hasVerticalAlign: true,
-        hasWrapText: true,
-        hasJustifyLastLine: true,
+        horizontal: 0,
+        vertical: 2,
+        wrapText: false,
+        justifyLastLine: false,
         textRotation: 255,
         indent: 0,
         shrinkToFit: false,

@@ -1,3 +1,4 @@
+import { ColorKind } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import {
   detectTypedWebUrl,
@@ -44,7 +45,7 @@ const addNamedStyleWithFont = (
   wb: WorkbookHandle,
   name: string,
   builtinId: number | null,
-  options: { size: number; colorArgb: number; colorKind?: number; hidden?: boolean },
+  options: { size: number; colorArgb: number; colorKind?: ColorKind; hidden?: boolean },
 ) => {
   const baseXf = wb.getCellStyleXf(0);
   const baseFont = baseXf ? wb.getFontRecord(baseXf.fontIndex) : null;
@@ -54,16 +55,15 @@ const addNamedStyleWithFont = (
 
   const fontIndex = wb.addFontRecord({
     ...baseFont,
-    size: options.size,
-    colorArgb: options.colorArgb,
+    sizePt: options.size,
     bold: false,
     italic: false,
     strike: false,
     underline: 0,
     vertAlign: 0,
     color: {
-      kind: options.colorKind ?? 1,
-      rgb: options.colorArgb,
+      kind: options.colorKind ?? ColorKind.Rgb,
+      argb: options.colorArgb,
       theme: 0,
       tint: 0,
       indexed: 0,
@@ -110,8 +110,8 @@ describe('resolveHyperlinkStyleXf', () => {
           xf: builtin.xf,
         });
         expect(wb.getFontRecord(resolved?.xf.fontIndex ?? -1)).toMatchObject({
-          size: 19,
-          colorArgb: 0xff0055cc,
+          sizePt: 19,
+          color: { argb: 0xff0055cc },
         });
         expect(
           Array.from({ length: wb.cellStyleCount() }, (_, index) => wb.getCellStyle(index)).find(
@@ -140,8 +140,8 @@ describe('resolveHyperlinkStyleXf', () => {
         xf: customized.xf,
       });
       expect(wb.getFontRecord(resolved?.xf.fontIndex ?? -1)).toMatchObject({
-        size: 16,
-        colorArgb: 0xff008844,
+        sizePt: 16,
+        color: { argb: 0xff008844 },
       });
     } finally {
       wb.dispose();
@@ -340,12 +340,12 @@ describe('resolveHyperlinkStyleXf', () => {
       const style = addNamedStyleWithFont(wb, 'LienWeb', 8, {
         size: 11,
         colorArgb: 0,
-        colorKind: 0,
+        colorKind: ColorKind.None,
       });
       wb.setText(A1, URL);
       const resolved = wb.getResolvedFontRecord(style.xf?.fontIndex ?? -1);
       expect(resolved?.color?.kind).toBe(0);
-      expect(resolved?.colorArgb).toBe(0);
+      expect(resolved?.color?.argb).toBe(0);
       expect(getTypedWebUrlFormatPatch(wb, store.getState(), A1, URL)?.color).toBe('#000000');
     } finally {
       wb.dispose();

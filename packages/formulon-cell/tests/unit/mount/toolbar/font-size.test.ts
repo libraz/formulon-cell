@@ -54,7 +54,7 @@ describe('font-size point semantics at the mounted ribbon boundary', () => {
       expect(
         sheet.instance.store.getState().format.formats.get(addrKey(target))?.fontSize,
       ).toBeCloseTo(16, 10);
-      expect(nativeFontAt(sheet.workbook)?.size).toBeCloseTo(12, 10);
+      expect(nativeFontAt(sheet.workbook)?.sizePt).toBeCloseTo(12, 10);
     } finally {
       toolbar.dispose();
     }
@@ -68,13 +68,13 @@ describe('font-size point semantics at the mounted ribbon boundary', () => {
       expect(
         sheet.instance.store.getState().format.formats.get(addrKey(target))?.fontSize,
       ).toBeCloseTo(16, 10);
-      expect(nativeFontAt(sheet.workbook)?.size).toBeCloseTo(12, 10);
+      expect(nativeFontAt(sheet.workbook)?.sizePt).toBeCloseTo(12, 10);
 
       expect(toolbar.applyCommand('fontShrink')).toBe(true);
       expect(
         sheet.instance.store.getState().format.formats.get(addrKey(target))?.fontSize,
       ).toBeCloseTo((11 * 96) / 72, 10);
-      expect(nativeFontAt(sheet.workbook)?.size).toBeCloseTo(11, 10);
+      expect(nativeFontAt(sheet.workbook)?.sizePt).toBeCloseTo(11, 10);
     } finally {
       toolbar.dispose();
     }
@@ -99,15 +99,15 @@ describe('font-size point semantics at the mounted ribbon boundary', () => {
       expect(
         sheet.instance.store.getState().format.formats.get(addrKey(target))?.fontSize,
       ).toBeCloseTo((14 * 96) / 72, 10);
-      expect(nativeFontAt(sheet.workbook)?.size).toBeCloseTo(14, 10);
+      expect(nativeFontAt(sheet.workbook)?.sizePt).toBeCloseTo(14, 10);
 
       expect(toolbar.applyCommand('fontGrow')).toBe(true);
       expect(ribbonFontSize()).toBe('16');
-      expect(nativeFontAt(sheet.workbook)?.size).toBeCloseTo(16, 10);
+      expect(nativeFontAt(sheet.workbook)?.sizePt).toBeCloseTo(16, 10);
 
       expect(toolbar.applyCommand('fontShrink')).toBe(true);
       expect(ribbonFontSize()).toBe('14');
-      expect(nativeFontAt(sheet.workbook)?.size).toBeCloseTo(14, 10);
+      expect(nativeFontAt(sheet.workbook)?.sizePt).toBeCloseTo(14, 10);
 
       sheet.instance.openFormatDialog('font');
       const fourteen = document.querySelector<HTMLButtonElement>(

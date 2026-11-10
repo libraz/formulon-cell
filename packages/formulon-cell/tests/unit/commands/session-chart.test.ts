@@ -95,7 +95,7 @@ describe('session chart commands', () => {
       source: range(0, 0, 3, 2),
       seriesDirection: 'columns',
       legend: { visible: true, position: 'bottom' },
-      nativeAnchor: { anchorKind: AnchorKind.TwoCell, editAs: AnchorEditAs.TwoCell },
+      nativeAnchor: { kind: AnchorKind.TwoCell, editAs: AnchorEditAs.TwoCell },
     });
     // An omitted title is Excel's automatic one, which the renderer localizes.
     expect(chart.title).toEqual({ auto: true });
@@ -188,11 +188,11 @@ describe('session chart commands', () => {
     // 16 x 40 default cells of 64 x 20 px; the 480 x 288 px frame starts at (272, 256).
     expect(centred?.nativeAnchor).toMatchObject({
       fromCol: 4,
-      fromColOff: 16 * 9525,
+      fromColOffsetEmu: 16 * 9525,
       fromRow: 12,
-      fromRowOff: 16 * 9525,
-      cx: 4_572_000,
-      cy: 2_743_200,
+      fromRowOffsetEmu: 16 * 9525,
+      widthEmu: 4_572_000,
+      heightEmu: 2_743_200,
     });
 
     const placed = createSessionChart(store, range(0, 0, 3, 2), {
@@ -200,11 +200,11 @@ describe('session chart commands', () => {
       anchor: { row: 20, col: 8, widthEmu: 952_500, heightEmu: 476_250 },
     });
     expect(placed?.nativeAnchor).toMatchObject({
-      anchorKind: AnchorKind.TwoCell,
+      kind: AnchorKind.TwoCell,
       fromRow: 20,
       fromCol: 8,
-      cx: 952_500,
-      cy: 476_250,
+      widthEmu: 952_500,
+      heightEmu: 476_250,
     });
   });
 
@@ -599,19 +599,19 @@ describe('session chart commands', () => {
     );
     expect(moved?.nativeObjectId).toBe(chart.nativeObjectId);
     expect(moved?.nativeAnchor).toMatchObject({
-      anchorKind: AnchorKind.TwoCell,
+      kind: AnchorKind.TwoCell,
       editAs: AnchorEditAs.TwoCell,
       fromRow: 9,
       fromCol: 2,
-      cx: 2_857_500,
+      widthEmu: 2_857_500,
     });
 
     expect(history.undo()).toBe(true);
     expect(sessionChartById(store.getState(), chart.id)?.nativeAnchor).toMatchObject({
-      anchorKind: AnchorKind.TwoCell,
+      kind: AnchorKind.TwoCell,
       fromRow: 5,
       fromCol: 5,
-      cx: 1_905_000,
+      widthEmu: 1_905_000,
     });
     expect(history.redo()).toBe(true);
     expect(sessionChartById(store.getState(), chart.id)?.nativeAnchor).toMatchObject({

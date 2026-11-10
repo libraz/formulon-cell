@@ -1,4 +1,11 @@
 import type {
+  CellXfInput,
+  FillPattern as EngineFillPattern,
+  HorizontalAlign,
+  ReadingOrder,
+  VerticalAlign,
+} from '@libraz/formulon';
+import type {
   CellBorderSide,
   CellBorders,
   CellFormat,
@@ -8,7 +15,8 @@ import type {
   TextDirection,
 } from '../store/store.js';
 import { fontCssPxToPoints, fontPointsToCssPx } from './font-units.js';
-import type { BorderRecord, BorderSide, CellXf, FillRecord, FontRecord } from './types.js';
+import { colorArgb, literalColor } from './style-records.js';
+import type { BorderRecord, BorderSide, FillRecord, FontRecord } from './types.js';
 
 /** Default font name + size used when a CellFormat omits these. Mirrors the
  *  workbook's default font; matches "Calibri 11". */
@@ -19,7 +27,7 @@ const DEFAULT_FONT_SIZE = 11;
 const BLACK_ARGB = 0xff000000;
 /** ARGB packed value for "auto" (transparent — caller-defined default). */
 const NO_COLOR_ARGB = 0;
-/** `ColorSpec.kind` of a literal RGB colour. */
+/** `Color.kind` of a literal RGB colour. */
 const LITERAL_COLOR_KIND = 1;
 
 const UNDERLINE_ORDINALS = {
@@ -36,7 +44,7 @@ const UNDERLINE_FROM_ORDINAL = new Map<number, CellFormat['underline']>([
   [4, 'doubleAccounting'],
 ]);
 
-const underlineOrdinal = (underline: CellFormat['underline']): number => {
+const underlineOrdinal = (underline: CellFormat['underline']): FontRecord['underline'] => {
   if (underline === true || underline === 'single') return UNDERLINE_ORDINALS.single;
   if (underline === 'double') return UNDERLINE_ORDINALS.double;
   if (underline === 'singleAccounting') return UNDERLINE_ORDINALS.singleAccounting;
@@ -68,8 +76,7 @@ const BORDER_STYLE_DASH_DOT_DOT = 11;
 const BORDER_STYLE_MEDIUM_DASH_DOT_DOT = 12;
 const BORDER_STYLE_SLANT_DASH_DOT = 13;
 
-/** OOXML alignment ordinals. Mirrors the JSDoc on `CellXf.horizontalAlign` /
- *  `CellXf.verticalAlign`. */
+/** OOXML alignment ordinals. Mirrors `HorizontalAlign` / `VerticalAlign`. */
 const HALIGN_GENERAL = 0;
 const HALIGN_LEFT = 1;
 const HALIGN_CENTER = 2;
@@ -87,7 +94,7 @@ const VALIGN_DISTRIBUTED = 4;
 /** OOXML pattern ordinals for the pattern names currently exposed by the UI.
  *  Pattern fills store the pattern colour in fgArgb and the background colour
  *  in bgArgb; solid fills instead store their visible colour in fgArgb. */
-const FILL_PATTERN_ORDINALS: Record<FillPattern, number> = {
+const FILL_PATTERN_ORDINALS: Record<FillPattern, EngineFillPattern> = {
   gray125: 17,
   gray0625: 18,
   gray25: 4,
@@ -138,12 +145,15 @@ const GRADIENT_PATH = 1;
 /** Built-in numFmt id for "General" — every engine reserves 0 for this. */
 const BUILTIN_NUM_FMT_GENERAL = 0;
 
+/** The workbook body font a cell format inherits; `size` is in points. */
+export type WorkbookDefaultFont = Pick<FontRecord, 'name' | 'scheme'> & { size: number };
+
 /** Build a FontRecord from the cell's UI format fields. Missing family/size
  * fall back to the supplied workbook default (or the legacy Calibri default
  * when the caller has no workbook context, such as a differential format). */
 export function fontRecordFromFormat(
   fmt: CellFormat,
-  workbookDefault?: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null,
+  workbookDefault?: WorkbookDefaultFont | null,
 ): FontRecord {
   const name = fmt.fontFamily ?? workbookDefault?.name ?? DEFAULT_FONT_NAME;
   const size = Number.isFinite(fmt.fontSize)
@@ -151,32 +161,24 @@ export function fontRecordFromFormat(
     : (workbookDefault?.size ?? DEFAULT_FONT_SIZE);
   return {
     name,
-    size,
+    sizePt: size,
     // A theme link belongs to the typeface, so it carries only while the cell
     // is still on the workbook's body font. Naming a family picks a literal
     // font, which is what unlinks it — bolding or resizing does not.
     scheme: name === workbookDefault?.name ? workbookDefault.scheme : undefined,
-    bold: fmt.bold === true,
-    italic: fmt.italic === true,
-    strike: fmt.strike === true,
     // A format that says nothing about bold leaves the `<b>` element out. For
     // a cell font that reads the same as "not bold"; for a differential font
     // it is the difference between "leave it alone" and "switch it off".
-    hasBold: fmt.bold !== undefined,
-    hasItalic: fmt.italic !== undefined,
-    hasStrike: fmt.strike !== undefined,
-    hasSize: Number.isFinite(fmt.fontSize),
+    bold: fmt.bold === undefined ? null : fmt.bold === true,
+    italic: fmt.italic === undefined ? null : fmt.italic === true,
+    strike: fmt.strike === undefined ? null : fmt.strike === true,
     underline: underlineOrdinal(fmt.underline),
     vertAlign: fmt.fontVertAlign === 'superscript' ? 1 : fmt.fontVertAlign === 'subscript' ? 2 : 0,
-    colorArgb: fmt.color ? (cssColorToArgb(fmt.color) ?? BLACK_ARGB) : BLACK_ARGB,
-    outline: fmt.fontOutline === true,
-    shadow: fmt.fontShadow === true,
-    condense: fmt.fontCondense === true,
-    extend: fmt.fontExtend === true,
-    hasOutline: fmt.fontOutline !== undefined,
-    hasShadow: fmt.fontShadow !== undefined,
-    hasCondense: fmt.fontCondense !== undefined,
-    hasExtend: fmt.fontExtend !== undefined,
+    color: literalColor(fmt.color ? (cssColorToArgb(fmt.color) ?? BLACK_ARGB) : BLACK_ARGB),
+    outline: fmt.fontOutline === undefined ? null : fmt.fontOutline === true,
+    shadow: fmt.fontShadow === undefined ? null : fmt.fontShadow === true,
+    condense: fmt.fontCondense === undefined ? null : fmt.fontCondense === true,
+    extend: fmt.fontExtend === undefined ? null : fmt.fontExtend === true,
   };
 }
 
@@ -186,18 +188,18 @@ export function fillRecordFromFormat(fmt: CellFormat): FillRecord {
     const g = fmt.fillGradient;
     return {
       pattern: 0,
-      fgArgb: NO_COLOR_ARGB,
-      bgArgb: NO_COLOR_ARGB,
+      foreground: literalColor(NO_COLOR_ARGB),
+      background: literalColor(NO_COLOR_ARGB),
       gradient: {
         type: g.type === 'path' ? GRADIENT_PATH : GRADIENT_LINEAR,
-        degree: g.degree,
+        angleDeg: g.degree,
         left: g.left,
         right: g.right,
         top: g.top,
         bottom: g.bottom,
         stops: g.stops.map((stop) => ({
           position: stop.position,
-          colorArgb: cssColorToArgb(stop.color) ?? BLACK_ARGB,
+          color: literalColor(cssColorToArgb(stop.color) ?? BLACK_ARGB),
         })),
       },
     };
@@ -205,17 +207,23 @@ export function fillRecordFromFormat(fmt: CellFormat): FillRecord {
   if (fmt.fillPattern) {
     return {
       pattern: FILL_PATTERN_ORDINALS[fmt.fillPattern],
-      fgArgb: fmt.fillPatternColor
-        ? (cssColorToArgb(fmt.fillPatternColor) ?? BLACK_ARGB)
-        : BLACK_ARGB,
-      bgArgb: fmt.fill ? (cssColorToArgb(fmt.fill) ?? NO_COLOR_ARGB) : NO_COLOR_ARGB,
+      foreground: literalColor(
+        fmt.fillPatternColor ? (cssColorToArgb(fmt.fillPatternColor) ?? BLACK_ARGB) : BLACK_ARGB,
+      ),
+      background: literalColor(
+        fmt.fill ? (cssColorToArgb(fmt.fill) ?? NO_COLOR_ARGB) : NO_COLOR_ARGB,
+      ),
     };
   }
   if (!fmt.fill) {
-    return { pattern: 0, fgArgb: NO_COLOR_ARGB, bgArgb: NO_COLOR_ARGB };
+    return {
+      pattern: 0,
+      foreground: literalColor(NO_COLOR_ARGB),
+      background: literalColor(NO_COLOR_ARGB),
+    };
   }
   const fg = cssColorToArgb(fmt.fill) ?? NO_COLOR_ARGB;
-  return { pattern: 1, fgArgb: fg, bgArgb: NO_COLOR_ARGB };
+  return { pattern: 1, foreground: literalColor(fg), background: literalColor(NO_COLOR_ARGB) };
 }
 
 /** Build a BorderRecord from the cell's `borders` field. Missing sides → none. */
@@ -233,9 +241,9 @@ export function borderRecordFromFormat(fmt: CellFormat): BorderRecord {
 }
 
 function borderSideToRecord(side: CellBorderSide | undefined): BorderSide {
-  if (!side) return { style: BORDER_STYLE_NONE, colorArgb: BLACK_ARGB };
-  if (side === true) return { style: BORDER_STYLE_THIN, colorArgb: BLACK_ARGB };
-  let style = BORDER_STYLE_THIN;
+  if (!side) return { style: BORDER_STYLE_NONE, color: literalColor(BLACK_ARGB) };
+  if (side === true) return { style: BORDER_STYLE_THIN, color: literalColor(BLACK_ARGB) };
+  let style: BorderSide['style'] = BORDER_STYLE_THIN;
   switch (side.style) {
     case 'medium':
       style = BORDER_STYLE_MEDIUM;
@@ -276,8 +284,8 @@ function borderSideToRecord(side: CellBorderSide | undefined): BorderSide {
     default:
       style = BORDER_STYLE_THIN;
   }
-  const colorArgb = side.color ? (cssColorToArgb(side.color) ?? BLACK_ARGB) : BLACK_ARGB;
-  return { style, colorArgb };
+  const argb = side.color ? (cssColorToArgb(side.color) ?? BLACK_ARGB) : BLACK_ARGB;
+  return { style, color: literalColor(argb) };
 }
 
 /** Built-in number-format codes as the workbook's locale renders them. */
@@ -383,7 +391,7 @@ export function numFmtToFormatCode(
 }
 
 /** Map a UI horizontal-align string to its OOXML ordinal. */
-export function halignOrdinal(align: CellFormat['align']): number {
+export function halignOrdinal(align: CellFormat['align']): HorizontalAlign {
   switch (align) {
     case 'left':
       return HALIGN_LEFT;
@@ -406,7 +414,7 @@ export function halignOrdinal(align: CellFormat['align']): number {
 
 /** Map a UI vertical-align string to its OOXML ordinal. the spreadsheet's default is
  *  bottom; we treat "middle" as ordinal 1 (center). */
-export function valignOrdinal(vAlign: CellFormat['vAlign']): number {
+export function valignOrdinal(vAlign: CellFormat['vAlign']): VerticalAlign {
   switch (vAlign) {
     case 'top':
       return VALIGN_TOP;
@@ -451,7 +459,7 @@ export function textRotationToCellRotation(
 /** Translate a CellFormat text direction into the OOXML readingOrder ordinal. */
 export function textDirectionToReadingOrder(
   value: TextDirection | undefined,
-): 0 | 1 | 2 | undefined {
+): ReadingOrder | undefined {
   if (value === undefined) return undefined;
   if (value === 'context') return 0;
   if (value === 'ltr') return 1;
@@ -480,7 +488,7 @@ export function buildXfRecord(
   borderIndex: number,
   numFmtId: number,
   fmt: CellFormat,
-): CellXf {
+): CellXfInput {
   const hasNumberFormat = Object.hasOwn(fmt, 'numFmt');
   const hasFont = [
     'fontFamily',
@@ -522,15 +530,12 @@ export function buildXfRecord(
     fillIndex,
     borderIndex,
     numFmtId,
-    horizontalAlign: halignOrdinal(fmt.align),
-    verticalAlign: valignOrdinal(fmt.vAlign),
-    wrapText: fmt.wrap === true,
-    justifyLastLine: fmt.align === 'distributed' && fmt.justifyLastLine === true,
-    hasAlignment,
-    hasHorizontalAlign,
-    hasVerticalAlign,
-    hasWrapText,
-    hasJustifyLastLine,
+    horizontal: hasHorizontalAlign ? halignOrdinal(fmt.align) : null,
+    vertical: hasVerticalAlign ? valignOrdinal(fmt.vAlign) : null,
+    wrapText: hasWrapText ? fmt.wrap === true : null,
+    justifyLastLine: hasJustifyLastLine
+      ? fmt.align === 'distributed' && fmt.justifyLastLine === true
+      : null,
     ...(hasNumberFormat ? { applyNumberFormat: true } : {}),
     ...(hasFont ? { applyFont: true } : {}),
     ...(hasFill ? { applyFill: true } : {}),
@@ -539,7 +544,6 @@ export function buildXfRecord(
     ...(hasProtection ? { applyProtection: true } : {}),
     ...(hasProtection
       ? {
-          hasProtection: true,
           locked: fmt.locked !== false,
           hidden: fmt.formulaHidden === true,
         }
@@ -556,7 +560,7 @@ export function buildXfRecord(
 /** Translate an engine FontRecord back into the CellFormat font fields. */
 export function fontRecordToFormat(
   rec: FontRecord,
-  workbookDefault: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null = null,
+  workbookDefault: WorkbookDefaultFont | null = null,
 ): Partial<CellFormat> {
   const out: Partial<CellFormat> = {};
   const defaultName = workbookDefault?.name ?? DEFAULT_FONT_NAME;
@@ -575,7 +579,8 @@ export function fontRecordToFormat(
   if (rec.name !== defaultName && !sameThemeBodyFont) out.fontFamily = rec.name;
   // Compare in native units before converting. A default 12 pt font must be
   // stripped even though its paint value is 16 CSS px.
-  if (rec.size !== defaultSize) out.fontSize = fontPointsToCssPx(rec.size);
+  const size = rec.sizePt ?? defaultSize;
+  if (size !== defaultSize) out.fontSize = fontPointsToCssPx(size);
   if (rec.bold) out.bold = true;
   if (rec.italic) out.italic = true;
   if (rec.strike) out.strike = true;
@@ -583,8 +588,9 @@ export function fontRecordToFormat(
   else if (rec.vertAlign === 2) out.fontVertAlign = 'subscript';
   const underline = UNDERLINE_FROM_ORDINAL.get(rec.underline);
   if (underline) out.underline = underline;
-  if (rec.colorArgb !== BLACK_ARGB && rec.colorArgb !== NO_COLOR_ARGB) {
-    out.color = argbToCssColor(rec.colorArgb);
+  const fontArgb = colorArgb(rec.color);
+  if (fontArgb !== BLACK_ARGB && fontArgb !== NO_COLOR_ARGB) {
+    out.color = argbToCssColor(fontArgb);
   }
   if (rec.outline) out.fontOutline = true;
   if (rec.shadow) out.fontShadow = true;
@@ -603,35 +609,37 @@ export function fillRecordToFormat(
     return {
       fillGradient: {
         type: g.type === GRADIENT_PATH ? 'path' : 'linear',
-        degree: g.degree,
+        degree: g.angleDeg,
         left: g.left,
         right: g.right,
         top: g.top,
         bottom: g.bottom,
         stops: g.stops.map((stop) => ({
           position: stop.position,
-          color: argbToCssColor(stop.colorArgb),
+          color: argbToCssColor(colorArgb(stop.color)),
         })),
       },
     };
   }
   if (rec.pattern === 0) return {};
+  const fgArgb = colorArgb(rec.foreground);
+  const bgArgb = colorArgb(rec.background);
   if (rec.pattern === 1) {
     // A cell's solid fill without a foreground (`00000000` is read as none)
     // paints black; a differential format's fill takes its colour elsewhere.
-    if (rec.fgArgb === NO_COLOR_ARGB && rec.fg?.kind !== LITERAL_COLOR_KIND) {
+    if (fgArgb === NO_COLOR_ARGB && rec.foreground?.kind !== LITERAL_COLOR_KIND) {
       return options.cell ? { fill: argbToCssColor(NO_COLOR_ARGB) } : {};
     }
-    return { fill: argbToCssColor(rec.fgArgb) };
+    return { fill: argbToCssColor(fgArgb) };
   }
   const pattern = FILL_PATTERN_FROM_ORDINAL.get(rec.pattern);
   if (!pattern) {
-    const preservedColor = rec.bgArgb || rec.fgArgb;
+    const preservedColor = bgArgb || fgArgb;
     return preservedColor === NO_COLOR_ARGB ? {} : { fill: argbToCssColor(preservedColor) };
   }
   const out: Partial<CellFormat> = { fillPattern: pattern };
-  if (rec.bgArgb !== NO_COLOR_ARGB) out.fill = argbToCssColor(rec.bgArgb);
-  if (rec.fgArgb !== NO_COLOR_ARGB) out.fillPatternColor = argbToCssColor(rec.fgArgb);
+  if (bgArgb !== NO_COLOR_ARGB) out.fill = argbToCssColor(bgArgb);
+  if (fgArgb !== NO_COLOR_ARGB) out.fillPatternColor = argbToCssColor(fgArgb);
   return out;
 }
 
@@ -671,8 +679,9 @@ export function borderRecordToFormat(rec: BorderRecord): Partial<CellFormat> {
       }
     })();
     const out: { style: typeof style; color?: string } = { style };
-    if (s.colorArgb !== BLACK_ARGB && s.colorArgb !== NO_COLOR_ARGB) {
-      out.color = argbToCssColor(s.colorArgb);
+    const sideArgb = colorArgb(s.color);
+    if (sideArgb !== BLACK_ARGB && sideArgb !== NO_COLOR_ARGB) {
+      out.color = argbToCssColor(sideArgb);
     }
     return out;
   };

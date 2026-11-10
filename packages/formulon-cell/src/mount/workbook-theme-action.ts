@@ -1,7 +1,7 @@
-import type { ThemeResult } from '@libraz/formulon';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import type { OperationIntent } from '../commands/interaction-policy.js';
 import { hydrateCellFormatsFromEngine } from '../engine/cell-format-sync.js';
+import type { WorkbookTheme } from '../engine/workbook-handle-styles.js';
 import {
   WORKBOOK_THEME_PRESETS,
   type WorkbookThemePresetId,
@@ -43,7 +43,7 @@ export function applyWorkbookTheme(
     JSON.stringify(before.fonts) === JSON.stringify(after.fonts)
   )
     return true;
-  const write = (next: Pick<ThemeResult, 'colors' | 'fonts'>): void => {
+  const write = (next: Pick<WorkbookTheme, 'colors' | 'fonts'>): void => {
     const current = wb.getTheme();
     if (!current) throw new Error('Workbook theme is unavailable');
     const originalFormat = instance.store.getState().format;

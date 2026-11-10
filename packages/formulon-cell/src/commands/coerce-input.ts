@@ -409,8 +409,8 @@ function makeCustomEvaluator(
     const literal = substituteCellRefs(formula, wb, a, candidate);
     if (literal === null) return null;
     const res = wb.evalFormula(literal);
-    if (res.status.status !== 0) return null; // evaluation unavailable → parity accept
-    const v = fromEngineValue(res.value);
+    if (!res) return null; // evaluation unavailable → parity accept
+    const v = fromEngineValue(res);
     if (v.kind === 'number') return v.value !== 0;
     if (v.kind === 'bool') return v.value;
     return false; // text / error / blank → not satisfied (Excel requires TRUE / nonzero)

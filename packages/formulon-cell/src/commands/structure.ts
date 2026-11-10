@@ -636,9 +636,9 @@ const drawingRemovedByDelete = (
 ): boolean => {
   const inBand = (line: number): boolean => line >= split && line < split + count;
   return (
-    object.editAs === AnchorEditAs.TwoCell &&
-    inBand(axis === 'row' ? object.fromRow : object.fromCol) &&
-    inBand(axis === 'row' ? object.toRow : object.toCol)
+    object.anchor.editAs === AnchorEditAs.TwoCell &&
+    inBand(axis === 'row' ? object.anchor.fromRow : object.anchor.fromCol) &&
+    inBand(axis === 'row' ? object.anchor.toRow : object.anchor.toCol)
   );
 };
 

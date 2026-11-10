@@ -20,7 +20,22 @@ const rule = (overrides: Partial<Rule> = {}): Rule => ({
   type: 1, // cellIs
   priority: 1,
   stopIfTrue: false,
-  sqref: [{ firstRow: 0, firstCol: 0, lastRow: 4, lastCol: 0 }],
+  ranges: [{ firstRow: 0, firstCol: 0, lastRow: 4, lastCol: 0 }],
+  dxfIndex: null,
+  formula1: null,
+  formula2: null,
+  operator: null,
+  rank: null,
+  percent: null,
+  bottom: null,
+  aboveAverage: null,
+  equalAverage: null,
+  stdDev: null,
+  text: null,
+  timePeriod: null,
+  colorScale: null,
+  dataBar: null,
+  iconSet: null,
   ...overrides,
 });
 
@@ -91,7 +106,7 @@ describe('attachCfRulesDialog', () => {
         id: 'b',
         priority: 2,
         type: 16, // duplicateValues
-        sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+        ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
       }),
     ]);
     const handle = attachCfRulesDialog({
@@ -313,12 +328,12 @@ describe('attachCfRulesDialog', () => {
       rule({
         id: 'a',
         priority: 1,
-        sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+        ranges: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
       }),
       rule({
         id: 'b',
         priority: 2,
-        sqref: [{ firstRow: 4, firstCol: 4, lastRow: 4, lastCol: 4 }],
+        ranges: [{ firstRow: 4, firstCol: 4, lastRow: 4, lastCol: 4 }],
       }),
     ]);
     const store = createSpreadsheetStore();
@@ -610,7 +625,7 @@ describe('attachCfRulesDialog', () => {
       rule({
         id: 'imported',
         priority: 1,
-        sqref: [{ firstRow: 1, firstCol: 1, lastRow: 2, lastCol: 1 }],
+        ranges: [{ firstRow: 1, firstCol: 1, lastRow: 2, lastCol: 1 }],
       }),
     ]);
     const seenSnapshots: string[][] = [];
@@ -978,8 +993,8 @@ describe('attachCfRulesDialog', () => {
     it('reorders loaded rules by rewriting their priorities and keeps their stopIfTrue', async () => {
       const wb = await WorkbookHandle.createDefault();
       try {
-        wb.addConditionalFormat(0, { sqref, type: 17, priority: 1, stopIfTrue: true });
-        wb.addConditionalFormat(0, { sqref, type: 16, priority: 2 });
+        wb.addConditionalFormat(0, { ranges: sqref, type: 17, priority: 1, stopIfTrue: true });
+        wb.addConditionalFormat(0, { ranges: sqref, type: 16, priority: 2 });
         const handle = attachCfRulesDialog({
           host,
           getWb: () => wb,
@@ -1003,7 +1018,7 @@ describe('attachCfRulesDialog', () => {
     it('toggles Stop If True on a loaded rule through the engine', async () => {
       const wb = await WorkbookHandle.createDefault();
       try {
-        wb.addConditionalFormat(0, { sqref, type: 17, priority: 4 });
+        wb.addConditionalFormat(0, { ranges: sqref, type: 17, priority: 4 });
         const handle = attachCfRulesDialog({
           host,
           getWb: () => wb,

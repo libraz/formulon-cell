@@ -20,58 +20,46 @@ describe('engine theme colour resolution', () => {
 
       const themedFontIndex = wb.addFontRecord({
         ...defaultFont,
-        colorArgb: 0xff010203,
-        color: { kind: 2, rgb: 0, theme: 4, tint: 0.4, indexed: 0 },
+        color: { kind: 2, argb: 0xff010203, theme: 4, tint: 0.4, indexed: 0 },
       });
       const indexedAndAutoFillIndex = wb.addFillRecord({
         ...defaultFill,
         pattern: 1,
-        fgArgb: 0xff040506,
-        fg: { kind: 3, rgb: 0, theme: 0, tint: 0, indexed: 2 },
-        bgArgb: 0xff070809,
-        bg: { kind: 4, rgb: 0, theme: 0, tint: 0, indexed: 0 },
+        foreground: { kind: 3, argb: 0xff040506, theme: 0, tint: 0, indexed: 2 },
+        background: { kind: 4, argb: 0xff070809, theme: 0, tint: 0, indexed: 0 },
       });
       const autoBorderIndex = wb.addBorderRecord({
         ...defaultBorder,
         top: {
           ...defaultBorder.top,
           style: 1,
-          colorArgb: 0xff0a0b0c,
-          color: { kind: 4, rgb: 0, theme: 0, tint: 0, indexed: 0 },
+          color: { kind: 4, argb: 0xff0a0b0c, theme: 0, tint: 0, indexed: 0 },
         },
       });
 
       expect(wb.getFontRecord(themedFontIndex)).toMatchObject({
-        colorArgb: 0xff010203,
-        color: { kind: 2, theme: 4, tint: 0.4 },
+        color: { kind: 2, argb: 0xff010203, theme: 4, tint: 0.4 },
       });
       // The unreleased engine tracks the current Office default theme. Its
       // accent1 is #156082, whose 40% tint resolves to #44B3E1. The older
       // #4472C4 theme would produce #8EA9DB, which is no longer the native
       // default for a workbook without an explicit theme part.
       expect(wb.getResolvedFontRecord(themedFontIndex)).toMatchObject({
-        colorArgb: 0xff44b3e1,
-        color: { kind: 2, theme: 4, tint: 0.4 },
+        color: { kind: 2, argb: 0xff44b3e1, theme: 4, tint: 0.4 },
       });
       expect(wb.getFillRecord(indexedAndAutoFillIndex)).toMatchObject({
-        fgArgb: 0xff040506,
-        bgArgb: 0xff070809,
-        fg: { kind: 3, indexed: 2 },
-        bg: { kind: 4 },
+        foreground: { kind: 3, argb: 0xff040506, indexed: 2 },
+        background: { kind: 4, argb: 0xff070809 },
       });
       expect(wb.getResolvedFillRecord(indexedAndAutoFillIndex)).toMatchObject({
-        fgArgb: 0xffff0000,
-        bgArgb: 0xffffffff,
-        fg: { kind: 3, indexed: 2 },
-        bg: { kind: 4 },
+        foreground: { kind: 3, argb: 0xffff0000, indexed: 2 },
+        background: { kind: 4, argb: 0xffffffff },
       });
       expect(wb.getBorderRecord(autoBorderIndex)?.top).toMatchObject({
-        colorArgb: 0xff0a0b0c,
-        color: { kind: 4 },
+        color: { kind: 4, argb: 0xff0a0b0c },
       });
       expect(wb.getResolvedBorderRecord(autoBorderIndex)?.top).toMatchObject({
-        colorArgb: 0xff000000,
-        color: { kind: 4 },
+        color: { kind: 4, argb: 0xff000000 },
       });
 
       const xfIndex = wb.addXfRecord({
@@ -92,17 +80,17 @@ describe('engine theme colour resolution', () => {
         theme: 4,
         tint: 0.4,
       });
-      expect(reloaded.getResolvedFontRecord(loadedXf.fontIndex)?.colorArgb).toBe(0xff44b3e1);
-      expect(reloaded.getFillRecord(loadedXf.fillIndex)?.fg).toMatchObject({
+      expect(reloaded.getResolvedFontRecord(loadedXf.fontIndex)?.color?.argb).toBe(0xff44b3e1);
+      expect(reloaded.getFillRecord(loadedXf.fillIndex)?.foreground).toMatchObject({
         kind: 3,
         indexed: 2,
       });
       expect(reloaded.getResolvedFillRecord(loadedXf.fillIndex)).toMatchObject({
-        fgArgb: 0xffff0000,
-        bgArgb: 0xffffffff,
+        foreground: { argb: 0xffff0000 },
+        background: { argb: 0xffffffff },
       });
       expect(reloaded.getBorderRecord(loadedXf.borderIndex)?.top.color).toMatchObject({ kind: 4 });
-      expect(reloaded.getResolvedBorderRecord(loadedXf.borderIndex)?.top.colorArgb).toBe(
+      expect(reloaded.getResolvedBorderRecord(loadedXf.borderIndex)?.top.color?.argb).toBe(
         0xff000000,
       );
     } finally {

@@ -1,4 +1,4 @@
-import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind, DrawingObjectKind } from '@libraz/formulon';
 import {
   cellOrigin,
   DUPLICATE_OFFSET_PX,
@@ -253,24 +253,24 @@ export function createSessionImage(
   if (options.bytes && options.bytes.length > 0 && options.wb?.capabilities.images) {
     const probe = options.wb.probeImage(options.bytes);
     if (!probe) return null;
-    nativeWidthEmu = Math.max(1, Math.round((options.w ?? probe.pxWidth) * 9525));
-    nativeHeightEmu = Math.max(1, Math.round((options.h ?? probe.pxHeight) * 9525));
+    nativeWidthEmu = Math.max(1, Math.round((options.w ?? probe.widthPx) * 9525));
+    nativeHeightEmu = Math.max(1, Math.round((options.h ?? probe.heightPx) * 9525));
     const placed = options.anchorAtPixels
       ? placementForPixels(
           store,
           {
-            anchorKind: AnchorKind.OneCell,
+            kind: AnchorKind.OneCell,
             editAs: AnchorEditAs.OneCell,
             fromRow: range.r0,
             fromCol: range.c0,
-            fromRowOff: 0,
-            fromColOff: 0,
+            fromRowOffsetEmu: 0,
+            fromColOffsetEmu: 0,
             toRow: 0,
             toCol: 0,
-            toRowOff: 0,
-            toColOff: 0,
-            cx: nativeWidthEmu,
-            cy: nativeHeightEmu,
+            toRowOffsetEmu: 0,
+            toColOffsetEmu: 0,
+            widthEmu: nativeWidthEmu,
+            heightEmu: nativeHeightEmu,
           },
           { x: options.x, y: options.y, w: options.w, h: options.h },
         )
@@ -280,30 +280,37 @@ export function createSessionImage(
       nativeHeightEmu = placed.heightEmu ?? nativeHeightEmu;
     }
     nativeObjectId = options.wb.insertImage(range.sheet, options.bytes, {
-      row: placed?.row ?? range.r0,
-      col: placed?.col ?? range.c0,
-      ...(placed ? { rowOffEmu: placed.rowOffEmu, colOffEmu: placed.colOffEmu } : {}),
       name: options.alt ?? '',
-      descr: options.alt ?? '',
-      widthEmu: nativeWidthEmu,
-      heightEmu: nativeHeightEmu,
+      description: options.alt ?? '',
+      anchor: {
+        fromRow: placed?.fromRow ?? range.r0,
+        fromCol: placed?.fromCol ?? range.c0,
+        ...(placed
+          ? {
+              fromRowOffsetEmu: placed.fromRowOffsetEmu,
+              fromColOffsetEmu: placed.fromColOffsetEmu,
+            }
+          : {}),
+        widthEmu: nativeWidthEmu,
+        heightEmu: nativeHeightEmu,
+      },
     });
     if (nativeObjectId === null) return null;
     nativeFormat = probe.format;
   }
   const requestedAnchor: EngineDrawingAnchor = {
-    anchorKind: AnchorKind.OneCell,
+    kind: AnchorKind.OneCell,
     editAs: AnchorEditAs.OneCell,
     fromRow: range.r0,
     fromCol: range.c0,
-    fromRowOff: 0,
-    fromColOff: 0,
+    fromRowOffsetEmu: 0,
+    fromColOffsetEmu: 0,
     toRow: 0,
     toCol: 0,
-    toRowOff: 0,
-    toColOff: 0,
-    cx: nativeWidthEmu ?? 1,
-    cy: nativeHeightEmu ?? 1,
+    toRowOffsetEmu: 0,
+    toColOffsetEmu: 0,
+    widthEmu: nativeWidthEmu ?? 1,
+    heightEmu: nativeHeightEmu ?? 1,
   };
   const persistedItem: SessionIllustration =
     nativeObjectId === null
@@ -973,7 +980,9 @@ const nativeZTarget = (
         candidate.nativeObjectId !== undefined,
     )
     .findIndex((candidate) => candidate.id === item.id);
-  const slots = objects.flatMap((object, index) => (object.imageFormat !== 0 ? [index] : []));
+  const slots = objects.flatMap((object, index) =>
+    object.kind === DrawingObjectKind.Picture ? [index] : [],
+  );
   const to = slots[rank];
   return rank < 0 || to === undefined || to === from ? null : { from, to };
 };

@@ -27,12 +27,11 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
     hydrateThreadedComments(store, 0, [
       {
         id: '{88888888-8888-4888-8888-888888888888}',
-        row: 0,
-        col: 0,
+        cell: { row: 0, col: 0 },
         personId: '{99999999-9999-4999-8999-999999999999}',
-        created: '2026-01-01T10:00:00.00',
+        created: { year: 2026, month: 1, day: 1, hour: 10, minute: 0, second: 0 },
         text: 'stale',
-        parentId: '',
+        parentId: null,
         done: false,
         mentions: [],
       },
@@ -54,15 +53,14 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
       const threadId = '{22222222-2222-4222-8222-222222222222}';
       const replyId = '{33333333-3333-4333-8333-333333333333}';
       expect(
-        first.addPerson({ id: personId, displayName: 'Alice', userId: '', providerId: 'None' }),
+        first.addPerson({ id: personId, displayName: 'Alice', userId: null, providerId: 'None' }),
       ).toBe(true);
       expect(
         first.addThreadedComment(0, {
           id: threadId,
-          row: 2,
-          col: 3,
+          cell: { row: 2, col: 3 },
           personId,
-          created: '2026-01-01T10:00:00.00',
+          created: { year: 2026, month: 1, day: 1, hour: 10, minute: 0, second: 0 },
           text: 'Review this',
         }),
       ).toBe(true);
@@ -70,7 +68,7 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
         first.addThreadedComment(0, {
           id: replyId,
           personId,
-          created: '2026-01-01T10:01:00.00',
+          created: { year: 2026, month: 1, day: 1, hour: 10, minute: 1, second: 0 },
           text: 'Done',
           parentId: threadId,
         }),
@@ -82,8 +80,7 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
         const comments = reloaded.getThreadedComments(0);
         expect(comments.map((comment) => comment.id)).toEqual([threadId, replyId]);
         expect(comments[0]).toMatchObject({
-          row: 2,
-          col: 3,
+          cell: { row: 2, col: 3 },
           text: 'Review this',
           done: true,
         });
@@ -122,18 +119,21 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
     try {
       expect(first.isStub).toBe(false);
       expect(first.capabilities.images).toBe(true);
-      expect(first.probeImage(PNG)).toMatchObject({ pxWidth: 1, pxHeight: 1 });
+      expect(first.probeImage(PNG)).toMatchObject({ widthPx: 1, heightPx: 1 });
       const objectId = first.insertImage(0, PNG, {
-        row: 4,
-        col: 2,
+        anchor: { fromRow: 4, fromCol: 2 },
         name: 'logo',
-        descr: 'Logo',
+        description: 'Logo',
       });
       expect(objectId).not.toBeNull();
       const reloaded = await WorkbookHandle.loadBytes(first.save());
       try {
         const object = reloaded.listDrawingObjects(0).find((entry) => entry.objectId > 0);
-        expect(object).toMatchObject({ fromRow: 4, fromCol: 2, name: 'logo', descr: 'Logo' });
+        expect(object).toMatchObject({
+          anchor: { fromRow: 4, fromCol: 2 },
+          name: 'logo',
+          description: 'Logo',
+        });
         expect(object).toBeDefined();
         const image = reloaded.getImage(0, object?.objectId ?? 0);
         expect(image?.bytes).toEqual(PNG);
@@ -148,16 +148,19 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
   it('moves and restores a picture keeping its object id through save/load', async () => {
     const first = await WorkbookHandle.createDefault();
     try {
-      const objectId = first.insertImage(0, PNG, { row: 1, col: 1, name: 'logo' });
+      const objectId = first.insertImage(0, PNG, {
+        anchor: { fromRow: 1, fromCol: 1 },
+        name: 'logo',
+      });
       expect(objectId).not.toBeNull();
       const reloaded = await WorkbookHandle.loadBytes(first.save());
       try {
         const id = objectId ?? 0;
-        expect(reloaded.setDrawingAnchor(0, id, { row: 5, col: 3, rowOffEmu: 9525 })).toBe(true);
+        expect(
+          reloaded.setDrawingAnchor(0, id, { fromRow: 5, fromCol: 3, fromRowOffsetEmu: 9525 }),
+        ).toBe(true);
         expect(reloaded.listDrawingObjects(0).find((o) => o.objectId === id)).toMatchObject({
-          fromRow: 5,
-          fromCol: 3,
-          fromRowOff: 9525,
+          anchor: { fromRow: 5, fromCol: 3, fromRowOffsetEmu: 9525 },
         });
         const snapshot = reloaded.snapshotDrawing(0, id);
         expect(snapshot).not.toBeNull();
@@ -165,8 +168,7 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
         expect(reloaded.listDrawingObjects(0).some((o) => o.objectId === id)).toBe(false);
         expect(reloaded.restoreDrawing(0, snapshot ?? new Uint8Array())).toBe(id);
         expect(reloaded.listDrawingObjects(0).find((o) => o.objectId === id)).toMatchObject({
-          fromRow: 5,
-          fromCol: 3,
+          anchor: { fromRow: 5, fromCol: 3 },
           name: 'logo',
         });
       } finally {
@@ -185,16 +187,15 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
       const personId = '{44444444-4444-4444-8444-444444444444}';
       const threadId = '{55555555-5555-4555-8555-555555555555}';
       expect(
-        first.addPerson({ id: personId, displayName: 'Bob', userId: '', providerId: 'None' }),
+        first.addPerson({ id: personId, displayName: 'Bob', userId: null, providerId: 'None' }),
       ).toBe(true);
       expect(first.setCommentEntry(0, 1, 1, 'Bob', 'legacy note')).toBe(true);
       expect(
         first.addThreadedComment(0, {
           id: threadId,
-          row: 1,
-          col: 1,
+          cell: { row: 1, col: 1 },
           personId,
-          created: '2026-01-01T10:00:00.00',
+          created: { year: 2026, month: 1, day: 1, hour: 10, minute: 0, second: 0 },
           text: 'thread attempt',
         }),
       ).toBe(false);
@@ -204,10 +205,9 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
       expect(
         first.addThreadedComment(0, {
           id: threadId,
-          row: 1,
-          col: 1,
+          cell: { row: 1, col: 1 },
           personId,
-          created: '2026-01-01T10:00:00.00',
+          created: { year: 2026, month: 1, day: 1, hour: 10, minute: 0, second: 0 },
           text: 'thread',
         }),
       ).toBe(true);
@@ -233,15 +233,14 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
       const personId = '{66666666-6666-4666-8666-666666666666}';
       const threadId = '{77777777-7777-4777-8777-777777777777}';
       expect(
-        wb.addPerson({ id: personId, displayName: 'Carol', userId: '', providerId: 'None' }),
+        wb.addPerson({ id: personId, displayName: 'Carol', userId: null, providerId: 'None' }),
       ).toBe(true);
       expect(
         wb.addThreadedComment(0, {
           id: threadId,
-          row: 3,
-          col: 4,
+          cell: { row: 3, col: 4 },
           personId,
-          created: '2026-01-01T10:00:00.00',
+          created: { year: 2026, month: 1, day: 1, hour: 10, minute: 0, second: 0 },
           text: 'Protected thread',
         }),
       ).toBe(true);

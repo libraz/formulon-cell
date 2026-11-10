@@ -245,7 +245,7 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
       const bold = (handle: WorkbookHandle, addr: Addr) => {
         const xfIndex = handle.getCellXfIndex(addr.sheet, addr.row, addr.col);
         const xf = xfIndex === null ? null : handle.getCellXf(xfIndex);
-        return xf ? handle.getFontRecord(xf.fontIndex)?.bold : false;
+        return xf ? (handle.getFontRecord(xf.fontIndex)?.bold ?? false) : false;
       };
       const validate = (handle: WorkbookHandle, addr: Addr) => {
         expect(bold(handle, addr)).toBe(true);

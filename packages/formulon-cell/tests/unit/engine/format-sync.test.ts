@@ -43,6 +43,14 @@ const makeFake = (opts: {
     getComment: (sheet: number, row: number, col: number) =>
       commentsData[`${sheet}:${row}:${col}`] ?? null,
     getHyperlinks: (_sheet: number) => hyperlinksData,
+    getHyperlinksFull: (_sheet: number) =>
+      hyperlinksData.map((h) => ({
+        range: { firstRow: h.row, firstCol: h.col, lastRow: h.row, lastCol: h.col },
+        target: h.target || null,
+        location: null,
+        display: h.display || null,
+        tooltip: h.tooltip || null,
+      })),
   };
   if (commentsList) {
     return {

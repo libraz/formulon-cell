@@ -32,12 +32,8 @@ function seed(wb: WorkbookHandle): void {
 async function twoTableWorkbook(): Promise<WorkbookHandle> {
   const wb = await WorkbookHandle.createDefault();
   seed(wb);
-  expect(
-    wb.createTable({ sheetIndex: 0, ref: 'A1:B4', name: 'Sales', columns: ['Item', 'Region'] }),
-  ).toBe(0);
-  expect(
-    wb.createTable({ sheetIndex: 0, ref: 'D1:E4', name: 'Stock', columns: ['Part', 'Bin'] }),
-  ).toBe(1);
+  expect(wb.createTable(0, { range: 'A1:B4', name: 'Sales', columns: ['Item', 'Region'] })).toBe(0);
+  expect(wb.createTable(0, { range: 'D1:E4', name: 'Stock', columns: ['Part', 'Bin'] })).toBe(1);
   return wb;
 }
 
@@ -59,7 +55,10 @@ describe('several AutoFilters on one sheet', () => {
 
       applyValueFilter(store.getState(), store, stockRange, 4, ['Y'], wb);
       expect(wb.getTableAutoFilter(0)).not.toBeNull();
-      expect(wb.getTableAutoFilter(1)?.columns[0]).toMatchObject({ colId: 1, values: ['X'] });
+      expect(wb.getTableAutoFilter(1)?.columns[0]).toMatchObject({
+        columnOffset: 1,
+        values: ['X'],
+      });
       expect(store.getState().ui.filterRanges).toEqual([salesRange, stockRange]);
       expect(store.getState().layout.hiddenRows).toEqual(new Set([2]));
 
@@ -98,7 +97,7 @@ describe('several AutoFilters on one sheet', () => {
     try {
       seed(wb);
       expect(
-        wb.createTable({ sheetIndex: 0, ref: 'A1:B4', name: 'Sales', columns: ['Item', 'Region'] }),
+        wb.createTable(0, { range: 'A1:B4', name: 'Sales', columns: ['Item', 'Region'] }),
       ).toBe(0);
       const store = hydratedStore(wb);
       setAutoFilter(store, sheetRange, wb);

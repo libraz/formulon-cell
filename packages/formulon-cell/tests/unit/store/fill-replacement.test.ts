@@ -97,11 +97,13 @@ describe('a fill kind replaces the others', () => {
       const base = wb.getCellXfIndex(0, 0, 0) ?? -1;
       const patched = patchXfIndexFromBase(wb, base, { fill: '#00ff00' });
       const fill = wb.getFillRecord(wb.getCellXf(patched)?.fillIndex ?? -1);
-      expect(fill?.gradient).toBeUndefined();
+      expect(fill?.gradient).toBeNull();
       expect(fill?.pattern).toBe(1);
 
       const regradient = patchXfIndexFromBase(wb, patched, { fillGradient: GRADIENT });
-      expect(wb.getFillRecord(wb.getCellXf(regradient)?.fillIndex ?? -1)?.gradient?.degree).toBe(0);
+      expect(wb.getFillRecord(wb.getCellXf(regradient)?.fillIndex ?? -1)?.gradient?.angleDeg).toBe(
+        0,
+      );
     } finally {
       wb.dispose();
     }

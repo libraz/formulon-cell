@@ -32,9 +32,7 @@ async function tableWorkbook(): Promise<WorkbookHandle> {
     wb.setText({ sheet: 0, row, col: 0 }, item);
     wb.setText({ sheet: 0, row, col: 1 }, region);
   });
-  expect(
-    wb.createTable({ sheetIndex: 0, ref: 'A1:B4', name: 'Sales', columns: ['Item', 'Region'] }),
-  ).toBe(0);
+  expect(wb.createTable(0, { range: 'A1:B4', name: 'Sales', columns: ['Item', 'Region'] })).toBe(0);
   return wb;
 }
 
@@ -80,7 +78,10 @@ describe('table-level AutoFilter', () => {
       const store = hydratedStore(wb);
       applyValueFilter(store.getState(), store, tableRange, 1, ['West'], wb);
       expect(wb.getAutoFilter(0)).toBeNull();
-      expect(wb.getTableAutoFilter(0)?.columns[0]).toMatchObject({ colId: 1, values: ['East'] });
+      expect(wb.getTableAutoFilter(0)?.columns[0]).toMatchObject({
+        columnOffset: 1,
+        values: ['East'],
+      });
       expect(wb.evaluateTableAutoFilter(0)?.match).toEqual([true, false, true]);
 
       applyValueFilter(store.getState(), store, tableRange, 1, [], wb);
@@ -152,7 +153,10 @@ describe('table-level AutoFilter', () => {
       ]);
       syncAutoFilterToEngine(wb, store.getState(), 0, store);
       expect(wb.getAutoFilter(0)).toBeNull();
-      expect(wb.getTableAutoFilter(0)?.columns[0]).toMatchObject({ colId: 1, values: ['East'] });
+      expect(wb.getTableAutoFilter(0)?.columns[0]).toMatchObject({
+        columnOffset: 1,
+        values: ['East'],
+      });
       expect(wb.evaluateTableAutoFilter(0)?.match).toEqual([true, false, true]);
     } finally {
       wb.dispose();

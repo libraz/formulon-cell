@@ -99,15 +99,14 @@ describe('attachCommentDialog', () => {
       const personId = '{AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA}';
       const threadId = '{BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB}';
       expect(
-        wb.addPerson({ id: personId, displayName: 'Alice', userId: '', providerId: 'None' }),
+        wb.addPerson({ id: personId, displayName: 'Alice', userId: null, providerId: 'None' }),
       ).toBe(true);
       expect(
         wb.addThreadedComment(0, {
           id: threadId,
-          row: 1,
-          col: 1,
+          cell: { row: 1, col: 1 },
           personId,
-          created: '2026-01-01T10:00:00.00',
+          created: { year: 2026, month: 1, day: 1, hour: 10, minute: 0, second: 0 },
           text: 'Please review',
         }),
       ).toBe(true);

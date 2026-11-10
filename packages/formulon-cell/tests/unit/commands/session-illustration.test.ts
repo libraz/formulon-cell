@@ -1,3 +1,4 @@
+import { AnchorEditAs, AnchorKind, DrawingObjectKind } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
@@ -255,16 +256,22 @@ describe('session illustration commands', () => {
         history,
       );
       expect(image?.nativeObjectId).toBeGreaterThan(0);
-      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(1);
+      expect(
+        wb.listDrawingObjects(0).filter((object) => object.kind === DrawingObjectKind.Picture),
+      ).toHaveLength(1);
 
       expect(history.undo()).toBe(true);
       expect(sessionIllustrationById(store.getState(), 'native-image')).toBeNull();
-      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(0);
+      expect(
+        wb.listDrawingObjects(0).filter((object) => object.kind === DrawingObjectKind.Picture),
+      ).toHaveLength(0);
       expect(history.redo()).toBe(true);
       expect(
         sessionIllustrationById(store.getState(), 'native-image')?.nativeObjectId,
       ).toBeGreaterThan(0);
-      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(1);
+      expect(
+        wb.listDrawingObjects(0).filter((object) => object.kind === DrawingObjectKind.Picture),
+      ).toHaveLength(1);
 
       const original = wb
         .listDrawingObjects(0)
@@ -286,8 +293,8 @@ describe('session illustration commands', () => {
         {
           x: target.x + 10 * 2,
           y: target.y + 5 * 2,
-          w: (original.cx / EMU_PER_PX) * 2,
-          h: (original.cy / EMU_PER_PX) * 2,
+          w: (original.anchor.widthEmu / EMU_PER_PX) * 2,
+          h: (original.anchor.heightEmu / EMU_PER_PX) * 2,
         },
         history,
         wb,
@@ -296,39 +303,53 @@ describe('session illustration commands', () => {
       const movedNative = wb
         .listDrawingObjects(0)
         .find((object) => object.objectId === moved?.nativeObjectId);
-      expect(movedNative).toMatchObject({ fromRow: 4, fromCol: 3 });
-      expect(movedNative?.fromColOff).toBe(10 * EMU_PER_PX);
-      expect(movedNative?.fromRowOff).toBe(5 * EMU_PER_PX);
-      expect(movedNative?.cx).toBe(original.cx);
-      expect(movedNative?.cy).toBe(original.cy);
+      expect(movedNative?.anchor).toMatchObject({ fromRow: 4, fromCol: 3 });
+      expect(movedNative?.anchor.fromColOffsetEmu).toBe(10 * EMU_PER_PX);
+      expect(movedNative?.anchor.fromRowOffsetEmu).toBe(5 * EMU_PER_PX);
+      expect(movedNative?.anchor.widthEmu).toBe(original.anchor.widthEmu);
+      expect(movedNative?.anchor.heightEmu).toBe(original.anchor.heightEmu);
       expect(history.undo()).toBe(true);
-      const undoneNative = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      const undoneNative = wb
+        .listDrawingObjects(0)
+        .find((object) => object.kind === DrawingObjectKind.Picture);
       expect(undoneNative?.objectId).toBe(original.objectId);
       expect(sessionIllustrationById(store.getState(), 'native-image')?.nativeObjectId).toBe(
         original.objectId,
       );
-      expect(undoneNative).toMatchObject({ fromRow: original.fromRow, fromCol: original.fromCol });
-      expect(undoneNative?.cx).toBe(original.cx);
-      expect(undoneNative?.cy).toBe(original.cy);
+      expect(undoneNative?.anchor).toMatchObject({
+        fromRow: original.anchor.fromRow,
+        fromCol: original.anchor.fromCol,
+      });
+      expect(undoneNative?.anchor.widthEmu).toBe(original.anchor.widthEmu);
+      expect(undoneNative?.anchor.heightEmu).toBe(original.anchor.heightEmu);
       expect(history.redo()).toBe(true);
-      const redoneNative = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
-      expect(redoneNative).toMatchObject({ fromRow: 4, fromCol: 3 });
+      const redoneNative = wb
+        .listDrawingObjects(0)
+        .find((object) => object.kind === DrawingObjectKind.Picture);
+      expect(redoneNative?.anchor).toMatchObject({ fromRow: 4, fromCol: 3 });
       expect(redoneNative?.objectId).toBe(original.objectId);
-      expect(redoneNative?.cx).toBe(original.cx);
-      expect(redoneNative?.cy).toBe(original.cy);
+      expect(redoneNative?.anchor.widthEmu).toBe(original.anchor.widthEmu);
+      expect(redoneNative?.anchor.heightEmu).toBe(original.anchor.heightEmu);
 
       expect(clearSessionIllustration(store, 'native-image', history, wb)).toBe(true);
-      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(0);
+      expect(
+        wb.listDrawingObjects(0).filter((object) => object.kind === DrawingObjectKind.Picture),
+      ).toHaveLength(0);
       expect(history.undo()).toBe(true);
-      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(1);
+      expect(
+        wb.listDrawingObjects(0).filter((object) => object.kind === DrawingObjectKind.Picture),
+      ).toHaveLength(1);
       expect(sessionIllustrationById(store.getState(), 'native-image')?.nativeObjectId).toBe(
         original.objectId,
       );
-      expect(wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0)?.objectId).toBe(
-        original.objectId,
-      );
+      expect(
+        wb.listDrawingObjects(0).find((object) => object.kind === DrawingObjectKind.Picture)
+          ?.objectId,
+      ).toBe(original.objectId);
       expect(history.redo()).toBe(true);
-      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(0);
+      expect(
+        wb.listDrawingObjects(0).filter((object) => object.kind === DrawingObjectKind.Picture),
+      ).toHaveLength(0);
     } finally {
       wb.dispose();
     }
@@ -339,18 +360,22 @@ describe('session illustration commands', () => {
     let wb: WorkbookHandle | null = null;
     try {
       const inserted = first.insertImage(0, PNG, {
-        row: 2,
-        col: 1,
-        anchorKind: 1,
-        editAs: 1,
-        widthEmu: 40 * EMU_PER_PX,
-        heightEmu: 30 * EMU_PER_PX,
+        anchor: {
+          fromRow: 2,
+          fromCol: 1,
+          kind: AnchorKind.TwoCell,
+          editAs: AnchorEditAs.OneCell,
+          widthEmu: 40 * EMU_PER_PX,
+          heightEmu: 30 * EMU_PER_PX,
+        },
       });
       expect(inserted).not.toBeNull();
       wb = await WorkbookHandle.loadBytes(first.save());
-      const loaded = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      const loaded = wb
+        .listDrawingObjects(0)
+        .find((object) => object.kind === DrawingObjectKind.Picture);
       if (!loaded) throw new Error('loaded image missing');
-      expect(loaded.anchorKind).toBe(1);
+      expect(loaded.anchor.kind).toBe(AnchorKind.TwoCell);
 
       const store = createSpreadsheetStore();
       const history = new History();
@@ -366,33 +391,42 @@ describe('session illustration commands', () => {
       );
       const moved = updateSessionIllustration(store, id, { x: target.x, y: target.y }, history, wb);
       expect(moved?.nativeObjectId).toBe(loaded.objectId);
-      const after = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      const after = wb
+        .listDrawingObjects(0)
+        .find((object) => object.kind === DrawingObjectKind.Picture);
       expect(after).toMatchObject({
         objectId: loaded.objectId,
-        anchorKind: 1,
-        editAs: 1,
-        fromRow: 6,
-        fromCol: 4,
-        cx: loaded.cx,
-        cy: loaded.cy,
+        anchor: {
+          kind: AnchorKind.TwoCell,
+          editAs: AnchorEditAs.OneCell,
+          fromRow: 6,
+          fromCol: 4,
+          widthEmu: loaded.anchor.widthEmu,
+          heightEmu: loaded.anchor.heightEmu,
+        },
       });
       // The projection holds the engine's anchor, to marker included.
       if (!after) throw new Error('moved image missing');
       expect(moved?.nativeAnchor).toEqual(drawingAnchorOf(after));
 
       expect(history.undo()).toBe(true);
-      const undone = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      const undone = wb
+        .listDrawingObjects(0)
+        .find((object) => object.kind === DrawingObjectKind.Picture);
       expect(undone).toMatchObject({
         objectId: loaded.objectId,
-        anchorKind: 1,
-        fromRow: loaded.fromRow,
-        fromCol: loaded.fromCol,
+        anchor: {
+          kind: AnchorKind.TwoCell,
+          fromRow: loaded.anchor.fromRow,
+          fromCol: loaded.anchor.fromCol,
+        },
       });
       expect(history.redo()).toBe(true);
-      expect(wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0)).toMatchObject({
+      expect(
+        wb.listDrawingObjects(0).find((object) => object.kind === DrawingObjectKind.Picture),
+      ).toMatchObject({
         objectId: loaded.objectId,
-        fromRow: 6,
-        fromCol: 4,
+        anchor: { fromRow: 6, fromCol: 4 },
       });
     } finally {
       wb?.dispose();

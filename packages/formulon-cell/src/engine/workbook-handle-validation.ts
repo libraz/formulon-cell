@@ -1,4 +1,11 @@
-import type { CellsInRangeResult } from '@libraz/formulon';
+import type {
+  ComparisonOperator,
+  ErrorCode,
+  Sheet,
+  ValidationErrorStyle,
+  ValidationType,
+} from '@libraz/formulon';
+import { isFormulonError, orFallback } from './result.js';
 import type { DataValidationInput, EngineCapabilities, Range, Workbook } from './types.js';
 import { type CellValue, type Value, ValueKind } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -7,26 +14,6 @@ type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
   wb: Workbook;
   assertAlive(): void;
-};
-
-type ValidationWorkbook = Workbook & {
-  validateValue?: (
-    sheet: number,
-    row: number,
-    col: number,
-    value: Value,
-  ) => {
-    status: { ok: boolean };
-    hasRule: boolean;
-    valid: boolean;
-    ruleIndex: number;
-    errorStyle: number;
-  };
-  listInvalidCells?: (
-    sheet: number,
-    cursor?: number | null,
-    limit?: number | null,
-  ) => CellsInRangeResult;
 };
 
 declare module './workbook-handle.js' {
@@ -45,30 +32,33 @@ function wb(handle: unknown): Workbook {
   return internals(handle).wb;
 }
 
+function ws(handle: unknown, sheet: number): Sheet {
+  return wb(handle).sheet(sheet);
+}
+
+/** Run an engine call; an engine refusal is a soft `false`, anything else rethrows. */
+function attempt(fn: () => void): boolean {
+  try {
+    fn();
+    return true;
+  } catch (e) {
+    if (!isFormulonError(e)) throw e;
+    return false;
+  }
+}
+
 function toEngineValue(value: CellValue): Value {
   switch (value.kind) {
     case 'number':
-      return { kind: ValueKind.Number, number: value.value, boolean: 0, text: '', errorCode: 0 };
+      return { kind: ValueKind.Number, number: value.value };
     case 'bool':
-      return {
-        kind: ValueKind.Bool,
-        number: 0,
-        boolean: value.value ? 1 : 0,
-        text: '',
-        errorCode: 0,
-      };
+      return { kind: ValueKind.Bool, boolean: value.value };
     case 'text':
-      return { kind: ValueKind.Text, number: 0, boolean: 0, text: value.value, errorCode: 0 };
+      return { kind: ValueKind.Text, text: value.value };
     case 'error':
-      return {
-        kind: ValueKind.Error,
-        number: 0,
-        boolean: 0,
-        text: '',
-        errorCode: value.code,
-      };
+      return { kind: ValueKind.Error, errorCode: value.code as ErrorCode };
     default:
-      return { kind: ValueKind.Blank, number: 0, boolean: 0, text: '', errorCode: 0 };
+      return { kind: ValueKind.Blank };
   }
 }
 
@@ -91,18 +81,19 @@ export abstract class WorkbookHandleValidationMethods {
   } | null {
     assertAlive(this);
     if (!this.capabilities.validationEvaluation) return null;
-    const result = (wb(this) as ValidationWorkbook).validateValue?.(
-      sheet,
-      row,
-      col,
-      toEngineValue(value),
-    );
-    if (!result?.status.ok) return null;
+    const sh = ws(this, sheet);
+    const result = orFallback(null, () => sh.validateValue(row, col, toEngineValue(value)));
+    if (!result) return null;
+    // The engine names the applied rule by id; callers address it by position.
+    const ruleIndex =
+      result.ruleId === null
+        ? -1
+        : orFallback([], () => sh.listValidations()).findIndex((v) => v.id === result.ruleId);
     return {
-      hasRule: result.hasRule,
+      hasRule: result.ruleId !== null,
       valid: result.valid,
-      ruleIndex: result.ruleIndex,
-      errorStyle: result.errorStyle,
+      ruleIndex,
+      errorStyle: result.errorStyle ?? 0,
     };
   }
 
@@ -115,8 +106,8 @@ export abstract class WorkbookHandleValidationMethods {
   ): { cells: { sheet: number; row: number; col: number }[]; nextCursor: number | null } | null {
     assertAlive(this);
     if (!this.capabilities.validationEvaluation) return null;
-    const result = (wb(this) as ValidationWorkbook).listInvalidCells?.(sheet, cursor, limit);
-    if (!result?.status.ok) return null;
+    const result = orFallback(null, () => ws(this, sheet).getInvalidCells({ cursor, limit }));
+    if (!result) return null;
     return {
       cells: result.cells.map((cell) => ({ sheet, row: cell.row, col: cell.col })),
       nextCursor: result.nextCursor,
@@ -126,19 +117,20 @@ export abstract class WorkbookHandleValidationMethods {
   /** Snapshot of every validation entry on `sheet`. Each entry can apply to
    *  multiple ranges (`ranges`) and carries an spreadsheet-style descriptor: numeric
    *  `type` ordinal (0 none, 1 whole, 2 decimal, 3 list, 4 date, 5 time,
-   *  6 textLength, 7 custom), numeric `op` ordinal (0 between … 7 lessThanOrEqual),
-   *  formula1/2 strings, and the surrounding error/prompt metadata. Empty
-   *  when `capabilities.dataValidation` is off or when the engine returns
-   *  no rules. */
+   *  6 textLength, 7 custom), `op` as the engine's `ComparisonOperator`,
+   *  formula1/2 strings (a stated formula keeps its leading `=`; none reads
+   *  empty), and the surrounding error/prompt metadata. `showDropDown` is
+   *  whether the in-cell arrow is shown. Empty when `capabilities.dataValidation`
+   *  is off or when the engine returns no rules. */
   getValidationsForSheet(sheet: number): {
     ranges: Range[];
     type: number;
-    op: number;
-    errorStyle: number;
+    op: ComparisonOperator;
+    errorStyle: ValidationErrorStyle;
     allowBlank: boolean;
     showInputMessage: boolean;
     showErrorMessage: boolean;
-    showDropDown?: boolean;
+    showDropDown: boolean;
     formula1: string;
     formula2: string;
     errorTitle: string;
@@ -148,9 +140,7 @@ export abstract class WorkbookHandleValidationMethods {
   }[] {
     assertAlive(this);
     if (!this.capabilities.dataValidation) return [];
-    const arr = wb(this).getValidations(sheet);
-    if (!arr.status.ok) return [];
-    return arr.map((v) => ({
+    return orFallback([], () => ws(this, sheet).listValidations()).map((v) => ({
       ranges: v.ranges.map((m) => ({
         sheet,
         r0: m.firstRow,
@@ -159,19 +149,18 @@ export abstract class WorkbookHandleValidationMethods {
         c1: m.lastCol,
       })),
       type: v.type,
-      op: v.op,
+      op: v.operator,
       errorStyle: v.errorStyle,
       allowBlank: v.allowBlank,
       showInputMessage: v.showInputMessage,
       showErrorMessage: v.showErrorMessage,
-      showDropDown:
-        'showDropDown' in v && typeof v.showDropDown === 'boolean' ? v.showDropDown : undefined,
-      formula1: v.formula1,
-      formula2: v.formula2,
-      errorTitle: v.errorTitle,
-      errorMessage: v.errorMessage,
-      promptTitle: v.promptTitle,
-      promptMessage: v.promptMessage,
+      showDropDown: v.showInCellDropdown,
+      formula1: v.formula1 ?? '',
+      formula2: v.formula2 ?? '',
+      errorTitle: v.errorTitle ?? '',
+      errorMessage: v.errorMessage ?? '',
+      promptTitle: v.promptTitle ?? '',
+      promptMessage: v.promptMessage ?? '',
     }));
   }
 
@@ -182,9 +171,9 @@ export abstract class WorkbookHandleValidationMethods {
     sheet: number,
     input: {
       ranges: Range[];
-      type: number;
-      op?: number;
-      errorStyle?: number;
+      type: ValidationType;
+      op?: ComparisonOperator;
+      errorStyle?: ValidationErrorStyle;
       allowBlank?: boolean;
       showInputMessage?: boolean;
       showErrorMessage?: boolean;
@@ -207,12 +196,12 @@ export abstract class WorkbookHandleValidationMethods {
         lastRow: r.r1,
         lastCol: r.c1,
       })),
-      ...(input.op !== undefined ? { op: input.op } : {}),
+      ...(input.op !== undefined ? { operator: input.op } : {}),
       ...(input.errorStyle !== undefined ? { errorStyle: input.errorStyle } : {}),
       ...(input.allowBlank !== undefined ? { allowBlank: input.allowBlank } : {}),
       ...(input.showInputMessage !== undefined ? { showInputMessage: input.showInputMessage } : {}),
       ...(input.showErrorMessage !== undefined ? { showErrorMessage: input.showErrorMessage } : {}),
-      ...(input.showDropDown !== undefined ? { showDropDown: input.showDropDown } : {}),
+      ...(input.showDropDown !== undefined ? { showInCellDropdown: input.showDropDown } : {}),
       ...(input.formula1 !== undefined ? { formula1: input.formula1 } : {}),
       ...(input.formula2 !== undefined ? { formula2: input.formula2 } : {}),
       ...(input.errorTitle !== undefined ? { errorTitle: input.errorTitle } : {}),
@@ -220,24 +209,23 @@ export abstract class WorkbookHandleValidationMethods {
       ...(input.promptTitle !== undefined ? { promptTitle: input.promptTitle } : {}),
       ...(input.promptMessage !== undefined ? { promptMessage: input.promptMessage } : {}),
     };
-    const s = wb(this).addValidation(sheet, dv);
-    return s.ok;
+    return attempt(() => {
+      ws(this, sheet).addValidation(dv);
+    });
   }
 
   /** Remove the validation rule at `index` on `sheet`. */
   removeValidationAt(sheet: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.dataValidation) return false;
-    const s = wb(this).removeValidationAt(sheet, index);
-    return s.ok;
+    return attempt(() => ws(this, sheet).removeValidation(index));
   }
 
   /** Drop every validation rule on `sheet`. */
   clearValidations(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.dataValidation) return false;
-    const s = wb(this).clearValidations(sheet);
-    return s.ok;
+    return attempt(() => ws(this, sheet).clearValidations());
   }
 }
 

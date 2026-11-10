@@ -1,14 +1,21 @@
+import { CellShift, type ValidationType } from '@libraz/formulon';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { hydrateThreadedCommentsFromEngine } from '../engine/annotations-sync.js';
 import {
   type ActiveAxisFormatSnapshot,
   captureActiveAxisFormatOverrideForStructure,
   restoreActiveAxisFormatOverrideForStructure,
 } from '../engine/axis-format-sync.js';
+import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
+import { hydrateCommentsAndHyperlinksFromEngine } from '../engine/format-sync.js';
+import { hydrateMergesFromEngine } from '../engine/merges-sync.js';
 import {
   captureSyncedFormatKeysForStructure,
   restoreSyncedFormatKeysForStructure,
 } from '../engine/synced-format-keys.js';
+import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { hydrateValidationsFromEngine } from '../engine/validation-sync.js';
 import { writeCell } from '../engine/value.js';
 import {
   type ActiveWholeSheetFontSnapshot,
@@ -26,20 +33,15 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
-import { listComments, recordCommentChange } from './comment.js';
+import { listComments } from './comment.js';
 import { blockDataTableShift } from './data-table-guard.js';
 import { tableForCell } from './format-as-table.js';
 import { adjustFormulaForCellBandShift } from './formula-refs.js';
 import type { History } from './history.js';
 import { blockPivotEdit } from './pivot-guard.js';
 import { blockedByProtection } from './protection.js';
-import {
-  recordConditionalRulesChange,
-  recordFormatChange,
-  recordMergesChangeWithEngine,
-} from './slice-history.js';
+import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
 import { deleteCols, deleteVisibleRows, insertCols, insertRows } from './structure.js';
-import { shiftTablesForCols, shiftTablesForRows } from './table-rows.js';
 
 export type InsertCellsDirection = 'down' | 'right';
 export type DeleteCellsDirection = 'up' | 'left';
@@ -176,24 +178,14 @@ export function insertCells(
   range: Range,
   direction: InsertCellsDirection,
 ): boolean {
-  const sheet = range.sheet;
   const lines = wholeLineEdit(store, range);
   if (lines) {
     return lines.axis === 'row'
       ? insertRows(store, wb, history, lines.at, lines.count)
       : insertCols(store, wb, history, lines.at, lines.count);
   }
-  if (blockedByProtection(store, sheet, 'insert cells')) return false;
-  const affected: Range =
-    direction === 'down'
-      ? { sheet, r0: range.r0, c0: range.c0, r1: MAX_ROW, c1: range.c1 }
-      : { sheet, r0: range.r0, c0: range.c0, r1: range.r1, c1: MAX_COL };
-  const delta = direction === 'down' ? range.r1 - range.r0 + 1 : range.c1 - range.c0 + 1;
-  if (delta > 0 && shiftWouldOverflow(store, wb, affected, direction, delta)) return false;
-  if (blockDataTableShift(wb, affected)) return false;
-  // Shifted cells cannot carry a report along.
-  if (blockPivotEdit(wb, affected)) return false;
-  return shiftCellBand(store, wb, history, affected, direction, delta);
+  if (blockedByProtection(store, range.sheet, 'insert cells')) return false;
+  return shiftCellsViaEngine(store, wb, history, range, direction);
 }
 
 /** Table Rows Above: insert as many rows as `range` spans, within the table's columns only. */
@@ -229,23 +221,14 @@ export function deleteCells(
   range: Range,
   direction: DeleteCellsDirection,
 ): boolean {
-  const sheet = range.sheet;
   const lines = wholeLineEdit(store, range);
   if (lines) {
     return lines.axis === 'row'
       ? deleteVisibleRows(store, wb, history, lines.at, lines.count)
       : deleteCols(store, wb, history, lines.at, lines.count);
   }
-  if (blockedByProtection(store, sheet, 'delete cells')) return false;
-  const affected: Range =
-    direction === 'up'
-      ? { sheet, r0: range.r0, c0: range.c0, r1: MAX_ROW, c1: range.c1 }
-      : { sheet, r0: range.r0, c0: range.c0, r1: range.r1, c1: MAX_COL };
-  const delta = direction === 'up' ? -(range.r1 - range.r0 + 1) : -(range.c1 - range.c0 + 1);
-  if (blockDataTableShift(wb, affected)) return false;
-  // Shifted cells cannot carry a report along.
-  if (blockPivotEdit(wb, affected)) return false;
-  return shiftCellBand(store, wb, history, affected, direction === 'up' ? 'down' : 'right', delta);
+  if (blockedByProtection(store, range.sheet, 'delete cells')) return false;
+  return shiftCellsViaEngine(store, wb, history, range, direction);
 }
 
 /** A range of whole rows or whole columns on the active sheet. Excel ignores
@@ -263,91 +246,310 @@ function wholeLineEdit(
     : { axis: 'col', at: range.c0, count: range.c1 - range.c0 + 1 };
 }
 
-function shiftCellBand(
+const ENGINE_SHIFT: Readonly<Record<InsertCellsDirection | DeleteCellsDirection, CellShift>> = {
+  down: CellShift.Down,
+  right: CellShift.Right,
+  up: CellShift.Up,
+  left: CellShift.Left,
+};
+
+const INVERSE_SHIFT: Readonly<Record<CellShift, CellShift>> = {
+  [CellShift.Down]: CellShift.Up,
+  [CellShift.Up]: CellShift.Down,
+  [CellShift.Right]: CellShift.Left,
+  [CellShift.Left]: CellShift.Right,
+};
+
+/** The store slices a cell shift rewrites. */
+interface ShiftStoreSlices {
+  readonly format: State['format'];
+  readonly merges: State['merges'];
+  readonly conditional: State['conditional'];
+  readonly tables: State['tables'];
+  readonly threadedComments: State['threadedComments'];
+}
+
+const captureShiftStoreSlices = (state: State): ShiftStoreSlices =>
+  structuredClone({
+    format: state.format,
+    merges: state.merges,
+    conditional: state.conditional,
+    tables: state.tables,
+    threadedComments: state.threadedComments,
+  });
+
+/** What the engine cannot rebuild by shifting back: the sheet's cells and
+ *  formulas everywhere, the band's styles, notes, merges, conditional formats,
+ *  validations, defined names and hyperlinks as they stood. */
+interface EngineShiftCheckpoint {
+  readonly cells: readonly CellRecord[];
+  readonly externalFormulas: readonly CellRecord[];
+  readonly style: Uint8Array | null;
+  readonly comments: readonly EngineCommentRecord[];
+  readonly merges: readonly Range[];
+  readonly conditionalFormats: ReturnType<WorkbookHandle['getConditionalFormats']>;
+  readonly validations: ReturnType<WorkbookHandle['getValidationsForSheet']>;
+  readonly definedNames: ReturnType<typeof listNames>;
+  readonly hyperlinks: ReturnType<WorkbookHandle['getHyperlinksFull']>;
+}
+
+const listNames = (wb: WorkbookHandle) => [...wb.definedNames()];
+
+/** Null when the band's styles cannot be captured; the shift is then refused. */
+function captureEngineShiftCheckpoint(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  band: Range,
+): EngineShiftCheckpoint | null {
+  const sheet = band.sheet;
+  const style = wb.capabilities.rangeStyleSnapshot === true ? wb.snapshotRangeStyle(band) : null;
+  if (wb.capabilities.rangeStyleSnapshot === true && style === null) return null;
+  return {
+    cells: collectSheetCells(wb, sheet),
+    externalFormulas: collectExternalFormulaCells(wb, sheet),
+    style,
+    comments: collectEngineComments(
+      wb,
+      band,
+      listComments(store.getState(), sheet).map((comment) => comment.addr),
+    ),
+    merges: wb.capabilities.merges ? wb.getMerges(sheet).map((merge) => ({ ...merge })) : [],
+    conditionalFormats: wb.getConditionalFormats(sheet),
+    validations: wb.getValidationsForSheet(sheet),
+    definedNames: listNames(wb),
+    hyperlinks: wb.getHyperlinksFull(sheet),
+  };
+}
+
+/** Put the engine back to `checkpoint` after the inverse shift moved the band back. */
+function restoreEngineShiftCheckpoint(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  band: Range,
+  checkpoint: EngineShiftCheckpoint,
+): void {
+  const sheet = band.sheet;
+  wb.withBatchedRecalc(() => {
+    restoreSheetCells(wb, sheet, checkpoint.cells);
+    restoreFormulaCells(wb, checkpoint.externalFormulas);
+  });
+  if (checkpoint.style !== null && !wb.restoreRangeStyle(sheet, checkpoint.style)) {
+    throw new Error('cell shift: failed to restore band styles');
+  }
+  if (wb.capabilities.comments) {
+    const current = collectEngineComments(
+      wb,
+      band,
+      listComments(store.getState(), sheet).map((comment) => comment.addr),
+    );
+    for (const comment of current)
+      wb.setCommentEntry(sheet, comment.addr.row, comment.addr.col, '', '');
+    for (const comment of checkpoint.comments) {
+      wb.setCommentEntry(
+        sheet,
+        comment.addr.row,
+        comment.addr.col,
+        comment.author,
+        comment.text,
+        comment.visible,
+      );
+    }
+  }
+  if (wb.capabilities.merges) {
+    if (!wb.engineClearMerges(sheet)) throw new Error('cell shift: failed to restore merges');
+    for (const merge of checkpoint.merges) {
+      if (!wb.engineAddMerge(sheet, merge)) throw new Error('cell shift: failed to restore merge');
+    }
+  }
+  if (wb.capabilities.conditionalFormatMutate) {
+    wb.clearConditionalFormats(sheet);
+    for (const rule of checkpoint.conditionalFormats) {
+      if (wb.addConditionalFormat(sheet, rule) < 0) {
+        throw new Error('cell shift: failed to restore a conditional format');
+      }
+    }
+  }
+  if (wb.capabilities.dataValidation) {
+    wb.clearValidations(sheet);
+    for (const rule of checkpoint.validations) {
+      if (!wb.addValidationEntry(sheet, { ...rule, type: rule.type as ValidationType })) {
+        throw new Error('cell shift: failed to restore a validation');
+      }
+    }
+  }
+  const names = new Map(listNames(wb).map((name) => [`${name.localSheetId}:${name.name}`, name]));
+  for (const name of checkpoint.definedNames) {
+    const current = names.get(`${name.localSheetId}:${name.name}`);
+    if (current?.formula !== name.formula) {
+      wb.setDefinedNameEntry(name.name, name.formula, name.localSheetId);
+    }
+  }
+  if (checkpoint.hyperlinks && wb.capabilities.hyperlinks) {
+    wb.clearHyperlinks(sheet);
+    for (const link of checkpoint.hyperlinks) {
+      wb.addHyperlinkRange(
+        sheet,
+        link.range.firstRow,
+        link.range.firstCol,
+        link.range.lastRow,
+        link.range.lastCol,
+        link.target ?? '',
+        link.display ?? '',
+        link.tooltip ?? '',
+        link.location ?? '',
+      );
+    }
+  }
+  wb.recalcAuto();
+}
+
+/** Bring the store in line with an engine shift of `range`. The engine is
+ *  read back for cells, merges, imported conditional formats, tables and
+ *  threaded comments. Per-cell formats are shifted in the store: the engine
+ *  cannot yet enumerate format-only cells. Session conditional formats, which
+ *  the engine has not been given yet, shift with their cells. */
+function mirrorEngineShift(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  band: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+): void {
+  const sheet = band.sheet;
+  wb.withEngineSyncMuted(() => {
+    store.setState((s) => {
+      const shifted = shiftFormatMap(s.format.formats, band, axis, delta);
+      const formats =
+        delta > 0
+          ? inheritInsertedValidations(s.format.formats, shifted, band, axis, delta)
+          : shifted;
+      const rangeValidations = shiftRangeValidationsForBand(
+        s.format.rangeValidations,
+        band,
+        axis,
+        delta,
+      );
+      const rules = s.conditional.rules.flatMap<ConditionalRule>((rule) => {
+        if (rule.range.sheet !== sheet || rule.engineId !== undefined) return [rule];
+        return rangePiecesAfterBandShift(rule.range, band, axis, delta, 'inside').map((range) => ({
+          ...rule,
+          range,
+        }));
+      });
+      return {
+        ...s,
+        format: { ...s.format, formats, rangeValidations },
+        conditional: { rules },
+      };
+    });
+    if (sheet === store.getState().data.sheetIndex) mutators.replaceCells(store, wb.cells(sheet));
+    hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
+    hydrateMergesFromEngine(wb, store, sheet);
+    hydrateConditionalRulesFromEngine(wb, store, sheet);
+    hydrateValidationsFromEngine(wb, store, sheet);
+    hydrateTableOverlaysFromEngine(wb, store);
+    hydrateThreadedCommentsFromEngine(wb, store, sheet);
+  });
+}
+
+/** Move the store's per-cell formats and range validations of `band` by
+ *  `delta` rows after the engine shifted the band's cells (a totals row
+ *  turned on or off). The engine cannot yet enumerate format-only cells. */
+export function mirrorBandFormatsDown(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  band: Range,
+  delta: number,
+): void {
+  wb.withEngineSyncMuted(() => {
+    store.setState((s) => ({
+      ...s,
+      format: {
+        ...s.format,
+        formats: shiftFormatMap(s.format.formats, band, 'down', delta),
+        rangeValidations: shiftRangeValidationsForBand(
+          s.format.rangeValidations,
+          band,
+          'down',
+          delta,
+        ),
+      },
+    }));
+  });
+}
+
+function restoreShiftStoreSlices(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+  slices: ShiftStoreSlices,
+): void {
+  wb.withEngineSyncMuted(() => {
+    store.setState((s) => ({ ...s, ...structuredClone(slices) }));
+    if (sheet === store.getState().data.sheetIndex) mutators.replaceCells(store, wb.cells(sheet));
+  });
+}
+
+/** Insert or delete the cells of `range` through the engine, which moves the
+ *  band's cells, adjusts every reference and splits conditional formats,
+ *  validations and merges. One history step; undo shifts back and restores
+ *  what the shift removed. */
+function shiftCellsViaEngine(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
   history: History | null,
-  affected: Range,
-  axis: InsertCellsDirection,
-  delta: number,
+  range: Range,
+  direction: InsertCellsDirection | DeleteCellsDirection,
 ): boolean {
-  if (delta === 0) return true;
-  const replayRecovery: ShiftHistoryReplayRecovery = {};
-  if (history && !history.isReplaying()) {
-    replayRecovery.capture = () => captureShiftReplayCheckpoint(wb, store, affected);
+  // Shifting cells is an engine operation; the stub engine cannot do it.
+  if (!wb.capabilities.insertDeleteRowsCols) return false;
+  const sheet = range.sheet;
+  const axis: InsertCellsDirection = direction === 'down' || direction === 'up' ? 'down' : 'right';
+  const band: Range =
+    axis === 'down'
+      ? { sheet, r0: range.r0, c0: range.c0, r1: MAX_ROW, c1: range.c1 }
+      : { sheet, r0: range.r0, c0: range.c0, r1: range.r1, c1: MAX_COL };
+  const span = axis === 'down' ? range.r1 - range.r0 + 1 : range.c1 - range.c0 + 1;
+  const delta = direction === 'down' || direction === 'right' ? span : -span;
+  const shift = ENGINE_SHIFT[direction];
+  const record = history !== null && !history.isReplaying();
+  const beforeEngine = record ? captureEngineShiftCheckpoint(wb, store, band) : null;
+  if (record && beforeEngine === null) return false;
+  const beforeStore = record ? captureShiftStoreSlices(store.getState()) : null;
+  if (!wb.engineShiftCells(range, shift)) {
+    explainRefusedShift(wb, band);
+    return false;
   }
-  const transaction = history?.begin();
-  let transactionClosed = false;
-  try {
-    if (!shiftCellsWithHistory(wb, history, affected, axis, delta, replayRecovery)) return false;
-    const initialStoreCommentAddresses = listComments(store.getState(), affected.sheet)
-      .filter((comment) => rangeContainsAddr(affected, comment.addr))
-      .map((comment) => comment.addr);
-    const initialStoreCommentKeys = new Set(initialStoreCommentAddresses.map(addrKey));
-    const engineComments = collectEngineComments(wb, affected, initialStoreCommentAddresses);
-    hydrateEngineOnlyComments(store, engineComments, initialStoreCommentKeys);
-    const storeCommentAddresses = listComments(store.getState(), affected.sheet)
-      .filter((comment) => rangeContainsAddr(affected, comment.addr))
-      .map((comment) => comment.addr);
-    const commentAddresses = collectShiftCommentAddresses(
-      storeCommentAddresses,
-      engineComments,
-      affected,
-      axis,
-      delta,
-    );
-    recordCommentChange(history, store, wb, commentAddresses, () => {
-      shiftFormats(store, history, affected, axis, delta);
-      shiftEngineComments(wb, affected, axis, delta, engineComments);
+  wb.recalcAuto();
+  mirrorEngineShift(store, wb, band, axis, delta);
+  if (record && beforeEngine && beforeStore) {
+    const afterStore = captureShiftStoreSlices(store.getState());
+    history.push({
+      undo: () => {
+        if (!wb.engineShiftCells(range, INVERSE_SHIFT[shift])) {
+          throw new Error('cell shift: the engine refused to shift back');
+        }
+        restoreEngineShiftCheckpoint(wb, store, band, beforeEngine);
+        restoreShiftStoreSlices(store, wb, sheet, beforeStore);
+      },
+      redo: () => {
+        if (!wb.engineShiftCells(range, shift)) throw new Error('cell shift: redo was refused');
+        wb.recalcAuto();
+        restoreShiftStoreSlices(store, wb, sheet, afterStore);
+      },
     });
-    shiftMerges(store, wb, history, affected, axis, delta);
-    shiftConditionalRules(store, history, affected, axis, delta);
-    if (axis === 'down') {
-      shiftTablesForRows(store, wb, history, affected.sheet, affected.r0, delta, {
-        c0: affected.c0,
-        c1: affected.c1,
-      });
-    } else if (delta > 0) {
-      shiftTablesForCols(store, wb, history, affected.sheet, affected.c0, delta, {
-        r0: affected.r0,
-        r1: affected.r1,
-      });
-    }
-    wb.recalcAuto();
-    if (history && !history.isReplaying()) {
-      replayRecovery.restore = (phase) => {
-        const checkpoint = phase === 'undo' ? replayRecovery.after : replayRecovery.before;
-        if (!checkpoint) throw new Error(`cell shift: ${phase} replay checkpoint was not armed`);
-        restoreShiftReplayCheckpoint(wb, store, affected, checkpoint);
-      };
-      history.push({
-        undo: () => {
-          replayRecovery.after = replayRecovery.capture?.();
-        },
-        redo: () => {
-          replayRecovery.before = undefined;
-          replayRecovery.after = undefined;
-        },
-      });
-    }
-  } catch (error) {
-    if (transaction !== undefined) {
-      transactionClosed = true;
-      try {
-        history?.abort(transaction);
-      } catch (abortError) {
-        throw new AggregateError(
-          [error, abortError],
-          'cell shift: initial transaction rollback failed',
-          { cause: error },
-        );
-      }
-    }
-    throw error;
-  } finally {
-    if (transaction !== undefined && !transactionClosed) history?.end(transaction);
   }
   return true;
+}
+
+/** Tell the user why the engine refused a shift: a PivotTable or data table in
+ *  the way has its own alert; anything else (a table, an array formula, content
+ *  pushed off the grid) is logged. */
+function explainRefusedShift(wb: WorkbookHandle, band: Range): void {
+  if (blockPivotEdit(wb, band)) return;
+  if (blockDataTableShift(wb, band)) return;
+  // eslint-disable-next-line no-console
+  console.warn('formulon-cell: cell shift blocked by a table, array formula or the grid edge');
 }
 
 /**
@@ -556,63 +758,6 @@ function restoreFormulaCells(wb: WorkbookHandle, cells: readonly CellRecord[]): 
   wb.recalcAuto();
 }
 
-function collectShiftCommentAddresses(
-  storeCommentAddresses: readonly Addr[],
-  engineComments: readonly EngineCommentRecord[],
-  affected: Range,
-  axis: InsertCellsDirection,
-  delta: number,
-): Addr[] {
-  const tracked = new Map<string, Addr>();
-  const add = (addr: Addr): void => {
-    tracked.set(addrKey(addr), addr);
-  };
-  for (const addr of storeCommentAddresses) {
-    add(addr);
-    const shifted = shiftedCommentAddr(addr, axis, delta);
-    if (inShiftTarget(shifted, affected, axis)) add(shifted);
-  }
-  for (const comment of engineComments) {
-    add(comment.addr);
-    const shifted = shiftedCommentAddr(comment.addr, axis, delta);
-    if (inShiftTarget(shifted, affected, axis)) add(shifted);
-  }
-  return [...tracked.values()];
-}
-
-function shiftedCommentAddr(addr: Addr, axis: InsertCellsDirection, delta: number): Addr {
-  return axis === 'down' ? { ...addr, row: addr.row + delta } : { ...addr, col: addr.col + delta };
-}
-
-function shiftEngineComments(
-  wb: WorkbookHandle,
-  affected: Range,
-  axis: InsertCellsDirection,
-  delta: number,
-  entries: readonly EngineCommentRecord[],
-): void {
-  if (!wb.capabilities.comments) return;
-  if (entries.length === 0) return;
-
-  wb.withBatchedRecalc(() => {
-    for (const entry of entries) {
-      wb.setCommentEntry(entry.addr.sheet, entry.addr.row, entry.addr.col, '', '');
-    }
-    for (const entry of entries) {
-      const shifted = shiftedCommentAddr(entry.addr, axis, delta);
-      if (!inShiftTarget(shifted, affected, axis)) continue;
-      wb.setCommentEntry(
-        shifted.sheet,
-        shifted.row,
-        shifted.col,
-        entry.author,
-        entry.text,
-        entry.visible,
-      );
-    }
-  });
-}
-
 function collectEngineComments(
   wb: WorkbookHandle,
   affected: Range,
@@ -643,21 +788,6 @@ function collectEngineComments(
     if (rangeContainsAddr(affected, entry.addr)) unique.set(addrKey(entry.addr), entry);
   }
   return [...unique.values()];
-}
-
-function hydrateEngineOnlyComments(
-  store: SpreadsheetStore,
-  entries: readonly EngineCommentRecord[],
-  storeCommentKeys: ReadonlySet<string>,
-): void {
-  for (const entry of entries) {
-    if (storeCommentKeys.has(addrKey(entry.addr))) continue;
-    mutators.setCellFormat(store, entry.addr, {
-      comment: entry.text,
-      commentAuthor: entry.author || undefined,
-      commentVisible: entry.visible || undefined,
-    });
-  }
 }
 
 /** Move the cells inside `affected` by `delta` along `axis` and rewrite every
@@ -824,60 +954,6 @@ function mergeFitsBand(merge: Range, affected: Range, axis: InsertCellsDirection
     : merge.r0 >= affected.r0 && merge.r1 <= affected.r1 && merge.c0 >= affected.c0;
 }
 
-function shiftWouldOverflow(
-  store: SpreadsheetStore,
-  wb: WorkbookHandle,
-  affected: Range,
-  axis: InsertCellsDirection,
-  delta: number,
-): boolean {
-  const overflows = (addr: Addr): boolean => {
-    if (!rangeContainsAddr(affected, addr)) return false;
-    return axis === 'down' ? addr.row + delta > MAX_ROW : addr.col + delta > MAX_COL;
-  };
-  for (const cell of wb.physicalCells(affected.sheet)) {
-    if (overflows(cell.addr)) {
-      // eslint-disable-next-line no-console
-      console.warn('formulon-cell: cell shift blocked — content would leave the worksheet');
-      return true;
-    }
-  }
-  for (const key of store.getState().format.formats.keys()) {
-    const addr = parseAddrKey(key);
-    if (!addr) continue;
-    if (overflows(addr)) {
-      // eslint-disable-next-line no-console
-      console.warn('formulon-cell: cell shift blocked — format would leave the worksheet');
-      return true;
-    }
-  }
-  if (wb.capabilities.commentsEnumerable) {
-    for (const comment of wb.getComments(affected.sheet)) {
-      if (overflows({ sheet: affected.sheet, row: comment.row, col: comment.col })) {
-        // eslint-disable-next-line no-console
-        console.warn('formulon-cell: cell shift blocked — comment would leave the worksheet');
-        return true;
-      }
-    }
-  }
-  for (const merge of store.getState().merges.byAnchor.values()) {
-    if (
-      merge.sheet !== affected.sheet ||
-      !mergeIntersectsShiftBand(merge, affected, axis) ||
-      !mergeFitsBand(merge, affected, axis)
-    ) {
-      continue;
-    }
-    const shifted = shiftRange(merge, axis, delta);
-    if (shifted.r1 > MAX_ROW || shifted.c1 > MAX_COL) {
-      // eslint-disable-next-line no-console
-      console.warn('formulon-cell: cell shift blocked — merge would leave the worksheet');
-      return true;
-    }
-  }
-  return false;
-}
-
 const transposeRange = (r: Range): Range => ({ ...r, r0: r.c0, c0: r.r0, r1: r.c1, c1: r.r1 });
 
 /** Areas a range covers once the cells of `affected` move by `delta`. Cells
@@ -961,34 +1037,6 @@ function coalesceRanges(pieces: Range[]): Range[] {
     }
   }
   return out.sort((a, b) => a.r0 - b.r0 || a.c0 - b.c0);
-}
-
-const sameRange = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
-
-/** Re-point conditional-format ranges after a cell shift; a rule whose cells
- *  end up in several areas becomes one rule per area. */
-function shiftConditionalRules(
-  store: SpreadsheetStore,
-  history: History | null,
-  affected: Range,
-  axis: InsertCellsDirection,
-  delta: number,
-): void {
-  recordConditionalRulesChange(history, store, () => {
-    store.setState((s) => {
-      let changed = false;
-      const rules = s.conditional.rules.flatMap<ConditionalRule>((rule) => {
-        if (rule.range.sheet !== affected.sheet) return [rule];
-        const pieces = rangePiecesAfterBandShift(rule.range, affected, axis, delta, 'inside');
-        const [only] = pieces;
-        if (pieces.length === 1 && only && sameRange(only, rule.range)) return [rule];
-        changed = true;
-        return pieces.map((range) => ({ ...rule, range }));
-      });
-      return changed ? { ...s, conditional: { rules } } : s;
-    });
-  });
 }
 
 /** Range-stored validations follow the cells of the band; inserted cells take

@@ -59,10 +59,7 @@ const formulaRefSheet = (
   if (before.endsWith(']') || raw.includes('[') || raw.includes(']')) return null;
   if (!prefix) return activeSheet;
   const requested = (prefix[1] ?? prefix[2] ?? '').replaceAll("''", "'");
-  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
-    if (wb.sheetName(sheet).toLocaleLowerCase() === requested.toLocaleLowerCase()) return sheet;
-  }
-  return null;
+  return wb.sheetIndexByName(requested);
 };
 
 const formulaRefValueText = (

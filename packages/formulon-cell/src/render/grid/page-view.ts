@@ -56,6 +56,7 @@ const paperEndOf = (run: BandRun, trail: number): number =>
   run.paperEnd ?? (run.closes ? run.end + trail : run.end);
 
 const CSS_PX_PER_POINT = 96 / 72;
+const POINTS_PER_INCH = 72;
 
 type SegmentKind = 'content' | 'paper' | 'gutter';
 
@@ -73,7 +74,7 @@ function nativePageForBand(
   axis: 'row' | 'col',
 ): NonNullable<SheetPagination['native']>['pages'][number] | undefined {
   return pagination.native?.pages.find((page) =>
-    axis === 'row' ? page.firstRow === band.start : page.firstCol === band.start,
+    axis === 'row' ? page.range.firstRow === band.start : page.range.firstCol === band.start,
   );
 }
 
@@ -103,9 +104,11 @@ function nativePaperStartForBand(
   // of which earlier runs happen to be visible.
   const previousPage = native.pages
     .filter((candidate) =>
-      axis === 'row' ? candidate.lastRow < band.start : candidate.lastCol < band.start,
+      axis === 'row' ? candidate.range.lastRow < band.start : candidate.range.lastCol < band.start,
     )
-    .sort((a, b) => (axis === 'row' ? b.lastRow - a.lastRow : b.lastCol - a.lastCol))[0];
+    .sort((a, b) =>
+      axis === 'row' ? b.range.lastRow - a.range.lastRow : b.range.lastCol - a.range.lastCol,
+    )[0];
   if (previousPage) {
     const previousOrigin = nativePageOriginPt(pagination, previousPage, axis);
     return run.start - previousOrigin * factor;
@@ -148,7 +151,7 @@ function nativePageOriginPt(
   const origin = axis === 'row' ? page.originYPt : page.originXPt;
   const printableOrigin = axis === 'row' ? native.printable.y : native.printable.x;
   const pageExtent = axis === 'row' ? page.heightPt : page.widthPt;
-  const printableExtent = axis === 'row' ? native.printable.height : native.printable.width;
+  const printableExtent = axis === 'row' ? native.printable.heightPt : native.printable.widthPt;
   const centered = axis === 'row' ? pagination.centerVertically : pagination.centerHorizontally;
   if (!centered) return origin;
   const titleOffset = Math.max(0, origin - printableOrigin);
@@ -583,16 +586,16 @@ function paintPageBands(
         ? (CSS_PX_PER_POINT * axes.zoom) / Math.max(pagination.scale, 0.01)
         : 1;
       const nativeMarginLeft = pagination.native
-        ? pagination.native.margins.left * nativeFactor
+        ? pagination.native.margins.leftIn * POINTS_PER_INCH * nativeFactor
         : axes.margins.left;
       const nativeMarginRight = pagination.native
-        ? pagination.native.margins.right * nativeFactor
+        ? pagination.native.margins.rightIn * POINTS_PER_INCH * nativeFactor
         : axes.margins.right;
       const nativeMarginTop = pagination.native
-        ? pagination.native.margins.top * nativeFactor
+        ? pagination.native.margins.topIn * POINTS_PER_INCH * nativeFactor
         : axes.margins.top;
       const nativeMarginBottom = pagination.native
-        ? pagination.native.margins.bottom * nativeFactor
+        ? pagination.native.margins.bottomIn * POINTS_PER_INCH * nativeFactor
         : axes.margins.bottom;
       const paperLeft = nativeRect ? nativeRect.x : paperStartOf(colRun, axes.margins.left);
       const paperRight = nativeRect

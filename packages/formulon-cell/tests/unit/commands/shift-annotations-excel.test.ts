@@ -1,16 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { deleteCells, insertCells } from '../../../src/commands/cell-shift.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../../../src/commands/structure.js';
 import { MAX_COL, MAX_ROW } from '../../../src/engine/address.js';
 import type { Range } from '../../../src/engine/types.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { validationAt } from '../../../src/store/range-validations.js';
 import {
   createSpreadsheetStore,
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
-import { newWb } from './structure/fixtures.js';
 
 // Measured against desktop Excel: a grid B2:G9 with merges B3:D3, F2:F5, B6:C7,
 // cell-value rules on C3:E6 (> 50) and G2:G9 (< 75), and validations on D4:F7
@@ -73,13 +72,21 @@ describe('cell and axis shifts keep merges, conditional formats and validations 
     mutators.extendRangeTo(store, { sheet: 0, row: range.r1, col: range.c1 });
   };
 
+  afterEach(() => {
+    wb.dispose();
+  });
+
   beforeEach(async () => {
     store = createSpreadsheetStore();
-    wb = await newWb();
+    wb = await WorkbookHandle.createDefault();
+    wb.attachStore(store);
     for (let row = 1; row <= 8; row += 1)
       for (let col = 1; col <= 6; col += 1)
         wb.setNumber({ sheet: 0, row, col }, (row + 1) * 10 + col + 1);
-    for (const m of ['B3:D3', 'F2:F5', 'B6:C7']) mutators.mergeRange(store, rect(m));
+    for (const m of ['B3:D3', 'F2:F5', 'B6:C7']) {
+      mutators.mergeRange(store, rect(m));
+      wb.engineAddMerge(0, rect(m));
+    }
     mutators.addConditionalRule(store, {
       kind: 'cell-value',
       range: rect('C3:E6'),

@@ -1,5 +1,5 @@
 import { addrKey, formatA1Cell } from '../engine/address.js';
-import { type CellValue, type Range, ValueKind } from '../engine/types.js';
+import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialToDate } from '../format/date-serial.js';
 import type {
@@ -177,12 +177,7 @@ function nativeConditionalFormulaPasses(
       { row: anchorRow, col: anchorCol },
       formula,
     );
-    if (!result.status.ok) return false;
-    if (result.value.kind === ValueKind.Bool) return result.value.boolean !== 0;
-    if (result.value.kind === ValueKind.Number) {
-      return Number.isFinite(result.value.number) && result.value.number !== 0;
-    }
-    return false;
+    return result === true;
   } catch {
     // A capability-enabled engine must not silently switch to the local
     // evaluator after an error: the two evaluators can have different

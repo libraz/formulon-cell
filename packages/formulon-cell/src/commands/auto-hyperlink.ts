@@ -99,18 +99,22 @@ const underlineFromOrdinal = (ordinal: number | undefined): CellFormat['underlin
 
 function fontPatchFromNamedStyle(wb: WorkbookHandle, xf: CellXf): Partial<CellFormat> | null {
   const font = wb.getResolvedFontRecord(xf.fontIndex);
+  const sizePt = font?.sizePt;
+  const argb = font?.color?.argb;
   if (
     !font?.name ||
-    !Number.isFinite(font.size) ||
-    font.size <= 0 ||
-    !Number.isFinite(font.colorArgb)
+    typeof sizePt !== 'number' ||
+    !Number.isFinite(sizePt) ||
+    sizePt <= 0 ||
+    typeof argb !== 'number' ||
+    !Number.isFinite(argb)
   ) {
     return null;
   }
-  const color = cssColorFromArgb(font.colorArgb);
+  const color = cssColorFromArgb(argb);
   return {
     fontFamily: font.name,
-    fontSize: fontPointsToCssPx(font.size),
+    fontSize: fontPointsToCssPx(sizePt),
     bold: font.bold ?? false,
     italic: font.italic ?? false,
     strike: font.strike ?? false,
@@ -130,7 +134,7 @@ function defaultHyperlinkFontPatch(wb: WorkbookHandle): Partial<CellFormat> | nu
   const rawDefault = resolvedDefault ?? wb.getFontRecord(0);
   const displayFont = wb.workbookDisplayFont;
   const name = displayFont?.name ?? rawDefault?.name;
-  const size = displayFont?.size ?? rawDefault?.size;
+  const size = displayFont?.size ?? rawDefault?.sizePt;
   const hyperlinkColor = wb.getTheme()?.colors[10];
   if (
     !name ||

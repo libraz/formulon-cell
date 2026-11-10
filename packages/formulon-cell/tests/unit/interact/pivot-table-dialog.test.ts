@@ -46,6 +46,7 @@ const makeWb = () => {
     capabilities: { pivotTableMutate: true },
     sheetCount: 1,
     sheetName: () => 'Sheet1',
+    sheetIndexByName: (name: string) => (name.toLowerCase() === 'sheet1' ? 0 : null),
     addSheet: () => {
       calls.push('add-sheet');
       return 1;

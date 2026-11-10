@@ -15,8 +15,8 @@ const appearance = (wb: WorkbookHandle, addr: Addr) => {
   return {
     direct: wb.getCellXfIndex(addr.sheet, addr.row, addr.col),
     source: effective?.source,
-    size: font?.size,
-    color: font?.colorArgb,
+    size: font?.sizePt,
+    color: font?.color?.argb,
   };
 };
 

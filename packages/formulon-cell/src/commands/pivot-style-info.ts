@@ -1,10 +1,11 @@
-import type { PivotStyleInfo } from '@libraz/formulon';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { PivotStyleDefinition } from '../engine/workbook-handle-pivot.js';
+import type { PivotStyleInfo } from '../engine/workbook-handle-table-styles.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
 
 /** What a report with no style element is shown with. */
-const DEFAULT_PIVOT_STYLE: Required<PivotStyleInfo> = {
+const DEFAULT_PIVOT_STYLE: PivotStyleDefinition = {
   name: 'PivotStyleLight16',
   showRowHeaders: true,
   showColHeaders: true,
@@ -50,12 +51,12 @@ export function updatePivotStyleInfo(
   const { store, workbook: wb, history } = target;
   const stored = wb.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex);
   const before = stored ?? DEFAULT_PIVOT_STYLE;
-  const after: Required<PivotStyleInfo> = { ...before, ...patch };
+  const after: PivotStyleDefinition = { ...before, ...patch };
   if (!wb.setPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex, after)) return false;
   // The paint layer is keyed on the cell map, so a style change replaces it.
   const repaint = (): void => mutators.replaceCells(store, wb.cells(pivot.sheetIndex));
   repaint();
-  const apply = (info: Required<PivotStyleInfo>): void => {
+  const apply = (info: PivotStyleDefinition): void => {
     if (wb.setPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex, info)) repaint();
   };
   if (history && !history.isReplaying()) {

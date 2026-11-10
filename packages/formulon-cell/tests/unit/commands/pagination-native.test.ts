@@ -42,10 +42,10 @@ describe('native pagination integration', () => {
       expect(pagination.rowBands[0]?.start).toBe(0);
       expect(pagination.rowBands.some((band) => band.start === 60 && band.manual)).toBe(true);
       expect(pagination.scale).toBeCloseTo(0.5);
-      // Native margins are points; the view consumes CSS pixels at 96/72.
+      // Native margins are inches; the view consumes CSS pixels at 96 per inch.
       expect(pagination.marginPx.top).toBeCloseTo((0.75 * 96) / pagination.scale, 5);
       expect(pagination.pagePx.width).toBeCloseTo(
-        ((pagination.native?.printable.width ?? 0) * (96 / 72)) / pagination.scale,
+        ((pagination.native?.printable.widthPt ?? 0) * (96 / 72)) / pagination.scale,
         5,
       );
       const nextRowBand = pagination.rowBands[1];
@@ -58,11 +58,12 @@ describe('native pagination integration', () => {
         : 0;
       const firstPage = pagination.native?.pages.find(
         (page) =>
-          page.firstRow === pagination.rowBands[0]?.start &&
-          page.lastRow === pagination.rowBands[0]?.end,
+          page.range.firstRow === pagination.rowBands[0]?.start &&
+          page.range.lastRow === pagination.rowBands[0]?.end,
       );
       const secondPage = pagination.native?.pages.find(
-        (page) => page.firstRow === nextRowBand?.start && page.lastRow === nextRowBand?.end,
+        (page) =>
+          page.range.firstRow === nextRowBand?.start && page.range.lastRow === nextRowBand?.end,
       );
       const originDelta =
         firstPage && secondPage
@@ -99,7 +100,8 @@ describe('native pagination integration', () => {
       const previousTailBand = pagination.rowBands.at(-2);
       const previousTailPage = pagination.native?.pages.find(
         (page) =>
-          page.firstRow === previousTailBand?.start && page.lastRow === previousTailBand?.end,
+          page.range.firstRow === previousTailBand?.start &&
+          page.range.lastRow === previousTailBand?.end,
       );
       if (tailBand && previousTailBand && previousTailPage) {
         const tailGap = gaps.get(tailBand.start);
@@ -166,7 +168,7 @@ describe('native pagination integration', () => {
       const pagination = paginationFor(state, 0, { engine: wb });
       const firstBand = pagination.rowBands[0];
       const firstPage = pagination.native?.pages.find(
-        (page) => page.firstRow === firstBand?.start && page.lastRow === firstBand?.end,
+        (page) => page.range.firstRow === firstBand?.start && page.range.lastRow === firstBand?.end,
       );
       expect(firstPage).toBeDefined();
       const native = pagination.native;
@@ -174,7 +176,7 @@ describe('native pagination integration', () => {
       const titleOffset = Math.max(0, firstPage.originYPt - native.printable.y);
       const centerOffset = Math.max(
         0,
-        (native.printable.height - titleOffset - firstPage.heightPt) / 2,
+        (native.printable.heightPt - titleOffset - firstPage.heightPt) / 2,
       );
       const firstGap = pageLayoutGaps(state, 0, { engine: wb }).pageGapRows.get(firstBand.start);
       expect(firstGap).toBeCloseTo(

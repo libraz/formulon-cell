@@ -1,4 +1,4 @@
-import type { AutoFilterColumn } from '@libraz/formulon';
+import { type AutoFilterColumn, ComparisonOperator } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
   applyAdvancedFilter,
@@ -217,7 +217,7 @@ describe('AutoFilter engine sync', () => {
 
       expect(syncAutoFilterToEngine(first, store.getState(), 0, store)).toBe(true);
       expect(first.getAutoFilter(0)?.columns[0]).toMatchObject({
-        colId: 0,
+        columnOffset: 0,
         kind: 1,
         values: ['East'],
         filterBlank: true,
@@ -279,9 +279,7 @@ describe('AutoFilter engine sync', () => {
       expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
       expect(wb.getAutoFilter(0)?.columns[0]).toMatchObject({
         kind: 2,
-        customCount: 1,
-        op1: 0,
-        val1: '*a*',
+        conditions: [{ operator: ComparisonOperator.Equal, value: '*a*' }],
       });
       expect(wb.evaluateAutoFilter(0)?.match).toEqual([true, false, false]);
 
@@ -290,8 +288,7 @@ describe('AutoFilter engine sync', () => {
         expect(restored.capabilities.typedAutoFilter).toBe(true);
         expect(restored.getAutoFilter(0)?.columns[0]).toMatchObject({
           kind: 2,
-          customCount: 1,
-          val1: '*a*',
+          conditions: [{ operator: ComparisonOperator.Equal, value: '*a*' }],
         });
         expect(restored.evaluateAutoFilter(0)?.match).toEqual([true, false, false]);
       } finally {
@@ -318,23 +315,22 @@ describe('AutoFilter engine sync', () => {
           condition: { op: 'between', value: '4', value2: '6' } as const,
           column: {
             kind: 2,
-            customCount: 2,
             customAnd: true,
-            op1: 4,
-            val1: '4',
-            op2: 2,
-            val2: '6',
+            conditions: [
+              { operator: ComparisonOperator.GreaterThanOrEqual, value: '4' },
+              { operator: ComparisonOperator.LessThanOrEqual, value: '6' },
+            ],
           },
           match: [true, false, false, false, true],
         },
         {
           condition: { op: 'top10', value: '2', unit: 'items' } as const,
-          column: { kind: 3, top: true, percent: false, topVal: 2 },
+          column: { kind: 3, top: true, percent: false, topValue: 2 },
           match: [false, true, false, true, false],
         },
         {
           condition: { op: 'bottom10', value: '40', unit: 'percent' } as const,
-          column: { kind: 3, top: false, percent: true, topVal: 40 },
+          column: { kind: 3, top: false, percent: true, topValue: 40 },
           match: [true, false, true, false, false],
         },
         {
@@ -396,8 +392,7 @@ describe('AutoFilter engine sync', () => {
       expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
       expect(wb.getAutoFilter(0)?.columns[0]).toMatchObject({
         kind: 2,
-        op1: 0,
-        val1: '*a~*b~?~~*',
+        conditions: [{ operator: ComparisonOperator.Equal, value: '*a~*b~?~~*' }],
       });
       // The native matcher must see the escaped pattern: only the literal
       // `*`, `?`, and `~` row matches.
@@ -440,8 +435,7 @@ describe('AutoFilter engine sync', () => {
       expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
       expect(wb.getAutoFilter(0)?.columns[0]).toMatchObject({
         kind: 2,
-        op1: 0,
-        val1: 'a~*b~?~~',
+        conditions: [{ operator: ComparisonOperator.Equal, value: 'a~*b~?~~' }],
       });
       expect(wb.evaluateAutoFilter(0)?.match).toEqual([true, false, false, false]);
       expect(autoFilterXmlFromState(store.getState(), typedRange)).toContain('val="a~*b~?~~"');
@@ -755,7 +749,7 @@ describe('AutoFilter engine sync', () => {
       ).toBe(2);
       expect(store.getState().layout.hiddenRows).toEqual(new Set([2, 3]));
       expect(wb.getAutoFilter(0)?.columns).toHaveLength(1);
-      expect(wb.getAutoFilter(0)?.columns[0]).toMatchObject({ colId: 0, cellColor: true });
+      expect(wb.getAutoFilter(0)?.columns[0]).toMatchObject({ columnOffset: 0, cellColor: true });
       expect(
         wb
           .getRowLayouts(0)
@@ -809,7 +803,7 @@ describe('AutoFilter engine sync', () => {
       if (!valuesColumn) throw new Error('native values filter column missing');
       const importedUnsupported = {
         ...valuesColumn,
-        colId: 1,
+        columnOffset: 1,
         kind: 4,
         dynamicType: 4,
       } as AutoFilterColumn;
@@ -834,8 +828,10 @@ describe('AutoFilter engine sync', () => {
         wb,
       );
       expect(store.getState().layout.hiddenRows).toEqual(new Set([2]));
-      expect(wb.getAutoFilter(0)?.columns.find((column) => column.colId === 1)).toMatchObject({
-        colId: 1,
+      expect(
+        wb.getAutoFilter(0)?.columns.find((column) => column.columnOffset === 1),
+      ).toMatchObject({
+        columnOffset: 1,
         kind: 4,
         dynamicType: 4,
       });
@@ -878,7 +874,7 @@ describe('AutoFilter engine sync', () => {
       if (!valuesColumn) throw new Error('native values filter column missing');
       const importedUnsupported = {
         ...valuesColumn,
-        colId: 1,
+        columnOffset: 1,
         kind: 4,
         dynamicType: 4,
       };
@@ -900,15 +896,15 @@ describe('AutoFilter engine sync', () => {
       }));
       expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
       const after = wb.getAutoFilter(0);
-      expect(after?.columns.find((column) => column.colId === 1)).toMatchObject({
-        colId: 1,
+      expect(after?.columns.find((column) => column.columnOffset === 1)).toMatchObject({
+        columnOffset: 1,
         kind: 4,
         dynamicType: 4,
       });
 
       const importedDateGroups = {
         ...valuesColumn,
-        colId: 1,
+        columnOffset: 1,
         kind: 1,
         values: [],
         dateGroups: [{ year: 2024, month: 0, day: 0, hour: 0, minute: 0, second: 0, grouping: 0 }],
@@ -930,15 +926,17 @@ describe('AutoFilter engine sync', () => {
         },
       }));
       expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
-      expect(wb.getAutoFilter(0)?.columns.find((column) => column.colId === 1)).toMatchObject({
-        colId: 1,
+      expect(
+        wb.getAutoFilter(0)?.columns.find((column) => column.columnOffset === 1),
+      ).toMatchObject({
+        columnOffset: 1,
         kind: 1,
         dateGroups: [{ year: 2024, grouping: 0 }],
       });
 
       const importedButtonFlags = {
         ...valuesColumn,
-        colId: 1,
+        columnOffset: 1,
         hiddenButton: true,
         showButton: false,
       } as AutoFilterColumn;
@@ -958,8 +956,10 @@ describe('AutoFilter engine sync', () => {
         },
       }));
       expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
-      expect(wb.getAutoFilter(0)?.columns.find((column) => column.colId === 1)).toMatchObject({
-        colId: 1,
+      expect(
+        wb.getAutoFilter(0)?.columns.find((column) => column.columnOffset === 1),
+      ).toMatchObject({
+        columnOffset: 1,
         hiddenButton: true,
         showButton: false,
       });

@@ -223,8 +223,8 @@ describe('CELL_STYLES', () => {
       const firstXf = workbook.getCellStyleXf(first.xfId);
       expect(firstXf).toBeDefined();
       if (!firstXf) return;
-      expect(workbook.getFillRecord(firstXf.fillIndex)?.fgArgb).toBe(0xff83cceb);
-      expect(workbook.getFontRecord(firstXf.fontIndex)?.colorArgb).toBe(0xff000000);
+      expect(workbook.getFillRecord(firstXf.fillIndex)?.foreground?.argb).toBe(0xff83cceb);
+      expect(workbook.getFontRecord(firstXf.fontIndex)?.color?.argb).toBe(0xff000000);
 
       mutators.setRange(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 });
       expect(applyCellStyleToSelection(store, history, 'accent1_40', context)).toBe(true);
@@ -233,7 +233,7 @@ describe('CELL_STYLES', () => {
       expect(second?.xfId).toBe(first.xfId);
       expect(
         workbook.getFillRecord(workbook.getCellStyleXf(second?.xfId ?? -1)?.fillIndex ?? -1)
-          ?.fgArgb,
+          ?.foreground?.argb,
       ).toBe(0xff83cceb);
 
       loaded = await WorkbookHandle.loadBytes(workbook.save());
@@ -244,11 +244,15 @@ describe('CELL_STYLES', () => {
       const loadedXf = loaded.getCellStyleXf(loadedStyle.xfId);
       expect(loadedXf).toBeDefined();
       if (!loadedXf) return;
-      expect(loaded.getFillRecord(loadedXf.fillIndex)?.fgArgb).toBe(0xff83cceb);
-      expect(loaded.getFontRecord(loadedXf.fontIndex)?.colorArgb).toBe(0xff000000);
+      expect(loaded.getFillRecord(loadedXf.fillIndex)?.foreground?.argb).toBe(0xff83cceb);
+      expect(loaded.getFontRecord(loadedXf.fontIndex)?.color?.argb).toBe(0xff000000);
       expect(cellStyleKeysByXfId(loaded).get(loadedStyle.xfId)).toBe('accent1_40');
-      expect(loaded.getCellXf(loaded.getCellXfIndex(0, 0, 0) ?? -1)?.xfId).toBe(loadedStyle.xfId);
-      expect(loaded.getCellXf(loaded.getCellXfIndex(0, 0, 1) ?? -1)?.xfId).toBe(loadedStyle.xfId);
+      expect(loaded.getCellXf(loaded.getCellXfIndex(0, 0, 0) ?? -1)?.styleXfIndex).toBe(
+        loadedStyle.xfId,
+      );
+      expect(loaded.getCellXf(loaded.getCellXfIndex(0, 0, 1) ?? -1)?.styleXfIndex).toBe(
+        loadedStyle.xfId,
+      );
     } finally {
       loaded?.dispose();
       workbook.dispose();
@@ -307,12 +311,12 @@ describe('CELL_STYLES', () => {
         const styleXf = workbook.getCellStyleXf(published.xfId);
         expect(styleXf).toBeDefined();
         if (!styleXf) throw new Error('Check Cell style XF was not published');
-        expect(workbook.getFontRecord(styleXf.fontIndex)?.colorArgb).toBe(0xffffffff);
-        expect(workbook.getFillRecord(styleXf.fillIndex)?.fgArgb).toBe(0xffa5a5a5);
+        expect(workbook.getFontRecord(styleXf.fontIndex)?.color?.argb).toBe(0xffffffff);
+        expect(workbook.getFillRecord(styleXf.fillIndex)?.foreground?.argb).toBe(0xffa5a5a5);
         for (const col of columns) {
           const cellXf = workbook.getCellXf(workbook.getCellXfIndex(0, 0, col) ?? -1);
           expect(cellXf).toMatchObject({
-            xfId: published.xfId,
+            styleXfIndex: published.xfId,
             fontIndex: styleXf.fontIndex,
             fillIndex: styleXf.fillIndex,
             borderIndex: styleXf.borderIndex,
@@ -356,12 +360,12 @@ describe('CELL_STYLES', () => {
       const loadedXf = loaded.getCellStyleXf(loadedStyle.xfId);
       expect(loadedXf).toBeDefined();
       if (!loadedXf) return;
-      expect(loaded.getFontRecord(loadedXf.fontIndex)?.colorArgb).toBe(0xffffffff);
-      expect(loaded.getFillRecord(loadedXf.fillIndex)?.fgArgb).toBe(0xffa5a5a5);
+      expect(loaded.getFontRecord(loadedXf.fontIndex)?.color?.argb).toBe(0xffffffff);
+      expect(loaded.getFillRecord(loadedXf.fillIndex)?.foreground?.argb).toBe(0xffa5a5a5);
       expect(cellStyleKeysByXfId(loaded).get(loadedStyle.xfId)).toBe('checkCell');
       for (const col of [0, 1, 2]) {
         expect(loaded.getCellXf(loaded.getCellXfIndex(0, 0, col) ?? -1)).toMatchObject({
-          xfId: loadedStyle.xfId,
+          styleXfIndex: loadedStyle.xfId,
           fontIndex: loadedXf.fontIndex,
           fillIndex: loadedXf.fillIndex,
           borderIndex: loadedXf.borderIndex,
@@ -401,10 +405,9 @@ describe('CELL_STYLES', () => {
       if (!normal || !defaultFont || !defaultFill) return;
       const themedFont = workbook.addFontRecord({
         ...defaultFont,
-        colorArgb: 0xff123456,
         color: {
           kind: 2,
-          rgb: defaultFont.color?.rgb ?? 0,
+          argb: 0xff123456,
           theme: 4,
           tint: 0.2,
           indexed: defaultFont.color?.indexed ?? 0,
@@ -413,13 +416,12 @@ describe('CELL_STYLES', () => {
       const themedFill = workbook.addFillRecord({
         ...defaultFill,
         pattern: 1,
-        fgArgb: 0xff654321,
-        fg: {
+        foreground: {
           kind: 2,
-          rgb: defaultFill.fg?.rgb ?? 0,
+          argb: 0xff654321,
           theme: 5,
           tint: 0.4,
-          indexed: defaultFill.fg?.indexed ?? 0,
+          indexed: defaultFill.foreground?.indexed ?? 0,
         },
       });
       const styleXfId = workbook.addCellStyleXfRecord({
@@ -434,8 +436,8 @@ describe('CELL_STYLES', () => {
       expect(resolvedFill).not.toBeNull();
       if (!resolvedFont || !resolvedFill) return;
       const resolvedColors = {
-        color: argbToCssColor(resolvedFont.colorArgb),
-        fill: argbToCssColor(resolvedFill.fgArgb),
+        color: argbToCssColor(resolvedFont.color?.argb ?? 0),
+        fill: argbToCssColor(resolvedFill.foreground?.argb ?? 0),
       };
       expect(
         cellStyleCommands.resolveCellStyleFormat('checkCell', workbook, 'excel365Mac'),
@@ -471,7 +473,7 @@ describe('CELL_STYLES', () => {
         theme: 4,
         tint: 0.2,
       });
-      expect(workbook.getFillRecord(publishedXf.fillIndex)?.fg).toMatchObject({
+      expect(workbook.getFillRecord(publishedXf.fillIndex)?.foreground).toMatchObject({
         kind: 2,
         theme: 5,
         tint: 0.4,
@@ -481,7 +483,7 @@ describe('CELL_STYLES', () => {
         expect(cellXf).toBeDefined();
         if (!cellXf) throw new Error(`raw Check Cell cell XF missing for column ${col}`);
         return {
-          xfId: cellXf.xfId,
+          xfId: cellXf.styleXfIndex,
           fontIndex: cellXf.fontIndex,
           fillIndex: cellXf.fillIndex,
           borderIndex: cellXf.borderIndex,
@@ -520,14 +522,14 @@ describe('CELL_STYLES', () => {
         theme: 4,
         tint: 0.2,
       });
-      expect(loaded.getFillRecord(loadedXf?.fillIndex ?? -1)?.fg).toMatchObject({
+      expect(loaded.getFillRecord(loadedXf?.fillIndex ?? -1)?.foreground).toMatchObject({
         kind: 2,
         theme: 5,
         tint: 0.4,
       });
       for (const col of [0, 1, 2]) {
         expect(loaded.getCellXf(loaded.getCellXfIndex(0, 0, col) ?? -1)).toMatchObject({
-          xfId: loadedStyle?.xfId,
+          styleXfIndex: loadedStyle?.xfId,
           ...firstStyleXfComponents,
         });
       }
@@ -583,10 +585,9 @@ describe('CELL_STYLES', () => {
       if (!normal || !defaultFont || !defaultFill) return;
       const themedFont = workbook.addFontRecord({
         ...defaultFont,
-        colorArgb: 0xff123456,
         color: {
           kind: 2,
-          rgb: defaultFont.color?.rgb ?? 0,
+          argb: 0xff123456,
           theme: 4,
           tint: 0.2,
           indexed: defaultFont.color?.indexed ?? 0,
@@ -595,13 +596,12 @@ describe('CELL_STYLES', () => {
       const themedFill = workbook.addFillRecord({
         ...defaultFill,
         pattern: 1,
-        fgArgb: 0xff654321,
-        fg: {
+        foreground: {
           kind: 2,
-          rgb: defaultFill.fg?.rgb ?? 0,
+          argb: 0xff654321,
           theme: 5,
           tint: 0.4,
-          indexed: defaultFill.fg?.indexed ?? 0,
+          indexed: defaultFill.foreground?.indexed ?? 0,
         },
       });
       const styleXfId = workbook.addCellStyleXfRecord({
@@ -616,8 +616,8 @@ describe('CELL_STYLES', () => {
       expect(resolvedFill).not.toBeNull();
       if (!resolvedFont || !resolvedFill) return;
       const resolvedColors = {
-        color: argbToCssColor(resolvedFont.colorArgb),
-        fill: argbToCssColor(resolvedFill.fgArgb),
+        color: argbToCssColor(resolvedFont.color?.argb ?? 0),
+        fill: argbToCssColor(resolvedFill.foreground?.argb ?? 0),
       };
       expect(
         cellStyleCommands.resolveCellStyleFormat('accent1_40', workbook, 'excel365Mac'),
@@ -640,7 +640,7 @@ describe('CELL_STYLES', () => {
         theme: 4,
         tint: 0.2,
       });
-      expect(workbook.getFillRecord(publishedXf?.fillIndex ?? -1)?.fg).toMatchObject({
+      expect(workbook.getFillRecord(publishedXf?.fillIndex ?? -1)?.foreground).toMatchObject({
         kind: 2,
         theme: 5,
         tint: 0.4,
@@ -655,7 +655,7 @@ describe('CELL_STYLES', () => {
         theme: 4,
         tint: 0.2,
       });
-      expect(loaded.getFillRecord(loadedXf?.fillIndex ?? -1)?.fg).toMatchObject({
+      expect(loaded.getFillRecord(loadedXf?.fillIndex ?? -1)?.foreground).toMatchObject({
         kind: 2,
         theme: 5,
         tint: 0.4,

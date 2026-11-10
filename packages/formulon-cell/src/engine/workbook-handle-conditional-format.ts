@@ -1,9 +1,17 @@
+import {
+  CfMatchKind,
+  type CfRangeEvaluationOptions,
+  type Color,
+  type ConditionalFormat,
+  type Formulon,
+} from '@libraz/formulon';
+import { orFallback } from './result.js';
 import { completeDxfRecord } from './style-records.js';
 import type {
-  ConditionalFormatEntry,
   ConditionalFormatInput,
   DxfRecord,
   EngineCapabilities,
+  Sheet,
   Workbook,
 } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -11,6 +19,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
   wb: Workbook;
+  module: Formulon;
   assertAlive(): void;
 };
 
@@ -30,15 +39,30 @@ function wb(handle: unknown): Workbook {
   return internals(handle).wb;
 }
 
+function ws(handle: unknown, sheet: number): Sheet {
+  return internals(handle).wb.sheet(sheet);
+}
+
+type Rgba = { r: number; g: number; b: number; a: number };
+
+const rgbaOf = (color: Color | null | undefined): Rgba => {
+  const argb = color ? color.argb >>> 0 : 0;
+  return {
+    a: (argb >>> 24) & 0xff,
+    r: (argb >>> 16) & 0xff,
+    g: (argb >>> 8) & 0xff,
+    b: argb & 0xff,
+  };
+};
+
+const NO_RGBA: Rgba = { r: 0, g: 0, b: 0, a: 0 };
+
 export abstract class WorkbookHandleConditionalFormatMethods {
   declare readonly capabilities: EngineCapabilities;
 
   /** Evaluate every CF block on `sheet` against the inclusive viewport rect.
-   *  Returns a sparse list — only cells with at least one match appear. The
-   *  underlying embind vectors are released before this method returns, so
-   *  the JS objects own no engine memory. Pass `NaN` for `todaySerial` to
-   *  disable `TimePeriod` rules; defaults to `NaN`. Returns `[]` when the
-   *  engine doesn't expose `evaluateCfRange`. */
+   *  Returns a sparse list — only cells with at least one match appear. Pass
+   *  `NaN` for `todaySerial` to disable `TimePeriod` rules; defaults to `NaN`. */
   evaluateCfRange(
     sheet: number,
     firstRow: number,
@@ -69,33 +93,41 @@ export abstract class WorkbookHandleConditionalFormatMethods {
   }[] {
     assertAlive(this);
     if (!this.capabilities.conditionalFormat) return [];
-    const r = wb(this).evaluateCfRange(sheet, firstRow, firstCol, lastRow, lastCol, todaySerial);
-    if (!r.status.ok) return [];
+    const native = wb(this);
+    const options: CfRangeEvaluationOptions = Number.isFinite(todaySerial)
+      ? {
+          today: internals(this).module.convertSerialToCivil(todaySerial, {
+            date1904: native.getDate1904(),
+          }),
+        }
+      : { timePeriodRules: false };
+    const cells = orFallback(null, () =>
+      ws(this, sheet).evaluateCfRange({ firstRow, firstCol, lastRow, lastCol }, options),
+    );
+    if (!cells) return [];
     const out: ReturnType<WorkbookHandle['evaluateCfRange']> = [];
-    for (const cell of r.cells) {
+    for (const cell of cells) {
       const matches: ReturnType<WorkbookHandle['evaluateCfRange']>[number]['matches'] = [];
       for (const m of cell.matches) {
+        const bar = m.kind === CfMatchKind.DataBar ? m.bar : null;
+        const icon = m.kind === CfMatchKind.IconSet ? m.icon : null;
+        const dxfIndex = m.kind === CfMatchKind.DifferentialFormat ? m.dxfIndex : null;
         matches.push({
-          kind: m.kind as number,
+          kind: m.kind,
           priority: m.priority,
-          dxfIdEngaged: m.dxfIdEngaged !== 0,
-          dxfId: m.dxfId,
-          color: { r: m.color.r, g: m.color.g, b: m.color.b, a: m.color.a },
-          barLengthPct: m.barLengthPct,
-          barAxisPositionPct: m.barAxisPositionPct,
-          barIsNegative: m.barIsNegative !== 0,
-          barFill: { r: m.barFill.r, g: m.barFill.g, b: m.barFill.b, a: m.barFill.a },
-          barBorderEngaged: m.barBorderEngaged !== 0,
-          barBorder: {
-            r: m.barBorder.r,
-            g: m.barBorder.g,
-            b: m.barBorder.b,
-            a: m.barBorder.a,
-          },
-          barGradient: m.barGradient !== 0,
-          barDirection: m.barDirection,
-          iconSetName: m.iconSetName,
-          iconIndex: m.iconIndex,
+          dxfIdEngaged: dxfIndex !== null,
+          dxfId: dxfIndex ?? 0,
+          color: m.kind === CfMatchKind.ColorScale ? rgbaOf(m.color) : { ...NO_RGBA },
+          barLengthPct: bar?.lengthPct ?? 0,
+          barAxisPositionPct: bar?.axisPositionPct ?? 0,
+          barIsNegative: bar?.isNegative === true,
+          barFill: bar ? rgbaOf(bar.fill) : { ...NO_RGBA },
+          barBorderEngaged: bar?.border != null,
+          barBorder: bar?.border ? rgbaOf(bar.border) : { ...NO_RGBA },
+          barGradient: bar?.gradient === true,
+          barDirection: bar?.direction ?? 0,
+          iconSetName: icon?.iconSet ?? 0,
+          iconIndex: icon?.iconIndex ?? 0,
         });
       }
       out.push({ row: cell.row, col: cell.col, matches });
@@ -104,67 +136,67 @@ export abstract class WorkbookHandleConditionalFormatMethods {
   }
 
   /** Snapshot of every CF rule on `sheet`, in flattened priority order.
-   *  Returns `[]` when the engine doesn't expose `getConditionalFormats`
-   *  or when there are no rules. The entries borrow rule ids from the
-   *  engine's storage; treat them as immutable view objects. */
-  getConditionalFormats(sheet: number): readonly ConditionalFormatEntry[] {
+   *  Returns `[]` when there are no rules. Treat the entries as immutable
+   *  view objects. */
+  getConditionalFormats(sheet: number): readonly ConditionalFormat[] {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatMutate) return [];
-    const entries = wb(this).getConditionalFormats(sheet);
-    return entries.status.ok ? [...entries] : [];
+    return orFallback([], () => [...ws(this, sheet).listCfRules()]);
   }
 
   /** Removes the CF rule at `index` (flattened priority order). When the
    *  containing block becomes empty, the engine drops it too. Returns
-   *  `false` (no-op) under stub mode and older engine package builds. */
+   *  `false` (no-op) under stub mode or when the engine refuses. */
   removeConditionalFormatAt(sheet: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatMutate) return false;
-    return wb(this).removeConditionalFormatAt(sheet, index).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).removeCfRule(index);
+      return true;
+    });
   }
 
   /** Drops every `<conditionalFormatting>` block on `sheet`. Returns
-   *  `false` (no-op) under stub mode and older engine package builds. */
+   *  `false` (no-op) under stub mode. */
   clearConditionalFormats(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatMutate) return false;
-    return wb(this).clearConditionalFormats(sheet).ok;
+    return orFallback(false, () => {
+      ws(this, sheet).clearCfRules();
+      return true;
+    });
   }
 
   /** Adds one conditional-format rule to `sheet` so it round-trips through
-   *  .xlsx. `rule.type` mirrors `formulon::cf::RuleType` (0 expression,
-   *  1 cellIs, 2 colorScale, 3 dataBar, 4 iconSet, 5 top10, 6 aboveAverage,
-   *  7 containsText, 8 notContainsText, 9 beginsWith, 10 endsWith, …). The
-   *  applied differential format is referenced by `dxfId`. Returns the
-   *  flattened rule index, or -1 when the engine refuses the write. */
-  addConditionalFormat(sheet: number, rule: ConditionalFormatInput): number {
+   *  .xlsx. The applied differential format is referenced by `dxfIndex`.
+   *  Returns the flattened rule index, or -1 when the engine refuses the
+   *  write. */
+  addConditionalFormat(sheet: number, rule: ConditionalFormatInput | ConditionalFormat): number {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatMutate) return -1;
-    const r = wb(this).addConditionalFormat(sheet, rule);
-    return r.status.ok ? r.index : -1;
+    return orFallback(-1, () => {
+      const target = ws(this, sheet);
+      const id = target.addCfRule(rule as ConditionalFormatInput);
+      return target.listCfRules().findIndex((entry) => entry.id === id);
+    });
   }
 
   getDxf(index: number): DxfRecord | null {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatDxf) return null;
-    const r = wb(this).getDxf(index);
-    if (!r.status.ok) return null;
-    const { status: _status, ...record } = r;
-    return record;
+    return orFallback(null, () => wb(this).ooxml.getDxf(index));
   }
 
   addDxf(record: DxfRecord): number {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatDxf) return -1;
-    const r = wb(this).addDxf(completeDxfRecord(record));
-    return r.status.ok ? r.index : -1;
+    return orFallback(-1, () => wb(this).ooxml.addDxf(completeDxfRecord(record)));
   }
 
   dxfCount(): number {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatDxf) return 0;
-    const count = wb(this).dxfCount();
-    return count.status.ok ? count.value : 0;
+    return orFallback(0, () => wb(this).ooxml.listDxfs().length);
   }
 }
 

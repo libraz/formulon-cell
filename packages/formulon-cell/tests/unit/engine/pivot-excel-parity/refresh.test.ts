@@ -9,9 +9,7 @@ describe('pivot refresh matches the desktop app', () => {
     const wb = await loadFixture('ja_c0_rows.xlsx');
     try {
       const source = wb.getPivotCacheWorksheetSource(wb.pivotTableCacheId(0, 0));
-      const sheet = Array.from({ length: wb.sheetCount }, (_, i) => i).find(
-        (i) => wb.sheetName(i) === source?.sheet,
-      );
+      const sheet = source?.range?.sheet;
       expect(sheet).toBeDefined();
       // The measured edit: A2 North/A 100/1 becomes a new region.
       const at = { sheet: sheet as number, row: 1, col: 0 };

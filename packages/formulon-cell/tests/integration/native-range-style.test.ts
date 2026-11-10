@@ -32,7 +32,7 @@ describe('updated native range-style API', () => {
         const effective = workbook.getEffectiveStyle(0, row, col);
         const xf = effective && workbook.getCellXf(effective.xfIndex);
         const font = xf && workbook.getFontRecord(xf.fontIndex);
-        return { size: font?.size, color: font?.colorArgb, xf, source: effective?.source };
+        return { size: font?.sizePt, color: font?.color?.argb, xf, source: effective?.source };
       };
       try {
         expect(workbook.capabilities.rangeStylePatch).toBe(true);

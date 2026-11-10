@@ -299,14 +299,13 @@ const nativeSortPermutation = (
     const result = wb.evaluateFormulaArray(anchor, formula);
     const rows = horizontal ? 1 : count;
     const cols = horizontal ? count : 1;
-    if (!result.status.ok || result.rows !== rows || result.cols !== cols) return null;
-    if (result.cells.length !== rows) return null;
-    const permutation: number[] = [];
-    const seen = new Set<number>();
-    const flat = horizontal ? (result.cells[0] ?? []) : result.cells.map((row) => row?.[0]);
-    if (flat.length !== count || (!horizontal && result.cells.some((row) => row?.length !== 1))) {
+    if (!result || result.length !== rows || result.some((row) => row.length !== cols)) {
       return null;
     }
+    const permutation: number[] = [];
+    const seen = new Set<number>();
+    const flat = horizontal ? (result[0] ?? []) : result.map((row) => row?.[0]);
+    if (flat.length !== count) return null;
     for (const raw of flat) {
       if (!raw) return null;
       const value = fromEngineValue(raw);
@@ -366,9 +365,9 @@ const nativeUniqueRows = (
     const anchor = nativeEvaluationAnchor(state, range, count, keyColumns.length);
     if (!anchor) return null;
     const result = wb.evaluateFormulaArray(anchor, `=UNIQUE(${keyFormula})`);
-    if (!result.status.ok || result.cols !== keyColumns.length || result.rows < 1) return null;
-    if (result.rows > count || result.cells.length !== result.rows) return null;
-    const uniqueValues = result.cells.map((row) => {
+    if (!result || result.length < 1 || result.length > count) return null;
+    if (result.some((row) => row.length !== keyColumns.length)) return null;
+    const uniqueValues = result.map((row) => {
       if (row.length !== keyColumns.length) return null;
       return row.map((value) => fromEngineValue(value));
     });

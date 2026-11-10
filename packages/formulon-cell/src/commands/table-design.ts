@@ -1,4 +1,5 @@
 import { MAX_ROW } from '../engine/address.js';
+import { totalsFromDetails } from '../engine/table-sync.js';
 import { defaultTotals } from '../engine/table-totals-defaults.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -86,30 +87,21 @@ const toggleBoundaryRow = (
   option: 'showHeader' | 'showTotal',
   totalsLabel: string,
 ): TableToggleResult => {
+  if (option === 'showTotal') return toggleTotalsRow(store, history, wb, table, totalsLabel);
   const r = table.range;
   const turningOn = !table[option];
-  const header = option === 'showHeader';
   const after = { ...table, [option]: turningOn };
   const dataRows =
     r.r1 - r.r0 + 1 + (turningOn ? 1 : -1) - (after.showHeader ? 1 : 0) - (after.showTotal ? 1 : 0);
   if (dataRows < 1) return 'blocked';
   // A header takes an empty row directly above the table; otherwise the table's own cells move
   // down and the header takes its first row. A total row takes the row below, shifting when taken.
-  const aboveFree = header && turningOn && r.r0 > 0 && bandBlank(wb, r, r.r0 - 1);
-  let range: Range;
-  let shiftRow: number;
-  let needsShift: boolean;
-  if (header) {
-    range = turningOn
-      ? { ...r, r0: aboveFree ? r.r0 - 1 : r.r0, r1: aboveFree ? r.r1 : r.r1 + 1 }
-      : { ...r, r0: r.r0 + 1 };
-    shiftRow = r.r0;
-    needsShift = turningOn && !aboveFree;
-  } else {
-    range = { ...r, r1: turningOn ? r.r1 + 1 : r.r1 - 1 };
-    shiftRow = r.r1 + 1;
-    needsShift = turningOn && !bandBlank(wb, r, shiftRow);
-  }
+  const aboveFree = turningOn && r.r0 > 0 && bandBlank(wb, r, r.r0 - 1);
+  const range: Range = turningOn
+    ? { ...r, r0: aboveFree ? r.r0 - 1 : r.r0, r1: aboveFree ? r.r1 : r.r1 + 1 }
+    : { ...r, r0: r.r0 + 1 };
+  const shiftRow = r.r0;
+  const needsShift = turningOn && !aboveFree;
   if (turningOn && range.r1 > MAX_ROW) return 'blocked';
   const claimed: Range = aboveFree
     ? { ...range, r1: range.r0 }
@@ -124,21 +116,7 @@ const toggleBoundaryRow = (
     const row: Range = { ...r, r0: shiftRow, r1: shiftRow };
     if (!needsShift || insertCells(store, wb, history, row, 'down')) {
       recordTablesChange(history, store, () => {
-        // A new total row starts with the desktop defaults, the label in the active language.
-        const defaults =
-          option === 'showTotal' && turningOn && !hasTotals(table.totals)
-            ? {
-                totals: defaultTotals(
-                  wb,
-                  range,
-                  table.showHeader,
-                  range.c1 - range.c0 + 1,
-                  totalsLabel,
-                ),
-              }
-            : {};
-        ok =
-          updateTableOverlay(store, table.id, { [option]: turningOn, range, ...defaults }) !== null;
+        ok = updateTableOverlay(store, table.id, { [option]: turningOn, range }) !== null;
       });
     }
   } finally {
@@ -147,6 +125,34 @@ const toggleBoundaryRow = (
       else history?.abort(transaction);
     }
   }
+  return ok ? 'toggled' : 'blocked';
+};
+
+/** Turn the total row on or off. The engine grows or shrinks the ref by that row, shifts the
+ *  cells below the table's columns (or takes a free row further down) and writes the totals
+ *  cells; the table mirror reads the new ref back. */
+const toggleTotalsRow = (
+  store: SpreadsheetStore,
+  history: History | null,
+  wb: WorkbookHandle,
+  table: TableOverlay,
+  totalsLabel: string,
+): TableToggleResult => {
+  const turningOn = !table.showTotal;
+  const r = table.range;
+  let ok = false;
+  recordTablesChange(history, store, () => {
+    const grown = { ...r, r1: r.r1 + 1 };
+    const defaults =
+      turningOn && !hasTotals(table.totals)
+        ? {
+            totals: defaultTotals(wb, grown, table.showHeader, r.c1 - r.c0 + 1, totalsLabel),
+          }
+        : {};
+    updateTableOverlay(store, table.id, { showTotal: turningOn, ...defaults });
+    // The mirror takes the engine's new ref, or restores the overlay when the engine refuses.
+    ok = store.getState().tables.tables.some((t) => t.id === table.id && t.showTotal === turningOn);
+  });
   return ok ? 'toggled' : 'blocked';
 };
 
@@ -195,14 +201,9 @@ export function renameActiveTable(
 
 /** The engine table's column settings when the overlay has not recorded them yet. */
 const engineTotals = (wb: WorkbookHandle, table: TableOverlay): TableColumnTotals[] => {
-  const key = table.name?.toLocaleLowerCase();
-  const entry = wb.getTables().find((t) => t.name.toLocaleLowerCase() === key);
-  const details = entry ? wb.getTableStyleDetails(entry.index) : null;
-  return (details?.columns ?? []).map((c) => ({
-    function: c.totalsRowFunction,
-    label: c.totalsRowLabel,
-    formula: c.totalsRowFormula,
-  }));
+  const index = table.name ? wb.tableIndexByName(table.name) : null;
+  const details = index === null ? null : wb.getTableStyleDetails(index);
+  return details ? totalsFromDetails(details) : [];
 };
 
 /** Set the totals-row function of one column of table `id`; the store mirror writes it to the

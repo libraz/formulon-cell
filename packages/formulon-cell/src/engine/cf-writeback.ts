@@ -1,3 +1,16 @@
+import {
+  type CellRect,
+  CfDataBarAxisPosition,
+  CfDataBarDirection,
+  CfRuleType,
+  type CfValueObjectInput,
+  CfValueObjectType,
+  type Color,
+  ColorKind,
+  ComparisonOperator,
+  type ConditionalFormat,
+  DatePeriod,
+} from '@libraz/formulon';
 import { iconSetSlotCount } from '../render/conditional.js';
 import type { CellFormat } from '../store/store.js';
 import type { ConditionalRule, ConditionalScalePoint } from '../store/types.js';
@@ -13,78 +26,56 @@ import {
 import type { ConditionalFormatInput, DxfRecord } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-/** `formulon::cf::RuleType` ordinals. */
-const RULE_TYPE = {
-  expression: 0,
-  cellIs: 1,
-  colorScale: 2,
-  dataBar: 3,
-  iconSet: 4,
-  top10: 5,
-  aboveAverage: 6,
-  containsText: 7,
-  notContainsText: 8,
-  beginsWith: 9,
-  endsWith: 10,
-  containsBlanks: 11,
-  notContainsBlanks: 12,
-  containsErrors: 13,
-  notContainsErrors: 14,
-  timePeriod: 15,
-  duplicateValues: 16,
-  uniqueValues: 17,
-} as const;
-
-/** `formulon::cf::TimePeriod` ordinals. */
+/** `DatePeriod` of each store date-occurring period. */
 export const TIME_PERIOD: Record<
   Extract<ConditionalRule, { kind: 'date-occurring' }>['period'],
-  number
+  DatePeriod
 > = {
-  today: 0,
-  yesterday: 1,
-  tomorrow: 2,
-  last7: 3,
-  'this-week': 4,
-  'last-week': 5,
-  'next-week': 6,
-  'this-month': 7,
-  'last-month': 8,
-  'next-month': 9,
+  today: DatePeriod.Today,
+  yesterday: DatePeriod.Yesterday,
+  tomorrow: DatePeriod.Tomorrow,
+  last7: DatePeriod.Last7Days,
+  'this-week': DatePeriod.ThisWeek,
+  'last-week': DatePeriod.LastWeek,
+  'next-week': DatePeriod.NextWeek,
+  'this-month': DatePeriod.ThisMonth,
+  'last-month': DatePeriod.LastMonth,
+  'next-month': DatePeriod.NextMonth,
 };
 
 const VALUE_OBJECT_TYPE = {
-  number: 0,
-  percent: 1,
-  percentile: 2,
-  min: 3,
-  max: 4,
+  number: CfValueObjectType.Number,
+  percent: CfValueObjectType.Percent,
+  percentile: CfValueObjectType.Percentile,
+  min: CfValueObjectType.Min,
+  max: CfValueObjectType.Max,
 } as const;
 
 const ENGINE_DATA_BAR_DIRECTIONS = {
-  context: 0,
-  'left-to-right': 1,
-  'right-to-left': 2,
+  context: CfDataBarDirection.Context,
+  'left-to-right': CfDataBarDirection.LeftToRight,
+  'right-to-left': CfDataBarDirection.RightToLeft,
 } as const;
 
 const ENGINE_DATA_BAR_AXIS_POSITIONS = {
-  automatic: 0,
-  middle: 1,
-  none: 2,
+  automatic: CfDataBarAxisPosition.Automatic,
+  middle: CfDataBarAxisPosition.Middle,
+  none: CfDataBarAxisPosition.None,
 } as const;
 
-/** `formulon::cf::CellIsOperator` ordinals. */
-const CELL_IS_OP: Record<string, number> = {
-  '<': 0,
-  '<=': 1,
-  '=': 2,
-  '<>': 3,
-  '>=': 4,
-  '>': 5,
-  between: 6,
-  'not-between': 7,
+/** `ComparisonOperator` of each store cell-value operator. */
+const CELL_IS_OP: Record<string, ComparisonOperator> = {
+  '<': ComparisonOperator.LessThan,
+  '<=': ComparisonOperator.LessThanOrEqual,
+  '=': ComparisonOperator.Equal,
+  '<>': ComparisonOperator.NotEqual,
+  '>=': ComparisonOperator.GreaterThanOrEqual,
+  '>': ComparisonOperator.GreaterThan,
+  between: ComparisonOperator.Between,
+  'not-between': ComparisonOperator.NotBetween,
 };
 
-const sqrefOf = (rule: ConditionalRule): ConditionalFormatInput['sqref'] => [
+const rangesOf = (rule: ConditionalRule): CellRect[] => [
   {
     firstRow: rule.range.r0,
     firstCol: rule.range.c0,
@@ -137,8 +128,6 @@ const nextOccurrenceKey = (
 };
 
 type ConditionalFormatEntry = ReturnType<WorkbookHandle['getConditionalFormats']>[number];
-type CfColor = NonNullable<ConditionalFormatInput['colorScale']>['colors'][number];
-type CfValueObjectInput = NonNullable<ConditionalFormatInput['colorScale']>['thresholds'][number];
 type DesiredConditionalRule = {
   readonly input: ConditionalFormatInput;
   readonly rule: ConditionalRule;
@@ -155,12 +144,9 @@ export interface SyncedConditionalRule {
 
 export type SyncedConditionalRuleMap = Map<string, SyncedConditionalRule>;
 
-function sameSqref(
-  a: ConditionalFormatInput['sqref'],
-  b: ConditionalFormatEntry['sqref'],
-): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((left, i) => {
+function sameRanges(a: unknown, b: readonly CellRect[]): boolean {
+  if (!Array.isArray(a) || a.length !== b.length) return false;
+  return a.every((left: CellRect, i) => {
     const right = b[i];
     return (
       right !== undefined &&
@@ -172,28 +158,38 @@ function sameSqref(
   });
 }
 
+/** Rule fields compared field by field; an absent input key matches `null`. */
+const COMPARED_FIELDS = [
+  'operator',
+  'rank',
+  'percent',
+  'bottom',
+  'aboveAverage',
+  'equalAverage',
+  'stdDev',
+  'text',
+  'timePeriod',
+] as const;
+
+/** Formula text without the leading `=` a read carries. */
+const bareFormula = (formula: unknown): unknown =>
+  typeof formula === 'string' && formula.startsWith('=') ? formula.slice(1) : (formula ?? null);
+
 function entryMatchesInput(
   entry: ConditionalFormatEntry | undefined,
   input: ConditionalFormatInput,
 ): boolean {
   if (!entry) return false;
+  const loose = input as unknown as Readonly<Record<string, unknown>>;
   return (
     entry.type === input.type &&
-    sameSqref(input.sqref, entry.sqref) &&
-    entry.formula1 === input.formula1 &&
-    entry.formula2 === input.formula2 &&
-    entry.op === input.op &&
-    entry.rank === input.rank &&
-    entry.percent === input.percent &&
-    entry.bottom === input.bottom &&
-    entry.aboveAverage === input.aboveAverage &&
-    entry.equalAverage === input.equalAverage &&
-    entry.stdDev === input.stdDev &&
-    entry.text === input.text &&
-    entry.timePeriod === input.timePeriod &&
-    JSON.stringify(entry.colorScale ?? null) === JSON.stringify(input.colorScale ?? null) &&
-    JSON.stringify(entry.dataBar ?? null) === JSON.stringify(input.dataBar ?? null) &&
-    JSON.stringify(entry.iconSet ?? null) === JSON.stringify(input.iconSet ?? null)
+    sameRanges(input.ranges, entry.ranges) &&
+    bareFormula(entry.formula1) === bareFormula(loose.formula1) &&
+    bareFormula(entry.formula2) === bareFormula(loose.formula2) &&
+    COMPARED_FIELDS.every((field) => (entry[field] ?? null) === (loose[field] ?? null)) &&
+    JSON.stringify(entry.colorScale ?? null) === JSON.stringify(loose.colorScale ?? null) &&
+    JSON.stringify(entry.dataBar ?? null) === JSON.stringify(loose.dataBar ?? null) &&
+    JSON.stringify(entry.iconSet ?? null) === JSON.stringify(loose.iconSet ?? null)
   );
 }
 
@@ -237,15 +233,10 @@ function decrementTrackedIndexesAfterRemoval(
   }
 }
 
-function cssColorToCfColor(color: string): CfColor | null {
+function cssColorToCfColor(color: string): Color | null {
   const argb = cssColorToArgb(color);
   if (argb === null) return null;
-  return {
-    a: (argb >>> 24) & 0xff,
-    r: (argb >>> 16) & 0xff,
-    g: (argb >>> 8) & 0xff,
-    b: argb & 0xff,
-  };
+  return { kind: ColorKind.Rgb, argb, theme: 0, tint: 0, indexed: 0 };
 }
 
 function scalePointToCfValueObject(point: ConditionalScalePoint): CfValueObjectInput {
@@ -300,7 +291,12 @@ export function dxfRecordFromApply(
   const dxf: DxfRecord = {};
   if (hasFontDxfFields(apply)) {
     const font = fontRecordFromFormat(apply);
-    dxf.font = { ...font, vertAlign: font.vertAlign ?? 0 };
+    // A differential font states only what the rule changes.
+    dxf.font = {
+      ...font,
+      sizePt: apply.fontSize === undefined ? null : font.sizePt,
+      vertAlign: font.vertAlign ?? 0,
+    };
   }
   if (
     apply.fill !== undefined ||
@@ -311,7 +307,7 @@ export function dxfRecordFromApply(
   }
   if (apply.borders !== undefined) dxf.border = borderRecordFromFormat(apply);
   const formatCode = numFmtToFormatCode(apply.numFmt, wb);
-  if (formatCode) dxf.numFmt = { numFmtId: 0, formatCode };
+  if (formatCode) dxf.numberFormat = formatCode;
   return Object.keys(dxf).length > 0 ? dxf : null;
 }
 
@@ -323,8 +319,10 @@ export function inputWithDxf(
   if (!wb.capabilities.conditionalFormatDxf) return input;
   const dxf = dxfRecordFromApply(wb, ruleApply(rule));
   if (!dxf) return input;
-  const dxfId = wb.addDxf(dxf);
-  return dxfId >= 0 ? { ...input, dxfId } : input;
+  const dxfIndex = wb.addDxf(dxf);
+  // Only a format rule takes a differential format.
+  if (dxfIndex < 0 || !formatRuleTypes.has(input.type)) return input;
+  return { ...input, dxfIndex } as ConditionalFormatInput;
 }
 
 /**
@@ -345,27 +343,45 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
   return input && rule.stopIfTrue === true ? { ...input, stopIfTrue: true } : input;
 }
 
+/** Rule kinds that apply a differential format. */
+const formatRuleTypes: ReadonlySet<number> = new Set([
+  CfRuleType.Expression,
+  CfRuleType.CellIs,
+  CfRuleType.Top10,
+  CfRuleType.AboveAverage,
+  CfRuleType.ContainsText,
+  CfRuleType.NotContainsText,
+  CfRuleType.BeginsWith,
+  CfRuleType.EndsWith,
+  CfRuleType.ContainsBlanks,
+  CfRuleType.NotContainsBlanks,
+  CfRuleType.ContainsErrors,
+  CfRuleType.NotContainsErrors,
+  CfRuleType.TimePeriod,
+  CfRuleType.DuplicateValues,
+  CfRuleType.UniqueValues,
+]);
+
 function conditionalRuleBodyToEngineInput(rule: ConditionalRule): ConditionalFormatInput | null {
-  const sqref = sqrefOf(rule);
+  const ranges = rangesOf(rule);
   switch (rule.kind) {
     case 'cell-value': {
-      const op = CELL_IS_OP[rule.op];
-      if (op === undefined) return null;
-      const input: ConditionalFormatInput = {
-        sqref,
-        type: RULE_TYPE.cellIs,
-        op,
+      const operator = CELL_IS_OP[rule.op];
+      if (operator === undefined) return null;
+      return {
+        ranges,
+        type: CfRuleType.CellIs,
+        operator,
         formula1: String(rule.a),
+        ...((rule.op === 'between' || rule.op === 'not-between') && rule.b !== undefined
+          ? { formula2: String(rule.b) }
+          : {}),
       };
-      if ((rule.op === 'between' || rule.op === 'not-between') && rule.b !== undefined) {
-        input.formula2 = String(rule.b);
-      }
-      return input;
     }
     case 'formula': {
       // Only a full `=`-expression is a valid standalone CF expression.
       if (!rule.formula.startsWith('=')) return null;
-      return { sqref, type: RULE_TYPE.expression, formula1: rule.formula.slice(1) };
+      return { ranges, type: CfRuleType.Expression, formula1: rule.formula.slice(1) };
     }
     case 'text-contains': {
       if (rule.caseSensitive === true) {
@@ -373,45 +389,45 @@ function conditionalRuleBodyToEngineInput(rule: ConditionalRule): ConditionalFor
         // An empty local needle is intentionally a no-match predicate. Leave
         // it local rather than asking the engine to interpret an empty FIND.
         if (formula1 === null) return null;
-        return { sqref, type: RULE_TYPE.expression, formula1 };
+        return { ranges, type: CfRuleType.Expression, formula1 };
       }
       return {
-        sqref,
+        ranges,
         type:
           rule.mode === 'not-contains'
-            ? RULE_TYPE.notContainsText
+            ? CfRuleType.NotContainsText
             : rule.mode === 'begins-with'
-              ? RULE_TYPE.beginsWith
+              ? CfRuleType.BeginsWith
               : rule.mode === 'ends-with'
-                ? RULE_TYPE.endsWith
-                : RULE_TYPE.containsText,
+                ? CfRuleType.EndsWith
+                : CfRuleType.ContainsText,
         text: rule.text,
       };
     }
     case 'duplicates':
-      return { sqref, type: RULE_TYPE.duplicateValues };
+      return { ranges, type: CfRuleType.DuplicateValues };
     case 'unique':
-      return { sqref, type: RULE_TYPE.uniqueValues };
+      return { ranges, type: CfRuleType.UniqueValues };
     case 'blanks':
-      return { sqref, type: RULE_TYPE.containsBlanks };
+      return { ranges, type: CfRuleType.ContainsBlanks };
     case 'non-blanks':
-      return { sqref, type: RULE_TYPE.notContainsBlanks };
+      return { ranges, type: CfRuleType.NotContainsBlanks };
     case 'errors':
-      return { sqref, type: RULE_TYPE.containsErrors };
+      return { ranges, type: CfRuleType.ContainsErrors };
     case 'no-errors':
-      return { sqref, type: RULE_TYPE.notContainsErrors };
+      return { ranges, type: CfRuleType.NotContainsErrors };
     case 'top-bottom':
       return {
-        sqref,
-        type: RULE_TYPE.top10,
+        ranges,
+        type: CfRuleType.Top10,
         rank: rule.n,
         percent: rule.percent === true,
         bottom: rule.mode === 'bottom',
       };
     case 'average':
       return {
-        sqref,
-        type: RULE_TYPE.aboveAverage,
+        ranges,
+        type: CfRuleType.AboveAverage,
         aboveAverage:
           rule.mode === 'above' || rule.mode === 'equal-or-above' || rule.mode === 'above-std-dev',
         equalAverage: rule.mode === 'equal-or-above' || rule.mode === 'equal-or-below',
@@ -427,11 +443,11 @@ function conditionalRuleBodyToEngineInput(rule: ConditionalRule): ConditionalFor
         : defaultColorScaleThresholds(rule.stops);
       if (thresholds.length !== colors.length) return null;
       return {
-        sqref,
-        type: RULE_TYPE.colorScale,
+        ranges,
+        type: CfRuleType.ColorScale,
         colorScale: {
           thresholds,
-          colors: colors as CfColor[],
+          colors: colors as Color[],
         },
       };
     }
@@ -467,8 +483,8 @@ function conditionalRuleBodyToEngineInput(rule: ConditionalRule): ConditionalFor
           ? undefined
           : ENGINE_DATA_BAR_AXIS_POSITIONS[rule.axisPosition];
       return {
-        sqref,
-        type: RULE_TYPE.dataBar,
+        ranges,
+        type: CfRuleType.DataBar,
         dataBar: {
           min: rule.min ? scalePointToCfValueObject(rule.min) : { type: VALUE_OBJECT_TYPE.min },
           max: rule.max ? scalePointToCfValueObject(rule.max) : { type: VALUE_OBJECT_TYPE.max },
@@ -498,8 +514,8 @@ function conditionalRuleBodyToEngineInput(rule: ConditionalRule): ConditionalFor
           ? rule.thresholds.slice(0, slots - 1).map(scalePointToCfValueObject)
           : defaultIconThresholds(slots);
       return {
-        sqref,
-        type: RULE_TYPE.iconSet,
+        ranges,
+        type: CfRuleType.IconSet,
         iconSet: {
           name: iconSet.name,
           thresholds,
@@ -512,7 +528,7 @@ function conditionalRuleBodyToEngineInput(rule: ConditionalRule): ConditionalFor
       };
     }
     case 'date-occurring':
-      return { sqref, type: RULE_TYPE.timePeriod, timePeriod: TIME_PERIOD[rule.period] };
+      return { ranges, type: CfRuleType.TimePeriod, timePeriod: TIME_PERIOD[rule.period] };
   }
 }
 
@@ -696,9 +712,9 @@ export function rewriteEngineConditionalFormat(
   const index = entries.findIndex((entry) => entry.id === id);
   const entry = entries[index];
   if (!entry) return false;
-  const original = entry as unknown as ConditionalFormatInput;
-  const body = change.input ?? original;
-  const next: ConditionalFormatInput = {
+  const original: ConditionalFormat = entry;
+  const body: ConditionalFormatInput | ConditionalFormat = change.input ?? original;
+  const next: ConditionalFormatInput | ConditionalFormat = {
     ...body,
     id,
     priority: change.priority ?? entry.priority,

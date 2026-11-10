@@ -57,14 +57,14 @@ describe('real WASM whole-sheet fonts', () => {
     const { instance, workbook } = mounted;
     mutators.selectAll(instance.store);
     chooseSize(18);
-    expect(fontAt(workbook)?.size).toBe(18);
-    expect(fontAt(workbook, far)?.size).toBe(18);
+    expect(fontAt(workbook)?.sizePt).toBe(18);
+    expect(fontAt(workbook, far)?.sizePt).toBe(18);
     expect(instance.store.getState().format.formats.size).toBe(0);
     expect(instance.store.getState().data.cells.size).toBe(0);
     expect(instance.undo()).toBe(true);
-    expect(fontAt(workbook, far)?.size).toBe(11);
+    expect(fontAt(workbook, far)?.sizePt).toBe(11);
     expect(instance.redo()).toBe(true);
-    expect(fontAt(workbook, far)?.size).toBe(18);
+    expect(fontAt(workbook, far)?.sizePt).toBe(18);
   });
 
   it('keeps individual overrides and future input through save/reload', async () => {
@@ -77,20 +77,20 @@ describe('real WASM whole-sheet fonts', () => {
     expect(instance.applyChanges([{ addr: { ...a1, col: 1 }, input: 'new' }]).status).toBe(
       'applied',
     );
-    expect(fontAt(workbook)?.size).toBe(24);
-    expect(fontAt(workbook, { ...a1, col: 1 })?.size).toBe(18);
-    expect(fontAt(workbook, far)?.size).toBe(18);
+    expect(fontAt(workbook)?.sizePt).toBe(24);
+    expect(fontAt(workbook, { ...a1, col: 1 })?.sizePt).toBe(18);
+    expect(fontAt(workbook, far)?.sizePt).toBe(18);
     const reloaded = await WorkbookHandle.loadBytes(workbook.save());
     const reloadedMount = await mountStubSheet({ workbook: reloaded, locale: 'ja' });
     try {
-      expect(fontAt(reloaded)?.size).toBe(24);
-      expect(fontAt(reloaded, { ...a1, col: 1 })?.size).toBe(18);
-      expect(fontAt(reloaded, far)?.size).toBe(18);
+      expect(fontAt(reloaded)?.sizePt).toBe(24);
+      expect(fontAt(reloaded, { ...a1, col: 1 })?.sizePt).toBe(18);
+      expect(fontAt(reloaded, far)?.sizePt).toBe(18);
       expect(
         reloadedMount.instance.applyChanges([{ addr: { ...a1, col: 2 }, input: 'after reload' }])
           .status,
       ).toBe('applied');
-      expect(fontAt(reloaded, { ...a1, col: 2 })?.size).toBe(18);
+      expect(fontAt(reloaded, { ...a1, col: 2 })?.sizePt).toBe(18);
     } finally {
       reloadedMount.dispose();
       reloaded.dispose();
@@ -102,16 +102,16 @@ describe('real WASM whole-sheet fonts', () => {
     workbook.addSheet('Other');
     mutators.selectAll(instance.store);
     chooseSize(18);
-    expect(fontAt(workbook, { ...far, sheet: 1 })?.size).toBe(11);
+    expect(fontAt(workbook, { ...far, sheet: 1 })?.sizePt).toBe(11);
     expect(moveSheet(instance.store, workbook, 0, 1)).toBe(true);
-    expect(fontAt(workbook, { ...far, sheet: 1 })?.size).toBe(18);
-    expect(fontAt(workbook, far)?.size).toBe(11);
+    expect(fontAt(workbook, { ...far, sheet: 1 })?.sizePt).toBe(18);
+    expect(fontAt(workbook, far)?.sizePt).toBe(11);
     expect(removeSheet(instance.store, workbook, 0)).toBe(true);
-    expect(fontAt(workbook, far)?.size).toBe(18);
+    expect(fontAt(workbook, far)?.sizePt).toBe(18);
     const reloaded = await WorkbookHandle.loadBytes(workbook.save());
     try {
       expect(reloaded.sheetCount).toBe(1);
-      expect(fontAt(reloaded, far)?.size).toBe(18);
+      expect(fontAt(reloaded, far)?.sizePt).toBe(18);
     } finally {
       reloaded.dispose();
     }
@@ -126,12 +126,10 @@ describe('real WASM whole-sheet fonts', () => {
     if (!baseFont || !baseXf) throw new Error('Missing default style');
     const sourceFont = {
       ...baseFont,
-      size: 18,
+      sizePt: 18,
       bold: true,
-      hasBold: true,
       charset: 128,
-      hasCharset: true,
-      color: { kind: 2, rgb: 0, theme: 4, tint: 0.4, indexed: 0 },
+      color: { kind: 2 as const, argb: 0, theme: 4, tint: 0.4, indexed: 0 },
     };
     const xfIndex = wb.addXfRecord({ ...baseXf, fontIndex: wb.addFontRecord(sourceFont) });
     expect(wb.setColumnStyle(0, 0, MAX_COL, xfIndex)).toBe(true);
@@ -148,7 +146,7 @@ describe('real WASM whole-sheet fonts', () => {
           fontSize: 32,
         }),
       ).toBe(true);
-      expect(fontAt(reloaded)).toMatchObject({ ...sourceFont, size: 24 });
+      expect(fontAt(reloaded)).toMatchObject({ ...sourceFont, sizePt: 24 });
     } finally {
       reloadedMount.dispose();
       reloaded.dispose();
@@ -172,9 +170,9 @@ describe('real WASM whole-sheet fonts', () => {
     expect(ok).not.toBeNull();
     ok?.click();
     expect(instance.store.getState().format.sheetFontOverrides?.get(0)?.patch.fontSize).toBe(24);
-    expect(fontAt(workbook, far)?.size).toBe(18);
+    expect(fontAt(workbook, far)?.sizePt).toBe(18);
     expect(instance.undo()).toBe(true);
-    expect(fontAt(workbook, far)?.size).toBe(11);
+    expect(fontAt(workbook, far)?.sizePt).toBe(11);
   });
 
   it('rejects the entire font change on a protected worksheet', () => {
@@ -186,6 +184,6 @@ describe('real WASM whole-sheet fonts', () => {
     mutators.selectAll(instance.store);
     expect(setFont(instance.store.getState(), instance.store, { fontSize: 24 })).toBe(false);
     expect(instance.store.getState().format.sheetFontOverrides?.size ?? 0).toBe(0);
-    expect(fontAt(workbook, far)?.size).toBe(11);
+    expect(fontAt(workbook, far)?.sizePt).toBe(11);
   });
 });
