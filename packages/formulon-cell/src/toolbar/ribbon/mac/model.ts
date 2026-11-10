@@ -440,15 +440,15 @@ const dataTab = (): RibbonTabModel =>
     group(
       { ja: '並べ替えとフィルター', en: 'Sort & Filter' },
       [
-        compactCommand('mac.data.sortAsc', t('sortAsc'), 'sortAsc'),
-        compactCommand('mac.data.sortDesc', t('sortDesc'), 'sortDesc'),
-        compactCommand('mac.data.sortCustom', t('sortCustom'), 'sortAsc'),
-        compactCommand('mac.data.filter', t('filter'), 'filter'),
+        iconCommand('mac.data.sortAsc', t('sortAsc'), 'sortAsc'),
+        iconCommand('mac.data.sortDesc', t('sortDesc'), 'sortDesc'),
+        menuCommand('mac.data.sortCustom', t('sortCustom'), 'sortAsc'),
+        menuCommand('mac.data.filter', t('filter'), 'filter'),
         compactCommand('mac.data.clear', t('clear'), 'clear'),
         compactCommand('mac.data.reapply', t('reapply'), 'refresh'),
         compactCommand('mac.data.advancedFilter', t('advancedFilter'), 'filter'),
       ],
-      'compact',
+      'sort-filter',
     ),
     group(
       { ja: 'データ ツール', en: 'Data Tools' },

@@ -18,6 +18,7 @@ import { projectDisabledState } from '../menu-a11y.js';
 import type { RibbonDisplayText, ToolbarMenuText } from '../menu-text.js';
 import {
   buildRibbonModel,
+  DATA_MIXED_LAYOUT_GROUP_VARIANTS,
   HOME_MIXED_LAYOUT_GROUP_VARIANTS,
   HOME_STACKED_LAYOUT_GROUP_VARIANTS,
   HOME_TILE_LAYOUT_GROUP_VARIANTS,
@@ -234,7 +235,10 @@ const TILE_LAYOUT_GROUP_VARIANTS = new Set(['tiles', ...HOME_TILE_LAYOUT_GROUP_V
 const STACKED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set(
   HOME_STACKED_LAYOUT_GROUP_VARIANTS,
 );
-const MIXED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set(HOME_MIXED_LAYOUT_GROUP_VARIANTS);
+const MIXED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set([
+  ...HOME_MIXED_LAYOUT_GROUP_VARIANTS,
+  ...DATA_MIXED_LAYOUT_GROUP_VARIANTS,
+]);
 
 const createRibbonTabButton = (
   tab: { id: RibbonTab; label: string; contextual?: boolean },

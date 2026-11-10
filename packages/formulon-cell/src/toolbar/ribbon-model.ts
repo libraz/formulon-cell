@@ -70,6 +70,7 @@ export interface RibbonTabModel {
 export const HOME_TILE_LAYOUT_GROUP_VARIANTS = ['styles'] as const;
 export const HOME_STACKED_LAYOUT_GROUP_VARIANTS = ['cells'] as const;
 export const HOME_MIXED_LAYOUT_GROUP_VARIANTS = ['editing'] as const;
+export const DATA_MIXED_LAYOUT_GROUP_VARIANTS = ['sort-filter'] as const;
 
 export const EXCEL365_STANDARD_RIBBON_TABS: readonly RibbonTab[] = [
   'file',
