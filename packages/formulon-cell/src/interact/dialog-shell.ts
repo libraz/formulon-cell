@@ -1,3 +1,4 @@
+import { visibleFocusReturn } from '../toolbar/ribbon/fit-ribbon.js';
 import { enhanceCustomSelect, syncCustomSelects } from './custom-select.js';
 import { advanceDialogTab, focusableDialogItems } from './dialog-focus.js';
 import { clearDialogPlacement, currentDialogAnchor, placeDialogPanel } from './dialog-placement.js';
@@ -330,7 +331,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
       overlay.hidden = true;
       clearDialogPlacement(overlay, panel);
       if (shouldRestore) {
-        restoreFocusEl?.focus({ preventScroll: true });
+        if (restoreFocusEl) visibleFocusReturn(restoreFocusEl).focus({ preventScroll: true });
       }
       restoreFocusEl = null;
     },

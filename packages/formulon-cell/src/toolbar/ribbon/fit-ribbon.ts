@@ -73,6 +73,14 @@ const canCollapse = (group: HTMLElement): boolean =>
   !group.classList.contains('fc-tb__ribbon-group--styles') &&
   group.querySelectorAll('[data-ribbon-command]').length > 1;
 
+/** Where focus goes back to for `el`: the button that folds its group while the group is folded
+ *  and closed, since `el` is hidden then; otherwise `el` itself. */
+export const visibleFocusReturn = (el: HTMLElement): HTMLElement => {
+  const group = el.closest<HTMLElement>(`.${RIBBON_GROUP_COLLAPSED_CLASS}`);
+  if (!group || group.classList.contains(GROUP_OPEN_CLASS)) return el;
+  return group.querySelector<HTMLElement>(`:scope > .${COLLAPSE_BUTTON_CLASS}`) ?? el;
+};
+
 /** Document listeners an open popup holds; closing the popup releases them. */
 const popupListeners = new WeakMap<HTMLElement, () => void>();
 

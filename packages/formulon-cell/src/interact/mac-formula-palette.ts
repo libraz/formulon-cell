@@ -20,6 +20,7 @@ import type { Strings } from '../i18n/strings.js';
 import type { ExternalFormulaDraftHandle, FormulaBarController } from '../mount/formula-bar.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { visibleFocusReturn } from '../toolbar/ribbon/fit-ribbon.js';
 import type { FormulaEditLease, FormulaEditLeaseContext } from './formula-edit-lease.js';
 import {
   CATEGORY_LABEL_KEY,
@@ -1305,7 +1306,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       connectedElement(returnFocusTarget) ??
       connectedElement(opener) ??
       deps.host;
-    target.focus();
+    visibleFocusReturn(target).focus();
     restoredFocusTarget = null;
     returnFocusTarget = null;
     opener = null;

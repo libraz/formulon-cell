@@ -7,6 +7,7 @@ import {
   RIBBON_GROUP_ICON_ONLY_CLASS,
   RIBBON_GROUP_NARROW_CLASS,
   twoLineLabelWidth,
+  visibleFocusReturn,
 } from '../../../src/toolbar/ribbon/fit-ribbon.js';
 
 type GroupSpec = {
@@ -285,6 +286,19 @@ describe('toolbar/ribbon group collapse', () => {
     label.click();
     expect(group.classList.contains('fc-tb__ribbon-group--open')).toBe(false);
     menu.remove();
+  });
+
+  it('returns focus to the fold button while the trigger sits in a closed folded group', () => {
+    const { panel, groups } = build(520);
+    fitRibbonPanel(panel, { collapse: true });
+    const group = groups[3] as HTMLElement;
+    const trigger = group.querySelector<HTMLElement>('[data-ribbon-command]') as HTMLElement;
+    const fold = group.querySelector<HTMLElement>('.fc-tb__ribbon-group-collapse');
+    expect(visibleFocusReturn(trigger)).toBe(fold);
+    fold?.click();
+    expect(visibleFocusReturn(trigger)).toBe(trigger);
+    const unfolded = groups[0]?.querySelector<HTMLElement>('[data-ribbon-command]') as HTMLElement;
+    expect(visibleFocusReturn(unfolded)).toBe(unfolded);
   });
 
   it('expands every group again once the panel fits', () => {
