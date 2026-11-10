@@ -420,6 +420,22 @@ export function recordTablesChange(
   });
 }
 
+/** Record a table change the engine already made (a row or column edit moves its tables): the
+ *  store follows the engine with its sync muted, on the edit and on every replay, so the table
+ *  mirror never writes the move a second time. */
+export function recordTablesFollowingEngine(
+  history: History | null,
+  store: SpreadsheetStore,
+  wb: Pick<WorkbookHandle, 'withEngineSyncMuted'>,
+  mutate: () => void,
+): void {
+  recordSliceChange(history, store, () => wb.withEngineSyncMuted(mutate), {
+    capture: captureTableOverlaysSnapshot,
+    apply: (target, snap) => wb.withEngineSyncMuted(() => applyTableOverlaysSnapshot(target, snap)),
+    same: sameTablesSnapshot,
+  });
+}
+
 const cloneSessionIllustration = (item: SessionIllustration): SessionIllustration => ({ ...item });
 
 export function captureIllustrationsSnapshot(state: State): SessionIllustration[] {

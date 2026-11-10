@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import { applyMerge } from '../../../src/commands/merge.js';
+import { setFreezePanes } from '../../../src/commands/row-col-layout.js';
 import { deleteRows } from '../../../src/commands/structure.js';
 import { setTableColumnFunction, toggleTableOption } from '../../../src/commands/table-design.js';
 import {
@@ -103,5 +105,72 @@ describe('deleting sheet rows against a table', () => {
     expect(engineColumn && totalsFunctionFromEngine(engineColumn.totalsRowFunction)).not.toBe(
       'max',
     );
+  });
+  it('keeps the first data row blank, shifts what lies below by one row fewer, and undoes exactly', async () => {
+    const { wb, store, history } = await book();
+    // Below the table: B8 holds 99; give it a format, merge E9:F9 and freeze the top 8 rows.
+    mutators.setCellFormat(store, { sheet: 0, row: 7, col: 1 }, { bold: true });
+    expect(applyMerge(store, wb, null, { sheet: 0, r0: 8, c0: 4, r1: 8, c1: 5 })).toBe(true);
+    setFreezePanes(store, 8, 0, wb);
+    const snapshot = () => ({
+      cells: Array.from({ length: 10 }, (_, row) =>
+        [0, 1, 2].map((col) => ({
+          value: wb.getValue({ sheet: 0, row, col }),
+          formula: wb.cellFormula({ sheet: 0, row, col }),
+        })),
+      ),
+      table: table(store)?.range,
+      ref: wb.getTables()[0]?.ref,
+      bold: [...store.getState().format.formats]
+        .filter(([, f]) => f.bold)
+        .map(([key]) => key)
+        .sort(),
+      merges: [...store.getState().merges.byAnchor.values()].map((m) => ({ ...m })),
+      engineMerges: wb.getMerges(0),
+      freezeRows: store.getState().layout.freezeRows,
+    });
+    const before = snapshot();
+
+    // Rows 3-6 (every data row): the engine keeps row 3 blank and removes the three below it.
+    expect(deleteRows(store, wb, history, 2, 4)).toBe(true);
+    const after = snapshot();
+    expect(after.table).toEqual({ sheet: 0, r0: 1, c0: 0, r1: 3, c1: 2 });
+    expect(after.ref).toBe('A2:C4');
+    for (const col of [0, 1, 2]) expect(blank(wb, 2, col)).toBe(true);
+    expect(num(wb, 4, 1)).toBe(99);
+    expect(after.bold).toEqual(['0:4:1']);
+    expect(after.merges).toEqual([{ sheet: 0, r0: 5, c0: 4, r1: 5, c1: 5 }]);
+    expect(after.engineMerges).toEqual([{ sheet: 0, r0: 5, c0: 4, r1: 5, c1: 5 }]);
+    expect(after.freezeRows).toBe(5);
+
+    expect(history.undo()).toBe(true);
+    expect(snapshot()).toEqual(before);
+    expect(history.canUndo()).toBe(false);
+    expect(history.redo()).toBe(true);
+    expect(snapshot()).toEqual(after);
+  });
+
+  it('blanks the only data row without removing a row', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    wb.setText({ sheet: 0, row: 0, col: 0 }, 'Item');
+    wb.setText({ sheet: 0, row: 1, col: 0 }, 'a');
+    wb.setText({ sheet: 0, row: 2, col: 0 }, 'below');
+    wb.createTable(0, { range: 'A1:A2', name: 'tblB', columns: ['Item'] });
+    const store = createSpreadsheetStore();
+    mutators.replaceCells(store, wb.cells(0));
+    hydrateTableOverlaysFromEngine(wb, store);
+    wb.attachStore(store);
+    const history = new History();
+    const text = (row: number) => wb.getValue({ sheet: 0, row, col: 0 });
+    expect(deleteRows(store, wb, history, 1, 1)).toBe(true);
+    expect(text(1)).toEqual({ kind: 'blank' });
+    expect(text(2)).toEqual({ kind: 'text', value: 'below' });
+    expect(table(store)?.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
+    expect(history.undo()).toBe(true);
+    expect(text(1)).toEqual({ kind: 'text', value: 'a' });
+    expect(text(2)).toEqual({ kind: 'text', value: 'below' });
+    expect(history.redo()).toBe(true);
+    expect(text(1)).toEqual({ kind: 'blank' });
+    expect(text(2)).toEqual({ kind: 'text', value: 'below' });
   });
 });

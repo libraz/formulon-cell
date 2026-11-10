@@ -92,7 +92,6 @@ import {
 } from './slice-history.js';
 import { shiftSparklinesForAxisEdit } from './sparkline.js';
 import {
-  clearTableRow,
   keptTableDataRow,
   rowDeleteHitsTableHeader,
   shiftTablesForCols,
@@ -642,6 +641,14 @@ const drawingRemovedByDelete = (
   );
 };
 
+/** A row delete the engine runs over more rows than it removes: deleting every data row of a
+ *  table keeps the first one, blank, so the engine deletes `count` rows from `split` and the
+ *  sheet loses only the ones below it. */
+interface NativeRowDelete {
+  readonly split: number;
+  readonly count: number;
+}
+
 function applyAxisShiftViaEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
@@ -652,14 +659,18 @@ function applyAxisShiftViaEngine(
   delta: number,
   restoreAfterFailedReplay?: (phase: 'redo' | 'undo') => void,
   replayCheckpoint?: StructureReplayCheckpointRef,
+  nativeDelete?: NativeRowDelete,
 ): boolean {
-  if (delta === 0) return true;
+  if (delta === 0 && !nativeDelete) return true;
   const positive = delta > 0;
   const count = Math.abs(delta);
+  // The rows the engine is asked to delete; the shift itself is `split`/`delta`.
+  const deleteSplit = nativeDelete?.split ?? split;
+  const deleteCount = nativeDelete?.count ?? count;
   const record = history !== null && !history.isReplaying();
   const shift: AxisStructureShift = { axis, split, delta };
   const bridge = record ? formatHistoryBridgeFor(store) : undefined;
-  const styleRange = structureStyleRange(sheet, axis, split);
+  const styleRange = structureStyleRange(sheet, axis, deleteSplit);
   const rangeStyleCapable = record && wb.capabilities.rangeStyleSnapshot === true;
   const beforeRangeStyle = rangeStyleCapable ? wb.snapshotRangeStyle(styleRange) : null;
   // A capable native module must produce the opaque checkpoint before any
@@ -678,7 +689,7 @@ function applyAxisShiftViaEngine(
       const addr = parseAddrKey(key);
       if (!addr || addr.sheet !== sheet) continue;
       const index = axis === 'row' ? addr.row : addr.col;
-      if (index >= split) sourceKeys.add(key);
+      if (index >= deleteSplit) sourceKeys.add(key);
     }
     for (const entry of store.getState().format.sheetAxisOverrides?.get(sheet)?.directXfs ?? []) {
       sourceKeys.add(entry.key);
@@ -701,7 +712,7 @@ function applyAxisShiftViaEngine(
   if (!positive && record) {
     for (const c of wb.cells(sheet)) {
       const k = axis === 'row' ? c.addr.row : c.addr.col;
-      if (k >= split && k < split + count) {
+      if (k >= deleteSplit && k < deleteSplit + deleteCount) {
         captured.push({ addr: c.addr, value: c.value, formula: c.formula });
       }
     }
@@ -745,15 +756,17 @@ function applyAxisShiftViaEngine(
   const runNativeOp = (insert: boolean): boolean => {
     let ok = false;
     if (insert) {
+      // Undoing a delete that removed no row (the table's only data row, blanked) inserts none.
       ok =
-        axis === 'row'
+        count === 0 ||
+        (axis === 'row'
           ? wb.engineInsertRows(sheet, split, count)
-          : wb.engineInsertCols(sheet, split, count);
+          : wb.engineInsertCols(sheet, split, count));
     } else {
       ok =
         axis === 'row'
-          ? wb.engineDeleteRows(sheet, split, count)
-          : wb.engineDeleteCols(sheet, split, count);
+          ? wb.engineDeleteRows(sheet, deleteSplit, deleteCount)
+          : wb.engineDeleteCols(sheet, deleteSplit, deleteCount);
     }
     if (!ok) return false;
     wb.recalcAuto();
@@ -1140,10 +1153,17 @@ function editAxis(
   const max = axis === 'row' ? MAX_ROW : MAX_COL;
   const edit = normalizeAxisEdit(at, count, max, kind);
   if (!edit) return false;
-  const split = edit.at;
-  const n = edit.count;
-  const delta = kind === 'insert' ? n : -n;
   const sheet = store.getState().data.sheetIndex;
+  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
+  // Deleting every data row of a table keeps the first one, blank: the engine is given the whole
+  // delete and removes the rows below it, which are what everything else shifts by.
+  const nativeDelete =
+    nativeAxisOp && axis === 'row' && kind === 'delete'
+      ? keptTableDataRow(store, sheet, edit.at, edit.count)
+      : null;
+  const split = nativeDelete ? edit.at + 1 : edit.at;
+  const n = nativeDelete ? edit.count - 1 : edit.count;
+  const delta = kind === 'insert' ? n : -n;
   const permission =
     kind === 'insert'
       ? axis === 'row'
@@ -1159,39 +1179,27 @@ function editAxis(
   if (
     kind === 'delete' &&
     !sheetPermits(store.getState(), sheet) &&
-    !isBandUnlocked(store.getState(), sheet, axis, split, n)
+    !isBandUnlocked(store.getState(), sheet, axis, edit.at, edit.count)
   ) {
     return false;
   }
   if (kind === 'insert' && insertionWouldOverflow(store, wb, sheet, axis, split, n)) return false;
-  if (axisEditSplitsDataTable(wb, sheet, axis, kind, split, n)) {
+  if (axisEditSplitsDataTable(wb, sheet, axis, kind, edit.at, edit.count)) {
     alertDataTableEdit(wb);
     return false;
   }
-  if (axisEditCrossesPivot(wb, sheet, axis, kind, split, n)) {
+  if (axisEditCrossesPivot(wb, sheet, axis, kind, edit.at, edit.count)) {
     alertPivotEdit(wb);
     return false;
   }
-  if (axis === 'row' && kind === 'delete') {
-    // Excel offers no delete over a table's header row, and keeps one blank
-    // data row when every data row goes.
-    if (rowDeleteHitsTableHeader(store, sheet, split, n)) return false;
-    const kept = keptTableDataRow(store, sheet, split, n);
-    if (kept) {
-      const txn = history?.begin();
-      try {
-        clearTableRow(wb, history, kept.range, kept.row);
-        return (
-          n === 1 ||
-          editAxis(store, wb, history, axis, kind, split + 1, n - 1, outerReplayCheckpoint)
-        );
-      } finally {
-        if (txn !== undefined) history?.end(txn);
-      }
-    }
-  }
+  // Excel offers no delete over a table's header row.
+  if (
+    axis === 'row' &&
+    kind === 'delete' &&
+    rowDeleteHitsTableHeader(store, sheet, edit.at, edit.count)
+  )
+    return false;
   const selectionGrown = selectionGrownByMerges(store.getState(), sheet);
-  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
   const structureShift: AxisStructureShift = { axis, split, delta };
   const inverseStructureShift: AxisStructureShift = { axis, split, delta: -delta };
   const beforeAxisOverride = cloneAxisOverride(
@@ -1237,6 +1245,7 @@ function editAxis(
           delta,
           (phase) => restoreAfterFailedReplay?.(phase),
           replayCheckpoint,
+          nativeDelete ? { split: edit.at, count: edit.count } : undefined,
         )
       )
         return false;
@@ -1361,8 +1370,9 @@ function editAxis(
 
     // 5. re-point merges, conditional formats, and the autofilter region.
     shiftAnchoredRanges(store, wb, history, sheet, axis, split, delta, nativeAxisOp);
-    if (axis === 'row') shiftTablesForRows(store, wb, history, sheet, split, delta);
-    else if (kind === 'insert') shiftTablesForCols(store, history, sheet, split, n);
+    if (axis === 'row') shiftTablesForRows(store, wb, history, sheet, split, delta, nativeAxisOp);
+    else if (kind === 'insert')
+      shiftTablesForCols(store, wb, history, sheet, split, n, nativeAxisOp);
     if (history && captureStructureCaches && outerReplayCheckpoint === undefined) {
       // Undo visits children in reverse order. This final marker therefore
       // arms the committed after-state immediately before the other children

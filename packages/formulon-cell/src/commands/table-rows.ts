@@ -1,19 +1,18 @@
-import type { Addr, CellValue } from '../engine/types.js';
-import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { shiftRangeAxis } from './axis-shift.js';
 import type { TableOverlay } from './format-as-table.js';
 import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';
-import { recordTablesChange } from './slice-history.js';
+import { recordTablesChange, recordTablesFollowingEngine } from './slice-history.js';
 
 /**
  * Re-point the tables of `sheet` after rows were inserted (`delta > 0`) or
  * deleted (`delta < 0`) at row `split`. A table below the edit moves and one
  * the edit lands inside grows or shrinks; deleting its totals row turns the
  * totals off. A new data row takes the calculated columns of the rows beside
- * it. A delete never reaches a header row (`rowDeleteHitsTableHeader`).
+ * it. A delete never reaches a header row (`rowDeleteHitsTableHeader`). When the engine ran the
+ * edit (`engineMoved`) it moved its tables already, so the overlays only follow it.
  */
 export function shiftTablesForRows(
   store: SpreadsheetStore,
@@ -22,6 +21,7 @@ export function shiftTablesForRows(
   sheet: number,
   split: number,
   delta: number,
+  engineMoved: boolean,
 ): void {
   const tables = store.getState().tables.tables.filter((t) => t.range.sheet === sheet);
   if (tables.length === 0 || delta === 0) return;
@@ -38,12 +38,14 @@ export function shiftTablesForRows(
     } else edits.push({ table, range: null });
   }
   if (edits.length === 0) return;
-  recordTablesChange(history, store, () => {
+  const shift = (): void => {
     for (const { table, range } of edits) {
       if (range) mutators.upsertTableOverlay(store, { ...table, range });
       else mutators.removeTableOverlay(store, table.id);
     }
-  });
+  };
+  if (engineMoved) recordTablesFollowingEngine(history, store, wb, shift);
+  else recordTablesChange(history, store, shift);
   if (delta < 0) return;
   wb.withBatchedRecalc(() => {
     for (const { table, range } of edits) {
@@ -104,7 +106,8 @@ export function rowDeleteHitsTableHeader(
 
 /**
  * The first data row of a table whose data rows the deletion of `count` rows
- * from `at` would all remove. Excel keeps that row, blank, instead.
+ * from `at` would all remove. The engine keeps that row, blank, and removes
+ * only the rows below it.
  */
 export function keptTableDataRow(
   store: SpreadsheetStore,
@@ -122,48 +125,19 @@ export function keptTableDataRow(
   return null;
 }
 
-/** Blank `row` across the columns of `range`, recording the cells for undo. */
-export function clearTableRow(
-  wb: WorkbookHandle,
-  history: History | null,
-  range: NonNullable<TableOverlay['range']>,
-  row: number,
-): void {
-  const before: { addr: Addr; value: CellValue; formula: string | null }[] = [];
-  for (let col = range.c0; col <= range.c1; col += 1) {
-    const addr = { sheet: range.sheet, row, col };
-    before.push({ addr, value: wb.getValue(addr), formula: wb.cellFormula(addr) });
-  }
-  const clear = (): void => {
-    wb.withBatchedRecalc(() => {
-      for (const { addr } of before) wb.setBlank(addr);
-    });
-    wb.recalcAuto();
-  };
-  clear();
-  if (!history || history.isReplaying()) return;
-  history.push({
-    undo: () => {
-      wb.withBatchedRecalc(() => {
-        for (const { addr, value, formula } of before) writeCell(wb, addr, value, formula);
-      });
-      wb.recalcAuto();
-    },
-    redo: clear,
-  });
-}
-
 /**
  * Re-point the tables of `sheet` after `count` columns were inserted at
  * `split`: the insert widens the table it lands inside and moves one to its
- * right.
+ * right. When the engine ran the insert (`engineMoved`) the overlays only follow it.
  */
 export function shiftTablesForCols(
   store: SpreadsheetStore,
+  wb: WorkbookHandle,
   history: History | null,
   sheet: number,
   split: number,
   count: number,
+  engineMoved: boolean,
 ): void {
   const edits: { table: TableOverlay; range: NonNullable<ReturnType<typeof shiftRangeAxis>> }[] =
     [];
@@ -174,7 +148,9 @@ export function shiftTablesForCols(
     if (range && (range.c0 !== t.c0 || range.c1 !== t.c1)) edits.push({ table, range });
   }
   if (edits.length === 0) return;
-  recordTablesChange(history, store, () => {
+  const shift = (): void => {
     for (const { table, range } of edits) mutators.upsertTableOverlay(store, { ...table, range });
-  });
+  };
+  if (engineMoved) recordTablesFollowingEngine(history, store, wb, shift);
+  else recordTablesChange(history, store, shift);
 }
