@@ -56,6 +56,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'deleteComment',
   'deleteCommentReview',
   'deleteRows',
+  'deleteSheet',
   'dependents',
   'drawErase',
   'drawGrid',
@@ -83,6 +84,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'formatTableInsert',
   'freeze',
   'fx',
+  'hideSheet',
   'hyperlinkInsert',
   'ifFormula',
   'indentDecrease',
@@ -92,6 +94,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'insertCopiedCells',
   'insertHyperlink',
   'insertRows',
+  'insertSheet',
   'insertTableColumns',
   'insertTableRows',
   'inspect',
@@ -299,6 +302,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'marginsPreset',
   'merge',
   'middle',
+  'moveSheet',
   'namedRanges',
   'newCommentReview',
   'nextCommentReview',
@@ -434,6 +438,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'recalcSheet',
   'recordActions',
   'removeDupes',
+  'renameSheet',
   'roundFormula',
   'rowDelete',
   'rowGroup',
@@ -454,6 +459,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'shapeOutline',
   'shapesInsert',
   'sheetBackground',
+  'sheetTabColor',
   'sheetViewDelete',
   'sheetViewSave',
   'sheetViewSelect',
@@ -486,6 +492,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'top',
   'translateReview',
   'underline',
+  'unhideSheet',
   'viewFormulaBar',
   'viewFormulas',
   'viewGridlines',
@@ -515,7 +522,16 @@ export type BuiltInCommandId = (typeof BUILT_IN_COMMAND_IDS)[number];
 
 /** Ids that reach the policy from none of the generated sources. Each one must also appear in
  * {@link BUILT_IN_COMMAND_IDS}; empty while every dispatched id comes from those sources. */
-export const OTHER_BUILT_IN_COMMAND_IDS: readonly BuiltInCommandId[] = [];
+/** Built-ins with no generated source: the sheet-tab menu and the sheet commands behind it. */
+export const OTHER_BUILT_IN_COMMAND_IDS: readonly BuiltInCommandId[] = [
+  'deleteSheet',
+  'hideSheet',
+  'insertSheet',
+  'moveSheet',
+  'renameSheet',
+  'sheetTabColor',
+  'unhideSheet',
+];
 
 const BUILT_IN_COMMAND_ID_SET: ReadonlySet<string> = new Set(BUILT_IN_COMMAND_IDS);
 

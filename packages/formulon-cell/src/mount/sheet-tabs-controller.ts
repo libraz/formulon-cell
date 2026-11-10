@@ -1,14 +1,17 @@
+import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import type { History } from '../commands/history.js';
+import type { InteractionOrigin } from '../commands/interaction-policy.js';
 import { isSheetProtected, isWorkbookStructureProtected } from '../commands/protection.js';
 import {
-  addSheet,
-  addSheetAfterActive,
-  moveSheet,
-  removeSheet,
-  renameSheet,
-  setSheetHidden,
-  setSheetTabVisibility,
-} from '../commands/sheet-mutate.js';
+  deleteSheetAction,
+  insertSheetAction,
+  moveSheetAction,
+  renameSheetAction,
+  type SheetActionContext,
+  setSheetHiddenAction,
+  setSheetTabColorAction,
+  setSheetVisibilityAction,
+} from '../commands/sheet-actions.js';
 import { createColorPalette, themeColorColumns } from '../components/color-palette.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import { SheetVisibility } from '../engine/types.js';
@@ -57,7 +60,8 @@ interface SheetTabsControllerInput {
 }
 
 export interface SheetTabsController {
-  addSheet(): void;
+  /** Insert a sheet from `origin` (the tab bar's own button when absent) and switch to it. */
+  addSheet(origin?: InteractionOrigin): void;
   closeMenu(): void;
   detach(): void;
   showMenu(idx: number, tab: HTMLButtonElement, x: number, y: number): void;
@@ -84,6 +88,15 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
 
   const visible = (): number[] => visibleSheetIndexes(getWb(), store);
   const hidden = (): number[] => hiddenSheetIndexes(getWb(), store);
+  // The tab bar, its menu and its gestures are one entry point; the keyboard passes its own.
+  const sheetCtx = (origin: InteractionOrigin = 'contextMenu'): SheetActionContext => ({
+    store,
+    workbook: getWb(),
+    history,
+    origin,
+  });
+  const denied = (id: Parameters<typeof canExecuteBuiltIn>[1]): boolean =>
+    !canExecuteBuiltIn(store, id, 'contextMenu').allowed;
   let sheetMenuRestoreFocus: HTMLElement | null = null;
 
   // The Mac arrows scroll the tab strip by one tab; elsewhere they switch sheets.
@@ -231,7 +244,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   };
 
   const beginRename = (idx: number, tab: HTMLButtonElement): void => {
-    if (isWorkbookStructureProtected(store.getState())) return;
+    if (denied('renameSheet')) return;
     const wb = getWb();
     const strings = getStrings();
     const before = wb.sheetName(idx);
@@ -253,7 +266,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       done = true;
       const next = renameInput.value.trim();
       if (commit && next && next !== before) {
-        const ok = renameSheet(wb, idx, next, store, history);
+        const ok = renameSheetAction(sheetCtx(), idx, next);
         if (!ok) {
           renameInput.setAttribute('aria-invalid', 'true');
           done = false;
@@ -295,7 +308,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     // saved file could not carry.
     const canVeryHide = canHide && wb.capabilities.sheetVisibility === true;
     const moveAndRefresh = (from: number, to: number): void => {
-      if (!moveSheet(store, wb, from, to, history)) return;
+      if (!moveSheetAction(sheetCtx(), from, to)) return;
       refreshAfterSheetChange();
     };
     const openMoveCopy = async (): Promise<void> => {
@@ -379,13 +392,16 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           choice.color,
           choice.color === null ? tabColor === undefined : tabColor?.toLowerCase() === choice.color,
           () => {
-            mutators.setSheetTabColor(store, idx, choice.color);
+            setSheetTabColorAction(sheetCtx(), idx, choice.color);
             update();
             closeMenu();
           },
         ),
       ),
     );
+    for (const swatch of swatches.querySelectorAll<HTMLButtonElement>('button')) {
+      projectDisabledState(swatch, denied('sheetTabColor'), sheetActionReason());
+    }
     colorPalette.append(colorLabel, swatches);
     const unhideButtons =
       hiddenIndexes.length > 0
@@ -393,54 +409,54 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
             menuButton(
               formatSheetLabel(strings.sheetTabs.unhideNamedSheet, wb.sheetName(target)),
               () => {
-                if (!setSheetHidden(store, wb, history, target, false)) return;
+                if (!setSheetHiddenAction(sheetCtx(), target, false)) return;
                 switchSheet(target);
                 update();
               },
-              structureProtected || !canHide,
+              denied('unhideSheet') || !canHide,
               unhideReason(true),
             ),
           )
         : [menuButton(strings.sheetTabs.unhideSheet, () => undefined, true, unhideReason(false))];
 
-    const insertSheetAction = (): void => {
-      const added = addSheet(store, wb, history);
+    const insertSheetFromMenu = (): void => {
+      const added = insertSheetAction(sheetCtx());
       if (added < 0) return;
       switchSheet(added);
       update();
     };
-    const deleteSheetAction = async (): Promise<void> => {
-      if (!(await confirmSheetDelete(strings, wb, idx))) return;
-      if (!removeSheet(store, wb, idx)) return;
+    const deleteSheetFromMenu = async (): Promise<void> => {
+      if (denied('deleteSheet') || !(await confirmSheetDelete(strings, wb, idx))) return;
+      if (!deleteSheetAction(sheetCtx(), idx)) return;
       refreshAfterSheetChange();
     };
     const hideSheetAction = (): void => {
-      if (!setSheetHidden(store, wb, history, idx, true)) return;
+      if (!setSheetHiddenAction(sheetCtx(), idx, true)) return;
       refreshAfterSheetChange();
     };
     const desktopItems: HTMLElement[] = [
       menuButton(
         strings.sheetTabs.rename,
         () => beginRename(idx, tab),
-        structureProtected || !canMutate,
+        denied('renameSheet') || !canMutate,
         sheetActionReason(),
       ),
       menuButton(
         strings.sheetTabs.insertSheet,
-        insertSheetAction,
-        structureProtected,
+        insertSheetFromMenu,
+        denied('insertSheet'),
         strings.ribbonMenu.workbookStructureProtectedBlocked,
       ),
       menuButton(
         strings.sheetTabs.moveLeft,
         () => moveAndRefresh(idx, idx - 1),
-        structureProtected || !canMutate || idx <= 0,
+        denied('moveSheet') || !canMutate || idx <= 0,
         moveReason(idx <= 0),
       ),
       menuButton(
         strings.sheetTabs.moveRight,
         () => moveAndRefresh(idx, idx + 1),
-        structureProtected || !canMutate || idx >= wb.sheetCount - 1,
+        denied('moveSheet') || !canMutate || idx >= wb.sheetCount - 1,
         moveReason(idx >= wb.sheetCount - 1),
       ),
       menuButton(
@@ -448,7 +464,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         () => {
           void openMoveCopy();
         },
-        structureProtected || !canMutate,
+        denied('moveSheet') || !canMutate,
         sheetActionReason(),
       ),
       createSheetMenuSeparator(),
@@ -456,25 +472,25 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       createSheetMenuSeparator(),
       menuButton(
         strings.sheetTabs.deleteSheet,
-        deleteSheetAction,
-        structureProtected || !canMutate || wb.sheetCount <= 1,
+        deleteSheetFromMenu,
+        denied('deleteSheet') || !canMutate || wb.sheetCount <= 1,
         deleteReason(),
       ),
       menuButton(
         strings.sheetTabs.hideSheet,
         hideSheetAction,
-        structureProtected || !canHide || visibleIndexes.length <= 1,
+        denied('hideSheet') || !canHide || visibleIndexes.length <= 1,
         hideReason(),
       ),
       menuButton(
         strings.sheetTabs.veryHideSheet,
         () => {
-          if (!setSheetTabVisibility(store, wb, history, idx, SheetVisibility.VeryHidden)) {
+          if (!setSheetVisibilityAction(sheetCtx(), idx, SheetVisibility.VeryHidden)) {
             return;
           }
           refreshAfterSheetChange();
         },
-        structureProtected || !canVeryHide || visibleIndexes.length <= 1,
+        denied('hideSheet') || !canVeryHide || visibleIndexes.length <= 1,
         veryHideReason(),
       ),
       ...unhideButtons,
@@ -487,7 +503,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       sub.setAttribute('role', 'menu');
       sub.setAttribute('aria-label', m.tabColor);
       const apply = (color: string | null): void => {
-        mutators.setSheetTabColor(store, idx, color);
+        setSheetTabColorAction(sheetCtx(), idx, color);
         update();
         closeMenu();
       };
@@ -559,27 +575,27 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           sheets: targets.map((i) => wb.sheetName(i)),
         });
         const target = pos === null ? undefined : targets[pos];
-        if (target === undefined || !setSheetHidden(store, wb, history, target, false)) return;
+        if (target === undefined || !setSheetHiddenAction(sheetCtx(), target, false)) return;
         switchSheet(target);
         update();
       };
       return [
         menuButton(
           m.insertSheet,
-          insertSheetAction,
-          structureProtected,
+          insertSheetFromMenu,
+          denied('insertSheet'),
           strings.ribbonMenu.workbookStructureProtectedBlocked,
         ),
         menuButton(
           strings.sheetTabs.deleteSheet,
-          deleteSheetAction,
-          structureProtected || !canMutate || wb.sheetCount <= 1,
+          deleteSheetFromMenu,
+          denied('deleteSheet') || !canMutate || wb.sheetCount <= 1,
           deleteReason(),
         ),
         menuButton(
           strings.sheetTabs.rename,
           () => beginRename(idx, tab),
-          structureProtected || !canMutate,
+          denied('renameSheet') || !canMutate,
           sheetActionReason(),
         ),
         menuButton(
@@ -587,7 +603,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           () => {
             void openMoveCopy();
           },
-          structureProtected || !canMutate,
+          denied('moveSheet') || !canMutate,
           sheetActionReason(),
         ),
         menuButton(m.viewCode, () => undefined, true, m.unavailable),
@@ -604,7 +620,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         menuButton(
           m.hideSheet,
           hideSheetAction,
-          structureProtected || !canHide || visibleIndexes.length <= 1,
+          denied('hideSheet') || !canHide || visibleIndexes.length <= 1,
           hideReason(),
         ),
         menuButton(
@@ -612,7 +628,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           () => {
             void unhideSheetsAction();
           },
-          structureProtected || !canHide || hiddenIndexes.length === 0,
+          denied('unhideSheet') || !canHide || hiddenIndexes.length === 0,
           unhideReason(hiddenIndexes.length > 0),
         ),
         createSheetMenuSeparator(),
@@ -709,11 +725,10 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       }
     }
     const strings = getStrings();
-    const structureProtected = isWorkbookStructureProtected(store.getState());
     refreshNav();
     setSheetButtonDisabled(
       addSheetBtn,
-      structureProtected,
+      denied('insertSheet'),
       strings.ribbonMenu.workbookStructureProtectedBlocked,
       strings.sheetTabs.addSheet,
     );
@@ -721,12 +736,9 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
 
   const firstSheetRepeater = createSheetNavRepeater(firstSheet, -1);
   const lastSheetRepeater = createSheetNavRepeater(lastSheet, 1);
-  const addAndSwitchSheet = (): void => {
-    const wb = getWb();
+  const addAndSwitchSheet = (origin?: InteractionOrigin): void => {
     // The Mac desktop inserts the new sheet after the active one.
-    const idx = isMacWorkbook(wb)
-      ? addSheetAfterActive(store, wb, history)
-      : addSheet(store, wb, history);
+    const idx = insertSheetAction(sheetCtx(origin), isMacWorkbook(getWb()));
     if (idx < 0) return;
     switchSheet(idx);
     update();
@@ -807,7 +819,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     sheetTabs,
     onDrop: (from, to) => {
       if (!getWb().capabilities.sheetMutate) return;
-      if (!moveSheet(store, getWb(), from, to, history)) return;
+      if (!moveSheetAction(sheetCtx(), from, to)) return;
       // The dragged tab becomes the active sheet.
       if (store.getState().data.sheetIndex !== to) mutators.setSheetIndex(store, to);
       refreshAfterSheetChange();

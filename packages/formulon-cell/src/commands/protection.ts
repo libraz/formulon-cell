@@ -277,6 +277,12 @@ export function isWorkbookStructureProtected(state: State): boolean {
   return !!state.protection.workbookStructure;
 }
 
+/** Whether workbook-structure protection lets `operation` through: the sheet
+ *  operations (insert, delete, rename, move, hide, unhide, tab color) are
+ *  governed by it rather than by sheet protection. */
+export const workbookStructurePermits = (state: State, operation: InteractionOperation): boolean =>
+  operation !== 'sheet' || !isWorkbookStructureProtected(state);
+
 /** The workbook structure password typed this session.
  *  @deprecated It is undefined once the password is hashed (right after
  *  protecting) and for loaded files; use `verifyWorkbookStructurePassword`. */
@@ -838,6 +844,20 @@ const applyProtectionSnapshot = (
     );
   }
 };
+
+/** A restore point for protection state: calling the returned function puts the store and the
+ *  engine back to the state at the time of the call, discarding every protection change since. */
+export function protectionCheckpoint(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle | undefined,
+): () => void {
+  const saved = captureProtectionSnapshot(store.getState());
+  return () => {
+    if (!sameProtectionSnapshot(saved, captureProtectionSnapshot(store.getState()))) {
+      applyProtectionSnapshot(store, wb, saved);
+    }
+  };
+}
 
 export function recordProtectionChange<T>(
   history: History | null,

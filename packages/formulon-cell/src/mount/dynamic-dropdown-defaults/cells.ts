@@ -1,3 +1,4 @@
+import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
 import { insertCopiedBand } from '../../commands/clipboard/insert-copied-cells.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { addrKey } from '../../engine/address.js';
@@ -210,6 +211,19 @@ const buildCellFormatAction =
     instance.host.focus();
   };
 
+/** The sheet command behind a Home > Format menu action, if it is one. */
+const sheetCommandForFormatAction = (
+  action: string | undefined,
+): 'renameSheet' | 'moveSheet' | 'hideSheet' | 'unhideSheet' | 'sheetTabColor' | null => {
+  if (action === 'rename-sheet') return 'renameSheet';
+  if (action === 'move-sheet-left' || action === 'move-sheet-right' || action === 'move-sheet-copy')
+    return 'moveSheet';
+  if (action === 'hide-sheet') return 'hideSheet';
+  if (action === 'unhide-sheet') return 'unhideSheet';
+  if (action?.startsWith('tab-color-')) return 'sheetTabColor';
+  return null;
+};
+
 const updateFormatCellsMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateFormatCellsMenu'] =>
   (menu) => {
@@ -226,8 +240,16 @@ const updateFormatCellsMenu =
     const activeTabColorAction = sheetTabColorActionForColor(
       state.layout.sheetTabColors.get(sheet),
     );
+    const structureProtected = isWorkbookStructureProtected(state);
+    const sheetCommandDenied = (action: string | undefined): boolean => {
+      const id = sheetCommandForFormatAction(action);
+      return id !== null && !canExecuteBuiltIn(instance.store, id, 'ribbon').allowed;
+    };
     const reasonForFormatAction = (action: string | undefined): string | undefined => {
       const t = instance.i18n.strings.ribbonMenu;
+      if (sheetCommandDenied(action)) {
+        return structureProtected ? t.workbookStructureProtectedBlocked : t.sheetActionUnavailable;
+      }
       if (
         (action === 'rename-sheet' ||
           action === 'move-sheet-copy' ||
@@ -258,6 +280,7 @@ const updateFormatCellsMenu =
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-format]')) {
       const action = button.dataset.cellFormat;
       const disabled =
+        sheetCommandDenied(action) ||
         ((action === 'rename-sheet' || action === 'move-sheet-copy') && !canMoveSheet) ||
         action === 'default-width' ||
         (action === 'move-sheet-left' && (sheet <= 0 || !canMoveSheet)) ||
@@ -284,10 +307,13 @@ const updateFormatCellsMenu =
 const updateCellInsertMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateCellInsertMenu'] =>
   (menu) => {
-    const structureProtected = isWorkbookStructureProtected(instance.store.getState());
-    const disabledReason = instance.i18n.strings.ribbonMenu.workbookStructureProtectedBlocked;
+    const strings = instance.i18n.strings.ribbonMenu;
+    const sheetDenied = !canExecuteBuiltIn(instance.store, 'insertSheet', 'ribbon').allowed;
+    const disabledReason = isWorkbookStructureProtected(instance.store.getState())
+      ? strings.workbookStructureProtectedBlocked
+      : strings.sheetActionUnavailable;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-insert]')) {
-      const disabled = button.dataset.cellInsert === 'sheet' && structureProtected;
+      const disabled = button.dataset.cellInsert === 'sheet' && sheetDenied;
       setMenuControlDisabled(button, disabled, disabledReason);
     }
   };
@@ -297,20 +323,21 @@ const updateCellDeleteMenu =
   (menu) => {
     const state = instance.store.getState();
     const structureProtected = isWorkbookStructureProtected(state);
+    const sheetDenied = !canExecuteBuiltIn(instance.store, 'deleteSheet', 'ribbon').allowed;
     const canRemoveSheet = instance.workbook.capabilities.sheetMutate;
     const strings = instance.i18n.strings.ribbonMenu;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-delete]')) {
       let disabledReason: string | undefined;
       if (button.dataset.cellDelete === 'sheet') {
         if (structureProtected) disabledReason = strings.workbookStructureProtectedBlocked;
+        else if (sheetDenied) disabledReason = strings.sheetActionUnavailable;
         else if (instance.workbook.sheetCount <= 1 && !isMacInstance(instance)) {
           disabledReason = strings.sheetDeleteRequiresAnotherSheet;
         } else if (!canRemoveSheet) disabledReason = strings.sheetMutationUnavailable;
       }
       const lastSheet = instance.workbook.sheetCount <= 1 && !isMacInstance(instance);
       const disabled =
-        button.dataset.cellDelete === 'sheet' &&
-        (structureProtected || lastSheet || !canRemoveSheet);
+        button.dataset.cellDelete === 'sheet' && (sheetDenied || lastSheet || !canRemoveSheet);
       setMenuControlDisabled(button, disabled, disabledReason);
     }
   };

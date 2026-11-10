@@ -509,7 +509,7 @@ export const Spreadsheet = {
     };
 
     const onHostKey = createHostShortcutHandler({
-      addSheet: () => sheetTabsController?.addSheet(),
+      addSheet: () => sheetTabsController?.addSheet('keyboard'),
       findReplace: () => binding.findReplace,
       formatDialog: () => featureState.formatDialog,
       formatPainter: () => featureState.formatPainter,

@@ -31,6 +31,7 @@ import {
   protectedSheetPermissions,
   sheetPermits,
   unlockedCellsOption,
+  workbookStructurePermits,
 } from './protection.js';
 
 const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
@@ -184,6 +185,8 @@ export class InteractionAuthorizer {
   ): PermissionDecision {
     const operation = operationDecision(policy, intent.operation);
     if (!operation.allowed) return operation;
+    const structure = this.structureDecision(intent);
+    if (!structure.allowed) return structure;
 
     const cells: Addr[] = [];
     const formulaCells: Addr[] = [];
@@ -411,10 +414,19 @@ export class InteractionAuthorizer {
     return { allowed: true };
   }
 
+  /** Workbook-structure protection's decision, which governs the sheet operations. */
+  private structureDecision(intent: OperationIntent): PermissionDecision {
+    return workbookStructurePermits(this.store.getState(), intent.operation)
+      ? { allowed: true }
+      : { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
+  }
+
   private legacyDecision(
     intent: OperationIntent,
     isAddress: WorkbookAddressCheck,
   ): PermissionDecision {
+    const structure = this.structureDecision(intent);
+    if (!structure.allowed) return structure;
     for (const effect of intent.effects) {
       if (effect.kind === 'sheet') {
         const decision = this.sheetDecision(intent, effect.sheet, undefined, isAddress);

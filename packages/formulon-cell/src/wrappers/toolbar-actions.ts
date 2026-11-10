@@ -9,17 +9,30 @@ import {
   autoSumSuggestion,
   autoSumTargets,
 } from '../commands/auto-sum.js';
+import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import { recordRecentFunction } from '../commands/function-history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { applyFreezeMode, type FreezeMode } from '../commands/row-col-layout.js';
-import { addSheet, removeSheet } from '../commands/sheet-mutate.js';
+import {
+  deleteSheetAction,
+  insertSheetAction,
+  type SheetActionContext,
+} from '../commands/sheet-actions.js';
 import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../commands/structure.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { mutators } from '../store/store.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
 import type { MergeAction } from '../toolbar/merge-action.js';
+
+/** A sheet command run from the ribbon's Insert or Delete menu. */
+const ribbonSheetContext = (instance: SpreadsheetInstance): SheetActionContext => ({
+  store: instance.store,
+  workbook: instance.workbook,
+  history: instance.history,
+  origin: 'ribbon',
+});
 
 export type AutoSumAction = AutoSumFunction | 'MORE';
 
@@ -204,7 +217,7 @@ export const handleInsertCellsAction = (
     return;
   }
   if (action === 'sheet') {
-    const added = addSheet(instance.store, instance.workbook, instance.history);
+    const added = insertSheetAction(ribbonSheetContext(instance));
     if (added >= 0) mutators.setSheetIndex(instance.store, added);
     return;
   }
@@ -233,8 +246,10 @@ export const handleDeleteCellsAction = (
   }
   if (action === 'sheet') {
     const sheet = instance.store.getState().data.sheetIndex;
+    // A refused delete is decided before the confirmation, not after it.
+    if (!canExecuteBuiltIn(instance.store, 'deleteSheet', 'ribbon').allowed) return;
     void confirmSheetDelete(instance.i18n.strings, instance.workbook, sheet).then((ok) => {
-      if (ok) removeSheet(instance.store, instance.workbook, sheet);
+      if (ok) deleteSheetAction(ribbonSheetContext(instance), sheet);
     });
     return;
   }

@@ -19,11 +19,16 @@ import {
   showCols,
   showRows,
 } from '../../commands/row-col-layout.js';
-import { moveSheet, renameSheet, setSheetHidden } from '../../commands/sheet-mutate.js';
-import { recordFormatChange, recordLayoutChange } from '../../commands/slice-history.js';
+import {
+  moveSheetAction,
+  renameSheetAction,
+  type SheetActionContext,
+  setSheetHiddenAction,
+  setSheetTabColorAction,
+} from '../../commands/sheet-actions.js';
+import { recordFormatChange } from '../../commands/slice-history.js';
 import type { Range } from '../../engine/types.js';
 import type { SpreadsheetInstance } from '../../mount.js';
-import { mutators } from '../../store/store.js';
 import { resolveTheme } from '../../theme/resolve.js';
 import { showMoveCopySheetDialog } from '../dialogs/move-copy-sheet.js';
 import type { ToolbarMenuText } from '../menu-text.js';
@@ -77,6 +82,12 @@ export const applyCellFormatAction = async (
     await deps.runSheetProtectionFlow();
     return;
   }
+  const sheetCtx: SheetActionContext = {
+    store: i.store,
+    workbook: i.workbook,
+    history: i.history,
+    origin: 'ribbon',
+  };
   if (action === 'rename-sheet') {
     const sheet = i.store.getState().data.sheetIndex;
     const current = i.workbook.sheetName(sheet);
@@ -86,7 +97,7 @@ export const applyCellFormatAction = async (
       initial: current,
       requiredMessage: t.sheetNameRequired,
     });
-    if (name !== null && renameSheet(i.workbook, sheet, name, i.store, i.history)) {
+    if (name !== null && renameSheetAction(sheetCtx, sheet, name)) {
       deps.renderSheetTabs();
     }
     return;
@@ -95,7 +106,7 @@ export const applyCellFormatAction = async (
     const sheet = i.store.getState().data.sheetIndex;
     const target = action === 'move-sheet-left' ? sheet - 1 : sheet + 1;
     if (target >= 0 && target < i.workbook.sheetCount) {
-      moveSheet(i.store, i.workbook, sheet, target, i.history);
+      moveSheetAction(sheetCtx, sheet, target);
       deps.renderSheetTabs();
     }
     return;
@@ -128,15 +139,7 @@ export const applyCellFormatAction = async (
     const last = shown.at(-1) ?? sheet;
     const to =
       beforeSheet === undefined ? last : sheet < beforeSheet ? beforeSheet - 1 : beforeSheet;
-    if (
-      moveSheet(
-        i.store,
-        i.workbook,
-        sheet,
-        Math.max(0, Math.min(i.workbook.sheetCount - 1, to)),
-        i.history,
-      )
-    ) {
+    if (moveSheetAction(sheetCtx, sheet, Math.max(0, Math.min(i.workbook.sheetCount - 1, to)))) {
       deps.renderSheetTabs();
     }
     return;
@@ -148,9 +151,7 @@ export const applyCellFormatAction = async (
     picker.value = i.store.getState().layout.sheetTabColors.get(sheet) ?? '#c00000';
     picker.style.cssText = 'position:fixed;left:-9999px;opacity:0';
     picker.addEventListener('change', () => {
-      recordLayoutChange(i.history, i.store, () => {
-        mutators.setSheetTabColor(i.store, sheet, picker.value);
-      });
+      setSheetTabColorAction(sheetCtx, sheet, picker.value);
       deps.renderSheetTabs();
       picker.remove();
     });
@@ -160,7 +161,7 @@ export const applyCellFormatAction = async (
   }
   if (action === 'hide-sheet') {
     const sheet = i.store.getState().data.sheetIndex;
-    if (setSheetHidden(i.store, i.workbook, i.history, sheet, true)) {
+    if (setSheetHiddenAction(sheetCtx, sheet, true)) {
       deps.renderSheetTabs();
       deps.switchSheet(i.store.getState().data.sheetIndex);
       deps.refreshWorkbookCells();
@@ -169,7 +170,7 @@ export const applyCellFormatAction = async (
   }
   if (action === 'unhide-sheet') {
     const hidden = [...i.store.getState().layout.hiddenSheets].sort((a, b) => a - b)[0];
-    if (hidden != null && setSheetHidden(i.store, i.workbook, i.history, hidden, false)) {
+    if (hidden != null && setSheetHiddenAction(sheetCtx, hidden, false)) {
       deps.renderSheetTabs();
     }
     return;
@@ -177,9 +178,7 @@ export const applyCellFormatAction = async (
   const tabColor = deps.sheetTabColorByAction(action);
   if (tabColor !== undefined) {
     const sheet = i.store.getState().data.sheetIndex;
-    recordLayoutChange(i.history, i.store, () => {
-      mutators.setSheetTabColor(i.store, sheet, tabColor);
-    });
+    setSheetTabColorAction(sheetCtx, sheet, tabColor);
     deps.renderSheetTabs();
     return;
   }

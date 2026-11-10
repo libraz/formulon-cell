@@ -11,7 +11,7 @@ import type {
   OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
-import { sheetPermits, unlockedCellsOption } from './protection.js';
+import { sheetPermits, unlockedCellsOption, workbookStructurePermits } from './protection.js';
 import { FUNCTION_SIGNATURES } from './refs.js';
 
 /** A built-in command id, or a Mac function-menu leaf naming a spreadsheet function. */
@@ -525,6 +525,14 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   rowUnhide: 'resizeRows',
   scalePercent: 'pageSetup',
   sheetBackground: 'pageSetup',
+  // Sheet-tab commands: governed by workbook-structure protection.
+  insertSheet: 'sheet',
+  deleteSheet: 'sheet',
+  renameSheet: 'sheet',
+  moveSheet: 'sheet',
+  hideSheet: 'sheet',
+  unhideSheet: 'sheet',
+  sheetTabColor: 'sheet',
   sheetViewDelete: 'sheet',
   sheetViewSave: 'sheet',
   sortData: 'sort',
@@ -643,9 +651,10 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<BuiltInCommandId> = new Set([
   'pivotRefresh',
 ]);
 
-/** Sheet protection's decision for a built-in command on the active sheet, with or without a
- *  policy: the always-refused commands, and an option-gated operation whose option is off.
- *  Commands it does not name are left to their operation's own protection check. */
+/** Protection's decision for a built-in command on the active sheet, with or without a policy:
+ *  the always-refused commands, an option-gated operation whose option is off, and a sheet
+ *  operation under workbook-structure protection. Commands it does not name are left to their
+ *  operation's own protection check. */
 export const builtInProtectionDecision = (
   store: SpreadsheetStore,
   id: string,
@@ -654,6 +663,8 @@ export const builtInProtectionDecision = (
   const state = store.getState();
   const sheet = state.data.sheetIndex;
   const operation = BUILT_IN_COMMAND_OPERATION[id];
+  if (operation !== null && !workbookStructurePermits(state, operation))
+    return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
   const option = operation ? unlockedCellsOption(operation) : undefined;
   const refused = REFUSED_ON_PROTECTED_SHEET.has(id)
     ? !sheetPermits(state, sheet)
