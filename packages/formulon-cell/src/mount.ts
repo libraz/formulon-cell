@@ -783,6 +783,21 @@ export const Spreadsheet = {
       getLocale: () => i18n.locale,
     });
     let requestedToolbar = opts.toolbar ?? (opts.ui ? ui.ribbon : false);
+    // Theme and toolbar the host set itself; `setUi` falls back to the ui defaults only without them.
+    let hostToolbar = opts.toolbar;
+    let hostTheme = opts.theme;
+    const applyToolbar = (next: MountOptions['toolbar']): void => {
+      requestedToolbar = next ?? false;
+      disposeMacRibbonActions(instance);
+      ribbon.setToolbar(requestedToolbar);
+    };
+    const applyTheme = (t: string): void => {
+      host.dataset.fcTheme = t;
+      syncOverlayPortalTheme(host);
+      mutators.setTheme(store, t);
+      renderer.invalidate();
+      emitter.emit('themeChange', { theme: t });
+    };
 
     const openInsertCopiedCells = createInsertCopiedCellsOpener({
       host,
@@ -853,7 +868,7 @@ export const Spreadsheet = {
         formulaBar.discardFx();
         commands.setPolicy(next);
         instance.setFeatures(requestedFeatures);
-        instance.setToolbar(requestedToolbar);
+        applyToolbar(requestedToolbar);
       },
       setViewportOptions(next) {
         if (disposed) return;
@@ -931,18 +946,17 @@ export const Spreadsheet = {
           refreshFormulaBarLabels();
           renderer.invalidate();
         }
-        instance.setFeatures({ ...ui.features, ...opts.features });
+        instance.setFeatures({ ...ui.features, ...next?.features });
         if (platformChanged && flags.fxDialog && !featureState.fxDialog) {
           attachHostFeature('fxDialog');
         }
-        instance.setTheme(opts.theme ?? ui.theme);
-        instance.setToolbar(opts.toolbar ?? (next ? ui.ribbon : false));
+        applyTheme(hostTheme ?? ui.theme);
+        applyToolbar(hostToolbar ?? (next ? ui.ribbon : false));
       },
       setToolbar(next) {
         if (disposed) return;
-        requestedToolbar = next;
-        disposeMacRibbonActions(instance);
-        ribbon.setToolbar(next);
+        hostToolbar = next;
+        applyToolbar(next);
       },
       i18n,
       features: featuresView,
@@ -1085,11 +1099,8 @@ export const Spreadsheet = {
         renderer.invalidate();
       },
       setTheme(t) {
-        host.dataset.fcTheme = t;
-        syncOverlayPortalTheme(host);
-        mutators.setTheme(store, t);
-        renderer.invalidate();
-        emitter.emit('themeChange', { theme: t });
+        hostTheme = t;
+        applyTheme(t);
       },
       undo() {
         // Batch the replay: a multi-cell entry restores cell by cell, and each
@@ -1252,7 +1263,7 @@ export const Spreadsheet = {
       // the top of `.fc-host` so its shell participates in the host flex column
       // directly (grid fills the rest). The toolbar reads the same
       // `data-fc-theme`, so grid and toolbar theme together via the cascade.
-      instance.setToolbar(requestedToolbar);
+      applyToolbar(requestedToolbar);
     } catch (error) {
       // At this point the instance is fully live. A setup failure must still
       // release every resource, while the caller receives the original setup

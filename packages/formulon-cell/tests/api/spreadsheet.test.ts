@@ -235,6 +235,17 @@ describe('spreadsheet: update', () => {
     expect(secondCapture).toHaveBeenCalledTimes(1);
   });
 
+  it('update({ ui }) leaves the theme and the toolbar the host set', async () => {
+    const sheet = await mountSheet({ theme: 'contrast' });
+    sheet.update({ ui: { ...sheet.options.ui, features: { slicer: true } } });
+    expect(sheet.host.dataset.fcTheme).toBe('contrast');
+
+    sheet.update({ theme: 'ink', toolbar: ribbon() });
+    sheet.update({ ui: { ...sheet.options.ui, features: { slicer: false } } });
+    expect(sheet.host.dataset.fcTheme).toBe('ink');
+    expect(sheet.toolbar).not.toBeNull();
+  });
+
   it('a policy does not disable dialogs whose features are on', async () => {
     const sheet = await mountSheet({ policy: viewerPolicy() });
     expect(sheet.dialogs.canOpen('format')).toBe(true);
