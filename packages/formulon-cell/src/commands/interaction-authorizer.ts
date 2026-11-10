@@ -30,6 +30,7 @@ import {
   isSheetProtected,
   protectedSheetPermissions,
   refusedOnProtectedSheet,
+  rowColumnOption,
   sheetPermits,
   tableChangePermitted,
   unlockedCellsOption,
@@ -58,18 +59,23 @@ const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
     : null;
 };
 
-/** Operations a Protect Sheet option lets through on a protected sheet, locked cells included.
- *  Every other mutation needs an unlocked cell. */
-const PROTECTION_OPTION: Partial<Record<InteractionOperation, keyof SheetProtectionPermissions>> = {
-  insertRows: 'insertRows',
-  deleteRows: 'deleteRows',
-  insertColumns: 'insertColumns',
-  deleteColumns: 'deleteColumns',
+/** Cell operations a Protect Sheet option lets through on a protected sheet, locked cells
+ *  included; the row and column ones are `rowColumnOption`'s. Every other mutation needs an
+ *  unlocked cell. */
+const CELL_PROTECTION_OPTION: Partial<
+  Record<InteractionOperation, keyof SheetProtectionPermissions>
+> = {
   format: 'formatCells',
   // Using an existing filter (its range): criteria, clear, reapply.
   filter: 'autoFilter',
   pivot: 'pivotTables',
 };
+
+/** The option a protected sheet needs for `operation`: a row/column option or a cell one. */
+const protectionOption = (
+  operation: InteractionOperation,
+): keyof SheetProtectionPermissions | undefined =>
+  rowColumnOption(operation) ?? CELL_PROTECTION_OPTION[operation];
 
 /** Whether sheet protection lets a sheet-level `operation` change `sheet`. */
 const sheetProtectionPermits = (
@@ -85,14 +91,14 @@ const sheetProtectionPermits = (
   if (operation === 'filter') return sheetPermits(state, sheet);
   // A table change is decided by its command, before any effect is read.
   if (operation === 'table') return true;
-  return sheetPermits(state, sheet, PROTECTION_OPTION[operation] ?? unlockedCellsOption(operation));
+  return sheetPermits(state, sheet, protectionOption(operation) ?? unlockedCellsOption(operation));
 };
 
 /** Whether sheet protection lets `operation` write `addr`. */
 const protectionPermits = (state: State, operation: InteractionOperation, addr: Addr): boolean => {
   // A table change is decided by its command, whatever the lock of the cells it covers.
   if (operation === 'table') return true;
-  const option = PROTECTION_OPTION[operation];
+  const option = protectionOption(operation);
   if (option) return sheetPermits(state, addr.sheet, option);
   const unlockedOption = unlockedCellsOption(operation);
   if (unlockedOption && !sheetPermits(state, addr.sheet, unlockedOption)) return false;
@@ -409,7 +415,7 @@ export class InteractionAuthorizer {
     }
     if (
       intent.operation !== 'table' &&
-      !sheetPermits(this.store.getState(), range.sheet, PROTECTION_OPTION[intent.operation])
+      !sheetPermits(this.store.getState(), range.sheet, protectionOption(intent.operation))
     )
       return { allowed: false, code: 'protected', addr: first, reason: 'sheet is protected' };
     return { allowed: true };

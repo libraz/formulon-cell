@@ -245,7 +245,7 @@ export function deleteCells(
 
 /** A range of whole rows or whole columns on the active sheet. Excel ignores
  *  the shift direction for it and edits the rows or columns themselves. */
-function wholeLineEdit(
+export function wholeLineEdit(
   store: SpreadsheetStore,
   range: Range,
 ): { axis: 'row' | 'col'; at: number; count: number } | null {

@@ -32,6 +32,7 @@ import { pageSetupWrite } from '../commands/page-setup-actions.js';
 import { paginationFor } from '../commands/pagination.js';
 import { pivotTableAtRange } from '../commands/pivot-table.js';
 import { blockedByProtection, deferForAllowedRangeUnlock } from '../commands/protection.js';
+import { layoutAllowed, layoutWrite } from '../commands/row-col-actions.js';
 import {
   autofitHeaderTracks,
   headerGestureSpans,
@@ -414,6 +415,15 @@ export function attachPointer(
     }
   });
 
+  // A header border drag or double-click sizes the tracks as Row Height / Column Width do.
+  const headerResizeContext = (axis: 'row' | 'col') =>
+    ({
+      store,
+      history,
+      origin: 'editor',
+      commandId: axis === 'row' ? 'rowHeight' : 'colWidth',
+    }) as const;
+
   const localXY = (e: PointerEvent | MouseEvent): { x: number; y: number } => {
     const rect = host.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -751,25 +761,30 @@ export function attachPointer(
     for (const t of hits.outlineToggles) {
       if (x < t.rect.x || x > t.rect.x + t.rect.w) continue;
       if (y < t.rect.y || y > t.rect.y + t.rect.h) continue;
-      if (restricted) {
-        e.preventDefault();
-        drag = { kind: 'none' };
-        return;
-      }
       e.preventDefault();
-      if (t.kind === 'level') {
-        showOutlineLevel(store, history, t.axis, t.level, wb);
-      } else if (t.axis === 'row') {
-        const collapsed = isRowGroupCollapsed(s.layout, t.i0, t.i1);
-        if (collapsed) expandRowGroup(store, history, t.i0, t.i1, wb);
-        else collapseRowGroup(store, history, t.i0, t.i1, wb);
-      } else {
-        const collapsed = isColGroupCollapsed(s.layout, t.i0, t.i1);
-        if (collapsed) expandColGroup(store, history, t.i0, t.i1, wb);
-        else collapseColGroup(store, history, t.i0, t.i1, wb);
-      }
       drag = { kind: 'none' };
-      onAfterCommit?.();
+      // A gutter toggle expands or collapses the outline, as Show/Hide Detail does.
+      const collapsed =
+        t.kind !== 'level' &&
+        (t.axis === 'row'
+          ? isRowGroupCollapsed(s.layout, t.i0, t.i1)
+          : isColGroupCollapsed(s.layout, t.i0, t.i1));
+      const ctx = {
+        store,
+        history,
+        origin: 'editor',
+        commandId: t.kind === 'level' || collapsed ? 'outlineShowDetail' : 'outlineHideDetail',
+      } as const;
+      const toggled = layoutWrite(ctx, t.axis, false, () => {
+        if (t.kind === 'level') showOutlineLevel(store, history, t.axis, t.level, wb);
+        else if (t.axis === 'row') {
+          if (collapsed) expandRowGroup(store, history, t.i0, t.i1, wb);
+          else collapseRowGroup(store, history, t.i0, t.i1, wb);
+        } else if (collapsed) expandColGroup(store, history, t.i0, t.i1, wb);
+        else collapseColGroup(store, history, t.i0, t.i1, wb);
+        return true;
+      });
+      if (toggled) onAfterCommit?.();
       return;
     }
 
@@ -1025,7 +1040,7 @@ export function attachPointer(
       case 'col-resize': {
         // A protected sheet refuses the drag unless it allows formatting columns.
         if (
-          restricted ||
+          !layoutAllowed(headerResizeContext('col'), 'col') ||
           blockedByProtection(store, s.data.sheetIndex, 'col-resize', 'formatColumns')
         ) {
           e.preventDefault();
@@ -1046,7 +1061,7 @@ export function attachPointer(
 
       case 'row-resize': {
         if (
-          restricted ||
+          !layoutAllowed(headerResizeContext('row'), 'row') ||
           blockedByProtection(store, s.data.sheetIndex, 'row-resize', 'formatRows')
         ) {
           e.preventDefault();
@@ -1554,19 +1569,25 @@ export function attachPointer(
       const before = drag.preLayout;
       const after = captureLayoutSnapshot(store.getState());
       const sheet = store.getState().data.sheetIndex;
-      syncLayoutSizesToEngine(wb, store.getState().layout, sheet, before, after);
-      if (history && !history.isReplaying()) {
-        history.push({
-          undo: () => {
-            applyLayoutSnapshot(store, before);
-            syncLayoutSizesToEngine(wb, store.getState().layout, sheet, after, before);
-          },
-          redo: () => {
-            applyLayoutSnapshot(store, after);
-            syncLayoutSizesToEngine(wb, store.getState().layout, sheet, before, after);
-          },
-        });
-      }
+      const axis = drag.kind === 'col-resize' ? 'col' : 'row';
+      const committed = layoutWrite(headerResizeContext(axis), axis, false, () => {
+        syncLayoutSizesToEngine(wb, store.getState().layout, sheet, before, after);
+        if (history && !history.isReplaying()) {
+          history.push({
+            undo: () => {
+              applyLayoutSnapshot(store, before);
+              syncLayoutSizesToEngine(wb, store.getState().layout, sheet, after, before);
+            },
+            redo: () => {
+              applyLayoutSnapshot(store, after);
+              syncLayoutSizesToEngine(wb, store.getState().layout, sheet, before, after);
+            },
+          });
+        }
+        return true;
+      });
+      // A resize refused while the drag ran leaves the sizes it started from.
+      if (!committed) applyLayoutSnapshot(store, before);
     }
     if (drag.kind === 'ruler-margin') {
       const { handle, inches } = drag;
@@ -1856,17 +1877,18 @@ export function attachPointer(
     if (zone.kind === 'col-resize' || zone.kind === 'row-resize') {
       e.preventDefault();
       e.stopPropagation();
-      if (interactionControllerFor(store)?.policy !== undefined) return;
       const axis = zone.kind === 'col-resize' ? 'col' : 'row';
       const track = zone.kind === 'col-resize' ? zone.col : zone.row;
-      autofitHeaderTracks(
-        store,
-        history,
-        axis,
-        track,
-        headerGestureSpans(s, axis, track),
-        wb,
-        getAutofitOptions(),
+      layoutWrite(headerResizeContext(axis), axis, undefined, () =>
+        autofitHeaderTracks(
+          store,
+          history,
+          axis,
+          track,
+          headerGestureSpans(s, axis, track),
+          wb,
+          getAutofitOptions(),
+        ),
       );
     }
   };

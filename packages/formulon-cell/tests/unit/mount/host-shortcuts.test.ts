@@ -23,6 +23,7 @@ function fakePainter() {
 
 interface Setup {
   addSheet: ReturnType<typeof vi.fn>;
+  createTable: ReturnType<typeof vi.fn>;
   handler: Handler;
   history: History;
   store: ReturnType<typeof createSpreadsheetStore>;
@@ -52,6 +53,7 @@ function makeSetup(
   getClipboardSnapshot?: () => ClipboardSnapshot | null,
 ): Setup {
   const addSheet = vi.fn();
+  const createTable = vi.fn();
   const recalc = vi.fn();
   const cells = vi.fn().mockReturnValue([]);
   const invalidate = vi.fn();
@@ -94,6 +96,7 @@ function makeSetup(
     host,
     hostTag,
     hyperlinkDialog: () => feature.hyperlinkDialog,
+    createTable,
     invalidate,
     getLocale: () => locale,
     namedRangeDialog: () => feature.namedRangeDialog,
@@ -106,6 +109,7 @@ function makeSetup(
 
   return {
     addSheet,
+    createTable,
     handler,
     history,
     store,
@@ -233,11 +237,11 @@ describe('mount/host-shortcuts', () => {
     expect(s.invalidate).toHaveBeenCalledTimes(2);
   });
 
-  it.each(['t', 'l'])('Ctrl+%s formats the selected range as a table', (keyName) => {
+  it.each(['t', 'l'])('Ctrl+%s opens Create Table and creates nothing itself', (keyName) => {
     const e = key({ key: keyName, ctrlKey: true });
     s.handler(e);
-    expect(s.store.getState().tables.tables).toHaveLength(1);
-    expect(s.store.getState().tables.tables[0]?.range).toEqual(s.store.getState().selection.range);
+    expect(s.createTable).toHaveBeenCalledTimes(1);
+    expect(s.store.getState().tables.tables).toHaveLength(0);
     expect(e.defaultPrevented).toBe(true);
   });
 

@@ -70,6 +70,74 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  /** Item/Qty over A1:B3 with the active cell on A2, as Create Table's region detection sees it. */
+  const seedItemQty = (): void => {
+    seedText(sheet, 0, 0, 'Item');
+    seedText(sheet, 0, 1, 'Qty');
+    seedText(sheet, 1, 0, 'Pen');
+    seedNumber(sheet, 1, 1, 3);
+    seedText(sheet, 2, 0, 'Ink');
+    seedNumber(sheet, 2, 1, 5);
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 1, col: 0 });
+  };
+  const createTableDialog = () => {
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    return {
+      dialog,
+      range: dialog?.querySelector<HTMLInputElement>('input[type="text"]')?.value,
+      headers: dialog?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked,
+    };
+  };
+
+  it('proposes the current region of a single cell from Insert > Table', async () => {
+    seedItemQty();
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    tb.setActiveTab('insert');
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableInsert"]')?.click();
+    await Promise.resolve();
+    expect(createTableDialog()).toMatchObject({ range: 'Sheet1!$A$1:$B$3', headers: true });
+    tb.dispose();
+  });
+
+  it.each(['t', 'l'])(
+    'opens Create Table from Ctrl+%s and creates the table only on OK',
+    async (k) => {
+      seedItemQty();
+      const press = () =>
+        sheet.instance.host.dispatchEvent(
+          new KeyboardEvent('keydown', { key: k, ctrlKey: true, bubbles: true, cancelable: true }),
+        );
+      press();
+      await waitFor(() => Boolean(createTableDialog().dialog));
+      expect(createTableDialog()).toMatchObject({ range: 'Sheet1!$A$1:$B$3', headers: true });
+      expect(sheet.instance.store.getState().tables.tables).toHaveLength(0);
+      const buttons = [
+        ...(createTableDialog().dialog?.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn') ??
+          []),
+      ];
+      buttons.find((b) => !b.classList.contains('fc-fmtdlg__btn--primary'))?.click();
+      await waitFor(() => !createTableDialog().dialog);
+      expect(sheet.instance.store.getState().tables.tables).toHaveLength(0);
+
+      press();
+      await waitFor(() => Boolean(createTableDialog().dialog));
+      createTableDialog()
+        .dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+        ?.click();
+      await waitFor(() => sheet.instance.store.getState().tables.tables.length === 1);
+      expect(sheet.instance.store.getState().tables.tables[0]?.range).toEqual({
+        sheet: 0,
+        r0: 0,
+        c0: 0,
+        r1: 2,
+        c1: 1,
+      });
+    },
+  );
+
   it('opens Create Table from the Insert ribbon primary button', async () => {
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 });
     seedText(sheet, 0, 0, 'Region');

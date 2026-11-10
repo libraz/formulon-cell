@@ -41,6 +41,7 @@ const setup = async (platform: 'default' | 'mac') => {
 
 const answering = (value: number | null) => vi.fn<DimensionPrompt>(async () => value);
 
+const ENTRY = { origin: 'ribbon', commandId: 'formatCellsHome' } as const;
 describe('runRowHeightDialog', () => {
   // Excel keeps row heights in quarter points up to 409.5: 12.7 -> 12.75,
   // 15.3 -> 15.25, 15.4 -> 15.5, 410 -> 409.5. The model keeps that value on
@@ -50,7 +51,14 @@ describe('runRowHeightDialog', () => {
     async (platform) => {
       const { wb, store } = await setup(platform);
       const prompt = answering(15.3);
-      await runRowHeightDialog({ store, history: null, wb, range: range(1, 0, 2, 0), prompt });
+      await runRowHeightDialog({
+        store,
+        history: null,
+        wb,
+        ...ENTRY,
+        range: range(1, 0, 2, 0),
+        prompt,
+      });
       expect(ROW_HEIGHT_MAX_PT).toBe(409.5);
       expect(store.getState().layout.rowHeights.get(1)).toBeCloseTo(15.25 * PX_PER_PT, 8);
       expect(store.getState().layout.rowHeights.get(2)).toBeCloseTo(15.25 * PX_PER_PT, 8);
@@ -59,6 +67,7 @@ describe('runRowHeightDialog', () => {
         store,
         history: null,
         wb,
+        ...ENTRY,
         range: range(1, 0, 1, 0),
         prompt: again,
       });
@@ -73,6 +82,7 @@ describe('runRowHeightDialog', () => {
       store,
       history: null,
       wb,
+      ...ENTRY,
       range: range(2, 0, 2, 0),
       prompt: answering(12.75),
     });
@@ -88,7 +98,14 @@ describe('runRowHeightDialog', () => {
     const { wb, store } = await setup('default');
     mutators.setRowHeight(store, 3, 30);
     const prompt = answering(null);
-    await runRowHeightDialog({ store, history: null, wb, range: range(2, 0, 3, 0), prompt });
+    await runRowHeightDialog({
+      store,
+      history: null,
+      wb,
+      ...ENTRY,
+      range: range(2, 0, 3, 0),
+      prompt,
+    });
     expect(prompt).toHaveBeenCalledWith(undefined, ROW_HEIGHT_MAX_PT);
   });
 
@@ -97,7 +114,14 @@ describe('runRowHeightDialog', () => {
     mutators.setRowHeight(store, 2, 30);
     mutators.setRowHeight(store, 3, 30);
     const prompt = answering(null);
-    await runRowHeightDialog({ store, history: null, wb, range: range(2, 0, 3, 0), prompt });
+    await runRowHeightDialog({
+      store,
+      history: null,
+      wb,
+      ...ENTRY,
+      range: range(2, 0, 3, 0),
+      prompt,
+    });
     expect(prompt).toHaveBeenCalledWith(22.5, ROW_HEIGHT_MAX_PT);
   });
 
@@ -107,6 +131,7 @@ describe('runRowHeightDialog', () => {
       store,
       history: null,
       wb,
+      ...ENTRY,
       range: range(4, 0, 5, 0),
       prompt: answering(0),
     });
@@ -118,7 +143,14 @@ describe('runColumnWidthDialog', () => {
   it('shows the Normal font characters and sets whole pixels on Windows', async () => {
     const { wb, store } = await setup('default');
     const prompt = answering(10);
-    await runColumnWidthDialog({ store, history: null, wb, range: range(0, 1, 0, 1), prompt });
+    await runColumnWidthDialog({
+      store,
+      history: null,
+      wb,
+      ...ENTRY,
+      range: range(0, 1, 0, 1),
+      prompt,
+    });
     expect(prompt).toHaveBeenCalledWith(8.43, COLUMN_WIDTH_MAX_CHARS);
     expect(store.getState().layout.colWidths.get(1)).toBe(75);
   });
@@ -129,6 +161,7 @@ describe('runColumnWidthDialog', () => {
       store,
       history: null,
       wb,
+      ...ENTRY,
       range: range(0, 2, 0, 2),
       prompt: answering(0.5),
     });
@@ -140,7 +173,14 @@ describe('runColumnWidthDialog', () => {
     const { wb, store } = await setup('mac');
     // Aptos Narrow 12 on Mac: a 6 pt digit, 5 pt padding, 65 pt default column.
     const prompt = answering(12.57);
-    await runColumnWidthDialog({ store, history: null, wb, range: range(0, 0, 0, 0), prompt });
+    await runColumnWidthDialog({
+      store,
+      history: null,
+      wb,
+      ...ENTRY,
+      range: range(0, 0, 0, 0),
+      prompt,
+    });
     expect(prompt).toHaveBeenCalledWith(10, COLUMN_WIDTH_MAX_CHARS);
     expect(store.getState().layout.colWidths.get(0)).toBeCloseTo(80 * PX_PER_PT, 8);
   });
@@ -151,6 +191,7 @@ describe('runColumnWidthDialog', () => {
       store,
       history: null,
       wb,
+      ...ENTRY,
       range: range(0, 3, 0, 3),
       prompt: answering(0),
     });

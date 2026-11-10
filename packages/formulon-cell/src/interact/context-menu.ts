@@ -1326,6 +1326,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           history,
           wb,
           range: state.selection.range,
+          origin: 'contextMenu',
+          commandId: id,
           prompt: (initial, max) =>
             showDimensionDialog({
               axis: rows ? 'row' : 'col',

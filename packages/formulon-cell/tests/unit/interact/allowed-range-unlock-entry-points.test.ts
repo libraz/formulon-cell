@@ -79,6 +79,7 @@ describe('fill shortcuts (Ctrl+D / Ctrl+R / Ctrl+E)', () => {
       host: document.createElement('div'),
       hostTag: document.createElement('input'),
       hyperlinkDialog: () => null,
+      createTable: vi.fn(),
       invalidate,
       getLocale: () => 'en-US',
       namedRangeDialog: () => null,

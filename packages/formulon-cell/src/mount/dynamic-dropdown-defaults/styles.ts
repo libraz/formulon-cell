@@ -26,7 +26,7 @@ import {
 } from '../../commands/format-as-table.js';
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
 import { recordConditionalRulesChange, recordTablesChange } from '../../commands/slice-history.js';
-import { tableWrite } from '../../commands/table-actions.js';
+import { tableSourceForSelection, tableWrite } from '../../commands/table-actions.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { Range } from '../../engine/types.js';
@@ -214,8 +214,9 @@ const updateTableStylesMenu =
     }
   };
 
-/** Create Table over the selection, from the entry point `entry` names: Insert > Table by
- *  default. A refused entry opens nothing. */
+/** The table-creation dialog over the selection (a single cell proposes its current region),
+ *  from the entry point `entry` names: Insert > Table by default. A refused entry opens nothing,
+ *  and the table is created only on OK. */
 export const showCreateTableDialog = async (
   instance: SpreadsheetInstance,
   options: {
@@ -226,7 +227,7 @@ export const showCreateTableDialog = async (
   entry: DialogEntry = { origin: 'ribbon', commandId: 'formatTableInsert' },
 ): Promise<void> => {
   if (!canExecuteBuiltInRequest(instance.store, entry.commandId, entry.origin).allowed) return;
-  const selection = normalizedSelectionRange(instance);
+  const selection = tableSourceForSelection(instance.store.getState());
   const sheetName = instance.workbook.sheetName(selection.sheet);
   const pivotDialogStrings = instance.i18n.strings
     .pivotTableDialog as typeof instance.i18n.strings.pivotTableDialog & {

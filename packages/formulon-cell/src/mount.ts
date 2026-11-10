@@ -53,6 +53,7 @@ import { attachAlwaysOnDialogs } from './mount/always-on-dialogs.js';
 import { createMountChrome } from './mount/chrome.js';
 import { attachChromeSync, type ChromeSyncController } from './mount/chrome-sync.js';
 import { toggleSheetProtectionFlow } from './mount/dynamic-dropdown-defaults/protection-flows.js';
+import { showCreateTableDialog } from './mount/dynamic-dropdown-defaults/styles.js';
 import { attachEngineBinding, type EngineBinding } from './mount/engine-binding.js';
 import { createErrorIndicatorClickHandler } from './mount/error-indicator-click.js';
 import { createExtensionRegistry } from './mount/extension-registry.js';
@@ -531,6 +532,12 @@ export const Spreadsheet = {
       host,
       hostTag: tag,
       hyperlinkDialog: () => featureState.hyperlinkDialog,
+      createTable: () =>
+        void showCreateTableDialog(
+          instance,
+          {},
+          { origin: 'keyboard', commandId: 'formatTableInsert' },
+        ),
       invalidate: () => renderer.invalidate(),
       getLocale: () => i18n.locale,
       namedRangeDialog: () => featureState.namedRangeDialog,

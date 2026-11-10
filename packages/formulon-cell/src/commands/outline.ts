@@ -185,7 +185,8 @@ export function colGroupRangeAt(
   return { c0, c1 };
 }
 
-/** Hide every row in `[r0, r1]`. Wrapped in a layout history entry. */
+/** Hide every row in `[r0, r1]`. Wrapped in a layout history entry. Expanding or collapsing an
+ *  outline on a protected sheet needs its Format rows (columns) option. */
 export function collapseRowGroup(
   store: SpreadsheetStore,
   history: History | null,
@@ -193,7 +194,8 @@ export function collapseRowGroup(
   r1: number,
   wb?: WorkbookHandle,
 ): void {
-  if (blockedByProtection(store, store.getState().data.sheetIndex, 'collapseRowGroup')) return;
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'collapseRowGroup', 'formatRows')) return;
   if (spanSize(r0, r1) > MAX_MATERIALIZED_OUTLINE_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
@@ -213,7 +215,8 @@ export function expandRowGroup(
   r1: number,
   wb?: WorkbookHandle,
 ): void {
-  if (blockedByProtection(store, store.getState().data.sheetIndex, 'expandRowGroup')) return;
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'expandRowGroup', 'formatRows')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenRows);
@@ -244,7 +247,8 @@ export function collapseColGroup(
   c1: number,
   wb?: WorkbookHandle,
 ): void {
-  if (blockedByProtection(store, store.getState().data.sheetIndex, 'collapseColGroup')) return;
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'collapseColGroup', 'formatColumns')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenCols);
@@ -263,7 +267,8 @@ export function expandColGroup(
   c1: number,
   wb?: WorkbookHandle,
 ): void {
-  if (blockedByProtection(store, store.getState().data.sheetIndex, 'expandColGroup')) return;
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'expandColGroup', 'formatColumns')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenCols);
@@ -365,7 +370,9 @@ export function showOutlineLevel(
   level: number,
   wb?: WorkbookHandle,
 ): void {
-  if (blockedByProtection(store, store.getState().data.sheetIndex, 'showOutlineLevel')) return;
+  const sheet = store.getState().data.sheetIndex;
+  const option = axis === 'row' ? 'formatRows' : 'formatColumns';
+  if (blockedByProtection(store, sheet, 'showOutlineLevel', option)) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const summary = outlineSummaryFor(s.layout, s.data.sheetIndex);
@@ -461,6 +468,10 @@ const outlineDetailTarget = (
   const col = range.r1 > range.r0 ? null : cols();
   return col && { axis: 'col', ...col };
 };
+
+/** The axis Show/Hide Detail acts on around `range`, or null when no group is there. */
+export const outlineDetailAxis = (store: SpreadsheetStore, range: Range): 'row' | 'col' | null =>
+  outlineDetailTarget(store, range)?.axis ?? null;
 
 /** Whether Show/Hide Detail has a group to act on around the selection. */
 export const hasOutlineDetail = (store: SpreadsheetStore, range: Range): boolean =>

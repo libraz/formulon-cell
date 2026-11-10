@@ -286,16 +286,23 @@ describe('runCellShiftChoice', () => {
       deleteCols: vi.spyOn(structure, 'deleteCols').mockReturnValue(true),
     };
     const norm = { sheet: 0, r0: 2, c0: 1, r1: 4, c1: 3 };
-    expect(runCellShiftChoice({ store, wb, history: null }, 'insert', range, 'down')).toBe(true);
+    const target = {
+      store,
+      wb,
+      history: null,
+      origin: 'ribbon',
+      commandId: 'insertRows',
+    } as const;
+    expect(runCellShiftChoice(target, 'insert', range, 'down')).toBe(true);
     expect(spies.insertCells).toHaveBeenCalledWith(store, wb, null, norm, 'down');
-    runCellShiftChoice({ store, wb, history: null }, 'delete', range, 'left');
+    runCellShiftChoice(target, 'delete', range, 'left');
     expect(spies.deleteCells).toHaveBeenCalledWith(store, wb, null, norm, 'left');
-    runCellShiftChoice({ store, wb, history: null }, 'insert', range, 'rows');
+    runCellShiftChoice(target, 'insert', range, 'rows');
     expect(spies.insertRows).toHaveBeenCalledWith(store, wb, null, 2, 3);
-    runCellShiftChoice({ store, wb, history: null }, 'delete', range, 'cols');
+    runCellShiftChoice(target, 'delete', range, 'cols');
     expect(spies.deleteCols).toHaveBeenCalledWith(store, wb, null, 1, 3);
     // A direction that belongs to the other dialog does nothing.
-    expect(runCellShiftChoice({ store, wb, history: null }, 'insert', range, 'up')).toBe(false);
+    expect(runCellShiftChoice(target, 'insert', range, 'up')).toBe(false);
     vi.restoreAllMocks();
     wb.dispose();
   });

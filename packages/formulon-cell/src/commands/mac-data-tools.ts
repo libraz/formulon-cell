@@ -254,10 +254,79 @@ const dataIntent = (
     effects: [{ kind: 'cells', cells, includesFormula: operation === 'formulaEdit' }],
   });
 
+/** The sheet-level writes of Subtotal: the outline it groups (or ungroups) and, when asked, the
+ *  page breaks it adds. */
+const subtotalSheetIntents =
+  (sheet: number, pageBreaks: boolean): AuthorizedIntentFactory =>
+  (origin) => [
+    {
+      operation: 'resizeRows',
+      origin,
+      commandId: 'mac.data.subtotal',
+      effects: [{ kind: 'sheet', sheet }],
+    },
+    ...(pageBreaks
+      ? [
+          {
+            operation: 'pageSetup' as const,
+            origin,
+            commandId: 'mac.data.subtotal',
+            effects: [{ kind: 'sheet' as const, sheet }],
+          },
+        ]
+      : []),
+  ];
+
+/** Remove All: the subtotal rows deleted below the header (re-inserted on undo) and the outline
+ *  cleared. */
+const subtotalRemovalIntents =
+  (range: Range): AuthorizedIntentFactory =>
+  (origin) => [
+    {
+      operation: origin === 'undo' ? 'insertRows' : 'deleteRows',
+      origin,
+      commandId: 'mac.data.subtotal',
+      effects: [{ kind: 'range', range: rowShiftBand(range.sheet, range.r0 + 1) }],
+    },
+    ...subtotalSheetIntents(range.sheet, false)(origin),
+  ];
+
+/** Replacing subtotals removes the old rows and inserts new ones below the header, writing values,
+ *  formulas and formats there; the new rows are known only once the old ones are gone, so the
+ *  cells are decided as the band they can land in. */
+const subtotalReplaceIntents =
+  (range: Range, pageBreaks: boolean): AuthorizedIntentFactory =>
+  (origin) => {
+    const band = rowShiftBand(range.sheet, range.r0 + 1);
+    const cells = { ...band, c0: range.c0, c1: range.c1 };
+    return [
+      ...(['deleteRows', 'insertRows'] as const).map((operation) => ({
+        operation,
+        origin,
+        commandId: 'mac.data.subtotal',
+        effects: [{ kind: 'range' as const, range: band }],
+      })),
+      ...(['valueEdit', 'formulaEdit'] as const).map((operation) => ({
+        operation,
+        origin,
+        commandId: 'mac.data.subtotal',
+        effects: [{ kind: 'range' as const, range: cells }],
+      })),
+      {
+        operation: 'format',
+        origin,
+        commandId: 'mac.data.subtotal',
+        effects: [{ kind: 'workbook' }],
+      },
+      ...subtotalSheetIntents(range.sheet, pageBreaks)(origin),
+    ];
+  };
+
 const subtotalIntents = (
   range: Range,
   outputCells: readonly Addr[],
   formulaCells: readonly Addr[],
+  pageBreaks: boolean,
 ): AuthorizedIntentFactory => {
   const cellsEffect = { kind: 'cells' as const, cells: outputCells };
   const formulasEffect = {
@@ -294,6 +363,7 @@ const subtotalIntents = (
       commandId: 'mac.data.subtotal',
       effects: [formatEffect],
     },
+    ...subtotalSheetIntents(range.sheet, pageBreaks)(origin),
   ];
 };
 
@@ -1007,7 +1077,12 @@ export function planMacSubtotal(
   // Preflight every apply, undo, and redo intent at their eventual positions.
   const output = subtotalOutputCells(range, columns, groups, request.summaryBelow !== false);
   if (!output) return failure('unsupported', 'groupLimit');
-  const intents = subtotalIntents(range, output.outputCells, output.formulaCells);
+  const intents = subtotalIntents(
+    range,
+    output.outputCells,
+    output.formulaCells,
+    request.pageBreaks === true,
+  );
   const authorization = authorizeWrite(instance.store, intents, 'ribbon');
   if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
   return success({ range: { ...range }, insertedRows: groups.length + 1, groups });
@@ -1047,7 +1122,12 @@ export function commitMacSubtotal(
   const below = request.summaryBelow !== false;
   const output = subtotalOutputCells(range, columns, solution.groups, below);
   if (!output) return failure('unsupported', 'groupLimit');
-  const intents = subtotalIntents(range, output.outputCells, output.formulaCells);
+  const intents = subtotalIntents(
+    range,
+    output.outputCells,
+    output.formulaCells,
+    request.pageBreaks === true,
+  );
   const write = (): void => {
     const writeTotalRow = (row: number, label: string, from: number, to: number): void => {
       wb.setText({ sheet: range.sheet, row, col: range.c0 }, label);
@@ -1154,29 +1234,27 @@ export function removeMacSubtotals(
   if (blockSubtotalOverDataTable(wb, range)) return failure('rejected', 'notEditable');
   const rows = subtotalRowsIn(wb, range);
   if (rows.length === 0) return success(0);
-  let token: ReturnType<typeof history.begin>;
   try {
-    token = history.begin();
-  } catch (error) {
-    return failure('invalid', 'failed', thrownReason(error));
-  }
-  try {
-    // Bottom-up, so the rows still to delete keep their indices.
-    for (const row of [...rows].reverse()) {
-      if (!deleteRows(store, wb, history, row, 1))
-        throw new Error('Could not delete subtotal row.');
-    }
-    const lastRow = range.r1 - rows.length;
-    // Subtotal outlines nest up to three levels deep.
-    for (let level = 0; level < 3; level += 1) ungroupRows(store, history, range.r0, lastRow, wb);
-    history.end(token);
+    const written = authorizedWrite({
+      store,
+      history,
+      intents: subtotalRemovalIntents(range),
+      origin: 'ribbon',
+      write: () => {
+        // Bottom-up, so the rows still to delete keep their indices.
+        for (const row of [...rows].reverse()) {
+          if (!deleteRows(store, wb, history, row, 1))
+            throw new Error('Could not delete subtotal row.');
+        }
+        const lastRow = range.r1 - rows.length;
+        // Subtotal outlines nest up to three levels deep.
+        for (let level = 0; level < 3; level += 1)
+          ungroupRows(store, history, range.r0, lastRow, wb);
+      },
+    });
+    if (!written.ok) return failure('rejected', 'notEditable', written.decision.reason);
     return success(rows.length);
   } catch (error) {
-    try {
-      history.abort(token);
-    } catch (abortError) {
-      return failure('invalid', 'failed', thrownReason(abortError));
-    }
     return failure('invalid', 'failed', thrownReason(error));
   }
 }
@@ -1188,33 +1266,35 @@ export function replaceMacSubtotals(
   region: Range,
   makeRequest: (target: Range) => SubtotalRequest,
 ): MacDataResult<void> {
-  const { history } = instance;
-  let token: ReturnType<typeof history.begin>;
-  try {
-    token = history.begin();
-  } catch (error) {
-    return failure('invalid', 'failed', thrownReason(error));
-  }
-  const abort = <T>(result: MacDataResult<T>): MacDataResult<void> => {
-    try {
-      history.abort(token);
-    } catch (abortError) {
-      return failure('invalid', 'failed', thrownReason(abortError));
+  const { store, history } = instance;
+  // A step that fails rolls the whole replacement back, carrying its own result out.
+  class Failed extends Error {
+    constructor(readonly result: MacDataResult<void>) {
+      super('subtotal replacement failed');
     }
-    return result.ok ? success(undefined) : result;
-  };
+  }
+  const pageBreaks = makeRequest(region).pageBreaks === true;
   try {
-    const removed = removeMacSubtotals(instance, region);
-    if (!removed.ok) return abort(removed);
-    const request = makeRequest({ ...region, r1: region.r1 - removed.value });
-    const plan = planMacSubtotal(instance, request);
-    if (!plan.ok) return abort(plan);
-    const committed = commitMacSubtotal(instance, request, plan.value);
-    if (!committed.ok) return abort(committed);
-    history.end(token);
+    const written = authorizedWrite({
+      store,
+      history,
+      intents: subtotalReplaceIntents(region, pageBreaks),
+      origin: 'ribbon',
+      write: () => {
+        const removed = removeMacSubtotals(instance, region);
+        if (!removed.ok) throw new Failed(removed);
+        const request = makeRequest({ ...region, r1: region.r1 - removed.value });
+        const plan = planMacSubtotal(instance, request);
+        if (!plan.ok) throw new Failed(plan);
+        const committed = commitMacSubtotal(instance, request, plan.value);
+        if (!committed.ok) throw new Failed(committed);
+      },
+    });
+    if (!written.ok) return failure('rejected', 'notEditable', written.decision.reason);
     return success(undefined);
   } catch (error) {
-    return abort(failure('invalid', 'failed', thrownReason(error)));
+    if (error instanceof Failed) return error.result;
+    return failure('invalid', 'failed', thrownReason(error));
   }
 }
 

@@ -739,6 +739,8 @@ describe('Mac Data command operations', () => {
       return out;
     };
     const before = snapshot();
+    // Under a policy the replacement replays through undo and redo as one authorized step.
+    instance.commands.setPolicy({ defaultOperation: 'allow' });
     const grown = { sheet: 0, r0: 0, c0: 0, r1: 4 + plan.value.insertedRows, c1: 1 };
     const result = replaceMacSubtotals(instance, grown, (target) => ({
       range: formatMacRangeAddress(wb, target),
@@ -747,9 +749,15 @@ describe('Mac Data command operations', () => {
       function: 'average',
     }));
     expect(result).toEqual({ ok: true, value: undefined });
-    expect(snapshot()).not.toEqual(before);
+    const after = snapshot();
+    expect(after).not.toEqual(before);
     expect(history.undo()).toBe(true);
     expect(snapshot()).toEqual(before);
+    expect(history.redo()).toBe(true);
+    expect(snapshot()).toEqual(after);
+    instance.commands.setPolicy({ defaultOperation: 'allow', operations: { deleteRows: false } });
+    expect(history.undo()).toBe(false);
+    expect(snapshot()).toEqual(after);
   });
 
   it('aborts every Subtotal mutation when a later structural step fails', async () => {
@@ -876,6 +884,7 @@ describe('Mac Data command operations', () => {
         valueEdit: true,
         formulaEdit: true,
         format: true,
+        resizeRows: true,
       },
       restrict: ({ intent }) => {
         if (intent.commandId === 'mac.data.subtotal') {
@@ -914,6 +923,7 @@ describe('Mac Data command operations', () => {
         'valueEdit:ribbon',
         'formulaEdit:ribbon',
         'format:ribbon',
+        'resizeRows:ribbon',
       ]),
     );
 

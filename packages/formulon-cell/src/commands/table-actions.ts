@@ -6,6 +6,7 @@ import {
   authorizedWrite,
   authorizeWrite,
 } from './authorized-write.js';
+import { currentRegion } from './current-region.js';
 import { History } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
 
@@ -66,3 +67,18 @@ export const selectionOverlapsTable = (state: State): boolean =>
   [state.selection.range, ...(state.selection.extraRanges ?? [])].some((range) =>
     overlapsTable(state, range),
   );
+
+/** The range a new table proposes: the selection, or for a single cell its current region (the
+ *  cell alone when it is empty), as Create Table detects it. */
+export const tableSourceForSelection = (state: State): Range => {
+  const r = state.selection.range;
+  const range: Range = {
+    sheet: r.sheet,
+    r0: Math.min(r.r0, r.r1),
+    c0: Math.min(r.c0, r.c1),
+    r1: Math.max(r.r0, r.r1),
+    c1: Math.max(r.c0, r.c1),
+  };
+  if (range.r0 !== range.r1 || range.c0 !== range.c1) return range;
+  return currentRegion(state, state.selection.active) ?? range;
+};

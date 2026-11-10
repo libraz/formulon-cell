@@ -24,11 +24,15 @@ import { hasActiveCopy, normalizedSelectionRange } from './selection.js';
 
 const noop = (): void => undefined;
 
-const cellShiftTarget = (instance: SpreadsheetInstance) => ({
-  store: instance.store,
-  wb: instance.workbook,
-  history: instance.history,
-});
+/** The Home Insert (Delete) split button's cell shift, run as that button. */
+const cellShiftTarget = (instance: SpreadsheetInstance, kind: 'insert' | 'delete') =>
+  ({
+    store: instance.store,
+    wb: instance.workbook,
+    history: instance.history,
+    origin: 'ribbon',
+    commandId: kind === 'insert' ? 'insertRows' : 'deleteRows',
+  }) as const;
 
 const buildCellInsertAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellInsertAction'] =>
@@ -74,7 +78,8 @@ const buildCellInsertAction =
         strings: instance.i18n.strings,
         kind: 'insert',
         onSubmit: (choice) => {
-          if (!runCellShiftChoice(cellShiftTarget(instance), 'insert', range, choice)) return;
+          if (!runCellShiftChoice(cellShiftTarget(instance, 'insert'), 'insert', range, choice))
+            return;
           mutators.replaceCells(
             instance.store,
             instance.workbook.cells(instance.store.getState().data.sheetIndex),
@@ -127,7 +132,8 @@ const buildCellDeleteAction =
         strings: instance.i18n.strings,
         kind: 'delete',
         onSubmit: (choice) => {
-          if (!runCellShiftChoice(cellShiftTarget(instance), 'delete', range, choice)) return;
+          if (!runCellShiftChoice(cellShiftTarget(instance, 'delete'), 'delete', range, choice))
+            return;
           mutators.replaceCells(
             instance.store,
             instance.workbook.cells(instance.store.getState().data.sheetIndex),

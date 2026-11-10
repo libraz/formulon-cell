@@ -30,10 +30,12 @@ import {
   groupCols,
   groupRows,
   hideOutlineDetail,
+  outlineDetailAxis,
   showOutlineDetail,
   ungroupCols,
   ungroupRows,
 } from '../commands/outline.js';
+import { layoutWrite } from '../commands/row-col-actions.js';
 import { deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
 import { setSheetZoom } from '../commands/view.js';
 import { formatA1Range, MAX_COL } from '../engine/address.js';
@@ -364,18 +366,26 @@ export function createDefaultRibbonHooks(
   const applyOutline = (action: 'group' | 'ungroup' | 'show-detail' | 'hide-detail'): void => {
     const range = instance.store.getState().selection.range;
     const useRows = range.r1 > range.r0 || range.c0 === range.c1;
+    const { store, history, workbook } = instance;
+    const ctx = (commandId: string) => ({ store, history, origin: 'ribbon', commandId }) as const;
     if (action === 'group') {
-      if (useRows)
-        groupRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
-      else groupCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+      layoutWrite(ctx('outlineGroup'), useRows ? 'row' : 'col', undefined, () => {
+        if (useRows) groupRows(store, history, range.r0, range.r1, workbook);
+        else groupCols(store, history, range.c0, range.c1, workbook);
+      });
     } else if (action === 'ungroup') {
-      if (useRows)
-        ungroupRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
-      else ungroupCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
-    } else if (action === 'hide-detail') {
-      hideOutlineDetail(instance.store, instance.history, range, instance.workbook);
+      layoutWrite(ctx('outlineUngroup'), useRows ? 'row' : 'col', undefined, () => {
+        if (useRows) ungroupRows(store, history, range.r0, range.r1, workbook);
+        else ungroupCols(store, history, range.c0, range.c1, workbook);
+      });
     } else {
-      showOutlineDetail(instance.store, instance.history, range, instance.workbook);
+      // Show/Hide Detail act on the outline around the selection, decided by its axis.
+      const axis = outlineDetailAxis(store, range) ?? 'row';
+      const hide = action === 'hide-detail';
+      layoutWrite(ctx(hide ? 'outlineHideDetail' : 'outlineShowDetail'), axis, undefined, () => {
+        if (hide) hideOutlineDetail(store, history, range, workbook);
+        else showOutlineDetail(store, history, range, workbook);
+      });
     }
     instance.host.focus();
   };

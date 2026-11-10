@@ -13,8 +13,10 @@ import type {
   OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
+import { outlineDetailAxis } from './outline.js';
 import {
   refusedOnProtectedSheet,
+  rowColumnOption,
   sheetPermits,
   tableChangePermitted,
   unlockedCellsOption,
@@ -576,8 +578,6 @@ const SELECTING_NAVIGATION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<Bui
 
 /** Operations whose writes touch no cell: decided by the operation alone. */
 const WORKBOOK_EFFECT_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
-  'resizeRows',
-  'resizeColumns',
   'namedRange',
   'sheet',
   'object',
@@ -585,6 +585,32 @@ const WORKBOOK_EFFECT_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'print',
   'export',
 ]);
+
+/** Row and column layout operations: decided for the sheet, by its Format rows/columns option. */
+const SHEET_LAYOUT_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
+  'resizeRows',
+  'resizeColumns',
+]);
+
+/** Show/Hide Detail: expanding or collapsing an outline is a row or a column layout change,
+ *  by the axis of the group around the selection. */
+const OUTLINE_DETAIL_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<BuiltInCommandId>([
+  'outlineShowDetail',
+  'outlineHideDetail',
+  'mac.data.showDetail',
+  'mac.data.hideDetail',
+]);
+
+/** The operation of built-in `id` in the current state: its classification, with Show/Hide
+ *  Detail taking the axis of the outline it acts on. */
+const builtInOperation = (
+  store: SpreadsheetStore,
+  id: BuiltInCommandId,
+): InteractionOperation | null => {
+  if (!OUTLINE_DETAIL_COMMANDS.has(id)) return BUILT_IN_COMMAND_OPERATION[id];
+  const { selection } = store.getState();
+  return outlineDetailAxis(store, selection.range) === 'col' ? 'resizeColumns' : 'resizeRows';
+};
 
 /** Commands that turn AutoFilter on or off rather than use an existing filter. */
 const FILTER_DEFINITION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<BuiltInCommandId>([
@@ -667,7 +693,7 @@ export const builtInCommandIntent = (
 ): OperationIntent | null | undefined => {
   if (!isBuiltInCommandRequest(id)) return undefined;
   const operation = isBuiltInCommandId(id)
-    ? BUILT_IN_COMMAND_OPERATION[id]
+    ? builtInOperation(store, id)
     : functionLeafOperation(store, id.slice(FUNCTION_COMMAND_PREFIX.length));
   if (operation === undefined || operation === null) return operation;
   const workbookTheme = /^mac\.page\.(theme|color|font)\.(office|gray)$/.test(id);
@@ -688,7 +714,11 @@ export const builtInCommandIntent = (
     effects = [{ kind: 'sheet', sheet: selection.sheet }];
   // A sheet-level write, or one whose Protect Sheet option alone makes it available (locked
   // cells refuse it at run time): decided for the active sheet as a whole.
-  else if (operation === 'pageSetup' || unlockedCellsOption(operation))
+  else if (
+    operation === 'pageSetup' ||
+    SHEET_LAYOUT_OPERATIONS.has(operation) ||
+    unlockedCellsOption(operation)
+  )
     effects = [{ kind: 'sheet', sheet: selection.sheet }];
   // A command on an existing report or table is decided on the one the active cell is in.
   else if (report) effects = [{ kind: 'range', range: report }];
@@ -713,10 +743,12 @@ export const builtInProtectionDecision = (
   if (!isBuiltInCommandId(id)) return { allowed: true };
   const state = store.getState();
   const sheet = state.data.sheetIndex;
-  const operation = BUILT_IN_COMMAND_OPERATION[id];
+  const operation = builtInOperation(store, id);
   if (operation !== null && !workbookStructurePermits(state, operation))
     return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
-  const option = operation ? unlockedCellsOption(operation) : undefined;
+  const option = operation
+    ? (unlockedCellsOption(operation) ?? rowColumnOption(operation))
+    : undefined;
   // Turning AutoFilter on or off is refused on a protected sheet; using a filter needs Use AutoFilter.
   const filterRefused =
     operation === 'filter' &&

@@ -10,6 +10,8 @@ import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
+import type { InteractionOrigin } from './interaction-policy.js';
+import { layoutAllowed, layoutWrite } from './row-col-actions.js';
 import { hideCols, hideRows, setColsWidth, setRowsHeight } from './row-col-layout.js';
 
 /** Largest row height the dialog accepts, in points. */
@@ -28,6 +30,9 @@ export interface DimensionDialogContext {
   wb: WorkbookHandle;
   range: Range;
   prompt: DimensionPrompt;
+  /** The entry point that opened the dialog; a refused one prompts for nothing. */
+  origin: InteractionOrigin;
+  commandId: string;
 }
 
 /** The size every track in `[first, last]` shares, or undefined when they differ. */
@@ -52,6 +57,7 @@ const sharedSize = (
 /** Prompt for the selection's row height in points and apply it. */
 export async function runRowHeightDialog(ctx: DimensionDialogContext): Promise<void> {
   const { store, history, wb, range } = ctx;
+  if (!layoutAllowed(ctx, 'row')) return;
   const layout = store.getState().layout;
   const px = sharedSize(layout.rowHeights, layout.defaultRowHeight, range.r0, range.r1);
   const pt = await ctx.prompt(
@@ -59,16 +65,16 @@ export async function runRowHeightDialog(ctx: DimensionDialogContext): Promise<v
     ROW_HEIGHT_MAX_PT,
   );
   if (pt === null) return;
-  if (pt === 0) {
-    hideRows(store, history, range.r0, range.r1, wb);
-    return;
-  }
-  setRowsHeight(store, history, range.r0, range.r1, wb.rowPxForDisplayPt(pt), wb);
+  layoutWrite(ctx, 'row', undefined, () => {
+    if (pt === 0) hideRows(store, history, range.r0, range.r1, wb);
+    else setRowsHeight(store, history, range.r0, range.r1, wb.rowPxForDisplayPt(pt), wb);
+  });
 }
 
 /** Prompt for the selection's column width in characters and apply it. */
 export async function runColumnWidthDialog(ctx: DimensionDialogContext): Promise<void> {
   const { store, history, wb, range } = ctx;
+  if (!layoutAllowed(ctx, 'col')) return;
   const layout = store.getState().layout;
   const px = sharedSize(layout.colWidths, layout.defaultColWidth, range.c0, range.c1);
   const chars = await ctx.prompt(
@@ -76,16 +82,16 @@ export async function runColumnWidthDialog(ctx: DimensionDialogContext): Promise
     COLUMN_WIDTH_MAX_CHARS,
   );
   if (chars === null) return;
-  if (chars === 0) {
-    hideCols(store, history, range.c0, range.c1, wb);
-    return;
-  }
-  setColsWidth(
-    store,
-    history,
-    range.c0,
-    range.c1,
-    wb.columnPxForDisplayChars(range.sheet, chars),
-    wb,
-  );
+  layoutWrite(ctx, 'col', undefined, () => {
+    if (chars === 0) hideCols(store, history, range.c0, range.c1, wb);
+    else
+      setColsWidth(
+        store,
+        history,
+        range.c0,
+        range.c1,
+        wb.columnPxForDisplayChars(range.sheet, chars),
+        wb,
+      );
+  });
 }

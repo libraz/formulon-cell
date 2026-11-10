@@ -10,17 +10,24 @@ import {
   autoSumTargets,
 } from '../commands/auto-sum.js';
 import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
-import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import { recordRecentFunction } from '../commands/function-history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
+import {
+  deleteCellsAction,
+  deleteColumnsAction,
+  deleteRowsAction,
+  insertCellsAction,
+  insertColumnsAction,
+  insertRowsAction,
+  type RowColActionContext,
+} from '../commands/row-col-actions.js';
 import { applyFreezeMode, type FreezeMode } from '../commands/row-col-layout.js';
 import {
   deleteSheetAction,
   insertSheetAction,
   type SheetActionContext,
 } from '../commands/sheet-actions.js';
-import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../commands/structure.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { mutators } from '../store/store.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
@@ -178,29 +185,17 @@ export const handleAutoSumAction = (
   return handleAutoSum(instance, action);
 };
 
-const insertSelectedRows = (instance: SpreadsheetInstance | null): void => {
-  if (!instance) return;
-  const r = instance.store.getState().selection.range;
-  insertRows(instance.store, instance.workbook, instance.history, r.r0, r.r1 - r.r0 + 1);
-};
-
-const deleteSelectedRows = (instance: SpreadsheetInstance | null): void => {
-  if (!instance) return;
-  const r = instance.store.getState().selection.range;
-  deleteVisibleRows(instance.store, instance.workbook, instance.history, r.r0, r.r1 - r.r0 + 1);
-};
-
-const insertSelectedCols = (instance: SpreadsheetInstance | null): void => {
-  if (!instance) return;
-  const r = instance.store.getState().selection.range;
-  insertCols(instance.store, instance.workbook, instance.history, r.c0, r.c1 - r.c0 + 1);
-};
-
-const deleteSelectedCols = (instance: SpreadsheetInstance | null): void => {
-  if (!instance) return;
-  const r = instance.store.getState().selection.range;
-  deleteCols(instance.store, instance.workbook, instance.history, r.c0, r.c1 - r.c0 + 1);
-};
+/** The Home Insert (Delete) split button, the entry point its menu items run as. */
+const homeCellsContext = (
+  instance: SpreadsheetInstance,
+  commandId: 'insertRows' | 'deleteRows',
+): RowColActionContext => ({
+  store: instance.store,
+  workbook: instance.workbook,
+  history: instance.history,
+  origin: 'ribbon',
+  commandId,
+});
 
 export const handleInsertCellsAction = (
   instance: SpreadsheetInstance | null,
@@ -208,12 +203,13 @@ export const handleInsertCellsAction = (
 ): void => {
   if (!instance) return;
   const r = instance.store.getState().selection.range;
+  const ctx = homeCellsContext(instance, 'insertRows');
   if (action === 'rows') {
-    insertSelectedRows(instance);
+    insertRowsAction(ctx, r.r0, r.r1 - r.r0 + 1);
     return;
   }
   if (action === 'cols') {
-    insertSelectedCols(instance);
+    insertColumnsAction(ctx, r.c0, r.c1 - r.c0 + 1);
     return;
   }
   if (action === 'sheet') {
@@ -221,13 +217,7 @@ export const handleInsertCellsAction = (
     if (added >= 0) mutators.setSheetIndex(instance.store, added);
     return;
   }
-  insertCells(
-    instance.store,
-    instance.workbook,
-    instance.history,
-    r,
-    action === 'shiftDown' ? 'down' : 'right',
-  );
+  insertCellsAction(ctx, r, action === 'shiftDown' ? 'down' : 'right');
 };
 
 export const handleDeleteCellsAction = (
@@ -236,12 +226,13 @@ export const handleDeleteCellsAction = (
 ): void => {
   if (!instance) return;
   const r = instance.store.getState().selection.range;
+  const ctx = homeCellsContext(instance, 'deleteRows');
   if (action === 'rows') {
-    deleteSelectedRows(instance);
+    deleteRowsAction(ctx, r.r0, r.r1 - r.r0 + 1);
     return;
   }
   if (action === 'cols') {
-    deleteSelectedCols(instance);
+    deleteColumnsAction(ctx, r.c0, r.c1 - r.c0 + 1);
     return;
   }
   if (action === 'sheet') {
@@ -253,11 +244,5 @@ export const handleDeleteCellsAction = (
     });
     return;
   }
-  deleteCells(
-    instance.store,
-    instance.workbook,
-    instance.history,
-    r,
-    action === 'shiftUp' ? 'up' : 'left',
-  );
+  deleteCellsAction(ctx, r, action === 'shiftUp' ? 'up' : 'left');
 };

@@ -11,7 +11,6 @@ import {
   toggleUnderline,
   withSelectionFormatOrigin,
 } from '../commands/format.js';
-import { formatAsTable } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
@@ -22,14 +21,19 @@ import {
   warnProtected,
 } from '../commands/protection.js';
 import {
+  deleteColumnsAction,
+  deleteRowsAction,
+  insertColumnsAction,
+  insertRowsAction,
+  layoutWrite,
+} from '../commands/row-col-actions.js';
+import {
   hideCols,
   hideRows,
   showColsAroundSelection,
   showRowsAroundSelection,
 } from '../commands/row-col-layout.js';
-import { recordFormatChange, recordTablesChange } from '../commands/slice-history.js';
-import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../commands/structure.js';
-import { tableWrite } from '../commands/table-actions.js';
+import { recordFormatChange } from '../commands/slice-history.js';
 import { setOutlineSymbolsVisible, setShowFormulas } from '../commands/view.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -92,6 +96,8 @@ interface HostShortcutInput {
   host: HTMLElement;
   hostTag: HTMLInputElement;
   hyperlinkDialog: () => Pick<HyperlinkDialogHandle, 'open'> | null;
+  /** Opens Create Table from the keyboard (Ctrl+T / Ctrl+L). */
+  createTable: () => void;
   invalidate: () => void;
   namedRangeDialog: () => { open(): void } | null;
   pasteSpecialDialog: () => { open(): void } | null;
@@ -110,6 +116,8 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     if (e.target instanceof HTMLSelectElement) return;
     const currentWb = input.wb();
     const restricted = interactionControllerFor(input.store)?.policy !== undefined;
+    const layoutEntry = (commandId: string) =>
+      ({ store: input.store, history: input.history, origin: 'keyboard', commandId }) as const;
     const meta = e.ctrlKey || e.metaKey;
     const macPlatform = isMacHost(input.host);
     const k = e.key.toLowerCase();
@@ -291,6 +299,13 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       e.preventDefault();
       if (restricted) return;
       const kind = insertCellsShortcut ? 'insert' : 'delete';
+      const cellShiftEntry = () =>
+        ({
+          store: input.store,
+          history: input.history,
+          origin: 'keyboard',
+          commandId: kind === 'insert' ? 'insertCells' : 'deleteCells',
+        }) as const;
       const state = input.store.getState();
       const selected = state.selection.range;
       const range = {
@@ -323,14 +338,15 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         (kind === 'delete' || !hasActiveCopy(state)) &&
         (isWholeRowRange(range) || isWholeColumnRange(range))
       ) {
+        const ctx = { ...cellShiftEntry(), workbook: currentWb };
         if (isWholeRowRange(range)) {
           const count = range.r1 - range.r0 + 1;
-          if (kind === 'insert') insertRows(input.store, currentWb, input.history, range.r0, count);
-          else deleteVisibleRows(input.store, currentWb, input.history, range.r0, count);
+          if (kind === 'insert') insertRowsAction(ctx, range.r0, count);
+          else deleteRowsAction(ctx, range.r0, count);
         } else {
           const count = range.c1 - range.c0 + 1;
-          if (kind === 'insert') insertCols(input.store, currentWb, input.history, range.c0, count);
-          else deleteCols(input.store, currentWb, input.history, range.c0, count);
+          if (kind === 'insert') insertColumnsAction(ctx, range.c0, count);
+          else deleteColumnsAction(ctx, range.c0, count);
         }
         mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
         input.invalidate();
@@ -342,7 +358,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         kind,
         onSubmit: (choice) => {
           const range = input.store.getState().selection.range;
-          const target = { store: input.store, wb: currentWb, history: input.history };
+          const target = { ...cellShiftEntry(), wb: currentWb };
           if (!runCellShiftChoice(target, kind, range, choice)) return;
           mutators.replaceCells(
             input.store,
@@ -407,25 +423,8 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     }
     if (k === 't' || k === 'l') {
       e.preventDefault();
-      if (restricted) return;
-      const range = input.store.getState().selection.range;
-      tableWrite(
-        {
-          store: input.store,
-          history: input.history,
-          origin: 'keyboard',
-          commandId: 'formatTableInsert',
-        },
-        range,
-        undefined,
-        () => {
-          // A table cannot overlap another, so a selection inside one creates nothing.
-          recordTablesChange(input.history, input.store, () => {
-            formatAsTable(input.store, range, { workbook: currentWb });
-          });
-        },
-      );
-      input.invalidate();
+      // Create Table opens with the detected range; the table appears only on OK.
+      input.createTable();
       return;
     }
     if (e.key === '8' && !e.shiftKey) {
@@ -442,9 +441,12 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       e.preventDefault();
       if (restricted) return;
       const range = input.store.getState().selection.range;
-      if (e.shiftKey)
-        showRowsAroundSelection(input.store, input.history, range.r0, range.r1, currentWb);
-      else hideRows(input.store, input.history, range.r0, range.r1, currentWb);
+      const commandId = e.shiftKey ? 'rowUnhide' : 'rowHide';
+      layoutWrite(layoutEntry(commandId), 'row', undefined, () => {
+        if (e.shiftKey)
+          showRowsAroundSelection(input.store, input.history, range.r0, range.r1, currentWb);
+        else hideRows(input.store, input.history, range.r0, range.r1, currentWb);
+      });
       input.invalidate();
       return;
     }
@@ -452,9 +454,12 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       e.preventDefault();
       if (restricted) return;
       const range = input.store.getState().selection.range;
-      if (e.shiftKey)
-        showColsAroundSelection(input.store, input.history, range.c0, range.c1, currentWb);
-      else hideCols(input.store, input.history, range.c0, range.c1, currentWb);
+      const commandId = e.shiftKey ? 'colUnhide' : 'colHide';
+      layoutWrite(layoutEntry(commandId), 'col', undefined, () => {
+        if (e.shiftKey)
+          showColsAroundSelection(input.store, input.history, range.c0, range.c1, currentWb);
+        else hideCols(input.store, input.history, range.c0, range.c1, currentWb);
+      });
       input.invalidate();
       return;
     }

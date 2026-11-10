@@ -147,6 +147,21 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'mac.data.dataTable',
 ]);
 
+/** Outline structure commands: Group, Ungroup and the outline settings (summary position). Any
+ *  protection refuses them, Format rows/columns included; Show/Hide Detail is decided apart. */
+const OUTLINE_STRUCTURE_COMMANDS: ReadonlySet<string> = new Set([
+  'outlineGroup',
+  'outlineUngroup',
+  'rowGroup',
+  'rowUngroup',
+  'colGroup',
+  'colUngroup',
+  'mac.data.group',
+  'mac.data.ungroup',
+  'outlineSummaryBelow',
+  'outlineSummaryRight',
+]);
+
 /** Whether `commandId` is one a protected `sheet` refuses whatever its options. */
 export const refusedOnProtectedSheet = (
   state: State,
@@ -154,8 +169,25 @@ export const refusedOnProtectedSheet = (
   commandId: string | undefined,
 ): boolean =>
   commandId !== undefined &&
-  REFUSED_ON_PROTECTED_SHEET.has(commandId) &&
+  (REFUSED_ON_PROTECTED_SHEET.has(commandId) || OUTLINE_STRUCTURE_COMMANDS.has(commandId)) &&
   !sheetPermits(state, sheet);
+
+/** The Protect Sheet option that lets a row or column operation through on a protected sheet,
+ *  locked cells included: insert/delete rows and columns, and Format rows/columns for sizing,
+ *  hiding and expanding or collapsing an outline. */
+const ROW_COLUMN_OPTION: Partial<Record<InteractionOperation, keyof SheetProtectionPermissions>> = {
+  insertRows: 'insertRows',
+  deleteRows: 'deleteRows',
+  insertColumns: 'insertColumns',
+  deleteColumns: 'deleteColumns',
+  resizeRows: 'formatRows',
+  resizeColumns: 'formatColumns',
+};
+
+/** The Protect Sheet option of a row or column `operation`, if it is one. */
+export const rowColumnOption = (
+  operation: InteractionOperation,
+): keyof SheetProtectionPermissions | undefined => ROW_COLUMN_OPTION[operation];
 
 /** Table commands a protected sheet still runs, locked cells included: the banding and first/last
  *  column toggles. Every other table change (create, restyle, resize, header/total row, rename)

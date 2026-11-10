@@ -1,5 +1,6 @@
 import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
 import { setCellsLockedAction } from '../../commands/protection-actions.js';
+import { layoutWrite } from '../../commands/row-col-actions.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../../commands/row-col-dimension.js';
 import {
   autofitColsWidthForRanges,
@@ -225,22 +226,35 @@ export const applyCellFormatAction = async (
     deps.focusSheet();
     return;
   }
+  // Home > Format items run as the Format button.
+  const formatMenu = { origin: 'ribbon', commandId: 'formatCellsHome' } as const;
+  const layout = { store: i.store, history: i.history, ...formatMenu };
   if (action === 'hide-rows') {
-    hideRows(i.store, i.history, range.r0, range.r1, i.workbook);
+    layoutWrite(layout, 'row', undefined, () =>
+      hideRows(i.store, i.history, range.r0, range.r1, i.workbook),
+    );
     return;
   }
   if (action === 'hide-cols') {
-    hideCols(i.store, i.history, range.c0, range.c1, i.workbook);
+    layoutWrite(layout, 'col', undefined, () =>
+      hideCols(i.store, i.history, range.c0, range.c1, i.workbook),
+    );
     return;
   }
   if (action === 'show-rows') {
     const hidden = hiddenExtentInSelection(i.store.getState().layout, 'row', range.r0, range.r1);
-    if (hidden) showRows(i.store, i.history, hidden.first, hidden.last, i.workbook);
+    if (hidden)
+      layoutWrite(layout, 'row', undefined, () =>
+        showRows(i.store, i.history, hidden.first, hidden.last, i.workbook),
+      );
     return;
   }
   if (action === 'show-cols') {
     const hidden = hiddenExtentInSelection(i.store.getState().layout, 'col', range.c0, range.c1);
-    if (hidden) showCols(i.store, i.history, hidden.first, hidden.last, i.workbook);
+    if (hidden)
+      layoutWrite(layout, 'col', undefined, () =>
+        showCols(i.store, i.history, hidden.first, hidden.last, i.workbook),
+      );
     return;
   }
   if (action === 'row-height') {
@@ -249,20 +263,23 @@ export const applyCellFormatAction = async (
       history: i.history,
       wb: i.workbook,
       range,
+      ...formatMenu,
       prompt: (initial, max) => deps.promptDimension('row', initial, max),
     });
     return;
   }
   if (action === 'row-autofit') {
-    autofitRowsHeightForRanges(
-      i.store,
-      i.history,
-      [range, ...(i.store.getState().selection.extraRanges ?? [])],
-      i.workbook,
-      {
-        locale: ribbonLang,
-        theme: resolveTheme(i.host),
-      },
+    layoutWrite(layout, 'row', undefined, () =>
+      autofitRowsHeightForRanges(
+        i.store,
+        i.history,
+        [range, ...(i.store.getState().selection.extraRanges ?? [])],
+        i.workbook,
+        {
+          locale: ribbonLang,
+          theme: resolveTheme(i.host),
+        },
+      ),
     );
     return;
   }
@@ -272,20 +289,23 @@ export const applyCellFormatAction = async (
       history: i.history,
       wb: i.workbook,
       range,
+      ...formatMenu,
       prompt: (initial, max) => deps.promptDimension('col', initial, max),
     });
     return;
   }
   if (action === 'col-autofit') {
-    autofitColsWidthForRanges(
-      i.store,
-      i.history,
-      [range, ...(i.store.getState().selection.extraRanges ?? [])],
-      i.workbook,
-      {
-        locale: ribbonLang,
-        theme: resolveTheme(i.host),
-      },
+    layoutWrite(layout, 'col', undefined, () =>
+      autofitColsWidthForRanges(
+        i.store,
+        i.history,
+        [range, ...(i.store.getState().selection.extraRanges ?? [])],
+        i.workbook,
+        {
+          locale: ribbonLang,
+          theme: resolveTheme(i.host),
+        },
+      ),
     );
   }
 };

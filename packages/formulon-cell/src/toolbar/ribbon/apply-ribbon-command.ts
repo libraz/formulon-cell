@@ -24,6 +24,13 @@ import {
 } from '../../commands/pivot-style-info.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { executeNoteVisibilityAction } from '../../commands/ribbon-comment.js';
+import {
+  deleteColumnsAction,
+  deleteRowsAction,
+  insertColumnsAction,
+  insertRowsAction,
+  layoutWrite,
+} from '../../commands/row-col-actions.js';
 import { hideCols, hideRows } from '../../commands/row-col-layout.js';
 import { arrangeSessionChart } from '../../commands/session-chart.js';
 import {
@@ -31,7 +38,6 @@ import {
   selectedSessionIllustration,
 } from '../../commands/session-illustration.js';
 import { toggleSplitPanes } from '../../commands/split-panes.js';
-import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../../commands/structure.js';
 import {
   TABLE_OPTION_COMMANDS,
   type TableOption,
@@ -221,6 +227,14 @@ const applyGenericRibbonCommand = (
   const range = state.selection.range;
   const rowCount = Math.max(1, range.r1 - range.r0 + 1);
   const colCount = Math.max(1, range.c1 - range.c0 + 1);
+  const rowColCtx = (commandId: string) =>
+    ({
+      store: i.store,
+      workbook: i.workbook,
+      history: i.history,
+      origin: 'ribbon',
+      commandId,
+    }) as const;
   const dialogOpener = RIBBON_DIALOG_OPENERS[id];
   if (dialogOpener) {
     dialogOpener(i);
@@ -458,22 +472,22 @@ const applyGenericRibbonCommand = (
       return true;
     }
     case 'insertRows':
-      insertRows(i.store, i.workbook, i.history, range.r0, rowCount);
+      insertRowsAction(rowColCtx(id), range.r0, rowCount);
       runtime.refreshCells();
       runtime.focusSheet();
       return true;
     case 'deleteRows':
-      deleteVisibleRows(i.store, i.workbook, i.history, range.r0, rowCount);
+      deleteRowsAction(rowColCtx(id), range.r0, rowCount);
       runtime.refreshCells();
       runtime.focusSheet();
       return true;
     case 'insertCols':
-      insertCols(i.store, i.workbook, i.history, range.c0, colCount);
+      insertColumnsAction(rowColCtx(id), range.c0, colCount);
       runtime.refreshCells();
       runtime.focusSheet();
       return true;
     case 'deleteCols':
-      deleteCols(i.store, i.workbook, i.history, range.c0, colCount);
+      deleteColumnsAction(rowColCtx(id), range.c0, colCount);
       runtime.refreshCells();
       runtime.focusSheet();
       return true;
@@ -522,9 +536,11 @@ const applyGenericRibbonCommand = (
     case 'outlineSummaryBelow':
     case 'outlineSummaryRight': {
       const summary = outlineSummaryFor(state.layout, state.data.sheetIndex);
-      setOutlineSummaryPosition(
-        i.store,
-        id === 'outlineSummaryBelow' ? { below: !summary.below } : { right: !summary.right },
+      layoutWrite(rowColCtx(id), id === 'outlineSummaryBelow' ? 'row' : 'col', undefined, () =>
+        setOutlineSummaryPosition(
+          i.store,
+          id === 'outlineSummaryBelow' ? { below: !summary.below } : { right: !summary.right },
+        ),
       );
       runtime.projectFormatToolbar();
       runtime.focusSheet();
@@ -714,11 +730,15 @@ const applyGenericRibbonCommand = (
       runtime.focusSheet();
       return true;
     case 'hideRows':
-      hideRows(i.store, i.history, range.r0, range.r1, i.workbook);
+      layoutWrite(rowColCtx('rowHide'), 'row', undefined, () =>
+        hideRows(i.store, i.history, range.r0, range.r1, i.workbook),
+      );
       runtime.focusSheet();
       return true;
     case 'hideCols':
-      hideCols(i.store, i.history, range.c0, range.c1, i.workbook);
+      layoutWrite(rowColCtx('colHide'), 'col', undefined, () =>
+        hideCols(i.store, i.history, range.c0, range.c1, i.workbook),
+      );
       runtime.focusSheet();
       return true;
     case 'deleteCommentReview':

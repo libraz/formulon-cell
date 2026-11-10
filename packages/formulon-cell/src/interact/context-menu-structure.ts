@@ -1,6 +1,15 @@
-import { insertTableColumns, insertTableRows } from '../commands/cell-shift.js';
 import type { History } from '../commands/history.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
+import {
+  deleteColumnsAction,
+  deleteRowsAction,
+  insertColumnsAction,
+  insertRowsAction,
+  insertTableColumnsAction,
+  insertTableRowsAction,
+  layoutWrite,
+  type RowColActionContext,
+} from '../commands/row-col-actions.js';
 import {
   hiddenExtentInSelection,
   hideCols,
@@ -8,7 +17,6 @@ import {
   showCols,
   showRows,
 } from '../commands/row-col-layout.js';
-import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../commands/structure.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
@@ -34,6 +42,15 @@ export function runContextMenuStructureItem(
   state: State,
 ): boolean {
   const { host, store, wb, history } = ctx;
+  // Every item runs as itself, from the context menu.
+  const action: RowColActionContext = {
+    store,
+    workbook: wb,
+    history,
+    origin: 'contextMenu',
+    commandId: id,
+  };
+  const shift = { store, wb, history, origin: 'contextMenu', commandId: id } as const;
   switch (id) {
     case 'insertCells': {
       openCellShiftDialog({
@@ -41,15 +58,15 @@ export function runContextMenuStructureItem(
         strings: ctx.strings(),
         kind: 'insert',
         onSubmit: (choice) => {
-          if (runCellShiftChoice(ctx, 'insert', state.selection.range, choice)) ctx.afterCommit();
+          if (runCellShiftChoice(shift, 'insert', state.selection.range, choice)) ctx.afterCommit();
         },
       });
       return true;
     }
     case 'insertTableRows':
     case 'insertTableColumns': {
-      const insert = id === 'insertTableRows' ? insertTableRows : insertTableColumns;
-      if (insert(store, wb, history, state.selection.range)) ctx.afterCommit();
+      const insert = id === 'insertTableRows' ? insertTableRowsAction : insertTableColumnsAction;
+      if (insert(action, state.selection.range)) ctx.afterCommit();
       return true;
     }
     case 'deleteCells': {
@@ -58,89 +75,87 @@ export function runContextMenuStructureItem(
         strings: ctx.strings(),
         kind: 'delete',
         onSubmit: (choice) => {
-          if (runCellShiftChoice(ctx, 'delete', state.selection.range, choice)) ctx.afterCommit();
+          if (runCellShiftChoice(shift, 'delete', state.selection.range, choice)) ctx.afterCommit();
         },
       });
       return true;
     }
     case 'rowInsertAbove': {
       const r = state.selection.range;
-      insertRows(store, wb, history, r.r0, r.r1 - r.r0 + 1);
-      ctx.afterCommit();
+      if (insertRowsAction(action, r.r0, r.r1 - r.r0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'rowInsertBelow': {
       const r = state.selection.range;
-      insertRows(store, wb, history, r.r1 + 1, r.r1 - r.r0 + 1);
-      ctx.afterCommit();
+      if (insertRowsAction(action, r.r1 + 1, r.r1 - r.r0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'rowDelete': {
       const r = state.selection.range;
-      deleteVisibleRows(store, wb, history, r.r0, r.r1 - r.r0 + 1);
-      ctx.afterCommit();
+      if (deleteRowsAction(action, r.r0, r.r1 - r.r0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'rowHide': {
       const r = state.selection.range;
-      hideRows(store, history, r.r0, r.r1);
+      layoutWrite(action, 'row', undefined, () => hideRows(store, history, r.r0, r.r1));
       return true;
     }
     case 'rowUnhide': {
       const r = state.selection.range;
       const hidden = hiddenExtentInSelection(state.layout, 'row', r.r0, r.r1);
       if (!hidden) return true;
-      showRows(store, history, hidden.first, hidden.last);
+      layoutWrite(action, 'row', undefined, () =>
+        showRows(store, history, hidden.first, hidden.last),
+      );
       return true;
     }
     case 'rowGroup': {
       const r = state.selection.range;
-      groupRows(store, history, r.r0, r.r1);
+      layoutWrite(action, 'row', undefined, () => groupRows(store, history, r.r0, r.r1));
       return true;
     }
     case 'rowUngroup': {
       const r = state.selection.range;
-      ungroupRows(store, history, r.r0, r.r1);
+      layoutWrite(action, 'row', undefined, () => ungroupRows(store, history, r.r0, r.r1));
       return true;
     }
     case 'colInsertLeft': {
       const r = state.selection.range;
-      insertCols(store, wb, history, r.c0, r.c1 - r.c0 + 1);
-      ctx.afterCommit();
+      if (insertColumnsAction(action, r.c0, r.c1 - r.c0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'colInsertRight': {
       const r = state.selection.range;
-      insertCols(store, wb, history, r.c1 + 1, r.c1 - r.c0 + 1);
-      ctx.afterCommit();
+      if (insertColumnsAction(action, r.c1 + 1, r.c1 - r.c0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'colDelete': {
       const r = state.selection.range;
-      deleteCols(store, wb, history, r.c0, r.c1 - r.c0 + 1);
-      ctx.afterCommit();
+      if (deleteColumnsAction(action, r.c0, r.c1 - r.c0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'colHide': {
       const r = state.selection.range;
-      hideCols(store, history, r.c0, r.c1);
+      layoutWrite(action, 'col', undefined, () => hideCols(store, history, r.c0, r.c1));
       return true;
     }
     case 'colUnhide': {
       const r = state.selection.range;
       const hidden = hiddenExtentInSelection(state.layout, 'col', r.c0, r.c1);
       if (!hidden) return true;
-      showCols(store, history, hidden.first, hidden.last);
+      layoutWrite(action, 'col', undefined, () =>
+        showCols(store, history, hidden.first, hidden.last),
+      );
       return true;
     }
     case 'colGroup': {
       const r = state.selection.range;
-      groupCols(store, history, r.c0, r.c1);
+      layoutWrite(action, 'col', undefined, () => groupCols(store, history, r.c0, r.c1));
       return true;
     }
     case 'colUngroup': {
       const r = state.selection.range;
-      ungroupCols(store, history, r.c0, r.c1);
+      layoutWrite(action, 'col', undefined, () => ungroupCols(store, history, r.c0, r.c1));
       return true;
     }
     default:

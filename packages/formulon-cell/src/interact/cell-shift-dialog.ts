@@ -1,10 +1,13 @@
-import {
-  type DeleteCellsDirection,
-  deleteCells,
-  type InsertCellsDirection,
-  insertCells,
-} from '../commands/cell-shift.js';
+import type { DeleteCellsDirection, InsertCellsDirection } from '../commands/cell-shift.js';
 import type { History } from '../commands/history.js';
+import { columnShiftBand, rowShiftBand } from '../commands/interaction-effects.js';
+import type { InteractionOrigin } from '../commands/interaction-policy.js';
+import {
+  deleteCellsAction,
+  insertCellsAction,
+  type RowColActionContext,
+  rowColWrite,
+} from '../commands/row-col-actions.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -139,6 +142,9 @@ export interface CellShiftTarget {
   store: SpreadsheetStore;
   wb: WorkbookHandle;
   history: History | null;
+  /** The entry point that opened the dialog. */
+  origin: InteractionOrigin;
+  commandId: string;
 }
 
 /** Apply an Insert / Delete cells dialog choice to `range`: shift the cells,
@@ -151,25 +157,33 @@ export function runCellShiftChoice(
   choice: CellShiftChoice,
 ): boolean {
   const { store, wb, history } = target;
+  const ctx: RowColActionContext = { ...target, workbook: wb };
   const r0 = Math.min(range.r0, range.r1);
   const r1 = Math.max(range.r0, range.r1);
   const c0 = Math.min(range.c0, range.c1);
   const c1 = Math.max(range.c0, range.c1);
   const norm: Range = { sheet: range.sheet, r0, c0, r1, c1 };
+  const sheet = store.getState().data.sheetIndex;
   if (choice === 'rows') {
-    return (kind === 'insert' ? insertRows : deleteRows)(store, wb, history, r0, r1 - r0 + 1);
+    const band = [{ kind: 'range', range: rowShiftBand(sheet, r0) }] as const;
+    return rowColWrite(ctx, kind === 'insert' ? 'insertRows' : 'deleteRows', band, false, () =>
+      (kind === 'insert' ? insertRows : deleteRows)(store, wb, history, r0, r1 - r0 + 1),
+    );
   }
   if (choice === 'cols') {
-    return (kind === 'insert' ? insertCols : deleteCols)(store, wb, history, c0, c1 - c0 + 1);
+    const band = [{ kind: 'range', range: columnShiftBand(sheet, c0) }] as const;
+    return rowColWrite(
+      ctx,
+      kind === 'insert' ? 'insertColumns' : 'deleteColumns',
+      band,
+      false,
+      () => (kind === 'insert' ? insertCols : deleteCols)(store, wb, history, c0, c1 - c0 + 1),
+    );
   }
   if (kind === 'insert') {
-    return choice === 'down' || choice === 'right'
-      ? insertCells(store, wb, history, norm, choice)
-      : false;
+    return choice === 'down' || choice === 'right' ? insertCellsAction(ctx, norm, choice) : false;
   }
-  return choice === 'up' || choice === 'left'
-    ? deleteCells(store, wb, history, norm, choice)
-    : false;
+  return choice === 'up' || choice === 'left' ? deleteCellsAction(ctx, norm, choice) : false;
 }
 
 /** Dispose a host's current dialog without returning focus to a removed opener. */

@@ -9,6 +9,7 @@ import {
   runAfterAllowedRangeUnlock,
   warnProtected,
 } from '../commands/protection.js';
+import { layoutWrite } from '../commands/row-col-actions.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import { editSeedForAddr } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
@@ -277,13 +278,21 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       const rowSpan = range.r1 - range.r0;
       const colSpan = range.c1 - range.c0;
       const useRows = rowSpan >= colSpan;
-      if (k === 'ArrowRight') {
-        if (useRows) groupRows(store, deps.history ?? null, range.r0, range.r1);
-        else groupCols(store, deps.history ?? null, range.c0, range.c1);
-      } else {
-        if (useRows) ungroupRows(store, deps.history ?? null, range.r0, range.r1);
-        else ungroupCols(store, deps.history ?? null, range.c0, range.c1);
-      }
+      const history = deps.history ?? null;
+      const group = k === 'ArrowRight';
+      const ctx = {
+        store,
+        history,
+        origin: 'keyboard',
+        commandId: group ? 'outlineGroup' : 'outlineUngroup',
+      } as const;
+      layoutWrite(ctx, useRows ? 'row' : 'col', undefined, () => {
+        if (group) {
+          if (useRows) groupRows(store, history, range.r0, range.r1);
+          else groupCols(store, history, range.c0, range.c1);
+        } else if (useRows) ungroupRows(store, history, range.r0, range.r1);
+        else ungroupCols(store, history, range.c0, range.c1);
+      });
       return;
     }
 
