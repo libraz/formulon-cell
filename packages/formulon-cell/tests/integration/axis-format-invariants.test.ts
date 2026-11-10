@@ -127,7 +127,7 @@ describe('native axis format invariants', () => {
       expect(direct).toBeGreaterThan(0);
       if (hasValue) workbook.setText({ sheet: 0, row: 1, col: 1 }, 'metadata');
       expect(workbook.setCellXfIndex(0, 1, 1, direct)).toBe(true);
-      expect([...workbook.physicalCells(0)].map((cell) => cell.addr)).toContainEqual({
+      expect(workbook.cellXfIndices(0).map((cell) => cell.addr)).toContainEqual({
         sheet: 0,
         row: 1,
         col: 1,

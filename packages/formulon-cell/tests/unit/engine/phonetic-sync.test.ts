@@ -32,6 +32,7 @@ const makeFake = (opts: {
       return values.get(addrKey(addr)) ?? { kind: 'blank' };
     },
     getCellXfIndex: () => 0,
+    cellXfIndices: () => [],
     setCellXfIndex: () => true,
     getCellXf: () => null,
     getFontRecord: () => null,

@@ -15,6 +15,7 @@ import { computeNamedCellStyles, type NamedCellStyle } from './cell-styles-meta.
 import { orFallback } from './result.js';
 import { completeBorderRecord, completeFillRecord, completeFontRecord } from './style-records.js';
 import type {
+  Addr,
   BorderRecord,
   CellRect,
   CellValue,
@@ -288,6 +289,19 @@ export abstract class WorkbookHandleStylesMethods {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return null;
     return orFallback(null, () => ws(this, sheet).ooxml.getCellXfIndex(row, col) ?? 0);
+  }
+
+  /** Every stored cell in `range` (default: the whole sheet) whose own cell XF is
+   *  not 0, styled blanks included, row-major. `[]` when cell formatting is
+   *  unavailable or the engine refuses. */
+  cellXfIndices(sheet: number, range?: Range): readonly { addr: Addr; xfIndex: number }[] {
+    assertAlive(this);
+    if (!this.capabilities.cellFormatting) return [];
+    return orFallback([], () =>
+      ws(this, sheet)
+        .ooxml.getCellXfIndices(range ? cellRect(range) : undefined)
+        .map((e) => ({ addr: { sheet, row: e.row, col: e.col }, xfIndex: e.xfIndex })),
+    );
   }
 
   /** Pin the XF index of `(sheet, row, col)` to `xfIndex`. The index must

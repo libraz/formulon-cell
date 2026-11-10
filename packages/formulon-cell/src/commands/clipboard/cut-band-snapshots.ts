@@ -86,11 +86,8 @@ interface EngineXfCleanup {
 
 export function captureEngineXfSnapshot(wb: WorkbookHandle, sheet: number): EngineXfSnapshot {
   const entries = new Map<string, { addr: Addr; xfIndex: number }>();
-  for (const cell of wb.physicalCells(sheet)) {
-    const xfIndex = wb.getCellXfIndex(sheet, cell.addr.row, cell.addr.col);
-    if (xfIndex !== null && xfIndex > 0) {
-      entries.set(addrKey(cell.addr), { addr: { ...cell.addr }, xfIndex });
-    }
+  for (const { addr, xfIndex } of wb.cellXfIndices(sheet)) {
+    entries.set(addrKey(addr), { addr: { ...addr }, xfIndex });
   }
   return { entries };
 }
@@ -104,11 +101,8 @@ function clearEngineXfsNotInStore(
   for (const key of store.getState().format.formats.keys()) {
     if (parseAddrKey(key)?.sheet === sheet) formatKeys.add(key);
   }
-  for (const cell of wb.physicalCells(sheet)) {
-    const key = addrKey(cell.addr);
-    if (formatKeys.has(key)) continue;
-    const xfIndex = wb.getCellXfIndex(sheet, cell.addr.row, cell.addr.col);
-    if (xfIndex !== null && xfIndex > 0) wb.setCellXfIndex(sheet, cell.addr.row, cell.addr.col, 0);
+  for (const { addr } of wb.cellXfIndices(sheet)) {
+    if (!formatKeys.has(addrKey(addr))) wb.setCellXfIndex(sheet, addr.row, addr.col, 0);
   }
 }
 
@@ -128,9 +122,9 @@ function clearEngineXfsInCutAxis(
     const last = cleanup.wholeRows ? range.r1 : range.c1;
     for (let index = first; index <= last; index += 1) axisIndices.add(index);
   }
-  for (const cell of wb.physicalCells(sheet)) {
-    const axis = cleanup.wholeRows ? cell.addr.row : cell.addr.col;
-    const other = cleanup.wholeRows ? cell.addr.col : cell.addr.row;
+  for (const { addr } of wb.cellXfIndices(sheet)) {
+    const axis = cleanup.wholeRows ? addr.row : addr.col;
+    const other = cleanup.wholeRows ? addr.col : addr.row;
     if (axisIndices.has(axis)) perpendicular.add(other);
   }
   for (const entry of original.entries.values()) {

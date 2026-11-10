@@ -131,6 +131,14 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
     getValue(_addr: Addr) {
       return { kind: 'text' as const, value: 'かな' };
     },
+    cellXfIndices(sheet: number): { addr: Addr; xfIndex: number }[] {
+      return [...xfIndices.entries()]
+        .map(([key, xfIndex]) => {
+          const [s, row, col] = key.split(':').map(Number) as [number, number, number];
+          return { addr: { sheet: s, row, col }, xfIndex };
+        })
+        .filter((e) => e.addr.sheet === sheet && e.xfIndex > 0);
+    },
     getCellXfIndex(_sheet: number, row: number, col: number): number | null {
       if (!caps.cellFormatting) return null;
       return xfIndices.get(`${_sheet}:${row}:${col}`) ?? null;

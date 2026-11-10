@@ -45,6 +45,14 @@ const makeEngine = (): {
         yield { addr: a, value: { kind: 'blank' } as never, formula: null };
       }
     },
+    cellXfIndices(sheet: number): { addr: Addr; xfIndex: number }[] {
+      return [...cellXf.entries()]
+        .map(([key, xfIndex]) => {
+          const [s, row, col] = key.split(':').map(Number) as [number, number, number];
+          return { addr: { sheet: s, row, col }, xfIndex };
+        })
+        .filter((e) => e.addr.sheet === sheet && e.xfIndex > 0);
+    },
     getCellXfIndex(sheet: number, row: number, col: number): number | null {
       return cellXf.get(`${sheet}:${row}:${col}`) ?? null;
     },

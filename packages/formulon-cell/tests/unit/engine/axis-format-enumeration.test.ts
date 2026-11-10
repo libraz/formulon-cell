@@ -22,6 +22,7 @@ const patch = { fontSize: 18 };
 
 interface NativeCellWithXf {
   readonly addr: Addr;
+  readonly xfIndex: number;
 }
 
 type EffectiveStyle = NonNullable<ReturnType<WorkbookHandleType['getEffectiveStyle']>>;
@@ -95,12 +96,10 @@ const makeWorkbook = async (
   });
 
   const readNativeCells = vi.fn(
-    (_sheet: number): Iterable<NativeCellWithXf> => nativeCells.map((addr) => ({ addr })),
+    (_sheet: number): Iterable<NativeCellWithXf> =>
+      nativeCells.map((addr) => ({ addr, xfIndex: 1 })),
   );
-  const extended = wb as WorkbookHandleType & {
-    physicalCellsWithXf: (sheet: number) => Iterable<NativeCellWithXf>;
-  };
-  extended.physicalCellsWithXf = readNativeCells;
+  vi.spyOn(wb, 'cellXfIndices').mockImplementation((sheet) => [...readNativeCells(sheet)]);
 
   return {
     wb,

@@ -245,23 +245,14 @@ const selectedByBand = (bands: readonly AxisFormatBand[], addr: Addr): boolean =
       (band.axis === 'column' && addr.col >= band.first && addr.col <= band.last),
   );
 
-type WorkbookPhysicalCell = { readonly addr: Addr };
-
-/** Return authored native cells without expanding blank worksheet space. The
- * optional adapter method includes blank cells that carry only a direct XF;
- * older handles fall back to their populated-cell iterator. */
+/** Return authored native cells without expanding blank worksheet space:
+ * populated cells plus blank cells that carry only a direct XF. */
 const nativeDirectCellsForSelection = (
   wb: WorkbookHandle,
   sheet: number,
   bands: readonly AxisFormatBand[],
 ): readonly Addr[] => {
-  const extended = wb as WorkbookHandle & {
-    physicalCellsWithXf?: (sheet: number) => Iterable<WorkbookPhysicalCell>;
-  };
-  const entries =
-    typeof extended.physicalCellsWithXf === 'function'
-      ? extended.physicalCellsWithXf(sheet)
-      : wb.physicalCells(sheet);
+  const entries = [...wb.physicalCells(sheet), ...wb.cellXfIndices(sheet)];
   const seen = new Set<string>();
   const result: Addr[] = [];
   for (const entry of entries) {
