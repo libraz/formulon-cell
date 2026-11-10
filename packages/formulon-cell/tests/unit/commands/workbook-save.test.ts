@@ -1,11 +1,13 @@
 import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { SpreadsheetInstance } from '../../../src/api/spreadsheet/instance.js';
+import { workbookOf } from '../../../src/api/workbook.js';
 import { WORKBOOK_SAVE_FORMATS, writeWorkbook } from '../../../src/commands/workbook-save.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import {
   chooseWorkbookSaveFormat,
-  saveWorkbookWithPrompts,
+  saveWithPrompts,
   workbookSaveFormats,
 } from '../../../src/toolbar/dialogs/workbook-save.js';
 
@@ -17,6 +19,14 @@ const noteWorkbook = async (): Promise<WorkbookHandle> => {
   wb.setCommentEntry(0, 0, 0, 'Author', 'A note');
   return wb;
 };
+
+/** The parts of a mounted spreadsheet that `saveWithPrompts` reads. */
+const spreadsheetOf = (wb: WorkbookHandle): SpreadsheetInstance =>
+  ({
+    workbook: workbookOf(wb),
+    i18n: { strings: defaultStrings },
+    host: document.body,
+  }) as unknown as SpreadsheetInstance;
 
 const dialog = (): HTMLElement | null => document.querySelector('[role="alertdialog"]');
 
@@ -115,7 +125,7 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
     const wb = await noteWorkbook();
     try {
       wb.setSheetHeaderFooter(0, { oddHeader: 'Title' });
-      const pending = saveWorkbookWithPrompts({ wb, strings: defaultStrings, format: 'xlsb' });
+      const pending = saveWithPrompts(spreadsheetOf(wb), { format: 'xlsb' });
       await flush();
       const text = dialog()?.textContent ?? '';
       expect(text).toContain(defaultStrings.workbookSave.notes);
@@ -136,7 +146,7 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
   it('asks before delivering a lossy .xlsb and returns null when cancelled', async () => {
     const wb = await noteWorkbook();
     try {
-      const pending = saveWorkbookWithPrompts({ wb, strings: defaultStrings, format: 'xlsb' });
+      const pending = saveWithPrompts(spreadsheetOf(wb), { format: 'xlsb' });
       await flush();
       expect(dialog()?.textContent).toContain(defaultStrings.workbookSave.notes);
       clickButton(defaultStrings.workbookSave.cancel);
@@ -149,7 +159,7 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
   it('delivers the bytes once the warning is accepted', async () => {
     const wb = await noteWorkbook();
     try {
-      const pending = saveWorkbookWithPrompts({ wb, strings: defaultStrings, format: 'xlsb' });
+      const pending = saveWithPrompts(spreadsheetOf(wb), { format: 'xlsb' });
       await flush();
       clickButton(defaultStrings.workbookSave.saveAnyway);
       const outcome = await pending;
@@ -163,11 +173,7 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
   it('saves a lossless workbook without any prompt', async () => {
     const wb = await noteWorkbook();
     try {
-      const outcome = await saveWorkbookWithPrompts({
-        wb,
-        strings: defaultStrings,
-        format: 'xlsx',
-      });
+      const outcome = await saveWithPrompts(spreadsheetOf(wb), { format: 'xlsx' });
       expect(dialog()).toBeNull();
       expect(outcome?.format).toBe('xlsx');
     } finally {
@@ -186,6 +192,32 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
       if (select) select.value = 'xlsb';
       clickButton(defaultStrings.workbookSave.save);
       expect(await pending).toBe('xlsb');
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('asks for the file type itself when no format is given', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const pending = saveWithPrompts(spreadsheetOf(wb));
+      await flush();
+      const select = document.querySelector<HTMLSelectElement>('[data-fc-save-format]');
+      if (select) select.value = 'xlsb';
+      clickButton(defaultStrings.workbookSave.save);
+      expect((await pending)?.format).toBe('xlsb');
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('resolves null when the file type choice is cancelled', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const pending = saveWithPrompts(spreadsheetOf(wb));
+      await flush();
+      clickButton(defaultStrings.workbookSave.cancel);
+      expect(await pending).toBeNull();
     } finally {
       wb.dispose();
     }

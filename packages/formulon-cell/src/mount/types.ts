@@ -1,3 +1,4 @@
+import type { SheetPrintDocument } from '../api/spreadsheet/types.js';
 import type { CellRegistry } from '../cells.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { History } from '../commands/history.js';
@@ -195,6 +196,8 @@ export interface SpreadsheetInstance {
   openInsertCopiedCells(): void;
   openPageSetup(tab?: 'page' | 'margins' | 'headerFooter' | 'sheet'): void;
   print(mode?: 'print' | 'pdf'): void;
+  /** The print document for the active sheet's page setup. */
+  printDocument(): SheetPrintDocument;
   setPrinterProfiles(next: readonly PrinterProfile[] | undefined): void;
   setPrinterProfileId(next: string | undefined): void;
   refreshPrinterProfiles(): Promise<readonly PrinterProfile[] | undefined>;

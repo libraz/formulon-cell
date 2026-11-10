@@ -1,30 +1,60 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  type BuildPrintDocumentOptions,
   buildPrintDocument,
+  buildSheetPrintDocument,
   computeFitToPagesScale,
   effectivePrintMargins,
   orderPrintRegionsForPageOrder,
+  type PrintDocument,
   PrintResourceLimitError,
   parsePrintArea,
   parsePrintAreas,
   parsePrintTitleCols,
   parsePrintTitleRows,
   printableMarginAdjustments,
-  printSheet,
+  renderPrintDocument,
 } from '../../../src/commands/print.js';
 import { MAX_COL } from '../../../src/engine/address.js';
+import { syncPageSetupToEngine } from '../../../src/engine/print-sync.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
   defaultPageSetup,
+  getPageSetup,
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
-const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
+// The page setup lives in the engine, so these tests need an engine that holds it.
+const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault();
+
+/** Set the store's page setup and push it to the engine, as the store mirror does. */
+const setPageSetup = (
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  patch: Parameters<typeof mutators.setPageSetup>[2],
+): void => {
+  mutators.setPageSetup(store, 0, patch);
+  syncPageSetupToEngine(wb, store, 0);
+};
 
 /** Seed a single number cell into both the engine and the store, mirroring the
  *  hydrate path that mount.ts uses on cell writes. */
+/** The local splitter path: the native paginator is bypassed the way a printer profile does, so
+ *  the page setup the engine holds is what shapes the tables. */
+const buildLocalDocument = (
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+  title?: string,
+  options: BuildPrintDocumentOptions = {},
+): PrintDocument =>
+  buildPrintDocument(wb, store, sheet, title, {
+    printableBounds: getPageSetup(store.getState(), sheet).printableBounds ?? null,
+    ...options,
+  });
+
 const setNumber = (
   store: SpreadsheetStore,
   wb: WorkbookHandle,
@@ -263,7 +293,7 @@ describe('buildPrintDocument', () => {
   it('uses an escaped localized document title when provided', async () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
-    const doc = buildPrintDocument(wb, store, 0, '印刷 <preview>');
+    const doc = buildLocalDocument(wb, store, 0, '印刷 <preview>');
 
     expect(doc.html).toContain('<title>印刷 &lt;preview&gt;</title>');
     wb.dispose();
@@ -277,7 +307,7 @@ describe('buildPrintDocument', () => {
     setNumber(store, wb, 1, 0, 3);
     setNumber(store, wb, 1, 1, 4);
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toContain('<table');
     expect(doc.html).toContain('<tbody>');
     // 2 rows × 2 cols = 4 <td> cells.
@@ -301,7 +331,7 @@ describe('buildPrintDocument', () => {
     // Merge A1:B1 — anchor (0,0) absorbs (0,1).
     mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toContain('colspan="2"');
     // The non-anchor merged cell must NOT emit a separate <td>.
     const headerOccurrences = (doc.html.match(/Header/g) ?? []).length;
@@ -319,7 +349,7 @@ describe('buildPrintDocument', () => {
       { bold: true, fill: '#ffeecc', color: '#222222' },
     );
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toMatch(/font-weight:600/);
     expect(doc.html).toMatch(/background:#ffeecc/);
     expect(doc.html).toMatch(/color:#222222/);
@@ -331,9 +361,9 @@ describe('buildPrintDocument', () => {
     const store = createSpreadsheetStore();
     // Wide content: 30 populated columns far exceed one A4 page width.
     for (let c = 0; c < 30; c += 1) setNumber(store, wb, 0, c, c);
-    mutators.setPageSetup(store, 0, { fitWidth: 1, fitHeight: 0 });
+    setPageSetup(wb, store, { fitWidth: 1, fitHeight: 0 });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toMatch(/transform:scale\(0\.\d+\)/);
     wb.dispose();
   });
@@ -343,7 +373,7 @@ describe('buildPrintDocument', () => {
     const store = createSpreadsheetStore();
     setNumber(store, wb, 0, 0, 1);
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).not.toContain('transform:scale(');
     wb.dispose();
   });
@@ -362,7 +392,7 @@ describe('buildPrintDocument', () => {
       },
     );
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toMatch(/background:#ffeecc/);
     expect(doc.html).toMatch(/background-image:repeating-linear-gradient\(45deg, #336699/);
     wb.dispose();
@@ -380,7 +410,7 @@ describe('buildPrintDocument', () => {
       },
     );
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toMatch(/color:#ff0000/);
     wb.dispose();
   });
@@ -388,22 +418,22 @@ describe('buildPrintDocument', () => {
   it('honors the Sheet tab cell error print mode', async () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
-    setError(store, wb, 0, 0, '#ERR!');
+    setError(store, wb, 0, 0, '#DIV/0!');
 
-    mutators.setPageSetup(store, 0, { cellErrorsAs: 'displayed' });
-    expect(buildPrintDocument(wb, store, 0).html).toContain('#ERR!');
+    setPageSetup(wb, store, { cellErrorsAs: 'displayed' });
+    expect(buildLocalDocument(wb, store, 0).html).toContain('#DIV/0!');
 
-    mutators.setPageSetup(store, 0, { cellErrorsAs: 'blank' });
-    expect(buildPrintDocument(wb, store, 0).html).toContain('<td></td>');
+    setPageSetup(wb, store, { cellErrorsAs: 'blank' });
+    expect(buildLocalDocument(wb, store, 0).html).toMatch(/<td[^>]*><\/td>/);
 
-    mutators.setPageSetup(store, 0, { cellErrorsAs: 'dash' });
-    expect(buildPrintDocument(wb, store, 0).html).toContain('>--<');
+    setPageSetup(wb, store, { cellErrorsAs: 'dash' });
+    expect(buildLocalDocument(wb, store, 0).html).toContain('>--<');
 
-    mutators.setPageSetup(store, 0, { cellErrorsAs: 'na' });
-    expect(buildPrintDocument(wb, store, 0).html).toContain('#N/A');
+    setPageSetup(wb, store, { cellErrorsAs: 'na' });
+    expect(buildLocalDocument(wb, store, 0).html).toContain('#N/A');
 
     store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: true } }));
-    expect(buildPrintDocument(wb, store, 0).html).toContain('=1/0');
+    expect(buildLocalDocument(wb, store, 0).html).toContain('=1/0');
 
     wb.setFormula({ sheet: 0, row: 2, col: 2 }, '=A1');
     store.setState((s) => {
@@ -415,7 +445,7 @@ describe('buildPrintDocument', () => {
       return { ...s, data: { ...s.data, cells: map } };
     });
     store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: true } }));
-    expect(buildPrintDocument(wb, store, 0).html).toContain('=R[-2]C[-2]');
+    expect(buildLocalDocument(wb, store, 0).html).toContain('=R[-2]C[-2]');
     wb.dispose();
   });
 
@@ -425,7 +455,7 @@ describe('buildPrintDocument', () => {
     setText(store, wb, 0, 0, 'hello');
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { textDirection: 'rtl' });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toMatch(/direction:rtl/);
     wb.dispose();
   });
@@ -444,7 +474,7 @@ describe('buildPrintDocument', () => {
     );
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { align: 'centerContinuous' });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toMatch(/colspan="2"/);
     expect(doc.html).toMatch(/text-align:center/);
     expect(doc.html).toMatch(/vertical-align:middle/);
@@ -463,13 +493,13 @@ describe('buildPrintDocument', () => {
       { sheet: 0, row: 1, col: 1 },
       { fill: '#ffeecc', color: '#cc0000' },
     );
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       printArea: 'B2:C2',
       blackAndWhite: true,
       draftQuality: true,
     });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toContain('inside');
     expect(doc.html).toContain('also inside');
     expect(doc.html).not.toContain('outside');
@@ -486,9 +516,9 @@ describe('buildPrintDocument', () => {
     setText(store, wb, 0, 0, 'first area');
     setText(store, wb, 2, 2, 'outside gap');
     setText(store, wb, 4, 4, 'second area');
-    mutators.setPageSetup(store, 0, { printArea: 'A1:A1,E5:E5' });
+    setPageSetup(wb, store, { printArea: 'A1:A1,E5:E5' });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toContain('first area');
     expect(doc.html).toContain('second area');
     expect(doc.html).not.toContain('outside gap');
@@ -502,17 +532,17 @@ describe('buildPrintDocument', () => {
     setNumber(store, wb, 0, 0, 11);
     setNumber(store, wb, 0, 1, 12);
     setNumber(store, wb, 1, 0, 21);
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       printArea: 'A2:A2,B1:B1,A1:A1',
       pageOrder: 'downThenOver',
     });
 
-    const downThenOver = buildPrintDocument(wb, store, 0).html;
+    const downThenOver = buildLocalDocument(wb, store, 0).html;
     expect(downThenOver.indexOf('>11<')).toBeLessThan(downThenOver.indexOf('>21<'));
     expect(downThenOver.indexOf('>21<')).toBeLessThan(downThenOver.indexOf('>12<'));
 
-    mutators.setPageSetup(store, 0, { pageOrder: 'overThenDown' });
-    const overThenDown = buildPrintDocument(wb, store, 0).html;
+    setPageSetup(wb, store, { pageOrder: 'overThenDown' });
+    const overThenDown = buildLocalDocument(wb, store, 0).html;
     expect(overThenDown.indexOf('>11<')).toBeLessThan(overThenDown.indexOf('>12<'));
     expect(overThenDown.indexOf('>12<')).toBeLessThan(overThenDown.indexOf('>21<'));
     wb.dispose();
@@ -528,19 +558,19 @@ describe('buildPrintDocument', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 1, col: 1 }, { comment: 'Second note' });
     mutators.setCellFormat(store, { sheet: 0, row: 2, col: 2 }, { comment: 'Outside area' });
 
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       comments: 'asDisplayed',
       printArea: 'A1:B2',
     });
-    const displayed = buildPrintDocument(wb, store, 0).html;
+    const displayed = buildLocalDocument(wb, store, 0).html;
     expect(displayed).toContain('fc-print__comment-note');
     expect(displayed).toContain('First &lt;note&gt;');
     expect(displayed).toContain('Second note');
     expect(displayed).not.toContain('Outside area');
     expect(displayed).not.toContain('Comments and Notes');
 
-    mutators.setPageSetup(store, 0, { comments: 'endOfSheet' });
-    const endOfSheet = buildPrintDocument(wb, store, 0).html;
+    setPageSetup(wb, store, { comments: 'endOfSheet' });
+    const endOfSheet = buildLocalDocument(wb, store, 0).html;
     expect(endOfSheet).toContain('<section class="fc-print__comments">');
     expect(endOfSheet).toContain('<th>A1</th>');
     expect(endOfSheet).toContain('<th>B2</th>');
@@ -549,8 +579,8 @@ describe('buildPrintDocument', () => {
     expect(endOfSheet).not.toContain('Outside area');
     expect(endOfSheet).not.toContain('<div class="fc-print__comment-note">');
 
-    mutators.setPageSetup(store, 0, { comments: 'none' });
-    const none = buildPrintDocument(wb, store, 0).html;
+    setPageSetup(wb, store, { comments: 'none' });
+    const none = buildLocalDocument(wb, store, 0).html;
     expect(none).not.toContain('First &lt;note&gt;');
     expect(none).not.toContain('<section class="fc-print__comments">');
     wb.dispose();
@@ -561,13 +591,13 @@ describe('buildPrintDocument', () => {
     const store = createSpreadsheetStore();
     mutators.setCellFormat(store, { sheet: 0, row: 3, col: 2 }, { comment: 'Blank cell note' });
 
-    mutators.setPageSetup(store, 0, { comments: 'asDisplayed' });
-    const displayed = buildPrintDocument(wb, store, 0).html;
+    setPageSetup(wb, store, { comments: 'asDisplayed' });
+    const displayed = buildLocalDocument(wb, store, 0).html;
     expect(displayed).toContain('Blank cell note');
     expect(displayed).toContain('<div class="fc-print__comment-note">');
 
-    mutators.setPageSetup(store, 0, { comments: 'endOfSheet' });
-    const endOfSheet = buildPrintDocument(wb, store, 0).html;
+    setPageSetup(wb, store, { comments: 'endOfSheet' });
+    const endOfSheet = buildLocalDocument(wb, store, 0).html;
     expect(endOfSheet).toContain('<th>C4</th>');
     expect(endOfSheet).toContain('Blank cell note');
     wb.dispose();
@@ -579,9 +609,9 @@ describe('buildPrintDocument', () => {
     setText(store, wb, 0, 0, 'Title');
     setText(store, wb, 1, 0, 'Sub');
     setNumber(store, wb, 2, 0, 100);
-    mutators.setPageSetup(store, 0, { printTitleRows: '1:2' });
+    setPageSetup(wb, store, { printTitleRows: '1:2' });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     const theadIdx = doc.html.indexOf('<thead>');
     const tbodyIdx = doc.html.indexOf('<tbody>');
     expect(theadIdx).toBeGreaterThan(-1);
@@ -603,30 +633,30 @@ describe('buildPrintDocument', () => {
     setText(store, wb, 0, 1, 'Title B');
     setText(store, wb, 0, 2, 'Body C');
     setText(store, wb, 0, 3, 'Body D');
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       printArea: 'C1:D1',
       printTitleCols: 'A:B',
     });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
 
     expect(doc.html).toContain(
       '<col class="fc-print__title-col"><col class="fc-print__title-col"><col><col>',
     );
     expect(doc.html).toMatch(
-      /<tbody><tr><td class="fc-print__title-col-cell">Title A<\/td><td class="fc-print__title-col-cell">Title B<\/td><td>Body C<\/td><td>Body D<\/td><\/tr><\/tbody>/,
+      /<tbody><tr><td class="fc-print__title-col-cell"[^>]*>Title A<\/td><td class="fc-print__title-col-cell"[^>]*>Title B<\/td><td[^>]*>Body C<\/td><td[^>]*>Body D<\/td><\/tr><\/tbody>/,
     );
 
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       printArea: 'A1:C1',
       printTitleCols: 'A:B',
     });
-    const overlapping = buildPrintDocument(wb, store, 0);
+    const overlapping = buildLocalDocument(wb, store, 0);
     const body = overlapping.html.slice(overlapping.html.indexOf('<tbody>'));
     expect((body.match(/Title A/g) ?? []).length).toBe(1);
     expect((body.match(/Title B/g) ?? []).length).toBe(1);
     expect(body).toMatch(
-      /<tbody><tr><td class="fc-print__title-col-cell">Title A<\/td><td class="fc-print__title-col-cell">Title B<\/td><td>Body C<\/td><\/tr><\/tbody>/,
+      /<tbody><tr><td class="fc-print__title-col-cell"[^>]*>Title A<\/td><td class="fc-print__title-col-cell"[^>]*>Title B<\/td><td[^>]*>Body C<\/td><\/tr><\/tbody>/,
     );
     wb.dispose();
   });
@@ -642,14 +672,14 @@ describe('buildPrintDocument', () => {
     mutators.setColWidth(store, 1, 300);
     mutators.setColWidth(store, 2, 300);
     mutators.setColWidth(store, 3, 300);
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       printArea: 'B1:D1',
       printTitleCols: 'A:A',
       fitWidth: 0,
       fitHeight: 0,
     });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     const sections = doc.html.match(/<section class="fc-print__area/g) ?? [];
 
     expect(sections.length).toBe(3);
@@ -670,7 +700,7 @@ describe('buildPrintDocument', () => {
     mutators.setRowHeight(store, 1, 500);
     mutators.setRowHeight(store, 2, 500);
     mutators.setRowHeight(store, 3, 500);
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       printArea: 'A2:A4',
       printTitleRows: '1:1',
       margins: { top: 3.8, right: 1, bottom: 3.8, left: 1 },
@@ -678,7 +708,7 @@ describe('buildPrintDocument', () => {
       fitHeight: 0,
     });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     const sections = doc.html.match(/<section class="fc-print__area/g) ?? [];
 
     expect(sections.length).toBe(3);
@@ -693,9 +723,9 @@ describe('buildPrintDocument', () => {
     const store = createSpreadsheetStore();
     setNumber(store, wb, 0, 0, 1);
     setNumber(store, wb, 1, 0, 2);
-    mutators.setPageSetup(store, 0, { manualPageBreakRows: [1] });
+    setPageSetup(wb, store, { manualPageBreakRows: [1] });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toContain('<tr class="fc-print__manual-break-row">');
     expect(doc.html).toContain('break-before: page');
     wb.dispose();
@@ -706,11 +736,11 @@ describe('buildPrintDocument', () => {
     const store = createSpreadsheetStore();
     for (let row = 0; row < 6; row += 1) setNumber(store, wb, row, 0, row);
 
-    const before = buildPrintDocument(wb, store, 0);
+    const before = buildLocalDocument(wb, store, 0);
     const sectionsBefore = (before.html.match(/<table/g) ?? []).length;
 
-    mutators.setPageSetup(store, 0, { manualPageBreakRows: [3] });
-    const after = buildPrintDocument(wb, store, 0);
+    setPageSetup(wb, store, { manualPageBreakRows: [3] });
+    const after = buildLocalDocument(wb, store, 0);
     const sectionsAfter = (after.html.match(/<table/g) ?? []).length;
 
     expect(sectionsBefore).toBe(1);
@@ -723,14 +753,14 @@ describe('buildPrintDocument', () => {
     const store = createSpreadsheetStore();
     setNumber(store, wb, 0, 0, 1);
     setNumber(store, wb, 0, 1, 2);
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       manualPageBreakCols: [1],
       showHeadings: true,
     });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toContain('<th class="fc-print__colhead fc-print__manual-break-col">B</th>');
-    expect(doc.html).toContain('<td class="fc-print__manual-break-col">2</td>');
+    expect(doc.html).toMatch(/<td class="fc-print__manual-break-col"[^>]*>2<\/td>/);
     expect(doc.html).toContain('.fc-print__manual-break-col { break-before: page');
     wb.dispose();
   });
@@ -739,7 +769,7 @@ describe('buildPrintDocument', () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
     setNumber(store, wb, 0, 0, 1);
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       orientation: 'landscape',
       paperSize: 'letter',
       margins: { top: 1, right: 1.25, bottom: 1, left: 0.5 },
@@ -754,7 +784,7 @@ describe('buildPrintDocument', () => {
       firstPageNumber: 3,
     });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toContain('@page');
     expect(doc.html).toContain('letter landscape');
     expect(doc.html).toContain('1in 1.25in 1in 0.5in');
@@ -776,13 +806,13 @@ describe('buildPrintDocument', () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
     setNumber(store, wb, 0, 0, 1);
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       headerCenter: 'Page &P of &N',
       headerLeft: '&D',
       footerRight: '&A',
     });
 
-    const doc = buildPrintDocument(wb, store, 0, 'Budget.xlsx');
+    const doc = buildLocalDocument(wb, store, 0, 'Budget.xlsx');
     // Page-relative codes become CSS counters inside the margin boxes.
     expect(doc.html).toContain(
       '@top-center { content: "Page " counter(page) " of " counter(pages)',
@@ -811,11 +841,11 @@ describe('buildPrintDocument', () => {
         fontVertAlign: 'superscript',
       },
     );
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       headerCenter: '</style><img src=x onerror="parent.__probe=1">',
     });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     const parsed = document.implementation.createHTMLDocument('print-probe');
     parsed.documentElement.innerHTML = doc.html;
     expect(parsed.querySelector('img')).toBeNull();
@@ -830,7 +860,7 @@ describe('buildPrintDocument', () => {
     const store = createSpreadsheetStore();
     setText(store, wb, 2000, 600, 'far');
 
-    expect(() => buildPrintDocument(wb, store, 0)).toThrow(PrintResourceLimitError);
+    expect(() => buildLocalDocument(wb, store, 0)).toThrow(PrintResourceLimitError);
     wb.dispose();
   });
 
@@ -856,7 +886,7 @@ describe('buildPrintDocument', () => {
 
       const store = createSpreadsheetStore();
       setText(store, wb, 0, 0, 'inherited text');
-      const doc = buildPrintDocument(wb, store, 0, 'Print', { printableBounds: null });
+      const doc = buildLocalDocument(wb, store, 0, 'Print', { printableBounds: null });
 
       expect(doc.html).toContain('font-family:&quot;Aptos Display&quot;, system-ui');
       expect(doc.html).toContain('font-size:32px');
@@ -870,9 +900,9 @@ describe('buildPrintDocument', () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
     setText(store, wb, 0, 0, 'title');
-    mutators.setPageSetup(store, 0, { printTitleRows: '1:1048576' });
+    setPageSetup(wb, store, { printTitleRows: '1:1048576' });
 
-    expect(() => buildPrintDocument(wb, store, 0, 'Print', { printableBounds: null })).toThrow(
+    expect(() => buildLocalDocument(wb, store, 0, 'Print', { printableBounds: null })).toThrow(
       PrintResourceLimitError,
     );
     wb.dispose();
@@ -882,13 +912,13 @@ describe('buildPrintDocument', () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
     setNumber(store, wb, 0, 0, 1);
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       scale: 0.5,
       fitWidth: 1,
       fitHeight: 2,
     });
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.cssVars['--fc-print-scale']).toBe('1');
     expect(doc.cssVars['--fc-print-fit-width']).toBe('1');
     expect(doc.cssVars['--fc-print-fit-height']).toBe('2');
@@ -901,7 +931,7 @@ describe('buildPrintDocument', () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
     setNumber(store, wb, 0, 0, 1);
-    mutators.setPageSetup(store, 0, {
+    setPageSetup(wb, store, {
       margins: { top: 0.1, right: 0.7, bottom: 0.1, left: 0.7 },
       printableBounds: { top: 0.25, right: 0.2, bottom: 0.25, left: 0.2 },
     });
@@ -918,7 +948,7 @@ describe('buildPrintDocument', () => {
       { side: 'bottom', margin: 0.1, minimum: 0.25, effective: 0.25 },
     ]);
 
-    const doc = buildPrintDocument(wb, store, 0);
+    const doc = buildLocalDocument(wb, store, 0);
     expect(doc.html).toContain('@page { size: A4 portrait; margin: 0.25in 0.7in 0.25in 0.7in; }');
     expect(doc.cssVars['--fc-print-margin-top']).toBe('0.1in');
     expect(doc.cssVars['--fc-print-effective-margin-top']).toBe('0.25in');
@@ -945,12 +975,12 @@ describe('printSheet', () => {
     document.body.appendChild(host);
 
     // happy-dom's window doesn't ship `print` — assign a stub on the host
-    // window so the synchronous fallback path inside printSheet has a target.
+    // window so the synchronous fallback path inside renderPrintDocument has a target.
     const winPrint = vi.fn();
     const original = (window as unknown as { print?: () => void }).print;
     (window as unknown as { print: () => void }).print = winPrint;
 
-    const remove = printSheet(wb, store, 0, host, 'PDF', 'pdf', {
+    const doc = buildSheetPrintDocument(wb, store, 0, host, 'PDF', {
       printerProfileId: 'selected',
       printerProfiles: [
         {
@@ -967,6 +997,7 @@ describe('printSheet', () => {
         },
       ],
     });
+    const remove = renderPrintDocument(doc, host, 'pdf');
     const iframe = host.querySelector('iframe');
     expect(iframe).not.toBeNull();
     expect(iframe?.dataset.fcPrintMode).toBe('pdf');
@@ -1016,7 +1047,7 @@ describe('printSheet', () => {
     );
     const a1Style = (html: string): string =>
       /<td[^>]*style="([^"]*)"[^>]*>(?:(?!<\/td>)[\s\S])*Effects/.exec(html)?.[1] ?? '';
-    const plain = a1Style(buildPrintDocument(wb, store, 0).html);
+    const plain = a1Style(buildLocalDocument(wb, store, 0).html);
     expect(plain).not.toContain('text-shadow');
     expect(plain).not.toContain('-webkit-text-stroke');
     expect(plain).toContain('linear-gradient(180deg');

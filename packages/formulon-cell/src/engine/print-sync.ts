@@ -1,4 +1,5 @@
 import {
+  defaultPageSetup,
   getPageSetup,
   mutators,
   type PageOrientation,
@@ -163,20 +164,14 @@ export function joinHeaderFooter(sections: Partial<HeaderFooterSections>): strin
 /* ---------- hydrate ---------- */
 
 /**
- * Seed the page-setup slice for `sheet` from the engine. Called after a
- * workbook is loaded so a spreadsheet's print settings drive both the print
- * document and the Page Break Preview overlay.
- *
- * No-op when the engine carries no print-settings surface — the store keeps
- * whatever the host or the defaults put there.
+ * The page-setup fields the engine states for `sheet`, read through the
+ * worksheet's page-setup getters. Empty when the engine carries no
+ * print-settings surface. `printableBounds` has no engine counterpart and is
+ * never part of the result.
  */
-export function hydratePageSetupFromEngine(
-  wb: WorkbookHandle,
-  store: SpreadsheetStore,
-  sheet: number,
-): void {
-  if (!wb.capabilities.printSettings) return;
+export function pageSetupPatchFromEngine(wb: WorkbookHandle, sheet: number): Partial<PageSetup> {
   const patch: Partial<PageSetup> = {};
+  if (!wb.capabilities.printSettings) return patch;
 
   const setup = wb.getSheetPageSetup(sheet);
   if (setup) {
@@ -285,6 +280,32 @@ export function hydratePageSetupFromEngine(
     patch.manualPageBreakCols = breaks.cols.length ? [...breaks.cols] : undefined;
   }
 
+  return patch;
+}
+
+/** The complete page setup the engine holds for `sheet`: every field the engine
+ *  states over the defaults. */
+export function readPageSetupFromEngine(wb: WorkbookHandle, sheet: number): PageSetup {
+  const base = defaultPageSetup();
+  const patch = pageSetupPatchFromEngine(wb, sheet);
+  return { ...base, ...patch, margins: { ...base.margins, ...patch.margins } };
+}
+
+/**
+ * Seed the page-setup slice for `sheet` from the engine. Called after a
+ * workbook is loaded so a spreadsheet's print settings drive the Page Break
+ * Preview overlay and the Page Setup dialog.
+ *
+ * No-op when the engine carries no print-settings surface — the store keeps
+ * whatever the host or the defaults put there.
+ */
+export function hydratePageSetupFromEngine(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+): void {
+  if (!wb.capabilities.printSettings) return;
+  const patch = pageSetupPatchFromEngine(wb, sheet);
   // Seeding the slice must not read back as a UI edit, or the subscription
   // would immediately write the same settings straight back to the engine.
   wb.withEngineSyncMuted(() => {

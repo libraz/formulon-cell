@@ -101,8 +101,8 @@ export {
 export {
   chooseWorkbookSaveFormat,
   confirmWorkbookSaveLosses,
-  type SaveWorkbookWithPromptsOptions,
-  saveWorkbookWithPrompts,
+  type SaveWithPromptsOptions,
+  saveWithPrompts,
   workbookSaveFormats,
 } from './workbook-save.js';
 export { showZoomDialog, type ZoomDialogOptions } from './zoom.js';

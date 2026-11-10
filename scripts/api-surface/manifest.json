@@ -55,6 +55,7 @@
         "ScreenClipResult": "type",
         "Shape": "type",
         "Sheet": "value",
+        "SheetPrintDocument": "type",
         "SheetRef": "type",
         "Slicer": "type",
         "SpreadsheetFailure": "type",
@@ -985,19 +986,21 @@
         "RibbonProfile": "type",
         "RibbonTab": "type",
         "RibbonTabModel": "type",
-        "SaveWorkbookWithPromptsOptions": "type",
+        "SaveWithPromptsOptions": "type",
         "Toolbar": "type",
         "ToolbarInstance": "type",
         "ToolbarInstanceRef": "type",
         "buildRibbonModel": "value",
-        "chooseWorkbookSaveFormat": "value",
         "mountToolbar": "value",
         "ribbon": "value",
-        "saveWithPrompts": "value",
-        "saveWorkbookWithPrompts": "value",
-        "workbookSaveFormats": "value"
+        "saveWithPrompts": "value"
       },
-      "mustNotExport": []
+      "mustNotExport": [
+        "SaveWorkbookWithPromptsOptions",
+        "chooseWorkbookSaveFormat",
+        "saveWorkbookWithPrompts",
+        "workbookSaveFormats"
+      ]
     }
   }
 }

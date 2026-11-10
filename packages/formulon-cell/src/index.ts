@@ -40,6 +40,7 @@ export type {
   RecalcEvent,
   RibbonToolbarConfig,
   SelectionState,
+  SheetPrintDocument,
   SpreadsheetInstanceEvents,
   SpreadsheetOptions,
   SpreadsheetPatch,
@@ -671,12 +672,6 @@ export type {
   ReportOptions,
 } from './toolbar/dialogs/report.js';
 export { reportDialogLabels, showReport } from './toolbar/dialogs/report.js';
-export type { SaveWorkbookWithPromptsOptions } from './toolbar/dialogs/workbook-save.js';
-export {
-  chooseWorkbookSaveFormat,
-  saveWorkbookWithPrompts,
-  workbookSaveFormats,
-} from './toolbar/dialogs/workbook-save.js';
 export type { ExcelRibbonIconName } from './toolbar/excel-ribbon-icons.js';
 export { createExcelRibbonSvg } from './toolbar/excel-ribbon-icons.js';
 export type { DisabledReasonProjectionOptions } from './toolbar/menu-a11y.js';

@@ -9,7 +9,7 @@
  *   theme    ∈ { paper, ink, contrast }
  *   locale   ∈ { en, ja }
  */
-import { ValueKind } from '@libraz/formulon';
+import { PageOrientation, PaperSize, ValueKind } from '@libraz/formulon';
 import {
   fixedFormPolicy,
   mount,
@@ -71,6 +71,62 @@ describe('spreadsheet: sub-objects', () => {
     expect(sheet.history.canRedo).toBe(true);
     sheet.history.clear();
     expect(sheet.history.canRedo).toBe(false);
+  });
+
+  it('history: repeat runs the latest repeatable action again and canRepeat tracks it', async () => {
+    const sheet = await mountSheet();
+    const changes = vi.fn();
+    sheet.history.on('change', changes);
+    expect(sheet.history.canRepeat).toBe(false);
+    expect(sheet.history.repeat()).toBe(false);
+
+    sheet.selection.set('A1');
+    sheet.commands.execute('bold');
+    expect(sheet.history.canRepeat).toBe(true);
+    expect(changes).toHaveBeenCalled();
+
+    sheet.selection.set('B2');
+    const before = changes.mock.calls.length;
+    expect(sheet.history.repeat()).toBe(true);
+    expect(changes.mock.calls.length).toBeGreaterThan(before);
+    expect(sheet.history.canUndo).toBe(true);
+
+    sheet.history.clear();
+    expect(sheet.history.canRepeat).toBe(false);
+    expect(sheet.history.repeat()).toBe(false);
+  });
+
+  it('printDocument: builds the document from the sheet page setup the engine holds', async () => {
+    const sheet = await mountSheet();
+    const s = sheet.workbook.sheet(0);
+    s.setText('A1', 'Quarterly');
+    s.updatePageSetup({ orientation: PageOrientation.Landscape, paperSize: PaperSize.Letter });
+    const doc = sheet.printDocument();
+    expect(doc.html).toContain('<!DOCTYPE html>');
+    expect(doc.html).toContain('Quarterly');
+    expect(doc.html).toContain('@page { size: 792pt 612pt;');
+    expect(doc.cssVars['--fc-print-orient']).toBe('landscape');
+    expect(doc.cssVars['--fc-print-paper']).toBe('letter');
+
+    s.updatePageSetup({ orientation: PageOrientation.Portrait });
+    expect(sheet.printDocument().cssVars['--fc-print-orient']).toBe('portrait');
+  });
+
+  it('printDocument: print() renders the same document', async () => {
+    const sheet = await mountSheet();
+    sheet.workbook.sheet(0).setText('A1', 'Rendered');
+    const host = sheet.host;
+    // happy-dom's window has no print(); the render path falls back to it.
+    const win = window as unknown as { print?: () => void };
+    const original = win.print;
+    win.print = vi.fn();
+    sheet.print('pdf');
+    const frame = host.querySelector('iframe');
+    expect(frame?.srcdoc).toContain('Rendered');
+    expect(frame?.srcdoc).toContain('@page');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    frame?.remove();
+    win.print = original;
   });
 
   it('commands: a ribbon command acts on the current selection', async () => {

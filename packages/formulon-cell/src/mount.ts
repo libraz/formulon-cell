@@ -1,3 +1,4 @@
+import type { SheetPrintDocument } from './api/spreadsheet/types.js';
 import { CellRegistry } from './cells.js';
 import { History } from './commands/history.js';
 import {
@@ -5,7 +6,11 @@ import {
   registerInteractionController,
 } from './commands/interaction-controller.js';
 import { policyPermits } from './commands/interaction-policy.js';
-import { PrintResourceLimitError, printSheet } from './commands/print.js';
+import {
+  buildSheetPrintDocument,
+  PrintResourceLimitError,
+  renderPrintDocument,
+} from './commands/print.js';
 import {
   isSheetProtected,
   registerAllowedRangeUnlockUi,
@@ -804,6 +809,15 @@ export const Spreadsheet = {
       refreshFeaturesView,
     });
 
+    const sheetPrintDocument = (mode: 'print' | 'pdf' = 'print'): SheetPrintDocument =>
+      buildSheetPrintDocument(
+        wb,
+        store,
+        store.getState().data.sheetIndex,
+        host,
+        mode === 'pdf' ? strings.ribbon.pdf : strings.ribbon.print,
+        { printerProfiles: printers.getProfiles(), printerProfileId: printers.getProfileId() },
+      );
     const instance: SpreadsheetInstance = {
       host,
       get workbook() {
@@ -989,6 +1003,7 @@ export const Spreadsheet = {
         return binding.pasteSpecialDialog?.apply(options, opts) ?? false;
       },
       openInsertCopiedCells,
+      printDocument: () => sheetPrintDocument(),
       print(mode = 'print') {
         if (!ui.print) return;
         if (
@@ -1004,15 +1019,7 @@ export const Spreadsheet = {
         // dialog never attached so consumers can rely on the gate.
         if (!featureState.pageSetupDialog) return;
         try {
-          printSheet(
-            wb,
-            store,
-            store.getState().data.sheetIndex,
-            host,
-            mode === 'pdf' ? strings.ribbon.pdf : strings.ribbon.print,
-            mode,
-            { printerProfiles: printers.getProfiles(), printerProfileId: printers.getProfileId() },
-          );
+          renderPrintDocument(sheetPrintDocument(mode), host, mode);
         } catch (error) {
           if (!(error instanceof PrintResourceLimitError)) throw error;
           void showMessage({

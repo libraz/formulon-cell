@@ -2,10 +2,7 @@ import type { RibbonToolbarConfig } from '../api/spreadsheet/types.js';
 import type { RibbonOptions } from './toolbar-object.js';
 
 export type { RibbonToolbarConfig } from '../api/spreadsheet/types.js';
-export {
-  type SaveWorkbookWithPromptsOptions,
-  saveWorkbookWithPrompts as saveWithPrompts,
-} from './dialogs/workbook-save.js';
+export { type SaveWithPromptsOptions, saveWithPrompts } from './dialogs/workbook-save.js';
 export type { RibbonHooks } from './ribbon/apply-ribbon-command.js';
 export type { RibbonDisplayMode } from './ribbon/render-ribbon.js';
 export type {

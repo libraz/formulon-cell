@@ -234,13 +234,20 @@ export class History {
   /** Register a selection-aware repeat operation for an action that has no
    *  material undo snapshot (for example a format that changed nothing). */
   setRepeat(repeat: (() => void) | null): void {
+    const changed = (this.lastRepeat === null) !== (repeat === null);
     this.lastRepeat = repeat;
+    if (changed) this.notify();
   }
 
   /** Install an authorization guard for undo/redo. The stack is moved only
    * after the guard and replay both succeed. */
   setGuard(guard: HistoryGuard | null): void {
     this.guard = guard;
+  }
+
+  /** Whether `repeatLast` would run an operation. */
+  canRepeat(): boolean {
+    return this.lastRepeat !== null && !this.replaying;
   }
 
   /** Repeat the latest command only when it explicitly supplied a

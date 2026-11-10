@@ -139,6 +139,16 @@ export interface ErrorEvent {
   readonly source: 'extension' | 'host' | 'engine' | 'workbook';
 }
 
+/** The print document of a sheet: a complete, self-contained HTML document whose `@page` rules
+ *  carry the sheet's page setup. */
+export interface SheetPrintDocument {
+  /** The document, ready to load into a frame and print. */
+  readonly html: string;
+  /** The page setup as resolved values (paper size token, margins, scale, ...), so a caller can
+   *  read what the document was built with without parsing the HTML. */
+  readonly cssVars: Readonly<Record<string, string>>;
+}
+
 /** Events of a {@link SpreadsheetInstance}. */
 export interface SpreadsheetInstanceEvents {
   change: ChangeEvent;

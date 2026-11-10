@@ -63,6 +63,7 @@ import type {
   HostProviders,
   RibbonToolbarConfig,
   SelectionState,
+  SheetPrintDocument,
   SpreadsheetInstanceEvents,
   SpreadsheetOptions,
   SpreadsheetPatch,
@@ -74,8 +75,12 @@ import type {
 export interface History {
   readonly canUndo: boolean;
   readonly canRedo: boolean;
+  /** Whether `repeat` would run an operation. */
+  readonly canRepeat: boolean;
   undo(): void;
   redo(): void;
+  /** Runs the latest repeatable action again on the current selection (F4); false when there is none. */
+  repeat(): boolean;
   /** Drops every undo and redo step. */
   clear(): void;
   on(name: 'change', listener: () => void): Disposer;
@@ -482,6 +487,12 @@ export class SpreadsheetInstance {
   /** Opens the print flow (or the PDF export). */
   print(mode: 'print' | 'pdf' = 'print'): void {
     stateOf(this).legacy.print(mode);
+  }
+
+  /** The print document for the active sheet's page setup, the document `print()` renders.
+   *  Throws an error with code `PRINT_RESOURCE_LIMIT` when the print range is too large to build. */
+  printDocument(): SheetPrintDocument {
+    return stateOf(this).legacy.printDocument();
   }
 
   /** Re-reads the printer list through `host.refreshPrinterProfiles`. */

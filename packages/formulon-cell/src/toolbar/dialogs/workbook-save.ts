@@ -1,3 +1,5 @@
+import type { SpreadsheetInstance } from '../../api/spreadsheet/instance.js';
+import { workbookHandleOf } from '../../api/workbook.js';
 import {
   type WorkbookSaveFormat,
   type WorkbookSaveLoss,
@@ -144,25 +146,28 @@ export const chooseWorkbookSaveFormat = (
     mountDialog(shell, select);
   });
 
-export interface SaveWorkbookWithPromptsOptions {
-  wb: WorkbookHandle;
-  strings: Strings;
-  format: WorkbookSaveFormat;
+/** Options of {@link saveWithPrompts}. */
+export interface SaveWithPromptsOptions {
+  /** The file type to write. Omitted, the Save As dialog asks for it. */
+  format?: WorkbookSaveFormat;
+  /** Element the dialogs mount in; the spreadsheet's own host by default. */
   host?: HTMLElement;
 }
 
-/** Write the workbook and ask before handing over a file that leaves content
- *  out. Resolves the bytes to deliver, or null when the user cancels. */
-export async function saveWorkbookWithPrompts(
-  opts: SaveWorkbookWithPromptsOptions,
+/** Write the spreadsheet's workbook and ask before handing over a file that
+ *  leaves content out. Without `format` the Save As dialog picks the file type
+ *  first. Resolves the bytes to deliver, or null when the user cancels. */
+export async function saveWithPrompts(
+  spreadsheet: SpreadsheetInstance,
+  options: SaveWithPromptsOptions = {},
 ): Promise<WorkbookSaveOutcome | null> {
-  const outcome = writeWorkbook(opts.wb, opts.format);
+  const wb = workbookHandleOf(spreadsheet.workbook);
+  const strings = spreadsheet.i18n.strings;
+  const host = options.host ?? spreadsheet.host;
+  const format = options.format ?? (await chooseWorkbookSaveFormat(wb, strings, host));
+  if (format === null) return null;
+  const outcome = writeWorkbook(wb, format);
   if (outcome.losses.length === 0) return outcome;
-  const proceed = await confirmWorkbookSaveLosses(
-    opts.strings,
-    opts.format,
-    outcome.losses,
-    opts.host,
-  );
+  const proceed = await confirmWorkbookSaveLosses(strings, format, outcome.losses, host);
   return proceed ? outcome : null;
 }

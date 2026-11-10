@@ -2,6 +2,7 @@ import type { Pagination, PaginationPage } from '@libraz/formulon';
 import { colLetter, formatA1Cell, parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { numFmtToFormatCode } from '../engine/format-writeback.js';
+import { readPageSetupFromEngine } from '../engine/print-sync.js';
 import type { CellValue } from '../engine/types.js';
 // Print / PDF export.
 //
@@ -12,7 +13,7 @@ import type { CellValue } from '../engine/types.js';
 // print dialog (Print → "Save as PDF") inherits orientation, paper size,
 // margins, and header/footer text.
 //
-// `printSheet` lifts that document into a hidden iframe, calls
+// `renderPrintDocument` lifts that document into a hidden iframe, calls
 // `iframe.contentWindow.print()`, then removes the iframe once focus
 // returns to the host window. We never spawn third-party PDF libs — the
 // browser's print pipeline is the entire export path.
@@ -496,14 +497,16 @@ export function buildPrintDocument(
   options: BuildPrintDocumentOptions = {},
 ): PrintDocument {
   const state = store.getState();
-  const baseSetup = getPageSetup(state, sheet);
-  const setup: PageSetup =
+  // The page setup is the engine's; only the printer's non-printable insets
+  // are session state with no engine counterpart.
+  const printableBounds =
     options.printableBounds !== undefined
-      ? {
-          ...baseSetup,
-          printableBounds: options.printableBounds ? { ...options.printableBounds } : undefined,
-        }
-      : baseSetup;
+      ? options.printableBounds
+      : getPageSetup(state, sheet).printableBounds;
+  const setup: PageSetup = {
+    ...readPageSetupFromEngine(wb, sheet),
+    printableBounds: printableBounds ? { ...printableBounds } : undefined,
+  };
   const showFormulas = state.ui.showFormulas;
   const hiddenRows = hiddenRowsOf(state.layout);
   const hiddenCols = state.layout.hiddenCols;
@@ -1293,29 +1296,38 @@ ${commentsHtml}
   return { html, cssVars };
 }
 
-/** Mount the print document into a hidden iframe attached to `host`, then
- *  invoke the iframe's print dialog. Returns a disposer that removes the
- *  iframe — callers usually let the auto-cleanup (`afterprint` / focus
- *  return) handle removal. Falls back to `window.print()` when the iframe
- *  contentWindow is unavailable (e.g. SSR / detached host). */
-export function printSheet(
+/** The print document of `sheet` as the print flow renders it: the engine's
+ *  page setup, with the host's printer profile bounds and the host's font
+ *  effects applied. */
+export function buildSheetPrintDocument(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
   host: HTMLElement,
   title?: string,
-  mode: 'print' | 'pdf' = 'print',
   options: PrintSheetOptions = {},
-): () => void {
-  const setup = getPageSetup(store.getState(), sheet);
+): PrintDocument {
+  const setup = readPageSetupFromEngine(wb, sheet);
   const printableBounds = options.printerProfiles
     ? (resolvePrinterProfileBounds(setup, options.printerProfiles, options.printerProfileId) ??
       null)
     : undefined;
-  const doc = buildPrintDocument(wb, store, sheet, title, {
+  return buildPrintDocument(wb, store, sheet, title, {
     printableBounds,
     fontEffects: isMacHost(host),
   });
+}
+
+/** Mount `doc` into a hidden iframe attached to `host`, then invoke the
+ *  iframe's print dialog. Returns a disposer that removes the iframe —
+ *  callers usually let the auto-cleanup (`afterprint` / focus return) handle
+ *  removal. Falls back to `window.print()` when the iframe contentWindow is
+ *  unavailable (e.g. SSR / detached host). */
+export function renderPrintDocument(
+  doc: PrintDocument,
+  host: HTMLElement,
+  mode: 'print' | 'pdf' = 'print',
+): () => void {
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.dataset.fcPrintMode = mode;

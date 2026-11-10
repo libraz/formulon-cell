@@ -5,10 +5,12 @@ import type {
   Disposer,
   SaveResult,
   Sheet,
+  SheetPrintDocument,
   SpreadsheetFailure,
   SpreadsheetInstance,
   Workbook,
 } from '@libraz/formulon-cell';
+import type { saveWithPrompts } from '@libraz/formulon-cell/toolbar';
 import { describe, expectTypeOf, it } from 'vitest';
 
 /** True when `T` admits `undefined`. */
@@ -83,5 +85,24 @@ describe('types', () => {
   it('protect and unprotect are async', () => {
     expectTypeOf(sheet.protect()).toEqualTypeOf<Promise<void>>();
     expectTypeOf(sheet.unprotect()).toEqualTypeOf<Promise<void>>();
+  });
+
+  it('history repeats like it undoes and redoes', () => {
+    expectTypeOf(instance.history.canRepeat).toEqualTypeOf<boolean>();
+    expectTypeOf(instance.history.canUndo).toEqualTypeOf<boolean>();
+    expectTypeOf(instance.history.repeat()).toEqualTypeOf<boolean>();
+  });
+
+  it('printDocument returns the print document', () => {
+    expectTypeOf(instance.printDocument()).toEqualTypeOf<SheetPrintDocument>();
+    expectTypeOf<SheetPrintDocument['html']>().toEqualTypeOf<string>();
+  });
+
+  it('saveWithPrompts takes the spreadsheet and optional format and host', () => {
+    expectTypeOf<Parameters<typeof saveWithPrompts>[0]>().toEqualTypeOf<SpreadsheetInstance>();
+    expectTypeOf<NonNullable<Parameters<typeof saveWithPrompts>[1]>>().toEqualTypeOf<{
+      format?: 'xlsx' | 'xlsb';
+      host?: HTMLElement;
+    }>();
   });
 });
