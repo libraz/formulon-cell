@@ -26,13 +26,28 @@ const linkWithCtrlK = async (sheet: UserJourneyPage, ref: string, url: string) =
 const linkAt = async (sheet: UserJourneyPage, ref: string) =>
   (await sheet.readFormat(ref))?.hyperlink ?? null;
 
+const removeWithClearMenu = async (sheet: UserJourneyPage, page: Page, ref: string) => {
+  await sheet.goTo(ref);
+  await selectRibbonTab(page, 'home');
+  await sheet.clickRibbon('clearFormat');
+  const menu = page.locator('#menu-clear');
+  await expect(menu).toBeVisible();
+  await menu.getByRole('menuitem', { name: 'Remove Hyperlinks' }).click();
+};
+
 /** On a protected sheet, the Insert hyperlinks option lets a link reach an unlocked cell only; a
- *  locked cell keeps refusing it. Without the option the Link command is unavailable. */
+ *  locked cell keeps refusing it. Without the option the Link command is unavailable, yet removing a
+ *  link still works on unlocked cells and is refused on locked ones. */
 export async function runProtectedSheetHyperlinkScenario(page: Page): Promise<void> {
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ locale: 'en' });
   await sheet.expectNoStub();
   await sheet.seed({ B2: 'unlocked', B3: 'locked' });
+  await page.evaluate(() =>
+    (window as unknown as InstanceWindow).__fcInst.workbook
+      .sheet(0)
+      .setHyperlink('B3', { target: 'https://example.com/original' }),
+  );
   await selectRibbonTab(page, 'insert');
   const link = page.locator('[data-ribbon-command="hyperlinkInsert"]').first();
 
@@ -42,10 +57,15 @@ export async function runProtectedSheetHyperlinkScenario(page: Page): Promise<vo
   await linkWithCtrlK(sheet, 'B2', 'https://example.com/unlocked');
   await expect.poll(() => linkAt(sheet, 'B2')).toBe('https://example.com/unlocked');
   await linkWithCtrlK(sheet, 'B3', 'https://example.com/locked');
-  await expect.poll(() => linkAt(sheet, 'B3')).toBeNull();
+  await expect.poll(() => linkAt(sheet, 'B3')).toBe('https://example.com/original');
 
   await protectWithUnlockedB2(page, false);
   await sheet.goTo('B2');
   await expect(link).toBeDisabled();
+
+  await removeWithClearMenu(sheet, page, 'B2');
+  await expect.poll(() => linkAt(sheet, 'B2')).toBeNull();
+  await removeWithClearMenu(sheet, page, 'B3');
+  await expect.poll(() => linkAt(sheet, 'B3')).toBe('https://example.com/original');
   await sheet.expectNoConsoleErrors();
 }
