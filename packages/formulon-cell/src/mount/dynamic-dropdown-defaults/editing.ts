@@ -32,6 +32,7 @@ import {
 } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
+import { openNamedRangeDialogFrom } from '../../interact/dialog-entry.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import { executeRibbonFilterDataAction } from '../../interact/ribbon-filter-data.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -459,7 +460,7 @@ const buildSortMenuAction =
       return;
     }
     if (action === 'named') {
-      instance.openNamedRangeDialog();
+      openNamedRangeDialogFrom(instance.store, { origin: 'ribbon', commandId: 'namedRanges' });
       return;
     }
     if (action === 'filter-advanced') {

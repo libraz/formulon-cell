@@ -15,7 +15,10 @@ import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../comm
 import { FUNCTION_SIGNATURES } from '../../../commands/refs.js';
 import { executeNoteVisibilityAction } from '../../../commands/ribbon-comment.js';
 import { formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
-import { openDataValidationDialogFrom } from '../../../interact/dialog-entry.js';
+import {
+  openDataValidationDialogFrom,
+  openDefineNameDialogFrom,
+} from '../../../interact/dialog-entry.js';
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
 import { createChartVariantFromSelection } from '../../../mount/dynamic-dropdown-defaults/insert.js';
@@ -419,7 +422,10 @@ export function dispatchMacRibbonCommand(
       case 'mac.formulas.autoSum':
         return ctx.applyAutoSumFormula('SUM');
       case 'mac.formulas.defineName':
-        return instance.openDefineNameDialog();
+        return openDefineNameDialogFrom(instance.store, {
+          origin: 'ribbon',
+          commandId: 'mac.formulas.defineName',
+        });
       case 'mac.formulas.useInFormula':
         return ctx.applyDefinedNameAction('use-formula');
       case 'mac.formulas.createFromSelection':

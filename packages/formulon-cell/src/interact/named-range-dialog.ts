@@ -1,4 +1,6 @@
+import { canExecuteBuiltInRequest } from '../commands/built-in-command-policy.js';
 import type { History } from '../commands/history.js';
+import { namedRangeWrite } from '../commands/named-range-actions.js';
 import {
   type DefinedNameEntry,
   definedNameDisplayFormula,
@@ -7,7 +9,6 @@ import {
   deleteDefinedName,
   isSameDefinedName,
   isValidDefinedName,
-  recordDefinedNamesChange,
   sanitizeName,
   upsertDefinedName,
 } from '../commands/named-ranges.js';
@@ -15,9 +16,15 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import type { SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
+import {
+  type DialogEntry,
+  INSTANCE_API_DEFINE_NAME_ENTRY,
+  INSTANCE_API_NAME_MANAGER_ENTRY,
+} from './dialog-entry.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -35,6 +42,8 @@ import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface NamedRangeDialogDeps {
   host: HTMLElement;
+  /** Store whose interaction controller authorizes every defined-name change. */
+  store: SpreadsheetStore;
   wb: WorkbookHandle;
   history?: History | null;
   strings?: Strings;
@@ -48,8 +57,9 @@ export interface NamedRangeDialogDeps {
 }
 
 export interface NamedRangeDialogHandle {
-  open(): void;
-  openNew(): void;
+  /** `entry` names the entry point the changes are authorized under; the instance API when absent. */
+  open(entry?: DialogEntry): void;
+  openNew(entry?: DialogEntry): void;
   close(): void;
   detach(): void;
   /** Swap to a fresh workbook handle (used when the host re-binds the engine). */
@@ -93,6 +103,23 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const { host } = deps;
   let wb = deps.wb;
   const history = deps.history ?? null;
+  let dialogEntry: DialogEntry = INSTANCE_API_NAME_MANAGER_ENTRY;
+  /** Whether the engine can store names and the opening entry may change them. */
+  const mayMutate = (): boolean =>
+    wb.capabilities.definedNameMutate &&
+    canExecuteBuiltInRequest(deps.store, dialogEntry.commandId, dialogEntry.origin).allowed;
+  /** Run a defined-name change as one authorized, undoable step under the opening entry. */
+  const writeNames = <T>(write: () => T) =>
+    namedRangeWrite(
+      {
+        store: deps.store,
+        workbook: wb,
+        history,
+        origin: dialogEntry.origin,
+        commandId: dialogEntry.commandId,
+      },
+      write,
+    );
   const strings = deps.strings ?? defaultStrings;
   const shared = strings.namedRangeDialog;
   // The Mac Name Manager words a few labels differently and orders the
@@ -426,7 +453,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const syncQuickRefers = (): void => {
     const entry = currentRows[selectedNameIndex];
-    const canMutate = wb.capabilities.definedNameMutate;
+    const canMutate = mayMutate();
     const enabled = canMutate && Boolean(entry);
     quickInput.value = definedNameDisplayFormula(entry?.formula ?? '');
     if (!canMutate) {
@@ -453,7 +480,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       button.classList.toggle('fc-namedlg__sort--active', selected);
       button.dataset.sortDir = selected ? sortDir : '';
     }
-    const canMutate = wb.capabilities.definedNameMutate;
+    const canMutate = mayMutate();
     const allRows = [...wb.definedNames()].filter((entry) => !entry.hidden);
     currentRows = allRows.filter((entry) => {
       if (activeFilter === 'errors') return hasFormulaError(entry.formula);
@@ -859,9 +886,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       focusAndSelectInput(defineName.input);
       return false;
     }
-    const result = recordDefinedNamesChange(history, wb, () =>
+    const written = writeNames(() =>
       upsertDefinedName(wb, name, defineRange.input.value.trim(), -1),
     );
+    if (!written.ok) return false;
+    const result = written.value;
     if (!result.ok) {
       showDefineError(errorMessageFor(result.reason, t));
       return false;
@@ -882,10 +911,9 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   defineShell.on(defineRemoveBtn, 'click', () => {
     const entry = defineSelected;
     if (!entry) return;
-    const result = recordDefinedNamesChange(history, wb, () =>
-      deleteDefinedName(wb, entry.name, entry.localSheetId),
-    );
-    if (!result.ok) {
+    const written = writeNames(() => deleteDefinedName(wb, entry.name, entry.localSheetId));
+    if (!written.ok) return;
+    if (!written.value.ok) {
       showDefineError(t.errorEngineFailed);
       return;
     }
@@ -920,10 +948,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const confirmDeleteSelectedName = (): void => {
     if (!pendingDeleteName) return;
     const entry = pendingDeleteName;
-    const result = recordDefinedNamesChange(history, wb, () =>
-      deleteDefinedName(wb, entry.name, entry.localSheetId),
-    );
-    if (!result.ok) {
+    const written = writeNames(() => deleteDefinedName(wb, entry.name, entry.localSheetId));
+    if (!written.ok || !written.value.ok) {
       showMainError(t.errorEngineFailed);
       closeDeleteConfirm();
       return;
@@ -943,9 +969,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const commitQuickRefers = (): void => {
     const entry = currentRows[selectedNameIndex];
     if (!entry) return;
-    const result = recordDefinedNamesChange(history, wb, () =>
+    const written = writeNames(() =>
       upsertDefinedName(wb, entry.name, quickInput.value, entry.localSheetId),
     );
+    if (!written.ok) return;
+    const result = written.value;
     if (!result.ok) {
       showMainError(errorMessageFor(result.reason, t));
       return;
@@ -1007,9 +1035,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       focusAndSelectInput(nameInput);
       return;
     }
-    const result = recordDefinedNamesChange(history, wb, () =>
+    const written = writeNames(() =>
       replaceDefinedName(previous, name, formula, scope, commentInput.value.trim()),
     );
+    if (!written.ok) return;
+    const result = written.value;
     if (!result.ok) {
       showError(errorMessageFor(result.reason, t));
       return;
@@ -1028,7 +1058,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   };
 
   const refreshFormState = (): void => {
-    const canMutate = wb.capabilities.definedNameMutate;
+    const canMutate = mayMutate();
     if (!canMutate) {
       setReadOnlyState(filterBtn, currentRows.length === 0);
     }
@@ -1077,7 +1107,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     if (e.key === 'Enter') {
       // Enter inside an input submits the form when mutation is enabled;
       // otherwise it's an alias for Close (legacy behaviour).
-      if (wb.capabilities.definedNameMutate) {
+      if (mayMutate()) {
         if (e.target === nameInput || e.target === formulaInput) {
           e.preventDefault();
           formRow.requestSubmit();
@@ -1103,20 +1133,22 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 
   const api: NamedRangeDialogHandle = {
-    open(): void {
+    open(entry = INSTANCE_API_NAME_MANAGER_ENTRY): void {
+      dialogEntry = entry;
       applyPlatform();
       refreshFormState();
       renderList();
       shell.open();
       deferInitialFocus(overlay, () => {
         if (editorShell.isOpen() || deleteShell.isOpen()) return;
-        if (wb.capabilities.definedNameMutate) newBtn.focus();
+        if (mayMutate()) newBtn.focus();
         else closeBtn.focus();
       });
     },
-    openNew(): void {
-      if (!wb.capabilities.definedNameMutate) {
-        api.open();
+    openNew(entry = INSTANCE_API_DEFINE_NAME_ENTRY): void {
+      dialogEntry = entry;
+      if (!mayMutate()) {
+        api.open(entry);
         return;
       }
       applyPlatform();

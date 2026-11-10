@@ -36,6 +36,7 @@ import { attachClipboard } from '../interact/clipboard.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
 import { attachContextMenu } from '../interact/context-menu.js';
+import type { DialogEntry } from '../interact/dialog-entry.js';
 import { attachFindReplace } from '../interact/find-replace.js';
 import { attachFormatDialog, type FormatDialogHandle } from '../interact/format-dialog.js';
 import { attachFormatPainter } from '../interact/format-painter.js';
@@ -43,7 +44,10 @@ import { attachGoToDialog } from '../interact/goto-dialog.js';
 import { attachHover } from '../interact/hover.js';
 import { attachHyperlinkDialog } from '../interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from '../interact/iterative-dialog.js';
-import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
+import {
+  attachNamedRangeDialog,
+  type NamedRangeDialogHandle,
+} from '../interact/named-range-dialog.js';
 import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { attachPasteSpecial } from '../interact/paste-special.js';
 import { showPivotSpillCallout } from '../interact/pivot-spill-callout.js';
@@ -511,18 +515,20 @@ export const namedRanges = (): Extension =>
     setup(ctx: BuiltInExtensionContext) {
       let handle = attachNamedRangeDialog({
         host: ctx.host,
+        store: ctx.store,
         wb: ctx.workbook,
         history: ctx.history as History,
         strings: ctx.i18n.strings,
       });
       return {
-        open: () => handle.open(),
+        open: (entry?: DialogEntry) => handle.open(entry),
         close: () => handle.close(),
         rebindWorkbook: (wb) => handle.bindWorkbook(wb),
         setStrings: (next) => {
           handle.detach();
           handle = attachNamedRangeDialog({
             host: ctx.host,
+            store: ctx.store,
             wb: ctx.workbook,
             history: ctx.history as History,
             strings: next,
@@ -777,7 +783,10 @@ export const contextMenu = (): Extension =>
           onPasteSpecial: () => callOpen('pasteSpecial'),
           onInsertHyperlink: () => callOpen('hyperlink'),
           onEditComment: () => callOpen('commentDialog'),
-          onDefineName: () => callOpen('namedRanges'),
+          onDefineName: () =>
+            ctx
+              .resolve<ExtensionHandle & NamedRangeDialogHandle>('namedRanges')
+              ?.open({ origin: 'contextMenu', commandId: 'defineName' }),
           getLocale: () => ctx.i18n.locale,
           getClipboardSnapshot,
         });

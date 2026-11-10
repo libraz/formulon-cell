@@ -1,10 +1,10 @@
 import type { AutoSumFunction } from '../../commands/auto-sum.js';
 import { cellValueIsFormulaError } from '../../commands/error-indicators.js';
+import { namedRangeWrite } from '../../commands/named-range-actions.js';
 import {
   createDefinedNamesFromSelection,
   insertDefinedNameFormula,
   listDefinedNames,
-  recordDefinedNamesChange,
 } from '../../commands/named-ranges.js';
 import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
 import { executeRibbonFormulaAuditingAction } from '../../commands/ribbon-formula-auditing.js';
@@ -17,6 +17,7 @@ import {
 } from '../../commands/watch.js';
 import { addrKey } from '../../engine/address.js';
 import { openDataTableDialog } from '../../interact/data-table-dialog.js';
+import { openDefineNameDialogFrom, openNamedRangeDialogFrom } from '../../interact/dialog-entry.js';
 import { openMacGoalSeekDialog } from '../../interact/mac-goal-seek-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators } from '../../store/store.js';
@@ -239,11 +240,11 @@ const buildDefinedNameAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyDefinedNameAction'] =>
   async (action) => {
     if (action === 'define') {
-      instance.openDefineNameDialog();
+      openDefineNameDialogFrom(instance.store, { origin: 'ribbon', commandId: 'defineName' });
       return;
     }
     if (action === 'manager') {
-      instance.openNamedRangeDialog();
+      openNamedRangeDialogFrom(instance.store, { origin: 'ribbon', commandId: 'namedRanges' });
       return;
     }
     const source =
@@ -257,8 +258,15 @@ const buildDefinedNameAction =
               ? 'right-column'
               : null;
     if (source) {
-      recordDefinedNamesChange(instance.history, instance.workbook, () =>
-        createDefinedNamesFromSelection(instance.store.getState(), instance.workbook, source),
+      namedRangeWrite(
+        {
+          store: instance.store,
+          workbook: instance.workbook,
+          history: instance.history,
+          origin: 'ribbon',
+          commandId: 'namedRanges',
+        },
+        () => createDefinedNamesFromSelection(instance.store.getState(), instance.workbook, source),
       );
       instance.host.focus();
       return;

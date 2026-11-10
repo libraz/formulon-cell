@@ -6,7 +6,9 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ExtensionHandle } from '../extensions/index.js';
 import {
   type DialogOpeners,
+  INSTANCE_API_DEFINE_NAME_ENTRY,
   INSTANCE_API_FORMAT_ENTRY,
+  INSTANCE_API_NAME_MANAGER_ENTRY,
   INSTANCE_API_VALIDATION_ENTRY,
   registerDialogOpeners,
 } from '../interact/dialog-entry.js';
@@ -92,9 +94,17 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
   const openDataValidationDialog: DialogOpeners['dataValidationDialog'] = (entry) => {
     featureState.formatDialog?.open('more', { mode: 'dataValidation', focus: 'validation', entry });
   };
+  const openNamedRangeDialog: DialogOpeners['namedRangeDialog'] = (entry) => {
+    featureState.namedRangeDialog?.open(entry);
+  };
+  const openDefineNameDialog: DialogOpeners['defineNameDialog'] = (entry) => {
+    featureState.namedRangeDialog?.openNew(entry);
+  };
   registerDialogOpeners(store, {
     formatDialog: openFormatDialog,
     dataValidationDialog: openDataValidationDialog,
+    namedRangeDialog: openNamedRangeDialog,
+    defineNameDialog: openDefineNameDialog,
   });
   return {
     openConditionalDialog(options) {
@@ -141,10 +151,10 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       getBinding().pasteSpecialDialog?.open(opts);
     },
     openNamedRangeDialog() {
-      featureState.namedRangeDialog?.open();
+      openNamedRangeDialog(INSTANCE_API_NAME_MANAGER_ENTRY);
     },
     openDefineNameDialog() {
-      featureState.namedRangeDialog?.openNew();
+      openDefineNameDialog(INSTANCE_API_DEFINE_NAME_ENTRY);
     },
     openPageSetup(tab) {
       featureState.pageSetupDialog?.open(tab);

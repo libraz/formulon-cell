@@ -1,4 +1,8 @@
-import { openDataValidationDialogFrom, openFormatDialogFrom } from '../../interact/dialog-entry.js';
+import {
+  openDataValidationDialogFrom,
+  openFormatDialogFrom,
+  openNamedRangeDialogFrom,
+} from '../../interact/dialog-entry.js';
 // Dispatch tables for the playground ribbon — each map is one row per ribbon
 // command id, replacing what used to be a `case 'id': handler; return true;`
 // triplet in `applyRibbonCommand`. Pulled out of main.ts so the dispatcher can
@@ -50,7 +54,8 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   newCommentReview: (i) => i.openCommentDialog({ mode: 'note' }),
   dataValidation: (i) =>
     openDataValidationDialogFrom(i.store, { origin: 'ribbon', commandId: 'dataValidation' }),
-  namedRanges: (i) => i.openNamedRangeDialog(),
+  namedRanges: (i) =>
+    openNamedRangeDialogFrom(i.store, { origin: 'ribbon', commandId: 'namedRanges' }),
   links: (i) => i.openExternalLinksDialog(),
   linksData: (i) => i.openExternalLinksDialog(),
   rules: (i) => i.openCfRulesDialog(),

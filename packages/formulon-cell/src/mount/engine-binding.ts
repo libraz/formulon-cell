@@ -53,6 +53,7 @@ import { attachFindReplace } from '../interact/find-replace.js';
 import type { FormatDialogHandle } from '../interact/format-dialog.js';
 import { followHyperlink, type HyperlinkFollowDeps } from '../interact/hyperlink-follow.js';
 import { attachKeyboard } from '../interact/keyboard.js';
+import type { NamedRangeDialogHandle } from '../interact/named-range-dialog.js';
 import { attachPageBandEditor } from '../interact/page-band-editor.js';
 import { attachPasteOptions } from '../interact/paste-options.js';
 import { attachPasteSpecial } from '../interact/paste-special.js';
@@ -149,7 +150,7 @@ interface AttachEngineBindingInput {
   getLocale: () => string;
   getGoToDialog: () => { open(mode?: 'go-to' | 'special'): void } | null;
   getHyperlinkDialog: () => { open(): void } | null;
-  getNamedRangeDialog: () => { open(): void } | null;
+  getNamedRangeDialog: () => Pick<NamedRangeDialogHandle, 'open'> | null;
   getPivotTableDialog: () => { open(): void } | null;
   getWorkbookObjects?: () => {
     openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
@@ -423,7 +424,8 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
           followHyperlink({ store, wb, ...hyperlinkFollow }, url);
         },
         onEditComment: () => getCommentDialog()?.open(),
-        onDefineName: () => getNamedRangeDialog()?.open(),
+        onDefineName: () =>
+          getNamedRangeDialog()?.open({ origin: 'contextMenu', commandId: 'defineName' }),
         getLocale,
         onOpenPivotFieldList: getWorkbookObjects
           ? (sheetIndex, pivotIndex) => {

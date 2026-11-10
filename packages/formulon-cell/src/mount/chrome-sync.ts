@@ -1,10 +1,10 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { TableOverlay } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
+import { namedRangeWrite } from '../commands/named-range-actions.js';
 import {
   definedNameDisplayFormula,
   isValidDefinedName,
-  recordDefinedNamesChange,
   upsertDefinedName,
 } from '../commands/named-ranges.js';
 import {
@@ -619,10 +619,17 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       wb.sheetName(state.selection.range.sheet),
       state.selection.range,
     );
-    const result = recordDefinedNamesChange(getHistory?.() ?? null, wb, () =>
-      upsertDefinedName(wb, raw, formula),
+    const written = namedRangeWrite(
+      {
+        store,
+        workbook: wb,
+        history: getHistory?.() ?? null,
+        origin: 'formulaBar',
+        commandId: 'defineName',
+      },
+      () => upsertDefinedName(wb, raw, formula),
     );
-    if (!result.ok) return false;
+    if (!written.ok || !written.value.ok) return false;
     host.focus();
     return true;
   };

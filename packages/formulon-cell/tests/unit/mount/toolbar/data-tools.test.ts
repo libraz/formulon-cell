@@ -125,9 +125,6 @@ describe('Spreadsheet.mountToolbar', () => {
     const openConditionalDialog = vi
       .spyOn(sheet.instance, 'openConditionalDialog')
       .mockImplementation(() => undefined);
-    const openNamedRangeDialog = vi
-      .spyOn(sheet.instance, 'openNamedRangeDialog')
-      .mockImplementation(() => undefined);
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,
       helpers: stubHelpers(),
@@ -189,9 +186,13 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(sheet.instance.store.getState().layout.hiddenRows.has(2)).toBe(false);
 
     await clickSort('conditional');
+    const closedManager = document.querySelector<HTMLElement>('.fc-namedlg__actions');
+    expect(!closedManager || closedManager.closest('[hidden]') !== null).toBe(true);
     await clickSort('named');
     expect(openConditionalDialog).toHaveBeenCalledTimes(1);
-    expect(openNamedRangeDialog).toHaveBeenCalledTimes(1);
+    // The ribbon reaches the Name Manager through its internal entry, not the public method.
+    const nameManager = document.querySelector<HTMLElement>('.fc-namedlg__actions');
+    expect(nameManager?.closest<HTMLElement>('[hidden]')).toBeNull();
 
     tb.dispose();
   });

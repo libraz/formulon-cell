@@ -512,6 +512,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.namedRangeDialog) return;
         s.namedRangeDialog = attachNamedRangeDialog({
           host: input.host,
+          store: input.store,
           wb: input.wb(),
           history: input.history,
           strings,
