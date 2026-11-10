@@ -78,6 +78,24 @@ export class UserJourneyPage extends SpreadsheetPage {
     await this.page.keyboard.press('Enter');
   }
 
+  /** Writes setup cells through the workbook API in one batch and clears the undo history, for
+   *  scenarios whose subject is not cell entry. A string starting with `=` is a formula. */
+  async seed(cells: Readonly<Record<string, number | string>>, sheet = 0): Promise<void> {
+    await ensureProbe(this.page);
+    await this.page.evaluate(
+      ({ cells: values, sheet: index }) => {
+        const instance = (window as ProbeWindow).__fcInst;
+        if (!instance) throw new Error('window.__fcInst is not available');
+        const target = instance.workbook.sheet(index);
+        instance.workbook.batch(() => {
+          for (const [ref, value] of Object.entries(values)) target.setValue(ref, value);
+        });
+        instance.history.clear();
+      },
+      { cells, sheet },
+    );
+  }
+
   async readValue(ref: string, sheet = 0): Promise<CellValue> {
     const addr = a1Address(ref, sheet);
     await ensureProbe(this.page);

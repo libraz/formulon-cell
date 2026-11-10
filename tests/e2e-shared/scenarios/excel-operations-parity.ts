@@ -28,8 +28,7 @@ export async function runMergedStructureCopyScenario(page: Page): Promise<void> 
   const sp = new UserJourneyPage(page);
   await sp.mount();
   await sp.expectNoStub();
-  await sp.enter('A2', '7');
-  await sp.enter('D7', '=SUM($A$2:$A$4)');
+  await sp.seed({ A2: 7, D7: '=SUM($A$2:$A$4)' });
   await sp.goTo('A2:B4');
   await sp.clickRibbon('bold');
   const mergeMenu = await sp.openRibbonSplitMenu('merge', 'menu-merge');
@@ -69,9 +68,7 @@ export async function runCrossSheetCutReferencesScenario(page: Page): Promise<vo
   await page.locator('.fc-host__sheetbar-add').click();
   await sp.renameSelectedSheet('Target');
   await sp.chooseSheet('Source');
-  await sp.enter('A1', '7');
-  await sp.enter('B1', '=A1');
-  await sp.enter('C1', '=B1');
+  await sp.seed({ A1: 7, B1: '=A1', C1: '=B1' });
   await sp.goTo('B1');
   await sp.clickRibbon('bold');
   await sp.goTo('B1');
@@ -113,11 +110,7 @@ export async function runPartialRangeCutScenario(page: Page): Promise<void> {
   await page.locator('.fc-host__sheetbar-add').click();
   await sp.renameSelectedSheet('Target');
   await sp.chooseSheet('Source');
-  await sp.enter('A1', '1');
-  await sp.enter('A2', '2');
-  await sp.enter('A3', '3');
-  await sp.enter('F1', '=SUM(A1:A3)');
-  await sp.enter('F2', '=SUM(Target!A1:A3)');
+  await sp.seed({ A1: 1, A2: 2, A3: 3, F1: '=SUM(A1:A3)', F2: '=SUM(Target!A1:A3)' });
   await sp.goTo('A1');
   await sp.shortcut('x');
   await sp.chooseSheet('Target');
@@ -139,8 +132,7 @@ export async function runDirectionalFillHistoryScenario(page: Page): Promise<voi
   const sp = new UserJourneyPage(page);
   await sp.mount();
   await sp.expectNoStub();
-  await sp.enter('A1', 'Item 1');
-  await sp.enter('A2', 'old');
+  await sp.seed({ A1: 'Item 1', A2: 'old' });
   await sp.goTo('A1');
   await sp.clickRibbon('bold');
   await sp.goTo('A1:A3');
@@ -161,20 +153,20 @@ export async function runSortFormulaHistoryScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount();
   await sp.expectNoStub();
-  await sp.enter('A1', 'Key');
-  await sp.enter('B1', 'Calculation');
-  for (const [ref, value] of [
-    ['A2', '3'],
-    ['A3', '1'],
-    ['A4', '2'],
-    ['D2', '100'],
-    ['D3', '200'],
-    ['D4', '300'],
-  ]) {
-    await sp.enter(ref as string, value as string);
-  }
-  for (const row of [2, 3, 4]) await sp.enter(`B${row}`, `=A${row}+$D$2+D${row}`);
-  await sp.enter('F2', '=A2');
+  await sp.seed({
+    A1: 'Key',
+    B1: 'Calculation',
+    A2: 3,
+    A3: 1,
+    A4: 2,
+    D2: 100,
+    D3: 200,
+    D4: 300,
+    B2: '=A2+$D$2+D2',
+    B3: '=A3+$D$2+D3',
+    B4: '=A4+$D$2+D4',
+    F2: '=A2',
+  });
   await sp.goTo('B3');
   await sp.clickRibbon('bold');
   await sp.goTo('A1:B4');
@@ -203,13 +195,9 @@ export async function runCellBandReferencesScenario(page: Page): Promise<void> {
   await sp.renameSelectedSheet('Source');
   await page.locator('.fc-host__sheetbar-add').click();
   await sp.renameSelectedSheet('Target');
-  await sp.enter('D1', '=Source!$A$2');
-  await sp.enter('D2', '=SUM(Source!A1:A3)');
-  await sp.enter('D3', '=A2');
+  await sp.seed({ D1: '=Source!$A$2', D2: '=SUM(Source!A1:A3)', D3: '=A2' }, 1);
   await sp.chooseSheet('Source');
-  for (const row of [1, 2, 3]) await sp.enter(`A${row}`, String(row));
-  await sp.enter('C1', '=Source!$A$2');
-  await sp.enter('C2', '=SUM(A1:A3)');
+  await sp.seed({ A1: 1, A2: 2, A3: 3, C1: '=Source!$A$2', C2: '=SUM(A1:A3)' });
   await sp.goTo('A2');
   await sp.insertRowsOrColumns('cells');
   await page.locator('.fc-cellshift__button--primary').click();
@@ -234,10 +222,7 @@ export async function runRepeatedPasteScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount();
   await sp.expectNoStub();
-  await sp.enter('A1', '1');
-  await sp.enter('B1', '=A1*2');
-  await sp.enter('A2', '3');
-  await sp.enter('B2', '=A2*2');
+  await sp.seed({ A1: 1, B1: '=A1*2', A2: 3, B2: '=A2*2' });
   await sp.goTo('B2');
   await sp.clickRibbon('bold');
   await sp.goTo('A1:B2');
@@ -255,7 +240,7 @@ export async function runRepeatedPasteScenario(page: Page): Promise<void> {
   await expect.poll(() => sp.readFormula('G4')).toBe('=F4*2');
   await expect.poll(() => sp.readFormat('G4')).toMatchObject({ bold: true });
   await page.keyboard.press('Escape');
-  await sp.enter('J1', '9');
+  await sp.seed({ J1: 9 });
   await sp.goTo('K2:L3');
   const mergeMenu = await sp.openRibbonSplitMenu('merge', 'menu-merge');
   await mergeMenu.locator('[data-merge-action="mergeCells"]').click();
@@ -280,9 +265,7 @@ export async function runWholeColumnCopyInsertScenario(page: Page): Promise<void
   const sp = new UserJourneyPage(page);
   await sp.mount();
   await sp.expectNoStub();
-  await sp.enter('A5', '7');
-  await sp.enter('B5', '=A5*2');
-  await sp.enter('D2', 'old');
+  await sp.seed({ A5: 7, B5: '=A5*2', D2: 'old' });
   await sp.goTo('A5');
   await sp.clickRibbon('bold');
   await clickColumnHeader(page, 0);
@@ -336,9 +319,7 @@ export async function runWholeRowCopyInsertScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount();
   await sp.expectNoStub();
-  await sp.enter('E1', '7');
-  await sp.enter('E2', '=E1*2');
-  await sp.enter('A4', 'old');
+  await sp.seed({ E1: 7, E2: '=E1*2', A4: 'old' });
   await sp.goTo('E1');
   await sp.clickRibbon('bold');
   await clickRowHeader(page, 0);
@@ -371,8 +352,7 @@ export async function runWholeBandInsertDeleteScenario(page: Page): Promise<void
   const sp = new UserJourneyPage(page);
   await sp.mount();
   await sp.expectNoStub();
-  await sp.enter('B5', '7');
-  await sp.enter('F1', '=B5');
+  await sp.seed({ B5: 7, F1: '=B5' });
   await clickColumnHeader(page, 1);
   await sp.shortcut('Shift+Equal');
   await expect.poll(() => sp.readValue('C5')).toEqual({ kind: 'number', value: 7 });
@@ -392,7 +372,7 @@ export async function runWholeBandInsertDeleteScenario(page: Page): Promise<void
   await expect(page.locator('.fc-cellshift')).toHaveCount(0);
   await sp.shortcut('z');
 
-  await sp.enter('E2', '11');
+  await sp.seed({ E2: 11 });
   await clickRowHeader(page, 1);
   await sp.shortcut('Shift+Equal');
   await expect.poll(() => sp.readValue('E3')).toEqual({ kind: 'number', value: 11 });
@@ -416,8 +396,7 @@ export async function runCopiedBandInsertRoutesScenario(page: Page): Promise<voi
   const sp = new UserJourneyPage(page);
   await sp.mount();
   await sp.expectNoStub();
-  await sp.enter('E5', '7');
-  await sp.enter('D5', '=$E5');
+  await sp.seed({ E5: 7, D5: '=$E5' });
   await clickColumnHeader(page, 3);
   await sp.shortcut('c');
   await sp.goTo('B5');
@@ -430,8 +409,7 @@ export async function runCopiedBandInsertRoutesScenario(page: Page): Promise<voi
   await expect.poll(() => sp.readFormula('B5')).toBeNull();
   await page.keyboard.press('Escape');
 
-  await sp.enter('J5', '11');
-  await sp.enter('J4', '=J$5');
+  await sp.seed({ J5: 11, J4: '=J$5' });
   await clickRowHeader(page, 3);
   await sp.shortcut('c');
   await sp.goTo('A2');
@@ -451,11 +429,7 @@ export async function runCutBandInsertRoutesScenario(page: Page): Promise<void> 
   const sp = new UserJourneyPage(page);
   await sp.mount();
   await sp.expectNoStub();
-  await sp.enter('B5', '2');
-  await sp.enter('C5', '3');
-  await sp.enter('E5', '7');
-  await sp.enter('D5', '=$E5');
-  await sp.enter('J10', '=D5');
+  await sp.seed({ B5: 2, C5: 3, E5: 7, D5: '=$E5', J10: '=D5' });
   await sp.goTo('D5');
   await sp.clickRibbon('bold');
   await clickColumnHeader(page, 3);
@@ -475,11 +449,7 @@ export async function runCutBandInsertRoutesScenario(page: Page): Promise<void> 
   await expect.poll(() => sp.readFormula('B5')).toBe('=$E5');
   await page.keyboard.press('Escape');
 
-  await sp.enter('J1', '11');
-  await sp.enter('J2', '=J$1');
-  await sp.enter('J3', '3');
-  await sp.enter('J4', '4');
-  await sp.enter('K10', '=J2');
+  await sp.seed({ J1: 11, J2: '=J$1', J3: 3, J4: 4, K10: '=J2' });
   await clickRowHeader(page, 1);
   await sp.shortcut('x');
   await sp.goTo('A5');
@@ -519,11 +489,9 @@ export async function runCrossSheetCutBandInsertScenario(page: Page): Promise<vo
   await sp.renameSelectedSheet('Source');
   await page.locator('.fc-host__sheetbar-add').click();
   await sp.renameSelectedSheet('Target');
-  await sp.enter('D5', '9');
+  await sp.seed({ D5: 9 }, 1);
   await sp.chooseSheet('Source');
-  await sp.enter('B5', '7');
-  await sp.enter('C5', '8');
-  await sp.enter('J10', '=B5');
+  await sp.seed({ B5: 7, C5: 8, J10: '=B5' });
   await clickColumnHeader(page, 1);
   await sp.shortcut('x');
   await sp.chooseSheet('Target');
