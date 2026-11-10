@@ -107,6 +107,24 @@ export type ChangeEvent =
   | { kind: 'sheet-remove'; index: number }
   | { kind: 'sheet-move'; from: number; to: number };
 
+/** Store slice a non-cell write through the public facade touched; the mount re-hydrates it. */
+export type FacadeChangeKind =
+  | 'table'
+  | 'format'
+  | 'layout'
+  | 'drawing'
+  | 'print'
+  | 'view'
+  | 'names'
+  | 'cf'
+  | 'validation';
+
+/** A non-cell facade write: its kind and the sheet it touched (`null` for workbook scope). */
+export interface FacadeChange {
+  readonly kind: FacadeChangeKind;
+  readonly sheet: number | null;
+}
+
 /** Snapshot of one cell's full state — enough to restore it on undo. */
 export interface CellSnapshot {
   addr: Addr;
@@ -232,6 +250,8 @@ export class WorkbookHandle {
 
   private readonly listeners = new Set<ChangeListener>();
 
+  private readonly facadeListeners = new Set<(change: FacadeChange) => void>();
+
   private disposed = false;
   private recoveryFailure: Error | null = null;
   private loadLosses: LoadDiagnostics = emptyLoadDiagnostics();
@@ -286,16 +306,21 @@ export class WorkbookHandle {
    *  profile (font, row height, base column width); a default-profile book
    *  states the locale font and the row height Windows writes for it. */
   static async createDefault(
-    opts: LoadOptions & { locale?: string; platform?: SpreadsheetPlatform } = {},
+    opts: LoadOptions & {
+      locale?: string;
+      platform?: SpreadsheetPlatform;
+      /** Reject when the platform profile cannot load instead of falling back to the default book. */
+      strictProfile?: boolean;
+    } = {},
   ): Promise<WorkbookHandle> {
-    const { locale, platform = 'default', ...loadOptions } = opts;
+    const { locale, platform = 'default', strictProfile = false, ...loadOptions } = opts;
     const module = await loadFormulon(loadOptions);
     if (platform === 'mac') {
       let profiled: Workbook | null = null;
       try {
         profiled = module.Workbook.createForProfile(engineProfileIdFor(locale ?? 'en', 'mac'));
       } catch (e) {
-        if (!isFormulonError(e)) throw e;
+        if (strictProfile || !isFormulonError(e)) throw e;
       }
       if (profiled) {
         const handle = new WorkbookHandle(module, profiled);
@@ -1147,6 +1172,77 @@ export class WorkbookHandle {
     return orFallback([], () => this.wb.ooxml.listPassthroughs()).map((path) => ({ path }));
   }
 
+  // Internal hooks for the public facade (src/api). The facade calls the engine handles itself and
+  // reports through these so journaling, recalc scheduling and change events stay in one place.
+
+  /** The raw engine workbook. */
+  engineWorkbook(): Workbook {
+    this.assertAlive();
+    return this.wb;
+  }
+
+  /** The engine module this workbook was created by. */
+  engineModule(): Formulon {
+    this.assertAlive();
+    return this.module;
+  }
+
+  /** The History cell writes are journaled into, or `null` for a headless workbook. */
+  attachedHistory(): History | null {
+    return this.history;
+  }
+
+  /** Before-state of one cell, for the facade's batch rollback and undo entry. */
+  captureCell(a: Addr): CellSnapshot {
+    this.assertAlive();
+    return this.captureSnapshot(a);
+  }
+
+  /** Runs an engine write of the cell at `a` that the caller journals itself, then schedules the
+   *  recalc and announces the new value. */
+  writeCellUnjournaled(a: Addr, write: () => void): void {
+    this.assertAlive();
+    write();
+    this.scheduleRecalc(a);
+    this.emit({ kind: 'value', addr: a, next: this.getValue(a) });
+  }
+
+  /** Writes cells back to snapshots without journaling, announcing each value. */
+  restoreCells(snapshots: readonly CellSnapshot[]): void {
+    this.assertAlive();
+    for (let i = snapshots.length - 1; i >= 0; i -= 1) {
+      const snap = snapshots[i];
+      if (snap) this.replay(snap);
+    }
+  }
+
+  /** Announces a sheet-list change the facade made on the engine directly. */
+  noteSheetChange(e: Extract<ChangeEvent, { kind: `sheet-${string}` }>): void {
+    this.assertAlive();
+    if (e.kind === 'sheet-add') this.stateNewSheetRowHeight(e.index);
+    this.emit(e);
+  }
+
+  /** Announces a non-cell facade write and schedules the recalc it may need. */
+  noteFacadeChange(change: FacadeChange): void {
+    this.assertAlive();
+    for (const fn of [...this.facadeListeners]) {
+      try {
+        fn(change);
+      } catch {
+        // Observers are advisory, as for `emit`.
+      }
+    }
+    if (this.recalcBatchDepth > 0) this.pendingRecalc = true;
+    else this.recalcAuto();
+  }
+
+  /** Subscribes to non-cell facade writes. */
+  subscribeFacadeChanges(fn: (change: FacadeChange) => void): () => void {
+    this.facadeListeners.add(fn);
+    return () => this.facadeListeners.delete(fn);
+  }
+
   subscribe(fn: ChangeListener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -1157,6 +1253,7 @@ export class WorkbookHandle {
     this.storeMirror.attach(null);
     this.disposed = true;
     this.listeners.clear();
+    this.facadeListeners.clear();
     this.wb.dispose();
   }
 

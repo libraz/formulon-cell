@@ -30,6 +30,40 @@ const NEEDS_ENGINE_CODE = 99;
 
 const fail = (code: StatusCode, message: string): FormulonError => new FormulonError(code, message);
 
+/** Keys a host or a test runner probes on any object; they read as absent rather than throwing. */
+const PROBE_KEYS: ReadonlySet<string> = new Set([
+  'then',
+  'toJSON',
+  'constructor',
+  'asymmetricMatch',
+  'nodeType',
+  'tagName',
+]);
+
+/** A stand-in for an engine member the stub lacks: calling it, or reading through it, throws
+ *  `NotImplemented` naming the member. */
+const unavailable = (member: string): unknown => {
+  const raise = (): never => {
+    throw fail(StatusCode.NotImplemented, `${member} unavailable in the stub engine`);
+  };
+  return new Proxy(raise, {
+    get: (target, key) => (typeof key === 'symbol' ? Reflect.get(target, key) : raise()),
+    apply: raise,
+  });
+};
+
+/** Wraps a stub object so a member it does not implement throws `NotImplemented` at the call,
+ *  as the engine would, instead of reading as `undefined`. `in` still reports the real members. */
+const withUnavailableMembers = <T extends object>(target: T): T =>
+  new Proxy(target, {
+    get: (obj, key, receiver) => {
+      if (typeof key === 'symbol' || key in obj || PROBE_KEYS.has(key) || /^[@$]{2}/.test(key)) {
+        return Reflect.get(obj, key, receiver);
+      }
+      return unavailable(key);
+    },
+  });
+
 interface CellStore {
   literal?: Value;
   formula?: string;
@@ -207,7 +241,7 @@ class StubWorkbook {
     if (!data) throw fail(StatusCode.NotFound, `no sheet ${String(ref)}`);
     let handle = this.handles.get(data);
     if (!handle) {
-      handle = new StubSheet(this, data);
+      handle = withUnavailableMembers(new StubSheet(this, data));
       this.handles.set(data, handle);
     }
     return handle as unknown as Sheet;
@@ -506,8 +540,8 @@ const asWorkbook = (wb: StubWorkbook): Workbook => wb as unknown as Workbook;
 
 const stubModule = {
   Workbook: {
-    createDefault: (): Workbook => asWorkbook(new StubWorkbook(['Sheet1'])),
-    createEmpty: (): Workbook => asWorkbook(new StubWorkbook([])),
+    createDefault: (): Workbook => asWorkbook(withUnavailableMembers(new StubWorkbook(['Sheet1']))),
+    createEmpty: (): Workbook => asWorkbook(withUnavailableMembers(new StubWorkbook([]))),
     createForProfile: (): Workbook => {
       // Profile-specific evaluation requires the real engine.
       throw fail(StatusCode.NotImplemented, 'createForProfile unavailable in stub');

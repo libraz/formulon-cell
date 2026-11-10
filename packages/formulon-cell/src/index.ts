@@ -1,4 +1,22 @@
 // Cell renderer registry — `inst.cells.registerFormatter(...)`.
+
+export { type SpreadsheetFailure, spreadsheetFailureOf } from './api/errors.js';
+export type { Disposer } from './api/events.js';
+export {
+  type ChangedCell,
+  type ChangeOrigin,
+  type FileLoss,
+  SAVE_FORMATS,
+  type SaveFormat,
+  type SaveOptions,
+  type SaveResult,
+  Sheet,
+  type SheetRef,
+  Workbook,
+  type WorkbookChange,
+  type WorkbookEvents,
+  type WorkbookOptions,
+} from './api/workbook.js';
 export type { CellFormatterEntry, CellRenderInput } from './cells.js';
 export { CellRegistry } from './cells.js';
 export {

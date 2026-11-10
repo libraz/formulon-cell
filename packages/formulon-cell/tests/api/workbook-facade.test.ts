@@ -101,10 +101,7 @@ describe('stub engine', () => {
     const wb = await Workbook.createDefault({ engine: 'stub' });
     open.push(wb);
     expect(wb.engine).toBe('stub');
-    expectFormulonError(
-      () => wb.sheet(0).addTable({ range: 'A1:B3', name: 'T' }),
-      StatusCode.NotImplemented,
-    );
+    expectFormulonError(() => wb.sheet(0).addMerge('A1:B2'), StatusCode.NotImplemented);
   });
 });
 
