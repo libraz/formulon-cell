@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -25,25 +25,14 @@ export async function runNativeR1C1Scenario(page: Page): Promise<void> {
   await sp.expectNoConsoleErrors();
 }
 
-type NativeProbe = {
-  workbook: {
-    getTheme(): { colors: number[]; fonts: { minorLatin: string } };
-    getThreadedComments(sheet: number): { text: string; done: boolean; parentId: string | null }[];
-    listDrawingObjects(sheet: number): { objectId: number }[];
-    getImage(sheet: number, objectId: number): { bytes: Uint8Array } | null;
-  };
-};
-
 const readNative = (page: Page) =>
   page.evaluate(() => {
-    const instance = (window as Window & { __fcInst: NativeProbe }).__fcInst;
-    const objects = instance.workbook.listDrawingObjects(0);
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const sheet = instance.workbook.sheet(0);
     return {
-      theme: instance.workbook.getTheme(),
-      comments: instance.workbook.getThreadedComments(0),
-      imageSizes: objects.map(
-        (object) => instance.workbook.getImage(0, object.objectId)?.bytes.length ?? 0,
-      ),
+      theme: { fonts: instance.workbook.getThemeFonts() },
+      comments: sheet.listThreadedComments(),
+      imageSizes: sheet.listPictures().map((picture) => picture.getProperties().bytes.length),
     };
   });
 

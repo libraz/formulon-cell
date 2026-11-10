@@ -1,8 +1,4 @@
-import type {
-  ExcelRibbonIconName,
-  RibbonTab,
-  LegacySpreadsheetInstance as SpreadsheetInstance,
-} from '@libraz/formulon-cell';
+import type { ExcelRibbonIconName, RibbonTab, SpreadsheetInstance } from '@libraz/formulon-cell';
 import type { DemoUiStrings } from './demo-strings.js';
 
 /** Commands the Mac Quick Access Toolbar can show, in its customize-menu order. */
@@ -95,7 +91,8 @@ export const demoQuickAccessEnabled = (
   instance: SpreadsheetInstance | null,
 ): boolean => {
   if (id === 'sendWorkbook') return false;
-  if (id === 'undo') return instance?.history.canUndo() ?? false;
+  if (id === 'undo') return instance?.history.canUndo ?? false;
+  if (id === 'redo') return instance?.history.canRepeat ?? false;
   return true;
 };
 
@@ -125,11 +122,11 @@ export const runDemoQuickAccess = (id: DemoQuickAccessId, deps: DemoQuickAccessD
       deps.applyCommand('spellingReview');
       return;
     case 'undo':
-      deps.instance?.undo();
+      deps.instance?.history.undo();
       return;
     case 'redo':
       // The Mac button repeats the last action rather than redoing it.
-      deps.instance?.history.repeatLast();
+      deps.instance?.history.repeat();
       return;
     case 'sortAsc':
       deps.applyCommand('sortAsc');

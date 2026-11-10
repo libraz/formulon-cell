@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** Blank-workbook defaults per platform: canonical row px, workbook font and
@@ -15,8 +16,17 @@ const STARTUP = {
   },
 } as const;
 
+const STARTUP_COLUMN_WIDTHS = {
+  default: { ja: [112, 80, 104, 128], en: [112, 80, 104, 128] },
+  mac: {
+    ja: [116, 248 / 3, 108, 400 / 3],
+    en: [128, 92, 356 / 3, 440 / 3],
+  },
+} as const;
+
 type FontProbeWindow = Window & {
   __fcInst: SpreadsheetInstance;
+  __fcProbes: E2eProbes;
   __startupText: Record<string, { font: string; width: number }>;
   __startupGlyphs: { ch: string; font: string; x: number; y: number; width: number }[];
   __startupFindRun: (text: string) => { font: string; width: number } | undefined;
@@ -83,9 +93,12 @@ export async function runStartupFont(
   const startup = await page.evaluate(() => {
     const probe = window as unknown as FontProbeWindow;
     const instance = probe.__fcInst;
-    const state = instance.store.getState();
+    const state = probe.__fcProbes['mount/internals']
+      .spreadsheetInternals(instance)
+      .store.getState();
     return {
-      font: instance.workbook.workbookDisplayFont,
+      font: probe.__fcProbes['api/workbook'].workbookHandleOf(instance.workbook)
+        .workbookDisplayFont,
       widths: [0, 1, 2, 3].map((col) => state.layout.colWidths.get(col)),
       rowHeight: state.layout.defaultRowHeight,
       draws: Object.fromEntries(
@@ -104,7 +117,8 @@ export async function runStartupFont(
   await expect(page.locator('[data-ribbon-command="fontFamily"] button').first()).toContainText(
     fontName,
   );
-  for (const [col, width] of [112, 80, 104, 128].entries()) {
+  // The demo seeds widths through the Windows column model, so Mac lands on other px values.
+  for (const [col, width] of STARTUP_COLUMN_WIDTHS[platform][locale].entries()) {
     expect(startup.widths[col]).toBeCloseTo(width, 1);
   }
   expect(startup.rowHeight).toBeCloseTo(expected.rowHeight, 4);
@@ -148,7 +162,7 @@ export async function runStartupFont(
     .getByRole('option', { name: nextLocale === 'ja' ? '日本語' : 'English', exact: true })
     .click();
   await expect
-    .poll(() => page.evaluate(() => (window as unknown as FontProbeWindow).__fcInst.locale))
+    .poll(() => page.evaluate(() => (window as unknown as FontProbeWindow).__fcInst.i18n.locale))
     .toBe(nextLocale);
   await options.click();
   await expect(panel).toBeHidden();
@@ -165,9 +179,11 @@ export async function runStartupFont(
   });
   // Changing the UI language keeps authored fonts until a new book is created.
   expect(
-    await page.evaluate(
-      () => (window as unknown as FontProbeWindow).__fcInst.workbook.workbookDisplayFont,
-    ),
+    await page.evaluate(() => {
+      const probe = window as unknown as FontProbeWindow;
+      return probe.__fcProbes['api/workbook'].workbookHandleOf(probe.__fcInst.workbook)
+        .workbookDisplayFont;
+    }),
   ).toEqual(expected.font);
   await page
     .locator(platform === 'mac' ? '.demo__quick .demo__brand-mark' : '[data-ribbon-tab="file"]')
@@ -190,17 +206,18 @@ export async function runStartupFont(
   const replacement = await page.evaluate(() => {
     const probe = window as unknown as FontProbeWindow;
     return {
-      locale: probe.__fcInst.locale,
-      font: probe.__fcInst.workbook.workbookDisplayFont,
+      locale: probe.__fcInst.i18n.locale,
+      font: probe.__fcProbes['api/workbook'].workbookHandleOf(probe.__fcInst.workbook)
+        .workbookDisplayFont,
       disposeCount: probe.__startupDisposeCount,
-      value: probe.__fcInst.workbook.getValue({ sheet: 0, row: 0, col: 0 }),
+      value: probe.__fcInst.workbook.sheet(0).getValue(0, 0),
     };
   });
   expect(replacement).toEqual({
     locale: nextLocale,
     font: STARTUP[platform][nextLocale].font,
     disposeCount: 1,
-    value: { kind: 'blank' },
+    value: null,
   });
   await expect(page.locator('[data-ribbon-select="fontSize"] .fc-tb__rb-dd__value')).toHaveText(
     String(STARTUP[platform][nextLocale].font.size),

@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { a1Address, UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -16,17 +17,20 @@ export async function runR1C1ReferenceTransactions(
   await sheet.expectNoStub();
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.applyChanges([
-      { addr: { sheet: 0, row: 3, col: 3 }, input: '=B2+SUM(B3:C3)+LOG10(100)' },
-      { addr: { sheet: 0, row: 1, col: 1 }, input: '2' },
-      { addr: { sheet: 0, row: 2, col: 1 }, input: '3' },
-      { addr: { sheet: 0, row: 2, col: 2 }, input: '4' },
-    ]);
+    instance.workbook.batch(() => {
+      const sheet = instance.workbook.sheet(0);
+      sheet.setFormula(3, 3, '=B2+SUM(B3:C3)+LOG10(100)');
+      sheet.setNumber(1, 1, 2);
+      sheet.setNumber(2, 1, 3);
+      sheet.setNumber(2, 2, 4);
+    });
+    instance.history.clear();
   });
   await sheet.goTo('D4');
   await page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: true } }));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: true } }));
   });
   const input = page.locator(
     surface === 'inline' ? '.fc-host__editor' : '.fc-host__formulabar-input',
@@ -36,11 +40,11 @@ export async function runR1C1ReferenceTransactions(
   const suffix = '+SUM(R[-1]C[-2]:R[-1]C[-1])+LOG10(100)';
   await expect(input).toHaveValue(`=R[-2]C[-2]${suffix}`);
   const refs = () =>
-    page.evaluate(
-      () =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().ui
-          .editorRefs,
-    );
+    page.evaluate(() => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      return w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState().ui
+        .editorRefs;
+    });
   const expectedRefs = [
     { r0: 1, c0: 1, r1: 1, c1: 1, colorIndex: 0 },
     { r0: 2, c0: 1, r1: 2, c1: 2, colorIndex: 1 },
@@ -67,13 +71,16 @@ export async function runR1C1ReferenceTransactions(
   expect(await sheet.readValue('D4')).toEqual({ kind: 'number', value: 11 });
 
   await page.evaluate((rc5) => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.applyChanges([
-      { addr: rc5, input: '9' },
-      { addr: { sheet: 0, row: 3, col: 4 }, input: '17' },
-      { addr: { sheet: 0, row: 3, col: 5 }, input: '23' },
-    ]);
-    instance.store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: false } }));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    w.__fcInst.workbook.batch(() => {
+      const sheet = w.__fcInst.workbook.sheet(0);
+      sheet.setNumber(rc5.row, rc5.col, 9);
+      sheet.setNumber(3, 4, 17);
+      sheet.setNumber(3, 5, 23);
+    });
+    w.__fcInst.history.clear();
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: false } }));
   }, a1Address('RC5'));
   await sheet.goTo('D4');
   if (surface === 'inline') await page.keyboard.press('F2');
@@ -85,8 +92,9 @@ export async function runR1C1ReferenceTransactions(
 
   await sheet.goTo('D4');
   await page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: true } }));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: true } }));
   });
   if (surface === 'inline') await page.keyboard.press('F2');
   else await input.focus();
@@ -96,13 +104,15 @@ export async function runR1C1ReferenceTransactions(
   expect(await sheet.readValue('D4')).toEqual({ kind: 'number', value: 17 });
 
   await page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: false } }));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: false } }));
   });
   await sheet.goTo('D4:E4');
   await page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: true } }));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: true } }));
   });
   if (surface === 'inline') await page.keyboard.press('F2');
   else await input.focus();
@@ -125,8 +135,9 @@ export async function runFormulaDraftTransactions(
   await sheet.expectNoStub();
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.applyChanges([{ addr: { sheet: 0, row: 0, col: 0 }, input: '=1+2' }]);
-    instance.applyChanges([{ addr: { sheet: 0, row: 0, col: 1 }, input: '6' }], {
+    instance.workbook.batch(() => instance.workbook.sheet(0).setFormula(0, 0, '=1+2'));
+    instance.history.clear();
+    instance.applyChanges([{ sheet: 0, at: { row: 0, col: 1 }, input: '6' }], {
       history: 'record',
     });
   });
@@ -142,12 +153,14 @@ export async function runFormulaDraftTransactions(
   const redo = platform === 'mac' ? 'Meta+Shift+z' : 'Control+y';
   const workbookState = () =>
     page.evaluate(() => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      // The tagged cell value has no facade equivalent; read it from the engine handle.
+      const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
       return {
-        formula: instance.workbook.cellFormula({ sheet: 0, row: 0, col: 0 }),
-        marker: instance.workbook.getValue({ sheet: 0, row: 0, col: 1 }),
-        undo: instance.history.canUndo(),
-        redo: instance.history.canRedo(),
+        formula: handle.cellFormula({ sheet: 0, row: 0, col: 0 }),
+        marker: handle.getValue({ sheet: 0, row: 0, col: 1 }),
+        undo: w.__fcInst.history.canUndo,
+        redo: w.__fcInst.history.canRedo,
       };
     });
   const baseline = await workbookState();
@@ -224,9 +237,12 @@ export async function runFormulaDraftTransactions(
   await page.keyboard.press('Escape');
 
   expect(
-    await page.evaluate(() =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
-    ),
+    await page.evaluate(() => {
+      const { history } = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const available = history.canUndo;
+      history.undo();
+      return available;
+    }),
   ).toBe(true);
   expect(await sheet.readValue('B1')).toEqual({ kind: 'blank' });
   expect(await sheet.readFormula('A1')).toBe('=1+2');

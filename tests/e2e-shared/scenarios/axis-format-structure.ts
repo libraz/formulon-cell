@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -31,15 +32,16 @@ export async function runAxisFormatStructure(
       .poll(() =>
         page.evaluate(
           ({ axis, indices }) => {
-            const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+            const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+            const wb = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
             return indices.map((index) => {
-              const style = instance.workbook.getEffectiveStyle(
+              const style = wb.getEffectiveStyle(
                 0,
                 axis === 'row' ? index : 1048575,
                 axis === 'col' ? index : 16383,
               );
-              const xf = style && instance.workbook.getCellXf(style.xfIndex);
-              return xf && instance.workbook.getFontRecord(xf.fontIndex)?.sizePt;
+              const xf = style && wb.getCellXf(style.xfIndex);
+              return xf && wb.getFontRecord(xf.fontIndex)?.sizePt;
             });
           },
           { axis, indices },
@@ -49,10 +51,12 @@ export async function runAxisFormatStructure(
   };
   const history = async (action: 'undo' | 'redo') => {
     expect(
-      await page.evaluate(
-        (action) => (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst[action](),
-        action,
-      ),
+      await page.evaluate((action) => {
+        const { history } = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+        const available = action === 'undo' ? history.canUndo : history.canRedo;
+        history[action]();
+        return available;
+      }, action),
     ).toBe(true);
   };
   for (const axis of ['row', 'col'] as const) {

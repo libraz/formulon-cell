@@ -1,5 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -22,12 +24,9 @@ export async function runMacSparklineScenario(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
   const read = () =>
     page.evaluate(() => {
-      const inst = (
-        window as unknown as {
-          __fcInst: { store: { getState(): { sparkline: { sparklines: Map<string, unknown> } } } };
-        }
-      ).__fcInst;
-      return inst.store.getState().sparkline.sparklines.get('0:0:4') ?? null;
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      return store.getState().sparkline.sparklines.get('0:0:4') ?? null;
     });
   await expect.poll(read).toMatchObject({ kind: 'line' });
   await page.locator('.fc-host').focus();
@@ -129,15 +128,11 @@ export async function runMacChartKindScenario(page: Page): Promise<void> {
     .locator('[role=menu]:not([hidden]) [data-ribbon-command="mac.insert.chartArea"]')
     .click();
   const kinds = () =>
-    page.evaluate(() =>
-      (
-        window as unknown as {
-          __fcInst: { store: { getState(): { charts: { charts: { kind: string }[] } } } };
-        }
-      ).__fcInst.store
-        .getState()
-        .charts.charts.map((chart) => chart.kind),
-    );
+    page.evaluate(() => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      return store.getState().charts.charts.map((chart) => chart.kind);
+    });
   await expect.poll(kinds).toEqual(['area']);
   // The inserted chart is selected and opens Chart Design, as in the spreadsheet.
   await expect(page.locator('[data-ribbon-tab="chartDesign"]')).toHaveAttribute(
@@ -179,17 +174,11 @@ export async function runMacInsertGalleryScenario(page: Page): Promise<void> {
     await expect(menu).toBeHidden();
   }
   const shapes = () =>
-    page.evaluate(() =>
-      (
-        window as unknown as {
-          __fcInst: {
-            store: { getState(): { illustrations: { illustrations: { shape?: string }[] } } };
-          };
-        }
-      ).__fcInst.store
-        .getState()
-        .illustrations.illustrations.map((item) => item.shape),
-    );
+    page.evaluate(() => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      return store.getState().illustrations.illustrations.map((item) => item.shape);
+    });
   await expect
     .poll(shapes)
     .toEqual(['line', 'rectangle', 'rounded-rectangle', 'oval', 'triangle', 'diamond']);

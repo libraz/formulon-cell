@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runExcelChromeBackstageSearchScenario(page: Page): Promise<void> {
@@ -25,17 +25,13 @@ export async function runExcelChromeBackstageSearchScenario(page: Page): Promise
 
   await page.evaluate(() => {
     const win = window as unknown as {
-      __fcInst?: {
-        print?: (mode?: 'print' | 'pdf') => void;
-        workbook?: {
-          setText?: (addr: { sheet: number; row: number; col: number }, value: string) => void;
-        };
-      };
+      __fcInst?: SpreadsheetInstance;
       __fcPrintModes?: string[];
     };
     win.__fcPrintModes = [];
     if (win.__fcInst) {
-      win.__fcInst.workbook?.setText?.({ sheet: 0, row: 0, col: 0 }, 'Preview Cell');
+      win.__fcInst.workbook.sheet(0).setText(0, 0, 'Preview Cell');
+      win.__fcInst.history.clear();
       win.__fcInst.print = (mode = 'print') => {
         win.__fcPrintModes?.push(mode);
       };
@@ -184,35 +180,19 @@ export async function runExcelChromeCreateTableDialogScenario(page: Page): Promi
   await sp.expectNoStub();
 
   await page.evaluate(() => {
-    const w = window as unknown as {
-      __fcInst?: {
-        workbook?: {
-          setText?: (addr: { sheet: number; row: number; col: number }, value: string) => void;
-          setNumber?: (addr: { sheet: number; row: number; col: number }, value: number) => void;
-        };
-        store?: {
-          setState?: (fn: (state: Record<string, unknown>) => Record<string, unknown>) => void;
-        };
-      };
-    };
-    const inst = w.__fcInst;
-    if (!inst?.workbook || !inst.store?.setState) {
-      throw new Error('window.__fcInst with workbook/store APIs is required');
-    }
-    inst.workbook.setText?.({ sheet: 0, row: 0, col: 0 }, 'Name');
-    inst.workbook.setText?.({ sheet: 0, row: 0, col: 1 }, 'Qty');
-    inst.workbook.setText?.({ sheet: 0, row: 1, col: 0 }, 'Alpha');
-    inst.workbook.setNumber?.({ sheet: 0, row: 1, col: 1 }, 1);
-    inst.workbook.setText?.({ sheet: 0, row: 2, col: 0 }, 'Beta');
-    inst.workbook.setNumber?.({ sheet: 0, row: 2, col: 1 }, 2);
-    inst.store.setState((state) => ({
-      ...state,
-      selection: {
-        ...(state.selection as Record<string, unknown>),
-        active: { sheet: 0, row: 0, col: 0 },
-        range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
-      },
-    }));
+    const inst = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+    if (!inst) throw new Error('window.__fcInst is required');
+    const sheet0 = inst.workbook.sheet(0);
+    inst.workbook.batch(() => {
+      sheet0.setText(0, 0, 'Name');
+      sheet0.setText(0, 1, 'Qty');
+      sheet0.setText(1, 0, 'Alpha');
+      sheet0.setNumber(1, 1, 1);
+      sheet0.setText(2, 0, 'Beta');
+      sheet0.setNumber(2, 1, 2);
+    });
+    inst.history.clear();
+    inst.selection.set('A1:B3');
   });
 
   await page.locator('[data-ribbon-tab="insert"]').click();

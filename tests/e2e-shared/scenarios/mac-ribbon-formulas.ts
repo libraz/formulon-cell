@@ -1,5 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
@@ -19,7 +21,7 @@ export async function runMacEditingPaletteScenario(
     await sp.enter('A1', '9');
     await sp.goTo('A1');
     await page.evaluate(() => {
-      const inst = (window as Window & { __fcInst?: { history: { clear(): void } } }).__fcInst;
+      const inst = (window as Window & { __fcInst?: SpreadsheetInstance }).__fcInst;
       if (!inst) throw new Error('Missing mounted instance.');
       inst.history.clear();
     });
@@ -69,10 +71,9 @@ export async function runMacEditingPaletteScenario(
     await expect.poll(() => sp.readFormula('A1')).toBeNull();
     expect(
       await page.evaluate(() => {
-        const inst = (window as Window & { __fcInst?: { history: { canUndo(): boolean } } })
-          .__fcInst;
+        const inst = (window as Window & { __fcInst?: SpreadsheetInstance }).__fcInst;
         if (!inst) throw new Error('Missing mounted instance.');
-        return inst.history.canUndo();
+        return inst.history.canUndo;
       }),
     ).toBe(false);
     await page.keyboard.press('Meta+Shift+z');
@@ -494,13 +495,9 @@ export async function runMacAuditMenusScenario(page: Page): Promise<void> {
   await sp.clickRibbon('mac.formulas.dependents');
   const traces = () =>
     page.evaluate(() =>
-      (
-        window as unknown as {
-          __fcInst: { store: { getState(): { traces: { items: { kind: string }[] } } } };
-        }
-      ).__fcInst.store
-        .getState()
-        .traces.items.map((item) => item.kind),
+      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.audit
+        .list()
+        .map((arrow) => arrow.kind),
     );
   await expect.poll(traces).toEqual(expect.arrayContaining(['precedent', 'dependent']));
   await sp.clickRibbon('mac.formulas.removeArrows');
@@ -536,17 +533,11 @@ export async function runMacAuditMenusScenario(page: Page): Promise<void> {
   await error.locator('[data-ribbon-command="mac.formulas.errorCheck.ignore"]').click();
   await expect
     .poll(() =>
-      page.evaluate(() =>
-        Array.from(
-          (
-            window as unknown as {
-              __fcInst: {
-                store: { getState(): { errorIndicators: { ignoredErrors: Set<string> } } };
-              };
-            }
-          ).__fcInst.store.getState().errorIndicators.ignoredErrors,
-        ),
-      ),
+      page.evaluate(() => {
+        const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+        const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+        return Array.from(store.getState().errorIndicators.ignoredErrors);
+      }),
     )
     .toContain('0:0:4');
   await sp.goTo('A1');

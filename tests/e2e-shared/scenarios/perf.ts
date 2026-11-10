@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** N03 — a wide multi-cell selection (10k cells) completes within the timeout.
@@ -15,12 +16,7 @@ export async function runWideSelectionPerfScenario(page: Page): Promise<void> {
   await sp.expectNoStub();
 
   type SpreadsheetGlobal = {
-    __fcInst?: {
-      store: {
-        setState: (fn: (s: unknown) => unknown) => void;
-        getState: () => { selection: { range: { c1: number } } };
-      };
-    };
+    __fcInst?: SpreadsheetInstance;
   };
 
   // Set up an exit-early signal so tests in apps without __fcInst still pass.
@@ -37,16 +33,7 @@ export async function runWideSelectionPerfScenario(page: Page): Promise<void> {
     const t0 = performance.now();
     // Programmatically set a wide selection range without going through the
     // canvas — this is what the spreadsheet does internally for Mod+A / Mod+Shift+Arrow.
-    inst.store.setState((s) => {
-      const old = s as Record<string, unknown>;
-      return {
-        ...(old as object),
-        selection: {
-          ...((old as Record<string, unknown>).selection as Record<string, unknown>),
-          range: { sheet: 0, r0: 0, c0: 0, r1: 1000, c1: 9 },
-        },
-      };
-    });
+    inst.selection.set('A1:J1001');
     return performance.now() - t0;
   });
 

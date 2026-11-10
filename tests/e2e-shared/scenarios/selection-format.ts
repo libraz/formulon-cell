@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runSelectionFormat(
@@ -14,22 +14,24 @@ export async function runSelectionFormat(
   await sheet.expectNoStub();
   // New workbooks default to 11 pt on the default profile and 12 pt on Mac.
   const baseSize = platform === 'mac' ? 12 : 11;
-  const seeded = await page.evaluate(() => {
+  await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    return instance.applyChanges([
-      { addr: { sheet: 0, row: 0, col: 0 }, input: 'outside' },
-      { addr: { sheet: 0, row: 0, col: 1 }, input: 'selected' },
-      { addr: { sheet: 0, row: 1, col: 1 }, input: 'hole' },
-    ]).status;
+    const sheet0 = instance.workbook.sheet(0);
+    instance.workbook.batch(() => {
+      sheet0.setText('A1', 'outside');
+      sheet0.setText('B1', 'selected');
+      sheet0.setText('B2', 'hole');
+    });
+    instance.history.clear();
   });
-  expect(seeded).toBe('applied');
   const native = (addresses: [number, number][]) =>
     page.evaluate((addresses) => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
       return addresses.map(([row, col]) => {
-        const style = instance.workbook.getEffectiveStyle(0, row, col);
-        const xf = style && instance.workbook.getCellXf(style.xfIndex);
-        const font = xf && instance.workbook.getFontRecord(xf.fontIndex);
+        const style = handle.getEffectiveStyle(0, row, col);
+        const xf = style && handle.getCellXf(style.xfIndex);
+        const font = xf && handle.getFontRecord(xf.fontIndex);
         return {
           size: font?.sizePt,
           family: font?.name,
@@ -50,12 +52,15 @@ export async function runSelectionFormat(
       String(size),
     );
   };
+  const historyStep = (action: 'undo' | 'redo') =>
+    page.evaluate((action) => {
+      const { history } = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const available = action === 'undo' ? history.canUndo : history.canRedo;
+      history[action]();
+      return available;
+    }, action);
   const undo = async () => {
-    expect(
-      await page.evaluate(() =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
-      ),
-    ).toBe(true);
+    expect(await historyStep('undo')).toBe(true);
   };
   const header = async (
     axis: 'row' | 'col',
@@ -104,11 +109,7 @@ export async function runSelectionFormat(
     ],
     [baseSize, baseSize],
   );
-  expect(
-    await page.evaluate(() =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
-    ),
-  ).toBe(true);
+  expect(await historyStep('redo')).toBe(true);
   await expectSizes([[1048575, 1]], [18]);
   await undo();
 
@@ -306,7 +307,7 @@ export async function runSelectionFormat(
     const { WorkbookHandle } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
       'engine/workbook-handle'
     ];
-    const workbook = await WorkbookHandle.loadBytes(instance.workbook.save());
+    const workbook = await WorkbookHandle.loadBytes(instance.workbook.save().bytes);
     try {
       const addresses: [number, number][] = [
         [0, 1],
@@ -329,11 +330,11 @@ export async function runSelectionFormat(
   ]);
   expect(saved[2]).toMatchObject({ size: baseSize, bold: false });
   expect(
-    await page.evaluate(
-      () =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().format
-          .formats.size,
-    ),
+    await page.evaluate(() => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      return w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState()
+        .format.formats.size;
+    }),
   ).toBeLessThan(100);
   expect(errors.read()).toEqual([]);
 }

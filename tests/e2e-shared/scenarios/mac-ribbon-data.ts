@@ -1,5 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -9,14 +11,9 @@ export async function runMacOutlineDetailScenario(page: Page): Promise<void> {
   await sp.expectNoStub();
   const hidden = () =>
     page.evaluate(() => {
-      const inst = (
-        window as unknown as {
-          __fcInst: {
-            store: { getState(): { layout: { hiddenRows: Set<number>; hiddenCols: Set<number> } } };
-          };
-        }
-      ).__fcInst;
-      const layout = inst.store.getState().layout;
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      const layout = store.getState().layout;
       return { rows: Array.from(layout.hiddenRows), cols: Array.from(layout.hiddenCols) };
     });
   await sp.goTo('A1:A3');
@@ -227,17 +224,11 @@ export async function runMacValidationMenuScenario(page: Page): Promise<void> {
   await sp.clickRibbon('mac.data.validation');
   await menu.locator('[data-ribbon-command="mac.data.validation.circleInvalid"]').click();
   const circles = () =>
-    page.evaluate(() =>
-      Array.from(
-        (
-          window as unknown as {
-            __fcInst: {
-              store: { getState(): { errorIndicators: { validationCircles: Set<string> } } };
-            };
-          }
-        ).__fcInst.store.getState().errorIndicators.validationCircles,
-      ),
-    );
+    page.evaluate(() => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      return Array.from(store.getState().errorIndicators.validationCircles);
+    });
   await expect.poll(circles).toEqual(['0:0:0']);
   await sp.clickRibbon('mac.data.validation');
   await menu.locator('[data-ribbon-command="mac.data.validation.clearCircles"]').click();
@@ -245,18 +236,11 @@ export async function runMacValidationMenuScenario(page: Page): Promise<void> {
   await sp.clickRibbon('mac.data.validation');
   await menu.locator('[data-ribbon-command="mac.data.validation.clearRules"]').click();
   const validation = () =>
-    page.evaluate(
-      () =>
-        (
-          window as unknown as {
-            __fcInst: {
-              store: { getState(): { format: { formats: Map<string, { validation?: unknown }> } } };
-            };
-          }
-        ).__fcInst.store
-          .getState()
-          .format.formats.get('0:0:0')?.validation ?? null,
-    );
+    page.evaluate(() => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      return store.getState().format.formats.get('0:0:0')?.validation ?? null;
+    });
   await expect.poll(validation).toBeNull();
   await page.locator('.fc-host').focus();
   await page.keyboard.press('Meta+z');

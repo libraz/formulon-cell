@@ -1,7 +1,4 @@
-import type {
-  RibbonTab,
-  LegacySpreadsheetInstance as SpreadsheetInstance,
-} from '@libraz/formulon-cell';
+import type { RibbonTab, SpreadsheetInstance } from '@libraz/formulon-cell';
 import {
   type ReactElement,
   type RefObject,
@@ -197,7 +194,7 @@ export const DemoTitleBar = ({
                 className="demo__title-icon"
                 aria-label={ui.undo}
                 title={ui.undo}
-                onClick={() => instance?.undo()}
+                onClick={() => instance?.history.undo()}
               >
                 <DemoIcon name="undo" />
               </button>
@@ -206,7 +203,7 @@ export const DemoTitleBar = ({
                 className="demo__title-icon"
                 aria-label={ui.redo}
                 title={ui.redo}
-                onClick={() => instance?.redo()}
+                onClick={() => instance?.history.redo()}
               >
                 <DemoIcon name="redo" />
               </button>

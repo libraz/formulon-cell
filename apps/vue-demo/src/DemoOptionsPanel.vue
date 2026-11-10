@@ -1,21 +1,20 @@
 <script setup lang="ts">
 import type {
-  CellValue,
   FeatureFlags,
   FeatureId,
-  LegacySpreadsheetInstance,
   SelectionState,
   SpreadsheetInstance,
   ThemeName,
 } from '@libraz/formulon-cell';
 import { useSelection } from '@libraz/formulon-cell-vue';
-import { computed, ref, toRef } from 'vue';
+import { computed, toRef } from 'vue';
 import {
   type ChangeLogEntry,
   type DemoCommandStrings,
   type DemoUiStrings,
+  DEMO_FORMULA_HINTS,
+  demoFormulaHintSignature,
   demoSelectionLabel,
-  evaluateDemoProbe,
   FEATURE_GROUPS,
   isDemoFeatureOn,
   LOCALES,
@@ -43,8 +42,6 @@ const props = defineProps<{
   ui: DemoUiStrings;
   commandText: DemoCommandStrings;
   spreadsheet: SpreadsheetInstance | null;
-  /** The mount behind `spreadsheet`, for the probe helper that still reads it. */
-  legacy: LegacySpreadsheetInstance | null;
   hidden: boolean;
   theme: ThemeName;
   locale: string;
@@ -66,14 +63,8 @@ const emit = defineEmits<{
   formatterChange: [key: 'uppercase' | 'arrows', checked: boolean];
 }>();
 
-const probe = ref<{ name: string; result: string } | null>(null);
 const selection = useSelection(toRef(props, 'spreadsheet'));
 const selectionLabel = computed(() => demoSelectionText(selection.value));
-
-const runProbe = (name: string, args: CellValue[]): void => {
-  if (!props.legacy) return;
-  probe.value = evaluateDemoProbe(props.legacy, name, args);
-};
 </script>
 
 <template>
@@ -185,24 +176,8 @@ const runProbe = (name: string, args: CellValue[]): void => {
       <h2>{{ ui.customFunctions }}</h2>
       <p class="demo__hint">{{ ui.customFunctionsHint }}</p>
       <div class="demo__probe">
-        <button
-          type="button"
-          class="fc-tb__btn fc-tb__btn--ghost"
-          :disabled="!legacy"
-          @click="runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])"
-        >
-          GREET("Workbook")
-        </button>
-        <button
-          type="button"
-          class="fc-tb__btn fc-tb__btn--ghost"
-          :disabled="!legacy"
-          @click="runProbe('FAHRENHEIT', [{ kind: 'number', value: 100 }])"
-        >
-          FAHRENHEIT(100)
-        </button>
-        <p v-if="probe" class="demo__probe-out">
-          → <code>{{ probe.result }}</code>
+        <p v-for="hint in DEMO_FORMULA_HINTS" :key="hint.name" class="demo__probe-out">
+          <code>{{ demoFormulaHintSignature(hint) }}</code> {{ hint.description }}
         </p>
       </div>
     </section>

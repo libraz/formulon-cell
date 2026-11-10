@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runLocaleFormulaScenario(
@@ -9,20 +10,11 @@ export async function runLocaleFormulaScenario(
   const errors = sp.collectConsoleErrors();
   const readCell = (row: number) =>
     page.evaluate((r) => {
-      const instance = (
-        window as unknown as {
-          __fcInst: {
-            workbook: {
-              cellFormula: (addr: { sheet: number; row: number; col: number }) => string | null;
-              getValue: (addr: { sheet: number; row: number; col: number }) => unknown;
-            };
-          };
-        }
-      ).__fcInst;
-      const addr = { sheet: 0, row: r, col: 0 };
+      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const sheet = instance.workbook.sheet(0);
       return {
-        formula: instance.workbook.cellFormula(addr),
-        value: instance.workbook.getValue(addr),
+        formula: sheet.getFormula(r, 0),
+        value: sheet.getValue(r, 0),
       };
     }, row);
 
@@ -33,7 +25,7 @@ export async function runLocaleFormulaScenario(
     await sp.mount({ locale: profile.locale, platform });
     await sp.expectNoStub();
     await sp.typeIntoActiveCell(profile.formula);
-    const expected = { formula: '=SUM(1.5,2)', value: { kind: 'number', value: 3.5 } };
+    const expected = { formula: '=SUM(1.5,2)', value: 3.5 };
     await expect.poll(() => readCell(0)).toEqual(expected);
     await page.keyboard.press('ArrowUp');
     await expect.poll(() => sp.formulaBarValue()).toBe(profile.formula);
@@ -80,14 +72,12 @@ export async function runLocaleFormulaScenario(
       .poll(() => readCell(2))
       .toEqual({
         formula: '=SUM(1.5,3)',
-        value: { kind: 'number', value: 4.5 },
+        value: 4.5,
       });
 
     await page.evaluate(() => {
-      const instance = (
-        window as unknown as { __fcInst: { setLocale: (locale: string) => boolean } }
-      ).__fcInst;
-      if (!instance.setLocale('en')) throw new Error('Locale switch rejected');
+      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      instance.update({ locale: 'en' });
     });
     await expect.poll(() => readCell(0)).toEqual(expected);
     await expect.poll(() => sp.formulaBarValue()).toBe('=SUM(1.5,3)');
@@ -98,7 +88,7 @@ export async function runLocaleFormulaScenario(
   await sp.mount({ locale: 'ja', platform });
   await sp.expectNoStub();
   await sp.typeIntoActiveCell('=YEN(1234.5)');
-  const yen = { formula: '=DOLLAR(1234.5)', value: { kind: 'text', value: '¥1,235' } };
+  const yen = { formula: '=DOLLAR(1234.5)', value: '¥1,235' };
   await expect.poll(() => readCell(0)).toEqual(yen);
   await page.keyboard.press('ArrowUp');
   await expect.poll(() => sp.formulaBarValue()).toBe('=YEN(1234.5)');

@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -21,8 +21,10 @@ export async function runKeyboardMenuLayoutScenario(
     await page.locator('.fc-tb__rb-dd__opt[data-value="24"]').click();
     await sheet.goTo('D8');
     const cell = await page.evaluate(() => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      const state = instance.store.getState();
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const state = w.__fcProbes['mount/internals']
+        .spreadsheetInternals(w.__fcInst)
+        .store.getState();
       const grid = document.querySelector('.fc-host__grid')?.getBoundingClientRect();
       if (!grid) throw new Error('Grid unavailable');
       const { layoutForView, cellRectUnclamped } = (window as unknown as { __fcProbes: E2eProbes })
@@ -60,12 +62,10 @@ export async function runKeyboardMenuLayoutScenario(
     await expect(submenu).toBeHidden();
     await expect(page.locator('.fc-host').first()).toBeFocused();
     expect(
-      await page.evaluate(
-        () =>
-          (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState()
-            .selection.active,
+      await page.evaluate(() =>
+        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
       ),
-    ).toEqual({ sheet: 0, row: 7, col: 3 });
+    ).toMatchObject({ sheet: 0, active: { row: 7, col: 3 } });
 
     await page.keyboard.press('Shift+F10');
     await expect(menu).toBeVisible();
@@ -93,6 +93,7 @@ async function runOwnerDocumentMenuScenario(
 ): Promise<void> {
   await page.evaluate(async () => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const probes = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes;
     const frame = document.createElement('iframe');
     frame.id = 'menu-owner-frame';
     frame.style.cssText =
@@ -121,8 +122,8 @@ async function runOwnerDocumentMenuScenario(
     ];
     const detach = attachContextMenu({
       host,
-      store: instance.store,
-      wb: instance.workbook,
+      store: probes['mount/internals'].spreadsheetInternals(instance).store,
+      wb: probes['api/workbook'].workbookHandleOf(instance.workbook),
       options: {
         mode: 'builtIn',
         transform: () => [
@@ -236,7 +237,7 @@ export async function runPopupFocusScenario(page: Page): Promise<void> {
 
     await openPopup(page, kind);
     await page.evaluate(() => {
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.openFormatDialog();
+      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.dialogs.open('format');
     });
     const dialog = page.locator('.fc-fmtdlg[aria-label="Format Cells"]');
     await expect(menu, `${kind}: a dialog takes focus`).toBeHidden();

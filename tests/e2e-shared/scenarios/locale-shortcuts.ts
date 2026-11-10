@@ -1,6 +1,15 @@
-import type { LegacySpreadsheetInstance as SpreadsheetInstance } from '@libraz/formulon-cell';
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
+
+/** The pending-format slot of the UI state, when the build has one. */
+type PendingFormatUi = {
+  pendingFormat?: {
+    addr: { sheet: number; row: number; col: number };
+    format: { numFmt?: unknown };
+  } | null;
+};
 
 /** Exercise real keyboard events against the language control and grid. */
 export async function runLocaleShortcutsScenario(
@@ -12,8 +21,9 @@ export async function runLocaleShortcutsScenario(
   await sp.mount({ locale: 'en', platform });
   await sp.expectNoStub();
   await page.evaluate(() => {
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.setFeatures({
-      localeSwitcher: true,
+    const inst = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    inst.update({
+      ui: { ...inst.options.ui, features: { ...inst.options.ui?.features, localeSwitcher: true } },
     });
   });
   const select = page.locator('[data-fc-locale-select]');
@@ -21,11 +31,12 @@ export async function runLocaleShortcutsScenario(
 
   const readFormat = () =>
     page.evaluate(() => {
-      const state = (
-        window as unknown as { __fcInst: SpreadsheetInstance }
-      ).__fcInst.store.getState();
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const state = w.__fcProbes['mount/internals']
+        .spreadsheetInternals(w.__fcInst)
+        .store.getState();
       const addr = state.selection.active;
-      const pending = state.ui.pendingFormat;
+      const pending = (state.ui as PendingFormatUi).pendingFormat;
       if (
         pending &&
         pending.addr.sheet === addr.sheet &&
@@ -62,25 +73,27 @@ export async function runLocaleShortcutsScenario(
 
   await select.focus();
   const before = await page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const state = instance.store.getState();
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const instance = w.__fcInst;
+    const state = w.__fcProbes['mount/internals'].spreadsheetInternals(instance).store.getState();
     return {
       active: state.selection.active,
-      pending: state.ui.pendingFormat,
+      pending: (state.ui as PendingFormatUi).pendingFormat,
       formats: [...state.format.formats],
-      sheets: instance.workbook.sheetCount,
+      sheets: instance.workbook.listSheets().length,
     };
   });
   await page.keyboard.press('Control+Shift+4');
   await page.keyboard.press('Shift+F11');
   const after = await page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const state = instance.store.getState();
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const instance = w.__fcInst;
+    const state = w.__fcProbes['mount/internals'].spreadsheetInternals(instance).store.getState();
     return {
       active: state.selection.active,
-      pending: state.ui.pendingFormat,
+      pending: (state.ui as PendingFormatUi).pendingFormat,
       formats: [...state.format.formats],
-      sheets: instance.workbook.sheetCount,
+      sheets: instance.workbook.listSheets().length,
     };
   });
   expect(after).toEqual(before);

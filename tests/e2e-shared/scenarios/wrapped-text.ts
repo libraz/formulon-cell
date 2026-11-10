@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runWrappedText(page: Page): Promise<void> {
@@ -25,7 +25,9 @@ export async function runWrappedText(page: Page): Promise<void> {
         const { computeAutofitRowHeight } = probes['commands/autofit-measurement'];
         const { mutators } = probes['store/store'];
         const { resolveTheme } = probes['theme/resolve'];
-        const font = instance.workbook.workbookDisplayFont;
+        const { store } = probes['mount/internals'].spreadsheetInternals(instance);
+        // The workbook display font has no facade member.
+        const font = probes['api/workbook'].workbookHandleOf(instance.workbook).workbookDisplayFont;
         if (!font) throw new Error('Missing workbook display font');
         const format = {
           wrap: true,
@@ -33,9 +35,10 @@ export async function runWrappedText(page: Page): Promise<void> {
           fontFamily: font.name,
           indent: 1,
         };
-        instance.applyChanges([{ addr: { sheet: 0, row: 0, col: 0 }, input: text }]);
-        mutators.setCellFormat(instance.store, { sheet: 0, row: 0, col: 0 }, format);
-        mutators.setColWidth(instance.store, 0, 80);
+        instance.workbook.batch(() => instance.workbook.sheet(0).setText(0, 0, text));
+        instance.history.clear();
+        mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, format);
+        mutators.setColWidth(store, 0, 80);
         const theme = resolveTheme(instance.host);
         const painted: string[][] = [];
         for (const zoom of [0.5, 1, 2]) {
@@ -61,14 +64,14 @@ export async function runWrappedText(page: Page): Promise<void> {
         }
         const ctx = document.createElement('canvas').getContext('2d');
         if (!ctx) throw new Error('Missing real canvas context');
-        const height = computeAutofitRowHeight(instance.store.getState(), 0, ctx, {
+        const height = computeAutofitRowHeight(store.getState(), 0, ctx, {
           locale,
           theme,
           workbookDisplayFont: font,
         });
         // The cell uses the Normal font, so the row padding is the default
         // height minus one Normal line pitch.
-        const defaultHeight = instance.store.getState().layout.defaultRowHeight;
+        const defaultHeight = store.getState().layout.defaultRowHeight;
         const pitch = Math.round(format.fontSize * 1.28);
         return {
           painted,

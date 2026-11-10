@@ -1,5 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** T03 — freeze pane toggle round-trip.
@@ -7,7 +9,8 @@ import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
  *  Setting and clearing freeze panes is a layout mutation. The visible result
  *  (a thin pane divider on the canvas) is hard to assert from Playwright
  *  without pixel diffing, but the underlying `layout.freezeRows / freezeCols`
- *  state is observable through the demo's `window.__fcInst` exposure.
+ *  state is observable through the demo's `window.__fcInst` exposure and the
+ *  store behind it (`mount/internals` probe).
  *  This scenario drives the imperative API directly so the test is fast and
  *  deterministic, and it asserts that the engine echoes the layout change
  *  back through the workbook hint surface (used by the canvas renderer).
@@ -28,12 +31,12 @@ export async function runFreezePanesScenario(page: Page): Promise<void> {
   const readFreeze = async (): Promise<FreezeProbe> => {
     const probe = await page.evaluate((): FreezeProbe | { ok: false } => {
       const w = window as unknown as {
-        __fcInst?: {
-          store: { getState(): { layout: { freezeRows: number; freezeCols: number } } };
-        };
+        __fcInst?: SpreadsheetInstance;
+        __fcProbes: E2eProbes;
       };
       if (!w.__fcInst) return { ok: false };
-      const layout = w.__fcInst.store.getState().layout;
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      const layout = store.getState().layout;
       return { ok: true, freezeRows: layout.freezeRows, freezeCols: layout.freezeCols };
     });
     expect(probe.ok, 'window.__fcInst is required for this scenario').toBe(true);
@@ -44,22 +47,15 @@ export async function runFreezePanesScenario(page: Page): Promise<void> {
     await page.evaluate(
       ({ rows: r, cols: c }) => {
         const w = window as unknown as {
-          __fcInst?: {
-            store: {
-              setState(
-                reducer: (s: {
-                  layout: { freezeRows: number; freezeCols: number; [k: string]: unknown };
-                  [k: string]: unknown;
-                }) => unknown,
-              ): void;
-            };
-          };
+          __fcInst?: SpreadsheetInstance;
+          __fcProbes: E2eProbes;
         };
         const inst = w.__fcInst;
         if (!inst) throw new Error('no __fcInst');
+        const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(inst);
         // Drive the layout slice directly. The view toolbar / freeze menu does
         // the same thing — we skip them so the scenario stays portable.
-        inst.store.setState((s) => ({
+        store.setState((s) => ({
           ...s,
           layout: { ...s.layout, freezeRows: r, freezeCols: c },
         }));

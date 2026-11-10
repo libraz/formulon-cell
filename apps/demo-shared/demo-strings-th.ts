@@ -81,7 +81,7 @@ export const thUi: DemoUiStrings = {
   uppercaseColumnA: 'ทำให้คอลัมน์ A เป็นตัวพิมพ์ใหญ่',
   arrowPrefixNegatives: 'เติมลูกศรหน้าค่าลบ',
   customFunctions: 'ฟังก์ชันแบบกำหนดเอง',
-  customFunctionsHint: 'ตรวจสอบรีจิสทรีฟังก์ชันฝั่งโฮสต์โดยตรง',
+  customFunctionsHint: 'คำแนะนำสูตรฝั่งโฮสต์สำหรับการเติมอัตโนมัติและตัวช่วยอาร์กิวเมนต์',
   cellChangeLog: 'บันทึกการเปลี่ยนแปลงเซลล์',
   cellChangeLogHint: 'จำลองการแก้ไขเซลล์ลงในบันทึกการสาธิต',
   editCellToSeeEvents: 'แก้ไขเซลล์เพื่อดูสตรีมเหตุการณ์',

@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 export async function runMacHomeMenusScenario(page: Page): Promise<void> {
@@ -79,18 +80,13 @@ export async function runMacHomeMenusScenario(page: Page): Promise<void> {
   await expect(menu).toBeVisible();
   await menu.locator('[data-underline-action="double"]').click();
   const read = () =>
-    page.evaluate(
-      () =>
-        (
-          window as unknown as {
-            __fcInst: {
-              store: { getState(): { format: { formats: Map<string, { underline?: string }> } } };
-            };
-          }
-        ).__fcInst.store
-          .getState()
-          .format.formats.get('0:0:0')?.underline,
-    );
+    page.evaluate(() => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      return w.__fcProbes['mount/internals']
+        .spreadsheetInternals(w.__fcInst)
+        .store.getState()
+        .format.formats.get('0:0:0')?.underline;
+    });
   await expect.poll(read).toBe('double');
   await page.locator('.fc-host').focus();
   await page.keyboard.press('Meta+z');

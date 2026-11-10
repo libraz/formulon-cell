@@ -3,6 +3,7 @@
  * so they run the same against the dev server and a production build.
  * Demo apps only.
  */
+import * as apiWorkbook from '../../packages/formulon-cell/src/api/workbook.js';
 import * as chartsLayout from '../../packages/formulon-cell/src/charts/layout.js';
 import * as commandsAutofitMeasurement from '../../packages/formulon-cell/src/commands/autofit-measurement.js';
 import * as commandsFormatAsTable from '../../packages/formulon-cell/src/commands/format-as-table.js';
@@ -15,6 +16,7 @@ import * as engineWorkbookHandle from '../../packages/formulon-cell/src/engine/w
 import * as interactContextMenu from '../../packages/formulon-cell/src/interact/context-menu.js';
 import * as interactFormulaHelperPosition from '../../packages/formulon-cell/src/interact/formula-helper-position.js';
 import * as interactObjectMenu from '../../packages/formulon-cell/src/interact/object-menu.js';
+import * as mountInternals from '../../packages/formulon-cell/src/mount/internals.js';
 import * as renderGeometry from '../../packages/formulon-cell/src/render/geometry.js';
 import * as renderGridHitState from '../../packages/formulon-cell/src/render/grid/hit-state.js';
 import * as renderPaintersText from '../../packages/formulon-cell/src/render/painters/text.js';
@@ -23,6 +25,7 @@ import * as themeResolve from '../../packages/formulon-cell/src/theme/resolve.js
 import * as demoSharedDemoStrings from './demo-strings.js';
 
 export const e2eProbes = {
+  'api/workbook': apiWorkbook,
   'charts/layout': chartsLayout,
   'commands/autofit-measurement': commandsAutofitMeasurement,
   'commands/format-as-table': commandsFormatAsTable,
@@ -35,6 +38,7 @@ export const e2eProbes = {
   'interact/context-menu': interactContextMenu,
   'interact/formula-helper-position': interactFormulaHelperPosition,
   'interact/object-menu': interactObjectMenu,
+  'mount/internals': mountInternals,
   'render/geometry': renderGeometry,
   'render/grid/hit-state': renderGridHitState,
   'render/painters/text': renderPaintersText,

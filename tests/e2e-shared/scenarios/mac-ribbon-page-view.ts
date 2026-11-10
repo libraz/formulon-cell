@@ -1,5 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -10,16 +12,9 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
   await sp.expectNoStub();
   const read = () =>
     page.evaluate(() => {
-      const inst = (
-        window as unknown as {
-          __fcInst: {
-            store: {
-              getState(): import('../../../packages/formulon-cell/src/store/types.js').State;
-            };
-          };
-        }
-      ).__fcInst;
-      const state = inst.store.getState();
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      const state = store.getState();
       return {
         setup: state.pageSetup.setupBySheet.get(0),
         views: state.sheetViews.views,
@@ -89,19 +84,13 @@ export async function runMacPageAndCalculationScenario(page: Page): Promise<void
   await sp.expectNoStub();
   const read = () =>
     page.evaluate(() => {
-      const inst = (
-        window as unknown as {
-          __fcInst: {
-            store: {
-              getState(): import('../../../packages/formulon-cell/src/store/types.js').State;
-            };
-            workbook: { calcMode(): number };
-          };
-        }
-      ).__fcInst;
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      // The calc mode has no facade member; read it from the engine handle.
+      const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
       return {
-        setup: inst.store.getState().pageSetup.setupBySheet.get(0),
-        mode: inst.workbook.calcMode(),
+        setup: store.getState().pageSetup.setupBySheet.get(0),
+        mode: handle.calcMode(),
       };
     });
   await selectRibbonTab(page, 'pageLayout');
@@ -179,11 +168,8 @@ export async function runMacPageToggleAndZoomScenario(page: Page): Promise<void>
   const zoom = () =>
     page.evaluate(
       () =>
-        (
-          window as unknown as {
-            __fcInst: { store: { getState(): { viewport: { zoom: number } } } };
-          }
-        ).__fcInst.store.getState().viewport.zoom,
+        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.viewport.zoomPercent /
+        100,
     );
   await expect.poll(zoom).toBe(1.5);
   await sp.clickRibbon('mac.view.zoom100');

@@ -1,4 +1,4 @@
-import type { LegacySpreadsheetInstance as SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { SpreadsheetInstance } from '@libraz/formulon-cell';
 import {
   type ReactElement,
   useCallback,
@@ -37,8 +37,8 @@ export const DemoQuickAccess = ({ ui, instance, deps }: DemoQuickAccessProps): R
   const chevronRef = useRef<HTMLButtonElement | null>(null);
   // Re-render when the history changes so Undo enables and disables with it.
   useSyncExternalStore(
-    instance ? (notify) => instance.history.subscribe(notify) : noHistory,
-    () => instance?.history.canUndo() ?? false,
+    instance ? (notify) => instance.history.on('change', notify) : noHistory,
+    () => instance?.history.canUndo ?? false,
   );
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);

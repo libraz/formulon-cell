@@ -1,10 +1,10 @@
 import { expect, type Page } from '@playwright/test';
 
-import type { WorkbookHandle } from '../../../packages/formulon-cell/src/engine/workbook-handle.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
-type DemoWindow = Window & { __fcInst?: SpreadsheetInstance };
+type DemoWindow = Window & { __fcInst?: SpreadsheetInstance; __fcProbes?: E2eProbes };
 
 export async function runExcelDataBarAppearanceScenario(
   page: Page,
@@ -19,8 +19,11 @@ export async function runExcelDataBarAppearanceScenario(
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const wb = (window as DemoWindow).__fcInst?.workbook;
-        return [0, 1].map((row) => wb?.getValue({ sheet: 0, row, col: 0 }));
+        const w = window as DemoWindow;
+        if (!w.__fcInst || !w.__fcProbes) return [];
+        // The tagged cell value has no facade equivalent; read it from the engine handle.
+        const wb = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+        return [0, 1].map((row) => wb.getValue({ sheet: 0, row, col: 0 }));
       }),
     )
     .toEqual([
@@ -115,7 +118,8 @@ async function openRule(page: Page, kind: 'data-bar' | 'icon-set', edit = false)
     ({ kind: ruleKind, edit: isEdit }) => {
       const inst = (window as DemoWindow).__fcInst;
       if (!inst) throw new Error('Spreadsheet instance unavailable');
-      inst.openConditionalDialog(
+      inst.dialogs.open(
+        'conditional',
         isEdit ? { mode: 'edit', editIndex: 0 } : { mode: 'new', kind: ruleKind },
       );
     },
@@ -126,27 +130,33 @@ async function openRule(page: Page, kind: 'data-bar' | 'icon-set', edit = false)
 
 async function readRules(page: Page) {
   return page.evaluate(() => {
-    const inst = (window as DemoWindow).__fcInst;
-    if (!inst) throw new Error('Spreadsheet instance unavailable');
-    return inst.store.getState().conditional.rules;
+    const w = window as DemoWindow;
+    if (!w.__fcInst || !w.__fcProbes) throw new Error('Spreadsheet instance unavailable');
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    return store.getState().conditional.rules;
   });
 }
 
 async function saveAndReload(page: Page): Promise<void> {
   await expect
     .poll(() =>
-      page.evaluate(
-        () => (window as DemoWindow).__fcInst?.workbook.getConditionalFormats(0).length,
-      ),
+      page.evaluate(() => {
+        const w = window as DemoWindow;
+        if (!w.__fcInst || !w.__fcProbes) return undefined;
+        // Conditional formats are read through the engine handle.
+        return w.__fcProbes['api/workbook']
+          .workbookHandleOf(w.__fcInst.workbook)
+          .getConditionalFormats(0).length;
+      }),
     )
     .toBe(1);
   await page.evaluate(async () => {
-    const inst = (window as DemoWindow).__fcInst;
-    if (!inst) throw new Error('Spreadsheet instance unavailable');
-    const ctor = inst.workbook.constructor as typeof WorkbookHandle;
-    const next = await ctor.loadBytes(inst.workbook.save());
-    if (next.isStub) throw new Error('Reload must use the real WASM engine');
-    await inst.setWorkbook(next);
+    const w = window as DemoWindow;
+    if (!w.__fcInst || !w.__fcProbes) throw new Error('Spreadsheet instance unavailable');
+    const { Workbook } = w.__fcProbes['api/workbook'];
+    const next = await Workbook.load(w.__fcInst.workbook.save().bytes);
+    if (next.engine !== 'wasm') throw new Error('Reload must use the real WASM engine');
+    w.__fcInst.update({ workbook: next });
   });
 }
 
@@ -155,7 +165,7 @@ async function expectOneManagedRule(page: Page): Promise<void> {
   await page.evaluate(() => {
     const inst = (window as DemoWindow).__fcInst;
     if (!inst) throw new Error('Spreadsheet instance unavailable');
-    inst.openCfRulesDialog();
+    inst.dialogs.open('cfRules');
   });
   const manager = page.locator('.fc-cfrulesdlg');
   await expect(manager).toBeVisible();

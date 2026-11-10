@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import {
-  type CellChangeEvent,
+  type CellEvent,
   type FeatureFlags,
   type FeatureId,
   type HostProviders,
-  type LegacySpreadsheetInstance,
   type LocaleChangeEvent,
   parseScriptCommand,
   type ScriptCommand,
   type SpreadsheetInstance,
   type ThemeName,
-  WorkbookHandle,
+  Workbook,
 } from '@libraz/formulon-cell';
 import type { RibbonHooks, RibbonTab, Toolbar } from '@libraz/formulon-cell/toolbar';
 import { Spreadsheet, SpreadsheetToolbar } from '@libraz/formulon-cell-vue';
@@ -22,8 +21,6 @@ import {
   shallowRef,
   watch,
 } from 'vue';
-import { legacyInstanceOf } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
-import { workbookOf } from '../../../packages/formulon-cell/src/api/workbook.js';
 import {
   buildDemoCommands,
   buildDemoReviewDialog,
@@ -32,7 +29,7 @@ import {
   composeDemoUiOptions,
   createDemoStrings,
   createInitialDemoWorkbook,
-  DEMO_FUNCTIONS,
+  DEMO_FORMULA_HINTS,
   demoFunctionArgumentHelp,
   DEMO_MAC_RIBBON_TABS,
   DEMO_PRINTER_PROFILE_ID,
@@ -77,12 +74,11 @@ const UI = createDemoStrings('Vue');
 const f6ToolbarOf = (toolbar: Toolbar | null, host: HTMLElement | null): DemoF6Toolbar | null =>
   host ? { host, focusActiveTab: () => toolbar?.focusActiveTab() ?? false } : null;
 
-/** Shows `handle` in `live`. Settles on the instance's `workbook` event for it, or rejects with the
+/** Shows `next` in `live`. Settles on the instance's `workbook` event for it, or rejects with the
  *  swap's synchronous refusal or its `error` event. */
-const swapWorkbook = (live: SpreadsheetInstance, handle: WorkbookHandle): Promise<void> =>
+const swapWorkbook = (live: SpreadsheetInstance, next: Workbook): Promise<void> =>
   new Promise<void>((resolve, reject) => {
-    const facade = workbookOf(handle);
-    if (live.workbook === facade) {
+    if (live.workbook === next) {
       resolve();
       return;
     }
@@ -93,7 +89,7 @@ const swapWorkbook = (live: SpreadsheetInstance, handle: WorkbookHandle): Promis
     };
     offs.push(
       live.on('workbook', (event) => {
-        if (event.workbook === facade) settle(resolve);
+        if (event.workbook === next) settle(resolve);
       }),
       // `workbook` is the source the instance reports a refused workbook swap under.
       live.on('error', (event) => {
@@ -101,7 +97,7 @@ const swapWorkbook = (live: SpreadsheetInstance, handle: WorkbookHandle): Promis
       }),
     );
     try {
-      live.update({ workbook: facade });
+      live.update({ workbook: next });
     } catch (error) {
       settle(() => reject(error));
     }
@@ -112,7 +108,7 @@ let disposeF6Navigation: (() => void) | undefined;
 const theme = ref<ThemeName>('paper');
 const locale = ref<DemoLocale>(resolveInitialLocale());
 const platform = ref<DemoPlatform>(resolveInitialPlatform());
-const workbook = shallowRef<WorkbookHandle | null>(null);
+const workbook = shallowRef<Workbook | null>(null);
 // Vue's reactive proxy walks deeply by default; the spreadsheet instance
 // holds a canvas + many internal refs that should not be reactivified.
 const instance = shallowRef<SpreadsheetInstance | null>(null);
@@ -134,7 +130,7 @@ const reviewDialog = ref<DemoReviewDialogState | null>(null);
 const scriptOpen = ref(false);
 const uploadStatus = ref<'saved' | 'saving' | 'error' | null>(null);
 let demoAlive = true;
-let workbookOwner: WorkbookHandle | null = null;
+let workbookOwner: Workbook | null = null;
 
 const resolvedUi = computed(() =>
   composeDemoUiOptions({
@@ -150,12 +146,6 @@ const ribbonTabs = computed(() =>
 const features = computed<FeatureFlags>(() => resolvedUi.value.features);
 const ui = computed(() => demoUiStringsForLocale(UI, locale.value));
 const commandText = computed(() => demoCommandText(locale.value));
-// The demo-shared helpers and the E2E hook still drive the mount behind the public instance.
-const legacy = computed<LegacySpreadsheetInstance | null>(() =>
-  instance.value ? legacyInstanceOf(instance.value) : null,
-);
-// The demo keeps owning the engine handle; the facade leaves its disposal to the demo.
-const workbookFacade = computed(() => (workbook.value ? workbookOf(workbook.value) : null));
 const host = computed<HostProviders>(() => {
   const name = bookName.value;
   return {
@@ -192,35 +182,27 @@ void createInitialDemoWorkbook()
     loadError.value = formatLoadError(err);
   });
 
-const onCellChange = (e: CellChangeEvent): void => {
-  log.value = pushDemoChangeLog(log.value, demoChangeLogEntry(e));
+const onCellChange = (live: SpreadsheetInstance, e: CellEvent): void => {
+  log.value = pushDemoChangeLog(log.value, demoChangeLogEntry(live.workbook, e));
 };
 
 watch(
-  legacy,
+  instance,
   (target, _o, onCleanup) => {
     if (!target) return;
-    const disposers = DEMO_FUNCTIONS.map((f) => target.formula.register(f.name, f.impl, f.meta));
-    disposers.push(target.on('cellChange', onCellChange));
-    onCleanup(() => {
-      for (const d of disposers) d();
-    });
+    onCleanup(target.on('cell', (e) => onCellChange(target, e)));
   },
   { immediate: true },
 );
 
 watch(
-  [legacy, () => formatters.value.uppercase, () => formatters.value.arrows],
+  [instance, () => formatters.value.uppercase, () => formatters.value.arrows],
   (_n, _o, onCleanup) => {
-    const target = legacy.value;
+    const target = instance.value;
     if (!target) return;
     const disposers: (() => void)[] = [];
-    if (formatters.value.uppercase) {
-      disposers.push(target.cells.registerFormatter(FORMATTERS.uppercaseA));
-    }
-    if (formatters.value.arrows) {
-      disposers.push(target.cells.registerFormatter(FORMATTERS.arrowNegatives));
-    }
+    if (formatters.value.uppercase) disposers.push(target.cells.add(FORMATTERS.uppercaseA));
+    if (formatters.value.arrows) disposers.push(target.cells.add(FORMATTERS.arrowNegatives));
     onCleanup(() => {
       for (const d of disposers) d();
     });
@@ -231,9 +213,9 @@ watch(
 // Expose the live instance on `window.__fcInst` so cross-demo E2E scenarios
 // can drive imperative paths without depending on demo-specific UI.
 watch(
-  legacy,
+  instance,
   (target) => {
-    (window as unknown as { __fcInst?: LegacySpreadsheetInstance | null }).__fcInst = target;
+    (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst = target;
   },
   { immediate: true },
 );
@@ -243,16 +225,19 @@ const onReady = (inst: SpreadsheetInstance): void => {
 };
 
 const onSpellingReview = (): void => {
-  const inst = legacy.value;
+  const inst = instance.value;
   if (!inst) return;
   reviewDialog.value = buildDemoReviewFindings('spelling', inst, locale.value, commandText.value);
 };
 
 const onAccessibilityCheck = (): void => {
-  const inst = legacy.value;
+  const inst = instance.value;
   if (!inst) return;
   // The Mac host docks its own checker; other platforms keep the review list.
-  if (inst.openAccessibilityChecker()) return;
+  if (platform.value === 'mac' && inst.dialogs.canOpen('accessibilityChecker')) {
+    inst.dialogs.open('accessibilityChecker');
+    return;
+  }
   reviewDialog.value = buildDemoReviewFindings(
     'accessibility',
     inst,
@@ -299,7 +284,7 @@ const ribbonHooks = computed<RibbonHooks>(() => {
 });
 
 const applyParsedScript = (command: ReturnType<typeof parseScriptCommand>): void => {
-  const inst = legacy.value;
+  const inst = instance.value;
   if (!inst || !command) return;
   reviewDialog.value = reportDemoScriptRun(inst, command, commandText.value);
 };
@@ -320,7 +305,7 @@ onBeforeUnmount(() => {
 });
 
 const demoSaveOptions = () => ({
-  instance: legacy.value,
+  instance: instance.value,
   bookName: bookName.value,
   setUploadStatus: (next: DemoUploadStatus) => {
     uploadStatus.value = next;
@@ -340,7 +325,7 @@ const onSpreadsheetError = (error: unknown): void => {
 };
 
 const onNewWorkbook = async (): Promise<void> => {
-  const wb = await WorkbookHandle.createDefault({ locale: locale.value, platform: platform.value });
+  const wb = await Workbook.createDefault({ locale: locale.value, platform: platform.value });
   if (!demoAlive) {
     wb.dispose();
     return;
@@ -380,7 +365,7 @@ const runBackstageAction = (action: DemoBackstageAction): void => {
   }
   runDemoBackstageAction({
     action,
-    instance: legacy.value,
+    instance: instance.value,
     ui: ui.value,
     newWorkbook: onNewWorkbook,
     openWorkbook: () => fileInput.value?.click(),
@@ -404,24 +389,29 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
   if (!file) return;
   target.value = '';
   const live = instance.value;
-  const mounted = legacy.value;
-  if (!live || !mounted || !demoAlive) return;
+  if (!live || !demoAlive) return;
   const previous = workbookOwner;
+  let opened: Workbook | null = null;
   try {
-    const name = await openDemoWorkbookFile(mounted, file);
-    if (!demoAlive || instance.value !== live) return;
-    // The helper swapped the workbook on the mount; bring the public instance to the same one.
-    const next = mounted.workbook;
+    const { workbook: next, name } = await openDemoWorkbookFile(file);
+    opened = next;
+    if (!demoAlive || instance.value !== live) {
+      next.dispose();
+      return;
+    }
     await swapWorkbook(live, next);
-    if (!demoAlive) return;
+    if (!demoAlive) {
+      next.dispose();
+      return;
+    }
     workbookOwner = next;
     workbook.value = next;
-    // The helper has detached the previous workbook before resolving. Release
-    // the app-owned borrowed handle only after that successful handoff.
+    // The instance no longer shows the previous workbook; release the one the demo owned.
     previous?.dispose();
     bookName.value = name;
     loadError.value = null;
   } catch (err) {
+    opened?.dispose();
     if (!demoAlive) return;
     reviewDialog.value = buildDemoReviewDialog(
       commandText.value.openFailed,
@@ -462,7 +452,7 @@ const onCoreLocaleChange = (event: LocaleChangeEvent): void => {
 const commands = computed(() =>
   buildDemoCommands({
     commandText: commandText.value,
-    instance: legacy.value,
+    instance: instance.value,
     openWorkbook: () => fileInput.value?.click(),
     saveWorkbook: onSave,
     setRibbonTab: (tab) => {
@@ -514,15 +504,13 @@ onMounted(() => {
   disposeF6Navigation = installDemoF6Navigation({
     getQuickAccess: () => titleBar.value?.quickAccess ?? null,
     getToolbar: () => f6ToolbarOf(toolbar.value, ribbonHost.value),
-    getInstance: () => legacy.value,
+    getInstance: () => instance.value,
   });
 });
 
 onBeforeUnmount(() => {
   demoAlive = false;
-  // The binding borrows the initial workbook. Dispose the core instance first
-  // so a workbook adopted during a New action is released by core, then close
-  // the app-owned borrowed handle as well.
+  // Dispose the instance first, then the workbook the demo owns.
   try {
     instance.value?.dispose();
   } catch (error) {
@@ -534,7 +522,7 @@ onBeforeUnmount(() => {
   }
   disposeF6Navigation?.();
   disposeF6Navigation = undefined;
-  delete (window as unknown as { __fcInst?: LegacySpreadsheetInstance | null }).__fcInst;
+  delete (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst;
 });
 </script>
 
@@ -553,7 +541,7 @@ onBeforeUnmount(() => {
       :ui="ui"
       :platform="platform"
       :book-name="bookName"
-      :instance="legacy"
+      :instance="instance"
       :show-panel="showPanel"
       :search-items="searchItems"
       :apply-command="applyToolbarCommand"
@@ -581,7 +569,8 @@ onBeforeUnmount(() => {
         <Spreadsheet
           class="demo__sheet"
           :ui="resolvedUi"
-          :workbook="workbookFacade ?? undefined"
+          :workbook="workbook ?? undefined"
+          :formula-hints="DEMO_FORMULA_HINTS"
           :theme="theme"
           :locale="locale"
           :host="host"
@@ -594,7 +583,7 @@ onBeforeUnmount(() => {
         <DemoBackstage
           v-if="ribbonTab === 'file'"
           :ui="ui"
-          :instance="legacy"
+          :instance="instance"
           :book-name="bookName"
           :action="backstageAction"
           @action="runBackstageAction"
@@ -604,7 +593,6 @@ onBeforeUnmount(() => {
         :ui="ui"
         :command-text="commandText"
         :spreadsheet="instance"
-        :legacy="legacy"
         :hidden="!showPanel"
         :theme="theme"
         :locale="locale"

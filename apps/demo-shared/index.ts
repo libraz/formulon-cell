@@ -14,38 +14,38 @@
  */
 
 import type {
-  CellChangeEvent,
-  CellRenderInput,
-  CellValue,
+  CellChange,
+  CellEvent,
+  CellFormatter,
   FeatureFlags,
   FeatureId,
+  FormulaHint,
   ReviewCell,
   RibbonTab,
   ScriptCommand,
-  LegacySpreadsheetInstance as SpreadsheetInstance,
+  Sheet,
+  SpreadsheetInstance,
   ThemeName,
   WorkbookSaveFormat,
 } from '@libraz/formulon-cell';
 import {
   analyzeAccessibilityCells,
   analyzeSpellingCells,
-  applyTextScriptToRange,
-  chooseWorkbookSaveFormat,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   isFeatureDefaultOff,
-  mutators,
   parseScriptCommand,
   presets,
   resolveSpreadsheetPlatform,
   resolveSpreadsheetUiOptions,
-  saveWorkbookWithPrompts,
   WORKBOOK_SAVE_FORMATS,
-  WorkbookHandle,
+  Workbook,
 } from '@libraz/formulon-cell';
+import { saveWithPrompts } from '@libraz/formulon-cell/toolbar';
 import { nextDemoSearchIndex } from './demo-search.js';
 import type { DemoCommandStrings, DemoStrings, DemoUiStrings } from './demo-strings.js';
 
+export * from './demo-actions.js';
 export * from './demo-backstage.js';
 export * from './demo-document-menu.js';
 export * from './demo-function-help.js';
@@ -100,7 +100,7 @@ export const resolveInitialPlatform = (
 export type DemoUploadStatus = 'saved' | 'saving' | 'error' | null;
 
 export interface SaveDemoWorkbookOptions {
-  instance: Pick<SpreadsheetInstance, 'workbook' | 'host' | 'i18n'> | null;
+  instance: SpreadsheetInstance | null;
   bookName: string;
   setUploadStatus: (status: DemoUploadStatus) => void;
   format?: WorkbookSaveFormat;
@@ -109,13 +109,13 @@ export interface SaveDemoWorkbookOptions {
   setTimeoutFn?: (handler: () => void, timeout: number) => unknown;
 }
 
-/** Write the workbook, warn before a file that leaves content out, and
- *  download it with the extension of the chosen format. */
-export const saveDemoWorkbookToDownload = async ({
+/** Writes the workbook (asking for the file type first when `format` is omitted), warns before a
+ *  file that leaves content out, and downloads it with the extension of the chosen format. */
+const downloadDemoWorkbook = async ({
   instance,
   bookName,
   setUploadStatus,
-  format = 'xlsx',
+  format,
   documentRef = globalThis.document,
   urlApi = globalThis.URL,
   setTimeoutFn = globalThis.setTimeout.bind(globalThis),
@@ -123,12 +123,7 @@ export const saveDemoWorkbookToDownload = async ({
   if (!instance) return;
   setUploadStatus('saving');
   try {
-    const outcome = await saveWorkbookWithPrompts({
-      wb: instance.workbook,
-      strings: instance.i18n.strings,
-      format,
-      host: instance.host,
-    });
+    const outcome = await saveWithPrompts(instance, { format });
     if (!outcome) {
       setUploadStatus(null);
       return;
@@ -149,18 +144,14 @@ export const saveDemoWorkbookToDownload = async ({
   }
 };
 
+/** Save: writes the file type `format` (xlsx by default). */
+export const saveDemoWorkbookToDownload = (opts: SaveDemoWorkbookOptions): Promise<void> =>
+  downloadDemoWorkbook({ ...opts, format: opts.format ?? 'xlsx' });
+
 /** Save As: ask for the file type first, then save like Save. */
-export const saveDemoWorkbookAsToDownload = async (
+export const saveDemoWorkbookAsToDownload = (
   opts: Omit<SaveDemoWorkbookOptions, 'format'>,
-): Promise<void> => {
-  if (!opts.instance) return;
-  const format = await chooseWorkbookSaveFormat(
-    opts.instance.workbook,
-    opts.instance.i18n.strings,
-    opts.instance.host,
-  );
-  if (format) await saveDemoWorkbookToDownload({ ...opts, format });
-};
+): Promise<void> => downloadDemoWorkbook(opts);
 
 export type DemoIconName = 'app' | 'save' | 'undo' | 'redo' | 'search';
 
@@ -437,47 +428,36 @@ export const FEATURE_GROUPS: {
 export const formatLoadError = (err: unknown): string =>
   err instanceof Error ? err.message : String(err);
 
-/** Sample user-defined functions registered into both demos so testers can
- *  verify host function injection without re-deriving the boilerplate. */
-export const DEMO_FUNCTIONS = [
-  {
-    name: 'GREET',
-    impl: (...args: CellValue[]) => {
-      const v = args[0];
-      const who = v?.kind === 'text' ? v.value : 'World';
-      return `Hello, ${who}!`;
-    },
-    meta: { description: 'Friendly greeting', args: ['name'], returnType: 'text' as const },
-  },
-  {
-    name: 'FAHRENHEIT',
-    impl: (...args: CellValue[]) => {
-      const v = args[0];
-      const c = v?.kind === 'number' ? v.value : Number.NaN;
-      return Number.isFinite(c) ? c * 1.8 + 32 : null;
-    },
-    meta: {
-      description: 'Celsius to Fahrenheit',
-      args: ['celsius'],
-      returnType: 'number' as const,
-    },
-  },
+/** Sample formula hints for the host-defined function names `GREET` and `FAHRENHEIT`. They feed
+ *  autocomplete and the argument helper only; the calculator does not evaluate them. */
+export const DEMO_FORMULA_HINTS: readonly FormulaHint[] = [
+  { name: 'GREET', args: ['name'], description: 'Friendly greeting' },
+  { name: 'FAHRENHEIT', args: ['celsius'], description: 'Celsius to Fahrenheit' },
 ];
+
+/** Signature text of a hint, e.g. `GREET(name)`. */
+export const demoFormulaHintSignature = (hint: FormulaHint): string =>
+  `${hint.name}(${(hint.args ?? []).join(', ')})`;
+
+/** `kind` tags of a cell `Value` the demo reads or writes. */
+const POINTS_PER_CSS_PX = 0.75;
+
+const VALUE_KIND = { blank: 0, number: 1, text: 3 } as const;
 
 /** Custom cell formatters demonstrating the formatter registry. */
 export const FORMATTERS = {
   uppercaseA: {
     id: 'demo:uppercaseA',
-    match: (i: CellRenderInput) => i.addr.col === 0 && i.value.kind === 'text',
-    format: (i: CellRenderInput) => (i.value.kind === 'text' ? i.value.value.toUpperCase() : null),
+    match: (i) => i.at.col === 0 && i.value.kind === VALUE_KIND.text,
+    format: (i) => (i.value.kind === VALUE_KIND.text ? i.value.text.toUpperCase() : null),
   },
   arrowNegatives: {
     id: 'demo:arrowNegatives',
-    match: (i: CellRenderInput) => i.value.kind === 'number' && i.value.value < 0,
-    format: (i: CellRenderInput) =>
-      i.value.kind === 'number' ? `↓ ${Math.abs(i.value.value).toFixed(2)}` : null,
+    match: (i) => i.value.kind === VALUE_KIND.number && i.value.number < 0,
+    format: (i) =>
+      i.value.kind === VALUE_KIND.number ? `↓ ${Math.abs(i.value.number).toFixed(2)}` : null,
   },
-};
+} satisfies Record<string, CellFormatter>;
 
 // ─── Demo runtime helpers ──────────────────────────────────────────────
 // These were previously duplicated byte-for-byte between react-demo and
@@ -555,40 +535,39 @@ export const activateDemoModal = (root: HTMLElement, onClose: () => void): (() =
   };
 };
 
-/** Formats a cell change event for the demo's change log (favours the
- *  raw formula text when present so users see what they typed). */
-export const previewCellChange = (e: CellChangeEvent): string => {
-  if (e.formula) return e.formula;
-  switch (e.value.kind) {
+/** Formats a cell change for the demo's change log (favours the formula text
+ *  when present so users see what they typed). */
+export const previewCellChange = (workbook: Workbook, e: CellEvent): string => {
+  const sheet = workbook.sheet(e.sheet);
+  const formula = sheet.getFormula(e.at.row, e.at.col);
+  if (formula) return formula;
+  const value = sheet.getValue(e.at.row, e.at.col);
+  if (value === null) return '∅';
+  switch (typeof value) {
     case 'number':
-      return String(e.value.value);
-    case 'text':
-      return JSON.stringify(e.value.value);
-    case 'bool':
-      return String(e.value.value);
-    case 'error':
-      return `#${e.value.code}`;
-    case 'blank':
-      return '∅';
+    case 'boolean':
+      return String(value);
+    case 'string':
+      return JSON.stringify(value);
     default:
-      return '?';
+      return Array.isArray(value) ? '?' : String(value);
   }
 };
 
 /** Demo seed — only runs once on the initial blank workbook. Core gates
  *  `seed` on `ownsWb`, so re-mounts and Open xlsx don't re-trigger it. */
-export const seedDemoWorkbook = (wb: WorkbookHandle): void => {
+export const seedDemoWorkbook = (wb: Workbook): void => {
   // One recalc for the whole seed instead of one per written cell.
-  wb.withBatchedRecalc(() => {
-    seedRows(wb);
+  wb.batch(() => {
+    seedRows(wb.sheet(0));
   });
 };
 
-const seedRows = (wb: WorkbookHandle): void => {
-  wb.setText({ sheet: 0, row: 0, col: 0 }, 'item');
-  wb.setText({ sheet: 0, row: 0, col: 1 }, 'celsius');
-  wb.setText({ sheet: 0, row: 0, col: 2 }, 'fahrenheit');
-  wb.setText({ sheet: 0, row: 0, col: 3 }, 'greeting');
+const seedRows = (sheet: Sheet): void => {
+  sheet.setText(0, 0, 'item');
+  sheet.setText(0, 1, 'celsius');
+  sheet.setText(0, 2, 'fahrenheit');
+  sheet.setText(0, 3, 'greeting');
   const rows: [string, number][] = [
     ['London', 8],
     ['Tokyo', 22],
@@ -597,68 +576,63 @@ const seedRows = (wb: WorkbookHandle): void => {
   ];
   rows.forEach(([city, c], i) => {
     const r = i + 1;
-    wb.setText({ sheet: 0, row: r, col: 0 }, city);
-    wb.setNumber({ sheet: 0, row: r, col: 1 }, c);
-    wb.setFormula({ sheet: 0, row: r, col: 2 }, `=B${r + 1}*1.8+32`);
-    wb.setFormula({ sheet: 0, row: r, col: 3 }, `=A${r + 1}&" ☼"`);
+    sheet.setText(r, 0, city);
+    sheet.setNumber(r, 1, c);
+    sheet.setFormula(r, 2, `=B${r + 1}*1.8+32`);
+    sheet.setFormula(r, 3, `=A${r + 1}&" ☼"`);
   });
 };
 
 /** Projects a workbook's cells for the demo review dialog. */
-export const reviewCellsForInstance = (inst: SpreadsheetInstance): ReviewCell[] => {
-  const sheet = inst.store.getState().data.sheetIndex;
-  return Array.from(inst.workbook.cells(sheet), (entry) => ({
-    label: `${demoColLabel(entry.addr.col)}${entry.addr.row + 1}`,
-    value:
-      entry.value.kind === 'text'
-        ? { kind: 'text' as const, value: entry.value.value }
-        : entry.value.kind === 'error'
-          ? { kind: 'error' as const, text: entry.value.text }
-          : entry.value.kind === 'number'
-            ? { kind: 'number' as const }
-            : entry.value.kind === 'bool'
-              ? { kind: 'bool' as const }
-              : { kind: 'blank' as const },
-    formula: entry.formula,
-  }));
-};
+export const reviewCellsForInstance = (inst: SpreadsheetInstance): ReviewCell[] =>
+  inst.workbook
+    .sheet(inst.selection.get().sheet)
+    .listCells()
+    .map((cell) => ({
+      label: `${demoColLabel(cell.col)}${cell.row + 1}`,
+      value:
+        cell.value === null
+          ? { kind: 'blank' as const }
+          : typeof cell.value === 'string'
+            ? { kind: 'text' as const, value: cell.value }
+            : typeof cell.value === 'number'
+              ? { kind: 'number' as const }
+              : typeof cell.value === 'boolean'
+                ? { kind: 'bool' as const }
+                : { kind: 'error' as const, text: String(cell.value) },
+      formula: cell.formula,
+    }));
 
-/** Creates the demo's initial workbook. Core only auto-seeds when it owns the
+/** Creates the demo's initial workbook; the caller owns it. Core only auto-seeds when it owns the
  *  workbook, so the demo seeds by hand; `?fixture=empty` (deterministic blank
  *  workbook for E2E specs) skips the seed. */
 export const createInitialDemoWorkbook = async (
   search = globalThis.location?.search ?? '',
-): Promise<WorkbookHandle> => {
-  const wb = await WorkbookHandle.createDefault({
+): Promise<Workbook> => {
+  const wb = await Workbook.createDefault({
     locale: resolveInitialLocale(search),
     platform: resolveInitialPlatform(search),
   });
   if (new URLSearchParams(search).get('fixture') !== 'empty') {
     seedDemoWorkbook(wb);
-    const seededColumnWidths = [112, 80, 104, 128];
-    for (const [col, width] of seededColumnWidths.entries()) {
-      wb.setColumnWidth(0, col, col, width);
+    // Seeded widths are CSS px, converted to the character units `setColumnWidth` takes.
+    const sheet = wb.sheet(0);
+    const seededColumnWidthsPx = [112, 80, 104, 128];
+    for (const [col, px] of seededColumnWidthsPx.entries()) {
+      sheet.setColumnWidth(col, col, sheet.convertColumnPtToChars(px * POINTS_PER_CSS_PX));
     }
   }
   return wb;
 };
 
-/** Loads an xlsx/xlsm file into the instance and returns the workbook's
+/** Reads an xlsx/xlsm/xlsb file into a new workbook the caller owns, and returns it with its
  *  display name (the filename without its extension). Rejects on load failure. */
 export const openDemoWorkbookFile = async (
-  inst: SpreadsheetInstance,
   file: File,
-): Promise<string> => {
-  const buf = await file.arrayBuffer();
-  const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
-  try {
-    await inst.setWorkbook(next);
-  } catch (error) {
-    next.dispose();
-    throw error;
-  }
-  return file.name.replace(/\.(xlsx|xlsm)$/i, '');
-};
+): Promise<{ workbook: Workbook; name: string }> => ({
+  workbook: await Workbook.load(new Uint8Array(await file.arrayBuffer())),
+  name: file.name.replace(/\.(xlsx|xlsm)$/i, ''),
+});
 
 /** Routes clicks on the built-in `#menu-script` items to `onCommand`. The
  *  toolbar owns the rest of the click (closing the menu, restoring focus and
@@ -681,26 +655,37 @@ export const installDemoScriptMenu = (
   return () => document.removeEventListener('click', onMenuClick);
 };
 
-/** Applies a text-script command to the normalized selection as one undo
- *  step (protected cells are skipped) and returns the number of changed cells. */
-export const runDemoScript = (inst: SpreadsheetInstance, command: ScriptCommand): number => {
-  const r = inst.store.getState().selection.range;
-  const range = {
-    sheet: r.sheet,
-    r0: Math.min(r.r0, r.r1),
-    c0: Math.min(r.c0, r.c1),
-    r1: Math.max(r.r0, r.r1),
-    c1: Math.max(r.c0, r.c1),
-  };
-  let changed = 0;
-  inst.history.begin();
-  try {
-    changed = applyTextScriptToRange(inst.store.getState(), inst.workbook, range, command);
-  } finally {
-    inst.history.end();
+const transformDemoScriptText = (
+  value: string,
+  command: Exclude<ScriptCommand, 'clear'>,
+): string => {
+  switch (command) {
+    case 'uppercase':
+      return value.toUpperCase();
+    case 'lowercase':
+      return value.toLowerCase();
+    case 'trim':
+      return value.trim().replace(/\s+/g, ' ');
   }
-  mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
-  return changed;
+};
+
+/** Applies a text-script command to the selection as one undo step (protected
+ *  cells are skipped) and returns the number of changed cells. */
+export const runDemoScript = (inst: SpreadsheetInstance, command: ScriptCommand): number => {
+  const { sheet, range } = inst.selection.get();
+  const changes: CellChange[] = [];
+  for (const cell of inst.workbook.sheet(sheet).listCells(range)) {
+    const at = { row: cell.row, col: cell.col };
+    if (command === 'clear') {
+      changes.push({ sheet, at, value: { kind: VALUE_KIND.blank }, formula: null });
+    } else if (typeof cell.value === 'string') {
+      const next = transformDemoScriptText(cell.value, command);
+      if (next !== cell.value) {
+        changes.push({ sheet, at, value: { kind: VALUE_KIND.text, text: next }, formula: null });
+      }
+    }
+  }
+  return inst.applyChanges(changes, { history: 'record' }).applied.length;
 };
 
 /** A few features ship default-off; everything else is opt-out. */
@@ -743,27 +728,6 @@ export const demoSelectionLabel = (selection: {
   const br = `${demoColLabel(range.c1)}${range.r1 + 1}`;
   const cells = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
   return `${tl}:${br} · ${cells}`;
-};
-
-/** Evaluates a registered function for the demo probe buttons; evaluation
- *  errors are reported as the result text. */
-export const evaluateDemoProbe = (
-  inst: Pick<SpreadsheetInstance, 'formula'>,
-  name: string,
-  args: CellValue[],
-): { name: string; result: string } => {
-  try {
-    const out = inst.formula.evaluate(name, args);
-    const result =
-      out.kind === 'number'
-        ? out.value.toString()
-        : out.kind === 'text'
-          ? out.value
-          : JSON.stringify(out);
-    return { name, result };
-  } catch (err) {
-    return { name, result: err instanceof Error ? err.message : String(err) };
-  }
 };
 
 export interface DemoReviewDialogState {
@@ -814,10 +778,10 @@ export const DEMO_CHANGE_LOG_LIMIT = 8;
 
 let demoChangeId = 0;
 
-export const demoChangeLogEntry = (e: CellChangeEvent): ChangeLogEntry => ({
+export const demoChangeLogEntry = (workbook: Workbook, e: CellEvent): ChangeLogEntry => ({
   id: ++demoChangeId,
-  cell: `${demoColLabel(e.addr.col)}${e.addr.row + 1}`,
-  preview: previewCellChange(e),
+  cell: `${demoColLabel(e.at.col)}${e.at.row + 1}`,
+  preview: previewCellChange(workbook, e),
 });
 
 /** Prepends the change to the log, keeping the newest `DEMO_CHANGE_LOG_LIMIT`. */

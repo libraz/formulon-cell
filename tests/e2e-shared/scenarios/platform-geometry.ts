@@ -1,10 +1,11 @@
 import { expect, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 type GeometryProbeWindow = Window & {
   __fcInst: SpreadsheetInstance;
+  __fcProbes: E2eProbes;
   __geometryDraws: string[];
 };
 
@@ -35,11 +36,10 @@ const EXPECTED: Record<'default' | 'mac', Record<'ja' | 'en', Expected>> = {
 
 const screenPitch = (page: Page) => {
   return page.evaluate(() => {
-    const instance = (window as unknown as GeometryProbeWindow).__fcInst;
-    const { cellRectUnclamped } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
-      'render/geometry'
-    ];
-    const { layout, viewport, data } = instance.store.getState() as unknown as {
+    const w = window as unknown as GeometryProbeWindow;
+    const { cellRectUnclamped } = w.__fcProbes['render/geometry'];
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    const { layout, viewport, data } = store.getState() as unknown as {
       layout: Parameters<typeof cellRectUnclamped>[0];
       viewport: Parameters<typeof cellRectUnclamped>[1] & { zoom: number };
       data: { sheetIndex: number };
@@ -99,9 +99,11 @@ export async function runPlatformGeometry(
   };
   await expectPitch(0);
   expect(
-    await page.evaluate(
-      () => (window as unknown as GeometryProbeWindow).__fcInst.workbook.workbookDisplayFont,
-    ),
+    await page.evaluate(() => {
+      // The workbook display font has no facade member.
+      const w = window as unknown as GeometryProbeWindow;
+      return w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook).workbookDisplayFont;
+    }),
   ).toEqual(expected.font);
 
   const a1 = await gridCellCenter(page, 0, 0);
@@ -110,13 +112,13 @@ export async function runPlatformGeometry(
   await page.keyboard.press('Enter');
   await expect
     .poll(() =>
-      page.evaluate(() =>
-        (window as unknown as GeometryProbeWindow).__fcInst.workbook.getValue({
-          sheet: 0,
-          row: 0,
-          col: 0,
-        }),
-      ),
+      page.evaluate(() => {
+        // The tagged cell value has no facade equivalent; read it from the engine handle.
+        const w = window as unknown as GeometryProbeWindow;
+        return w.__fcProbes['api/workbook']
+          .workbookHandleOf(w.__fcInst.workbook)
+          .getValue({ sheet: 0, row: 0, col: 0 });
+      }),
     )
     .toEqual({ kind: 'text', value: PROBE_TEXT });
   await page.waitForFunction(

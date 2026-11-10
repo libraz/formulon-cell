@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** E01: typing into the active cell and pressing Enter commits the value.
@@ -64,12 +66,11 @@ export async function runFormulaScenario(page: Page): Promise<void> {
   await page.keyboard.press('ArrowUp');
   expect(await sp.formulaBarValue()).toBe('=SUM(A1:A3)');
   const total = await page.evaluate(() => {
-    const inst = (window as Window & { __fcInst?: unknown }).__fcInst as {
-      workbook: {
-        getValue(addr: { sheet: number; row: number; col: number }): unknown;
-      };
-    };
-    return inst.workbook.getValue({ sheet: 0, row: 3, col: 0 });
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    // The tagged cell value has no facade equivalent; read it from the engine handle.
+    return w.__fcProbes['api/workbook']
+      .workbookHandleOf(w.__fcInst.workbook)
+      .getValue({ sheet: 0, row: 3, col: 0 });
   });
   expect(total).toEqual({ kind: 'number', value: 6 });
 }

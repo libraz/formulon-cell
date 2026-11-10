@@ -48,10 +48,10 @@ export async function runErrorOverlayTierScenario(page: Page): Promise<void> {
   });
 
   // Documented tiers from core/base.css.
-  expect(probe.err, 'error tier').toBeGreaterThanOrEqual(2_147_483_070);
-  expect(probe.menu, 'menu tier').toBeGreaterThanOrEqual(2_147_483_060);
-  expect(probe.popover, 'popover tier').toBeGreaterThanOrEqual(2_147_483_040);
-  expect(probe.dialog, 'dialog tier').toBeGreaterThanOrEqual(2_147_483_020);
+  expect(probe.err, 'error tier').toBeGreaterThanOrEqual(16_777_070);
+  expect(probe.menu, 'menu tier').toBeGreaterThanOrEqual(16_777_060);
+  expect(probe.popover, 'popover tier').toBeGreaterThanOrEqual(16_777_040);
+  expect(probe.dialog, 'dialog tier').toBeGreaterThanOrEqual(16_777_020);
 
   // The actual ordering invariants we care about for the error popover:
   expect(probe.err).toBeGreaterThan(probe.menu);

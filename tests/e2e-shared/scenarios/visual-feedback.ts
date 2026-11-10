@@ -1,12 +1,12 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 const themes = ['paper', 'ink', 'contrast'] as const;
 
-async function setTheme(page: Page, theme: string): Promise<void> {
+async function setTheme(page: Page, theme: (typeof themes)[number]): Promise<void> {
   await page.evaluate((theme) => {
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.setTheme(theme);
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.update({ theme });
   }, theme);
 }
 
@@ -99,12 +99,14 @@ export async function runMiniToolbarFeedbackScenario(page: Page): Promise<void> 
     );
     await page.keyboard.press('Escape');
     await page.evaluate(() => {
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.setPolicy({
-        readOnly: true,
-        defaultOperation: 'deny',
-        selection: true,
-        copy: true,
-        batchDenied: 'reject',
+      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.update({
+        policy: {
+          readOnly: true,
+          defaultOperation: 'deny',
+          selection: true,
+          copy: true,
+          batchDenied: 'reject',
+        },
       });
     });
     menu = await openMenu(page);
@@ -120,7 +122,7 @@ export async function runMiniToolbarFeedbackScenario(page: Page): Promise<void> 
     expect(muted.opacity).toBeLessThan(1);
     await page.keyboard.press('Escape');
     await page.evaluate(() => {
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.setPolicy();
+      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.update({ policy: null });
     });
     await page.mouse.move(1090, 0);
   }

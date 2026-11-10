@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac'): Promise<void> {
@@ -17,20 +17,19 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
   await page.keyboard.press('Enter');
   expect(
     await page.evaluate(() =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.workbook.getValue({
-        sheet: 0,
-        row: 0,
-        col: 0,
-      }),
+      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.workbook
+        .sheet(0)
+        .getValue(0, 0),
     ),
-  ).toEqual({ kind: 'text', value: '全セルのフォント' });
+  ).toBe('全セルのフォント');
   const nativeSize = (row = 0, col = 0) =>
     page.evaluate(
       ({ row, col }) => {
-        const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-        const effective = instance.workbook.getEffectiveStyle(0, row, col);
-        const xf = effective && instance.workbook.getCellXf(effective.xfIndex);
-        return xf && instance.workbook.getFontRecord(xf.fontIndex)?.sizePt;
+        const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+        const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+        const effective = handle.getEffectiveStyle(0, row, col);
+        const xf = effective && handle.getCellXf(effective.xfIndex);
+        return xf && handle.getFontRecord(xf.fontIndex)?.sizePt;
       },
       { row, col },
     );
@@ -43,12 +42,15 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
     .locator('.fc-host__grid')
     .first()
     .click({ position: { x: 10, y: 10 } });
-  const range = await page.evaluate(
-    () =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().selection
-        .range,
+  const selection = await page.evaluate(() =>
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
   );
-  expect(range).toMatchObject({ r0: 0, c0: 0, r1: 1048575, c1: 16383 });
+  expect(selection.range).toMatchObject({
+    firstRow: 0,
+    firstCol: 0,
+    lastRow: 1048575,
+    lastCol: 16383,
+  });
   const sizePicker = page.locator('[data-ribbon-command="fontSize"] button').first();
   await sizePicker.click();
   await page.locator('.fc-tb__rb-dd__opt[data-value="18"]').click();
@@ -59,15 +61,21 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
   );
 
   expect(
-    await page.evaluate(() =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
-    ),
+    await page.evaluate(() => {
+      const { history } = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const available = history.canUndo;
+      history.undo();
+      return available;
+    }),
   ).toBe(true);
   expect(await nativeSize()).toBe(originalSize);
   expect(
-    await page.evaluate(() =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
-    ),
+    await page.evaluate(() => {
+      const { history } = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const available = history.canRedo;
+      history.redo();
+      return available;
+    }),
   ).toBe(true);
   expect(await nativeSize()).toBe(18);
 
@@ -98,7 +106,7 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
     const { WorkbookHandle } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
       'engine/workbook-handle'
     ];
-    const reloaded = await WorkbookHandle.loadBytes(instance.workbook.save());
+    const reloaded = await WorkbookHandle.loadBytes(instance.workbook.save().bytes);
     try {
       return [
         [0, 0],
@@ -123,7 +131,9 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
   // Re-select one cell before checking the dialog's complete family list.
   await clickA1();
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.openFormatDialog('font'),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.dialogs.open('format', {
+      tab: 'font',
+    }),
   );
   const dialog = page.locator('.fc-fmtdlg:not([hidden])');
   const families = dialog.locator('.fc-fmtdlg__font-list--family');

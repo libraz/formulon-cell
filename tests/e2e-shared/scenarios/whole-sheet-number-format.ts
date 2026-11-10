@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 type PaintedRun = { text: string; y: number; end: number };
@@ -37,15 +37,21 @@ export async function runWholeSheetNumberFormat(
   await sheet.expectNoStub();
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const { mutators } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes['store/store'];
-    const inputs = ['1234.5', "'00123", 'abc', '=SUM(A1,1)', '="label"'];
-    const result = instance.applyChanges(
-      inputs.map((input, row) => ({ addr: { sheet: 0, row, col: 0 }, input })),
-    );
-    if (result.status !== 'applied') throw new Error('Mixed values were not seeded');
-    mutators.setColWidth(instance.store, 0, 160);
+    const probes = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes;
+    const { mutators } = probes['store/store'];
+    const { store } = probes['mount/internals'].spreadsheetInternals(instance);
+    const sheet0 = instance.workbook.sheet(0);
+    instance.workbook.batch(() => {
+      sheet0.setNumber(0, 0, 1234.5);
+      sheet0.setText(1, 0, '00123');
+      sheet0.setText(2, 0, 'abc');
+      sheet0.setFormula(3, 0, '=SUM(A1,1)');
+      sheet0.setFormula(4, 0, '="label"');
+    });
+    instance.history.clear();
+    mutators.setColWidth(store, 0, 160);
     mutators.setCellFormat(
-      instance.store,
+      store,
       { sheet: 0, row: 0, col: 0 },
       {
         numFmt: { kind: 'percent', decimals: 1 },
@@ -59,13 +65,14 @@ export async function runWholeSheetNumberFormat(
     .click({ position: { x: 10, y: 10 } });
   await expect
     .poll(() =>
-      page.evaluate(
-        () =>
-          (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState()
-            .selection.range,
+      page.evaluate(() =>
+        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
       ),
     )
-    .toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 16383 });
+    .toMatchObject({
+      sheet: 0,
+      ranges: [{ firstRow: 0, firstCol: 0, lastRow: 1048575, lastCol: 16383 }],
+    });
   await sheet.shortcut('1');
   const dialog = page.getByRole('dialog', { name: 'Format Cells', exact: true });
   await expect(dialog).toBeVisible();
@@ -94,18 +101,22 @@ export async function runWholeSheetNumberFormat(
     .toEqual(['1234.50', '00123', 'abc', '1235.50', 'label']);
   expect(
     await page.evaluate(() => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      const wb = instance.workbook;
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const instance = w.__fcInst;
+      const sheet0 = instance.workbook.sheet(0);
+      const probes = w.__fcProbes;
+      const handle = probes['api/workbook'].workbookHandleOf(instance.workbook);
+      const { store } = probes['mount/internals'].spreadsheetInternals(instance);
       return {
-        text: wb.getValue({ sheet: 0, row: 1, col: 0 }),
-        formula: wb.cellFormula({ sheet: 0, row: 3, col: 0 }),
-        farFormat: wb.getEffectiveStyle(0, 1048575, 16383)?.numberFormat,
-        formatCount: instance.store.getState().format.formats.size,
-        bold: instance.store.getState().format.formats.get('0:0:0')?.bold,
+        text: sheet0.getValue(1, 0),
+        formula: sheet0.getFormula(3, 0),
+        farFormat: handle.getEffectiveStyle(0, 1048575, 16383)?.numberFormat,
+        formatCount: store.getState().format.formats.size,
+        bold: store.getState().format.formats.get('0:0:0')?.bold,
       };
     }),
   ).toEqual({
-    text: { kind: 'text', value: '00123' },
+    text: '00123',
     formula: '=SUM(A1,1)',
     farFormat: '0.00',
     formatCount: 1,
@@ -114,8 +125,10 @@ export async function runWholeSheetNumberFormat(
   await sheet.shortcut('z');
   expect(
     await page.evaluate(() => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      return instance.workbook.getEffectiveStyle(0, 1048575, 16383)?.numberFormat;
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      return w.__fcProbes['api/workbook']
+        .workbookHandleOf(w.__fcInst.workbook)
+        .getEffectiveStyle(0, 1048575, 16383)?.numberFormat;
     }),
   ).toBe('General');
 }

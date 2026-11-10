@@ -1,5 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runPrintPdfSmokeScenario(page: Page): Promise<void> {
@@ -8,23 +10,25 @@ export async function runPrintPdfSmokeScenario(page: Page): Promise<void> {
   await sp.expectNoStub();
 
   await page.evaluate(() => {
-    const win = window as unknown as {
-      __fcInst?: {
-        workbook?: {
-          setText?: (addr: { sheet: number; row: number; col: number }, value: string) => void;
-        };
-        store?: {
-          setState?: (updater: (state: Record<string, unknown>) => Record<string, unknown>) => void;
-        };
-      };
-    };
+    const win = window as unknown as { __fcInst?: SpreadsheetInstance; __fcProbes: E2eProbes };
     const inst = win.__fcInst;
-    inst?.workbook?.setText?.({ sheet: 0, row: 0, col: 0 }, 'PDF Title Row');
-    inst?.workbook?.setText?.({ sheet: 0, row: 1, col: 0 }, 'PDF Title Col');
-    inst?.workbook?.setText?.({ sheet: 0, row: 1, col: 1 }, 'PDF Body 1');
-    inst?.workbook?.setText?.({ sheet: 0, row: 1, col: 2 }, 'PDF Body 2');
-    inst?.workbook?.setText?.({ sheet: 0, row: 2, col: 1 }, 'PDF Body 3');
-    inst?.store?.setState?.((state) => {
+    if (!inst) return;
+    inst.workbook.batch(() => {
+      const sheet = inst.workbook.sheet(0);
+      sheet.setText(0, 0, 'PDF Title Row');
+      sheet.setText(1, 0, 'PDF Title Col');
+      sheet.setText(1, 1, 'PDF Body 1');
+      sheet.setText(1, 2, 'PDF Body 2');
+      sheet.setText(2, 1, 'PDF Body 3');
+    });
+    inst.history.clear();
+    // Layout and page setup are UI state with no public write route.
+    const { store } = win.__fcProbes['mount/internals'].spreadsheetInternals(inst);
+    (
+      store as unknown as {
+        setState(updater: (state: Record<string, unknown>) => Record<string, unknown>): void;
+      }
+    ).setState((state) => {
       const layout = state.layout as {
         colWidths: Map<number, number>;
         rowHeights: Map<number, number>;

@@ -81,7 +81,7 @@ export const zhUi: DemoUiStrings = {
   uppercaseColumnA: '将 A 列转换为大写',
   arrowPrefixNegatives: '为负数添加箭头前缀',
   customFunctions: '自定义函数',
-  customFunctionsHint: '直接探查主机端函数注册表。',
+  customFunctionsHint: '用于自动完成和参数提示的主机端公式提示。',
   cellChangeLog: '单元格更改日志',
   cellChangeLogHint: '将单元格编辑镜像到演示日志中。',
   editCellToSeeEvents: '编辑单元格即可查看事件流。',

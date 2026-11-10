@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import matrix from '../fixtures/full-check-matrix.json' with { type: 'json' };
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
@@ -64,6 +65,20 @@ const localeAfter = (locale: FullCheckLocale): FullCheckLocale => {
   return FULL_CHECK_LOCALES[(index + 1) % FULL_CHECK_LOCALES.length] ?? 'en';
 };
 
+const columnLetters = (col: number): string => {
+  let name = '';
+  for (let n = col + 1; n > 0; n = Math.floor((n - 1) / 26)) {
+    name = String.fromCharCode(65 + ((n - 1) % 26)) + name;
+  }
+  return name;
+};
+
+const rangeRef = (range: { r0: number; c0: number; r1: number; c1: number }): string => {
+  const from = `${columnLetters(range.c0)}${range.r0 + 1}`;
+  const to = `${columnLetters(range.c1)}${range.r1 + 1}`;
+  return from === to ? from : `${from}:${to}`;
+};
+
 type CellAddress = { sheet: number; row: number; col: number };
 type SeedCell = {
   address: CellAddress;
@@ -71,84 +86,9 @@ type SeedCell = {
   value: string | number | boolean;
 };
 
-type BrowserInstance = {
-  locale: string;
-  i18n: { locale: string; strings: Record<string, unknown> };
-  workbook: {
-    capabilities: Record<string, boolean>;
-    setText(address: CellAddress, value: string): void;
-    setNumber(address: CellAddress, value: number): void;
-    setBool(address: CellAddress, value: boolean): void;
-    setFormula(address: CellAddress, value: string): void;
-    recalc(): void;
-    getValue(address: CellAddress): unknown;
-    cellFormula(address: CellAddress): string | null;
-    getEffectiveStyle?(
-      sheet: number,
-      row: number,
-      col: number,
-    ): { xfIndex: number; source?: number } | null;
-    getCellXf?(xfIndex: number): { fontIndex: number; [key: string]: unknown } | null;
-    getFontRecord?(
-      fontIndex: number,
-    ): { name: string; sizePt: number | null; [key: string]: unknown } | null;
-    setWorkbookDefaultFont?(record: { name?: string; sizePt?: number }): boolean;
-    addFontRecord?(record: Record<string, unknown>): number;
-    addXfRecord?(record: Record<string, unknown>): number;
-    setColumnStyle?(sheet: number, first: number, last: number, xfIndex: number): boolean;
-    setRowStyle?(sheet: number, row: number, xfIndex: number): boolean;
-    spreadsheetProfileId?(): string | null;
-    getTables?(): { name: string; displayName: string; ref: string; columns: string[] }[];
-    setSheetAutoFilterXml?(sheet: number, xml: string): boolean;
-  };
-  history: unknown;
-  toolbar?: {
-    getDisplayMode?(): string;
-  } | null;
-  store: {
-    getState(): {
-      selection: unknown;
-      ui: {
-        filterRanges: unknown[];
-        filterCriteria: unknown[];
-        editor: { kind: string };
-        copyMode?: string | null;
-      };
-      layout: { hiddenRows: Set<number> };
-      charts: { charts: unknown[] };
-      conditional: { rules: unknown[] };
-      errorIndicators: { ignoredErrors: Set<string> };
-    };
-    setState(updater: (state: Record<string, unknown>) => Record<string, unknown>): void;
-  };
-  setLocale(locale: string): boolean;
-  setFeatures(next: Record<string, boolean>): void;
-  setTheme(theme: FullCheckTheme): void;
-  clipboard?: {
-    getSnapshot(): {
-      cells: Array<Array<{ format?: { fontFamily?: string; fontSize?: number } }>>;
-    } | null;
-  } | null;
-  openPivotTableDialog(): void;
-  openActivePivotFieldList(): boolean;
-  addSlicer(input: {
-    tableName: string;
-    column: string;
-    selected?: readonly string[];
-    x?: number;
-    y?: number;
-  }): { id: string };
-  openPasteSpecial(): void;
-  openInsertCopiedCells(): void;
-  openFilterDropdown(
-    range: { sheet: number; r0: number; c0: number; r1: number; c1: number },
-    col: number,
-  ): void;
-  openQuickAnalysis(): void;
-};
-
 type ProbeWindow = Window & {
-  __fcInst?: BrowserInstance;
+  __fcInst?: SpreadsheetInstance;
+  __fcProbes: E2eProbes;
   __fcToolbar?: { readonly displayMode?: string } | null;
 };
 
@@ -215,14 +155,17 @@ interface SurfaceLabels {
 
 const getStrings = async (page: Page): Promise<SurfaceLabels> =>
   page.evaluate(() => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check requires window.__fcInst');
     const { createDemoStrings } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
       'demo-shared/demo-strings'
     ];
     const demoStrings =
-      createDemoStrings('React')[instance.locale as keyof ReturnType<typeof createDemoStrings>];
-    if (!demoStrings) throw new Error(`full-check demo strings missing for ${instance.locale}`);
+      createDemoStrings('React')[
+        instance.i18n.locale as keyof ReturnType<typeof createDemoStrings>
+      ];
+    if (!demoStrings)
+      throw new Error(`full-check demo strings missing for ${instance.i18n.locale}`);
     const strings = instance.i18n.strings as unknown as {
       ribbon: {
         tabs: { home: string; file: string };
@@ -281,7 +224,9 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
     const mac = document.querySelector<HTMLElement>('.fc-host')?.dataset.fcPlatform === 'mac';
     return {
       home: strings.ribbon.tabs.home,
-      profile: instance.workbook.spreadsheetProfileId?.() ?? null,
+      profile: (window as unknown as ProbeWindow).__fcProbes['api/workbook']
+        .workbookHandleOf(instance.workbook)
+        .spreadsheetProfileId(),
       contextTitle: strings.contextMenu.title,
       copy: strings.contextMenu.copy,
       paste: strings.contextMenu.paste,
@@ -332,12 +277,17 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
 
 const runtime = (page: Page): Promise<RuntimeSnapshot> =>
   page.evaluate(() => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check requires a mounted spreadsheet instance');
-    const state = instance.store.getState();
+    const { store } = (window as unknown as ProbeWindow).__fcProbes[
+      'mount/internals'
+    ].spreadsheetInternals(instance);
+    const state = store.getState();
     return {
-      locale: instance.locale,
-      profile: instance.workbook.spreadsheetProfileId?.() ?? null,
+      locale: instance.i18n.locale,
+      profile: (window as unknown as ProbeWindow).__fcProbes['api/workbook']
+        .workbookHandleOf(instance.workbook)
+        .spreadsheetProfileId(),
       filterRanges: state.ui.filterRanges,
       filterCriteria: state.ui.filterCriteria,
       hiddenRows: [...state.layout.hiddenRows].sort((a, b) => a - b),
@@ -351,19 +301,11 @@ const setSelection = async (
   page: Page,
   range: { sheet: number; r0: number; c0: number; r1: number; c1: number },
 ): Promise<void> => {
-  await page.evaluate((nextRange) => {
-    const instance = (window as ProbeWindow).__fcInst;
+  await page.evaluate((ref) => {
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check selection requires __fcInst');
-    instance.store.setState((state) => ({
-      ...state,
-      selection: {
-        active: { sheet: nextRange.sheet, row: nextRange.r0, col: nextRange.c0 },
-        anchor: { sheet: nextRange.sheet, row: nextRange.r0, col: nextRange.c0 },
-        range: nextRange,
-        extraRanges: [],
-      },
-    }));
-  }, range);
+    instance.selection.set(ref);
+  }, rangeRef(range));
 };
 
 const seed = async (
@@ -372,45 +314,42 @@ const seed = async (
   selection?: { sheet: number; r0: number; c0: number; r1: number; c1: number },
 ): Promise<void> => {
   await page.evaluate(
-    ({ cells: nextCells, selection: nextSelection }) => {
-      const instance = (window as ProbeWindow).__fcInst;
+    ({ cells: nextCells, ref }) => {
+      const instance = (window as unknown as ProbeWindow).__fcInst;
       if (!instance) throw new Error('full-check seed requires __fcInst');
-      for (const cell of nextCells) {
-        if (cell.kind === 'text') instance.workbook.setText(cell.address, String(cell.value));
-        else if (cell.kind === 'number')
-          instance.workbook.setNumber(cell.address, Number(cell.value));
-        else if (cell.kind === 'bool') instance.workbook.setBool(cell.address, Boolean(cell.value));
-        else instance.workbook.setFormula(cell.address, String(cell.value));
-      }
-      instance.workbook.recalc();
-      if (nextSelection) {
-        instance.store.setState((state) => ({
-          ...state,
-          selection: {
-            active: { sheet: nextSelection.sheet, row: nextSelection.r0, col: nextSelection.c0 },
-            anchor: { sheet: nextSelection.sheet, row: nextSelection.r0, col: nextSelection.c0 },
-            range: nextSelection,
-            extraRanges: [],
-          },
-        }));
-      }
+      const workbook = instance.workbook;
+      workbook.batch(() => {
+        for (const cell of nextCells) {
+          const { sheet, row, col } = cell.address;
+          const target = workbook.sheet(sheet);
+          if (cell.kind === 'text') target.setText(row, col, String(cell.value));
+          else if (cell.kind === 'number') target.setNumber(row, col, Number(cell.value));
+          else if (cell.kind === 'bool') target.setBool(row, col, Boolean(cell.value));
+          else target.setFormula(row, col, String(cell.value));
+        }
+      });
+      instance.history.clear();
+      workbook.recalc();
+      if (ref) instance.selection.set(ref);
     },
-    { cells, selection },
+    { cells, ref: selection ? rangeRef(selection) : null },
   );
 };
 
 const readCells = async (page: Page, addresses: readonly CellAddress[]): Promise<unknown[]> =>
   page.evaluate((nextAddresses) => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check read requires __fcInst');
-    return nextAddresses.map((address) => instance.workbook.getValue(address));
+    return nextAddresses.map((address) =>
+      instance.workbook.sheet(address.sheet).getValue(address.row, address.col),
+    );
   }, addresses);
 
 const readCellFormula = async (page: Page, address: CellAddress): Promise<string | null> =>
   page.evaluate((nextAddress) => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check formula read requires __fcInst');
-    return instance.workbook.cellFormula(nextAddress);
+    return instance.workbook.sheet(nextAddress.sheet).getFormula(nextAddress.row, nextAddress.col);
   }, address);
 
 const readNativeFonts = async (
@@ -418,9 +357,11 @@ const readNativeFonts = async (
   addresses: readonly CellAddress[],
 ): Promise<NativeFont[]> =>
   page.evaluate((nextAddresses) => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check native font read requires __fcInst');
-    const workbook = instance.workbook;
+    const workbook = (window as unknown as ProbeWindow).__fcProbes['api/workbook'].workbookHandleOf(
+      instance.workbook,
+    );
     if (
       !workbook.getEffectiveStyle ||
       !workbook.getCellXf ||
@@ -453,7 +394,7 @@ const readClipboardSnapshotFonts = async (
   offsets: readonly { row: number; col: number }[],
 ): Promise<Array<{ fontFamily: string; fontSize: number }>> =>
   page.evaluate((nextOffsets) => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check clipboard snapshot requires __fcInst');
     const snapshot = instance.clipboard?.getSnapshot();
     if (!snapshot) throw new Error('full-check clipboard snapshot is unavailable after copy');
@@ -479,9 +420,11 @@ const setNativeInheritedClipboardFonts = async (page: Page): Promise<NativeFont[
     { sheet: 0, row: 1, col: 3 },
   ];
   const fonts = await page.evaluate((nextAddresses) => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check native font fixture requires __fcInst');
-    const workbook = instance.workbook;
+    const workbook = (window as unknown as ProbeWindow).__fcProbes['api/workbook'].workbookHandleOf(
+      instance.workbook,
+    );
     if (
       workbook.capabilities.defaultFont !== true ||
       workbook.capabilities.sheetFontStyles !== true ||
@@ -578,12 +521,15 @@ const cellCorner = async (
 ): Promise<{ x: number; y: number }> => {
   return page.evaluate(
     ({ row: targetRow, col: targetCol }) => {
-      const instance = (window as ProbeWindow).__fcInst;
+      const instance = (window as unknown as ProbeWindow).__fcInst;
       if (!instance) throw new Error('full-check geometry requires __fcInst');
       const { cellRectUnclamped } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
         'render/geometry'
       ];
-      const { layout, viewport } = instance.store.getState() as unknown as {
+      const { store } = (window as unknown as ProbeWindow).__fcProbes[
+        'mount/internals'
+      ].spreadsheetInternals(instance);
+      const { layout, viewport } = store.getState() as unknown as {
         layout: Parameters<typeof cellRectUnclamped>[0];
         viewport: Parameters<typeof cellRectUnclamped>[1];
       };
@@ -702,9 +648,15 @@ const attemptRejectedLocaleSwitchWithDraft = async (
   rejectedLocale: FullCheckLocale,
 ): Promise<void> => {
   const result = await page.evaluate((nextLocale) => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check locale draft requires __fcInst');
-    return { accepted: instance.setLocale(nextLocale), locale: instance.locale };
+    let accepted = true;
+    try {
+      instance.update({ locale: nextLocale });
+    } catch {
+      accepted = false;
+    }
+    return { accepted, locale: instance.i18n.locale };
   }, rejectedLocale);
   expect(result).toEqual({ accepted: false, locale: currentLocale });
 };
@@ -713,6 +665,7 @@ const withinViewport = async (
   page: Page,
   locator: import('@playwright/test').Locator,
 ): Promise<void> => {
+  await expect(locator).toBeVisible();
   const box = await locator.boundingBox();
   expect(box, 'full-check surface must have geometry').not.toBeNull();
   if (!box) return;
@@ -739,33 +692,30 @@ const seedObjectFixture = async (page: Page): Promise<void> => {
   ];
   await seed(page, cells, { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 });
   await page.evaluate(() => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check objects fixture requires __fcInst');
-    if (!instance.workbook.capabilities.tableMutate) {
+    const probes = (window as unknown as ProbeWindow).__fcProbes;
+    const handle = probes['api/workbook'].workbookHandleOf(instance.workbook);
+    const { store, controller } = probes['mount/internals'].spreadsheetInternals(instance);
+    if (!handle.capabilities.tableMutate) {
       throw new Error(
         'full-check objects fixture unavailable: engine tableMutate capability is false',
       );
     }
-    if (!instance.workbook.capabilities.pivotTableMutate) {
+    if (!handle.capabilities.pivotTableMutate) {
       throw new Error(
         'full-check objects fixture unavailable: engine pivotTableMutate capability is false',
       );
     }
-    instance.setFeatures({ slicer: true });
-    const { formatAsTable } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
-      'commands/format-as-table'
-    ];
+    instance.update({ ui: { ...instance.options.ui, features: { slicer: true } } });
+    const { formatAsTable } = probes['commands/format-as-table'];
     const tableRange = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 };
-    formatAsTable(instance.store as never, tableRange, {
-      workbook: instance.workbook as never,
-      style: 'medium',
-    });
-    const table = instance.workbook.getTables?.()[0];
+    formatAsTable(store, tableRange, { workbook: handle, style: 'medium' });
+    const table = instance.workbook.sheet(0).listTables()[0];
     if (!table)
       throw new Error('full-check objects fixture failed: table creation returned no table');
-    const { createPivotTableFromRange } = (window as unknown as { __fcProbes: E2eProbes })
-      .__fcProbes['commands/pivot-table'];
-    const pivot = createPivotTableFromRange(instance.workbook as never, {
+    const { createPivotTableFromRange } = probes['commands/pivot-table'];
+    const pivot = createPivotTableFromRange(handle, {
       source: tableRange,
       destination: { sheet: 0, row: 7, col: 0 },
       name: 'FullCheckPivot',
@@ -776,17 +726,20 @@ const seedObjectFixture = async (page: Page): Promise<void> => {
     if (!pivot.ok) {
       throw new Error(`full-check objects fixture pivot creation failed: ${pivot.reason}`);
     }
-    const { createSessionChart } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
-      'commands/session-chart'
-    ];
+    const { createSessionChart } = probes['commands/session-chart'];
     const chart = createSessionChart(
-      instance.store as never,
+      store,
       tableRange,
-      { wb: instance.workbook as never, kind: 'column' },
-      instance.history as never,
+      { wb: handle, kind: 'column' },
+      controller.history,
     );
     if (!chart) throw new Error('full-check objects fixture failed: chart creation returned null');
-    const slicer = instance.addSlicer({ tableName: table.name, column: 'Region', x: 24, y: 24 });
+    const slicers = instance.extensions.get('slicer') as unknown as {
+      addSlicer(input: { tableName: string; column: string; x?: number; y?: number }): {
+        id: string;
+      };
+    } | null;
+    const slicer = slicers?.addSlicer({ tableName: table.name, column: 'Region', x: 24, y: 24 });
     if (!slicer?.id)
       throw new Error('full-check objects fixture failed: slicer creation returned no id');
   });
@@ -798,9 +751,11 @@ const runObjectsFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await seedObjectFixture(page);
   await setSelection(page, { sheet: 0, r0: 7, c0: 0, r1: 7, c1: 0 });
   const opened = await page.evaluate(() => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check objects flow requires __fcInst');
-    return instance.openActivePivotFieldList();
+    const available = instance.dialogs.canOpen('activePivotFieldList');
+    if (available) instance.dialogs.open('activePivotFieldList');
+    return available;
   });
   expect(opened).toBe(true);
   const fieldList = page.locator('.fc-objects--taskpane').first();
@@ -875,7 +830,14 @@ const seedClipboardFixture = async (page: Page): Promise<ClipboardFixture> => {
   await sp.shortcut('c');
   await expect
     .poll(() =>
-      page.evaluate(() => (window as ProbeWindow).__fcInst?.store.getState().ui.copyMode ?? null),
+      page.evaluate(() => {
+        const w = window as unknown as ProbeWindow;
+        if (!w.__fcInst) return null;
+        return (
+          w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState().ui
+            .copyMode ?? null
+        );
+      }),
     )
     .toBe('copy');
   return { sp, sourceFonts };
@@ -917,7 +879,9 @@ const runClipboardFlow = async (page: Page, row: FullCheckRow): Promise<void> =>
     { sheet: 0, row: 1, col: 1 },
   ];
   const before = await readCells(page, addresses);
-  await page.evaluate(() => (window as ProbeWindow).__fcInst?.openPasteSpecial());
+  await page.evaluate(() =>
+    (window as unknown as ProbeWindow).__fcInst?.dialogs.open('pasteSpecial'),
+  );
   let labels = await getStrings(page);
   const pasteDialog = page.locator('.fc-pastesp:visible').first();
   await expect(pasteDialog).toBeVisible();
@@ -942,16 +906,27 @@ const runClipboardFlow = async (page: Page, row: FullCheckRow): Promise<void> =>
   await sp.shortcut('c');
   await expect
     .poll(() =>
-      page.evaluate(() => (window as ProbeWindow).__fcInst?.store.getState().ui.copyMode ?? null),
+      page.evaluate(() => {
+        const w = window as unknown as ProbeWindow;
+        if (!w.__fcInst) return null;
+        return (
+          w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState().ui
+            .copyMode ?? null
+        );
+      }),
     )
     .toBe('copy');
-  await page.evaluate(() => (window as ProbeWindow).__fcInst?.openPasteSpecial());
+  await page.evaluate(() =>
+    (window as unknown as ProbeWindow).__fcInst?.dialogs.open('pasteSpecial'),
+  );
   await expect(pasteDialog).toBeVisible();
   await expect(pasteDialog).toHaveAttribute('aria-label', labels.pasteSpecialTitle);
   await pasteDialog.getByRole('button', { name: labels.pasteCancel, exact: true }).click();
   await expect(pasteDialog).toBeHidden();
 
-  await page.evaluate(() => (window as ProbeWindow).__fcInst?.openInsertCopiedCells());
+  await page.evaluate(() =>
+    (window as unknown as ProbeWindow).__fcInst?.dialogs.open('insertCopiedCells'),
+  );
   const insertDialog = page.locator('.fc-insertcopied:visible').first();
   await expect(insertDialog).toBeVisible();
   await expect(insertDialog).toHaveAttribute('aria-label', labels.insertCopiedTitle);
@@ -972,12 +947,7 @@ const runClipboardFlow = async (page: Page, row: FullCheckRow): Promise<void> =>
         { sheet: 0, row: 1, col: 8 },
       ]),
     )
-    .toEqual([
-      { kind: 'text', value: 'copy-text' },
-      { kind: 'number', value: 42 },
-      { kind: 'number', value: 84 },
-      { kind: 'number', value: 21 },
-    ]);
+    .toEqual(['copy-text', 42, 84, 21]);
   const pastedAddresses: CellAddress[] = [
     { sheet: 0, row: 0, col: 10 },
     { sheet: 0, row: 0, col: 11 },
@@ -1040,40 +1010,37 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
     range,
   );
   await page.evaluate(
-    ({ nextRange }) => {
-      const instance = (window as ProbeWindow).__fcInst;
+    ({ nextRef }) => {
+      const instance = (window as unknown as ProbeWindow).__fcInst;
       if (!instance) throw new Error('full-check filter fixture requires __fcInst');
-      if (!instance.workbook.capabilities.autoFilter || !instance.workbook.setSheetAutoFilterXml) {
+      const probes = (window as unknown as ProbeWindow).__fcProbes;
+      const handle = probes['api/workbook'].workbookHandleOf(instance.workbook);
+      const { store } = probes['mount/internals'].spreadsheetInternals(instance);
+      if (!handle.capabilities.autoFilter) {
         throw new Error(
           'full-check filter fixture unavailable: engine autoFilter capability is false',
         );
       }
-      if (!instance.workbook.setSheetAutoFilterXml(0, '<autoFilter ref="A1:C6"/>')) {
+      if (!handle.setSheetAutoFilterXml(0, '<autoFilter ref="A1:C6"/>')) {
         throw new Error('full-check filter fixture failed: engine rejected autoFilter definition');
       }
-      const { hydrateAutoFilterFromEngine } = (window as unknown as { __fcProbes: E2eProbes })
-        .__fcProbes['engine/auto-filter-sync'];
-      hydrateAutoFilterFromEngine(instance.workbook as never, instance.store as never, 0);
-      instance.store.setState((state) => ({
-        ...state,
-        selection: {
-          active: { sheet: 0, row: 0, col: 0 },
-          anchor: { sheet: 0, row: 0, col: 0 },
-          range: nextRange,
-          extraRanges: [],
-        },
-      }));
+      const { hydrateAutoFilterFromEngine } = probes['engine/auto-filter-sync'];
+      hydrateAutoFilterFromEngine(handle, store, 0);
+      instance.selection.set(nextRef);
     },
-    { nextRange: range },
+    { nextRef: rangeRef(range) },
   );
   // The Mac panel is titled by the column's header text.
   const filterPanelLabel = (current: SurfaceLabels): string =>
     row.platform === 'mac' ? 'Sales' : current.filterTitle;
   const openFilter = async (): Promise<void> => {
     await page.evaluate((nextRange) => {
-      const instance = (window as ProbeWindow).__fcInst;
+      const instance = (window as unknown as ProbeWindow).__fcInst;
       if (!instance) throw new Error('full-check filter flow requires __fcInst');
-      instance.openFilterDropdown(nextRange, 1);
+      instance.dialogs.open('filterDropdown', {
+        range: nextRange,
+        col: 1,
+      });
     }, range);
   };
   await openFilter();
@@ -1127,11 +1094,7 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
       { sheet: 0, row: 2, col: 1 },
       { sheet: 0, row: 3, col: 1 },
     ]),
-  ).toEqual([
-    { kind: 'number', value: 12.5 },
-    { kind: 'number', value: 8 },
-    { kind: 'number', value: 20 },
-  ]);
+  ).toEqual([12.5, 8, 20]);
   await page.keyboard.press('Escape');
   await expect(dropdown).toBeHidden();
   await openFilter();
@@ -1172,9 +1135,9 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await expect.poll(async () => (await runtime(page)).filterRanges).toEqual([range]);
 
   await page.evaluate((nextRange) => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check boolean filter requires __fcInst');
-    instance.openFilterDropdown(nextRange, 2);
+    instance.dialogs.open('filterDropdown', { range: nextRange, col: 2 });
   }, range);
   await expect(dropdown).toBeVisible();
   await expect(dropdown).toContainText(localizedBoolean(nextLocale, true));
@@ -1186,12 +1149,9 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
 
 const localizedFormula = async (page: Page, canonical: string): Promise<string> =>
   page.evaluate((formula) => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check formula requires __fcInst');
-    const workbook = instance.workbook as typeof instance.workbook & {
-      localizeFormulaText?: (value: string) => string;
-    };
-    return workbook.localizeFormulaText?.(formula) ?? formula;
+    return instance.workbook.localizeFormula(formula);
   }, canonical);
 
 const runFormulaFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
@@ -1254,9 +1214,7 @@ const runFormulaFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await expect
     .poll(() => readCellFormula(page, { sheet: 0, row: 0, col: 2 }))
     .toBe(canonicalFormula);
-  await expect
-    .poll(() => readCells(page, [{ sheet: 0, row: 0, col: 2 }]))
-    .toEqual([{ kind: 'number', value: 3 }]);
+  await expect.poll(() => readCells(page, [{ sheet: 0, row: 0, col: 2 }])).toEqual([3]);
 
   // The next locale is deliberately chosen from a profile with a translated
   // SUM alias. en/ja/zh/ko/th retain canonical English function names, so
@@ -1269,9 +1227,7 @@ const runFormulaFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await sp.goTo('C1');
   await expect.poll(() => sp.formulaBarValue()).toBe(nextFormula);
   expect(await readCellFormula(page, { sheet: 0, row: 0, col: 2 })).toBe(canonicalFormula);
-  await expect
-    .poll(() => readCells(page, [{ sheet: 0, row: 0, col: 2 }]))
-    .toEqual([{ kind: 'number', value: 3 }]);
+  await expect.poll(() => readCells(page, [{ sheet: 0, row: 0, col: 2 }])).toEqual([3]);
 
   // Reopen a fresh draft under the switched profile to prove the argument
   // helper follows the translated formula surface as well.
@@ -1292,9 +1248,9 @@ const runFormulaFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
 
 const runAnalysisFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await page.evaluate(() => {
-    const instance = (window as ProbeWindow).__fcInst;
+    const instance = (window as unknown as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check analysis feature setup requires __fcInst');
-    instance.setFeatures({ errorIndicators: true });
+    instance.update({ ui: { ...instance.options.ui, features: { errorIndicators: true } } });
   });
   const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 };
   await seed(
@@ -1312,9 +1268,10 @@ const runAnalysisFlow = async (page: Page, row: FullCheckRow): Promise<void> => 
   );
   const openQuickAnalysis = async (): Promise<void> => {
     await page.evaluate(() => {
-      const instance = (window as ProbeWindow).__fcInst;
+      const instance = (window as unknown as ProbeWindow).__fcInst;
       if (!instance) throw new Error('full-check analysis flow requires __fcInst');
-      instance.openQuickAnalysis();
+      // The Mac profile has no Quick Analysis; the old opener was inert there.
+      if (instance.dialogs.canOpen('quickAnalysis')) instance.dialogs.open('quickAnalysis');
     });
   };
   // The Mac profile has no Quick Analysis: the extension stays inert there.
@@ -1353,9 +1310,11 @@ const runAnalysisFlow = async (page: Page, row: FullCheckRow): Promise<void> => 
       .poll(async () => (await runtime(page)).conditionalRuleCount)
       .toBeGreaterThan(ruleCount);
     const undone = await page.evaluate(() => {
-      const instance = (window as ProbeWindow).__fcInst;
+      const instance = (window as unknown as ProbeWindow).__fcInst;
       if (!instance) throw new Error('full-check analysis undo requires __fcInst');
-      return (instance as BrowserInstance & { undo(): boolean }).undo();
+      const available = instance.history.canUndo;
+      instance.history.undo();
+      return available;
     });
     expect(undone).toBe(true);
     await expect.poll(async () => (await runtime(page)).conditionalRuleCount).toBe(ruleCount);
@@ -1436,7 +1395,14 @@ const runMenusFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await sp.shortcut('c');
   await expect
     .poll(() =>
-      page.evaluate(() => (window as ProbeWindow).__fcInst?.store.getState().ui.copyMode ?? null),
+      page.evaluate(() => {
+        const w = window as unknown as ProbeWindow;
+        if (!w.__fcInst) return null;
+        return (
+          w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState().ui
+            .copyMode ?? null
+        );
+      }),
     )
     .toBe('copy');
   let point = await cellCorner(page, 0, 0);
@@ -1459,7 +1425,14 @@ const runMenusFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   );
   await expect
     .poll(() =>
-      page.evaluate(() => (window as ProbeWindow).__fcInst?.store.getState().ui.copyMode ?? null),
+      page.evaluate(() => {
+        const w = window as unknown as ProbeWindow;
+        if (!w.__fcInst) return null;
+        return (
+          w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState().ui
+            .copyMode ?? null
+        );
+      }),
     )
     .toBe('copy');
   point = await cellCorner(page, 0, 0);
@@ -1490,17 +1463,14 @@ const runMenusFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
 
   const readDisplayMode = async (): Promise<{ shell: string | null; toolbar: string | null }> =>
     page.evaluate(() => {
-      const instance = (window as ProbeWindow).__fcInst;
+      const instance = (window as unknown as ProbeWindow).__fcInst;
       const shell = document.querySelector<HTMLElement>('.fc-tb__ribbon-shell');
       if (!instance || !shell) {
         throw new Error('full-check display mode requires the live ribbon instance');
       }
       return {
         shell: shell.dataset.ribbonDisplayMode ?? null,
-        toolbar:
-          instance.toolbar?.getDisplayMode?.() ??
-          (window as ProbeWindow).__fcToolbar?.displayMode ??
-          null,
+        toolbar: (window as unknown as ProbeWindow).__fcToolbar?.displayMode ?? null,
       };
     });
 

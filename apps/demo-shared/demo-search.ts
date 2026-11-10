@@ -3,7 +3,7 @@ import type {
   RibbonSearchItem,
   RibbonSearchUsagePrior,
   RibbonTab,
-  LegacySpreadsheetInstance as SpreadsheetInstance,
+  SpreadsheetInstance,
   ThemeName,
 } from '@libraz/formulon-cell';
 import {
@@ -12,6 +12,12 @@ import {
   EXCEL365_STANDARD_RIBBON_TABS,
   queryRibbonSearchIndex,
 } from '@libraz/formulon-cell';
+import {
+  openDemoDialog,
+  runDemoCommand,
+  toggleDemoSheetProtection,
+  traceDemoPrecedents,
+} from './demo-actions.js';
 import type { DemoCommandStrings, DemoUiStrings } from './demo-strings.js';
 
 export interface DemoCommandItem {
@@ -123,7 +129,7 @@ export const buildDemoCommands = ({
     label: commandText.commands.pageSetup.label,
     hint: commandText.commands.pageSetup.hint,
     tab: 'file',
-    run: () => instance?.openPageSetup(),
+    run: () => openDemoDialog(instance, 'pageSetup'),
   },
   {
     id: 'print',
@@ -137,49 +143,49 @@ export const buildDemoCommands = ({
     label: commandText.commands.formatCells.label,
     hint: commandText.commands.formatCells.hint,
     tab: 'home',
-    run: () => instance?.openFormatDialog(),
+    run: () => openDemoDialog(instance, 'format'),
   },
   {
     id: 'conditional',
     label: commandText.commands.conditionalFormatting.label,
     hint: commandText.commands.conditionalFormatting.hint,
     tab: 'insert',
-    run: () => instance?.openConditionalDialog(),
+    run: () => openDemoDialog(instance, 'conditional'),
   },
   {
     id: 'cell-styles',
     label: commandText.commands.cellStyles.label,
     hint: commandText.commands.cellStyles.hint,
     tab: 'insert',
-    run: () => instance?.openCellStylesGallery(),
+    run: () => openDemoDialog(instance, 'cellStylesGallery'),
   },
   {
     id: 'name-manager',
     label: commandText.commands.nameManager.label,
     hint: commandText.commands.nameManager.hint,
     tab: 'insert',
-    run: () => instance?.openNamedRangeDialog(),
+    run: () => openDemoDialog(instance, 'namedRange'),
   },
   {
     id: 'insert-function',
     label: commandText.commands.insertFunction.label,
     hint: commandText.commands.insertFunction.hint,
     tab: 'formulas',
-    run: () => instance?.openFunctionArguments(),
+    run: () => openDemoDialog(instance, 'functionArguments'),
   },
   {
     id: 'trace-precedents',
     label: commandText.commands.tracePrecedents.label,
     hint: commandText.commands.tracePrecedents.hint,
     tab: 'formulas',
-    run: () => instance?.tracePrecedents(),
+    run: () => traceDemoPrecedents(instance),
   },
   {
     id: 'watch-window',
     label: commandText.commands.watchWindow.label,
     hint: commandText.commands.watchWindow.hint,
     tab: 'formulas',
-    run: () => instance?.toggleWatchWindow(),
+    run: () => runDemoCommand(instance, 'watch'),
   },
   {
     id: 'filter',
@@ -207,7 +213,7 @@ export const buildDemoCommands = ({
     label: commandText.commands.protectSheet.label,
     hint: commandText.commands.protectSheet.hint,
     tab: 'view',
-    run: () => instance?.toggleSheetProtection(),
+    run: () => toggleDemoSheetProtection(instance),
   },
   {
     id: 'options-pane',
@@ -376,7 +382,9 @@ export const buildDemoSearchSuggestions = (
       heading: t.recommended,
       items: [
         item('freeze', 'freeze', () => deps.setRibbonTab('view'), { submenu: true }),
-        item('headerFooter', 'headerFooter', () => deps.instance?.openPageSetup('headerFooter')),
+        item('headerFooter', 'headerFooter', () =>
+          openDemoDialog(deps.instance, 'pageSetup', { tab: 'headerFooter' }),
+        ),
         item('insertSheetRows', 'insertRows', () => deps.applyCommand('insertRows')),
         item('removeDuplicates', 'removeDuplicates', () => deps.applyCommand('removeDupes')),
         item('macros', 'code', () => {}, { disabled: true }),
@@ -386,8 +394,10 @@ export const buildDemoSearchSuggestions = (
       id: 'findReplace',
       heading: t.findReplace,
       items: [
-        item('find', 'find', () => deps.instance?.openFindReplace('find')),
-        item('findReplace', 'replaceFind', () => deps.instance?.openFindReplace('replace')),
+        item('find', 'find', () => openDemoDialog(deps.instance, 'findReplace', { tab: 'find' })),
+        item('findReplace', 'replaceFind', () =>
+          openDemoDialog(deps.instance, 'findReplace', { tab: 'replace' }),
+        ),
       ],
     },
     {

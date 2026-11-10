@@ -1,5 +1,8 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { DialogOptions } from '../../../packages/formulon-cell/src/api/spreadsheet/dialogs.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -56,55 +59,41 @@ type ConditionalRuleProbe = {
   formula?: string;
 };
 
-type SpreadsheetGlobal = {
-  __fcInst?: {
-    locale?: string;
-    i18n?: { locale?: string };
-    workbook?: {
-      spreadsheetProfileId?: () => string | null;
-      getValue: (addr: { sheet: number; row: number; col: number }) => unknown;
-      save: () => Uint8Array;
-    };
-    store?: {
-      getState: () => {
-        conditional: { rules: ConditionalRuleProbe[] };
-      };
-    };
-    openConditionalDialog?: (options?: {
-      mode?: 'manage' | 'new' | 'edit';
-      editIndex?: number;
-      kind?: 'cell-value' | 'formula';
-      cellValueOp?: '>' | '<' | '>=' | '<=' | '=' | '<>' | 'between' | 'not-between';
-    }) => void;
-    openWatchWindow?: () => void;
-    setFeatures?: (flags: { localeSwitcher?: boolean }) => void;
-  };
-};
+type SpreadsheetGlobal = { __fcInst?: SpreadsheetInstance; __fcProbes?: E2eProbes };
+
+type ConditionalDialogOptions = DialogOptions['conditional'];
 
 const readInstanceState = (page: Page) =>
   page.evaluate(() => {
-    const instance = (window as unknown as SpreadsheetGlobal).__fcInst;
-    if (!instance?.workbook) throw new Error('Missing spreadsheet instance');
+    const w = window as unknown as SpreadsheetGlobal;
+    if (!w.__fcInst || !w.__fcProbes) throw new Error('Missing spreadsheet instance');
+    // The calculation profile id has no facade member; read it from the engine handle.
+    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
     return {
-      locale: instance.locale ?? instance.i18n?.locale ?? null,
-      profile: instance.workbook.spreadsheetProfileId?.() ?? null,
+      locale: w.__fcInst.i18n.locale ?? null,
+      profile: handle.spreadsheetProfileId?.() ?? null,
     };
   });
 
 const readCell = (page: Page, row: number, col = 0) =>
   page.evaluate(
     ({ row: targetRow, col: targetCol }) => {
-      const instance = (window as unknown as SpreadsheetGlobal).__fcInst;
-      if (!instance?.workbook) throw new Error('Missing spreadsheet instance');
-      return instance.workbook.getValue({ sheet: 0, row: targetRow, col: targetCol });
+      const w = window as unknown as SpreadsheetGlobal;
+      if (!w.__fcInst || !w.__fcProbes) throw new Error('Missing spreadsheet instance');
+      // The tagged cell value has no facade equivalent; read it from the engine handle.
+      return w.__fcProbes['api/workbook']
+        .workbookHandleOf(w.__fcInst.workbook)
+        .getValue({ sheet: 0, row: targetRow, col: targetCol });
     },
     { row, col },
   );
 
 const readRules = (page: Page): Promise<ConditionalRuleProbe[]> =>
   page.evaluate(() => {
-    const instance = (window as unknown as SpreadsheetGlobal).__fcInst;
-    const rules = instance?.store?.getState().conditional.rules ?? [];
+    const w = window as unknown as SpreadsheetGlobal;
+    if (!w.__fcInst || !w.__fcProbes) return [];
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    const rules = store.getState().conditional.rules as ConditionalRuleProbe[];
     return rules.map((rule) => ({
       kind: rule.kind,
       ...(rule.a !== undefined ? { a: rule.a } : {}),
@@ -122,7 +111,14 @@ const goTo = async (page: Page, ref: string): Promise<void> => {
 
 const enableLocaleSwitcher = async (page: Page) => {
   await page.evaluate(() => {
-    (window as unknown as SpreadsheetGlobal).__fcInst?.setFeatures?.({ localeSwitcher: true });
+    const instance = (window as unknown as SpreadsheetGlobal).__fcInst;
+    if (!instance) return;
+    instance.update({
+      ui: {
+        ...instance.options.ui,
+        features: { ...instance.options.ui?.features, localeSwitcher: true },
+      },
+    });
   });
   const selector = page.locator('.fc-host__locale-switcher-select').first();
   await expect(selector).toBeVisible();
@@ -149,14 +145,11 @@ const switchLocale = async (
     });
 };
 
-const openConditional = async (
-  page: Page,
-  options: Parameters<NonNullable<SpreadsheetGlobal['__fcInst']>['openConditionalDialog']>[0],
-) => {
+const openConditional = async (page: Page, options?: ConditionalDialogOptions) => {
   await page.evaluate((dialogOptions) => {
     const instance = (window as unknown as SpreadsheetGlobal).__fcInst;
-    if (!instance?.openConditionalDialog) throw new Error('Conditional dialog API unavailable');
-    instance.openConditionalDialog(dialogOptions);
+    if (!instance) throw new Error('Conditional dialog API unavailable');
+    instance.dialogs.open('conditional', dialogOptions);
   }, options);
   const dialog = page.locator('.fc-conddlg').first();
   await expect(dialog).toBeVisible();
@@ -200,7 +193,14 @@ const finishLocaleScenario = async (
   consoleErrors: LocaleScenarioContext['consoleErrors'],
 ): Promise<void> => {
   await page.evaluate(() => {
-    (window as unknown as SpreadsheetGlobal).__fcInst?.setFeatures?.({ localeSwitcher: false });
+    const instance = (window as unknown as SpreadsheetGlobal).__fcInst;
+    if (!instance) return;
+    instance.update({
+      ui: {
+        ...instance.options.ui,
+        features: { ...instance.options.ui?.features, localeSwitcher: false },
+      },
+    });
   });
   await expect(page.locator('.fc-host__locale-switcher-select')).toHaveCount(0);
   expect(consoleErrors.read(), 'locale dialog scenario should not emit console errors').toEqual([]);
@@ -340,8 +340,8 @@ export async function runConditionalFormulaLocaleScenario(
 
   const saved = await page.evaluate(() => {
     const instance = (window as unknown as SpreadsheetGlobal).__fcInst;
-    if (!instance?.workbook) throw new Error('Missing workbook save API');
-    const bytes = instance.workbook.save();
+    if (!instance) throw new Error('Missing workbook save API');
+    const { bytes } = instance.workbook.save();
     return { length: bytes.byteLength, zip: bytes[0] === 0x50 && bytes[1] === 0x4b };
   });
   expect(saved.zip).toBe(true);
@@ -420,8 +420,8 @@ export async function runWatchWindowLocaleDialogScenario(
   await page.keyboard.press('ArrowUp');
   await page.evaluate(() => {
     const instance = (window as unknown as SpreadsheetGlobal).__fcInst;
-    if (!instance?.openWatchWindow) throw new Error('Watch Window API unavailable');
-    instance.openWatchWindow();
+    if (!instance) throw new Error('Watch Window API unavailable');
+    instance.dialogs.open('watchWindow');
   });
   const watch = page.locator('.fc-watch').first();
   await expect(watch).toBeVisible();

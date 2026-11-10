@@ -1,25 +1,25 @@
 import { expect, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const url = 'https://example.com/formulon-native-check';
 
 async function linkState(page: Page) {
   return page.evaluate(() => {
-    const { layoutForView } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
-      'render/geometry'
-    ];
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const wb = instance.workbook;
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { layoutForView } = w.__fcProbes['render/geometry'];
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    // Resolved fonts, the display font and the theme have no facade member.
+    const wb = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
     const style = wb.getEffectiveStyle(0, 0, 0);
     const xf = style && wb.getCellXf(style.xfIndex);
     const font = xf && wb.getResolvedFontRecord(xf.fontIndex);
     const normal = wb.workbookDisplayFont;
     const hlink = wb.getTheme()?.colors[10];
     if (!font || !normal || hlink === undefined) throw new Error('Workbook font/theme unavailable');
-    const format = instance.store.getState().format.formats.get('0:0:0');
-    const layout = layoutForView(instance.store.getState());
+    const format = store.getState().format.formats.get('0:0:0');
+    const layout = layoutForView(store.getState());
     return {
       rowHeight: layout.rowHeights.get(0) ?? layout.defaultRowHeight,
       value: wb.getValue({ sheet: 0, row: 0, col: 0 }),
@@ -46,13 +46,15 @@ export async function runTypedUrlAutoformat(
   await sheet.mount({ locale: 'en', platform });
   await sheet.expectNoStub();
   await page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const normal = instance.workbook.workbookDisplayFont;
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    const normal = handle.workbookDisplayFont;
     if (!normal) throw new Error('Default font unavailable');
-    const { mutators } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes['store/store'];
-    mutators.setColWidth(instance.store, 0, 480);
+    const { mutators } = w.__fcProbes['store/store'];
+    mutators.setColWidth(store, 0, 480);
     mutators.setCellFormat(
-      instance.store,
+      store,
       { sheet: 0, row: 0, col: 0 },
       {
         fontSize: (normal.size + 13) * (4 / 3),

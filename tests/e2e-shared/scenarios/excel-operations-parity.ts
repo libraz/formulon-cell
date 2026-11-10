@@ -1,4 +1,6 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 async function clickColumnHeader(
@@ -7,26 +9,10 @@ async function clickColumnHeader(
   button: 'left' | 'right' = 'left',
 ): Promise<void> {
   const position = await page.evaluate((targetCol) => {
-    const instance = (
-      window as Window & {
-        __fcInst?: {
-          store: {
-            getState(): {
-              layout: {
-                headerColWidth: number;
-                headerRowHeight: number;
-                defaultColWidth: number;
-                colWidths: Map<number, number>;
-                screenScale?: number;
-              };
-              viewport: { zoom: number };
-            };
-          };
-        };
-      }
-    ).__fcInst;
-    if (!instance) throw new Error('window.__fcInst is not available');
-    const { layout, viewport } = instance.store.getState();
+    const w = window as unknown as { __fcInst?: SpreadsheetInstance; __fcProbes: E2eProbes };
+    if (!w.__fcInst) throw new Error('window.__fcInst is not available');
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    const { layout, viewport } = store.getState();
     // Headers are chrome px; cell sizes are canonical px scaled like renderScale.
     const scale = viewport.zoom * (layout.screenScale ?? 1);
     let x = layout.headerColWidth;
@@ -93,12 +79,10 @@ export async function runCrossSheetCutReferencesScenario(page: Page): Promise<vo
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const inst = (
-          window as Window & {
-            __fcInst?: { store: { getState(): { ui: { copyMode: string | null } } } };
-          }
-        ).__fcInst;
-        return inst?.store.getState().ui.copyMode;
+        const w = window as unknown as { __fcInst?: SpreadsheetInstance; __fcProbes: E2eProbes };
+        if (!w.__fcInst) return undefined;
+        return w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState().ui
+          .copyMode;
       }),
     )
     .toBe('cut');
@@ -333,26 +317,10 @@ async function clickRowHeader(
   button: 'left' | 'right' = 'left',
 ): Promise<void> {
   const position = await page.evaluate((targetRow) => {
-    const instance = (
-      window as Window & {
-        __fcInst?: {
-          store: {
-            getState(): {
-              layout: {
-                headerColWidth: number;
-                headerRowHeight: number;
-                defaultRowHeight: number;
-                rowHeights: Map<number, number>;
-                screenScale?: number;
-              };
-              viewport: { zoom: number };
-            };
-          };
-        };
-      }
-    ).__fcInst;
-    if (!instance) throw new Error('window.__fcInst is not available');
-    const { layout, viewport } = instance.store.getState();
+    const w = window as unknown as { __fcInst?: SpreadsheetInstance; __fcProbes: E2eProbes };
+    if (!w.__fcInst) throw new Error('window.__fcInst is not available');
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    const { layout, viewport } = store.getState();
     // Headers are chrome px; cell sizes are canonical px scaled like renderScale.
     const scale = viewport.zoom * (layout.screenScale ?? 1);
     let y = layout.headerRowHeight;
@@ -531,12 +499,10 @@ export async function runCutBandInsertRoutesScenario(page: Page): Promise<void> 
   await expect.poll(() => sp.readValue('J2')).toEqual({ kind: 'number', value: 3 });
   const copyMode = () =>
     page.evaluate(() => {
-      const inst = (
-        window as Window & {
-          __fcInst?: { store: { getState(): { ui: { copyMode: string | null } } } };
-        }
-      ).__fcInst;
-      return inst?.store.getState().ui.copyMode;
+      const w = window as unknown as { __fcInst?: SpreadsheetInstance; __fcProbes: E2eProbes };
+      if (!w.__fcInst) return undefined;
+      return w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState().ui
+        .copyMode;
     });
   await expect.poll(copyMode).toBe('cut');
   await clickRowHeader(page, 2);

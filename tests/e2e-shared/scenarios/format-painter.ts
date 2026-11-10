@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** F02 — apply a currency format imperatively and verify the engine round-trips
@@ -11,33 +13,21 @@ export async function runCurrencyFormatScenario(page: Page): Promise<void> {
   await sp.mount();
   await sp.expectNoStub();
 
-  type SpreadsheetGlobal = {
-    __fcInst?: {
-      workbook: { setNumber(addr: { sheet: number; row: number; col: number }, n: number): void };
-      store: {
-        setState(fn: (s: unknown) => unknown): void;
-        getState(): unknown;
-      };
-    };
-  };
+  type SpreadsheetGlobal = { __fcInst?: SpreadsheetInstance; __fcProbes: E2eProbes };
 
   const result = await page.evaluate(() => {
     const w = window as unknown as SpreadsheetGlobal;
     const inst = w.__fcInst;
     if (!inst) return { ok: false as const };
 
-    const addr = { sheet: 0, row: 0, col: 0 };
-    inst.workbook.setNumber(addr, 1234.5);
+    inst.workbook.sheet(0).setNumber(0, 0, 1234.5);
+    inst.history.clear();
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(inst);
     // Patch the cell format slice directly to apply currency.
-    inst.store.setState((s) => {
-      const state = s as Record<string, unknown>;
-      const fmt = state.format as { formats: Map<string, unknown> };
-      const next = new Map(fmt.formats);
+    store.setState((s) => {
+      const next = new Map(s.format.formats);
       next.set('0:0:0', { numFmt: { kind: 'currency', decimals: 2, symbol: '$' } });
-      return {
-        ...(state as object),
-        format: { ...fmt, formats: next },
-      };
+      return { ...s, format: { ...s.format, formats: next } };
     });
     return { ok: true as const };
   });

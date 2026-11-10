@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -21,26 +22,30 @@ export async function runFormulaDataEdgeNavigation(
   await sheet.expectNoStub();
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.applyChanges([
-      { addr: { sheet: 0, row: 1, col: 1 }, input: '=9' },
-      { addr: { sheet: 0, row: 1, col: 2 }, input: '1' },
-      { addr: { sheet: 0, row: 1, col: 3 }, input: '2' },
-      { addr: { sheet: 0, row: 1, col: 4 }, input: '3' },
-      { addr: { sheet: 0, row: 1, col: 7 }, input: '4' },
-    ]);
+    const sheet0 = instance.workbook.sheet(0);
+    instance.workbook.batch(() => {
+      sheet0.setFormula(1, 1, '=9');
+      sheet0.setNumber(1, 2, 1);
+      sheet0.setNumber(1, 3, 2);
+      sheet0.setNumber(1, 4, 3);
+      sheet0.setNumber(1, 7, 4);
+    });
+    instance.history.clear();
   });
   const input = page.locator(
     surface === 'inline' ? '.fc-host__editor' : '.fc-host__formulabar-input',
   );
   const begin = async () => {
     await page.evaluate(() => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      instance.store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: false } }));
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: false } }));
     });
     await sheet.goTo('B2');
     await page.evaluate((r1c1) => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      instance.store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1 } }));
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+      store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1 } }));
     }, style === 'r1c1');
     if (surface === 'inline') await page.keyboard.press('F2');
     else await input.focus();
@@ -61,12 +66,10 @@ export async function runFormulaDataEdgeNavigation(
   await expect(input).toHaveValue(`=SUM(${expanded})+7`);
   expect(await sheet.readFormula('B2')).toBe('=9');
   expect(
-    await page.evaluate(
-      () =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().selection
-          .active,
+    await page.evaluate(() =>
+      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
     ),
-  ).toEqual({ sheet: 0, row: 1, col: 1 });
+  ).toMatchObject({ sheet: 0, active: { row: 1, col: 1 } });
   await page.keyboard.press(undo);
   await expect(input).toHaveValue('=SUM()+7');
   await page.keyboard.press(redo);
@@ -102,12 +105,14 @@ export async function runStructuredReferenceCompletion(
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const headers = ['A]B', 'A,B', "O'Brien", 'Revenue', 'Region', 'Revenue', '金額', 'Net'];
     const values = [7, 11, 13, 17, 23, 29, 31, 37];
-    instance.applyChanges(
-      headers.flatMap((header, col) => [
-        { addr: { sheet: 0, row: 0, col }, input: header },
-        { addr: { sheet: 0, row: 1, col }, input: String(values[col]) },
-      ]),
-    );
+    const sheet0 = instance.workbook.sheet(0);
+    instance.workbook.batch(() => {
+      headers.forEach((header, col) => {
+        sheet0.setText(0, col, header);
+        sheet0.setNumber(1, col, values[col] ?? 0);
+      });
+    });
+    instance.history.clear();
     for (const table of [
       { name: 'Sales', range: 'A1:D2', columns: headers.slice(0, 4) },
       { name: 'Data', range: 'E1:E2', columns: ['Region'] },
@@ -115,8 +120,7 @@ export async function runStructuredReferenceCompletion(
       { name: '売上', range: 'G1:G2', columns: ['金額'] },
       { name: '\\Ledger', range: 'H1:H2', columns: ['Net'] },
     ]) {
-      if (instance.workbook.createTable(0, table) < 0)
-        throw new Error(`Table fixture rejected: ${table.name}`);
+      sheet0.addTable(table);
     }
   });
   const input = page.locator(

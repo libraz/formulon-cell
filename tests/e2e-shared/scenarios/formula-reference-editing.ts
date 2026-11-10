@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export type FormulaEditEntry = 'f2' | 'double-click' | 'formula-bar';
@@ -16,14 +17,16 @@ export async function runFormulaReferenceEditing(
   const original = '=SUM(B1:B2)+D1';
   await page.evaluate((formula) => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.applyChanges([
-      { addr: { sheet: 0, row: 0, col: 0 }, input: formula },
-      { addr: { sheet: 0, row: 0, col: 1 }, input: '2' },
-      { addr: { sheet: 0, row: 1, col: 1 }, input: '3' },
-      { addr: { sheet: 0, row: 0, col: 3 }, input: '7' },
-      { addr: { sheet: 0, row: 3, col: 2 }, input: '11' },
-      { addr: { sheet: 0, row: 4, col: 3 }, input: '13' },
-    ]);
+    instance.workbook.batch(() => {
+      const sheet = instance.workbook.sheet(0);
+      sheet.setFormula(0, 0, formula);
+      sheet.setNumber(0, 1, 2);
+      sheet.setNumber(1, 1, 3);
+      sheet.setNumber(0, 3, 7);
+      sheet.setNumber(3, 2, 11);
+      sheet.setNumber(4, 3, 13);
+    });
+    instance.history.clear();
   }, original);
   const clickCell = async (row: number, col: number) => {
     const point = await gridCellCenter(page, row, col);
@@ -31,11 +34,13 @@ export async function runFormulaReferenceEditing(
   };
   const readSource = () =>
     page.evaluate(() => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      // The tagged cell value has no facade equivalent; read it from the engine handle.
+      const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
       const addr = { sheet: 0, row: 0, col: 0 };
       return {
-        formula: instance.workbook.cellFormula(addr),
-        value: instance.workbook.getValue(addr),
+        formula: handle.cellFormula(addr),
+        value: handle.getValue(addr),
       };
     });
   const input = page
@@ -78,9 +83,12 @@ export async function runFormulaReferenceEditing(
     .toEqual({ formula: '=SUM(C4:D5)+D1', value: { kind: 'number', value: 31 } });
 
   expect(
-    await page.evaluate(() =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
-    ),
+    await page.evaluate(() => {
+      const { history } = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const available = history.canUndo;
+      history.undo();
+      return available;
+    }),
   ).toBe(true);
   expect((await readSource()).formula).toBe(original);
 
@@ -98,9 +106,12 @@ export async function runFormulaReferenceEditing(
     value: { kind: 'number', value: 43 },
   });
   expect(
-    await page.evaluate(() =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
-    ),
+    await page.evaluate(() => {
+      const { history } = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const available = history.canUndo;
+      history.undo();
+      return available;
+    }),
   ).toBe(true);
 
   await begin();
@@ -148,9 +159,11 @@ export async function runFormulaReferenceEditing(
   await expect.poll(readSource).toEqual({ formula: '=C4', value: { kind: 'number', value: 11 } });
   // The same pointer route must replace relative R1C1 references during a drag.
   await page.evaluate((formula) => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.applyChanges([{ addr: { sheet: 0, row: 0, col: 0 }, input: formula }]);
-    instance.store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: true } }));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    w.__fcInst.workbook.batch(() => w.__fcInst.workbook.sheet(0).setFormula(0, 0, formula));
+    w.__fcInst.history.clear();
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    store.setState((state) => ({ ...state, ui: { ...state.ui, r1c1: true } }));
   }, original);
   await begin();
   const r1c1 = await input.inputValue();

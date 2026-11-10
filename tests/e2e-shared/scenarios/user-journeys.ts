@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const start = async (page: Page): Promise<UserJourneyPage> => {
@@ -263,11 +263,10 @@ export async function runMergedSummaryScenario(page: Page): Promise<void> {
       .poll(() =>
         page.evaluate(
           () =>
-            (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState()
-              .selection.range,
+            (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get().range,
         ),
       )
-      .toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+      .toEqual({ firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 1 });
   });
 
   await test.step('AutoSum counts the merged balance once and places the total below the range', async () => {

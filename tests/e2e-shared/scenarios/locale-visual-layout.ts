@@ -1,5 +1,5 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
-
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { revealRibbonCommand, selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
@@ -18,12 +18,8 @@ export async function runLocaleVisualLayout(
   const shell = page.locator(`[data-fc-platform="${platform}"] > .fc-tb__ribbon-shell`).first();
   await expect(shell).toBeVisible();
   await page.evaluate(() => {
-    const instance = (
-      window as unknown as {
-        __fcInst: { setFeatures: (options: { localeSwitcher: boolean }) => void };
-      }
-    ).__fcInst;
-    instance.setFeatures({ localeSwitcher: true });
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    instance.update({ ui: { ...instance.options.ui, features: { localeSwitcher: true } } });
   });
   const localeSelect = page.locator('.fc-host__locale-switcher-select').first();
   for (const locale of LOCALES) {

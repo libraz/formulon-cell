@@ -1,4 +1,6 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { a1Address, UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -6,19 +8,11 @@ const targets = ['A1', 'B1', 'C1', 'A2', 'C2', 'A3', 'B3', 'C3', 'E5'];
 
 const engineBold = (page: Page, ref: string): Promise<boolean> =>
   page.evaluate((addr) => {
-    const instance = (
-      window as unknown as {
-        __fcInst: {
-          workbook: {
-            getCellXfIndex(sheet: number, row: number, col: number): number;
-            getCellXf(index: number): { fontIndex: number } | null;
-            getFontRecord(index: number): { bold: boolean | null } | null;
-          };
-        };
-      }
-    ).__fcInst;
-    const wb = instance.workbook;
-    const xf = wb.getCellXf(wb.getCellXfIndex(addr.sheet, addr.row, addr.col));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    // XF, font, fill and border records are read from the engine handle.
+    const wb = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    const xfIndex = wb.getCellXfIndex(addr.sheet, addr.row, addr.col);
+    const xf = xfIndex === null ? null : wb.getCellXf(xfIndex);
     if (!xf) throw new Error('Missing engine XF');
     const font = wb.getFontRecord(xf.fontIndex);
     if (!font) throw new Error('Missing engine font');
@@ -34,23 +28,10 @@ async function commandClick(page: Page, row: number, col: number): Promise<void>
 
 const engineBorderStyles = (page: Page, ref: string): Promise<number[]> =>
   page.evaluate((addr) => {
-    const wb = (
-      window as unknown as {
-        __fcInst: {
-          workbook: {
-            getCellXfIndex(sheet: number, row: number, col: number): number;
-            getCellXf(index: number): { borderIndex: number } | null;
-            getBorderRecord(index: number): {
-              top: { style: number };
-              right: { style: number };
-              bottom: { style: number };
-              left: { style: number };
-            } | null;
-          };
-        };
-      }
-    ).__fcInst.workbook;
-    const xf = wb.getCellXf(wb.getCellXfIndex(addr.sheet, addr.row, addr.col));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const wb = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    const xfIndex = wb.getCellXfIndex(addr.sheet, addr.row, addr.col);
+    const xf = xfIndex === null ? null : wb.getCellXf(xfIndex);
     if (!xf) throw new Error('Missing engine XF');
     const border = wb.getBorderRecord(xf.borderIndex);
     if (!border) throw new Error('Missing engine border');
@@ -274,17 +255,10 @@ export async function runMacSelectionClearAllWithHole(page: Page): Promise<void>
 
 const engineHorizontalAlign = (page: Page, ref: string): Promise<number> =>
   page.evaluate((addr) => {
-    const wb = (
-      window as unknown as {
-        __fcInst: {
-          workbook: {
-            getCellXfIndex(sheet: number, row: number, col: number): number;
-            getCellXf(index: number): { horizontal: number | null } | null;
-          };
-        };
-      }
-    ).__fcInst.workbook;
-    const xf = wb.getCellXf(wb.getCellXfIndex(addr.sheet, addr.row, addr.col));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const wb = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    const xfIndex = wb.getCellXfIndex(addr.sheet, addr.row, addr.col);
+    const xf = xfIndex === null ? null : wb.getCellXf(xfIndex);
     if (!xf) throw new Error('Missing engine XF');
     return xf.horizontal ?? 0;
   }, a1Address(ref));
@@ -362,22 +336,14 @@ export async function runMacSelectionFormatDialogWithHole(page: Page): Promise<v
 
 const engineFill = (page: Page, ref: string): Promise<[number, number]> =>
   page.evaluate((addr) => {
-    const wb = (
-      window as unknown as {
-        __fcInst: {
-          workbook: {
-            getCellXfIndex(sheet: number, row: number, col: number): number;
-            getCellXf(index: number): { fillIndex: number } | null;
-            getFillRecord(index: number): { pattern: number; foreground: { argb: number } } | null;
-          };
-        };
-      }
-    ).__fcInst.workbook;
-    const xf = wb.getCellXf(wb.getCellXfIndex(addr.sheet, addr.row, addr.col));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const wb = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    const xfIndex = wb.getCellXfIndex(addr.sheet, addr.row, addr.col);
+    const xf = xfIndex === null ? null : wb.getCellXf(xfIndex);
     if (!xf) throw new Error('Missing engine XF');
     const fill = wb.getFillRecord(xf.fillIndex);
     if (!fill) throw new Error('Missing engine fill');
-    return [fill.pattern, fill.foreground.argb & 0xffffff];
+    return [fill.pattern, (fill.foreground?.argb ?? 0) & 0xffffff];
   }, a1Address(ref));
 
 export async function runMacSelectionCellStyleWithHole(page: Page): Promise<void> {

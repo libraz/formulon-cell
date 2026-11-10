@@ -1,15 +1,14 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const selection = (page: Page) =>
-  page.evaluate(
-    () =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().selection,
+  page.evaluate(() =>
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
   );
 
 const active = async (page: Page, row: number, col: number): Promise<void> => {
-  await expect.poll(() => selection(page)).toMatchObject({ active: { sheet: 0, row, col } });
+  await expect.poll(() => selection(page)).toMatchObject({ sheet: 0, active: { row, col } });
 };
 
 async function mount(page: Page): Promise<UserJourneyPage> {
@@ -139,6 +138,9 @@ export async function runTabReturnResets(page: Page): Promise<void> {
   await page.keyboard.press('Enter');
   await expect
     .poll(() => selection(page))
-    .toMatchObject({ active: { row: 1, col: 2 }, range: { r0: 0, c0: 0, r1: 1, c1: 2 } });
+    .toMatchObject({
+      active: { row: 1, col: 2 },
+      range: { firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 2 },
+    });
   await sp.expectNoConsoleErrors();
 }

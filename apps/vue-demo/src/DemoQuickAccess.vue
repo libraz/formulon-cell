@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LegacySpreadsheetInstance as SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { SpreadsheetInstance } from '@libraz/formulon-cell';
 import { onBeforeUnmount, ref, watch } from 'vue';
 import {
   DEFAULT_DEMO_QUICK_ACCESS,
@@ -34,7 +34,7 @@ watch(
   () => props.instance,
   (instance) => {
     unsubscribeHistory?.();
-    unsubscribeHistory = instance?.history.subscribe(() => {
+    unsubscribeHistory = instance?.history.on('change', () => {
       historyRevision.value += 1;
     });
   },

@@ -82,7 +82,7 @@ export const deUi: DemoUiStrings = {
   uppercaseColumnA: 'Spalte A großschreiben',
   arrowPrefixNegatives: 'Negative Werte mit Pfeil kennzeichnen',
   customFunctions: 'Benutzerdefinierte Funktionen',
-  customFunctionsHint: 'Die hostseitige Funktionsregistrierung direkt prüfen.',
+  customFunctionsHint: 'Hostseitige Formelhinweise für Autovervollständigung und Argumenthilfe.',
   cellChangeLog: 'Änderungsprotokoll der Zellen',
   cellChangeLogHint: 'Zelländerungen werden im Demo-Protokoll gespiegelt.',
   editCellToSeeEvents: 'Bearbeiten Sie eine Zelle, um Ereignisse zu sehen.',

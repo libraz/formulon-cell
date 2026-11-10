@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 const LOCALE_PROFILES = [
@@ -48,11 +50,8 @@ export async function runSevenLocalesScenario(
   const nativeSelect = page.locator('.fc-host__locale-switcher select');
   await expect(nativeSelect).toHaveCount(0);
   await page.evaluate(() => {
-    (
-      window as unknown as {
-        __fcInst: { setFeatures: (flags: { localeSwitcher: boolean }) => void };
-      }
-    ).__fcInst.setFeatures({ localeSwitcher: true });
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    instance.update({ ui: { ...instance.options.ui, features: { localeSwitcher: true } } });
   });
   await expect(nativeSelect).toBeVisible();
   await expect(nativeSelect.locator('option')).toHaveCount(7);
@@ -73,9 +72,7 @@ export async function runSevenLocalesScenario(
       .poll(
         () =>
           page.evaluate(
-            () =>
-              (window as unknown as { __fcInst?: { i18n?: { locale?: string } } }).__fcInst?.i18n
-                ?.locale,
+            () => (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst?.i18n.locale,
           ),
         { message: `core i18n locale should switch to ${profile.id}` },
       )
@@ -98,14 +95,11 @@ export async function runSevenLocalesScenario(
       .poll(
         () =>
           page.evaluate(() => {
-            const instance = (
-              window as unknown as {
-                __fcInst?: {
-                  workbook?: { spreadsheetProfileId?: () => string | null };
-                };
-              }
-            ).__fcInst;
-            return instance?.workbook?.spreadsheetProfileId?.() ?? null;
+            const instance = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+            const probes = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes;
+            return instance
+              ? probes['api/workbook'].workbookHandleOf(instance.workbook).spreadsheetProfileId()
+              : null;
           }),
         { message: `engine profile should follow ${profile.id}` },
       )
@@ -123,27 +117,14 @@ export async function runSevenLocalesScenario(
     await expect
       .poll(() =>
         page.evaluate(() => {
-          const instance = (
-            window as unknown as {
-              __fcInst?: {
-                workbook: {
-                  getValue: (addr: { sheet: number; row: number; col: number }) => {
-                    kind: string;
-                    value?: string;
-                  };
-                };
-                store: {
-                  getState: () => {
-                    data: { cells: Map<string, { value: { kind: string; value?: string } }> };
-                  };
-                };
-              };
-            }
-          ).__fcInst;
+          const w = window as unknown as { __fcInst?: SpreadsheetInstance; __fcProbes: E2eProbes };
+          const instance = w.__fcInst;
           if (!instance) throw new Error('Missing spreadsheet instance');
+          const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(instance);
+          const displayed = store.getState().data.cells.get('0:0:0')?.value;
           return {
-            engine: instance.workbook.getValue({ sheet: 0, row: 0, col: 0 }).value,
-            displayed: instance.store.getState().data.cells.get('0:0:0')?.value.value,
+            engine: instance.workbook.sheet(0).getValue(0, 0),
+            displayed: displayed && 'value' in displayed ? displayed.value : undefined,
           };
         }),
       )
@@ -151,11 +132,8 @@ export async function runSevenLocalesScenario(
   }
 
   await page.evaluate(() => {
-    (
-      window as unknown as {
-        __fcInst: { setFeatures: (flags: { localeSwitcher: boolean }) => void };
-      }
-    ).__fcInst.setFeatures({ localeSwitcher: false });
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    instance.update({ ui: { ...instance.options.ui, features: { localeSwitcher: false } } });
   });
   await expect(nativeSelect).toHaveCount(0);
 

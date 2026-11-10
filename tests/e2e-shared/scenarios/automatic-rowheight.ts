@@ -1,17 +1,17 @@
 import { expect, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 async function rowGeometry(page: Page, row: number) {
   return page.evaluate(
     ({ row }) => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      const { layoutForView } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
-        'render/geometry'
-      ];
-      const state = instance.store.getState();
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { layoutForView } = w.__fcProbes['render/geometry'];
+      const state = w.__fcProbes['mount/internals']
+        .spreadsheetInternals(w.__fcInst)
+        .store.getState();
       const layout = layoutForView(state);
       return {
         logicalHeight: layout.rowHeights.get(row) ?? layout.defaultRowHeight,
@@ -54,8 +54,8 @@ export async function runAutomaticRowheight(
   expect(
     await page.evaluate(
       () =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().selection
-          .active.row,
+        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get().active
+          .row,
     ),
   ).toBe(1);
 
@@ -68,11 +68,11 @@ export async function runAutomaticRowheight(
   expect((await rowGeometry(page, 0)).logicalHeight).toBeLessThan(enlarged.logicalHeight);
 
   await page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const { setRowsHeight } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
-      'commands/row-col-layout'
-    ];
-    setRowsHeight(instance.store, instance.history, 0, 0, 24, instance.workbook);
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { setRowsHeight } = w.__fcProbes['commands/row-col-layout'];
+    const { store, controller } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    setRowsHeight(store, controller.history, 0, 0, 24, handle);
   });
   await chooseFontSize(36);
   expect((await rowGeometry(page, 0)).logicalHeight).toBe(24);
@@ -89,12 +89,15 @@ export async function runAutomaticRowheight(
   await expect
     .poll(async () => {
       const instanceState = await page.evaluate(() => {
-        const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-        const state = instance.store.getState();
-        const effective = instance.workbook.getEffectiveStyle(0, 100, 0);
-        const xf = effective && instance.workbook.getCellXf(effective.xfIndex);
+        const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+        const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+        const state = store.getState();
+        // The resolved font record has no facade member; read it from the engine handle.
+        const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+        const effective = handle.getEffectiveStyle(0, 100, 0);
+        const xf = effective && handle.getCellXf(effective.xfIndex);
         return {
-          nativePoints: xf && instance.workbook.getResolvedFontRecord(xf.fontIndex)?.sizePt,
+          nativePoints: xf && handle.getResolvedFontRecord(xf.fontIndex)?.sizePt,
           sheetPatch: state.format.sheetFontOverrides?.get(0)?.patch ?? null,
           axisOverride: state.format.sheetAxisOverrides?.has(0) ?? false,
         };

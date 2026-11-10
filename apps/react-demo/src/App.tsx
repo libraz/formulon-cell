@@ -1,20 +1,17 @@
 import {
-  type CellChangeEvent,
+  type CellEvent,
   type FeatureFlags,
   type FeatureId,
   type HostProviders,
-  type LegacySpreadsheetInstance,
   type parseScriptCommand,
   type ScriptCommand,
   type SpreadsheetInstance,
   type ThemeName,
-  WorkbookHandle,
+  Workbook,
 } from '@libraz/formulon-cell';
 import type { RibbonHooks, RibbonTab, Toolbar } from '@libraz/formulon-cell/toolbar';
 import { Spreadsheet, SpreadsheetToolbar } from '@libraz/formulon-cell-react';
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { legacyInstanceOf } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
-import { workbookOf } from '../../../packages/formulon-cell/src/api/workbook.js';
 import {
   buildDemoCommands,
   buildDemoReviewDialog,
@@ -24,7 +21,7 @@ import {
   composeDemoUiOptions,
   createDemoStrings,
   createInitialDemoWorkbook,
-  DEMO_FUNCTIONS,
+  DEMO_FORMULA_HINTS,
   DEMO_MAC_RIBBON_TABS,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
@@ -67,12 +64,11 @@ const UI = createDemoStrings('React');
 const f6ToolbarOf = (toolbar: Toolbar | null, host: HTMLElement | null): DemoF6Toolbar | null =>
   host ? { host, focusActiveTab: () => toolbar?.focusActiveTab() ?? false } : null;
 
-/** Shows `handle` in `live`. Settles on the instance's `workbook` event for it, or rejects with the
+/** Shows `next` in `live`. Settles on the instance's `workbook` event for it, or rejects with the
  *  swap's synchronous refusal or its `error` event. */
-const swapWorkbook = (live: SpreadsheetInstance, handle: WorkbookHandle): Promise<void> =>
+const swapWorkbook = (live: SpreadsheetInstance, next: Workbook): Promise<void> =>
   new Promise<void>((resolve, reject) => {
-    const facade = workbookOf(handle);
-    if (live.workbook === facade) {
+    if (live.workbook === next) {
       resolve();
       return;
     }
@@ -83,7 +79,7 @@ const swapWorkbook = (live: SpreadsheetInstance, handle: WorkbookHandle): Promis
     };
     offs.push(
       live.on('workbook', (event) => {
-        if (event.workbook === facade) settle(resolve);
+        if (event.workbook === next) settle(resolve);
       }),
       // `workbook` is the source the instance reports a refused workbook swap under.
       live.on('error', (event) => {
@@ -91,7 +87,7 @@ const swapWorkbook = (live: SpreadsheetInstance, handle: WorkbookHandle): Promis
       }),
     );
     try {
-      live.update({ workbook: facade });
+      live.update({ workbook: next });
     } catch (error) {
       settle(() => reject(error));
     }
@@ -101,7 +97,7 @@ export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
   const [locale, setLocale] = useState<DemoLocale>(() => resolveInitialLocale());
   const [platform] = useState<DemoPlatform>(() => resolveInitialPlatform());
-  const [workbook, setWorkbook] = useState<WorkbookHandle | null>(null);
+  const [workbook, setWorkbook] = useState<Workbook | null>(null);
   const [instance, setInstance] = useState<SpreadsheetInstance | null>(null);
   const [log, setLog] = useState<ChangeLogEntry[]>([]);
   const [formatters, setFormatters] = useState({ uppercase: false, arrows: false });
@@ -124,7 +120,7 @@ export const App = (): ReactElement => {
   const quickAccessRef = useRef<HTMLDivElement | null>(null);
   const ribbonHostRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<Toolbar | null>(null);
-  const workbookOwnerRef = useRef<WorkbookHandle | null>(null);
+  const workbookOwnerRef = useRef<Workbook | null>(null);
   const instanceRef = useRef<SpreadsheetInstance | null>(null);
   const aliveRef = useRef(true);
 
@@ -138,13 +134,6 @@ export const App = (): ReactElement => {
   const commandText = useMemo(() => demoCommandText(locale), [locale]);
   const closeReviewDialog = useCallback(() => setReviewDialog(null), []);
   const closeScriptDialog = useCallback(() => setScriptOpen(false), []);
-  // The demo-shared helpers and the E2E hook still drive the mount behind the public instance.
-  const legacy = useMemo<LegacySpreadsheetInstance | null>(
-    () => (instance ? legacyInstanceOf(instance) : null),
-    [instance],
-  );
-  // The demo keeps owning the engine handle; the facade leaves its disposal to the demo.
-  const workbookFacade = useMemo(() => (workbook ? workbookOf(workbook) : null), [workbook]);
   const host = useMemo<HostProviders>(
     () => ({
       workbookName: () => bookName,
@@ -156,9 +145,9 @@ export const App = (): ReactElement => {
     [bookName],
   );
 
-  const onCellChange = useCallback((e: CellChangeEvent) => {
+  const onCellChange = useCallback((live: SpreadsheetInstance, e: CellEvent) => {
     // The id is drawn once, outside the updater React may call twice.
-    const entry = demoChangeLogEntry(e);
+    const entry = demoChangeLogEntry(live.workbook, e);
     setLog((prev) => pushDemoChangeLog(prev, entry));
   }, []);
 
@@ -168,7 +157,7 @@ export const App = (): ReactElement => {
     void createInitialDemoWorkbook()
       .then((wb) => {
         if (!alive || !aliveRef.current) {
-          // The demo created this borrowed handle, so a late completion must
+          // The demo created this workbook, so a late completion must
           // release it instead of leaving the engine workbook orphaned.
           wb.dispose();
           return;
@@ -184,9 +173,7 @@ export const App = (): ReactElement => {
     return () => {
       alive = false;
       aliveRef.current = false;
-      // The binding borrows the initial workbook. Dispose the core instance
-      // first so a workbook adopted during a New action is released by core;
-      // the explicit handle cleanup then covers the borrowed initial handle.
+      // Dispose the instance first, then the workbook the demo owns.
       try {
         instanceRef.current?.dispose();
       } catch (error) {
@@ -200,27 +187,19 @@ export const App = (): ReactElement => {
   }, []);
 
   useEffect(() => {
-    if (!legacy) return undefined;
-    const disposers = DEMO_FUNCTIONS.map((f) => legacy.formula.register(f.name, f.impl, f.meta));
-    disposers.push(legacy.on('cellChange', onCellChange));
-    return () => {
-      for (const d of disposers) d();
-    };
-  }, [legacy, onCellChange]);
+    if (!instance) return undefined;
+    return instance.on('cell', (e) => onCellChange(instance, e));
+  }, [instance, onCellChange]);
 
   useEffect(() => {
-    if (!legacy) return undefined;
+    if (!instance) return undefined;
     const disposers: (() => void)[] = [];
-    if (formatters.uppercase) {
-      disposers.push(legacy.cells.registerFormatter(FORMATTERS.uppercaseA));
-    }
-    if (formatters.arrows) {
-      disposers.push(legacy.cells.registerFormatter(FORMATTERS.arrowNegatives));
-    }
+    if (formatters.uppercase) disposers.push(instance.cells.add(FORMATTERS.uppercaseA));
+    if (formatters.arrows) disposers.push(instance.cells.add(FORMATTERS.arrowNegatives));
     return () => {
       for (const d of disposers) d();
     };
-  }, [legacy, formatters.uppercase, formatters.arrows]);
+  }, [instance, formatters.uppercase, formatters.arrows]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -231,32 +210,35 @@ export const App = (): ReactElement => {
       installDemoF6Navigation({
         getQuickAccess: () => quickAccessRef.current,
         getToolbar: () => f6ToolbarOf(toolbarRef.current, ribbonHostRef.current),
-        getInstance: () => legacy,
+        getInstance: () => instance,
       }),
-    [legacy],
+    [instance],
   );
 
   // Expose the live instance on `window.__fcInst` so cross-demo E2E scenarios
   // can drive imperative paths (named-range, paste-special, etc.) without
   // depending on demo-specific UI.
   useEffect(() => {
-    (window as unknown as { __fcInst?: LegacySpreadsheetInstance | null }).__fcInst = legacy;
+    (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst = instance;
     return () => {
-      delete (window as unknown as { __fcInst?: LegacySpreadsheetInstance | null }).__fcInst;
+      delete (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst;
     };
-  }, [legacy]);
+  }, [instance]);
 
   const onSpellingReview = useCallback(() => {
-    if (!legacy) return;
-    setReviewDialog(buildDemoReviewFindings('spelling', legacy, locale, commandText));
-  }, [commandText, legacy, locale]);
+    if (!instance) return;
+    setReviewDialog(buildDemoReviewFindings('spelling', instance, locale, commandText));
+  }, [commandText, instance, locale]);
 
   const onAccessibilityCheck = useCallback(() => {
-    if (!legacy) return;
+    if (!instance) return;
     // The Mac host docks its own checker; other platforms keep the review list.
-    if (legacy.openAccessibilityChecker()) return;
-    setReviewDialog(buildDemoReviewFindings('accessibility', legacy, locale, commandText));
-  }, [commandText, legacy, locale]);
+    if (platform === 'mac' && instance.dialogs.canOpen('accessibilityChecker')) {
+      instance.dialogs.open('accessibilityChecker');
+      return;
+    }
+    setReviewDialog(buildDemoReviewFindings('accessibility', instance, locale, commandText));
+  }, [commandText, instance, locale, platform]);
 
   const onRunScript = useCallback(() => {
     if (!instance) return;
@@ -295,10 +277,10 @@ export const App = (): ReactElement => {
 
   const applyParsedScript = useCallback(
     (command: ReturnType<typeof parseScriptCommand>) => {
-      if (!legacy || !command) return;
-      setReviewDialog(reportDemoScriptRun(legacy, command, commandText));
+      if (!instance || !command) return;
+      setReviewDialog(reportDemoScriptRun(instance, command, commandText));
     },
-    [commandText, legacy],
+    [commandText, instance],
   );
 
   const onScriptSubmit = useCallback(
@@ -317,19 +299,19 @@ export const App = (): ReactElement => {
   useEffect(() => installDemoScriptMenu(applyParsedScript), [applyParsedScript]);
 
   const onSave = useCallback(() => {
-    void saveDemoWorkbookToDownload({ instance: legacy, bookName, setUploadStatus });
-  }, [bookName, legacy]);
+    void saveDemoWorkbookToDownload({ instance, bookName, setUploadStatus });
+  }, [bookName, instance]);
 
   const onSaveAs = useCallback(() => {
-    void saveDemoWorkbookAsToDownload({ instance: legacy, bookName, setUploadStatus });
-  }, [bookName, legacy]);
+    void saveDemoWorkbookAsToDownload({ instance, bookName, setUploadStatus });
+  }, [bookName, instance]);
 
   const onSpreadsheetError = useCallback((error: unknown) => {
     console.error('formulon demo: spreadsheet error', error);
   }, []);
 
   const onNewWorkbook = useCallback(async () => {
-    const wb = await WorkbookHandle.createDefault({ locale, platform });
+    const wb = await Workbook.createDefault({ locale, platform });
     if (!aliveRef.current) {
       wb.dispose();
       return;
@@ -363,32 +345,36 @@ export const App = (): ReactElement => {
   const onOpen = useCallback(
     async (file: File) => {
       const live = instance;
-      const mounted = legacy;
-      if (!live || !mounted || !aliveRef.current) return;
+      if (!live || !aliveRef.current) return;
       const previous = workbookOwnerRef.current;
+      let opened: Workbook | null = null;
       try {
-        const name = await openDemoWorkbookFile(mounted, file);
-        if (!aliveRef.current || instanceRef.current !== live) return;
-        // The helper swapped the workbook on the mount; bring the public instance to the same one.
-        const next = mounted.workbook;
+        const { workbook: next, name } = await openDemoWorkbookFile(file);
+        opened = next;
+        if (!aliveRef.current || instanceRef.current !== live) {
+          next.dispose();
+          return;
+        }
         await swapWorkbook(live, next);
-        if (!aliveRef.current) return;
+        if (!aliveRef.current) {
+          next.dispose();
+          return;
+        }
         workbookOwnerRef.current = next;
         setWorkbook(next);
-        // `openDemoWorkbookFile` has already detached the previous workbook
-        // from the core instance. Only now release the demo-owned borrowed
-        // handle and publish the adopted handle as the controlled prop.
+        // The instance no longer shows the previous workbook; release the one the demo owned.
         previous?.dispose();
         setBookName(name);
         setLoadError(null);
       } catch (err) {
+        opened?.dispose();
         if (!aliveRef.current) return;
         setReviewDialog(
           buildDemoReviewDialog(commandText.openFailed, commandText.workbook, formatLoadError(err)),
         );
       }
     },
-    [commandText.openFailed, commandText.workbook, instance, legacy],
+    [commandText.openFailed, commandText.workbook, instance],
   );
 
   const runBackstageAction = useCallback(
@@ -399,7 +385,7 @@ export const App = (): ReactElement => {
       }
       runDemoBackstageAction({
         action,
-        instance: legacy,
+        instance,
         ui,
         newWorkbook: onNewWorkbook,
         openWorkbook: () => fileInputRef.current?.click(),
@@ -414,7 +400,7 @@ export const App = (): ReactElement => {
         },
       });
     },
-    [legacy, onNewWorkbook, onSave, onSaveAs, showRibbonNotice, ui],
+    [instance, onNewWorkbook, onSave, onSaveAs, showRibbonNotice, ui],
   );
 
   const onFormatterChange = useCallback((key: 'uppercase' | 'arrows', checked: boolean) => {
@@ -441,7 +427,7 @@ export const App = (): ReactElement => {
     () =>
       buildDemoCommands({
         commandText,
-        instance: legacy,
+        instance,
         openWorkbook: () => fileInputRef.current?.click(),
         saveWorkbook: onSave,
         setRibbonTab,
@@ -452,7 +438,7 @@ export const App = (): ReactElement => {
           if (resolved) setLocale(resolved);
         },
       }),
-    [commandText, legacy, onSave],
+    [commandText, instance, onSave],
   );
   const applyToolbarCommand = useCallback((commandId: string): boolean => {
     const toolbar = toolbarRef.current;
@@ -497,7 +483,7 @@ export const App = (): ReactElement => {
         ui={ui}
         platform={platform}
         bookName={bookName}
-        instance={legacy}
+        instance={instance}
         showPanel={showPanel}
         searchItems={searchItems}
         quickAccessRef={quickAccessRef}
@@ -542,7 +528,8 @@ export const App = (): ReactElement => {
           <Spreadsheet
             className="demo__sheet"
             ui={resolvedUi}
-            workbook={workbookFacade ?? undefined}
+            workbook={workbook}
+            formulaHints={DEMO_FORMULA_HINTS}
             theme={theme}
             locale={locale}
             host={host}
@@ -561,7 +548,7 @@ export const App = (): ReactElement => {
           {ribbonTab === 'file' ? (
             <DemoBackstage
               ui={ui}
-              instance={legacy}
+              instance={instance}
               bookName={bookName}
               action={backstageAction}
               onAction={runBackstageAction}
@@ -572,7 +559,6 @@ export const App = (): ReactElement => {
           ui={ui}
           commandText={commandText}
           spreadsheet={instance}
-          legacy={legacy}
           hidden={!showPanel}
           theme={theme}
           locale={locale}

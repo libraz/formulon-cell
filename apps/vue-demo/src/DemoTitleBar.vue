@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RibbonTab, LegacySpreadsheetInstance as SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { RibbonTab, SpreadsheetInstance } from '@libraz/formulon-cell';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   buildDemoSearchSuggestions,
@@ -186,10 +186,10 @@ onBeforeUnmount(() => {
           <button type="button" class="demo__title-icon" :aria-label="ui.save" :title="ui.save" @click="emit('save')">
             <DemoIcon name="save" />
           </button>
-          <button type="button" class="demo__title-icon" :aria-label="ui.undo" :title="ui.undo" @click="instance?.undo()">
+          <button type="button" class="demo__title-icon" :aria-label="ui.undo" :title="ui.undo" @click="instance?.history.undo()">
             <DemoIcon name="undo" />
           </button>
-          <button type="button" class="demo__title-icon" :aria-label="ui.redo" :title="ui.redo" @click="instance?.redo()">
+          <button type="button" class="demo__title-icon" :aria-label="ui.redo" :title="ui.redo" @click="instance?.history.redo()">
             <DemoIcon name="redo" />
           </button>
         </template>

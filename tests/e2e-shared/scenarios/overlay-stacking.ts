@@ -60,6 +60,6 @@ export async function runOverlayStackingScenario(page: Page): Promise<void> {
   //    the build accidentally drops or rewrites the `--fc-z-*` custom
   //    properties the resolved values would be near-zero, which is a clear
   //    integration regression we want to catch.
-  expect(dialogZ).toBeGreaterThanOrEqual(2_147_483_020);
-  expect(findZ).toBeGreaterThanOrEqual(2_147_483_010);
+  expect(dialogZ).toBeGreaterThanOrEqual(16_777_020);
+  expect(findZ).toBeGreaterThanOrEqual(16_777_010);
 }

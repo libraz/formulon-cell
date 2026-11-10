@@ -1,31 +1,18 @@
 import { expect, type Page } from '@playwright/test';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const selection = (page: Page) =>
-  page.evaluate(() => {
-    const inst = (
-      window as unknown as {
-        __fcInst: {
-          store: {
-            getState(): {
-              selection: {
-                active: { sheet: number; row: number; col: number };
-                range: { sheet: number; r0: number; c0: number; r1: number; c1: number };
-              };
-            };
-          };
-        };
-      }
-    ).__fcInst;
-    return inst.store.getState().selection;
-  });
+  page.evaluate(() =>
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
+  );
 
 export async function runMacSelectionTraversal(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
   await sp.expectNoStub();
-  const range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+  const range = { firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 1 };
   for (const [key, path] of [
     [
       'Enter',
@@ -85,13 +72,19 @@ export async function runMacSelectionEntry(page: Page): Promise<void> {
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 10 });
   await expect
     .poll(() => selection(page))
-    .toMatchObject({ active: { row: 1, col: 0 }, range: { r0: 0, c0: 0, r1: 1, c1: 1 } });
+    .toMatchObject({
+      active: { row: 1, col: 0 },
+      range: { firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 1 },
+    });
   await page.keyboard.type('20');
   await page.keyboard.press('Tab');
   await expect.poll(() => sp.readValue('A2')).toEqual({ kind: 'number', value: 20 });
   await expect
     .poll(() => selection(page))
-    .toMatchObject({ active: { row: 1, col: 1 }, range: { r0: 0, c0: 0, r1: 1, c1: 1 } });
+    .toMatchObject({
+      active: { row: 1, col: 1 },
+      range: { firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 1 },
+    });
   await sp.expectNoConsoleErrors();
 }
 
@@ -108,7 +101,10 @@ export async function runMacCommandReturnFill(page: Page): Promise<void> {
     await expect.poll(() => sp.readValue(ref)).toEqual({ kind: 'number', value: 42 });
   await expect
     .poll(() => selection(page))
-    .toMatchObject({ active: { row: 0, col: 0 }, range: { r0: 0, c0: 0, r1: 1, c1: 1 } });
+    .toMatchObject({
+      active: { row: 0, col: 0 },
+      range: { firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 1 },
+    });
   await page.locator('.fc-host').focus();
   await page.keyboard.press('Meta+z');
   for (const ref of ['A1', 'A2', 'B1', 'B2'])
@@ -134,7 +130,10 @@ export async function runMacCollapseSelection(page: Page): Promise<void> {
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'text', value: 'keep' });
   await expect
     .poll(() => selection(page))
-    .toMatchObject({ active: { row: 0, col: 0 }, range: { r0: 0, c0: 0, r1: 0, c1: 0 } });
+    .toMatchObject({
+      active: { row: 0, col: 0 },
+      range: { firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 },
+    });
   await sp.expectNoConsoleErrors();
 }
 
@@ -149,13 +148,19 @@ export async function runMacFormulaBarSelection(page: Page): Promise<void> {
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 7 });
   await expect
     .poll(() => selection(page))
-    .toMatchObject({ active: { row: 1, col: 0 }, range: { r0: 0, c0: 0, r1: 1, c1: 1 } });
+    .toMatchObject({
+      active: { row: 1, col: 0 },
+      range: { firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 1 },
+    });
   await fx.fill('8');
   await fx.press('Tab');
   await expect.poll(() => sp.readValue('A2')).toEqual({ kind: 'number', value: 8 });
   await expect
     .poll(() => selection(page))
-    .toMatchObject({ active: { row: 1, col: 1 }, range: { r0: 0, c0: 0, r1: 1, c1: 1 } });
+    .toMatchObject({
+      active: { row: 1, col: 1 },
+      range: { firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 1 },
+    });
   await sp.goTo('C1:D2');
   await fx.fill('=A1');
   await fx.press('Meta+Enter');

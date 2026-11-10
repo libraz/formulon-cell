@@ -1,11 +1,11 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const selection = (page: Page) =>
-  page.evaluate(
-    () =>
-      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().selection,
+  page.evaluate(() =>
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
   );
 
 async function hideBands(sp: UserJourneyPage): Promise<void> {
@@ -16,9 +16,9 @@ async function hideBands(sp: UserJourneyPage): Promise<void> {
   await expect
     .poll(() =>
       sp.page.evaluate(() => {
-        const { layout } = (
-          window as unknown as { __fcInst: SpreadsheetInstance }
-        ).__fcInst.store.getState();
+        const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+        const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+        const { layout } = store.getState();
         return { rows: [...layout.hiddenRows], cols: [...layout.hiddenCols] };
       }),
     )
@@ -86,7 +86,7 @@ export async function runHiddenBandTraversal(page: Page): Promise<void> {
   await sp.mount({ platform: 'mac' });
   await sp.expectNoStub();
   await hideBands(sp);
-  const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 3 };
+  const range = { firstRow: 0, firstCol: 0, lastRow: 3, lastCol: 3 };
   for (const [key, path] of [
     [
       'Enter',
@@ -171,7 +171,7 @@ export async function runMergedSelectionCycles(page: Page): Promise<void> {
   await sp.goTo('B1:C2');
   const menu = await sp.openRibbonSplitMenu('merge', 'menu-merge');
   await menu.locator('[data-merge-action="mergeCells"]').click();
-  const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 };
+  const range = { firstRow: 0, firstCol: 0, lastRow: 2, lastCol: 2 };
   for (const [key, path] of [
     [
       'Tab',

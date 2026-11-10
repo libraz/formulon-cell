@@ -1,20 +1,19 @@
 import type {
-  CellValue,
   FeatureFlags,
   FeatureId,
-  LegacySpreadsheetInstance,
   SelectionState,
   SpreadsheetInstance,
   ThemeName,
 } from '@libraz/formulon-cell';
 import { useSelection } from '@libraz/formulon-cell-react';
-import { type ReactElement, useCallback, useMemo, useState } from 'react';
+import { type ReactElement, useMemo } from 'react';
 import {
   type ChangeLogEntry,
+  DEMO_FORMULA_HINTS,
   type DemoCommandStrings,
   type DemoUiStrings,
+  demoFormulaHintSignature,
   demoSelectionLabel,
-  evaluateDemoProbe,
   FEATURE_GROUPS,
   isDemoFeatureOn,
   LOCALES,
@@ -42,8 +41,6 @@ interface DemoOptionsPanelProps {
   ui: DemoUiStrings;
   commandText: DemoCommandStrings;
   spreadsheet: SpreadsheetInstance | null;
-  /** The mount behind `spreadsheet`, for the probe helper that still reads it. */
-  legacy: LegacySpreadsheetInstance | null;
   hidden: boolean;
   theme: ThemeName;
   locale: string;
@@ -64,7 +61,6 @@ export const DemoOptionsPanel = ({
   ui,
   commandText,
   spreadsheet,
-  legacy,
   hidden,
   theme,
   locale,
@@ -80,17 +76,8 @@ export const DemoOptionsPanel = ({
   onRibbonChange,
   onFormatterChange,
 }: DemoOptionsPanelProps): ReactElement => {
-  const [probe, setProbe] = useState<{ name: string; result: string } | null>(null);
   const selection = useSelection(spreadsheet);
   const selectionLabel = useMemo(() => demoSelectionText(selection), [selection]);
-
-  const runProbe = useCallback(
-    (name: string, args: CellValue[]) => {
-      if (!legacy) return;
-      setProbe(evaluateDemoProbe(legacy, name, args));
-    },
-    [legacy],
-  );
 
   return (
     <aside className="demo__panel" aria-label={ui.optionsPanel} hidden={hidden}>
@@ -211,27 +198,11 @@ export const DemoOptionsPanel = ({
         <h2>{ui.customFunctions}</h2>
         <p className="demo__hint">{ui.customFunctionsHint}</p>
         <div className="demo__probe">
-          <button
-            type="button"
-            className="fc-tb__btn fc-tb__btn--ghost"
-            onClick={() => runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])}
-            disabled={!legacy}
-          >
-            GREET("Workbook")
-          </button>
-          <button
-            type="button"
-            className="fc-tb__btn fc-tb__btn--ghost"
-            onClick={() => runProbe('FAHRENHEIT', [{ kind: 'number', value: 100 }])}
-            disabled={!legacy}
-          >
-            FAHRENHEIT(100)
-          </button>
-          {probe ? (
-            <p className="demo__probe-out">
-              → <code>{probe.result}</code>
+          {DEMO_FORMULA_HINTS.map((hint) => (
+            <p key={hint.name} className="demo__probe-out">
+              <code>{demoFormulaHintSignature(hint)}</code> {hint.description}
             </p>
-          ) : null}
+          ))}
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runDisjointAutofit(page: Page): Promise<void> {
@@ -10,18 +11,23 @@ export async function runDisjointAutofit(page: Page): Promise<void> {
     expect(
       await page.evaluate(() => {
         const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-        return instance.applyChanges([
-          { addr: { sheet: 0, row: 0, col: 0 }, input: 'one\ntwo\nthree' },
-          { addr: { sheet: 0, row: 2, col: 0 }, input: 'one\ntwo\nthree\nfour' },
-          {
-            addr: { sheet: 0, row: 0, col: 1 },
-            input: 'A long selected column B text for AutoFit',
-          },
-          {
-            addr: { sheet: 0, row: 0, col: 3 },
-            input: 'An even longer selected column D text for AutoFit',
-          },
-        ]).status;
+        return instance.applyChanges(
+          [
+            { sheet: 0, at: { row: 0, col: 0 }, input: 'one\ntwo\nthree' },
+            { sheet: 0, at: { row: 2, col: 0 }, input: 'one\ntwo\nthree\nfour' },
+            {
+              sheet: 0,
+              at: { row: 0, col: 1 },
+              input: 'A long selected column B text for AutoFit',
+            },
+            {
+              sheet: 0,
+              at: { row: 0, col: 3 },
+              input: 'An even longer selected column D text for AutoFit',
+            },
+          ],
+          { history: 'reset' },
+        ).status;
       }),
     ).toBe('applied');
 
@@ -49,15 +55,18 @@ export async function runDisjointAutofit(page: Page): Promise<void> {
     };
     const layout = () =>
       page.evaluate(() => {
-        const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-        const state = instance.store.getState();
+        const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+        const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+        const state = store.getState();
+        // Native row and column layouts have no facade member.
+        const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
         return {
           rows: [...state.layout.rowHeights],
           cols: [...state.layout.colWidths],
           rowDefault: state.layout.defaultRowHeight,
           colDefault: state.layout.defaultColWidth,
-          nativeRows: instance.workbook.getRowLayouts(0),
-          nativeCols: instance.workbook.getColumnLayouts(0),
+          nativeRows: handle.getRowLayouts(0),
+          nativeCols: handle.getColumnLayouts(0),
         };
       });
     const before = await layout();
@@ -74,15 +83,21 @@ export async function runDisjointAutofit(page: Page): Promise<void> {
     }
     expect(new Map(fittedRows.rows).get(1)).toBe(new Map(before.rows).get(1));
     expect(
-      await page.evaluate(() =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
-      ),
+      await page.evaluate(() => {
+        const { history } = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+        const available = history.canUndo;
+        history.undo();
+        return available;
+      }),
     ).toBe(true);
     expect((await layout()).rows).toEqual(before.rows);
     expect(
-      await page.evaluate(() =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
-      ),
+      await page.evaluate(() => {
+        const { history } = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+        const available = history.canRedo;
+        history.redo();
+        return available;
+      }),
     ).toBe(true);
     expect((await layout()).rows).toEqual(fittedRows.rows);
     await selectHeader('col', 1);

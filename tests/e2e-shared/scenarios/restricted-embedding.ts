@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 type DemoWindow = Window & { __fcInst?: SpreadsheetInstance };
@@ -12,27 +12,30 @@ export async function runRestrictedEmbeddingScenario(page: Page): Promise<void> 
   await page.evaluate(() => {
     const instance = (window as DemoWindow).__fcInst;
     if (!instance) throw new Error('Spreadsheet instance is unavailable');
-    instance.setUi({ profile: 'embedded', features: { shortcuts: true, clipboard: true } });
-    instance.setViewportOptions({ range: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 } });
-    instance.setPolicy({
-      operations: { valueEdit: true, clear: true, paste: true, fill: true },
-      editable: [{ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }],
+    instance.update({
+      ui: { profile: 'embedded', features: { shortcuts: true, clipboard: true } },
+      viewport: { mode: 'fixed', range: 'A1:C4' },
+      policy: {
+        operations: { valueEdit: true, clear: true, paste: true, fill: true },
+        editable: [{ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }],
+      },
+      contextMenu: {
+        mode: 'builtIn',
+        items: ['copy', 'paste', 'clear', 'rowInsertAbove'],
+      },
     });
-    instance.setContextMenu({
-      mode: 'builtIn',
-      items: ['copy', 'paste', 'clear', 'rowInsertAbove'],
+    instance.workbook.batch(() => {
+      instance.workbook.sheet(0).setNumber('A1', 1);
+      instance.workbook.sheet(0).setFormula('B1', '=A1*2');
     });
-    instance.applyChanges([
-      { addr: { sheet: 0, row: 0, col: 0 }, input: '1' },
-      { addr: { sheet: 0, row: 0, col: 1 }, input: '=A1*2' },
-    ]);
+    instance.history.clear();
     const dialog = document.createElement('dialog');
     dialog.id = 'embedded-host-dialog';
     dialog.style.cssText = 'width:900px;height:500px';
     document.body.append(dialog);
     dialog.append(instance.host);
     dialog.showModal();
-    instance.setOverlayOptions({ root: dialog });
+    instance.update({ overlays: { root: dialog } });
     instance.host.focus();
   });
   // Actual keyboard input passes through the restricted editor and real WASM.
@@ -40,11 +43,9 @@ export async function runRestrictedEmbeddingScenario(page: Page): Promise<void> 
   await page.keyboard.press('Enter');
   await expect
     .poll(() =>
-      page.evaluate(() =>
-        (window as DemoWindow).__fcInst?.workbook.getValue({ sheet: 0, row: 0, col: 1 }),
-      ),
+      page.evaluate(() => (window as DemoWindow).__fcInst?.workbook.sheet(0).getValue(0, 1)),
     )
-    .toEqual({ kind: 'number', value: 14 });
+    .toEqual(14);
 
   await page.keyboard.press('Shift+F10');
   const menu = page.locator('#embedded-host-dialog .fc-ctxmenu:not(.fc-ctxmenu__sub)');
@@ -68,18 +69,16 @@ export async function runRestrictedEmbeddingScenario(page: Page): Promise<void> 
   await page.evaluate(() => {
     const instance = (window as DemoWindow).__fcInst;
     if (!instance) throw new Error('Spreadsheet instance is unavailable');
-    instance.setPolicy({ readOnly: true });
+    instance.update({ policy: { readOnly: true } });
     instance.host.focus();
   });
   await page.keyboard.type('99');
   await page.keyboard.press('Enter');
   await expect
     .poll(() =>
-      page.evaluate(() =>
-        (window as DemoWindow).__fcInst?.workbook.getValue({ sheet: 0, row: 1, col: 0 }),
-      ),
+      page.evaluate(() => (window as DemoWindow).__fcInst?.workbook.sheet(0).getValue(1, 0)),
     )
-    .toEqual({ kind: 'blank' });
+    .toBeNull();
   // The default portal follows a real fullscreen boundary after leaving the modal.
   await page.evaluate(() => {
     const instance = (window as DemoWindow).__fcInst;
@@ -104,7 +103,7 @@ export async function runRestrictedEmbeddingScenario(page: Page): Promise<void> 
     });
     fullscreen.append(button, instance.host);
     document.body.append(fullscreen);
-    instance.setOverlayOptions(undefined);
+    instance.update({ overlays: null });
   });
   await page.getByRole('button', { name: 'Enter embedded fullscreen' }).click();
   await expect(page.locator('#embedded-fullscreen')).toHaveAttribute(

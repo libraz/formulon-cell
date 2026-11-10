@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 interface SnapshotOptions {
@@ -90,136 +91,71 @@ const snapshotRibbonSecondaryMenu = async (
 
 const seedTableSelection = async (page: Page): Promise<void> => {
   await page.evaluate(() => {
-    const w = window as unknown as {
-      __fcInst?: {
-        workbook?: {
-          setText?: (addr: { sheet: number; row: number; col: number }, value: string) => void;
-          setNumber?: (addr: { sheet: number; row: number; col: number }, value: number) => void;
-        };
-        store?: {
-          setState?: (fn: (state: Record<string, unknown>) => Record<string, unknown>) => void;
-        };
-      };
-    };
-    const inst = w.__fcInst;
-    if (!inst?.workbook || !inst.store?.setState) {
-      throw new Error('window.__fcInst with workbook/store APIs is required');
-    }
-    inst.workbook.setText?.({ sheet: 0, row: 0, col: 0 }, 'Region');
-    inst.workbook.setText?.({ sheet: 0, row: 0, col: 1 }, 'Sales');
-    inst.workbook.setText?.({ sheet: 0, row: 1, col: 0 }, 'East');
-    inst.workbook.setNumber?.({ sheet: 0, row: 1, col: 1 }, 120);
-    inst.workbook.setText?.({ sheet: 0, row: 2, col: 0 }, 'West');
-    inst.workbook.setNumber?.({ sheet: 0, row: 2, col: 1 }, 80);
-    inst.store.setState((state) => ({
-      ...state,
-      selection: {
-        ...(state.selection as Record<string, unknown>),
-        active: { sheet: 0, row: 0, col: 0 },
-        range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
-      },
-    }));
+    const inst = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+    if (!inst) throw new Error('window.__fcInst is required');
+    inst.workbook.batch(() => {
+      const sheet = inst.workbook.sheet(0);
+      sheet.setText(0, 0, 'Region');
+      sheet.setText(0, 1, 'Sales');
+      sheet.setText(1, 0, 'East');
+      sheet.setNumber(1, 1, 120);
+      sheet.setText(2, 0, 'West');
+      sheet.setNumber(2, 1, 80);
+    });
+    inst.history.clear();
+    inst.selection.set('A1:B3');
   });
 };
 
 const seedPivotFilterSelection = async (page: Page): Promise<void> => {
   await page.evaluate(() => {
-    const w = window as unknown as {
-      __fcInst?: {
-        workbook?: {
-          setText?: (addr: { sheet: number; row: number; col: number }, value: string) => void;
-          setNumber?: (addr: { sheet: number; row: number; col: number }, value: number) => void;
-        };
-        store?: {
-          setState?: (fn: (state: Record<string, unknown>) => Record<string, unknown>) => void;
-        };
-      };
-    };
-    const inst = w.__fcInst;
-    if (!inst?.workbook || !inst.store?.setState) {
-      throw new Error('window.__fcInst with workbook/store APIs is required');
-    }
-    ['Region', 'Sales', 'Qty', 'Channel', 'Segment'].forEach((value, col) => {
-      inst.workbook?.setText?.({ sheet: 0, row: 0, col }, value);
+    const inst = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+    if (!inst) throw new Error('window.__fcInst is required');
+    inst.workbook.batch(() => {
+      const sheet = inst.workbook.sheet(0);
+      ['Region', 'Sales', 'Qty', 'Channel', 'Segment'].forEach((value, col) => {
+        sheet.setText(0, col, value);
+      });
+      sheet.setText(1, 0, 'East');
+      sheet.setNumber(1, 1, 10);
+      sheet.setNumber(1, 2, 2);
+      sheet.setText(1, 3, 'Online');
+      sheet.setText(1, 4, 'Consumer');
+      sheet.setText(2, 0, 'West');
+      sheet.setNumber(2, 1, 20);
+      sheet.setNumber(2, 2, 4);
+      sheet.setText(2, 3, 'Retail');
+      sheet.setText(2, 4, 'Business');
     });
-    inst.workbook.setText?.({ sheet: 0, row: 1, col: 0 }, 'East');
-    inst.workbook.setNumber?.({ sheet: 0, row: 1, col: 1 }, 10);
-    inst.workbook.setNumber?.({ sheet: 0, row: 1, col: 2 }, 2);
-    inst.workbook.setText?.({ sheet: 0, row: 1, col: 3 }, 'Online');
-    inst.workbook.setText?.({ sheet: 0, row: 1, col: 4 }, 'Consumer');
-    inst.workbook.setText?.({ sheet: 0, row: 2, col: 0 }, 'West');
-    inst.workbook.setNumber?.({ sheet: 0, row: 2, col: 1 }, 20);
-    inst.workbook.setNumber?.({ sheet: 0, row: 2, col: 2 }, 4);
-    inst.workbook.setText?.({ sheet: 0, row: 2, col: 3 }, 'Retail');
-    inst.workbook.setText?.({ sheet: 0, row: 2, col: 4 }, 'Business');
-    inst.store.setState((state) => ({
-      ...state,
-      selection: {
-        ...(state.selection as Record<string, unknown>),
-        active: { sheet: 0, row: 0, col: 0 },
-        range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 },
-      },
-    }));
+    inst.history.clear();
+    inst.selection.set('A1:E3');
   });
 };
 
 const seedMultiSelection = async (page: Page): Promise<void> => {
   await page.evaluate(() => {
-    const w = window as unknown as {
-      __fcInst?: {
-        workbook?: {
-          setText?: (addr: { sheet: number; row: number; col: number }, value: string) => void;
-          setNumber?: (addr: { sheet: number; row: number; col: number }, value: number) => void;
-        };
-        store?: {
-          setState?: (fn: (state: Record<string, unknown>) => Record<string, unknown>) => void;
-        };
-      };
-    };
-    const inst = w.__fcInst;
-    if (!inst?.workbook || !inst.store?.setState) {
-      throw new Error('window.__fcInst with workbook/store APIs is required');
-    }
-    inst.workbook.setText?.({ sheet: 0, row: 0, col: 0 }, 'North');
-    inst.workbook.setNumber?.({ sheet: 0, row: 0, col: 1 }, 120);
-    inst.workbook.setText?.({ sheet: 0, row: 1, col: 0 }, 'South');
-    inst.workbook.setNumber?.({ sheet: 0, row: 1, col: 1 }, 80);
-    inst.workbook.setText?.({ sheet: 0, row: 2, col: 0 }, 'East');
-    inst.workbook.setNumber?.({ sheet: 0, row: 2, col: 1 }, 140);
-    inst.store.setState((state) => ({
-      ...state,
-      selection: {
-        ...(state.selection as Record<string, unknown>),
-        active: { sheet: 0, row: 0, col: 0 },
-        anchor: { sheet: 0, row: 0, col: 0 },
-        range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
-      },
-    }));
+    const inst = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+    if (!inst) throw new Error('window.__fcInst is required');
+    inst.workbook.batch(() => {
+      const sheet = inst.workbook.sheet(0);
+      sheet.setText(0, 0, 'North');
+      sheet.setNumber(0, 1, 120);
+      sheet.setText(1, 0, 'South');
+      sheet.setNumber(1, 1, 80);
+      sheet.setText(2, 0, 'East');
+      sheet.setNumber(2, 1, 140);
+    });
+    inst.history.clear();
+    inst.selection.set('A1:B3');
   });
 };
 
-/** Collapses the selection onto a single cell through the instance store. */
+/** Collapses the selection onto a single cell. */
 const selectSingleCell = async (page: Page, cell: { row: number; col: number }): Promise<void> => {
   await page.evaluate(({ row, col }) => {
-    const w = window as unknown as {
-      __fcInst?: {
-        store?: {
-          setState?: (fn: (state: Record<string, unknown>) => Record<string, unknown>) => void;
-        };
-      };
-    };
-    const setState = w.__fcInst?.store?.setState;
-    if (!setState) throw new Error('window.__fcInst with a store is required');
-    setState((state) => ({
-      ...state,
-      selection: {
-        ...(state.selection as Record<string, unknown>),
-        active: { sheet: 0, row, col },
-        anchor: { sheet: 0, row, col },
-        range: { sheet: 0, r0: row, c0: col, r1: row, c1: col },
-        extraRanges: [],
-      },
-    }));
+    const inst = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+    if (!inst) throw new Error('window.__fcInst is required');
+    inst.selection.set(`${String.fromCharCode(65 + col)}${row + 1}`);
   }, cell);
 };
 
@@ -779,19 +715,10 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await note.getByRole('button', { name: 'キャンセル', exact: true }).click();
   await expect(note).toBeHidden();
   await page.evaluate(() => {
-    const inst = (
-      window as unknown as {
-        __fcInst?: {
-          workbook?: {
-            setText?: (addr: { sheet: number; row: number; col: number }, value: string) => void;
-          };
-        };
-      }
-    ).__fcInst;
-    if (!inst?.workbook?.setText) {
-      throw new Error('window.__fcInst.workbook.setText is required');
-    }
-    inst.workbook.setText({ sheet: 0, row: 0, col: 0 }, 'teh teh');
+    const inst = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+    if (!inst) throw new Error('window.__fcInst is required');
+    inst.workbook.batch(() => inst.workbook.sheet(0).setText(0, 0, 'teh teh'));
+    inst.history.clear();
   });
   await page.locator('[data-ribbon-command="spellingReview"]').click();
   const spelling = page.getByRole('dialog', { name: 'スペル チェック' });

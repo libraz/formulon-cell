@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** Exercise real editor and both clipboard payloads without the system clipboard. */
@@ -7,16 +8,8 @@ export async function runLocaleInputScenario(page: Page): Promise<void> {
   const errors = sp.collectConsoleErrors();
   const readCell = (row: number) =>
     page.evaluate((r) => {
-      const instance = (
-        window as unknown as {
-          __fcInst: {
-            workbook: {
-              getValue: (addr: { sheet: number; row: number; col: number }) => unknown;
-            };
-          };
-        }
-      ).__fcInst;
-      return instance.workbook.getValue({ sheet: 0, row: r, col: 0 });
+      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      return instance.workbook.sheet(0).getValue(r, 0);
     }, row);
 
   for (const profile of [
@@ -31,7 +24,7 @@ export async function runLocaleInputScenario(page: Page): Promise<void> {
     await page.keyboard.press('F2');
     await expect(page.locator('.fc-host__editor')).toHaveValue('1,5');
     await page.keyboard.press('Enter');
-    await expect.poll(() => readCell(0)).toEqual({ kind: 'number', value: 1.5 });
+    await expect.poll(() => readCell(0)).toEqual(1.5);
     await page.keyboard.press('ArrowUp');
 
     const payload = await page.evaluate(() => {
@@ -60,16 +53,16 @@ export async function runLocaleInputScenario(page: Page): Promise<void> {
           new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
         );
     }, payload.text);
-    await expect.poll(() => readCell(2)).toEqual({ kind: 'number', value: 1.5 });
+    await expect.poll(() => readCell(2)).toEqual(1.5);
 
     await sp.typeIntoActiveCell(profile.trueText);
     await page.keyboard.press('ArrowUp');
-    await expect.poll(() => readCell(0)).toEqual({ kind: 'bool', value: true });
+    await expect.poll(() => readCell(0)).toEqual(true);
     await expect.poll(() => sp.formulaBarValue()).toBe(profile.trueText);
     await page.keyboard.press('F2');
     await expect(page.locator('.fc-host__editor')).toHaveValue(profile.trueText);
     await page.keyboard.press('Enter');
-    await expect.poll(() => readCell(0)).toEqual({ kind: 'bool', value: true });
+    await expect.poll(() => readCell(0)).toEqual(true);
   }
 
   expect(errors.read()).toEqual([]);

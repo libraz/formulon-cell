@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** U02 — named range undo. We use the demo's imperative `window.__fcInst`
@@ -10,15 +11,7 @@ export async function runNamedRangeUndoScenario(page: Page): Promise<void> {
   await sp.mount();
   await sp.expectNoStub();
 
-  type SpreadsheetGlobal = {
-    __fcInst?: {
-      workbook: {
-        setDefinedNameEntry(name: string, formula: string): boolean;
-        definedNames(): Iterable<{ name: string; formula: string }>;
-      };
-      undo(): boolean;
-    };
-  };
+  type SpreadsheetGlobal = { __fcInst?: SpreadsheetInstance };
 
   const result = await page.evaluate(() => {
     const w = window as unknown as SpreadsheetGlobal;
@@ -27,13 +20,14 @@ export async function runNamedRangeUndoScenario(page: Page): Promise<void> {
 
     const listNames = (): string[] => {
       const out: string[] = [];
-      for (const n of inst.workbook.definedNames()) out.push(n.name);
+      for (const n of inst.workbook.listDefinedNames()) out.push(n.name);
       return out;
     };
     const beforeNames = listNames();
-    inst.workbook.setDefinedNameEntry('myRange', 'Sheet1!$A$1:$A$5');
+    inst.workbook.setDefinedName({ name: 'myRange', formula: 'Sheet1!$A$1:$A$5' });
     const afterAdd = listNames();
-    const undid = inst.undo();
+    const undid = inst.history.canUndo;
+    inst.history.undo();
     const afterUndo = listNames();
     return { ok: true as const, beforeNames, afterAdd, afterUndo, undid };
   });

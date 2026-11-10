@@ -1,28 +1,15 @@
 import { expect, type Page } from '@playwright/test';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const selectedCells = (page: Page): Promise<string[]> =>
   page.evaluate(() => {
-    const inst = (
-      window as unknown as {
-        __fcInst: {
-          store: {
-            getState(): {
-              selection: {
-                range: { r0: number; r1: number; c0: number; c1: number };
-                extraRanges?: Array<{ r0: number; r1: number; c0: number; c1: number }>;
-              };
-            };
-          };
-        };
-      }
-    ).__fcInst;
-    const selection = inst.store.getState().selection;
+    const inst = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const cells = new Set<string>();
-    for (const range of [selection.range, ...(selection.extraRanges ?? [])]) {
-      for (let row = range.r0; row <= range.r1; row++) {
-        for (let col = range.c0; col <= range.c1; col++) cells.add(`${row}:${col}`);
+    for (const range of inst.selection.get().ranges) {
+      for (let row = range.firstRow; row <= range.lastRow; row++) {
+        for (let col = range.firstCol; col <= range.lastCol; col++) cells.add(`${row}:${col}`);
       }
     }
     return [...cells].sort();
@@ -157,23 +144,13 @@ export async function runMacHeaderSelectionToggle(page: Page): Promise<void> {
   };
   const bands = (axis: 'row' | 'col') =>
     page.evaluate((direction) => {
-      const inst = (
-        window as unknown as {
-          __fcInst: {
-            store: {
-              getState(): {
-                selection: {
-                  range: { r0: number; r1: number; c0: number; c1: number };
-                  extraRanges?: Array<{ r0: number; r1: number; c0: number; c1: number }>;
-                };
-              };
-            };
-          };
-        }
-      ).__fcInst;
-      const s = inst.store.getState().selection;
-      return [s.range, ...(s.extraRanges ?? [])]
-        .map((r) => (direction === 'row' ? [r.r0, r.r1, r.c0, r.c1] : [r.c0, r.c1, r.r0, r.r1]))
+      const inst = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      return [...inst.selection.get().ranges]
+        .map((r) =>
+          direction === 'row'
+            ? [r.firstRow, r.lastRow, r.firstCol, r.lastCol]
+            : [r.firstCol, r.lastCol, r.firstRow, r.lastRow],
+        )
         .sort((a, b) => (a[0] ?? 0) - (b[0] ?? 0));
     }, axis);
   for (const axis of ['row', 'col'] as const) {

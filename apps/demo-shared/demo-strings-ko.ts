@@ -82,7 +82,7 @@ export const koUi: DemoUiStrings = {
   uppercaseColumnA: 'A열을 대문자로 표시',
   arrowPrefixNegatives: '음수 앞에 화살표 표시',
   customFunctions: '사용자 지정 함수',
-  customFunctionsHint: '호스트 측 함수 레지스트리를 직접 확인합니다.',
+  customFunctionsHint: '자동 완성과 인수 도우미에 쓰이는 호스트 측 수식 힌트입니다.',
   cellChangeLog: '셀 변경 로그',
   cellChangeLogHint: '셀 편집 내용을 데모 로그에 반영합니다.',
   editCellToSeeEvents: '셀을 편집하면 이벤트가 표시됩니다.',

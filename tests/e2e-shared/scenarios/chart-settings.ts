@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** Select the chart, as a click on it does, and press one of the buttons beside it. */
@@ -18,32 +18,30 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await sheet.expectNoStub();
   const chartId = await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const { createSessionChart } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
-      'commands/session-chart'
-    ];
+    const probes = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes;
+    const { createSessionChart } = probes['commands/session-chart'];
+    const { store, controller } = probes['mount/internals'].spreadsheetInternals(instance);
     const table = [
       ['Month', 'Sales', 'Costs'],
       ['Jan', 10, 6],
       ['Feb', 15, 8],
       ['Mar', 8, 3],
     ];
-    const result = instance.applyChanges(
-      table.flatMap((row, r) =>
-        row.map((value, col) => ({
-          addr: { sheet: 0, row: r, col },
-          value:
-            typeof value === 'number'
-              ? { kind: 'number' as const, value }
-              : { kind: 'text' as const, value },
-        })),
-      ),
-    );
-    if (result.status !== 'applied') throw new Error('chart fixture cells were not applied');
+    instance.workbook.batch(() => {
+      const sheet0 = instance.workbook.sheet(0);
+      table.forEach((row, r) => {
+        row.forEach((value, col) => {
+          if (typeof value === 'number') sheet0.setNumber(r, col, value);
+          else sheet0.setText(r, col, value);
+        });
+      });
+    });
+    instance.history.clear();
     const created = createSessionChart(
-      instance.store,
+      store,
       { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
       {
-        wb: instance.workbook,
+        wb: probes['api/workbook'].workbookHandleOf(instance.workbook),
         kind: 'column',
         seriesDirection: 'columns',
         title: 'Monthly sales',
@@ -57,7 +55,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
           heightEmu: 2_667_000,
         },
       },
-      instance.history,
+      controller.history,
     );
     if (!created) throw new Error('chart fixture was not created');
     return created.id as string;
@@ -94,11 +92,11 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     await bars.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-point-id'))),
   ).toEqual(['category-0', 'category-2']);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   await expect(bars).toHaveCount(6);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   await expect(bars).toHaveCount(2);
 
@@ -121,11 +119,11 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(styledPoint).toHaveAttribute('fill', '#ff0000');
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   await expect(styledPoint).toHaveAttribute('fill', originalFills[0] ?? '');
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   await expect(styledPoint).toHaveAttribute('fill', '#ff0000');
 
@@ -172,11 +170,11 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     (automaticHeight * automaticMax) / 20,
   );
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(automaticHeight);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   await expect(yAxisLabels).toHaveText(['0.0', '5.0', '10.0', '15.0', '20.0']);
 
@@ -203,12 +201,12 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(beforeReverse.height);
   await expect(styledPoint).toHaveAttribute('fill', '#ff0000');
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   expect(Number(await inheritedPoint.getAttribute('x'))).toBeCloseTo(beforeReverse.x);
   expect(Number(await inheritedPoint.getAttribute('y'))).toBeCloseTo(beforeReverse.y);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   expect(Number(await inheritedPoint.getAttribute('y'))).toBeCloseTo(plotTop);
   await openChartButton(chart, 'elements');
@@ -247,12 +245,12 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   expect(Number(await inheritedPoint.getAttribute('y'))).toBeCloseTo(beforeReverse.y);
   expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(beforeReverse.height);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   expect(Number(await verticalAxis.getAttribute('x1'))).toBeCloseTo(automaticCrossing.x);
   expect(Number(await horizontalAxis.getAttribute('y1'))).toBeCloseTo(automaticCrossing.y);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   expect(Number(await verticalAxis.getAttribute('x1'))).toBeCloseTo(plotRight);
   await openChartButton(chart, 'elements');
@@ -285,11 +283,11 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   );
   await expect(yAxisLabels.first()).toHaveAttribute('text-anchor', 'start');
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   expect(Number(await inheritedPoint.getAttribute('y'))).toBeCloseTo(beforeReverse.y);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   await expect(yAxisLabels.first()).toHaveAttribute('text-anchor', 'start');
 
@@ -360,11 +358,11 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     Number(await verticalAxis.getAttribute('y2')) - Number(await verticalAxis.getAttribute('y1'));
   expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(logPlotHeight / 3);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   await expect(yAxisLabels).toHaveText(['0.0', '5.0', '10.0', '15.0', '20.0']);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   await expect(yAxisLabels).toHaveText(['1.0', '10.0', '100.0', '1000.0']);
   await openChartButton(chart, 'elements');
@@ -386,7 +384,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   expect(Number(await inheritedPoint.getAttribute('width'))).toBeGreaterThan(automaticWidth);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   expect(Number(await inheritedPoint.getAttribute('width'))).toBeCloseTo(automaticWidth);
 
@@ -488,11 +486,11 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     }),
   ).toBe(true);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   await expect(slices.first()).toHaveAttribute('d', originalSlice ?? '');
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   await expect(slices.first()).toHaveAttribute('d', resizedSlice ?? '');
 
@@ -522,11 +520,11 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(points).toHaveCount(6);
   await expect(slices).toHaveCount(0);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   await expect(slices).toHaveCount(6);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   await expect(points).toHaveCount(6);
   const connectors = chart.locator('[data-chart-role="line"]');
@@ -538,12 +536,12 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(connectors).toHaveCount(4);
   await expect(points).toHaveCount(0);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.undo(),
   );
   await expect(connectors).toHaveCount(0);
   await expect(points).toHaveCount(6);
   await page.evaluate(() =>
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.history.redo(),
   );
   await expect(connectors).toHaveCount(4);
   await expect(points).toHaveCount(0);
@@ -573,8 +571,9 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   // A blank Costs value for Feb breaks that series' line until blanks span.
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '' }]);
-    if (result.status !== 'applied') throw new Error('Scatter blank fixture was not applied');
+    const sheet0 = instance.workbook.sheet(0);
+    sheet0.setBlank(2, 2);
+    instance.history.clear();
   });
   await expect(connectors).toHaveCount(2);
   await expect(points).toHaveCount(5);
@@ -585,8 +584,9 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(points).toHaveCount(5);
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '8' }]);
-    if (result.status !== 'applied') throw new Error('Scatter source fixture was not restored');
+    const sheet0 = instance.workbook.sheet(0);
+    sheet0.setNumber(2, 2, 8);
+    instance.history.clear();
   });
   await expect(connectors).toHaveCount(4);
   await expect(points).toHaveCount(6);
@@ -611,15 +611,17 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   // A zero cannot sit on a logarithmic axis.
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '0' }]);
-    if (result.status !== 'applied') throw new Error('Log scatter zero fixture was not applied');
+    const sheet0 = instance.workbook.sheet(0);
+    sheet0.setNumber(2, 2, 0);
+    instance.history.clear();
   });
   await expect(points).toHaveCount(5);
   await expect(connectors).toHaveCount(2);
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '8' }]);
-    if (result.status !== 'applied') throw new Error('Log scatter source fixture was not restored');
+    const sheet0 = instance.workbook.sheet(0);
+    sheet0.setNumber(2, 2, 8);
+    instance.history.clear();
   });
   await expect(connectors).toHaveCount(4);
   await openChartButton(chart, 'elements');

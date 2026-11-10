@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 export async function runWholeSheetCopy(page: Page, platform: 'default' | 'mac'): Promise<void> {
@@ -9,12 +9,13 @@ export async function runWholeSheetCopy(page: Page, platform: 'default' | 'mac')
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const wb = instance.workbook;
-    if (wb.addSheet('Target') !== 1) throw new Error('Target worksheet was not created');
-    wb.applyCellPatchAtomic([
-      { addr: { sheet: 0, row: 4, col: 3 }, value: { kind: 'number', value: 2 }, formula: null },
-      { addr: { sheet: 0, row: 4, col: 4 }, value: { kind: 'number', value: 6 }, formula: '=D5*3' },
-      { addr: { sheet: 1, row: 19, col: 25 }, value: { kind: 'number', value: 9 }, formula: null },
-    ]);
+    if (wb.addSheet('Target').index !== 1) throw new Error('Target worksheet was not created');
+    wb.batch(() => {
+      wb.sheet(0).setNumber('D5', 2);
+      wb.sheet(0).setFormula('E5', '=D5*3');
+      wb.sheet(1).setNumber('Z20', 9);
+    });
+    instance.history.clear();
   });
 
   await page
@@ -23,13 +24,14 @@ export async function runWholeSheetCopy(page: Page, platform: 'default' | 'mac')
     .click({ position: { x: 10, y: 10 } });
   await expect
     .poll(() =>
-      page.evaluate(
-        () =>
-          (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState()
-            .selection.range,
+      page.evaluate(() =>
+        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
       ),
     )
-    .toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 16383 });
+    .toMatchObject({
+      sheet: 0,
+      ranges: [{ firstRow: 0, firstCol: 0, lastRow: 1048575, lastCol: 16383 }],
+    });
   await sheet.shortcut('c');
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('2\t=D5*3');
 

@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runCfRulesKeyboardScenario(page: Page): Promise<void> {
@@ -10,14 +11,14 @@ export async function runCfRulesKeyboardScenario(page: Page): Promise<void> {
 
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.openConditionalDialog({ mode: 'new', kind: 'cell-value' });
+    instance.dialogs.open('conditional', { mode: 'new', kind: 'cell-value' });
   });
   const authoring = page.locator('.fc-conddlg');
   await expect(authoring).toBeVisible();
   await authoring.getByRole('button', { name: 'OK', exact: true }).click();
   await expect(authoring).toBeHidden();
   await page.evaluate(() => {
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.openCfRulesDialog();
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.dialogs.open('cfRules');
   });
 
   const manager = page.locator('.fc-cfrulesdlg');
@@ -32,11 +33,11 @@ export async function runCfRulesKeyboardScenario(page: Page): Promise<void> {
   await expect(stopIfTrue).toBeChecked();
   await expect(rows).toHaveCount(1);
   expect(
-    await page.evaluate(
-      () =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState()
-          .conditional.rules[0]?.stopIfTrue,
-    ),
+    await page.evaluate(() => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      return w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState()
+        .conditional.rules[0]?.stopIfTrue;
+    }),
   ).toBe(true);
 
   const duplicate = rows.first().locator('.fc-cfrulesdlg__row-duplicate');
@@ -61,7 +62,7 @@ export async function runCfRulesKeyboardScenario(page: Page): Promise<void> {
   await page.keyboard.press('Escape');
   await expect(manager).toBeHidden();
   await page.evaluate(() => {
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.openCfRulesDialog();
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.dialogs.open('cfRules');
   });
   await expect(rows).toHaveCount(1);
   await expect(stopIfTrue).toBeChecked();
@@ -72,20 +73,27 @@ export async function runCfRulesKeyboardScenario(page: Page): Promise<void> {
 
 async function readRuleCounts(page: Page): Promise<{ session: number; engine: number }> {
   return page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const instance = w.__fcInst;
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(instance);
     return {
-      session: instance.store.getState().conditional.rules.length,
-      engine: instance.workbook.getConditionalFormats(0).length,
+      session: store.getState().conditional.rules.length,
+      engine: instance.workbook.sheet(0).listCfRules().length,
     };
   });
 }
 
 async function readStopFlags(page: Page): Promise<{ session: boolean[]; engine: boolean[] }> {
   return page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const instance = w.__fcInst;
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(instance);
     return {
-      session: instance.store.getState().conditional.rules.map((rule) => rule.stopIfTrue === true),
-      engine: instance.workbook.getConditionalFormats(0).map((rule) => rule.stopIfTrue),
+      session: store.getState().conditional.rules.map((rule) => rule.stopIfTrue === true),
+      engine: instance.workbook
+        .sheet(0)
+        .listCfRules()
+        .map((rule) => rule.stopIfTrue),
     };
   });
 }

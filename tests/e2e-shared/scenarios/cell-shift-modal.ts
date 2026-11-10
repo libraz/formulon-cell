@@ -1,13 +1,16 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 type Kind = 'insert' | 'delete';
 
 async function values(page: Page) {
   return page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    return [0, 1, 2, 3].map((row) => instance.workbook.getValue({ sheet: 0, row, col: 0 }));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    // The tagged cell value has no facade equivalent; read it from the engine handle.
+    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    return [0, 1, 2, 3].map((row) => handle.getValue({ sheet: 0, row, col: 0 }));
   });
 }
 
@@ -116,7 +119,8 @@ export async function runCellShiftModalScenario(page: Page, kind: Kind): Promise
 
 async function rowValues(page: Page) {
   return page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    return [0, 1, 2].map((col) => instance.workbook.getValue({ sheet: 0, row: 0, col }));
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    return [0, 1, 2].map((col) => handle.getValue({ sheet: 0, row: 0, col }));
   });
 }

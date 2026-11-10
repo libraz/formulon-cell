@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LegacySpreadsheetInstance as SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { SpreadsheetInstance } from '@libraz/formulon-cell';
 import { computed } from 'vue';
 import {
   buildDemoBackstageCards,
@@ -9,6 +9,7 @@ import {
   type DemoBackstageAction,
   type DemoUiStrings,
   isDemoBackstageActionDisabled,
+  openDemoDialog,
 } from '../../demo-shared/index.js';
 import DemoIcon from './DemoIcon.vue';
 
@@ -80,7 +81,7 @@ const printPreview = computed(() => {
             type="button"
             class="fc-tb__print-action"
             :disabled="!instance"
-            @click="instance?.openPageSetup()"
+            @click="openDemoDialog(instance, 'pageSetup')"
           >
             {{ printPreview.pageSetupLabel }}
           </button>

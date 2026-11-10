@@ -82,7 +82,8 @@ export const frUi: DemoUiStrings = {
   uppercaseColumnA: 'Mettre la colonne A en majuscules',
   arrowPrefixNegatives: 'Préfixer les valeurs négatives d’une flèche',
   customFunctions: 'Fonctions personnalisées',
-  customFunctionsHint: 'Interroger directement le registre de fonctions de l’hôte.',
+  customFunctionsHint:
+    'Indications de formule de l’hôte pour la saisie semi-automatique et l’aide aux arguments.',
   cellChangeLog: 'Journal des changements de cellule',
   cellChangeLogHint: 'Reflète les modifications de cellules dans le journal de démonstration.',
   editCellToSeeEvents: 'Modifiez une cellule pour voir les événements.',

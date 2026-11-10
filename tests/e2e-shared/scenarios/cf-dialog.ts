@@ -1,9 +1,10 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
-/** D05 — the CF Rules dialog is reachable via `instance.openCfRulesDialog()`.
+/** D05 — the CF Rules dialog is reachable via `instance.dialogs.open('cfRules')`.
  *  Verify calling it from a demo app exposes a visible overlay and that
  *  Esc closes it cleanly. */
 export async function runCfRulesDialogScenario(page: Page): Promise<void> {
@@ -13,12 +14,12 @@ export async function runCfRulesDialogScenario(page: Page): Promise<void> {
   await sp.expectNoStub();
 
   type SpreadsheetGlobal = {
-    __fcInst?: { openCfRulesDialog(): void };
+    __fcInst?: SpreadsheetInstance;
   };
 
   await page.evaluate(() => {
     const w = window as unknown as SpreadsheetGlobal;
-    w.__fcInst?.openCfRulesDialog();
+    w.__fcInst?.dialogs.open('cfRules');
   });
 
   // The CF rules dialog uses its own `fc-cfrulesdlg` overlay class.
@@ -29,7 +30,7 @@ export async function runCfRulesDialogScenario(page: Page): Promise<void> {
 }
 
 /** D05b — opening the conditional-format authoring dialog through the
- *  `instance.openConditionalDialog()` API. */
+ *  `instance.dialogs.open('conditional')` API. */
 export async function runConditionalDialogScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
   const consoleErrors = sp.collectConsoleErrors();
@@ -37,12 +38,12 @@ export async function runConditionalDialogScenario(page: Page): Promise<void> {
   await sp.expectNoStub();
 
   type SpreadsheetGlobal = {
-    __fcInst?: { openConditionalDialog(): void };
+    __fcInst?: SpreadsheetInstance;
   };
 
   await page.evaluate(() => {
     const w = window as unknown as SpreadsheetGlobal;
-    w.__fcInst?.openConditionalDialog();
+    w.__fcInst?.dialogs.open('conditional');
   });
 
   await page.waitForTimeout(150);

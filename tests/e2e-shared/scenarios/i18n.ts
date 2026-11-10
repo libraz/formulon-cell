@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** I01 — `?locale=ja` boots the app in Japanese and keeps the demo chrome
@@ -471,9 +472,13 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await expect(optionsPanel.getByRole('heading', { name: 'デモ表示' })).toBeVisible();
   await expect(optionsPanel.getByRole('heading', { name: 'プリセット' })).toBeVisible();
   await expect(optionsPanel.getByText('数式バー', { exact: true })).toBeVisible();
-  await expect(optionsPanel.getByText('GREET("Workbook")', { exact: true })).toBeVisible();
-  await expect(optionsPanel).not.toContainText('GREET("React")');
-  await expect(optionsPanel).not.toContainText('GREET("Vue")');
+  await expect(optionsPanel.getByRole('heading', { name: 'カスタム関数' })).toBeVisible();
+  await expect(optionsPanel).toContainText(
+    'オートコンプリートと引数ヘルパーに使うホスト側の数式ヒントです。',
+  );
+  await expect(optionsPanel.getByText('GREET(name)', { exact: true })).toBeVisible();
+  await expect(optionsPanel.getByText('FAHRENHEIT(celsius)', { exact: true })).toBeVisible();
+  await expect(optionsPanel).not.toContainText('Custom functions');
   await optionsButton.first().click();
   await expect(optionsPanel).toBeHidden();
 
@@ -841,19 +846,10 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await expect(commentDialog).toHaveCount(0);
 
   await page.evaluate(() => {
-    const inst = (
-      window as unknown as {
-        __fcInst?: {
-          workbook?: {
-            setText?: (addr: { sheet: number; row: number; col: number }, value: string) => void;
-          };
-        };
-      }
-    ).__fcInst;
-    if (!inst?.workbook?.setText) {
-      throw new Error('window.__fcInst.workbook.setText is required');
-    }
-    inst.workbook.setText({ sheet: 0, row: 0, col: 0 }, 'teh teh');
+    const inst = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+    if (!inst) throw new Error('window.__fcInst is required');
+    inst.workbook.batch(() => inst.workbook.sheet(0).setText(0, 0, 'teh teh'));
+    inst.history.clear();
   });
   const spellingCommand = page.getByRole('button', { name: /スペル/ }).first();
   await expect(spellingCommand).toBeVisible();

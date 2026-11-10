@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 const host = (page: Page): Locator => page.locator('.fc-host').first();
@@ -51,8 +52,10 @@ export async function runContextDialogReturnScenario(page: Page): Promise<void> 
 
 async function rowHeight(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const layout = instance.store.getState().layout;
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const layout = w.__fcProbes['mount/internals']
+      .spreadsheetInternals(w.__fcInst)
+      .store.getState().layout;
     return layout.rowHeights.get(0) ?? layout.defaultRowHeight;
   });
 }
@@ -74,7 +77,7 @@ async function openPasteSpecial(page: Page): Promise<Locator> {
 async function readValue(page: Page, col: number) {
   return page.evaluate((column) => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    return instance.workbook.getValue({ sheet: 0, row: 0, col: column });
+    return instance.workbook.sheet(0).getValue(0, column);
   }, col);
 }
 
@@ -96,22 +99,22 @@ export async function runPasteSpecialCancelScenario(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(dialog).toBeHidden();
-  await expect.poll(() => readValue(page, 1)).toEqual({ kind: 'number', value: 99 });
+  await expect.poll(() => readValue(page, 1)).toEqual(99);
   await expect(host(page)).toBeFocused();
 
   await openPasteSpecial(page);
   await dialog.getByRole('button', { name: 'OK', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(dialog).toBeHidden();
-  await expect.poll(() => readValue(page, 1)).toEqual({ kind: 'number', value: 17 });
+  await expect.poll(() => readValue(page, 1)).toEqual(17);
   await expect(host(page)).toBeFocused();
   await sp.shortcut('z');
-  await expect.poll(() => readValue(page, 1)).toEqual({ kind: 'number', value: 99 });
+  await expect.poll(() => readValue(page, 1)).toEqual(99);
 }
 
 async function openHyperlink(page: Page): Promise<Locator> {
   await page.evaluate(() => {
-    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.openHyperlinkDialog();
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.dialogs.open('hyperlink');
   });
   const dialog = page.locator('.fc-hldlg');
   await expect(dialog).toBeVisible();
@@ -120,8 +123,9 @@ async function openHyperlink(page: Page): Promise<Locator> {
 
 async function readLinks(page: Page): Promise<string[]> {
   return page.evaluate(() => {
-    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    return [...instance.store.getState().format.formats.values()].flatMap((format) =>
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    return [...store.getState().format.formats.values()].flatMap((format) =>
       format.hyperlink ? [format.hyperlink] : [],
     );
   });

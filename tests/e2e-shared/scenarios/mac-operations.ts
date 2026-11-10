@@ -1,4 +1,6 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
@@ -32,19 +34,15 @@ export async function runMacEditShortcutScenario(page: Page): Promise<void> {
   // must still win over the Windows underline route after either rebind.
   for (const rebind of ['features', 'locale']) {
     await page.evaluate((reason) => {
-      const inst = (
-        window as unknown as {
-          __fcInst: {
-            setFeatures(flags: { shortcuts: boolean }): void;
-            i18n: { setLocale(locale: string): void };
-          };
-        }
-      ).__fcInst;
+      const inst = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
       if (reason === 'features') {
-        inst.setFeatures({ shortcuts: false });
-        inst.setFeatures({ shortcuts: true });
+        for (const shortcuts of [false, true]) {
+          inst.update({
+            ui: { ...inst.options.ui, features: { ...inst.options.ui?.features, shortcuts } },
+          });
+        }
       } else {
-        inst.i18n.setLocale('ja');
+        inst.update({ locale: 'ja' });
       }
     }, rebind);
     await page.locator('.fc-host').focus();
@@ -100,12 +98,9 @@ export async function runMacPasteSpecialShortcutScenario(page: Page): Promise<vo
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const inst = (
-          window as unknown as {
-            __fcInst: { store: { getState(): { ui: { copyRange: unknown } } } };
-          }
-        ).__fcInst;
-        return Boolean(inst.store.getState().ui.copyRange);
+        const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+        const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+        return Boolean(store.getState().ui.copyRange);
       }),
     )
     .toBe(true);

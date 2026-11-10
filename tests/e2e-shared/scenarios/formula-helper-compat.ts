@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 export type FormulaHelperSurface = 'inline' | 'bar';
@@ -15,11 +15,13 @@ export async function runFormulaKeyboardPointing(
   await sheet.expectNoStub();
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    instance.applyChanges([
-      { addr: { sheet: 0, row: 3, col: 3 }, input: '=1' },
-      { addr: { sheet: 0, row: 2, col: 2 }, input: '1' },
-      { addr: { sheet: 0, row: 3, col: 2 }, input: '2' },
-    ]);
+    const sheet0 = instance.workbook.sheet(0);
+    instance.workbook.batch(() => {
+      sheet0.setFormula(3, 3, '=1');
+      sheet0.setNumber(2, 2, 1);
+      sheet0.setNumber(3, 2, 2);
+    });
+    instance.history.clear();
   });
   const input = page
     .locator(surface === 'inline' ? '.fc-host__editor' : '.fc-host__formulabar-input')
@@ -53,12 +55,10 @@ export async function runFormulaKeyboardPointing(
   await page.keyboard.press('Shift+ArrowUp');
   await expect(input).toHaveValue('=SUM(C3:C4');
   expect(
-    await page.evaluate(
-      () =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().selection
-          .active,
+    await page.evaluate(() =>
+      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
     ),
-  ).toEqual({ sheet: 0, row: 3, col: 3 });
+  ).toMatchObject({ sheet: 0, active: { row: 3, col: 3 } });
   expect(await sheet.readFormula('D4')).toBe('=1');
   await page.keyboard.type(')');
   await page.keyboard.press('Enter');
@@ -149,10 +149,10 @@ export async function runFormulaHelperInteraction(
   const source = () =>
     page.evaluate(() => {
       const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      const addr = { sheet: 0, row: 0, col: 0 };
+      const sheet0 = instance.workbook.sheet(0);
       return {
-        formula: instance.workbook.cellFormula(addr),
-        value: instance.workbook.getValue(addr),
+        formula: sheet0.getFormula(0, 0),
+        value: sheet0.getValue(0, 0),
       };
     });
   const list = page.locator('.fc-autocomplete');
@@ -197,16 +197,17 @@ export async function runFormulaHelperInteraction(
   if (surface === 'inline') {
     expect(
       await page.evaluate(() => {
-        const mode = (
-          window as unknown as { __fcInst: SpreadsheetInstance }
-        ).__fcInst.store.getState().ui.editor;
+        const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+        const mode = w.__fcProbes['mount/internals']
+          .spreadsheetInternals(w.__fcInst)
+          .store.getState().ui.editor;
         return mode.kind === 'idle' ? null : mode.raw;
       }),
     ).toBe('=SUM(');
   }
   await page.keyboard.type('1,2)');
   await page.keyboard.press('Enter');
-  await expect.poll(source).toEqual({ formula: '=SUM(1,2)', value: { kind: 'number', value: 3 } });
+  await expect.poll(source).toEqual({ formula: '=SUM(1,2)', value: 3 });
 
   await begin();
   await input.fill('=IF(TRUE,SU,7)');
@@ -264,10 +265,8 @@ export async function runFormulaHelperInteraction(
 
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    if (!instance.workbook.setDefinedNameEntry('Rate.Factor', '=2')) {
-      throw new Error('The real workbook rejected the defined-name fixture');
-    }
-    instance.formula.register('FOO', () => 0);
+    instance.workbook.setDefinedName({ name: 'Rate.Factor', formula: '=2' });
+    instance.formulaHints.add({ name: 'FOO' });
   });
   await begin();
   await input.fill('=Rate.F+1');
@@ -279,7 +278,7 @@ export async function runFormulaHelperInteraction(
   await page.keyboard.press('Enter');
   await expect.poll(source).toEqual({
     formula: '=Rate.Factor+1',
-    value: { kind: 'number', value: 3 },
+    value: 3,
   });
   await sheet.expectNoConsoleErrors();
 }
@@ -340,8 +339,11 @@ export async function runFormulaHelperVisual(
   await page.evaluate(
     ({ theme, rtl, zoom }) => {
       const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      instance.setTheme(theme);
-      instance.store.setState((state) => ({
+      const { store } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+        'mount/internals'
+      ].spreadsheetInternals(instance);
+      instance.update({ theme });
+      store.setState((state) => ({
         ...state,
         ui: { ...state.ui, rightToLeft: rtl },
         viewport: { ...state.viewport, zoom },
@@ -358,7 +360,7 @@ export async function runFormulaHelperVisual(
           const { cellRectUnclamped, layoutForView } = probes['render/geometry'];
           const { formatA1Cell } = probes['engine/address'];
           const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-          const state = instance.store.getState();
+          const state = probes['mount/internals'].spreadsheetInternals(instance).store.getState();
           const grid = document.querySelector('.fc-host__grid')?.getBoundingClientRect();
           if (!grid) throw new Error('Missing grid');
           let row = state.viewport.rowStart;

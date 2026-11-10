@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
-import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { revealRibbonCommand } from './ribbon-tabs.js';
 import { gridCellCenter, SpreadsheetPage } from './SpreadsheetPage.js';
 
@@ -43,25 +44,11 @@ export const a1Address = (ref: string, sheet = 0): CellAddress => {
   return { sheet, row: Number(row) - 1, col: columnNumber(letters) };
 };
 
-type WorkbookProbe = {
-  workbook: {
-    getValue(addr: CellAddress): CellValue;
-    cellFormula(addr: CellAddress): string | null;
-    sheetCount: number;
-    sheetName(index: number): string;
-  };
-  store: {
-    getState(): {
-      data: { sheetIndex: number };
-      format: { formats: Map<string, CellFormat> };
-      merges: { byAnchor: Map<string, MergeRange> };
-    };
-  };
-};
+type ProbeWindow = Window & { __fcInst?: SpreadsheetInstance; __fcProbes?: E2eProbes };
 
 const ensureProbe = (page: Page): Promise<void> =>
   page.evaluate(() => {
-    if (!(window as Window & { __fcInst?: WorkbookProbe }).__fcInst) {
+    if (!(window as ProbeWindow).__fcInst) {
       throw new Error('window.__fcInst is not available');
     }
   });
@@ -96,9 +83,16 @@ export class UserJourneyPage extends SpreadsheetPage {
     await ensureProbe(this.page);
     return this.page.evaluate(
       ({ addr: target }) => {
-        const instance = (window as Window & { __fcInst?: WorkbookProbe }).__fcInst;
+        const instance = (window as ProbeWindow).__fcInst;
         if (!instance) throw new Error('window.__fcInst is not available');
-        return instance.workbook.getValue(target);
+        const native = instance.workbook.sheet(target.sheet).getValue(target.row, target.col);
+        if (native === null) return { kind: 'blank' };
+        if (typeof native === 'number') return { kind: 'number', value: native };
+        if (typeof native === 'boolean') return { kind: 'bool', value: native };
+        if (typeof native === 'string') return { kind: 'text', value: native };
+        if (Array.isArray(native)) return { kind: 'array', value: native };
+        const error = native as { code: number; toString(): string };
+        return { kind: 'error', code: error.code, text: error.toString() };
       },
       { addr },
     );
@@ -109,9 +103,9 @@ export class UserJourneyPage extends SpreadsheetPage {
     await ensureProbe(this.page);
     return this.page.evaluate(
       ({ addr: target }) => {
-        const instance = (window as Window & { __fcInst?: WorkbookProbe }).__fcInst;
+        const instance = (window as ProbeWindow).__fcInst;
         if (!instance) throw new Error('window.__fcInst is not available');
-        return instance.workbook.cellFormula(target);
+        return instance.workbook.sheet(target.sheet).getFormula(target.row, target.col);
       },
       { addr },
     );
@@ -122,11 +116,12 @@ export class UserJourneyPage extends SpreadsheetPage {
     await ensureProbe(this.page);
     return this.page.evaluate(
       ({ addr: target }) => {
-        const instance = (window as Window & { __fcInst?: WorkbookProbe }).__fcInst;
-        if (!instance) throw new Error('window.__fcInst is not available');
-        const format = instance.store
-          .getState()
-          .format.formats.get(`${target.sheet}:${target.row}:${target.col}`);
+        const w = window as ProbeWindow;
+        if (!w.__fcInst || !w.__fcProbes) throw new Error('window.__fcInst is not available');
+        const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+        const format = (store.getState().format.formats as Map<string, CellFormat>).get(
+          `${target.sheet}:${target.row}:${target.col}`,
+        );
         return format ? { ...format } : null;
       },
       { addr },
@@ -138,9 +133,10 @@ export class UserJourneyPage extends SpreadsheetPage {
     await ensureProbe(this.page);
     return this.page.evaluate(
       ({ addr: target }) => {
-        const instance = (window as Window & { __fcInst?: WorkbookProbe }).__fcInst;
-        if (!instance) throw new Error('window.__fcInst is not available');
-        const merge = instance.store
+        const w = window as ProbeWindow;
+        if (!w.__fcInst || !w.__fcProbes) throw new Error('window.__fcInst is not available');
+        const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+        const merge = store
           .getState()
           .merges.byAnchor.get(`${target.sheet}:${target.row}:${target.col}`);
         return merge ? { ...merge } : null;
@@ -152,18 +148,18 @@ export class UserJourneyPage extends SpreadsheetPage {
   async sheetCount(): Promise<number> {
     await ensureProbe(this.page);
     return this.page.evaluate(() => {
-      const instance = (window as Window & { __fcInst?: WorkbookProbe }).__fcInst;
+      const instance = (window as ProbeWindow).__fcInst;
       if (!instance) throw new Error('window.__fcInst is not available');
-      return instance.workbook.sheetCount;
+      return instance.workbook.listSheets().length;
     });
   }
 
   async sheetName(index: number): Promise<string> {
     await ensureProbe(this.page);
     return this.page.evaluate((sheetIndex) => {
-      const instance = (window as Window & { __fcInst?: WorkbookProbe }).__fcInst;
+      const instance = (window as ProbeWindow).__fcInst;
       if (!instance) throw new Error('window.__fcInst is not available');
-      return instance.workbook.sheetName(sheetIndex);
+      return instance.workbook.sheet(sheetIndex).name;
     }, index);
   }
 
@@ -239,8 +235,7 @@ export class UserJourneyPage extends SpreadsheetPage {
     // Right-click outside the selection moves the active cell, so open the menu on the active cell.
     const active = await this.page.evaluate(
       () =>
-        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().selection
-          .active,
+        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get().active,
     );
     const point = await gridCellCenter(this.page, active.row, active.col);
     await this.page.mouse.click(point.x, point.y, { button: 'right' });

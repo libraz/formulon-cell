@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** D01 — `workbook.save()` round-trips the current workbook to xlsx bytes.
@@ -13,9 +14,7 @@ export async function runSaveXlsxScenario(page: Page): Promise<void> {
   await sp.expectNoStub();
 
   type SpreadsheetGlobal = {
-    __fcInst?: {
-      workbook: { save(): Uint8Array };
-    };
+    __fcInst?: SpreadsheetInstance;
   };
 
   const out = await page.evaluate(() => {
@@ -23,7 +22,7 @@ export async function runSaveXlsxScenario(page: Page): Promise<void> {
     const inst = w.__fcInst;
     if (!inst) return { ok: false as const };
     try {
-      const bytes = inst.workbook.save();
+      const { bytes } = inst.workbook.save();
       return { ok: true as const, length: bytes.byteLength, head: Array.from(bytes.slice(0, 4)) };
     } catch (e) {
       return { ok: false as const, error: (e as Error).message };

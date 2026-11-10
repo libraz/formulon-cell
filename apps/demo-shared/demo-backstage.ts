@@ -1,12 +1,6 @@
-import type {
-  PrinterProfile,
-  LegacySpreadsheetInstance as SpreadsheetInstance,
-} from '@libraz/formulon-cell';
-import {
-  buildPrintDocument,
-  getPageSetup,
-  resolvePrinterProfileBounds,
-} from '@libraz/formulon-cell';
+import type { PrinterProfile, SpreadsheetInstance } from '@libraz/formulon-cell';
+import { formatA1Cell } from '@libraz/formulon-cell';
+import { openDemoDialog } from './demo-actions.js';
 import type { DemoUiStrings } from './demo-strings.js';
 
 export const DEMO_PRINTER_PROFILES: readonly PrinterProfile[] = [
@@ -125,8 +119,8 @@ export const runDemoBackstageAction = (opts: RunDemoBackstageActionOptions): voi
   else if (action === 'save-as') opts.saveWorkbookAs();
   else if (action === 'print') instance?.print('print');
   else if (action === 'export') instance?.print('pdf');
-  else if (action === 'page-setup') instance?.openPageSetup();
-  else if (action === 'edit-links') instance?.openExternalLinksDialog();
+  else if (action === 'page-setup') openDemoDialog(instance, 'pageSetup');
+  else if (action === 'edit-links') openDemoDialog(instance, 'externalLinks');
   else if (action === 'share') opts.showNotice(opts.ui.share, opts.ui.shareDesc);
   else if (action === 'options') opts.toggleOptions();
   else if (action === 'close') opts.closeBackstage();
@@ -139,9 +133,51 @@ const formatMarginSummary = (margins: {
   left: number;
 }): string => `${margins.top}" / ${margins.right}" / ${margins.bottom}" / ${margins.left}"`;
 
-const selectedDemoPrinterProfile = (): PrinterProfile | undefined =>
-  DEMO_PRINTER_PROFILES.find((profile) => profile.id === DEMO_PRINTER_PROFILE_ID) ??
-  DEMO_PRINTER_PROFILES[0];
+/** `PageOrientation.Landscape` of the engine's page setup. */
+const ORIENTATION_LANDSCAPE = 1;
+
+type DemoPaperSize = NonNullable<PrinterProfile['paperSize']>;
+
+/** The OOXML paper size codes the spreadsheet names, and the ribbon string that labels each. */
+const PAPER_SIZE_BY_CODE: Readonly<Record<number, DemoPaperSize>> = {
+  1: 'letter',
+  3: 'tabloid',
+  5: 'legal',
+  8: 'A3',
+  9: 'A4',
+  11: 'A5',
+};
+
+const PAPER_LABEL_KEYS = {
+  A3: 'paperA3',
+  A4: 'paperA4',
+  A5: 'paperA5',
+  letter: 'paperLetter',
+  legal: 'paperLegal',
+  tabloid: 'paperTabloid',
+} as const satisfies Record<DemoPaperSize, string>;
+
+const printableBound = (value: number | undefined): number =>
+  Number.isFinite(value) ? Math.max(0, value ?? 0) : 0;
+
+/** The printer profile the page setup prints on: the one the host selected by id, else the first
+ *  that fits the paper size and orientation. */
+const demoPrinterProfileFor = (
+  instance: SpreadsheetInstance,
+  paperSize: DemoPaperSize | undefined,
+  landscape: boolean,
+): PrinterProfile | undefined => {
+  const { printerProfiles = [], printerProfileId } = instance.options.host ?? {};
+  const orientation = landscape ? 'landscape' : 'portrait';
+  return (
+    printerProfiles.find((profile) => profile.id === printerProfileId) ??
+    printerProfiles.find(
+      (profile) =>
+        (!profile.paperSize || profile.paperSize === paperSize) &&
+        (!profile.orientation || profile.orientation === orientation),
+    )
+  );
+};
 
 export const buildDemoPrintPreviewModel = (
   ui: DemoUiStrings,
@@ -161,34 +197,32 @@ export const buildDemoPrintPreviewModel = (
       settings: [],
     };
   }
-  const state = instance.store.getState();
-  const sheet = state.data.sheetIndex;
-  const setup = getPageSetup(state, sheet);
-  const scale =
-    setup.fitWidth || setup.fitHeight
-      ? `${setup.fitWidth || 1} x ${setup.fitHeight || 1}`
-      : `${Math.round((setup.scale ?? 1) * 100)}%`;
-  const printerProfile = selectedDemoPrinterProfile();
-  const printerBounds = resolvePrinterProfileBounds(
-    setup,
-    DEMO_PRINTER_PROFILES,
-    DEMO_PRINTER_PROFILE_ID,
-  );
+  const sheetIndex = instance.selection.get().sheet;
+  const sheet = instance.workbook.sheet(sheetIndex);
+  const setup = sheet.getPageSetup();
+  const margins = sheet.getPageMargins();
+  const scale = setup.fitToPage
+    ? `${setup.fitToWidth || 1} x ${setup.fitToHeight || 1}`
+    : `${setup.scalePct}%`;
+  const landscape = setup.orientation === ORIENTATION_LANDSCAPE;
+  const paperSize = PAPER_SIZE_BY_CODE[setup.paperSize];
+  const printerProfile = demoPrinterProfileFor(instance, paperSize, landscape);
+  const printerBounds = printerProfile && {
+    top: printableBound(printerProfile.printableBounds.top),
+    right: printableBound(printerProfile.printableBounds.right),
+    bottom: printableBound(printerProfile.printableBounds.bottom),
+    left: printableBound(printerProfile.printableBounds.left),
+  };
+  const printArea = sheet
+    .getPrintArea()
+    ?.map((r) => `${formatA1Cell(r.firstRow, r.firstCol)}:${formatA1Cell(r.lastRow, r.lastCol)}`)
+    .join(',');
   const printerSettings = [
     printerProfile?.name ? { label: ui.printPreviewPrinter, value: printerProfile.name } : null,
     printerBounds
       ? { label: ui.printPreviewPrinterMargins, value: formatMarginSummary(printerBounds) }
       : null,
   ].filter((item): item is { label: string; value: string } => item !== null);
-  const printDocument = buildPrintDocument(
-    instance.workbook,
-    instance.store,
-    sheet,
-    ui.printPreviewTitle,
-    {
-      printableBounds: printerBounds ?? null,
-    },
-  );
   return {
     title: ui.printPreviewTitle,
     subtitle: bookName,
@@ -197,21 +231,31 @@ export const buildDemoPrintPreviewModel = (
     pageSetupLabel: ui.pageSetup,
     previewTitle: `${ui.printPreviewPage} 1`,
     previewHint: ui.printPreviewHint,
-    previewHtml: printDocument.html,
+    previewHtml: instance.printDocument().html,
     settings: [
-      { label: ui.printPreviewSheet, value: String(sheet + 1) },
+      { label: ui.printPreviewSheet, value: String(sheetIndex + 1) },
       {
         label: ui.printPreviewOrientation,
-        value:
-          setup.orientation === 'portrait'
-            ? ui.printPreviewOrientPortrait
-            : ui.printPreviewOrientLandscape,
+        value: landscape ? ui.printPreviewOrientLandscape : ui.printPreviewOrientPortrait,
       },
-      { label: ui.printPreviewPaper, value: setup.paperSize },
+      {
+        label: ui.printPreviewPaper,
+        value: paperSize
+          ? instance.i18n.strings.ribbon[PAPER_LABEL_KEYS[paperSize]]
+          : `#${setup.paperSize}`,
+      },
       ...printerSettings,
-      { label: ui.printPreviewMargins, value: formatMarginSummary(setup.margins) },
+      {
+        label: ui.printPreviewMargins,
+        value: formatMarginSummary({
+          top: margins.topIn,
+          right: margins.rightIn,
+          bottom: margins.bottomIn,
+          left: margins.leftIn,
+        }),
+      },
       { label: ui.printPreviewScale, value: scale },
-      { label: ui.printPreviewArea, value: setup.printArea?.trim() || ui.printPreviewNoArea },
+      { label: ui.printPreviewArea, value: printArea || ui.printPreviewNoArea },
     ],
   };
 };

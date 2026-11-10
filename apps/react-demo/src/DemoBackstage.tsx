@@ -1,4 +1,4 @@
-import type { LegacySpreadsheetInstance as SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { SpreadsheetInstance } from '@libraz/formulon-cell';
 import { type ReactElement, useMemo } from 'react';
 import {
   buildDemoBackstageCards,
@@ -8,6 +8,7 @@ import {
   type DemoBackstageAction,
   type DemoUiStrings,
   isDemoBackstageActionDisabled,
+  openDemoDialog,
 } from '../../demo-shared/index.js';
 import { DemoIcon } from './DemoIcon.js';
 
@@ -84,7 +85,7 @@ export const DemoBackstage = ({
               <button
                 type="button"
                 className="fc-tb__print-action"
-                onClick={() => instance?.openPageSetup()}
+                onClick={() => openDemoDialog(instance, 'pageSetup')}
                 disabled={!instance}
               >
                 {printPreview.pageSetupLabel}
