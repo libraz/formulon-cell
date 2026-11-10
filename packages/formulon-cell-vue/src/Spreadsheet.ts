@@ -9,7 +9,7 @@ import {
   type LocaleChangeEvent,
   type MountOptions,
   type PrinterProfile,
-  type RecalcEvent,
+  type LegacyRecalcEvent as RecalcEvent,
   resolveAdapterTheme,
   type SelectionChangeEvent,
   Spreadsheet as SpreadsheetCore,
