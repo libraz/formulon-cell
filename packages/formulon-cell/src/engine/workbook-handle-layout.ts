@@ -23,7 +23,6 @@ import { formulonErrorCode, isFormulonError, orFallback } from './result.js';
 import type { EngineCapabilities, Range, Workbook } from './types.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-import { shiftPivotOwnedAreas } from './workbook-handle-pivot.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
@@ -647,9 +646,7 @@ export abstract class WorkbookHandleLayoutMethods {
   engineInsertRows(sheet: number, row: number, count: number): boolean {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
-    const ok = attempt(() => ws(this, sheet).insertRows(row, row + count - 1));
-    if (ok) shiftPivotOwnedAreas(this, sheet, 'row', 'insert', row, count);
-    return ok;
+    return attempt(() => ws(this, sheet).insertRows(row, row + count - 1));
   }
 
   /** Delete `count` rows starting at `row` on `sheet`. Refs that fall
@@ -657,27 +654,21 @@ export abstract class WorkbookHandleLayoutMethods {
   engineDeleteRows(sheet: number, row: number, count: number): boolean {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
-    const ok = attempt(() => ws(this, sheet).deleteRows(row, row + count - 1));
-    if (ok) shiftPivotOwnedAreas(this, sheet, 'row', 'delete', row, count);
-    return ok;
+    return attempt(() => ws(this, sheet).deleteRows(row, row + count - 1));
   }
 
   /** Insert `count` blank columns at `col` on `sheet`. */
   engineInsertCols(sheet: number, col: number, count: number): boolean {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
-    const ok = attempt(() => ws(this, sheet).insertColumns(col, col + count - 1));
-    if (ok) shiftPivotOwnedAreas(this, sheet, 'col', 'insert', col, count);
-    return ok;
+    return attempt(() => ws(this, sheet).insertColumns(col, col + count - 1));
   }
 
   /** Delete `count` columns starting at `col` on `sheet`. */
   engineDeleteCols(sheet: number, col: number, count: number): boolean {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
-    const ok = attempt(() => ws(this, sheet).deleteColumns(col, col + count - 1));
-    if (ok) shiftPivotOwnedAreas(this, sheet, 'col', 'delete', col, count);
-    return ok;
+    return attempt(() => ws(this, sheet).deleteColumns(col, col + count - 1));
   }
 
   /** Insert (`Down` / `Right`) or delete (`Up` / `Left`) the cells of `range`, shifting the band. False when

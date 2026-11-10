@@ -729,10 +729,11 @@ export function recreatePivotTable(
         if (!placed) return false;
       }
     }
+    // The data fields go in first: a field order places the Values field only once there are two.
     return (
+      definition.dataFields.every((spec) => wb.addPivotDataField(sheet, pivotIndex, spec) >= 0) &&
       wb.setPivotRowFieldOrder(sheet, pivotIndex, definition.rowFieldOrder) &&
       wb.setPivotColFieldOrder(sheet, pivotIndex, definition.colFieldOrder) &&
-      definition.dataFields.every((spec) => wb.addPivotDataField(sheet, pivotIndex, spec) >= 0) &&
       definition.filters.every((filter) => wb.addPivotFilter(sheet, pivotIndex, filter)) &&
       (definition.style === null ||
         wb.setPivotStyleInfo(sheet, pivotIndex, {
@@ -806,10 +807,8 @@ export function refreshPivotReportsAfterEdit(
 ): { spilled: PivotSpill[] } {
   const sheet = store.getState().data.sheetIndex;
   const before = lastPivotStyleLayer(wb, sheet);
-  const owned = wb.pivotOwnedAreas(sheet);
   for (const { pivotIndex } of wb.pivotBounds(sheet)) settlePivotAnchor(wb, sheet, pivotIndex);
-  clearVacatedReportCells(wb, sheet, [...(before?.reports.map((r) => r.range) ?? []), ...owned]);
-  wb.releasePivotCachedArea(sheet);
+  clearVacatedReportCells(wb, sheet, before?.reports.map((r) => r.range) ?? []);
   mutators.replaceCells(store, wb.cells(sheet));
   reflowPivotFormats(store, wb);
   autofitPivotTableColumns(store, wb, opts);
