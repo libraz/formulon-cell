@@ -627,7 +627,7 @@ export const builtInCommandIntent = (
 };
 
 /** Commands a protected sheet refuses whatever its Protect Sheet options: the formula auditing
- *  arrows (trace precedents/dependents, remove arrows) and refreshing a pivot report. */
+ *  arrows (trace precedents/dependents/error, remove arrows) and refreshing a pivot report. */
 const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<BuiltInCommandId> = new Set([
   'precedents',
   'dependents',
@@ -637,6 +637,7 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<BuiltInCommandId> = new Set([
   'mac.formulas.removeArrows.all',
   'mac.formulas.removeArrows.precedents',
   'mac.formulas.removeArrows.dependents',
+  'mac.formulas.errorCheck.trace',
   'pivotRefresh',
 ]);
 

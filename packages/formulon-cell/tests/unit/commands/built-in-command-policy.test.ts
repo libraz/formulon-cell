@@ -220,6 +220,7 @@ describe('built-in Mac command policy catalog', () => {
       'mac.formulas.removeArrows.all',
       'mac.formulas.removeArrows.precedents',
       'mac.formulas.removeArrows.dependents',
+      'mac.formulas.errorCheck.trace',
     ] as const;
 
     it('refuses the auditing arrows and pivot refresh whatever the options, policy or not', () => {
