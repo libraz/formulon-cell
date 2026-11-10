@@ -10,6 +10,7 @@ import {
   runSaveOpenContinueScenario,
   runTableOrganizationScenario,
 } from '../../../tests/e2e-shared/scenarios/user-journeys.js';
+import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
 
 test('user journey: budget entry, currency, formulas, undo, and redo (react-demo)', async ({
   page,
@@ -17,7 +18,9 @@ test('user journey: budget entry, currency, formulas, undo, and redo (react-demo
   await runBudgetEntryScenario(page);
 });
 
-test('user journey: order formula fill (react-demo)', async ({ page }) => {
+test('user journey: order formula fill (react-demo)', { tag: SYSTEM_CLIPBOARD }, async ({
+  page,
+}) => {
   await runOrderFillScenario(page);
 });
 
@@ -29,11 +32,15 @@ test('user journey: report header font, alignment, and merge (react-demo)', asyn
   await runReportHeaderScenario(page);
 });
 
-test('user journey: table copy, formats, and structural edits (react-demo)', async ({ page }) => {
+test('user journey: table copy, formats, and structural edits (react-demo)', {
+  tag: SYSTEM_CLIPBOARD,
+}, async ({ page }) => {
   await runTableOrganizationScenario(page);
 });
 
-test('user journey: monthly sheets and cross-sheet copy (react-demo)', async ({ page }) => {
+test('user journey: monthly sheets and cross-sheet copy (react-demo)', {
+  tag: SYSTEM_CLIPBOARD,
+}, async ({ page }) => {
   await runMonthlySheetsScenario(page);
 });
 

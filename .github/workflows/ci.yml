@@ -114,7 +114,7 @@ jobs:
       - name: Run e2e
         env:
           CI: 'true'
-        run: yarn workspace @formulon-cell/${{ matrix.app }} test:e2e --project=${{ matrix.browser }}
+        run: yarn workspace @formulon-cell/${{ matrix.app }} test:e2e --project='${{ matrix.browser }}*'
 
       - name: Upload report
         if: failure()

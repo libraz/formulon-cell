@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 import { ADAPTER_SPECS, PRIMARY_DEMO_APP, runFullE2E } from './adapter-specs.js';
+import { SYSTEM_CLIPBOARD } from './tags.js';
 import type { DemoApp } from './types.js';
 
 const portFromEnv = (app: DemoApp): number => {
@@ -13,6 +14,13 @@ const portFromEnv = (app: DemoApp): number => {
   }
   return value;
 };
+
+const SYSTEM_CLIPBOARD_GREP = new RegExp(SYSTEM_CLIPBOARD);
+
+const BROWSER_PROJECTS = [
+  { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  { name: 'webkit', use: { ...devices['Desktop Safari'], permissions: [] } },
+];
 
 /**
  * Builds a Playwright config for a demo app. Both framework demos share the same
@@ -58,13 +66,12 @@ export function defineDemoAppConfig(app: DemoApp) {
       // the project-level override below clears it for that engine.
       permissions: ['clipboard-read', 'clipboard-write'],
     },
-    projects: [
-      { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-      {
-        name: 'webkit',
-        use: { ...devices['Desktop Safari'], permissions: [] },
-      },
-    ],
+    // Each browser has a `<browser>-clipboard` project that runs the system-clipboard tests one at a
+    // time; select both with `--project='chromium*'`.
+    projects: BROWSER_PROJECTS.flatMap((project) => [
+      { ...project, grepInvert: SYSTEM_CLIPBOARD_GREP },
+      { ...project, name: `${project.name}-clipboard`, grep: SYSTEM_CLIPBOARD_GREP, workers: 1 },
+    ]),
     // A production build served by `vite preview`, so edits to the sources during a run cannot
     // hot-update the app under test. FC_E2E_DEV=1 serves the dev server instead, for debugging.
     webServer: {
