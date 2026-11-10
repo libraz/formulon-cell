@@ -11,7 +11,7 @@ import type {
   OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
-import { sheetPermits } from './protection.js';
+import { sheetPermits, unlockedCellsOption } from './protection.js';
 import { FUNCTION_SIGNATURES } from './refs.js';
 
 /** A built-in command id, or a Mac function-menu leaf naming a spreadsheet function. */
@@ -617,6 +617,8 @@ export const builtInCommandIntent = (
   const band = shiftedBand(operation, selection);
   let effects: readonly OperationEffect[];
   if (WORKBOOK_EFFECT_OPERATIONS.has(operation) || workbookTheme) effects = [{ kind: 'workbook' }];
+  // Its Protect Sheet option alone makes the command available; locked cells refuse it at run time.
+  else if (unlockedCellsOption(operation)) effects = [{ kind: 'sheet', sheet: selection.sheet }];
   else if (band) effects = [{ kind: 'range', range: band }];
   else if (operation === 'format')
     effects = [selection, ...(state.selection.extraRanges ?? [])].map(
@@ -642,15 +644,21 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<BuiltInCommandId> = new Set([
 ]);
 
 /** Sheet protection's decision for a built-in command on the active sheet, with or without a
- *  policy. Commands it does not name are left to their operation's own protection check. */
+ *  policy: the always-refused commands, and an option-gated operation whose option is off.
+ *  Commands it does not name are left to their operation's own protection check. */
 export const builtInProtectionDecision = (
   store: SpreadsheetStore,
   id: string,
 ): PermissionDecision => {
+  if (!isBuiltInCommandId(id)) return { allowed: true };
   const state = store.getState();
-  return isBuiltInCommandId(id) &&
-    REFUSED_ON_PROTECTED_SHEET.has(id) &&
-    !sheetPermits(state, state.data.sheetIndex)
+  const sheet = state.data.sheetIndex;
+  const operation = BUILT_IN_COMMAND_OPERATION[id];
+  const option = operation ? unlockedCellsOption(operation) : undefined;
+  const refused = REFUSED_ON_PROTECTED_SHEET.has(id)
+    ? !sheetPermits(state, sheet)
+    : option !== undefined && !sheetPermits(state, sheet, option);
+  return refused
     ? { allowed: false, code: 'protected', reason: 'sheet is protected' }
     : { allowed: true };
 };

@@ -31,6 +31,7 @@ import {
   type WorkbookStructureProtectionState,
 } from '../store/store.js';
 import type { History } from './history.js';
+import type { InteractionOperation } from './interaction-policy.js';
 
 export interface SheetProtectionOptions {
   password?: string;
@@ -105,6 +106,20 @@ export function sheetPermits(
   if (!isSheetProtected(state, sheet)) return true;
   return permission !== undefined && protectedSheetPermissions(state, sheet)?.[permission] === true;
 }
+
+/** Operations a Protect Sheet option enables on a protected sheet for unlocked cells only. The
+ *  option alone decides whether the command is available; a locked target is refused silently
+ *  when it runs (a sort never reorders a range holding a locked cell, whatever its option says). */
+const UNLOCKED_CELLS_OPTION: Partial<
+  Record<InteractionOperation, keyof SheetProtectionPermissions>
+> = {
+  sort: 'sort',
+};
+
+/** The Protect Sheet option that makes `operation` available on unlocked cells, if it has one. */
+export const unlockedCellsOption = (
+  operation: InteractionOperation,
+): keyof SheetProtectionPermissions | undefined => UNLOCKED_CELLS_OPTION[operation];
 
 /** Spreadsheet-parity gate for sheet-level operations: rejected (no-op +
  *  warning) on a protected sheet unless `permission` is allowed there. */

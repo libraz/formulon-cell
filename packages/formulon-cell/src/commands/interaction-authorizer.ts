@@ -30,6 +30,7 @@ import {
   isSheetProtected,
   protectedSheetPermissions,
   sheetPermits,
+  unlockedCellsOption,
 } from './protection.js';
 
 const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
@@ -74,22 +75,14 @@ const sheetProtectionPermits = (
   if (operation === 'protection') return true;
   // Protect Sheet leaves page setup (margins, print area, titles, header/footer) editable.
   if (operation === 'pageSetup') return true;
-  return sheetPermits(state, sheet, PROTECTION_OPTION[operation]);
-};
-
-/** Operations a Protect Sheet option enables on a protected sheet for unlocked cells only:
- *  a sort never reorders a range holding a locked cell, whatever its option says. */
-const UNLOCKED_PROTECTION_OPTION: Partial<
-  Record<InteractionOperation, keyof SheetProtectionPermissions>
-> = {
-  sort: 'sort',
+  return sheetPermits(state, sheet, PROTECTION_OPTION[operation] ?? unlockedCellsOption(operation));
 };
 
 /** Whether sheet protection lets `operation` write `addr`. */
 const protectionPermits = (state: State, operation: InteractionOperation, addr: Addr): boolean => {
   const option = PROTECTION_OPTION[operation];
   if (option) return sheetPermits(state, addr.sheet, option);
-  const unlockedOption = UNLOCKED_PROTECTION_OPTION[operation];
+  const unlockedOption = unlockedCellsOption(operation);
   if (unlockedOption && !sheetPermits(state, addr.sheet, unlockedOption)) return false;
   return isCellWritable(state, addr);
 };

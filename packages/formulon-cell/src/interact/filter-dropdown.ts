@@ -1,3 +1,4 @@
+import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { parseLocalizedNumericInput } from '../commands/coerce-input.js';
 import {
   applyConditionFilter,
@@ -548,6 +549,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       const sortRow = ownerDocument.createElement('div');
       sortRow.className = 'fc-filter-dropdown__sort';
       for (const direction of ['asc', 'desc'] as const) {
+        const sortId = direction === 'asc' ? 'sortAsc' : 'sortDesc';
         const button = createFilterDropdownActionButton(
           `fc-filter-dropdown__sort-${direction}`,
           direction === 'asc' ? m.sortAsc : m.sortDesc,
@@ -562,10 +564,16 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
             range: activeRange,
             options: { byCol: activeCol, direction, hasHeader: true },
             origin: 'contextMenu',
-            commandId: direction === 'asc' ? 'sortAsc' : 'sortDesc',
+            commandId: sortId,
           });
         });
-        projectDisabledState(button, !deps.getWb || !deps.history, m.unavailable);
+        projectDisabledState(
+          button,
+          !deps.getWb ||
+            !deps.history ||
+            !canExecuteBuiltIn(deps.store, sortId, 'contextMenu').allowed,
+          m.unavailable,
+        );
         sortRow.append(button);
       }
       const colorSelect = (disabledOptions: readonly string[]): HTMLElement => {
