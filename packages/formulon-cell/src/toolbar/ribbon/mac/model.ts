@@ -108,6 +108,16 @@ const checkboxCommand = (id: string, label: LabelLike, icon?: string): RibbonCom
     className: 'fc-tb__rb--mac-checkbox',
   });
 
+/** A checkbox the current view does not offer, as Ruler in Normal view. */
+const disabledCheckboxCommand = (id: string, label: LabelLike, reason: LabelLike): RibbonCommand =>
+  command(id, label, undefined, {
+    kind: 'wide',
+    layout: 'stacked',
+    className: 'fc-tb__rb--mac-checkbox',
+    disabled: true,
+    disabledReason: reason,
+  });
+
 /** A static caption inside a group; it carries no action. */
 const labelCommand = (id: string, label: LabelLike): RibbonCommand =>
   command(id, label, undefined, { kind: 'label' });
@@ -433,7 +443,7 @@ const dataTab = (): RibbonTabModel =>
         compactCommand('mac.data.sortAsc', t('sortAsc'), 'sortAsc'),
         compactCommand('mac.data.sortDesc', t('sortDesc'), 'sortDesc'),
         compactCommand('mac.data.sortCustom', t('sortCustom'), 'sortAsc'),
-        checkboxCommand('mac.data.filter', t('filter'), 'filter'),
+        compactCommand('mac.data.filter', t('filter'), 'filter'),
         compactCommand('mac.data.clear', t('clear'), 'clear'),
         compactCommand('mac.data.reapply', t('reapply'), 'refresh'),
         compactCommand('mac.data.advancedFilter', t('advancedFilter'), 'filter'),
@@ -601,7 +611,7 @@ const viewTab = (): RibbonTabModel =>
       { ja: '表示/非表示', en: 'Show' },
       [
         disabledCompactCommand('mac.view.navigation', t('navigation'), 'show', NOT_IMPLEMENTED),
-        disabledCompactCommand('mac.view.ruler', t('ruler'), 'show', NOT_IMPLEMENTED),
+        disabledCheckboxCommand('mac.view.ruler', t('ruler'), NOT_IMPLEMENTED),
         checkboxCommand('mac.view.gridlines', t('gridlines'), 'show'),
         checkboxCommand('mac.view.formulaBar', t('formulaBar'), 'show'),
         checkboxCommand('mac.view.headings', t('headings'), 'show'),
