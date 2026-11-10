@@ -235,14 +235,16 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
         pasteSpecial: string;
         insertCopiedCells: string;
       };
-      macContextMenu: { pasteSpecial: string };
-      macPasteSpecial: { title?: string };
-      macFilterPanel: {
-        search: string;
-        selectAll: string;
-        blanks: string;
-        apply: string;
-        clear: string;
+      mac: {
+        contextMenu: { pasteSpecial: string };
+        pasteSpecial: { title?: string };
+        filterPanel: {
+          search: string;
+          selectAll: string;
+          blanks: string;
+          apply: string;
+          clear: string;
+        };
       };
       pasteSpecialDialog: { title: string; cancel: string };
       insertCopiedCellsDialog: { title: string; cancel: string };
@@ -284,11 +286,11 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       copy: strings.contextMenu.copy,
       paste: strings.contextMenu.paste,
       // The Mac menu opens Paste Special as a submenu, so its label has no ellipsis.
-      pasteSpecial: mac ? strings.macContextMenu.pasteSpecial : strings.contextMenu.pasteSpecial,
+      pasteSpecial: mac ? strings.mac.contextMenu.pasteSpecial : strings.contextMenu.pasteSpecial,
       insertCopiedCells: strings.contextMenu.insertCopiedCells,
       // The Mac host lays its own wording over the dialog's shared text.
       pasteSpecialTitle: mac
-        ? (strings.macPasteSpecial.title ?? strings.pasteSpecialDialog.title)
+        ? (strings.mac.pasteSpecial.title ?? strings.pasteSpecialDialog.title)
         : strings.pasteSpecialDialog.title,
       pasteCancel: strings.pasteSpecialDialog.cancel,
       insertCopiedTitle: strings.insertCopiedCellsDialog.title,
@@ -299,11 +301,11 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       pasteFormatting: strings.pasteOptions.formattingOnly,
       filterTitle: strings.filterDropdown.title,
       // The Mac column filter panel carries its own wording.
-      filterSearch: mac ? strings.macFilterPanel.search : strings.filterDropdown.searchPlaceholder,
-      filterSelectAll: mac ? strings.macFilterPanel.selectAll : strings.filterDropdown.selectAll,
-      filterBlanks: mac ? strings.macFilterPanel.blanks : strings.filterDropdown.blanks,
-      filterApply: mac ? strings.macFilterPanel.apply : strings.filterDropdown.apply,
-      filterClear: mac ? strings.macFilterPanel.clear : strings.filterDropdown.clear,
+      filterSearch: mac ? strings.mac.filterPanel.search : strings.filterDropdown.searchPlaceholder,
+      filterSelectAll: mac ? strings.mac.filterPanel.selectAll : strings.filterDropdown.selectAll,
+      filterBlanks: mac ? strings.mac.filterPanel.blanks : strings.filterDropdown.blanks,
+      filterApply: mac ? strings.mac.filterPanel.apply : strings.filterDropdown.apply,
+      filterClear: mac ? strings.mac.filterPanel.clear : strings.filterDropdown.clear,
       argHelperIntersection: strings.argHelper.implicitIntersection,
       quickTitle: strings.quickAnalysis.title,
       quickDataBar: strings.quickAnalysis.actions.dataBar,
