@@ -217,9 +217,6 @@ export const mountDialog = (
   placeDialogPanel(shell.overlay, shell.panel, shell.anchor);
   if (!focusInit) return;
   const focus = (): void => {
-    // A dialog can be cancelled before its deferred focus callback runs. Do
-    // not move focus into a detached overlay in that case.
-    if (!shell.overlay.isConnected) return;
     if (typeof focusInit === 'function') focusInit();
     else focusInit.focus({ preventScroll: true });
   };
@@ -227,12 +224,15 @@ export const mountDialog = (
     focus();
     return;
   }
-  const frame = shell.overlay.ownerDocument.defaultView
-    ? shell.overlay.ownerDocument.defaultView.requestAnimationFrame.bind(
-        shell.overlay.ownerDocument.defaultView,
-      )
-    : requestAnimationFrame;
-  frame(focus);
+  const view = shell.overlay.ownerDocument.defaultView;
+  const frame = view ? view.requestAnimationFrame.bind(view) : requestAnimationFrame;
+  frame(() => {
+    // The dialog may be gone, or the user may already have moved focus into it (Tab to Cancel);
+    // initial focus must not take that back.
+    if (!shell.overlay.isConnected) return;
+    if (shell.overlay.contains(shell.overlay.ownerDocument.activeElement)) return;
+    focus();
+  });
 };
 
 /** Adds a labelled text input row in the standard dialog body. */

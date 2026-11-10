@@ -222,25 +222,62 @@ describe('toolbar dialog shell overlay boundary', () => {
     }
   });
 
-  it('does not focus a detached dialog from a deferred callback', async () => {
+  const nextFrame = (): Promise<void> =>
+    new Promise<void>((resolve) => {
+      const frame = document.defaultView?.requestAnimationFrame ?? requestAnimationFrame;
+      frame(() => resolve());
+    });
+
+  it('keeps focus the user moved inside the dialog before the deferred tick', async () => {
     const opener = document.createElement('button');
     const host = document.createElement('div');
     document.body.append(opener, host);
     opener.focus();
+
+    const shell = createDialogShell({ title: 'Prompt', host });
+    const input = document.createElement('input');
+    const cancel = document.createElement('button');
+    shell.body.append(input, cancel);
+    mountDialog(shell, input);
+    cancel.focus();
+
+    await nextFrame();
+
+    expect(document.activeElement).toBe(cancel);
+    shell.overlay.remove();
+  });
+
+  it('takes focus back when the opener reclaims it before the deferred tick', async () => {
+    const opener = document.createElement('button');
+    const host = document.createElement('div');
+    document.body.append(opener, host);
+
+    const shell = createDialogShell({ title: 'Prompt', host });
+    const input = document.createElement('input');
+    shell.body.appendChild(input);
+    mountDialog(shell, input);
+    opener.focus();
+
+    await nextFrame();
+
+    expect(document.activeElement).toBe(input);
+    shell.overlay.remove();
+  });
+
+  it('does not focus a detached dialog from the deferred tick', async () => {
+    const opener = document.createElement('button');
+    const host = document.createElement('div');
+    document.body.append(opener, host);
 
     const shell = createDialogShell({ title: 'Deferred dialog', host });
     const control = document.createElement('button');
     shell.body.appendChild(control);
     mountDialog(shell, control);
     shell.overlay.remove();
+    opener.focus();
 
-    await new Promise<void>((resolve) => {
-      const frame = document.defaultView?.requestAnimationFrame ?? requestAnimationFrame;
-      frame(() => resolve());
-    });
+    await nextFrame();
 
     expect(document.activeElement).toBe(opener);
-    opener.remove();
-    host.remove();
   });
 });
