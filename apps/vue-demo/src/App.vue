@@ -35,6 +35,7 @@ import {
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
+  demoChangeLogEntry,
   pushDemoChangeLog,
   nextDemoFeatureOverrides,
   openDemoWorkbookFile,
@@ -159,7 +160,7 @@ watch(
 );
 
 const onCellChange = (e: CellChangeEvent): void => {
-  log.value = pushDemoChangeLog(log.value, e);
+  log.value = pushDemoChangeLog(log.value, demoChangeLogEntry(e));
 };
 
 const onReady = (inst: SpreadsheetInstance): void => {

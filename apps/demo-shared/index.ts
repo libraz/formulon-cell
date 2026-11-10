@@ -825,8 +825,8 @@ export const demoChangeLogEntry = (e: CellChangeEvent): ChangeLogEntry => ({
 /** Prepends the change to the log, keeping the newest `DEMO_CHANGE_LOG_LIMIT`. */
 export const pushDemoChangeLog = (
   log: readonly ChangeLogEntry[],
-  e: CellChangeEvent,
-): ChangeLogEntry[] => [demoChangeLogEntry(e), ...log].slice(0, DEMO_CHANGE_LOG_LIMIT);
+  entry: ChangeLogEntry,
+): ChangeLogEntry[] => [entry, ...log].slice(0, DEMO_CHANGE_LOG_LIMIT);
 
 export type DemoSearchKeyAction =
   | { kind: 'close' }

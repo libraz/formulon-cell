@@ -29,6 +29,7 @@ import {
   type DemoLocale,
   type DemoPlatform,
   type DemoReviewDialogState,
+  demoChangeLogEntry,
   demoCommandText,
   demoFunctionArgumentHelp,
   demoUiStringsForLocale,
@@ -174,7 +175,9 @@ export const App = (): ReactElement => {
   }, [instance]);
 
   const onCellChange = useCallback((e: CellChangeEvent) => {
-    setLog((prev) => pushDemoChangeLog(prev, e));
+    // The id is drawn once, outside the updater React may call twice.
+    const entry = demoChangeLogEntry(e);
+    setLog((prev) => pushDemoChangeLog(prev, entry));
   }, []);
 
   const onSpellingReview = useCallback(() => {
