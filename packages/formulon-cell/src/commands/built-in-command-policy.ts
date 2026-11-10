@@ -1,3 +1,5 @@
+import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
+import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { Range } from '../engine/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { type BuiltInCommandId, isBuiltInCommandId } from './built-in-command-ids.js';
@@ -282,8 +284,8 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   allScripts: null,
   arrangeObjectsPageLayout: null,
   calcOptions: null,
-  cellStyles: null,
-  conditional: null,
+  cellStyles: 'format',
+  conditional: 'format',
   copy: null,
   drawErase: null,
   errorChecking: null,
@@ -360,18 +362,18 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   pageLayoutGridlinesView: null,
   pageLayoutHeadingsView: null,
   pageTheme: null,
-  pivotBlankRows: null,
-  pivotClear: null,
-  pivotFieldsItemsSets: null,
-  pivotGrandTotals: null,
-  pivotReportLayout: null,
+  pivotBlankRows: 'pivot',
+  pivotClear: 'pivot',
+  pivotFieldsItemsSets: 'pivot',
+  pivotGrandTotals: 'pivot',
+  pivotReportLayout: 'pivot',
   pivotSelect: null,
   pivotSelectData: null,
   pivotSelectEnable: null,
   pivotSelectLabels: null,
   pivotSelectLabelsAndData: null,
   pivotSelectTable: null,
-  pivotSubtotals: null,
+  pivotSubtotals: 'pivot',
   previousCommentReview: null,
   recalcNow: null,
   recalcSheet: null,
@@ -589,6 +591,17 @@ const FILTER_DEFINITION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<BuiltI
   'tableFilterButton',
 ]);
 
+/** The pivot report the active cell is in, or null when there is none. */
+const activeReportRange = (store: SpreadsheetStore): Range | null => {
+  const wb = formatHistoryBridgeFor(store)?.workbook;
+  if (!wb?.capabilities.pivotTables) return null;
+  const pivot = findPivotTableAtCell(wb, store.getState().selection.active);
+  if (!pivot) return null;
+  return (
+    wb.pivotBounds(pivot.sheetIndex).find((b) => b.pivotIndex === pivot.pivotIndex)?.range ?? null
+  );
+};
+
 const FUNCTION_COMMAND_PREFIX = 'mac.function.';
 
 const shiftedBand = (operation: InteractionOperation, selection: Range): Range | null => {
@@ -634,6 +647,7 @@ export const builtInCommandIntent = (
   const state = store.getState();
   const selection = state.selection.range;
   const band = shiftedBand(operation, selection);
+  const report = operation === 'pivot' ? activeReportRange(store) : null;
   let effects: readonly OperationEffect[];
   if (WORKBOOK_EFFECT_OPERATIONS.has(operation) || workbookTheme || id === 'sheetViewSelect')
     effects = [{ kind: 'workbook' }];
@@ -644,6 +658,8 @@ export const builtInCommandIntent = (
   // cells refuse it at run time): decided for the active sheet as a whole.
   else if (operation === 'pageSetup' || unlockedCellsOption(operation))
     effects = [{ kind: 'sheet', sheet: selection.sheet }];
+  // A command on an existing report is decided on the report the active cell is in.
+  else if (operation === 'pivot' && report) effects = [{ kind: 'range', range: report }];
   else if (band) effects = [{ kind: 'range', range: band }];
   else if (operation === 'format')
     effects = [selection, ...(state.selection.extraRanges ?? [])].map(
@@ -654,9 +670,9 @@ export const builtInCommandIntent = (
 };
 
 /** Protection's decision for a built-in command on the active sheet, with or without a policy:
- *  the always-refused commands, an option-gated operation whose option is off, and a sheet
- *  operation under workbook-structure protection. Commands it does not name are left to their
- *  operation's own protection check. */
+ *  the always-refused commands, an option-gated operation (Use PivotTable for pivot edits)
+ *  whose option is off, and a sheet operation under workbook-structure protection. Commands it
+ *  does not name are left to their operation's own protection check. */
 export const builtInProtectionDecision = (
   store: SpreadsheetStore,
   id: string,
@@ -676,6 +692,7 @@ export const builtInProtectionDecision = (
   const refused =
     refusedOnProtectedSheet(state, sheet, id) ||
     filterRefused ||
+    (operation === 'pivot' && !sheetPermits(state, sheet, 'pivotTables')) ||
     (option !== undefined && !sheetPermits(state, sheet, option));
   return refused
     ? { allowed: false, code: 'protected', reason: 'sheet is protected' }

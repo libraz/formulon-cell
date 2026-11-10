@@ -330,6 +330,7 @@ export function attachWorkbookObjectsPanel(
     store: deps.store,
     origin: 'ribbon',
     commandId: 'pivotFieldList',
+    onChanged: () => deps.onAfterPivotEdit?.(),
     errorText: pivotEditError,
     setError: (message) => {
       pivotEditError = message;
@@ -342,7 +343,6 @@ export function attachWorkbookObjectsPanel(
     onApplied: () => {
       activePivotEditKey = '';
       activePivotFieldListKey = '';
-      deps.onAfterPivotEdit?.();
     },
   });
 

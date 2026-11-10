@@ -84,7 +84,11 @@ function commitAuthorizedPivotChange(
   const capture = () => {
     const definition = wb.getPivotDefinition(sheetIndex, pivotIndex);
     return definition
-      ? { definition, anchor: pivotAnchorOf(wb, sheetIndex, pivotIndex, definition) }
+      ? {
+          definition,
+          anchor: pivotAnchorOf(wb, sheetIndex, pivotIndex, definition),
+          name: wb.pivotTableName(sheetIndex, pivotIndex),
+        }
       : null;
   };
   const before = capture();
@@ -100,6 +104,9 @@ function commitAuthorizedPivotChange(
       const anchor = target.anchor;
       if (anchor && (at?.row !== anchor.row || at?.col !== anchor.col)) {
         wb.setPivotTableAnchor(sheetIndex, pivotIndex, anchor);
+      }
+      if (target.name && wb.pivotTableName(sheetIndex, pivotIndex) !== target.name) {
+        wb.renamePivotTable(sheetIndex, pivotIndex, target.name);
       }
       ctx.onChanged();
     };

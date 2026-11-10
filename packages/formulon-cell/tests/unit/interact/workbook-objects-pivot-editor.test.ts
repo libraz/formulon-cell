@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { PivotAggregation, PivotAxis } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -167,6 +168,52 @@ describe('PivotTable editors against the engine', () => {
     submit(form);
 
     expect(clear).toHaveBeenCalledWith(0, 0, 0);
+    handle.detach();
+    wb.dispose();
+  });
+  it('applies and deletes from the editor as one undo step each', async () => {
+    const wb = await setup(['Sales']);
+    const history = new History();
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+      history,
+    });
+    const editForm = (): HTMLFormElement => {
+      handle.open();
+      Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
+        .find((el) => el.textContent === en.workbookObjects.editPivotTable)
+        ?.click();
+      const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+      if (!form) throw new Error('missing pivot edit form');
+      return form;
+    };
+    const rowTotals = () => wb.getPivotDefinition(0, 0)?.grandTotals.rows;
+
+    const form = editForm();
+    const check = Array.from(form.querySelectorAll('label')).find(
+      (label) => label.textContent === en.workbookObjects.rowGrandTotals,
+    )?.firstElementChild as HTMLInputElement;
+    check.checked = false;
+    submit(form);
+    expect(rowTotals()).toBe(false);
+    expect(history.undo()).toBe(true);
+    expect(rowTotals()).toBe(true);
+    expect(history.canUndo()).toBe(false);
+    expect(history.redo()).toBe(true);
+    expect(rowTotals()).toBe(false);
+
+    Array.from(editForm().querySelectorAll<HTMLButtonElement>('button'))
+      .find((el) => el.textContent === en.workbookObjects.deletePivotTable)
+      ?.click();
+    expect(wb.getPivotTables()).toHaveLength(0);
+    expect(history.undo()).toBe(true);
+    expect(wb.getPivotTables()).toHaveLength(1);
+    expect(rowTotals()).toBe(false);
+    expect(history.undo()).toBe(true);
+    expect(rowTotals()).toBe(true);
     handle.detach();
     wb.dispose();
   });

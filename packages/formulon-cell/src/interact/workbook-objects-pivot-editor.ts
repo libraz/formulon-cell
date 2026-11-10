@@ -1,11 +1,7 @@
 import type { History } from '../commands/history.js';
-import {
-  type PivotAuthorization,
-  pivotReportEffects,
-  pivotWrite,
-} from '../commands/pivot-actions.js';
+import { type PivotAuthorization, pivotReportRange } from '../commands/pivot-actions.js';
 import { applyPivotEdit, type PivotEditField } from '../commands/pivot-edit.js';
-import { pivotCacheFieldIsNumeric } from '../commands/pivot-table.js';
+import { deletePivotTables, pivotCacheFieldIsNumeric } from '../commands/pivot-table.js';
 import { formatA1Cell, parseA1Atom } from '../engine/address.js';
 import {
   PivotAggregation,
@@ -24,6 +20,7 @@ import {
   pivotFilterSpecToCondition,
   showPivotFilterDialog,
 } from './pivot-field-settings.js';
+import { commitPivotChange } from './pivot-field-settings-dialog-apply.js';
 import {
   createWorkbookObjectsActionButton,
   pivotEditCheck,
@@ -36,6 +33,8 @@ export interface PivotEditorContext extends PivotAuthorization {
   wb: WorkbookHandle;
   strings: Strings;
   history?: History | null;
+  /** The report was rewritten, by an edit or by its undo or redo. */
+  onChanged(): void;
   /** Error shown when the form is built. */
   errorText: string;
   setError(message: string): void;
@@ -524,13 +523,12 @@ export function renderPivotEditForm(
   actions.append(remove, apply);
   remove.addEventListener('click', () => {
     ctx.setError('');
-    const removed = pivotWrite(
-      { ...ctx, commandId: 'pivotDelete' },
-      ctx.history,
-      pivotReportEffects(wb, pivot.sheetIndex, pivot.pivotIndex),
-      false,
-      () => wb.removePivotTable(pivot.sheetIndex, pivot.pivotIndex),
-    );
+    const range = pivotReportRange(wb, pivot.sheetIndex, pivot.pivotIndex);
+    const removed =
+      range !== null &&
+      deletePivotTables({ ...ctx, workbook: wb, commandId: 'pivotDelete' }, pivot.sheetIndex, [
+        { pivotIndex: pivot.pivotIndex, range },
+      ]);
     if (!removed) {
       ctx.setError(t.pivotEditFailed);
       ctx.rerender();
@@ -557,23 +555,18 @@ export function renderPivotEditForm(
       editor,
       axis: axisSelect.value === AXIS_NONE ? null : (Number(axisSelect.value) as PivotAxis),
     }));
-    const applied = pivotWrite(
-      ctx,
-      ctx.history,
-      pivotReportEffects(wb, pivot.sheetIndex, pivot.pivotIndex),
-      false,
-      () =>
-        applyPivotEdit(wb, pivot, {
-          fieldListOnly: false,
-          name: name.value.trim(),
-          anchor: nextAnchor,
-          rowGrandTotals: rowTotals.checked,
-          colGrandTotals: colTotals.checked,
-          layout: Number(layoutSelect.value) as PivotReportLayout,
-          ...(definition ? { dataFields: definition.dataFields } : {}),
-          fields: placed.map(({ editor, axis }) => editor.toEditField(axis)),
-          filters: editedPivotFilters(editorModel.pivotFilters, placed),
-        }),
+    const applied = commitPivotChange({ ...ctx, wb }, pivot.sheetIndex, pivot.pivotIndex, () =>
+      applyPivotEdit(wb, pivot, {
+        fieldListOnly: false,
+        name: name.value.trim(),
+        anchor: nextAnchor,
+        rowGrandTotals: rowTotals.checked,
+        colGrandTotals: colTotals.checked,
+        layout: Number(layoutSelect.value) as PivotReportLayout,
+        ...(definition ? { dataFields: definition.dataFields } : {}),
+        fields: placed.map(({ editor, axis }) => editor.toEditField(axis)),
+        filters: editedPivotFilters(editorModel.pivotFilters, placed),
+      }),
     );
     if (!applied) {
       ctx.setError(t.pivotEditFailed);

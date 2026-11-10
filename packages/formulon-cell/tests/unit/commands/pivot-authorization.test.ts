@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { canExecuteBuiltIn } from '../../../src/commands/built-in-command-policy.js';
+import {
+  builtInCommandIntent,
+  canExecuteBuiltIn,
+} from '../../../src/commands/built-in-command-policy.js';
 import { History } from '../../../src/commands/history.js';
 import {
   InteractionController,
@@ -12,11 +15,23 @@ import {
   setProtectedSheet,
   setWorkbookStructureProtected,
 } from '../../../src/commands/protection.js';
+import {
+  createFormatHistoryBridge,
+  registerFormatHistoryBridge,
+} from '../../../src/engine/format-history-bridge.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { commitPivotChange } from '../../../src/interact/pivot-field-settings-dialog-apply.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const SOURCE = { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 };
+const REPORT_ROOTS = [
+  'pivotBlankRows',
+  'pivotClear',
+  'pivotFieldsItemsSets',
+  'pivotGrandTotals',
+  'pivotReportLayout',
+  'pivotSubtotals',
+] as const;
 
 const allowAll: InteractionPolicy = { defaultOperation: 'allow' };
 const denyPivot: InteractionPolicy = { defaultOperation: 'allow', operations: { pivot: false } };
@@ -55,6 +70,15 @@ describe('pivot writes under the interaction policy', () => {
     const controller = new InteractionController({ store, getWb: () => wb, history });
     controllers.push(controller);
     registerInteractionController(store, controller);
+    registerFormatHistoryBridge(
+      store,
+      createFormatHistoryBridge(
+        wb,
+        () => undefined,
+        () => new Map(),
+        () => undefined,
+      ),
+    );
     const create = (placement: { row: number; col: number } | 'new-sheet' = { row: 1, col: 5 }) =>
       createPivotTableAtPlacement(
         { store, workbook: wb, history, origin: 'ribbon', commandId: 'pivotTableInsert' },
@@ -145,4 +169,43 @@ describe('pivot writes under the interaction policy', () => {
     expect(history.redo()).toBe(false);
     expect(reports()).toBe(0);
   });
+  it('decides the report dropdown roots on the report under the active cell', async () => {
+    const { wb, store, controller, create } = await setup();
+    controller.setPolicy(allowAll);
+    create();
+    const bounds = wb.pivotBounds(0)[0]?.range;
+    expect(bounds).toBeDefined();
+    mutators.setActive(store, { sheet: 0, row: bounds?.r0 ?? 0, col: bounds?.c0 ?? 0 });
+    for (const id of REPORT_ROOTS) {
+      expect(builtInCommandIntent(store, id, 'ribbon')?.effects, id).toEqual([
+        { kind: 'range', range: bounds },
+      ]);
+      expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(true);
+    }
+    controller.setPolicy(denyPivot);
+    for (const id of REPORT_ROOTS) {
+      expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(false);
+    }
+  });
+
+  for (const [label, policy] of [
+    ['without a policy', undefined],
+    ['under an allow-all policy', allowAll],
+  ] as const satisfies readonly (readonly [string, InteractionPolicy | undefined])[]) {
+    it(`greys the report dropdown roots on a protected sheet without Use PivotTable ${label}`, async () => {
+      const { wb, store, controller, create } = await setup();
+      controller.setPolicy(policy);
+      create();
+      const bounds = wb.pivotBounds(0)[0]?.range;
+      mutators.setActive(store, { sheet: 0, row: bounds?.r0 ?? 0, col: bounds?.c0 ?? 0 });
+      setProtectedSheet(store, 0, true);
+      for (const id of REPORT_ROOTS) {
+        expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(false);
+      }
+      setProtectedSheet(store, 0, true, { permissions: { pivotTables: true } });
+      for (const id of REPORT_ROOTS) {
+        expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(true);
+      }
+    });
+  }
 });
