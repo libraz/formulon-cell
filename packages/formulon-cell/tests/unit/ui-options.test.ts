@@ -50,10 +50,10 @@ describe('resolveSpreadsheetUiOptions', () => {
     expect(custom.features.shortcuts).toBe(true);
     expect(custom.features.sheetTabs).toBe(false);
   });
-  it('defaults to the Excel 365 profile with full chrome enabled', () => {
+  it('defaults to the full profile with full chrome enabled', () => {
     const resolved = resolveSpreadsheetUiOptions();
 
-    expect(resolved.profile).toBe('excel365');
+    expect(resolved.profile).toBe('full');
     expect(resolved.theme).toBe('paper');
     expect(resolved.ribbon).toBe(true);
     expect(resolved.print).toBe(true);
@@ -90,16 +90,12 @@ describe('resolveSpreadsheetUiOptions', () => {
     expect(resolved.features.pageSetup).toBe(true);
   });
 
-  it('applies profile defaults before advanced and friendly feature overrides', () => {
+  it('applies profile defaults before explicit feature switches', () => {
     const resolved = resolveSpreadsheetUiOptions({
       profile: 'minimal',
-      advancedFeatures: {
-        quickAnalysis: true,
-        charts: true,
-        validation: false,
-      },
       features: {
         quickAnalysis: false,
+        charts: true,
         validation: true,
         contextMenu: true,
       },
@@ -113,17 +109,14 @@ describe('resolveSpreadsheetUiOptions', () => {
     expect(resolved.features.sheetTabs).toBe(false);
   });
 
-  it('preserves the theme host option independently from feature flags', () => {
+  it('accepts every feature id as a switch, including the draw-borders tool', () => {
     const resolved = resolveSpreadsheetUiOptions({
       profile: 'standard',
-      theme: 'ink',
-      features: {
-        ribbon: false,
-      },
+      features: { borderDraw: false, ribbon: false },
     });
 
     expect(resolved.profile).toBe('standard');
-    expect(resolved.theme).toBe('ink');
+    expect(resolved.features.borderDraw).toBe(false);
     expect(resolved.ribbon).toBe(false);
     expect(resolved.features.formatDialog).toBe(false);
   });

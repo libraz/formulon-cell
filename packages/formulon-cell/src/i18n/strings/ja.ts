@@ -19,7 +19,7 @@ export const ja: Strings = {
   ...editDialogsJa,
   ...formulaDialogsJa,
   ...dataObjectsJa,
-  ...macJa,
+  mac: macJa,
   ...pageLayoutJa,
   ...workbookChromeJa,
   ...localeSwitcherJa,

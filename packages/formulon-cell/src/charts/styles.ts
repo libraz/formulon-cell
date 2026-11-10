@@ -1,3 +1,4 @@
+import { shapeDashStroke } from '../commands/shape-format.js';
 import { clamp } from './numeric.js';
 import { DEFAULT_THEME_ACCENTS } from './series-colors.js';
 import type {
@@ -131,17 +132,14 @@ export const lineWidth = (
 ): number | undefined =>
   line?.width !== undefined && Number.isFinite(line.width) ? clamp(line.width, 0, 72) : fallback;
 
-export const dashArray = (dash: ChartLineSpec['dash']): string | undefined => {
-  switch (dash) {
-    case 'dash':
-      return '6 4';
-    case 'dot':
-      return '1 4';
-    case 'dash-dot':
-      return '6 3 1 3';
-    default:
-      return undefined;
-  }
+/** The SVG stroke attributes of a dash style at `width` points; none for a solid line. */
+export const dashAttrs = (dash: ChartLineSpec['dash'], width: number): Record<string, string> => {
+  if (dash === undefined || dash === 'solid') return {};
+  const stroke = shapeDashStroke(dash, width);
+  return {
+    'stroke-dasharray': stroke.dasharray,
+    ...(stroke.linecap === 'round' ? { 'stroke-linecap': 'round' } : {}),
+  };
 };
 
 export const markerSize = (marker: ChartMarkerSpec): number =>

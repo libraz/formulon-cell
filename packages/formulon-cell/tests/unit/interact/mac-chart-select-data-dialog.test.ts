@@ -42,7 +42,9 @@ const change = (el: HTMLInputElement | HTMLSelectElement, value?: string): void 
 };
 /** Values of the second series of a category chart. */
 const secondValues = (chart: ReturnType<typeof sessionChartById>) =>
-  chart?.data.domain === 'category' ? chart.data.series[1]?.values : undefined;
+  chart?.data.domain === 'category'
+    ? chart.data.series[1]?.points.map((point) => point.value)
+    : undefined;
 
 const options = (): string[] =>
   Array.from(document.querySelectorAll('.fc-mac-chartdata__option')).map(

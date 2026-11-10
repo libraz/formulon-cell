@@ -30,13 +30,13 @@ import type { ChartPrimitive, ChartScene, ChartSpec, ChartValueFormatter } from 
 /** Series-level labels override the chart-wide labels; hidden series labels stay hidden. */
 const labelSpecFor = (
   spec: ChartSpec,
-  series: { readonly id: string; readonly formatCode?: string },
+  series: { readonly id: string; readonly numberFormat?: string },
 ): ChartSpec['dataLabels'] => {
   const labels = styleFor(spec, series.id)?.dataLabels ?? spec.dataLabels;
   // The percentage part derives its own code from `numberFormat`, so only value labels inherit.
-  if (!labels || labels.showPercentage || !series.formatCode) return labels;
+  if (!labels || labels.showPercentage || !series.numberFormat) return labels;
   if (labels.numberFormat !== undefined && labels.numberFormat.trim().length > 0) return labels;
-  return { ...labels, numberFormat: series.formatCode };
+  return { ...labels, numberFormat: series.numberFormat };
 };
 
 const hasDataLabels = (spec: ChartSpec): boolean =>
@@ -345,7 +345,7 @@ const addCategoryDataLabels = (
     if (!labelSpec || labelSpec.visible === false) continue;
     const originalSeriesIndex = view.originalSeriesIndices[seriesIndex] ?? seriesIndex;
     for (let pointIndex = 0; pointIndex < data.categories.length; pointIndex += 1) {
-      const raw = series.values[pointIndex] ?? null;
+      const raw = series.points[pointIndex]?.value ?? null;
       if (raw === null || !Number.isFinite(raw) || (numericLogBase !== undefined && !(raw > 0)))
         continue;
       const segment = segments[seriesIndex]?.[pointIndex];
@@ -360,7 +360,7 @@ const addCategoryDataLabels = (
         originalSeriesIndex,
         originalPointIndex,
       );
-      const categoryName = data.categories[pointIndex];
+      const categoryName = data.categories[pointIndex]?.label;
       const percentage = grouping === 'percent-stacked' ? Math.abs(segment.value) : undefined;
       const fullText = labelParts(
         labelSpec,
@@ -530,7 +530,7 @@ const addScatterDataLabels = (
     // The X part follows the x values' format unless the labels set their own.
     const ownCode = labelSpecFor(spec, { id: series.id })?.numberFormat;
     const xLabelCode =
-      ownCode !== undefined && ownCode.trim().length > 0 ? ownCode : series.xFormatCode;
+      ownCode !== undefined && ownCode.trim().length > 0 ? ownCode : series.xNumberFormat;
     const originalSeriesIndex = view.originalSeriesIndices[seriesIndex] ?? seriesIndex;
     for (let pointIndex = 0; pointIndex < series.points.length; pointIndex += 1) {
       const point = series.points[pointIndex];
@@ -614,7 +614,7 @@ const addPieDataLabels = (
   if (!first) return;
   const labelSpec = labelSpecFor(spec, first);
   if (!labelSpec || labelSpec.visible === false) return;
-  const magnitudes = normalizedMagnitudes(first.values);
+  const magnitudes = normalizedMagnitudes(first.points.map((point) => point.value));
   if (!magnitudes) return;
   const { values: normalized, total } = magnitudes;
   const { cx, cy, radius, firstSliceStart } = circularFrame(spec, plot);
@@ -634,7 +634,7 @@ const addPieDataLabels = (
       view.originalSeriesIndices[0] ?? 0,
       originalPointIndex,
     );
-    const raw = first.values[pointIndex];
+    const raw = first.points[pointIndex]?.value ?? null;
     if (raw === null || !Number.isFinite(raw)) {
       start += angle;
       continue;
@@ -642,7 +642,7 @@ const addPieDataLabels = (
     const fullText = labelParts(
       labelSpec,
       first.name ?? String((view.originalSeriesIndices[0] ?? 0) + 1),
-      data.categories[pointIndex],
+      data.categories[pointIndex]?.label,
       raw,
       normalizedValue / total,
       locale,
@@ -736,7 +736,7 @@ const addDoughnutDataLabels = (
     if (!series) continue;
     const labelSpec = labelSpecFor(spec, series);
     if (!labelSpec || labelSpec.visible === false) continue;
-    const normalized = normalizedMagnitudes(series.values);
+    const normalized = normalizedMagnitudes(series.points.map((point) => point.value));
     if (!normalized) continue;
     const innerRadius = holeRadius + ringWidth * seriesIndex;
     const outerRingRadius = innerRadius + ringWidth;
@@ -748,7 +748,7 @@ const addDoughnutDataLabels = (
       if (!(normalizedValue > 0) || !Number.isFinite(normalizedValue)) continue;
       const angle = (normalizedValue / normalized.total) * Math.PI * 2;
       if (!(angle > 0) || !Number.isFinite(angle)) continue;
-      const raw = series.values[pointIndex];
+      const raw = series.points[pointIndex]?.value ?? null;
       if (raw === null || !Number.isFinite(raw)) {
         start += angle;
         continue;
@@ -766,7 +766,7 @@ const addDoughnutDataLabels = (
       const fullText = labelParts(
         labelSpec,
         series.name ?? String(originalSeriesIndex + 1),
-        data.categories[pointIndex],
+        data.categories[pointIndex]?.label,
         raw,
         normalizedValue / normalized.total,
         locale,

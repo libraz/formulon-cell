@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { coerceInput } from '../../../../src/commands/coerce-input.js';
 import { addrKey } from '../../../../src/engine/workbook-handle.js';
-import { de } from '../../../../src/i18n/strings.js';
+import { de, ja } from '../../../../src/i18n/strings.js';
 import { attachFormatDialog } from '../../../../src/interact/format-dialog.js';
 import {
   createSpreadsheetStore,
@@ -27,7 +27,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('a focused custom validation formula takes grid picks and the dialog stays open', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     try {
       handle.open('more');
       const kind = document.querySelector<HTMLSelectElement>('select[aria-label="許可:"]');
@@ -47,7 +47,7 @@ describe('attachFormatDialog', () => {
 
   it('uses the shared range picker for validation list range sources', () => {
     setRange(store, 0, 0, 4, 2);
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     try {
       handle.open('more');
 
@@ -118,7 +118,7 @@ describe('attachFormatDialog', () => {
   };
 
   it('lets list validation hide the in-cell dropdown', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     try {
       handle.open('more', { mode: 'dataValidation', focus: 'validation' });
 
@@ -159,7 +159,7 @@ describe('attachFormatDialog', () => {
       { sheet: 0, row: 0, col: 0 },
       { validation: { kind: 'list', source: ['A', 'B'], showDropdown: false } },
     );
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     try {
       handle.open('more', { mode: 'dataValidation', focus: 'validation' });
       const dropdownToggle = findValidationDropdownToggle();
@@ -171,7 +171,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('date validation exposes date pickers for bounds and stores serials', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     try {
       handle.open('more', { mode: 'dataValidation', focus: 'validation' });
 
@@ -211,7 +211,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('time validation uses a time picker for bounds', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     try {
       handle.open('more', { mode: 'dataValidation', focus: 'validation' });
 
@@ -315,7 +315,7 @@ describe('attachFormatDialog', () => {
         },
       },
     );
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     try {
       handle.open('more', { mode: 'dataValidation', focus: 'validation' });
       const aInput = document.querySelector<HTMLInputElement>('input[aria-label="値"]');
@@ -341,7 +341,7 @@ describe('attachFormatDialog', () => {
         },
       },
     );
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     try {
       handle.open('more', { mode: 'dataValidation', focus: 'validation' });
       const aInput = document.querySelector<HTMLInputElement>('input[aria-label="値"]');

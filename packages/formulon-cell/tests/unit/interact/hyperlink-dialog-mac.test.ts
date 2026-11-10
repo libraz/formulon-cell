@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { ja } from '../../../src/i18n/strings.js';
 import { attachHyperlinkDialog } from '../../../src/interact/hyperlink-dialog.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -34,7 +35,7 @@ describe('Insert Hyperlink on the Mac host', () => {
   const open = (seed?: (store: ReturnType<typeof createSpreadsheetStore>) => void) => {
     const store = createSpreadsheetStore();
     seed?.(store);
-    const handle = attachHyperlinkDialog({ host, store, getWb: () => wb });
+    const handle = attachHyperlinkDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     return { store, handle };
   };

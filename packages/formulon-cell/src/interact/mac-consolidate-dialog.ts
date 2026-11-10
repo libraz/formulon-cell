@@ -61,7 +61,7 @@ const appendDisabledOption = (body: HTMLElement): DisabledOption => {
 };
 
 function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDialogHandle {
-  let strings = instance.i18n.strings.macData;
+  let strings = instance.i18n.strings.mac.data;
   let t = strings.consolidate;
   const shell = createDialogShell({
     host: instance.host,
@@ -197,7 +197,7 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
   cancelBtn.dataset.fcMacAction = 'consolidate-cancel';
 
   const applyLabels = (): void => {
-    strings = instance.i18n.strings.macData;
+    strings = instance.i18n.strings.mac.data;
     t = strings.consolidate;
     shell.setAriaLabel(t.title);
     header.textContent = t.title;
@@ -220,7 +220,7 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
     syncCustomSelects(shell.panel);
   };
   applyLabels();
-  const unsubscribeLocale = instance.i18n.subscribe(applyLabels);
+  const unsubscribeLocale = instance.i18n.on('change', applyLabels);
 
   const close = (): void => {
     shell.close();

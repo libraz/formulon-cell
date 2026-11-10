@@ -72,8 +72,8 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
   error.hidden = true;
   body.append(fieldList, error);
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
-    cancelLabel: strings.macSlicer.cancel,
-    okLabel: strings.macSlicer.ok,
+    cancelLabel: strings.mac.slicer.cancel,
+    okLabel: strings.mac.slicer.ok,
   });
 
   const setError = (message: string | null): void => {
@@ -81,7 +81,7 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     error.textContent = message ?? '';
     projectDisabledState(okBtn, message !== null, message, {
       datasetKey: 'disabledReason',
-      titlePrefix: strings.macSlicer.ok,
+      titlePrefix: strings.mac.slicer.ok,
     });
   };
 
@@ -103,7 +103,7 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     fieldList.replaceChildren();
     const table = targetTable();
     if (!table || table.columns.length === 0) {
-      setError(tables.length === 0 ? strings.macSlicer.noTable : strings.macSlicer.noColumns);
+      setError(tables.length === 0 ? strings.mac.slicer.noTable : strings.mac.slicer.noColumns);
       return;
     }
     for (const column of table.columns) {
@@ -132,7 +132,7 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     }
     for (const column of checked) {
       if (!deps.onAdd({ tableName: table.name, column })) {
-        setError(strings.macSlicer.insertFailed);
+        setError(strings.mac.slicer.insertFailed);
         return;
       }
     }
@@ -147,8 +147,8 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     header.textContent = strings.slicer.addSlicer;
     shell.setAriaLabel(strings.slicer.addSlicer);
     fieldList.setAttribute('aria-label', strings.slicer.chooseColumn);
-    cancelBtn.textContent = strings.macSlicer.cancel;
-    okBtn.textContent = strings.macSlicer.ok;
+    cancelBtn.textContent = strings.mac.slicer.cancel;
+    okBtn.textContent = strings.mac.slicer.ok;
   };
 
   const api: MacSlicerDialogHandle = {

@@ -249,7 +249,7 @@ export const showCreateTableDialog = async (
     // The Mac dialog names the table up front; only an engine table carries a name.
     ...(mac && instance.workbook.capabilities.tableMutate
       ? {
-          nameLabel: instance.i18n.strings.macCreateTable.nameLabel,
+          nameLabel: instance.i18n.strings.mac.createTable.nameLabel,
           initialName: nextTableName(instance.workbook, instance.store.getState().tables.tables),
           validateName: (value: string) => {
             const error = tableNameError(instance.store, '', value);
@@ -420,7 +420,7 @@ const buildCellStyleFooterAction =
     if (action === 'new-cell-style') {
       // The Mac host shows the desktop Style dialog.
       const macStyle =
-        instance.host.dataset.fcPlatform === 'mac' ? strings.macStyleDialog : undefined;
+        instance.host.dataset.fcPlatform === 'mac' ? strings.mac.styleDialog : undefined;
       const active = instance.store.getState().selection.active;
       const activeFormat = instance.store.getState().format.formats.get(addrKey(active));
       const value = await showCellStyleDialog({

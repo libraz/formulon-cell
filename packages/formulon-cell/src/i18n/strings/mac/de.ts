@@ -37,7 +37,7 @@ import { macWatchWindowDe } from './watch-window.js';
 import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macDe: MacStrings = {
-  macData: {
+  data: {
     goalSeek: {
       title: 'Zielwertsuche',
       formulaCell: 'Zielzelle',
@@ -126,7 +126,7 @@ export const macDe: MacStrings = {
       noRoom: 'Es ist kein Platz zum Einfügen einer Teilergebniszeile vorhanden.',
     },
   },
-  macSparkline: {
+  sparkline: {
     title: 'Sparkline einfügen',
     dataRange: 'Datenbereich',
     location: 'Position',
@@ -140,14 +140,14 @@ export const macDe: MacStrings = {
     unavailable: 'Dieser Vorgang ist für die aktuelle Auswahl nicht verfügbar.',
     protectedLocation: 'Die Sparkline-Position ist geschützt.',
   },
-  macSlicer: {
+  slicer: {
     ok: 'OK',
     cancel: 'Abbrechen',
     noTable: 'Keine Tabelle verfügbar.',
     noColumns: 'Die Tabelle enthält keine Spalten.',
     insertFailed: 'Der Datenschnitt konnte für diese Tabelle nicht eingefügt werden.',
   },
-  macWorkbookStats: {
+  workbookStats: {
     title: 'Arbeitsmappenstatistik',
     close: 'Schließen',
     sheets: 'Blätter',
@@ -163,11 +163,11 @@ export const macDe: MacStrings = {
     usedRows: 'Verwendete Zeilen',
     usedColumns: 'Verwendete Spalten',
   },
-  macInk: {
+  ink: {
     strokeLabel: 'Tintenstrich',
     drawLabel: 'Mit Tinte zeichnen',
   },
-  macContextMenu: {
+  contextMenu: {
     cut: 'Ausschneiden',
     copy: 'Kopieren',
     paste: 'Einfügen',
@@ -197,7 +197,7 @@ export const macDe: MacStrings = {
     defineName: 'Namen definieren…',
     hyperlink: 'Hyperlink einfügen…',
   },
-  macHomeRibbon: {
+  homeRibbon: {
     conditional: 'Bedingte Formatierung',
     paste: 'Einfügen',
     cut: 'Ausschneiden',
@@ -206,19 +206,19 @@ export const macDe: MacStrings = {
     cellStyles: 'Zellenformatvorlagen',
     autoSum: 'AutoSumme',
   },
-  macFormatDialog: macFormatDialogFrom(cellFormatDe.formatDialog),
-  macIterativeDialog: macIterativeDialogFrom(formulaDialogsDe.iterativeDialog, {
+  formatDialog: macFormatDialogFrom(cellFormatDe.formatDialog),
+  iterativeDialog: macIterativeDialogFrom(formulaDialogsDe.iterativeDialog, {
     calcAutoNoTable: ribbonMenusDe.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsDe.namedRangeDialog, {
+  namedRangeDialog: macNamedRangeDialogFrom(formulaDialogsDe.namedRangeDialog, {
     defineTitle: 'Namen definieren',
     defineNames: 'Namen:',
     defineNamePrompt: 'Geben Sie einen Namen für den Datenbereich ein:',
     defineRangePrompt: 'Wählen Sie den Zellbereich aus:',
   }),
-  macPasteSpecial: macPasteSpecialFrom(editDialogsDe.pasteSpecialDialog),
-  macZoomDialog: macZoomDialogFrom(ribbonDe.ribbon, cellFormatDe.formatDialog),
-  macAlerts: macAlertsFrom(
+  pasteSpecial: macPasteSpecialFrom(editDialogsDe.pasteSpecialDialog),
+  zoomDialog: macZoomDialogFrom(ribbonDe.ribbon, cellFormatDe.formatDialog),
+  alerts: macAlertsFrom(
     ribbonDe.ribbon,
     {
       message: 'Dieses Blatt wird endgültig gelöscht. Möchten Sie fortfahren?',
@@ -227,25 +227,25 @@ export const macDe: MacStrings = {
     },
     editDialogsDe.moveCells,
   ),
-  macProtectSheet: macProtectSheetFrom(editDialogsDe.protection, {
+  protectSheet: macProtectSheetFrom(editDialogsDe.protection, {
     heading: 'Arbeitsblatt und Inhalt gesperrter Zellen schützen',
     note: 'Standardmäßig sind alle Zellen gesperrt, die Sperre kann aber aufgehoben werden.',
   }),
-  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusDe.ribbonMenu, {
+  advancedFilter: macAdvancedFilterFrom(ribbonMenusDe.ribbonMenu, {
     filterInPlace: 'Liste an gleicher Stelle filtern',
     copyToLocation: 'An eine andere Stelle kopieren',
   }),
-  macChrome: macChromeFrom(workbookChromeDe, formulaDialogsDe),
-  macTextToColumnsWizard: macTextToColumnsWizardDe,
-  macStyleDialog: macStyleDialogDe,
-  macExternalLinksPane: macExternalLinksPaneDe,
-  macWatchWindow: macWatchWindowDe,
-  macAccessibilityPane: macAccessibilityPaneDe,
-  macCfRulesDialog: macCfRulesDialogFrom(cellFormatDe.cfRulesDialog, {
+  chrome: macChromeFrom(workbookChromeDe, formulaDialogsDe),
+  textToColumnsWizard: macTextToColumnsWizardDe,
+  styleDialog: macStyleDialogDe,
+  externalLinksPane: macExternalLinksPaneDe,
+  watchWindow: macWatchWindowDe,
+  accessibilityPane: macAccessibilityPaneDe,
+  cfRulesDialog: macCfRulesDialogFrom(cellFormatDe.cfRulesDialog, {
     orderLabel: 'Regelreihenfolge ändern:',
     appliesToLabel: 'Wird angewendet auf:',
   }),
-  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsDe.hyperlinkDialog, {
+  hyperlinkDialog: macHyperlinkDialogFrom(editDialogsDe.hyperlinkDialog, {
     displayText: 'Anzuzeigender Text:',
     selectionInDocument: '<<Auswahl im Dokument>>',
     screenTip: 'QuickInfo...',
@@ -264,26 +264,26 @@ export const macDe: MacStrings = {
     subject: 'Betreff:',
     recentEmails: 'Zuletzt verwendete E-Mail-Adressen:',
   }),
-  macPageSetup: macPageSetupFrom(pageLayoutDe.pageSetup),
-  macDataValidation: {
+  pageSetup: macPageSetupFrom(pageLayoutDe.pageSetup),
+  dataValidation: {
     inputCaption: 'Diese Eingabemeldung anzeigen, wenn die Zelle ausgewählt wird:',
     errorCaption: 'Diese Fehlermeldung anzeigen, wenn ungültige Daten eingegeben wurden:',
   },
-  macCreateTable: { nameLabel: 'Wie lautet der Name Ihrer Tabelle?' },
-  macGoToDialog: macGoToDialogFrom(editDialogsDe.goToDialog, {
+  createTable: { nameLabel: 'Wie lautet der Name Ihrer Tabelle?' },
+  goToDialog: macGoToDialogFrom(editDialogsDe.goToDialog, {
     selectCaption: 'Auswählen',
     optionsGroup: 'Optionen',
     noOptions: 'Für diese Auswahl gibt es keine Optionen.',
   }),
-  macPivotFieldSettings: macPivotFieldSettingsDe,
-  macPivotOptions: macPivotOptionsDe,
-  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsDe.pivotTableDialog, {
+  pivotFieldSettings: macPivotFieldSettingsDe,
+  pivotOptions: macPivotOptionsDe,
+  pivotTableDialog: macPivotTableDialogFrom(dataObjectsDe.pivotTableDialog, {
     chooseConnection: 'Verbindung auswählen...',
     moveTitle: 'PivotTable verschieben',
     moveLocation: 'Speicherort:',
   }),
-  macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusDe.ribbonMenu),
-  macSortDialog: macSortDialogFrom(ribbonMenusDe.ribbonMenu, {
+  removeDuplicates: macRemoveDuplicatesFrom(ribbonMenusDe.ribbonMenu),
+  sortDialog: macSortDialogFrom(ribbonMenusDe.ribbonMenu, {
     levelsHeading: 'Sortierebene hinzufügen:',
     columnHeading: 'Spalte',
     sortOnHeading: 'Sortieren nach',
@@ -300,10 +300,10 @@ export const macDe: MacStrings = {
     noPhonetic: 'Nicht phonetisch sortieren',
     caseSensitive: 'Groß-/Kleinschreibung beachten',
   }),
-  macErrorMenu: macErrorMenuDe,
-  macFilterPanel: macFilterPanelDe(gridPopupsDe.filterDropdown),
-  macSheetTabMenu: macSheetTabMenuDe,
-  macFindReplace: macFindReplaceFrom(
+  errorMenu: macErrorMenuDe,
+  filterPanel: macFilterPanelDe(gridPopupsDe.filterDropdown),
+  sheetTabMenu: macSheetTabMenuDe,
+  findReplace: macFindReplaceFrom(
     editDialogsDe.findReplace,
     'Halbbreite und Vollbreite unterscheiden',
   ),

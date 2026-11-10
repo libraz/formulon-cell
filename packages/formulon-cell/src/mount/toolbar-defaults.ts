@@ -535,7 +535,7 @@ export function createDefaultRibbonHooks(
         const strings = instance.i18n.strings.ribbon;
         const current = Math.round(instance.store.getState().viewport.zoom * 100);
         if (instance.host.dataset.fcPlatform === 'mac') {
-          const mac = instance.i18n.strings.macZoomDialog;
+          const mac = instance.i18n.strings.mac.zoomDialog;
           const choice = await showMacZoomDialog({
             locale: () => instance.locale,
             title: strings.zoomDialogTitle,

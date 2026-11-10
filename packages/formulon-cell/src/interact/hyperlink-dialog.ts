@@ -50,7 +50,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
   const strings = deps.strings ?? defaultStrings;
   // The Mac dialog adds display text, a ScreenTip and Web / document / e-mail tabs.
   const mac = isMacHost(host);
-  const m = mac ? strings.macHyperlinkDialog : null;
+  const m = mac ? strings.mac.hyperlinkDialog : null;
   const t = m ? { ...strings.hyperlinkDialog, ...m } : strings.hyperlinkDialog;
 
   const shell = createDialogShell({

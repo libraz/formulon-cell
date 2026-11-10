@@ -126,7 +126,7 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
     strings: instance.i18n.strings,
   });
 
-  const unsubscribeLocale = instance.i18n.subscribe((next) => {
+  const unsubscribeLocale = instance.i18n.on('change', (next) => {
     // Dialogs stay mounted across a locale switch so an open picker does not
     // lose its current values. Each handle updates its labels in place.
     sparkline.setStrings(next);

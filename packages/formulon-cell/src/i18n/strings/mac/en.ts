@@ -37,7 +37,7 @@ import { macWatchWindowEn } from './watch-window.js';
 import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macEn: MacStrings = {
-  macData: {
+  data: {
     goalSeek: {
       title: 'Goal Seek',
       formulaCell: 'Set cell',
@@ -124,7 +124,7 @@ export const macEn: MacStrings = {
       noRoom: 'There is no room to insert a subtotal row.',
     },
   },
-  macSparkline: {
+  sparkline: {
     title: 'Insert Sparkline',
     dataRange: 'Data range',
     location: 'Location',
@@ -138,14 +138,14 @@ export const macEn: MacStrings = {
     unavailable: 'This operation is unavailable for the current selection.',
     protectedLocation: 'The sparkline location is protected.',
   },
-  macSlicer: {
+  slicer: {
     ok: 'OK',
     cancel: 'Cancel',
     noTable: 'No table is available.',
     noColumns: 'The table has no columns.',
     insertFailed: 'The slicer could not be inserted for this table.',
   },
-  macWorkbookStats: {
+  workbookStats: {
     title: 'Workbook Statistics',
     close: 'Close',
     sheets: 'Sheets',
@@ -161,11 +161,11 @@ export const macEn: MacStrings = {
     usedRows: 'Used rows',
     usedColumns: 'Used columns',
   },
-  macInk: {
+  ink: {
     strokeLabel: 'Ink stroke',
     drawLabel: 'Draw Ink',
   },
-  macContextMenu: {
+  contextMenu: {
     cut: 'Cut',
     copy: 'Copy',
     paste: 'Paste',
@@ -195,7 +195,7 @@ export const macEn: MacStrings = {
     defineName: 'Define Name…',
     hyperlink: 'Hyperlink…',
   },
-  macHomeRibbon: {
+  homeRibbon: {
     conditional: 'Conditional Formatting',
     paste: 'Paste',
     cut: 'Cut',
@@ -204,19 +204,19 @@ export const macEn: MacStrings = {
     cellStyles: 'Cell Styles',
     autoSum: 'AutoSum',
   },
-  macFormatDialog: macFormatDialogFrom(cellFormatEn.formatDialog),
-  macIterativeDialog: macIterativeDialogFrom(formulaDialogsEn.iterativeDialog, {
+  formatDialog: macFormatDialogFrom(cellFormatEn.formatDialog),
+  iterativeDialog: macIterativeDialogFrom(formulaDialogsEn.iterativeDialog, {
     calcAutoNoTable: ribbonMenusEn.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsEn.namedRangeDialog, {
+  namedRangeDialog: macNamedRangeDialogFrom(formulaDialogsEn.namedRangeDialog, {
     defineTitle: 'Define Name',
     defineNames: 'Names:',
     defineNamePrompt: 'Enter a name for the data range:',
     defineRangePrompt: 'Select the range of cells:',
   }),
-  macPasteSpecial: macPasteSpecialFrom(editDialogsEn.pasteSpecialDialog),
-  macZoomDialog: macZoomDialogFrom(ribbonEn.ribbon, cellFormatEn.formatDialog),
-  macAlerts: macAlertsFrom(
+  pasteSpecial: macPasteSpecialFrom(editDialogsEn.pasteSpecialDialog),
+  zoomDialog: macZoomDialogFrom(ribbonEn.ribbon, cellFormatEn.formatDialog),
+  alerts: macAlertsFrom(
     ribbonEn.ribbon,
     {
       message: 'This sheet will be permanently deleted. Do you want to continue?',
@@ -225,25 +225,25 @@ export const macEn: MacStrings = {
     },
     editDialogsEn.moveCells,
   ),
-  macProtectSheet: macProtectSheetFrom(editDialogsEn.protection, {
+  protectSheet: macProtectSheetFrom(editDialogsEn.protection, {
     heading: 'Protect worksheet and contents of locked cells',
     note: 'By default, all cells are locked, but you can unlock them.',
   }),
-  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusEn.ribbonMenu, {
+  advancedFilter: macAdvancedFilterFrom(ribbonMenusEn.ribbonMenu, {
     filterInPlace: 'Filter the list, in-place',
     copyToLocation: 'Copy to another location',
   }),
-  macChrome: macChromeFrom(workbookChromeEn, formulaDialogsEn),
-  macTextToColumnsWizard: macTextToColumnsWizardEn,
-  macStyleDialog: macStyleDialogEn,
-  macExternalLinksPane: macExternalLinksPaneEn,
-  macWatchWindow: macWatchWindowEn,
-  macAccessibilityPane: macAccessibilityPaneEn,
-  macCfRulesDialog: macCfRulesDialogFrom(cellFormatEn.cfRulesDialog, {
+  chrome: macChromeFrom(workbookChromeEn, formulaDialogsEn),
+  textToColumnsWizard: macTextToColumnsWizardEn,
+  styleDialog: macStyleDialogEn,
+  externalLinksPane: macExternalLinksPaneEn,
+  watchWindow: macWatchWindowEn,
+  accessibilityPane: macAccessibilityPaneEn,
+  cfRulesDialog: macCfRulesDialogFrom(cellFormatEn.cfRulesDialog, {
     orderLabel: 'Change rule order:',
     appliesToLabel: 'Applies to:',
   }),
-  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsEn.hyperlinkDialog, {
+  hyperlinkDialog: macHyperlinkDialogFrom(editDialogsEn.hyperlinkDialog, {
     displayText: 'Text to display:',
     selectionInDocument: '<<Selection in Document>>',
     screenTip: 'ScreenTip...',
@@ -261,26 +261,26 @@ export const macEn: MacStrings = {
     subject: 'Subject:',
     recentEmails: 'Recently used email addresses:',
   }),
-  macPageSetup: macPageSetupFrom(pageLayoutEn.pageSetup),
-  macDataValidation: {
+  pageSetup: macPageSetupFrom(pageLayoutEn.pageSetup),
+  dataValidation: {
     inputCaption: 'When cell is selected, show this input message:',
     errorCaption: 'When user enters invalid data, show this error alert:',
   },
-  macCreateTable: { nameLabel: 'What is the name of your table?' },
-  macGoToDialog: macGoToDialogFrom(editDialogsEn.goToDialog, {
+  createTable: { nameLabel: 'What is the name of your table?' },
+  goToDialog: macGoToDialogFrom(editDialogsEn.goToDialog, {
     selectCaption: 'Select',
     optionsGroup: 'Options',
     noOptions: 'This selection has no options.',
   }),
-  macPivotFieldSettings: macPivotFieldSettingsEn,
-  macPivotOptions: macPivotOptionsEn,
-  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsEn.pivotTableDialog, {
+  pivotFieldSettings: macPivotFieldSettingsEn,
+  pivotOptions: macPivotOptionsEn,
+  pivotTableDialog: macPivotTableDialogFrom(dataObjectsEn.pivotTableDialog, {
     chooseConnection: 'Choose Connection...',
     moveTitle: 'Move PivotTable',
     moveLocation: 'Location:',
   }),
-  macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusEn.ribbonMenu),
-  macSortDialog: macSortDialogFrom(ribbonMenusEn.ribbonMenu, {
+  removeDuplicates: macRemoveDuplicatesFrom(ribbonMenusEn.ribbonMenu),
+  sortDialog: macSortDialogFrom(ribbonMenusEn.ribbonMenu, {
     levelsHeading: 'Add a level to sort by:',
     columnHeading: 'Column',
     sortOnHeading: 'Sort On',
@@ -297,8 +297,8 @@ export const macEn: MacStrings = {
     noPhonetic: "Don't use phonetic",
     caseSensitive: 'Case sensitive',
   }),
-  macErrorMenu: macErrorMenuEn,
-  macFilterPanel: macFilterPanelEn(gridPopupsEn.filterDropdown),
-  macSheetTabMenu: macSheetTabMenuEn,
-  macFindReplace: macFindReplaceFrom(editDialogsEn.findReplace, 'Match half-width and full-width'),
+  errorMenu: macErrorMenuEn,
+  filterPanel: macFilterPanelEn(gridPopupsEn.filterDropdown),
+  sheetTabMenu: macSheetTabMenuEn,
+  findReplace: macFindReplaceFrom(editDialogsEn.findReplace, 'Match half-width and full-width'),
 };

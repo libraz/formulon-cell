@@ -60,7 +60,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   const fcHost = host.closest<HTMLElement>('.fc-host') ?? host;
   const mac = fcHost.dataset.fcPlatform === 'mac';
   const dock = mac ? fcHost.querySelector<HTMLElement>('.fc-host__taskpane-dock') : null;
-  const macLabels = () => strings.macWatchWindow;
+  const macLabels = () => strings.mac.watchWindow;
   let selectedKey: string | null = null;
 
   const root = document.createElement('div');

@@ -108,7 +108,7 @@ describe('Spreadsheet platform switch', () => {
     mutators.setColWidth(instance.store, 2, 120);
     const before = instance.store.getState().layout;
 
-    instance.setUi({ platform: 'mac', theme: 'ink' });
+    instance.setTheme('ink');
     const after = instance.store.getState().layout;
     expect(after.defaultColWidth).toBe(before.defaultColWidth);
     expect(after.defaultRowHeight).toBe(before.defaultRowHeight);

@@ -358,7 +358,7 @@ describe('integration: locale profile switching', () => {
             input.value = 'uncommitted draft';
             dialog.append(input);
             overlayPortalFor(ctx.host).append(dialog);
-            const unsubscribe = ctx.i18n.subscribe(() => {
+            const unsubscribe = ctx.i18n.on('change', () => {
               observed.push(ctx.i18n.locale);
               if (ctx.i18n.locale === 'fr' && input) input.value = 'lost';
             });
@@ -394,11 +394,11 @@ describe('integration: locale profile switching', () => {
     const secondDraft = document.createElement('div');
     secondDraft.className = 'fc-cmtnote';
     portal.append(secondDraft);
-    sheet.instance.i18n.extend('en', {
+    sheet.instance.i18n.override('en', {
       a11y: { spreadsheet: 'First label' },
       formatDialog: { title: 'First format title' },
     });
-    sheet.instance.i18n.extend('en', {
+    sheet.instance.i18n.override('en', {
       a11y: { spreadsheet: 'Latest label' },
       formatDialog: { title: 'Latest format title' },
     });
@@ -434,7 +434,7 @@ describe('integration: locale profile switching', () => {
       await Promise.resolve();
       const changed = vi.fn();
       const unsubscribe = sheet.instance.on('localeChange', changed);
-      sheet.instance.i18n.extend('en', { formatDialog: { title: 'Updated format title' } });
+      sheet.instance.i18n.override('en', { formatDialog: { title: 'Updated format title' } });
       expect(changed).not.toHaveBeenCalled();
       draft.classList.add('fc-test-closed-draft');
       await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(1));

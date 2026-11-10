@@ -15,9 +15,8 @@ describe('chart value formatting', () => {
     expect(formatChartNumber(1.2345, 'host-specific-code', 'en-US')).toBe('1.2345');
   });
 
-  it('uses the injected formatter and falls back for nullish callback results', () => {
+  it('uses the injected formatter and falls back when it returns null', () => {
     expect(formatChartValue(3, 'x', 'ja-JP', () => 'Excel')).toBe('Excel');
     expect(formatChartValue(3, 'x', 'ja-JP', () => null)).toBe('3');
-    expect(formatChartValue(3, 'x', 'ja-JP', () => undefined)).toBe('3');
   });
 });

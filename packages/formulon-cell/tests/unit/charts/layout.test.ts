@@ -32,10 +32,18 @@ const pointPairs = (points: string): [number, number][] =>
 describe('layoutChart', () => {
   const salesData: ChartData = {
     domain: 'category',
-    categories: ['Jan', 'Feb', 'Mar', 'Apr'],
+    categories: [{ label: 'Jan' }, { label: 'Feb' }, { label: 'Mar' }, { label: 'Apr' }],
     series: [
-      { id: 'sales', name: 'Sales', values: [10, 15, 8, 12] },
-      { id: 'costs', name: 'Costs', values: [6, 8, 3, 7] },
+      {
+        id: 'sales',
+        name: 'Sales',
+        points: [{ value: 10 }, { value: 15 }, { value: 8 }, { value: 12 }],
+      },
+      {
+        id: 'costs',
+        name: 'Costs',
+        points: [{ value: 6 }, { value: 8 }, { value: 3 }, { value: 7 }],
+      },
     ],
   };
 
@@ -75,8 +83,8 @@ describe('layoutChart', () => {
   it('retains the default padded plot and emits readable category axes', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['one', 'two'],
-      series: [{ id: 'series-0', name: 'B', values: [1, 2] }],
+      categories: [{ label: 'one' }, { label: 'two' }],
+      series: [{ id: 'series-0', name: 'B', points: [{ value: 1 }, { value: 2 }] }],
     };
     const scene = sceneFor({ kind: 'column' }, data);
     expect(scene.plot).toEqual({ x: 20, y: 20, width: 280, height: 92 });
@@ -115,8 +123,8 @@ describe('layoutChart', () => {
 
     const pieData: ChartData = {
       domain: 'category',
-      categories: ['slice'],
-      series: [{ id: 'series-0', name: 'Only', values: [1] }],
+      categories: [{ label: 'slice' }],
+      series: [{ id: 'series-0', name: 'Only', points: [{ value: 1 }] }],
     };
     const pie = sceneFor({ kind: 'pie' }, pieData);
     expect(
@@ -134,10 +142,10 @@ describe('layoutChart', () => {
   it('separates positive and negative stacks and leaves empty points unplotted', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B', 'C'],
+      categories: [{ label: 'A' }, { label: 'B' }, { label: 'C' }],
       series: [
-        { id: 'a', values: [2, null, 3] },
-        { id: 'b', values: [-1, 2, null] },
+        { id: 'a', points: [{ value: 2 }, { value: null }, { value: 3 }] },
+        { id: 'b', points: [{ value: -1 }, { value: 2 }, { value: null }] },
       ],
     };
     const stacked = sceneFor({ kind: 'column', grouping: 'stacked' }, data);
@@ -157,8 +165,10 @@ describe('layoutChart', () => {
   it('lays out all seven chart families with finite semantic primitives', () => {
     const categoryData: ChartData = {
       domain: 'category',
-      categories: ['one', 'two', 'three'],
-      series: [{ id: 'series-0', name: 'A', values: [1, 10, 100] }],
+      categories: [{ label: 'one' }, { label: 'two' }, { label: 'three' }],
+      series: [
+        { id: 'series-0', name: 'A', points: [{ value: 1 }, { value: 10 }, { value: 100 }] },
+      ],
     };
     const scatterData: ChartData = {
       domain: 'xy',
@@ -218,10 +228,10 @@ describe('layoutChart', () => {
 
     const percentData: ChartData = {
       domain: 'category',
-      categories: ['A'],
+      categories: [{ label: 'A' }],
       series: [
-        { id: 'positive', values: [2] },
-        { id: 'negative', values: [-1] },
+        { id: 'positive', points: [{ value: 2 }] },
+        { id: 'negative', points: [{ value: -1 }] },
       ],
     };
     const percent = sceneFor({ kind: 'column', grouping: 'percent-stacked' }, percentData);
@@ -233,23 +243,59 @@ describe('layoutChart', () => {
   });
 
   it('breaks a line at gap points, joins across connect points, and plots value points', () => {
-    const base = { domain: 'category', categories: ['A', 'B', 'C'] } as const;
+    const base = {
+      domain: 'category',
+      categories: [{ label: 'A' }, { label: 'B' }, { label: 'C' }],
+    } as const;
     const lines = (scene: ReturnType<typeof sceneFor>) =>
       scene.elements.filter((element) => element.role === 'line');
     const gap = sceneFor(
       { kind: 'line' },
-      { ...base, series: [{ id: 's', values: [1, null, 3], states: ['value', 'gap', 'value'] }] },
+      {
+        ...base,
+        series: [
+          {
+            id: 's',
+            points: [
+              { value: 1, state: 'value' },
+              { value: null, state: 'gap' },
+              { value: 3, state: 'value' },
+            ],
+          },
+        ],
+      },
     );
     const connect = sceneFor(
       { kind: 'line' },
       {
         ...base,
-        series: [{ id: 's', values: [1, null, 3], states: ['value', 'connect', 'value'] }],
+        series: [
+          {
+            id: 's',
+            points: [
+              { value: 1, state: 'value' },
+              { value: null, state: 'connect' },
+              { value: 3, state: 'value' },
+            ],
+          },
+        ],
       },
     );
     const zero = sceneFor(
       { kind: 'line' },
-      { ...base, series: [{ id: 's', values: [1, 0, 3], states: ['value', 'value', 'value'] }] },
+      {
+        ...base,
+        series: [
+          {
+            id: 's',
+            points: [
+              { value: 1, state: 'value' },
+              { value: 0, state: 'value' },
+              { value: 3, state: 'value' },
+            ],
+          },
+        ],
+      },
     );
     expect(lines(gap)).toHaveLength(0);
     expect(gap.elements.filter((element) => element.role === 'point')).toHaveLength(2);
@@ -263,12 +309,23 @@ describe('layoutChart', () => {
       { kind: 'line' },
       {
         domain: 'category',
-        categories: ['A', 'B', 'C', 'D', 'E'],
+        categories: [
+          { label: 'A' },
+          { label: 'B' },
+          { label: 'C' },
+          { label: 'D' },
+          { label: 'E' },
+        ],
         series: [
           {
             id: 's',
-            values: [1, 2, null, 4, 5],
-            states: ['value', 'value', 'gap', 'value', 'value'],
+            points: [
+              { value: 1, state: 'value' },
+              { value: 2, state: 'value' },
+              { value: null, state: 'gap' },
+              { value: 4, state: 'value' },
+              { value: 5, state: 'value' },
+            ],
           },
         ],
       },
@@ -281,10 +338,18 @@ describe('layoutChart', () => {
       { kind: 'line', filter: { hiddenSeriesIds: ['hidden'], hiddenCategoryIds: ['category-1'] } },
       {
         domain: 'category',
-        categories: ['A', 'B', 'C', 'D'],
+        categories: [{ label: 'A' }, { label: 'B' }, { label: 'C' }, { label: 'D' }],
         series: [
-          { id: 'hidden', values: [1, 1, 1, 1] },
-          { id: 's', values: [1, 2, null, 4], states: ['value', 'value', 'gap', 'value'] },
+          { id: 'hidden', points: [{ value: 1 }, { value: 1 }, { value: 1 }, { value: 1 }] },
+          {
+            id: 's',
+            points: [
+              { value: 1, state: 'value' },
+              { value: 2, state: 'value' },
+              { value: null, state: 'gap' },
+              { value: 4, state: 'value' },
+            ],
+          },
         ],
       },
     );
@@ -313,10 +378,10 @@ describe('layoutChart', () => {
   it('keeps stacked area envelopes', () => {
     const stackedAreaData: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
+      categories: [{ label: 'A' }, { label: 'B' }],
       series: [
-        { id: 'base', values: [2, 2] },
-        { id: 'top', values: [3, 3] },
+        { id: 'base', points: [{ value: 2 }, { value: 2 }] },
+        { id: 'top', points: [{ value: 3 }, { value: 3 }] },
       ],
     };
     const area = sceneFor({ kind: 'area', grouping: 'stacked' }, stackedAreaData);
@@ -333,7 +398,11 @@ describe('layoutChart', () => {
   it('keeps explicit one-sided axis bounds and never renders negative bars', () => {
     const lowerBound = sceneFor(
       { kind: 'column', yAxis: { min: 10 } },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [5] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 5 }] }],
+      },
     );
     const lowerLabels = lowerBound.elements
       .filter((element) => element.role === 'axis-label')
@@ -348,7 +417,11 @@ describe('layoutChart', () => {
 
     const upperBound = sceneFor(
       { kind: 'column', yAxis: { max: -10 } },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [-5] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: -5 }] }],
+      },
     );
     const upperLabels = upperBound.elements
       .filter((element) => element.role === 'axis-label')
@@ -365,8 +438,8 @@ describe('layoutChart', () => {
   it('supports axis visibility, independent gridlines, axis identities, and major units', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      series: [{ id: 's', values: [3, 13] }],
+      categories: [{ label: 'A' }, { label: 'B' }],
+      series: [{ id: 's', points: [{ value: 3 }, { value: 13 }] }],
     };
     const scene = sceneFor(
       {
@@ -433,8 +506,8 @@ describe('layoutChart', () => {
       },
       data: {
         domain: 'category',
-        categories: ['A'],
-        series: [{ id: 's', values: [3] }],
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 3 }] }],
       },
       width: 320,
       height: 132,
@@ -455,7 +528,11 @@ describe('layoutChart', () => {
 
     const bar = sceneFor(
       { kind: 'bar', xAxis: { min: 3, max: 13, majorUnit: 5 } },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [3] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 3 }] }],
+      },
     );
     expect(
       bar.elements
@@ -492,8 +569,8 @@ describe('layoutChart', () => {
   it('keeps x-axis lines horizontal and y-axis lines vertical across chart families', () => {
     const categoryData: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      series: [{ id: 's', values: [-2, 4] }],
+      categories: [{ label: 'A' }, { label: 'B' }],
+      series: [{ id: 's', points: [{ value: -2 }, { value: 4 }] }],
     };
     const scatterData: ChartData = {
       domain: 'xy',
@@ -568,10 +645,10 @@ describe('layoutChart', () => {
       { kind: 'column', grouping: 'percent-stacked', yAxis: { numberFormat: '0.0%' } },
       {
         domain: 'category',
-        categories: ['A'],
+        categories: [{ label: 'A' }],
         series: [
-          { id: 'positive', values: [2] },
-          { id: 'negative', values: [-1] },
+          { id: 'positive', points: [{ value: 2 }] },
+          { id: 'negative', points: [{ value: -1 }] },
         ],
       },
     );
@@ -600,8 +677,8 @@ describe('layoutChart', () => {
             }
           : {
               domain: 'category',
-              categories: ['A'],
-              series: [{ id: 's', values: [Number.MAX_VALUE] }],
+              categories: [{ label: 'A' }],
+              series: [{ id: 's', points: [{ value: Number.MAX_VALUE }] }],
             };
       const scene = sceneFor(spec, data);
       expect(
@@ -615,11 +692,19 @@ describe('layoutChart', () => {
 
     const auto = sceneFor(
       { kind: 'column' },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [5, 15] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 5 }, { value: 15 }] }],
+      },
     );
     const invalidExplicit = sceneFor(
       { kind: 'column', yAxis: { min: Number.NaN, max: Number.POSITIVE_INFINITY } },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [5, 15] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 5 }, { value: 15 }] }],
+      },
     );
     const labels = (scene: ReturnType<typeof sceneFor>) =>
       scene.elements
@@ -662,8 +747,8 @@ describe('layoutChart', () => {
       spec: { kind: 'column', yAxis: { title: 'Value', numberFormat: 'host-code' } },
       data: {
         domain: 'category',
-        categories: ['A'],
-        series: [{ id: 's', values: [1, 2] }],
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 1 }, { value: 2 }] }],
       },
       width: 320,
       height: 132,
@@ -830,8 +915,8 @@ describe('layoutChart', () => {
       spec: { kind: 'column', yAxis: { min: 0, max: 1, majorUnit: 0.01 } },
       data: {
         domain: 'category',
-        categories: ['A'],
-        series: [{ id: 's', values: [0, 1] }],
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 0 }, { value: 1 }] }],
       },
       width: 320,
       height: 132,
@@ -853,8 +938,8 @@ describe('layoutChart', () => {
       spec: { kind: 'bar', yAxis: { title: 'Category' } },
       data: {
         domain: 'category',
-        categories: ['2026年10月', '2026年11月'],
-        series: [{ id: 's', values: [-5, 20] }],
+        categories: [{ label: '2026年10月' }, { label: '2026年11月' }],
+        series: [{ id: 's', points: [{ value: -5 }, { value: 20 }] }],
       },
       width: 640,
       height: 220,
@@ -869,7 +954,11 @@ describe('layoutChart', () => {
     for (const value of [Number.MAX_VALUE, Number.MIN_VALUE]) {
       const scene = sceneFor(
         { kind: 'column' },
-        { domain: 'category', categories: ['A'], series: [{ id: 's', values: [value] }] },
+        {
+          domain: 'category',
+          categories: [{ label: 'A' }],
+          series: [{ id: 's', points: [{ value: value }] }],
+        },
       );
       const mark = barElements(scene)[0];
       expect(mark).toBeDefined();
@@ -879,7 +968,11 @@ describe('layoutChart', () => {
 
     const tiny = sceneFor(
       { kind: 'column' },
-      { domain: 'category', categories: ['A', 'B'], series: [{ id: 's', values: [1e-13, 2e-13] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }, { label: 'B' }],
+        series: [{ id: 's', points: [{ value: 1e-13 }, { value: 2e-13 }] }],
+      },
     );
     expect(barElements(tiny).every((bar) => Number(bar.attrs.height) > 0)).toBe(true);
 
@@ -887,8 +980,8 @@ describe('layoutChart', () => {
       { kind: 'column' },
       {
         domain: 'category',
-        categories: ['A', 'B'],
-        series: [{ id: 's', values: [-1e308, 1e308] }],
+        categories: [{ label: 'A' }, { label: 'B' }],
+        series: [{ id: 's', points: [{ value: -1e308 }, { value: 1e308 }] }],
       },
     );
     expect(
@@ -933,12 +1026,12 @@ describe('layoutChart', () => {
       { kind: 'column', grouping: 'stacked' },
       {
         domain: 'category',
-        categories: ['A'],
+        categories: [{ label: 'A' }],
         series: [
-          { id: 'p1', values: [2] },
-          { id: 'n1', values: [-1] },
-          { id: 'p2', values: [3] },
-          { id: 'n2', values: [-2] },
+          { id: 'p1', points: [{ value: 2 }] },
+          { id: 'n1', points: [{ value: -1 }] },
+          { id: 'p2', points: [{ value: 3 }] },
+          { id: 'n2', points: [{ value: -2 }] },
         ],
       },
     );
@@ -959,10 +1052,10 @@ describe('layoutChart', () => {
   it('reserves y-axis space from the actual stacked domain', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A'],
+      categories: [{ label: 'A' }],
       series: Array.from({ length: 100 }, (_, index) => ({
         id: `series-${index}`,
-        values: [9],
+        points: [{ value: 9 }],
       })),
     };
     const scene = sceneFor({ kind: 'column', grouping: 'stacked' }, data);
@@ -979,10 +1072,10 @@ describe('layoutChart', () => {
           { kind: 'column', grouping },
           {
             domain: 'category',
-            categories: ['A'],
+            categories: [{ label: 'A' }],
             series: [
-              { id: 'first', values: [value] },
-              { id: 'second', values: [value] },
+              { id: 'first', points: [{ value: value }] },
+              { id: 'second', points: [{ value: value }] },
             ],
           },
         );
@@ -1001,7 +1094,11 @@ describe('layoutChart', () => {
   });
 
   it('reserves no legend space for a doughnut legend that draws no entries', () => {
-    const data: ChartData = { domain: 'category', categories: ['A', 'B'], series: [] };
+    const data: ChartData = {
+      domain: 'category',
+      categories: [{ label: 'A' }, { label: 'B' }],
+      series: [],
+    };
     const shown = sceneFor(
       { kind: 'doughnut', legend: { visible: true, position: 'right' } },
       data,
@@ -1014,11 +1111,11 @@ describe('layoutChart', () => {
   it('bounds compact legends and retains full labels in aria-label attributes', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A'],
+      categories: [{ label: 'A' }],
       series: Array.from({ length: 20 }, (_, index) => ({
         id: `series-${index}`,
         name: `very-long-series-name-${index}`,
-        values: [index + 1],
+        points: [{ value: index + 1 }],
       })),
     };
     const right = sceneAt(
@@ -1071,8 +1168,8 @@ describe('layoutChart', () => {
   it('keeps no-data and single-value scenes finite', () => {
     const noData: ChartData = {
       domain: 'category',
-      categories: ['A'],
-      series: [{ id: 's', values: [null] }],
+      categories: [{ label: 'A' }],
+      series: [{ id: 's', points: [{ value: null }] }],
     };
     const scene = sceneFor({ kind: 'pie' }, noData);
     expect(scene.elements.some((element) => element.role === 'empty' && element.text === '—')).toBe(
@@ -1082,8 +1179,8 @@ describe('layoutChart', () => {
       { kind: 'column' },
       {
         domain: 'category',
-        categories: ['A'],
-        series: [{ id: 's', values: [0], states: ['value'] }],
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 0, state: 'value' }] }],
       },
     );
     expect(zero.elements.some((element) => element.role === 'empty')).toBe(false);
@@ -1091,7 +1188,11 @@ describe('layoutChart', () => {
     for (const kind of ['column', 'bar', 'line', 'area', 'pie'] as const) {
       const single = sceneFor(
         { kind },
-        { domain: 'category', categories: ['A'], series: [{ id: 's', values: [1] }] },
+        {
+          domain: 'category',
+          categories: [{ label: 'A' }],
+          series: [{ id: 's', points: [{ value: 1 }] }],
+        },
       );
       expect(single.elements.length).toBeGreaterThan(0);
     }
@@ -1100,10 +1201,10 @@ describe('layoutChart', () => {
   it('uses Excel gapWidth and overlap equations for clustered and stacked slots', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A'],
+      categories: [{ label: 'A' }],
       series: [
-        { id: 'first', values: [1] },
-        { id: 'second', values: [2] },
+        { id: 'first', points: [{ value: 1 }] },
+        { id: 'second', points: [{ value: 2 }] },
       ],
     };
     const defaultBars = barElements(sceneFor({ kind: 'column', legend: { visible: false } }, data));
@@ -1152,12 +1253,15 @@ describe('layoutChart', () => {
   it('draws stacked and area series from the engine states without re-deriving blanks', () => {
     const data = (state: 'gap' | 'connect' | 'value'): ChartData => ({
       domain: 'category',
-      categories: ['A', 'B', 'C'],
+      categories: [{ label: 'A' }, { label: 'B' }, { label: 'C' }],
       series: [
         {
           id: 'series',
-          values: [1, state === 'value' ? 0 : null, 3],
-          states: ['value', state, 'value'],
+          points: [
+            { value: 1, state: 'value' },
+            { value: state === 'value' ? 0 : null, state: state },
+            { value: 3, state: 'value' },
+          ],
         },
       ],
     });
@@ -1198,11 +1302,23 @@ describe('layoutChart', () => {
   it('normalizes pie magnitudes before summing and rotates from twelve o’clock', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['positive', 'large', 'negative', 'zero', 'invalid'],
+      categories: [
+        { label: 'positive' },
+        { label: 'large' },
+        { label: 'negative' },
+        { label: 'zero' },
+        { label: 'invalid' },
+      ],
       series: [
         {
           id: 'series',
-          values: [1, Number.MAX_VALUE, -Number.MAX_VALUE, 0, Number.NaN],
+          points: [
+            { value: 1 },
+            { value: Number.MAX_VALUE },
+            { value: -Number.MAX_VALUE },
+            { value: 0 },
+            { value: Number.NaN },
+          ],
         },
       ],
     };
@@ -1227,10 +1343,10 @@ describe('layoutChart', () => {
   it('lays out doughnut rings with a clamped hole and stable full-circle paths', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
+      categories: [{ label: 'A' }, { label: 'B' }],
       series: [
-        { id: 'inner', values: [1, 1] },
-        { id: 'outer', values: [1, 0] },
+        { id: 'inner', points: [{ value: 1 }, { value: 1 }] },
+        { id: 'outer', points: [{ value: 1 }, { value: 0 }] },
       ],
     };
     const doughnut = (holeSize: number | undefined) =>
@@ -1260,10 +1376,10 @@ describe('layoutChart', () => {
       { kind: 'doughnut', legend: { visible: false } },
       {
         domain: 'category',
-        categories: ['A', 'B'],
+        categories: [{ label: 'A' }, { label: 'B' }],
         series: [
-          { id: 'inner', values: [1, 1] },
-          { id: 'outer', values: [1, 1] },
+          { id: 'inner', points: [{ value: 1 }, { value: 1 }] },
+          { id: 'outer', points: [{ value: 1 }, { value: 1 }] },
         ],
       },
     );
@@ -1292,9 +1408,12 @@ describe('layoutChart', () => {
   it('draws per-slice pie fills keyed by category id, also under a category filter', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B', 'C'],
-      categoryIds: ['category-0', 'category-1', 'category-2'],
-      series: [{ id: 'series-0', values: [1, 2, 3] }],
+      categories: [
+        { id: 'category-0', label: 'A' },
+        { id: 'category-1', label: 'B' },
+        { id: 'category-2', label: 'C' },
+      ],
+      series: [{ id: 'series-0', points: [{ value: 1 }, { value: 2 }, { value: 3 }] }],
     };
     const spec: ChartSpec = {
       kind: 'pie',
@@ -1331,12 +1450,15 @@ describe('layoutChart', () => {
   it('keeps doughnut filtering, first-angle rotation, identities, ring styles, and category legends', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B', 'C'],
-      categoryIds: ['a', 'b', 'c'],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+        { id: 'c', label: 'C' },
+      ],
       series: [
-        { id: 'hidden', values: [9, 9, 9] },
-        { id: 'kept', values: [1, 2, 3] },
-        { id: 'outer', values: [3, 2, 1] },
+        { id: 'hidden', points: [{ value: 9 }, { value: 9 }, { value: 9 }] },
+        { id: 'kept', points: [{ value: 1 }, { value: 2 }, { value: 3 }] },
+        { id: 'outer', points: [{ value: 3 }, { value: 2 }, { value: 1 }] },
       ],
     };
     const scene = sceneFor(
@@ -1397,10 +1519,10 @@ describe('layoutChart', () => {
       },
       {
         domain: 'category',
-        categories: ['A', 'B'],
+        categories: [{ label: 'A' }, { label: 'B' }],
         series: [
-          { id: 'inner', values: [2, -1] },
-          { id: 'outer', values: [1, 3] },
+          { id: 'inner', points: [{ value: 2 }, { value: -1 }] },
+          { id: 'outer', points: [{ value: 1 }, { value: 3 }] },
         ],
       },
     );
@@ -1445,10 +1567,10 @@ describe('layoutChart', () => {
       },
       {
         domain: 'category',
-        categories: ['A'],
+        categories: [{ label: 'A' }],
         series: [
-          { id: 'inner', values: [1] },
-          { id: 'outer', values: [1] },
+          { id: 'inner', points: [{ value: 1 }] },
+          { id: 'outer', points: [{ value: 1 }] },
         ],
       },
     );
@@ -1468,8 +1590,8 @@ describe('layoutChart', () => {
   it('uses themed text for labels while keeping legend keys on the data color', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A'],
-      series: [{ id: 's', values: [2] }],
+      categories: [{ label: 'A' }],
+      series: [{ id: 's', points: [{ value: 2 }] }],
     };
     const baseSpec: ChartSpec = {
       kind: 'doughnut',
@@ -1503,11 +1625,11 @@ describe('layoutChart', () => {
       },
       {
         domain: 'category',
-        categories: ['A', 'B', 'C'],
+        categories: [{ label: 'A' }, { label: 'B' }, { label: 'C' }],
         series: [
-          { id: 'inner', values: [10, 15, 8] },
-          { id: 'middle', values: [10, 15, 8] },
-          { id: 'outer', values: [10, 15, 8] },
+          { id: 'inner', points: [{ value: 10 }, { value: 15 }, { value: 8 }] },
+          { id: 'middle', points: [{ value: 10 }, { value: 15 }, { value: 8 }] },
+          { id: 'outer', points: [{ value: 10 }, { value: 15 }, { value: 8 }] },
         ],
       },
     );
@@ -1551,10 +1673,10 @@ describe('layoutChart', () => {
   it('uses every visible doughnut series for emptiness and omits axes and numeric callbacks', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A'],
+      categories: [{ label: 'A' }],
       series: [
-        { id: 'zero', values: [0] },
-        { id: 'positive', values: [2] },
+        { id: 'zero', points: [{ value: 0 }] },
+        { id: 'positive', points: [{ value: 2 }] },
       ],
     };
     let callbackCalls = 0;
@@ -1581,8 +1703,8 @@ describe('layoutChart', () => {
 
     const axisData: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      series: [{ id: 's', values: [1, 2] }],
+      categories: [{ label: 'A' }, { label: 'B' }],
+      series: [{ id: 's', points: [{ value: 1 }, { value: 2 }] }],
     };
     for (const kind of ['pie', 'doughnut'] as const) {
       const withoutAxes = sceneFor({ kind, legend: { visible: false } }, axisData);
@@ -1611,10 +1733,10 @@ describe('layoutChart', () => {
       { kind: 'doughnut', legend: { visible: false } },
       {
         domain: 'category',
-        categories: ['max', 'min'],
+        categories: [{ label: 'max' }, { label: 'min' }],
         series: [
-          { id: 'outer', values: [Number.MAX_VALUE, Number.MIN_VALUE] },
-          { id: 'inner', values: [Number.MIN_VALUE, Number.MAX_VALUE] },
+          { id: 'outer', points: [{ value: Number.MAX_VALUE }, { value: Number.MIN_VALUE }] },
+          { id: 'inner', points: [{ value: Number.MIN_VALUE }, { value: Number.MAX_VALUE }] },
         ],
       },
     );
@@ -1624,7 +1746,7 @@ describe('layoutChart', () => {
   });
 
   it('keeps large doughnut label sets complete without recursive placement', () => {
-    const categories = Array.from({ length: 1000 }, (_, index) => `C${index}`);
+    const categories = Array.from({ length: 1000 }, (_, index) => ({ label: `C${index}` }));
     const scene = sceneFor(
       {
         kind: 'doughnut',
@@ -1634,7 +1756,7 @@ describe('layoutChart', () => {
       {
         domain: 'category',
         categories,
-        series: [{ id: 's', values: categories.map(() => 1) }],
+        series: [{ id: 's', points: categories.map(() => ({ value: 1 })) }],
       },
     );
     expect(scene.elements.filter((element) => element.role === 'data-label')).toHaveLength(
@@ -1645,14 +1767,22 @@ describe('layoutChart', () => {
   it('marks an all-zero pie empty while retaining valid zero category values', () => {
     const pie = sceneFor(
       { kind: 'pie' },
-      { domain: 'category', categories: ['A', 'B'], series: [{ id: 's', values: [0, 0] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }, { label: 'B' }],
+        series: [{ id: 's', points: [{ value: 0 }, { value: 0 }] }],
+      },
     );
     expect(pie.elements.filter((element) => element.role === 'slice')).toHaveLength(0);
     expect(pie.elements.some((element) => element.role === 'empty')).toBe(true);
 
     const column = sceneFor(
       { kind: 'column' },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [0] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 0 }] }],
+      },
     );
     expect(column.elements.some((element) => element.role === 'empty')).toBe(false);
     expect(barElements(column)).toHaveLength(1);
@@ -1663,10 +1793,10 @@ describe('layoutChart', () => {
     (kind) => {
       const data: ChartData = {
         domain: 'category',
-        categories: ['A'],
+        categories: [{ label: 'A' }],
         series: [
-          { id: 'a', values: [1] },
-          { id: 'b', values: [2] },
+          { id: 'a', points: [{ value: 1 }] },
+          { id: 'b', points: [{ value: 2 }] },
         ],
       };
       const position = kind === 'bar' ? 'y' : 'x';
@@ -1701,10 +1831,25 @@ describe('layoutChart', () => {
   );
 
   it('draws a stacked line through an engine zero and breaks an area at a gap', () => {
-    const base = { domain: 'category', categories: ['A', 'B', 'C'] } as const;
+    const base = {
+      domain: 'category',
+      categories: [{ label: 'A' }, { label: 'B' }, { label: 'C' }],
+    } as const;
     const scene = sceneFor(
       { kind: 'line', grouping: 'stacked' },
-      { ...base, series: [{ id: 's', values: [1, 0, 3], states: ['value', 'value', 'value'] }] },
+      {
+        ...base,
+        series: [
+          {
+            id: 's',
+            points: [
+              { value: 1, state: 'value' },
+              { value: 0, state: 'value' },
+              { value: 3, state: 'value' },
+            ],
+          },
+        ],
+      },
     );
     const lines = scene.elements.filter((element) => element.role === 'line');
     expect(lines).toHaveLength(1);
@@ -1713,7 +1858,19 @@ describe('layoutChart', () => {
     expect(points[1]?.[1]).toBeCloseTo(scene.plot.y + scene.plot.height);
     const area = sceneFor(
       { kind: 'area' },
-      { ...base, series: [{ id: 's', values: [1, null, 3], states: ['value', 'gap', 'value'] }] },
+      {
+        ...base,
+        series: [
+          {
+            id: 's',
+            points: [
+              { value: 1, state: 'value' },
+              { value: null, state: 'gap' },
+              { value: 3, state: 'value' },
+            ],
+          },
+        ],
+      },
     );
     expect(area.elements.filter((element) => element.role === 'area')).toHaveLength(2);
   });
@@ -1724,8 +1881,8 @@ describe('layoutChart', () => {
         { kind: 'pie', firstSliceAngle, legend: { visible: false } },
         {
           domain: 'category',
-          categories: ['A', 'B'],
-          series: [{ id: 's', values }],
+          categories: [{ label: 'A' }, { label: 'B' }],
+          series: [{ id: 's', points: values.map((value) => ({ value })) }],
         },
       );
     const scene = pie([Number.MAX_VALUE, Number.MAX_VALUE], 90);
@@ -1759,11 +1916,14 @@ describe('layoutChart', () => {
   it('filters before geometry and preserves original category/series identities', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B', 'C'],
-      categoryIds: ['a', 'b', 'c'],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+        { id: 'c', label: 'C' },
+      ],
       series: [
-        { id: 'hidden-series', values: [1, 2, 3] },
-        { id: 'visible-series', values: [4, 5, 6] },
+        { id: 'hidden-series', points: [{ value: 1 }, { value: 2 }, { value: 3 }] },
+        { id: 'visible-series', points: [{ value: 4 }, { value: 5 }, { value: 6 }] },
       ],
     };
     const original = structuredClone(data);
@@ -1822,11 +1982,10 @@ describe('layoutChart', () => {
   it('uses visible-series denominators for percent labels and stable point style ids', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A'],
-      categoryIds: ['a'],
+      categories: [{ id: 'a', label: 'A' }],
       series: [
-        { id: 'kept', values: [1] },
-        { id: 'filtered', values: [3] },
+        { id: 'kept', points: [{ value: 1 }] },
+        { id: 'filtered', points: [{ value: 3 }] },
       ],
     };
     const scene = sceneFor(
@@ -1857,7 +2016,11 @@ describe('layoutChart', () => {
           showLegendKey: false,
         },
       },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [1] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 1 }] }],
+      },
     );
     expect(scene.elements.some((element) => element.role === 'data-label')).toBe(false);
   });
@@ -1865,9 +2028,11 @@ describe('layoutChart', () => {
   it('applies point > series > palette styles and keeps legend colors aligned', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      categoryIds: ['a', 'b'],
-      series: [{ id: 'sales', name: 'Sales', values: [1, 2] }],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
+      series: [{ id: 'sales', name: 'Sales', points: [{ value: 1 }, { value: 2 }] }],
     };
     const scene = sceneFor(
       {
@@ -1878,7 +2043,7 @@ describe('layoutChart', () => {
           {
             seriesId: 'sales',
             fill: { color: '#series', transparency: 75 },
-            line: { color: '#edge', transparency: 25, width: 3, dash: 'dash-dot' },
+            line: { color: '#edge', transparency: 25, width: 3, dash: 'dashDot' },
             points: [{ pointId: 'a', fill: { color: '#point', transparency: 50 } }],
           },
         ],
@@ -1892,7 +2057,7 @@ describe('layoutChart', () => {
     expect(bars[0]?.attrs.stroke).toBe('#edge');
     expect(bars[0]?.attrs['stroke-opacity']).toBe(0.75);
     expect(bars[0]?.attrs['stroke-width']).toBe(3);
-    expect(bars[0]?.attrs['stroke-dasharray']).toBe('6 3 1 3');
+    expect(bars[0]?.attrs['stroke-dasharray']).toBe('12 9 3 9');
     const legend = scene.elements.find(
       (element) => element.role === 'legend' && element.tag === 'rect',
     );
@@ -1921,9 +2086,11 @@ describe('layoutChart', () => {
       },
       {
         domain: 'category',
-        categories: ['A', 'B'],
-        categoryIds: ['a', 'b'],
-        series: [{ id: 'sales', values: [1, 2] }],
+        categories: [
+          { id: 'a', label: 'A' },
+          { id: 'b', label: 'B' },
+        ],
+        series: [{ id: 'sales', points: [{ value: 1 }, { value: 2 }] }],
       },
     );
     const markers = scene.elements.filter((element) => element.role === 'point');
@@ -1947,10 +2114,10 @@ describe('layoutChart', () => {
       },
       {
         domain: 'category',
-        categories: ['A', 'B'],
+        categories: [{ label: 'A' }, { label: 'B' }],
         series: [
-          { id: 'sales', values: [1, 2] },
-          { id: 'costs', values: [2, 1] },
+          { id: 'sales', points: [{ value: 1 }, { value: 2 }] },
+          { id: 'costs', points: [{ value: 2 }, { value: 1 }] },
         ],
       },
     );
@@ -2060,8 +2227,8 @@ describe('layoutChart', () => {
         spec: { kind: 'pie' },
         data: {
           domain: 'category',
-          categories: Array.from({ length: 13 }, (_, index) => `c${index}`),
-          series: [{ id: 's', values: Array.from({ length: 13 }, () => 1) }],
+          categories: Array.from({ length: 13 }, (_, index) => ({ label: `c${index}` })),
+          series: [{ id: 's', points: Array.from({ length: 13 }, () => ({ value: 1 })) }],
         },
         width: 320,
         height: 132,
@@ -2093,8 +2260,8 @@ describe('layoutChart', () => {
         { kind: 'line', seriesStyles: [{ seriesId: 's', smooth }] },
         {
           domain: 'category',
-          categories: ['A', 'B', 'C'],
-          series: [{ id: 's', values: [1, 3, 2] }],
+          categories: [{ label: 'A' }, { label: 'B' }, { label: 'C' }],
+          series: [{ id: 's', points: [{ value: 1 }, { value: 3 }, { value: 2 }] }],
         },
       ).elements.find((element) => element.role === 'line');
     const straight = lineOf(false);
@@ -2143,8 +2310,8 @@ describe('layoutChart', () => {
       series: [
         {
           id: 's',
-          formatCode: '0.000',
-          xFormatCode: '0.00',
+          numberFormat: '0.000',
+          xNumberFormat: '0.00',
           points: [
             { id: 'point-0', x: 1, y: 2 },
             { id: 'point-1', x: 3, y: 4 },
@@ -2183,11 +2350,11 @@ describe('layoutChart', () => {
         spec: { kind: 'column', title: { auto: true } },
         data: {
           domain: 'category',
-          categories: ['A'],
+          categories: [{ label: 'A' }],
           series: Array.from({ length: series }, (_, index) => ({
             id: `s${index}`,
             name: `Series ${index}`,
-            values: [1],
+            points: [{ value: 1 }],
           })),
         },
         width: 320,
@@ -2209,8 +2376,8 @@ describe('layoutChart', () => {
         spec: { kind: 'column', xAxis: { title: { auto: true } }, yAxis: { title: 'Units' } },
         data: {
           domain: 'category',
-          categories: ['A'],
-          series: [{ id: 's0', name: 'S', values: [1] }],
+          categories: [{ label: 'A' }],
+          series: [{ id: 's0', name: 'S', points: [{ value: 1 }] }],
         },
         width: 320,
         height: 132,
@@ -2227,9 +2394,11 @@ describe('layoutChart', () => {
   it('supports vary-colors defaults, marker shapes, and separate marker transparency', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      categoryIds: ['a', 'b'],
-      series: [{ id: 's', values: [1, 2] }],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
+      series: [{ id: 's', points: [{ value: 1 }, { value: 2 }] }],
     };
     const line = sceneFor(
       {
@@ -2257,7 +2426,11 @@ describe('layoutChart', () => {
     expect(markers[0]?.attrs['stroke-opacity']).toBe(0.4);
     const pie = sceneFor(
       { kind: 'pie', palette: ['#one', '#two'], varyColors: false },
-      { domain: 'category', categories: ['A', 'B'], series: [{ id: 's', values: [1, 2] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }, { label: 'B' }],
+        series: [{ id: 's', points: [{ value: 1 }, { value: 2 }] }],
+      },
     );
     expect(
       pie.elements.filter((element) => element.role === 'slice').map((slice) => slice.attrs.fill),
@@ -2281,8 +2454,8 @@ describe('layoutChart', () => {
       },
       {
         domain: 'category',
-        categories: ['Long category name'],
-        series: [{ id: 's', name: 'Sales', values: [-1.25] }],
+        categories: [{ label: 'Long category name' }],
+        series: [{ id: 's', name: 'Sales', points: [{ value: -1.25 }] }],
       },
       180,
       80,
@@ -2307,7 +2480,11 @@ describe('layoutChart', () => {
         kind: 'column',
         dataLabels: { visible: true, showValue: true, numberFormat: 'host-code' },
       },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [1234.5] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 1234.5 }] }],
+      },
     );
     const formattedLabel = formatted.elements.find((element) => element.role === 'data-label');
     expect(formattedLabel?.text).toBe('1,234.5');
@@ -2316,7 +2493,11 @@ describe('layoutChart', () => {
         kind: 'column',
         dataLabels: { visible: true, showValue: true, numberFormat: 'host-code' },
       },
-      data: { domain: 'category', categories: ['A'], series: [{ id: 's', values: [1234.5] }] },
+      data: {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 1234.5 }] }],
+      },
       width: 320,
       height: 132,
       locale: 'ja-JP',
@@ -2330,8 +2511,8 @@ describe('layoutChart', () => {
   it('keeps Excel label positions distinct for positive and negative bars', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A'],
-      series: [{ id: 's', values: [-2] }],
+      categories: [{ label: 'A' }],
+      series: [{ id: 's', points: [{ value: -2 }] }],
     };
     const atBase = sceneFor(
       { kind: 'bar', dataLabels: { visible: true, position: 'inside-base' } },
@@ -2363,12 +2544,12 @@ describe('layoutChart', () => {
       },
       {
         domain: 'category',
-        categories: ['A'],
+        categories: [{ label: 'A' }],
         series: [
-          { id: 'positive-first', values: [2] },
-          { id: 'positive-second', values: [3] },
-          { id: 'negative-first', values: [-2] },
-          { id: 'negative-second', values: [-3] },
+          { id: 'positive-first', points: [{ value: 2 }] },
+          { id: 'positive-second', points: [{ value: 3 }] },
+          { id: 'negative-first', points: [{ value: -2 }] },
+          { id: 'negative-second', points: [{ value: -3 }] },
         ],
       },
     );
@@ -2432,8 +2613,8 @@ describe('layoutChart', () => {
 
     const data: ChartData = {
       domain: 'category',
-      categories: ['A'],
-      series: [{ id: 's', values: [2] }],
+      categories: [{ label: 'A' }],
+      series: [{ id: 's', points: [{ value: 2 }] }],
     };
     const labelAttrs = (
       kind: ChartSpec['kind'],
@@ -2509,8 +2690,8 @@ describe('layoutChart', () => {
       },
       {
         domain: 'category',
-        categories: ['2026年10月'],
-        series: [{ id: 's', name: '日本語の系列名', values: [10] }],
+        categories: [{ label: '2026年10月' }],
+        series: [{ id: 's', name: '日本語の系列名', points: [{ value: 10 }] }],
       },
       width,
       height,
@@ -2544,7 +2725,11 @@ describe('layoutChart', () => {
       const data: ChartData =
         kind === 'scatter'
           ? { domain: 'xy', series: [{ id: 's', points: [{ id: 'p', x: 1, y: 2 }] }] }
-          : { domain: 'category', categories: ['A'], series: [{ id: 's', values: [2] }] };
+          : {
+              domain: 'category',
+              categories: [{ label: 'A' }],
+              series: [{ id: 's', points: [{ value: 2 }] }],
+            };
       const scene = sceneFor({ kind, dataLabels: { visible: true, showValue: true } }, data);
       expect(scene.elements.some((element) => element.role === 'data-label')).toBe(true);
       expect(
@@ -2605,11 +2790,13 @@ describe('layoutChart', () => {
   it('reverses category bands without mirroring clustered series offsets or identities', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      categoryIds: ['a', 'b'],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
       series: [
-        { id: 'first', values: [1, 2] },
-        { id: 'second', values: [3, 4] },
+        { id: 'first', points: [{ value: 1 }, { value: 2 }] },
+        { id: 'second', points: [{ value: 3 }, { value: 4 }] },
       ],
     };
     const normal = sceneFor({ kind: 'column' }, data);
@@ -2644,9 +2831,12 @@ describe('layoutChart', () => {
   it('keeps bar and column label directions screen-relative for both signs and zero', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['positive', 'negative', 'zero'],
-      categoryIds: ['positive', 'negative', 'zero'],
-      series: [{ id: 's', values: [2, -2, 0] }],
+      categories: [
+        { id: 'positive', label: 'positive' },
+        { id: 'negative', label: 'negative' },
+        { id: 'zero', label: 'zero' },
+      ],
+      series: [{ id: 's', points: [{ value: 2 }, { value: -2 }, { value: 0 }] }],
     };
     const labelFor = (scene: ReturnType<typeof sceneFor>, pointId: string) =>
       scene.elements.find(
@@ -2730,9 +2920,11 @@ describe('layoutChart', () => {
   it('keeps inside-base and inside-end labels near the requested screen endpoint', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['positive', 'negative'],
-      categoryIds: ['positive', 'negative'],
-      series: [{ id: 's', values: [4, -4] }],
+      categories: [
+        { id: 'positive', label: 'positive' },
+        { id: 'negative', label: 'negative' },
+      ],
+      series: [{ id: 's', points: [{ value: 4 }, { value: -4 }] }],
     };
     const barFor = (scene: ReturnType<typeof sceneAt>, pointId: string) =>
       scene.elements.find((element) => element.role === 'bar' && element.pointId === pointId);
@@ -2795,8 +2987,8 @@ describe('layoutChart', () => {
   it('accepts only literal true for reverseOrder and ignores it on circular charts', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      series: [{ id: 's', values: [1, 2] }],
+      categories: [{ label: 'A' }, { label: 'B' }],
+      series: [{ id: 's', points: [{ value: 1 }, { value: 2 }] }],
     };
     const baseline = sceneFor({ kind: 'column' }, data);
     const falseFlag = sceneFor({ kind: 'column', xAxis: { reverseOrder: false } }, data);
@@ -2809,9 +3001,11 @@ describe('layoutChart', () => {
 
     const circularData: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      categoryIds: ['a', 'b'],
-      series: [{ id: 's', values: [1, 2] }],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
+      series: [{ id: 's', points: [{ value: 1 }, { value: 2 }] }],
     };
     const pie = sceneFor(
       {
@@ -2889,11 +3083,14 @@ describe('layoutChart', () => {
           }
         : {
             domain: 'category',
-            categories: ['A', 'B', 'C'],
-            categoryIds: ['a', 'b', 'c'],
+            categories: [
+              { id: 'a', label: 'A' },
+              { id: 'b', label: 'B' },
+              { id: 'c', label: 'C' },
+            ],
             series: [
-              { id: 's', values: [-2, 0, 4] },
-              { id: 't', values: [1, 3, -1] },
+              { id: 's', points: [{ value: -2 }, { value: 0 }, { value: 4 }] },
+              { id: 't', points: [{ value: 1 }, { value: 3 }, { value: -1 }] },
             ],
           };
       const reverseXFlag = reverseX === 'true';
@@ -2966,7 +3163,7 @@ describe('layoutChart', () => {
           expect(reversedBar).toBeDefined();
           const category =
             data.domain === 'category'
-              ? (data.categoryIds?.indexOf(normalBar.pointId ?? '') ?? -1)
+              ? data.categories.findIndex((candidate) => candidate.id === normalBar.pointId)
               : -1;
           expect(category).toBeGreaterThanOrEqual(0);
           if (kind === 'bar') {
@@ -3084,11 +3281,14 @@ describe('layoutChart', () => {
             }
           : {
               domain: 'category',
-              categories: ['A', 'B', 'C'],
-              categoryIds: ['a', 'b', 'c'],
+              categories: [
+                { id: 'a', label: 'A' },
+                { id: 'b', label: 'B' },
+                { id: 'c', label: 'C' },
+              ],
               series: [
-                { id: 's', values: [-3, 0, 4] },
-                { id: 't', values: [2, -1, 3] },
+                { id: 's', points: [{ value: -3 }, { value: 0 }, { value: 4 }] },
+                { id: 't', points: [{ value: 2 }, { value: -1 }, { value: 3 }] },
               ],
             };
       const crossingValue = (mode: CrossingMode): ChartAxisSpec['crossing'] =>
@@ -3206,16 +3406,16 @@ describe('layoutChart', () => {
         kind: 'column',
         data: {
           domain: 'category',
-          categories: ['A', 'B'],
-          series: [{ id: 's', values: [2, -3] }],
+          categories: [{ label: 'A' }, { label: 'B' }],
+          series: [{ id: 's', points: [{ value: 2 }, { value: -3 }] }],
         },
       },
       {
         kind: 'bar',
         data: {
           domain: 'category',
-          categories: ['A', 'B'],
-          series: [{ id: 's', values: [2, -3] }],
+          categories: [{ label: 'A' }, { label: 'B' }],
+          series: [{ id: 's', points: [{ value: 2 }, { value: -3 }] }],
         },
       },
       {
@@ -3264,11 +3464,19 @@ describe('layoutChart', () => {
   it('clamps automatic zero and finite out-of-domain numeric crossings to resolved endpoints', () => {
     const positive = sceneFor(
       { kind: 'column', yAxis: { min: 2, max: 8, crossing: 'auto' } },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [2, 8] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: 2 }, { value: 8 }] }],
+      },
     );
     const negative = sceneFor(
       { kind: 'column', yAxis: { min: -8, max: -2, crossing: 'auto' } },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [-2, -8] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }],
+        series: [{ id: 's', points: [{ value: -2 }, { value: -8 }] }],
+      },
     );
     const positiveAxis = positive.elements.find(
       (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'x',
@@ -3361,7 +3569,11 @@ describe('layoutChart', () => {
         xAxis: { visible: false, crossing: 'max' },
         yAxis: { min: -5, max: 5 },
       },
-      { domain: 'category', categories: ['A', 'B'], series: [{ id: 's', values: [-1, 2] }] },
+      {
+        domain: 'category',
+        categories: [{ label: 'A' }, { label: 'B' }],
+        series: [{ id: 's', points: [{ value: -1 }, { value: 2 }] }],
+      },
     );
     const yLine = hiddenController.elements.find(
       (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'y',
@@ -3380,9 +3592,13 @@ describe('layoutChart', () => {
   it('maps category crossings to visible bands, IDs, edge rules, and reverse order', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B', 'C', 'D'],
-      categoryIds: ['a', 'b', 'c', 'd'],
-      series: [{ id: 's', values: [1, 2, 3, 4] }],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+        { id: 'c', label: 'C' },
+        { id: 'd', label: 'D' },
+      ],
+      series: [{ id: 's', points: [{ value: 1 }, { value: 2 }, { value: 3 }, { value: 4 }] }],
     };
     const filtered = sceneFor(
       {
@@ -3450,9 +3666,12 @@ describe('layoutChart', () => {
       },
       {
         domain: 'category',
-        categories: ['A', 'B', 'C'],
-        categoryIds: ['a', 'b', 'c'],
-        series: [{ id: 's', values: [1, 2, 3] }],
+        categories: [
+          { id: 'a', label: 'A' },
+          { id: 'b', label: 'B' },
+          { id: 'c', label: 'C' },
+        ],
+        series: [{ id: 's', points: [{ value: 1 }, { value: 2 }, { value: 3 }] }],
       },
     );
     const barXLine = bar.elements.find(
@@ -3467,7 +3686,7 @@ describe('layoutChart', () => {
   it('falls back to legacy edges for empty visible categories and ignores circular crossings', () => {
     const emptyColumn = sceneFor(
       { kind: 'column', xAxis: { crossing: 'max' } },
-      { domain: 'category', categories: [], series: [{ id: 's', values: [] }] },
+      { domain: 'category', categories: [], series: [{ id: 's', points: [] }] },
     );
     const emptyColumnLine = emptyColumn.elements.find(
       (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'y',
@@ -3476,7 +3695,7 @@ describe('layoutChart', () => {
 
     const emptyBar = sceneFor(
       { kind: 'bar', yAxis: { crossing: 'min' } },
-      { domain: 'category', categories: [], series: [{ id: 's', values: [] }] },
+      { domain: 'category', categories: [], series: [{ id: 's', points: [] }] },
     );
     const emptyBarLine = emptyBar.elements.find(
       (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'x',
@@ -3485,9 +3704,11 @@ describe('layoutChart', () => {
 
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      categoryIds: ['a', 'b'],
-      series: [{ id: 's', values: [1, 2] }],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
+      series: [{ id: 's', points: [{ value: 1 }, { value: 2 }] }],
     };
     for (const kind of ['pie', 'doughnut'] as const) {
       const baseline = sceneFor({ kind }, data);
@@ -3502,9 +3723,11 @@ describe('layoutChart', () => {
   it('positions axis labels additively while preserving legacy and mark identities', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      categoryIds: ['category-a', 'category-b'],
-      series: [{ id: 'series-a', values: [1, 2] }],
+      categories: [
+        { id: 'category-a', label: 'A' },
+        { id: 'category-b', label: 'B' },
+      ],
+      series: [{ id: 'series-a', points: [{ value: 1 }, { value: 2 }] }],
     };
     const baseline = sceneFor({ kind: 'column' }, data);
     const explicitLow = sceneFor(
@@ -3573,8 +3796,8 @@ describe('layoutChart', () => {
   it('keeps next-to labels beside the actual crossing lines and retains controllers', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
-      series: [{ id: 'series-a', values: [1, 2] }],
+      categories: [{ label: 'A' }, { label: 'B' }],
+      series: [{ id: 'series-a', points: [{ value: 1 }, { value: 2 }] }],
     };
     const scene = sceneFor(
       {
@@ -3627,8 +3850,11 @@ describe('layoutChart', () => {
   it('reserves high label lanes for titles and separates right legends from bounded labels', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['非常に長いカテゴリラベル一', '非常に長いカテゴリラベル二'],
-      series: [{ id: 'series-a', name: 'Series', values: [1, 2] }],
+      categories: [
+        { label: '非常に長いカテゴリラベル一' },
+        { label: '非常に長いカテゴリラベル二' },
+      ],
+      series: [{ id: 'series-a', name: 'Series', points: [{ value: 1 }, { value: 2 }] }],
     };
     const title = sceneAt(
       { kind: 'column', title: 'Chart title', xAxis: { labelPosition: 'high' } },
@@ -3786,9 +4012,14 @@ describe('layoutChart', () => {
 
     const categoryData: ChartData = {
       domain: 'category',
-      categories: ['A', 'B', 'C'],
-      categoryIds: ['a', 'b', 'c'],
-      series: [{ id: 'series-a', name: 'Series', values: [-4, 10, 7] }],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+        { id: 'c', label: 'C' },
+      ],
+      series: [
+        { id: 'series-a', name: 'Series', points: [{ value: -4 }, { value: 10 }, { value: 7 }] },
+      ],
     };
     const scatterData: ChartData = {
       domain: 'xy',
@@ -4000,9 +4231,19 @@ describe('layoutChart', () => {
   it('skips non-positive category values and uses the positive domain minimum as baseline', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['one', 'zero', 'negative', 'ten', 'nan'],
-      categoryIds: ['one', 'zero', 'negative', 'ten', 'nan'],
-      series: [{ id: 'series-a', values: [1, 0, -2, 10, Number.NaN] }],
+      categories: [
+        { id: 'one', label: 'one' },
+        { id: 'zero', label: 'zero' },
+        { id: 'negative', label: 'negative' },
+        { id: 'ten', label: 'ten' },
+        { id: 'nan', label: 'nan' },
+      ],
+      series: [
+        {
+          id: 'series-a',
+          points: [{ value: 1 }, { value: 0 }, { value: -2 }, { value: 10 }, { value: Number.NaN }],
+        },
+      ],
     };
     const scene = sceneAt(
       {
@@ -4031,8 +4272,33 @@ describe('layoutChart', () => {
   it('keeps clustered log lines positive and breaks span runs at invalid values', () => {
     const data: ChartData = {
       domain: 'category',
-      categories: ['a', 'b', 'blank', 'c', 'zero', 'd', 'nan', 'e', 'f'],
-      series: [{ id: 'series-a', values: [1, 2, null, 3, 0, 4, Number.NaN, 5, 6] }],
+      categories: [
+        { label: 'a' },
+        { label: 'b' },
+        { label: 'blank' },
+        { label: 'c' },
+        { label: 'zero' },
+        { label: 'd' },
+        { label: 'nan' },
+        { label: 'e' },
+        { label: 'f' },
+      ],
+      series: [
+        {
+          id: 'series-a',
+          points: [
+            { value: 1 },
+            { value: 2 },
+            { value: null },
+            { value: 3 },
+            { value: 0 },
+            { value: 4 },
+            { value: Number.NaN },
+            { value: 5 },
+            { value: 6 },
+          ],
+        },
+      ],
     };
     const scene = sceneFor({ kind: 'line', emptyCells: 'span', yAxis: { logBase: 10 } }, data);
     const lines = scene.elements.filter((element) => element.role === 'line');
@@ -4173,9 +4439,12 @@ describe('layoutChart', () => {
 
     const categoryData: ChartData = {
       domain: 'category',
-      categories: ['A', 'B', 'C'],
-      categoryIds: ['a', 'b', 'c'],
-      series: [{ id: 'series-a', values: [1, 10, 100] }],
+      categories: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+        { id: 'c', label: 'C' },
+      ],
+      series: [{ id: 'series-a', points: [{ value: 1 }, { value: 10 }, { value: 100 }] }],
     };
     const scatterData: ChartData = {
       domain: 'xy',
@@ -4357,10 +4626,10 @@ describe('layoutChart', () => {
   it('leaves stacked and invalid log settings on the exact legacy linear layout', () => {
     const category: ChartData = {
       domain: 'category',
-      categories: ['A', 'B'],
+      categories: [{ label: 'A' }, { label: 'B' }],
       series: [
-        { id: 'a', values: [1, 10] },
-        { id: 'b', values: [2, 20] },
+        { id: 'a', points: [{ value: 1 }, { value: 10 }] },
+        { id: 'b', points: [{ value: 2 }, { value: 20 }] },
       ],
     };
     expect(
@@ -4378,10 +4647,10 @@ describe('layoutChart', () => {
 describe('layoutChart series data labels', () => {
   const data: ChartData = {
     domain: 'category',
-    categories: ['A', 'B'],
+    categories: [{ label: 'A' }, { label: 'B' }],
     series: [
-      { id: 'one', values: [1, 2] },
-      { id: 'two', values: [3, 4] },
+      { id: 'one', points: [{ value: 1 }, { value: 2 }] },
+      { id: 'two', points: [{ value: 3 }, { value: 4 }] },
     ],
   };
   const labelTexts = (scene: ReturnType<typeof sceneFor>, seriesIndex: number) =>
@@ -4449,10 +4718,10 @@ describe('layoutChart legend default', () => {
       spec: { kind: 'column' },
       data: {
         domain: 'category',
-        categories: ['A'],
+        categories: [{ label: 'A' }],
         series: [
-          { id: 'one', name: 'One', values: [1] },
-          { id: 'two', name: 'Two', values: [2] },
+          { id: 'one', name: 'One', points: [{ value: 1 }] },
+          { id: 'two', name: 'Two', points: [{ value: 2 }] },
         ],
       },
       width: 320,
@@ -4488,12 +4757,18 @@ describe('layoutUnsupportedChart', () => {
 
 describe('layoutChart engine format codes', () => {
   const dateFormatter = (value: number, code: string | undefined) =>
-    code === 'yyyy-mm-dd' ? `D${value}` : undefined;
+    code === 'yyyy-mm-dd' ? `D${value}` : null;
   const category = (formatCode?: string): ChartData => ({
     domain: 'category',
-    categories: ['45000', '45001'],
-    ...(formatCode === undefined ? {} : { categoryFormatCode: 'yyyy-mm-dd' }),
-    series: [{ id: 's', values: [0.25, 0.5], ...(formatCode ? { formatCode } : {}) }],
+    categories: [{ label: '45000' }, { label: '45001' }],
+    ...(formatCode === undefined ? {} : { categoryNumberFormat: 'yyyy-mm-dd' }),
+    series: [
+      {
+        id: 's',
+        points: [{ value: 0.25 }, { value: 0.5 }],
+        ...(formatCode ? { numberFormat: formatCode } : {}),
+      },
+    ],
   });
   const texts = (scene: ReturnType<typeof sceneFor>, role: string) =>
     scene.elements.filter((element) => element.role === role).map((element) => element.text);

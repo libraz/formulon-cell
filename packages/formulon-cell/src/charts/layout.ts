@@ -45,7 +45,7 @@ import type {
   XYChartData,
 } from './types.js';
 
-/** Re-attach the engine's per-point states and series formats, which the filtered view does not carry. */
+/** Re-attach the series formats, which the filtered view does not carry. */
 const withPointStates = (view: PreparedChartData, source: ChartData): PreparedChartData => {
   if (view.data.domain === 'category' && source.domain === 'category') {
     const categoryView = view as CategoryChartView;
@@ -55,13 +55,11 @@ const withPointStates = (view: PreparedChartData, source: ChartData): PreparedCh
         ...categoryView.data,
         series: categoryView.data.series.map((series, index) => {
           const original = source.series[categoryView.originalSeriesIndices[index] ?? index];
-          const states = original?.states;
           return {
             ...series,
-            ...(original?.formatCode === undefined ? {} : { formatCode: original.formatCode }),
-            ...(states
-              ? { states: categoryView.originalCategoryIndices.map((i) => states[i] ?? 'value') }
-              : {}),
+            ...(original?.numberFormat === undefined
+              ? {}
+              : { numberFormat: original.numberFormat }),
           };
         }),
       },
@@ -80,12 +78,12 @@ const withPointStates = (view: PreparedChartData, source: ChartData): PreparedCh
             source.series[xyView.originalSeriesIndices[seriesIndex] ?? seriesIndex];
           return {
             ...series,
-            ...(sourceSeries?.formatCode === undefined
+            ...(sourceSeries?.numberFormat === undefined
               ? {}
-              : { formatCode: sourceSeries.formatCode }),
-            ...(sourceSeries?.xFormatCode === undefined
+              : { numberFormat: sourceSeries.numberFormat }),
+            ...(sourceSeries?.xNumberFormat === undefined
               ? {}
-              : { xFormatCode: sourceSeries.xFormatCode }),
+              : { xNumberFormat: sourceSeries.xNumberFormat }),
             points: series.points.map((point, pointIndex) => {
               const state =
                 original?.[xyView.originalPointIndices[seriesIndex]?.[pointIndex] ?? pointIndex]
@@ -111,18 +109,21 @@ const withCategoryFormat = (
   formatter: ChartValueFormatter | undefined,
 ): PreparedChartData => {
   if (view.data.domain !== 'category' || source.domain !== 'category') return view;
-  const code = source.categoryFormatCode;
+  const code = source.categoryNumberFormat;
   if (!hasFormat(code)) return view;
   const categoryView = view as CategoryChartView;
   return {
     ...categoryView,
     data: {
       ...categoryView.data,
-      categories: categoryView.data.categories.map((label) => {
-        const value = label.trim().length > 0 ? Number(label) : Number.NaN;
+      categories: categoryView.data.categories.map((category) => {
+        const value = category.label.trim().length > 0 ? Number(category.label) : Number.NaN;
         return Number.isFinite(value)
-          ? (formatChartValue(value, code, locale, formatter) ?? label)
-          : label;
+          ? {
+              ...category,
+              label: formatChartValue(value, code, locale, formatter) ?? category.label,
+            }
+          : category;
       }),
     },
   };
@@ -137,8 +138,8 @@ const withValueAxisFormat = (spec: ChartSpec, view: PreparedChartData): ChartSpe
       hasFormat(code) && !((axis?.numberFormat?.trim().length ?? 0) > 0)
         ? { ...axis, numberFormat: code }
         : axis;
-    const xAxis = linked(spec.xAxis, first?.xFormatCode);
-    const yAxis = linked(spec.yAxis, first?.formatCode);
+    const xAxis = linked(spec.xAxis, first?.xNumberFormat);
+    const yAxis = linked(spec.yAxis, first?.numberFormat);
     return {
       ...spec,
       ...(xAxis === undefined ? {} : { xAxis }),
@@ -147,7 +148,7 @@ const withValueAxisFormat = (spec: ChartSpec, view: PreparedChartData): ChartSpe
   }
   if (view.data.domain !== 'category' || isCircularKind(spec.kind)) return spec;
   if (spec.grouping === 'percent-stacked') return spec;
-  const code = view.data.series[0]?.formatCode;
+  const code = view.data.series[0]?.numberFormat;
   if (!hasFormat(code)) return spec;
   const key = spec.kind === 'bar' ? 'xAxis' : 'yAxis';
   const axis = spec[key];
@@ -167,16 +168,17 @@ const dataHasValues = (
     if (kind === 'pie') {
       const first = data.series[0];
       return (
-        first?.values.some((value) => value !== null && Number.isFinite(value) && value !== 0) ??
-        false
+        first?.points.some(
+          ({ value }) => value !== null && Number.isFinite(value) && value !== 0,
+        ) ?? false
       );
     }
     if (kind === 'doughnut') {
       return data.series.some((series) =>
-        series.values.some((value) => value !== null && Number.isFinite(value) && value !== 0),
+        series.points.some(({ value }) => value !== null && Number.isFinite(value) && value !== 0),
       );
     }
-    return data.series.some((series) => series.values.some(valueIsPlottable));
+    return data.series.some((series) => series.points.some(({ value }) => valueIsPlottable(value)));
   }
   return data.series.some((series) =>
     series.points.some((point) => {
@@ -212,17 +214,17 @@ export const chartTitleText = (
   return only !== undefined && only.length > 0 ? only : chartTitle;
 };
 
-/**
- * Convert chart data into a finite, browser-independent scene. The default
- * 320×132 scene retains the historic 20/20/300/112 plot rectangle; title and
- * legend reservations are added only when those features are requested.
- */
-export function layoutChart(input: {
+/** Input of {@link layoutChart}. */
+export interface ChartLayoutInput {
   readonly spec: ChartSpec;
   readonly data: ChartData;
+  /** Scene width in pixels; a non-finite value falls back to 320. */
   readonly width: number;
+  /** Scene height in pixels; a non-finite value falls back to 132. */
   readonly height: number;
+  /** Locale of number labels. Defaults to `'en-US'`. */
   readonly locale?: string;
+  /** Formats values with their Excel number format; the built-in formatter handles the rest. */
   readonly formatValue?: ChartValueFormatter;
   /** The workbook theme's accent1..accent6; the default Office theme's when omitted. */
   readonly accents?: readonly string[];
@@ -230,7 +232,14 @@ export function layoutChart(input: {
   readonly chartTitle?: string;
   /** The automatic title of an axis, localised; "Axis Title" when omitted. */
   readonly axisTitle?: string;
-}): ChartScene {
+}
+
+/**
+ * Convert chart data into a finite, browser-independent scene. The default
+ * 320×132 scene retains the historic 20/20/300/112 plot rectangle; title and
+ * legend reservations are added only when those features are requested.
+ */
+export function layoutChart(input: ChartLayoutInput): ChartScene {
   const width = Math.max(1, finite(input.width, 320));
   const height = Math.max(1, finite(input.height, 132));
   const maxNumericLabelWidth = numericAxisLabelMaxWidth(width);
@@ -315,7 +324,7 @@ export function layoutChart(input: {
   let rightLabelGutter = 0;
   if (spec.kind === 'bar' && data.domain === 'category' && axisIsVisible(spec.yAxis)) {
     const categoryWidth = data.categories.reduce(
-      (current, label) =>
+      (current, { label }) =>
         Math.max(
           current,
           textWidth(highYLabels ? boundedAxisLabel(label, maxNumericLabelWidth) : label) + 10,
@@ -337,7 +346,7 @@ export function layoutChart(input: {
           const grouping = spec.grouping ?? 'clustered';
           if (grouping === 'clustered') {
             return data.series.flatMap((series) =>
-              series.values.flatMap((value) => {
+              series.points.flatMap(({ value }) => {
                 const resolved = valueFor(value);
                 return resolved === null ? [] : [resolved];
               }),
@@ -404,7 +413,7 @@ export function layoutChart(input: {
   let yLabelWidth =
     spec.kind === 'bar' && data.domain === 'category' && axisIsVisible(spec.yAxis)
       ? data.categories.reduce(
-          (current, label) =>
+          (current, { label }) =>
             Math.max(
               current,
               textWidth(highYLabels ? boundedAxisLabel(label, maxNumericLabelWidth) : label),
@@ -506,12 +515,12 @@ export function layoutChart(input: {
   let labels: readonly string[] = [];
   let percent = false;
   if (data.domain === 'category') {
-    labels = data.categories;
+    labels = data.categories.map((category) => category.label);
     const grouping = spec.grouping ?? 'clustered';
     percent = grouping === 'percent-stacked';
     const totals = effectiveStackTotals(data);
     const rawValues = data.series.flatMap((series) =>
-      series.values.flatMap((value) => {
+      series.points.flatMap(({ value }) => {
         const resolved = valueFor(value);
         return resolved === null ? [] : [resolved];
       }),
@@ -547,7 +556,7 @@ export function layoutChart(input: {
         yDomain,
         labels,
         (prepared as CategoryChartView).originalCategoryIndices,
-        data.categoryIds ?? [],
+        data.categories.map((category, index) => category.id ?? `category-${index}`),
         spec,
         percent,
         height,
@@ -683,16 +692,23 @@ export function layoutChart(input: {
   return { width, height, plot, elements };
 }
 
+/** Input of {@link layoutUnsupportedChart}. */
+export interface UnsupportedChartLayoutInput {
+  /** Chart title shown above the message; omitted when absent or empty. */
+  readonly title?: string;
+  /** Localized text explaining why the chart is not drawn. */
+  readonly message: string;
+  /** Scene width in pixels; a non-finite value falls back to 320. */
+  readonly width: number;
+  /** Scene height in pixels; a non-finite value falls back to 132. */
+  readonly height: number;
+}
+
 /**
  * Scene for a chart the engine models but cannot draw: a frame, the chart
  * title when it has one, and a caller-supplied (localized) message.
  */
-export function layoutUnsupportedChart(input: {
-  readonly title?: string;
-  readonly message: string;
-  readonly width: number;
-  readonly height: number;
-}): ChartScene {
+export function layoutUnsupportedChart(input: UnsupportedChartLayoutInput): ChartScene {
   const width = Math.max(1, finite(input.width, 320));
   const height = Math.max(1, finite(input.height, 132));
   const plot = { x: 0, y: 0, width, height };

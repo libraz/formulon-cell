@@ -49,7 +49,7 @@ describe('integration: locale + theme swap mid-edit', () => {
   it('i18n.setLocale fires localeChange subscribers (notification semantics)', () => {
     const { instance } = sheet;
     let count = 0;
-    const unsub = instance.i18n.subscribe(() => {
+    const unsub = instance.i18n.on('change', () => {
       count += 1;
     });
     instance.i18n.setLocale('ja');

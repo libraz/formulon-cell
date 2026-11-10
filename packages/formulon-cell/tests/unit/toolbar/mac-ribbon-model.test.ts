@@ -693,7 +693,7 @@ describe('Mac Excel ribbon profile', () => {
         );
       const mac = commandsOf(macHome);
       const generic = commandsOf(genericHome);
-      const macLabels = dictionaries[locale].macHomeRibbon;
+      const macLabels = dictionaries[locale].mac.homeRibbon;
 
       expect(mac.get('paste')).toMatchObject({ kind: 'large', label: macLabels.paste });
       for (const [id, label] of [
@@ -727,13 +727,13 @@ describe('Mac Excel ribbon profile', () => {
       expect(generic.get('paste')?.label).toBe(dictionaries[locale].ribbon.paste);
       expect(generic.get('cellStyles')?.label).toBe(dictionaries[locale].ribbon.cellStyles);
     }
-    expect(dictionaries.ja.macHomeRibbon).toMatchObject({
+    expect(dictionaries.ja.mac.homeRibbon).toMatchObject({
       paste: 'ペースト',
       formatPainter: '書式',
       cellStyles: 'セルのスタイル',
       autoSum: 'オート SUM',
     });
-    expect(dictionaries.en.macHomeRibbon.formatPainter).toBe('Format');
+    expect(dictionaries.en.mac.homeRibbon.formatPainter).toBe('Format');
   });
 
   it('projects Mac checked states and contextual eligibility without accumulating titles', () => {

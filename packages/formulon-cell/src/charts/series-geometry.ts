@@ -38,7 +38,7 @@ export const effectiveStackTotals = (
   const negative = Array.from({ length: data.categories.length }, () => 0);
   for (const series of data.series) {
     for (let index = 0; index < data.categories.length; index += 1) {
-      const value = valueFor(series.values[index] ?? null);
+      const value = valueFor(series.points[index]?.value ?? null);
       if (value === null) continue;
       if (value >= 0) {
         positive[index] = saturatedAdd(positive[index] ?? 0, value);
@@ -62,14 +62,14 @@ const stableStackTotal = (
 ): StableStackTotal => {
   let scale = 0;
   for (const series of data.series) {
-    const value = valueFor(series.values[pointIndex] ?? null);
+    const value = valueFor(series.points[pointIndex]?.value ?? null);
     if (value === null || value >= 0 !== positive) continue;
     scale = Math.max(scale, Math.abs(value));
   }
   if (!(scale > 0)) return { scale: 1, total: 0 };
   let total = 0;
   for (const series of data.series) {
-    const value = valueFor(series.values[pointIndex] ?? null);
+    const value = valueFor(series.points[pointIndex]?.value ?? null);
     if (value === null || value >= 0 !== positive) continue;
     total = saturatedAdd(total, Math.abs(value) / scale);
   }
@@ -102,7 +102,7 @@ export const segmentsFor = (
     const target = result[seriesIndex];
     if (!series || !target) continue;
     for (let pointIndex = 0; pointIndex < data.categories.length; pointIndex += 1) {
-      const raw = series.values[pointIndex] ?? null;
+      const raw = series.points[pointIndex]?.value ?? null;
       const value = valueFor(raw);
       if (value === null) continue;
       if (grouping === 'clustered') {

@@ -1,5 +1,12 @@
 export { formatChartNumber, formatChartValue } from './format.js';
+export type { ChartLayoutInput, UnsupportedChartLayoutInput } from './layout.js';
 export { layoutChart, layoutUnsupportedChart } from './layout.js';
+export type {
+  LinearScaleOptions,
+  LogProjectionOptions,
+  NumericDomain,
+  ScaleRange,
+} from './scales.js';
 export {
   formatTick,
   linearScale,
@@ -10,8 +17,11 @@ export {
 } from './scales.js';
 export type {
   CategoryChartData,
+  CategoryChartPoint,
   CategoryChartSeries,
+  ChartAutoTitle,
   ChartAxisSpec,
+  ChartCategory,
   ChartData,
   ChartDataLabelSpec,
   ChartDataLabelsSpec,
@@ -36,7 +46,6 @@ export type {
   ChartSeriesStyleSpec,
   ChartSpec,
   ChartValueFormatter,
-  DataLabelSpec,
   XYChartData,
   XYChartPoint,
   XYChartSeries,

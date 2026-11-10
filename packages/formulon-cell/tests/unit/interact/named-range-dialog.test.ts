@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { en } from '../../../src/i18n/strings.js';
+import { en, ja } from '../../../src/i18n/strings.js';
 import { attachNamedRangeDialog } from '../../../src/interact/named-range-dialog.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -28,7 +28,7 @@ describe('attachNamedRangeDialog', () => {
   });
 
   it('mounts hidden, opens shows the empty-state', () => {
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     const overlay = document.querySelector<HTMLElement>('.fc-namedlg');
     expect(overlay?.hidden).toBe(true);
 
@@ -40,7 +40,7 @@ describe('attachNamedRangeDialog', () => {
   });
 
   it('Escape closes the overlay', () => {
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     const overlay = document.querySelector<HTMLElement>('.fc-namedlg') as HTMLElement;
     overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -49,7 +49,7 @@ describe('attachNamedRangeDialog', () => {
   });
 
   it('bindWorkbook re-renders the listing on next open', () => {
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     handle.close();
     // Swap to a different workbook handle. The stub engine never has defined
@@ -61,7 +61,7 @@ describe('attachNamedRangeDialog', () => {
   });
 
   it('hides the add-form when capability is off (read-only fallback note shown)', () => {
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     expect(document.querySelector<HTMLElement>('.fc-namedlg__form')).toBeNull();
     const note = document.querySelector<HTMLElement>('.fc-namedlg__note');
@@ -195,7 +195,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
 
   it('New opens a New Name dialog and writes through on submit', () => {
     const { wb, calls } = makeMutableWb();
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     const newButton = document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button');
     newButton?.click();
@@ -238,7 +238,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     vi.stubGlobal('requestAnimationFrame', schedule);
     const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
     const { wb } = makeMutableWb();
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       const newButton = document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button');
@@ -260,7 +260,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     vi.stubGlobal('requestAnimationFrame', schedule);
     const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
     const { wb } = makeMutableWb();
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
@@ -287,7 +287,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     vi.stubGlobal('requestAnimationFrame', schedule);
     const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
     const { wb } = makeMutableWb();
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       const newButton = document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button');
@@ -306,7 +306,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
 
   it('Escape closes the child editor first and returns focus to its opener', () => {
     const { wb } = makeMutableWb();
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     const newButton = document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button');
     // Pointer activation does not move keyboard focus to buttons in WebKit.
@@ -329,7 +329,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
 
   it('passes the selected sheet scope when creating a defined name', () => {
     const { wb, calls } = makeMutableWb();
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
     const nameField = document.querySelector<HTMLInputElement>(
@@ -355,7 +355,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
     const afterMutate = vi.fn();
-    const handle = attachNamedRangeDialog({ host, wb, onAfterMutate: afterMutate });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb, onAfterMutate: afterMutate });
     handle.open();
 
     document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
@@ -383,7 +383,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
 
   it('openNew opens the New Name editor directly', async () => {
     const { wb } = makeMutableWb();
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.openNew();
 
     const manager = document.querySelector<HTMLElement>('.fc-namedlg');
@@ -417,7 +417,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
   it('refuses a duplicate name instead of overwriting it', () => {
     const { wb, registry, calls } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
     const f = editorFields();
@@ -438,7 +438,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
     const history = new History();
-    const handle = attachNamedRangeDialog({ host, wb, history });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb, history });
     handle.open();
     document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button')[1]?.click();
     const f = editorFields();
@@ -458,7 +458,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       active: { sheet: 0, row: 1, col: 1 },
       range: { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 },
     };
-    const handle = attachNamedRangeDialog({ host, wb, getSelection: () => selection });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb, getSelection: () => selection });
     handle.openNew();
     let f = editorFields();
     expect(f.formula.value).toBe('=Sheet1!$B$2:$C$3');
@@ -479,7 +479,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     values.set('0:0:1', { kind: 'number', value: 1 });
     values.set('0:1:0', { kind: 'text', value: 'b' });
     values.set('0:1:1', { kind: 'number', value: 2 });
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     const shown = Array.from(
       document.querySelectorAll('.fc-namedlg__row-value'),
@@ -492,7 +492,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
   it('records Name Manager edits in unified history', () => {
     const { wb, registry } = makeMutableWb();
     const history = new History();
-    const handle = attachNamedRangeDialog({ host, wb, history });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb, history });
     handle.open();
     document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
     const nameField = document.querySelector<HTMLInputElement>(
@@ -519,7 +519,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
   it('renders Excel-like Name Manager actions and table columns', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
 
     const actions = Array.from(
@@ -546,7 +546,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry, values } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
     values.set('0:0:0', { kind: 'number', value: 0.08 });
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
 
     expect(document.querySelector<HTMLElement>('.fc-namedlg__row-value')?.textContent).toBe('0.08');
@@ -556,7 +556,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
   it('shows engine-stored references with a leading = as the spreadsheet does', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', 'Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
 
     expect(document.querySelector<HTMLElement>('.fc-namedlg__row-formula')?.textContent).toBe(
@@ -579,7 +579,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$C$1');
     registry.set('Budget', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
 
     const rowNames = (): (string | null)[] =>
@@ -605,7 +605,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
   it('Edit loads the selected name into the inline form for replacement', () => {
     const { wb, calls, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     const edit = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
@@ -632,7 +632,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
   it('quick Refers to box commits and cancels selected-name reference edits', () => {
     const { wb, calls, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
 
     const quick = document.querySelector<HTMLInputElement>('.fc-namedlg__refers-input');
@@ -658,6 +658,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     let picked = '=B2:C4';
     const listeners: Array<() => void> = [];
     const handle = attachNamedRangeDialog({
+      strings: ja,
       host,
       wb,
       getSelectedRangeFormula: () => picked,
@@ -702,6 +703,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=A1');
     const handle = attachNamedRangeDialog({
+      strings: ja,
       host,
       wb,
       getSelectedRangeFormula: () => '=B2',
@@ -728,7 +730,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
     registry.set('BrokenRef', '=#REF!');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
 
     const filter = Array.from(
@@ -761,7 +763,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
 
   it('rejects empty name with inline error and no engine call', () => {
     const { wb, calls } = makeMutableWb();
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
     document.querySelector<HTMLFormElement>('.fc-namedlg-editor__form')?.requestSubmit();
@@ -774,7 +776,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
 
   it('rejects empty reference with inline error and no engine call', () => {
     const { wb, calls } = makeMutableWb();
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
     const nameField = document.querySelector<HTMLInputElement>(
@@ -792,7 +794,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
   it('Delete button passes empty formula (engine convention) and refreshes', () => {
     const { wb, calls, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     const del = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
@@ -823,7 +825,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
     const { wb, calls, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       Array.from(
@@ -857,7 +859,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       const row = document.querySelector<HTMLElement>('.fc-namedlg__item');
@@ -885,7 +887,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       const deleteButton = document.querySelector<HTMLButtonElement>(
@@ -909,7 +911,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
     const setDefinedNameEntry = vi.spyOn(wb, 'setDefinedNameEntry').mockReturnValue(false);
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       const deleteButton = document.querySelector<HTMLButtonElement>(
@@ -936,7 +938,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('Budget', '=Sheet1!$B$1');
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       document
@@ -955,7 +957,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
   it('falls back to Close when no name remains and New is disabled', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       const actions = Array.from(
@@ -984,7 +986,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('Budget', '=Sheet1!$B$1');
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     try {
       handle.open();
       document
@@ -1008,7 +1010,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
     registry.set('Budget', '=Sheet1!$B$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
 
     const list = document.querySelector<HTMLElement>('.fc-namedlg__list');
@@ -1039,7 +1041,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, calls, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
     registry.set('Budget', '=Sheet1!$B$1');
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
 
     const firstRow = document.querySelector<HTMLElement>('.fc-namedlg__item');
@@ -1145,7 +1147,7 @@ describe('Name Manager comment field', () => {
     document.body.appendChild(host);
     const { wb } = makeMutableWb();
     (wb.capabilities as { definedNameAttrs?: boolean }).definedNameAttrs = definedNameAttrs;
-    const handle = attachNamedRangeDialog({ host, wb });
+    const handle = attachNamedRangeDialog({ strings: ja, host, wb });
     handle.open();
     const field = document.querySelector<HTMLTextAreaElement>('textarea.fc-namedlg-editor__input');
     handle.detach();
@@ -1173,6 +1175,7 @@ describe('Name Manager on the Mac host', () => {
     document.body.appendChild(host);
     const { wb } = makeMutableWb();
     const handle = attachNamedRangeDialog({
+      strings: ja,
       host,
       wb,
       getSelectedRangeFormula: () => '=Sheet1!$A$1',
@@ -1241,6 +1244,7 @@ describe('Define Name on the Mac host', () => {
     const mutable = makeMutableWb();
     mutable.registry.set('Rate', '=Sheet1!$B$1');
     const handle = attachNamedRangeDialog({
+      strings: ja,
       host,
       wb: mutable.wb,
       getSelectedRangeFormula: () => '=A1',

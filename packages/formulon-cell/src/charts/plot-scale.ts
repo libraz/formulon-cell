@@ -158,7 +158,7 @@ export const numericProjection = (
   const to = reverse ? start : end;
   const projected =
     logBase === undefined
-      ? (linearScale(value, domain.min, domain.max, from, to) ?? from)
-      : unclampedLogProjection(value, domain.min, domain.max, from, to);
+      ? (linearScale(value, { domain, range: { from, to } }) ?? from)
+      : unclampedLogProjection(value, { domain, range: { from, to } });
   return clamp(projected, Math.min(start, end), Math.max(start, end));
 };

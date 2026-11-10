@@ -28,9 +28,11 @@ const setup = () => {
     kind: 'column',
     data: {
       domain: 'category',
-      categories: ['A', 'B'],
-      categoryIds: ['category-0', 'category-1'],
-      series: [{ id: 'series-0', name: 'Value', values: [10, 20] }],
+      categories: [
+        { id: 'category-0', label: 'A' },
+        { id: 'category-1', label: 'B' },
+      ],
+      series: [{ id: 'series-0', name: 'Value', points: [{ value: 10 }, { value: 20 }] }],
     },
   });
   const handle = attachSessionCharts({ host, store });

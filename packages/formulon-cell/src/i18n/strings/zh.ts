@@ -19,7 +19,7 @@ export const zh: Strings = {
   ...editDialogsZh,
   ...formulaDialogsZh,
   ...dataObjectsZh,
-  ...macZh,
+  mac: macZh,
   ...pageLayoutZh,
   ...workbookChromeZh,
   ...localeSwitcherZh,

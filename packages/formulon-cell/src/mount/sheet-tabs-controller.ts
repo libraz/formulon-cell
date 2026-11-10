@@ -481,7 +481,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     ];
     // The Mac tab-colour submenu opens beside the menu with the shared palette.
     const openColorSub = (trigger: HTMLButtonElement): void => {
-      const m = strings.macSheetTabMenu;
+      const m = strings.mac.sheetTabMenu;
       const sub = document.createElement('div');
       sub.className = 'fc-sheetmenu__sub';
       sub.setAttribute('role', 'menu');
@@ -529,7 +529,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     };
     // The Mac desktop's tab menu lists its own entries in its own order.
     const macItems = (): HTMLElement[] => {
-      const m = strings.macSheetTabMenu;
+      const m = strings.mac.sheetTabMenu;
       const protectedSheet = isSheetProtected(store.getState(), idx);
       const sheetProtection = input.toggleSheetProtection;
       const colorTrigger = createSheetMenuSubmenuTrigger(m.tabColor);

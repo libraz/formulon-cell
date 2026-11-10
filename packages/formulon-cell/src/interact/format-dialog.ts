@@ -241,7 +241,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
   const getDate1904 = (): boolean => store.getState().ui.date1904 === true;
   const t = isMacHost(host)
-    ? { ...strings.formatDialog, ...strings.macFormatDialog }
+    ? { ...strings.formatDialog, ...strings.mac.formatDialog }
     : strings.formatDialog;
 
   const localizeDialogFormula = (formula: string): string => {
@@ -464,7 +464,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // show-message checkbox of each pane.
   const validationCaptions = new Map<'input' | 'error', HTMLDivElement>();
   const syncValidationCaptions = (show: boolean): void => {
-    const text = strings.macDataValidation;
+    const text = strings.mac.dataValidation;
     for (const pane of ['input', 'error'] as const) {
       let caption = validationCaptions.get(pane);
       if (!caption && show) {

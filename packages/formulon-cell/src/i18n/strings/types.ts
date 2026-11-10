@@ -32,10 +32,12 @@ export interface Strings
     EditDialogsStrings,
     FormulaDialogsStrings,
     DataObjectsStrings,
-    MacStrings,
     PageLayoutStrings,
     WorkbookChromeStrings,
-    LocaleSwitcherStrings {}
+    LocaleSwitcherStrings {
+  /** Wording used by the Mac host layout. */
+  mac: MacStrings;
+}
 
 export type Locale = BuiltInLocale;
 

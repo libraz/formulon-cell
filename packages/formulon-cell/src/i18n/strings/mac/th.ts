@@ -37,7 +37,7 @@ import { macWatchWindowTh } from './watch-window.js';
 import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macTh: MacStrings = {
-  macData: {
+  data: {
     goalSeek: {
       title: 'ค้นหาค่าเป้าหมาย',
       formulaCell: 'เซลล์สูตร',
@@ -123,7 +123,7 @@ export const macTh: MacStrings = {
       noRoom: 'ไม่มีพื้นที่สำหรับแทรกแถวผลรวมย่อย',
     },
   },
-  macSparkline: {
+  sparkline: {
     title: 'แทรกเส้นประกายไฟ',
     dataRange: 'ช่วงข้อมูล',
     location: 'ตำแหน่งที่ตั้ง',
@@ -137,14 +137,14 @@ export const macTh: MacStrings = {
     unavailable: 'การดำเนินการนี้ไม่พร้อมใช้งานสำหรับส่วนที่เลือกปัจจุบัน',
     protectedLocation: 'ตำแหน่งเส้นประกายไฟได้รับการป้องกัน',
   },
-  macSlicer: {
+  slicer: {
     ok: 'ตกลง',
     cancel: 'ยกเลิก',
     noTable: 'ไม่มีตารางที่พร้อมใช้งาน',
     noColumns: 'ตารางไม่มีคอลัมน์',
     insertFailed: 'ไม่สามารถแทรกตัวแบ่งส่วนข้อมูลสำหรับตารางนี้ได้',
   },
-  macWorkbookStats: {
+  workbookStats: {
     title: 'สถิติเวิร์กบุ๊ก',
     close: 'ปิด',
     sheets: 'แผ่นงาน',
@@ -160,11 +160,11 @@ export const macTh: MacStrings = {
     usedRows: 'แถวที่ใช้',
     usedColumns: 'คอลัมน์ที่ใช้',
   },
-  macInk: {
+  ink: {
     strokeLabel: 'เส้นหมึก',
     drawLabel: 'วาดด้วยหมึก',
   },
-  macContextMenu: {
+  contextMenu: {
     cut: 'ตัด',
     copy: 'คัดลอก',
     paste: 'วาง',
@@ -194,7 +194,7 @@ export const macTh: MacStrings = {
     defineName: 'กำหนดชื่อ…',
     hyperlink: 'แทรกไฮเปอร์ลิงก์…',
   },
-  macHomeRibbon: {
+  homeRibbon: {
     conditional: 'การจัดรูปแบบตามเงื่อนไข',
     paste: 'วาง',
     cut: 'ตัด',
@@ -203,19 +203,19 @@ export const macTh: MacStrings = {
     cellStyles: 'สไตล์เซลล์',
     autoSum: 'ผลรวมอัตโนมัติ',
   },
-  macFormatDialog: macFormatDialogFrom(cellFormatTh.formatDialog),
-  macIterativeDialog: macIterativeDialogFrom(formulaDialogsTh.iterativeDialog, {
+  formatDialog: macFormatDialogFrom(cellFormatTh.formatDialog),
+  iterativeDialog: macIterativeDialogFrom(formulaDialogsTh.iterativeDialog, {
     calcAutoNoTable: ribbonMenusTh.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsTh.namedRangeDialog, {
+  namedRangeDialog: macNamedRangeDialogFrom(formulaDialogsTh.namedRangeDialog, {
     defineTitle: 'กำหนดชื่อ',
     defineNames: 'ชื่อ:',
     defineNamePrompt: 'ใส่ชื่อสำหรับช่วงข้อมูล:',
     defineRangePrompt: 'เลือกช่วงของเซลล์:',
   }),
-  macPasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
-  macZoomDialog: macZoomDialogFrom(ribbonTh.ribbon, cellFormatTh.formatDialog),
-  macAlerts: macAlertsFrom(
+  pasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
+  zoomDialog: macZoomDialogFrom(ribbonTh.ribbon, cellFormatTh.formatDialog),
+  alerts: macAlertsFrom(
     ribbonTh.ribbon,
     {
       message: 'แผ่นงานนี้จะถูกลบอย่างถาวร คุณต้องการดำเนินการต่อหรือไม่',
@@ -224,25 +224,25 @@ export const macTh: MacStrings = {
     },
     editDialogsTh.moveCells,
   ),
-  macProtectSheet: macProtectSheetFrom(editDialogsTh.protection, {
+  protectSheet: macProtectSheetFrom(editDialogsTh.protection, {
     heading: 'ป้องกันเวิร์กชีตและเนื้อหาของเซลล์ที่ถูกล็อก',
     note: 'ตามค่าเริ่มต้น เซลล์ทั้งหมดถูกล็อก แต่สามารถปลดล็อกได้',
   }),
-  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusTh.ribbonMenu, {
+  advancedFilter: macAdvancedFilterFrom(ribbonMenusTh.ribbonMenu, {
     filterInPlace: 'กรองรายการในตำแหน่งเดิม',
     copyToLocation: 'คัดลอกไปยังตำแหน่งอื่น',
   }),
-  macChrome: macChromeFrom(workbookChromeTh, formulaDialogsTh),
-  macTextToColumnsWizard: macTextToColumnsWizardTh,
-  macStyleDialog: macStyleDialogTh,
-  macExternalLinksPane: macExternalLinksPaneTh,
-  macWatchWindow: macWatchWindowTh,
-  macAccessibilityPane: macAccessibilityPaneTh,
-  macCfRulesDialog: macCfRulesDialogFrom(cellFormatTh.cfRulesDialog, {
+  chrome: macChromeFrom(workbookChromeTh, formulaDialogsTh),
+  textToColumnsWizard: macTextToColumnsWizardTh,
+  styleDialog: macStyleDialogTh,
+  externalLinksPane: macExternalLinksPaneTh,
+  watchWindow: macWatchWindowTh,
+  accessibilityPane: macAccessibilityPaneTh,
+  cfRulesDialog: macCfRulesDialogFrom(cellFormatTh.cfRulesDialog, {
     orderLabel: 'เปลี่ยนลำดับกฎ:',
     appliesToLabel: 'นำไปใช้กับ:',
   }),
-  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsTh.hyperlinkDialog, {
+  hyperlinkDialog: macHyperlinkDialogFrom(editDialogsTh.hyperlinkDialog, {
     displayText: 'ข้อความที่จะแสดง:',
     selectionInDocument: '<<ส่วนที่เลือกในเอกสาร>>',
     screenTip: 'คำแนะนำบนหน้าจอ...',
@@ -260,26 +260,26 @@ export const macTh: MacStrings = {
     subject: 'เรื่อง:',
     recentEmails: 'ที่อยู่อีเมลที่ใช้ล่าสุด:',
   }),
-  macPageSetup: macPageSetupFrom(pageLayoutTh.pageSetup),
-  macDataValidation: {
+  pageSetup: macPageSetupFrom(pageLayoutTh.pageSetup),
+  dataValidation: {
     inputCaption: 'เมื่อเลือกเซลล์ ให้แสดงข้อความป้อนข้อมูลนี้:',
     errorCaption: 'เมื่อผู้ใช้ป้อนข้อมูลที่ไม่ถูกต้อง ให้แสดงการแจ้งเตือนข้อผิดพลาดนี้:',
   },
-  macCreateTable: { nameLabel: 'ตารางของคุณชื่ออะไร' },
-  macGoToDialog: macGoToDialogFrom(editDialogsTh.goToDialog, {
+  createTable: { nameLabel: 'ตารางของคุณชื่ออะไร' },
+  goToDialog: macGoToDialogFrom(editDialogsTh.goToDialog, {
     selectCaption: 'เลือก',
     optionsGroup: 'ตัวเลือก',
     noOptions: 'รายการที่เลือกนี้ไม่มีตัวเลือก',
   }),
-  macPivotFieldSettings: macPivotFieldSettingsTh,
-  macPivotOptions: macPivotOptionsTh,
-  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
+  pivotFieldSettings: macPivotFieldSettingsTh,
+  pivotOptions: macPivotOptionsTh,
+  pivotTableDialog: macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
     chooseConnection: 'เลือกการเชื่อมต่อ...',
     moveTitle: 'ย้าย PivotTable',
     moveLocation: 'ตำแหน่ง:',
   }),
-  macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusTh.ribbonMenu),
-  macSortDialog: macSortDialogFrom(ribbonMenusTh.ribbonMenu, {
+  removeDuplicates: macRemoveDuplicatesFrom(ribbonMenusTh.ribbonMenu),
+  sortDialog: macSortDialogFrom(ribbonMenusTh.ribbonMenu, {
     levelsHeading: 'เพิ่มระดับการเรียงลำดับ:',
     columnHeading: 'คอลัมน์',
     sortOnHeading: 'เรียงลำดับตาม',
@@ -296,11 +296,8 @@ export const macTh: MacStrings = {
     noPhonetic: "Don't use phonetic",
     caseSensitive: 'Case sensitive',
   }),
-  macErrorMenu: macErrorMenuTh,
-  macFilterPanel: macFilterPanelTh(gridPopupsTh.filterDropdown),
-  macSheetTabMenu: macSheetTabMenuTh,
-  macFindReplace: macFindReplaceFrom(
-    editDialogsTh.findReplace,
-    'แยกอักขระครึ่งความกว้างและเต็มความกว้าง',
-  ),
+  errorMenu: macErrorMenuTh,
+  filterPanel: macFilterPanelTh(gridPopupsTh.filterDropdown),
+  sheetTabMenu: macSheetTabMenuTh,
+  findReplace: macFindReplaceFrom(editDialogsTh.findReplace, 'แยกอักขระครึ่งความกว้างและเต็มความกว้าง'),
 };

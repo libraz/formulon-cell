@@ -99,7 +99,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   // reference row and editor buttons its own way; resolved on every open.
   const isMac = (): boolean => isMacHost(host);
   let mac = isMac();
-  let t: typeof shared = mac ? { ...shared, ...strings.macNamedRangeDialog } : shared;
+  let t: typeof shared = mac ? { ...shared, ...strings.mac.namedRangeDialog } : shared;
   const rangePickerOptions =
     deps.getSelectedRangeFormula && deps.subscribeToRangeChanges
       ? {
@@ -295,7 +295,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const applyPlatform = (): void => {
     mac = isMac();
-    t = mac ? { ...shared, ...strings.macNamedRangeDialog } : shared;
+    t = mac ? { ...shared, ...strings.mac.namedRangeDialog } : shared;
     header.textContent = t.title;
     shell.setAriaLabel(t.title);
     list.setAttribute('aria-label', t.title);
@@ -901,7 +901,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     closeDefine();
   });
   const openDefine = (): void => {
-    const m = strings.macNamedRangeDialog;
+    const m = strings.mac.namedRangeDialog;
     defineFrame.header.textContent = m.defineTitle;
     defineShell.setAriaLabel(m.defineTitle);
     defineNamesLabel.textContent = m.defineNames;

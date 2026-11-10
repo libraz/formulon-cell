@@ -131,7 +131,7 @@ export const showPivotOptionsDialog = (
   opts: PivotOptionsDialogOptions,
 ): Promise<PivotOptionsResult | null> =>
   new Promise<PivotOptionsResult | null>((resolve) => {
-    const t = opts.strings.macPivotOptions;
+    const t = opts.strings.mac.pivotOptions;
     let done = false;
     const finish = (result: PivotOptionsResult | null): void => {
       if (done) return;

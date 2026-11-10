@@ -1201,7 +1201,7 @@ export function mountToolbar(
     syncMacInkSubscription(current);
     unsubLocale =
       current && langOverride === undefined
-        ? current.i18n.subscribe(() => refreshLocale(current))
+        ? current.i18n.on('change', () => refreshLocale(current))
         : null;
     if (current) refreshLocale(current);
     syncContextualTabs(current, false);

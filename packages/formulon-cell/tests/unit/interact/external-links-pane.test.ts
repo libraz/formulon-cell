@@ -10,11 +10,14 @@ const fakeWb = (links: readonly LinkRecord[]): WorkbookHandle =>
 // Excel for Mac (ja): the links are a docked "ブックのリンク" pane, not a modal.
 const strings = {
   ...defaultStrings,
-  macExternalLinksPane: {
-    title: 'ブックのリンク',
-    close: 'ブックのリンク を閉じる',
-    empty: '外部ブックへのリンクはありません。',
-    help: 'ブック リンクの作成方法の詳細',
+  mac: {
+    ...defaultStrings.mac,
+    externalLinksPane: {
+      title: 'ブックのリンク',
+      close: 'ブックのリンク を閉じる',
+      empty: '外部ブックへのリンクはありません。',
+      help: 'ブック リンクの作成方法の詳細',
+    },
   },
 } as unknown as Strings;
 

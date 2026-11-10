@@ -175,7 +175,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
 
     const heading = document.createElement('div');
     heading.className = 'fc-errmenu__heading';
-    const m = strings.macErrorMenu;
+    const m = strings.mac.errorMenu;
     const rule = mac && kind === 'error' ? macRuleOf(addr) : null;
     const label = rule
       ? rule === 'divZero'

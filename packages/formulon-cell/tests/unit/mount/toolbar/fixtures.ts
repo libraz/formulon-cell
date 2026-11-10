@@ -45,7 +45,11 @@ export const selectStoreChart = (store: SpreadsheetStore, id = 'chart-native-0-1
       heightEmu: 0,
     },
     kind: 'column',
-    data: { domain: 'category', categories: ['Jan'], series: [{ id: 's0', values: [1] }] },
+    data: {
+      domain: 'category',
+      categories: [{ label: 'Jan' }],
+      series: [{ id: 's0', points: [{ value: 1 }] }],
+    },
   });
   mutators.setSelectedObject(store, { id, name: 'Chart 1' });
 };

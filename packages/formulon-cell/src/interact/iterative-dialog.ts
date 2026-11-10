@@ -203,7 +203,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     const mac = isMac();
     footer.hidden = mac;
     closeBtn.hidden = !mac;
-    const overlay = mac ? strings.macIterativeDialog : null;
+    const overlay = mac ? strings.mac.iterativeDialog : null;
     t = overlay ? { ...shared, ...overlay } : shared;
     modeLabel.hidden = mac;
     note.hidden = mac;

@@ -118,9 +118,9 @@ export const axisTickLabel = (
 ): string => {
   const formatCode = axis?.numberFormat;
   if (formatCode !== undefined && formatCode.trim().length > 0) {
-    return formatChartValue(value, formatCode, locale, formatter) ?? formatTick(value, percent);
+    return formatChartValue(value, formatCode, locale, formatter) ?? formatTick(value, { percent });
   }
-  return formatTick(value, percent);
+  return formatTick(value, { percent });
 };
 
 const AXIS_LABEL_MAX_WIDTH = 160;

@@ -2,11 +2,14 @@
 export const BUILT_IN_LOCALES = ['en', 'ja', 'de', 'fr', 'zh', 'ko', 'th'] as const;
 
 export type BuiltInLocale = (typeof BUILT_IN_LOCALES)[number];
-/** Short locale id used by the built-in dictionaries and profile adapter. */
-export type Locale = BuiltInLocale;
+/**
+ * A UI locale: a built-in id (`'en'`, `'ja'`, …) or any other BCP 47 tag, which
+ * resolves to the built-in language it starts with and otherwise to the default.
+ */
+export type Locale = BuiltInLocale | (string & {});
 
 /** Locale used when none is given or the requested one has no dictionary. */
-export const DEFAULT_LOCALE: BuiltInLocale = 'ja';
+export const DEFAULT_LOCALE: BuiltInLocale = 'en';
 
 export const isBuiltInLocale = (locale: string): locale is BuiltInLocale =>
   (BUILT_IN_LOCALES as readonly string[]).includes(locale);

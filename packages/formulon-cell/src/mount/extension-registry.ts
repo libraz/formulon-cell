@@ -1,19 +1,31 @@
+import { workbookOf } from '../api/workbook.js';
+import { createHistoryView } from '../commands/history-view.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isBuiltInExtension } from '../extensions/built-in-mark.js';
 import {
   dedupeById,
   type Extension,
-  type ExtensionContext,
   type ExtensionHandle,
   type ExtensionInput,
   flattenExtensions,
   sortByPriority,
 } from '../extensions/index.js';
+import type {
+  BuiltInExtensionContext,
+  BuiltInExtensionHandle,
+  ExtensionContext,
+} from '../extensions/types.js';
 import type { Strings } from '../i18n/strings.js';
 import { type EngineBinding, WB_REGISTRY_IDS } from './engine-binding.js';
 
 export interface ExtensionRegistryDeps {
   /** Extension context minus the lookups the registry itself provides. */
-  context: Omit<ExtensionContext, 'resolve' | 'onWorkbookChange'>;
+  context: Omit<
+    BuiltInExtensionContext,
+    'resolve' | 'onWorkbookChange' | 'workbook' | 'spreadsheet'
+  >;
+  /** The current workbook; read on every access to the context's `workbook`. */
+  getWorkbook: () => WorkbookHandle;
 }
 
 export interface ExtensionRegistry {
@@ -87,17 +99,49 @@ export function createExtensionRegistry(deps: ExtensionRegistryDeps): ExtensionR
   // and the engine binding so they can read other features via
   // `ctx.resolve()`.
   const userHandles = new Map<string, ExtensionHandle>();
+  const builtInHandles = new WeakSet<ExtensionHandle>();
   const wbListeners = new Set<(next: WorkbookHandle) => void>();
-  const ctx: ExtensionContext = {
+  const onWorkbookChange = (fn: (next: WorkbookHandle) => void): (() => void) => {
+    wbListeners.add(fn);
+    return () => {
+      wbListeners.delete(fn);
+    };
+  };
+  const history = createHistoryView(deps.context.history);
+  const resolve = <T extends ExtensionHandle = ExtensionHandle>(id: string): T | undefined =>
+    (featureRegistry.get(id) ?? userHandles.get(id)) as T | undefined;
+  const builtInCtx: BuiltInExtensionContext = {
     ...deps.context,
-    resolve: <T extends ExtensionHandle = ExtensionHandle>(id: string): T | undefined =>
-      (featureRegistry.get(id) ?? userHandles.get(id)) as T | undefined,
-    onWorkbookChange: (fn) => {
-      wbListeners.add(fn);
-      return () => {
-        wbListeners.delete(fn);
-      };
+    get workbook() {
+      return deps.getWorkbook();
     },
+    spreadsheet: {
+      history,
+      on: (_name, listener) =>
+        onWorkbookChange((handle) => listener({ workbook: workbookOf(handle) })),
+    },
+    resolve,
+    onWorkbookChange,
+  };
+  const { i18n: controller, store: _store, history: _history, ...shared } = deps.context;
+  const publicCtx: ExtensionContext = {
+    ...shared,
+    get workbook() {
+      return workbookOf(deps.getWorkbook());
+    },
+    i18n: {
+      get locale() {
+        return controller.locale;
+      },
+      get strings() {
+        return controller.strings;
+      },
+      override: (locale, strings) => controller.override(locale, strings),
+      on: (_name, listener) =>
+        controller.on('change', (strings) => listener({ locale: controller.locale, strings })),
+    },
+    spreadsheet: builtInCtx.spreadsheet,
+    resolve,
   };
 
   const mountExtension = (ext: Extension): void => {
@@ -106,8 +150,12 @@ export function createExtensionRegistry(deps: ExtensionRegistryDeps): ExtensionR
       userHandles.get(ext.id)?.dispose();
       userHandles.delete(ext.id);
     }
-    const handle = ext.setup(ctx);
-    if (handle) userHandles.set(ext.id, handle);
+    const builtInExt = isBuiltInExtension(ext);
+    const handle = builtInExt ? ext.setup(builtInCtx as never) : ext.setup(publicCtx);
+    if (handle) {
+      userHandles.set(ext.id, handle);
+      if (builtInExt) builtInHandles.add(handle);
+    }
   };
   const mountAll = (input: readonly ExtensionInput[]): void => {
     const sorted = sortByPriority(dedupeById(flattenExtensions(input)));
@@ -194,10 +242,11 @@ export function createExtensionRegistry(deps: ExtensionRegistryDeps): ExtensionR
       for (const handle of userHandles.values()) handle.setStrings?.(next);
     },
     notifyWorkbookChange(wb) {
-      // Notify user extensions so they can rebind their wb references.
+      // Built-in extensions rebind their engine handle; user ones listen on `spreadsheet`.
       for (const handle of [...userHandles.values()]) {
+        if (!builtInHandles.has(handle)) continue;
         try {
-          handle.rebindWorkbook?.(wb);
+          (handle as BuiltInExtensionHandle).rebindWorkbook?.(wb);
         } catch (error) {
           console.warn('formulon-cell: extension workbook hook failed', error);
         }

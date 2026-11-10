@@ -22,7 +22,7 @@ export const legendLabels = (view: PreparedChartData, spec: ChartSpec): string[]
   const data = view.data;
   if (data.domain === 'category' && isCircularKind(spec.kind)) {
     if (spec.kind === 'doughnut' && data.series.length === 0) return [];
-    return data.categories.map((label, index) => label ?? `${index + 1}`);
+    return data.categories.map(({ label }, index) => label ?? `${index + 1}`);
   }
   return data.series.map(
     (series, index) => series.name ?? `${(view.originalSeriesIndices[index] ?? index) + 1}`,

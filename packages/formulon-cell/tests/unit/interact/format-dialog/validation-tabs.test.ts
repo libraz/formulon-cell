@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ja } from '../../../../src/i18n/strings.js';
 import { attachFormatDialog } from '../../../../src/interact/format-dialog.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import { setActive } from './fixtures.js';
@@ -12,7 +13,7 @@ describe('Data Validation dialog tabs', () => {
     document.body.appendChild(host);
     const store = createSpreadsheetStore();
     setActive(store, 0, 0);
-    attachFormatDialog({ host, store }).open('more', { mode: 'dataValidation' });
+    attachFormatDialog({ host, store, strings: ja }).open('more', { mode: 'dataValidation' });
   });
 
   afterEach(() => {
@@ -112,7 +113,9 @@ describe('Data Validation dialog tabs', () => {
     document.body.appendChild(macHost);
     const store = createSpreadsheetStore();
     setActive(store, 0, 0);
-    attachFormatDialog({ host: macHost, store }).open('more', { mode: 'dataValidation' });
+    attachFormatDialog({ host: macHost, store, strings: ja }).open('more', {
+      mode: 'dataValidation',
+    });
     const caption = (pane: string): string | null | undefined =>
       document.querySelector(`.fc-fmtdlg__vpane[data-fc-pane="${pane}"] .fc-fmtdlg__vmsg-caption`)
         ?.textContent;

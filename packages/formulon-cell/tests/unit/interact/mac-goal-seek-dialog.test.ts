@@ -117,7 +117,7 @@ describe('Goal Seek dialog', () => {
     fx.workbook.recalc();
     byId<HTMLInputElement>('fc-mac-goalseek-target-value').value = '7';
     byAction('goal-seek-ok').click();
-    const notConverged = fx.instance.i18n.strings.macData.errors.notConverged;
+    const notConverged = fx.instance.i18n.strings.mac.data.errors.notConverged;
     await waitFor(() => status().textContent?.startsWith(notConverged) ?? false);
     expect(status().dataset.state).toBe('error');
     expect(status().textContent).toContain('-335543.32');

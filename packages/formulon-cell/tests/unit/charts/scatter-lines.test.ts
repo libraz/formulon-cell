@@ -139,7 +139,7 @@ describe('scatter line geometry', () => {
         seriesStyles: [
           {
             seriesId: 'series',
-            line: { color: '#123456', transparency: 20, width: 3, dash: 'dot' },
+            line: { color: '#123456', transparency: 20, width: 3, dash: 'roundDot' },
             points: [{ pointId: 'p1', marker: { line: { color: '#abcdef', width: 5 } } }],
           },
         ],
@@ -153,7 +153,8 @@ describe('scatter line geometry', () => {
     expect(connector?.attrs.stroke).toBe('#123456');
     expect(connector?.attrs['stroke-opacity']).toBe(0.8);
     expect(connector?.attrs['stroke-width']).toBe(3);
-    expect(connector?.attrs['stroke-dasharray']).toBe('1 4');
+    expect(connector?.attrs['stroke-dasharray']).toBe('0 6');
+    expect(connector?.attrs['stroke-linecap']).toBe('round');
     const styledMarker = points(scene).find((point) => point.pointId === 'p1');
     expect(styledMarker?.attrs.stroke).toBe('#abcdef');
     expect(styledMarker?.attrs['stroke-width']).toBe(5);

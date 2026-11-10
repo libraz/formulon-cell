@@ -76,7 +76,7 @@ const appendField = (
 };
 
 function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHandle {
-  let t = instance.i18n.strings.macData.goalSeek;
+  let t = instance.i18n.strings.mac.data.goalSeek;
   const shell = createDialogShell({
     host: instance.host,
     className: 'fc-mac-goalseek',
@@ -129,7 +129,7 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
   cancelBtn.dataset.fcMacAction = 'goal-seek-cancel';
 
   const applyLabels = (): void => {
-    t = instance.i18n.strings.macData.goalSeek;
+    t = instance.i18n.strings.mac.data.goalSeek;
     shell.setAriaLabel(t.title);
     header.textContent = t.title;
     formulaField.text.textContent = t.formulaCell;
@@ -143,7 +143,7 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     }
   };
   applyLabels();
-  const unsubscribeLocale = instance.i18n.subscribe(applyLabels);
+  const unsubscribeLocale = instance.i18n.on('change', applyLabels);
 
   let runToken = 0;
   let solving = false;
@@ -284,7 +284,7 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     status.dataset.state = result.value.converged ? 'success' : 'error';
     const outcome = result.value.converged
       ? t.converged
-      : instance.i18n.strings.macData.errors.notConverged;
+      : instance.i18n.strings.mac.data.errors.notConverged;
     status.textContent = `${outcome} ${t.result}: ${result.value.changingValue}`;
   };
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey } from '../../../../src/engine/workbook-handle.js';
+import { ja } from '../../../../src/i18n/strings.js';
 import { attachFormatDialog } from '../../../../src/interact/format-dialog.js';
 import {
   createSpreadsheetStore,
@@ -25,7 +26,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('fill color input + reset', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     handle.open();
 
     const fillInput = document.querySelector<HTMLInputElement>(
@@ -54,7 +55,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Fill tab persists pattern style and pattern color', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="fill"]')
@@ -94,7 +95,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('uses the 6 by 3 pattern gallery to update the fill pattern', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     handle.open('fill');
     const gallery = document.querySelector<HTMLDivElement>('.fc-fmtdlg__fill-pattern-gallery');
     const darkGrid = document.querySelector<HTMLButtonElement>(
@@ -113,7 +114,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('renders Format Cells select controls through the shared dialog select contract', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     handle.open('align');
 
     const hAlign = document.querySelector<HTMLSelectElement>('select[data-fc-select="align"]');
@@ -184,7 +185,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('font and fill swatches apply colors', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     handle.open();
 
     const fontSwatch = document.querySelector<HTMLButtonElement>(
@@ -208,7 +209,7 @@ describe('attachFormatDialog', () => {
 
   it('hydrates fill picker default for non-hex existing fill', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fill: 'red' });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, strings: ja });
     handle.open();
     const fillInput = document.querySelector<HTMLInputElement>('input[data-fc-color="fill"]');
     expect(fillInput?.value).toBe('#ffffff');

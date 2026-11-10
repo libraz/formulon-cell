@@ -6,7 +6,10 @@ import {
 } from '../../../src/mount/extension-registry.js';
 
 const createRegistry = () =>
-  createExtensionRegistry({ context: {} as ExtensionRegistryDeps['context'] });
+  createExtensionRegistry({
+    context: {} as ExtensionRegistryDeps['context'],
+    getWorkbook: () => undefined as never,
+  });
 
 describe('mount/extension-registry', () => {
   it('rolls back partial setExtensions mounts and keeps the setup error', () => {

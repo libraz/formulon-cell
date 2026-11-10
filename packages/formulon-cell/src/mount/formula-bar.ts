@@ -273,7 +273,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const dirty = fxEditing && (isMacPlatform() || fxInput.value !== fxBaseline);
     const all = getStrings();
     const strings = all.a11y;
-    const macNames = isMacPlatform() ? all.macChrome : null;
+    const macNames = isMacPlatform() ? all.mac.chrome : null;
     const cancelReason = fxEditing ? null : strings.cancelFormulaEditUnavailable;
     const acceptReason = dirty
       ? null

@@ -37,7 +37,7 @@ import { macWatchWindowZh } from './watch-window.js';
 import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macZh: MacStrings = {
-  macData: {
+  data: {
     goalSeek: {
       title: '单变量求解',
       formulaCell: '设置单元格',
@@ -123,7 +123,7 @@ export const macZh: MacStrings = {
       noRoom: '没有空间插入分类汇总行。',
     },
   },
-  macSparkline: {
+  sparkline: {
     title: '插入迷你图',
     dataRange: '数据范围',
     location: '位置',
@@ -137,14 +137,14 @@ export const macZh: MacStrings = {
     unavailable: '当前选择无法执行此操作。',
     protectedLocation: '迷你图位置受保护。',
   },
-  macSlicer: {
+  slicer: {
     ok: '确定',
     cancel: '取消',
     noTable: '没有可用的表格。',
     noColumns: '表格没有列。',
     insertFailed: '无法为此表格插入切片器。',
   },
-  macWorkbookStats: {
+  workbookStats: {
     title: '工作簿统计信息',
     close: '关闭',
     sheets: '工作表',
@@ -160,11 +160,11 @@ export const macZh: MacStrings = {
     usedRows: '已用行',
     usedColumns: '已用列',
   },
-  macInk: {
+  ink: {
     strokeLabel: '墨迹笔画',
     drawLabel: '使用墨迹绘图',
   },
-  macContextMenu: {
+  contextMenu: {
     cut: '剪切',
     copy: '拷贝',
     paste: '粘贴',
@@ -194,7 +194,7 @@ export const macZh: MacStrings = {
     defineName: '定义名称…',
     hyperlink: '插入超链接…',
   },
-  macHomeRibbon: {
+  homeRibbon: {
     conditional: '条件格式',
     paste: '粘贴',
     cut: '剪切',
@@ -203,19 +203,19 @@ export const macZh: MacStrings = {
     cellStyles: '单元格样式',
     autoSum: '自动求和',
   },
-  macFormatDialog: macFormatDialogFrom(cellFormatZh.formatDialog),
-  macIterativeDialog: macIterativeDialogFrom(formulaDialogsZh.iterativeDialog, {
+  formatDialog: macFormatDialogFrom(cellFormatZh.formatDialog),
+  iterativeDialog: macIterativeDialogFrom(formulaDialogsZh.iterativeDialog, {
     calcAutoNoTable: ribbonMenusZh.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsZh.namedRangeDialog, {
+  namedRangeDialog: macNamedRangeDialogFrom(formulaDialogsZh.namedRangeDialog, {
     defineTitle: '定义名称',
     defineNames: '名称:',
     defineNamePrompt: '请输入数据区域的名称:',
     defineRangePrompt: '请选择单元格区域:',
   }),
-  macPasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
-  macZoomDialog: macZoomDialogFrom(ribbonZh.ribbon, cellFormatZh.formatDialog),
-  macAlerts: macAlertsFrom(
+  pasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
+  zoomDialog: macZoomDialogFrom(ribbonZh.ribbon, cellFormatZh.formatDialog),
+  alerts: macAlertsFrom(
     ribbonZh.ribbon,
     {
       message: '此工作表将被永久删除。是否继续?',
@@ -224,25 +224,25 @@ export const macZh: MacStrings = {
     },
     editDialogsZh.moveCells,
   ),
-  macProtectSheet: macProtectSheetFrom(editDialogsZh.protection, {
+  protectSheet: macProtectSheetFrom(editDialogsZh.protection, {
     heading: '保护工作表及锁定的单元格内容',
     note: '默认情况下所有单元格均已锁定，但可以解除锁定。',
   }),
-  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusZh.ribbonMenu, {
+  advancedFilter: macAdvancedFilterFrom(ribbonMenusZh.ribbonMenu, {
     filterInPlace: '在原有区域显示筛选结果',
     copyToLocation: '将筛选结果复制到其他位置',
   }),
-  macChrome: macChromeFrom(workbookChromeZh, formulaDialogsZh),
-  macTextToColumnsWizard: macTextToColumnsWizardZh,
-  macStyleDialog: macStyleDialogZh,
-  macExternalLinksPane: macExternalLinksPaneZh,
-  macWatchWindow: macWatchWindowZh,
-  macAccessibilityPane: macAccessibilityPaneZh,
-  macCfRulesDialog: macCfRulesDialogFrom(cellFormatZh.cfRulesDialog, {
+  chrome: macChromeFrom(workbookChromeZh, formulaDialogsZh),
+  textToColumnsWizard: macTextToColumnsWizardZh,
+  styleDialog: macStyleDialogZh,
+  externalLinksPane: macExternalLinksPaneZh,
+  watchWindow: macWatchWindowZh,
+  accessibilityPane: macAccessibilityPaneZh,
+  cfRulesDialog: macCfRulesDialogFrom(cellFormatZh.cfRulesDialog, {
     orderLabel: '更改规则顺序:',
     appliesToLabel: '应用于:',
   }),
-  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsZh.hyperlinkDialog, {
+  hyperlinkDialog: macHyperlinkDialogFrom(editDialogsZh.hyperlinkDialog, {
     displayText: '要显示的文字:',
     selectionInDocument: '<<文档中的选定内容>>',
     screenTip: '屏幕提示...',
@@ -260,26 +260,26 @@ export const macZh: MacStrings = {
     subject: '主题:',
     recentEmails: '最近用过的电子邮件地址:',
   }),
-  macPageSetup: macPageSetupFrom(pageLayoutZh.pageSetup),
-  macDataValidation: {
+  pageSetup: macPageSetupFrom(pageLayoutZh.pageSetup),
+  dataValidation: {
     inputCaption: '选定单元格时显示下列输入信息:',
     errorCaption: '输入无效数据时显示下列出错警告:',
   },
-  macCreateTable: { nameLabel: '表名称是什么?' },
-  macGoToDialog: macGoToDialogFrom(editDialogsZh.goToDialog, {
+  createTable: { nameLabel: '表名称是什么?' },
+  goToDialog: macGoToDialogFrom(editDialogsZh.goToDialog, {
     selectCaption: '选择',
     optionsGroup: '选项',
     noOptions: '此选择项没有选项。',
   }),
-  macPivotFieldSettings: macPivotFieldSettingsZh,
-  macPivotOptions: macPivotOptionsZh,
-  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
+  pivotFieldSettings: macPivotFieldSettingsZh,
+  pivotOptions: macPivotOptionsZh,
+  pivotTableDialog: macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
     chooseConnection: '选择连接...',
     moveTitle: '移动数据透视表',
     moveLocation: '位置:',
   }),
-  macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusZh.ribbonMenu),
-  macSortDialog: macSortDialogFrom(ribbonMenusZh.ribbonMenu, {
+  removeDuplicates: macRemoveDuplicatesFrom(ribbonMenusZh.ribbonMenu),
+  sortDialog: macSortDialogFrom(ribbonMenusZh.ribbonMenu, {
     levelsHeading: '添加排序级别:',
     columnHeading: '列',
     sortOnHeading: '排序依据',
@@ -296,8 +296,8 @@ export const macZh: MacStrings = {
     noPhonetic: '不使用拼音',
     caseSensitive: '区分大小写',
   }),
-  macErrorMenu: macErrorMenuZh,
-  macFilterPanel: macFilterPanelZh(gridPopupsZh.filterDropdown),
-  macSheetTabMenu: macSheetTabMenuZh,
-  macFindReplace: macFindReplaceFrom(editDialogsZh.findReplace, '区分全/半角'),
+  errorMenu: macErrorMenuZh,
+  filterPanel: macFilterPanelZh(gridPopupsZh.filterDropdown),
+  sheetTabMenu: macSheetTabMenuZh,
+  findReplace: macFindReplaceFrom(editDialogsZh.findReplace, '区分全/半角'),
 };

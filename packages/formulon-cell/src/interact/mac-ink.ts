@@ -401,7 +401,8 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
   const macDrawAvailable = (): boolean =>
     platformIsMac && instance.host.dataset.fcPlatform === 'mac';
 
-  const inkStrings = (): Strings['macInk'] => (instance.i18n?.strings ?? defaultStrings).macInk;
+  const inkStrings = (): Strings['mac']['ink'] =>
+    (instance.i18n?.strings ?? defaultStrings).mac.ink;
 
   const canMutate = (range: ReturnType<typeof rangeForMetadata>): boolean => {
     const commands = instance.commands;

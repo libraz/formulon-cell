@@ -728,7 +728,7 @@ const MAC_HOME_WIDE_STACKED_COMMAND_IDS = new Set([
 ]);
 /** Cells commands are full-height tiles on Mac rather than rows. */
 const MAC_HOME_TILE_COMMAND_IDS = new Set(['insertRows', 'deleteRows', 'formatCellsHome']);
-const MAC_HOME_LABEL_KEYS: Readonly<Record<string, keyof Strings['macHomeRibbon']>> = {
+const MAC_HOME_LABEL_KEYS: Readonly<Record<string, keyof Strings['mac']['homeRibbon']>> = {
   paste: 'paste',
   cut: 'cut',
   copy: 'copy',
@@ -774,7 +774,7 @@ const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonComm
       : candidate.id === 'wrap' && lang === 'ja'
         ? '折り返して全体を表示する'
         : macLabelKey
-          ? dictionaries[lang].macHomeRibbon[macLabelKey]
+          ? dictionaries[lang].mac.homeRibbon[macLabelKey]
           : undefined;
   // Keep any title suffix such as AutoSum's "(Σ)" after the relabelled name.
   const macHomeTitle = (label: string): string =>

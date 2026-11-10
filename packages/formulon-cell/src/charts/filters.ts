@@ -23,7 +23,7 @@ export interface XYChartView {
 export type PreparedChartData = CategoryChartView | XYChartView;
 
 const categoryIdAt = (data: CategoryChartData, index: number): string =>
-  data.categoryIds?.[index] ?? `category-${index}`;
+  data.categories[index]?.id ?? `category-${index}`;
 
 const pointIdAt = (point: XYChartData['series'][number]['points'][number], index: number): string =>
   point.id ?? `point-${index}`;
@@ -51,19 +51,23 @@ const prepareCategoryData = (
 
   const series = originalSeriesIndices.map((originalIndex) => {
     const source = data.series[originalIndex];
-    if (!source) return { id: `series-${originalIndex}`, values: [] as readonly number[] };
+    if (!source) return { id: `series-${originalIndex}`, points: [] };
     return {
       id: source.id,
       ...(source.name === undefined ? {} : { name: source.name }),
-      values: originalCategoryIndices.map((categoryIndex) => source.values[categoryIndex] ?? null),
+      points: originalCategoryIndices.map(
+        (categoryIndex) => source.points[categoryIndex] ?? { value: null },
+      ),
     };
   });
 
   return {
     data: {
       domain: 'category',
-      categories: originalCategoryIndices.map((index) => data.categories[index] ?? ''),
-      categoryIds: originalCategoryIndices.map((index) => categoryIdAt(data, index)),
+      categories: originalCategoryIndices.map((index) => ({
+        id: categoryIdAt(data, index),
+        label: data.categories[index]?.label ?? '',
+      })),
       series,
     },
     originalSeriesIndices,

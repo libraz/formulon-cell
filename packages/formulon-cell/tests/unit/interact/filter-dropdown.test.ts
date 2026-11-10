@@ -24,7 +24,7 @@ describe('attachFilterDropdown', () => {
   });
 
   it('renders localized default labels', () => {
-    const handle = attachFilterDropdown({ store });
+    const handle = attachFilterDropdown({ store, strings: ja });
     handle.open({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
 
     const root = document.querySelector<HTMLElement>('.fc-filter-dropdown');

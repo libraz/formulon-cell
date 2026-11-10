@@ -197,7 +197,7 @@ const buildProtectAction =
   async (action) => {
     if (action === 'protect-sheet') {
       const strings = instance.i18n.strings;
-      const mac = instance.host.dataset.fcPlatform === 'mac' ? strings.macProtectSheet : null;
+      const mac = instance.host.dataset.fcPlatform === 'mac' ? strings.mac.protectSheet : null;
       const protectionStrings = { ...strings.protection, ...mac } as typeof strings.protection & {
         allowAutoFilter: string;
         allowDeleteColumns: string;

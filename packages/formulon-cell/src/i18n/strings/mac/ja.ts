@@ -29,7 +29,7 @@ import { macWatchWindowJa } from './watch-window.js';
 import { macZoomDialogJa } from './zoom-dialog.js';
 
 export const macJa: MacStrings = {
-  macData: {
+  data: {
     goalSeek: {
       title: 'ゴール シーク',
       formulaCell: '数式入力セル:',
@@ -122,7 +122,7 @@ export const macJa: MacStrings = {
       noRoom: '小計行を挿入する余地がありません。',
     },
   },
-  macSparkline: {
+  sparkline: {
     title: 'スパークラインの作成',
     dataRange: 'スパークラインのデータ範囲を選んでください:',
     location: 'スパークラインを配置する場所を選んでください:',
@@ -136,14 +136,14 @@ export const macJa: MacStrings = {
     unavailable: '現在の選択範囲ではこの操作は使用できません。',
     protectedLocation: 'スパークラインの場所は保護されています。',
   },
-  macSlicer: {
+  slicer: {
     ok: 'OK',
     cancel: 'キャンセル',
     noTable: '使用できるテーブルがありません。',
     noColumns: 'テーブルに列がありません。',
     insertFailed: 'このテーブルにスライサーを挿入できませんでした。',
   },
-  macWorkbookStats: {
+  workbookStats: {
     title: 'ブックの統計情報',
     close: '閉じる',
     sheets: 'シート数',
@@ -159,11 +159,11 @@ export const macJa: MacStrings = {
     usedRows: '使用行数',
     usedColumns: '使用列数',
   },
-  macInk: {
+  ink: {
     strokeLabel: 'インクの線',
     drawLabel: 'インクで描画',
   },
-  macContextMenu: {
+  contextMenu: {
     cut: 'カット',
     copy: 'コピー',
     paste: 'ペースト',
@@ -193,7 +193,7 @@ export const macJa: MacStrings = {
     defineName: '名前の定義...',
     hyperlink: 'ハイパーリンク...',
   },
-  macHomeRibbon: {
+  homeRibbon: {
     conditional: '条件付き 書式',
     paste: 'ペースト',
     cut: '切り取り',
@@ -203,34 +203,34 @@ export const macJa: MacStrings = {
     autoSum: 'オート SUM',
   },
   /** Wording of the Mac app's Format Cells dialog, measured from the app. */
-  macIterativeDialog: macIterativeDialogJa,
-  macNamedRangeDialog: macNamedRangeDialogJa,
-  macPageSetup: macPageSetupJa,
-  macPasteSpecial: macPasteSpecialJa,
-  macZoomDialog: macZoomDialogJa,
-  macAlerts: macAlertsJa,
-  macProtectSheet: macProtectSheetJa,
-  macAdvancedFilter: macAdvancedFilterJa,
-  macCfRulesDialog: macCfRulesDialogJa,
-  macChrome: macChromeJa,
-  macTextToColumnsWizard: macTextToColumnsWizardJa,
-  macStyleDialog: macStyleDialogJa,
-  macExternalLinksPane: macExternalLinksPaneJa,
-  macWatchWindow: macWatchWindowJa,
-  macAccessibilityPane: macAccessibilityPaneJa,
-  macCreateTable: macCreateTableJa,
-  macDataValidation: macDataValidationJa,
-  macGoToDialog: macGoToDialogJa,
-  macHyperlinkDialog: macHyperlinkDialogJa,
-  macPivotFieldSettings: macPivotFieldSettingsJa,
-  macPivotOptions: macPivotOptionsJa,
-  macPivotTableDialog: macPivotTableDialogJa,
-  macRemoveDuplicates: macRemoveDuplicatesJa,
-  macSortDialog: macSortDialogJa,
-  macErrorMenu: macErrorMenuJa,
-  macFilterPanel: macFilterPanelJa(gridPopupsJa.filterDropdown),
-  macSheetTabMenu: macSheetTabMenuJa,
-  macFindReplace: {
+  iterativeDialog: macIterativeDialogJa,
+  namedRangeDialog: macNamedRangeDialogJa,
+  pageSetup: macPageSetupJa,
+  pasteSpecial: macPasteSpecialJa,
+  zoomDialog: macZoomDialogJa,
+  alerts: macAlertsJa,
+  protectSheet: macProtectSheetJa,
+  advancedFilter: macAdvancedFilterJa,
+  cfRulesDialog: macCfRulesDialogJa,
+  chrome: macChromeJa,
+  textToColumnsWizard: macTextToColumnsWizardJa,
+  styleDialog: macStyleDialogJa,
+  externalLinksPane: macExternalLinksPaneJa,
+  watchWindow: macWatchWindowJa,
+  accessibilityPane: macAccessibilityPaneJa,
+  createTable: macCreateTableJa,
+  dataValidation: macDataValidationJa,
+  goToDialog: macGoToDialogJa,
+  hyperlinkDialog: macHyperlinkDialogJa,
+  pivotFieldSettings: macPivotFieldSettingsJa,
+  pivotOptions: macPivotOptionsJa,
+  pivotTableDialog: macPivotTableDialogJa,
+  removeDuplicates: macRemoveDuplicatesJa,
+  sortDialog: macSortDialogJa,
+  errorMenu: macErrorMenuJa,
+  filterPanel: macFilterPanelJa(gridPopupsJa.filterDropdown),
+  sheetTabMenu: macSheetTabMenuJa,
+  findReplace: {
     optionsMore: 'オプション',
     optionsLess: 'オプション',
     search: '検索:',
@@ -240,7 +240,7 @@ export const macJa: MacStrings = {
     cellsFound: '{count}セルが見つかりました',
     matchWidth: '半角と全角を区別する',
   },
-  macFormatDialog: {
+  formatDialog: {
     categoryLabel: '分類:',
     fontFamily: 'フォント名:',
     fontStyle: 'スタイル:',

@@ -82,7 +82,7 @@ export const protectedCellMessage = (
   strings: Strings,
   workbook: { spreadsheetProfileId?: () => string | null } | null,
 ): string =>
-  (isMacWorkbook(workbook) ? strings.macProtectSheet.protectedCellEdit : undefined) ??
+  (isMacWorkbook(workbook) ? strings.mac.protectSheet.protectedCellEdit : undefined) ??
   strings.protection.protectedCellEdit;
 
 /** Whether `sheet` is currently flagged protected on the workbook. Mirrors

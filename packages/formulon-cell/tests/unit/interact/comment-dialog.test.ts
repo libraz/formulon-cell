@@ -10,6 +10,7 @@ import {
 } from '../../../src/commands/interaction-controller.js';
 import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { ja } from '../../../src/i18n/strings.js';
 import { attachCommentDialog } from '../../../src/interact/comment-dialog.js';
 import {
   createSpreadsheetStore,
@@ -50,7 +51,7 @@ describe('attachCommentDialog', () => {
   });
 
   it('open with no existing comment shows a blank textarea and hides the remove button', () => {
-    const handle = attachCommentDialog({ host, store });
+    const handle = attachCommentDialog({ host, store, strings: ja });
     handle.open();
     expect(wrap()?.hidden).toBe(false);
     expect(textarea()?.value).toBe('');
@@ -61,7 +62,7 @@ describe('attachCommentDialog', () => {
 
   it('open populates the textarea from the existing comment and shows the remove button', () => {
     setComment(store, { sheet: 0, row: 1, col: 1 }, 'preexisting note');
-    const handle = attachCommentDialog({ host, store });
+    const handle = attachCommentDialog({ host, store, strings: ja });
     handle.open();
     expect(textarea()?.value).toBe('preexisting note');
     expect(removeBtn()?.hidden).toBe(false);
@@ -69,7 +70,7 @@ describe('attachCommentDialog', () => {
   });
 
   it('OK with non-empty text persists via setComment to the store format slice', () => {
-    const handle = attachCommentDialog({ host, store });
+    const handle = attachCommentDialog({ host, store, strings: ja });
     handle.open();
     const ta = textarea();
     if (!ta) throw new Error('textarea missing');
@@ -82,7 +83,7 @@ describe('attachCommentDialog', () => {
 
   it('remove icon clears the existing comment via clearComment', () => {
     setComment(store, { sheet: 0, row: 1, col: 1 }, 'will be wiped');
-    const handle = attachCommentDialog({ host, store });
+    const handle = attachCommentDialog({ host, store, strings: ja });
     handle.open();
     expect(commentAt(store.getState(), { sheet: 0, row: 1, col: 1 })).toBe('will be wiped');
     removeBtn()?.click();
@@ -110,7 +111,7 @@ describe('attachCommentDialog', () => {
           text: 'Please review',
         }),
       ).toBe(true);
-      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      const handle = attachCommentDialog({ host, store, getWb: () => wb, strings: ja });
       handle.open({ mode: 'thread' });
       expect(document.querySelector('.fc-cmtnote__title')?.textContent).toBe('コメント');
       expect(textarea()?.placeholder).toBe('コメントを入力');
@@ -129,7 +130,7 @@ describe('attachCommentDialog', () => {
     mutators.setActive(store, { sheet: 0, row: 4, col: 7 });
     const wb = await WorkbookHandle.createDefault();
     try {
-      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      const handle = attachCommentDialog({ host, store, getWb: () => wb, strings: ja });
       handle.open({ mode: 'thread' });
       const card = wrap();
       expect(card?.classList.contains('fc-cmtnote--start')).toBe(true);
@@ -169,7 +170,7 @@ describe('attachCommentDialog', () => {
     host.dataset.fcPlatform = 'mac';
     const wb = await WorkbookHandle.createDefault();
     try {
-      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      const handle = attachCommentDialog({ host, store, getWb: () => wb, strings: ja });
       handle.open({ mode: 'thread' });
       const ta = textarea();
       if (!ta) throw new Error('textarea missing');
@@ -186,7 +187,7 @@ describe('attachCommentDialog', () => {
   it('keeps the titled thread editor on the default profile', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
-      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      const handle = attachCommentDialog({ host, store, getWb: () => wb, strings: ja });
       handle.open({ mode: 'thread' });
       expect(wrap()?.classList.contains('fc-cmtnote--start')).toBe(false);
       expect(document.querySelector<HTMLElement>('.fc-cmtnote__head')?.hidden).toBe(false);
@@ -203,7 +204,7 @@ describe('attachCommentDialog', () => {
       expect(wb.isStub).toBe(false);
       expect(wb.capabilities.threadedComments).toBe(true);
       setComment(store, { sheet: 0, row: 1, col: 1 }, 'existing note');
-      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      const handle = attachCommentDialog({ host, store, getWb: () => wb, strings: ja });
       handle.open({ mode: 'thread' });
       const ta = textarea();
       if (!ta) throw new Error('textarea missing');
@@ -232,7 +233,7 @@ describe('attachCommentDialog', () => {
     try {
       expect(wb.isStub).toBe(false);
       expect(setComment(store, { sheet: 0, row: 1, col: 1 }, 'before', wb)).toBe(true);
-      const handle = attachCommentDialog({ host, store, history, getWb: () => wb });
+      const handle = attachCommentDialog({ host, store, history, getWb: () => wb, strings: ja });
       handle.open({ mode: 'note' });
       controller.setPolicy(viewerPolicy());
       const ta = textarea();
@@ -253,7 +254,7 @@ describe('attachCommentDialog', () => {
   });
 
   it('Escape closes without writing the typed text', () => {
-    const handle = attachCommentDialog({ host, store });
+    const handle = attachCommentDialog({ host, store, strings: ja });
     handle.open();
     const ta = textarea();
     if (!ta) throw new Error('textarea missing');
@@ -265,7 +266,7 @@ describe('attachCommentDialog', () => {
   });
 
   it('Cancel button closes without writing the typed text', () => {
-    const handle = attachCommentDialog({ host, store });
+    const handle = attachCommentDialog({ host, store, strings: ja });
     handle.open();
     const ta = textarea();
     if (!ta) throw new Error('textarea missing');
@@ -278,7 +279,7 @@ describe('attachCommentDialog', () => {
 
   it('close returns focus to the spreadsheet host', () => {
     host.tabIndex = 0;
-    const handle = attachCommentDialog({ host, store });
+    const handle = attachCommentDialog({ host, store, strings: ja });
     handle.open();
     cancelBtn()?.click();
     expect(document.activeElement).toBe(host);
@@ -286,7 +287,7 @@ describe('attachCommentDialog', () => {
   });
 
   it('detach removes the note element from the host', () => {
-    const handle = attachCommentDialog({ host, store });
+    const handle = attachCommentDialog({ host, store, strings: ja });
     expect(wrap()).not.toBeNull();
     handle.detach();
     expect(wrap()).toBeNull();

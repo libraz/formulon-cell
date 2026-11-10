@@ -17,7 +17,7 @@ import {
   segmentsFor,
 } from './series-geometry.js';
 import {
-  dashArray,
+  dashAttrs,
   fillColor,
   fillOpacity,
   lineOpacity,
@@ -65,8 +65,7 @@ const styleAttrs = (
     if (strokeOpacity !== undefined) attrs['stroke-opacity'] = strokeOpacity;
     const width = lineWidth(style.line);
     if (width !== undefined) attrs['stroke-width'] = width;
-    const dash = dashArray(style.line.dash);
-    if (dash !== undefined) attrs['stroke-dasharray'] = dash;
+    Object.assign(attrs, dashAttrs(style.line.dash, width ?? 1));
   }
   return attrs;
 };
@@ -85,14 +84,14 @@ const markerAttrs = (
   const stroke = line === undefined ? undefined : (line.color ?? style.color);
   const strokeOpacity = lineOpacity(line);
   const strokeWidth = lineWidth(line);
-  const dash = dashArray(line?.dash);
+  const dash = dashAttrs(line?.dash, strokeWidth ?? 1);
   const common: Record<string, string | number> = {
     fill,
     ...(opacity === undefined ? {} : { 'fill-opacity': opacity }),
     ...(stroke === undefined ? {} : { stroke }),
     ...(strokeOpacity === undefined ? {} : { 'stroke-opacity': strokeOpacity }),
     ...(strokeWidth === undefined ? {} : { 'stroke-width': strokeWidth }),
-    ...(dash === undefined ? {} : { 'stroke-dasharray': dash }),
+    ...dash,
   };
   // Excel's x, star and plus are drawn by their outline alone, in the outline colour.
   const strokedShape = (d: string) => ({
@@ -103,7 +102,7 @@ const markerAttrs = (
       stroke: stroke ?? style.color,
       'stroke-width': strokeWidth ?? 1,
       ...(strokeOpacity === undefined ? {} : { 'stroke-opacity': strokeOpacity }),
-      ...(dash === undefined ? {} : { 'stroke-dasharray': dash }),
+      ...dash,
     },
   });
   const cross = `M${x - half},${y - half} L${x + half},${y + half} M${x - half},${y + half} L${x + half},${y - half}`;
@@ -293,7 +292,7 @@ export const addCategoryMarks = (
     let run: { index: number; value: number; base: number }[] = [];
     for (const point of points) {
       if (point.y === null || !point.segment) {
-        const raw = data.series[seriesIndex]?.values[point.pointIndex] ?? null;
+        const raw = data.series[seriesIndex]?.points[point.pointIndex]?.value ?? null;
         const logBreak =
           numericLogBase !== undefined && raw !== null && (!Number.isFinite(raw) || raw <= 0);
         if (logBreak) {
@@ -301,7 +300,7 @@ export const addCategoryMarks = (
           run = [];
           continue;
         }
-        if (series.states?.[point.pointIndex] === 'connect') continue;
+        if (series.points[point.pointIndex]?.state === 'connect') continue;
         if (run.length > 0) runs.push(run);
         run = [];
       } else {
@@ -370,7 +369,7 @@ export const addCategoryMarks = (
         );
         const opacity = lineOpacity(style.line);
         const width = lineWidth(style.line, 2) ?? 2;
-        const dash = dashArray(style.line?.dash);
+        const dash = dashAttrs(style.line?.dash, width);
         const smooth = spec.kind === 'line' && smoothed(spec, series.id);
         const coordinates = lineRun.map(
           (point) =>
@@ -388,7 +387,7 @@ export const addCategoryMarks = (
               stroke: style.line?.color ?? style.color,
               'stroke-width': width,
               ...(opacity === undefined ? {} : { 'stroke-opacity': opacity }),
-              ...(dash === undefined ? {} : { 'stroke-dasharray': dash }),
+              ...dash,
             },
             'line',
             originalSeriesIndex,
@@ -540,13 +539,13 @@ export const addScatterMarks = (
       // connector while leaving point markers independently controllable.
       if (width > 0) {
         const opacity = lineOpacity(lineStyle.line);
-        const dash = dashArray(lineStyle.line?.dash);
+        const dash = dashAttrs(lineStyle.line?.dash, width);
         const stroke = {
           fill: 'none',
           stroke: lineStyle.line?.color ?? lineStyle.color,
           'stroke-width': width,
           ...(opacity === undefined ? {} : { 'stroke-opacity': opacity }),
-          ...(dash === undefined ? {} : { 'stroke-dasharray': dash }),
+          ...dash,
         };
         const segments = scatterLineSegments(lineSamples, plot, false, lineDomains, {
           reverseX: reversedAxis(spec.xAxis),
@@ -636,7 +635,7 @@ export const addPieMarks = (
   const data = view.data;
   const first = data.series[0];
   if (!first) return;
-  const magnitudes = normalizedMagnitudes(first.values);
+  const magnitudes = normalizedMagnitudes(first.points.map((point) => point.value));
   if (!magnitudes) return;
   const { values: normalized, total } = magnitudes;
   const { cx, cy, radius, firstSliceStart } = circularFrame(spec, plot);
@@ -712,7 +711,7 @@ export const addDoughnutMarks = (
   for (let seriesIndex = 0; seriesIndex < data.series.length; seriesIndex += 1) {
     const series = data.series[seriesIndex];
     if (!series) continue;
-    const normalized = normalizedMagnitudes(series.values);
+    const normalized = normalizedMagnitudes(series.points.map((point) => point.value));
     if (!normalized) continue;
     const innerRadius = holeRadius + ringWidth * seriesIndex;
     const outerRingRadius = innerRadius + ringWidth;

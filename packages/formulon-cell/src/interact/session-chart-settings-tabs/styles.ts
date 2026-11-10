@@ -56,7 +56,7 @@ const clampPercent = (value: string): number => {
 
 const pointIdForData = (data: ChartData, seriesIndex: number, pointIndex: number): string => {
   if (data.domain === 'category') {
-    return data.categoryIds?.[pointIndex] ?? `category-${pointIndex}`;
+    return data.categories[pointIndex]?.id ?? `category-${pointIndex}`;
   }
   return data.series[seriesIndex]?.points[pointIndex]?.id ?? `point-${pointIndex}`;
 };
@@ -176,8 +176,8 @@ const renderColorAndLineControls = (
     [
       { value: 'solid', label: labels.dashSolid },
       { value: 'dash', label: labels.dashDash },
-      { value: 'dot', label: labels.dashDot },
-      { value: 'dash-dot', label: labels.dashDashDot },
+      { value: 'roundDot', label: labels.dashDot },
+      { value: 'dashDot', label: labels.dashDashDot },
     ],
     (value) => {
       currentLine = patchLine(currentLine, { dash: value as ChartLineSpec['dash'] });

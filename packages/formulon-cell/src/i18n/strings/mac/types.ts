@@ -30,61 +30,61 @@ import type { MacZoomDialogStrings } from './zoom-dialog.js';
 
 export interface MacStrings {
   /** Overrides of `formatDialog` that apply on the Mac host only. */
-  macFormatDialog: Partial<CellFormatStrings['formatDialog']>;
+  formatDialog: Partial<CellFormatStrings['formatDialog']>;
   /** Overrides of `findReplace` that apply on the Mac host only. */
-  macErrorMenu: MacErrorMenuStrings;
-  macFilterPanel: MacFilterPanelStrings;
-  macSheetTabMenu: MacSheetTabMenuStrings;
-  macFindReplace: MacFindReplaceStrings;
+  errorMenu: MacErrorMenuStrings;
+  filterPanel: MacFilterPanelStrings;
+  sheetTabMenu: MacSheetTabMenuStrings;
+  findReplace: MacFindReplaceStrings;
   /** Overrides of `iterativeDialog`, plus its Mac-only labels, that apply on the Mac host only. */
-  macIterativeDialog: MacIterativeDialogStrings;
+  iterativeDialog: MacIterativeDialogStrings;
   /** Overrides of `namedRangeDialog` that apply on the Mac host only. */
-  macNamedRangeDialog: MacNamedRangeDialogStrings;
+  namedRangeDialog: MacNamedRangeDialogStrings;
   /** Overrides of `pasteSpecialDialog` that apply on the Mac host only. */
-  macPasteSpecial: MacPasteSpecialStrings;
+  pasteSpecial: MacPasteSpecialStrings;
   /** Overrides of `pivotTableDialog`, plus its Mac-only labels, that apply on the Mac host only. */
-  macPivotTableDialog: MacPivotTableDialogStrings;
+  pivotTableDialog: MacPivotTableDialogStrings;
   /** The PivotTable Field dialog for value and row/column fields. */
-  macPivotFieldSettings: MacPivotFieldSettingsStrings;
+  pivotFieldSettings: MacPivotFieldSettingsStrings;
   /** The PivotTable Options dialog. */
-  macPivotOptions: MacPivotOptionsStrings;
+  pivotOptions: MacPivotOptionsStrings;
   /** Overrides of the Remove Duplicates wording that apply on the Mac host only. */
-  macRemoveDuplicates: MacRemoveDuplicatesStrings;
+  removeDuplicates: MacRemoveDuplicatesStrings;
   /** Overrides of the Sort dialog wording, plus its Mac-only labels, that apply on the Mac host only. */
-  macSortDialog: MacSortDialogStrings;
+  sortDialog: MacSortDialogStrings;
   /** Overrides of `protection`, plus its Mac-only lines, for the Mac Protect Sheet dialog. */
-  macProtectSheet: MacProtectSheetStrings;
+  protectSheet: MacProtectSheetStrings;
   /** Overrides of the Advanced Filter wording, plus its Mac-only radios, on the Mac host. */
-  macAdvancedFilter: MacAdvancedFilterStrings;
+  advancedFilter: MacAdvancedFilterStrings;
   /** Overrides of `goToDialog`, plus its Mac-only lines, that apply on the Mac host only. */
-  macGoToDialog: MacGoToDialogStrings;
+  goToDialog: MacGoToDialogStrings;
   /** Accessible names of the Mac formula bar and status bar controls. */
-  macChrome: MacChromeStrings;
+  chrome: MacChromeStrings;
   /** The Mac three-step Convert Text to Columns wizard. */
-  macTextToColumnsWizard: TextToColumnsWizardStrings;
+  textToColumnsWizard: TextToColumnsWizardStrings;
   /** The Mac Style dialog opened from New Cell Style. */
-  macStyleDialog: MacStyleDialogStrings;
+  styleDialog: MacStyleDialogStrings;
   /** The Mac Workbook Links pane. */
-  macExternalLinksPane: ExternalLinksPaneStrings;
+  externalLinksPane: ExternalLinksPaneStrings;
   /** The Mac Watch Window task pane. */
-  macWatchWindow: MacWatchWindowStrings;
+  watchWindow: MacWatchWindowStrings;
   /** The Mac accessibility checker task pane. */
-  macAccessibilityPane: MacAccessibilityPaneStrings;
+  accessibilityPane: MacAccessibilityPaneStrings;
   /** Overrides of `cfRulesDialog`, plus its Mac-only labels, that apply on the Mac host only. */
-  macCfRulesDialog: MacCfRulesDialogStrings;
+  cfRulesDialog: MacCfRulesDialogStrings;
   /** Overrides of `hyperlinkDialog`, plus its Mac-only labels, that apply on the Mac host only. */
-  macHyperlinkDialog: MacHyperlinkDialogStrings;
+  hyperlinkDialog: MacHyperlinkDialogStrings;
   /** Overrides of `pageSetup` that apply on the Mac host only. */
-  macPageSetup: MacPageSetupStrings;
+  pageSetup: MacPageSetupStrings;
   /** Captions only the Mac Data Validation message tabs show. */
-  macDataValidation: MacDataValidationStrings;
+  dataValidation: MacDataValidationStrings;
   /** Labels only the Mac Create Table dialog shows. */
-  macCreateTable: MacCreateTableStrings;
+  createTable: MacCreateTableStrings;
   /** Labels of the Mac Zoom dialog. */
-  macZoomDialog: MacZoomDialogStrings;
+  zoomDialog: MacZoomDialogStrings;
   /** Texts of the Mac compact alert panels. */
-  macAlerts: MacAlertStrings;
-  macData: {
+  alerts: MacAlertStrings;
+  data: {
     goalSeek: {
       title: string;
       formulaCell: string;
@@ -175,7 +175,7 @@ export interface MacStrings {
       noRoom: string;
     };
   };
-  macSparkline: {
+  sparkline: {
     title: string;
     dataRange: string;
     location: string;
@@ -189,14 +189,14 @@ export interface MacStrings {
     unavailable: string;
     protectedLocation: string;
   };
-  macSlicer: {
+  slicer: {
     ok: string;
     cancel: string;
     noTable: string;
     noColumns: string;
     insertFailed: string;
   };
-  macWorkbookStats: {
+  workbookStats: {
     title: string;
     close: string;
     sheets: string;
@@ -212,13 +212,13 @@ export interface MacStrings {
     usedRows: string;
     usedColumns: string;
   };
-  macInk: {
+  ink: {
     strokeLabel: string;
     drawLabel: string;
   };
   /** Cell context-menu labels where the Mac desktop menu differs from the
    * default profile's wording. */
-  macContextMenu: {
+  contextMenu: {
     cut: string;
     copy: string;
     paste: string;
@@ -250,7 +250,7 @@ export interface MacStrings {
   };
   /** Home ribbon labels where the Mac desktop ribbon differs from the
    * default profile's wording. */
-  macHomeRibbon: {
+  homeRibbon: {
     conditional: string;
     paste: string;
     cut: string;

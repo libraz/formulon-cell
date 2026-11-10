@@ -12,6 +12,7 @@ import {
 } from '../../commands/built-in-command-policy.js';
 import type { PasteSpecialOptions } from '../../commands/clipboard/paste-special.js';
 import type { History as LegacyHistory } from '../../commands/history.js';
+import { createHistoryView } from '../../commands/history-view.js';
 import type {
   HostCellChangeInput,
   InteractionOperation,
@@ -23,12 +24,8 @@ import { resolveCellInput, resolveRangeInput } from '../../engine/range-input.js
 import type { Addr, Range } from '../../engine/types.js';
 import { fromEngineValue } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
-import type {
-  Extension,
-  ExtensionHandle,
-  ExtensionInput,
-  FeatureFlags,
-} from '../../extensions/index.js';
+import type { Extension, ExtensionHandle, ExtensionInput } from '../../extensions/index.js';
+import type { I18n } from '../../i18n/public-view.js';
 import type { DeepPartial, Strings } from '../../i18n/strings.js';
 import type { BorderDrawHandle } from '../../interact/border-draw.js';
 import type { ClipboardHandle } from '../../interact/clipboard.js';
@@ -133,14 +130,7 @@ export interface Extensions {
   list(): string[];
 }
 
-/** UI language and strings. Change the language with `update({ locale })`. */
-export interface I18n {
-  readonly locale: string;
-  readonly strings: Strings;
-  /** Overrides strings of `locale`; takes effect at once when it is the current locale. */
-  override(locale: string, strings: DeepPartial<Strings>): void;
-  on(name: 'change', listener: (event: { locale: string; strings: Strings }) => void): Disposer;
-}
+export type { I18n };
 
 /** How a cell's displayed text is replaced. */
 export interface CellFormatter {
@@ -574,7 +564,7 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
       }
       break;
     case 'strings':
-      legacy.i18n.extend(legacy.i18n.locale, (value as DeepPartial<Strings> | null) ?? {});
+      legacy.i18n.override(legacy.i18n.locale, (value as DeepPartial<Strings> | null) ?? {});
       break;
     case 'extensions':
       legacy.setExtensions(
@@ -629,24 +619,7 @@ const swapWorkbook = (state: InstanceState, next: Workbook | null): void => {
   state.events.emit('workbook', { workbook: replacement });
 };
 
-const createHistory = (history: LegacyHistory): History => ({
-  get canUndo() {
-    return history.canUndo();
-  },
-  get canRedo() {
-    return history.canRedo();
-  },
-  undo() {
-    history.undo();
-  },
-  redo() {
-    history.redo();
-  },
-  clear() {
-    history.clear();
-  },
-  on: (_name, listener) => history.subscribe(listener),
-});
+const createHistory = (history: LegacyHistory): History => createHistoryView(history);
 
 const createSelection = (
   state: () => InstanceState,
@@ -751,11 +724,11 @@ const createI18n = (legacy: () => LegacyInstance): I18n => ({
     return legacy().i18n.strings;
   },
   override(locale, strings) {
-    legacy().i18n.extend(locale, strings);
+    legacy().i18n.override(locale, strings);
   },
   on(_name, listener) {
     const i18n = legacy().i18n;
-    return i18n.subscribe((strings) => listener({ locale: i18n.locale, strings }));
+    return i18n.on('change', (strings) => listener({ locale: i18n.locale, strings }));
   },
 });
 
@@ -852,7 +825,7 @@ const legacyOptionsOf = (options: SpreadsheetOptions, handle: WorkbookHandle): M
     workbook: handle,
     ...(options.ui ? { ui: options.ui } : {}),
     // A switch named after a feature id reaches that feature even where `ui` has no switch of its own.
-    ...(options.ui?.features ? { features: options.ui.features as FeatureFlags } : {}),
+    ...(options.ui?.features ? { features: options.ui.features } : {}),
     ...(options.policy ? { policy: options.policy } : {}),
     ...(legacyViewport(options.viewport) ? { viewport: legacyViewport(options.viewport) } : {}),
     ...(options.contextMenu ? { contextMenu: options.contextMenu } : {}),

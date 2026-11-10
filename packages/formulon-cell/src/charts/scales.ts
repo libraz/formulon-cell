@@ -1,6 +1,25 @@
+/** A closed numeric interval. */
 export interface NumericDomain {
   readonly min: number;
   readonly max: number;
+}
+
+/** Screen-space interval a domain maps onto; `from` may exceed `to` to flip the axis. */
+export interface ScaleRange {
+  readonly from: number;
+  readonly to: number;
+}
+
+/** Domain and target range of a scale helper. */
+export interface LinearScaleOptions {
+  readonly domain: NumericDomain;
+  readonly range: ScaleRange;
+}
+
+/** {@link LinearScaleOptions} plus whether the range is walked backwards. */
+export interface LogProjectionOptions extends LinearScaleOptions {
+  /** Swap the range endpoints. Defaults to `false`. */
+  readonly reverse?: boolean;
 }
 
 /** Return a usable logarithmic base, or leave the axis on its linear path. */
@@ -417,18 +436,13 @@ export function majorTicks(
  * fraction. Endpoint checks keep adjacent extreme values from collapsing to
  * a midpoint when their natural logarithms round to the same number.
  */
-export function unclampedLogProjection(
-  value: number,
-  domainMin: number,
-  domainMax: number,
-  rangeMin: number,
-  rangeMax: number,
-  reverse = false,
-): number {
-  const from = reverse ? rangeMax : rangeMin;
-  const to = reverse ? rangeMin : rangeMax;
-  const lo = domainMin;
-  const hi = domainMax;
+export function unclampedLogProjection(value: number, options: LogProjectionOptions): number {
+  const { domain, range, reverse = false } = options;
+  const from = reverse ? range.to : range.from;
+  const to = reverse ? range.from : range.to;
+  const lo = domain.min;
+  const hi = domain.max;
+  const scale: LinearScaleOptions = { domain: { min: lo, max: hi }, range: { from, to } };
   if (
     !Number.isFinite(value) ||
     !(value > 0) ||
@@ -438,7 +452,7 @@ export function unclampedLogProjection(
     !(hi > 0) ||
     lo === hi
   ) {
-    return linearScale(value, lo, hi, from, to) ?? from;
+    return linearScale(value, scale) ?? from;
   }
   if (value === lo) return from;
   if (value === hi) return to;
@@ -446,11 +460,11 @@ export function unclampedLogProjection(
   const logMax = Math.log(hi);
   const logSpan = logMax - logMin;
   if (!(logSpan > 0) || !Number.isFinite(logSpan)) {
-    return linearScale(value, lo, hi, from, to) ?? from;
+    return linearScale(value, scale) ?? from;
   }
   const logValue = Math.log(value);
   const fraction = (logValue - logMin) / logSpan;
-  if (!Number.isFinite(fraction)) return linearScale(value, lo, hi, from, to) ?? from;
+  if (!Number.isFinite(fraction)) return linearScale(value, scale) ?? from;
   const mapped = from + fraction * (to - from);
   if (Number.isFinite(mapped)) return mapped;
   if (fraction <= 0) return from;
@@ -459,16 +473,10 @@ export function unclampedLogProjection(
 }
 
 /** Map a finite value into a screen range without ever returning NaN/Infinity. */
-export function linearScale(
-  value: number | null,
-  domainMin: number,
-  domainMax: number,
-  rangeMin: number,
-  rangeMax: number,
-): number | null {
+export function linearScale(value: number | null, options: LinearScaleOptions): number | null {
   if (value === null || !Number.isFinite(value)) return null;
-  const lo = finiteOr(domainMin, 0);
-  const hi = finiteOr(domainMax, 1);
+  const lo = finiteOr(options.domain.min, 0);
+  const hi = finiteOr(options.domain.max, 1);
   let fraction = 0.5;
   if (lo !== hi) {
     const span = hi - lo;
@@ -484,8 +492,8 @@ export function linearScale(
       fraction = normalizedSpan === 0 ? 0.5 : (normalizedValue - normalizedLo) / normalizedSpan;
     }
   }
-  const rangeLo = finiteOr(rangeMin, 0);
-  const rangeHi = finiteOr(rangeMax, 1);
+  const rangeLo = finiteOr(options.range.from, 0);
+  const rangeHi = finiteOr(options.range.to, 1);
   const rangeSpan = rangeHi - rangeLo;
   const mapped = Number.isFinite(rangeSpan)
     ? rangeLo + fraction * rangeSpan
@@ -497,9 +505,9 @@ export function linearScale(
 }
 
 /** Format a tick label without locale or browser dependencies. */
-export function formatTick(value: number, percent = false): string {
+export function formatTick(value: number, options: { readonly percent?: boolean } = {}): string {
   if (!Number.isFinite(value)) return '';
-  if (percent) return `${Math.round(value * 100)}%`;
+  if (options.percent) return `${Math.round(value * 100)}%`;
   const absolute = Math.abs(value);
   if (absolute !== 0 && (absolute >= 1e6 || absolute < 1e-4)) {
     return value.toExponential(2).replace('e+', 'e');

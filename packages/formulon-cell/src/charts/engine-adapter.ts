@@ -258,12 +258,23 @@ const LEGEND_TO_ENGINE: Readonly<
   left: ChartLegendPosition.Left,
 };
 
+// The file stores four dash styles; the longer and squarer variants share the nearest one.
 const DASH_TO_ENGINE: Readonly<Record<NonNullable<ChartLineSpec['dash']>, ChartLineDash>> = {
   solid: ChartLineDash.Solid,
   dash: ChartLineDash.Dash,
-  dot: ChartLineDash.Dot,
-  'dash-dot': ChartLineDash.DashDot,
+  longDash: ChartLineDash.Dash,
+  roundDot: ChartLineDash.Dot,
+  squareDot: ChartLineDash.Dot,
+  dashDot: ChartLineDash.DashDot,
+  longDashDot: ChartLineDash.DashDot,
+  longDashDotDot: ChartLineDash.DashDot,
 };
+const DASH_FROM_ENGINE: ReadonlyMap<ChartLineDash, NonNullable<ChartLineSpec['dash']>> = new Map([
+  [ChartLineDash.Solid, 'solid'],
+  [ChartLineDash.Dash, 'dash'],
+  [ChartLineDash.Dot, 'roundDot'],
+  [ChartLineDash.DashDot, 'dashDot'],
+]);
 
 const SHAPE_TO_ENGINE: Readonly<Record<NonNullable<ChartMarkerSpec['shape']>, ChartMarkerSymbol>> =
   {
@@ -318,7 +329,6 @@ const invert = <K extends string, V extends number>(
   new Map((Object.entries(table) as [K, V][]).map(([key, value]) => [value, key]));
 
 const DIRECTION_FROM_ENGINE = invert(DIRECTION_TO_ENGINE);
-const DASH_FROM_ENGINE = invert(DASH_TO_ENGINE);
 const SHAPE_FROM_ENGINE = invert(SHAPE_TO_ENGINE);
 const LABEL_POSITION_FROM_ENGINE = invert(LABEL_POSITION_TO_ENGINE);
 const TICK_LABEL_FROM_ENGINE = invert(TICK_LABEL_TO_ENGINE);
@@ -1424,8 +1434,8 @@ export const chartDataFromEngine = (data: EngineChartData): ChartData => {
       series: data.series.map((series) => ({
         id: seriesId(series.seriesId),
         ...(series.name === null ? {} : { name: series.name }),
-        formatCode: series.numberFormat,
-        xFormatCode: series.xNumberFormat,
+        numberFormat: series.numberFormat,
+        xNumberFormat: series.xNumberFormat,
         points: Array.from({ length: data.pointCount }, (_, index) => {
           const state = pointState(series.states[index]);
           return {
@@ -1441,21 +1451,20 @@ export const chartDataFromEngine = (data: EngineChartData): ChartData => {
   }
   return {
     domain: 'category',
-    categories: data.categories.labels,
-    categoryIds: data.categories.labels.map((_label, index) => `category-${index}`),
-    categoryFormatCode: data.categories.numberFormat ?? undefined,
+    categories: data.categories.labels.map((label, index) => ({
+      id: `category-${index}`,
+      label,
+    })),
+    categoryNumberFormat: data.categories.numberFormat ?? undefined,
     series: data.series.map((series) => {
-      const states = Array.from({ length: data.pointCount }, (_, index) =>
-        pointState(series.states[index]),
-      );
       return {
         id: seriesId(series.seriesId),
         ...(series.name === null ? {} : { name: series.name }),
-        values: states.map((state, index) =>
-          state === 'value' ? finite(series.values[index]) : null,
-        ),
-        states,
-        formatCode: series.numberFormat,
+        points: Array.from({ length: data.pointCount }, (_, index) => {
+          const state = pointState(series.states[index]);
+          return { value: state === 'value' ? finite(series.values[index]) : null, state };
+        }),
+        numberFormat: series.numberFormat,
       };
     }),
   };

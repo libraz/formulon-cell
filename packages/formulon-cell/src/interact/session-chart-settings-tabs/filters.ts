@@ -14,8 +14,8 @@ const categoryEntries = (
 ): readonly { id: string; label: string }[] => {
   if (data.domain === 'category') {
     return data.categories.map((category, index) => ({
-      id: data.categoryIds?.[index] ?? `category-${index}`,
-      label: category || `${labels?.categories ?? DEFAULT_LABELS.categories} ${index + 1}`,
+      id: category.id ?? `category-${index}`,
+      label: category.label || `${labels?.categories ?? DEFAULT_LABELS.categories} ${index + 1}`,
     }));
   }
   const count = data.series.reduce((max, series) => Math.max(max, series.points.length), 0);

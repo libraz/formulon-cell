@@ -862,8 +862,8 @@ describe('chartSpecFromEngine', () => {
         null: [null, undefined],
         Solid: [ChartLineDash.Solid, 'solid'],
         Dash: [ChartLineDash.Dash, 'dash'],
-        Dot: [ChartLineDash.Dot, 'dot'],
-        DashDot: [ChartLineDash.DashDot, 'dash-dot'],
+        Dot: [ChartLineDash.Dot, 'roundDot'],
+        DashDot: [ChartLineDash.DashDot, 'dashDot'],
         Other: [ChartLineDash.Other, undefined],
       } as const;
       const line = lineInfo({
@@ -1873,17 +1873,17 @@ describe('chartSpecOps', () => {
     ['clear', 'set', 'clear', 'clear', 'series'],
     ['set', 'clear', 'clear', 'dash', 'point'],
     ['keep', 'clear', 'set', 'clear', 'series'],
-    ['clear', 'clear', 'keep', 'dot', 'point'],
+    ['clear', 'clear', 'keep', 'roundDot', 'point'],
     ['keep', 'set', 'set', 'keep', 'point'],
-    ['set', 'set', 'keep', 'dash-dot', 'series'],
+    ['set', 'set', 'keep', 'dashDot', 'series'],
     ['keep', 'keep', 'keep', 'keep', 'series'],
-    ['clear', 'keep', 'set', 'dash-dot', 'point'],
-    ['keep', 'keep', 'clear', 'dot', 'series'],
-    ['keep', 'clear', 'clear', 'dash-dot', 'point'],
+    ['clear', 'keep', 'set', 'dashDot', 'point'],
+    ['keep', 'keep', 'clear', 'roundDot', 'series'],
+    ['keep', 'clear', 'clear', 'dashDot', 'point'],
     ['keep', 'set', 'set', 'dash', 'series'],
     ['clear', 'set', 'set', 'solid', 'point'],
     ['clear', 'keep', 'clear', 'keep', 'series'],
-    ['set', 'set', 'set', 'dot', 'point'],
+    ['set', 'set', 'set', 'roundDot', 'point'],
     ['set', 'keep', 'keep', 'clear', 'point'],
     ['clear', 'set', 'clear', 'solid', 'series'],
     ['clear', 'clear', 'keep', 'dash', 'point'],
@@ -1894,14 +1894,19 @@ describe('chartSpecOps', () => {
   ] as const)(
     'writes a line (colour %s, transparency %s, width %s, dash %s) to a %s',
     (color, transparency, width, dash, target) => {
-      const before: ChartLineSpec = { color: '#112233', transparency: 10, width: 1.5, dash: 'dot' };
+      const before: ChartLineSpec = {
+        color: '#112233',
+        transparency: 10,
+        width: 1.5,
+        dash: 'roundDot',
+      };
       const pick = <T>(change: string, set: T, keep: T): T | undefined =>
         change === 'keep' ? keep : change === 'set' ? set : undefined;
       const after: ChartLineSpec = {
         color: pick(color, '#AABBCC', '#112233'),
         transparency: pick(transparency, 60, 10),
         width: pick(width, 3, 1.5),
-        dash: dash === 'keep' ? 'dot' : dash === 'clear' ? undefined : dash,
+        dash: dash === 'keep' ? 'roundDot' : dash === 'clear' ? undefined : dash,
       };
       const patch = {
         ...({ keep: {}, set: { color: '#aabbcc' }, clear: { color: null } } as const)[color],
@@ -1914,8 +1919,8 @@ describe('chartSpecOps', () => {
             keep: {},
             solid: { dash: ChartLineDash.Solid },
             dash: { dash: ChartLineDash.Dash },
-            dot: {},
-            'dash-dot': { dash: ChartLineDash.DashDot },
+            roundDot: {},
+            dashDot: { dash: ChartLineDash.DashDot },
             clear: { dash: null },
           } as const
         )[dash],
@@ -2549,22 +2554,31 @@ describe('chartDataFromEngine', () => {
     };
     expect(chartDataFromEngine(data)).toEqual({
       domain: 'category',
-      categories: ['Jan', 'Feb', 'Mar'],
-      categoryIds: ['category-0', 'category-1', 'category-2'],
-      categoryFormatCode: 'General',
+      categories: [
+        { id: 'category-0', label: 'Jan' },
+        { id: 'category-1', label: 'Feb' },
+        { id: 'category-2', label: 'Mar' },
+      ],
+      categoryNumberFormat: 'General',
       series: [
         {
           id: 'series-4',
           name: 'North',
-          values: [1.5, null, null],
-          states: ['value', 'gap', 'connect'],
-          formatCode: '0.0',
+          points: [
+            { value: 1.5, state: 'value' },
+            { value: null, state: 'gap' },
+            { value: null, state: 'connect' },
+          ],
+          numberFormat: '0.0',
         },
         {
           id: 'series-5',
-          values: [2, 3, 4],
-          states: ['value', 'value', 'value'],
-          formatCode: 'General',
+          points: [
+            { value: 2, state: 'value' },
+            { value: 3, state: 'value' },
+            { value: 4, state: 'value' },
+          ],
+          numberFormat: 'General',
         },
       ],
     });
@@ -2605,8 +2619,8 @@ describe('chartDataFromEngine', () => {
         {
           id: 'series-0',
           name: 'S0',
-          formatCode: 'General',
-          xFormatCode: 'General',
+          numberFormat: 'General',
+          xNumberFormat: 'General',
           points: [
             { id: 'point-0', x: 0.5, y: 10, state: 'value' },
             { id: 'point-1', x: null, y: null, state: 'gap' },
@@ -2615,8 +2629,8 @@ describe('chartDataFromEngine', () => {
         {
           id: 'series-1',
           name: 'S1',
-          formatCode: 'General',
-          xFormatCode: 'General',
+          numberFormat: 'General',
+          xNumberFormat: 'General',
           points: [
             { id: 'point-0', x: 1, y: 10, state: 'value' },
             { id: 'point-1', x: 2, y: null, state: 'gap' },

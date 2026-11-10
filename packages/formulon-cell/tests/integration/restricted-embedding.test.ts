@@ -193,19 +193,16 @@ describe('restricted embedding public API', () => {
         {
           id: 'host-hooks',
           setup(context) {
-            const stopThrowing = context.onWorkbookChange(() => {
+            const stopThrowing = context.spreadsheet.on('workbook', () => {
               throw new Error('Host hook error');
             });
-            const stopCounting = context.onWorkbookChange(() => {
+            const stopCounting = context.spreadsheet.on('workbook', () => {
               notified += 1;
             });
             return {
               dispose() {
                 stopThrowing();
                 stopCounting();
-              },
-              rebindWorkbook() {
-                throw new Error('Extension hook error');
               },
             };
           },

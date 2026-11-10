@@ -101,10 +101,10 @@ describe('session chart commands', () => {
     expect(chart.title).toEqual({ auto: true });
     expect(chart.data).toMatchObject({
       domain: 'category',
-      categories: ['Jan', 'Feb', 'Mar'],
+      categories: [{ label: 'Jan' }, { label: 'Feb' }, { label: 'Mar' }],
       series: [
-        { id: 'series-0', name: 'North', values: [10, 15, 12] },
-        { id: 'series-1', name: 'South', values: [20, 25, 22] },
+        { id: 'series-0', name: 'North', points: [{ value: 10 }, { value: 15 }, { value: 12 }] },
+        { id: 'series-1', name: 'South', points: [{ value: 20 }, { value: 25 }, { value: 22 }] },
       ],
     });
     expect(listSessionCharts(store.getState())).toEqual([chart]);
@@ -359,8 +359,8 @@ describe('session chart commands', () => {
     const moved = updateSessionChart(store, chart.id, { source: range(0, 4, 2, 5) }, history, wb);
     expect(moved?.source).toEqual(range(0, 4, 2, 5));
     expect(moved?.data).toMatchObject({
-      categories: ['x', 'y'],
-      series: [{ name: 'v', values: [1, 2] }],
+      categories: [{ label: 'x' }, { label: 'y' }],
+      series: [{ name: 'v', points: [{ value: 1 }, { value: 2 }] }],
     });
     expect(history.undo()).toBe(true);
     expect(sessionChartById(store.getState(), chart.id)?.source).toEqual(range(0, 0, 3, 2));
@@ -393,7 +393,7 @@ describe('session chart commands', () => {
     const rows = updateSessionChart(store, chart.id, { seriesDirection: 'rows' }, history, wb);
     expect(rows?.seriesDirection).toBe('rows');
     expect(rows?.data).toMatchObject({
-      categories: ['North', 'South'],
+      categories: [{ label: 'North' }, { label: 'South' }],
       series: [{ name: 'Jan' }, { name: 'Feb' }, { name: 'Mar' }],
     });
   });
@@ -421,11 +421,11 @@ describe('session chart commands', () => {
       );
       expect(added?.data).toMatchObject({
         domain: 'category',
-        categories: ['Jan', 'Feb', 'Mar'],
+        categories: [{ label: 'Jan' }, { label: 'Feb' }, { label: 'Mar' }],
         series: [
           { id: 'series-0', name: 'North' },
           { id: 'series-1', name: 'South' },
-          { id: 'series-2', name: 'West', values: [30, 35, 32] },
+          { id: 'series-2', name: 'West', points: [{ value: 30 }, { value: 35 }, { value: 32 }] },
         ],
       });
       expect(wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series[2]?.values).toMatchObject({
@@ -458,7 +458,14 @@ describe('session chart commands', () => {
       expect(added?.data.series).toHaveLength(before + 1);
       const series = added?.data.series[before];
       expect(series?.name).toBe('West');
-      expect(series && 'points' in series ? series.points.map(({ x, y }) => [x, y]) : []).toEqual([
+      expect(
+        series && 'points' in series
+          ? (series.points as readonly { x: number | null; y: number | null }[]).map(({ x, y }) => [
+              x,
+              y,
+            ])
+          : [],
+      ).toEqual([
         [10, 30],
         [15, 35],
         [12, 32],
@@ -481,7 +488,7 @@ describe('session chart commands', () => {
       expect(edited?.data).toMatchObject({
         series: [
           { id: 'series-0', name: 'North' },
-          { id: 'series-1', name: 'West', values: [30, 35, 32] },
+          { id: 'series-1', name: 'West', points: [{ value: 30 }, { value: 35 }, { value: 32 }] },
         ],
       });
       expect(wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series[1]?.values).toMatchObject({
@@ -508,7 +515,9 @@ describe('session chart commands', () => {
         history,
         wb,
       );
-      expect(edited?.data).toMatchObject({ categories: ['Q1', 'Q2', 'Q3'] });
+      expect(edited?.data).toMatchObject({
+        categories: [{ label: 'Q1' }, { label: 'Q2' }, { label: 'Q3' }],
+      });
       const series = wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series ?? [];
       expect(series.map((entry) => entry.categories?.formula)).toEqual([
         'Sheet1!$E$2:$E$4',
@@ -710,7 +719,7 @@ describe('session chart commands', () => {
     wb.setFormula({ sheet: 0, row: 2, col: 8 }, '=B3*10');
     const chart = createSessionChart(store, range(0, 7, 2, 8), { wb });
     if (!chart) throw new Error('chart was not created');
-    expect(chart.data).toMatchObject({ series: [{ values: [100, 150] }] });
+    expect(chart.data).toMatchObject({ series: [{ points: [{ value: 100 }, { value: 150 }] }] });
     const unsubscribe = wb.subscribe((event) => {
       if (event.kind === 'recalc') refreshChartsAfterRecalc(wb, store);
     });
@@ -720,7 +729,7 @@ describe('session chart commands', () => {
       unsubscribe();
     }
     expect(sessionChartById(store.getState(), chart.id)?.data).toMatchObject({
-      series: [{ values: [70, 150] }],
+      series: [{ points: [{ value: 70 }, { value: 150 }] }],
     });
   });
 

@@ -37,7 +37,7 @@ import { macWatchWindowKo } from './watch-window.js';
 import { macZoomDialogFrom } from './zoom-dialog.js';
 
 export const macKo: MacStrings = {
-  macData: {
+  data: {
     goalSeek: {
       title: '목표값 찾기',
       formulaCell: '수식 셀',
@@ -124,7 +124,7 @@ export const macKo: MacStrings = {
       noRoom: '부분합 행을 삽입할 공간이 없습니다.',
     },
   },
-  macSparkline: {
+  sparkline: {
     title: '스파크라인 삽입',
     dataRange: '데이터 범위',
     location: '위치',
@@ -138,14 +138,14 @@ export const macKo: MacStrings = {
     unavailable: '현재 선택에서는 이 작업을 사용할 수 없습니다.',
     protectedLocation: '스파크라인 위치가 보호되어 있습니다.',
   },
-  macSlicer: {
+  slicer: {
     ok: '확인',
     cancel: '취소',
     noTable: '사용 가능한 표가 없습니다.',
     noColumns: '표에 열이 없습니다.',
     insertFailed: '이 표에 슬라이서를 삽입할 수 없습니다.',
   },
-  macWorkbookStats: {
+  workbookStats: {
     title: '통합 문서 통계',
     close: '닫기',
     sheets: '시트',
@@ -161,11 +161,11 @@ export const macKo: MacStrings = {
     usedRows: '사용된 행',
     usedColumns: '사용된 열',
   },
-  macInk: {
+  ink: {
     strokeLabel: '잉크 선',
     drawLabel: '잉크로 그리기',
   },
-  macContextMenu: {
+  contextMenu: {
     cut: '잘라내기',
     copy: '복사',
     paste: '붙여넣기',
@@ -195,7 +195,7 @@ export const macKo: MacStrings = {
     defineName: '이름 정의…',
     hyperlink: '하이퍼링크 삽입…',
   },
-  macHomeRibbon: {
+  homeRibbon: {
     conditional: '조건부 서식',
     paste: '붙여넣기',
     cut: '잘라내기',
@@ -204,19 +204,19 @@ export const macKo: MacStrings = {
     cellStyles: '셀 스타일',
     autoSum: '자동 합계',
   },
-  macFormatDialog: macFormatDialogFrom(cellFormatKo.formatDialog),
-  macIterativeDialog: macIterativeDialogFrom(formulaDialogsKo.iterativeDialog, {
+  formatDialog: macFormatDialogFrom(cellFormatKo.formatDialog),
+  iterativeDialog: macIterativeDialogFrom(formulaDialogsKo.iterativeDialog, {
     calcAutoNoTable: ribbonMenusKo.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsKo.namedRangeDialog, {
+  namedRangeDialog: macNamedRangeDialogFrom(formulaDialogsKo.namedRangeDialog, {
     defineTitle: '이름 정의',
     defineNames: '이름:',
     defineNamePrompt: '데이터 범위의 이름을 입력하십시오:',
     defineRangePrompt: '셀 범위를 선택하십시오:',
   }),
-  macPasteSpecial: macPasteSpecialFrom(editDialogsKo.pasteSpecialDialog),
-  macZoomDialog: macZoomDialogFrom(ribbonKo.ribbon, cellFormatKo.formatDialog),
-  macAlerts: macAlertsFrom(
+  pasteSpecial: macPasteSpecialFrom(editDialogsKo.pasteSpecialDialog),
+  zoomDialog: macZoomDialogFrom(ribbonKo.ribbon, cellFormatKo.formatDialog),
+  alerts: macAlertsFrom(
     ribbonKo.ribbon,
     {
       message: '이 시트는 영구적으로 삭제됩니다. 계속하시겠습니까?',
@@ -225,25 +225,25 @@ export const macKo: MacStrings = {
     },
     editDialogsKo.moveCells,
   ),
-  macProtectSheet: macProtectSheetFrom(editDialogsKo.protection, {
+  protectSheet: macProtectSheetFrom(editDialogsKo.protection, {
     heading: '워크시트 및 잠긴 셀의 내용 보호',
     note: '기본적으로 모든 셀이 잠겨 있지만 잠금을 해제할 수 있습니다.',
   }),
-  macAdvancedFilter: macAdvancedFilterFrom(ribbonMenusKo.ribbonMenu, {
+  advancedFilter: macAdvancedFilterFrom(ribbonMenusKo.ribbonMenu, {
     filterInPlace: '현재 위치에 필터',
     copyToLocation: '다른 장소에 복사',
   }),
-  macChrome: macChromeFrom(workbookChromeKo, formulaDialogsKo),
-  macTextToColumnsWizard: macTextToColumnsWizardKo,
-  macStyleDialog: macStyleDialogKo,
-  macExternalLinksPane: macExternalLinksPaneKo,
-  macWatchWindow: macWatchWindowKo,
-  macAccessibilityPane: macAccessibilityPaneKo,
-  macCfRulesDialog: macCfRulesDialogFrom(cellFormatKo.cfRulesDialog, {
+  chrome: macChromeFrom(workbookChromeKo, formulaDialogsKo),
+  textToColumnsWizard: macTextToColumnsWizardKo,
+  styleDialog: macStyleDialogKo,
+  externalLinksPane: macExternalLinksPaneKo,
+  watchWindow: macWatchWindowKo,
+  accessibilityPane: macAccessibilityPaneKo,
+  cfRulesDialog: macCfRulesDialogFrom(cellFormatKo.cfRulesDialog, {
     orderLabel: '규칙 순서 변경:',
     appliesToLabel: '적용 대상:',
   }),
-  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsKo.hyperlinkDialog, {
+  hyperlinkDialog: macHyperlinkDialogFrom(editDialogsKo.hyperlinkDialog, {
     displayText: '표시할 텍스트:',
     selectionInDocument: '<<문서에서 선택한 영역>>',
     screenTip: '화면 설명...',
@@ -261,26 +261,26 @@ export const macKo: MacStrings = {
     subject: '제목:',
     recentEmails: '최근에 사용한 전자 메일 주소:',
   }),
-  macPageSetup: macPageSetupFrom(pageLayoutKo.pageSetup),
-  macDataValidation: {
+  pageSetup: macPageSetupFrom(pageLayoutKo.pageSetup),
+  dataValidation: {
     inputCaption: '셀을 선택하면 나타낼 설명 메시지:',
     errorCaption: '유효하지 않은 데이터를 입력하면 표시할 오류 메시지:',
   },
-  macCreateTable: { nameLabel: '표 이름은 무엇입니까?' },
-  macGoToDialog: macGoToDialogFrom(editDialogsKo.goToDialog, {
+  createTable: { nameLabel: '표 이름은 무엇입니까?' },
+  goToDialog: macGoToDialogFrom(editDialogsKo.goToDialog, {
     selectCaption: '선택',
     optionsGroup: '옵션',
     noOptions: '이 선택 항목에는 옵션이 없습니다.',
   }),
-  macPivotFieldSettings: macPivotFieldSettingsKo,
-  macPivotOptions: macPivotOptionsKo,
-  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsKo.pivotTableDialog, {
+  pivotFieldSettings: macPivotFieldSettingsKo,
+  pivotOptions: macPivotOptionsKo,
+  pivotTableDialog: macPivotTableDialogFrom(dataObjectsKo.pivotTableDialog, {
     chooseConnection: '연결 선택...',
     moveTitle: '피벗 테이블 이동',
     moveLocation: '위치:',
   }),
-  macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusKo.ribbonMenu),
-  macSortDialog: macSortDialogFrom(ribbonMenusKo.ribbonMenu, {
+  removeDuplicates: macRemoveDuplicatesFrom(ribbonMenusKo.ribbonMenu),
+  sortDialog: macSortDialogFrom(ribbonMenusKo.ribbonMenu, {
     levelsHeading: '정렬 수준 추가:',
     columnHeading: '열',
     sortOnHeading: '정렬 기준',
@@ -297,8 +297,8 @@ export const macKo: MacStrings = {
     noPhonetic: '발음 사용 안 함',
     caseSensitive: '대/소문자 구분',
   }),
-  macErrorMenu: macErrorMenuKo,
-  macFilterPanel: macFilterPanelKo(gridPopupsKo.filterDropdown),
-  macSheetTabMenu: macSheetTabMenuKo,
-  macFindReplace: macFindReplaceFrom(editDialogsKo.findReplace, '반각과 전각 구분'),
+  errorMenu: macErrorMenuKo,
+  filterPanel: macFilterPanelKo(gridPopupsKo.filterDropdown),
+  sheetTabMenu: macSheetTabMenuKo,
+  findReplace: macFindReplaceFrom(editDialogsKo.findReplace, '반각과 전각 구분'),
 };

@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { ja } from '../../../src/i18n/strings.js';
 import { attachIterativeDialog } from '../../../src/interact/iterative-dialog.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -67,7 +68,7 @@ describe('attachIterativeDialog', () => {
 
   it('open hydrates inputs from defaults (disabled, 100, 0.001) and disables numerics', () => {
     const fake = makeFakeWb();
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     expect(overlay()?.hidden).toBe(false);
     expect(enableInput()?.checked).toBe(false);
@@ -87,7 +88,7 @@ describe('attachIterativeDialog', () => {
 
   it('toggling the enable checkbox enables the numeric inputs', () => {
     const fake = makeFakeWb();
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     const cb = enableInput();
     if (!cb) throw new Error('checkbox missing');
@@ -102,7 +103,7 @@ describe('attachIterativeDialog', () => {
 
   it('OK forwards the draft settings to wb.setIterative and wires a progress callback when enabled', () => {
     const fake = makeFakeWb();
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     const cb = enableInput();
     if (!cb) throw new Error('checkbox missing');
@@ -132,7 +133,7 @@ describe('attachIterativeDialog', () => {
 
   it('Enter acts as the default OK command', () => {
     const fake = makeFakeWb();
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     const cb = enableInput();
     if (!cb) throw new Error('checkbox missing');
@@ -148,7 +149,7 @@ describe('attachIterativeDialog', () => {
 
   it('numeric input clamps min iterations to 1', () => {
     const fake = makeFakeWb();
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     const cb = enableInput();
     const num = numberInput();
@@ -165,7 +166,7 @@ describe('attachIterativeDialog', () => {
 
   it('Cancel closes without invoking setIterative', () => {
     const fake = makeFakeWb();
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     const cb = enableInput();
     if (!cb) throw new Error('checkbox missing');
@@ -180,7 +181,7 @@ describe('attachIterativeDialog', () => {
   it('OK shows the unsupported message when wb.setIterative returns false', () => {
     const fake = makeFakeWb();
     fake.setIterative.mockReturnValueOnce(false);
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     const cb = enableInput();
     if (!cb) throw new Error('checkbox missing');
@@ -195,7 +196,7 @@ describe('attachIterativeDialog', () => {
 
   it('detach removes the overlay from the DOM', () => {
     const fake = makeFakeWb();
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.detach();
     expect(overlay()).toBeNull();
   });
@@ -210,7 +211,7 @@ describe('attachIterativeDialog', () => {
   });
 
   it('wears the shared Format Cells dialog chrome', () => {
-    const handle = attachIterativeDialog({ host, getWb: () => makeFakeWb().handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => makeFakeWb().handle });
     const root = overlay();
     expect(root?.classList.contains('fc-fmtdlg')).toBe(true);
     expect(root?.querySelector('.fc-fmtdlg__panel')).not.toBeNull();
@@ -221,7 +222,7 @@ describe('attachIterativeDialog', () => {
 
   it('opens on the settings the workbook already carries', () => {
     const fake = makeFakeWb(true, { enabled: true, maxIterations: 250, maxChange: 0.05 });
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     expect(enableInput()?.checked).toBe(true);
     expect(numberInput()?.value).toBe('250');
@@ -232,7 +233,7 @@ describe('attachIterativeDialog', () => {
 
   it('keeps its own defaults when the engine has no readback', () => {
     const fake = makeFakeWb();
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     expect(enableInput()?.checked).toBe(false);
     expect(numberInput()?.value).toBe('100');
@@ -242,6 +243,7 @@ describe('attachIterativeDialog', () => {
   it('parses maximum change with the live locale and keeps full input precision', () => {
     const fake = makeFakeWb();
     const handle = attachIterativeDialog({
+      strings: ja,
       host,
       getWb: () => fake.handle,
       getLocale: () => 'de-DE',
@@ -263,6 +265,7 @@ describe('attachIterativeDialog', () => {
   it('does not confirm while maximum change is invalid', () => {
     const fake = makeFakeWb();
     const handle = attachIterativeDialog({
+      strings: ja,
       host,
       getWb: () => fake.handle,
       getLocale: () => 'fr-FR',
@@ -286,7 +289,7 @@ describe('attachIterativeDialog', () => {
     host.classList.add('fc-host');
     host.dataset.fcPlatform = 'mac';
     const fake = makeFakeWb();
-    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
     handle.open();
     const visibleText = (selector: string): string[] =>
       [...document.querySelectorAll<HTMLElement>(selector)]
@@ -334,7 +337,7 @@ describe('attachIterativeDialog', () => {
         recalcAuto: vi.fn(),
         cells: () => [],
       } as unknown as WorkbookHandle;
-      const dialog = attachIterativeDialog({ host, getWb: () => handle });
+      const dialog = attachIterativeDialog({ strings: ja, host, getWb: () => handle });
       dialog.open();
       return { dialog, calls };
     };
@@ -378,7 +381,7 @@ describe('attachIterativeDialog', () => {
 
     it('keeps OK semantics on the other profiles', () => {
       const fake = makeFakeWb();
-      const dialog = attachIterativeDialog({ host, getWb: () => fake.handle });
+      const dialog = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
       dialog.open();
       const cb = enableInput();
       if (!cb) throw new Error('missing checkbox');

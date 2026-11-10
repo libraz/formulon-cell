@@ -231,6 +231,7 @@ describe('Spreadsheet feature registry', () => {
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const instance = await Spreadsheet.mount(host, {
       workbook,
+      locale: 'ja',
       features: { viewToolbar: false, workbookObjects: false },
     });
 

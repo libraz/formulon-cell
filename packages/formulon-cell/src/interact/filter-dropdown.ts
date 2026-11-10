@@ -78,7 +78,7 @@ const findColumnCriteria = (
 export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHandle {
   const strings = deps.strings ?? defaultStrings;
   const t = strings.filterDropdown;
-  const m = strings.macFilterPanel;
+  const m = strings.mac.filterPanel;
   const fcHost = deps.host?.closest<HTMLElement>('.fc-host') ?? deps.host;
   const mac = fcHost?.dataset.fcPlatform === 'mac';
   const ownerDocument = deps.host?.ownerDocument ?? document;
@@ -148,7 +148,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       labels.map((label) => ({ value: label, label })),
     );
     for (const option of Array.from(select.options).slice(first)) {
-      projectDisabledState(option, true, strings.macFilterPanel.unavailable);
+      projectDisabledState(option, true, strings.mac.filterPanel.unavailable);
     }
   };
 

@@ -15,7 +15,7 @@ export async function confirmSheetDelete(
 ): Promise<boolean> {
   if (!isMacWorkbook(workbook)) return true;
   if (workbook.cells(sheet).next().done) return true;
-  const t = strings.macAlerts.deleteSheet;
+  const t = strings.mac.alerts.deleteSheet;
   return showConfirm({
     title: strings.sheetTabs.deleteSheet,
     message: t.message,

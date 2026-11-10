@@ -73,7 +73,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const history = deps.history ?? null;
   const strings = deps.strings ?? defaultStrings;
   const mac = isMacHost(host);
-  const t = mac ? { ...strings.pageSetup, ...strings.macPageSetup } : strings.pageSetup;
+  const t = mac ? { ...strings.pageSetup, ...strings.mac.pageSetup } : strings.pageSetup;
   let openingPrinterProfileId = normalizePrinterProfileId(deps.getPrinterProfileId?.());
 
   const shell = createDialogShell({

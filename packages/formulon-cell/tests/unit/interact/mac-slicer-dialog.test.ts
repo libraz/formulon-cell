@@ -129,7 +129,7 @@ describe('attachMacSlicerDialog', () => {
     const overlay = document.querySelector<HTMLElement>('.fc-macslicerdlg');
     expect(overlay?.getAttribute('aria-label')).toBe(en.slicer.addSlicer);
     expect(overlay?.querySelector('.fc-fmtdlg__header')?.textContent).toBe(en.slicer.addSlicer);
-    expect(overlay?.querySelector('.fc-fmtdlg__btn--primary')?.textContent).toBe(en.macSlicer.ok);
+    expect(overlay?.querySelector('.fc-fmtdlg__btn--primary')?.textContent).toBe(en.mac.slicer.ok);
     handle.detach();
   });
 

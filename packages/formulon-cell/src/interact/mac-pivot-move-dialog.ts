@@ -18,7 +18,7 @@ const handles = new WeakMap<SpreadsheetInstance, PivotMoveDialogHandle>();
 function attachPivotMoveDialog(instance: SpreadsheetInstance): PivotMoveDialogHandle {
   const labels = () => ({
     ...instance.i18n.strings.pivotTableDialog,
-    ...instance.i18n.strings.macPivotTableDialog,
+    ...instance.i18n.strings.mac.pivotTableDialog,
   });
   let t = labels();
   let target: { sheet: number; pivotIndex: number } | null = null;
@@ -104,7 +104,7 @@ function attachPivotMoveDialog(instance: SpreadsheetInstance): PivotMoveDialogHa
     updateRangePickerLabel(picker, t.rangePickerSelect);
   };
   applyLabels();
-  const unsubscribeLocale = instance.i18n.subscribe(applyLabels);
+  const unsubscribeLocale = instance.i18n.on('change', applyLabels);
 
   const close = (): void => {
     target = null;

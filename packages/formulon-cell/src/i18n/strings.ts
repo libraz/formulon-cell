@@ -12,8 +12,8 @@ export { BUILT_IN_LOCALES } from './locales.js';
 export type { DeepPartial, Locale, Strings } from './strings/types.js';
 export { de, en, fr, ja, ko, th, zh };
 
-export const dictionaries: Record<Locale, Strings> = { ja, en, de, fr, zh, ko, th };
-export const defaultStrings: Strings = ja;
+export const dictionaries: Record<Locale, Strings> = { en, ja, de, fr, zh, ko, th };
+export const defaultStrings: Strings = en;
 
 export const dictionaryLocaleFor = (locale: string): Locale => {
   return builtInLocaleFor(locale) ?? DEFAULT_LOCALE;

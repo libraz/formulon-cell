@@ -125,7 +125,7 @@ describe('attachStatusBar', () => {
   });
 
   it('leaves the accessibility status out without a checker', () => {
-    const handle = attachStatusBar({ statusbar, store, getEngineLabel: () => 'stub' });
+    const handle = attachStatusBar({ statusbar, store, getEngineLabel: () => 'stub', strings: ja });
     expect(statusbar.querySelector('.fc-host__statusbar-a11y')).toBeNull();
     handle.detach();
   });
@@ -135,6 +135,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     expect(statusbar.querySelector('.fc-host__statusbar-left')).not.toBeNull();
     expect(statusbar.querySelector('.fc-host__statusbar-aggs')).not.toBeNull();
@@ -169,6 +170,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
       showEngineLabel: true,
     });
     const right = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-right');
@@ -221,6 +223,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     const center = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
     expect(center?.textContent).toContain('60'); // sum
@@ -511,6 +514,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     const center = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
     expect(center?.textContent).toBe('');
@@ -524,6 +528,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
 
     statusbar.dispatchEvent(
@@ -569,6 +574,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     const target = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
     if (!target) throw new Error('status-bar aggregate strip not found');
@@ -625,6 +631,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     const chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
     expect(chooser).toBeTruthy();
@@ -811,6 +818,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     statusbar.tabIndex = -1;
     statusbar.focus();
@@ -827,6 +835,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     const item = document.querySelector<HTMLButtonElement>('.fc-statusbar__chooser-item');
@@ -857,6 +866,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     const outsideInput = document.createElement('input');
     document.body.appendChild(outsideInput);
@@ -892,6 +902,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     const item = document.querySelector<HTMLButtonElement>('.fc-statusbar__chooser-item');
@@ -920,6 +931,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     const chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
@@ -944,6 +956,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     statusbar.tabIndex = -1;
     statusbar.focus();
@@ -966,6 +979,7 @@ describe('attachStatusBar', () => {
   it('refresh() re-reads the engine label', () => {
     let label = 'stub';
     const handle = attachStatusBar({
+      strings: ja,
       statusbar,
       store,
       getEngineLabel: () => label,
@@ -985,6 +999,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     handle.detach();
     expect(document.querySelector('.fc-statusbar__chooser')).toBeNull();
@@ -998,6 +1013,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
       getCalcMode: () => null,
     });
     const badge = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-calcmode');
@@ -1012,11 +1028,12 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
       getCalcMode: () => mode,
     });
     const badge = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-calcmode');
     expect(badge?.style.display).toBe('');
-    // defaultStrings is ja-JP; the test asserts the localized label.
+    // The test passes the ja dictionary and asserts the localized label.
     expect(badge?.textContent).toContain('手動');
     expect(badge?.dataset.calcMode).toBe('1');
 
@@ -1034,6 +1051,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
       getCalcMode: () => 0,
       onCycleCalcMode: () => cycle.push(1),
       onRecalc: () => recalcs.push(1),
@@ -1051,6 +1069,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     const slider = statusbar.querySelector<HTMLInputElement>('.fc-host__statusbar-zoom-slider');
     const label = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-zoom-label');
@@ -1079,6 +1098,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     const slider = statusbar.querySelector<HTMLInputElement>('.fc-host__statusbar-zoom-slider');
     if (!slider) throw new Error('expected zoom slider');
@@ -1112,6 +1132,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     const buttons = statusbar.querySelectorAll<HTMLButtonElement>('.fc-host__statusbar-zoom-btn');
     const minus = buttons[0];
@@ -1155,6 +1176,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
     });
     handle.setStrings(en);
     expect(statusbar.querySelector('.fc-host__statusbar-left')?.textContent).toContain('Ready');
@@ -1173,6 +1195,7 @@ describe('attachStatusBar', () => {
       statusbar,
       store,
       getEngineLabel: () => 'stub',
+      strings: ja,
       onZoomChange: (z) => {
         calls.push(z);
         mutators.setZoom(store, z);

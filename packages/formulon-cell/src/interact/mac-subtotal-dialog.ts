@@ -62,7 +62,7 @@ const appendOption = (
 };
 
 function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHandle {
-  let strings = instance.i18n.strings.macData;
+  let strings = instance.i18n.strings.mac.data;
   let t = strings.subtotal;
   const shell = createDialogShell({
     host: instance.host,
@@ -128,7 +128,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
   const checks: HTMLInputElement[] = [];
 
   const applyLabels = (): void => {
-    strings = instance.i18n.strings.macData;
+    strings = instance.i18n.strings.mac.data;
     t = strings.subtotal;
     shell.setAriaLabel(t.title);
     header.textContent = t.title;
@@ -145,7 +145,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
     syncCustomSelects(shell.panel);
   };
   applyLabels();
-  const unsubscribeLocale = instance.i18n.subscribe(applyLabels);
+  const unsubscribeLocale = instance.i18n.on('change', applyLabels);
 
   const close = (): void => {
     shell.close();

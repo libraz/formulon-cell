@@ -135,7 +135,7 @@ export const applyControlledProps = async (
       ? applyControlledLocale(inst, props.locale, handlers)
       : undefined;
   if (props.strings && (props.strings !== baseline.strings || localeAccepted === true)) {
-    inst.i18n.extend(inst.i18n.locale, props.strings);
+    inst.i18n.override(inst.i18n.locale, props.strings);
   }
   if (props.features !== baseline.features || props.ui !== baseline.ui) {
     inst.setFeatures({ ...resolvedUi.features, ...(props.features ?? {}) });

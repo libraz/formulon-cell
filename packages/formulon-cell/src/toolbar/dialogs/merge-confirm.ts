@@ -21,7 +21,7 @@ export async function confirmMergeLoseData(
   if (!(across ? mergeAcrossWillLoseData(state, range) : mergeWillLoseData(state, range)))
     return true;
   const t = strings.ribbon;
-  const mac = isMacWorkbook(workbook) ? strings.macAlerts.mergeLoseData : null;
+  const mac = isMacWorkbook(workbook) ? strings.mac.alerts.mergeLoseData : null;
   return showConfirm({
     title: t.mergeLoseDataTitle,
     message: mac?.message ?? t.mergeLoseDataMessage,

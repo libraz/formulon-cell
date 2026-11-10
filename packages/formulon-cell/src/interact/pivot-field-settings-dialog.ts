@@ -243,7 +243,7 @@ export const showPivotFieldSettingsDialog = (
   opts: PivotFieldSettingsDialogOptions,
 ): Promise<PivotFieldSettingsResult | null> =>
   new Promise<PivotFieldSettingsResult | null>((resolve) => {
-    const t = opts.strings.macPivotFieldSettings;
+    const t = opts.strings.mac.pivotFieldSettings;
     const labels = opts.strings.pivotTableDialog;
     const { target } = opts;
     let done = false;

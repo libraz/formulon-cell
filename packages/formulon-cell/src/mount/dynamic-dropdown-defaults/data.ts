@@ -63,7 +63,7 @@ const buildTextToColumnsCustom =
     };
     // The Mac host runs the desktop three-step wizard.
     const macWizard =
-      instance.host.dataset.fcPlatform === 'mac' ? strings.macTextToColumnsWizard : undefined;
+      instance.host.dataset.fcPlatform === 'mac' ? strings.mac.textToColumnsWizard : undefined;
     const result = await showTextToColumnsDialog({
       wizard: macWizard,
       strings: {

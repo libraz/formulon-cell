@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { workbookOf } from '../../../src/api/workbook.js';
 import type { CellValue } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { Extension } from '../../../src/extensions/types.js';
@@ -150,11 +151,9 @@ describe('mount/public contract', () => {
     const rebindWorkbook = vi.fn();
     const extension: Extension = {
       id: 'rebind-probe',
-      setup() {
-        return {
-          dispose() {},
-          rebindWorkbook,
-        };
+      setup(ctx) {
+        const stop = ctx.spreadsheet.on('workbook', ({ workbook }) => rebindWorkbook(workbook));
+        return { dispose: stop };
       },
     };
     sheet = await mountStubSheet({ extensions: [extension] });
@@ -173,7 +172,7 @@ describe('mount/public contract', () => {
       kind: 'number',
       value: 42,
     });
-    expect(rebindWorkbook).toHaveBeenCalledWith(next);
+    expect(rebindWorkbook).toHaveBeenCalledWith(workbookOf(next));
     expect(onWorkbookChange).toHaveBeenCalledTimes(1);
     expect(onWorkbookChange).toHaveBeenCalledWith({ workbook: next });
   });

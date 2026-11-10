@@ -99,10 +99,10 @@ describe('attachMacSparklineDialog', () => {
     handle.setStrings(en);
     handle.refresh();
     const overlay = document.querySelector<HTMLElement>('.fc-macsparkdlg');
-    expect(overlay?.querySelector('.fc-fmtdlg__header')?.textContent).toBe(en.macSparkline.title);
-    expect(overlay?.getAttribute('aria-label')).toBe(en.macSparkline.title);
+    expect(overlay?.querySelector('.fc-fmtdlg__header')?.textContent).toBe(en.mac.sparkline.title);
+    expect(overlay?.getAttribute('aria-label')).toBe(en.mac.sparkline.title);
     expect(overlay?.querySelector('.fc-fmtdlg__btn--primary')?.textContent).toBe(
-      en.macSparkline.ok,
+      en.mac.sparkline.ok,
     );
     expect(type.value).toBe('column');
     handle.detach();

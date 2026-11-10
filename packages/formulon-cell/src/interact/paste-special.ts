@@ -99,7 +99,7 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const mac = isMacHost(host);
   // The dialog's strings, with the Mac wording laid over them on the Mac host.
   const t: PasteSpecialText = mac
-    ? { ...strings.pasteSpecialDialog, ...strings.macPasteSpecial }
+    ? { ...strings.pasteSpecialDialog, ...strings.mac.pasteSpecial }
     : strings.pasteSpecialDialog;
   const whatOptions = buildWhatOptions(t);
   const opOptions = buildOpOptions(t);

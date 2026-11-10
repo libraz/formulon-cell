@@ -180,18 +180,18 @@ const chartLabel = (chart: SessionChart, labels: SessionChartLabels): string => 
 const dataForKind = (data: ChartData, kind: ChartKind): ChartData => {
   if ((kind === 'scatter') === (data.domain === 'xy')) return data;
   if (data.domain === 'category') {
-    const numeric = data.categories.map((label) => (label.trim() === '' ? Number.NaN : +label));
+    const numeric = data.categories.map(({ label }) => (label.trim() === '' ? Number.NaN : +label));
     const useLabels = numeric.every(Number.isFinite);
     return {
       domain: 'xy',
       series: data.series.map((series) => ({
         id: series.id,
         ...(series.name === undefined ? {} : { name: series.name }),
-        points: series.values.map((y, index) => ({
+        points: series.points.map(({ value, state }, index) => ({
           id: `point-${index}`,
           x: useLabels ? (numeric[index] ?? null) : index + 1,
-          y,
-          ...(series.states?.[index] === undefined ? {} : { state: series.states[index] }),
+          y: value,
+          ...(state === undefined ? {} : { state }),
         })),
       })),
     };
@@ -199,13 +199,14 @@ const dataForKind = (data: ChartData, kind: ChartKind): ChartData => {
   const first = data.series[0]?.points ?? [];
   return {
     domain: 'category',
-    categories: first.map((point, index) => (point.x === null ? String(index + 1) : `${point.x}`)),
-    categoryIds: first.map((_point, index) => `category-${index}`),
+    categories: first.map((point, index) => ({
+      id: `category-${index}`,
+      label: point.x === null ? String(index + 1) : `${point.x}`,
+    })),
     series: data.series.map((series) => ({
       id: series.id,
       ...(series.name === undefined ? {} : { name: series.name }),
-      values: series.points.map((point) => point.y),
-      states: series.points.map((point) => point.state ?? 'value'),
+      points: series.points.map((point) => ({ value: point.y, state: point.state ?? 'value' })),
     })),
   };
 };
@@ -677,17 +678,17 @@ export function attachSessionCharts(deps: {
     const format = (value: number | null): string =>
       value === null
         ? ''
-        : (formatChartValue(value, series.formatCode, locale ?? 'en-US', formatValue) ??
+        : (formatChartValue(value, series.numberFormat, locale ?? 'en-US', formatValue) ??
           String(value));
     let point: string;
     let value: string;
     if (data.domain === 'category') {
-      const raw = data.series[seriesIndex]?.values[pointIndex] ?? null;
-      point = data.categories[pointIndex] ?? String(pointIndex + 1);
+      const raw = data.series[seriesIndex]?.points[pointIndex]?.value ?? null;
+      point = data.categories[pointIndex]?.label ?? String(pointIndex + 1);
       value = format(raw);
       if ((chart.kind === 'pie' || chart.kind === 'doughnut') && raw !== null) {
-        const values = data.series[seriesIndex]?.values ?? [];
-        const total = values.reduce<number>((sum, entry) => sum + Math.abs(entry ?? 0), 0);
+        const points = data.series[seriesIndex]?.points ?? [];
+        const total = points.reduce<number>((sum, entry) => sum + Math.abs(entry.value ?? 0), 0);
         if (total > 0) value += ` (${Math.round((Math.abs(raw) / total) * 100)}%)`;
       }
     } else {

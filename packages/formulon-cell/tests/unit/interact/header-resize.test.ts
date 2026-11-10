@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { ja } from '../../../src/i18n/strings.js';
 import { attachPointer } from '../../../src/interact/pointer.js';
 import {
   colLeadingEdge,
@@ -94,7 +95,18 @@ describe('header border resize', () => {
     }));
     wb = await WorkbookHandle.createDefault({ preferStub: true });
     history = new History();
-    detach = attachPointer(host, store, wb, undefined, history);
+    detach = attachPointer(
+      host,
+      store,
+      wb,
+      undefined,
+      history,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      () => ja.resizeTip,
+    );
   });
 
   afterEach(() => {

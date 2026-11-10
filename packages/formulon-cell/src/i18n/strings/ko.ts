@@ -19,7 +19,7 @@ export const ko: Strings = {
   ...editDialogsKo,
   ...formulaDialogsKo,
   ...dataObjectsKo,
-  ...macKo,
+  mac: macKo,
   ...pageLayoutKo,
   ...workbookChromeKo,
   ...localeSwitcherKo,

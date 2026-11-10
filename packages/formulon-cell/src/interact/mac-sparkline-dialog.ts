@@ -87,12 +87,12 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   const shell = createDialogShell({
     host,
     className: 'fc-macsparkdlg',
-    ariaLabel: strings.macSparkline.title,
+    ariaLabel: strings.mac.sparkline.title,
     onDismiss: () => api.close(),
   });
   shell.overlay.classList.add('fc-fmtdlg');
   const { header, body, footer } = appendDialogFrame(shell, {
-    title: strings.macSparkline.title,
+    title: strings.mac.sparkline.title,
     panelClasses: ['fc-fmtdlg__panel', 'fc-macsparkdlg__panel'],
     bodyClass: 'fc-fmtdlg__body fc-macsparkdlg__body',
   });
@@ -146,8 +146,8 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     }),
   ];
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
-    cancelLabel: strings.macSparkline.cancel,
-    okLabel: strings.macSparkline.ok,
+    cancelLabel: strings.mac.sparkline.cancel,
+    okLabel: strings.mac.sparkline.ok,
   });
 
   let lastSource: ResolvedRange | null = null;
@@ -160,7 +160,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     error.textContent = message ?? '';
     projectDisabledState(okBtn, message !== null, message, {
       datasetKey: 'disabledReason',
-      titlePrefix: strings.macSparkline.ok,
+      titlePrefix: strings.mac.sparkline.ok,
     });
   };
 
@@ -170,14 +170,14 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     if (!source) {
       lastSource = null;
       lastDestination = null;
-      setError(strings.macSparkline.invalidSource);
+      setError(strings.mac.sparkline.invalidSource);
       return false;
     }
     const destination = resolveRange(destinationInput.value, currentSheet(), wb);
     if (!destination || destination.r0 !== destination.r1 || destination.c0 !== destination.c1) {
       lastSource = null;
       lastDestination = null;
-      setError(strings.macSparkline.locationOneCell);
+      setError(strings.mac.sparkline.locationOneCell);
       return false;
     }
     if (
@@ -192,7 +192,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     ) {
       lastSource = null;
       lastDestination = null;
-      setError(strings.macSparkline.outOfBounds);
+      setError(strings.mac.sparkline.outOfBounds);
       return false;
     }
     const destinationAddr: Addr = {
@@ -204,13 +204,13 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     if (kind !== 'line' && kind !== 'column' && kind !== 'win-loss') {
       lastSource = null;
       lastDestination = null;
-      setError(strings.macSparkline.chooseType);
+      setError(strings.mac.sparkline.chooseType);
       return false;
     }
     if (deps.canCommit && !deps.canCommit(source, destinationAddr)) {
       lastSource = null;
       lastDestination = null;
-      setError(strings.macSparkline.unavailable);
+      setError(strings.mac.sparkline.unavailable);
       return false;
     }
     lastSource = source;
@@ -246,7 +246,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       deps.history ?? null,
     );
     if (!ok) {
-      setError(strings.macSparkline.protectedLocation);
+      setError(strings.mac.sparkline.protectedLocation);
       return;
     }
     deps.onCommitted?.(lastSource, lastDestination, lastKind);
@@ -269,7 +269,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
 
   const refreshLabels = (): void => {
     const labels = kindLabels(strings);
-    const t = strings.macSparkline;
+    const t = strings.mac.sparkline;
     header.textContent = t.title;
     shell.setAriaLabel(t.title);
     sourceRow.text.textContent = t.dataRange;

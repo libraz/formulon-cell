@@ -345,14 +345,14 @@ const buildSortMenuAction =
       const mac = instance.host.dataset.fcPlatform === 'mac';
       // The dialog's strings, with the Mac wording laid over them on the Mac host.
       const strings = mac
-        ? { ...instance.i18n.strings.ribbonMenu, ...instance.i18n.strings.macSortDialog }
+        ? { ...instance.i18n.strings.ribbonMenu, ...instance.i18n.strings.mac.sortDialog }
         : instance.i18n.strings.ribbonMenu;
       const state = instance.store.getState();
       const range = inferAutoFilterRange(state);
       const columns = sortColumnsForRange(instance, range);
       const result = await showSortDialog({
         host: instance.host,
-        mac: mac ? instance.i18n.strings.macSortDialog : undefined,
+        mac: mac ? instance.i18n.strings.mac.sortDialog : undefined,
         title: strings.sortDialogTitle,
         columnLabel: strings.sortDialogColumn,
         thenByLabel: strings.sortThenBy,
@@ -369,7 +369,7 @@ const buildSortMenuAction =
         rows: mac
           ? Array.from({ length: range.r1 - range.r0 + 1 }, (_, i) => ({
               value: String(range.r0 + i),
-              label: `${instance.i18n.strings.macSortDialog.rowHeading} ${range.r0 + i + 1}`,
+              label: `${instance.i18n.strings.mac.sortDialog.rowHeading} ${range.r0 + i + 1}`,
             }))
           : undefined,
         initialColumn: String(Math.min(Math.max(state.selection.active.col, range.c0), range.c1)),
@@ -408,7 +408,7 @@ const buildSortMenuAction =
       const mac = instance.host.dataset.fcPlatform === 'mac';
       // The dialog's strings, with the Mac wording laid over them on the Mac host.
       const strings = mac
-        ? { ...instance.i18n.strings.ribbonMenu, ...instance.i18n.strings.macRemoveDuplicates }
+        ? { ...instance.i18n.strings.ribbonMenu, ...instance.i18n.strings.mac.removeDuplicates }
         : instance.i18n.strings.ribbonMenu;
       const state = instance.store.getState();
       const range = inferAutoFilterRange(state);
@@ -460,7 +460,9 @@ const buildSortMenuAction =
     }
     if (action === 'filter-advanced') {
       const mac =
-        instance.host.dataset.fcPlatform === 'mac' ? instance.i18n.strings.macAdvancedFilter : null;
+        instance.host.dataset.fcPlatform === 'mac'
+          ? instance.i18n.strings.mac.advancedFilter
+          : null;
       const strings = {
         ...instance.i18n.strings.ribbonMenu,
         ...mac,

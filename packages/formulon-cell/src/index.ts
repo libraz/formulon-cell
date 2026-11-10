@@ -72,8 +72,10 @@ export {
 } from './charts/index.js';
 export type {
   CategoryChartData,
+  CategoryChartPoint,
   CategoryChartSeries,
   ChartAxisSpec,
+  ChartCategory,
   ChartData,
   ChartDataLabelSpec,
   ChartDataLabelsSpec,
@@ -478,9 +480,9 @@ export type {
   ExtensionContext,
   ExtensionHandle,
   ExtensionInput,
+  ExtensionSpreadsheet,
   FeatureFlags,
   FeatureId,
-  I18nController,
   ResolvedSpreadsheetPlatform,
   ResolvedSpreadsheetUiOptions,
   SpreadsheetFeatureSwitches,

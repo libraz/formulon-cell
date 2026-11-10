@@ -44,6 +44,11 @@ export const ALL_FEATURE_IDS = [
 
 export type FeatureId = (typeof ALL_FEATURE_IDS)[number];
 
+/**
+ * Per-feature switches. An omitted (or `undefined`) flag means the feature's
+ * default: on, except `watchWindow`, `slicer`, `viewToolbar` and
+ * `localeSwitcher`, which are off until set to `true`.
+ */
 export type FeatureFlags = Partial<Record<FeatureId, boolean>>;
 
 /** Features that ship default-off — adding them to the chrome opt-in lets us

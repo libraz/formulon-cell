@@ -142,7 +142,7 @@ describe('table insert menu entries', () => {
   it('replaces the flat Insert entry with a submenu holding the two table entries', () => {
     const entries = withTableInsertMenu(buildMacCellEntries(ja, false), ja, { rows: true });
     const insert = entries.find((e) => e.kind === 'submenu' && e.id === 'insertTableMenu');
-    expect(insert?.kind === 'submenu' && insert.label).toBe(ja.macContextMenu.insert);
+    expect(insert?.kind === 'submenu' && insert.label).toBe(ja.mac.contextMenu.insert);
     expect(entries.some((e) => e.kind === 'item' && e.id === 'insertCells')).toBe(false);
     const kids = insert?.kind === 'submenu' ? insert.children : [];
     expect(kids.map((k) => (k.kind === 'item' ? [k.id, k.label] : null))).toEqual([

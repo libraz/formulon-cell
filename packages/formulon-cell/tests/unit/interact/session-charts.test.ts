@@ -188,9 +188,11 @@ const reverseOrder = (surface: HTMLElement, axisLabel: string): HTMLInputElement
 
 const CATEGORY_DATA: ChartData = {
   domain: 'category',
-  categories: ['A', 'B'],
-  categoryIds: ['category-0', 'category-1'],
-  series: [{ id: 'series-0', name: 'Value', values: [10, 20] }],
+  categories: [
+    { id: 'category-0', label: 'A' },
+    { id: 'category-1', label: 'B' },
+  ],
+  series: [{ id: 'series-0', name: 'Value', points: [{ value: 10 }, { value: 20 }] }],
 };
 
 const PROJECTED_ANCHOR = {
@@ -775,10 +777,10 @@ describe('attachSessionCharts', () => {
       { kind: 'column', title: { auto: true } },
       {
         domain: 'category',
-        categories: ['A'],
+        categories: [{ label: 'A' }],
         series: [
-          { id: 'series-0', name: 'North', values: [1] },
-          { id: 'series-1', name: 'South', values: [2] },
+          { id: 'series-0', name: 'North', points: [{ value: 1 }] },
+          { id: 'series-1', name: 'South', points: [{ value: 2 }] },
         ],
       },
     );
@@ -875,7 +877,7 @@ describe('attachSessionCharts', () => {
       typeRef('categories', 'A2:A3');
       button('fc-chart-settings__new-series-confirm').click();
       expect(seriesNames()).toEqual(['North', 'South', 'West']);
-      expect(current()?.data).toMatchObject({ categories: ['Jan', 'Feb'] });
+      expect(current()?.data).toMatchObject({ categories: [{ label: 'Jan' }, { label: 'Feb' }] });
       expect(refInput('values')).toBeNull();
       expect(seriesSelect().value).toBe('series-2');
       expect(host.querySelectorAll('.fc-chart__plot [data-chart-role="bar"]')).toHaveLength(6);
@@ -1951,11 +1953,11 @@ describe('attachSessionCharts', () => {
           { kind, nativeAnchor: sceneAnchor },
           {
             domain: 'category',
-            categories: Array.from({ length: count }, (_, index) => `C${index + 1}`),
+            categories: Array.from({ length: count }, (_, index) => ({ label: `C${index + 1}` })),
             series: [
               {
                 id: 'series-0',
-                values: Array.from({ length: count }, (_, index) => index + 1),
+                points: Array.from({ length: count }, (_, index) => ({ value: index + 1 })),
               },
             ],
           },
@@ -2391,9 +2393,11 @@ describe('attachSessionCharts', () => {
       { kind: 'pie' },
       {
         domain: 'category',
-        categories: ['A', 'B'],
-        categoryIds: ['category-0', 'category-1'],
-        series: [{ id: 'series-0', name: 'Value', values: [30, 10] }],
+        categories: [
+          { id: 'category-0', label: 'A' },
+          { id: 'category-1', label: 'B' },
+        ],
+        series: [{ id: 'series-0', name: 'Value', points: [{ value: 30 }, { value: 10 }] }],
       },
     );
     const handle = attach();
@@ -2633,9 +2637,14 @@ describe('attachSessionCharts', () => {
       { kind: 'column', filter: { hiddenCategoryIds: ['category-1'] } },
       {
         domain: 'category',
-        categories: ['A', 'B', 'C'],
-        categoryIds: ['category-0', 'category-1', 'category-2'],
-        series: [{ id: 'series-0', name: 'Value', values: [1, 2, 3] }],
+        categories: [
+          { id: 'category-0', label: 'A' },
+          { id: 'category-1', label: 'B' },
+          { id: 'category-2', label: 'C' },
+        ],
+        series: [
+          { id: 'series-0', name: 'Value', points: [{ value: 1 }, { value: 2 }, { value: 3 }] },
+        ],
       },
     );
     const handle = attach();

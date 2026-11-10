@@ -87,7 +87,7 @@ export const primitive = (
 });
 
 export const categoryIdAt = (view: CategoryChartView, pointIndex: number): string =>
-  view.data.categoryIds?.[pointIndex] ??
+  view.data.categories[pointIndex]?.id ??
   `category-${view.originalCategoryIndices[pointIndex] ?? pointIndex}`;
 
 export const pointIdAt = (view: XYChartView, seriesIndex: number, pointIndex: number): string => {

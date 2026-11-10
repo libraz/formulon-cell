@@ -181,12 +181,12 @@ export function attachMacWorkbookStatistics(
   const shell = createDialogShell({
     host,
     className: 'fc-macstatsdlg',
-    ariaLabel: strings.macWorkbookStats.title,
+    ariaLabel: strings.mac.workbookStats.title,
     onDismiss: () => api.close(),
   });
   shell.overlay.classList.add('fc-fmtdlg');
   const { header, body, footer } = appendDialogFrame(shell, {
-    title: strings.macWorkbookStats.title,
+    title: strings.mac.workbookStats.title,
     panelClasses: ['fc-fmtdlg__panel', 'fc-macstatsdlg__panel'],
     bodyClass: 'fc-fmtdlg__body fc-macstatsdlg__body',
   });
@@ -195,7 +195,7 @@ export function attachMacWorkbookStatistics(
   list.dataset.macWorkbookStatistics = 'true';
   body.appendChild(list);
   const closeBtn = appendDialogButton(footer, {
-    label: strings.macWorkbookStats.close,
+    label: strings.mac.workbookStats.close,
     variant: 'secondary',
   });
 
@@ -203,7 +203,7 @@ export function attachMacWorkbookStatistics(
 
   const render = (): void => {
     const stats = collectWorkbookStatistics(deps.getWb(), deps.store);
-    const labels = strings.macWorkbookStats;
+    const labels = strings.mac.workbookStats;
     list.replaceChildren();
     for (const key of STAT_FIELDS) {
       const term = document.createElement('dt');
@@ -217,10 +217,10 @@ export function attachMacWorkbookStatistics(
   };
 
   const refreshLabels = (): void => {
-    const title = strings.macWorkbookStats.title;
+    const title = strings.mac.workbookStats.title;
     header.textContent = title;
     shell.setAriaLabel(title);
-    closeBtn.textContent = strings.macWorkbookStats.close;
+    closeBtn.textContent = strings.mac.workbookStats.close;
   };
 
   const api: MacWorkbookStatisticsHandle = {

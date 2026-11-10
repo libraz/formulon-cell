@@ -9,7 +9,7 @@ export function confirmMoveOverwrite(
   workbook: { spreadsheetProfileId?: () => string | null } | null,
 ): Promise<boolean> {
   const t = strings.moveCells;
-  const mac = isMacWorkbook(workbook) ? strings.macAlerts.overwriteOnMove : null;
+  const mac = isMacWorkbook(workbook) ? strings.mac.alerts.overwriteOnMove : null;
   return showConfirm({
     title: t.title,
     message: mac?.message ?? t.overwriteMessage,

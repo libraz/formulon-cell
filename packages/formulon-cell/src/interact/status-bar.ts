@@ -371,7 +371,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     viewButtons.pageLayout.setAttribute('aria-label', t.pageLayoutView);
     viewButtons.pageLayout.title = t.pageLayoutView;
     const mac = isMacHost(statusbar);
-    const pageBreak = mac ? strings.macChrome.pageBreakPreview : t.pageBreakPreview;
+    const pageBreak = mac ? strings.mac.chrome.pageBreakPreview : t.pageBreakPreview;
     viewButtons.pageBreakPreview.setAttribute('aria-label', pageBreak);
     viewButtons.pageBreakPreview.title = pageBreak;
   };
@@ -437,7 +437,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const t = strings.statusBar;
     switch (key) {
       case 'capsLock':
-        return isMacHost(statusbar) ? strings.macChrome.capsLock : t.capsLock;
+        return isMacHost(statusbar) ? strings.mac.chrome.capsLock : t.capsLock;
       case 'numLock':
         return t.numLock;
       case 'scrollLock':
@@ -543,7 +543,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const refreshAccessibility = (): void => {
     if (!accessibilityStatus || !deps.accessibility) return;
-    const t = strings.macAccessibilityPane;
+    const t = strings.mac.accessibilityPane;
     accessibilityStatus.textContent = deps.accessibility.hasIssues()
       ? t.statusIssues
       : t.statusClean;
@@ -667,7 +667,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       invalidMessage: strings.ribbon.zoomDialogInvalid,
     };
     if (isMacHost(statusbar)) {
-      const mac = strings.macZoomDialog;
+      const mac = strings.mac.zoomDialog;
       const choice = await showMacZoomDialog({
         ...common,
         caption: mac.caption,
@@ -761,7 +761,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     };
 
     const mac = isMacHost(statusbar);
-    addHeading(mac ? strings.macChrome.statusBarCustomize : strings.statusBar.aggregatesHeading);
+    addHeading(mac ? strings.mac.chrome.statusBarCustomize : strings.statusBar.aggregatesHeading);
 
     const addCheckboxRow = (
       labelText: string,

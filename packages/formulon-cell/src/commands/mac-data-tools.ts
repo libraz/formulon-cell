@@ -47,7 +47,7 @@ const MAC_DATA_FUNCTIONS: ReadonlySet<MacDataFunction> = new Set([
 ]);
 
 /** Keys of the localized `macData.errors` table. */
-export type MacDataErrorCode = keyof Strings['macData']['errors'];
+export type MacDataErrorCode = keyof Strings['mac']['data']['errors'];
 
 export interface MacDataError {
   readonly status: 'rejected' | 'invalid' | 'unsupported' | 'stale' | 'nonconverged';
@@ -60,7 +60,7 @@ export interface MacDataError {
 /** Localized text for a failure: the host-supplied detail when present,
  *  otherwise the table entry for its code. */
 export const describeMacDataError = (strings: Strings, error: MacDataError): string =>
-  error.reason ?? strings.macData.errors[error.code];
+  error.reason ?? strings.mac.data.errors[error.code];
 
 export type MacDataResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -1060,7 +1060,7 @@ export function commitMacSubtotal(
   }
   const range = { ...solution.range };
   if (blockSubtotalOverDataTable(wb, range)) return failure('rejected', 'notEditable');
-  const labels = instance.i18n.strings.macData.subtotal;
+  const labels = instance.i18n.strings.mac.data.subtotal;
   const functionCode = subtotalFunctionCode(request.function);
   const columns = [...new Set(request.subtotalColumns)].filter(
     (col) => col >= range.c0 && col <= range.c1,

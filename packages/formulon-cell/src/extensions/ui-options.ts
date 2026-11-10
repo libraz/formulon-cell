@@ -2,7 +2,11 @@ import { ALL_FEATURE_IDS, type FeatureFlags } from './features.js';
 import { full, minimal, standard } from './presets.js';
 import type { ThemeName } from './types.js';
 
-export type SpreadsheetUiProfile = 'embedded' | 'minimal' | 'standard' | 'excel365' | 'full';
+/**
+ * Named starting point for `features`: `'embedded'` switches every feature off,
+ * `'minimal'` and `'standard'` apply the preset of that name, `'full'` leaves each at its default.
+ */
+export type SpreadsheetUiProfile = 'embedded' | 'minimal' | 'standard' | 'full';
 
 /** Platform preference for desktop-spreadsheet interaction details. */
 export type SpreadsheetPlatform = 'auto' | 'mac' | 'default';
@@ -50,52 +54,38 @@ export function resolveSpreadsheetPlatform(
 export const isMacHost = (el: HTMLElement): boolean =>
   (el.closest<HTMLElement>('.fc-host') ?? el).dataset.fcPlatform === 'mac';
 
-export interface SpreadsheetFeatureSwitches {
+/**
+ * Switches for the spreadsheet's chrome and features, keyed by feature id.
+ * `ribbon` and `print` are chrome switches; `conditionalFormatting`, `comments` and `pivotTable`
+ * are the friendly names of `conditional`, `commentDialog` and `pivotTableDialog`. An omitted
+ * switch means the feature's default (see {@link FeatureFlags}). The explicit switches win over
+ * the profile.
+ */
+export interface SpreadsheetFeatureSwitches extends FeatureFlags {
+  /** Show the ribbon. Defaults to `true` except for the `'embedded'` profile. */
   ribbon?: boolean;
-  formulaBar?: boolean;
-  viewToolbar?: boolean;
-  sheetTabs?: boolean;
-  statusBar?: boolean;
-  localeSwitcher?: boolean;
-  workbookObjects?: boolean;
-  contextMenu?: boolean;
-  findReplace?: boolean;
-  formatDialog?: boolean;
-  formatPainter?: boolean;
-  conditionalFormatting?: boolean;
-  namedRanges?: boolean;
-  hyperlink?: boolean;
-  comments?: boolean;
-  pasteSpecial?: boolean;
-  quickAnalysis?: boolean;
-  charts?: boolean;
+  /** Offer printing and page setup. Defaults to `true` except for the `'embedded'` profile. */
   print?: boolean;
-  pageSetup?: boolean;
+  conditionalFormatting?: boolean;
+  comments?: boolean;
   pivotTable?: boolean;
-  validation?: boolean;
-  autocomplete?: boolean;
-  clipboard?: boolean;
-  shortcuts?: boolean;
-  wheel?: boolean;
-  watchWindow?: boolean;
-  slicer?: boolean;
 }
 
 export interface SpreadsheetUiOptions {
+  /** Starting set of features; explicit `features` entries are merged over it. Defaults to `'full'`. */
   profile?: SpreadsheetUiProfile;
   /**
    * Interaction profile. Defaults to `'default'`; pass `'mac'` to force the
    * Mac profile or `'auto'` to detect it from the browser.
    */
   platform?: SpreadsheetPlatform;
-  theme?: ThemeName;
   features?: SpreadsheetFeatureSwitches;
-  advancedFeatures?: FeatureFlags;
 }
 
 export interface ResolvedSpreadsheetUiOptions {
   profile: SpreadsheetUiProfile;
   platform: ResolvedSpreadsheetPlatform;
+  /** Default theme when the host sets none; the host's own `theme` option wins. */
   theme: ThemeName;
   ribbon: boolean;
   print: boolean;
@@ -110,7 +100,6 @@ const profileFlags = (profile: SpreadsheetUiProfile): FeatureFlags => {
       return minimal();
     case 'standard':
       return standard();
-    case 'excel365':
     case 'full':
       return full();
   }
@@ -119,43 +108,18 @@ const profileFlags = (profile: SpreadsheetUiProfile): FeatureFlags => {
 export function resolveSpreadsheetUiOptions(
   opts: SpreadsheetUiOptions = {},
 ): ResolvedSpreadsheetUiOptions {
-  const profile = opts.profile ?? 'excel365';
+  const profile = opts.profile ?? 'full';
   const switches = opts.features ?? {};
-  const features: FeatureFlags = {
-    ...profileFlags(profile),
-    ...opts.advancedFeatures,
-  };
+  const features: FeatureFlags = { ...profileFlags(profile) };
 
   const apply = <K extends keyof FeatureFlags>(target: K, value: boolean | undefined): void => {
     if (value !== undefined) features[target] = value;
   };
 
-  apply('formulaBar', switches.formulaBar);
-  apply('viewToolbar', switches.viewToolbar);
-  apply('sheetTabs', switches.sheetTabs);
-  apply('statusBar', switches.statusBar);
-  apply('localeSwitcher', switches.localeSwitcher);
-  apply('workbookObjects', switches.workbookObjects);
-  apply('contextMenu', switches.contextMenu);
-  apply('findReplace', switches.findReplace);
-  apply('formatDialog', switches.formatDialog);
-  apply('formatPainter', switches.formatPainter);
+  for (const id of ALL_FEATURE_IDS) apply(id, switches[id]);
   apply('conditional', switches.conditionalFormatting);
-  apply('namedRanges', switches.namedRanges);
-  apply('hyperlink', switches.hyperlink);
   apply('commentDialog', switches.comments);
-  apply('pasteSpecial', switches.pasteSpecial);
-  apply('quickAnalysis', switches.quickAnalysis);
-  apply('charts', switches.charts);
-  apply('pageSetup', switches.pageSetup);
   apply('pivotTableDialog', switches.pivotTable);
-  apply('validation', switches.validation);
-  apply('autocomplete', switches.autocomplete);
-  apply('clipboard', switches.clipboard);
-  apply('shortcuts', switches.shortcuts);
-  apply('wheel', switches.wheel);
-  apply('watchWindow', switches.watchWindow);
-  apply('slicer', switches.slicer);
 
   if (switches.print === false && switches.pageSetup === undefined) {
     features.pageSetup = false;
@@ -164,7 +128,7 @@ export function resolveSpreadsheetUiOptions(
   return {
     profile,
     platform: resolveSpreadsheetPlatform(opts.platform),
-    theme: opts.theme ?? 'paper',
+    theme: 'paper',
     ribbon: switches.ribbon ?? profile !== 'embedded',
     print: switches.print ?? profile !== 'embedded',
     features,

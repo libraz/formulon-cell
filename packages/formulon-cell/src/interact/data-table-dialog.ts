@@ -85,7 +85,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
     }
   };
   applyLabels();
-  const unsubscribeLocale = instance.i18n.subscribe(applyLabels);
+  const unsubscribeLocale = instance.i18n.on('change', applyLabels);
 
   const close = (): void => {
     shell.close();

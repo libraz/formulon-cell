@@ -740,9 +740,9 @@ describe.skipIf(typeof WebAssembly === 'undefined')('Data > What-If Analysis', (
     const host = document.createElement('div');
     document.body.appendChild(host);
     const unsubscribes: ReturnType<typeof vi.fn>[] = [];
-    const subscribe = sheet.instance.i18n.subscribe.bind(sheet.instance.i18n);
-    vi.spyOn(sheet.instance.i18n, 'subscribe').mockImplementation((listener) => {
-      const off = vi.fn(subscribe(listener));
+    const subscribe = sheet.instance.i18n.on.bind(sheet.instance.i18n);
+    vi.spyOn(sheet.instance.i18n, 'on').mockImplementation((name, listener) => {
+      const off = vi.fn(subscribe(name, listener));
       unsubscribes.push(off);
       return off;
     });

@@ -38,7 +38,7 @@ describe('attachConditionalDialog', () => {
   });
 
   it('initializes the style from the requested kind on every open', () => {
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     const style = () =>
       document.querySelector<HTMLSelectElement>('.fc-conddlg__style-row select')?.value;
     try {
@@ -57,7 +57,7 @@ describe('attachConditionalDialog', () => {
   });
 
   it('keeps focus in a field the user moved to before the initial focus frame', async () => {
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     try {
       handle.open({ mode: 'new', kind: 'cell-value' });
       const threshold = document.querySelector<HTMLInputElement>(
@@ -75,7 +75,7 @@ describe('attachConditionalDialog', () => {
 
   it('mounts a hidden overlay and pre-fills selection range on open', () => {
     setRange(store, 0, 0, 4, 2);
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     const overlay = document.querySelector<HTMLElement>('.fc-conddlg');
     expect(overlay?.hidden).toBe(true);
 
@@ -287,7 +287,7 @@ describe('attachConditionalDialog', () => {
     setRange(store, 0, 0, 1, 0);
     const history = new History();
     const onChanged = vi.fn();
-    const handle = attachConditionalDialog({ host, store, history, onChanged });
+    const handle = attachConditionalDialog({ strings: ja, host, store, history, onChanged });
     handle.open();
 
     const valueA = document.querySelector<HTMLInputElement>(
@@ -335,7 +335,7 @@ describe('attachConditionalDialog', () => {
 
   it('adds a text cell-value rule from the classic dialog', () => {
     setRange(store, 0, 0, 1, 0);
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     handle.open({ kind: 'cell-value', cellValueOp: '=' });
 
     const valueA = document.querySelector<HTMLInputElement>(
@@ -364,7 +364,7 @@ describe('attachConditionalDialog', () => {
       apply: { fill: '#ffc7ce' },
       stopIfTrue: true,
     });
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     handle.open({ mode: 'edit', editIndex: 0 });
     document
       .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
@@ -390,7 +390,7 @@ describe('attachConditionalDialog', () => {
       const before = wb.getConditionalFormats(0)[0];
       expect(store.getState().conditional.rules[0]?.engineId).toBe(before?.id);
 
-      const handle = attachConditionalDialog({ host, store, getWb: () => wb });
+      const handle = attachConditionalDialog({ strings: ja, host, store, getWb: () => wb });
       handle.open({ mode: 'edit', editIndex: 0 });
       const valueInput = document.querySelector<HTMLInputElement>(
         '.fc-conddlg__sub input[type="text"]',
@@ -427,7 +427,7 @@ describe('attachConditionalDialog', () => {
       a: 10,
       apply: { fill: '#ffc7ce', color: '#9c0006' },
     });
-    const handle = attachConditionalDialog({ host, store, history });
+    const handle = attachConditionalDialog({ strings: ja, host, store, history });
     handle.open({ mode: 'edit', editIndex: 0 });
 
     expect(document.querySelector<HTMLElement>('.fc-fmtdlg__header')?.textContent).toBe(
@@ -467,7 +467,7 @@ describe('attachConditionalDialog', () => {
 
   it('accepts a single-cell reference in the applies-to field', () => {
     setRange(store, 0, 0, 4, 2);
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     handle.open();
 
     const rangeInput = document.querySelector<HTMLInputElement>(
@@ -504,7 +504,7 @@ describe('attachConditionalDialog', () => {
       stops: ['#ff0000', '#00ff00'],
     });
 
-    const handle = attachConditionalDialog({ host, store, history });
+    const handle = attachConditionalDialog({ strings: ja, host, store, history });
     handle.open();
 
     const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
@@ -522,7 +522,7 @@ describe('attachConditionalDialog', () => {
   });
 
   it('switches subforms when kind changes', () => {
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     handle.open();
 
     const subs = document.querySelectorAll<HTMLDivElement>('.fc-conddlg__sub');
@@ -587,7 +587,7 @@ describe('attachConditionalDialog', () => {
   });
 
   it('switches the five Excel rule styles into their matching form kinds', () => {
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     handle.open();
     const selects = Array.from(
       document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
@@ -658,7 +658,7 @@ describe('attachConditionalDialog', () => {
       range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 },
       stops: ['#f8696b', '#ffeb84', '#63be7b'],
     });
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     handle.open({ mode: 'edit', editIndex: 0 });
     const style = Array.from(
       document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
@@ -668,7 +668,7 @@ describe('attachConditionalDialog', () => {
   });
 
   it('opens with a preset rule kind from ribbon menu actions', () => {
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     handle.open({ kind: 'cell-value', cellValueOp: 'between' });
 
     const selects = Array.from(
@@ -715,7 +715,7 @@ describe('attachConditionalDialog', () => {
 
   it('labels apply-format color controls and treats Enter as Add Rule', () => {
     setRange(store, 0, 0, 1, 0);
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     handle.open();
 
     const colorInputs = Array.from(
@@ -741,7 +741,7 @@ describe('attachConditionalDialog', () => {
 
   it('detach() removes every listener left on still-connected targets', () => {
     const { registered, leaked } = trackConnectedListenerLeaks(() => {
-      const handle = attachConditionalDialog({ host, store });
+      const handle = attachConditionalDialog({ strings: ja, host, store });
       handle.open({ mode: 'new', kind: 'formula' });
       const preset = document.querySelectorAll<HTMLSelectElement>(
         '.fc-conddlg__format-picker select',
@@ -756,7 +756,7 @@ describe('attachConditionalDialog', () => {
   });
 
   it('Escape closes the overlay', () => {
-    const handle = attachConditionalDialog({ host, store });
+    const handle = attachConditionalDialog({ strings: ja, host, store });
     handle.open();
     const overlay = document.querySelector<HTMLElement>('.fc-conddlg') as HTMLElement;
     overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

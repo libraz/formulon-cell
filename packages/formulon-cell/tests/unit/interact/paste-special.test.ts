@@ -619,7 +619,7 @@ describe('attachPasteSpecial', () => {
       host,
       store,
       wb,
-      strings: { ...ja, macPasteSpecial: macPasteSpecialJa },
+      strings: { ...ja, mac: { ...ja.mac, pasteSpecial: macPasteSpecialJa } },
       getSnapshot: () => snap,
       onAfterCommit,
     });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addrKey } from '../../../../src/engine/workbook-handle.js';
 import { en } from '../../../../src/i18n/strings/en.js';
+import { ja } from '../../../../src/i18n/strings.js';
 import { attachFormatDialog } from '../../../../src/interact/format-dialog.js';
 import {
   type CellFormat,
@@ -27,7 +28,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('mounts a hidden overlay on attach', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
     expect(overlay).not.toBeNull();
     expect(overlay?.hidden).toBe(true);
@@ -35,7 +36,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('open() reveals the overlay and focuses the active tab button', async () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
     expect(overlay?.hidden).toBe(false);
@@ -47,7 +48,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('open(tab) opens the requested tab and focuses it', async () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open('more');
     const moreTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="more"]');
     const morePanel = document.querySelector<HTMLDivElement>('div[data-fc-tab="more"]');
@@ -60,7 +61,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('opens the shared validation editor as a dedicated Data Validation dialog', async () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open('more', { mode: 'dataValidation', focus: 'validation' });
 
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
@@ -152,7 +153,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('restores the normal Format Cells chrome after Data Validation mode', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open('more', { mode: 'dataValidation', focus: 'validation' });
     handle.close();
     handle.open('font');
@@ -176,7 +177,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('close() hides the overlay and refocuses host', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
     handle.close();
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
@@ -186,7 +187,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('header close button hides the overlay without applying changes', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
 
     const fontTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="font"]');
@@ -208,14 +209,14 @@ describe('attachFormatDialog', () => {
   });
 
   it('detach() removes the overlay from DOM', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     expect(document.querySelector('.fc-fmtdlg')).not.toBeNull();
     handle.detach();
     expect(document.querySelector('.fc-fmtdlg')).toBeNull();
   });
 
   it('switching tabs toggles aria-selected and panel visibility', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
 
     const fontTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="font"]');
@@ -238,7 +239,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('format tabs support Excel-style arrow, Home, and End keyboard navigation', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
 
     const numberTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="number"]');
@@ -261,7 +262,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('labels Format Cells controls for keyboard and assistive navigation', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
 
     const namedControls = Array.from(
@@ -301,7 +302,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('clicking tab strip outside button does nothing', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
     const tabsStrip = document.querySelector<HTMLElement>('.fc-fmtdlg__tabs');
     tabsStrip?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -311,7 +312,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Cancel button closes the dialog without writing', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
 
     const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
@@ -327,7 +328,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('backdrop click never closes the dialog', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
 
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
@@ -343,7 +344,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Escape closes the dialog and stops propagation', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
 
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
@@ -359,7 +360,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Enter on input applies and closes', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
 
     const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
@@ -384,7 +385,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Enter on a button does not apply (lets button click handle it)', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
 
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
@@ -401,7 +402,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('detach() removes wired listeners (clicking after detach is inert)', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();
     handle.detach();
     expect(document.querySelector('.fc-fmtdlg')).toBeNull();
@@ -409,7 +410,7 @@ describe('attachFormatDialog', () => {
 
   it('detach() removes every listener left on still-connected targets', () => {
     const { registered, leaked } = trackConnectedListenerLeaks(() => {
-      const handle = attachFormatDialog({ host, store });
+      const handle = attachFormatDialog({ strings: ja, host, store });
       handle.open('font');
       handle.detach();
     });

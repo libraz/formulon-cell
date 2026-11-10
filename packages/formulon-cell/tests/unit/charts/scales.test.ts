@@ -83,7 +83,12 @@ describe('chart scales', () => {
       [Number.MAX_VALUE * 0.5, Number.MAX_VALUE * 0.75, Number.MAX_VALUE],
     ] as const;
     for (const domain of values) {
-      const mapped = domain.map((value) => linearScale(value, domain[0], domain[2], 20, 112));
+      const mapped = domain.map((value) =>
+        linearScale(value, {
+          domain: { min: domain[0], max: domain[2] },
+          range: { from: 20, to: 112 },
+        }),
+      );
       expect(mapped.every((value) => value !== null && Number.isFinite(value))).toBe(true);
     }
     expect(numericDomain([Number.MAX_VALUE])).toEqual({
@@ -196,12 +201,21 @@ describe('chart scales', () => {
     );
     expect(powerTicks(1, 100, 10)).toEqual([1, 10, 100]);
     expect(powerTicks(2, 3, 10)).toEqual([]);
-    expect(unclampedLogProjection(1, 1, 100, 20, 220)).toBe(20);
-    expect(unclampedLogProjection(100, 1, 100, 20, 220)).toBe(220);
-    expect(unclampedLogProjection(10, 1, 100, 20, 220)).toBeCloseTo(120);
+    expect(
+      unclampedLogProjection(1, { domain: { min: 1, max: 100 }, range: { from: 20, to: 220 } }),
+    ).toBe(20);
+    expect(
+      unclampedLogProjection(100, { domain: { min: 1, max: 100 }, range: { from: 20, to: 220 } }),
+    ).toBe(220);
+    expect(
+      unclampedLogProjection(10, { domain: { min: 1, max: 100 }, range: { from: 20, to: 220 } }),
+    ).toBeCloseTo(120);
     expect(
       Number.isFinite(
-        unclampedLogProjection(Number.MAX_VALUE, Number.MAX_VALUE / 2, Number.MAX_VALUE, 20, 220),
+        unclampedLogProjection(Number.MAX_VALUE, {
+          domain: { min: Number.MAX_VALUE / 2, max: Number.MAX_VALUE },
+          range: { from: 20, to: 220 },
+        }),
       ),
     ).toBe(true);
   });

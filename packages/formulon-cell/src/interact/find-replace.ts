@@ -63,8 +63,8 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const isMac = (): boolean => isMacHost(host);
   /** The dialog's strings, with the Mac wording laid over them on the Mac host. */
   const copy = (): Strings['findReplace'] =>
-    isMac() ? { ...strings.findReplace, ...strings.macFindReplace } : strings.findReplace;
-  const widthText = (): string => strings.macFindReplace.matchWidth;
+    isMac() ? { ...strings.findReplace, ...strings.mac.findReplace } : strings.findReplace;
+  const widthText = (): string => strings.mac.findReplace.matchWidth;
   let activeTab: FindTab = 'find';
   let optionsOpen = false;
 

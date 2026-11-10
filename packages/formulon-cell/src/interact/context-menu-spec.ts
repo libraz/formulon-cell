@@ -797,7 +797,7 @@ export function buildColEntries(s: Strings): MenuEntry[] {
 
 function macPasteSpecialSubmenu(s: Strings): MenuEntry {
   const t = s.contextMenu;
-  const m = s.macContextMenu;
+  const m = s.mac.contextMenu;
   return {
     kind: 'submenu',
     id: 'pasteSpecialMenu',
@@ -827,7 +827,7 @@ function macPasteSpecialSubmenu(s: Strings): MenuEntry {
  *  the same command, so its label (and the delete row) follow `hasNote`. */
 export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
   const t = s.contextMenu;
-  const m = s.macContextMenu;
+  const m = s.mac.contextMenu;
   return [
     { kind: 'item', id: 'cut', label: m.cut, hint: '⌘X' },
     { kind: 'item', id: 'copy', label: m.copy, hint: '⌘C' },
@@ -861,7 +861,7 @@ export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
 
 /** Select-all corner menu: the Mac cell list with the band wording for Insert and Delete. */
 export function buildMacCornerEntries(s: Strings, hasNote: boolean): MenuEntry[] {
-  const m = s.macContextMenu;
+  const m = s.mac.contextMenu;
   return buildMacCellEntries(s, hasNote).map((entry) => {
     if (entry.kind !== 'item') return entry;
     if (entry.id === 'insertCells') return { ...entry, label: m.insertBand };
@@ -872,7 +872,7 @@ export function buildMacCornerEntries(s: Strings, hasNote: boolean): MenuEntry[]
 
 /** Row header menu in the Mac desktop order. */
 export function buildMacRowEntries(s: Strings): MenuEntry[] {
-  const m = s.macContextMenu;
+  const m = s.mac.contextMenu;
   return [
     ...macBandHead(s),
     { kind: 'item', id: 'rowInsertAbove', label: m.insertBand },
@@ -889,7 +889,7 @@ export function buildMacRowEntries(s: Strings): MenuEntry[] {
 
 /** Column header menu in the Mac desktop order. */
 export function buildMacColEntries(s: Strings): MenuEntry[] {
-  const m = s.macContextMenu;
+  const m = s.mac.contextMenu;
   return [
     ...macBandHead(s),
     { kind: 'item', id: 'colInsertLeft', label: m.insertBand },
@@ -905,7 +905,7 @@ export function buildMacColEntries(s: Strings): MenuEntry[] {
 }
 
 function macBandHead(s: Strings): MenuEntry[] {
-  const m = s.macContextMenu;
+  const m = s.mac.contextMenu;
   return [
     { kind: 'item', id: 'cut', label: m.cut, hint: '⌘X' },
     { kind: 'item', id: 'copy', label: m.copy, hint: '⌘C' },
@@ -918,7 +918,7 @@ function macBandHead(s: Strings): MenuEntry[] {
 /** Row/column header menus on Mac: the default entries with the Mac clipboard
  *  wording, no Delete-key hint and no Select All row. */
 export function toMacBandEntries(entries: readonly MenuEntry[], s: Strings): MenuEntry[] {
-  const m = s.macContextMenu;
+  const m = s.mac.contextMenu;
   const labels: Partial<Record<ItemId, string>> = {
     cut: m.cut,
     copy: m.copy,

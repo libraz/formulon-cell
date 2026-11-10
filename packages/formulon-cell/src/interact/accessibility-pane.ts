@@ -61,7 +61,7 @@ const sectionOf = (rule: AccessibilityRuleId): AccessibilitySectionId =>
  */
 export function attachAccessibilityPane(deps: AccessibilityPaneDeps): AccessibilityPaneHandle {
   const { host, store, getWb } = deps;
-  const labels = (): MacAccessibilityPaneStrings => deps.getStrings().macAccessibilityPane;
+  const labels = (): MacAccessibilityPaneStrings => deps.getStrings().mac.accessibilityPane;
   const dock = (): HTMLElement | null => host.querySelector<HTMLElement>('.fc-host__taskpane-dock');
 
   const root = document.createElement('div');

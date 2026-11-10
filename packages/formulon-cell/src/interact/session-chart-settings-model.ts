@@ -369,8 +369,8 @@ export const draftFromChart = (
   const yAxis = axisFromChart(chart.yAxis);
   const categoryCount =
     data.domain === 'category'
-      ? data.categories.reduce((count, _category, index) => {
-          const id = data.categoryIds?.[index] ?? `category-${index}`;
+      ? data.categories.reduce((count, category, index) => {
+          const id = category.id ?? `category-${index}`;
           return chart.filter?.hiddenCategoryIds?.includes(id) ? count : count + 1;
         }, 0)
       : 0;
@@ -478,8 +478,8 @@ export const normalizedCrossingCustom = (
 
 export const categoryCountForDraft = (data: ChartData, draft: ChartDraft): number => {
   if (data.domain !== 'category') return 0;
-  return data.categories.reduce((count, _category, index) => {
-    const id = data.categoryIds?.[index] ?? `category-${index}`;
+  return data.categories.reduce((count, category, index) => {
+    const id = category.id ?? `category-${index}`;
     return draft.filter.hiddenCategoryIds.includes(id) ? count : count + 1;
   }, 0);
 };
@@ -799,9 +799,9 @@ export const stylePointEntries = (
   labels?: SessionChartSettingsLabels,
 ): readonly { id: string; label: string }[] => {
   if (data.domain === 'category') {
-    return data.categories.map((label, index) => ({
-      id: data.categoryIds?.[index] ?? `category-${index}`,
-      label: label || `${labels?.categories ?? DEFAULT_LABELS.categories} ${index + 1}`,
+    return data.categories.map((category, index) => ({
+      id: category.id ?? `category-${index}`,
+      label: category.label || `${labels?.categories ?? DEFAULT_LABELS.categories} ${index + 1}`,
     }));
   }
   const series = data.series.find((candidate) => candidate.id === seriesId);

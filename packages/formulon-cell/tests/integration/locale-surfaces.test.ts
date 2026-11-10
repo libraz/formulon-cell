@@ -77,7 +77,11 @@ function placeholderSet(value: string): string[] {
 }
 
 function sectionValue(strings: Strings, section: LocaleSurfaceSection): unknown {
-  return (strings as unknown as Record<string, unknown>)[section];
+  let value: unknown = strings;
+  for (const key of section.split('.')) {
+    value = (value as Record<string, unknown> | undefined)?.[key];
+  }
+  return value;
 }
 
 function portalFor(host: HTMLElement): HTMLElement | null {
@@ -416,8 +420,8 @@ describe('seven-language locale surface manifest', () => {
   it('keeps every dictionary section complete and placeholder-compatible', () => {
     expect(LOCALE_SURFACE_LOCALES).toHaveLength(7);
     expect(Object.keys(dictionaries).sort()).toEqual([...LOCALE_SURFACE_LOCALES].sort());
-    expect(Object.keys(dictionaries.en)).toHaveLength(LOCALE_SURFACE_SECTIONS.length);
-    expect(Object.keys(dictionaries.en).sort()).toEqual([...LOCALE_SURFACE_SECTIONS].sort());
+    const topLevel = [...new Set(LOCALE_SURFACE_SECTIONS.map((section) => section.split('.')[0]))];
+    expect(Object.keys(dictionaries.en).sort()).toEqual(topLevel.sort());
 
     const baseline = stringLeaves(dictionaries.en);
     expect(baseline.size).toBeGreaterThan(2_000);

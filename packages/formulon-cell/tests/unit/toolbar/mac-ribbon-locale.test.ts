@@ -11,6 +11,6 @@ describe('toolbarLangForLocale', () => {
     for (const locale of ['de', 'fr', 'zh', 'ko', 'th']) {
       expect(toolbarLangForLocale(`${locale}-XX`)).toBe(locale);
     }
-    expect(toolbarLangForLocale('unknown')).toBe('ja');
+    expect(toolbarLangForLocale('unknown')).toBe('en');
   });
 });

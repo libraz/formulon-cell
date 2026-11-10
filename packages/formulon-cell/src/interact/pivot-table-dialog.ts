@@ -63,7 +63,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   let mac = false;
   const dialogStrings = () =>
     mac
-      ? { ...strings.pivotTableDialog, ...strings.macPivotTableDialog }
+      ? { ...strings.pivotTableDialog, ...strings.mac.pivotTableDialog }
       : strings.pivotTableDialog;
   const shell = createDialogShell({
     host,
@@ -266,7 +266,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     const connection = document.createElement('div');
     connection.className = 'fc-pivotdlg__connection';
     const chooseConnection = createDialogButton({
-      label: strings.macPivotTableDialog.chooseConnection,
+      label: strings.mac.pivotTableDialog.chooseConnection,
       baseClass: 'fc-pivotdlg__connection-btn',
     });
     projectDisabledState(chooseConnection, true, null);

@@ -19,9 +19,17 @@ const DIR = join(__dirname, '../../fixtures/charts');
 const bytesOf = (name: string): Uint8Array => new Uint8Array(readFileSync(join(DIR, name)));
 
 const ACCENT = ['#156082', '#e97132', '#196b24', '#0f9ed5'];
-const S1 = { id: 'series-0', name: 'S1', values: [1, 2, 3, 7] };
-const S2 = { id: 'series-1', name: 'S2', values: [4, 5, 6, 8] };
-const CATEGORIES = ['a', 'b', 'c', 'd'];
+const S1 = {
+  id: 'series-0',
+  name: 'S1',
+  points: [{ value: 1 }, { value: 2 }, { value: 3 }, { value: 7 }],
+};
+const S2 = {
+  id: 'series-1',
+  name: 'S2',
+  points: [{ value: 4 }, { value: 5 }, { value: 6 }, { value: 8 }],
+};
+const CATEGORIES = ['a', 'b', 'c', 'd'].map((label) => ({ label }));
 const SPLIT = { seriesDirection: 'columns', headerRow: true, headerColumn: true } as const;
 const SHOWN = {
   emptyCells: 'gap',

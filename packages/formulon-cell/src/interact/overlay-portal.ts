@@ -5,9 +5,10 @@
 // Why a dedicated container rather than raw `document.body`: overlays must
 // escape the `.fc-host { contain: strict }` boundary, but appending straight
 // to `<body>` drops them out of the theme cascade. The portal carries the
-// same `data-fc-theme` and `data-fc-platform` as its `.fc-host`, so every
-// overlay inside it inherits paper/ink/contrast tokens and platform-scoped
-// styling through normal cascade. It stays in the light DOM
+// same `data-fc-theme` and `data-fc-platform` as its `.fc-host`, plus the
+// host's inline `--fc-*` custom properties, so every overlay inside it
+// inherits paper/ink/contrast tokens, host-scoped variables and
+// platform-scoped styling through normal cascade. It stays in the light DOM
 // (not a shadow root) so imperative dialog/menu code and tests can still find
 // overlays with `document.querySelector`.
 
@@ -60,7 +61,24 @@ export function registerOverlayOwner(node: Element, getHost: () => HTMLElement |
   };
 }
 
+/** The `--fc-*` custom properties declared inline, by name. */
+function inlineThemeVars(el: HTMLElement): string[] {
+  const names: string[] = [];
+  for (let i = 0; i < el.style.length; i++) {
+    const name = el.style.item(i);
+    if (name.startsWith('--fc-')) names.push(name);
+  }
+  return names;
+}
+
 function syncTheme(host: HTMLElement, portal: HTMLElement): void {
+  const hostVars = inlineThemeVars(host);
+  for (const name of inlineThemeVars(portal)) {
+    if (!hostVars.includes(name)) portal.style.removeProperty(name);
+  }
+  for (const name of hostVars) {
+    portal.style.setProperty(name, host.style.getPropertyValue(name));
+  }
   const theme = host.dataset.fcTheme;
   if (theme) portal.dataset.fcTheme = theme;
   else delete portal.dataset.fcTheme;

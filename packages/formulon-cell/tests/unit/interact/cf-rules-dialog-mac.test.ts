@@ -1,7 +1,7 @@
 import { CfRuleType } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { defaultStrings } from '../../../src/i18n/strings.js';
+import { ja } from '../../../src/i18n/strings.js';
 import { attachCfRulesDialog } from '../../../src/interact/cf-rules-dialog.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -59,6 +59,7 @@ describe('attachCfRulesDialog on the Mac profile', () => {
       host,
       getWb: () => fake.wb,
       getActiveSheet: () => 0,
+      strings: ja,
       ...extra,
     });
     handle.open();
@@ -76,9 +77,9 @@ describe('attachCfRulesDialog on the Mac profile', () => {
     const { handle } = open([rule()]);
     expect(labels('.fc-cfrulesdlg__table thead th')).toEqual([
       'ルール (表示順で適用)',
-      defaultStrings.cfRulesDialog.headerFormat,
-      defaultStrings.cfRulesDialog.headerAppliesTo,
-      defaultStrings.cfRulesDialog.headerStopIfTrue,
+      ja.cfRulesDialog.headerFormat,
+      ja.cfRulesDialog.headerAppliesTo,
+      ja.cfRulesDialog.headerStopIfTrue,
     ]);
     handle.detach();
   });
@@ -89,7 +90,7 @@ describe('attachCfRulesDialog on the Mac profile', () => {
     expect(labels('.fc-cfrulesdlg__bottombar button')).toEqual([
       '+',
       '−',
-      defaultStrings.cfRulesDialog.editRule,
+      ja.cfRulesDialog.editRule,
       'ルールの重複',
     ]);
     expect(document.querySelectorAll('.fc-cfrulesdlg__order button')).toHaveLength(2);
@@ -99,8 +100,8 @@ describe('attachCfRulesDialog on the Mac profile', () => {
   it('ends with Cancel and OK instead of Clear All and Close', () => {
     const { handle } = open([rule()]);
     expect(labels('.fc-cfrulesdlg__footer > button')).toEqual([
-      defaultStrings.formatDialog.cancel,
-      defaultStrings.formatDialog.ok,
+      ja.formatDialog.cancel,
+      ja.formatDialog.ok,
     ]);
     handle.detach();
   });
@@ -257,7 +258,7 @@ describe('attachCfRulesDialog on the Mac profile', () => {
       setSelection(store, 1, 1, 3, 2);
       input.dispatchEvent(new Event('change', { bubbles: true }));
       [...document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__footer button')]
-        .find((b) => b.textContent === defaultStrings.formatDialog.cancel)
+        .find((b) => b.textContent === ja.formatDialog.cancel)
         ?.click();
       expect(store.getState().conditional.rules[0]?.range).toMatchObject({ r0: 0, r1: 4 });
       handle.detach();

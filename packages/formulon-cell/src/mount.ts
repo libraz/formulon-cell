@@ -443,10 +443,10 @@ export const Spreadsheet = {
         store,
         history,
         i18n,
-        getWb: () => wb,
         refreshCells,
         invalidate: () => renderer.invalidate(),
       },
+      getWorkbook: () => wb,
     });
     const { featureRegistry, featuresView, wrapHandle, syncBindingFeatures, refreshFeaturesView } =
       extensionRegistry;
@@ -759,7 +759,7 @@ export const Spreadsheet = {
 
       emitter.emit('localeChange', { locale: i18n.locale, strings: next });
     };
-    const unsubI18n = i18n.subscribe(applyLocaleStrings);
+    const unsubI18n = i18n.on('change', applyLocaleStrings);
     const draftObserver = new MutationObserver(() => {
       if (disposed || deferredStrings === null || hasOpenLocaleDraft(host)) return;
       applyLocaleStrings(deferredStrings);

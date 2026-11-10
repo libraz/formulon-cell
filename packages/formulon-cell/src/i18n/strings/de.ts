@@ -19,7 +19,7 @@ export const de: Strings = {
   ...editDialogsDe,
   ...formulaDialogsDe,
   ...dataObjectsDe,
-  ...macDe,
+  mac: macDe,
   ...pageLayoutDe,
   ...workbookChromeDe,
   ...localeSwitcherDe,

@@ -59,7 +59,7 @@ describe('attachCellStylesGallery', () => {
   });
 
   it('mounts a hidden overlay and reveals it on open', () => {
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     expect(overlay()?.hidden).toBe(true);
     handle.open();
     expect(overlay()?.hidden).toBe(false);
@@ -90,7 +90,7 @@ describe('attachCellStylesGallery', () => {
 
   it('uses the owner platform for live 40% accent previews and application', () => {
     host.dataset.fcPlatform = 'mac';
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
     const macChip = chips().find((chip) => chip.dataset.fcStyle === 'accent1_40');
     expect(macChip).toBeTruthy();
@@ -122,7 +122,7 @@ describe('attachCellStylesGallery', () => {
 
   it('uses Mac non-accent fallback colors for modal previews and restores defaults', () => {
     host.dataset.fcPlatform = 'mac';
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
     expect(chips().find((chip) => chip.dataset.fcStyle === 'title')?.style.color).toBe('#0e2841');
     expect(chips().find((chip) => chip.dataset.fcStyle === 'heading1')?.style.color).toBe(
@@ -166,7 +166,7 @@ describe('attachCellStylesGallery', () => {
   });
 
   it('moves chip focus with Excel-style arrow, Home, and End keys', () => {
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
     const list = chips();
     if (!list[0] || !list[1]) throw new Error('expected style chips');
@@ -189,7 +189,7 @@ describe('attachCellStylesGallery', () => {
 
   it('clicking a non-normal chip applies the style format to the active range', () => {
     setRange(store, 2, 3, 2, 3);
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
     const goodChip = chips().find((c) => c.dataset.fcStyle === 'good');
     goodChip?.click();
@@ -210,7 +210,7 @@ describe('attachCellStylesGallery', () => {
         extraRanges: [{ sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 }],
       },
     }));
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
     const goodChip = chips().find((c) => c.dataset.fcStyle === 'good');
     expect(goodChip?.getAttribute('aria-pressed')).toBe('false');
@@ -236,7 +236,7 @@ describe('attachCellStylesGallery', () => {
       label: 'Review OK',
       format: { bold: true, fill: '#c6efce', color: '#006100' },
     });
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
 
     expect(headings()).toContain(ja.cellStylesGallery.groups.custom);
@@ -274,7 +274,7 @@ describe('attachCellStylesGallery', () => {
   });
 
   it('clicking the overlay backdrop (overlay element itself) closes the gallery', () => {
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
     const o = overlay();
     o?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -283,7 +283,7 @@ describe('attachCellStylesGallery', () => {
   });
 
   it('Escape closes the gallery', () => {
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
     const o = overlay();
     o?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -297,7 +297,7 @@ describe('attachCellStylesGallery', () => {
     expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.bold).toBe(
       true,
     );
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
     const normalChip = chips().find((c) => c.dataset.fcStyle === 'normal');
     normalChip?.click();
@@ -308,7 +308,7 @@ describe('attachCellStylesGallery', () => {
   });
 
   it('detach removes the overlay from the DOM', () => {
-    const handle = attachCellStylesGallery({ host, store });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.detach();
     expect(overlay()).toBeNull();
   });

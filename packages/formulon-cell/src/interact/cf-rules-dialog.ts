@@ -200,7 +200,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   // The Mac manager works on a draft: edits take effect on OK and are dropped on Cancel.
   const mac = isMacHost(host);
   const dialogStrings = (): typeof strings.cfRulesDialog =>
-    mac ? { ...strings.cfRulesDialog, ...strings.macCfRulesDialog } : strings.cfRulesDialog;
+    mac ? { ...strings.cfRulesDialog, ...strings.mac.cfRulesDialog } : strings.cfRulesDialog;
   let t = dialogStrings();
 
   const shell = createDialogShell({
@@ -284,7 +284,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     labelCommand(deleteBtn, t.deleteRule, '−');
     labelCommand(moveUpBtn, t.moveUp, '▲');
     labelCommand(moveDownBtn, t.moveDown, '▼');
-    orderLabel.textContent = strings.macCfRulesDialog.orderLabel;
+    orderLabel.textContent = strings.mac.cfRulesDialog.orderLabel;
     orderGroup.append(orderLabel, moveUpBtn, moveDownBtn);
     bottomBar.append(newRuleBtn, deleteBtn, editRuleBtn, duplicateBtn);
   } else {
@@ -300,7 +300,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   appliesToRow.className = 'fc-cfrulesdlg__appliesto';
   const appliesToText = document.createElement('span');
   const appliesToCaption = (): string =>
-    mac ? strings.macCfRulesDialog.appliesToLabel : t.headerAppliesTo;
+    mac ? strings.mac.cfRulesDialog.appliesToLabel : t.headerAppliesTo;
   appliesToText.textContent = appliesToCaption();
   const appliesToInput = document.createElement('input');
   appliesToInput.type = 'text';
@@ -1146,7 +1146,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     labelCommand(moveDownBtn, t.moveDown, '▼');
     appliesToText.textContent = appliesToCaption();
     if (mac) appliesToInput.setAttribute('aria-label', appliesToCaption());
-    orderLabel.textContent = mac ? strings.macCfRulesDialog.orderLabel : '';
+    orderLabel.textContent = mac ? strings.mac.cfRulesDialog.orderLabel : '';
     closeBtn.textContent = t.close;
     if (!armed) clearAllBtn.textContent = t.clearAll;
     if (!overlay.hidden) renderTable();

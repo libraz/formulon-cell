@@ -221,7 +221,7 @@ export function attachExternalLinksDialog(
   const paneStrings = (): ExternalLinksPaneStrings | undefined =>
     host.closest<HTMLElement>('[data-fc-platform]')?.dataset.fcPlatform === 'mac' ||
     host.dataset.fcPlatform === 'mac'
-      ? strings.macExternalLinksPane
+      ? strings.mac.externalLinksPane
       : undefined;
   let pane: ExternalLinksPaneHandle | null = null;
 

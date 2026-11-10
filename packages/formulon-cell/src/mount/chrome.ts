@@ -69,7 +69,7 @@ export function createMountChrome({
 
   // The Mac formula bar names its controls with the desktop accessibility text.
   const barLabels = (current: typeof strings) => {
-    const mac = host.dataset.fcPlatform === 'mac' ? current.macChrome : null;
+    const mac = host.dataset.fcPlatform === 'mac' ? current.mac.chrome : null;
     return {
       fx: mac?.fxButton ?? current.fxDialog?.fxButtonLabel ?? current.a11y.formulaBar,
       cancel: mac?.cancelFormulaEdit ?? current.a11y.cancelFormulaEdit,

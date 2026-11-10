@@ -34,8 +34,8 @@ describe('dictionaries', () => {
     expect(Object.keys(dictionaries).sort()).toEqual(['de', 'en', 'fr', 'ja', 'ko', 'th', 'zh']);
   });
 
-  it('defaults to Japanese', () => {
-    expect(defaultStrings).toBe(ja);
+  it('defaults to English', () => {
+    expect(defaultStrings).toBe(en);
   });
 
   it('maps BCP 47 locale tags to the bundled dictionary language', () => {
@@ -47,7 +47,7 @@ describe('dictionaries', () => {
     expect(dictionaryLocaleFor('zh-CN')).toBe('zh');
     expect(dictionaryLocaleFor('ko-KR')).toBe('ko');
     expect(dictionaryLocaleFor('th_TH')).toBe('th');
-    expect(dictionaryLocaleFor('custom')).toBe('ja');
+    expect(dictionaryLocaleFor('custom')).toBe('en');
   });
 
   it('keeps the same shape for ja and en', () => {

@@ -106,8 +106,8 @@ const dataSignature = (data: ChartData): string =>
     categories:
       data.domain === 'category'
         ? data.categories.map((category, index) => ({
-            id: data.categoryIds?.[index] ?? `category-${index}`,
-            name: category,
+            id: category.id ?? `category-${index}`,
+            name: category.label,
           }))
         : undefined,
   });

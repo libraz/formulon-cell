@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { defaultStrings } from '../../../src/i18n/strings.js';
+import { ja } from '../../../src/i18n/strings.js';
 import { attachGoToDialog } from '../../../src/interact/goto-dialog.js';
 import {
   createSpreadsheetStore,
@@ -33,7 +33,7 @@ const okBtn = (): HTMLButtonElement | null =>
   document.querySelector<HTMLButtonElement>('.fc-goto .fc-fmtdlg__btn--primary');
 const specialBtn = (): HTMLButtonElement | undefined =>
   Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-goto .fc-fmtdlg__btn')).find(
-    (b) => b.textContent === defaultStrings.goToDialog.special,
+    (b) => b.textContent === ja.goToDialog.special,
   );
 const typeReference = (text: string): void => {
   const input = referenceInput();
@@ -104,7 +104,7 @@ describe('attachGoToDialog', () => {
 
   it('splits the Mac options eight and seven and omits the range picker', () => {
     host.dataset.fcPlatform = 'mac';
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     const columns = document.querySelectorAll<HTMLElement>(
       '.fc-goto__kinds:not(.fc-goto__targets) > div',
@@ -129,7 +129,7 @@ describe('attachGoToDialog', () => {
 
   it('words the Mac options and moves sub-options into the オプション box', () => {
     host.dataset.fcPlatform = 'mac';
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open('special');
     const label = (kind: string): string | null | undefined =>
       document.querySelector(`.fc-goto__kinds input[value="${kind}"]`)?.parentElement?.textContent;
@@ -171,7 +171,7 @@ describe('attachGoToDialog', () => {
   });
 
   it('renders the options in the two-column order with constants pre-checked', () => {
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     expect(kindRadios().map((r) => r.value)).toEqual([
       'comments',
@@ -203,7 +203,7 @@ describe('attachGoToDialog', () => {
   });
 
   it('enables the sub-options only for the options they belong to', () => {
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     const pick = (kind: string): void => {
       const radio = kindRadios().find((r) => r.value === kind) as HTMLInputElement;
@@ -224,13 +224,13 @@ describe('attachGoToDialog', () => {
     sync(store, wb);
     setRange(store, 3, 3, 3, 3);
     const before = store.getState().selection;
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     const formulaRadio = kindRadios().find((r) => r.value === 'formulas');
     if (formulaRadio) formulaRadio.checked = true;
     okBtn()?.click();
     expect(overlay()?.hidden).toBe(true);
-    expect(alertText()).toBe(defaultStrings.goToDialog.noResults);
+    expect(alertText()).toBe(ja.goToDialog.noResults);
     expect(store.getState().selection).toBe(before);
     handle.detach();
   });
@@ -240,12 +240,12 @@ describe('attachGoToDialog', () => {
     wb.recalc();
     sync(store, wb);
     setRange(store, 0, 0, 1048575, 0);
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     const blanks = kindRadios().find((r) => r.value === 'blanks');
     if (blanks) blanks.checked = true;
     okBtn()?.click();
-    expect(alertText()).toBe(defaultStrings.goToDialog.selectionTooLarge);
+    expect(alertText()).toBe(ja.goToDialog.selectionTooLarge);
     handle.detach();
   });
 
@@ -257,7 +257,7 @@ describe('attachGoToDialog', () => {
     wb.setNumber({ sheet: 0, row: 5, col: 4 }, 22);
     wb.recalc();
     sync(store, wb);
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     okBtn()?.click();
     expect(overlay()?.hidden).toBe(true);
@@ -274,7 +274,7 @@ describe('attachGoToDialog', () => {
     wb.recalc();
     sync(store, wb);
     setRange(store, 0, 0, 2, 2);
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     okBtn()?.click();
     const sel = store.getState().selection;
@@ -289,7 +289,7 @@ describe('attachGoToDialog', () => {
     wb.setBool({ sheet: 0, row: 3, col: 3 }, true);
     wb.recalc();
     sync(store, wb);
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     for (const check of valueFilterChecks()) {
       check.checked = check.value === 'logical';
@@ -303,7 +303,7 @@ describe('attachGoToDialog', () => {
 
   it('Go To lists range names then recent references and fills the reference on click', () => {
     defineNames(wb, { Zeta: '=Sheet1!$B$2:$C$3', alpha: '=Sheet1!$A$1' });
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open('go-to');
     expect(targetItems()).toEqual(['alpha', 'Zeta']);
     typeReference('B2');
@@ -316,7 +316,7 @@ describe('attachGoToDialog', () => {
   });
 
   it('keeps only the last four recent references, newest first', () => {
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     for (const ref of ['A1', 'B1', 'C1', 'D1', 'E1', 'C1']) {
       handle.open('go-to');
       typeReference(ref);
@@ -329,7 +329,7 @@ describe('attachGoToDialog', () => {
 
   it('Go To accepts defined names, sheet-qualified and multi-area references', () => {
     defineNames(wb, { Tax: '=Sheet1!$B$2:$C$3' });
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open('go-to');
     typeReference('Tax');
     okBtn()?.click();
@@ -346,7 +346,7 @@ describe('attachGoToDialog', () => {
   });
 
   it('Go To reads R2C3 as a reference only in R1C1 reference style', () => {
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: true } }));
     handle.open('go-to');
     typeReference('R2C3');
@@ -363,7 +363,7 @@ describe('attachGoToDialog', () => {
   });
 
   it('Go To scrolls a far-away reference into view', () => {
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open('go-to');
     typeReference('C800');
     okBtn()?.click();
@@ -375,7 +375,7 @@ describe('attachGoToDialog', () => {
 
   it('Go To switches sheet for a sheet-qualified reference', () => {
     wb.addSheet('My Sheet');
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open('go-to');
     typeReference("'My Sheet'!B4");
     okBtn()?.click();
@@ -388,21 +388,19 @@ describe('attachGoToDialog', () => {
   });
 
   it('the Special button opens Go To Special', () => {
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open('go-to');
     expect(document.body.textContent).toContain('参照先');
     expect(kindRadios()[0]?.closest('[hidden]')).toBeTruthy();
     specialBtn()?.click();
     expect(overlay()?.hidden).toBe(false);
-    expect(overlay()?.querySelector('.fc-fmtdlg__header')?.textContent).toBe(
-      defaultStrings.goToDialog.title,
-    );
+    expect(overlay()?.querySelector('.fc-fmtdlg__header')?.textContent).toBe(ja.goToDialog.title);
     expect(referenceInput()?.closest('label')?.hidden).toBe(true);
     handle.detach();
   });
 
   it('normal Go To jumps to a typed reference range', () => {
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open('go-to');
     const input = referenceInput();
     if (!input) throw new Error('missing reference input');
@@ -417,7 +415,7 @@ describe('attachGoToDialog', () => {
 
   it('normal Go To uses the shared range picker for the reference input', () => {
     setRange(store, 1, 1, 3, 3);
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open('go-to');
 
     const picker = document.querySelector<HTMLButtonElement>(
@@ -439,12 +437,12 @@ describe('attachGoToDialog', () => {
   });
 
   it('normal Go To keeps the dialog open on an invalid reference', () => {
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open('go-to');
     const input = referenceInput();
     if (input) input.value = 'not a ref';
     okBtn()?.click();
-    expect(status()?.textContent).toBe(defaultStrings.goToDialog.invalidReference);
+    expect(status()?.textContent).toBe(ja.goToDialog.invalidReference);
     expect(overlay()?.hidden).toBe(false);
     handle.detach();
   });
@@ -452,7 +450,7 @@ describe('attachGoToDialog', () => {
   it('Escape closes the dialog without mutating the selection', () => {
     setRange(store, 1, 1, 1, 1);
     const before = { ...store.getState().selection.active };
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.open();
     overlay()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(overlay()?.hidden).toBe(true);
@@ -461,7 +459,7 @@ describe('attachGoToDialog', () => {
   });
 
   it('detach removes the overlay node', () => {
-    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     handle.detach();
     expect(overlay()).toBeNull();
   });

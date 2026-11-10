@@ -27,6 +27,23 @@ afterEach(() => {
 });
 
 describe('overlay portal', () => {
+  it('copies the host --fc-* custom properties and drops the ones the host lost', () => {
+    const host = makeHost();
+    host.style.setProperty('--fc-accent', '#123456');
+    host.style.setProperty('--fc-radius', '4px');
+    host.style.setProperty('color', 'red');
+    const portal = ensureOverlayPortal(host);
+    expect(portal.style.getPropertyValue('--fc-accent')).toBe('#123456');
+    expect(portal.style.getPropertyValue('--fc-radius')).toBe('4px');
+    expect(portal.style.getPropertyValue('color')).toBe('');
+
+    host.style.removeProperty('--fc-radius');
+    host.style.setProperty('--fc-accent', '#abcdef');
+    refreshOverlayPortal(host);
+    expect(portal.style.getPropertyValue('--fc-accent')).toBe('#abcdef');
+    expect(portal.style.getPropertyValue('--fc-radius')).toBe('');
+  });
+
   it.each(['dialog', 'alertdialog'])(
     'blocks visible %s drafts only in their owning sheet',
     (role) => {

@@ -1,36 +1,42 @@
 // Extensions — the public surface for feature composition.
 //
-// v0.1 ships `features` flags + presets and Extension factories for
-// every replaceable built-in. Pair `features: {<id>: false}` with
-// `extensions: [<factory>()]` to substitute your own implementation.
+// Feature flags + presets, and one Extension factory per replaceable
+// built-in. Each factory is named after the feature id it provides, and an
+// extension added under that id replaces the built-in.
 
-// Built-in factories — wrap each `attach*` interact module as an
-// Extension. Consumers replace a built-in by disabling it via
-// `MountOptions.features` and re-mounting their own through `extensions`.
+// Built-in factories — wrap each `attach*` interact module as an Extension.
+// Names the factories carried before they were renamed after their feature ids.
 export {
   allBuiltIns,
   borderDraw,
   charts,
   clipboard,
   commentDialog,
-  conditionalDialog,
+  conditional,
+  conditional as conditionalDialog,
   contextMenu,
   findReplace,
   formatDialog,
   formatPainter,
-  goToSpecialDialog,
+  gotoSpecial,
+  gotoSpecial as goToSpecialDialog,
   hoverComment,
-  hyperlinkDialog,
+  hyperlink,
+  hyperlink as hyperlinkDialog,
   illustrations,
-  iterativeDialog,
-  namedRangeDialog,
-  pageSetupDialog,
+  iterative,
+  iterative as iterativeDialog,
+  namedRanges,
+  namedRanges as namedRangeDialog,
+  pageSetup,
+  pageSetup as pageSetupDialog,
   pasteSpecial,
   pivotTableDialog,
   quickAnalysis,
   slicer,
   statusBar,
-  validationList,
+  validation,
+  validation as validationList,
   viewToolbar,
   watchWindow,
   wheel,
@@ -49,7 +55,7 @@ export type {
   ExtensionContext,
   ExtensionHandle,
   ExtensionInput,
-  I18nController,
+  ExtensionSpreadsheet,
   ThemeName,
 } from './types.js';
 export { dedupeById, flattenExtensions, sortByPriority } from './types.js';

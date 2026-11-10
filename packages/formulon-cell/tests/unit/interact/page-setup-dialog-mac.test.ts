@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { defaultStrings } from '../../../src/i18n/strings.js';
+import { ja } from '../../../src/i18n/strings.js';
 import { attachPageSetupDialog } from '../../../src/interact/page-setup-dialog.js';
 import { createSpreadsheetStore, getPageSetup, mutators } from '../../../src/store/store.js';
 
-const t = defaultStrings.pageSetup;
+const t = ja.pageSetup;
 /** Visible within its tab panel; the panel's own tab state is ignored. */
 const visible = (el: Element | null): boolean => {
   for (let node = el; node && node.getAttribute('role') !== 'tabpanel'; node = node.parentElement) {
@@ -29,7 +29,7 @@ describe('Page Setup dialog on the Mac profile', () => {
 
   const open = () => {
     const store = createSpreadsheetStore();
-    const handle = attachPageSetupDialog({ host, store });
+    const handle = attachPageSetupDialog({ host, store, strings: ja });
     handle.open();
     return { store, handle };
   };
@@ -85,6 +85,7 @@ describe('Page Setup dialog on the Mac profile', () => {
     const handle = attachPageSetupDialog({
       host,
       store,
+      strings: ja,
       getPrinterProfiles: () => [{ id: 'demo', name: 'Demo' }],
       refreshPrinterProfiles: async () => [],
     } as unknown as Parameters<typeof attachPageSetupDialog>[0]);

@@ -95,7 +95,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   const strings = deps.strings ?? defaultStrings;
   let mode: 'go-to' | 'special' = 'special';
   const mac = isMacHost(host);
-  const macText = mac ? strings.macGoToDialog : null;
+  const macText = mac ? strings.mac.goToDialog : null;
   const t = macText ? { ...strings.goToDialog, ...macText } : strings.goToDialog;
 
   const shell = createDialogShell({

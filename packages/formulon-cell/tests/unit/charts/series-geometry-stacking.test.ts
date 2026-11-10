@@ -7,19 +7,22 @@ const CATEGORIES = 4;
 
 const build = (counter: { reads: number }): CategoryChartData => ({
   domain: 'category',
-  categories: Array.from({ length: CATEGORIES }, (_, i) => `c${i}`),
+  categories: Array.from({ length: CATEGORIES }, (_, i) => ({ label: `c${i}` })),
   series: Array.from({ length: SERIES }, (_, s) => {
     const values = Array.from({ length: CATEGORIES }, (_, c) =>
       (s + c) % 3 === 0 ? -(s + 1) : s + 1,
     );
     return {
       id: `s${s}`,
-      values: new Proxy(values, {
-        get(target, key, receiver) {
-          if (typeof key === 'string' && /^\d+$/.test(key)) counter.reads += 1;
-          return Reflect.get(target, key, receiver);
+      points: new Proxy(
+        values.map((value) => ({ value })),
+        {
+          get(target, key, receiver) {
+            if (typeof key === 'string' && /^\d+$/.test(key)) counter.reads += 1;
+            return Reflect.get(target, key, receiver);
+          },
         },
-      }),
+      ),
     };
   }),
 });
@@ -36,13 +39,13 @@ describe('stacked segments', () => {
   it('accumulates positive and negative runs separately', () => {
     const data: CategoryChartData = {
       domain: 'category',
-      categories: ['a'],
+      categories: [{ label: 'a' }],
       series: [
-        { id: '1', values: [2] },
-        { id: '2', values: [-3] },
-        { id: '3', values: [4] },
-        { id: '4', values: [null] },
-        { id: '5', values: [-1] },
+        { id: '1', points: [{ value: 2 }] },
+        { id: '2', points: [{ value: -3 }] },
+        { id: '3', points: [{ value: 4 }] },
+        { id: '4', points: [{ value: null }] },
+        { id: '5', points: [{ value: -1 }] },
       ],
     };
     const seg = segmentsFor(data, 'stacked').map((s) => s[0]);

@@ -1,3 +1,5 @@
+import type { SessionShapeLineDash } from '../store/types.js';
+
 /** The seven chart families understood by the session chart renderer. */
 export type ChartKind = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'doughnut' | 'scatter';
 
@@ -30,7 +32,9 @@ export interface ChartAxisSpec {
   readonly crossing?: 'auto' | 'min' | 'max' | number;
   /** Title text, or Excel's automatic title. */
   readonly title?: string | ChartAutoTitle;
+  /** Lower bound of the value axis, in data units; automatic when omitted. */
   readonly min?: number;
+  /** Upper bound of the value axis, in data units; automatic when omitted. */
   readonly max?: number;
   /** Explicit finite positive major tick interval. */
   readonly majorUnit?: number;
@@ -41,7 +45,9 @@ export interface ChartAxisSpec {
 }
 
 export interface ChartLegendSpec {
+  /** Show the legend. Defaults to `true` for charts with several series and for pie charts. */
   readonly visible?: boolean;
+  /** Side of the plot the legend sits on. Defaults to `'bottom'`. */
   readonly position?: 'top' | 'right' | 'bottom' | 'left';
 }
 
@@ -58,11 +64,18 @@ export interface ChartFillSpec {
 }
 
 export interface ChartLineSpec {
+  /** CSS colour of the line; the series colour when omitted. */
   readonly color?: string;
+  /** Excel transparency percentage (0–100): 0 is opaque and 100 is invisible. */
   readonly transparency?: number;
-  /** Line width in points. */
+  /** Line width in points (0–72); 0 suppresses a series line. */
   readonly width?: number;
-  readonly dash?: 'solid' | 'dash' | 'dot' | 'dash-dot';
+  /**
+   * Dash style, in the vocabulary of a shape outline. Defaults to `'solid'`. A workbook stores
+   * only solid, dash, dot and dash-dot: long dashes read back as `'dash'`, square dots as
+   * `'roundDot'`, and the long dash-dot forms as `'dashDot'`.
+   */
+  readonly dash?: SessionShapeLineDash;
 }
 
 export interface ChartMarkerSpec {
@@ -116,29 +129,34 @@ export type ChartLabelPosition =
   | 'right';
 
 export interface ChartDataLabelsSpec {
+  /** Draw the labels. */
   readonly visible?: boolean;
   readonly showSeriesName?: boolean;
   readonly showCategoryName?: boolean;
   readonly showValue?: boolean;
+  /** Show the share of the whole; pie and doughnut charts only. */
   readonly showPercentage?: boolean;
   readonly showLegendKey?: boolean;
+  /** Text between the parts of one label. Defaults to `', '`. */
   readonly separator?: string;
   readonly position?: ChartLabelPosition;
+  /** Excel number format of the value part; the series' own format when omitted. */
   readonly numberFormat?: string;
+  /** CSS colour of the label text. */
   readonly color?: string;
+  /** Label font size in points. */
   readonly fontSize?: number;
 }
 
-/** Backwards-compatible singular spelling. Prefer ChartDataLabelsSpec. */
+/** Singular spelling of {@link ChartDataLabelsSpec}. */
 export type ChartDataLabelSpec = ChartDataLabelsSpec;
-/** Short spelling used by the standalone chart package API. */
-export type DataLabelSpec = ChartDataLabelsSpec;
 
+/** Formats a chart value with an Excel number format; `null` leaves it to the built-in formatter. */
 export type ChartValueFormatter = (
   value: number,
-  formatCode: string | undefined,
+  numberFormat: string | undefined,
   locale: string,
-) => string | null | undefined;
+) => string | null;
 
 /**
  * Excel's automatic title. A chart title shows the only series' name of a
@@ -188,23 +206,35 @@ export interface ChartSpec {
 /** How a resolved point is drawn: a value, a break in the line, or skipped with the line joined across it. */
 export type ChartPointState = 'value' | 'gap' | 'connect';
 
+/** One point of a category series. */
+export interface CategoryChartPoint {
+  /** The value; `null` for an empty cell. */
+  readonly value: number | null;
+  /** How the point is drawn; defaults to `'value'`. */
+  readonly state?: ChartPointState;
+}
+
 export interface CategoryChartSeries {
   readonly id: string;
   readonly name?: string;
-  readonly values: readonly (number | null)[];
-  /** Per-point state, parallel to `values`. */
-  readonly states?: readonly ChartPointState[];
-  /** Number format of the series values. */
-  readonly formatCode?: string;
+  /** One point per category, in category order. */
+  readonly points: readonly CategoryChartPoint[];
+  /** Excel number format of the series values. */
+  readonly numberFormat?: string;
+}
+
+/** One category of a category chart. */
+export interface ChartCategory {
+  /** Stable identity used by filters and point styles; `category-<index>` when omitted. */
+  readonly id?: string;
+  readonly label: string;
 }
 
 export interface CategoryChartData {
   readonly domain: 'category';
-  readonly categories: readonly string[];
-  /** Stable category identities used by filters and point styles. */
-  readonly categoryIds?: readonly string[];
-  /** Number format of the category labels. */
-  readonly categoryFormatCode?: string;
+  readonly categories: readonly ChartCategory[];
+  /** Excel number format of the category labels. */
+  readonly categoryNumberFormat?: string;
   readonly series: readonly CategoryChartSeries[];
 }
 
@@ -220,10 +250,10 @@ export interface XYChartSeries {
   readonly id: string;
   readonly name?: string;
   readonly points: readonly XYChartPoint[];
-  /** Number format of the y values. */
-  readonly formatCode?: string;
-  /** Number format of the x values. */
-  readonly xFormatCode?: string;
+  /** Excel number format of the y values. */
+  readonly numberFormat?: string;
+  /** Excel number format of the x values. */
+  readonly xNumberFormat?: string;
 }
 
 export interface XYChartData {
@@ -258,6 +288,8 @@ export type ChartPrimitiveRole =
   | 'slice'
   | 'data-label'
   | 'data-label-key'
+  | 'frame'
+  | 'unsupported'
   | 'empty';
 
 /** A browser-independent SVG-like element description. */
@@ -265,7 +297,7 @@ export interface ChartPrimitive {
   readonly tag: ChartPrimitiveTag;
   readonly attrs: Readonly<Record<string, string | number>>;
   readonly text?: string;
-  readonly role?: ChartPrimitiveRole | string;
+  readonly role?: ChartPrimitiveRole;
   readonly seriesIndex?: number;
   readonly pointIndex?: number;
   readonly seriesId?: string;
