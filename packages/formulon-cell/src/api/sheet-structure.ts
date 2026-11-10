@@ -59,17 +59,10 @@ export const SHEET_STRUCTURE_MEMBERS = {
     ],
     view: ['updateView', 'setSelection', 'setTabColor', 'setVisibility'],
     format: ['setHyperlink', 'clearHyperlinks'],
-    drawing: [
-      'setComment',
-      'setCommentVisible',
-      'addThreadedComment',
-      'updateThreadedComment',
-      'removeThreadedComment',
-      'addSparklineGroup',
-      'updateSparklineGroup',
-      'removeSparklineGroup',
-    ],
-    table: ['setAutoFilter', 'applyAutoFilter', 'clearAutoFilterCriteria'],
+    comments: ['setComment', 'setCommentVisible'],
+    threadedComments: ['addThreadedComment', 'updateThreadedComment', 'removeThreadedComment'],
+    sparklineGroups: ['addSparklineGroup', 'updateSparklineGroup', 'removeSparklineGroup'],
+    autoFilter: ['setAutoFilter', 'applyAutoFilter', 'clearAutoFilterCriteria'],
   },
 } as const satisfies MemberSpec<SheetContext>;
 

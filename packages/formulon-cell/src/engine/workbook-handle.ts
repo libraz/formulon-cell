@@ -109,13 +109,17 @@ export type ChangeEvent =
 
 /** Store slice a non-cell write through the public facade touched; the mount re-hydrates it. */
 export type FacadeChangeKind =
-  | 'table'
   | 'format'
+  | 'comments'
+  | 'threadedComments'
   | 'layout'
-  | 'drawing'
-  | 'print'
   | 'view'
   | 'names'
+  | 'table'
+  | 'autoFilter'
+  | 'drawing'
+  | 'sparklineGroups'
+  | 'print'
   | 'cf'
   | 'validation'
   | 'protection';
