@@ -4,6 +4,7 @@ import { copy } from '../../../src/commands/clipboard/copy.js';
 import type { ClipboardSnapshot } from '../../../src/commands/clipboard/snapshot.js';
 import { captureSnapshotFromCopyResult } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
@@ -177,6 +178,17 @@ describe('mount/host-shortcuts', () => {
   });
 
   it('Ctrl+K opens the hyperlink dialog', () => {
+    s.handler(key({ key: 'k', ctrlKey: true }));
+    expect(s.feature.hyperlinkDialog?.open).toHaveBeenCalledTimes(1);
+  });
+
+  it('Ctrl+K opens nothing on a protected sheet without Insert hyperlinks', () => {
+    setProtectedSheet(s.store, 0, true);
+    const e = key({ key: 'k', ctrlKey: true });
+    s.handler(e);
+    expect(e.defaultPrevented).toBe(true);
+    expect(s.feature.hyperlinkDialog?.open).not.toHaveBeenCalled();
+    setProtectedSheet(s.store, 0, true, { permissions: { insertHyperlinks: true } });
     s.handler(key({ key: 'k', ctrlKey: true }));
     expect(s.feature.hyperlinkDialog?.open).toHaveBeenCalledTimes(1);
   });

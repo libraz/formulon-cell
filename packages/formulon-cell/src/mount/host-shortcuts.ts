@@ -1,3 +1,4 @@
+import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { executeRibbonFillAction, fillOutputRange } from '../commands/fill.js';
@@ -456,7 +457,8 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       const dialog = input.hyperlinkDialog();
       if (!dialog) return;
       e.preventDefault();
-      if (restricted) return;
+      // A refused command opens nothing, as the greyed ribbon button does.
+      if (!canExecuteBuiltIn(input.store, 'hyperlinkInsert', 'keyboard').allowed) return;
       dialog.open({ origin: 'keyboard', commandId: 'hyperlinkInsert' });
     } else if (matchesRibbonShortcut(e, 'formatCells', 'formatCellsHome')) {
       const dialog = input.formatDialog();

@@ -381,7 +381,7 @@ describe('Mac automation gallery', () => {
     const origins: string[] = [];
     native.controller.setPolicy({
       defaultOperation: 'deny',
-      operations: { hyperlink: true },
+      operations: { clear: true, hyperlink: true },
       editable: ({ addr }) => addr.row >= 40 && addr.row <= 41 && addr.col >= 2 && addr.col <= 3,
       restrict: ({ intent }) => {
         origins.push(intent.origin);
@@ -441,7 +441,7 @@ describe('Mac automation gallery', () => {
     const otherBefore = workbook.getHyperlinksFull(1);
     controller.setPolicy({
       defaultOperation: 'deny',
-      operations: { hyperlink: true },
+      operations: { clear: true, hyperlink: true },
       editable: ({ addr }) => addr.sheet === 0 && addr.row >= 82 && addr.row <= 83,
     });
 
@@ -490,7 +490,10 @@ describe('Mac automation gallery', () => {
       authorizationCalls += 1;
       return canExecute(intent);
     };
-    controller.setPolicy({ defaultOperation: 'deny', operations: { hyperlink: true } });
+    controller.setPolicy({
+      defaultOperation: 'deny',
+      operations: { clear: true, hyperlink: true },
+    });
     let events = 0;
     host.addEventListener('fc:mac-automation', () => {
       events += 1;
@@ -526,7 +529,10 @@ describe('Mac automation gallery', () => {
       authorizationCalls += 1;
       return canExecute(intent);
     };
-    controller.setPolicy({ defaultOperation: 'deny', operations: { hyperlink: true } });
+    controller.setPolicy({
+      defaultOperation: 'deny',
+      operations: { clear: true, hyperlink: true },
+    });
 
     await runMacAutomationScript(instance, 'removeHyperlinks');
 
@@ -559,7 +565,7 @@ describe('Mac automation gallery', () => {
     };
     native.controller.setPolicy({
       defaultOperation: 'deny',
-      operations: { hyperlink: true },
+      operations: { clear: true, hyperlink: true },
       editable: { ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 }] },
     });
 
@@ -573,7 +579,7 @@ describe('Mac automation gallery', () => {
 
     native.controller.setPolicy({
       defaultOperation: 'deny',
-      operations: { hyperlink: true },
+      operations: { clear: true, hyperlink: true },
       restrict: () => true,
     });
     setProtectedSheet(store, 0, true);
@@ -599,7 +605,10 @@ describe('Mac automation gallery', () => {
       ),
     ).toBe(true);
     const boundedBefore = bounded.workbook.getHyperlinksFull(0);
-    bounded.controller.setPolicy({ defaultOperation: 'deny', operations: { hyperlink: true } });
+    bounded.controller.setPolicy({
+      defaultOperation: 'deny',
+      operations: { clear: true, hyperlink: true },
+    });
     await runMacAutomationScript(bounded.instance, 'removeHyperlinks');
     expect(bounded.workbook.getHyperlinksFull(0)).toEqual(boundedBefore);
     expect(bounded.history.canUndo()).toBe(false);
@@ -629,7 +638,7 @@ describe('Mac automation gallery', () => {
     const origins: string[] = [];
     controller.setPolicy({
       defaultOperation: 'deny',
-      operations: { hyperlink: true },
+      operations: { clear: true, hyperlink: true },
       editable: ({ addr: candidate }) => candidate.row === addr.row && candidate.col === addr.col,
       restrict: ({ intent }) => {
         origins.push(intent.origin);
@@ -688,7 +697,10 @@ describe('Mac automation gallery', () => {
       if (calls === 2) return false;
       return remove(...args);
     };
-    native.controller.setPolicy({ defaultOperation: 'deny', operations: { hyperlink: true } });
+    native.controller.setPolicy({
+      defaultOperation: 'deny',
+      operations: { clear: true, hyperlink: true },
+    });
 
     await expect(runMacAutomationScript(instance, 'removeHyperlinks')).rejects.toThrow(
       'Could not remove hyperlink',
@@ -711,7 +723,10 @@ describe('Mac automation gallery', () => {
     );
     const before = workbook.getHyperlinksFull(0);
     expect(before).toHaveLength(2);
-    controller.setPolicy({ defaultOperation: 'deny', operations: { hyperlink: true } });
+    controller.setPolicy({
+      defaultOperation: 'deny',
+      operations: { clear: true, hyperlink: true },
+    });
 
     await runMacAutomationScript(instance, 'removeHyperlinks');
     expect(workbook.getHyperlinksFull(0)).toEqual([]);
@@ -728,7 +743,10 @@ describe('Mac automation gallery', () => {
       workbook.addHyperlinkRange(0, 74, 1, 74, 1, 'https://undo.example', 'Undo', '', ''),
     ).toBe(true);
     const before = workbook.getHyperlinksFull(0);
-    controller.setPolicy({ defaultOperation: 'deny', operations: { hyperlink: true } });
+    controller.setPolicy({
+      defaultOperation: 'deny',
+      operations: { clear: true, hyperlink: true },
+    });
 
     await runMacAutomationScript(instance, 'removeHyperlinks');
     expect(workbook.getHyperlinksFull(0)).toEqual([]);
