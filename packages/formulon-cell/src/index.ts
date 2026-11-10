@@ -576,20 +576,6 @@ export {
   buildFileLossReport,
   buildSpreadsheetCompatibilityReport,
 } from './interact/workbook-objects.js';
-export type {
-  AdapterControlledProps,
-  AdapterReconcileHandlers,
-  AdapterRibbonCallbacks,
-} from './mount/adapter-props.js';
-export {
-  ADAPTER_FALLBACK_LOCALE,
-  ADAPTER_FALLBACK_SELECTION,
-  applyControlledLocale,
-  applyControlledProps,
-  applyUiFeaturesToolbar,
-  buildAdapterRibbonWiring,
-  resolveAdapterTheme,
-} from './mount/adapter-props.js';
 export type { DefaultDynamicDropdownsOptions } from './mount/dynamic-dropdowns-defaults.js';
 export { createDefaultDynamicDropdownsCtx } from './mount/dynamic-dropdowns-defaults.js';
 export type {

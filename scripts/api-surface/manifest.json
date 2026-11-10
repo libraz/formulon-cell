@@ -873,18 +873,11 @@
     },
     "@libraz/formulon-cell/adapter": {
       "mustExport": {
-        "ADAPTER_FALLBACK_LOCALE": "value",
-        "ADAPTER_FALLBACK_SELECTION": "value",
-        "AdapterControlledProps": "type",
-        "AdapterReconcileHandlers": "type",
-        "AdapterRibbonCallbacks": "type",
         "DefaultDynamicDropdownsOptions": "type",
-        "applyControlledLocale": "value",
-        "applyControlledProps": "value",
-        "applyUiFeaturesToolbar": "value",
-        "buildAdapterRibbonWiring": "value",
         "createDefaultDynamicDropdownsCtx": "value",
-        "resolveAdapterTheme": "value"
+        "propsPatch": "value",
+        "reconcileProps": "value",
+        "sameProp": "value"
       },
       "mustNotExport": []
     },
