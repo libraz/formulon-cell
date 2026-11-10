@@ -174,7 +174,14 @@ type DragMode =
     }
   /** Moving the selection by its frame; `grab` is the grabbed cell's offset
    *  from the block's top-left. */
-  | { kind: 'move'; src: Range; grab: { row: number; col: number }; menu?: boolean }
+  | {
+      kind: 'move';
+      src: Range;
+      grab: { row: number; col: number };
+      menu?: boolean;
+      /** Client position of a right-button press, to tell a click from a drag. */
+      pressed?: { x: number; y: number };
+    }
   /** An item of a report dragged by its cell border; `after` is the row it is dropped below. */
   | { kind: 'pivot-item'; slots: PivotItemSlots; fromRow: number; after: number }
   | { kind: 'page-break'; handle: PageBreakHandle; target: number }
@@ -607,6 +614,9 @@ export function attachPointer(
     if (result.status === 'applied') onAfterCommit?.();
   };
 
+  /** Pointer travel, in client px, within which a right press is still a click. */
+  const RIGHT_CLICK_SLOP_PX = 4;
+
   let releaseContextMenuSwallow: (() => void) | null = null;
   const swallowContextMenu = (): void => {
     releaseContextMenuSwallow?.();
@@ -662,6 +672,7 @@ export function attachPointer(
           src,
           grab: { row: grabbed.row - src.r0, col: grabbed.col - src.c0 },
           menu: true,
+          pressed: { x: e.clientX, y: e.clientY },
         };
         host.style.cursor = 'move';
         swallowContextMenu();
@@ -1568,10 +1579,28 @@ export function attachPointer(
     if (drag.kind === 'move') {
       const target = store.getState().ui.movePreview;
       mutators.setMovePreview(store, null);
-      const { src, menu } = drag;
+      const { src, menu, pressed } = drag;
       drag = { kind: 'none' };
       host.style.cursor = '';
       if (menu) {
+        const click =
+          !target &&
+          pressed !== undefined &&
+          Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) <= RIGHT_CLICK_SLOP_PX;
+        if (click) {
+          // A right press that never became a drag is a plain right-click: let the
+          // cell menu open for the current selection, then swallow the native event.
+          releaseContextMenuSwallow?.();
+          host.dispatchEvent(
+            new MouseEvent('contextmenu', {
+              bubbles: true,
+              cancelable: true,
+              clientX: e.clientX,
+              clientY: e.clientY,
+            }),
+          );
+          swallowContextMenu();
+        }
         finishSecondaryDrag();
         if (target) {
           host.dispatchEvent(
