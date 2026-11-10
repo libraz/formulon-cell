@@ -239,6 +239,24 @@ export abstract class WorkbookHandleTablesMethods {
     return t ? attempt(() => t.update(patch)) : false;
   }
 
+  /** Insert data rows `first`..`last` (data-row positions) into the table at `index`; the
+   *  table's columns move down and calculated columns fill the new rows. */
+  insertTableRows(index: number, first: number, last: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.tableMutate) return false;
+    const t = tableAt(this, index);
+    return t ? attempt(() => t.insertRows(first, last)) : false;
+  }
+
+  /** Insert columns `first`..`last` (table-column positions) into the table at `index`; the
+   *  table's rows move right and each new column is named from its left neighbour. */
+  insertTableColumns(index: number, first: number, last: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.tableMutate) return false;
+    const t = tableAt(this, index);
+    return t ? attempt(() => t.insertColumns(first, last)) : false;
+  }
+
   /** Rename the table at `index`; structured references follow the new name. */
   renameTable(index: number, name: string): boolean {
     assertAlive(this);

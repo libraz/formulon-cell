@@ -197,8 +197,14 @@ export function insertTableRows(
 ): boolean {
   const table = tableForCell(store.getState().tables.tables, range.sheet, range.r0, range.c0);
   if (!table || (table.showHeader && range.r0 === table.range.r0)) return false;
+  const index = table.name ? wb.tableIndexByName(table.name) : null;
+  if (index === null || blockedByProtection(store, range.sheet, 'insert cells')) return false;
   const { c0, c1 } = table.range;
-  return insertCells(store, wb, history, { ...range, c0, c1 }, 'down');
+  const first = range.r0 - table.range.r0 - (table.showHeader ? 1 : 0);
+  const last = first + range.r1 - range.r0;
+  return shiftCellsViaEngine(store, wb, history, { ...range, c0, c1 }, 'down', () =>
+    wb.insertTableRows(index, first, last),
+  );
 }
 
 /** Table Columns to the Left: shift the table's rows right by as many columns as `range` spans. */
@@ -210,8 +216,14 @@ export function insertTableColumns(
 ): boolean {
   const table = tableForCell(store.getState().tables.tables, range.sheet, range.r0, range.c0);
   if (!table) return false;
+  const index = table.name ? wb.tableIndexByName(table.name) : null;
+  if (index === null || blockedByProtection(store, range.sheet, 'insert cells')) return false;
   const { r0, r1 } = table.range;
-  return insertCells(store, wb, history, { ...range, r0, r1 }, 'right');
+  const first = range.c0 - table.range.c0;
+  const last = first + range.c1 - range.c0;
+  return shiftCellsViaEngine(store, wb, history, { ...range, r0, r1 }, 'right', () =>
+    wb.insertTableColumns(index, first, last),
+  );
 }
 
 export function deleteCells(
@@ -492,14 +504,16 @@ function restoreShiftStoreSlices(
 
 /** Insert or delete the cells of `range` through the engine, which moves the
  *  band's cells, adjusts every reference and splits conditional formats,
- *  validations and merges. One history step; undo shifts back and restores
- *  what the shift removed. */
+ *  validations and merges. `apply` performs the forward edit (a table insert
+ *  in place of the plain shift). One history step; undo shifts back and
+ *  restores what the shift removed. */
 function shiftCellsViaEngine(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
   history: History | null,
   range: Range,
   direction: InsertCellsDirection | DeleteCellsDirection,
+  apply: () => boolean = () => wb.engineShiftCells(range, ENGINE_SHIFT[direction]),
 ): boolean {
   // Shifting cells is an engine operation; the stub engine cannot do it.
   if (!wb.capabilities.insertDeleteRowsCols) return false;
@@ -516,7 +530,7 @@ function shiftCellsViaEngine(
   const beforeEngine = record ? captureEngineShiftCheckpoint(wb, store, band) : null;
   if (record && beforeEngine === null) return false;
   const beforeStore = record ? captureShiftStoreSlices(store.getState()) : null;
-  if (!wb.engineShiftCells(range, shift)) {
+  if (!apply()) {
     explainRefusedShift(wb, band);
     return false;
   }
@@ -533,7 +547,7 @@ function shiftCellsViaEngine(
         restoreShiftStoreSlices(store, wb, sheet, beforeStore);
       },
       redo: () => {
-        if (!wb.engineShiftCells(range, shift)) throw new Error('cell shift: redo was refused');
+        if (!apply()) throw new Error('cell shift: redo was refused');
         wb.recalcAuto();
         restoreShiftStoreSlices(store, wb, sheet, afterStore);
       },
