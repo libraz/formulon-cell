@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
+import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { createSessionChart, sessionChartById } from '../../../src/commands/session-chart.js';
 import {
@@ -143,6 +148,26 @@ describe('clipboard with a selected chart or picture', () => {
     expect(charts()).toEqual([]);
     expect(history.undo()).toBe(true);
     expect(charts().map((entry) => entry.id)).toEqual([original.id]);
+  });
+
+  it('copies a chart under a policy that allows copying, and cuts none under a viewer', async () => {
+    const original = chart();
+    const controller = new InteractionController({ store, getWb: () => wb, history });
+    const unregister = registerInteractionController(store, controller);
+    try {
+      controller.setPolicy({ defaultOperation: 'allow' });
+      await handle.runShortcut('copy');
+      expect(systemText).toBe('Chart 1');
+
+      controller.setPolicy(viewerPolicy());
+      systemText = 'Earlier text';
+      mutators.setSelectedObject(store, { id: original.id, name: 'Chart 1' });
+      await handle.runShortcut('cut');
+      expect(systemText).toBe('Earlier text');
+      expect(charts().map((entry) => entry.id)).toEqual([original.id]);
+    } finally {
+      unregister();
+    }
   });
 
   it('pastes text copied elsewhere rather than the chart copied before it', async () => {

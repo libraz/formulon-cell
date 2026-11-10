@@ -25,6 +25,7 @@ import { encodeTSV, parseTSV } from '../commands/clipboard/tsv.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { policyPermits } from '../commands/interaction-policy.js';
 import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
@@ -73,12 +74,24 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   let disposed = false;
   const drawings = createDrawingClipboard({ store, wb, history });
 
-  const isRestricted = (): boolean => interactionControllerFor(store)?.policy !== undefined;
+  const policy = () => interactionControllerFor(store)?.policy;
+  /** The full-fidelity clipboard writes without asking the policy, so it runs only when the
+   *  policy limits no cell and allows pasting formulas and formats. Otherwise copies carry
+   *  values alone and pastes go through the controller, cell by cell. */
+  const valuesOnly = (): boolean => {
+    const current = policy();
+    if (current === undefined) return false;
+    if (current.editable !== undefined) return true;
+    return !(['paste', 'formulaEdit', 'format'] as const).every((operation) =>
+      policyPermits(current, operation),
+    );
+  };
 
   /** Copy or cut the selected chart or picture instead of the cells under it.
    *  Returns the system clipboard text, or null when nothing was taken. */
   const takeDrawing = (mode: 'copy' | 'cut'): string | null => {
-    if (isRestricted()) return null;
+    if (policy()?.copy === false) return null;
+    if (mode === 'cut' && !policyPermits(policy(), 'object')) return null;
     const text = drawings.take(mode);
     if (text === null) return null;
     snapshot = null;
@@ -92,10 +105,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   /** Paste the copied chart or picture when the system clipboard still holds
    *  it; `text` is null when the clipboard cannot be read. */
   const pasteDrawing = (text: string | null): boolean =>
-    !isRestricted() && drawings.owns(text) && drawings.paste();
+    policyPermits(policy(), 'object') && drawings.owns(text) && drawings.paste();
 
-  /** Restricted internal copies intentionally retain cell positions and values
-   * only. Re-pasting them must not carry formulas, formats, or cut semantics. */
+  /** A values-only copy retains cell positions and values only. Re-pasting it must not
+   * carry formulas, formats, or cut semantics. */
   const valueOnlySnapshot = (source: ClipboardSnapshot): ClipboardSnapshot => ({
     ...source,
     mode: 'copy',
@@ -315,7 +328,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       // Keep snapshotText untouched: it is the system clipboard token that
       // proves this is still the workbook's internal payload. Only the
       // structured cell snapshot is re-materialized.
-      snapshot = refreshed ? (isRestricted() ? valueOnlySnapshot(refreshed) : refreshed) : null;
+      snapshot = refreshed ? (valuesOnly() ? valueOnlySnapshot(refreshed) : refreshed) : null;
     }
     return snapshot === null || snapshot.mode === ui.copyMode;
   };
@@ -471,10 +484,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     }
     const resolveFormat = formatResolverFor(s);
     const captured = captureMaterializedSnapshot(s, r, 'copy', resolveFormat);
-    snapshot = isRestricted() && captured ? valueOnlySnapshot(captured) : captured;
-    snapshotText = snapshot && isRestricted() ? valueOnlyText(snapshot) : r.tsv;
+    snapshot = valuesOnly() && captured ? valueOnlySnapshot(captured) : captured;
+    snapshotText = snapshot && valuesOnly() ? valueOnlyText(snapshot) : r.tsv;
     e.clipboardData.setData('text/plain', snapshotText ?? r.tsv);
-    if (!isRestricted()) {
+    if (!valuesOnly()) {
       e.clipboardData.setData('text/html', encodeMaterializedHtml(s, r, resolveFormat));
     }
     if (r.ranges) mutators.setCopyRanges(store, r.ranges);
@@ -492,8 +505,8 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       if (text !== null) e.clipboardData?.setData('text/plain', text);
       return;
     }
-    if (isRestricted()) {
-      // Cut is a move operation. The restricted route has no atomic move
+    if (valuesOnly() || !policyPermits(policy(), 'moveCells')) {
+      // Cut is a move operation. The values-only route has no atomic move
       // executor yet, so fail closed before touching data or the marquee.
       e.preventDefault();
       return;
@@ -531,7 +544,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       return;
     }
     if (!hasPastePayload(text)) return;
-    if (isRestricted()) {
+    if (valuesOnly()) {
       e.preventDefault();
       const r = restrictedPaste(s, text);
       if (r) {
@@ -628,19 +641,19 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
         return;
       }
       const captured = captureMaterializedSnapshot(s, r, 'copy');
-      snapshot = isRestricted() && captured ? valueOnlySnapshot(captured) : captured;
-      snapshotText = snapshot && isRestricted() ? valueOnlyText(snapshot) : r.tsv;
+      snapshot = valuesOnly() && captured ? valueOnlySnapshot(captured) : captured;
+      snapshotText = snapshot && valuesOnly() ? valueOnlyText(snapshot) : r.tsv;
       if (r.ranges) mutators.setCopyRanges(store, r.ranges);
       else mutators.setCopyRange(store, r.range);
       payloadRevision = store.getState().ui.copyRevision ?? 0;
       await writeClipboard(
         snapshotText ?? r.tsv,
-        isRestricted() ? null : encodeMaterializedHtml(s, r),
+        valuesOnly() ? null : encodeMaterializedHtml(s, r),
       );
       return;
     }
     if (kind === 'cut') {
-      if (isRestricted()) return;
+      if (valuesOnly() || !policyPermits(policy(), 'moveCells')) return;
       const r = cut(s, wb);
       if (!r) return;
       drawings.clear();
@@ -682,7 +695,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (pasteState.ui.editor.kind !== 'idle') return;
     if (pasteDrawing(text)) return;
     if (!hasPastePayload(text)) return;
-    if (isRestricted()) {
+    if (valuesOnly()) {
       const r = restrictedPaste(pasteState, text);
       if (!r) return;
       consumeCutMarquee();
