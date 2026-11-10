@@ -66,7 +66,16 @@ const cellMenuAllowed = (
   action: string,
 ): boolean => {
   const id = commands[action];
-  return id === undefined || canExecuteBuiltInRequest(instance.store, id, 'ribbon').allowed;
+  if (id === undefined) return true;
+  // The Home menu's Cells item is the shift itself over part of the rows: unlike the context
+  // menu's Insert… / Delete…, it is not offered for its Entire row / Entire column choices.
+  if (action === 'cells') {
+    const range = normalizedSelectionRange(instance);
+    if (!isWholeRowRange(range) && !isWholeColumnRange(range))
+      return cellShiftChoices(instance.store, id === 'insertCells' ? 'insert' : 'delete', 'ribbon')
+        .shift;
+  }
+  return canExecuteBuiltInRequest(instance.store, id, 'ribbon').allowed;
 };
 
 const buildCellInsertAction =

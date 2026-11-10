@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { builtInProtectionDecision } from '../../../src/commands/built-in-command-policy.js';
+import {
+  builtInProtectionDecision,
+  canExecuteBuiltIn,
+  cellShiftChoices,
+} from '../../../src/commands/built-in-command-policy.js';
 import type { InteractionPolicy } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { insertCellsAction, insertRowsAction } from '../../../src/commands/row-col-actions.js';
@@ -19,12 +23,6 @@ const menuOf = (attr: 'cellInsert' | 'cellDelete', actions: readonly string[]): 
   }
   return menu;
 };
-
-/** The choices the open cell dialog offers. */
-const dialogChoices = (): string[] =>
-  [...document.querySelectorAll<HTMLInputElement>('.fc-cellshift input[type="radio"]')]
-    .filter((input) => !input.disabled)
-    .map((input) => input.value);
 
 const enabled = (menu: HTMLElement, attr: 'cellInsert' | 'cellDelete'): string[] =>
   [...menu.querySelectorAll<HTMLButtonElement>('button')]
@@ -61,17 +59,23 @@ describe('row and column insert and delete on a protected sheet', () => {
     expect(document.querySelector('.fc-cellshift')).toBeNull();
   });
 
-  it('with Insert rows only, offers Rows and a cell dialog of Entire row alone', async () => {
+  it('with Insert rows only, offers Rows; the Home Cells item stays off, the context menu dialog offers Entire row', async () => {
     const { instance, ctx, value } = await setup();
     setProtectedSheet(instance.store, 0, true, { permissions: { insertRows: true } });
     const menu = menuOf('cellInsert', ['cells', 'rows', 'cols']);
 
     mutators.setRange(instance.store, CELL);
     ctx.updateCellInsertMenu(menu);
-    expect(enabled(menu, 'cellInsert')).toEqual(['cells', 'rows']);
+    expect(enabled(menu, 'cellInsert')).toEqual(['rows']);
     ctx.applyCellInsertAction('cells');
-    expect(dialogChoices()).toEqual(['rows']);
-    document.querySelector<HTMLButtonElement>('.fc-cellshift__button--secondary')?.click();
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    // The context menu's Insert… opens the dialog for its Entire row choice.
+    expect(canExecuteBuiltIn(instance.store, 'insertCells', 'contextMenu').allowed).toBe(true);
+    expect(cellShiftChoices(instance.store, 'insert', 'contextMenu')).toEqual({
+      shift: false,
+      rows: true,
+      cols: false,
+    });
     ctx.applyCellInsertAction('cols');
     expect(value(1)).toEqual({ kind: 'number', value: 2 });
 
@@ -93,10 +97,9 @@ describe('row and column insert and delete on a protected sheet', () => {
 
     mutators.setRange(instance.store, CELL);
     ctx.updateCellDeleteMenu(menu);
-    expect(enabled(menu, 'cellDelete')).toEqual(['cells', 'rows', 'row']);
+    expect(enabled(menu, 'cellDelete')).toEqual(['rows', 'row']);
     ctx.applyCellDeleteAction('cells');
-    expect(dialogChoices()).toEqual(['rows']);
-    document.querySelector<HTMLButtonElement>('.fc-cellshift__button--secondary')?.click();
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
 
     // Every cell is locked; the option alone lets the rows go.
     mutators.setRange(instance.store, ROW);

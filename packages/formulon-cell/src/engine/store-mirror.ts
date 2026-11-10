@@ -22,6 +22,7 @@ import {
 } from './format-history-bridge.js';
 import { advanceNativeFormatEpoch } from './native-format-epoch.js';
 import { syncPageSetupToEngine } from './print-sync.js';
+import { hydrateAxisLocksFromEngine } from './protection-sync.js';
 import { syncSheetPrToEngine } from './sheet-pr-sync.js';
 import {
   captureSyncedFormatKeyMembership,
@@ -248,13 +249,12 @@ export class StoreMirror {
         formatSheets.add(sheet);
       }
       const nextSheetAxisOverrides = state.format.sheetAxisOverrides ?? new Map();
-      for (const sheet of changedMapKeys(
+      const axisSheets = changedMapKeys(
         this.lastSheetAxisOverrides ?? undefined,
         nextSheetAxisOverrides,
         sameJson,
-      )) {
-        formatSheets.add(sheet);
-      }
+      );
+      for (const sheet of axisSheets) formatSheets.add(sheet);
       const stylesChanged = (state.format.customCellStyles ?? null) !== this.lastCustomCellStyles;
       if (stylesChanged) {
         // Only sheets whose cells reference a style are rewritten; flushing any
@@ -297,6 +297,11 @@ export class StoreMirror {
       try {
         for (const sheet of formatPublicationSheets) {
           flushFormatToEngine(this.handle, store, sheet);
+        }
+        // Row and column styles just written decide the lock of unformatted cells.
+        for (const sheet of axisSheets) {
+          if (sheet < this.handle.sheetCount)
+            this.withMuted(() => hydrateAxisLocksFromEngine(this.handle, store, sheet));
         }
         if (stylesChanged) syncNamedStyleCatalogToEngine(this.handle, store);
       } finally {

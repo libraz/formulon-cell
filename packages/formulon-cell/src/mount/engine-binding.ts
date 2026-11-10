@@ -21,6 +21,7 @@ import { hydrateLayoutFromEngine } from '../engine/layout-sync.js';
 import { hydrateMergesFromEngine } from '../engine/merges-sync.js';
 import { hydratePageSetupFromEngine } from '../engine/print-sync.js';
 import {
+  hydrateAxisLocksFromEngine,
   hydrateProtectedRangesFromEngine,
   hydrateProtectionFromEngine,
 } from '../engine/protection-sync.js';
@@ -89,7 +90,11 @@ type SliceHydrator = (
 /** The store slices each kind of facade write leaves stale, re-read from the engine for the sheet
  *  the write touched (the active sheet for a workbook-scoped write). */
 const FACADE_HYDRATORS: Readonly<Record<FacadeChangeKind, readonly SliceHydrator[]>> = {
-  format: [hydrateCellFormatsFromEngine, hydrateCommentsAndHyperlinksFromEngine],
+  format: [
+    hydrateCellFormatsFromEngine,
+    hydrateCommentsAndHyperlinksFromEngine,
+    hydrateAxisLocksFromEngine,
+  ],
   comments: [hydrateCommentsAndHyperlinksFromEngine],
   threadedComments: [hydrateThreadedCommentsFromEngine],
   layout: [

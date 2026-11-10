@@ -10,7 +10,10 @@ import { hydrateLayoutFromEngine } from '../engine/layout-sync.js';
 import { hydrateMergesFromEngine } from '../engine/merges-sync.js';
 import { summarizePassthroughs, summarizeTables } from '../engine/passthrough-sync.js';
 import { hydratePageSetupFromEngine } from '../engine/print-sync.js';
-import { hydrateProtectionFromEngine } from '../engine/protection-sync.js';
+import {
+  hydrateAxisLocksFromEngine,
+  hydrateProtectionFromEngine,
+} from '../engine/protection-sync.js';
 import { hydrateSheetPrFromEngine } from '../engine/sheet-pr-sync.js';
 import { hydrateSlicersFromEngine } from '../engine/slicer-sync.js';
 import { hydrateSparklinesFromEngine } from '../engine/sparkline-sync.js';
@@ -33,6 +36,7 @@ export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: Spreadsh
     hydrateMergesFromEngine(wb, store, sheet);
     hydrateValidationsFromEngine(wb, store, sheet);
     hydrateCellFormatsFromEngine(wb, store, sheet);
+    hydrateAxisLocksFromEngine(wb, store, sheet);
     hydrateConditionalRulesFromEngine(wb, store, sheet);
     hydrateAutoFilterFromEngine(wb, store, sheet);
     hydratePageSetupFromEngine(wb, store, sheet);

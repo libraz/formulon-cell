@@ -681,12 +681,25 @@ export interface WorkbookStructureProtectionState {
   passwordHash?: SheetProtectionPasswordHash;
 }
 
+/** The Locked flag of a sheet's row and column styles, read from the engine: what a cell with no
+ *  format of its own inherits (row style first, then column style, else locked). */
+export interface SheetAxisLocks {
+  readonly rows: ReadonlyMap<number, boolean>;
+  readonly cols: readonly {
+    readonly first: number;
+    readonly last: number;
+    readonly locked: boolean;
+  }[];
+}
+
 export interface ProtectionSlice {
   protectedSheets: Map<number, SheetProtectionState>;
   workbookStructure?: WorkbookStructureProtectionState;
   allowedEditRanges: readonly AllowedEditRange[];
   /** Password-guarded ranges unlocked this session; never saved or undone. */
   unlockedAllowedRanges?: ReadonlySet<string>;
+  /** Per sheet, the lock its row and column styles give unformatted cells. */
+  axisLocks?: ReadonlyMap<number, SheetAxisLocks>;
 }
 
 export interface ThreadedCommentsSlice {

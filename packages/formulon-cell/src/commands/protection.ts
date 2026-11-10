@@ -986,9 +986,34 @@ export function recordProtectionChange<T>(
  *  missing format entry (or `locked === undefined`) returns `true`. Only
  *  an explicit `locked: false` opts the cell out. */
 export function isCellLocked(state: State, addr: Addr): boolean {
-  const fmt = state.format.formats.get(addrKey(addr));
-  return fmt?.locked !== false;
+  const own = state.format.formats.get(addrKey(addr))?.locked;
+  if (own !== undefined) return own;
+  return axisLocked(state, addr.sheet, addr.row, addr.col);
 }
+
+/** The lock a cell with no Locked flag of its own inherits: its row style's, else its column
+ *  style's, else locked. */
+const axisLocked = (state: State, sheet: number, row: number, col: number): boolean => {
+  const axes = state.protection.axisLocks?.get(sheet);
+  const rowLock = axes?.rows.get(row);
+  if (rowLock !== undefined) return rowLock;
+  return axes?.cols.find((span) => col >= span.first && col <= span.last)?.locked ?? true;
+};
+
+/** Whether column styles leave every column of `first..last` unlocked. */
+const columnsUnlocked = (state: State, sheet: number, first: number, last: number): boolean => {
+  const spans = [...(state.protection.axisLocks?.get(sheet)?.cols ?? [])].sort(
+    (a, b) => a.first - b.first,
+  );
+  let next = first;
+  for (const span of spans) {
+    if (span.last < next) continue;
+    if (span.first > next || span.locked) return false;
+    next = span.last + 1;
+    if (next > last) return true;
+  }
+  return next > last;
+};
 
 /** Combined gate. A cell is writable when EITHER the sheet is unprotected
  *  OR the cell is explicitly unlocked. Used by the command layer at write
@@ -1005,8 +1030,19 @@ export function isCellFormattable(state: State, addr: Addr): boolean {
   return sheetPermits(state, addr.sheet, 'formatCells') || isCellWritable(state, addr);
 }
 
-/** Whether every cell of rows (or columns) `start..start+count-1` is unlocked. A band too large to
- *  inspect cell by cell counts as locked. */
+/** Whether column styles leave unlocked every column of a row other than `own`. */
+const gapsUnlocked = (state: State, sheet: number, own: readonly number[]): boolean => {
+  let next = 0;
+  for (const col of [...own].sort((a, b) => a - b)) {
+    if (col > next && !columnsUnlocked(state, sheet, next, col - 1)) return false;
+    next = Math.max(next, col + 1);
+  }
+  return next > MAX_COL || columnsUnlocked(state, sheet, next, MAX_COL);
+};
+
+/** Whether every cell of rows (or columns) `start..start+count-1` is unlocked, by the Locked flag
+ *  each cell takes: its own, else its row style's, else its column style's. Read from the styles
+ *  and the stored cells rather than cell by cell. */
 export function isBandUnlocked(
   state: State,
   sheet: number,
@@ -1014,17 +1050,35 @@ export function isBandUnlocked(
   start: number,
   count: number,
 ): boolean {
-  const range: Range =
-    axis === 'row'
-      ? { sheet, r0: start, c0: 0, r1: start + count - 1, c1: MAX_COL }
-      : { sheet, r0: 0, c0: start, r1: MAX_ROW, c1: start + count - 1 };
-  if (rangeArea(range) > MAX_MATERIALIZED_LOCK_CELLS) return false;
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    for (let col = range.c0; col <= range.c1; col += 1) {
-      if (isCellLocked(state, { sheet, row, col })) return false;
-    }
+  const end = start + count - 1;
+  const axes = state.protection.axisLocks?.get(sheet);
+  const inBand = (row: number, col: number): boolean =>
+    axis === 'row' ? row >= start && row <= end : col >= start && col <= end;
+  // Columns of each banded row holding a format of their own.
+  const ownCols = new Map<number, number[]>();
+  for (const [key, fmt] of state.format.formats) {
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet || !inBand(addr.row, addr.col)) continue;
+    if (fmt.locked === true) return false;
+    if (fmt.locked === undefined && axisLocked(state, sheet, addr.row, addr.col)) return false;
+    if (axis !== 'row') continue;
+    const cols = ownCols.get(addr.row);
+    if (cols) cols.push(addr.col);
+    else ownCols.set(addr.row, [addr.col]);
   }
-  return true;
+  if (axis === 'row') {
+    // A cell with no format takes its row style, or without one its column style.
+    for (let row = start; row <= end; row += 1) {
+      const rowLock = axes?.rows.get(row);
+      if (rowLock === true) return false;
+      if (rowLock === undefined && !gapsUnlocked(state, sheet, ownCols.get(row) ?? []))
+        return false;
+    }
+    return true;
+  }
+  // A row style overrides the column's for every cell of that row.
+  for (const rowLock of axes?.rows.values() ?? []) if (rowLock) return false;
+  return columnsUnlocked(state, sheet, start, end);
 }
 
 /** Soft warn-and-return helper used by writeInput / writeCoerced wrappers.

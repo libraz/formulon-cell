@@ -26,6 +26,30 @@ export function hydrateProtectionFromEngine(wb: WorkbookHandle, store: Spreadshe
   for (let i = 0; i < wb.sheetCount; i += 1) hydrateSheetProtectionFromEngine(wb, store, i);
 }
 
+/** Read the Locked flag of `sheet`'s row and column styles into the store, so a lock check of a
+ *  cell with no format of its own sees what it inherits. */
+export function hydrateAxisLocksFromEngine(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+): void {
+  const snapshot = wb.getSheetFontAxisSnapshot?.(sheet) ?? null;
+  if (!snapshot) {
+    mutators.setSheetAxisLocks(store, sheet, null);
+    return;
+  }
+  // An XF with no protection element is locked.
+  const locked = (xf: number): boolean => wb.getCellXf(xf)?.locked !== false;
+  mutators.setSheetAxisLocks(store, sheet, {
+    rows: new Map(snapshot.rows.map(({ row, styleXf }) => [row, locked(styleXf)])),
+    cols: snapshot.columns.map(({ first, last, styleXf }) => ({
+      first,
+      last,
+      locked: locked(styleXf),
+    })),
+  });
+}
+
 /** Read one sheet's `<sheetProtection>` and protected ranges into the store. */
 export function hydrateSheetProtectionFromEngine(
   wb: WorkbookHandle,

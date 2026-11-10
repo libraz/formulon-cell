@@ -5,6 +5,7 @@ import type {
   OutlineSummary,
   PageSetup,
   ProtectionSlice,
+  SheetAxisLocks,
   SheetProtectionPasswordHash,
   SheetProtectionPermissions,
   SheetProtectionState,
@@ -41,6 +42,16 @@ export const newAllowedEditRangeId = (): string =>
 /** Per-sheet and workbook settings: protection, allowed-edit ranges, page
  *  setup and sheet tab colors. */
 export const sheetSettingsMutators = {
+  /** Record the lock `sheet`'s row and column styles give unformatted cells; null forgets it. */
+  setSheetAxisLocks(store: SpreadsheetStore, sheet: number, locks: SheetAxisLocks | null): void {
+    store.setState((s) => {
+      const next = new Map(s.protection.axisLocks);
+      if (locks) next.set(sheet, locks);
+      else if (!next.delete(sheet)) return s;
+      return { ...s, protection: { ...s.protection, axisLocks: next } };
+    });
+  },
+
   /** Toggle sheet-level protection for `sheet`. When `on` is `true` the sheet
    *  enters protected mode and the command layer gates writes against
    *  per-cell `locked` flags. The optional password and permission flags
