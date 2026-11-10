@@ -757,11 +757,14 @@ function applyAxisShiftViaEngine(
     let ok = false;
     if (insert) {
       // Undoing a delete that removed no row (the table's only data row, blanked) inserts none.
+      // Undoing one that kept a table's first data row inserts at that row, inside the table, so
+      // the engine grows the table back; the captured band then refills every row.
+      const at = nativeDelete ? deleteSplit : split;
       ok =
         count === 0 ||
         (axis === 'row'
-          ? wb.engineInsertRows(sheet, split, count)
-          : wb.engineInsertCols(sheet, split, count));
+          ? wb.engineInsertRows(sheet, at, count)
+          : wb.engineInsertCols(sheet, at, count));
     } else {
       ok =
         axis === 'row'

@@ -173,4 +173,47 @@ describe('deleting sheet rows against a table', () => {
     expect(text(1)).toEqual({ kind: 'blank' });
     expect(text(2)).toEqual({ kind: 'text', value: 'below' });
   });
+  it('grows the engine table back on undo when it has no totals row', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    [
+      ['Item', 'Qty'],
+      ['Pen', 3],
+      ['Ink', 5],
+      ['Pad', 2],
+    ].forEach(([item, qty], row) => {
+      wb.setText({ sheet: 0, row, col: 0 }, item as string);
+      if (typeof qty === 'number') wb.setNumber({ sheet: 0, row, col: 1 }, qty);
+      else wb.setText({ sheet: 0, row, col: 1 }, qty as string);
+    });
+    wb.createTable(0, { range: 'A1:B4', name: 'Sales', columns: ['Item', 'Qty'] });
+    const store = createSpreadsheetStore();
+    mutators.replaceCells(store, wb.cells(0));
+    hydrateTableOverlaysFromEngine(wb, store);
+    wb.attachStore(store);
+    const history = new History();
+    // The engine's own record of the table, not the overlay.
+    const engineRef = () => wb.getTables().find((t) => t.name === 'Sales')?.ref;
+    const text = (row: number) => wb.getValue({ sheet: 0, row, col: 0 });
+
+    expect(deleteRows(store, wb, history, 1, 3)).toBe(true);
+    expect(engineRef()).toBe('A1:B2');
+    expect(text(1)).toEqual({ kind: 'blank' });
+
+    expect(history.undo()).toBe(true);
+    expect(engineRef()).toBe('A1:B4');
+    expect(table(store)?.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 });
+    expect([1, 2, 3].map((row) => text(row))).toEqual([
+      { kind: 'text', value: 'Pen' },
+      { kind: 'text', value: 'Ink' },
+      { kind: 'text', value: 'Pad' },
+    ]);
+    expect(num(wb, 3, 1)).toBe(2);
+
+    expect(history.redo()).toBe(true);
+    expect(engineRef()).toBe('A1:B2');
+    expect(text(1)).toEqual({ kind: 'blank' });
+    expect(table(store)?.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    wb.detachStore(store);
+    wb.dispose();
+  });
 });
