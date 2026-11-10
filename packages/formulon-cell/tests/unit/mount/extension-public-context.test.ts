@@ -33,7 +33,9 @@ describe('extension public context', () => {
       expect(ctx.i18n).not.toHaveProperty('register');
       expect(ctx.i18n).not.toHaveProperty('setLocale');
 
+      const swapped = new Promise((resolve) => instance.on('workbook', resolve));
       instance.update({ workbook: second });
+      await swapped;
 
       expect(swaps).toEqual([second]);
       expect(ctx.workbook).toBe(second);

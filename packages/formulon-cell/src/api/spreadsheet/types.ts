@@ -132,10 +132,11 @@ export interface UpdateEvent {
 }
 
 /** A failure after `mount` resolved that no call could throw: an extension's setup, a host
- *  provider's rejection, a deferred engine failure. */
+ *  provider's rejection, a deferred engine failure, or a workbook swap the mount could not make
+ *  (`'workbook'`; the instance keeps its current workbook). */
 export interface ErrorEvent {
   readonly error: unknown;
-  readonly source: 'extension' | 'host' | 'engine';
+  readonly source: 'extension' | 'host' | 'engine' | 'workbook';
 }
 
 /** Events of a {@link SpreadsheetInstance}. */

@@ -182,6 +182,11 @@ interface InstanceState {
   options: SpreadsheetOptions;
   /** The current host providers; the mounted spreadsheet reads them through it at call time. */
   readonly host: { current: HostProviders };
+  /** The workbook the latest `update({ workbook })` asked for; differs from `workbook` while the
+   *  mount is still switching to it. */
+  requestedWorkbook: Workbook;
+  /** Workbook swaps, run one at a time in request order. */
+  swaps: Promise<void>;
   origin: ChangeOrigin | null;
   readonly life: Lifecycle;
   readonly events: Emitter<SpreadsheetInstanceEvents>;
@@ -599,25 +604,44 @@ const applyHostProviders = (state: InstanceState, host: HostProviders): void => 
 };
 
 const swapWorkbook = (state: InstanceState, next: Workbook | null): void => {
-  if (next === state.workbook) return;
-  const replacement = next;
-  if (!replacement) throw new TypeError('update({ workbook: null }): a workbook is required');
-  const nextHandle = workbookHandleOf(replacement);
+  if (!next) throw new TypeError('update({ workbook: null }): a workbook is required');
+  if (next === state.requestedWorkbook) return;
+  const nextHandle = workbookHandleOf(next);
   if (mountedWorkbooks.has(nextHandle)) {
     throw spreadsheetFailure('workbook-in-use', 'the workbook is mounted by another spreadsheet');
   }
-  const previous = state.workbook;
-  const previousHandle = workbookHandleOf(previous);
-  void state.legacy
-    .setWorkbook(nextHandle)
-    .catch((error: unknown) => state.events.emit('error', { error, source: 'engine' }));
-  mountedWorkbooks.delete(previousHandle);
+  // Reserved now so no other instance mounts it while the engine switches.
   mountedWorkbooks.add(nextHandle);
-  state.workbook = replacement;
-  state.options = { ...state.options, workbook: replacement };
+  state.requestedWorkbook = next;
+  state.swaps = state.swaps.then(() => runWorkbookSwap(state, next));
+};
+
+/** Switches the mount to `next`, then commits it to the instance; a failure keeps the current one. */
+const runWorkbookSwap = async (state: InstanceState, next: Workbook): Promise<void> => {
+  const nextHandle = workbookHandleOf(next);
+  if (state.life.disposed) {
+    mountedWorkbooks.delete(nextHandle);
+    return;
+  }
+  try {
+    await state.legacy.setWorkbook(nextHandle);
+  } catch (error: unknown) {
+    mountedWorkbooks.delete(nextHandle);
+    if (state.requestedWorkbook === next) state.requestedWorkbook = state.workbook;
+    if (!state.life.disposed) state.events.emit('error', { error, source: 'workbook' });
+    return;
+  }
+  if (state.life.disposed) {
+    mountedWorkbooks.delete(nextHandle);
+    return;
+  }
+  const previous = state.workbook;
+  mountedWorkbooks.delete(workbookHandleOf(previous));
+  state.workbook = next;
+  state.options = { ...state.options, workbook: next };
   if (state.ownsWorkbook) previous.dispose();
   state.ownsWorkbook = false;
-  state.events.emit('workbook', { workbook: replacement });
+  state.events.emit('workbook', { workbook: next });
 };
 
 const createHistory = (history: LegacyHistory): History => createHistoryView(history);
@@ -926,6 +950,8 @@ export async function mount(
     ownsWorkbook,
     options: { ...options, locale: options.locale ?? 'en' },
     host: hostProviders,
+    requestedWorkbook: workbook,
+    swaps: Promise.resolve(),
     origin: null,
     life,
     events,

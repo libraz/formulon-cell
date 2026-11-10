@@ -287,11 +287,40 @@ describe('spreadsheet: ownership', () => {
     const created = sheet.workbook;
     const next = await Workbook.createDefault();
     live.push(next);
+    const swapped = new Promise((resolve) => sheet.on('workbook', resolve));
     sheet.update({ workbook: next });
+    expect(sheet.workbook).toBe(created);
+    expect(await swapped).toEqual({ workbook: next });
     expect(sheet.workbook).toBe(next);
     expect(created.disposed).toBe(true);
     sheet.dispose();
     expect(next.disposed).toBe(false);
+  });
+
+  it('update({ workbook }) keeps the current workbook when the mount cannot switch', async () => {
+    const created = await Workbook.createDefault();
+    created.addSheet('Input');
+    live.push(created);
+    const sheet = await mountSheet({
+      workbook: created,
+      viewport: { mode: 'fixed', range: 'Input!A1:B2' },
+    });
+    const next = await Workbook.createDefault();
+    live.push(next);
+    const swaps = vi.fn();
+    sheet.on('workbook', swaps);
+    const failed = new Promise((resolve) => sheet.on('error', resolve));
+
+    sheet.update({ workbook: next });
+
+    expect(await failed).toMatchObject({ source: 'workbook', error: expect.any(Error) });
+    expect(swaps).not.toHaveBeenCalled();
+    expect(sheet.workbook).toBe(created);
+    expect(sheet.options.workbook).toBe(created);
+    expect(next.disposed).toBe(false);
+    // The refused workbook is free again for another spreadsheet.
+    const other = await mountSheet({ workbook: next });
+    expect(other.workbook).toBe(next);
   });
 });
 
