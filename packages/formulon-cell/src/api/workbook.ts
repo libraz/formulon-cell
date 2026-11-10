@@ -31,7 +31,7 @@ import { type Disposer, Emitter } from './events.js';
 import type { MemberSpec, SheetContext, WorkbookContext } from './facade-context.js';
 import { Lifecycle } from './lifecycle.js';
 import { SHEET_CELL_MEMBERS } from './sheet-cells.js';
-import { SHEET_STRUCTURE_MEMBERS } from './sheet-structure.js';
+import { SHEET_STRUCTURE_MEMBERS, WORKBOOK_NAME_MEMBERS } from './sheet-structure.js';
 
 /** File container a workbook saves to. */
 export type SaveFormat = WorkbookSaveFormat;
@@ -602,46 +602,65 @@ const cellOf = (wb: EngineWorkbook, at: string | CellAddress): CellAddress => {
   return { row: range.firstRow, col: range.firstCol };
 };
 
-type Method = (...args: unknown[]) => unknown;
-type SheetMethod = (this: Sheet, ...args: unknown[]) => unknown;
+type Method = (this: unknown, ...args: unknown[]) => unknown;
 
 const call = (target: object, name: string, args: readonly unknown[]): unknown =>
   (target as Record<string, Method>)[name]?.apply(target, args as unknown[]);
 
-/** Installs a member file's pass-through and hand-written members on `Sheet.prototype`. */
-const installSheetMembers = (spec: MemberSpec<SheetContext>): void => {
-  const proto = Sheet.prototype as unknown as Record<string, SheetMethod>;
+/** How members reach their engine object from a facade instance. */
+interface MemberHost<C> {
+  readonly proto: object;
+  contextOf(self: unknown): C;
+  target(ctx: C): object;
+  change<T>(ctx: C, kind: FacadeChangeKind, fn: () => T): T;
+}
+
+/** Installs a member file's pass-through and hand-written members on a facade prototype. */
+const installMembers = <C>(host: MemberHost<C>, spec: MemberSpec<C>): void => {
+  const proto = host.proto as Record<string, Method>;
   for (const name of spec.read ?? []) {
-    proto[name] = function (this: Sheet, ...args) {
-      return call(sheetContext(this).sheetEngine, name, args);
+    proto[name] = function (...args) {
+      return call(host.target(host.contextOf(this)), name, args);
     };
   }
   for (const name of spec.cellWrite ?? []) {
-    proto[name] = function (this: Sheet, ...args) {
-      const ctx = sheetContext(this);
+    proto[name] = function (...args) {
+      const ctx = host.contextOf(this) as SheetContext;
       ctx.cellWrite(args, () => call(ctx.sheetEngine, name, args));
     };
   }
   for (const [kind, names] of Object.entries(spec.change ?? {})) {
     for (const name of names ?? []) {
-      proto[name] = function (this: Sheet, ...args) {
-        const ctx = sheetContext(this);
-        return ctx.sheetChange(kind as FacadeChangeKind, () => call(ctx.sheetEngine, name, args));
+      proto[name] = function (...args) {
+        const ctx = host.contextOf(this);
+        return host.change(ctx, kind as FacadeChangeKind, () => call(host.target(ctx), name, args));
       };
     }
   }
   for (const [name, method] of Object.entries(spec.methods ?? {})) {
-    proto[name] = function (this: Sheet, ...args) {
-      return (method as (ctx: SheetContext, ...rest: unknown[]) => unknown)(
-        sheetContext(this),
-        ...args,
-      );
+    proto[name] = function (...args) {
+      return (method as (ctx: C, ...rest: unknown[]) => unknown)(host.contextOf(this), ...args);
     };
   }
 };
 
-installSheetMembers(SHEET_CELL_MEMBERS);
-installSheetMembers(SHEET_STRUCTURE_MEMBERS);
+const SHEET_HOST: MemberHost<SheetContext> = {
+  proto: Sheet.prototype,
+  contextOf: (self) => sheetContext(self as Sheet),
+  target: (ctx) => ctx.sheetEngine,
+  change: (ctx, kind, fn) => ctx.sheetChange(kind, fn),
+};
+
+const WORKBOOK_HOST: MemberHost<WorkbookContext> = {
+  proto: Workbook.prototype,
+  contextOf: (self) => workbookContext(self as Workbook),
+  target: (ctx) => ctx.engine,
+  change: (ctx, kind, fn) => ctx.change(kind, null, fn),
+};
+
+installMembers(SHEET_HOST, SHEET_CELL_MEMBERS);
+installMembers(SHEET_HOST, SHEET_STRUCTURE_MEMBERS);
+installMembers(WORKBOOK_HOST, WORKBOOK_NAME_MEMBERS);
 
 /** @internal The engine binding behind a facade workbook. */
 export const workbookHandleOf = (wb: Workbook): WorkbookHandle => stateOf(wb).handle;

@@ -194,6 +194,28 @@ describe('sheet structure', () => {
     s.addMerge('C1:D2');
     expect(s.listMerges()).toHaveLength(1);
   });
+
+  it('freezes panes through the view and announces the part it changed', async () => {
+    const wb = await createWorkbook();
+    const s = wb.sheet(0);
+    const parts: unknown[] = [];
+    wb.on('change', (e) => parts.push(...e.parts));
+    s.updateView({ freezeRows: 1, freezeCols: 2 });
+    expect(s.getView()).toMatchObject({ freezeRows: 1, freezeCols: 2 });
+    expect(parts).toEqual(['view']);
+  });
+
+  it('defines, reads and removes a workbook name', async () => {
+    const wb = await createWorkbook();
+    const parts: unknown[] = [];
+    wb.on('change', (e) => parts.push(...e.parts));
+    wb.setDefinedName({ name: 'Rate', formula: '=Sheet1!$A$1' });
+    expect(wb.getDefinedName('Rate')).toMatchObject({ name: 'Rate', scope: null });
+    expect(wb.getDefinedName('Missing')).toBeNull();
+    wb.removeDefinedName('Rate');
+    expect(wb.listDefinedNames()).toEqual([]);
+    expect(parts).toEqual(['names', 'names']);
+  });
 });
 
 describe('sheet format', () => {
