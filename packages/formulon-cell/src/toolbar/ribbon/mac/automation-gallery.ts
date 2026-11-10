@@ -4,9 +4,9 @@ import {
 } from '../../../commands/authorized-write.js';
 import { formatAsTable, inferTableHasHeaders } from '../../../commands/format-as-table.js';
 import { hyperlinkOperation } from '../../../commands/hyperlink-actions.js';
-import type { InteractionOperation } from '../../../commands/interaction-policy.js';
 import { applyFreezeMode, showCols, showRows } from '../../../commands/row-col-layout.js';
 import { recordTablesChange } from '../../../commands/slice-history.js';
+import { tableWrite } from '../../../commands/table-actions.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../../engine/address.js';
 import { parseRangeRef } from '../../../engine/range-resolver.js';
 import type { Addr, Range } from '../../../engine/types.js';
@@ -381,21 +381,6 @@ export function usedRangeForMacAutomation(instance: SpreadsheetInstance): Range 
   return found ? { sheet, r0, c0, r1, c1 } : normalizedRange(state.selection.range);
 }
 
-const policyAllows = (
-  instance: SpreadsheetInstance,
-  operation: InteractionOperation,
-  range: Range,
-  commandId: string,
-): boolean => {
-  if (!instance.commands.policy) return true;
-  return instance.commands.canExecute({
-    operation,
-    origin: 'ribbon',
-    commandId,
-    effects: [{ kind: 'range', range }],
-  }).allowed;
-};
-
 const markResult = (instance: SpreadsheetInstance, commandId: string, result: unknown): void => {
   instance.host.dataset.fcMacAutomation = commandId;
   instance.host.dataset.fcMacAutomationResult =
@@ -526,14 +511,22 @@ const runFreezeSelection = (instance: SpreadsheetInstance): void => {
 
 const runMakeSubtable = (instance: SpreadsheetInstance): void => {
   const range = normalizedRange(instance.store.getState().selection.range);
-  if (!policyAllows(instance, 'table', range, 'mac.automate.makeSubtable')) return;
-  let created = false;
-  recordTablesChange(instance.history, instance.store, () => {
-    created =
-      formatAsTable(instance.store, range, {
-        workbook: instance.workbook,
-        showHeader: inferTableHasHeaders(instance.workbook, range),
-      }) !== null;
+  const ctx = {
+    store: instance.store,
+    history: instance.history,
+    origin: 'ribbon',
+    commandId: 'mac.automate.makeSubtable',
+  } as const;
+  const created = tableWrite(ctx, range, false, () => {
+    let made = false;
+    recordTablesChange(instance.history, instance.store, () => {
+      made =
+        formatAsTable(instance.store, range, {
+          workbook: instance.workbook,
+          showHeader: inferTableHasHeaders(instance.workbook, range),
+        }) !== null;
+    });
+    return made;
   });
   if (created) markResult(instance, 'mac.automate.makeSubtable', { range });
 };

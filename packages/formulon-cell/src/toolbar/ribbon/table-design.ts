@@ -2,7 +2,7 @@ import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy
 import { DEFAULT_PIVOT_TOGGLES, PIVOT_STYLE_TOGGLES } from '../../commands/pivot-style-info.js';
 import {
   activeTableOverlay,
-  renameActiveTable,
+  renameActiveTableAction,
   TABLE_OPTION_COMMANDS,
 } from '../../commands/table-design.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
@@ -53,7 +53,10 @@ export const createTableNameInput = (
       revert();
       return;
     }
-    const result = renameActiveTable(inst.store, inst.history, input.value);
+    const result = renameActiveTableAction(
+      { store: inst.store, history: inst.history, origin: 'ribbon', commandId: command.id },
+      input.value,
+    );
     if (result === 'invalid' || result === 'duplicate') {
       void showMessage({
         title: command.title,

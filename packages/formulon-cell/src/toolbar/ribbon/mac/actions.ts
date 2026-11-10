@@ -2,7 +2,7 @@ import type { FunctionCategory } from '../../../commands/function-categories.js'
 import type { InteractionOperation } from '../../../commands/interaction-policy.js';
 import {
   disposeDataTableDialog,
-  openDataTableDialog,
+  openDataTableDialogFrom,
 } from '../../../interact/data-table-dialog.js';
 import { openPivotTableDialogFrom } from '../../../interact/dialog-entry.js';
 import {
@@ -156,7 +156,7 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
     'mac.formulas.category.all': () => formulaCategory(instance, 'all'),
     'mac.review.stats': () => statistics.open(),
     'mac.data.goalSeek': () => openMacGoalSeekDialog(instance),
-    'mac.data.dataTable': () => openDataTableDialog(instance),
+    'mac.data.dataTable': () => openDataTableDialogFrom(instance, 'ribbon'),
     'mac.data.consolidate': () => openMacConsolidateDialog(instance),
     'mac.data.subtotal': () => openMacSubtotalDialog(instance),
     'mac.automate.showScripts': () => openMacAutomationGallery(instance),

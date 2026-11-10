@@ -24,6 +24,7 @@ import {
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
 import { createChartVariantFromSelection } from '../../../mount/dynamic-dropdown-defaults/insert.js';
+import { showCreateTableDialog } from '../../../mount/dynamic-dropdown-defaults/styles.js';
 import { createDefaultDynamicDropdownsCtx } from '../../../mount/dynamic-dropdowns-defaults.js';
 import { selectAdjacentComment } from '../../../mount/toolbar-defaults.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
@@ -424,7 +425,7 @@ export function dispatchMacRibbonCommand(
       case 'mac.insert.recommendedPivotTable':
         return ctx.applyPivotTableAction('recommended');
       case 'mac.insert.table':
-        return dispatchGeneric('formatTableInsert');
+        return showCreateTableDialog(instance, {}, { origin: 'ribbon', commandId: id });
       case 'mac.insert.photo':
         return ctx.insertPictureFromRibbon('device');
       case 'mac.insert.screenshot':

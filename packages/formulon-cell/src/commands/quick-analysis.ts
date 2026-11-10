@@ -20,6 +20,7 @@ import {
   recordSparklineChange,
   recordTablesChange,
 } from './slice-history.js';
+import { tableWrite } from './table-actions.js';
 
 /**
  * Quick Analysis — a context-aware action sheet that appears anchored at the
@@ -502,13 +503,19 @@ function addChart(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult 
 
 function formatAsTable(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
   const { range, store, wb } = input;
-  let ok = false;
-  recordTablesChange(input.history ?? null, store, () => {
-    ok =
-      applyFormatAsTable(store, range, {
-        id: `qa-table-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}`,
-        workbook: wb,
-      }) != null;
+  const history = input.history ?? null;
+  // The grid's Quick Analysis button inserts a table as Insert > Table does.
+  const ctx = { store, history, origin: 'editor', commandId: 'formatTableInsert' } as const;
+  const ok = tableWrite(ctx, range, false, () => {
+    let made = false;
+    recordTablesChange(history, store, () => {
+      made =
+        applyFormatAsTable(store, range, {
+          id: `qa-table-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}`,
+          workbook: wb,
+        }) != null;
+    });
+    return made;
   });
   if (!ok) return { ok: false, reason: 'protected' };
   return { ok: true, kind: 'table', count: 1 };

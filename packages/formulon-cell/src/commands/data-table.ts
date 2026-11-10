@@ -3,8 +3,10 @@ import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { DataTableDefinition, DataTableInfo } from '../engine/workbook-handle-data-tables.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import type { History } from './history.js';
-import { isSheetProtected, warnProtected } from './protection.js';
+import { authorizedWrite } from './authorized-write.js';
+import { History } from './history.js';
+import type { InteractionOrigin } from './interaction-policy.js';
+import { overlapsTable } from './table-actions.js';
 
 export type DataTableRequestError = 'invalid-range' | 'invalid-input' | 'rejected';
 
@@ -20,6 +22,14 @@ interface DataTableCommandContext {
   store: SpreadsheetStore;
   workbook: WorkbookHandle;
   history: History | null;
+}
+
+/** The command every Data Table entry point runs as. */
+export const DATA_TABLE_COMMAND = 'mac.data.dataTable';
+
+/** A Data Table creation and the entry point that asked for it. */
+interface DataTableCreateContext extends DataTableCommandContext {
+  origin: InteractionOrigin;
 }
 
 const inside = (range: Range, addr: Addr): boolean =>
@@ -47,19 +57,37 @@ const refreshCells = (store: SpreadsheetStore, workbook: WorkbookHandle): void =
   mutators.replaceCells(store, workbook.cells(store.getState().data.sheetIndex));
 };
 
-/** What-If Analysis → Data Table. One undo step. */
+/** What-If Analysis → Data Table, as one authorized undo step. A protected sheet refuses it
+ *  whatever its options, and so does a selection over an existing table. */
 export function createDataTable(
-  ctx: DataTableCommandContext,
+  ctx: DataTableCreateContext,
   request: DataTableRequest,
 ): DataTableRequestError | null {
   const def = dataTableDefinition(request);
   if (typeof def === 'string') return def;
+  if (overlapsTable(ctx.store.getState(), request.selection)) return 'rejected';
+  const result = authorizedWrite({
+    store: ctx.store,
+    history: ctx.history ?? new History(),
+    intents: (origin) => [
+      {
+        operation: 'valueEdit',
+        origin,
+        commandId: DATA_TABLE_COMMAND,
+        effects: [{ kind: 'range', range: def.range }],
+      },
+    ],
+    origin: ctx.origin,
+    write: () => writeDataTable(ctx, def),
+  });
+  return result.ok ? result.value : 'rejected';
+}
+
+const writeDataTable = (
+  ctx: DataTableCommandContext,
+  def: DataTableDefinition,
+): DataTableRequestError | null => {
   const { store, workbook, history } = ctx;
-  // What-If Analysis is unavailable on a protected sheet.
-  if (isSheetProtected(store.getState(), def.range.sheet)) {
-    warnProtected({ sheet: def.range.sheet, row: def.range.r0, col: def.range.c0 });
-    return 'rejected';
-  }
   const replaced = [...workbook.cellsInRange(def.range)];
   if (!workbook.addDataTable(def)) return 'rejected';
   const anchor = { sheet: def.range.sheet, row: def.range.r0, col: def.range.c0 };
@@ -81,7 +109,7 @@ export function createDataTable(
   }
   refreshCells(store, workbook);
   return null;
-}
+};
 
 /** Remove whole data tables, as Delete over their result blocks does. */
 export function deleteDataTables(

@@ -35,7 +35,7 @@ import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../../com
 import {
   TABLE_OPTION_COMMANDS,
   type TableOption,
-  toggleTableOption,
+  toggleTableOptionAction,
 } from '../../commands/table-design.js';
 import {
   setGridlinesVisible,
@@ -418,10 +418,14 @@ const applyGenericRibbonCommand = (
     case 'tableBandedColumns':
     case 'tableFilterButton': {
       const toggle = () =>
-        toggleTableOption(
-          i.store,
-          i.history,
-          i.workbook,
+        toggleTableOptionAction(
+          {
+            store: i.store,
+            history: i.history,
+            workbook: i.workbook,
+            origin: 'ribbon',
+            commandId: id,
+          },
           TABLE_OPTION_COMMANDS[id] as TableOption,
           i.i18n.strings.ribbonMenu.cellStyleTotalCell,
         );

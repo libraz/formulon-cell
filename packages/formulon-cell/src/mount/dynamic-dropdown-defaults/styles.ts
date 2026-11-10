@@ -1,3 +1,4 @@
+import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import {
   activeCellStyleId,
   applyCellStyleToSelection,
@@ -25,11 +26,12 @@ import {
 } from '../../commands/format-as-table.js';
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
 import { recordConditionalRulesChange, recordTablesChange } from '../../commands/slice-history.js';
+import { tableWrite } from '../../commands/table-actions.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { Range } from '../../engine/types.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
-import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
+import { type DialogEntry, openFormatDialogFrom } from '../../interact/dialog-entry.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { type ConditionalRule, mutators } from '../../store/store.js';
@@ -158,19 +160,28 @@ const buildTableStyleAction =
     const state = instance.store.getState();
     const active = state.selection.active;
     const table = tableOverlayAt(state, active.sheet, active.row, active.col);
+    const entry = { origin: 'ribbon', commandId: 'formatTableHome' } as const;
     if (!table) {
-      void showCreateTableDialog(instance, { style, color, variant });
+      void showCreateTableDialog(instance, { style, color, variant }, entry);
       return;
     }
-    // Inside a table the gallery restyles it and keeps the table's own style options.
+    // Inside a table the gallery restyles it and keeps the table's own style options; a refused
+    // restyle is silent.
     const {
       banded: _banded,
       firstCol: _firstCol,
       ...look
     } = tableStyleOptionsById(state, style, color, variant);
-    recordTablesChange(instance.history, instance.store, () => {
-      updateTableOverlay(instance.store, table.id, look);
-    });
+    tableWrite(
+      { store: instance.store, history: instance.history, ...entry },
+      table.range,
+      undefined,
+      () => {
+        recordTablesChange(instance.history, instance.store, () => {
+          updateTableOverlay(instance.store, table.id, look);
+        });
+      },
+    );
     instance.host.focus();
   };
 
@@ -203,6 +214,8 @@ const updateTableStylesMenu =
     }
   };
 
+/** Create Table over the selection, from the entry point `entry` names: Insert > Table by
+ *  default. A refused entry opens nothing. */
 export const showCreateTableDialog = async (
   instance: SpreadsheetInstance,
   options: {
@@ -210,7 +223,9 @@ export const showCreateTableDialog = async (
     color?: string;
     variant?: CustomTableStyle['variant'];
   } = {},
+  entry: DialogEntry = { origin: 'ribbon', commandId: 'formatTableInsert' },
 ): Promise<void> => {
+  if (!canExecuteBuiltInRequest(instance.store, entry.commandId, entry.origin).allowed) return;
   const selection = normalizedSelectionRange(instance);
   const sheetName = instance.workbook.sheetName(selection.sheet);
   const pivotDialogStrings = instance.i18n.strings
@@ -270,20 +285,27 @@ export const showCreateTableDialog = async (
   }
   const range = parsedRange(result.range);
   if (!range) return;
-  recordTablesChange(instance.history, instance.store, () => {
-    formatAsTableByStyleId(
-      instance.store,
-      range,
-      options.style ?? 'medium',
-      options.color,
-      options.variant ?? 'banded',
-      {
-        showHeader: result.hasHeaders,
-        workbook: instance.workbook,
-        ...(result.name ? { name: result.name } : {}),
-      },
-    );
-  });
+  tableWrite(
+    { store: instance.store, history: instance.history, ...entry },
+    range,
+    undefined,
+    () => {
+      recordTablesChange(instance.history, instance.store, () => {
+        formatAsTableByStyleId(
+          instance.store,
+          range,
+          options.style ?? 'medium',
+          options.color,
+          options.variant ?? 'banded',
+          {
+            showHeader: result.hasHeaders,
+            workbook: instance.workbook,
+            ...(result.name ? { name: result.name } : {}),
+          },
+        );
+      });
+    },
+  );
   instance.host.focus();
 };
 

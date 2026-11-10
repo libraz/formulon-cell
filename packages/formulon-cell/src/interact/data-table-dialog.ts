@@ -1,4 +1,10 @@
-import { createDataTable, type DataTableRequestError } from '../commands/data-table.js';
+import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
+import {
+  createDataTable,
+  DATA_TABLE_COMMAND,
+  type DataTableRequestError,
+} from '../commands/data-table.js';
+import type { InteractionOrigin } from '../commands/interaction-policy.js';
 import { parseMacRange } from '../commands/mac-data-tools.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
@@ -8,7 +14,7 @@ import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
 
 interface DataTableDialogHandle {
-  open(): void;
+  open(origin: InteractionOrigin): void;
   close(): void;
   detach(): void;
 }
@@ -61,6 +67,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
   // Picking an input cell moves the grid selection, so the table range is
   // the selection captured when the dialog opened.
   let tableRange: Range = instance.store.getState().selection.range;
+  let origin: InteractionOrigin = 'instanceApi';
   const status = document.createElement('div');
   status.className = 'fc-datatable__status';
   status.setAttribute('role', 'status');
@@ -121,7 +128,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
       return;
     }
     const error = createDataTable(
-      { store: instance.store, workbook: instance.workbook, history: instance.history },
+      { store: instance.store, workbook: instance.workbook, history: instance.history, origin },
       { selection: tableRange, rowInput, colInput },
     );
     if (error) {
@@ -141,8 +148,9 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
   });
 
   return {
-    open(): void {
+    open(from: InteractionOrigin): void {
       applyLabels();
+      origin = from;
       tableRange = instance.store.getState().selection.range;
       pickFormat.begin();
       rowField.input.value = '';
@@ -160,14 +168,24 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
   };
 }
 
-/** Open Data → What-If Analysis → Data Table over the current selection. */
-export function openDataTableDialog(instance: SpreadsheetInstance): void {
+/** Open Data → What-If Analysis → Data Table over the current selection from `origin`; a refused
+ *  command opens nothing. */
+export function openDataTableDialogFrom(
+  instance: SpreadsheetInstance,
+  origin: InteractionOrigin,
+): void {
+  if (!canExecuteBuiltIn(instance.store, DATA_TABLE_COMMAND, origin).allowed) return;
   let handle = handles.get(instance);
   if (!handle) {
     handle = attachDataTableDialog(instance);
     handles.set(instance, handle);
   }
-  handle.open();
+  handle.open(origin);
+}
+
+/** Open Data → What-If Analysis → Data Table over the current selection. */
+export function openDataTableDialog(instance: SpreadsheetInstance): void {
+  openDataTableDialogFrom(instance, 'instanceApi');
 }
 
 /** Dispose the Data Table overlay owned by an instance, if it has been opened. */

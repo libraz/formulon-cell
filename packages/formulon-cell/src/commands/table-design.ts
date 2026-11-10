@@ -1,6 +1,8 @@
 import { totalsFromDetails } from '../engine/table-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
+import { authorizedWrite } from './authorized-write.js';
+import { filterDefinitionWrite } from './filter-actions.js';
 import {
   type TableColumnTotals,
   type TableNameError,
@@ -11,9 +13,10 @@ import {
   tableOverlayById,
   updateTableOverlay,
 } from './format-as-table.js';
-import type { History } from './history.js';
+import { History } from './history.js';
 import { isSheetProtected } from './protection.js';
 import { recordTablesChange } from './slice-history.js';
+import { type TableActionContext, tableWrite } from './table-actions.js';
 
 /** Table Design toggles: each flips one show-flag of the active table. */
 export type TableOption =
@@ -94,16 +97,19 @@ const toggleBoundaryRow = (
   return ok ? 'toggled' : 'blocked';
 };
 
-/** Flip a show-flag of the active table. Only engine tables are editable here. */
-export function toggleTableOption(
+/** The Table Design command that flips `option`. */
+const optionCommand = (option: TableOption): string =>
+  Object.keys(TABLE_OPTION_COMMANDS).find((id) => TABLE_OPTION_COMMANDS[id] === option) ?? option;
+
+/** Flip `option` on `table` without authorizing it. */
+const flipTableOption = (
   store: SpreadsheetStore,
   history: History | null,
   wb: WorkbookHandle,
+  table: TableOverlay,
   option: TableOption,
-  totalsLabel = 'Total',
-): TableToggleResult {
-  const table = activeTableOverlay(store.getState());
-  if (table?.source !== 'engine') return 'none';
+  totalsLabel: string,
+): TableToggleResult => {
   if (option === 'showHeader' || option === 'showTotal') {
     return toggleBoundaryRow(store, history, wb, table, option, totalsLabel);
   }
@@ -114,6 +120,68 @@ export function toggleTableOption(
     applied = updateTableOverlay(store, table.id, { [option]: !on }) !== null;
   });
   return applied ? 'toggled' : 'blocked';
+};
+
+/**
+ * Flip a show-flag of the active table from the entry point `ctx` names, as one authorized step.
+ * Only engine tables are editable here; `none` also answers a refused change, which is silent.
+ * The filter button turns the table's AutoFilter on or off, so its caller decides it as a filter
+ * change.
+ */
+export function toggleTableOptionAction(
+  ctx: TableActionContext & { readonly workbook: WorkbookHandle },
+  option: TableOption,
+  totalsLabel = 'Total',
+): TableToggleResult {
+  const { store, history, workbook } = ctx;
+  const table = activeTableOverlay(store.getState());
+  if (table?.source !== 'engine') return 'none';
+  const flip = () => flipTableOption(store, history, workbook, table, option, totalsLabel);
+  if (option === 'filterButton') return flip();
+  return tableWrite(ctx, table.range, 'none', flip);
+}
+
+/** Flip a show-flag of the active table. Only engine tables are editable here; `none` also
+ *  answers a refused change. */
+export function toggleTableOption(
+  store: SpreadsheetStore,
+  history: History | null,
+  wb: WorkbookHandle,
+  option: TableOption,
+  totalsLabel = 'Total',
+): TableToggleResult {
+  const ctx = {
+    store,
+    history,
+    workbook: wb,
+    origin: 'instanceApi',
+    commandId: optionCommand(option),
+  } as const;
+  if (option !== 'filterButton') return toggleTableOptionAction(ctx, option, totalsLabel);
+  return filterDefinitionWrite(ctx, store.getState().selection.active.sheet, 'none', () =>
+    toggleTableOptionAction(ctx, option, totalsLabel),
+  );
+}
+
+/** Rename the active engine table from the entry point `ctx` names; the result says why a name
+ *  was refused, and `none` answers a refused change. */
+export function renameActiveTableAction(ctx: TableActionContext, name: string): TableRenameResult {
+  const { store, history } = ctx;
+  const table = activeTableOverlay(store.getState());
+  if (table?.source !== 'engine') return 'none';
+  const next = name.trim();
+  if (next === table.name) return 'unchanged';
+  if (isSheetProtected(store.getState(), table.range.sheet)) return 'protected';
+  const error = tableNameError(store, table.id, next);
+  if (error) return error;
+  return tableWrite(ctx, table.range, 'none', () => {
+    let renamed = false;
+    recordTablesChange(history, store, () => {
+      renamed = updateTableOverlay(store, table.id, { name: next }) !== null;
+    });
+    // The engine refuses a name another object already uses.
+    return renamed ? 'renamed' : 'duplicate';
+  });
 }
 
 /** Rename the active engine table; the result says why a name was refused. */
@@ -122,19 +190,10 @@ export function renameActiveTable(
   history: History | null,
   name: string,
 ): TableRenameResult {
-  const table = activeTableOverlay(store.getState());
-  if (table?.source !== 'engine') return 'none';
-  const next = name.trim();
-  if (next === table.name) return 'unchanged';
-  if (isSheetProtected(store.getState(), table.range.sheet)) return 'protected';
-  const error = tableNameError(store, table.id, next);
-  if (error) return error;
-  let renamed = false;
-  recordTablesChange(history, store, () => {
-    renamed = updateTableOverlay(store, table.id, { name: next }) !== null;
-  });
-  // The engine refuses a name another object already uses.
-  return renamed ? 'renamed' : 'duplicate';
+  return renameActiveTableAction(
+    { store, history, origin: 'instanceApi', commandId: 'tableName' },
+    name,
+  );
 }
 
 /** The engine table's column settings when the overlay has not recorded them yet. */
@@ -143,6 +202,46 @@ const engineTotals = (wb: WorkbookHandle, table: TableOverlay): TableColumnTotal
   const details = index === null ? null : wb.getTableStyleDetails(index);
   return details ? totalsFromDetails(details) : [];
 };
+
+/** Set the totals-row function of one column of table `id` from the entry point `ctx` names, as
+ *  an edit of its total cell; the store mirror writes it to the engine, which fills that cell. */
+export function setTableColumnFunctionAction(
+  ctx: TableActionContext & { readonly workbook: WorkbookHandle },
+  id: string,
+  column: number,
+  fn: TableTotalsFunction,
+): boolean {
+  const { store, history, workbook } = ctx;
+  const table = tableOverlayById(store.getState(), id);
+  if (table?.source !== 'engine') return false;
+  if (!table.showTotal) return false;
+  const totals = [...(table.totals ?? engineTotals(workbook, table))];
+  if (column < 0 || column >= totals.length) return false;
+  totals[column] = { function: fn, label: '', formula: '' };
+  // Picking a function edits the total cell's formula, so that cell's lock decides it.
+  const cell = { sheet: table.range.sheet, row: table.range.r1, col: table.range.c0 + column };
+  const result = authorizedWrite({
+    store,
+    history: history ?? new History(),
+    intents: (origin) => [
+      {
+        operation: 'formulaEdit',
+        origin,
+        commandId: ctx.commandId,
+        effects: [{ kind: 'cells', cells: [cell], includesFormula: true }],
+      },
+    ],
+    origin: ctx.origin,
+    write: () => {
+      let applied = false;
+      recordTablesChange(history, store, () => {
+        applied = updateTableOverlay(store, id, { totals }) !== null;
+      });
+      return applied;
+    },
+  });
+  return result.ok && result.value;
+}
 
 /** Set the totals-row function of one column of table `id`; the store mirror writes it to the
  *  engine, which fills the totals cell. */
@@ -154,14 +253,10 @@ export function setTableColumnFunction(
   column: number,
   fn: TableTotalsFunction,
 ): boolean {
-  const table = tableOverlayById(store.getState(), id);
-  if (table?.source !== 'engine') return false;
-  const totals = [...(table.totals ?? engineTotals(workbook, table))];
-  if (column < 0 || column >= totals.length) return false;
-  totals[column] = { function: fn, label: '', formula: '' };
-  let applied = false;
-  recordTablesChange(history, store, () => {
-    applied = updateTableOverlay(store, id, { totals }) !== null;
-  });
-  return applied;
+  return setTableColumnFunctionAction(
+    { store, history, workbook, origin: 'instanceApi', commandId: 'tableTotalRow' },
+    id,
+    column,
+    fn,
+  );
 }

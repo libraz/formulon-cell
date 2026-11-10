@@ -16,10 +16,12 @@ import type {
 import {
   refusedOnProtectedSheet,
   sheetPermits,
+  tableChangePermitted,
   unlockedCellsOption,
   workbookStructurePermits,
 } from './protection.js';
 import { FUNCTION_SIGNATURES } from './refs.js';
+import { selectionOverlapsTable } from './table-actions.js';
 
 /** A built-in command id, or a Mac function-menu leaf naming a spreadsheet function. */
 export type BuiltInCommandRequest = BuiltInCommandId | `mac.function.${string}`;
@@ -591,6 +593,31 @@ const FILTER_DEFINITION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<BuiltI
   'tableFilterButton',
 ]);
 
+/** The table the active cell is in, or null when there is none. */
+const activeTableRange = (store: SpreadsheetStore): Range | null => {
+  const { selection, tables } = store.getState();
+  const a = selection.active;
+  return (
+    tables.tables.find(
+      (t) =>
+        t.range.sheet === a.sheet &&
+        a.row >= t.range.r0 &&
+        a.row <= t.range.r1 &&
+        a.col >= t.range.c0 &&
+        a.col <= t.range.c1,
+    )?.range ?? null
+  );
+};
+
+/** Commands that create a table, or a Data Table, over the selection: refused where it overlaps an
+ *  existing table. */
+const TABLE_CREATION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<BuiltInCommandId>([
+  'formatTableInsert',
+  'mac.insert.table',
+  'mac.automate.makeSubtable',
+  'mac.data.dataTable',
+]);
+
 /** The pivot report the active cell is in, or null when there is none. */
 const activeReportRange = (store: SpreadsheetStore): Range | null => {
   const wb = formatHistoryBridgeFor(store)?.workbook;
@@ -647,7 +674,12 @@ export const builtInCommandIntent = (
   const state = store.getState();
   const selection = state.selection.range;
   const band = shiftedBand(operation, selection);
-  const report = operation === 'pivot' ? activeReportRange(store) : null;
+  const report =
+    operation === 'pivot'
+      ? activeReportRange(store)
+      : operation === 'table' && !(isBuiltInCommandId(id) && TABLE_CREATION_COMMANDS.has(id))
+        ? activeTableRange(store)
+        : null;
   let effects: readonly OperationEffect[];
   if (WORKBOOK_EFFECT_OPERATIONS.has(operation) || workbookTheme || id === 'sheetViewSelect')
     effects = [{ kind: 'workbook' }];
@@ -658,8 +690,8 @@ export const builtInCommandIntent = (
   // cells refuse it at run time): decided for the active sheet as a whole.
   else if (operation === 'pageSetup' || unlockedCellsOption(operation))
     effects = [{ kind: 'sheet', sheet: selection.sheet }];
-  // A command on an existing report is decided on the report the active cell is in.
-  else if (operation === 'pivot' && report) effects = [{ kind: 'range', range: report }];
+  // A command on an existing report or table is decided on the one the active cell is in.
+  else if (report) effects = [{ kind: 'range', range: report }];
   else if (band) effects = [{ kind: 'range', range: band }];
   else if (operation === 'format')
     effects = [selection, ...(state.selection.extraRanges ?? [])].map(
@@ -671,7 +703,8 @@ export const builtInCommandIntent = (
 
 /** Protection's decision for a built-in command on the active sheet, with or without a policy:
  *  the always-refused commands, an option-gated operation (Use PivotTable for pivot edits)
- *  whose option is off, and a sheet operation under workbook-structure protection. Commands it
+ *  whose option is off, a table change other than banding, and a sheet operation under
+ *  workbook-structure protection. Commands it
  *  does not name are left to their operation's own protection check. */
 export const builtInProtectionDecision = (
   store: SpreadsheetStore,
@@ -693,6 +726,7 @@ export const builtInProtectionDecision = (
     refusedOnProtectedSheet(state, sheet, id) ||
     filterRefused ||
     (operation === 'pivot' && !sheetPermits(state, sheet, 'pivotTables')) ||
+    (operation === 'table' && !tableChangePermitted(state, sheet, id)) ||
     (option !== undefined && !sheetPermits(state, sheet, option));
   return refused
     ? { allowed: false, code: 'protected', reason: 'sheet is protected' }
@@ -706,6 +740,12 @@ const decideBuiltIn = (
 ): PermissionDecision => {
   const protection = builtInProtectionDecision(store, id);
   if (!protection.allowed) return protection;
+  if (
+    isBuiltInCommandId(id) &&
+    TABLE_CREATION_COMMANDS.has(id) &&
+    selectionOverlapsTable(store.getState())
+  )
+    return { allowed: false, code: 'invalid', reason: 'selection overlaps a table' };
   const controller = interactionControllerFor(store);
   if (!controller?.restricted) return { allowed: true };
   // Ids arrive from DOM datasets and public command APIs; validate at the boundary.

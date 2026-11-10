@@ -31,6 +31,7 @@ import {
   protectedSheetPermissions,
   refusedOnProtectedSheet,
   sheetPermits,
+  tableChangePermitted,
   unlockedCellsOption,
   workbookStructurePermits,
 } from './protection.js';
@@ -82,11 +83,15 @@ const sheetProtectionPermits = (
   if (operation === 'pageSetup') return true;
   // Turning AutoFilter on or off (the sheet-level filter change) is enabled by no Protect Sheet option.
   if (operation === 'filter') return sheetPermits(state, sheet);
+  // A table change is decided by its command, before any effect is read.
+  if (operation === 'table') return true;
   return sheetPermits(state, sheet, PROTECTION_OPTION[operation] ?? unlockedCellsOption(operation));
 };
 
 /** Whether sheet protection lets `operation` write `addr`. */
 const protectionPermits = (state: State, operation: InteractionOperation, addr: Addr): boolean => {
+  // A table change is decided by its command, whatever the lock of the cells it covers.
+  if (operation === 'table') return true;
   const option = PROTECTION_OPTION[operation];
   if (option) return sheetPermits(state, addr.sheet, option);
   const unlockedOption = unlockedCellsOption(operation);
@@ -402,7 +407,10 @@ export class InteractionAuthorizer {
         reason: 'range is outside editable cells',
       };
     }
-    if (!sheetPermits(this.store.getState(), range.sheet, PROTECTION_OPTION[intent.operation]))
+    if (
+      intent.operation !== 'table' &&
+      !sheetPermits(this.store.getState(), range.sheet, PROTECTION_OPTION[intent.operation])
+    )
       return { allowed: false, code: 'protected', addr: first, reason: 'sheet is protected' };
     return { allowed: true };
   }
@@ -433,13 +441,17 @@ export class InteractionAuthorizer {
   }
 
   /** Protection's decision before any effect is read: workbook-structure protection governs the
-   *  sheet operations, and a protected sheet refuses some commands whatever its options. */
+   *  sheet operations, a protected sheet refuses some commands whatever its options, and a table
+   *  change there is decided by its command alone. */
   private structureDecision(intent: OperationIntent): PermissionDecision {
     const state = this.store.getState();
     if (!workbookStructurePermits(state, intent.operation))
       return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
     for (const sheet of effectSheets(intent, state.data.sheetIndex)) {
-      if (refusedOnProtectedSheet(state, sheet, intent.commandId))
+      if (
+        refusedOnProtectedSheet(state, sheet, intent.commandId) ||
+        (intent.operation === 'table' && !tableChangePermitted(state, sheet, intent.commandId))
+      )
         return { allowed: false, code: 'protected', reason: 'sheet is protected' };
     }
     return { allowed: true };

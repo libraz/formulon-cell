@@ -115,7 +115,12 @@ import {
 } from './pointer-targets.js';
 import { type RangeInsertTarget, rangeRefOf, refOf } from './range-insert.js';
 import { createResizeSizeTooltip } from './resize-size-tooltip.js';
-import { applyTableResize, tableGripAt, tableResizeRange } from './table-resize.js';
+import {
+  applyTableResize,
+  resizableTableGripAt,
+  TABLE_RESIZE_COMMAND,
+  tableResizeRange,
+} from './table-resize.js';
 
 type ResizeTipStrings = GridPopupsStrings['resizeTip'];
 
@@ -851,7 +856,7 @@ export function attachPointer(
     // A table's corner grip resizes the table; the target range previews in the
     // same band the fill drag uses.
     if (!restricted && !inFormula) {
-      const table = tableGripAt(s, x, y);
+      const table = resizableTableGripAt(store, x, y);
       if (table) {
         e.preventDefault();
         host.focus();
@@ -1654,7 +1659,14 @@ export function attachPointer(
       mutators.setFillPreview(store, null);
       drag = { kind: 'none' };
       if (range && table && isNavigationRangeAllowed(store, range)) {
-        if (applyTableResize(store, wb, history, table, range)) onAfterCommit?.();
+        const ctx = {
+          store,
+          history,
+          workbook: wb,
+          origin: 'editor',
+          commandId: TABLE_RESIZE_COMMAND,
+        } as const;
+        if (applyTableResize(ctx, table, range)) onAfterCommit?.();
       }
       const { x, y } = localXY(e);
       updateCursor(host, store, x, y);

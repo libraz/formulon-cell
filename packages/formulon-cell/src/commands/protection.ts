@@ -125,7 +125,7 @@ export const unlockedCellsOption = (
 
 /** Commands a protected sheet refuses whatever its Protect Sheet options: the formula auditing
  *  arrows (trace precedents/dependents/error, remove arrows), inserting or refreshing a pivot
- *  report and the sheet background. */
+ *  report, the sheet background, cell styles (Format > Style) and a What-If Data Table. */
 const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'precedents',
   'dependents',
@@ -143,6 +143,8 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'mac.automate.newPivotTable',
   'sheetBackground',
   'mac.page.background',
+  'cellStyles',
+  'mac.data.dataTable',
 ]);
 
 /** Whether `commandId` is one a protected `sheet` refuses whatever its options. */
@@ -154,6 +156,33 @@ export const refusedOnProtectedSheet = (
   commandId !== undefined &&
   REFUSED_ON_PROTECTED_SHEET.has(commandId) &&
   !sheetPermits(state, sheet);
+
+/** Table commands a protected sheet still runs, locked cells included: the banding and first/last
+ *  column toggles. Every other table change (create, restyle, resize, header/total row, rename)
+ *  is refused there whatever its options. */
+const TABLE_COMMANDS_ALLOWED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
+  'tableBandedRows',
+  'tableBandedColumns',
+  'tableFirstColumn',
+  'tableLastColumn',
+]);
+
+/** The table fields those commands change; a protected sheet lets a patch of only these through. */
+export const TABLE_FIELDS_ALLOWED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
+  'banded',
+  'colStripes',
+  'firstCol',
+  'lastCol',
+]);
+
+/** Whether sheet protection lets the table command `commandId` change a table on `sheet`. */
+export const tableChangePermitted = (
+  state: State,
+  sheet: number,
+  commandId: string | undefined,
+): boolean =>
+  sheetPermits(state, sheet) ||
+  (commandId !== undefined && TABLE_COMMANDS_ALLOWED_ON_PROTECTED_SHEET.has(commandId));
 
 /** Spreadsheet-parity gate for sheet-level operations: rejected (no-op +
  *  warning) on a protected sheet unless `permission` is allowed there. */

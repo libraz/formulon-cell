@@ -1,4 +1,6 @@
 import type { AutoSumFunction } from '../../commands/auto-sum.js';
+import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import { DATA_TABLE_COMMAND } from '../../commands/data-table.js';
 import { cellValueIsFormulaError } from '../../commands/error-indicators.js';
 import { namedRangeWrite } from '../../commands/named-range-actions.js';
 import {
@@ -16,7 +18,7 @@ import {
   watchRange,
 } from '../../commands/watch.js';
 import { addrKey } from '../../engine/address.js';
-import { openDataTableDialog } from '../../interact/data-table-dialog.js';
+import { openDataTableDialogFrom } from '../../interact/data-table-dialog.js';
 import { openDefineNameDialogFrom, openNamedRangeDialogFrom } from '../../interact/dialog-entry.js';
 import { openMacGoalSeekDialog } from '../../interact/mac-goal-seek-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -130,7 +132,7 @@ const buildWhatIfAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyWhatIfAction'] =>
   (action) => {
     if (action === 'goal-seek') openMacGoalSeekDialog(instance);
-    else if (action === 'data-table') openDataTableDialog(instance);
+    else if (action === 'data-table') openDataTableDialogFrom(instance, 'ribbon');
   };
 
 const updateWhatIfMenu =
@@ -138,10 +140,20 @@ const updateWhatIfMenu =
   (menu) => {
     const dataTable = menu.querySelector<HTMLButtonElement>('[data-what-if="data-table"]');
     if (!dataTable) return;
+    if (!instance.workbook.capabilities.dataTables) {
+      setMenuControlDisabled(
+        dataTable,
+        true,
+        instance.i18n.strings.ribbonMenu.whatIfDataTableUnavailable,
+      );
+      return;
+    }
+    // A protected sheet, or a selection over a table, refuses a Data Table.
+    const decision = canExecuteBuiltIn(instance.store, DATA_TABLE_COMMAND, 'ribbon');
     setMenuControlDisabled(
       dataTable,
-      !instance.workbook.capabilities.dataTables,
-      instance.i18n.strings.ribbonMenu.whatIfDataTableUnavailable,
+      !decision.allowed,
+      decision.allowed ? undefined : (decision.reason ?? decision.code),
     );
   };
 

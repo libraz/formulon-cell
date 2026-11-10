@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { canExecuteBuiltIn } from '../../../src/commands/built-in-command-policy.js';
 import { clearSelectedContents } from '../../../src/commands/clear-contents.js';
+import { defaultTableOverlay } from '../../../src/commands/format-as-table.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
-import { openDataTableDialog } from '../../../src/interact/data-table-dialog.js';
+import {
+  disposeDataTableDialog,
+  openDataTableDialog,
+} from '../../../src/interact/data-table-dialog.js';
 import { mutators } from '../../../src/store/store.js';
 import { projectMacRibbonState } from '../../../src/toolbar/ribbon/mac/model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
@@ -163,21 +168,36 @@ describe.skipIf(!canLoadWasm())('Data Table dialog', () => {
     expect(workbook.dataTables(0)).toHaveLength(1);
   });
 
-  it('refuses a protected sheet or a locked result cell', async () => {
+  it('refuses a protected sheet whatever the lock of the result cells', async () => {
     const { workbook, instance } = await mountWithModel();
-    mutators.setCellFormat(instance.store, { sheet: 0, row: 3, col: 2 }, { locked: true });
-    instance.store.setState((s) => ({
-      ...s,
-      protection: {
-        ...s.protection,
-        protectedSheets: new Map([[0, { password: null } as never]]),
-      },
-    }));
+    const protect = (): void =>
+      instance.store.setState((s) => ({
+        ...s,
+        protection: {
+          ...s.protection,
+          protectedSheets: new Map([[0, { password: null } as never]]),
+        },
+      }));
+    mutators.setCellFormat(instance.store, { sheet: 0, row: 3, col: 2 }, { locked: false });
     openDataTableDialog(instance);
+    protect();
     field('col').value = 'A1';
     ok();
     expect(workbook.dataTables(0)).toEqual([]);
     expect(status()).toBe(en.dataTableDialog.rejected);
+    disposeDataTableDialog(instance);
+    openDataTableDialog(instance);
+    expect(document.querySelector('.fc-datatable [data-data-table-input="col"]')).toBeNull();
+  });
+
+  it('refuses a selection over an existing table', async () => {
+    const { workbook, instance } = await mountWithModel();
+    const range = instance.store.getState().selection.range;
+    mutators.upsertTableOverlay(instance.store, defaultTableOverlay('t1', { ...range }));
+    expect(canExecuteBuiltIn(instance.store, 'mac.data.dataTable', 'ribbon').allowed).toBe(false);
+    openDataTableDialog(instance);
+    expect(document.querySelector('.fc-datatable [data-data-table-input="col"]')).toBeNull();
+    expect(workbook.dataTables(0)).toEqual([]);
   });
 
   it('picks input cells from the grid and keeps the table range chosen at open', async () => {

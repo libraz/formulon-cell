@@ -29,6 +29,7 @@ import {
 } from '../commands/row-col-layout.js';
 import { recordFormatChange, recordTablesChange } from '../commands/slice-history.js';
 import { deleteCols, deleteVisibleRows, insertCols, insertRows } from '../commands/structure.js';
+import { tableWrite } from '../commands/table-actions.js';
 import { setOutlineSymbolsVisible, setShowFormulas } from '../commands/view.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -407,9 +408,23 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     if (k === 't' || k === 'l') {
       e.preventDefault();
       if (restricted) return;
-      recordTablesChange(input.history, input.store, () => {
-        formatAsTable(input.store, input.store.getState().selection.range, { workbook: currentWb });
-      });
+      const range = input.store.getState().selection.range;
+      tableWrite(
+        {
+          store: input.store,
+          history: input.history,
+          origin: 'keyboard',
+          commandId: 'formatTableInsert',
+        },
+        range,
+        undefined,
+        () => {
+          // A table cannot overlap another, so a selection inside one creates nothing.
+          recordTablesChange(input.history, input.store, () => {
+            formatAsTable(input.store, range, { workbook: currentWb });
+          });
+        },
+      );
       input.invalidate();
       return;
     }

@@ -1,6 +1,6 @@
 import { totalsCellAt } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
-import { setTableColumnFunction, TABLE_TOTALS_FUNCTIONS } from '../commands/table-design.js';
+import { setTableColumnFunctionAction, TABLE_TOTALS_FUNCTIONS } from '../commands/table-design.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { gridHitState } from '../render/grid.js';
@@ -100,7 +100,14 @@ export function attachTableTotals(deps: TableTotalsDeps): TableTotalsHandle {
       deps.onMoreFunctions();
       return;
     }
-    if (setTableColumnFunction(store, deps.history, deps.wb, tableId, column, fn)) {
+    const ctx = {
+      store,
+      history: deps.history,
+      workbook: deps.wb,
+      origin: 'editor',
+      commandId: 'tableTotalRow',
+    } as const;
+    if (setTableColumnFunctionAction(ctx, tableId, column, fn)) {
       deps.onAfterCommit();
     }
     grid.focus({ preventScroll: true });

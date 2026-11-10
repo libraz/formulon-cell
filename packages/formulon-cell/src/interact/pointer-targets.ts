@@ -11,7 +11,7 @@ import { type GridHitState, gridHitState } from '../render/grid.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { isMacHost, MAC_GRID_CURSORS, resizeCursor } from './grid-cursors.js';
-import { tableGripAt } from './table-resize.js';
+import { resizableTableGripAt } from './table-resize.js';
 
 /** Pixels the fill-handle hit zone extends past the painted handle. */
 const FILL_HANDLE_HIT_PAD = 3;
@@ -167,7 +167,7 @@ export function updateCursor(
     host.style.cursor = 'crosshair';
     return;
   }
-  if (tableGripAt(s0, x, y)) {
+  if (resizableTableGripAt(store, x, y)) {
     host.style.cursor = 'nwse-resize';
     return;
   }

@@ -4,16 +4,35 @@ import {
   type TableOverlay,
   updateTableOverlay,
 } from '../commands/format-as-table.js';
-import type { History } from '../commands/history.js';
 import { recordTablesChange } from '../commands/slice-history.js';
+import {
+  type TableActionContext,
+  tableChangeAllowed,
+  tableWrite,
+} from '../commands/table-actions.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { layoutForView, rangeRects } from '../render/geometry.js';
 import { tableGripRect } from '../render/painters/handles.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
+/** The command a grip drag runs as. */
+export const TABLE_RESIZE_COMMAND = 'tableResize';
+
 /** Pixels the table grip hit zone extends past the painted glyph. */
 const TABLE_GRIP_HIT_PAD = 3;
+
+/** The table whose resize grip lies under the pointer on the current sheet, when `store` lets a
+ *  grip drag resize it. */
+export function resizableTableGripAt(
+  store: SpreadsheetStore,
+  x: number,
+  y: number,
+): TableOverlay | null {
+  const table = tableGripAt(store.getState(), x, y);
+  const ctx = { store, history: null, origin: 'editor', commandId: TABLE_RESIZE_COMMAND } as const;
+  return table && tableChangeAllowed(ctx, table.range) ? table : null;
+}
 
 /** The table whose resize grip lies under the pointer on the current sheet. */
 export function tableGripAt(s: State, x: number, y: number): TableOverlay | null {
@@ -70,19 +89,27 @@ const nextHeaderName = (previous: string, fallback: string): string => {
 };
 
 /**
- * Resize `table` to `range`. New columns get header names that continue the
- * last header's numbering; columns that leave the table keep their contents.
- * Returns whether the table changed.
+ * Resize `table` to `range` from the entry point `ctx` names, as one authorized step. New columns
+ * get header names that continue the last header's numbering; columns that leave the table keep
+ * their contents. Returns whether the table changed.
  */
 export function applyTableResize(
-  store: SpreadsheetStore,
-  wb: WorkbookHandle,
-  history: History | null,
+  ctx: TableActionContext & { readonly workbook: WorkbookHandle },
   table: TableOverlay,
   range: Range,
 ): boolean {
   const old = table.range;
   if (range.r1 === old.r1 && range.c1 === old.c1) return false;
+  return tableWrite(ctx, old, false, () => resizeTable(ctx, table, range));
+}
+
+const resizeTable = (
+  ctx: TableActionContext & { readonly workbook: WorkbookHandle },
+  table: TableOverlay,
+  range: Range,
+): boolean => {
+  const { store, history, workbook: wb } = ctx;
+  const old = table.range;
   const transaction = history && !history.isReplaying() ? history.begin() : undefined;
   let ok = false;
   try {
@@ -107,4 +134,4 @@ export function applyTableResize(
     }
   }
   return ok;
-}
+};

@@ -5,7 +5,11 @@ import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { inputLocaleForWorkbook } from './coerce-input.js';
 import type { History } from './history.js';
-import { blockedByProtection } from './protection.js';
+import {
+  blockedByProtection,
+  isCellWritable,
+  TABLE_FIELDS_ALLOWED_ON_PROTECTED_SHEET,
+} from './protection.js';
 import { recordTablesChange } from './slice-history.js';
 
 /** "Format As Table" overlay. With a table-authoring engine every overlay is
@@ -712,6 +716,22 @@ export function tableNameError(
   return taken ? 'duplicate' : null;
 }
 
+/** Whether every total cell whose settings `totals` changes on `table` is writable. */
+const totalCellsWritable = (
+  store: SpreadsheetStore,
+  table: TableOverlay,
+  totals: readonly TableColumnTotals[] | undefined,
+): boolean => {
+  if (!table.showTotal || !totals) return false;
+  const state = store.getState();
+  const { sheet, r1, c0 } = table.range;
+  return totals.every(
+    (next, i) =>
+      JSON.stringify(next) === JSON.stringify(table.totals?.[i]) ||
+      isCellWritable(state, { sheet, row: r1, col: c0 + i }),
+  );
+};
+
 /** Patch a table overlay and return the updated overlay; the store mirror
  *  carries the change to an engine-backed table. Null when the new range
  *  overlaps another table or the engine refused the change. */
@@ -722,7 +742,14 @@ export function updateTableOverlay(
 ): TableOverlay | null {
   const current = tableOverlayById(store.getState(), id);
   if (!current) return null;
-  if (blockedByProtection(store, current.range.sheet, 'updateTableOverlay')) return null;
+  // A protected sheet still lets the style toggles change, and a total cell it leaves unlocked.
+  const permitted = Object.keys(patch).every(
+    (key) =>
+      TABLE_FIELDS_ALLOWED_ON_PROTECTED_SHEET.has(key) ||
+      (key === 'totals' && totalCellsWritable(store, current, patch.totals)),
+  );
+  if (!permitted && blockedByProtection(store, current.range.sheet, 'updateTableOverlay'))
+    return null;
   if (patch.range && overlapsOtherTable(store, id, patch.range)) return null;
   const { name, ...rest } = patch;
   if (name !== undefined && current.source === 'engine' && tableNameError(store, id, name)) {

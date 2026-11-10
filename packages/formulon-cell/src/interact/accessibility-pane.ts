@@ -11,7 +11,7 @@ import {
 import { setFontColor } from '../commands/format.js';
 import type { History } from '../commands/history.js';
 import { recordFormatChange } from '../commands/slice-history.js';
-import { toggleTableOption } from '../commands/table-design.js';
+import { toggleTableOptionAction } from '../commands/table-design.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { MacAccessibilityPaneStrings } from '../i18n/strings/mac/accessibility-pane.js';
@@ -220,7 +220,16 @@ export function attachAccessibilityPane(deps: AccessibilityPaneDeps): Accessibil
       text.textContent = t.tableHeaderText;
       const fix = button(card, 'fc-a11ypane__fix', t.insertHeaderRow);
       fix.addEventListener('click', () => {
-        toggleTableOption(store, deps.history ?? null, getWb(), 'showHeader');
+        toggleTableOptionAction(
+          {
+            store,
+            history: deps.history ?? null,
+            workbook: getWb(),
+            origin: 'ribbon',
+            commandId: 'tableHeaderRow',
+          },
+          'showHeader',
+        );
       });
     }
     const help = button(card, 'fc-a11ypane__help', '?');
