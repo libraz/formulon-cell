@@ -3,6 +3,7 @@
 export { type SpreadsheetFailure, spreadsheetFailureOf } from './api/errors.js';
 export type { Disposer } from './api/events.js';
 export type { ExportCsvOptions, ImportCsvOptions } from './api/sheet-cells.js';
+export type { ProtectOptions } from './api/sheet-format.js';
 export {
   type ChangedCell,
   type ChangeOrigin,

@@ -31,6 +31,7 @@ import { type Disposer, Emitter } from './events.js';
 import type { MemberSpec, SheetContext, WorkbookContext } from './facade-context.js';
 import { Lifecycle } from './lifecycle.js';
 import { SHEET_CELL_MEMBERS } from './sheet-cells.js';
+import { SHEET_FORMAT_MEMBERS, WORKBOOK_FORMAT_MEMBERS } from './sheet-format.js';
 import { SHEET_STRUCTURE_MEMBERS, WORKBOOK_NAME_MEMBERS } from './sheet-structure.js';
 
 /** File container a workbook saves to. */
@@ -660,7 +661,9 @@ const WORKBOOK_HOST: MemberHost<WorkbookContext> = {
 
 installMembers(SHEET_HOST, SHEET_CELL_MEMBERS);
 installMembers(SHEET_HOST, SHEET_STRUCTURE_MEMBERS);
+installMembers(SHEET_HOST, SHEET_FORMAT_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_NAME_MEMBERS);
+installMembers(WORKBOOK_HOST, WORKBOOK_FORMAT_MEMBERS);
 
 /** @internal The engine binding behind a facade workbook. */
 export const workbookHandleOf = (wb: Workbook): WorkbookHandle => stateOf(wb).handle;

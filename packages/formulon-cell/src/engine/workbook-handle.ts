@@ -117,7 +117,8 @@ export type FacadeChangeKind =
   | 'view'
   | 'names'
   | 'cf'
-  | 'validation';
+  | 'validation'
+  | 'protection';
 
 /** A non-cell facade write: its kind and the sheet it touched (`null` for workbook scope). */
 export interface FacadeChange {
