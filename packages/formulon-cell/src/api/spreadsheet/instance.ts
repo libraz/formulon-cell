@@ -44,7 +44,7 @@ import { Spreadsheet } from '../../mount.js';
 import { mutators } from '../../store/store.js';
 import type { TraceArrow } from '../../store/types.js';
 import { type BatchRejection, type ChangeBatchResult, changeBatchResult } from '../change-batch.js';
-import { spreadsheetFailure } from '../errors.js';
+import { failureOfDecision, spreadsheetFailure } from '../errors.js';
 import { type Disposer, Emitter } from '../events.js';
 import { Lifecycle } from '../lifecycle.js';
 import {
@@ -293,7 +293,8 @@ const PROTECTION_PERMISSION: Partial<
 type CommandRefusal = 'policy-denied' | 'protected' | null;
 
 const commandRefusal = (legacy: LegacyInstance, id: string): CommandRefusal => {
-  if (!canExecuteBuiltInRequest(legacy.store, id, 'instanceApi').allowed) return 'policy-denied';
+  const refused = failureOfDecision(canExecuteBuiltInRequest(legacy.store, id, 'instanceApi'));
+  if (refused) return refused;
   const operation = isBuiltInCommandId(id) ? BUILT_IN_COMMAND_OPERATION[id] : null;
   if (!operation || !(operation in PROTECTION_PERMISSION)) return null;
   const permission = PROTECTION_PERMISSION[operation];

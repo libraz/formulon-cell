@@ -1,4 +1,5 @@
 import { FormulonError, StatusCode } from '@libraz/formulon';
+import type { PermissionDecision } from '../commands/interaction-policy.js';
 
 /**
  * Why formulon-cell refused a call that the engine itself would have accepted.
@@ -42,6 +43,13 @@ export function spreadsheetFailureOf(error: unknown): SpreadsheetFailure | null 
   const kind = FAILURE_PAIR.exec(error.context)?.[1];
   return kind !== undefined && FAILURES.has(kind) ? (kind as SpreadsheetFailure) : null;
 }
+
+/** The failure a refused interaction decision reports: `protected` when protection refused it,
+ *  `policy-denied` otherwise; `null` when it is allowed. */
+export const failureOfDecision = (
+  decision: PermissionDecision,
+): 'policy-denied' | 'protected' | null =>
+  decision.allowed ? null : decision.code === 'protected' ? 'protected' : 'policy-denied';
 
 /** Extra `key=value` pairs and the wrapped cause of a formulon-cell failure. */
 export interface SpreadsheetFailureDetail {

@@ -246,9 +246,26 @@ describe('spreadsheet: update', () => {
     expect(sheet.toolbar).not.toBeNull();
   });
 
-  it('a policy does not disable dialogs whose features are on', async () => {
+  it('decides a dialog as the ribbon decides the command that opens it', async () => {
     const sheet = await mountSheet({ policy: viewerPolicy() });
-    expect(sheet.dialogs.canOpen('format')).toBe(true);
+    expect(sheet.dialogs.canOpen('format')).toBe(false);
+    expect(sheet.dialogs.canOpen('goTo')).toBe(true);
+    expect(sheet.dialogs.canOpen('findReplace')).toBe(true);
+    expectFailure(() => sheet.dialogs.open('format'), 'policy-denied');
+  });
+
+  it('refuses dialogs the protected sheet refuses, as the ribbon and shortcuts do', async () => {
+    const sheet = await mountSheet();
+    expect(sheet.dialogs.canOpen('pivotTable')).toBe(true);
+    expect(sheet.dialogs.canOpen('hyperlink')).toBe(true);
+    await sheet.workbook.sheet(0).protect();
+    expect(sheet.dialogs.canOpen('pivotTable')).toBe(false);
+    expect(sheet.dialogs.canOpen('hyperlink')).toBe(false);
+    expectFailure(() => sheet.dialogs.open('pivotTable'), 'protected');
+    expectFailure(() => sheet.dialogs.open('hyperlink'), 'protected');
+    await sheet.workbook.sheet(0).unprotect();
+    expect(sheet.dialogs.canOpen('pivotTable')).toBe(true);
+    expect(sheet.dialogs.canOpen('hyperlink')).toBe(true);
   });
 
   it('asks the policy about the dialogs that lead straight to an edit', async () => {
