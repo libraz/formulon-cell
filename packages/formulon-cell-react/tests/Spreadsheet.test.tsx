@@ -129,6 +129,90 @@ describe('React <Spreadsheet>', () => {
     expect(onLocaleChange.mock.calls.at(-1)?.[0].locale).toBe('ja');
   });
 
+  it('keeps the printer profile refresh provider current without remounting', async () => {
+    const first = vi.fn(() => []);
+    const second = vi.fn(() => []);
+    mounted = await mountReactSpreadsheet({ host: { refreshPrinterProfiles: first } });
+    const original = mounted.instance;
+
+    await original.refreshPrinterProfiles();
+    const firstCalls = first.mock.calls.length;
+    expect(firstCalls).toBeGreaterThan(0);
+
+    await mounted.rerender({ host: { refreshPrinterProfiles: second } });
+    second.mockClear();
+    await original.refreshPrinterProfiles();
+
+    expect(mounted.refValue.spreadsheet).toBe(original);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).toHaveBeenCalledTimes(firstCalls);
+  });
+
+  it('keeps the Screen Clipping capture provider current without remounting', async () => {
+    const first = vi.fn(() => 'data:image/png;base64,first');
+    const second = vi.fn(() => ({ src: 'data:image/png;base64,second', alt: 'second clip' }));
+    mounted = await mountReactSpreadsheet({ host: { captureScreenClip: first } });
+    const original = mounted.instance;
+
+    expect(await original.captureScreenClip()).toEqual({ src: 'data:image/png;base64,first' });
+    await mounted.rerender({ host: { captureScreenClip: second } });
+
+    expect(mounted.refValue.spreadsheet).toBe(original);
+    expect(await original.captureScreenClip()).toEqual({
+      src: 'data:image/png;base64,second',
+      alt: 'second clip',
+    });
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the function argument help provider current without remounting', async () => {
+    const first = vi.fn(() => ({ description: 'first hint' }));
+    const second = vi.fn((_name: string, _index: number, locale: string) => ({
+      description: `second hint (${locale})`,
+    }));
+    const common = { ui: { platform: 'mac' }, locale: 'en' } as const;
+    mounted = await mountReactSpreadsheet({ ...common, host: { functionArgumentHelp: first } });
+    const original = mounted.instance;
+    const hint = (): string | null | undefined =>
+      document.querySelector('.fc-mac-formula-palette__argument small')?.textContent;
+    const closePalette = (): void =>
+      document
+        .querySelector<HTMLButtonElement>('.fc-mac-formula-palette [data-action="close"]')
+        ?.click();
+
+    original.dialogs.open('functionArguments', { name: 'ACOS' });
+    expect(hint()).toBe('first hint');
+    closePalette();
+
+    await mounted.rerender({ ...common, host: { functionArgumentHelp: second } });
+    original.dialogs.open('functionArguments', { name: 'ACOS' });
+
+    expect(mounted.refValue.spreadsheet).toBe(original);
+    expect(hint()).toBe('second hint (en)');
+    expect(second).toHaveBeenCalledWith('ACOS', 0, 'en');
+    closePalette();
+  });
+
+  it('clears the host providers when the host prop is removed', async () => {
+    const capture = vi.fn(() => 'data:image/png;base64,clip');
+    const refresh = vi.fn(() => []);
+    mounted = await mountReactSpreadsheet({
+      host: { captureScreenClip: capture, refreshPrinterProfiles: refresh },
+    });
+    const original = mounted.instance;
+    expect(await original.captureScreenClip()).toEqual({ src: 'data:image/png;base64,clip' });
+
+    await mounted.rerender({});
+    const refreshCalls = refresh.mock.calls.length;
+    await original.refreshPrinterProfiles();
+
+    expect(mounted.refValue.spreadsheet).toBe(original);
+    expect(await original.captureScreenClip()).toBeNull();
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(refreshCalls);
+  });
+
   it('disposes the instance on unmount and clears the ref', async () => {
     const onCell = vi.fn();
     mounted = await mountReactSpreadsheet({ onCell });

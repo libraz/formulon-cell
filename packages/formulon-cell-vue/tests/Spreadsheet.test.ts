@@ -239,4 +239,77 @@ describe('<Spreadsheet>', () => {
     expect(view.ready).not.toHaveBeenCalled();
     workbook.dispose();
   });
+
+  describe('host providers', () => {
+    it('calls the replacement refreshPrinterProfiles, not the previous one', async () => {
+      const first = vi.fn(() => []);
+      const second = vi.fn(() => []);
+      const view = await mountComponent({ host: { refreshPrinterProfiles: first } });
+      const inst = view.instance();
+      await inst?.refreshPrinterProfiles();
+      expect(first).toHaveBeenCalledTimes(1);
+      view.props.host = { refreshPrinterProfiles: second };
+      await flush();
+      expect(view.instance()).toBe(inst);
+      await inst?.refreshPrinterProfiles();
+      expect(first).toHaveBeenCalledTimes(1);
+      expect(second).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls the replacement captureScreenClip, not the previous one', async () => {
+      const first = vi.fn(() => 'data:image/png;base64,first');
+      const second = vi.fn(() => ({ src: 'data:image/png;base64,second', alt: 'clip' }));
+      const view = await mountComponent({ host: { captureScreenClip: first } });
+      const inst = view.instance() as SpreadsheetInstance;
+      expect(await inst.captureScreenClip()).toEqual({ src: 'data:image/png;base64,first' });
+      view.props.host = { captureScreenClip: second };
+      await flush();
+      expect(await inst.captureScreenClip()).toEqual({
+        src: 'data:image/png;base64,second',
+        alt: 'clip',
+      });
+      expect(first).toHaveBeenCalledTimes(1);
+      expect(second).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls the replacement functionArgumentHelp, not the previous one', async () => {
+      const first = vi.fn(() => ({ description: 'First hint.' }));
+      const second = vi.fn((_name: string, _index: number, locale: string) => ({
+        description: `Second hint (${locale}).`,
+      }));
+      const view = await mountComponent({
+        ui: { platform: 'mac', features: { fxDialog: true } },
+        host: { functionArgumentHelp: first },
+      });
+      const inst = view.instance() as SpreadsheetInstance;
+      const hint = (): string | null | undefined =>
+        document.querySelector('.fc-mac-formula-palette__argument small')?.textContent;
+      inst.dialogs.open('functionArguments', { name: 'ACOS' });
+      expect(hint()).toBe('First hint.');
+      document
+        .querySelector<HTMLButtonElement>('.fc-mac-formula-palette [data-action="close"]')
+        ?.click();
+      view.props.host = { functionArgumentHelp: second };
+      await flush();
+      inst.dialogs.open('functionArguments', { name: 'ACOS' });
+      expect(hint()).toBe('Second hint (en).');
+      expect(second).toHaveBeenCalledWith('ACOS', 0, 'en');
+    });
+
+    it('clears the providers when the host prop is removed', async () => {
+      const capture = vi.fn(() => 'data:image/png;base64,x');
+      const refresh = vi.fn(() => []);
+      const view = await mountComponent({
+        host: { captureScreenClip: capture, refreshPrinterProfiles: refresh },
+      });
+      const inst = view.instance() as SpreadsheetInstance;
+      expect(await inst.captureScreenClip()).not.toBeNull();
+      view.props.host = undefined;
+      await flush();
+      expect(await inst.captureScreenClip()).toBeNull();
+      await inst.refreshPrinterProfiles();
+      expect(capture).toHaveBeenCalledTimes(1);
+      expect(refresh).not.toHaveBeenCalled();
+    });
+  });
 });
