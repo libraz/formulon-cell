@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
@@ -34,12 +35,9 @@ export async function runWholeSheetNumberFormat(
   const sheet = new SpreadsheetPage(page);
   await sheet.mount({ locale: 'en', platform });
   await sheet.expectNoStub();
-  const moduleUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/store/store.ts', import.meta.url).pathname
-  }`;
-  await page.evaluate(async (url) => {
+  await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const { mutators } = await import(url);
+    const { mutators } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes['store/store'];
     const inputs = ['1234.5', "'00123", 'abc', '=SUM(A1,1)', '="label"'];
     const result = instance.applyChanges(
       inputs.map((input, row) => ({ addr: { sheet: 0, row, col: 0 }, input })),
@@ -54,7 +52,7 @@ export async function runWholeSheetNumberFormat(
         bold: true,
       },
     );
-  }, moduleUrl);
+  });
   await page
     .locator('.fc-host__grid')
     .first()

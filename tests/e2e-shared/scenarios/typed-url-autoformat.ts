@@ -1,15 +1,15 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const url = 'https://example.com/formulon-native-check';
 
 async function linkState(page: Page) {
-  const geometryUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/render/geometry.ts', import.meta.url).pathname
-  }`;
-  return page.evaluate(async (geometryUrl) => {
-    const { layoutForView } = await import(geometryUrl);
+  return page.evaluate(() => {
+    const { layoutForView } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'render/geometry'
+    ];
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const wb = instance.workbook;
     const style = wb.getEffectiveStyle(0, 0, 0);
@@ -34,7 +34,7 @@ async function linkState(page: Page) {
       color: (font.color?.argb ?? 0) >>> 0,
       hlink: hlink >>> 0,
     };
-  }, geometryUrl);
+  });
 }
 
 export async function runTypedUrlAutoformat(
@@ -45,14 +45,11 @@ export async function runTypedUrlAutoformat(
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ locale: 'en', platform });
   await sheet.expectNoStub();
-  const moduleUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/store/store.ts', import.meta.url).pathname
-  }`;
-  await page.evaluate(async (moduleUrl) => {
+  await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const normal = instance.workbook.workbookDisplayFont;
     if (!normal) throw new Error('Default font unavailable');
-    const { mutators } = await import(moduleUrl);
+    const { mutators } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes['store/store'];
     mutators.setColWidth(instance.store, 0, 480);
     mutators.setCellFormat(
       instance.store,
@@ -63,7 +60,7 @@ export async function runTypedUrlAutoformat(
         underline: false,
       },
     );
-  }, moduleUrl);
+  });
   const before = await linkState(page);
   // CSS-pixel conversion can leave a few floating-point bits in native point values.
   expect(before.points).toBeCloseTo(before.normalPoints + 13, 10);

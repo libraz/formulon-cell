@@ -1,17 +1,16 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
-const geometryUrl = `/@fs${
-  new URL('../../../packages/formulon-cell/src/render/geometry.ts', import.meta.url).pathname
-}`;
-
 async function rowGeometry(page: Page, row: number) {
   return page.evaluate(
-    async ({ moduleUrl, row }) => {
+    ({ row }) => {
       const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      const { layoutForView } = await import(moduleUrl);
+      const { layoutForView } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+        'render/geometry'
+      ];
       const state = instance.store.getState();
       const layout = layoutForView(state);
       return {
@@ -19,7 +18,7 @@ async function rowGeometry(page: Page, row: number) {
         explicitRows: state.layout.rowHeights.size,
       };
     },
-    { moduleUrl: geometryUrl, row },
+    { row },
   );
 }
 
@@ -68,15 +67,13 @@ export async function runAutomaticRowheight(
   await chooseFontSize(12);
   expect((await rowGeometry(page, 0)).logicalHeight).toBeLessThan(enlarged.logicalHeight);
 
-  const layoutCommandUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/commands/row-col-layout.ts', import.meta.url)
-      .pathname
-  }`;
-  await page.evaluate(async (moduleUrl) => {
+  await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const { setRowsHeight } = await import(moduleUrl);
+    const { setRowsHeight } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'commands/row-col-layout'
+    ];
     setRowsHeight(instance.store, instance.history, 0, 0, 24, instance.workbook);
-  }, layoutCommandUrl);
+  });
   await chooseFontSize(36);
   expect((await rowGeometry(page, 0)).logicalHeight).toBe(24);
 

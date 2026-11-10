@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
@@ -10,9 +11,6 @@ export async function runKeyboardMenuLayoutScenario(
   capture?: (name: string) => Promise<void>,
 ): Promise<void> {
   const sheet = new UserJourneyPage(page);
-  const geometryUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/render/geometry.ts', import.meta.url).pathname
-  }`;
   for (const platform of ['default', 'mac'] as const) {
     await page.setViewportSize({ width: 1280, height: 1000 });
     await sheet.mount({ locale: 'en', platform });
@@ -22,19 +20,20 @@ export async function runKeyboardMenuLayoutScenario(
     await page.locator('[data-ribbon-command="fontSize"] button').first().click();
     await page.locator('.fc-tb__rb-dd__opt[data-value="24"]').click();
     await sheet.goTo('D8');
-    const cell = await page.evaluate(async (geometryUrl) => {
+    const cell = await page.evaluate(() => {
       const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
       const state = instance.store.getState();
       const grid = document.querySelector('.fc-host__grid')?.getBoundingClientRect();
       if (!grid) throw new Error('Grid unavailable');
-      const { layoutForView, cellRectUnclamped } = await import(geometryUrl);
+      const { layoutForView, cellRectUnclamped } = (window as unknown as { __fcProbes: E2eProbes })
+        .__fcProbes['render/geometry'];
       const rect = cellRectUnclamped(layoutForView(state), state.viewport, 7, 3);
       return {
         left: grid.left + rect.x,
         right: grid.left + rect.x + rect.w,
         bottom: grid.top + rect.y + rect.h,
       };
-    }, geometryUrl);
+    });
     await page.mouse.move(1270, 0);
     await page.keyboard.press('Shift+F10');
     const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
@@ -92,11 +91,7 @@ async function runOwnerDocumentMenuScenario(
   page: Page,
   capture?: (name: string) => Promise<void>,
 ): Promise<void> {
-  const contextMenuUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/interact/context-menu.ts', import.meta.url)
-      .pathname
-  }`;
-  await page.evaluate(async (moduleUrl) => {
+  await page.evaluate(async () => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const frame = document.createElement('iframe');
     frame.id = 'menu-owner-frame';
@@ -121,7 +116,9 @@ async function runOwnerDocumentMenuScenario(
     host.dataset.fcPlatform = 'mac';
     host.dataset.fcTheme = 'paper';
     owner.body.append(host);
-    const { attachContextMenu } = await import(moduleUrl);
+    const { attachContextMenu } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'interact/context-menu'
+    ];
     const detach = attachContextMenu({
       host,
       store: instance.store,
@@ -141,7 +138,7 @@ async function runOwnerDocumentMenuScenario(
       detach();
       frame.remove();
     };
-  }, contextMenuUrl);
+  });
   try {
     const frame = page.frameLocator('#menu-owner-frame');
     await frame.locator('#menu-owner-host').click({ button: 'right', position: { x: 600, y: 40 } });
@@ -368,14 +365,12 @@ export async function runSubmenuHighlightScenario(page: Page): Promise<void> {
     expect(await highlightedRootItems(menu)).toEqual(['sortMenu']);
     await page.keyboard.press('Escape');
     await expect(menu).toBeHidden();
-    const moduleUrl = `/@fs${
-      new URL('../../../packages/formulon-cell/src/interact/object-menu.ts', import.meta.url)
-        .pathname
-    }`;
-    await page.evaluate(async (moduleUrl) => {
+    await page.evaluate(() => {
       const host = document.querySelector<HTMLElement>('.fc-host');
       if (!host) throw new Error('Missing host');
-      const { createObjectMenu } = await import(moduleUrl);
+      const { createObjectMenu } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+        'interact/object-menu'
+      ];
       createObjectMenu(host).open(
         80,
         220,
@@ -405,7 +400,7 @@ export async function runSubmenuHighlightScenario(page: Page): Promise<void> {
         ],
         { label: 'Object actions', restoreFocusTo: host },
       );
-    }, moduleUrl);
+    });
     const objectMenu = page.locator('.fc-ctxmenu--object');
     await expect(objectMenu.locator('[data-fc-action="first"]')).toBeFocused();
     expect(await highlightedRootItems(objectMenu)).toEqual(['first']);

@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -350,46 +351,42 @@ export async function runFormulaHelperVisual(
   );
   // Rendering counts include overscan; use actual geometry to target a fully
   // visible edge cell rather than assuming a fixed row/column fits at every zoom.
-  const geometryUrl = `/@fs${new URL('../../../packages/formulon-cell/src/render/geometry.ts', import.meta.url).pathname}`;
-  const addressUrl = `/@fs${new URL('../../../packages/formulon-cell/src/engine/address.ts', import.meta.url).pathname}`;
   const target =
     scenario.edge === 'end'
-      ? await page.evaluate(
-          async ({ geometryUrl, addressUrl }) => {
-            const { cellRectUnclamped, layoutForView } = await import(geometryUrl);
-            const { formatA1Cell } = await import(addressUrl);
-            const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-            const state = instance.store.getState();
-            const grid = document.querySelector('.fc-host__grid')?.getBoundingClientRect();
-            if (!grid) throw new Error('Missing grid');
-            let row = state.viewport.rowStart;
-            let col = state.viewport.colStart;
+      ? await page.evaluate(() => {
+          const probes = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes;
+          const { cellRectUnclamped, layoutForView } = probes['render/geometry'];
+          const { formatA1Cell } = probes['engine/address'];
+          const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+          const state = instance.store.getState();
+          const grid = document.querySelector('.fc-host__grid')?.getBoundingClientRect();
+          if (!grid) throw new Error('Missing grid');
+          let row = state.viewport.rowStart;
+          let col = state.viewport.colStart;
+          for (
+            let r = state.viewport.rowStart;
+            r < state.viewport.rowStart + state.viewport.rowCount;
+            r += 1
+          ) {
             for (
-              let r = state.viewport.rowStart;
-              r < state.viewport.rowStart + state.viewport.rowCount;
-              r += 1
+              let c = state.viewport.colStart;
+              c < state.viewport.colStart + state.viewport.colCount;
+              c += 1
             ) {
-              for (
-                let c = state.viewport.colStart;
-                c < state.viewport.colStart + state.viewport.colCount;
-                c += 1
+              const cell = cellRectUnclamped(layoutForView(state), state.viewport, r, c);
+              if (
+                cell.x >= 0 &&
+                cell.y >= 0 &&
+                cell.x + cell.w <= grid.width &&
+                cell.y + cell.h <= grid.height
               ) {
-                const cell = cellRectUnclamped(layoutForView(state), state.viewport, r, c);
-                if (
-                  cell.x >= 0 &&
-                  cell.y >= 0 &&
-                  cell.x + cell.w <= grid.width &&
-                  cell.y + cell.h <= grid.height
-                ) {
-                  row = r;
-                  col = c;
-                }
+                row = r;
+                col = c;
               }
             }
-            return formatA1Cell(row, col);
-          },
-          { geometryUrl, addressUrl },
-        )
+          }
+          return formatA1Cell(row, col);
+        })
       : 'A1';
   await sheet.goTo(target);
   const input = page
@@ -466,9 +463,10 @@ export async function runFormulaHelperGeometry(page: Page): Promise<void> {
   const sheet = new UserJourneyPage(page);
   await page.setViewportSize({ width: 840, height: 620 });
   await sheet.mount({ locale: 'en' });
-  const moduleUrl = `/@fs${new URL('../../../packages/formulon-cell/src/interact/formula-helper-position.ts', import.meta.url).pathname}`;
-  const measured = await page.evaluate(async (moduleUrl) => {
-    const { createFormulaCaretPositioner, positionFormulaHelper } = await import(moduleUrl);
+  const measured = await page.evaluate(() => {
+    const { createFormulaCaretPositioner, positionFormulaHelper } = (
+      window as unknown as { __fcProbes: E2eProbes }
+    ).__fcProbes['interact/formula-helper-position'];
     const textarea = document.createElement('textarea');
     textarea.style.cssText =
       'position:fixed;left:100px;top:100px;width:400px;height:80px;font:20px monospace;padding:4px;border:1px solid black;box-sizing:border-box';
@@ -511,7 +509,7 @@ export async function runFormulaHelperGeometry(page: Page): Promise<void> {
     const placed = panel.getBoundingClientRect().toJSON();
     owner.remove();
     return { alignment, placed, width: innerWidth, height: innerHeight };
-  }, moduleUrl);
+  });
   for (const item of measured.alignment) {
     // WebKit quantizes collapsed Range coordinates to CSS pixels while Canvas
     // reports fractional font advances. The old prefix-only mirror was 48px off.

@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
@@ -33,10 +34,11 @@ const EXPECTED: Record<'default' | 'mac', Record<'ja' | 'en', Expected>> = {
 };
 
 const screenPitch = (page: Page) => {
-  const moduleUrl = `/@fs${new URL('../../../packages/formulon-cell/src/render/geometry.ts', import.meta.url).pathname}`;
-  return page.evaluate(async (nextModuleUrl) => {
+  return page.evaluate(() => {
     const instance = (window as unknown as GeometryProbeWindow).__fcInst;
-    const { cellRectUnclamped } = await import(nextModuleUrl);
+    const { cellRectUnclamped } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'render/geometry'
+    ];
     const { layout, viewport, data } = instance.store.getState() as unknown as {
       layout: Parameters<typeof cellRectUnclamped>[0];
       viewport: Parameters<typeof cellRectUnclamped>[1] & { zoom: number };
@@ -52,7 +54,7 @@ const screenPitch = (page: Page) => {
       height: a1.h,
       width: a1.w,
     };
-  }, moduleUrl);
+  });
 };
 
 export async function runPlatformGeometry(

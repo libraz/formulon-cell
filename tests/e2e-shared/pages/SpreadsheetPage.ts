@@ -1,23 +1,22 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 
 /** Absolute pointer position from the live sheet layout, including its zoom. */
 export async function gridCellCenter(page: Page, row: number, col: number) {
   const box = await page.locator('.fc-host__grid').first().boundingBox();
   if (!box) throw new Error('Missing grid');
-  const moduleUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/render/geometry.ts', import.meta.url).pathname
-  }`;
   const point = await page.evaluate(
-    async ({ row, col, moduleUrl }) => {
+    ({ row, col }) => {
       const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
       const state = instance.store.getState();
-      const { cellRectUnclamped, layoutForView } = await import(moduleUrl);
+      const { cellRectUnclamped, layoutForView } = (window as unknown as { __fcProbes: E2eProbes })
+        .__fcProbes['render/geometry'];
       const rect = cellRectUnclamped(layoutForView(state), state.viewport, row, col);
       return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
     },
-    { row, col, moduleUrl },
+    { row, col },
   );
   return { x: box.x + point.x, y: box.y + point.y };
 }

@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import matrix from '../fixtures/full-check-matrix.json' with { type: 'json' };
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
@@ -213,13 +213,13 @@ interface SurfaceLabels {
   displayAutoHide: string;
 }
 
-const demoStringsUrl = `/@fs${new URL('../../../apps/demo-shared/demo-strings.ts', import.meta.url).pathname}`;
-
 const getStrings = async (page: Page): Promise<SurfaceLabels> =>
-  page.evaluate(async (moduleUrl) => {
+  page.evaluate(() => {
     const instance = (window as ProbeWindow).__fcInst;
     if (!instance) throw new Error('full-check requires window.__fcInst');
-    const { createDemoStrings } = await import(moduleUrl);
+    const { createDemoStrings } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'demo-shared/demo-strings'
+    ];
     const demoStrings =
       createDemoStrings('React')[instance.locale as keyof ReturnType<typeof createDemoStrings>];
     if (!demoStrings) throw new Error(`full-check demo strings missing for ${instance.locale}`);
@@ -326,7 +326,7 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       displayCollapsed: strings.ribbonDisplay.collapsed,
       displayAutoHide: strings.ribbonDisplay.autoHide,
     } satisfies SurfaceLabels;
-  }, demoStringsUrl);
+  });
 
 const runtime = (page: Page): Promise<RuntimeSnapshot> =>
   page.evaluate(() => {
@@ -574,12 +574,13 @@ const cellCorner = async (
   row: number,
   col: number,
 ): Promise<{ x: number; y: number }> => {
-  const moduleUrl = `/@fs${new URL('../../../packages/formulon-cell/src/render/geometry.ts', import.meta.url).pathname}`;
   return page.evaluate(
-    async ({ moduleUrl: nextModuleUrl, row: targetRow, col: targetCol }) => {
+    ({ row: targetRow, col: targetCol }) => {
       const instance = (window as ProbeWindow).__fcInst;
       if (!instance) throw new Error('full-check geometry requires __fcInst');
-      const { cellRectUnclamped } = await import(nextModuleUrl);
+      const { cellRectUnclamped } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+        'render/geometry'
+      ];
       const { layout, viewport } = instance.store.getState() as unknown as {
         layout: Parameters<typeof cellRectUnclamped>[0];
         viewport: Parameters<typeof cellRectUnclamped>[1];
@@ -590,25 +591,23 @@ const cellCorner = async (
       if (!box) throw new Error('full-check geometry cannot find canvas');
       return { x: box.x + rect.x + 2, y: box.y + rect.y + 2 };
     },
-    { moduleUrl, row, col },
+    { row, col },
   );
 };
 
 /** Centre of the Mac error-check smart tag, or null until a frame has painted it. */
 const errorTagCenter = async (page: Page): Promise<{ x: number; y: number } | null> => {
-  const moduleUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/render/grid/hit-state.ts', import.meta.url)
-      .pathname
-  }`;
-  return page.evaluate(async (nextModuleUrl) => {
-    const { gridHitState } = await import(nextModuleUrl);
+  return page.evaluate(() => {
+    const { gridHitState } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'render/grid/hit-state'
+    ];
     const grid = document.querySelector<HTMLElement>('.fc-host__grid');
     const canvas = document.querySelector<HTMLCanvasElement>('.fc-host__canvas');
     const tag = grid ? gridHitState(grid).errorTag : null;
     if (!tag || !canvas) return null;
     const box = canvas.getBoundingClientRect();
     return { x: box.x + tag.rect.x + tag.rect.w / 2, y: box.y + tag.rect.y + tag.rect.h / 2 };
-  }, moduleUrl);
+  });
 };
 
 const errorTriangleCenter = async (
@@ -616,13 +615,11 @@ const errorTriangleCenter = async (
   row: number,
   col: number,
 ): Promise<{ x: number; y: number }> => {
-  const moduleUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/render/grid/hit-state.ts', import.meta.url)
-      .pathname
-  }`;
   return page.evaluate(
-    async ({ moduleUrl: nextModuleUrl, row: targetRow, col: targetCol }) => {
-      const { gridHitState } = await import(nextModuleUrl);
+    ({ row: targetRow, col: targetCol }) => {
+      const { gridHitState } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+        'render/grid/hit-state'
+      ];
       const grid = document.querySelector<HTMLElement>('.fc-host__grid');
       if (!grid) throw new Error('full-check error geometry cannot find grid');
       const hit = (gridHitState(grid).errorTriangles as ErrorTriangleProbe[]).find(
@@ -639,7 +636,7 @@ const errorTriangleCenter = async (
         y: box.y + hit.rect.y + hit.rect.h / 2,
       };
     },
-    { moduleUrl, row, col },
+    { row, col },
   );
 };
 
@@ -739,60 +736,58 @@ const seedObjectFixture = async (page: Page): Promise<void> => {
     { address: { sheet: 0, row: 4, col: 1 }, kind: 'number', value: 15 },
   ];
   await seed(page, cells, { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 });
-  const formatTableUrl = `/@fs${new URL('../../../packages/formulon-cell/src/commands/format-as-table.ts', import.meta.url).pathname}`;
-  const pivotUrl = `/@fs${new URL('../../../packages/formulon-cell/src/commands/pivot-table.ts', import.meta.url).pathname}`;
-  const chartUrl = `/@fs${new URL('../../../packages/formulon-cell/src/commands/session-chart.ts', import.meta.url).pathname}`;
-  await page.evaluate(
-    async ({ formatTableUrl: tableUrl, pivotUrl: nextPivotUrl, chartUrl: nextChartUrl }) => {
-      const instance = (window as ProbeWindow).__fcInst;
-      if (!instance) throw new Error('full-check objects fixture requires __fcInst');
-      if (!instance.workbook.capabilities.tableMutate) {
-        throw new Error(
-          'full-check objects fixture unavailable: engine tableMutate capability is false',
-        );
-      }
-      if (!instance.workbook.capabilities.pivotTableMutate) {
-        throw new Error(
-          'full-check objects fixture unavailable: engine pivotTableMutate capability is false',
-        );
-      }
-      instance.setFeatures({ slicer: true });
-      const { formatAsTable } = await import(tableUrl);
-      const tableRange = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 };
-      formatAsTable(instance.store as never, tableRange, {
-        workbook: instance.workbook as never,
-        style: 'medium',
-      });
-      const table = instance.workbook.getTables?.()[0];
-      if (!table)
-        throw new Error('full-check objects fixture failed: table creation returned no table');
-      const { createPivotTableFromRange } = await import(nextPivotUrl);
-      const pivot = createPivotTableFromRange(instance.workbook as never, {
-        source: tableRange,
-        destination: { sheet: 0, row: 7, col: 0 },
-        name: 'FullCheckPivot',
-        rowField: 'Region',
-        valueField: 'Sales',
-        aggregation: 0,
-      });
-      if (!pivot.ok) {
-        throw new Error(`full-check objects fixture pivot creation failed: ${pivot.reason}`);
-      }
-      const { createSessionChart } = await import(nextChartUrl);
-      const chart = createSessionChart(
-        instance.store as never,
-        tableRange,
-        { wb: instance.workbook as never, kind: 'column' },
-        instance.history as never,
+  await page.evaluate(() => {
+    const instance = (window as ProbeWindow).__fcInst;
+    if (!instance) throw new Error('full-check objects fixture requires __fcInst');
+    if (!instance.workbook.capabilities.tableMutate) {
+      throw new Error(
+        'full-check objects fixture unavailable: engine tableMutate capability is false',
       );
-      if (!chart)
-        throw new Error('full-check objects fixture failed: chart creation returned null');
-      const slicer = instance.addSlicer({ tableName: table.name, column: 'Region', x: 24, y: 24 });
-      if (!slicer?.id)
-        throw new Error('full-check objects fixture failed: slicer creation returned no id');
-    },
-    { formatTableUrl, pivotUrl, chartUrl },
-  );
+    }
+    if (!instance.workbook.capabilities.pivotTableMutate) {
+      throw new Error(
+        'full-check objects fixture unavailable: engine pivotTableMutate capability is false',
+      );
+    }
+    instance.setFeatures({ slicer: true });
+    const { formatAsTable } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'commands/format-as-table'
+    ];
+    const tableRange = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 };
+    formatAsTable(instance.store as never, tableRange, {
+      workbook: instance.workbook as never,
+      style: 'medium',
+    });
+    const table = instance.workbook.getTables?.()[0];
+    if (!table)
+      throw new Error('full-check objects fixture failed: table creation returned no table');
+    const { createPivotTableFromRange } = (window as unknown as { __fcProbes: E2eProbes })
+      .__fcProbes['commands/pivot-table'];
+    const pivot = createPivotTableFromRange(instance.workbook as never, {
+      source: tableRange,
+      destination: { sheet: 0, row: 7, col: 0 },
+      name: 'FullCheckPivot',
+      rowField: 'Region',
+      valueField: 'Sales',
+      aggregation: 0,
+    });
+    if (!pivot.ok) {
+      throw new Error(`full-check objects fixture pivot creation failed: ${pivot.reason}`);
+    }
+    const { createSessionChart } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'commands/session-chart'
+    ];
+    const chart = createSessionChart(
+      instance.store as never,
+      tableRange,
+      { wb: instance.workbook as never, kind: 'column' },
+      instance.history as never,
+    );
+    if (!chart) throw new Error('full-check objects fixture failed: chart creation returned null');
+    const slicer = instance.addSlicer({ tableName: table.name, column: 'Region', x: 24, y: 24 });
+    if (!slicer?.id)
+      throw new Error('full-check objects fixture failed: slicer creation returned no id');
+  });
   await expect.poll(() => page.locator('.fc-chart').count()).toBeGreaterThan(0);
   await expect.poll(() => page.locator('.fc-slicer').count()).toBeGreaterThan(0);
 };
@@ -1042,9 +1037,8 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
     ],
     range,
   );
-  const autoFilterUrl = `/@fs${new URL('../../../packages/formulon-cell/src/engine/auto-filter-sync.ts', import.meta.url).pathname}`;
   await page.evaluate(
-    async ({ moduleUrl, nextRange }) => {
+    ({ nextRange }) => {
       const instance = (window as ProbeWindow).__fcInst;
       if (!instance) throw new Error('full-check filter fixture requires __fcInst');
       if (!instance.workbook.capabilities.autoFilter || !instance.workbook.setSheetAutoFilterXml) {
@@ -1055,7 +1049,8 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
       if (!instance.workbook.setSheetAutoFilterXml(0, '<autoFilter ref="A1:C6"/>')) {
         throw new Error('full-check filter fixture failed: engine rejected autoFilter definition');
       }
-      const { hydrateAutoFilterFromEngine } = await import(moduleUrl);
+      const { hydrateAutoFilterFromEngine } = (window as unknown as { __fcProbes: E2eProbes })
+        .__fcProbes['engine/auto-filter-sync'];
       hydrateAutoFilterFromEngine(instance.workbook as never, instance.store as never, 0);
       instance.store.setState((state) => ({
         ...state,
@@ -1067,7 +1062,7 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
         },
       }));
     },
-    { moduleUrl: autoFilterUrl, nextRange: range },
+    { nextRange: range },
   );
   // The Mac panel is titled by the column's header text.
   const filterPanelLabel = (current: SurfaceLabels): string =>

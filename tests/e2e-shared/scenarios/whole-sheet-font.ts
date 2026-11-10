@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
@@ -92,13 +93,11 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
   await page.keyboard.press('Enter');
   expect(await nativeSize(0, 1)).toBe(18);
 
-  const moduleUrl = `/@fs${
-    new URL('../../../packages/formulon-cell/src/engine/workbook-handle.ts', import.meta.url)
-      .pathname
-  }`;
-  const reloadedFonts = await page.evaluate(async (moduleUrl) => {
+  const reloadedFonts = await page.evaluate(async () => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const { WorkbookHandle } = await import(moduleUrl);
+    const { WorkbookHandle } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'engine/workbook-handle'
+    ];
     const reloaded = await WorkbookHandle.loadBytes(instance.workbook.save());
     try {
       return [
@@ -114,7 +113,7 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
     } finally {
       reloaded.dispose();
     }
-  }, moduleUrl);
+  });
   expect(reloadedFonts).toEqual([
     { size: 24, name: '游ゴシック' },
     { size: 18, name: '游ゴシック' },

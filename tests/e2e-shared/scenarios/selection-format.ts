@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
@@ -300,10 +301,11 @@ export async function runSelectionFormat(
       ).map((format) => format.bold),
     )
     .toEqual([true, true, false]);
-  const moduleUrl = `/@fs${new URL('../../../packages/formulon-cell/src/engine/workbook-handle.ts', import.meta.url).pathname}`;
-  const saved = await page.evaluate(async (moduleUrl) => {
+  const saved = await page.evaluate(async () => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-    const { WorkbookHandle } = await import(moduleUrl);
+    const { WorkbookHandle } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'engine/workbook-handle'
+    ];
     const workbook = await WorkbookHandle.loadBytes(instance.workbook.save());
     try {
       const addresses: [number, number][] = [
@@ -320,7 +322,7 @@ export async function runSelectionFormat(
     } finally {
       workbook.dispose();
     }
-  }, moduleUrl);
+  });
   expect(saved.slice(0, 2)).toEqual([
     { size: baseSize, family: 'Arial', bold: true },
     { size: baseSize, family: 'Arial', bold: true },

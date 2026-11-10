@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
@@ -15,54 +16,52 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   const sheet = new SpreadsheetPage(page);
   await sheet.mount();
   await sheet.expectNoStub();
-  const commandsUrl = `/@fs${new URL('../../../packages/formulon-cell/src/commands/session-chart.ts', import.meta.url).pathname}`;
-  const chartId = await page.evaluate(
-    async ({ commandsUrl }) => {
-      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      const { createSessionChart } = await import(commandsUrl);
-      const table = [
-        ['Month', 'Sales', 'Costs'],
-        ['Jan', 10, 6],
-        ['Feb', 15, 8],
-        ['Mar', 8, 3],
-      ];
-      const result = instance.applyChanges(
-        table.flatMap((row, r) =>
-          row.map((value, col) => ({
-            addr: { sheet: 0, row: r, col },
-            value:
-              typeof value === 'number'
-                ? { kind: 'number' as const, value }
-                : { kind: 'text' as const, value },
-          })),
-        ),
-      );
-      if (result.status !== 'applied') throw new Error('chart fixture cells were not applied');
-      const created = createSessionChart(
-        instance.store,
-        { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
-        {
-          wb: instance.workbook,
-          kind: 'column',
-          seriesDirection: 'columns',
-          title: 'Monthly sales',
-          // 420 x 280 px at C3.
-          anchor: {
-            row: 2,
-            col: 2,
-            rowOffEmu: 0,
-            colOffEmu: 0,
-            widthEmu: 4_000_500,
-            heightEmu: 2_667_000,
-          },
+  const chartId = await page.evaluate(() => {
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const { createSessionChart } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'commands/session-chart'
+    ];
+    const table = [
+      ['Month', 'Sales', 'Costs'],
+      ['Jan', 10, 6],
+      ['Feb', 15, 8],
+      ['Mar', 8, 3],
+    ];
+    const result = instance.applyChanges(
+      table.flatMap((row, r) =>
+        row.map((value, col) => ({
+          addr: { sheet: 0, row: r, col },
+          value:
+            typeof value === 'number'
+              ? { kind: 'number' as const, value }
+              : { kind: 'text' as const, value },
+        })),
+      ),
+    );
+    if (result.status !== 'applied') throw new Error('chart fixture cells were not applied');
+    const created = createSessionChart(
+      instance.store,
+      { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
+      {
+        wb: instance.workbook,
+        kind: 'column',
+        seriesDirection: 'columns',
+        title: 'Monthly sales',
+        // 420 x 280 px at C3.
+        anchor: {
+          row: 2,
+          col: 2,
+          rowOffEmu: 0,
+          colOffEmu: 0,
+          widthEmu: 4_000_500,
+          heightEmu: 2_667_000,
         },
-        instance.history,
-      );
-      if (!created) throw new Error('chart fixture was not created');
-      return created.id as string;
-    },
-    { commandsUrl },
-  );
+      },
+      instance.history,
+    );
+    if (!created) throw new Error('chart fixture was not created');
+    return created.id as string;
+  });
 
   const chart = page.locator(`[data-chart-id="${chartId}"]`);
   const bars = chart.locator('[data-chart-role="bar"]');
@@ -391,63 +390,61 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   );
   expect(Number(await inheritedPoint.getAttribute('width'))).toBeCloseTo(automaticWidth);
 
-  const layoutUrl = `/@fs${new URL('../../../packages/formulon-cell/src/charts/layout.ts', import.meta.url).pathname}`;
-  const narrowScene = await page.evaluate(
-    async ({ layoutUrl }) => {
-      const { layoutChart } = await import(layoutUrl);
-      const axis = { numberFormat: 'host-code', min: 0, max: 20, majorUnit: 5 };
-      const scene = layoutChart({
-        spec: { kind: 'scatter', xAxis: axis, yAxis: { ...axis, title: '値' } },
-        data: {
-          domain: 'xy',
-          series: [
-            {
-              id: 's',
-              points: [
-                { x: 5, y: 10 },
-                { x: 15, y: 20 },
-              ],
-            },
-          ],
-        },
-        width: 240,
-        height: 132,
-        formatValue: (value: number) => `日本語の長い数値書式 ${value.toFixed(2)}円`,
-      });
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('viewBox', '0 0 240 132');
-      svg.style.cssText = 'position:fixed;left:0;top:0;width:240px;height:132px';
-      for (const primitive of scene.elements) {
-        const node = document.createElementNS(svg.namespaceURI, primitive.tag);
-        for (const [name, value] of Object.entries(primitive.attrs))
-          node.setAttribute(name, String(value));
-        if (primitive.text !== undefined) node.textContent = primitive.text;
-        if (primitive.role) node.setAttribute('data-chart-role', primitive.role);
-        svg.append(node);
-      }
-      document.body.append(svg);
-      try {
-        const bounds = svg.getBoundingClientRect();
-        const clipped = [
-          ...svg.querySelectorAll('[data-chart-role="axis-label"], [data-chart-role="axis-title"]'),
-        ]
-          .filter((node) => {
-            const box = node.getBoundingClientRect();
-            return (
-              box.left < bounds.left ||
-              box.right > bounds.right ||
-              box.top < bounds.top ||
-              box.bottom > bounds.bottom
-            );
-          })
-          .map((node) => node.textContent);
-        return { plotWidth: scene.plot.width, clipped };
-      } finally {
-        svg.remove();
-      }
-    },
-    { layoutUrl },
-  );
+  const narrowScene = await page.evaluate(() => {
+    const { layoutChart } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
+      'charts/layout'
+    ];
+    const axis = { numberFormat: 'host-code', min: 0, max: 20, majorUnit: 5 };
+    const scene = layoutChart({
+      spec: { kind: 'scatter', xAxis: axis, yAxis: { ...axis, title: '値' } },
+      data: {
+        domain: 'xy',
+        series: [
+          {
+            id: 's',
+            points: [
+              { x: 5, y: 10 },
+              { x: 15, y: 20 },
+            ],
+          },
+        ],
+      },
+      width: 240,
+      height: 132,
+      formatValue: (value: number) => `日本語の長い数値書式 ${value.toFixed(2)}円`,
+    });
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 240 132');
+    svg.style.cssText = 'position:fixed;left:0;top:0;width:240px;height:132px';
+    for (const primitive of scene.elements) {
+      const node = document.createElementNS(svg.namespaceURI, primitive.tag);
+      for (const [name, value] of Object.entries(primitive.attrs))
+        node.setAttribute(name, String(value));
+      if (primitive.text !== undefined) node.textContent = primitive.text;
+      if (primitive.role) node.setAttribute('data-chart-role', primitive.role);
+      svg.append(node);
+    }
+    document.body.append(svg);
+    try {
+      const bounds = svg.getBoundingClientRect();
+      const clipped = [
+        ...svg.querySelectorAll('[data-chart-role="axis-label"], [data-chart-role="axis-title"]'),
+      ]
+        .filter((node) => {
+          const box = node.getBoundingClientRect();
+          return (
+            box.left < bounds.left ||
+            box.right > bounds.right ||
+            box.top < bounds.top ||
+            box.bottom > bounds.bottom
+          );
+        })
+        .map((node) => node.textContent);
+      return { plotWidth: scene.plot.width, clipped };
+    } finally {
+      svg.remove();
+    }
+  });
   expect(narrowScene.plotWidth).toBeGreaterThanOrEqual(48);
   expect(narrowScene.clipped).toEqual([]);
 

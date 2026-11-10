@@ -1,15 +1,10 @@
 import { expect, type Page } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runWrappedText(page: Page): Promise<void> {
   const spreadsheet = new SpreadsheetPage(page);
-  const moduleUrls = {
-    text: `/@fs${new URL('../../../packages/formulon-cell/src/render/painters/text.ts', import.meta.url).pathname}`,
-    autofit: `/@fs${new URL('../../../packages/formulon-cell/src/commands/autofit-measurement.ts', import.meta.url).pathname}`,
-    store: `/@fs${new URL('../../../packages/formulon-cell/src/store/store.ts', import.meta.url).pathname}`,
-    theme: `/@fs${new URL('../../../packages/formulon-cell/src/theme/resolve.ts', import.meta.url).pathname}`,
-  };
   const texts = {
     en: 'averylongunbrokenLatinwordforwrapping',
     ja: '東京都千代田区丸の内一丁目、二丁目。',
@@ -23,12 +18,13 @@ export async function runWrappedText(page: Page): Promise<void> {
     await spreadsheet.mount({ locale });
     await spreadsheet.expectNoStub();
     const result = await page.evaluate(
-      async ({ moduleUrls, locale, text }) => {
+      ({ locale, text }) => {
         const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-        const { paintCellText } = await import(moduleUrls.text);
-        const { computeAutofitRowHeight } = await import(moduleUrls.autofit);
-        const { mutators } = await import(moduleUrls.store);
-        const { resolveTheme } = await import(moduleUrls.theme);
+        const probes = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes;
+        const { paintCellText } = probes['render/painters/text'];
+        const { computeAutofitRowHeight } = probes['commands/autofit-measurement'];
+        const { mutators } = probes['store/store'];
+        const { resolveTheme } = probes['theme/resolve'];
         const font = instance.workbook.workbookDisplayFont;
         if (!font) throw new Error('Missing workbook display font');
         const format = {
@@ -83,7 +79,7 @@ export async function runWrappedText(page: Page): Promise<void> {
           ),
         };
       },
-      { moduleUrls, locale, text },
+      { locale, text },
     );
     expect(result.painted[1].length, `${locale} wraps in the real browser font`).toBeGreaterThan(1);
     expect(result.painted[0], `${locale} 50%`).toEqual(result.painted[1]);
