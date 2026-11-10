@@ -34,6 +34,13 @@ export async function setRibbonDisplayMode(
  * group has folded into a single named button at the current window width.
  */
 export async function revealRibbonCommand(button: Locator): Promise<void> {
+  // The ribbon refolds from a ResizeObserver, which runs before the next paint;
+  // two frames guarantee a viewport change has been folded before it is read.
+  await button
+    .page()
+    .evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
   const group = button.locator(
     'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " fc-tb__ribbon-group--collapsed ")][1]',
   );
