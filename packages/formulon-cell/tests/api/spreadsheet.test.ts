@@ -219,7 +219,7 @@ describe('spreadsheet: events', () => {
     const changes = vi.fn();
     sheet.on('cell', cells);
     sheet.on('change', changes);
-    sheet.applyChanges([{ addr: 'A1', input: '5' }], { history: 'record', origin: 'host:import' });
+    sheet.applyChanges([{ at: 'A1', input: '5' }], { history: 'record', origin: 'host:import' });
     expect(cells).toHaveBeenCalledWith(
       expect.objectContaining({
         sheet: 0,

@@ -130,7 +130,7 @@ describe('error model: partial application', () => {
     const instance = await mount(makeHost());
     disposers.push(instance);
     await instance.workbook.sheet(0).protect();
-    const result = instance.applyChanges([{ addr: 'A1', input: '1' }], { history: 'record' });
+    const result = instance.applyChanges([{ at: 'A1', input: '1' }], { history: 'record' });
     expect(result.status).toBe('refused');
     expect(result.rejections.length).toBeGreaterThan(0);
   });
