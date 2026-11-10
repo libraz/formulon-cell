@@ -4,10 +4,10 @@ import { PivotAggregation, PivotShowValuesAs } from '../../../src/engine/types.j
 import { createPivotFieldAreas } from '../../../src/interact/pivot-table-field-areas.js';
 import { createDialogSelect } from '../../../src/toolbar/dialogs/form-controls.js';
 
-const field = (name: string, index: number, numericCount = 0): PivotSourceField => ({
+const field = (name: string, index: number, numeric = false): PivotSourceField => ({
   name,
   index,
-  numericCount,
+  numeric,
 });
 
 const FIELDS = [
@@ -15,8 +15,8 @@ const FIELDS = [
   field('Product', 1),
   field('Channel', 2),
   field('Zone', 3),
-  field('Sales', 4, 5),
-  field('Qty', 5, 5),
+  field('Sales', 4, true),
+  field('Qty', 5, true),
 ];
 
 const setup = () => {
@@ -90,7 +90,7 @@ describe('createPivotFieldAreas resetSource', () => {
     const { areas, rowSelect } = setup();
     areas.assignFieldToArea('Product', 'rows', FIELDS);
     expect(rowSelect.value).toBe('Product');
-    areas.resetSource([field('Alpha', 0), field('Beta', 1, 3)], 'None');
+    areas.resetSource([field('Alpha', 0), field('Beta', 1, true)], 'None');
     expect(rowSelect.value).toBe('Alpha');
   });
 });

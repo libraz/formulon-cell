@@ -1,10 +1,8 @@
-import type { PivotWorksheetSourceInput } from '@libraz/formulon';
+import { type PivotWorksheetSourceInput, StatusCode } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
   createPivotTableFromRange,
   executeRibbonPivotTableAction,
-  inferPivotFieldItems,
-  inferPivotSourceFields,
   refreshPivotCacheFromRange,
   refreshPivotTable,
   refreshPivotTableFromRange,
@@ -40,6 +38,7 @@ const makeWb = () => {
     ['2:2', num(8)],
   ]);
   const calls: string[] = [];
+  let sourceRows = 0;
   const wb = {
     capabilities: { pivotTableMutate: true, pivotCacheSource: true },
     sheetCount: 1,
@@ -49,7 +48,10 @@ const makeWb = () => {
       calls.push('cache');
       return 4;
     },
-    removePivotCache: () => true,
+    removePivotCache: () => {
+      calls.push('remove-cache');
+      return true;
+    },
     setPivotCacheWorksheetSource: (_cache: number, source: PivotWorksheetSourceInput | null) => {
       const range = typeof source?.range === 'object' ? source.range : null;
       const ref = range
@@ -66,39 +68,25 @@ const makeWb = () => {
       calls.push(
         `cache-source:${source !== null}:${range ? `Sheet${range.sheet + 1}` : ''}:${ref}`,
       );
+      sourceRows = range ? range.rect.lastRow - range.rect.firstRow + 1 : 0;
       return true;
     },
-    addPivotCacheField: (_cache: number, name: string) => {
-      calls.push(`cache-field:${name}`);
-      return calls.filter((c) => c.startsWith('cache-field:')).length - 1;
+    // The engine refuses a source past its record cell limit.
+    refreshPivotCache: () => {
+      calls.push('refresh');
+      return sourceRows > 100_000 ? StatusCode.SecurityResourceLimit : null;
     },
-    addPivotCacheSharedItem: (_cache: number, field: number, value: CellValue) => {
-      calls.push(`shared:${field}:${value.kind}`);
-      return true;
-    },
-    addPivotCacheRecord: () => {
-      calls.push('record');
-      return calls.filter((c) => c === 'record').length - 1;
-    },
-    setPivotCacheRecordValue: (_cache: number, record: number, field: number, value: CellValue) => {
-      const payload =
-        value.kind === 'number'
-          ? String(value.value)
-          : value.kind === 'text'
-            ? value.value
-            : value.kind;
-      calls.push(`value:${record}:${field}:${value.kind}:${payload}`);
-      return true;
-    },
-    pivotCacheFieldNames: () => ['Region', 'Product', 'Sales'],
-    clearPivotCacheSharedItems: (_cache: number, field: number) => {
-      calls.push(`clear-shared:${field}`);
-      return true;
-    },
-    clearPivotCacheRecords: (_cache: number) => {
-      calls.push('clear-records');
-      return true;
-    },
+    pivotCacheFields: () => [
+      { name: 'Region', containsNumber: false },
+      { name: 'Product', containsNumber: false },
+      { name: 'Sales', containsNumber: true },
+    ],
+    pivotCacheSharedItems: (_cache: number, field: number) =>
+      [
+        [text('East'), text('West')],
+        [text('Desk'), text('Chair')],
+        [num(12), num(8)],
+      ][field] ?? [],
     pivotTableCacheId: (_sheet: number, pivotIndex: number) => (pivotIndex === 2 ? 4 : -1),
     pivotFieldCount: () => 0,
     pivotTableName: () => 'PivotTable1',
@@ -193,37 +181,6 @@ const makeWb = () => {
 };
 
 describe('pivot-table command helpers', () => {
-  it('infers fields from the header row and counts numeric values', () => {
-    const { wb } = makeWb();
-    expect(inferPivotSourceFields(wb, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 })).toEqual([
-      { name: 'Region', index: 0, numericCount: 0 },
-      { name: 'Product', index: 1, numericCount: 0 },
-      { name: 'Sales', index: 2, numericCount: 2 },
-    ]);
-  });
-
-  it('refuses huge pivot source inference before scanning every cell', () => {
-    const { wb } = makeWb();
-
-    expect(inferPivotSourceFields(wb, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 })).toEqual([]);
-  });
-
-  it('infers unique PivotTable field items from source values', () => {
-    const { wb } = makeWb();
-    expect(inferPivotFieldItems(wb, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 }, 'Region')).toEqual([
-      'East',
-      'West',
-    ]);
-  });
-
-  it('refuses huge pivot field item inference', () => {
-    const { wb } = makeWb();
-
-    expect(
-      inferPivotFieldItems(wb, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 }, 'Region'),
-    ).toEqual([]);
-  });
-
   it('creates a cache, records, pivot fields, and a data field from a range', () => {
     const { wb, calls } = makeWb();
     const result = createPivotTableFromRange(wb, {
@@ -243,11 +200,7 @@ describe('pivot-table command helpers', () => {
 
     expect(result).toEqual({ ok: true, cacheId: 4, pivotIndex: 2, sharedCache: false });
     expect(calls).toContain('cache-source:true:Sheet1:A1:C3');
-    expect(calls).toContain('cache-field:Region');
-    expect(calls).toContain('shared:2:number');
-    expect(calls).toContain('record');
-    expect(calls).toContain('value:0:2:number:0');
-    expect(calls).toContain('value:1:2:number:1');
+    expect(calls).toContain('refresh');
     expect(calls).toContain('pivot-field:Region:0');
     expect(calls).toContain('grand:false:true');
     expect(calls).toContain('subtotal-top:Region:false');
@@ -334,7 +287,7 @@ describe('pivot-table command helpers', () => {
     }
   });
 
-  it('refuses huge pivot creation before creating a cache', () => {
+  it('refuses a source the engine finds too large and removes the cache', () => {
     const { wb, calls } = makeWb();
     const result = createPivotTableFromRange(wb, {
       source: { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 },
@@ -343,8 +296,9 @@ describe('pivot-table command helpers', () => {
       valueField: 'Sales',
     });
 
-    expect(result).toEqual({ ok: false, reason: 'invalid-range' });
-    expect(calls).toEqual([]);
+    expect(result).toEqual({ ok: false, reason: 'invalid-range', step: 'refresh' });
+    expect(calls.at(-1)).toBe('remove-cache');
+    expect(calls.some((c) => c.startsWith('pivot:'))).toBe(false);
   });
 
   it('adds a page/filter field when requested', () => {
@@ -538,28 +492,17 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result).toEqual({ ok: true, cacheId: 4 });
-    expect(calls).toContain('cache-source:true:Sheet1:A1:C3');
-    expect(calls).toContain('clear-shared:0');
-    expect(calls).toContain('clear-shared:1');
-    expect(calls).toContain('clear-shared:2');
-    expect(calls).toContain('clear-records');
-    expect(calls).toContain('shared:0:text');
-    expect(calls).toContain('shared:2:number');
-    expect(calls).toContain('record');
-    expect(calls).toContain('value:0:2:number:0');
-    expect(calls).toContain('value:1:2:number:1');
+    expect(calls).toEqual(['cache-source:true:Sheet1:A1:C3', 'refresh']);
   });
 
-  it('refuses huge pivot cache refresh before clearing records', () => {
-    const { wb, calls } = makeWb();
+  it('reports a refresh the engine refuses as too large as an invalid range', () => {
+    const { wb } = makeWb();
     const result = refreshPivotCacheFromRange(wb, {
       cacheId: 4,
       source: { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 },
     });
 
-    expect(result).toEqual({ ok: false, reason: 'invalid-range' });
-    expect(calls).not.toContain('clear-records');
-    expect(calls).not.toContain('clear-shared:0');
+    expect(result).toEqual({ ok: false, reason: 'invalid-range', step: 'refresh' });
   });
 
   it('refreshes an existing pivot table by resolving its cache id', () => {
@@ -571,8 +514,7 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result).toEqual({ ok: true, cacheId: 4 });
-    expect(calls).toContain('clear-records');
-    expect(calls).toContain('value:0:2:number:0');
+    expect(calls).toContain('refresh');
   });
 
   it('refreshes an existing pivot table from stored worksheet source metadata', () => {
@@ -583,8 +525,7 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result).toEqual({ ok: true, cacheId: 4 });
-    expect(calls).toContain('clear-records');
-    expect(calls).toContain('value:0:2:number:0');
+    expect(calls).toContain('refresh');
   });
 
   it('rejects stored-source pivot refresh when metadata is unavailable', () => {
@@ -596,7 +537,7 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result).toEqual({ ok: false, reason: 'invalid-range' });
-    expect(calls).not.toContain('clear-records');
+    expect(calls).not.toContain('refresh');
   });
 
   it('rejects pivot table refresh when the pivot cache id is unavailable', () => {
@@ -608,22 +549,10 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result).toEqual({ ok: false, reason: 'invalid-pivot' });
-    expect(calls).not.toContain('clear-records');
+    expect(calls).not.toContain('refresh');
   });
 
-  it('refuses to refresh a pivot cache when source headers no longer match', () => {
-    const { wb, calls } = makeWb();
-    wb.pivotCacheFieldNames = () => ['Region', 'Sales'];
-    const result = refreshPivotCacheFromRange(wb, {
-      cacheId: 4,
-      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
-    });
-
-    expect(result).toEqual({ ok: false, reason: 'invalid-field' });
-    expect(calls).not.toContain('clear-records');
-  });
-
-  it('rejects duplicate row and column fields before creating a cache', () => {
+  it('rejects duplicate row and column fields and leaves no cache behind', () => {
     const { wb, calls } = makeWb();
     const result = createPivotTableFromRange(wb, {
       source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
@@ -633,7 +562,8 @@ describe('pivot-table command helpers', () => {
       valueField: 'Sales',
     });
     expect(result).toEqual({ ok: false, reason: 'invalid-field' });
-    expect(calls).toEqual([]);
+    expect(calls.at(-1)).toBe('remove-cache');
+    expect(calls.some((c) => c.startsWith('pivot:'))).toBe(false);
   });
 
   it('reports unsupported engines before mutating', () => {
@@ -705,7 +635,7 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result).toEqual({ kind: 'refreshed', sheet: 0 });
-    expect(calls).toContain('clear-records');
+    expect(calls).toContain('refresh');
     expect(calls).toContain('cache-source:true:Sheet1:A1:C3');
   });
 

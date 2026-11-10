@@ -225,11 +225,7 @@ export type {
   PivotFieldItemVisibility,
   PivotSourceField,
 } from './commands/pivot-table.js';
-export {
-  createPivotTableFromRange,
-  inferPivotFieldItems,
-  inferPivotSourceFields,
-} from './commands/pivot-table.js';
+export { createPivotTableFromRange } from './commands/pivot-table.js';
 export type { BuildPrintDocumentOptions, PrintDocument } from './commands/print.js';
 export { buildPrintDocument } from './commands/print.js';
 export type { AllowedEditRangeOptions, SheetProtectionOptions } from './commands/protection.js';

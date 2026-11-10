@@ -2,7 +2,6 @@ import { pivotFieldFiltered } from '../engine/pivot-style.js';
 import type { PivotAxis, PivotFilterSpec, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { writePivotFieldItems } from './pivot-edit.js';
-import { inferPivotFieldItems, pivotCacheWorksheetSourceRange } from './pivot-table.js';
 
 /** One item of a field's checklist. */
 export interface PivotFilterItem {
@@ -31,27 +30,16 @@ export interface PivotFieldFilterModel {
   dataFields: string[];
 }
 
-/** A cache field's item names in cache-index order: the cache's shared items
- *  when the engine reads them back, else the source range in the first-seen
- *  order the cache was built in. */
-function cacheItemNames(
-  wb: WorkbookHandle,
-  cacheId: number,
-  cacheFieldIndex: number,
-  sourceName: string,
-): string[] {
+/** A cache field's item names in cache-index order. */
+function cacheItemNames(wb: WorkbookHandle, cacheId: number, cacheFieldIndex: number): string[] {
   const shared = cacheId >= 0 ? wb.pivotCacheSharedItems(cacheId, cacheFieldIndex) : [];
-  if (shared.length > 0) {
-    return shared.map((value) =>
-      value.kind === 'text'
-        ? value.value
-        : value.kind === 'number' || value.kind === 'bool'
-          ? String(value.value)
-          : '',
-    );
-  }
-  const source = pivotCacheWorksheetSourceRange(wb, cacheId);
-  return source ? inferPivotFieldItems(wb, source, sourceName) : [];
+  return shared.map((value) =>
+    value.kind === 'text'
+      ? value.value
+      : value.kind === 'number' || value.kind === 'bool'
+        ? String(value.value)
+        : '',
+  );
 }
 
 /** The filter state of a report field; null when the definition cannot be read. */
@@ -68,7 +56,7 @@ export function pivotFieldFilterModel(
   if (field.items.length > 0) {
     // Items written by cache index read back without a name.
     const names = field.items.some((item) => !item.label && item.cacheIndex >= 0)
-      ? cacheItemNames(wb, definition.cacheId, field.cacheFieldIndex, field.sourceName)
+      ? cacheItemNames(wb, definition.cacheId, field.cacheFieldIndex)
       : [];
     items = field.items.map((item) => ({
       value: item.label || (item.cacheIndex >= 0 ? (names[item.cacheIndex] ?? '') : ''),

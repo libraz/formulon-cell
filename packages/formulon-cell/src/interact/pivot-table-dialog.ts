@@ -1,12 +1,11 @@
 import type { History } from '../commands/history.js';
 import {
   createPivotTableAtPlacement,
-  inferPivotFieldItems,
-  inferPivotSourceFields,
   nextPivotTableName,
   type PivotPlacement,
   type PivotSourceField,
   pivotSourceForSelection,
+  readPivotSource,
 } from '../commands/pivot-table.js';
 import { isWorkbookStructureProtected } from '../commands/protection.js';
 import { formatA1Cell } from '../engine/address.js';
@@ -217,7 +216,9 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       fields,
       inferFilterItems: (fieldName) => {
         const range = rangeFromSourceInput();
-        return range ? inferPivotFieldItems(wb, range, fieldName, sourceFieldsFor(range)) : [];
+        const read = range ? sourceFor(range) : null;
+        const index = read?.fields.findIndex((field) => field.name === fieldName) ?? -1;
+        return read?.items[index] ?? [];
       },
     });
 
@@ -301,14 +302,15 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     return el;
   };
 
-  // Scanning the source range is the costly part; redo it only when the range itself changes.
-  let sourceFields: { key: string; fields: PivotSourceField[] } | null = null;
-  const sourceFieldsFor = (range: EngineRange): PivotSourceField[] => {
+  // Reading the source builds a cache, the costly part; redo it only when the range itself changes.
+  let source: { key: string; read: ReturnType<typeof readPivotSource> } | null = null;
+  const sourceFor = (range: EngineRange): ReturnType<typeof readPivotSource> => {
     const key = JSON.stringify(range);
-    if (sourceFields?.key !== key)
-      sourceFields = { key, fields: inferPivotSourceFields(wb, range) };
-    return sourceFields.fields;
+    if (source?.key !== key) source = { key, read: readPivotSource(wb, range) };
+    return source.read;
   };
+  const sourceFieldsFor = (range: EngineRange): PivotSourceField[] =>
+    sourceFor(range)?.fields ?? [];
 
   const configureForSource = (): void => {
     const t = strings.pivotTableDialog;

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { CellRect, PivotWorksheetSourceInput } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import { type CellValue, PivotShowValuesAs } from '../../../src/engine/types.js';
@@ -42,8 +43,9 @@ const ENGINE_AGGREGATION_NAMES = ['Sum', 'Count', 'Average', 'Max', 'Min'];
 
 const makeWb = () => {
   const calls: string[] = [];
+  let source: CellRect | null = null;
   const wb = {
-    capabilities: { pivotTableMutate: true },
+    capabilities: { pivotTableMutate: true, pivotCacheSource: true },
     sheetCount: 1,
     sheetName: () => 'Sheet1',
     sheetIndexByName: (name: string) => (name.toLowerCase() === 'sheet1' ? 0 : null),
@@ -78,13 +80,37 @@ const makeWb = () => {
     },
     createPivotCache: () => 9,
     removePivotCache: () => true,
-    addPivotCacheField: (_cache: number, name: string) => {
-      calls.push(`field:${name}`);
-      return calls.filter((c) => c.startsWith('field:')).length - 1;
+    setPivotCacheWorksheetSource: (_cache: number, input: PivotWorksheetSourceInput | null) => {
+      source = input?.range && typeof input.range === 'object' ? input.range.rect : null;
+      return true;
     },
-    addPivotCacheSharedItem: () => true,
-    addPivotCacheRecord: () => 0,
-    setPivotCacheRecordValue: () => true,
+    // The engine names and types the fields from the source's header row.
+    refreshPivotCache: () => {
+      calls.push('refresh');
+      return null;
+    },
+    pivotCacheFields: () => {
+      if (!source) return [];
+      const fields = [];
+      for (let col = source.firstCol; col <= source.lastCol; col += 1) {
+        const header = wb.getValue({ sheet: 0, row: source.firstRow, col });
+        let containsNumber = false;
+        for (let row = source.firstRow + 1; row <= source.lastRow; row += 1) {
+          if (wb.getValue({ sheet: 0, row, col }).kind === 'number') containsNumber = true;
+        }
+        fields.push({ name: header.kind === 'text' ? header.value : '', containsNumber });
+      }
+      return fields;
+    },
+    pivotCacheSharedItems: (_cache: number, field: number) => {
+      if (!source) return [];
+      const seen = new Map<string, CellValue>();
+      for (let row = source.firstRow + 1; row <= source.lastRow; row += 1) {
+        const value = wb.getValue({ sheet: 0, row, col: source.firstCol + field });
+        seen.set(JSON.stringify(value), value);
+      }
+      return [...seen.values()];
+    },
     createPivotTable: () => {
       calls.push('pivot');
       return 0;
@@ -320,8 +346,7 @@ describe('attachPivotTableDialog', () => {
     if (!form) throw new Error('missing PivotTable form');
     form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
-    expect(calls).toContain('field:Region');
-    expect(calls).toContain('field:Sales');
+    expect(calls).toContain('refresh');
     expect(calls).toContain('pivot');
     expect(calls).toContain('grand:true:true');
     expect(document.querySelector('.fc-pivotdlg')?.hasAttribute('hidden')).toBe(true);
@@ -957,8 +982,7 @@ describe('attachPivotTableDialog', () => {
     if (!form) throw new Error('missing PivotTable form');
     form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
-    expect(calls).toContain('field:Region');
-    expect(calls).toContain('field:Sales');
+    expect(calls).toContain('refresh');
     expect(calls).toContain('pivot');
     handle.detach();
   });
@@ -980,8 +1004,7 @@ describe('attachPivotTableDialog', () => {
       .querySelector('form')
       ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
-    expect(calls).toContain('field:Region');
-    expect(calls).toContain('field:Sales');
+    expect(calls).toContain('refresh');
     expect(calls).toContain('pivot');
     handle.detach();
   });

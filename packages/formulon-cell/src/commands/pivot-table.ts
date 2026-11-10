@@ -1,3 +1,4 @@
+import { StatusCode } from '@libraz/formulon';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { lastPivotStyleLayer, pivotStyleLayer } from '../engine/pivot-style.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
@@ -12,7 +13,6 @@ import {
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { PivotDefinition, PivotSpill } from '../engine/workbook-handle-pivot.js';
-import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { AutofitOptions } from './autofit-measurement.js';
 import { currentRegion } from './current-region.js';
@@ -25,7 +25,8 @@ import { addSheet, moveSheet, removeSheet } from './sheet-mutate.js';
 export interface PivotSourceField {
   name: string;
   index: number;
-  numericCount: number;
+  /** Whether the field's source column holds a number. */
+  numeric: boolean;
 }
 
 export type PivotSortDirection = 'none' | 'asc' | 'desc';
@@ -57,7 +58,7 @@ export interface PivotValueFieldSettings {
   showValuesAs?: PivotShowValuesAs;
   /** Row or column field the show-as base axis refers to. */
   showAsBaseField?: string;
-  /** Position in `inferPivotFieldItems` of the base field, or a base-item sentinel. */
+  /** Position among the base field's cache items, or a base-item sentinel. */
   showAsBaseItem?: number;
 }
 
@@ -128,35 +129,6 @@ const cellLabel = (value: CellValue, fallback: string): string => {
   return fallback;
 };
 
-const uniqueFieldName = (raw: string, seen: Map<string, number>): string => {
-  const base = raw.trim() || 'Column';
-  const n = seen.get(base) ?? 0;
-  seen.set(base, n + 1);
-  return n === 0 ? base : `${base}${n + 1}`;
-};
-
-const valueKey = (value: CellValue): string => {
-  if (value.kind === 'number') return `n:${value.value}`;
-  if (value.kind === 'text') return `t:${value.value}`;
-  if (value.kind === 'bool') return `b:${value.value}`;
-  if (value.kind === 'error') return `e:${value.code}`;
-  return 'blank';
-};
-
-const pivotCacheRecordValue = (
-  value: CellValue,
-  sharedItemIndexes: Map<string, number>,
-): CellValue => {
-  if (value.kind !== 'number') return value;
-  const index = sharedItemIndexes.get(valueKey(value));
-  return index === undefined ? value : { kind: 'number', value: index };
-};
-
-const MAX_PIVOT_SOURCE_CELLS = 100_000;
-
-const canMaterializePivotSource = (range: Range): boolean =>
-  rangeArea(range) <= MAX_PIVOT_SOURCE_CELLS;
-
 const writePivotCacheWorksheetSource = (
   wb: WorkbookHandle,
   cacheId: number,
@@ -189,61 +161,42 @@ export const pivotCacheWorksheetSourceRange = (
   };
 };
 
-export function inferPivotSourceFields(wb: WorkbookHandle, range: Range): PivotSourceField[] {
-  if (range.r1 <= range.r0 || range.c1 < range.c0) return [];
-  if (!canMaterializePivotSource(range)) return [];
-  const seen = new Map<string, number>();
-  const fields: PivotSourceField[] = [];
-  for (let c = range.c0; c <= range.c1; c += 1) {
-    const fallback = `Column${c - range.c0 + 1}`;
-    const name = uniqueFieldName(
-      cellLabel(wb.getValue({ sheet: range.sheet, row: range.r0, col: c }), fallback),
-      seen,
-    );
-    let numericCount = 0;
-    for (let r = range.r0 + 1; r <= range.r1; r += 1) {
-      if (wb.getValue({ sheet: range.sheet, row: r, col: c }).kind === 'number') numericCount += 1;
-    }
-    fields.push({ name, index: c - range.c0, numericCount });
-  }
-  return fields;
-}
+/** The fields of a pivot cache, as the engine named and typed them from the source's header row. */
+export const pivotCacheSourceFields = (wb: WorkbookHandle, cacheId: number): PivotSourceField[] =>
+  wb
+    .pivotCacheFields(cacheId)
+    .map((field, index) => ({ name: field.name, index, numeric: field.containsNumber }));
 
-/** Whether the worksheet column behind a cache field holds numbers. False
- *  when the cache has no readable worksheet source. */
+/** Whether the source column behind a cache field holds numbers. */
 export function pivotCacheFieldIsNumeric(
   wb: WorkbookHandle,
   cacheId: number,
   cacheFieldIndex: number,
 ): boolean {
-  const range = pivotCacheWorksheetSourceRange(wb, cacheId);
-  if (!range) return false;
-  const field = inferPivotSourceFields(wb, range)[cacheFieldIndex];
-  return (field?.numericCount ?? 0) > 0;
+  return wb.pivotCacheFields(cacheId)[cacheFieldIndex]?.containsNumber ?? false;
 }
 
-export function inferPivotFieldItems(
+/** The distinct items of a cache field, in cache order, as labels. */
+export const pivotCacheItemLabels = (
   wb: WorkbookHandle,
-  range: Range,
-  fieldName: string,
-  fields: readonly PivotSourceField[] = inferPivotSourceFields(wb, range),
-): string[] {
-  const field = fields.find((candidate) => candidate.name === fieldName);
-  if (!field) return [];
-  const seen = new Set<string>();
-  const items: string[] = [];
-  for (let r = range.r0 + 1; r <= range.r1; r += 1) {
-    const value = wb.getValue({
-      sheet: range.sheet,
-      row: r,
-      col: range.c0 + field.index,
-    });
-    const label = cellLabel(value, '(blank)');
-    if (seen.has(label)) continue;
-    seen.add(label);
-    items.push(label);
-  }
-  return items;
+  cacheId: number,
+  cacheFieldIndex: number,
+): string[] =>
+  wb.pivotCacheSharedItems(cacheId, cacheFieldIndex).map((v) => cellLabel(v, '(blank)'));
+
+/** A source range read the way a new pivot cache reads it: the fields the engine names from the
+ *  header row and each field's distinct items. Leaves no cache behind; null when the range cannot
+ *  back a cache. */
+export function readPivotSource(
+  wb: WorkbookHandle,
+  source: Range,
+): { fields: PivotSourceField[]; items: string[][] } | null {
+  const built = buildPivotCache(wb, source);
+  if (typeof built !== 'number') return null;
+  const fields = pivotCacheSourceFields(wb, built);
+  const items = fields.map((field) => pivotCacheItemLabels(wb, built, field.index));
+  wb.removePivotCache(built);
+  return { fields, items };
 }
 
 /** The first free "<stem>N" report name, stem in the workbook's language;
@@ -260,11 +213,10 @@ export const nextPivotTableName = (wb: WorkbookHandle): string => {
   return `${pivot}${n}`;
 };
 
-/** A new cache holding `source`: its fields, shared items and records. */
+/** A new cache the engine builds from `source`: its fields, shared items and records. */
 function buildPivotCache(
   wb: WorkbookHandle,
   source: Range,
-  fields: readonly PivotSourceField[],
 ): number | Extract<CreatePivotTableResult, { ok: false }> {
   const cacheId = wb.createPivotCache(0);
   if (cacheId < 0) return { ok: false, reason: 'engine-failed', step: 'cache' };
@@ -272,61 +224,26 @@ function buildPivotCache(
     wb.removePivotCache(cacheId);
     return { ok: false, reason: 'engine-failed', step: 'cache-source' };
   }
-
-  for (const field of fields) {
-    if (wb.addPivotCacheField(cacheId, field.name) < 0) {
-      wb.removePivotCache(cacheId);
-      return { ok: false, reason: 'engine-failed', step: 'cache-field' };
-    }
+  const refused = wb.refreshPivotCache(cacheId);
+  if (refused !== null) {
+    wb.removePivotCache(cacheId);
+    return refreshFailure(refused);
   }
-
-  const sharedItemIndexesByField = new Map<number, Map<string, number>>();
-  for (const field of fields) {
-    const seen = new Set<string>();
-    const indexes = new Map<string, number>();
-    for (let r = source.r0 + 1; r <= source.r1; r += 1) {
-      const value = wb.getValue({
-        sheet: source.sheet,
-        row: r,
-        col: source.c0 + field.index,
-      });
-      const key = valueKey(value);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      indexes.set(key, indexes.size);
-      if (!wb.addPivotCacheSharedItem(cacheId, field.index, value)) {
-        wb.removePivotCache(cacheId);
-        return { ok: false, reason: 'engine-failed', step: 'shared-item' };
-      }
-    }
-    sharedItemIndexesByField.set(field.index, indexes);
-  }
-
-  for (let r = source.r0 + 1; r <= source.r1; r += 1) {
-    const recordIdx = wb.addPivotCacheRecord(cacheId);
-    if (recordIdx < 0) {
-      wb.removePivotCache(cacheId);
-      return { ok: false, reason: 'engine-failed', step: 'cache-record' };
-    }
-    for (let c = source.c0; c <= source.c1; c += 1) {
-      const ok = wb.setPivotCacheRecordValue(
-        cacheId,
-        recordIdx,
-        c - source.c0,
-        pivotCacheRecordValue(
-          wb.getValue({ sheet: source.sheet, row: r, col: c }),
-          sharedItemIndexesByField.get(c - source.c0) ?? new Map(),
-        ),
-      );
-      if (!ok) {
-        wb.removePivotCache(cacheId);
-        return { ok: false, reason: 'engine-failed', step: 'cache-value' };
-      }
-    }
-  }
-
   return cacheId;
 }
+
+/** A refusal of the engine's Refresh: a source that does not resolve or is too large is the
+ *  range's fault, anything else the engine's. */
+const refreshFailure = (
+  code: number,
+): { ok: false; reason: 'invalid-range' | 'engine-failed'; step: string } => ({
+  ok: false,
+  reason:
+    code === StatusCode.PreconditionFailed || code === StatusCode.SecurityResourceLimit
+      ? 'invalid-range'
+      : 'engine-failed',
+  step: 'refresh',
+});
 
 export function createPivotTableFromRange(
   wb: WorkbookHandle,
@@ -334,8 +251,16 @@ export function createPivotTableFromRange(
 ): CreatePivotTableResult {
   if (!wb.capabilities.pivotTableMutate) return { ok: false, reason: 'unsupported' };
 
-  const fields = inferPivotSourceFields(wb, opts.source);
-  if (fields.length < 2) return { ok: false, reason: 'invalid-range' };
+  const sharedCache = opts.cacheId !== undefined;
+  const built = opts.cacheId ?? buildPivotCache(wb, opts.source);
+  if (typeof built !== 'number') return built;
+  const cacheId = built;
+  const refuse = (reason: 'invalid-range' | 'invalid-field'): CreatePivotTableResult => {
+    if (!sharedCache) wb.removePivotCache(cacheId);
+    return { ok: false, reason };
+  };
+  const fields = pivotCacheSourceFields(wb, cacheId);
+  if (fields.length < 2) return refuse('invalid-range');
   const byName = new Map(fields.map((f) => [f.name, f]));
   const rowField = byName.get(opts.rowField);
   const columnField = opts.columnField ? byName.get(opts.columnField) : undefined;
@@ -390,13 +315,8 @@ export function createPivotTableFromRange(
     filterFields.some((field) => field?.name === rowField?.name) ||
     (columnField !== undefined && filterFields.some((field) => field?.name === columnField.name))
   ) {
-    return { ok: false, reason: 'invalid-field' };
+    return refuse('invalid-field');
   }
-
-  const sharedCache = opts.cacheId !== undefined;
-  const built = opts.cacheId ?? buildPivotCache(wb, opts.source, fields);
-  if (typeof built !== 'number') return built;
-  const cacheId = built;
 
   const pivotIndex = wb.createPivotTable(
     opts.destination.sheet,
@@ -529,7 +449,7 @@ export function createPivotTableFromRange(
       continue;
     }
     itemsListed.add(baseName);
-    for (const item of inferPivotFieldItems(wb, opts.source, baseName)) {
+    for (const item of pivotCacheItemLabels(wb, cacheId, byName.get(baseName)?.index ?? -1)) {
       if (
         !wb.addPivotFieldItem(
           opts.destination.sheet,
@@ -550,7 +470,7 @@ export function createPivotTableFromRange(
     const aggregation =
       settings?.aggregation ??
       opts.aggregation ??
-      (valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count);
+      (valueField.numeric ? PivotAggregation.Sum : PivotAggregation.Count);
     const numberFormat =
       settings?.numberFormat?.trim() ||
       opts.valueNumberFormat?.trim() ||
@@ -576,107 +496,16 @@ export function createPivotTableFromRange(
   return { ok: true, cacheId, pivotIndex, sharedCache };
 }
 
-/** Labels of each cache field's items in cache-index order, read from a
- *  report drawing on the cache (the engine cannot list shared items). */
-const cachedItemLabels = (wb: WorkbookHandle, cacheId: number): Map<number, string[]> => {
-  const out = new Map<number, string[]>();
-  const report = wb
-    .getPivotTables()
-    .find((p) => wb.pivotTableCacheId(p.sheetIndex, p.pivotIndex) === cacheId);
-  if (!report) return out;
-  const { sheetIndex: sheet, pivotIndex } = report;
-  const count = wb.pivotFieldCount(sheet, pivotIndex);
-  for (let fieldIdx = 0; fieldIdx < count; fieldIdx += 1) {
-    const items = wb.getPivotField(sheet, pivotIndex, fieldIdx)?.items ?? [];
-    const labels: string[] = [];
-    for (const item of items) if (item.cacheIndex >= 0) labels[item.cacheIndex] = item.label;
-    if (labels.length > 0) out.set(fieldIdx, labels);
-  }
-  return out;
-};
-
-/** Position of `value` among previously cached labels; unseen values sort after. */
-const rankByLabel = (labels: readonly string[] | undefined, value: CellValue): number => {
-  const label =
-    value.kind === 'text' ? value.value : value.kind === 'number' ? String(value.value) : null;
-  const at = label === null || !labels ? -1 : labels.indexOf(label);
-  return at < 0 ? Number.MAX_SAFE_INTEGER : at;
-};
-
 export function refreshPivotCacheFromRange(
   wb: WorkbookHandle,
   opts: RefreshPivotCacheOptions,
 ): RefreshPivotCacheResult {
   if (!wb.capabilities.pivotTableMutate) return { ok: false, reason: 'unsupported' };
-
-  const fields = inferPivotSourceFields(wb, opts.source);
-  if (fields.length < 2) return { ok: false, reason: 'invalid-range' };
-  const cacheFields = wb.pivotCacheFieldNames(opts.cacheId);
-  if (
-    cacheFields.length !== fields.length ||
-    fields.some((field, index) => field.name !== cacheFields[index])
-  ) {
-    return { ok: false, reason: 'invalid-field' };
-  }
-
-  const previousOrder = cachedItemLabels(wb, opts.cacheId);
-  const sharedItemIndexesByField = new Map<number, Map<string, number>>();
-  for (const field of fields) {
-    if (!wb.clearPivotCacheSharedItems(opts.cacheId, field.index)) {
-      return { ok: false, reason: 'engine-failed', step: 'shared-item-clear' };
-    }
-    const values = new Map<string, CellValue>();
-    for (let r = opts.source.r0 + 1; r <= opts.source.r1; r += 1) {
-      const value = wb.getValue({
-        sheet: opts.source.sheet,
-        row: r,
-        col: opts.source.c0 + field.index,
-      });
-      const key = valueKey(value);
-      if (!values.has(key)) values.set(key, value);
-    }
-    // The report's field items point at cache indices, so values the cache
-    // held keep their old order and new ones follow, as the desktop app does.
-    const ordered = [...values.values()].sort(
-      (a, b) =>
-        rankByLabel(previousOrder.get(field.index), a) -
-        rankByLabel(previousOrder.get(field.index), b),
-    );
-    const indexes = new Map<string, number>();
-    for (const value of ordered) {
-      indexes.set(valueKey(value), indexes.size);
-      if (!wb.addPivotCacheSharedItem(opts.cacheId, field.index, value)) {
-        return { ok: false, reason: 'engine-failed', step: 'shared-item' };
-      }
-    }
-    sharedItemIndexesByField.set(field.index, indexes);
-  }
-
-  if (!wb.clearPivotCacheRecords(opts.cacheId)) {
-    return { ok: false, reason: 'engine-failed', step: 'cache-record-clear' };
-  }
-  for (let r = opts.source.r0 + 1; r <= opts.source.r1; r += 1) {
-    const recordIdx = wb.addPivotCacheRecord(opts.cacheId);
-    if (recordIdx < 0) return { ok: false, reason: 'engine-failed', step: 'cache-record' };
-    for (let c = opts.source.c0; c <= opts.source.c1; c += 1) {
-      const ok = wb.setPivotCacheRecordValue(
-        opts.cacheId,
-        recordIdx,
-        c - opts.source.c0,
-        pivotCacheRecordValue(
-          wb.getValue({ sheet: opts.source.sheet, row: r, col: c }),
-          sharedItemIndexesByField.get(c - opts.source.c0) ?? new Map(),
-        ),
-      );
-      if (!ok) return { ok: false, reason: 'engine-failed', step: 'cache-record-value' };
-    }
-  }
-
   if (!writePivotCacheWorksheetSource(wb, opts.cacheId, opts.source)) {
     return { ok: false, reason: 'engine-failed', step: 'cache-source' };
   }
-
-  return { ok: true, cacheId: opts.cacheId };
+  const refused = wb.refreshPivotCache(opts.cacheId);
+  return refused === null ? { ok: true, cacheId: opts.cacheId } : refreshFailure(refused);
 }
 
 export function refreshPivotTableFromRange(
@@ -1166,9 +995,9 @@ function insertRecommendedPivotTable(
 ): RibbonPivotTableActionResult {
   const { store, workbook, strings, history = null } = deps;
   const source = pivotSourceForSelection(store, workbook);
-  const fields = inferPivotSourceFields(workbook, source);
-  const rowField = fields.find((field) => field.numericCount === 0);
-  const columnField = fields.find((field) => field.numericCount > 0);
+  const fields = readPivotSource(workbook, source)?.fields ?? [];
+  const rowField = fields.find((field) => !field.numeric);
+  const columnField = fields.find((field) => field.numeric);
   if (!workbook.capabilities.pivotTableMutate || !rowField || !columnField) {
     return {
       kind: 'report',
@@ -1300,8 +1129,8 @@ export const executeRibbonPivotTableAction = (
     };
   }
   const source = pivotSourceForSelection(store, workbook);
-  const fields = inferPivotSourceFields(workbook, source);
-  const valueField = fields.find((field) => field.numericCount > 0) ?? fields.at(-1);
+  const fields = readPivotSource(workbook, source)?.fields ?? [];
+  const valueField = fields.find((field) => field.numeric) ?? fields.at(-1);
   const rowField = fields.find((field) => field.name !== valueField?.name) ?? fields[0];
   if (!rowField || !valueField || rowField.name === valueField.name) {
     return {
@@ -1321,7 +1150,7 @@ export const executeRibbonPivotTableAction = (
       name: nextPivotTableName(workbook),
       rowField: rowField.name,
       valueField: valueField.name,
-      aggregation: valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count,
+      aggregation: valueField.numeric ? PivotAggregation.Sum : PivotAggregation.Count,
     },
     'new-sheet',
   );

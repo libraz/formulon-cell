@@ -5,11 +5,12 @@ import type {
   NativeValue,
   Pivot,
   PivotCache,
+  PivotCacheField,
   PivotFilter,
   PivotFilterInput,
   PivotWorksheetSourceInput,
 } from '@libraz/formulon';
-import { PivotDatePeriod } from '@libraz/formulon';
+import { PivotDatePeriod, StatusCode } from '@libraz/formulon';
 import {
   isEmptyPivotLayout,
   PIVOT_CELL_KIND,
@@ -350,6 +351,31 @@ function pivotBlockers(
   clearGivenUp(handle, sheet, previous, needed);
   owned.set(key, needed);
   return [];
+}
+
+/** After the engine's Refresh, which refuses a report that would grow over a filled cell and writes
+ *  the reports it rebuilt, each report on the cache owns its new area. */
+function adoptRefreshedAreas(handle: WorkbookHandlePivotMethods, cacheId: number): void {
+  let owned = ownedExtents.get(handle);
+  if (!owned) {
+    owned = new Map();
+    ownedExtents.set(handle, owned);
+  }
+  for (let sheet = 0; sheet < handle.sheetCount; sheet += 1) {
+    const n = pivotCount(handle, sheet) ?? 0;
+    for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
+      if (pivotOf(handle, sheet, pivotIndex).cache().cacheId !== cacheId) continue;
+      const layout = readLayout(handle, sheet, pivotIndex);
+      if (!layout || layout.rows <= 0 || layout.cols <= 0) continue;
+      owned.set(ownedKey(handle, sheet, pivotIndex), {
+        sheet,
+        r0: layout.top,
+        c0: layout.left,
+        r1: layout.top + layout.rows - 1,
+        c1: layout.left + layout.cols - 1,
+      });
+    }
+  }
 }
 
 /** Move the areas reports own on `sheet` with a row or column insert or
@@ -790,6 +816,28 @@ export abstract class WorkbookHandlePivotMethods {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
     return attempt(0, () => cacheOf(this, cacheId).listFields().length);
+  }
+
+  /** The fields of a pivot cache with the value kinds their source column holds. */
+  pivotCacheFields(cacheId: number): readonly PivotCacheField[] {
+    assertAlive(this);
+    if (!this.capabilities.pivotTableMutate) return [];
+    return attempt([], () => cacheOf(this, cacheId).listFields());
+  }
+
+  /** Rebuilds a cache from its worksheet source and re-projects its reports, as Refresh does.
+   *  Returns the engine's status code when it refuses, else null. */
+  refreshPivotCache(cacheId: number): number | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotTableMutate) return StatusCode.NotImplemented;
+    try {
+      cacheOf(this, cacheId).refresh();
+      adoptRefreshedAreas(this, cacheId);
+      return null;
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return e.code;
+    }
   }
 
   pivotCacheFieldNames(cacheId: number): string[] {

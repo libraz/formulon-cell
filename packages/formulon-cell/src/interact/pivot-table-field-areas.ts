@@ -82,7 +82,7 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
     }
     if (selectedValueFields.length === 0) {
       const fallback =
-        fields.find((field) => field.numericCount > 0 && valueNames.has(field.name)) ??
+        fields.find((field) => field.numeric && valueNames.has(field.name)) ??
         fields.find((field) => valueNames.has(field.name));
       if (fallback) selectedValueFields = [fallback.name];
     }
@@ -247,7 +247,7 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
 
   /** Rebuilds the select options for a new source and reconciles prior assignments. */
   const resetSource = (fields: readonly PivotSourceField[], noneLabel: string): void => {
-    const numeric = fields.filter((f) => f.numericCount > 0);
+    const numeric = fields.filter((f) => f.numeric);
     const prevRow = rowSelect.value;
     const prevCol = colSelect.value;
     const prevFilters =

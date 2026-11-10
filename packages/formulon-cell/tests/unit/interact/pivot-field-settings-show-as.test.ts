@@ -17,9 +17,9 @@ import { createPivotFieldAreas } from '../../../src/interact/pivot-table-field-a
 import { createDialogSelect } from '../../../src/toolbar/dialogs/form-controls.js';
 
 const FIELDS: PivotSourceField[] = [
-  { name: 'Region', index: 0, numericCount: 0 },
-  { name: 'Product', index: 1, numericCount: 0 },
-  { name: 'Sales', index: 2, numericCount: 5 },
+  { name: 'Region', index: 0, numeric: false },
+  { name: 'Product', index: 1, numeric: false },
+  { name: 'Sales', index: 2, numeric: true },
 ];
 const ITEMS: Record<string, string[]> = { Region: ['East', 'West', 'North'], Product: ['A', 'B'] };
 
