@@ -11,7 +11,12 @@ import type {
   OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
-import { sheetPermits, unlockedCellsOption, workbookStructurePermits } from './protection.js';
+import {
+  refusedOnProtectedSheet,
+  sheetPermits,
+  unlockedCellsOption,
+  workbookStructurePermits,
+} from './protection.js';
 import { FUNCTION_SIGNATURES } from './refs.js';
 
 /** A built-in command id, or a Mac function-menu leaf naming a spreadsheet function. */
@@ -569,13 +574,19 @@ const SELECTING_NAVIGATION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<Bui
 const WORKBOOK_EFFECT_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'resizeRows',
   'resizeColumns',
-  'filter',
   'namedRange',
   'sheet',
   'object',
   'protection',
   'print',
   'export',
+]);
+
+/** Commands that turn AutoFilter on or off rather than use an existing filter. */
+const FILTER_DEFINITION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<BuiltInCommandId>([
+  'filter',
+  'mac.data.filter',
+  'tableFilterButton',
 ]);
 
 const FUNCTION_COMMAND_PREFIX = 'mac.function.';
@@ -624,7 +635,11 @@ export const builtInCommandIntent = (
   const selection = state.selection.range;
   const band = shiftedBand(operation, selection);
   let effects: readonly OperationEffect[];
-  if (WORKBOOK_EFFECT_OPERATIONS.has(operation) || workbookTheme) effects = [{ kind: 'workbook' }];
+  if (WORKBOOK_EFFECT_OPERATIONS.has(operation) || workbookTheme || id === 'sheetViewSelect')
+    effects = [{ kind: 'workbook' }];
+  // Turning AutoFilter on or off is a sheet-level filter change; using a filter is decided on its range.
+  else if (isBuiltInCommandId(id) && FILTER_DEFINITION_COMMANDS.has(id))
+    effects = [{ kind: 'sheet', sheet: selection.sheet }];
   // A sheet-level write, or one whose Protect Sheet option alone makes it available (locked
   // cells refuse it at run time): decided for the active sheet as a whole.
   else if (operation === 'pageSetup' || unlockedCellsOption(operation))
@@ -637,21 +652,6 @@ export const builtInCommandIntent = (
   else effects = [{ kind: 'range', range: selection }];
   return { operation, origin, commandId: id, effects };
 };
-
-/** Commands a protected sheet refuses whatever its Protect Sheet options: the formula auditing
- *  arrows (trace precedents/dependents/error, remove arrows) and refreshing a pivot report. */
-const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<BuiltInCommandId> = new Set([
-  'precedents',
-  'dependents',
-  'clearArrows',
-  'mac.formulas.precedents',
-  'mac.formulas.dependents',
-  'mac.formulas.removeArrows.all',
-  'mac.formulas.removeArrows.precedents',
-  'mac.formulas.removeArrows.dependents',
-  'mac.formulas.errorCheck.trace',
-  'pivotRefresh',
-]);
 
 /** Protection's decision for a built-in command on the active sheet, with or without a policy:
  *  the always-refused commands, an option-gated operation whose option is off, and a sheet
@@ -668,9 +668,15 @@ export const builtInProtectionDecision = (
   if (operation !== null && !workbookStructurePermits(state, operation))
     return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
   const option = operation ? unlockedCellsOption(operation) : undefined;
-  const refused = REFUSED_ON_PROTECTED_SHEET.has(id)
-    ? !sheetPermits(state, sheet)
-    : option !== undefined && !sheetPermits(state, sheet, option);
+  // Turning AutoFilter on or off is refused on a protected sheet; using a filter needs Use AutoFilter.
+  const filterRefused =
+    operation === 'filter' &&
+    id !== 'sheetViewSelect' &&
+    !sheetPermits(state, sheet, FILTER_DEFINITION_COMMANDS.has(id) ? undefined : 'autoFilter');
+  const refused =
+    refusedOnProtectedSheet(state, sheet, id) ||
+    filterRefused ||
+    (option !== undefined && !sheetPermits(state, sheet, option));
   return refused
     ? { allowed: false, code: 'protected', reason: 'sheet is protected' }
     : { allowed: true };

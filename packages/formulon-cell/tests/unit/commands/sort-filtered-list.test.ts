@@ -64,11 +64,15 @@ describe('Data > Clear on a filtered list', () => {
       },
     }));
     executeRibbonFilterDataAction({
-      store,
-      history: new History(),
+      context: {
+        store,
+        history: new History(),
+        workbook: wb,
+        origin: 'ribbon',
+        commandId: 'filterClear',
+      },
       action: 'clear',
-      getWb: () => wb,
-    } as never);
+    });
     const s = store.getState();
     expect(s.layout.hiddenRows.size).toBe(0);
     expect(s.ui.filterRanges).toEqual([filter]);

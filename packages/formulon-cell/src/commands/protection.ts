@@ -121,6 +121,34 @@ export const unlockedCellsOption = (
   operation: InteractionOperation,
 ): keyof SheetProtectionPermissions | undefined => UNLOCKED_CELLS_OPTION[operation];
 
+/** Commands a protected sheet refuses whatever its Protect Sheet options: the formula auditing
+ *  arrows (trace precedents/dependents/error, remove arrows), refreshing a pivot report and the
+ *  sheet background. */
+const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
+  'precedents',
+  'dependents',
+  'clearArrows',
+  'mac.formulas.precedents',
+  'mac.formulas.dependents',
+  'mac.formulas.removeArrows.all',
+  'mac.formulas.removeArrows.precedents',
+  'mac.formulas.removeArrows.dependents',
+  'mac.formulas.errorCheck.trace',
+  'pivotRefresh',
+  'sheetBackground',
+  'mac.page.background',
+]);
+
+/** Whether `commandId` is one a protected `sheet` refuses whatever its options. */
+export const refusedOnProtectedSheet = (
+  state: State,
+  sheet: number,
+  commandId: string | undefined,
+): boolean =>
+  commandId !== undefined &&
+  REFUSED_ON_PROTECTED_SHEET.has(commandId) &&
+  !sheetPermits(state, sheet);
+
 /** Spreadsheet-parity gate for sheet-level operations: rejected (no-op +
  *  warning) on a protected sheet unless `permission` is allowed there. */
 export function blockedByProtection(

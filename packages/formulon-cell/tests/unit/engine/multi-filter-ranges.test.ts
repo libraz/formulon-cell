@@ -83,7 +83,13 @@ describe('several AutoFilters on one sheet', () => {
     try {
       const store = hydratedStore(wb);
       mutators.setActive(store, { sheet: 0, row: 2, col: 4 });
-      toggleAutoFilterFromSelection(store, new History(), () => wb);
+      toggleAutoFilterFromSelection({
+        store: store,
+        history: new History(),
+        workbook: wb,
+        origin: 'ribbon',
+        commandId: 'filter',
+      });
       expect(store.getState().ui.filterRanges).toEqual([salesRange]);
       expect(wb.getTableAutoFilter(0)).not.toBeNull();
       expect(wb.getTableAutoFilter(1)).toBeNull();

@@ -9,15 +9,17 @@ import {
   filterBySelectedCellValue,
   inferAutoFilterRange,
   reapplyFilters,
-  recordFilterChange,
   resetFilterCriteria,
   setAutoFilter,
 } from '../commands/filter.js';
+import {
+  type FilterActionContext,
+  filterDefinitionWrite,
+  filterUseWrite,
+} from '../commands/filter-actions.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
-import type { History } from '../commands/history.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
-import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { SpreadsheetStore } from '../store/store.js';
 
 export type RibbonFilterDataAction =
   | 'toggle'
@@ -34,40 +36,31 @@ export type RibbonFilterDataActionResult =
   | { kind: 'mutated' };
 
 export interface ExecuteRibbonFilterDataActionDeps {
-  store: SpreadsheetStore;
-  history: History;
+  /** The store, history, workbook and entry point the filter change runs under. */
+  context: FilterActionContext;
   action: RibbonFilterDataAction;
-  getWb?: () => WorkbookHandle;
 }
 
-/** Toggle the auto-filter on the active range as one undoable step. Used as
- *  the host's "Filter" toolbar callback; the [[RibbonFilterDataAction.toggle]]
- *  branch routes back here so the host can also surface a closeDropdown.
- *  Pulled out so both hosts share the exact same begin/end shape. */
-export const toggleAutoFilterFromSelection = (
-  store: SpreadsheetStore,
-  history: History,
-  getWb?: () => WorkbookHandle,
-): void => {
+/** Every row of `sheet`: what Clear (with no filter) and Reapply act on. */
+const wholeSheet = (sheet: number): Range => ({ sheet, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL });
+
+/** Toggle the auto-filter on the active range as one undoable step (Ctrl+Shift+L,
+ *  the Filter button). Turning AutoFilter on or off is decided for the sheet. */
+export const toggleAutoFilterFromSelection = (ctx: FilterActionContext): void => {
+  const { store, workbook: wb } = ctx;
   const state = store.getState();
-  const wb = getWb?.();
-  recordFilterChange(
-    history,
-    store,
-    () => {
-      const active = activeFilterRange(state);
-      if (active) clearFilter(state, store, active, wb);
-      else setAutoFilter(store, inferAutoFilterRange(state), wb);
-    },
-    wb,
-  );
+  filterDefinitionWrite(ctx, state.data.sheetIndex, undefined, () => {
+    const active = activeFilterRange(state);
+    if (active) clearFilter(state, store, active, wb);
+    else setAutoFilter(store, inferAutoFilterRange(state), wb);
+  });
 };
 
 /** Dispatch a "Filter" menu item. The helper performs every mutation here so
  *  hosts only handle UI-side outcomes (opening dialogs / dropdowns):
  *  - `toggle` → mutation already ran; `{kind:'toggle'}` is purely a "refresh
  *    your open/close UI state" signal so hosts don't re-toggle.
- *  - `clear` / `reapply` / `filter-by-selected` → pure store mutations.
+ *  - `clear` / `reapply` / `filter-by-selected` → uses of the filter.
  *  - `advanced` → return the inferred range so the host can prefill the
  *    advanced-filter dialog.
  *  - default → ensure an auto-filter exists, then ask the host to open the
@@ -75,42 +68,34 @@ export const toggleAutoFilterFromSelection = (
 export const executeRibbonFilterDataAction = (
   deps: ExecuteRibbonFilterDataActionDeps,
 ): RibbonFilterDataActionResult => {
-  const { store, history, action } = deps;
+  const { context: ctx, action } = deps;
+  const { store, workbook: wb } = ctx;
   const state = store.getState();
   if (action === 'toggle') {
-    toggleAutoFilterFromSelection(store, history, deps.getWb);
+    toggleAutoFilterFromSelection(ctx);
     return { kind: 'toggle' };
   }
   if (action === 'clear') {
-    const wb = deps.getWb?.();
     const active = activeFilterRange(state);
     // With no filter at all, Clear reveals every row; otherwise it never
     // reaches past the active filter into another table's.
     if (active || state.ui.filterRanges.length === 0) {
-      recordFilterChange(
-        history,
-        store,
-        () =>
-          active
-            ? resetFilterCriteria(store, active, wb)
-            : clearFilter(state, store, undefined, wb),
-        wb,
+      filterUseWrite(ctx, active ?? wholeSheet(state.data.sheetIndex), undefined, () =>
+        active ? resetFilterCriteria(store, active, wb) : clearFilter(state, store, undefined, wb),
       );
     }
     return { kind: 'mutated' };
   }
   if (action === 'reapply') {
-    const wb = deps.getWb?.();
-    recordFilterChange(history, store, () => reapplyFilters(store.getState(), store, wb), wb);
+    filterUseWrite(ctx, wholeSheet(state.data.sheetIndex), undefined, () =>
+      reapplyFilters(store.getState(), store, wb),
+    );
     return { kind: 'mutated' };
   }
   if (action === 'filter-by-selected') {
-    const wb = deps.getWb?.();
-    recordFilterChange(
-      history,
-      store,
-      () => filterBySelectedCellValue(store.getState(), store, undefined, wb),
-      wb,
+    const range = activeFilterRange(state) ?? inferAutoFilterRange(state);
+    filterUseWrite(ctx, range, undefined, () =>
+      filterBySelectedCellValue(store.getState(), store, undefined, wb),
     );
     return { kind: 'mutated' };
   }
@@ -122,14 +107,8 @@ export const executeRibbonFilterDataAction = (
   }
   const active = activeFilterRange(state);
   const range = active ?? inferAutoFilterRange(state);
-  const wb = deps.getWb?.();
-  recordFilterChange(
-    history,
-    store,
-    () => {
-      if (!active) setAutoFilter(store, range, wb);
-    },
-    wb,
-  );
+  if (!active) {
+    filterDefinitionWrite(ctx, range.sheet, undefined, () => setAutoFilter(store, range, wb));
+  }
   return { kind: 'open-filter-dropdown', range, column: state.selection.active.col };
 };

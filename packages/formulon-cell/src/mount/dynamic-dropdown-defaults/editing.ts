@@ -1,3 +1,4 @@
+import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
 import { conditionalRulesForRange } from '../../commands/conditional-format.js';
 import {
   executeRibbonFillAction,
@@ -11,6 +12,11 @@ import {
   copyAdvancedFilterResult,
   inferAutoFilterRange,
 } from '../../commands/filter.js';
+import {
+  advancedFilterCopyWrite,
+  type FilterActionContext,
+  filterUseWrite,
+} from '../../commands/filter-actions.js';
 import { activeFilterRange } from '../../commands/filter-ranges.js';
 import { executeRibbonFindAction } from '../../commands/goto-special.js';
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
@@ -323,6 +329,15 @@ const sortColumnsForRange = (instance: SpreadsheetInstance, range: Range): SortD
     };
   });
 
+/** A filter change run from the ribbon's Sort & Filter commands under `commandId`. */
+const filterContext = (instance: SpreadsheetInstance, commandId: string): FilterActionContext => ({
+  store: instance.store,
+  history: instance.history,
+  workbook: instance.workbook,
+  origin: 'ribbon',
+  commandId,
+});
+
 const buildSortMenuAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applySortMenuAction'] =>
   async (action) => {
@@ -520,10 +535,18 @@ const buildSortMenuAction =
         instance.host.focus();
         return;
       }
-      instance.history.begin();
-      try {
-        if (copyToRange) {
-          const copied = copyAdvancedFilterResult(
+      const ctx = filterContext(instance, 'filterAdvanced');
+      if (copyToRange) {
+        // The copy covers at most the list's rows and columns from the destination's corner.
+        const output: Range = {
+          sheet: copyToRange.sheet,
+          r0: copyToRange.r0,
+          c0: copyToRange.c0,
+          r1: Math.min(MAX_ROW, copyToRange.r0 + listRange.r1 - listRange.r0),
+          c1: Math.min(MAX_COL, copyToRange.c0 + listRange.c1 - listRange.c0),
+        };
+        const copied = advancedFilterCopyWrite(ctx, listRange, output, null, () =>
+          copyAdvancedFilterResult(
             instance.store.getState(),
             instance.store,
             listRange,
@@ -531,7 +554,9 @@ const buildSortMenuAction =
             { sheet: copyToRange.sheet, row: copyToRange.r0, col: copyToRange.c0 },
             { uniqueOnly: result.uniqueOnly },
             instance.workbook,
-          );
+          ),
+        );
+        if (copied !== null) {
           mutators.replaceCells(instance.store, instance.workbook.cells(listRange.sheet));
           await showInstanceReport(instance, strings.advancedFilterDialogTitle, [
             {
@@ -540,17 +565,17 @@ const buildSortMenuAction =
               detail: strings.advancedFilterCopiedStatus.replace('{count}', String(copied)),
             },
           ]);
-        } else {
+        }
+      } else {
+        filterUseWrite(ctx, listRange, undefined, () =>
           applyAdvancedFilter(
             instance.store.getState(),
             instance.store,
             listRange,
             criteriaRange,
             instance.workbook,
-          );
-        }
-      } finally {
-        instance.history.end();
+          ),
+        );
       }
       instance.host.focus();
       return;
@@ -566,15 +591,31 @@ const buildSortMenuAction =
               ? 'filter-by-selected'
               : null;
     if (filterAction) {
+      const commandId =
+        action === 'filter'
+          ? 'filter'
+          : action === 'filter-clear'
+            ? 'filterClear'
+            : action === 'filter-reapply'
+              ? 'filterReapply'
+              : 'filterByValue';
       executeRibbonFilterDataAction({
-        store: instance.store,
-        history: instance.history,
+        context: filterContext(instance, commandId),
         action: filterAction,
-        getWb: () => instance.workbook,
       });
       instance.host.focus();
     }
   };
+
+/** The built-in command behind each filter item of the Sort & Filter menu. */
+const SORT_MENU_FILTER_COMMAND: Readonly<
+  Record<string, 'filter' | 'filterClear' | 'filterReapply' | 'filterByValue'>
+> = {
+  filter: 'filter',
+  'filter-clear': 'filterClear',
+  'filter-reapply': 'filterReapply',
+  'filter-by-value': 'filterByValue',
+};
 
 const updateSortMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateSortMenu'] =>
@@ -585,11 +626,16 @@ const updateSortMenu =
     const strings = instance.i18n.strings.ribbonMenu;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-sort]')) {
       const action = button.dataset.sort;
+      const commandId = SORT_MENU_FILTER_COMMAND[action ?? ''];
+      const denied =
+        commandId !== undefined && !canExecuteBuiltIn(instance.store, commandId, 'ribbon').allowed;
       const disabled =
+        denied ||
         (action === 'filter-clear' && !hasFilterRange) ||
         (action === 'filter-reapply' && !hasFilterCriteria);
-      const reason =
-        action === 'filter-clear'
+      const reason = denied
+        ? instance.i18n.strings.backstage.commandUnavailable
+        : action === 'filter-clear'
           ? strings.filterClearRequiresRange
           : action === 'filter-reapply'
             ? strings.filterReapplyRequiresCriteria

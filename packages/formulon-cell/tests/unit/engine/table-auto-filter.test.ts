@@ -102,12 +102,24 @@ describe('table-level AutoFilter', () => {
       expect(wb.getTableAutoFilter(0)).not.toBeNull();
       mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
 
-      toggleAutoFilterFromSelection(store, history, () => wb);
+      toggleAutoFilterFromSelection({
+        store: store,
+        history: history,
+        workbook: wb,
+        origin: 'ribbon',
+        commandId: 'filter',
+      });
       expect(store.getState().ui.filterRanges).toEqual([]);
       expect(wb.getTableAutoFilter(0)).toBeNull();
       expect(wb.getAutoFilter(0)).toBeNull();
 
-      toggleAutoFilterFromSelection(store, history, () => wb);
+      toggleAutoFilterFromSelection({
+        store: store,
+        history: history,
+        workbook: wb,
+        origin: 'ribbon',
+        commandId: 'filter',
+      });
       expect(store.getState().ui.filterRanges).toEqual([tableRange]);
       expect(wb.getTableAutoFilter(0)).not.toBeNull();
       expect(wb.getAutoFilter(0)).toBeNull();

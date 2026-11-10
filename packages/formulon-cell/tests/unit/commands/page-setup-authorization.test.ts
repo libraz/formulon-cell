@@ -105,10 +105,39 @@ describe('page-setup writes under the interaction policy', () => {
       controller.setPolicy(policy);
       setProtectedSheet(store, 0, true);
       for (const id of PAGE_SETUP_IDS) {
+        if (id === 'sheetBackground') continue;
         expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(true);
       }
       expect(landscape()).toBe(true);
       expect(orientation()).toBe('landscape');
+    });
+
+    it(`refuses the sheet background on a protected sheet ${label}`, async () => {
+      const { store, history, controller } = await setup();
+      controller.setPolicy(policy);
+      setProtectedSheet(store, 0, true);
+      for (const id of ['sheetBackground', 'mac.page.background'] as const) {
+        expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toMatchObject({
+          allowed: false,
+          code: 'protected',
+        });
+      }
+      let wrote = false;
+      const background = () =>
+        pageSetupWrite(
+          { store, history, origin: 'ribbon', commandId: 'sheetBackground' },
+          0,
+          false,
+          () => {
+            wrote = true;
+            return true;
+          },
+        );
+      expect(background()).toBe(false);
+      expect(wrote).toBe(false);
+      setProtectedSheet(store, 0, false);
+      expect(background()).toBe(true);
+      expect(wrote).toBe(true);
     });
   }
 

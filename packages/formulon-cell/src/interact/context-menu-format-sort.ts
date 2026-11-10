@@ -4,9 +4,9 @@ import {
   filterValueKey,
   inferAutoFilterRange,
   reapplyFilters,
-  recordFilterChange,
   resetFilterCriteria,
 } from '../commands/filter.js';
+import { filterUseWrite } from '../commands/filter-actions.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import {
   cycleBorders,
@@ -19,7 +19,7 @@ import { History } from '../commands/history.js';
 import { phoneticReading, setPhoneticReading, toggleShowPhonetic } from '../commands/phonetic.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { inferSortHasHeader, sortRangeWithHistory } from '../commands/sort.js';
-import { addrKey, parseAddrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { localeForWorkbook, profileTextKey } from '../engine/profile-text-semantics.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -72,6 +72,14 @@ export function runContextMenuFormatSortItem(
   state: State,
 ): boolean {
   const { store, wb, history, formatChange: wrapFmt } = ctx;
+  /** A filter change made from this menu under `commandId`. */
+  const menuFilter = (commandId: string) => ({
+    store,
+    history,
+    workbook: wb,
+    origin: 'contextMenu' as const,
+    commandId,
+  });
   switch (id) {
     case 'bold': {
       wrapFmt('bold', () => toggleBold(store.getState(), store));
@@ -125,12 +133,19 @@ export function runContextMenuFormatSortItem(
     }
     case 'filterClear': {
       const range = boundRowsToData(store, activeFilterRange(state) ?? inferAutoFilterRange(state));
-      recordFilterChange(history, store, () => resetFilterCriteria(store, range, wb), wb);
+      filterUseWrite(menuFilter('filterClear'), range, undefined, () =>
+        resetFilterCriteria(store, range, wb),
+      );
       ctx.afterCommit();
       return true;
     }
     case 'filterReapply': {
-      recordFilterChange(history, store, () => reapplyFilters(store.getState(), store, wb), wb);
+      filterUseWrite(
+        menuFilter('filterReapply'),
+        { sheet: state.data.sheetIndex, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL },
+        undefined,
+        () => reapplyFilters(store.getState(), store, wb),
+      );
       ctx.afterCommit();
       return true;
     }
@@ -144,11 +159,8 @@ export function runContextMenuFormatSortItem(
       const hidden = distinct.items
         .map((item) => item.key)
         .filter((k) => profileTextKey(k, locale) !== profileTextKey(keep, locale));
-      recordFilterChange(
-        history,
-        store,
-        () => applyValueFilter(store.getState(), store, range, byCol, hidden, wb),
-        wb,
+      filterUseWrite(menuFilter('filterByValue'), range, undefined, () =>
+        applyValueFilter(store.getState(), store, range, byCol, hidden, wb),
       );
       ctx.afterCommit();
       return true;

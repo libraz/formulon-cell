@@ -1,8 +1,6 @@
 import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { executeRibbonFillAction, fillOutputRange } from '../commands/fill.js';
-import { clearFilter, recordFilterChange, setAutoFilter } from '../commands/filter.js';
-import { activeFilterRange } from '../commands/filter-ranges.js';
 import {
   applySelectionFormatPatch,
   setNumFmt,
@@ -38,6 +36,7 @@ import { excelSerialFromParts } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
 import { openCellShiftDialog, runCellShiftChoice } from '../interact/cell-shift-dialog.js';
 import type { FormatDialogHandle } from '../interact/format-dialog.js';
+import { toggleAutoFilterFromSelection } from '../interact/ribbon-filter-data.js';
 import { directCellFormat } from '../store/direct-format.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -393,11 +392,12 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     if (e.shiftKey && k === 'l') {
       e.preventDefault();
       if (restricted) return;
-      recordFilterChange(input.history, input.store, () => {
-        const state = input.store.getState();
-        const active = activeFilterRange(state);
-        if (active) clearFilter(state, input.store, active);
-        else setAutoFilter(input.store, state.selection.range);
+      toggleAutoFilterFromSelection({
+        store: input.store,
+        history: input.history,
+        workbook: input.wb(),
+        origin: 'keyboard',
+        commandId: 'filter',
       });
       input.invalidate();
       return;

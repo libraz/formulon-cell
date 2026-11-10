@@ -7,9 +7,9 @@ import {
   type ConditionFilterOptions,
   type DistinctFilterFailureReason,
   distinctFilterItemsResult,
-  recordFilterChange,
   resetFilterCriteria,
 } from '../commands/filter.js';
+import { filterUseWrite } from '../commands/filter-actions.js';
 import type { History } from '../commands/history.js';
 import { sortRangeWithHistory } from '../commands/sort.js';
 import { addrKey } from '../engine/address.js';
@@ -153,39 +153,43 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     }
   };
 
+  /** A filter change made from this dropdown under `commandId`. */
+  const dropdownFilter = (commandId: string, wb: WorkbookHandle | undefined) => ({
+    store: deps.store,
+    history: deps.history ?? null,
+    ...(wb ? { workbook: wb } : {}),
+    origin: 'contextMenu' as const,
+    commandId,
+  });
+
   /** Apply the panel's state; the Mac panel keeps itself open while it auto-applies. */
   const applyActiveFilter = (closeAfter = true): void => {
     if (!activeRange || !root) return;
     const wb = deps.getWb?.();
     const condition = root.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
-    recordFilterChange(
-      deps.history ?? null,
-      deps.store,
-      () => {
-        const op = condition?.value as ConditionFilterOp | '' | undefined;
-        const spec = op ? readCondition(op) : null;
-        if (spec) {
-          applyConditionFilter(
-            deps.store.getState(),
-            deps.store,
-            activeRange as Range,
-            activeCol,
-            spec,
-            wb,
-          );
-        } else {
-          applyValueFilter(
-            deps.store.getState(),
-            deps.store,
-            activeRange as Range,
-            activeCol,
-            Array.from(activeHidden),
-            wb,
-          );
-        }
-      },
-      wb,
-    );
+    filterUseWrite(dropdownFilter('filterByValue', wb), activeRange, undefined, () => {
+      const op = condition?.value as ConditionFilterOp | '' | undefined;
+      const spec = op ? readCondition(op) : null;
+      if (spec) {
+        applyConditionFilter(
+          deps.store.getState(),
+          deps.store,
+          activeRange as Range,
+          activeCol,
+          spec,
+          wb,
+        );
+      } else {
+        applyValueFilter(
+          deps.store.getState(),
+          deps.store,
+          activeRange as Range,
+          activeCol,
+          Array.from(activeHidden),
+          wb,
+        );
+      }
+    });
     if (closeAfter) close();
   };
 
@@ -508,14 +512,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     clear.addEventListener('click', () => {
       if (!activeRange) return;
       const wb = deps.getWb?.();
-      recordFilterChange(
-        deps.history ?? null,
-        deps.store,
-        () => {
-          resetFilterCriteria(deps.store, activeRange as Range, wb);
-        },
-        wb,
-      );
+      filterUseWrite(dropdownFilter('filterClear', wb), activeRange, undefined, () => {
+        resetFilterCriteria(deps.store, activeRange as Range, wb);
+      });
       // The desktop panel stays open on a cleared column, showing the idle state.
       if (mac) open(range, col, anchor);
       else close();

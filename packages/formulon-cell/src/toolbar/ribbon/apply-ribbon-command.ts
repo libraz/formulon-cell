@@ -1,3 +1,4 @@
+import { filterDefinitionWrite } from '../../commands/filter-actions.js';
 import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 // Ribbon command dispatcher. Fans out a ribbon command id to the matching
 // handler — first via the declarative dispatch tables (dialog openers,
@@ -415,16 +416,32 @@ const applyGenericRibbonCommand = (
     case 'tableFirstColumn':
     case 'tableLastColumn':
     case 'tableBandedColumns':
-    case 'tableFilterButton':
-      if (
+    case 'tableFilterButton': {
+      const toggle = () =>
         toggleTableOption(
           i.store,
           i.history,
           i.workbook,
           TABLE_OPTION_COMMANDS[id] as TableOption,
           i.i18n.strings.ribbonMenu.cellStyleTotalCell,
-        ) === 'blocked'
-      ) {
+        );
+      // The filter button turns the table's AutoFilter on or off.
+      const outcome =
+        id === 'tableFilterButton'
+          ? filterDefinitionWrite(
+              {
+                store: i.store,
+                history: i.history,
+                workbook: i.workbook,
+                origin: 'ribbon',
+                commandId: id,
+              },
+              range.sheet,
+              undefined,
+              toggle,
+            )
+          : toggle();
+      if (outcome === 'blocked') {
         void showMessage({
           title: deps.text.tableStyleOptions,
           message: deps.text.tableShiftBlocked,
@@ -435,6 +452,7 @@ const applyGenericRibbonCommand = (
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;
+    }
     case 'insertRows':
       insertRows(i.store, i.workbook, i.history, range.r0, rowCount);
       runtime.refreshCells();

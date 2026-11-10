@@ -29,6 +29,7 @@ import {
   isCellWritable,
   isSheetProtected,
   protectedSheetPermissions,
+  refusedOnProtectedSheet,
   sheetPermits,
   unlockedCellsOption,
   workbookStructurePermits,
@@ -64,6 +65,8 @@ const PROTECTION_OPTION: Partial<Record<InteractionOperation, keyof SheetProtect
   insertColumns: 'insertColumns',
   deleteColumns: 'deleteColumns',
   format: 'formatCells',
+  // Using an existing filter (its range): criteria, clear, reapply.
+  filter: 'autoFilter',
   pivot: 'pivotTables',
 };
 
@@ -77,6 +80,8 @@ const sheetProtectionPermits = (
   if (operation === 'protection') return true;
   // Protect Sheet leaves page setup (margins, print area, titles, header/footer) editable.
   if (operation === 'pageSetup') return true;
+  // Turning AutoFilter on or off (the sheet-level filter change) is enabled by no Protect Sheet option.
+  if (operation === 'filter') return sheetPermits(state, sheet);
   return sheetPermits(state, sheet, PROTECTION_OPTION[operation] ?? unlockedCellsOption(operation));
 };
 
@@ -87,6 +92,18 @@ const protectionPermits = (state: State, operation: InteractionOperation, addr: 
   const unlockedOption = unlockedCellsOption(operation);
   if (unlockedOption && !sheetPermits(state, addr.sheet, unlockedOption)) return false;
   return isCellWritable(state, addr);
+};
+
+/** The sheets an intent writes; a workbook effect counts as the active sheet. */
+const effectSheets = (intent: OperationIntent, activeSheet: number): Set<number> => {
+  const sheets = new Set<number>();
+  for (const effect of intent.effects) {
+    if (effect.kind === 'sheet') sheets.add(effect.sheet);
+    else if (effect.kind === 'range') sheets.add(effect.range.sheet);
+    else if (effect.kind === 'cells') for (const cell of effect.cells) sheets.add(cell.sheet);
+    else sheets.add(activeSheet);
+  }
+  return sheets;
 };
 
 const ownsAutomaticHyperlinkCommand = (intent: OperationIntent): boolean =>
@@ -415,11 +432,17 @@ export class InteractionAuthorizer {
     return { allowed: true };
   }
 
-  /** Workbook-structure protection's decision, which governs the sheet operations. */
+  /** Protection's decision before any effect is read: workbook-structure protection governs the
+   *  sheet operations, and a protected sheet refuses some commands whatever its options. */
   private structureDecision(intent: OperationIntent): PermissionDecision {
-    return workbookStructurePermits(this.store.getState(), intent.operation)
-      ? { allowed: true }
-      : { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
+    const state = this.store.getState();
+    if (!workbookStructurePermits(state, intent.operation))
+      return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
+    for (const sheet of effectSheets(intent, state.data.sheetIndex)) {
+      if (refusedOnProtectedSheet(state, sheet, intent.commandId))
+        return { allowed: false, code: 'protected', reason: 'sheet is protected' };
+    }
+    return { allowed: true };
   }
 
   private legacyDecision(
