@@ -1,4 +1,5 @@
 import {
+  CellShift,
   type TableColumnPatch,
   type TableStyleOptionsPatch,
   TableTotalsRowFunction,
@@ -200,19 +201,6 @@ const writeTotals = (
     };
   });
   return changed && wb.updateTable(index, { columns: patches });
-};
-
-/** Blank the cells of `row` across the columns of `range`. */
-const clearRow = (wb: WorkbookHandle, range: Range, row: number): void => {
-  for (let col = range.c0; col <= range.c1; col += 1) wb.setBlank({ sheet: range.sheet, row, col });
-};
-
-/** Write the column names of the table at `index` into the header row of `range`. */
-const writeHeaderNames = (wb: WorkbookHandle, index: number, range: Range): void => {
-  const columns = wb.getTableStyleDetails(index)?.columns ?? [];
-  columns.forEach((c, i) => {
-    wb.setText({ sheet: range.sheet, row: range.r0, col: range.c0 + i }, c.name);
-  });
 };
 
 /** Totals settings of the table at `index` by lower-cased column name. */
@@ -456,43 +444,37 @@ export class TableMirror {
           old.range.sheet !== table.range.sheet ||
           old.range.c1 - old.range.c0 !== table.range.c1 - table.range.c0;
         if (!reshaped) {
-          // A totals-row flip the engine has not applied yet grows or shrinks
-          // the range there; a range the engine already holds (a row edit
-          // removed the totals row) only sets the flag.
-          if (
-            patch.totalsRow !== undefined &&
-            patch.range !== undefined &&
-            sameRange(
-              engineTableRange(wb, existing.index, old.range.sheet) ?? table.range,
-              old.range,
-            )
-          ) {
-            delete patch.range;
-          }
-          const below = patch.totalsRow !== undefined ? cellsBelow(wb, old.range) : null;
+          // A flip the engine already holds (a row delete took the totals row) only moves the range.
+          const details = wb.getTableStyleDetails(existing.index);
+          if (details && patch.headerRow === details.headerRowCount > 0) delete patch.headerRow;
+          if (details && patch.totalsRow === details.totalsRowCount > 0) delete patch.totalsRow;
+          const flip = flipShiftRow(old.range, patch);
+          // The engine shapes a flipped table itself; the overlay adopts its ref.
+          if (flip !== null) delete patch.range;
+          const cells = flip === null ? null : cellsFrom(wb, old.range, flip);
           if (!isEmptyUpdate(update) && !applyTableUpdate(wb, existing.index, update)) {
             edits.rejected.set(table.id, old);
             continue;
           }
-          if (below)
-            this.adoptTotalsRowRange(store, edits, table, existing.index, old.range, below);
-          if (patch.headerRow === false && old.showHeader) clearRow(wb, old.range, old.range.r0);
-          if (patch.headerRow === true) writeHeaderNames(wb, existing.index, table.range);
-          if (patch.headerRow !== undefined) cellsChanged = true;
-          const wroteTotals = totalsChanged && writeTotals(wb, existing.index, table.totals);
-          if (patch.totalsRow === true) {
-            applyDefaultTotals(wb, existing.index, {
-              ...table,
-              range: edits.ranges.get(table.id) ?? table.range,
-            });
+          if (patch.headerRow === false && !closeHeaderGap(wb, existing.index, old, table)) {
+            wb.updateTable(existing.index, { headerRow: true });
+            edits.rejected.set(table.id, old);
+            continue;
+          }
+          if (flip !== null && cells) {
+            this.adoptFlippedRange(store, edits, table, existing.index, old.range, flip, cells);
             cellsChanged = true;
-          } else if (patch.totalsRow === false || (wroteTotals && table.showTotal)) {
+          }
+          if (totalsChanged && writeTotals(wb, existing.index, table.totals) && table.showTotal) {
             cellsChanged = true;
           }
           this.adoptTotals(edits, table, existing.index);
           // Rewritten structured references hold no value until the next recalc.
           if (update.name !== undefined) cellsChanged = true;
-          if (filterToggled) syncTableFilterButton(wb, existing.index, table);
+          // Turning the header on gives the table its AutoFilter back.
+          if (filterToggled || (patch.headerRow === true && table.filterButton === false)) {
+            syncTableFilterButton(wb, existing.index, table);
+          }
           const filterMoved =
             patch.range !== undefined ||
             patch.headerRow !== undefined ||
@@ -543,24 +525,24 @@ export class TableMirror {
       const range = tableFilterRange(wb, index, table.range.sheet);
       if (range) edits.added.push({ range, from });
     }
-    if (cellsChanged) this.refreshCells(store);
-    if (
-      edits.dropped.length === 0 &&
-      edits.added.length === 0 &&
-      edits.totals.size === 0 &&
-      edits.rejected.size === 0 &&
-      edits.ranges.size === 0
-    ) {
-      return false;
-    }
     let wrote = false;
-    store.setState((state) => {
-      const next = applyFilterEdits(state, edits);
-      wrote = next !== state;
-      // Restored or rejected overlays already match the engine.
-      this.last = next.tables;
-      return next;
-    });
+    if (
+      edits.dropped.length > 0 ||
+      edits.added.length > 0 ||
+      edits.totals.size > 0 ||
+      edits.rejected.size > 0 ||
+      edits.ranges.size > 0
+    ) {
+      store.setState((state) => {
+        const next = applyFilterEdits(state, edits);
+        wrote = next !== state;
+        // Restored or rejected overlays already match the engine.
+        this.last = next.tables;
+        return next;
+      });
+    }
+    // After the filter follow-up, whose engine writes this recalc then covers.
+    if (cellsChanged) this.refreshCells(store);
     return wrote;
   }
 
@@ -579,16 +561,17 @@ export class TableMirror {
     });
   }
 
-  /** Take the range the engine gave the table at `index` for its totals row, and
-   *  move the store's formats below it when the engine shifted those cells
-   *  (rather than using a free row further down). */
-  private adoptTotalsRowRange(
+  /** Take the range the engine gave the table at `index` for a header or totals flip, and move
+   *  the store's formats from row `from` by the rows the ref grew or shrank at its bottom, when
+   *  the engine shifted those cells (`cells`, captured from `from` before the flip). */
+  private adoptFlippedRange(
     store: SpreadsheetStore,
     edits: FilterEdits,
     table: TableOverlay,
     index: number,
     before: Range,
-    below: ReadonlyMap<string, string>,
+    from: number,
+    cells: ReadonlyMap<string, string>,
   ): void {
     const range = engineTableRange(this.handle, index, table.range.sheet);
     if (!range) return;
@@ -605,12 +588,17 @@ export class TableMirror {
     if (delta === 0) return;
     const band: Range = {
       sheet: before.sheet,
-      r0: before.r1 + (delta > 0 ? 1 : 0),
+      r0: from + (delta < 0 ? -1 : 0),
       c0: before.c0,
       r1: MAX_ROW,
       c1: before.c1,
     };
-    if (below.size > 0 && !sameShiftedCells(below, cellsBelow(this.handle, range), delta)) return;
+    if (
+      cells.size > 0 &&
+      !sameShiftedCells(cells, cellsFrom(this.handle, range, from + delta), delta)
+    ) {
+      return;
+    }
     mirrorBandFormatsDown(store, this.handle, band, delta);
   }
 
@@ -638,15 +626,49 @@ function engineTableRange(wb: WorkbookHandle, index: number, sheet: number): Ran
   return parsed ? { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 } : null;
 }
 
-/** Value signatures of the populated cells below `table` across its columns. */
-function cellsBelow(wb: WorkbookHandle, table: Range): Map<string, string> {
+/** Value signatures of the populated cells from row `from` down across the columns of `table`. */
+function cellsFrom(wb: WorkbookHandle, table: Range, from: number): Map<string, string> {
   const out = new Map<string, string>();
   for (const cell of wb.physicalCells(table.sheet)) {
     const { row, col } = cell.addr;
-    if (row <= table.r1 || col < table.c0 || col > table.c1) continue;
+    if (row < from || col < table.c0 || col > table.c1) continue;
     out.set(`${row}:${col}`, JSON.stringify([cell.value, cell.formula]));
   }
   return out;
+}
+
+/** The first row whose cells a header or totals flip in `patch` can move: the data rows for a
+ *  header (down when it is turned on over an occupied row, back up when an undo closes the gap),
+ *  the rows below the table for a totals row. Null when `patch` flips neither. */
+function flipShiftRow(table: Range, patch: TablePatch): number | null {
+  if (patch.headerRow === true) return table.r0;
+  if (patch.headerRow === false) return table.r0 + 1;
+  if (patch.totalsRow !== undefined) return table.r1 + 1;
+  return null;
+}
+
+/**
+ * After the header of `old` was turned off, move the table back up when `table` asks for the
+ * range just above the engine's: undoing a header that shifted the table down leaves the
+ * emptied header row as a gap above the data. False when the engine refuses the shift.
+ */
+function closeHeaderGap(
+  wb: WorkbookHandle,
+  index: number,
+  old: TableOverlay,
+  table: TableOverlay,
+): boolean {
+  const range = engineTableRange(wb, index, table.range.sheet);
+  const want = table.range;
+  if (
+    !range ||
+    sameRange(want, old.range) ||
+    range.r0 !== want.r0 + 1 ||
+    range.r1 !== want.r1 + 1
+  ) {
+    return true;
+  }
+  return wb.engineShiftCells({ ...want, r1: want.r0 }, CellShift.Up);
 }
 
 /** Whether every cell of `before` reappears `delta` rows away in `after`. */

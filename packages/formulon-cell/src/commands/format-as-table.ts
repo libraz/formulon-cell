@@ -443,14 +443,18 @@ export type TableOverlayPatch = Partial<
 >;
 
 /** The stored overlay `written` became, or null when the store dropped or reverted it. The
- *  store mirror may re-read the totals the engine settled on, which is not a refusal. */
-function storedOverlay(store: SpreadsheetStore, written: TableOverlay): TableOverlay | null {
+ *  store mirror may re-read the totals the engine settled on, and the range it gave a table
+ *  whose header or total row was flipped (`engineShaped`), which is not a refusal. */
+function storedOverlay(
+  store: SpreadsheetStore,
+  written: TableOverlay,
+  engineShaped = false,
+): TableOverlay | null {
   const stored = tableOverlayById(store.getState(), written.id);
   if (stored === written) return stored;
   if (!stored) return null;
-  return JSON.stringify({ ...stored, totals: 0 }) === JSON.stringify({ ...written, totals: 0 })
-    ? stored
-    : null;
+  const settled = (t: TableOverlay) => ({ ...t, totals: 0, ...(engineShaped ? { range: 0 } : {}) });
+  return JSON.stringify(settled(stored)) === JSON.stringify(settled(written)) ? stored : null;
 }
 
 /** Default factory — keeps the construction site small. */
@@ -732,7 +736,8 @@ export function updateTableOverlay(
     source: current.source,
   };
   mutators.upsertTableOverlay(store, next);
-  return storedOverlay(store, next);
+  const flipped = next.showHeader !== current.showHeader || next.showTotal !== current.showTotal;
+  return storedOverlay(store, next, flipped);
 }
 
 /** Remove a Format-as-Table overlay by id. */

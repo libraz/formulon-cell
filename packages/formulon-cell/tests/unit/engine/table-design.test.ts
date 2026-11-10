@@ -186,6 +186,33 @@ describe('table design commands', () => {
     expect(wb.getValue({ sheet: 0, row: 4, col: 2 })).toMatchObject({ kind: 'number', value: 6 });
   });
 
+  it('restores the picked totals when the total row comes back, keeping the label', async () => {
+    const { wb, store, history } = await setup();
+    toggleTableOption(store, history, wb, 'showTotal', '集計');
+    setTableColumnFunction(store, history, wb, only(store).id, 2, 'max');
+    toggleTableOption(store, history, wb, 'showTotal', '集計');
+    expect(only(store).totals?.[2]?.function).toBe('max');
+    expect(toggleTableOption(store, history, wb, 'showTotal', 'Total')).toBe('toggled');
+    expect(only(store).totals?.map((t) => [t.function, t.label])).toEqual([
+      ['none', '集計'],
+      ['none', ''],
+      ['max', ''],
+    ]);
+    expect(wb.getValue({ sheet: 0, row: 4, col: 0 })).toMatchObject({ value: '集計' });
+    expect(wb.getValue({ sheet: 0, row: 4, col: 2 })).toMatchObject({ kind: 'number', value: 3 });
+  });
+
+  it('refuses to drop a total row a formula references, changing nothing', async () => {
+    const { wb, store, history } = await setup();
+    toggleTableOption(store, history, wb, 'showTotal');
+    wb.setFormula({ sheet: 0, row: 0, col: 5 }, '=Table1[[#Totals],[Qty]]');
+    const before = only(store);
+    expect(toggleTableOption(store, history, wb, 'showTotal')).toBe('blocked');
+    expect(only(store)).toMatchObject({ showTotal: true, range: before.range });
+    expect(wb.getTables()[0]?.ref).toBe('A1:C5');
+    expect(wb.getValue({ sheet: 0, row: 4, col: 2 })).toMatchObject({ kind: 'number', value: 6 });
+  });
+
   // Desktop Excel moves a table below in the same columns down with the new total row.
   it('shifts another table below down when the total row is turned on', async () => {
     const { wb, store, history } = await setup();
