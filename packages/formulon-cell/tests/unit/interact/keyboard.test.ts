@@ -1400,12 +1400,23 @@ describe('attachKeyboard', () => {
       const history = new History();
       const undo = vi.spyOn(history, 'undo').mockReturnValue(true);
       const redo = vi.spyOn(history, 'redo').mockReturnValue(true);
+      vi.spyOn(history, 'canRedo').mockReturnValue(true);
       setup(history);
       fire(host, 'z', { metaKey: true });
       fire(host, 'z', { metaKey: true, shiftKey: true });
       fire(host, 'y', { metaKey: true });
       expect(undo).toHaveBeenCalledTimes(1);
       expect(redo).toHaveBeenCalledTimes(2);
+    });
+
+    it('Cmd+Y repeats the last operation when there is nothing to redo', () => {
+      const history = new History();
+      const repeated = vi.fn();
+      history.setRepeat(repeated);
+      setup(history);
+      fire(host, 'y', { metaKey: true });
+      expect(repeated).toHaveBeenCalledTimes(1);
+      expect(onAfterHistory).toHaveBeenCalled();
     });
 
     it('does not call onAfterHistory when undo/redo returns false', () => {

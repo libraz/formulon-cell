@@ -496,8 +496,9 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       e.preventDefault();
       return;
     } else if (meta && (k === 'y' || k === 'Y')) {
+      // Redo while there is something to redo, otherwise repeat the last operation.
       const h = deps.history;
-      const ok = h ? h.redo() : deps.wb.redo();
+      const ok = h ? (h.canRedo() ? h.redo() : h.repeatLast()) : deps.wb.redo();
       if (ok) deps.onAfterHistory?.();
       e.preventDefault();
       return;
