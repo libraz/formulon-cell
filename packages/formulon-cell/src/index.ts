@@ -441,10 +441,12 @@ export type {
   CellChangeEvent,
   LocaleChangeEvent,
   RecalcEvent,
+  RecalcEvent as LegacyRecalcEvent,
   SelectionChangeEvent,
   SpreadsheetEventHandler,
   SpreadsheetEventName,
   SpreadsheetEvents,
+  SpreadsheetEvents as LegacySpreadsheetEvents,
   ThemeChangeEvent,
   WorkbookChangeEvent,
 } from './events.js';
