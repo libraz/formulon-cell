@@ -3,6 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import type { SheetProtectionPermissions } from '../store/types.js';
 import { AUTO_HYPERLINK_COMMAND_ID } from './auto-hyperlink.js';
 import type { HistoryDirection, HistoryEntry } from './history.js';
 import {
@@ -14,6 +15,7 @@ import {
   unenumerableEffect,
 } from './interaction-effects.js';
 import {
+  type InteractionOperation,
   type InteractionPolicy,
   isMutatingInteraction,
   isPolicyCellEligible,
@@ -23,7 +25,12 @@ import {
   operationDecision,
   type PermissionDecision,
 } from './interaction-policy.js';
-import { isCellWritable, isSheetProtected, protectedSheetPermissions } from './protection.js';
+import {
+  isCellWritable,
+  isSheetProtected,
+  protectedSheetPermissions,
+  sheetPermits,
+} from './protection.js';
 
 const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
   if (
@@ -45,6 +52,14 @@ const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
     Number.isInteger(cell.col)
     ? cell
     : null;
+};
+
+/** The Protect Sheet option that lets each row/column shift through on a protected sheet. */
+const SHIFT_PERMISSION: Partial<Record<InteractionOperation, keyof SheetProtectionPermissions>> = {
+  insertRows: 'insertRows',
+  deleteRows: 'deleteRows',
+  insertColumns: 'insertColumns',
+  deleteColumns: 'deleteColumns',
 };
 
 const ownsAutomaticHyperlinkCommand = (intent: OperationIntent): boolean =>
@@ -335,7 +350,7 @@ export class InteractionAuthorizer {
         reason: 'range is outside editable cells',
       };
     }
-    if (isSheetProtected(this.store.getState(), range.sheet))
+    if (!sheetPermits(this.store.getState(), range.sheet, SHIFT_PERMISSION[intent.operation]))
       return { allowed: false, code: 'protected', addr: first, reason: 'sheet is protected' };
     return { allowed: true };
   }
