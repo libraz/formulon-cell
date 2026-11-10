@@ -101,8 +101,8 @@ const SUBTOTAL_FUNCTIONS: Readonly<Record<number, TableColumnTotals['function']>
 const SUBTOTAL_PATTERN = /^SUBTOTAL\(\s*(\d+)\s*,\s*[^[\]]*\[[^\]]*\]\s*\)$/i;
 
 /** Totals settings that reproduce what a totals-row cell holds: the engine's SUBTOTAL formula is
- *  its built-in function, any other formula a custom one, text the column label, a number or
- *  boolean a constant custom formula, and a blank cell none. */
+ *  its built-in function, any other formula a custom one, and a blank cell none. Only a formula
+ *  takes the formula path; any other entry, a typed number included, is the column label. */
 export function totalsFromCell(wb: Pick<WorkbookHandle, 'cellFormula' | 'getValue'>, addr: Addr) {
   const formula = wb.cellFormula(addr)?.replace(/^=/, '');
   if (formula) {
@@ -114,11 +114,10 @@ export function totalsFromCell(wb: Pick<WorkbookHandle, 'cellFormula' | 'getValu
   }
   const value = wb.getValue(addr);
   if (value.kind === 'text') return { function: 'none' as const, label: value.value, formula: '' };
-  if (value.kind === 'number') {
-    return { function: 'custom' as const, label: '', formula: String(value.value) };
-  }
+  if (value.kind === 'number')
+    return { function: 'none' as const, label: String(value.value), formula: '' };
   if (value.kind === 'bool') {
-    return { function: 'custom' as const, label: '', formula: value.value ? 'TRUE' : 'FALSE' };
+    return { function: 'none' as const, label: value.value ? 'TRUE' : 'FALSE', formula: '' };
   }
   return { function: 'none' as const, label: '', formula: '' };
 }

@@ -388,8 +388,20 @@ describe('table design commands', () => {
       expect(loaded.getValue({ sheet: 0, row: 4, col: 2 })).toMatchObject({ value: 'Subtotal' });
     });
 
-    it('keeps a typed number as a constant custom formula', async () => {
-      const { wb } = await commit('42');
+    it('stores a typed number as the column label, as text', async () => {
+      const { wb, store } = await commit('42');
+      expect(only(store).totals?.[2]).toMatchObject({ function: 'none', label: '42' });
+      expect(wb.getValue({ sheet: 0, row: 4, col: 2 })).toEqual({ kind: 'text', value: '42' });
+      const loaded = await reloaded(wb);
+      expect(loaded.getTableStyleDetails(0)?.columns[2]).toMatchObject({
+        totalsRowFunction: TableTotalsRowFunction.None,
+        totalsRowLabel: '42',
+        totalsRowFormula: null,
+      });
+    });
+
+    it('takes the formula path only for an entry that starts with =', async () => {
+      const { wb } = await commit('=42');
       const loaded = await reloaded(wb);
       expect(loaded.getTableStyleDetails(0)?.columns[2]).toMatchObject({
         totalsRowFunction: TableTotalsRowFunction.Custom,
