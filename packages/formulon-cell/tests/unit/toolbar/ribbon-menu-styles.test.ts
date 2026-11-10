@@ -35,4 +35,13 @@ describe('ribbon menu styles', () => {
     );
     expect(label).toContain('white-space: nowrap');
   });
+
+  it('draws Mac ribbon checkboxes with no tile behind them', () => {
+    const body = rule(
+      'platform-mac.css',
+      '.fc-tb__ribbon-shell .fc-tb__rb--mac-checkbox.fc-tb__rb--active',
+    );
+    expect(body).toContain('background: transparent');
+    expect(body).toContain('border-color: transparent');
+  });
 });

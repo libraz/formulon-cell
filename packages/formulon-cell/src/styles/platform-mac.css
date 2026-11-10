@@ -1184,11 +1184,14 @@
     max-width: none;
   }
 
-  [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__rb--mac-checkbox {
+  /* A ribbon checkbox is the box and its label on the ribbon itself, with no tile behind it,
+   * checked or not. */
+  [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__rb--mac-checkbox,
+  [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__rb--mac-checkbox.fc-tb__rb--active {
     gap: 5px;
-    border-color: var(--fc-tb-line-soft);
+    border-color: transparent;
     border-radius: 4px;
-    background: color-mix(in srgb, var(--fc-tb-ribbon-bg) 94%, var(--fc-tb-fg-soft));
+    background: transparent;
   }
 
   [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__rb--mac-checkbox::before {
