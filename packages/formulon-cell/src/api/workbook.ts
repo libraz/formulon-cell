@@ -30,6 +30,7 @@ import {
 import { type Disposer, Emitter } from './events.js';
 import type { MemberSpec, SheetContext, WorkbookContext } from './facade-context.js';
 import { Lifecycle } from './lifecycle.js';
+import { SHEET_OOXML_MEMBERS, SheetOoxml, WORKBOOK_OOXML_MEMBERS, WorkbookOoxml } from './ooxml.js';
 import { SHEET_CELL_MEMBERS } from './sheet-cells.js';
 import { SHEET_FORMAT_MEMBERS, WORKBOOK_FORMAT_MEMBERS } from './sheet-format.js';
 import { SHEET_STRUCTURE_MEMBERS, WORKBOOK_NAME_MEMBERS } from './sheet-structure.js';
@@ -126,6 +127,25 @@ const sheetEngines = new WeakMap<
 >();
 const workbooksByHandle = new WeakMap<WorkbookHandle, Workbook>();
 const CONSTRUCT = Symbol('construct');
+/** The workbook or sheet behind each `ooxml` facade, and each owner's facade. */
+const ooxmlOwners = new WeakMap<object, Workbook | Sheet>();
+const ooxmlFacades = new WeakMap<Workbook | Sheet, object>();
+
+const ooxmlOf = <T extends object>(owner: Workbook | Sheet, proto: T): T => {
+  let facade = ooxmlFacades.get(owner);
+  if (!facade) {
+    facade = Object.create(proto) as object;
+    ooxmlOwners.set(facade, owner);
+    ooxmlFacades.set(owner, facade);
+  }
+  return facade as T;
+};
+
+const ooxmlOwner = (facade: unknown): Workbook | Sheet => {
+  const owner = ooxmlOwners.get(facade as object);
+  if (!owner) throw new TypeError('not an ooxml facade');
+  return owner;
+};
 
 const stateOf = (wb: Workbook): WorkbookState => {
   const state = workbookStates.get(wb);
@@ -241,6 +261,12 @@ export class Workbook {
   /** True once `dispose()` has run. */
   get disposed(): boolean {
     return (workbookStates.get(this) as WorkbookState).life.disposed;
+  }
+
+  /** The OOXML-level layer: the style record tables and the parts kept verbatim. */
+  get ooxml(): WorkbookOoxml {
+    stateOf(this);
+    return ooxmlOf(this, WorkbookOoxml.prototype);
   }
 
   /** What the reader dropped or deferred when the file was loaded; empty for a new workbook. */
@@ -524,6 +550,12 @@ export class Sheet {
     return sheetContext(this).sheetEngine.name;
   }
 
+  /** The OOXML-level layer: XF indices, the range-XF remap and the sheet's XML fragments. */
+  get ooxml(): SheetOoxml {
+    sheetContext(this);
+    return ooxmlOf(this, SheetOoxml.prototype);
+  }
+
   /** Renames the sheet; formulas that reference it follow. */
   rename(newName: string): void {
     const ctx = sheetContext(this);
@@ -659,11 +691,27 @@ const WORKBOOK_HOST: MemberHost<WorkbookContext> = {
   change: (ctx, kind, fn) => ctx.change(kind, null, fn),
 };
 
+const WORKBOOK_OOXML_HOST: MemberHost<WorkbookContext> = {
+  ...WORKBOOK_HOST,
+  proto: WorkbookOoxml.prototype,
+  contextOf: (self) => workbookContext(ooxmlOwner(self) as Workbook),
+  target: (ctx) => ctx.engine.ooxml,
+};
+
+const SHEET_OOXML_HOST: MemberHost<SheetContext> = {
+  ...SHEET_HOST,
+  proto: SheetOoxml.prototype,
+  contextOf: (self) => sheetContext(ooxmlOwner(self) as Sheet),
+  target: (ctx) => ctx.sheetEngine.ooxml,
+};
+
 installMembers(SHEET_HOST, SHEET_CELL_MEMBERS);
 installMembers(SHEET_HOST, SHEET_STRUCTURE_MEMBERS);
 installMembers(SHEET_HOST, SHEET_FORMAT_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_NAME_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_FORMAT_MEMBERS);
+installMembers(WORKBOOK_OOXML_HOST, WORKBOOK_OOXML_MEMBERS);
+installMembers(SHEET_OOXML_HOST, SHEET_OOXML_MEMBERS);
 
 /** @internal The engine binding behind a facade workbook. */
 export const workbookHandleOf = (wb: Workbook): WorkbookHandle => stateOf(wb).handle;

@@ -277,6 +277,13 @@ describe('ooxml', () => {
     expect(Array.isArray(wb.ooxml.listNumberFormats())).toBe(true);
     expect(wb.sheet(0).ooxml.getAutoFilterXml()).toBeNull();
   });
+
+  it('keeps one ooxml object per workbook and per sheet', async () => {
+    const wb = await createWorkbook();
+    expect(wb.ooxml).toBe(wb.ooxml);
+    expect(wb.sheet(0).ooxml).toBe(wb.sheet(0).ooxml);
+    expect(wb.sheet(0).ooxml).not.toBe(wb.addSheet('Data').ooxml);
+  });
 });
 
 describe('table', () => {
