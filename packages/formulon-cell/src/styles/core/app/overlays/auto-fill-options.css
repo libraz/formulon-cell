@@ -1,7 +1,7 @@
 @layer fc.app {
   .fc-autofill-options__button {
     position: fixed;
-    z-index: var(--fc-z-menu, 2147483060);
+    z-index: var(--fc-z-menu, 16777060);
     width: 23.6px;
     height: 21.8px;
     padding: 0;
@@ -54,7 +54,7 @@
 
   .fc-autofill-options__menu {
     position: fixed;
-    z-index: var(--fc-z-menu, 2147483060);
+    z-index: var(--fc-z-menu, 16777060);
     min-width: 168px;
     padding: 4px 0;
     border: 1px solid var(--fc-rule-strong);

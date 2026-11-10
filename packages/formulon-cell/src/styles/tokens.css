@@ -217,8 +217,10 @@
    *   :root { --fc-z-menu: 9_000_000; }  // retarget one layer
    *
    * Tiers (low → high), bottom-up:
-   *   --fc-z-base     baseline (defaults to 2147483000, well above
-   *                   typical host modal/backdrop z-index of 1000–9999).
+   *   --fc-z-base     baseline (defaults to 16777000, well above
+   *                   typical host modal/backdrop z-index of 1000–9999;
+   *                   every tier stays an exact float32 integer, so a CSS
+   *                   minifier cannot round the stack down).
    *   --fc-z-grid     in-grid panels (find bar, slicer, charts, quick
    *                   analysis, objects inspector).
    *   --fc-z-dialog   modal-with-backdrop dialogs (Format Cells,

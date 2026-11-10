@@ -6,7 +6,7 @@
     position: absolute;
     top: 54px;
     left: 50%;
-    z-index: var(--fc-z-grid, 2147483010);
+    z-index: var(--fc-z-grid, 16777010);
     pointer-events: auto;
   }
 

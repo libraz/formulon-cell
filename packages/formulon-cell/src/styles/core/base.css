@@ -30,7 +30,7 @@
    *   2. Override a single tier (e.g. --fc-z-menu) to retarget one layer.
    *   3. Set z-index directly on a class for a single element override. */
   :where(html) {
-    --fc-z-base: 2147483000;
+    --fc-z-base: 16777000;
     --fc-z-grid: calc(var(--fc-z-base) + 10);
     --fc-z-dialog: calc(var(--fc-z-base) + 20);
     --fc-z-tooltip: calc(var(--fc-z-base) + 30);

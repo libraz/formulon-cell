@@ -1,7 +1,7 @@
 @layer fc.app {
   .fc-ctxmenu {
     position: fixed;
-    z-index: var(--fc-z-menu, 2147483060);
+    z-index: var(--fc-z-menu, 16777060);
     pointer-events: auto;
     min-width: 292px;
     max-width: min(360px, calc(100vw - 8px));

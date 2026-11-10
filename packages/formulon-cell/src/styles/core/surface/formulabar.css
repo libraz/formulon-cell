@@ -169,7 +169,7 @@
 
   .fc-namebox-menu {
     position: fixed;
-    z-index: var(--fc-z-popover, 2147483040);
+    z-index: var(--fc-z-popover, 16777040);
     display: flex;
     flex-direction: column;
     max-height: 240px;

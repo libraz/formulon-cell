@@ -1,7 +1,7 @@
 @layer fc.app {
   .fc-quick__button {
     position: absolute;
-    z-index: var(--fc-z-grid, 2147483010);
+    z-index: var(--fc-z-grid, 16777010);
     width: 22px;
     height: 22px;
     padding: 0;
@@ -43,7 +43,7 @@
 
   .fc-quick {
     position: absolute;
-    z-index: var(--fc-z-grid, 2147483010);
+    z-index: var(--fc-z-grid, 16777010);
     pointer-events: auto;
     width: min(320px, calc(100% - 16px));
     max-height: min(420px, calc(100% - 16px));
@@ -148,7 +148,7 @@
   .fc-charts {
     position: absolute;
     inset: 0;
-    z-index: var(--fc-z-grid, 2147483010);
+    z-index: var(--fc-z-grid, 16777010);
     pointer-events: none;
   }
 
@@ -219,7 +219,7 @@
 
   .fc-chart-settings {
     position: absolute;
-    z-index: calc(var(--fc-z-grid, 2147483010) + 2);
+    z-index: calc(var(--fc-z-grid, 16777010) + 2);
     box-sizing: border-box;
     display: flex;
     flex-direction: column;

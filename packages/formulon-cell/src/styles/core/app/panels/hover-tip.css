@@ -1,6 +1,6 @@
 @layer fc.app {
   .fc-hover-tip {
-    z-index: var(--fc-z-tooltip, 2147483030);
+    z-index: var(--fc-z-tooltip, 16777030);
     box-sizing: border-box;
     background: #fff8c4;
     color: #2b2b2b;

@@ -70,7 +70,7 @@
 
   .fc-select__list {
     position: absolute;
-    z-index: calc(var(--fc-z-dialog, 2147483020) + 1);
+    z-index: calc(var(--fc-z-dialog, 16777020) + 1);
     top: calc(100% + 2px);
     left: 0;
     width: max(100%, 150px);

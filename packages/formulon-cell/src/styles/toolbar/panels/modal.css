@@ -6,7 +6,7 @@
   .fc-tb__modal {
     position: fixed;
     inset: 0;
-    z-index: var(--fc-z-dialog, 2147483020);
+    z-index: var(--fc-z-dialog, 16777020);
     display: grid;
     place-items: center;
     padding: 24px;

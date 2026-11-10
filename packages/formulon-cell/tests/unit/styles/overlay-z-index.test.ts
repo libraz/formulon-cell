@@ -25,14 +25,14 @@ const walkCss = (dir: string): string[] => {
 const overlayCss = walkCss(resolve(styleRoot, 'app')).join('\n');
 
 const expectedTierValues = {
-  base: 2_147_483_000,
-  grid: 2_147_483_010,
-  dialog: 2_147_483_020,
-  tooltip: 2_147_483_030,
-  popover: 2_147_483_040,
-  callout: 2_147_483_050,
-  menu: 2_147_483_060,
-  error: 2_147_483_070,
+  base: 16_777_000,
+  grid: 16_777_010,
+  dialog: 16_777_020,
+  tooltip: 16_777_030,
+  popover: 16_777_040,
+  callout: 16_777_050,
+  menu: 16_777_060,
+  error: 16_777_070,
 } as const;
 
 type ZTier = Exclude<keyof typeof expectedTierValues, 'base'>;
@@ -120,6 +120,20 @@ describe('overlay z-index tiers', () => {
       expect(Number(fallback), `fallback for --fc-z-${tier}`).toBe(
         expectedTierValues[tier as ZTier],
       );
+    }
+  });
+
+  it('keeps every z-index number an exact float32 integer, so CSS minifiers keep it', () => {
+    // Minifiers print numbers through float32; above 2^24 an integer can round to a lower value.
+    const css = [baseCss, overlayCss].join('\n');
+    const numbers = [
+      ...[...css.matchAll(/z-index:[^;]*/g)].flatMap((m) => m[0].match(/\d+/g) ?? []),
+      ...[...css.matchAll(/--fc-z-base:\s*(\d+)/g)].map((m) => m[1] ?? ''),
+    ].map(Number);
+    expect(numbers.length).toBeGreaterThan(0);
+    for (const value of numbers) {
+      expect(Math.fround(value), String(value)).toBe(value);
+      expect(value, String(value)).toBeLessThanOrEqual(2 ** 24);
     }
   });
 });

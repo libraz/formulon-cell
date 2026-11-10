@@ -3,7 +3,7 @@
 
 @layer fc.app {
   .fc-filter-dropdown {
-    z-index: var(--fc-z-popover, 2147483040);
+    z-index: var(--fc-z-popover, 16777040);
     pointer-events: auto;
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid

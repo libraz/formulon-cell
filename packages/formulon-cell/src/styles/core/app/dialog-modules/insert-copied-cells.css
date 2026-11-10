@@ -3,7 +3,7 @@
   .fc-cellshift {
     position: fixed;
     inset: 0;
-    z-index: 2147483600;
+    z-index: var(--fc-z-dialog, 16777020);
     display: grid;
     place-items: center;
     background: rgba(0, 0, 0, 0.12);

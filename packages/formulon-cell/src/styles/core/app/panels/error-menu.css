@@ -3,7 +3,7 @@
  * by error-menu.ts (position: fixed); we only own the visual shell. */
   .fc-errmenu {
     position: fixed;
-    z-index: var(--fc-z-error, 2147483070);
+    z-index: var(--fc-z-error, 16777070);
     pointer-events: auto;
     min-width: 200px;
     max-width: 260px;

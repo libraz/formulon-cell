@@ -5,7 +5,7 @@
      the cell. Matches the visual language of the canvas hover-tip. */
   .fc-cmtnote {
     position: absolute;
-    z-index: var(--fc-z-callout, 2147483050);
+    z-index: var(--fc-z-callout, 16777050);
     pointer-events: auto;
     display: flex;
     flex-direction: column;

@@ -211,7 +211,7 @@
 
   .fc-fmtdlg__color-flyout {
     position: fixed;
-    z-index: calc(var(--fc-z-dialog, 2147483020) + 1);
+    z-index: calc(var(--fc-z-dialog, 16777020) + 1);
     padding: 8px;
     border: 1px solid var(--fc-fmtdlg-rule);
     border-radius: 4px;
