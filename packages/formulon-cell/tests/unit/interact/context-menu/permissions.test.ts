@@ -1,18 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { OperationIntent } from '../../../../src/commands/interaction-policy.js';
+import { History } from '../../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../../src/commands/interaction-controller.js';
+import { rowShiftBand } from '../../../../src/commands/interaction-effects.js';
+import { type OperationIntent, viewerPolicy } from '../../../../src/commands/interaction-policy.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import type { ContextMenuInteractionController } from '../../../../src/interact/context-menu-options.js';
 import { createContextMenuPermissions } from '../../../../src/interact/context-menu-permissions.js';
-import type { MenuKind } from '../../../../src/interact/context-menu-spec.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 
-const build = (
-  interactionController?: ContextMenuInteractionController,
-  menuKind: MenuKind = 'cell',
-) =>
+const build = (interactionController?: ContextMenuInteractionController) =>
   createContextMenuPermissions({
     store: createSpreadsheetStore(),
     interactionController,
-    menuKind: () => menuKind,
   });
 
 const controller = (
@@ -31,12 +33,31 @@ describe('context-menu permissions', () => {
     expect(permissions.navigationBlocks('rowDelete')).toBe(false);
   });
 
-  it('denies items outside the safe set once the controller is restricted', () => {
-    const permissions = build(controller({ restricted: true }));
-    expect(permissions.hasExplicitPolicy()).toBe(true);
-    const decision = permissions.decisionForItem('rowDelete');
-    expect(decision).toMatchObject({ allowed: false, code: 'unsupported' });
-    expect(permissions.decisionReason(decision)).toMatch(/restricted mode/);
+  it('decides every item through the built-in policy once the controller is restricted', async () => {
+    const store = createSpreadsheetStore();
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const restricted = new InteractionController({
+      store,
+      getWb: () => workbook,
+      history: new History(),
+    });
+    const unregister = registerInteractionController(store, restricted);
+    try {
+      restricted.setPolicy(viewerPolicy());
+      const permissions = createContextMenuPermissions({
+        store,
+        interactionController: restricted,
+      });
+      expect(permissions.hasExplicitPolicy()).toBe(true);
+      expect(permissions.decisionForItem('rowDelete')).toMatchObject({ allowed: false });
+      expect(permissions.decisionForItem('rowDelete')).not.toMatchObject({ code: 'invalid' });
+      expect(permissions.decisionForItem('selectAll')).toEqual({ allowed: true });
+      expect(permissions.decisionForItem('toggleWatch')).toEqual({ allowed: true });
+    } finally {
+      unregister();
+      restricted.dispose();
+      workbook.dispose();
+    }
   });
 
   it('denies copy when the host policy turns it off', () => {
@@ -59,17 +80,11 @@ describe('context-menu permissions', () => {
       commandId: 'paste',
       effects: [{ kind: 'range' }],
     });
-    expect(rowInsert).toMatchObject({ operation: 'insertRows', effects: [{ kind: 'workbook' }] });
-  });
-
-  it('treats insertCopiedCells as a workbook effect only on row and column menus', () => {
-    const effectKind = (kind: MenuKind): string | undefined => {
-      const canExecute = vi.fn((_intent: OperationIntent) => ({ allowed: true as const }));
-      build(controller({ canExecute }), kind).decisionForItem('insertCopiedCells');
-      return canExecute.mock.calls[0]?.[0].effects[0]?.kind;
-    };
-    expect(effectKind('cell')).toBe('range');
-    expect(effectKind('row')).toBe('workbook');
+    // A row insert declares the band it shifts: from the selection to the sheet end.
+    expect(rowInsert).toMatchObject({
+      operation: 'insertRows',
+      effects: [{ kind: 'range', range: rowShiftBand(0, 0) }],
+    });
   });
 
   it('lets canSelect override the selection policy flag', () => {

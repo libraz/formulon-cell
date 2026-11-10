@@ -237,7 +237,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const permissions = createContextMenuPermissions({
     store,
     interactionController,
-    menuKind: () => menuKind,
   });
   const { decisionForItem, decisionReason, hasExplicitPolicy, canPasteToRange } = permissions;
   let pasteBtnRef: HTMLButtonElement | null = null;

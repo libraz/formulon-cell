@@ -1,4 +1,7 @@
-import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
+import {
+  canExecuteBuiltIn,
+  canExecuteBuiltInRequest,
+} from '../../../commands/built-in-command-policy.js';
 import {
   type CatalogFunctionCategory,
   type CatalogLocaleOrdinal,
@@ -454,7 +457,11 @@ const projectMacRecentMenuPrepared = (
         projectFunctionButtonState(button, name, store, lang, availabilityContext);
         continue;
       }
-      const decision = canExecuteBuiltIn(store, button.dataset.ribbonCommand ?? '', 'ribbon');
+      const decision = canExecuteBuiltInRequest(
+        store,
+        button.dataset.ribbonCommand ?? '',
+        'ribbon',
+      );
       projectDisabledState(
         button,
         !decision.allowed,

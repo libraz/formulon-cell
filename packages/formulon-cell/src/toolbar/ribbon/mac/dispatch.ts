@@ -1,4 +1,8 @@
-import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
+import type { BuiltInCommandId } from '../../../commands/built-in-command-ids.js';
+import {
+  canExecuteBuiltIn,
+  canExecuteBuiltInRequest,
+} from '../../../commands/built-in-command-policy.js';
 import { inputLocaleForWorkbook } from '../../../commands/coerce-input.js';
 import {
   listThreadedComments,
@@ -293,7 +297,7 @@ export function dispatchMacRibbonCommand(
   if (!isMacRibbonCommandSupported(id, reportedNames)) return false;
   // Menu availability and execution of a root's legacy primary action have
   // separate permissions. Public applyCommand callers can invoke roots too.
-  const rootActionPermissions: Readonly<Record<string, string>> = {
+  const rootActionPermissions: Readonly<Record<string, BuiltInCommandId>> = {
     'mac.formulas.autoSum': 'mac.autosum.SUM',
     'mac.formulas.removeArrows': 'mac.formulas.removeArrows.all',
     'mac.formulas.errorCheck': 'mac.formulas.errorCheck.run',
@@ -312,7 +316,7 @@ export function dispatchMacRibbonCommand(
   ) {
     if (
       !instance.workbook?.capabilities?.threadedComments ||
-      !canExecuteBuiltIn(instance.store, id, 'ribbon').allowed
+      !canExecuteBuiltInRequest(instance.store, id, 'ribbon').allowed
     )
       return true;
   }
@@ -321,7 +325,7 @@ export function dispatchMacRibbonCommand(
   const run = (): unknown => {
     const themeAction = /^mac\.page\.(theme|color|font)\.(office|gray)$/.exec(id);
     if (themeAction) {
-      if (!canExecuteBuiltIn(instance.store, id, 'ribbon').allowed) return;
+      if (!canExecuteBuiltInRequest(instance.store, id, 'ribbon').allowed) return;
       return applyWorkbookTheme(
         instance,
         themeAction[2] as 'office' | 'gray',

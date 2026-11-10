@@ -66,7 +66,6 @@ export type PermissionCode =
   | 'protected'
   | 'outOfBounds'
   | 'effectTooLarge'
-  | 'unsupported'
   | 'invalid';
 
 export type PermissionDecision =

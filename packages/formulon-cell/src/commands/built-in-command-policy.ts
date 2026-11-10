@@ -1,5 +1,6 @@
 import type { Range } from '../engine/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { type BuiltInCommandId, isBuiltInCommandId } from './built-in-command-ids.js';
 import { getRecentFunctions } from './function-history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import { columnShiftBand, rowShiftBand } from './interaction-effects.js';
@@ -7,14 +8,20 @@ import type {
   InteractionOperation,
   InteractionOrigin,
   OperationEffect,
+  OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
 import { FUNCTION_SIGNATURES } from './refs.js';
 
-/** Stable built-in command classification. Keep this explicit: an unknown
- * command must not become executable merely because a host allowed a broad
- * operation category. */
-export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOperation>> = {
+/** A built-in command id, or a Mac function-menu leaf naming a spreadsheet function. */
+export type BuiltInCommandRequest = BuiltInCommandId | `mac.function.${string}`;
+
+/** The operation each built-in command performs, or `null` for a command that never mutates the
+ * workbook and is always allowed. Total over {@link BuiltInCommandId}, so a new command cannot
+ * ship without a classification, and an unknown id is never executable. */
+export const BUILT_IN_COMMAND_OPERATION: Readonly<
+  Record<BuiltInCommandId, InteractionOperation | null>
+> = {
   paste: 'paste',
   pasteSpecial: 'paste',
   pasteAll: 'paste',
@@ -31,8 +38,6 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   deleteCells: 'deleteRows',
   insertRows: 'insertRows',
   deleteRows: 'deleteRows',
-  insertCols: 'insertColumns',
-  deleteCols: 'deleteColumns',
   rowInsertAbove: 'insertRows',
   rowInsertBelow: 'insertRows',
   rowDelete: 'deleteRows',
@@ -61,7 +66,6 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   decUp: 'format',
   decDown: 'format',
   wrap: 'format',
-  general: 'format',
   textOrientation: 'format',
   indentDecrease: 'format',
   indentIncrease: 'format',
@@ -85,12 +89,10 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   insertHyperlink: 'hyperlink',
   showPhonetic: 'format',
   editPhonetic: 'format',
-  phoneticSettings: 'format',
   protect: 'protection',
   protectReview: 'protection',
   pageSetup: 'pageSetup',
   print: 'print',
-  export: 'export',
   printArea: 'pageSetup',
   pageBreaks: 'pageSetup',
   dataValidation: 'validation',
@@ -109,7 +111,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   pictureInsert: 'object',
   shapesInsert: 'object',
   screenshotInsert: 'object',
-  workbookObjectsView: 'object',
+  workbookObjectsView: null,
   chartAddElement: 'object',
   chartColors: 'object',
   chartSwitchRowColumn: 'object',
@@ -118,24 +120,18 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   chartFormatSelection: 'object',
   objectBringForward: 'object',
   objectSendBackward: 'object',
-  objectSelectionPane: 'object',
+  objectSelectionPane: null,
   shapeFill: 'object',
   shapeOutline: 'object',
-  sheetInsert: 'sheet',
-  sheetDelete: 'sheet',
-  sheetRename: 'sheet',
-  undo: 'valueEdit',
-  redo: 'valueEdit',
   scaleWidth: 'pageSetup',
   scaleHeight: 'pageSetup',
-  sheetViewSelect: 'format',
+  sheetViewSelect: 'filter',
 
   // Excel 365 Mac ribbon actions. Keep these aliases explicit so a restricted
   // embed cannot gain a new mutation merely by adopting the Mac profile.
   'mac.insert.pivotTable': 'table',
   'mac.insert.recommendedPivotTable': 'table',
   'mac.insert.table': 'table',
-  'mac.insert.forms': 'object',
   'mac.insert.photo': 'object',
   'mac.insert.shapeRectangle': 'object',
   'mac.insert.shapeArrow': 'object',
@@ -144,12 +140,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.insert.shapeOval': 'object',
   'mac.insert.shapeTriangle': 'object',
   'mac.insert.shapeDiamond': 'object',
-  'mac.insert.shapeCallout': 'object',
-  'mac.insert.icons': 'object',
-  'mac.insert.threeDModel': 'object',
-  'mac.insert.smartArt': 'object',
   'mac.insert.screenshot': 'object',
-  'mac.insert.checkBox': 'object',
   'mac.insert.recommendedChart': 'object',
   'mac.insert.chartColumn': 'object',
   'mac.insert.chartColumnStacked': 'object',
@@ -171,20 +162,13 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.insert.chartWaterfall': 'object',
   'mac.insert.chartCombo': 'object',
   'mac.insert.chartMap': 'object',
-  'mac.insert.pivotChart': 'object',
   'mac.insert.sparkline': 'object',
   'mac.insert.slicer': 'table',
   'mac.insert.link': 'hyperlink',
   'mac.insert.newComment': 'comment',
-  'mac.insert.textBox': 'object',
   'mac.insert.headerFooter': 'pageSetup',
-  'mac.insert.wordArt': 'object',
-  'mac.insert.object': 'object',
-  'mac.insert.equation': 'formulaEdit',
-  'mac.insert.pictureFromData': 'object',
-  'mac.home.addins': 'object',
+  'mac.home.addins': null,
   'mac.draw.toggle': 'object',
-  'mac.draw.lasso': 'object',
   'mac.draw.penBlack': 'object',
   'mac.draw.penRed': 'object',
   'mac.draw.pencil': 'object',
@@ -199,11 +183,9 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.page.background': 'pageSetup',
   'mac.page.printTitles': 'pageSetup',
   'mac.page.pageSetup': 'pageSetup',
-  'mac.page.scaleWidth': 'pageSetup',
-  'mac.page.scaleHeight': 'pageSetup',
-  'mac.page.showGridlines': 'pageSetup',
+  'mac.page.showGridlines': null,
   'mac.page.printGridlines': 'pageSetup',
-  'mac.page.showHeadings': 'pageSetup',
+  'mac.page.showHeadings': null,
   'mac.page.printHeadings': 'pageSetup',
   'mac.formulas.insertFunction': 'formulaEdit',
   'mac.autosum.SUM': 'formulaEdit',
@@ -222,17 +204,8 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.formulas.errorCheck.ignore': 'formulaEdit',
   'mac.formulas.precedents': 'formulaEdit',
   'mac.formulas.dependents': 'formulaEdit',
-  'mac.formulas.recalc': 'formulaEdit',
-  'mac.formulas.sheetRecalc': 'formulaEdit',
-  // Keep every function leaf in lockstep with the engine catalog. This is
-  // deliberately generated from known signatures; an arbitrary
-  // `mac.function.*` id remains denied below.
-  ...Object.fromEntries(
-    Object.keys(FUNCTION_SIGNATURES).map((name) => [
-      `mac.function.${name}`,
-      'formulaEdit' as InteractionOperation,
-    ]),
-  ),
+  'mac.formulas.recalc': null,
+  'mac.formulas.sheetRecalc': null,
   'mac.page.margins.normal': 'pageSetup',
   'mac.page.margins.wide': 'pageSetup',
   'mac.page.margins.narrow': 'pageSetup',
@@ -257,7 +230,6 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.formulas.calc.autoNoTable': 'formulaEdit',
   'mac.formulas.calc.manual': 'formulaEdit',
   'mac.formulas.calc.iterative': 'formulaEdit',
-  'mac.data.refreshAll': 'valueEdit',
   'mac.data.sortAsc': 'sort',
   'mac.data.sortDesc': 'sort',
   'mac.data.sortCustom': 'sort',
@@ -273,154 +245,314 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.data.validation.clearCircles': 'validation',
   'mac.data.validation.clearRules': 'validation',
   'mac.data.consolidate': 'valueEdit',
-  'mac.data.whatIf': 'valueEdit',
+  'mac.data.whatIf': null,
   'mac.data.goalSeek': 'valueEdit',
   'mac.data.dataTable': 'valueEdit',
   'mac.data.subtotal': 'valueEdit',
-  'mac.data.group': 'format',
-  'mac.data.ungroup': 'format',
-  'mac.data.showDetail': 'format',
-  'mac.data.hideDetail': 'format',
-  'mac.data.analysis': 'object',
+  'mac.data.group': 'resizeRows',
+  'mac.data.ungroup': 'resizeRows',
+  'mac.data.showDetail': 'resizeRows',
+  'mac.data.hideDetail': 'resizeRows',
   'mac.review.newComment': 'comment',
   'mac.review.deleteComment': 'comment',
   'mac.review.newNote': 'comment',
   'mac.review.protectSheet': 'protection',
   'mac.review.protectWorkbook': 'protection',
-  'mac.view.sheetViewSave': 'format',
-  'mac.view.sheetViewDelete': 'format',
-  'mac.automate.showScripts': 'object',
-  'mac.automate.allRowsColumns': 'format',
+  'mac.view.sheetViewSave': 'sheet',
+  'mac.view.sheetViewDelete': 'sheet',
+  'mac.automate.showScripts': null,
+  'mac.automate.allRowsColumns': 'resizeRows',
   'mac.automate.makeSubtable': 'table',
   'mac.automate.removeHyperlinks': 'hyperlink',
-  'mac.automate.countEmptyRows': 'valueEdit',
+  'mac.automate.countEmptyRows': null,
   'mac.automate.tableToJson': 'export',
   'mac.automate.newPivotTable': 'table',
-};
 
-/** Ids that never mutate and so bypass the operation map; they are not listed there. */
-const SAFE_NAVIGATION_COMMANDS: ReadonlySet<string> = new Set([
-  'copy',
-  'selectAll',
-  'openHyperlink',
-  'toggleWatch',
-  'findHome',
-  'gotoSpecial',
-  'gotoSpecialHome',
-  'viewNormal',
-  'viewPageLayout',
-  'viewPageBreakPreview',
-  'zoom75',
-  'zoom100',
-  'zoom125',
-  'zoomDialog',
-  'mac.view.zoom100',
-  'mac.view.freeze',
-  'mac.view.freeze.firstRow',
-  'mac.view.freeze.firstColumn',
-  'mac.view.split',
-  'split',
-  'outlineSymbols',
-  'mac.automate.freezeSelection',
-  'showFormulas',
-  'r1c1',
-  'mac.insert.shapes',
-  'mac.draw.eraser',
-  'mac.draw.add',
-  'mac.page.theme',
-  'mac.page.color',
-  'mac.page.font',
-  'mac.page.margins',
-  'mac.page.orientation',
-  'mac.page.size',
-  'mac.page.printArea',
-  'mac.formulas.autoSum',
-  'mac.formulas.recent',
-  'mac.formulas.financial',
-  'mac.formulas.logical',
-  'mac.formulas.text',
-  'mac.formulas.dateTime',
-  'mac.formulas.lookup',
-  'mac.formulas.math',
-  'mac.formulas.more',
-  'mac.formulas.removeArrows',
-  'mac.formulas.errorCheck',
-  'mac.formulas.category.recent',
-  'mac.formulas.category.all',
-  'mac.formulas.showFormulas',
-  'mac.formulas.watch',
-  'mac.formulas.calcOptions',
-  'mac.page.pageBreaks',
-  'linksData',
-  'mac.data.workbookLinks',
-  'mac.data.dataTypes',
-  'mac.data.sortFilter',
-  'mac.data.validation',
-  'mac.review.spelling',
-  'mac.review.stats',
-  'mac.review.accessibility',
-  'mac.review.translate',
-  'mac.review.showComments',
-  'mac.review.showHideNote',
-  'mac.review.showNotes',
-  'showHideNoteReview',
-  'showAllNotesReview',
-  'showHideNote',
-  'mac.view.standard',
-  'mac.view.pageLayout',
-  'mac.view.pageBreakPreview',
-  'mac.view.customViews',
-  'mac.view.show',
-  'mac.view.zoom',
-  'mac.view.zoomSelection',
-  'mac.view.newWindow',
-  'mac.view.arrange',
-  'mac.view.switchWindow',
-  'mac.automate.gallery',
-]);
+  // Never mutate the workbook: navigation, view state, zoom, read-only panes, menu roots and
+  // launchers whose own writes go through the controller. Selection-moving ids are listed here
+  // too and follow SELECTING_NAVIGATION_COMMANDS.
+  accessibility: null,
+  addIn: null,
+  allScripts: null,
+  arrangeObjectsPageLayout: null,
+  calcOptions: null,
+  cellStyles: null,
+  conditional: null,
+  copy: null,
+  drawErase: null,
+  errorChecking: null,
+  evaluateFormula: null,
+  fillHome: null,
+  findHome: null,
+  findReview: null,
+  formatCellsHome: null,
+  freeze: null,
+  inspect: null,
+  linksData: null,
+  'mac.automate.freezeSelection': null,
+  'mac.automate.gallery': null,
+  'mac.data.dataTypes': null,
+  'mac.data.pictureFromData': null,
+  'mac.data.validation': null,
+  'mac.data.workbookLinks': null,
+  'mac.draw.add': null,
+  'mac.draw.eraser': null,
+  'mac.formulas.autoSum': null,
+  'mac.formulas.calcOptions': null,
+  'mac.formulas.category.all': null,
+  'mac.formulas.category.recent': null,
+  'mac.formulas.dateTime': null,
+  'mac.formulas.errorCheck': null,
+  'mac.formulas.errorCheck.run': null,
+  'mac.formulas.financial': null,
+  'mac.formulas.logical': null,
+  'mac.formulas.lookup': null,
+  'mac.formulas.math': null,
+  'mac.formulas.more': null,
+  'mac.formulas.recent': null,
+  'mac.formulas.removeArrows': null,
+  'mac.formulas.showFormulas': null,
+  'mac.formulas.text': null,
+  'mac.formulas.watch': null,
+  'mac.insert.shapes': null,
+  'mac.page.color': null,
+  'mac.page.font': null,
+  'mac.page.margins': null,
+  'mac.page.orientation': null,
+  'mac.page.pageBreaks': null,
+  'mac.page.printArea': null,
+  'mac.page.size': null,
+  'mac.page.theme': null,
+  'mac.review.accessibility': null,
+  'mac.review.nextComment': null,
+  'mac.review.nextNote': null,
+  'mac.review.notes': null,
+  'mac.review.previousComment': null,
+  'mac.review.previousNote': null,
+  'mac.review.showComments': null,
+  'mac.review.showHideNote': null,
+  'mac.review.showNotes': null,
+  'mac.review.spelling': null,
+  'mac.review.stats': null,
+  'mac.view.formulaBar': null,
+  'mac.view.freeze': null,
+  'mac.view.freeze.firstColumn': null,
+  'mac.view.freeze.firstRow': null,
+  'mac.view.gridlines': null,
+  'mac.view.headings': null,
+  'mac.view.pageBreakPreview': null,
+  'mac.view.pageLayout': null,
+  'mac.view.split': null,
+  'mac.view.standard': null,
+  'mac.view.zeros': null,
+  'mac.view.zoom': null,
+  'mac.view.zoom100': null,
+  'mac.view.zoomSelection': null,
+  nextCommentReview: null,
+  openHyperlink: null,
+  outlineSymbols: null,
+  pageLayoutGridlinesView: null,
+  pageLayoutHeadingsView: null,
+  pageTheme: null,
+  pivotBlankRows: null,
+  pivotClear: null,
+  pivotFieldsItemsSets: null,
+  pivotGrandTotals: null,
+  pivotReportLayout: null,
+  pivotSelect: null,
+  pivotSelectData: null,
+  pivotSelectEnable: null,
+  pivotSelectLabels: null,
+  pivotSelectLabelsAndData: null,
+  pivotSelectTable: null,
+  pivotSubtotals: null,
+  previousCommentReview: null,
+  recalcNow: null,
+  recalcSheet: null,
+  recordActions: null,
+  script: null,
+  selectAll: null,
+  selectionPanePageLayout: null,
+  showAllNotesReview: null,
+  showFormulasFormula: null,
+  showHideNote: null,
+  showHideNoteReview: null,
+  spellingReview: null,
+  split: null,
+  toggleWatch: null,
+  translateReview: null,
+  viewFormulaBar: null,
+  viewFormulas: null,
+  viewGridlines: null,
+  viewHeadings: null,
+  viewNormal: null,
+  viewPageBreakPreview: null,
+  viewPageLayout: null,
+  viewR1C1: null,
+  viewRightToLeft: null,
+  viewZeros: null,
+  watch: null,
+  watchView: null,
+  whatIf: null,
+  zoom100: null,
+  zoom125: null,
+  zoom75: null,
+  zoomDialog: null,
+  zoomSelection: null,
+
+  // Generic ribbon, context-menu and pivot commands.
+  autosum: 'formulaEdit',
+  autosumFormula: 'formulaEdit',
+  avg: 'formulaEdit',
+  clearArrows: 'formulaEdit',
+  clearFormat: 'format',
+  colGroup: 'resizeColumns',
+  colHide: 'resizeColumns',
+  colUngroup: 'resizeColumns',
+  colUnhide: 'resizeColumns',
+  commentInsert: 'comment',
+  concatFormula: 'formulaEdit',
+  deleteCommentReview: 'comment',
+  dependents: 'formulaEdit',
+  drawGrid: 'format',
+  drawPen: 'object',
+  filter: 'filter',
+  formatPainter: 'format',
+  fx: 'formulaEdit',
+  hyperlinkInsert: 'hyperlink',
+  ifFormula: 'formulaEdit',
+  insertTableColumns: 'insertColumns',
+  insertTableRows: 'insertRows',
+  'mac.insert.recommendedChart.apply': 'object',
+  'mac.insert.symbol': 'valueEdit',
+  marginsPreset: 'pageSetup',
+  merge: 'merge',
+  newCommentReview: 'comment',
+  orientationPreset: 'pageSetup',
+  outlineGroup: 'resizeRows',
+  outlineHideDetail: 'resizeRows',
+  outlineShowDetail: 'resizeRows',
+  outlineSummaryBelow: 'resizeRows',
+  outlineSummaryRight: 'resizeColumns',
+  outlineUngroup: 'resizeRows',
+  pageLayoutGridlinesPrint: 'pageSetup',
+  pageLayoutHeadingsPrint: 'pageSetup',
+  pageSetupAdvanced: 'pageSetup',
+  paperSizePreset: 'pageSetup',
+  pasteColumnWidths: 'resizeColumns',
+  pasteKeepSource: 'paste',
+  pasteLink: 'formulaEdit',
+  pasteNoBorders: 'paste',
+  pdf: 'export',
+  pivotActiveField: 'table',
+  pivotCalcField: 'table',
+  pivotCalcItem: 'table',
+  pivotColHeaders: 'table',
+  pivotColStripes: 'table',
+  pivotCollapse: 'table',
+  pivotCollapseField: 'table',
+  pivotCollapseTo: 'table',
+  pivotDelete: 'table',
+  pivotExpand: 'table',
+  pivotExpandField: 'table',
+  pivotFieldList: 'table',
+  pivotFieldListView: 'table',
+  pivotFieldSettings: 'table',
+  pivotFilterClear: 'table',
+  pivotFilterHideSelected: 'table',
+  pivotFilterKeepSelected: 'table',
+  pivotFilterLabel: 'table',
+  pivotFilterTop10: 'table',
+  pivotFilterValue: 'table',
+  pivotGroup: 'table',
+  pivotListFormulas: 'sheet',
+  pivotMove: 'table',
+  pivotMoveFieldFirst: 'table',
+  pivotMoveFieldLast: 'table',
+  pivotMoveFieldLeft: 'table',
+  pivotMoveFieldRight: 'table',
+  pivotMoveFieldToColumns: 'table',
+  pivotMoveFieldToRows: 'table',
+  pivotMoveItemDown: 'table',
+  pivotMoveItemFirst: 'table',
+  pivotMoveItemLast: 'table',
+  pivotMoveItemUp: 'table',
+  pivotName: 'table',
+  pivotNumberFormat: 'table',
+  pivotOptions: 'table',
+  pivotRefresh: 'table',
+  pivotRemoveField: 'table',
+  pivotRemoveGrandTotal: 'table',
+  pivotRemoveValues: 'table',
+  pivotRowHeaders: 'table',
+  pivotRowStripes: 'table',
+  pivotShowAsMore: 'table',
+  pivotShowAsNormal: 'table',
+  pivotShowAsPercentOfColumn: 'table',
+  pivotShowAsPercentOfParentColumn: 'table',
+  pivotShowAsPercentOfParentRow: 'table',
+  pivotShowAsPercentOfRow: 'table',
+  pivotShowAsPercentOfTotal: 'table',
+  pivotShowDetails: 'sheet',
+  pivotShowFieldList: 'table',
+  pivotSolveOrder: 'table',
+  pivotSortAsc: 'table',
+  pivotSortDesc: 'table',
+  pivotSortMore: 'table',
+  pivotStyleGallery: 'table',
+  pivotSubtotal: 'table',
+  pivotSummarizeAverage: 'table',
+  pivotSummarizeCount: 'table',
+  pivotSummarizeDistinctCount: 'table',
+  pivotSummarizeMax: 'table',
+  pivotSummarizeMin: 'table',
+  pivotSummarizeMore: 'table',
+  pivotSummarizeProduct: 'table',
+  pivotSummarizeSum: 'table',
+  pivotUngroup: 'table',
+  pmtFormula: 'formulaEdit',
+  precedents: 'formulaEdit',
+  printPageLayout: 'print',
+  printTitles: 'pageSetup',
+  protectWorkbookReview: 'protection',
+  protectionReview: 'protection',
+  removeDupes: 'valueEdit',
+  roundFormula: 'formulaEdit',
+  rowGroup: 'resizeRows',
+  rowHide: 'resizeRows',
+  rowUngroup: 'resizeRows',
+  rowUnhide: 'resizeRows',
+  scalePercent: 'pageSetup',
+  sheetBackground: 'pageSetup',
+  sheetViewDelete: 'sheet',
+  sheetViewSave: 'sheet',
+  sortData: 'sort',
+  sortFilterHome: 'sort',
+  sum: 'formulaEdit',
+  symbolInsert: 'valueEdit',
+  tableFilterButton: 'filter',
+  textToColumns: 'valueEdit',
+  todayFormula: 'formulaEdit',
+  windowVisibility: 'format',
+  xlookupFormula: 'formulaEdit',
+};
 
 /** Commands whose useful effect is moving the active selection. These follow
  * the host's separate selection permission instead of the mutation policy. */
-const SELECTING_NAVIGATION_COMMANDS: ReadonlySet<string> = new Set([
+const SELECTING_NAVIGATION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<BuiltInCommandId>([
   'selectAll',
+  'errorChecking',
   'mac.formulas.errorCheck.run',
+  'nextCommentReview',
+  'previousCommentReview',
   'mac.review.previousComment',
   'mac.review.nextComment',
   'mac.review.previousNote',
   'mac.review.nextNote',
-]);
-
-const SELECTION_FORMAT_COMMANDS: ReadonlySet<string> = new Set([
-  'bold',
-  'italic',
-  'underline',
-  'strike',
-  'currency',
-  'percent',
-  'comma',
-  'alignLeft',
-  'alignCenter',
-  'alignRight',
-  'alignL',
-  'alignC',
-  'alignR',
-  'top',
-  'middle',
-  'bottomAlign',
-  'decUp',
-  'decDown',
-  'wrap',
-  'general',
-  'textOrientation',
-  'indentDecrease',
-  'indentIncrease',
-  'fontGrow',
-  'fontShrink',
-  'fontFamily',
-  'fontSize',
-  'fontColor',
-  'fillColor',
-  'numberFormat',
+  'pivotSelectData',
+  'pivotSelectLabels',
+  'pivotSelectLabelsAndData',
+  'pivotSelectTable',
 ]);
 
 /** Operations whose writes touch no cell: decided by the operation alone. */
@@ -437,6 +569,8 @@ const WORKBOOK_EFFECT_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'export',
 ]);
 
+const FUNCTION_COMMAND_PREFIX = 'mac.function.';
+
 const shiftedBand = (operation: InteractionOperation, selection: Range): Range | null => {
   if (operation === 'insertRows' || operation === 'deleteRows')
     return rowShiftBand(selection.sheet, Math.min(selection.r0, selection.r1));
@@ -445,34 +579,38 @@ const shiftedBand = (operation: InteractionOperation, selection: Range): Range |
   return null;
 };
 
-const unsupported = (id: string): PermissionDecision => ({
+const isBuiltInCommandRequest = (id: string): id is BuiltInCommandRequest =>
+  isBuiltInCommandId(id) || id.startsWith(FUNCTION_COMMAND_PREFIX);
+
+const invalidCommand = (id: string): PermissionDecision => ({
   allowed: false,
-  code: 'unsupported',
-  reason: `built-in command ${id} is not classified for restricted execution`,
+  code: 'invalid',
+  reason: `${id} is not a built-in command`,
 });
 
-export function canExecuteBuiltIn(
+/** A function leaf edits a formula when its name is a known function or was recorded from the
+ * live catalog; any other name is not a command. */
+const functionLeafOperation = (
+  store: SpreadsheetStore,
+  name: string,
+): InteractionOperation | undefined =>
+  name in FUNCTION_SIGNATURES || getRecentFunctions(store, new Set([name])).includes(name)
+    ? 'formulaEdit'
+    : undefined;
+
+/** The intent a built-in command declares: its operation and the cells it writes. `null` for a
+ * command that never mutates, `undefined` for an id that names no built-in command. */
+export const builtInCommandIntent = (
   store: SpreadsheetStore,
   id: string,
   origin: InteractionOrigin,
-): PermissionDecision {
-  const controller = interactionControllerFor(store);
-  if (!controller?.restricted) return { allowed: true };
-  if (id === 'copy') return controller.canCopy();
-  if (SELECTING_NAVIGATION_COMMANDS.has(id)) return controller.canSelect();
-  if (SAFE_NAVIGATION_COMMANDS.has(id)) return { allowed: true };
-  const dynamicFunctionName = id.startsWith('mac.function.')
-    ? id.slice('mac.function.'.length)
-    : null;
-  const dynamicFunctionRecorded =
-    dynamicFunctionName !== null &&
-    getRecentFunctions(store, new Set([dynamicFunctionName])).includes(dynamicFunctionName);
-  const operation =
-    BUILT_IN_COMMAND_OPERATION[id] ?? (dynamicFunctionRecorded ? 'formulaEdit' : undefined);
-  if (!operation) return unsupported(id);
+): OperationIntent | null | undefined => {
+  if (!isBuiltInCommandRequest(id)) return undefined;
+  const operation = isBuiltInCommandId(id)
+    ? BUILT_IN_COMMAND_OPERATION[id]
+    : functionLeafOperation(store, id.slice(FUNCTION_COMMAND_PREFIX.length));
+  if (operation === undefined || operation === null) return operation;
   const workbookTheme = /^mac\.page\.(theme|color|font)\.(office|gray)$/.test(id);
-  if (operation === 'format' && !SELECTION_FORMAT_COMMANDS.has(id) && !workbookTheme)
-    return unsupported(id);
   const state = store.getState();
   const selection = state.selection.range;
   const band = shiftedBand(operation, selection);
@@ -484,5 +622,47 @@ export function canExecuteBuiltIn(
       (range): OperationEffect => ({ kind: 'range', range }),
     );
   else effects = [{ kind: 'range', range: selection }];
-  return controller.canExecute({ operation, origin, commandId: id, effects });
+  return { operation, origin, commandId: id, effects };
+};
+
+const decideBuiltIn = (
+  store: SpreadsheetStore,
+  id: string,
+  origin: InteractionOrigin,
+): PermissionDecision => {
+  const controller = interactionControllerFor(store);
+  if (!controller?.restricted) return { allowed: true };
+  // Ids arrive from DOM datasets and public command APIs; validate at the boundary.
+  if (!isBuiltInCommandRequest(id)) return invalidCommand(id);
+  if (id === 'copy') return controller.canCopy();
+  if (isBuiltInCommandId(id) && SELECTING_NAVIGATION_COMMANDS.has(id))
+    return controller.canSelect();
+  const intent = builtInCommandIntent(store, id, origin);
+  if (intent === undefined) return invalidCommand(id);
+  if (intent === null) return { allowed: true };
+  return controller.canExecute(intent);
+};
+
+/** Decides whether a built-in UI command may run under the host's interaction policy. Without a
+ * restricting policy every command is allowed; under one, a `null` command is allowed, a
+ * selection-moving command follows the selection permission, and every other command is decided
+ * by its operation and effects. An id outside {@link BuiltInCommandRequest} is denied as
+ * `'invalid'`. */
+export function canExecuteBuiltIn(
+  store: SpreadsheetStore,
+  id: BuiltInCommandRequest,
+  origin: InteractionOrigin,
+): PermissionDecision {
+  return decideBuiltIn(store, id, origin);
+}
+
+/** {@link canExecuteBuiltIn} for an id that arrives as a plain string (a DOM dataset value or a
+ * public command API argument). A string that is not a built-in command is denied as `'invalid'`
+ * under a restricting policy and allowed without one, exactly as the typed form treats it. */
+export function canExecuteBuiltInRequest(
+  store: SpreadsheetStore,
+  id: string,
+  origin: InteractionOrigin,
+): PermissionDecision {
+  return decideBuiltIn(store, id, origin);
 }

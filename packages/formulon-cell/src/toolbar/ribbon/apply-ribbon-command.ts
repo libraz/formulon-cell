@@ -10,7 +10,7 @@
 //    hook → the matching command id silently no-ops so consumers can ship a
 //    minimal toolbar without every feature wired up.
 
-import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import { selectedSessionChart, switchSessionChartRowColumn } from '../../commands/chart-design.js';
 import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
 import { setOutlineSummaryPosition } from '../../commands/outline.js';
@@ -188,7 +188,7 @@ export interface ApplyRibbonCommandDeps {
 export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): boolean => {
   const i = deps.inst;
   if (!i) return false;
-  if (!canExecuteBuiltIn(i.store, id, 'ribbon').allowed) return true;
+  if (!canExecuteBuiltInRequest(i.store, id, 'ribbon').allowed) return true;
   if (id.startsWith('mac.'))
     return dispatchMacRibbonCommand(id, deps, (alias) =>
       applyGenericRibbonCommand(alias, deps, id),

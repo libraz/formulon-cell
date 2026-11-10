@@ -6,9 +6,10 @@ import {
   type Value,
 } from '@libraz/formulon';
 import { autofitColWidth, autofitRowHeight } from '../../commands/autofit-measurement.js';
+import { isBuiltInCommandId } from '../../commands/built-in-command-ids.js';
 import {
   BUILT_IN_COMMAND_OPERATION,
-  canExecuteBuiltIn,
+  canExecuteBuiltInRequest,
 } from '../../commands/built-in-command-policy.js';
 import type { PasteSpecialOptions } from '../../commands/clipboard/paste-special.js';
 import type { History as LegacyHistory } from '../../commands/history.js';
@@ -287,8 +288,8 @@ const PROTECTION_PERMISSION: Partial<
 type CommandRefusal = 'policy-denied' | 'protected' | null;
 
 const commandRefusal = (legacy: LegacyInstance, id: string): CommandRefusal => {
-  if (!canExecuteBuiltIn(legacy.store, id, 'instanceApi').allowed) return 'policy-denied';
-  const operation = BUILT_IN_COMMAND_OPERATION[id];
+  if (!canExecuteBuiltInRequest(legacy.store, id, 'instanceApi').allowed) return 'policy-denied';
+  const operation = isBuiltInCommandId(id) ? BUILT_IN_COMMAND_OPERATION[id] : null;
   if (!operation || !(operation in PROTECTION_PERMISSION)) return null;
   const permission = PROTECTION_PERMISSION[operation];
   if (permission === null) return null;

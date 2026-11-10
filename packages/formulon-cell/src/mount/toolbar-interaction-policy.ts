@@ -2,7 +2,7 @@
 // buttons and form controls the policy denies, and capture-phase listeners on
 // the host block any other ribbon interaction. `detach` removes the listeners.
 
-import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
+import { canExecuteBuiltInRequest } from '../commands/built-in-command-policy.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { MAC_FORMULAS_MORE_MENU_ID } from '../toolbar/ribbon/mac/model.js';
@@ -33,7 +33,7 @@ export function attachRibbonInteractionPolicy(
       // menu projector already supplied its localized reason; a policy tick
       // must not replace it with a generic denial message.
       if (button.dataset.functionUnavailable === 'true') continue;
-      const decision = canExecuteBuiltIn(
+      const decision = canExecuteBuiltInRequest(
         current.store,
         button.dataset.ribbonCommand ?? '',
         'ribbon',
@@ -65,7 +65,8 @@ export function attachRibbonInteractionPolicy(
       return;
     if (
       command &&
-      canExecuteBuiltIn(current.store, command.dataset.ribbonCommand ?? '', 'ribbon').allowed &&
+      canExecuteBuiltInRequest(current.store, command.dataset.ribbonCommand ?? '', 'ribbon')
+        .allowed &&
       !isInput
     )
       return;

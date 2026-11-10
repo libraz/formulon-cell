@@ -62,7 +62,6 @@ describe('selection-format built-in command policy', () => {
         'decUp',
         'decDown',
         'wrap',
-        'general',
         'textOrientation',
         'indentDecrease',
         'indentIncrease',
@@ -73,14 +72,17 @@ describe('selection-format built-in command policy', () => {
         'fontColor',
         'fillColor',
         'numberFormat',
-      ]) {
+        'borders',
+        'formatCells',
+        'editPhonetic',
+        'pasteFormatsOnly',
+      ] as const) {
         expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toEqual({ allowed: true });
       }
-      for (const id of ['borders', 'formatCells', 'editPhonetic', 'pasteFormatsOnly']) {
-        expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toMatchObject({
-          allowed: false,
-          code: 'unsupported',
-        });
+
+      controller.setPolicy({ ...policy, operations: { ...policy.operations, format: false } });
+      for (const id of ['borders', 'formatCells', 'editPhonetic', 'pasteFormatsOnly'] as const) {
+        expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toMatchObject({ allowed: false });
       }
     } finally {
       unregister();

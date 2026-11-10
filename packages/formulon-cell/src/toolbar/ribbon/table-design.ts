@@ -1,4 +1,4 @@
-import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import { DEFAULT_PIVOT_TOGGLES, PIVOT_STYLE_TOGGLES } from '../../commands/pivot-style-info.js';
 import {
   activeTableOverlay,
@@ -49,7 +49,7 @@ export const createTableNameInput = (
   const commit = (): void => {
     const inst = ctx.getInst();
     if (!inst || input.value === currentName()) return;
-    if (!canExecuteBuiltIn(inst.store, command.id, 'ribbon').allowed) {
+    if (!canExecuteBuiltInRequest(inst.store, command.id, 'ribbon').allowed) {
       revert();
       return;
     }

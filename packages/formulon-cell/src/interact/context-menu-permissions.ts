@@ -1,7 +1,5 @@
-import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
+import { builtInCommandIntent, canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import type {
-  InteractionOperation,
-  OperationEffect,
   OperationIntent,
   PermissionCode,
   PermissionDecision,
@@ -9,14 +7,12 @@ import type {
 import type { Range } from '../engine/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { ContextMenuInteractionController, ContextMenuItem } from './context-menu-options.js';
-import type { ItemId, MenuKind } from './context-menu-spec.js';
+import type { ItemId } from './context-menu-spec.js';
 import { navigationBoundsFor } from './navigation-policy.js';
 
 export interface ContextMenuPermissionsContext {
   readonly store: SpreadsheetStore;
   readonly interactionController: ContextMenuInteractionController | undefined;
-  /** Kind of the menu currently being built, read at call time. */
-  readonly menuKind: () => MenuKind;
 }
 
 /** Host policy and bounded-viewport decisions for context-menu items. */
@@ -33,9 +29,8 @@ export interface ContextMenuPermissions {
 export function createContextMenuPermissions(
   ctx: ContextMenuPermissionsContext,
 ): ContextMenuPermissions {
-  const { store, interactionController, menuKind } = ctx;
-  const restrictedMenuSafeIds = new Set<ItemId>(['copy', 'paste', 'clear', 'showHideNote']);
-  const navigationUnsupportedIds = new Set<ItemId>([
+  const { store, interactionController } = ctx;
+  const boundedViewportStructuralIds = new Set<ItemId>([
     'insertCopiedCells',
     'insertCells',
     'insertTableRows',
@@ -81,111 +76,6 @@ export function createContextMenuPermissions(
     );
   };
 
-  const operationForItem = (id: string): InteractionOperation | null => {
-    if (
-      id === 'copy' ||
-      id === 'selectAll' ||
-      id === 'rowHeight' ||
-      id === 'colWidth' ||
-      id === 'showHideNote'
-    ) {
-      return null;
-    }
-    if (
-      id === 'paste' ||
-      id === 'pasteSpecial' ||
-      id === 'pasteAll' ||
-      id === 'pasteFormulas' ||
-      id === 'pasteFormulasNumFmt' ||
-      id === 'pasteValues' ||
-      id === 'pasteValuesNumFmt' ||
-      id === 'pasteFormatsOnly' ||
-      id === 'pasteTranspose' ||
-      id === 'pasteKeepSource' ||
-      id === 'pasteNoBorders' ||
-      id === 'pasteColumnWidths' ||
-      id === 'pasteLink'
-    ) {
-      return 'paste';
-    }
-    if (id === 'clear') return 'clear';
-    if (
-      id === 'cut' ||
-      id === 'insertCopiedCells' ||
-      id === 'insertCells' ||
-      id === 'insertTableRows' ||
-      id === 'insertTableColumns' ||
-      id === 'deleteCells'
-    ) {
-      return 'moveCells';
-    }
-    if (id === 'rowInsertAbove' || id === 'rowInsertBelow') return 'insertRows';
-    if (id === 'rowDelete') return 'deleteRows';
-    if (id === 'colInsertLeft' || id === 'colInsertRight') return 'insertColumns';
-    if (id === 'colDelete') return 'deleteColumns';
-    if (
-      id === 'bold' ||
-      id === 'italic' ||
-      id === 'underline' ||
-      id === 'alignLeft' ||
-      id === 'alignCenter' ||
-      id === 'alignRight' ||
-      id === 'borders' ||
-      id === 'formatCells' ||
-      id === 'editPhonetic' ||
-      id === 'showPhonetic'
-    ) {
-      return 'format';
-    }
-    if (id === 'filterClear' || id === 'filterReapply' || id === 'filterByValue') {
-      return 'filter';
-    }
-    if (id === 'sortAsc' || id === 'sortDesc' || id === 'pivotSortAsc' || id === 'pivotSortDesc') {
-      return 'sort';
-    }
-    if (id === 'rowHide' || id === 'rowUnhide') return 'resizeRows';
-    if (id === 'colHide' || id === 'colUnhide') return 'resizeColumns';
-    if (id === 'rowGroup' || id === 'rowUngroup') return 'insertRows';
-    if (id === 'colGroup' || id === 'colUngroup') return 'insertColumns';
-    if (id === 'insertComment' || id === 'deleteComment') {
-      return 'comment';
-    }
-    if (id === 'insertHyperlink' || id === 'openHyperlink') return 'hyperlink';
-    if (id === 'defineName') return 'namedRange';
-    if (id === 'toggleWatch') return 'object';
-    return 'object';
-  };
-
-  const operationEffect = (id: string): OperationEffect => {
-    // Row/column structure commands operate on the worksheet axis. Feeding a
-    // full row or column range into the authorization materializer would
-    // exceed its bounded cell budget before the command's own protection and
-    // overflow checks run. Treat these as workbook-structure effects; the
-    // navigation gate above still applies to embedded bounded views.
-    const structural =
-      (id === 'insertCopiedCells' && menuKind() !== 'cell') ||
-      id === 'rowInsertAbove' ||
-      id === 'rowInsertBelow' ||
-      id === 'rowDelete' ||
-      id === 'colInsertLeft' ||
-      id === 'colInsertRight' ||
-      id === 'colDelete';
-    return structural
-      ? { kind: 'workbook' }
-      : { kind: 'range', range: { ...store.getState().selection.range } };
-  };
-
-  const intentForBuiltIn = (id: string): OperationIntent | null => {
-    const operation = operationForItem(id);
-    if (!operation) return null;
-    return {
-      operation,
-      origin: 'contextMenu',
-      commandId: id,
-      effects: [operationEffect(id)],
-    };
-  };
-
   const deniedDecision = (code: PermissionCode, reason?: string): PermissionDecision => ({
     allowed: false,
     code,
@@ -228,20 +118,14 @@ export function createContextMenuPermissions(
     if (itemId === 'copy' && interactionController?.policy?.copy === false) {
       return deniedDecision('operationDenied', 'Copy is disabled by the host policy.');
     }
-    if (navigationBounded() && navigationUnsupportedIds.has(itemId)) {
+    if (navigationBounded() && boundedViewportStructuralIds.has(itemId)) {
       return deniedDecision(
-        'unsupported',
+        'outOfBounds',
         'This structural operation is unavailable with a bounded viewport.',
       );
     }
-    if (hasExplicitPolicy() && !restrictedMenuSafeIds.has(itemId)) {
-      return deniedDecision(
-        'unsupported',
-        'This context-menu operation is unavailable in restricted mode.',
-      );
-    }
     if (hasExplicitPolicy()) return canExecuteBuiltIn(store, itemId, 'contextMenu');
-    const intent = intentForBuiltIn(itemId);
+    const intent = builtInCommandIntent(store, itemId, 'contextMenu');
     return intent ? decisionForIntent(intent) : { allowed: true };
   };
 
@@ -256,6 +140,6 @@ export function createContextMenuPermissions(
     hasExplicitPolicy,
     canPasteToRange,
     canChangeSelection,
-    navigationBlocks: (id) => navigationBounded() && navigationUnsupportedIds.has(id as ItemId),
+    navigationBlocks: (id) => navigationBounded() && boundedViewportStructuralIds.has(id as ItemId),
   };
 }

@@ -2,7 +2,7 @@ import { spreadsheetFailure } from '../api/errors.js';
 import { type Disposer, Emitter } from '../api/events.js';
 import { type Disposable, Lifecycle } from '../api/lifecycle.js';
 import { legacyInstanceOf, type SpreadsheetInstance } from '../api/spreadsheet/instance.js';
-import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
+import { canExecuteBuiltInRequest } from '../commands/built-in-command-policy.js';
 import {
   type MountToolbarOptions as LegacyToolbarOptions,
   mountToolbar as mountLegacyToolbar,
@@ -119,7 +119,7 @@ class ToolbarImpl implements Toolbar {
 
   execute(commandId: string): void {
     this.#life.assertLive();
-    if (!canExecuteBuiltIn(this.#legacy.store, commandId, 'ribbon').allowed) {
+    if (!canExecuteBuiltInRequest(this.#legacy.store, commandId, 'ribbon').allowed) {
       throw spreadsheetFailure('policy-denied', `command ${commandId} may not run`, {
         context: { command: commandId },
       });

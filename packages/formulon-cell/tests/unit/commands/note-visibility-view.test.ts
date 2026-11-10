@@ -96,8 +96,8 @@ describe('Show/Hide Note is a view operation', () => {
       'showAllNotesReview',
       'mac.review.showHideNote',
       'mac.review.showNotes',
-    ]) {
-      expect(BUILT_IN_COMMAND_OPERATION[id]).toBeUndefined();
+    ] as const) {
+      expect(BUILT_IN_COMMAND_OPERATION[id]).toBeNull();
       expect(canExecuteBuiltIn(store, id, 'ribbon').allowed).toBe(true);
     }
     mutators.setActive(store, a(0, 0));
