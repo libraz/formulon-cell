@@ -237,6 +237,7 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       };
       mac: {
         contextMenu: { pasteSpecial: string };
+        errorMenu: { divZeroHeading: string; help: string; ignore: string };
         pasteSpecial: { title?: string };
         filterPanel: {
           search: string;
@@ -266,7 +267,6 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       argHelper: { implicitIntersection: string };
       quickAnalysis: { title: string; actions: { dataBar: string } };
       errorMenu: { errorHeading: string; showInfo: string; ignore: string };
-      macErrorMenu: { divZeroHeading: string; help: string; ignore: string };
       slicer: { title: string; clear: string; close: string };
       workbookObjects: { pivotBlankItem: string; pivotFieldList: string };
       sessionCharts: { columnChart: string; elementsButton: string };
@@ -310,9 +310,9 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       quickTitle: strings.quickAnalysis.title,
       quickDataBar: strings.quickAnalysis.actions.dataBar,
       // The Mac menu words the #DIV/0! rule itself.
-      errorHeading: mac ? strings.macErrorMenu.divZeroHeading : strings.errorMenu.errorHeading,
-      errorShowInfo: mac ? strings.macErrorMenu.help : strings.errorMenu.showInfo,
-      errorIgnore: mac ? strings.macErrorMenu.ignore : strings.errorMenu.ignore,
+      errorHeading: mac ? strings.mac.errorMenu.divZeroHeading : strings.errorMenu.errorHeading,
+      errorShowInfo: mac ? strings.mac.errorMenu.help : strings.errorMenu.showInfo,
+      errorIgnore: mac ? strings.mac.errorMenu.ignore : strings.errorMenu.ignore,
       pivotFieldList: strings.workbookObjects.pivotFieldList,
       slicerTitle: strings.slicer.title,
       slicerClear: strings.slicer.clear,
