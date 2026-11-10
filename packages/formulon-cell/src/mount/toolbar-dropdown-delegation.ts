@@ -3,6 +3,7 @@
 // dispatcher; `detach` removes every one of them on toolbar dispose.
 
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import type { RibbonHooks } from '../toolbar/ribbon/apply-ribbon-command.js';
 import {
   createDynamicDropdowns,
   type DynamicDropdownsApi,
@@ -24,6 +25,8 @@ export interface DynamicDropdownDelegationDeps {
   projectFormatToolbar: () => void;
   refreshCells: () => void;
   closeBorderMenu: (restoreFocus?: boolean) => void;
+  /** Host hooks as passed to the toolbar; read at call time. */
+  getHostHooks?: () => RibbonHooks | undefined;
   /** Called after a click or Enter/Space dispatch left the menu closed. */
   onMenuClosedByCommand: () => void;
 }
@@ -40,10 +43,39 @@ export function attachDynamicDropdownDelegation(
   const { defaultsInstance, getInstance, onMenuClosedByCommand } = deps;
   const hostOverrides: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>) =
     option === true ? {} : option;
+  let coreDefaults: DynamicDropdownsCtx | null = null;
+  const getCoreDefaults = (): DynamicDropdownsCtx => {
+    coreDefaults ??= createDefaultDynamicDropdownsCtx(
+      (defaultsInstance ?? ({} as SpreadsheetInstance)) as unknown as Parameters<
+        typeof createDefaultDynamicDropdownsCtx
+      >[0],
+    );
+    return coreDefaults;
+  };
+  // The host's automation hooks take the custom-script and add-in manager items;
+  // every other action keeps the core default.
+  const hookRouting = (): Partial<DynamicDropdownsCtx> => {
+    const automation = deps.getHostHooks?.()?.automation;
+    const routed: Partial<DynamicDropdownsCtx> = {};
+    if (automation?.runScript) {
+      routed.applyScriptAction = (action) =>
+        action === 'custom'
+          ? void deps.getHostHooks?.()?.automation?.runScript?.()
+          : getCoreDefaults().applyScriptAction(action);
+    }
+    if (automation?.addInManager) {
+      routed.applyAddInAction = (action) =>
+        action === 'manage'
+          ? deps.getHostHooks?.()?.automation?.addInManager?.()
+          : getCoreDefaults().applyAddInAction(action);
+    }
+    return routed;
+  };
   const withToolbarDropdownOverrides = (
     overrides: Partial<DynamicDropdownsCtx>,
   ): Partial<DynamicDropdownsCtx> => ({
     closeBorderMenu: deps.closeBorderMenu,
+    ...hookRouting(),
     ...overrides,
   });
   const overridesOpt: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>) =

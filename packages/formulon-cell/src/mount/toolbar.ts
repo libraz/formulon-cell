@@ -623,6 +623,7 @@ export function mountToolbar(
     dropdownsDelegation = attachDynamicDropdownDelegation(opts.dynamicDropdowns, {
       defaultsInstance,
       getInstance,
+      getHostHooks: () => opts.hooks,
       focusSheet,
       projectFormatToolbar,
       refreshCells,
