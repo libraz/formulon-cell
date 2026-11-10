@@ -258,6 +258,13 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
     }
   };
 
+  // Pressing the active tab of an expanded Mac ribbon collapses it, so only other tabs are pressed.
+  const pressTab = async (tab: Locator, mode: MacRibbonDisplayMode): Promise<void> => {
+    const active = (await tab.getAttribute('aria-selected')) === 'true';
+    if (active && mode !== 'tabsOnly') return;
+    await tab.click();
+  };
+
   for (const locale of ['en', 'ja'] as const) {
     const sp = new UserJourneyPage(page);
     await sp.mount({ platform: 'mac', locale, fixture: 'empty' });
@@ -265,40 +272,6 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
     let expectedActiveTab: MacRibbonTab = tabIds[0];
 
     const shell = page.locator('.fc-tb__ribbon-shell');
-    const toggle = page.locator('[data-ribbon-toggle]');
-    const openDisplayMenu = async (expectedMode: MacRibbonDisplayMode) => {
-      await toggle.click();
-      const menu = page.locator('.fc-tb__ribbon-display-menu');
-      await expect(menu).toBeVisible();
-      const menuBounds = await menu.evaluate((element) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          left: rect.left,
-          top: rect.top,
-          right: rect.right,
-          bottom: rect.bottom,
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        };
-      });
-      expect(menuBounds.left, `${locale}/${expectedMode} menu left`).toBeGreaterThanOrEqual(-1);
-      expect(menuBounds.top, `${locale}/${expectedMode} menu top`).toBeGreaterThanOrEqual(-1);
-      expect(menuBounds.right, `${locale}/${expectedMode} menu right`).toBeLessThanOrEqual(
-        menuBounds.viewportWidth + 1,
-      );
-      expect(menuBounds.bottom, `${locale}/${expectedMode} menu bottom`).toBeLessThanOrEqual(
-        menuBounds.viewportHeight + 1,
-      );
-      await expect(menu.locator('[data-ribbon-display-option][aria-checked="true"]')).toHaveCount(
-        1,
-      );
-      await expect(menu.locator(`[data-ribbon-display-option="${expectedMode}"]`)).toHaveAttribute(
-        'aria-checked',
-        'true',
-      );
-      return menu;
-    };
-
     for (const mode of modes) {
       for (const width of widths) {
         await page.setViewportSize({ width, height: 900 });
@@ -314,17 +287,8 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
           await expect(page.locator(`[data-ribbon-panel="${expectedActiveTab}"]`)).toBeVisible();
         }
 
-        let menu = await openDisplayMenu(currentMode);
-        if (currentMode === mode) {
-          await page.keyboard.press('Escape');
-        } else {
-          await menu.locator(`[data-ribbon-display-option="${mode}"]`).click();
-        }
-        await expect(menu).toHaveCount(0);
+        await setRibbonDisplayMode(page, mode);
         await expect(shell).toHaveAttribute('data-ribbon-display-mode', mode);
-        menu = await openDisplayMenu(mode);
-        await page.keyboard.press('Escape');
-        await expect(menu).toHaveCount(0);
         await expectTabLabels();
 
         const firstTab = page.locator(`[data-ribbon-tab="${tabIds[0]}"]`);
@@ -338,7 +302,7 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
         await firstTab.scrollIntoViewIfNeeded();
         await firstTab.focus();
         await expect(firstTab).toBeFocused();
-        await firstTab.click();
+        await pressTab(firstTab, mode);
         await expect(firstTab).toBeFocused();
         await expectTabInRail(tabIds[0]);
         expectedActiveTab = tabIds[0];
@@ -359,7 +323,7 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
         await expectTabHitAtCenter(lastTabId);
         await lastTab.focus();
         await expect(lastTab).toBeFocused();
-        await lastTab.click();
+        await pressTab(lastTab, mode);
         await expect(lastTab).toBeFocused();
         await expectTabInRail(lastTabId);
         expectedActiveTab = lastTabId;
@@ -382,8 +346,8 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
   }
 }
 
-/** Display-menu placement under narrow, transformed ribbon hosts. */
-export async function runMacRibbonDisplayPlacementScenario(page: Page): Promise<void> {
+/** Display-menu placement under narrow, transformed ribbon hosts (the button exists off Mac only). */
+export async function runRibbonDisplayPlacementScenario(page: Page): Promise<void> {
   type DisplayMode = 'full' | 'singleLine' | 'tabsOnly' | 'autoHide';
   const modes: readonly DisplayMode[] = ['singleLine', 'tabsOnly', 'autoHide', 'full'];
   const hosts = [
@@ -399,7 +363,7 @@ export async function runMacRibbonDisplayPlacementScenario(page: Page): Promise<
         // layout wrapper so the transform creates a measurable fixed block.
         const ancestor = shell.closest<HTMLElement>('.fc-tb__sheet-col');
         if (!(ancestor instanceof HTMLElement)) {
-          throw new Error('Mac ribbon shell has no measurable host ancestor');
+          throw new Error('Ribbon shell has no measurable host ancestor');
         }
         // Deliberate embed stress: this is the real shell ancestor, with a
         // logical width that makes its transformed toggle land at 320/160px.
@@ -410,7 +374,7 @@ export async function runMacRibbonDisplayPlacementScenario(page: Page): Promise<
         ancestor.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
         const ancestorRect = ancestor.getBoundingClientRect();
         if (ancestorRect.width <= 0 || getComputedStyle(ancestor).display === 'contents') {
-          throw new Error('Mac ribbon stress wrapper did not produce a measurable layout box');
+          throw new Error('Ribbon stress wrapper did not produce a measurable layout box');
         }
         const toggle = shell.querySelector<HTMLElement>('[data-ribbon-toggle]');
         const toggleRect = toggle?.getBoundingClientRect();
@@ -476,7 +440,7 @@ export async function runMacRibbonDisplayPlacementScenario(page: Page): Promise<
   for (const host of hosts) {
     await page.setViewportSize({ width: host.viewportWidth, height: 900 });
     const sp = new UserJourneyPage(page);
-    await sp.mount({ platform: 'mac', locale: 'en', fixture: 'empty' });
+    await sp.mount({ platform: 'default', locale: 'en', fixture: 'empty' });
     await sp.expectNoStub();
     const configured = await configureHost(host);
     expect(configured.ancestorWidth, `${host.name} host width`).toBeCloseTo(
