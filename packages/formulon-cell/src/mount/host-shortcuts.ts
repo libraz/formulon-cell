@@ -1,4 +1,4 @@
-import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
+import { canExecuteBuiltIn, cellShiftChoices } from '../commands/built-in-command-policy.js';
 import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { executeRibbonFillAction, fillOutputRange } from '../commands/fill.js';
@@ -297,14 +297,17 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       !e.shiftKey && (e.key === '-' || e.code === 'Minus' || e.code === 'NumpadSubtract');
     if (insertCellsShortcut || deleteCellsShortcut) {
       e.preventDefault();
-      if (restricted) return;
       const kind = insertCellsShortcut ? 'insert' : 'delete';
+      // Decided as Insert (Delete) Cells: whole rows or columns act at once by their option; any
+      // other selection opens the dialog while one of its choices is allowed.
+      const commandId = kind === 'insert' ? 'insertCells' : 'deleteCells';
+      if (!canExecuteBuiltIn(input.store, commandId, 'keyboard').allowed) return;
       const cellShiftEntry = () =>
         ({
           store: input.store,
           history: input.history,
           origin: 'keyboard',
-          commandId: kind === 'insert' ? 'insertCells' : 'deleteCells',
+          commandId,
         }) as const;
       const state = input.store.getState();
       const selected = state.selection.range;
@@ -356,6 +359,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         host: input.host,
         strings: input.strings(),
         kind,
+        allowed: cellShiftChoices(input.store, kind, 'keyboard'),
         onSubmit: (choice) => {
           const range = input.store.getState().selection.range;
           const target = { ...cellShiftEntry(), wb: currentWb };

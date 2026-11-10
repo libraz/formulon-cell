@@ -185,10 +185,10 @@ export const handleAutoSumAction = (
   return handleAutoSum(instance, action);
 };
 
-/** The Home Insert (Delete) split button, the entry point its menu items run as. */
+/** A Home Insert (Delete) menu item, run as its own command. */
 const homeCellsContext = (
   instance: SpreadsheetInstance,
-  commandId: 'insertRows' | 'deleteRows',
+  commandId: string,
 ): RowColActionContext => ({
   store: instance.store,
   workbook: instance.workbook,
@@ -203,13 +203,12 @@ export const handleInsertCellsAction = (
 ): void => {
   if (!instance) return;
   const r = instance.store.getState().selection.range;
-  const ctx = homeCellsContext(instance, 'insertRows');
   if (action === 'rows') {
-    insertRowsAction(ctx, r.r0, r.r1 - r.r0 + 1);
+    insertRowsAction(homeCellsContext(instance, 'rowInsertAbove'), r.r0, r.r1 - r.r0 + 1);
     return;
   }
   if (action === 'cols') {
-    insertColumnsAction(ctx, r.c0, r.c1 - r.c0 + 1);
+    insertColumnsAction(homeCellsContext(instance, 'colInsertLeft'), r.c0, r.c1 - r.c0 + 1);
     return;
   }
   if (action === 'sheet') {
@@ -217,7 +216,11 @@ export const handleInsertCellsAction = (
     if (added >= 0) mutators.setSheetIndex(instance.store, added);
     return;
   }
-  insertCellsAction(ctx, r, action === 'shiftDown' ? 'down' : 'right');
+  insertCellsAction(
+    homeCellsContext(instance, 'insertCells'),
+    r,
+    action === 'shiftDown' ? 'down' : 'right',
+  );
 };
 
 export const handleDeleteCellsAction = (
@@ -226,13 +229,12 @@ export const handleDeleteCellsAction = (
 ): void => {
   if (!instance) return;
   const r = instance.store.getState().selection.range;
-  const ctx = homeCellsContext(instance, 'deleteRows');
   if (action === 'rows') {
-    deleteRowsAction(ctx, r.r0, r.r1 - r.r0 + 1);
+    deleteRowsAction(homeCellsContext(instance, 'rowDelete'), r.r0, r.r1 - r.r0 + 1);
     return;
   }
   if (action === 'cols') {
-    deleteColumnsAction(ctx, r.c0, r.c1 - r.c0 + 1);
+    deleteColumnsAction(homeCellsContext(instance, 'colDelete'), r.c0, r.c1 - r.c0 + 1);
     return;
   }
   if (action === 'sheet') {
@@ -244,5 +246,9 @@ export const handleDeleteCellsAction = (
     });
     return;
   }
-  deleteCellsAction(ctx, r, action === 'shiftUp' ? 'up' : 'left');
+  deleteCellsAction(
+    homeCellsContext(instance, 'deleteCells'),
+    r,
+    action === 'shiftUp' ? 'up' : 'left',
+  );
 };

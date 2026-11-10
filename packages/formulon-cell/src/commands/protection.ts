@@ -184,6 +184,15 @@ const ROW_COLUMN_OPTION: Partial<Record<InteractionOperation, keyof SheetProtect
   resizeColumns: 'formatColumns',
 };
 
+/** Whether a row (column) insert or delete over `range` moves only part of its rows (columns):
+ *  a cell shift, or a table's own rows or columns. A protected sheet refuses those whatever its
+ *  options; whole rows and columns are left to their options. */
+export const isPartialShift = (operation: InteractionOperation, range: Range): boolean =>
+  ((operation === 'insertRows' || operation === 'deleteRows') &&
+    (range.c0 !== 0 || range.c1 !== MAX_COL)) ||
+  ((operation === 'insertColumns' || operation === 'deleteColumns') &&
+    (range.r0 !== 0 || range.r1 !== MAX_ROW));
+
 /** The Protect Sheet option of a row or column `operation`, if it is one. */
 export const rowColumnOption = (
   operation: InteractionOperation,
@@ -996,9 +1005,8 @@ export function isCellFormattable(state: State, addr: Addr): boolean {
   return sheetPermits(state, addr.sheet, 'formatCells') || isCellWritable(state, addr);
 }
 
-/** Whether every cell of rows (or columns) `start..start+count-1` is unlocked:
- *  Excel deletes rows or columns on a protected sheet only then. A band too
- *  large to inspect cell by cell counts as locked. */
+/** Whether every cell of rows (or columns) `start..start+count-1` is unlocked. A band too large to
+ *  inspect cell by cell counts as locked. */
 export function isBandUnlocked(
   state: State,
   sheet: number,

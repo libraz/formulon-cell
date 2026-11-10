@@ -18,10 +18,9 @@ import { clearSessionChartsInRange, createSessionChart } from './session-chart.j
 import {
   recordConditionalRulesChange,
   recordFormatChange,
-  recordSparklineChange,
   recordTablesChange,
 } from './slice-history.js';
-import { setSparklinesAction } from './sparkline.js';
+import { clearSparklinesAction, setSparklinesAction } from './sparkline.js';
 import { tableWrite } from './table-actions.js';
 
 /**
@@ -558,9 +557,10 @@ function clearAnalysisFormatting(input: QuickAnalysisExecuteInput): QuickAnalysi
       recordConditionalRulesChange(history, store, () => {
         mutators.clearConditionalRulesInRange(store, range);
       });
-      recordSparklineChange(history, store, () => {
-        mutators.clearSparklinesInRange(store, range);
-      });
+      clearSparklinesAction(
+        { store, history, origin: 'editor', commandId: 'sparklineClear' },
+        range,
+      );
       clearSessionChartsInRange(store, range, history, input.wb, {
         origin: 'editor',
         commandId: 'chartDelete',

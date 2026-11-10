@@ -89,7 +89,23 @@ describe('protect-sheet options as Excel measures them', () => {
     });
   });
 
-  it('deletes rows with deleteRows only when every cell in them is unlocked', async () => {
+  it('deletes rows with deleteRows whatever the lock of their cells on the Mac desktop', async () => {
+    const { deleteRows } = await import('../../../src/commands/structure.js');
+    const { registerChromePlatform } = await import('../../../src/commands/chrome-platform.js');
+    const locked = await setup({ deleteRows: true });
+    registerChromePlatform(locked.store, () => true);
+    expect(deleteRows(locked.store, locked.wb, null, 4)).toBe(true);
+    const unlocked = await setup({ deleteRows: true });
+    registerChromePlatform(unlocked.store, () => true);
+    setCellLocked(unlocked.store, { sheet: 0, r0: 4, c0: 0, r1: 4, c1: 16383 }, false);
+    expect(deleteRows(unlocked.store, unlocked.wb, null, 4)).toBe(true);
+    const none = await setup();
+    registerChromePlatform(none.store, () => true);
+    setCellLocked(none.store, { sheet: 0, r0: 4, c0: 0, r1: 4, c1: 16383 }, false);
+    expect(deleteRows(none.store, none.wb, null, 4)).toBe(false);
+  });
+
+  it('deletes rows with deleteRows on Windows only when every cell in them is unlocked', async () => {
     const { deleteRows } = await import('../../../src/commands/structure.js');
     const locked = await setup({ deleteRows: true });
     expect(deleteRows(locked.store, locked.wb, null, 4)).toBe(false);

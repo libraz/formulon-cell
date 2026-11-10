@@ -24,6 +24,8 @@ export interface CellShiftDialogDeps {
   host: HTMLElement;
   strings: Strings;
   kind: 'insert' | 'delete';
+  /** The choices that may run; the others are disabled. Omitted, every choice is offered. */
+  allowed?: { readonly shift: boolean; readonly rows: boolean; readonly cols: boolean };
   onSubmit(choice: CellShiftChoice): void;
 }
 
@@ -42,6 +44,11 @@ const CHOICES: readonly CellShiftChoice[] = ['right', 'down', 'left', 'up', 'row
  *  shift directions, then Entire row and Entire column. */
 export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
   const { host, strings, kind } = deps;
+  const allowed = deps.allowed ?? { shift: true, rows: true, cols: true };
+  const permitted = (choice: CellShiftChoice): boolean =>
+    choice === 'rows' ? allowed.rows : choice === 'cols' ? allowed.cols : allowed.shift;
+  // With no choice it may run, it does not open.
+  if (!allowed.shift && !allowed.rows && !allowed.cols) return;
   const t = strings.cellShiftDialog;
   const ownerDocument = host.ownerDocument;
   dialogs.get(host)?.close();
@@ -87,9 +94,17 @@ export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
   // The vertical shift is the default, except that Mac's Delete dialog opens
   // on the left shift.
   const mac = isMacHost(host);
-  const defaultChoice = (kind === 'delete' && mac ? shifts[0] : shifts[1])?.[0];
-  for (const [value, label] of options)
-    choices.appendChild(radio(ownerDocument, name, value, label, value === defaultChoice));
+  const preferred = (kind === 'delete' && mac ? shifts[0] : shifts[1])?.[0];
+  const defaultChoice =
+    preferred && permitted(preferred)
+      ? preferred
+      : options.map(([value]) => value).find((value) => permitted(value));
+  for (const [value, label] of options) {
+    const row = radio(ownerDocument, name, value, label, value === defaultChoice);
+    const input = row.querySelector('input');
+    if (input && !permitted(value)) input.disabled = true;
+    choices.appendChild(row);
+  }
 
   const footer = ownerDocument.createElement('div');
   footer.className = 'fc-cellshift__footer';

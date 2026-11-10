@@ -136,6 +136,16 @@ export function clearSparklinesInRange(
   range: Range,
   history: History | null = null,
 ): number {
+  return clearSparklinesAction(
+    { store, history, origin: 'instanceApi', commandId: 'sparklineClear' },
+    range,
+  );
+}
+
+/** Clear the sparklines in `range` from the entry point `ctx` names, as one authorized object
+ *  step; a locked host cell keeps its sparkline. Returns how many were cleared. */
+export function clearSparklinesAction(ctx: ObjectActionContext, range: Range): number {
+  const { store, history } = ctx;
   const state = store.getState();
   const targets = listSparklines(state)
     .filter(({ addr }) => rangeContainsAddr(range, addr))
@@ -147,7 +157,6 @@ export function clearSparklinesInRange(
     return false;
   });
   if (writable.length === 0) return 0;
-  const ctx = { store, history, origin: 'instanceApi', commandId: 'sparklineClear' } as const;
   const cleared = sparklineWrite(ctx, writable, false, () => {
     recordSparklineChange(history, store, () => {
       for (const addr of writable) mutators.clearSparkline(store, addr);

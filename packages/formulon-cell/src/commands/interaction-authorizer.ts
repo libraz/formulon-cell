@@ -27,6 +27,7 @@ import {
 } from './interaction-policy.js';
 import {
   isCellWritable,
+  isPartialShift,
   isSheetProtected,
   protectedSheetPermissions,
   refusedOnProtectedSheet,
@@ -449,8 +450,8 @@ export class InteractionAuthorizer {
   }
 
   /** Protection's decision before any effect is read: workbook-structure protection governs the
-   *  sheet operations, a protected sheet refuses some commands whatever its options, and a table
-   *  change there is decided by its command alone. */
+   *  sheet operations, a protected sheet refuses some commands and every cell shift whatever its
+   *  options, and a table change there is decided by its command alone. */
   private structureDecision(intent: OperationIntent): PermissionDecision {
     const state = this.store.getState();
     if (!workbookStructurePermits(state, intent.operation))
@@ -459,6 +460,14 @@ export class InteractionAuthorizer {
       if (
         refusedOnProtectedSheet(state, sheet, intent.commandId) ||
         (intent.operation === 'table' && !tableChangePermitted(state, sheet, intent.commandId))
+      )
+        return { allowed: false, code: 'protected', reason: 'sheet is protected' };
+    }
+    for (const effect of intent.effects) {
+      if (
+        effect.kind === 'range' &&
+        isPartialShift(intent.operation, effect.range) &&
+        isSheetProtected(state, effect.range.sheet)
       )
         return { allowed: false, code: 'protected', reason: 'sheet is protected' };
     }

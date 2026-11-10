@@ -130,7 +130,9 @@ export function createContextMenuPermissions(
     }
     const protection = builtInProtectionDecision(store, itemId);
     if (!protection.allowed) return protection;
-    if (hasExplicitPolicy()) return canExecuteBuiltIn(store, itemId, 'contextMenu');
+    // Insert… / Delete… open a dialog, available while one of its choices is.
+    if (hasExplicitPolicy() || itemId === 'insertCells' || itemId === 'deleteCells')
+      return canExecuteBuiltIn(store, itemId, 'contextMenu');
     const intent = builtInCommandIntent(store, itemId, 'contextMenu');
     return intent ? decisionForIntent(intent) : { allowed: true };
   };

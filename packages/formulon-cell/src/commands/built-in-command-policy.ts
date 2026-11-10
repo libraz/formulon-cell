@@ -1,6 +1,8 @@
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { Range } from '../engine/types.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { type BuiltInCommandId, isBuiltInCommandId } from './built-in-command-ids.js';
 import { getRecentFunctions } from './function-history.js';
@@ -15,6 +17,7 @@ import type {
 } from './interaction-policy.js';
 import { outlineDetailAxis } from './outline.js';
 import {
+  isPartialShift,
   refusedOnProtectedSheet,
   rowColumnOption,
   sheetPermits,
@@ -608,6 +611,12 @@ const builtInOperation = (
   store: SpreadsheetStore,
   id: BuiltInCommandId,
 ): InteractionOperation | null => {
+  // Insert / Delete Cells over whole columns inserts or deletes the columns.
+  if (id === 'insertCells' || id === 'deleteCells') {
+    const columns = isWholeColumnRange(normalized(store.getState().selection.range));
+    if (id === 'insertCells') return columns ? 'insertColumns' : 'insertRows';
+    return columns ? 'deleteColumns' : 'deleteRows';
+  }
   if (!OUTLINE_DETAIL_COMMANDS.has(id)) return BUILT_IN_COMMAND_OPERATION[id];
   const { selection } = store.getState();
   return outlineDetailAxis(store, selection.range) === 'col' ? 'resizeColumns' : 'resizeRows';
@@ -658,12 +667,45 @@ const activeReportRange = (store: SpreadsheetStore): Range | null => {
 
 const FUNCTION_COMMAND_PREFIX = 'mac.function.';
 
-const shiftedBand = (operation: InteractionOperation, selection: Range): Range | null => {
-  if (operation === 'insertRows' || operation === 'deleteRows')
-    return rowShiftBand(selection.sheet, Math.min(selection.r0, selection.r1));
-  if (operation === 'insertColumns' || operation === 'deleteColumns')
-    return columnShiftBand(selection.sheet, Math.min(selection.c0, selection.c1));
-  return null;
+/** Commands that shift cells rather than whole rows or columns: Insert / Delete Cells over a
+ *  selection that is not whole rows or columns, and a table's own rows and columns. */
+const CELL_SHIFT_COMMANDS: ReadonlySet<string> = new Set([
+  'insertCells',
+  'deleteCells',
+  'insertTableRows',
+  'insertTableColumns',
+]);
+
+/** Insert / Delete Cells: over part of the rows they open a dialog of a shift, Entire row and
+ *  Entire column. */
+const CELL_SHIFT_DIALOG_COMMANDS: ReadonlySet<string> = new Set(['insertCells', 'deleteCells']);
+
+const normalized = (range: Range): Range => ({
+  sheet: range.sheet,
+  r0: Math.min(range.r0, range.r1),
+  c0: Math.min(range.c0, range.c1),
+  r1: Math.max(range.r0, range.r1),
+  c1: Math.max(range.c0, range.c1),
+});
+
+/** The band an insert or delete of `id` moves: whole rows (columns) from the selection to the sheet
+ *  end, or for a cell shift only the selection's columns (rows). */
+const shiftedBand = (
+  id: string,
+  operation: InteractionOperation,
+  selection: Range,
+): Range | null => {
+  const s = normalized(selection);
+  const rows = operation === 'insertRows' || operation === 'deleteRows';
+  const columns = operation === 'insertColumns' || operation === 'deleteColumns';
+  if (!rows && !columns) return null;
+  const whole = isWholeRowRange(s) || isWholeColumnRange(s);
+  if (CELL_SHIFT_COMMANDS.has(id) && !(whole && !id.startsWith('insertTable'))) {
+    return rows
+      ? { sheet: s.sheet, r0: s.r0, c0: s.c0, r1: MAX_ROW, c1: s.c1 }
+      : { sheet: s.sheet, r0: s.r0, c0: s.c0, r1: s.r1, c1: MAX_COL };
+  }
+  return rows ? rowShiftBand(s.sheet, s.r0) : columnShiftBand(s.sheet, s.c0);
 };
 
 const isBuiltInCommandRequest = (id: string): id is BuiltInCommandRequest =>
@@ -700,7 +742,7 @@ export const builtInCommandIntent = (
   const workbookTheme = /^mac\.page\.(theme|color|font)\.(office|gray)$/.test(id);
   const state = store.getState();
   const selection = state.selection.range;
-  const band = shiftedBand(operation, selection);
+  const band = shiftedBand(id, operation, selection);
   const report =
     operation === 'pivot'
       ? activeReportRange(store)
@@ -747,9 +789,22 @@ export const builtInProtectionDecision = (
   const operation = builtInOperation(store, id);
   if (operation !== null && !workbookStructurePermits(state, operation))
     return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
-  const option = operation
-    ? (unlockedCellsOption(operation) ?? rowColumnOption(operation))
-    : undefined;
+  // A cell shift is refused on a protected sheet whatever its options; Insert / Delete Cells over
+  // part of the rows is its dialog, available while Entire row or Entire column is.
+  const shift =
+    operation && CELL_SHIFT_COMMANDS.has(id) && !sheetPermits(state, sheet)
+      ? shiftedBand(id, operation, state.selection.range)
+      : null;
+  const partial = shift !== null && operation !== null && isPartialShift(operation, shift);
+  const dialog = partial && CELL_SHIFT_DIALOG_COMMANDS.has(id);
+  const dialogRefused =
+    dialog &&
+    !sheetPermits(state, sheet, id === 'insertCells' ? 'insertRows' : 'deleteRows') &&
+    !sheetPermits(state, sheet, id === 'insertCells' ? 'insertColumns' : 'deleteColumns');
+  const option =
+    operation && !dialog
+      ? (unlockedCellsOption(operation) ?? rowColumnOption(operation))
+      : undefined;
   // Turning AutoFilter on or off is refused on a protected sheet; using a filter needs Use AutoFilter.
   const filterRefused =
     operation === 'filter' &&
@@ -761,6 +816,7 @@ export const builtInProtectionDecision = (
     (operation === 'pivot' && !sheetPermits(state, sheet, 'pivotTables')) ||
     (operation === 'object' && !sheetPermits(state, sheet, 'objects')) ||
     (operation === 'table' && !tableChangePermitted(state, sheet, id)) ||
+    (dialog ? dialogRefused : partial) ||
     (option !== undefined && !sheetPermits(state, sheet, option));
   return refused
     ? { allowed: false, code: 'protected', reason: 'sheet is protected' }
@@ -782,6 +838,12 @@ const decideBuiltIn = (
     return { allowed: false, code: 'invalid', reason: 'selection overlaps a table' };
   const controller = interactionControllerFor(store);
   if (!controller?.restricted) return { allowed: true };
+  if (CELL_SHIFT_DIALOG_COMMANDS.has(id) && !wholeLineSelection(store)) {
+    const choices = cellShiftChoices(store, id === 'insertCells' ? 'insert' : 'delete', origin);
+    return choices.shift || choices.rows || choices.cols
+      ? { allowed: true }
+      : { allowed: false, code: 'operationDenied', reason: 'no choice of the dialog is allowed' };
+  }
   // Ids arrive from DOM datasets and public command APIs; validate at the boundary.
   if (!isBuiltInCommandRequest(id)) return invalidCommand(id);
   if (id === 'copy') return controller.canCopy();
@@ -815,4 +877,39 @@ export function canExecuteBuiltInRequest(
   origin: InteractionOrigin,
 ): PermissionDecision {
   return decideBuiltIn(store, id, origin);
+}
+
+const wholeLineSelection = (store: SpreadsheetStore): boolean => {
+  const s = normalized(store.getState().selection.range);
+  return isWholeRowRange(s) || isWholeColumnRange(s);
+};
+
+/** Which choices of the Insert (Delete) Cells dialog may run from `origin`: the shift of the
+ *  selection's cells (refused on a protected sheet), Entire row and Entire column (by their
+ *  options). The dialog opens only when one of them is allowed. */
+export function cellShiftChoices(
+  store: SpreadsheetStore,
+  kind: 'insert' | 'delete',
+  origin: InteractionOrigin,
+): { shift: boolean; rows: boolean; cols: boolean } {
+  const state = store.getState();
+  const selection = normalized(state.selection.range);
+  const operation = kind === 'insert' ? 'insertRows' : 'deleteRows';
+  const band = shiftedBand(kind === 'insert' ? 'insertCells' : 'deleteCells', operation, selection);
+  const controller = interactionControllerFor(store);
+  const shift =
+    sheetPermits(state, selection.sheet) &&
+    (!controller?.restricted ||
+      (band !== null &&
+        controller.canExecute({
+          operation,
+          origin,
+          commandId: kind === 'insert' ? 'insertCells' : 'deleteCells',
+          effects: [{ kind: 'range', range: band }],
+        }).allowed));
+  return {
+    shift,
+    rows: decideBuiltIn(store, kind === 'insert' ? 'rowInsertAbove' : 'rowDelete', origin).allowed,
+    cols: decideBuiltIn(store, kind === 'insert' ? 'colInsertLeft' : 'colDelete', origin).allowed,
+  };
 }

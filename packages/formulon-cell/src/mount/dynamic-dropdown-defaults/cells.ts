@@ -1,4 +1,8 @@
-import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import {
+  canExecuteBuiltIn,
+  canExecuteBuiltInRequest,
+  cellShiftChoices,
+} from '../../commands/built-in-command-policy.js';
 import { insertCopiedBand } from '../../commands/clipboard/insert-copied-cells.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { addrKey } from '../../engine/address.js';
@@ -24,19 +28,51 @@ import { hasActiveCopy, normalizedSelectionRange } from './selection.js';
 
 const noop = (): void => undefined;
 
-/** The Home Insert (Delete) split button's cell shift, run as that button. */
+/** The Home Insert (Delete) > Cells dialog's choice, run as Insert (Delete) Cells. */
 const cellShiftTarget = (instance: SpreadsheetInstance, kind: 'insert' | 'delete') =>
   ({
     store: instance.store,
     wb: instance.workbook,
     history: instance.history,
     origin: 'ribbon',
-    commandId: kind === 'insert' ? 'insertRows' : 'deleteRows',
+    commandId: kind === 'insert' ? 'insertCells' : 'deleteCells',
   }) as const;
+
+/** The command each Home Insert (Delete) menu item runs as, which also decides whether it is
+ *  available. */
+const CELL_INSERT_COMMANDS: Readonly<Record<string, string>> = {
+  cells: 'insertCells',
+  'shift-down': 'insertCells',
+  'shift-right': 'insertCells',
+  rows: 'rowInsertAbove',
+  cols: 'colInsertLeft',
+  sheet: 'insertSheet',
+};
+const CELL_DELETE_COMMANDS: Readonly<Record<string, string>> = {
+  cells: 'deleteCells',
+  'shift-up': 'deleteCells',
+  'shift-left': 'deleteCells',
+  rows: 'rowDelete',
+  row: 'rowDelete',
+  cols: 'colDelete',
+  col: 'colDelete',
+  sheet: 'deleteSheet',
+};
+
+/** Whether the Home menu item `action` may run; a refused Cells item opens no dialog. */
+const cellMenuAllowed = (
+  instance: SpreadsheetInstance,
+  commands: Readonly<Record<string, string>>,
+  action: string,
+): boolean => {
+  const id = commands[action];
+  return id === undefined || canExecuteBuiltInRequest(instance.store, id, 'ribbon').allowed;
+};
 
 const buildCellInsertAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellInsertAction'] =>
   (action) => {
+    if (!cellMenuAllowed(instance, CELL_INSERT_COMMANDS, action)) return;
     if (action === 'cells') {
       const range = normalizedSelectionRange(instance);
       if (hasActiveCopy(instance)) {
@@ -77,6 +113,7 @@ const buildCellInsertAction =
         host: instance.host,
         strings: instance.i18n.strings,
         kind: 'insert',
+        allowed: cellShiftChoices(instance.store, 'insert', 'ribbon'),
         onSubmit: (choice) => {
           if (!runCellShiftChoice(cellShiftTarget(instance, 'insert'), 'insert', range, choice))
             return;
@@ -116,6 +153,7 @@ const buildCellDeleteAction =
       reportSheetGuard(instance, instance.i18n.strings.ribbonMenu.sheetDeleteRequiresAnotherSheet);
       return;
     }
+    if (!cellMenuAllowed(instance, CELL_DELETE_COMMANDS, action)) return;
     if (action === 'cells') {
       const range = normalizedSelectionRange(instance);
       if (isWholeRowRange(range) || isWholeColumnRange(range)) {
@@ -131,6 +169,7 @@ const buildCellDeleteAction =
         host: instance.host,
         strings: instance.i18n.strings,
         kind: 'delete',
+        allowed: cellShiftChoices(instance.store, 'delete', 'ribbon'),
         onSubmit: (choice) => {
           if (!runCellShiftChoice(cellShiftTarget(instance, 'delete'), 'delete', range, choice))
             return;
@@ -335,8 +374,13 @@ const updateCellInsertMenu =
       ? strings.workbookStructureProtectedBlocked
       : strings.sheetActionUnavailable;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-insert]')) {
-      const disabled = button.dataset.cellInsert === 'sheet' && sheetDenied;
-      setMenuControlDisabled(button, disabled, disabledReason);
+      const action = button.dataset.cellInsert ?? '';
+      if (action === 'sheet') {
+        setMenuControlDisabled(button, sheetDenied, disabledReason);
+        continue;
+      }
+      const allowed = cellMenuAllowed(instance, CELL_INSERT_COMMANDS, action);
+      setMenuControlDisabled(button, !allowed, strings.sheetActionUnavailable);
     }
   };
 
@@ -358,8 +402,13 @@ const updateCellDeleteMenu =
         } else if (!canRemoveSheet) disabledReason = strings.sheetMutationUnavailable;
       }
       const lastSheet = instance.workbook.sheetCount <= 1 && !isMacInstance(instance);
-      const disabled =
-        button.dataset.cellDelete === 'sheet' && (sheetDenied || lastSheet || !canRemoveSheet);
+      const action = button.dataset.cellDelete ?? '';
+      if (action !== 'sheet') {
+        const allowed = cellMenuAllowed(instance, CELL_DELETE_COMMANDS, action);
+        setMenuControlDisabled(button, !allowed, strings.sheetActionUnavailable);
+        continue;
+      }
+      const disabled = sheetDenied || lastSheet || !canRemoveSheet;
       setMenuControlDisabled(button, disabled, disabledReason);
     }
   };

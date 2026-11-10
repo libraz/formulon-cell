@@ -1,3 +1,4 @@
+import { cellShiftChoices } from '../commands/built-in-command-policy.js';
 import type { History } from '../commands/history.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import {
@@ -57,6 +58,7 @@ export function runContextMenuStructureItem(
         host,
         strings: ctx.strings(),
         kind: 'insert',
+        allowed: cellShiftChoices(store, 'insert', 'contextMenu'),
         onSubmit: (choice) => {
           if (runCellShiftChoice(shift, 'insert', state.selection.range, choice)) ctx.afterCommit();
         },
@@ -74,6 +76,7 @@ export function runContextMenuStructureItem(
         host,
         strings: ctx.strings(),
         kind: 'delete',
+        allowed: cellShiftChoices(store, 'delete', 'contextMenu'),
         onSubmit: (choice) => {
           if (runCellShiftChoice(shift, 'delete', state.selection.range, choice)) ctx.afterCommit();
         },

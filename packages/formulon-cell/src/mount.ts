@@ -1,5 +1,6 @@
 import type { SheetPrintDocument } from './api/spreadsheet/types.js';
 import { CellRegistry } from './cells.js';
+import { registerChromePlatform } from './commands/chrome-platform.js';
 import { History } from './commands/history.js';
 import {
   InteractionController,
@@ -32,6 +33,7 @@ import { hydrateViewStateFromEngine } from './engine/view-state-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
 import { resolveSpreadsheetUiOptions } from './extensions/index.js';
+import { isMacHost } from './extensions/ui-options.js';
 import { FormulaRegistry } from './formula.js';
 import { createI18nController } from './i18n/controller.js';
 import { dictionaryLocaleFor, type Strings } from './i18n/strings.js';
@@ -375,6 +377,7 @@ export const Spreadsheet = {
       hydrateActiveSheetFromEngine(wb, store);
     }
     const unregisterSheetActivation = registerSheetActivationHydrator(store, hydrateActiveSheet);
+    const unregisterChromePlatform = registerChromePlatform(store, () => isMacHost(host));
 
     const cellRegistry = new CellRegistry();
     const renderer = new GridRenderer({
@@ -1235,6 +1238,7 @@ export const Spreadsheet = {
         cleanup(formulaBar.discardFx);
         cleanup(unregisterCommands);
         cleanup(unregisterSheetActivation);
+        cleanup(unregisterChromePlatform);
         cleanup(unregisterRangeUnlockUi);
         cleanup(() => commands.dispose());
         cleanup(() => navigation.dispose());

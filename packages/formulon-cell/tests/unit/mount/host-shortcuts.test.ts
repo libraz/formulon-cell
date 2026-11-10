@@ -596,4 +596,33 @@ describe('mount/host-shortcuts', () => {
     // No exception thrown; no other side effects.
     expect(s.recalc).not.toHaveBeenCalled();
   });
+  it('Ctrl+Plus on a protected sheet: whole rows by Insert rows, a cell by the dialog choices', async () => {
+    const s = await makeRealSetup();
+    const workbook = s.wb;
+    workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 10);
+    mutators.replaceCells(s.store, workbook.cells(0));
+    const plus = () => s.handler(key({ key: '+', code: 'Equal', ctrlKey: true, shiftKey: true }));
+    const choices = () =>
+      [...document.querySelectorAll<HTMLInputElement>('.fc-cellshift input[type="radio"]')]
+        .filter((input) => !input.disabled)
+        .map((input) => input.value);
+
+    // No option: a cell opens nothing.
+    setProtectedSheet(s.store, 0, true);
+    mutators.setRange(s.store, { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 });
+    plus();
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+
+    // Insert rows: the dialog offers Entire row alone.
+    setProtectedSheet(s.store, 0, true, { permissions: { insertRows: true } });
+    plus();
+    expect(choices()).toEqual(['rows']);
+    disposeCellShiftDialog(s.host);
+    expect(workbook.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 10 });
+
+    mutators.setRange(s.store, { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 16_383 });
+    plus();
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    expect(workbook.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'number', value: 10 });
+  });
 });

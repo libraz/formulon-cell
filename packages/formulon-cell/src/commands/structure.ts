@@ -73,6 +73,7 @@ import {
   shiftRangeAxis,
   shiftRangeValidations,
 } from './axis-shift.js';
+import { isMacChrome } from './chrome-platform.js';
 import { alertDataTableEdit, axisEditSplitsDataTable } from './data-table-guard.js';
 import { recordFilterChange } from './filter.js';
 import { filterVisibleRowRuns } from './filter-visible.js';
@@ -1178,14 +1179,15 @@ function editAxis(
   if (blockedByProtection(store, sheet, `${kind}${axis === 'row' ? 'Rows' : 'Cols'}`, permission)) {
     return false;
   }
-  // A protected sheet deletes only rows (columns) that hold no locked cell.
+  // Windows rule: a protected sheet deletes only rows (columns) holding no locked cell; the Mac
+  // desktop deletes them by the option alone.
   if (
     kind === 'delete' &&
+    !isMacChrome(store) &&
     !sheetPermits(store.getState(), sheet) &&
     !isBandUnlocked(store.getState(), sheet, axis, edit.at, edit.count)
-  ) {
+  )
     return false;
-  }
   if (kind === 'insert' && insertionWouldOverflow(store, wb, sheet, axis, split, n)) return false;
   if (axisEditSplitsDataTable(wb, sheet, axis, kind, edit.at, edit.count)) {
     alertDataTableEdit(wb);
