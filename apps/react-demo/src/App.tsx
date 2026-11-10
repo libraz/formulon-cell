@@ -2,15 +2,19 @@ import {
   type CellChangeEvent,
   type FeatureFlags,
   type FeatureId,
+  type HostProviders,
+  type LegacySpreadsheetInstance,
   type parseScriptCommand,
   type ScriptCommand,
-  type LegacySpreadsheetInstance as SpreadsheetInstance,
+  type SpreadsheetInstance,
   type ThemeName,
-  type ToolbarInstance,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
-import { type RibbonTab, Spreadsheet, SpreadsheetToolbar } from '@libraz/formulon-cell-react';
+import type { RibbonHooks, RibbonTab, Toolbar } from '@libraz/formulon-cell/toolbar';
+import { Spreadsheet, SpreadsheetToolbar } from '@libraz/formulon-cell-react';
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { legacyInstanceOf } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
+import { workbookOf } from '../../../packages/formulon-cell/src/api/workbook.js';
 import {
   buildDemoCommands,
   buildDemoReviewDialog,
@@ -26,6 +30,7 @@ import {
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
   type DemoBackstageAction,
+  type DemoF6Toolbar,
   type DemoLocale,
   type DemoPlatform,
   type DemoReviewDialogState,
@@ -58,6 +63,40 @@ import { DemoTitleBar } from './DemoTitleBar.js';
 
 const UI = createDemoStrings('React');
 
+/** The ribbon as F6 navigation reads it: the wrapper element around it and its tab focus. */
+const f6ToolbarOf = (toolbar: Toolbar | null, host: HTMLElement | null): DemoF6Toolbar | null =>
+  host ? { host, focusActiveTab: () => toolbar?.focusActiveTab() ?? false } : null;
+
+/** Shows `handle` in `live`. Settles on the instance's `workbook` event for it, or rejects with the
+ *  swap's synchronous refusal or its `error` event. */
+const swapWorkbook = (live: SpreadsheetInstance, handle: WorkbookHandle): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    const facade = workbookOf(handle);
+    if (live.workbook === facade) {
+      resolve();
+      return;
+    }
+    const offs: (() => void)[] = [];
+    const settle = (done: () => void): void => {
+      for (const off of offs.splice(0)) off();
+      done();
+    };
+    offs.push(
+      live.on('workbook', (event) => {
+        if (event.workbook === facade) settle(resolve);
+      }),
+      // `workbook` is the source the instance reports a refused workbook swap under.
+      live.on('error', (event) => {
+        if (event.source === 'workbook') settle(() => reject(event.error));
+      }),
+    );
+    try {
+      live.update({ workbook: facade });
+    } catch (error) {
+      settle(() => reject(error));
+    }
+  });
+
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
   const [locale, setLocale] = useState<DemoLocale>(() => resolveInitialLocale());
@@ -83,7 +122,8 @@ export const App = (): ReactElement => {
   const [bookName, setBookName] = useState('Book1');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const quickAccessRef = useRef<HTMLDivElement | null>(null);
-  const toolbarRef = useRef<ToolbarInstance | null>(null);
+  const ribbonHostRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef = useRef<Toolbar | null>(null);
   const workbookOwnerRef = useRef<WorkbookHandle | null>(null);
   const instanceRef = useRef<SpreadsheetInstance | null>(null);
   const aliveRef = useRef(true);
@@ -98,6 +138,29 @@ export const App = (): ReactElement => {
   const commandText = useMemo(() => demoCommandText(locale), [locale]);
   const closeReviewDialog = useCallback(() => setReviewDialog(null), []);
   const closeScriptDialog = useCallback(() => setScriptOpen(false), []);
+  // The demo-shared helpers and the E2E hook still drive the mount behind the public instance.
+  const legacy = useMemo<LegacySpreadsheetInstance | null>(
+    () => (instance ? legacyInstanceOf(instance) : null),
+    [instance],
+  );
+  // The demo keeps owning the engine handle; the facade leaves its disposal to the demo.
+  const workbookFacade = useMemo(() => (workbook ? workbookOf(workbook) : null), [workbook]);
+  const host = useMemo<HostProviders>(
+    () => ({
+      workbookName: () => bookName,
+      printerProfiles: DEMO_PRINTER_PROFILES,
+      printerProfileId: DEMO_PRINTER_PROFILE_ID,
+      refreshPrinterProfiles: refreshDemoPrinterProfiles,
+      functionArgumentHelp: demoFunctionArgumentHelp,
+    }),
+    [bookName],
+  );
+
+  const onCellChange = useCallback((e: CellChangeEvent) => {
+    // The id is drawn once, outside the updater React may call twice.
+    const entry = demoChangeLogEntry(e);
+    setLog((prev) => pushDemoChangeLog(prev, entry));
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -137,18 +200,27 @@ export const App = (): ReactElement => {
   }, []);
 
   useEffect(() => {
-    if (!instance) return undefined;
+    if (!legacy) return undefined;
+    const disposers = DEMO_FUNCTIONS.map((f) => legacy.formula.register(f.name, f.impl, f.meta));
+    disposers.push(legacy.on('cellChange', onCellChange));
+    return () => {
+      for (const d of disposers) d();
+    };
+  }, [legacy, onCellChange]);
+
+  useEffect(() => {
+    if (!legacy) return undefined;
     const disposers: (() => void)[] = [];
     if (formatters.uppercase) {
-      disposers.push(instance.cells.registerFormatter(FORMATTERS.uppercaseA));
+      disposers.push(legacy.cells.registerFormatter(FORMATTERS.uppercaseA));
     }
     if (formatters.arrows) {
-      disposers.push(instance.cells.registerFormatter(FORMATTERS.arrowNegatives));
+      disposers.push(legacy.cells.registerFormatter(FORMATTERS.arrowNegatives));
     }
     return () => {
       for (const d of disposers) d();
     };
-  }, [instance, formatters.uppercase, formatters.arrows]);
+  }, [legacy, formatters.uppercase, formatters.arrows]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -158,39 +230,33 @@ export const App = (): ReactElement => {
     () =>
       installDemoF6Navigation({
         getQuickAccess: () => quickAccessRef.current,
-        getToolbar: () => toolbarRef.current,
-        getInstance: () => instance,
+        getToolbar: () => f6ToolbarOf(toolbarRef.current, ribbonHostRef.current),
+        getInstance: () => legacy,
       }),
-    [instance],
+    [legacy],
   );
 
   // Expose the live instance on `window.__fcInst` so cross-demo E2E scenarios
   // can drive imperative paths (named-range, paste-special, etc.) without
   // depending on demo-specific UI.
   useEffect(() => {
-    (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst = instance;
+    (window as unknown as { __fcInst?: LegacySpreadsheetInstance | null }).__fcInst = legacy;
     return () => {
-      delete (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst;
+      delete (window as unknown as { __fcInst?: LegacySpreadsheetInstance | null }).__fcInst;
     };
-  }, [instance]);
-
-  const onCellChange = useCallback((e: CellChangeEvent) => {
-    // The id is drawn once, outside the updater React may call twice.
-    const entry = demoChangeLogEntry(e);
-    setLog((prev) => pushDemoChangeLog(prev, entry));
-  }, []);
+  }, [legacy]);
 
   const onSpellingReview = useCallback(() => {
-    if (!instance) return;
-    setReviewDialog(buildDemoReviewFindings('spelling', instance, locale, commandText));
-  }, [commandText, instance, locale]);
+    if (!legacy) return;
+    setReviewDialog(buildDemoReviewFindings('spelling', legacy, locale, commandText));
+  }, [commandText, legacy, locale]);
 
   const onAccessibilityCheck = useCallback(() => {
-    if (!instance) return;
+    if (!legacy) return;
     // The Mac host docks its own checker; other platforms keep the review list.
-    if (instance.openAccessibilityChecker()) return;
-    setReviewDialog(buildDemoReviewFindings('accessibility', instance, locale, commandText));
-  }, [commandText, instance, locale]);
+    if (legacy.openAccessibilityChecker()) return;
+    setReviewDialog(buildDemoReviewFindings('accessibility', legacy, locale, commandText));
+  }, [commandText, legacy, locale]);
 
   const onRunScript = useCallback(() => {
     if (!instance) return;
@@ -204,12 +270,35 @@ export const App = (): ReactElement => {
     [commandText.ribbonCommand],
   );
 
+  const ribbonHooks = useMemo<RibbonHooks>(
+    () => ({
+      review: {
+        spelling: onSpellingReview,
+        accessibility: onAccessibilityCheck,
+        translate: () =>
+          showRibbonNotice(commandText.translate, commandText.translationUnavailable),
+      },
+      drawing: {
+        setInkMode: (mode) =>
+          showRibbonNotice(
+            commandText.draw,
+            mode === 'pen' ? commandText.inkNotPersisted : commandText.selectInkFirst,
+          ),
+      },
+      automation: {
+        runScript: onRunScript,
+        addInManager: () => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks),
+      },
+    }),
+    [commandText, onAccessibilityCheck, onRunScript, onSpellingReview, showRibbonNotice],
+  );
+
   const applyParsedScript = useCallback(
     (command: ReturnType<typeof parseScriptCommand>) => {
-      if (!instance || !command) return;
-      setReviewDialog(reportDemoScriptRun(instance, command, commandText));
+      if (!legacy || !command) return;
+      setReviewDialog(reportDemoScriptRun(legacy, command, commandText));
     },
-    [commandText, instance],
+    [commandText, legacy],
   );
 
   const onScriptSubmit = useCallback(
@@ -222,18 +311,22 @@ export const App = (): ReactElement => {
 
   // Runs the built-in script commands from `#menu-script`. The toolbar owns the
   // rest of that click: it closes the menu, moves focus back to the Script
-  // command, and routes `custom` to the `onRunScript` prop — so this handler
+  // command, and routes `custom` to the `automation.runScript` hook — so this handler
   // neither reopens that dialog nor touches focus, which would pull focus back
   // out of the dialog the action just opened.
   useEffect(() => installDemoScriptMenu(applyParsedScript), [applyParsedScript]);
 
   const onSave = useCallback(() => {
-    void saveDemoWorkbookToDownload({ instance, bookName, setUploadStatus });
-  }, [bookName, instance]);
+    void saveDemoWorkbookToDownload({ instance: legacy, bookName, setUploadStatus });
+  }, [bookName, legacy]);
 
   const onSaveAs = useCallback(() => {
-    void saveDemoWorkbookAsToDownload({ instance, bookName, setUploadStatus });
-  }, [bookName, instance]);
+    void saveDemoWorkbookAsToDownload({ instance: legacy, bookName, setUploadStatus });
+  }, [bookName, legacy]);
+
+  const onSpreadsheetError = useCallback((error: unknown) => {
+    console.error('formulon demo: spreadsheet error', error);
+  }, []);
 
   const onNewWorkbook = useCallback(async () => {
     const wb = await WorkbookHandle.createDefault({ locale, platform });
@@ -244,22 +337,18 @@ export const App = (): ReactElement => {
     const previous = workbookOwnerRef.current;
     const live = instanceRef.current ?? instance;
     try {
-      if (live) await live.setWorkbook(wb);
+      // Swapping here rather than through the prop reports a refused swap to this flow; the
+      // prop then already matches the instance.
+      if (live) await swapWorkbook(live, wb);
     } catch (error) {
-      if (!aliveRef.current) {
-        wb.dispose();
-        return;
-      }
       wb.dispose();
+      if (!aliveRef.current) return;
       setReviewDialog(
         buildDemoReviewDialog(commandText.openFailed, commandText.workbook, formatLoadError(error)),
       );
       return;
     }
     if (!aliveRef.current) {
-      // The host may have unmounted while setWorkbook was pending. The core
-      // instance has already been disposed by the owner cleanup; close this
-      // late-created handle and avoid reviving React state.
       wb.dispose();
       return;
     }
@@ -273,13 +362,17 @@ export const App = (): ReactElement => {
 
   const onOpen = useCallback(
     async (file: File) => {
-      const live = instanceRef.current ?? instance;
-      if (!live || !aliveRef.current) return;
+      const live = instance;
+      const mounted = legacy;
+      if (!live || !mounted || !aliveRef.current) return;
       const previous = workbookOwnerRef.current;
       try {
-        const name = await openDemoWorkbookFile(live, file);
+        const name = await openDemoWorkbookFile(mounted, file);
         if (!aliveRef.current || instanceRef.current !== live) return;
-        const next = live.workbook;
+        // The helper swapped the workbook on the mount; bring the public instance to the same one.
+        const next = mounted.workbook;
+        await swapWorkbook(live, next);
+        if (!aliveRef.current) return;
         workbookOwnerRef.current = next;
         setWorkbook(next);
         // `openDemoWorkbookFile` has already detached the previous workbook
@@ -295,7 +388,7 @@ export const App = (): ReactElement => {
         );
       }
     },
-    [commandText.openFailed, commandText.workbook, instance],
+    [commandText.openFailed, commandText.workbook, instance, legacy],
   );
 
   const runBackstageAction = useCallback(
@@ -306,7 +399,7 @@ export const App = (): ReactElement => {
       }
       runDemoBackstageAction({
         action,
-        instance,
+        instance: legacy,
         ui,
         newWorkbook: onNewWorkbook,
         openWorkbook: () => fileInputRef.current?.click(),
@@ -315,13 +408,13 @@ export const App = (): ReactElement => {
         showNotice: showRibbonNotice,
         toggleOptions: () => setShowPanel((v) => !v),
         closeBackstage: () => {
-          toolbarRef.current?.setBackstageOpen(false);
+          toolbarRef.current?.update({ backstageOpen: false });
           setBackstageAction('info');
           setRibbonTab('home');
         },
       });
     },
-    [instance, onNewWorkbook, onSave, onSaveAs, showRibbonNotice, ui],
+    [legacy, onNewWorkbook, onSave, onSaveAs, showRibbonNotice, ui],
   );
 
   const onFormatterChange = useCallback((key: 'uppercase' | 'arrows', checked: boolean) => {
@@ -348,7 +441,7 @@ export const App = (): ReactElement => {
     () =>
       buildDemoCommands({
         commandText,
-        instance,
+        instance: legacy,
         openWorkbook: () => fileInputRef.current?.click(),
         saveWorkbook: onSave,
         setRibbonTab,
@@ -359,12 +452,19 @@ export const App = (): ReactElement => {
           if (resolved) setLocale(resolved);
         },
       }),
-    [commandText, instance, onSave],
+    [commandText, legacy, onSave],
   );
-  const applyToolbarCommand = useCallback(
-    (commandId: string) => toolbarRef.current?.applyCommand(commandId) ?? false,
-    [],
-  );
+  const applyToolbarCommand = useCallback((commandId: string): boolean => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return false;
+    try {
+      toolbar.execute(commandId);
+      return true;
+    } catch {
+      // A refused command did not run; the caller falls back to showing its tab.
+      return false;
+    }
+  }, []);
   const searchItems = useMemo(
     () => buildDemoSearchItems(commands, locale, setRibbonTab, applyToolbarCommand, ribbonTabs),
     [applyToolbarCommand, commands, locale, ribbonTabs],
@@ -372,7 +472,7 @@ export const App = (): ReactElement => {
 
   const openBackstage = useCallback(() => {
     setRibbonTab('file');
-    toolbarRef.current?.setBackstageOpen(true);
+    toolbarRef.current?.update({ backstageOpen: true });
   }, []);
 
   if (!workbook) {
@@ -397,7 +497,7 @@ export const App = (): ReactElement => {
         ui={ui}
         platform={platform}
         bookName={bookName}
-        instance={instance}
+        instance={legacy}
         showPanel={showPanel}
         searchItems={searchItems}
         quickAccessRef={quickAccessRef}
@@ -425,50 +525,34 @@ export const App = (): ReactElement => {
       <main className={`demo__body${showPanel ? ' demo__body--panel' : ''}`}>
         <div className="fc-tb__sheet-col">
           {resolvedUi.ribbon ? (
-            <SpreadsheetToolbar
-              instance={instance}
-              activeTab={ribbonTab}
-              onTabChange={setRibbonTab}
-              locale={locale}
-              ribbonTabs={ribbonTabs}
-              onSpellingReview={onSpellingReview}
-              onAccessibilityCheck={onAccessibilityCheck}
-              onRunScript={onRunScript}
-              onDrawPen={() => showRibbonNotice(commandText.draw, commandText.inkNotPersisted)}
-              onDrawEraser={() => showRibbonNotice(commandText.draw, commandText.selectInkFirst)}
-              onTranslate={() =>
-                showRibbonNotice(commandText.translate, commandText.translationUnavailable)
-              }
-              onAddIn={() => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks)}
-              onToolbarReady={(toolbar) => {
-                if (toolbar) toolbar.host.dataset.fcPlatform = platform;
-                toolbarRef.current = toolbar;
-                (window as unknown as { __fcToolbar?: ToolbarInstance | null }).__fcToolbar =
-                  toolbar;
-              }}
-            />
+            <div ref={ribbonHostRef} style={{ display: 'contents' }}>
+              <SpreadsheetToolbar
+                spreadsheet={instance}
+                activeTab={ribbonTab}
+                onTabChange={setRibbonTab}
+                ribbonTabs={ribbonTabs}
+                hooks={ribbonHooks}
+                onReady={(toolbar) => {
+                  toolbarRef.current = toolbar;
+                  (window as unknown as { __fcToolbar?: Toolbar | null }).__fcToolbar = toolbar;
+                }}
+              />
+            </div>
           ) : null}
           <Spreadsheet
             className="demo__sheet"
             ui={resolvedUi}
-            toolbar={false}
-            workbook={workbook}
+            workbook={workbookFacade ?? undefined}
             theme={theme}
             locale={locale}
-            features={features}
-            functions={DEMO_FUNCTIONS}
-            printerProfiles={DEMO_PRINTER_PROFILES}
-            printerProfileId={DEMO_PRINTER_PROFILE_ID}
-            refreshPrinterProfiles={refreshDemoPrinterProfiles}
-            getFunctionArgumentHelp={demoFunctionArgumentHelp}
-            getWorkbookName={() => bookName}
+            host={host}
             uploadStatus={uploadStatus}
             macroRecording={scriptOpen}
             onReady={(next) => {
               instanceRef.current = next;
               setInstance(next);
             }}
-            onCellChange={onCellChange}
+            onError={onSpreadsheetError}
             onLocaleChange={(event) => {
               const resolved = normalizeDemoLocale(event.locale);
               if (resolved) setLocale(resolved);
@@ -477,7 +561,7 @@ export const App = (): ReactElement => {
           {ribbonTab === 'file' ? (
             <DemoBackstage
               ui={ui}
-              instance={instance}
+              instance={legacy}
               bookName={bookName}
               action={backstageAction}
               onAction={runBackstageAction}
@@ -487,7 +571,8 @@ export const App = (): ReactElement => {
         <DemoOptionsPanel
           ui={ui}
           commandText={commandText}
-          instance={instance}
+          spreadsheet={instance}
+          legacy={legacy}
           hidden={!showPanel}
           theme={theme}
           locale={locale}

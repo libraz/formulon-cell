@@ -6,6 +6,8 @@
     "verbatimModuleSyntax": false,
     "paths": {
       "@libraz/formulon-cell": ["../../packages/formulon-cell/src/index.ts"],
+      "@libraz/formulon-cell/toolbar": ["../../packages/formulon-cell/src/toolbar/index.ts"],
+      "@libraz/formulon-cell/adapter": ["../../packages/formulon-cell/src/adapter/index.ts"],
       "@libraz/formulon-cell/styles.css": ["../../packages/formulon-cell/src/styles/index.css"],
       "@libraz/formulon-cell/styles/contrast.css": [
         "../../packages/formulon-cell/src/styles/theme-contrast.css"
@@ -13,10 +15,7 @@
       "@libraz/formulon-cell/styles/toolbar.css": [
         "../../packages/formulon-cell/src/styles/toolbar.css"
       ],
-      "@libraz/formulon-cell-vue": ["../../packages/formulon-cell-vue/src/index.ts"],
-      "@libraz/formulon-cell-vue/toolbar.vue": [
-        "../../packages/formulon-cell-vue/src/SpreadsheetToolbar.vue"
-      ]
+      "@libraz/formulon-cell-vue": ["../../packages/formulon-cell-vue/src/index.ts"]
     }
   },
   "include": ["src/**/*", "src/**/*.vue", "vite.config.ts", "../demo-shared/**/*"]

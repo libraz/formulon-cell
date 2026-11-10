@@ -79,31 +79,8 @@ const snapshotRibbonSecondaryMenu = async (
   const button = page.locator(`[data-ribbon-command="${opts.command}"]`).first();
   await expect(button).toHaveAttribute('data-ribbon-menu-id', opts.menuId);
   await expect(button).toHaveAttribute('data-ribbon-activation', opts.activation);
-  // The API open inherits the previous Escape's keyboard modality, which would show a focus
-  // screen tip; press blank ribbon space first so the menu opens as a chevron click would.
-  const rail = page.locator('.fc-tb__ribbon:not([hidden])').first();
-  const railBox = await rail.boundingBox();
-  if (!railBox) throw new Error('Missing ribbon rail');
-  await page.mouse.click(railBox.x + railBox.width - 80, railBox.y + railBox.height / 2);
-  await page.evaluate(({ command, menuId }) => {
-    const button = document.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
-    const toolbar = (
-      window as unknown as {
-        __fcToolbar?: {
-          dropdownsApi?: {
-            openDynamicRibbonDropdown?: (
-              spec: { command: string; menuId: string },
-              button?: HTMLButtonElement | null,
-            ) => void;
-          } | null;
-        } | null;
-      }
-    ).__fcToolbar;
-    if (!button || !toolbar?.dropdownsApi?.openDynamicRibbonDropdown) {
-      throw new Error(`window.__fcToolbar.dropdownsApi is required to open ${command}`);
-    }
-    toolbar.dropdownsApi.openDynamicRibbonDropdown({ command, menuId }, button);
-  }, opts);
+  // The primary face runs the command; the split chevron opens the secondary menu.
+  await button.locator('.fc-tb__rb-split-chevron').click();
   const menu = page.locator(`#${opts.menuId}`);
   await expect(menu).toBeVisible();
   await snapshotPage(page, opts.name);

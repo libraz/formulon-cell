@@ -149,7 +149,7 @@ type BrowserInstance = {
 
 type ProbeWindow = Window & {
   __fcInst?: BrowserInstance;
-  __fcToolbar?: { getDisplayMode?(): string } | null;
+  __fcToolbar?: { readonly displayMode?: string } | null;
 };
 
 type RuntimeSnapshot = {
@@ -1499,7 +1499,7 @@ const runMenusFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
         shell: shell.dataset.ribbonDisplayMode ?? null,
         toolbar:
           instance.toolbar?.getDisplayMode?.() ??
-          (window as ProbeWindow).__fcToolbar?.getDisplayMode?.() ??
+          (window as ProbeWindow).__fcToolbar?.displayMode ??
           null,
       };
     });

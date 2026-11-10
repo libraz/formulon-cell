@@ -24,7 +24,6 @@ import type {
   ScriptCommand,
   LegacySpreadsheetInstance as SpreadsheetInstance,
   ThemeName,
-  ToolbarInstance,
   WorkbookSaveFormat,
 } from '@libraz/formulon-cell';
 import {
@@ -267,9 +266,15 @@ export const installDemoSearchShortcut = (
   return () => document.removeEventListener('keydown', onKeydown);
 };
 
+/** The ribbon as F6 navigation sees it: the element it lives in and its tab focus. */
+export interface DemoF6Toolbar {
+  readonly host: HTMLElement;
+  focusActiveTab(): boolean;
+}
+
 export interface DemoF6NavigationTargets {
   getQuickAccess: () => HTMLElement | null | undefined;
-  getToolbar: () => ToolbarInstance | null | undefined;
+  getToolbar: () => DemoF6Toolbar | null;
   getInstance: () => SpreadsheetInstance | null | undefined;
 }
 

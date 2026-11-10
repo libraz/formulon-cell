@@ -1,4 +1,4 @@
-@import "@libraz/formulon-cell-vue/toolbar.css";
+@import "@libraz/formulon-cell/styles/toolbar.css";
 
 /* Full-viewport demo-page scaffolding. These globals belong to the demo host
  * page, not the embeddable library, so they live here rather than in the

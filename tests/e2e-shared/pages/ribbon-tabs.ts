@@ -22,10 +22,12 @@ export async function setRibbonDisplayMode(
 ): Promise<void> {
   await page.evaluate((next) => {
     const toolbar = (
-      window as unknown as { __fcToolbar?: { setDisplayMode(mode: string): void } | null }
+      window as unknown as {
+        __fcToolbar?: { update(patch: { displayMode: string }): void } | null;
+      }
     ).__fcToolbar;
     if (!toolbar) throw new Error('toolbar instance is not exposed');
-    toolbar.setDisplayMode(next);
+    toolbar.update({ displayMode: next });
   }, mode);
 }
 

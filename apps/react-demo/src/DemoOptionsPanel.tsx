@@ -2,7 +2,9 @@ import type {
   CellValue,
   FeatureFlags,
   FeatureId,
-  LegacySpreadsheetInstance as SpreadsheetInstance,
+  LegacySpreadsheetInstance,
+  SelectionState,
+  SpreadsheetInstance,
   ThemeName,
 } from '@libraz/formulon-cell';
 import { useSelection } from '@libraz/formulon-cell-react';
@@ -22,10 +24,26 @@ import {
 } from '../../demo-shared/index.js';
 import { DemoSelect } from './DemoSelect.js';
 
+/** The selection label; empty until the spreadsheet is mounted. */
+const demoSelectionText = (selection: SelectionState | null): string =>
+  selection
+    ? demoSelectionLabel({
+        active: selection.active,
+        range: {
+          r0: selection.range.firstRow,
+          c0: selection.range.firstCol,
+          r1: selection.range.lastRow,
+          c1: selection.range.lastCol,
+        },
+      })
+    : '';
+
 interface DemoOptionsPanelProps {
   ui: DemoUiStrings;
   commandText: DemoCommandStrings;
-  instance: SpreadsheetInstance | null;
+  spreadsheet: SpreadsheetInstance | null;
+  /** The mount behind `spreadsheet`, for the probe helper that still reads it. */
+  legacy: LegacySpreadsheetInstance | null;
   hidden: boolean;
   theme: ThemeName;
   locale: string;
@@ -45,7 +63,8 @@ interface DemoOptionsPanelProps {
 export const DemoOptionsPanel = ({
   ui,
   commandText,
-  instance,
+  spreadsheet,
+  legacy,
   hidden,
   theme,
   locale,
@@ -62,15 +81,15 @@ export const DemoOptionsPanel = ({
   onFormatterChange,
 }: DemoOptionsPanelProps): ReactElement => {
   const [probe, setProbe] = useState<{ name: string; result: string } | null>(null);
-  const selection = useSelection(instance);
-  const selectionLabel = useMemo(() => demoSelectionLabel(selection), [selection]);
+  const selection = useSelection(spreadsheet);
+  const selectionLabel = useMemo(() => demoSelectionText(selection), [selection]);
 
   const runProbe = useCallback(
     (name: string, args: CellValue[]) => {
-      if (!instance) return;
-      setProbe(evaluateDemoProbe(instance, name, args));
+      if (!legacy) return;
+      setProbe(evaluateDemoProbe(legacy, name, args));
     },
-    [instance],
+    [legacy],
   );
 
   return (
@@ -196,7 +215,7 @@ export const DemoOptionsPanel = ({
             type="button"
             className="fc-tb__btn fc-tb__btn--ghost"
             onClick={() => runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])}
-            disabled={!instance}
+            disabled={!legacy}
           >
             GREET("Workbook")
           </button>
@@ -204,7 +223,7 @@ export const DemoOptionsPanel = ({
             type="button"
             className="fc-tb__btn fc-tb__btn--ghost"
             onClick={() => runProbe('FAHRENHEIT', [{ kind: 'number', value: 100 }])}
-            disabled={!instance}
+            disabled={!legacy}
           >
             FAHRENHEIT(100)
           </button>

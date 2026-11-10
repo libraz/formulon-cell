@@ -4,27 +4,16 @@ import { defineConfig, mergeConfig } from 'vite';
 import { baseConfig } from '../vite.base.js';
 
 // `baseConfig` aliases `@libraz/formulon-cell` to source; we layer the Vue
-// adapter aliases on top (including the .vue and toolbar.css subpaths that
-// the Vue package publishes alongside its main entry).
+// adapter's source alias on top.
 const vuePkg = resolve(import.meta.dirname, '../../packages/formulon-cell-vue');
 
 export default defineConfig(
   mergeConfig(baseConfig(import.meta.dirname), {
     plugins: [vue()],
     resolve: {
-      // Prepend Vue-specific subpath aliases so they win over the broad
-      // `@libraz/formulon-cell-vue` rewrite at the end of the list.
-      alias: [
-        {
-          find: '@libraz/formulon-cell-vue/toolbar.css',
-          replacement: `${vuePkg}/src/spreadsheet-toolbar.css`,
-        },
-        {
-          find: '@libraz/formulon-cell-vue/toolbar.vue',
-          replacement: `${vuePkg}/src/SpreadsheetToolbar.vue`,
-        },
-        { find: '@libraz/formulon-cell-vue', replacement: `${vuePkg}/src/index.ts` },
-      ],
+      // Prepend the vue-package alias so it wins over the broad
+      // `@libraz/formulon-cell` rewrite in the base config.
+      alias: [{ find: '@libraz/formulon-cell-vue', replacement: `${vuePkg}/src/index.ts` }],
     },
     server: { port: 5175 },
     optimizeDeps: {

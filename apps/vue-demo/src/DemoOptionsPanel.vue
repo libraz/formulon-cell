@@ -3,7 +3,9 @@ import type {
   CellValue,
   FeatureFlags,
   FeatureId,
-  LegacySpreadsheetInstance as SpreadsheetInstance,
+  LegacySpreadsheetInstance,
+  SelectionState,
+  SpreadsheetInstance,
   ThemeName,
 } from '@libraz/formulon-cell';
 import { useSelection } from '@libraz/formulon-cell-vue';
@@ -23,10 +25,26 @@ import {
 } from '../../demo-shared/index.js';
 import DemoSelect from './DemoSelect.vue';
 
+/** The selection label; empty until the spreadsheet is mounted. */
+const demoSelectionText = (selection: SelectionState | null): string =>
+  selection
+    ? demoSelectionLabel({
+        active: selection.active,
+        range: {
+          r0: selection.range.firstRow,
+          c0: selection.range.firstCol,
+          r1: selection.range.lastRow,
+          c1: selection.range.lastCol,
+        },
+      })
+    : '';
+
 const props = defineProps<{
   ui: DemoUiStrings;
   commandText: DemoCommandStrings;
-  instance: SpreadsheetInstance | null;
+  spreadsheet: SpreadsheetInstance | null;
+  /** The mount behind `spreadsheet`, for the probe helper that still reads it. */
+  legacy: LegacySpreadsheetInstance | null;
   hidden: boolean;
   theme: ThemeName;
   locale: string;
@@ -49,12 +67,12 @@ const emit = defineEmits<{
 }>();
 
 const probe = ref<{ name: string; result: string } | null>(null);
-const selection = useSelection(toRef(props, 'instance'));
-const selectionLabel = computed(() => demoSelectionLabel(selection.value));
+const selection = useSelection(toRef(props, 'spreadsheet'));
+const selectionLabel = computed(() => demoSelectionText(selection.value));
 
 const runProbe = (name: string, args: CellValue[]): void => {
-  if (!props.instance) return;
-  probe.value = evaluateDemoProbe(props.instance, name, args);
+  if (!props.legacy) return;
+  probe.value = evaluateDemoProbe(props.legacy, name, args);
 };
 </script>
 
@@ -170,7 +188,7 @@ const runProbe = (name: string, args: CellValue[]): void => {
         <button
           type="button"
           class="fc-tb__btn fc-tb__btn--ghost"
-          :disabled="!instance"
+          :disabled="!legacy"
           @click="runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])"
         >
           GREET("Workbook")
@@ -178,7 +196,7 @@ const runProbe = (name: string, args: CellValue[]): void => {
         <button
           type="button"
           class="fc-tb__btn fc-tb__btn--ghost"
-          :disabled="!instance"
+          :disabled="!legacy"
           @click="runProbe('FAHRENHEIT', [{ kind: 'number', value: 100 }])"
         >
           FAHRENHEIT(100)
