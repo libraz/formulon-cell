@@ -227,8 +227,6 @@ export {
   hyperlinkDialog,
   InteractionController,
   ignoreCellError,
-  inferPivotFieldItems,
-  inferPivotSourceFields,
   isBandedRow,
   isCellErrorIgnored,
   isHeaderRow,
