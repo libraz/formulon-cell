@@ -357,6 +357,8 @@ const applyGenericRibbonCommand = (
           workbook: i.workbook,
           history: i.history,
           strings: i.i18n.strings,
+          origin: 'ribbon',
+          commandId: 'merge',
         },
         isExactMerge ? 'unmergeCells' : 'mergeCenter',
       ).then((applied) => {

@@ -77,6 +77,7 @@ describe('validation writes under the interaction policy', () => {
         plan,
         action: { patch },
         merge: { action: null, range: state.selection.range },
+        entry: { origin: 'ribbon', commandId: 'formatCells' },
       });
     };
     return { store, history, controller, ctx, ruleAt, seedRules, commitDialog };

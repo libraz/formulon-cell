@@ -1,3 +1,4 @@
+import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
 // Wires the integrated dropdown built by createBordersMenu(): edge / frame
 // / combined presets, "More borders..." entry, and the "border-draw" block
 // which arms the border-draw controller (drives pointer-edge editing on
@@ -177,7 +178,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
     if (!i) return;
     if (key === 'format') {
       closeBorderMenu();
-      i.openFormatDialog();
+      openFormatDialogFrom(i.store, undefined, { origin: 'ribbon', commandId: 'borders' });
       return;
     }
     const preset = MENU_TO_PRESET[key];

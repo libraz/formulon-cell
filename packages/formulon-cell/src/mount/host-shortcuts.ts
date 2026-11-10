@@ -37,6 +37,7 @@ import { isMacHost } from '../extensions/ui-options.js';
 import { excelSerialFromParts } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
 import { openCellShiftDialog, runCellShiftChoice } from '../interact/cell-shift-dialog.js';
+import type { FormatDialogHandle } from '../interact/format-dialog.js';
 import { directCellFormat } from '../store/direct-format.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -82,7 +83,7 @@ interface HostShortcutInput {
   addSheet: () => void;
   getClipboardSnapshot?: () => ClipboardSnapshot | null;
   findReplace: () => { open(tab?: 'find' | 'replace'): void } | null;
-  formatDialog: () => { open(): void } | null;
+  formatDialog: () => Pick<FormatDialogHandle, 'open'> | null;
   formatPainter: () => { activate(sticky?: boolean): void } | null;
   goToDialog: () => { open(): void } | null;
   history: History;
@@ -461,7 +462,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       if (!dialog) return;
       e.preventDefault();
       if (restricted) return;
-      dialog.open();
+      dialog.open(undefined, { entry: { origin: 'keyboard', commandId: 'formatCells' } });
     } else if (e.key === '`') {
       e.preventDefault();
       setShowFormulas(input.store, !input.store.getState().ui.showFormulas, currentWb);

@@ -12,10 +12,18 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
+import type { AuthorizedIntentFactory } from './authorized-write.js';
 import { blockDataTableEdit } from './data-table-guard.js';
 import type { History } from './history.js';
 import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
 import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
+
+/** The intent of a merge or unmerge whose merged region is `range`. */
+export const mergeIntents =
+  (range: Range, commandId: string): AuthorizedIntentFactory =>
+  (origin) => [
+    { operation: 'merge', origin, commandId, effects: [{ kind: 'range', range: { ...range } }] },
+  ];
 
 /** Look up the merge that covers `addr`, if any. Returns the full merge range
  *  (anchor on top-left, opposite corner on bottom-right). */

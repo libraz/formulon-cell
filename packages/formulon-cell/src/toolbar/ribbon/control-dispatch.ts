@@ -1,4 +1,5 @@
 import type { Locale } from '../../i18n/strings.js';
+import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
 // Ribbon control dispatch extracted from main.ts. Owns the read/write side of
 // the ribbon: reading the current value of a control from the active cell or
 // page setup, and applying a control change (font, fill, number format,
@@ -219,6 +220,8 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
         workbook: i.workbook,
         history: i.history,
         strings: i.i18n.strings,
+        origin: 'ribbon',
+        commandId: 'merge',
       },
       value,
     ).then((applied) => {
@@ -245,7 +248,12 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       applyRibbonFormat((state, store) => setFillColor(state, store, value || null), id);
     } else if (id === 'numberFormat') {
       if (value === 'more') {
-        getInst()?.openFormatDialog();
+        const inst = getInst();
+        if (inst)
+          openFormatDialogFrom(inst.store, undefined, {
+            origin: 'ribbon',
+            commandId: 'numberFormat',
+          });
         return;
       }
       const fmt = numberFormatForAction(value);

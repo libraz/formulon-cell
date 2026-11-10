@@ -12,7 +12,7 @@ import {
 } from '../commands/format.js';
 import { History } from '../commands/history.js';
 import type { InteractionOperation } from '../commands/interaction-policy.js';
-import { applyMerge, applyUnmerge } from '../commands/merge.js';
+import { applyMerge, applyUnmerge, mergeIntents } from '../commands/merge.js';
 import {
   planSelectionFormat,
   type SelectionFormatPlan,
@@ -21,6 +21,7 @@ import { recordMergesChangeWithEngine } from '../commands/slice-history.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import type { DialogEntry } from './dialog-entry.js';
 
 export interface FormatDialogTransaction {
   readonly store: SpreadsheetStore;
@@ -33,45 +34,36 @@ export interface FormatDialogTransaction {
   readonly plan: SelectionFormatPlan;
   readonly action: SelectionFormatAction;
   readonly merge: { action: 'merge' | 'unmerge' | null; range: Range };
+  /** The entry point that opened the dialog. */
+  readonly entry: DialogEntry;
 }
-
-/** Origin and command id the dialog commit, its F4 repeat and their replay are decided under. */
-const DIALOG_ORIGIN = 'instanceApi';
-const DIALOG_COMMAND_ID = 'formatCells';
 
 /** A step refused after the write started: the composite is rolled back and reported as false. */
 class StepRejected extends Error {}
 
 const dialogIntents = (
+  entry: DialogEntry,
   operations: readonly InteractionOperation[],
   ranges: readonly Range[],
   mergeRange: Range | null,
 ): AuthorizedIntentFactory => {
   const effects = ranges.map((range) => ({ kind: 'range' as const, range: { ...range } }));
+  const merge = mergeRange ? mergeIntents(mergeRange, entry.commandId) : null;
   return (origin) => [
     ...operations.map((operation) => ({
       operation,
       origin,
-      commandId: DIALOG_COMMAND_ID,
+      commandId: entry.commandId,
       effects,
     })),
-    ...(mergeRange
-      ? [
-          {
-            operation: 'merge' as const,
-            origin,
-            commandId: DIALOG_COMMAND_ID,
-            effects: [{ kind: 'range' as const, range: { ...mergeRange } }],
-          },
-        ]
-      : []),
+    ...(merge ? merge(origin) : []),
   ];
 };
 
 /** Returns true when every step applied; false when one was refused and the
  *  composite rolled back. Rethrows (after rollback) if a step throws. */
 export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean {
-  const { store, history, getWb, state, liveWb, plan, action } = tx;
+  const { store, history, getWb, state, liveWb, plan, action, entry } = tx;
   const range = state.selection.range;
   const mergeAction = tx.merge.action;
   const mergeRange = tx.merge.range;
@@ -110,11 +102,12 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
         store,
         history: actionHistory,
         intents: dialogIntents(
+          entry,
           [...selectionFormatActionOperations(repeatAction)],
           currentPlan.ranges,
           null,
         ),
-        origin: DIALOG_ORIGIN,
+        origin: entry.origin,
         write: () =>
           recordDialogFormatChange({
             history: actionHistory,
@@ -124,8 +117,8 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
             targets: currentPlan.cells,
             mutate: () =>
               applySelectionFormatAction(current, store, repeatAction, {
-                origin: DIALOG_ORIGIN,
-                commandId: DIALOG_COMMAND_ID,
+                origin: entry.origin,
+                commandId: entry.commandId,
               }),
             repeat: repeatFormatting,
           }),
@@ -143,8 +136,8 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
         targets: plan.cells,
         mutate: () =>
           applySelectionFormatAction(store.getState(), store, action, {
-            origin: DIALOG_ORIGIN,
-            commandId: DIALOG_COMMAND_ID,
+            origin: entry.origin,
+            commandId: entry.commandId,
           }),
         repeat: repeatFormatting,
         registerRepeat: false,
@@ -174,11 +167,12 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
       store,
       history: actionHistory,
       intents: dialogIntents(
+        entry,
         hasFormatAction ? [...selectionFormatActionOperations(action)] : [],
         plan.ranges,
-        mergeAction === 'merge' ? mergeRange : mergeAction === 'unmerge' ? range : null,
+        mergeAction ? mergeRange : null,
       ),
-      origin: DIALOG_ORIGIN,
+      origin: entry.origin,
       write,
     });
   } catch (error) {

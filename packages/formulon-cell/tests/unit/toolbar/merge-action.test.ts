@@ -47,6 +47,8 @@ const contextFor = (store: SpreadsheetStore, history: History) => ({
   workbook: makeWorkbook(),
   history,
   strings: defaultStrings,
+  origin: 'ribbon' as const,
+  commandId: 'merge',
 });
 
 const ribbonInstanceFor = (store: SpreadsheetStore, history: History): SpreadsheetInstance =>

@@ -15,6 +15,7 @@ import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../comm
 import { FUNCTION_SIGNATURES } from '../../../commands/refs.js';
 import { executeNoteVisibilityAction } from '../../../commands/ribbon-comment.js';
 import { formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
+import { openDataValidationDialogFrom } from '../../../interact/dialog-entry.js';
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
 import { createChartVariantFromSelection } from '../../../mount/dynamic-dropdown-defaults/insert.js';
@@ -440,7 +441,10 @@ export function dispatchMacRibbonCommand(
       case 'mac.data.textToColumns':
         return ctx.splitTextToColumnsCustom();
       case 'mac.data.validation':
-        return instance.openDataValidationDialog();
+        return openDataValidationDialogFrom(instance.store, {
+          origin: 'ribbon',
+          commandId: 'mac.data.validation',
+        });
       case 'mac.page.pageBreaks':
       case 'mac.page.break.insert':
         return ctx.applyPageBreakAction('insert');

@@ -1,3 +1,4 @@
+import { openDataValidationDialogFrom, openFormatDialogFrom } from '../../interact/dialog-entry.js';
 // Dispatch tables for the playground ribbon — each map is one row per ribbon
 // command id, replacing what used to be a `case 'id': handler; return true;`
 // triplet in `applyRibbonCommand`. Pulled out of main.ts so the dispatcher can
@@ -36,15 +37,19 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   pageSetup: (i) => i.openPageSetup(),
   pageSetupAdvanced: (i) => i.openPageSetup(),
   printTitles: (i) => i.openPageSetup('sheet'),
-  formatCells: (i) => i.openFormatDialog(),
-  moreBorders: (i) => i.openFormatDialog(),
-  windowVisibility: (i) => i.openFormatDialog('more'),
+  formatCells: (i) =>
+    openFormatDialogFrom(i.store, undefined, { origin: 'ribbon', commandId: 'formatCells' }),
+  moreBorders: (i) =>
+    openFormatDialogFrom(i.store, undefined, { origin: 'ribbon', commandId: 'moreBorders' }),
+  windowVisibility: (i) =>
+    openFormatDialogFrom(i.store, 'more', { origin: 'ribbon', commandId: 'windowVisibility' }),
   gotoSpecial: (i) => i.openGoToSpecial(),
   gotoSpecialHome: (i) => i.openGoToSpecial(),
   hyperlinkInsert: (i) => i.openHyperlinkDialog(),
   commentInsert: (i) => i.openCommentDialog({ mode: 'note' }),
   newCommentReview: (i) => i.openCommentDialog({ mode: 'note' }),
-  dataValidation: (i) => i.openDataValidationDialog(),
+  dataValidation: (i) =>
+    openDataValidationDialogFrom(i.store, { origin: 'ribbon', commandId: 'dataValidation' }),
   namedRanges: (i) => i.openNamedRangeDialog(),
   links: (i) => i.openExternalLinksDialog(),
   linksData: (i) => i.openExternalLinksDialog(),

@@ -613,7 +613,10 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             getWb: input.wb,
             getStrings: input.strings,
             history: input.history,
-            openFormatDialog: (tab) => s.formatDialog?.open(tab),
+            openFormatDialog: (tab) =>
+              s.formatDialog?.open(tab, {
+                entry: { origin: 'ribbon', commandId: 'accessibility' },
+              }),
           });
         }
         const accessibilityPane = s.accessibilityPane;

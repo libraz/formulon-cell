@@ -7,6 +7,7 @@ import {
   type ValidationActionContext,
 } from '../../commands/validation-actions.js';
 import { parseAddrKey } from '../../engine/address.js';
+import { openDataValidationDialogFrom } from '../../interact/dialog-entry.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { rangeValidationsIntersect } from '../../store/range-validations.js';
 import { rangeContainsAddr } from '../../store/selection-geometry.js';
@@ -123,7 +124,10 @@ const buildDataValidationAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyDataValidationAction'] =>
   (action) => {
     if (action === 'manage' || action === 'more' || action === 'open' || action === 'settings') {
-      instance.openDataValidationDialog();
+      openDataValidationDialogFrom(instance.store, {
+        origin: 'ribbon',
+        commandId: 'dataValidation',
+      });
       return;
     }
     const ctx: ValidationActionContext = {

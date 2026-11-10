@@ -120,7 +120,14 @@ describe('merge', () => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     select(store, area(0, 0, 0, 1));
     const ui = guard(store, area(0, 0, 0, 1), ['bad', PASSWORD]);
-    const context = { store, workbook: wb, history: null, strings: en };
+    const context = {
+      store,
+      workbook: wb,
+      history: null,
+      strings: en,
+      origin: 'ribbon' as const,
+      commandId: 'merge',
+    };
     const merges = () => store.getState().merges.byAnchor.size;
 
     await expect(applyMergeAction(context, 'mergeCells')).resolves.toBe(false);

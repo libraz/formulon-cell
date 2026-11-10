@@ -4,6 +4,12 @@ import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ExtensionHandle } from '../extensions/index.js';
+import {
+  type DialogOpeners,
+  INSTANCE_API_FORMAT_ENTRY,
+  INSTANCE_API_VALIDATION_ENTRY,
+  registerDialogOpeners,
+} from '../interact/dialog-entry.js';
 import type { FxDialogOpenOptions } from '../interact/fx-dialog.js';
 import type { ChartSettingsTarget as ChartSettingsTab } from '../interact/session-chart-settings.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -78,6 +84,18 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
     ensureWatchWindow,
     refreshFeaturesView,
   } = deps;
+  // Internal UI callers reach these with their own entry; the public methods
+  // below are the instance API by definition.
+  const openFormatDialog: DialogOpeners['formatDialog'] = (tab, entry) => {
+    featureState.formatDialog?.open(tab, { entry });
+  };
+  const openDataValidationDialog: DialogOpeners['dataValidationDialog'] = (entry) => {
+    featureState.formatDialog?.open('more', { mode: 'dataValidation', focus: 'validation', entry });
+  };
+  registerDialogOpeners(store, {
+    formatDialog: openFormatDialog,
+    dataValidationDialog: openDataValidationDialog,
+  });
   return {
     openConditionalDialog(options) {
       featureState.conditionalDialog?.open(options);
@@ -132,10 +150,10 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       featureState.pageSetupDialog?.open(tab);
     },
     openFormatDialog(tab) {
-      featureState.formatDialog?.open(tab);
+      openFormatDialog(tab, INSTANCE_API_FORMAT_ENTRY);
     },
     openDataValidationDialog() {
-      featureState.formatDialog?.open('more', { mode: 'dataValidation', focus: 'validation' });
+      openDataValidationDialog(INSTANCE_API_VALIDATION_ENTRY);
     },
     openGoTo() {
       featureState.goToDialog?.open('go-to');

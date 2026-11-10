@@ -208,7 +208,7 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
-  it('rejects a restricted format plus merge action before either mutation', async () => {
+  it('decides a restricted format plus merge action as one composite', async () => {
     setRange(store, 0, 0, 0, 1);
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const history = new History();
@@ -218,12 +218,8 @@ describe('attachFormatDialog', () => {
       history,
     });
     const unregister = registerInteractionController(store, controller);
-    controller.setPolicy({
-      ...fixedFormPolicy([{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 }]),
-      operations: { format: true, merge: true },
-    });
     const handle = attachFormatDialog({ host, store, history, getWb: () => workbook, strings: ja });
-    try {
+    const submit = (): void => {
       handle.open('align');
       const center = document.querySelector<HTMLInputElement>(
         'input[type="radio"][value="center"]',
@@ -235,10 +231,22 @@ describe('attachFormatDialog', () => {
       merge.checked = true;
       merge.dispatchEvent(new Event('change', { bubbles: true }));
       document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-
+    };
+    const editable = fixedFormPolicy([{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 }]);
+    try {
+      controller.setPolicy({ ...editable, operations: { format: true, merge: false } });
+      submit();
       expect(store.getState().format.formats.size).toBe(0);
       expect(store.getState().merges.byAnchor.size).toBe(0);
       expect(document.querySelector<HTMLElement>('.fc-fmtdlg')?.hidden).toBe(false);
+      handle.close();
+
+      controller.setPolicy({ ...editable, operations: { format: true, merge: true } });
+      submit();
+      expect(store.getState().merges.byAnchor.size).toBe(1);
+      expect(history.undo()).toBe(true);
+      expect(store.getState().merges.byAnchor.size).toBe(0);
+      expect(history.canUndo()).toBe(false);
     } finally {
       handle.detach();
       unregister();

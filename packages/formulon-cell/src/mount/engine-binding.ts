@@ -50,6 +50,7 @@ import type {
 } from '../interact/context-menu-options.js';
 import { InlineEditor } from '../interact/editor.js';
 import { attachFindReplace } from '../interact/find-replace.js';
+import type { FormatDialogHandle } from '../interact/format-dialog.js';
 import { followHyperlink, type HyperlinkFollowDeps } from '../interact/hyperlink-follow.js';
 import { attachKeyboard } from '../interact/keyboard.js';
 import { attachPageBandEditor } from '../interact/page-band-editor.js';
@@ -141,7 +142,7 @@ interface AttachEngineBindingInput {
   flags: FeatureFlags;
   formulaRegistry: FormulaRegistry;
   getCommentDialog: () => { open(): void } | null;
-  getFormatDialog: () => { open(): void } | null;
+  getFormatDialog: () => FormatDialogHandle | null;
   getFormatPainter: () => { isActive(): boolean } | null;
   getFormulaBarEditor?: () => RangeInsertTarget | null;
   /** UI/data-format locale, the same one the renderer formats cells with. */
@@ -412,7 +413,10 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         history,
         onAfterCommit: refreshCells,
         onClipboardShortcut: clipboardH ? (kind) => clipboardH.runShortcut(kind) : undefined,
-        onFormatDialog: () => getFormatDialog()?.open(),
+        onFormatDialog: () =>
+          getFormatDialog()?.open(undefined, {
+            entry: { origin: 'contextMenu', commandId: 'formatCells' },
+          }),
         onPasteSpecial: () => pasteSpecialDialog?.open(),
         onInsertHyperlink: () => getHyperlinkDialog()?.open(),
         onOpenHyperlink: (url) => {

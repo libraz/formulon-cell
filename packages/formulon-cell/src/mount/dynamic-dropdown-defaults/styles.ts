@@ -29,6 +29,7 @@ import { addrKey, formatA1Range } from '../../engine/address.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { Range } from '../../engine/types.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
+import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { type ConditionalRule, mutators } from '../../store/store.js';
@@ -436,7 +437,11 @@ const buildCellStyleFooterAction =
             bold: activeFormat?.bold,
             italic: activeFormat?.italic,
           },
-          onFormat: () => instance.openFormatDialog(),
+          onFormat: () =>
+            openFormatDialogFrom(instance.store, undefined, {
+              origin: 'ribbon',
+              commandId: 'cellStyles',
+            }),
         },
       });
       if (value) {

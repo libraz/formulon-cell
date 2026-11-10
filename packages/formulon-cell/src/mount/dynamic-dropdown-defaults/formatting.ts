@@ -6,6 +6,7 @@ import {
 } from '../../commands/format.js';
 import { toggleShowPhonetic } from '../../commands/phonetic.js';
 import { recordRepeatableFormatChange } from '../../commands/slice-history.js';
+import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { directCellFormat } from '../../store/direct-format.js';
 import type { CellFormat } from '../../store/store.js';
@@ -69,7 +70,10 @@ const buildTextOrientation =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyTextOrientationAction'] =>
   (action) => {
     if (action === 'format') {
-      instance.openFormatDialog();
+      openFormatDialogFrom(instance.store, undefined, {
+        origin: 'ribbon',
+        commandId: 'textOrientation',
+      });
       return;
     }
     const rotations: Record<string, NonNullable<CellFormat['rotation']>> = {
@@ -111,6 +115,8 @@ const buildMergeAction =
         workbook: instance.workbook,
         history: instance.history,
         strings: instance.i18n.strings,
+        origin: 'ribbon',
+        commandId: 'merge',
       },
       action,
     ).then((applied) => {
@@ -168,7 +174,8 @@ const buildCurrencyPresetAction =
 const buildCurrencyFooterAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['openCurrencyFooterAction'] =>
   (action) => {
-    if (action === 'more') instance.openFormatDialog();
+    if (action === 'more')
+      openFormatDialogFrom(instance.store, undefined, { origin: 'ribbon', commandId: 'currency' });
   };
 
 const updateCurrencyMenu =

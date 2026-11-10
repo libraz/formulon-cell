@@ -5,6 +5,7 @@ import {
 } from '../../commands/row-col-layout.js';
 import { addrKey } from '../../engine/address.js';
 import type { Locale } from '../../i18n/strings.js';
+import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
 
 // Cell Format ribbon dispatcher. Extracted from main.ts so the playground
 // doesn't carry the dispatch table in module scope. Side effects live on the
@@ -69,7 +70,7 @@ export const applyCellFormatAction = async (
   if (!i || !range) return;
   const t = ribbonMenuText as CellFormatMenuText;
   if (action === 'dialog') {
-    i.openFormatDialog();
+    openFormatDialogFrom(i.store, undefined, { origin: 'ribbon', commandId: 'formatCells' });
     return;
   }
   if (action === 'protect-sheet') {

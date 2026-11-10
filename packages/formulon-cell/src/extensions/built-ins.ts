@@ -37,7 +37,7 @@ import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
 import { attachContextMenu } from '../interact/context-menu.js';
 import { attachFindReplace } from '../interact/find-replace.js';
-import { attachFormatDialog } from '../interact/format-dialog.js';
+import { attachFormatDialog, type FormatDialogHandle } from '../interact/format-dialog.js';
 import { attachFormatPainter } from '../interact/format-painter.js';
 import { attachGoToDialog } from '../interact/goto-dialog.js';
 import { attachHover } from '../interact/hover.js';
@@ -770,7 +770,10 @@ export const contextMenu = (): Extension =>
           strings: ctx.i18n.strings,
           history: ctx.history as History,
           onAfterCommit: () => refreshCells(ctx),
-          onFormatDialog: () => callOpen('formatDialog'),
+          onFormatDialog: () =>
+            ctx
+              .resolve<ExtensionHandle & FormatDialogHandle>('formatDialog')
+              ?.open(undefined, { entry: { origin: 'contextMenu', commandId: 'formatCells' } }),
           onPasteSpecial: () => callOpen('pasteSpecial'),
           onInsertHyperlink: () => callOpen('hyperlink'),
           onEditComment: () => callOpen('commentDialog'),

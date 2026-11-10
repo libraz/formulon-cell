@@ -1,11 +1,16 @@
+import { authorizeWrite } from '../commands/authorized-write.js';
 import {
   canonicalizeLocalizedFormulaForInput,
   inputLocaleForWorkbook,
 } from '../commands/coerce-input.js';
 import { type SelectionFormatAction, setFont } from '../commands/format.js';
 import type { History } from '../commands/history.js';
-import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { expandRangeWithMerges, mergeAt, mergeWillLoseData } from '../commands/merge.js';
+import {
+  expandRangeWithMerges,
+  mergeAt,
+  mergeIntents,
+  mergeWillLoseData,
+} from '../commands/merge.js';
 import { deferForAllowedRangeUnlock, selectionEditRanges } from '../commands/protection.js';
 import {
   planSelectionFormat,
@@ -27,6 +32,7 @@ import type { CellFormat, NumFmt, SpreadsheetStore, State } from '../store/store
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { syncCustomSelects } from './custom-select.js';
+import { type DialogEntry, INSTANCE_API_FORMAT_ENTRY } from './dialog-entry.js';
 import { deferInitialFocus } from './dialog-shell.js';
 import {
   type DraftState,
@@ -79,6 +85,8 @@ export interface FormatDialogDeps {
 }
 
 export interface FormatDialogOpenOptions {
+  /** Who opened the dialog; the instance API when absent. */
+  entry?: DialogEntry;
   /** `numberFormat` shows only the number tab and hands its result to
    *  `onApplyNumberFormat`, writing nothing to the sheet. */
   mode?: 'format' | 'dataValidation' | 'dxf' | 'numberFormat';
@@ -523,6 +531,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   let showMoreTab = false;
   let dialogMode: NonNullable<FormatDialogOpenOptions['mode']> = 'format';
+  let dialogEntry: DialogEntry = INSTANCE_API_FORMAT_ENTRY;
   const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
     const dataValidationMode = mode === 'dataValidation';
     const dxfMode = mode === 'dxf';
@@ -583,11 +592,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     // A multi-area selection has no single merge result. The control is also
     // disabled during hydration, but retain this guard for stale event state.
     if ((state.selection.extraRanges?.length ?? 0) > 0 && mergeAction) return;
-    // Structural merge authorization has no safe dialog intent yet. A
-    // registered restricted controller must reject the complete composite
-    // action before formatting or confirmation can mutate anything.
-    if (mergeAction && interactionControllerFor(store)?.policy) return;
-
+    // A refused merge is reported before the data-loss prompt, not after it.
+    if (
+      mergeAction &&
+      !authorizeWrite(store, mergeIntents(mergeRange, dialogEntry.commandId), dialogEntry.origin)
+        .allowed
+    )
+      return;
     // Ask before any format, value, or merge mutation. The no-loss path does
     // not await, preserving the synchronous behavior of existing callers.
     if (mergeAction === 'merge' && !liveWb && mergeHasNonAnchorContent(state, mergeRange)) return;
@@ -688,6 +699,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       plan,
       action,
       merge: { action: mergeAction, range: mergeRange },
+      entry: dialogEntry,
     });
     if (completed) api.close();
   };
@@ -826,6 +838,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     open(tab?: TabId, options?: FormatDialogOpenOptions): void {
       pickFormat.begin();
       dialogMode = options?.mode ?? 'format';
+      dialogEntry = options?.entry ?? INSTANCE_API_FORMAT_ENTRY;
       const onNumberFormat = options?.onApplyNumberFormat;
       applyDxf =
         options?.mode === 'dxf'

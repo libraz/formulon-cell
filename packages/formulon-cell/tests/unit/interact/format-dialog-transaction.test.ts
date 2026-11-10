@@ -41,6 +41,7 @@ const run = (store: SpreadsheetStore, history: History | null, wb: WorkbookHandl
     plan,
     action: { patch: { bold: true } },
     merge: { action: 'merge', range: state.selection.range },
+    entry: { origin: 'ribbon', commandId: 'formatCells' },
   });
 };
 
