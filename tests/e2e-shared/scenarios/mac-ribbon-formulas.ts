@@ -403,13 +403,17 @@ export async function runMacFunctionCatalogScenario(page: Page): Promise<void> {
   expect(lastLeafBox.y).toBeGreaterThanOrEqual(-1);
   expect(lastLeafBox.y + lastLeafBox.height).toBeLessThanOrEqual(narrowViewport.height + 1);
 
+  // A leaf command closes the folded popup, so Close restores its nearest visible trigger.
+  const functionLibraryCollapse = page.locator(
+    '.fc-tb__ribbon-group--function-library > .fc-tb__ribbon-group-collapse',
+  );
   const narrowCountIf = statisticalPanel.locator('[data-ribbon-command="mac.function.COUNTIF"]');
   await narrowCountIf.click();
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.fc-mac-formula-palette__args-name')).toHaveText('COUNTIF');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.locator('[data-ribbon-command="mac.formulas.more"]')).toBeFocused();
+  await expect(functionLibraryCollapse).toBeFocused();
 
   await sp.clickRibbon('mac.formulas.more');
   await statisticalTrigger.focus();
@@ -421,7 +425,7 @@ export async function runMacFunctionCatalogScenario(page: Page): Promise<void> {
   await expect(dialog.locator('.fc-mac-formula-palette__args-name')).toHaveText('COUNTIF');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.locator('[data-ribbon-command="mac.formulas.more"]')).toBeFocused();
+  await expect(functionLibraryCollapse).toBeFocused();
 
   await sp.clickRibbon('mac.formulas.more');
   await statisticalTrigger.focus();
