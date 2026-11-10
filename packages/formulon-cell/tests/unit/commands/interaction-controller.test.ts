@@ -10,7 +10,7 @@ import {
   viewerPolicy,
 } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
-import { addrKey, MAX_COL } from '../../../src/engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../../../src/engine/address.js';
 import { type Addr, type CellValue, type Range, ValueKind } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -18,14 +18,14 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 const A1 = { sheet: 0, row: 0, col: 0 } as const;
 const B1 = { sheet: 0, row: 0, col: 1 } as const;
 const D4 = { sheet: 0, row: 3, col: 3 } as const;
-const SUBTOTAL_RANGE = { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 3 } as const;
+const SUBTOTAL_BAND = { sheet: 0, r0: 1, c0: 0, r1: MAX_ROW, c1: MAX_COL } as const;
 
 const subtotalStructuralIntent = (
   operation: 'insertRows' | 'deleteRows',
   origin: OperationIntent['origin'],
-  range: Range = SUBTOTAL_RANGE,
+  range: Range = SUBTOTAL_BAND,
   commandId = 'mac.data.subtotal',
-  effects: OperationIntent['effects'] = [{ kind: 'workbook' }, { kind: 'range', range }],
+  effects: OperationIntent['effects'] = [{ kind: 'range', range }],
 ): OperationIntent => ({
   operation,
   origin,
@@ -319,7 +319,7 @@ describe('InteractionController', () => {
     expect(callbackLog).toEqual(['second-undo', 'first-undo']);
   });
 
-  it('routes only the scoped Subtotal structural intents through restricted policy', async () => {
+  it('decides Subtotal row shifts like any row insert or delete over the shifted band', async () => {
     const { controller: service, store } = await createController();
     const seen: string[] = [];
     service.setPolicy({
@@ -343,22 +343,20 @@ describe('InteractionController', () => {
     });
     expect(seen).toEqual(['insertRows:ribbon', 'deleteRows:undo', 'insertRows:redo']);
 
+    // The command id and origin carry no extra rule: the same band decides the same way.
     expect(
-      service.canExecute(subtotalStructuralIntent('insertRows', 'ribbon', SUBTOTAL_RANGE, 'other')),
-    ).toMatchObject({ allowed: false, code: 'unsupported' });
-    expect(service.canExecute(subtotalStructuralIntent('insertRows', 'keyboard'))).toMatchObject({
-      allowed: false,
-      code: 'unsupported',
+      service.canExecute(subtotalStructuralIntent('insertRows', 'ribbon', SUBTOTAL_BAND, 'other')),
+    ).toEqual({ allowed: true });
+    expect(service.canExecute(subtotalStructuralIntent('insertRows', 'keyboard'))).toEqual({
+      allowed: true,
     });
-    expect(
-      service.canExecute(
-        subtotalStructuralIntent('insertRows', 'ribbon', SUBTOTAL_RANGE, 'mac.data.subtotal', [
-          { kind: 'workbook' },
-        ]),
-      ),
-    ).toMatchObject({ allowed: false, code: 'invalid' });
 
     service.setPolicy({ defaultOperation: 'allow' });
+    expect(service.canExecute(subtotalStructuralIntent('insertRows', 'ribbon'))).toEqual({
+      allowed: true,
+    });
+
+    service.setPolicy({ defaultOperation: 'allow', operations: { insertRows: false } });
     expect(service.canExecute(subtotalStructuralIntent('insertRows', 'ribbon'))).toMatchObject({
       allowed: false,
       code: 'operationDenied',
@@ -372,12 +370,26 @@ describe('InteractionController', () => {
 
     service.setPolicy({
       operations: { insertRows: true },
-      editable: { ranges: [SUBTOTAL_RANGE] },
-      restrict: () => true,
+      editable: { ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 9, c1: 3 }] },
     });
     expect(service.canExecute(subtotalStructuralIntent('insertRows', 'ribbon'))).toMatchObject({
       allowed: false,
-      code: 'operationDenied',
+      code: 'cellIneligible',
+    });
+    service.setPolicy({
+      operations: { insertRows: true },
+      editable: { predicate: () => true },
+    });
+    expect(service.canExecute(subtotalStructuralIntent('insertRows', 'ribbon'))).toMatchObject({
+      allowed: false,
+      code: 'cellIneligible',
+    });
+    service.setPolicy({
+      operations: { insertRows: true },
+      editable: { ranges: [{ sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL }] },
+    });
+    expect(service.canExecute(subtotalStructuralIntent('insertRows', 'ribbon'))).toEqual({
+      allowed: true,
     });
 
     service.setPolicy({ operations: { insertRows: true }, restrict: () => true });
@@ -389,7 +401,7 @@ describe('InteractionController', () => {
     setProtectedSheet(store, 0, false);
   });
 
-  it('pins Subtotal structural scope to the active worksheet and full bounds', async () => {
+  it('bounds a shifted band by the configured bounds and the workbook', async () => {
     const partial = await createController({
       getBounds: () => ({ sheet: 0, r0: 0, c0: 0, r1: 9, c1: 2 }),
     });
@@ -402,16 +414,21 @@ describe('InteractionController', () => {
     controller = undefined;
     workbook = undefined;
 
-    const { controller: service, store } = await createController();
-    service.setPolicy({ operations: { insertRows: true } });
-    mutators.setSheetIndex(store, 1);
-    expect(service.canExecute(subtotalStructuralIntent('insertRows', 'ribbon'))).toMatchObject({
-      allowed: false,
-      code: 'outOfBounds',
+    const full = await createController({
+      getBounds: () => ({ sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL }),
     });
+    full.controller.setPolicy({ operations: { insertRows: true } });
+    expect(full.controller.canExecute(subtotalStructuralIntent('insertRows', 'ribbon'))).toEqual({
+      allowed: true,
+    });
+    expect(
+      full.controller.canExecute(
+        subtotalStructuralIntent('insertRows', 'ribbon', { ...SUBTOTAL_BAND, sheet: 99 }),
+      ),
+    ).toMatchObject({ allowed: false, code: 'outOfBounds' });
   });
 
-  it('rechecks recognized Subtotal replay after policy clear without affecting ordinary history', async () => {
+  it('rechecks Subtotal replay under a policy and leaves ordinary history alone', async () => {
     const { controller: service, store, history } = await createController();
     const callbacks: string[] = [];
     service.setPolicy({ operations: { insertRows: true, deleteRows: true } });
@@ -424,18 +441,18 @@ describe('InteractionController', () => {
     });
     history.end();
 
-    service.setPolicy(undefined);
-    mutators.setSheetIndex(store, 1);
-    expect(history.undo()).toBe(false);
-    expect(callbacks).toEqual([]);
-    mutators.setSheetIndex(store, 0);
     setProtectedSheet(store, 0, true);
     expect(history.undo()).toBe(false);
     expect(callbacks).toEqual([]);
     setProtectedSheet(store, 0, false);
+    service.setPolicy({ operations: { insertRows: true, deleteRows: false } });
+    expect(history.undo()).toBe(false);
+    expect(callbacks).toEqual([]);
+    service.setPolicy({ operations: { insertRows: true, deleteRows: true } });
     expect(history.undo()).toBe(true);
     expect(callbacks).toEqual(['subtotal-undo']);
 
+    service.setPolicy(undefined);
     history.push({
       undo: () => callbacks.push('ordinary-undo'),
       redo: () => callbacks.push('ordinary-redo'),
@@ -1054,7 +1071,7 @@ describe('InteractionController', () => {
     restrictedController.setPolicy({ defaultOperation: 'allow' });
     const rejected = restrictedController.execute(command);
     expect(rejected.status).toBe('rejected');
-    expect(rejected.rejected[0]?.code).toBe('unsupported');
+    expect(rejected.rejected[0]?.code).toBe('effectTooLarge');
     expect(restricted.atomicCalls()).toBe(0);
     expect(restricted.formulaScanCalls()).toBe(1);
     expect(restrictedHistory.canUndo()).toBe(false);

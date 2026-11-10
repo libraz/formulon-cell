@@ -243,7 +243,7 @@ export class InteractionController {
     if (this.disposed)
       return this.rejectResult([{ code: 'invalid', reason: 'controller is disposed' }]);
     if (command.type !== 'cellBatch' || !CELL_OPERATIONS.has(command.operation)) {
-      return this.rejectResult([{ code: 'unsupported', reason: 'unsupported cell batch command' }]);
+      return this.rejectResult([{ code: 'invalid', reason: 'unknown cell batch command' }]);
     }
     if (command.changes.length === 0) return initial;
 
@@ -509,7 +509,7 @@ export class InteractionController {
     const merged = mergeCellsFor(state, addr);
     if (merged === null) {
       return {
-        rejection: { addr, code: 'unsupported', reason: 'merged cell range exceeds the limit' },
+        rejection: { addr, code: 'effectTooLarge', reason: 'merged cell range exceeds the limit' },
       };
     }
     const target = mergeAnchorFor(state, addr);

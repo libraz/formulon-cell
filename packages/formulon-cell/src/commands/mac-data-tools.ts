@@ -9,6 +9,7 @@ import { outlineSummaryFor } from '../store/outline-summary.js';
 import { rangeArea, rangesIntersect, sameRange } from '../store/selection-geometry.js';
 import { getPageSetup, mutators, type SpreadsheetStore } from '../store/store.js';
 import { blockDataTableShift } from './data-table-guard.js';
+import { rowShiftBand } from './interaction-effects.js';
 import type { OperationIntent, PermissionDecision } from './interaction-policy.js';
 import { groupRows, ungroupRows } from './outline.js';
 import { isSheetProtected } from './protection.js';
@@ -267,10 +268,9 @@ const subtotalIntents = (
     includesFormula: true,
   };
   const formatEffect = { kind: 'workbook' as const };
-  const structuralEffects = [
-    formatEffect,
-    { kind: 'range' as const, range: { ...range } },
-  ] as const;
+  // Every subtotal row lands at or below the first data row and shifts the rest of the sheet.
+  const shiftedBand = rowShiftBand(range.sheet, range.r0 + 1);
+  const structuralEffects = [{ kind: 'range' as const, range: shiftedBand }] as const;
   const make = (
     origin: 'ribbon' | 'undo' | 'redo',
     structuralOperation: 'insertRows' | 'deleteRows',

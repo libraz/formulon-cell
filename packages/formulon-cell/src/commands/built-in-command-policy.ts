@@ -1,11 +1,12 @@
+import type { Range } from '../engine/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { getRecentFunctions } from './function-history.js';
 import { interactionControllerFor } from './interaction-controller.js';
+import { columnShiftBand, rowShiftBand } from './interaction-effects.js';
 import type {
   InteractionOperation,
   InteractionOrigin,
   OperationEffect,
-  OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
 import { FUNCTION_SIGNATURES } from './refs.js';
@@ -422,6 +423,28 @@ const SELECTION_FORMAT_COMMANDS: ReadonlySet<string> = new Set([
   'numberFormat',
 ]);
 
+/** Operations whose writes touch no cell: decided by the operation alone. */
+const WORKBOOK_EFFECT_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
+  'resizeRows',
+  'resizeColumns',
+  'filter',
+  'namedRange',
+  'sheet',
+  'object',
+  'protection',
+  'pageSetup',
+  'print',
+  'export',
+]);
+
+const shiftedBand = (operation: InteractionOperation, selection: Range): Range | null => {
+  if (operation === 'insertRows' || operation === 'deleteRows')
+    return rowShiftBand(selection.sheet, Math.min(selection.r0, selection.r1));
+  if (operation === 'insertColumns' || operation === 'deleteColumns')
+    return columnShiftBand(selection.sheet, Math.min(selection.c0, selection.c1));
+  return null;
+};
+
 const unsupported = (id: string): PermissionDecision => ({
   allowed: false,
   code: 'unsupported',
@@ -451,20 +474,15 @@ export function canExecuteBuiltIn(
   if (operation === 'format' && !SELECTION_FORMAT_COMMANDS.has(id) && !workbookTheme)
     return unsupported(id);
   const state = store.getState();
-  const selectionFormat =
-    operation === 'format' && SELECTION_FORMAT_COMMANDS.has(id)
-      ? [state.selection.range, ...(state.selection.extraRanges ?? [])].map(
-          (range): OperationEffect => ({ kind: 'range', range }),
-        )
-      : null;
-  const intent: OperationIntent = {
-    operation,
-    origin,
-    commandId: id,
-    effects:
-      operation === 'print' || operation === 'export' || workbookTheme
-        ? [{ kind: 'workbook' }]
-        : (selectionFormat ?? [{ kind: 'range', range: state.selection.range }]),
-  };
-  return controller.canExecute(intent);
+  const selection = state.selection.range;
+  const band = shiftedBand(operation, selection);
+  let effects: readonly OperationEffect[];
+  if (WORKBOOK_EFFECT_OPERATIONS.has(operation) || workbookTheme) effects = [{ kind: 'workbook' }];
+  else if (band) effects = [{ kind: 'range', range: band }];
+  else if (operation === 'format')
+    effects = [selection, ...(state.selection.extraRanges ?? [])].map(
+      (range): OperationEffect => ({ kind: 'range', range }),
+    );
+  else effects = [{ kind: 'range', range: selection }];
+  return controller.canExecute({ operation, origin, commandId: id, effects });
 }

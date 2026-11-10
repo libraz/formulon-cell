@@ -2,29 +2,69 @@ import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { State } from '../store/types.js';
-import type { OperationEffect } from './interaction-policy.js';
+import type { OperationEffect, PermissionDecision } from './interaction-policy.js';
 
 const MAX_MATERIALIZED_CELLS = 100_000;
+
+const isWellFormedRange = (range: Range): boolean =>
+  Number.isInteger(range.sheet) &&
+  Number.isInteger(range.r0) &&
+  Number.isInteger(range.c0) &&
+  Number.isInteger(range.r1) &&
+  Number.isInteger(range.c1) &&
+  range.sheet >= 0 &&
+  range.r0 >= 0 &&
+  range.c0 >= 0 &&
+  range.r1 >= range.r0 &&
+  range.c1 >= range.c0;
+
+const rangeCellCount = (range: Range): number =>
+  (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
+/** The band a row insert/delete shifts: from `firstRow` to the sheet end, full width. */
+export const rowShiftBand = (sheet: number, firstRow: number): Range => ({
+  sheet,
+  r0: firstRow,
+  c0: 0,
+  r1: MAX_ROW,
+  c1: MAX_COL,
+});
+
+/** The band a column insert/delete shifts: from `firstCol` to the sheet end, full height. */
+export const columnShiftBand = (sheet: number, firstCol: number): Range => ({
+  sheet,
+  r0: 0,
+  c0: firstCol,
+  r1: MAX_ROW,
+  c1: MAX_COL,
+});
+
+/** The range of a well-formed range effect too large to enumerate cell by
+ *  cell (a row/column shift band); such a range is checked as a whole. */
+export const bandRange = (effect: OperationEffect): Range | null => {
+  if (effect.kind !== 'range' || !isWellFormedRange(effect.range)) return null;
+  const area = rangeCellCount(effect.range);
+  return Number.isSafeInteger(area) && area <= MAX_MATERIALIZED_CELLS ? null : effect.range;
+};
+
+/** The refusal for an effect `effectCells` cannot enumerate: a malformed range
+ *  is invalid input, anything else names more cells than the bound. */
+export const unenumerableEffect = (effect: OperationEffect): PermissionDecision =>
+  effect.kind === 'range' && !isWellFormedRange(effect.range)
+    ? { allowed: false, code: 'invalid', reason: 'affected range is malformed' }
+    : {
+        allowed: false,
+        code: 'effectTooLarge',
+        reason: 'affected range exceeds the authorization bound',
+      };
 
 export const effectCells = (effect: OperationEffect): readonly Addr[] | null => {
   if (effect.kind === 'cells')
     return effect.cells.length <= MAX_MATERIALIZED_CELLS ? effect.cells : null;
   if (effect.kind === 'workbook') return [];
   const { range } = effect;
-  if (
-    !Number.isInteger(range.sheet) ||
-    !Number.isInteger(range.r0) ||
-    !Number.isInteger(range.c0) ||
-    !Number.isInteger(range.r1) ||
-    !Number.isInteger(range.c1) ||
-    range.sheet < 0 ||
-    range.r0 < 0 ||
-    range.c0 < 0 ||
-    range.r1 < range.r0 ||
-    range.c1 < range.c0
-  )
-    return null;
-  const area = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+  if (!isWellFormedRange(range)) return null;
+  const area = rangeCellCount(range);
   if (!Number.isSafeInteger(area) || area < 0 || area > MAX_MATERIALIZED_CELLS) return null;
   const cells: Addr[] = [];
   for (let row = range.r0; row <= range.r1; row += 1) {

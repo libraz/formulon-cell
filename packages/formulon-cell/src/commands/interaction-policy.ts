@@ -12,34 +12,37 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 /** Operations that can be authorized by an embedded instance. Keep this list
  * finite: a new command must be classified before a restricted profile can
  * opt into it. */
-export type InteractionOperation =
-  | 'valueEdit'
-  | 'formulaEdit'
-  | 'clear'
-  | 'paste'
-  | 'fill'
-  | 'moveCells'
-  | 'format'
-  | 'insertRows'
-  | 'deleteRows'
-  | 'insertColumns'
-  | 'deleteColumns'
-  | 'resizeRows'
-  | 'resizeColumns'
-  | 'sort'
-  | 'merge'
-  | 'filter'
-  | 'table'
-  | 'comment'
-  | 'hyperlink'
-  | 'validation'
-  | 'namedRange'
-  | 'sheet'
-  | 'object'
-  | 'protection'
-  | 'pageSetup'
-  | 'print'
-  | 'export';
+export const INTERACTION_OPERATIONS = [
+  'valueEdit',
+  'formulaEdit',
+  'clear',
+  'paste',
+  'fill',
+  'moveCells',
+  'format',
+  'insertRows',
+  'deleteRows',
+  'insertColumns',
+  'deleteColumns',
+  'resizeRows',
+  'resizeColumns',
+  'sort',
+  'merge',
+  'filter',
+  'table',
+  'comment',
+  'hyperlink',
+  'validation',
+  'namedRange',
+  'sheet',
+  'object',
+  'protection',
+  'pageSetup',
+  'print',
+  'export',
+] as const;
+
+export type InteractionOperation = (typeof INTERACTION_OPERATIONS)[number];
 
 export type InteractionOrigin =
   | 'editor'
@@ -62,6 +65,7 @@ export type PermissionCode =
   | 'cellIneligible'
   | 'protected'
   | 'outOfBounds'
+  | 'effectTooLarge'
   | 'unsupported'
   | 'invalid';
 
@@ -258,22 +262,53 @@ export function isPolicyCellEligible(
   return editable.predicate({ addr, operation, origin });
 }
 
-/** Whether a dialog or command classified as `operation` may run: always without a policy or
- *  for `null` (nothing to edit), else as the policy decides the operation. */
-export const policyPermits = (
-  policy: InteractionPolicy | undefined,
-  operation: InteractionOperation | null,
-): boolean => operation === null || policy === undefined || operationPermission(policy, operation);
+/** Whether every cell of a range too large to enumerate is eligible under the
+ *  host policy: one editable range must cover it; a predicate cannot. */
+export function isPolicyRangeEligible(
+  policy: InteractionPolicy,
+  range: Range,
+  wb: WorkbookHandle,
+): boolean {
+  if (!policy.editable) return true;
+  const editable = normalizeEditable(policy.editable);
+  if (!('ranges' in editable)) return false;
+  const first: Addr = { sheet: range.sheet, row: range.r0, col: range.c0 };
+  const last: Addr = { sheet: range.sheet, row: range.r1, col: range.c1 };
+  return editablePatterns(editable.ranges).some(
+    (pattern) => patternContainsAddr(pattern, first, wb) && patternContainsAddr(pattern, last, wb),
+  );
+}
+
+/** The policy's decision for an operation before any cell effect is checked.
+ *  The authorizer starts every policy decision here, and `policyPermits` is
+ *  this decision's allowed flag, so the two agree by construction. */
+export function operationDecision(
+  policy: InteractionPolicy,
+  operation: InteractionOperation,
+): PermissionDecision {
+  const readOnly = policy.readOnly === true && isMutatingInteraction(operation);
+  if (readOnly) return { allowed: false, code: 'readOnly', reason: 'instance policy is read-only' };
+  const configured = policy.operations?.[operation];
+  const allowed =
+    configured !== undefined ? configured : (policy.defaultOperation ?? 'deny') === 'allow';
+  if (allowed) return { allowed: true };
+  return { allowed: false, code: 'operationDenied', reason: `operation ${operation} is denied` };
+}
 
 export function operationPermission(
   policy: InteractionPolicy,
   operation: InteractionOperation,
 ): boolean {
-  if (policy.readOnly && isMutatingInteraction(operation)) return false;
-  const configured = policy.operations?.[operation];
-  if (configured !== undefined) return configured;
-  return (policy.defaultOperation ?? 'deny') === 'allow';
+  return operationDecision(policy, operation).allowed;
 }
+
+/** Whether a dialog or command classified as `operation` may run: always without a policy or
+ *  for `null` (nothing to edit), else as the policy decides the operation. */
+export const policyPermits = (
+  policy: InteractionPolicy | undefined,
+  operation: InteractionOperation | null,
+): boolean =>
+  operation === null || policy === undefined || operationDecision(policy, operation).allowed;
 
 /** Viewer profile: users can select and copy, while every mutation remains
  * denied. Print/export are deliberately left for an explicit host choice. */

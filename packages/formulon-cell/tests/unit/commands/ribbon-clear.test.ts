@@ -620,7 +620,7 @@ describe('executeRibbonClearAction', () => {
     }
   });
 
-  it('fails closed before content when Clear All contains unsupported comment metadata', async () => {
+  it('decides Clear All over comment metadata by the comment permission', async () => {
     const store = createSpreadsheetStore();
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const history = new History();
@@ -635,12 +635,21 @@ describe('executeRibbonClearAction', () => {
       const base = fixedFormPolicy([{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }]);
       controller.setPolicy({
         ...base,
-        operations: { ...base.operations, clear: true, format: true, comment: true },
+        operations: { ...base.operations, clear: true, format: true, comment: false },
       });
       executeRibbonClearAction({ store, workbook, history, action: 'all' });
       expect(workbook.getValue(addr)).toEqual({ kind: 'number', value: 7 });
       expect(commentAt(store.getState(), addr)).toBe('protected metadata');
       expect(history.canUndo()).toBe(false);
+
+      controller.setPolicy({
+        ...base,
+        operations: { ...base.operations, clear: true, format: true, comment: true },
+      });
+      executeRibbonClearAction({ store, workbook, history, action: 'all' });
+      expect(workbook.getValue(addr).kind).toBe('blank');
+      expect(commentAt(store.getState(), addr)).toBeNull();
+      expect(history.canUndo()).toBe(true);
     } finally {
       unregister();
       controller.dispose();

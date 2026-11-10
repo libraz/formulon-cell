@@ -1,68 +1,29 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { rangeContainsAddr } from '../store/selection-geometry.js';
+import { rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { AUTO_HYPERLINK_COMMAND_ID } from './auto-hyperlink.js';
 import type { HistoryDirection, HistoryEntry } from './history.js';
 import {
+  bandRange,
   createWorkbookAddressCheck,
   effectCells,
   isWorkbookAddress,
   mergeCellsFor,
+  unenumerableEffect,
 } from './interaction-effects.js';
 import {
-  type InteractionOperation,
   type InteractionPolicy,
   isMutatingInteraction,
   isPolicyCellEligible,
+  isPolicyRangeEligible,
+  type OperationEffect,
   type OperationIntent,
-  operationPermission,
+  operationDecision,
   type PermissionDecision,
 } from './interaction-policy.js';
 import { isCellWritable, isSheetProtected, protectedSheetPermissions } from './protection.js';
-
-const IMPLEMENTED_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
-  'valueEdit',
-  'formulaEdit',
-  'clear',
-  'format',
-  'paste',
-  'fill',
-  'moveCells',
-  'print',
-  'export',
-]);
-const MAC_SUBTOTAL_COMMAND_ID = 'mac.data.subtotal';
-const MAC_REMOVE_HYPERLINK_COMMAND_ID = 'mac.automate.removeHyperlinks';
-
-const macSubtotalStructuralOperation = (
-  intent: OperationIntent,
-): 'insertRows' | 'deleteRows' | null => {
-  if (intent.commandId !== MAC_SUBTOTAL_COMMAND_ID) return null;
-  if (intent.operation === 'insertRows' && (intent.origin === 'ribbon' || intent.origin === 'redo'))
-    return 'insertRows';
-  if (intent.operation === 'deleteRows' && intent.origin === 'undo') return 'deleteRows';
-  return null;
-};
-
-const macSubtotalStructuralRange = (intent: OperationIntent): Range | null => {
-  if (macSubtotalStructuralOperation(intent) === null || intent.effects.length !== 2) return null;
-  let workbookEffects = 0;
-  let range: Range | undefined;
-  for (const effect of intent.effects) {
-    if (effect.kind === 'workbook') {
-      workbookEffects += 1;
-      continue;
-    }
-    if (effect.kind !== 'range' || effect.includesFormula !== undefined || range) return null;
-    range = effect.range;
-  }
-  return workbookEffects === 1 && range ? range : null;
-};
-
-const ownsMacRemoveHyperlinkCommand = (intent: OperationIntent): boolean =>
-  intent.commandId === MAC_REMOVE_HYPERLINK_COMMAND_ID;
 
 const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
   if (
@@ -95,22 +56,6 @@ const hasEditablePredicate = (policy: InteractionPolicy | undefined): boolean =>
     typeof editable === 'function' ||
     (editable !== undefined && !Array.isArray(editable) && 'predicate' in editable)
   );
-};
-
-const macRemoveHyperlinkCells = (intent: OperationIntent): readonly Addr[] | null => {
-  if (!ownsMacRemoveHyperlinkCommand(intent)) return null;
-  if (
-    intent.operation !== 'hyperlink' ||
-    (intent.origin !== 'ribbon' && intent.origin !== 'undo' && intent.origin !== 'redo') ||
-    intent.effects.length !== 1
-  )
-    return null;
-  const effect = intent.effects[0];
-  if (effect?.kind !== 'cells' || effect.includesFormula !== undefined || effect.cells.length === 0)
-    return null;
-  const sheet = effect.cells[0]?.sheet;
-  if (sheet === undefined || effect.cells.some((addr) => addr.sheet !== sheet)) return null;
-  return effect.cells;
 };
 
 type CanExecute = (intent: OperationIntent) => PermissionDecision;
@@ -185,19 +130,6 @@ export class InteractionAuthorizer {
         if (!policy) return this.legacyDecision(intent, isAddress);
         return this.policyDecision(intent, policy, isAddress);
       }
-      if (ownsMacRemoveHyperlinkCommand(intent)) {
-        if (!macRemoveHyperlinkCells(intent)) {
-          return {
-            allowed: false,
-            code: 'invalid',
-            reason: 'Remove hyperlinks authorization needs one nonempty same-sheet cell effect',
-          };
-        }
-        if (!policy) return this.legacyDecision(intent, isAddress);
-        return this.policyDecision(intent, policy, isAddress);
-      }
-      if (macSubtotalStructuralOperation(intent) !== null)
-        return this.macSubtotalStructuralDecision(intent, policy, isAddress);
       if (!policy) return this.legacyDecision(intent, isAddress);
       return this.policyDecision(intent, policy, isAddress);
     } catch {
@@ -205,141 +137,27 @@ export class InteractionAuthorizer {
     }
   }
 
-  private macSubtotalStructuralDecision(
-    intent: OperationIntent,
-    policy: InteractionPolicy | undefined,
-    isAddress: WorkbookAddressCheck,
-  ): PermissionDecision {
-    const range = macSubtotalStructuralRange(intent);
-    if (!range) {
-      return {
-        allowed: false,
-        code: 'invalid',
-        reason: 'Subtotal structural authorization needs one workbook and one range effect',
-      };
-    }
-    const state = this.store.getState();
-    if (range.sheet !== state.data.sheetIndex) {
-      return {
-        allowed: false,
-        code: 'outOfBounds',
-        reason: 'Subtotal structural authorization must target the active sheet',
-      };
-    }
-    if (
-      !Number.isInteger(range.sheet) ||
-      !Number.isInteger(range.r0) ||
-      !Number.isInteger(range.c0) ||
-      !Number.isInteger(range.r1) ||
-      !Number.isInteger(range.c1) ||
-      range.r0 < 0 ||
-      range.c0 < 0 ||
-      range.r1 < range.r0 ||
-      range.c1 < range.c0 ||
-      !isAddress({ sheet: range.sheet, row: range.r0, col: range.c0 }) ||
-      !isAddress({ sheet: range.sheet, row: range.r1, col: range.c1 })
-    ) {
-      return {
-        allowed: false,
-        code: 'outOfBounds',
-        reason: 'Subtotal structural authorization range is outside the worksheet',
-      };
-    }
-    if (isSheetProtected(state, range.sheet)) {
-      return {
-        allowed: false,
-        code: 'protected',
-        reason: 'Subtotal structural authorization targets a protected sheet',
-      };
-    }
-
-    if (!policy) return { allowed: true };
-    if (!operationPermission(policy, intent.operation)) {
-      return {
-        allowed: false,
-        code:
-          policy.readOnly && isMutatingInteraction(intent.operation)
-            ? 'readOnly'
-            : 'operationDenied',
-        reason:
-          policy.readOnly && isMutatingInteraction(intent.operation)
-            ? 'instance policy is read-only'
-            : `operation ${intent.operation} is denied`,
-      };
-    }
-    if (policy.operations?.[intent.operation] !== true) {
-      return {
-        allowed: false,
-        code: 'operationDenied',
-        reason: `operation ${intent.operation} needs explicit structural permission`,
-      };
-    }
-    if (policy.editable !== undefined) {
-      return {
-        allowed: false,
-        code: 'operationDenied',
-        reason: 'editable cell policy cannot authorize workbook row structure',
-      };
-    }
-    const bounds = this.getBounds?.();
-    if (
-      bounds &&
-      (bounds.sheet !== range.sheet ||
-        bounds.r0 !== 0 ||
-        bounds.c0 !== 0 ||
-        bounds.r1 !== MAX_ROW ||
-        bounds.c1 !== MAX_COL)
-    ) {
-      return {
-        allowed: false,
-        code: 'outOfBounds',
-        reason: 'Subtotal structural authorization needs the full target worksheet bound',
-      };
-    }
-    return this.applyRestriction(policy, intent, { allowed: true });
-  }
-
   private policyDecision(
     intent: OperationIntent,
     policy: InteractionPolicy,
     isAddress: WorkbookAddressCheck,
   ): PermissionDecision {
-    if (
-      !IMPLEMENTED_OPERATIONS.has(intent.operation) &&
-      !macRemoveHyperlinkCells(intent) &&
-      !automaticHyperlinkCell(intent)
-    ) {
-      return {
-        allowed: false,
-        code: 'unsupported',
-        reason: `operation ${intent.operation} is not routed yet`,
-      };
-    }
-    if (!operationPermission(policy, intent.operation)) {
-      return {
-        allowed: false,
-        code:
-          policy.readOnly && isMutatingInteraction(intent.operation)
-            ? 'readOnly'
-            : 'operationDenied',
-        reason:
-          policy.readOnly && isMutatingInteraction(intent.operation)
-            ? 'instance policy is read-only'
-            : `operation ${intent.operation} is denied`,
-      };
-    }
+    const operation = operationDecision(policy, intent.operation);
+    if (!operation.allowed) return operation;
 
     const cells: Addr[] = [];
     const formulaCells: Addr[] = [];
+    const formulaBands: OperationEffect[] = [];
     for (const effect of intent.effects) {
-      const addresses = effectCells(effect);
-      if (addresses === null) {
-        return {
-          allowed: false,
-          code: 'unsupported',
-          reason: 'affected range exceeds the authorization bound',
-        };
+      const band = bandRange(effect);
+      if (band) {
+        const decision = this.bandDecision(intent, band, policy, isAddress);
+        if (!decision.allowed) return decision;
+        if (effect.kind !== 'workbook' && effect.includesFormula) formulaBands.push(effect);
+        continue;
       }
+      const addresses = effectCells(effect);
+      if (addresses === null) return unenumerableEffect(effect);
       cells.push(...addresses);
       if (effect.kind !== 'workbook' && effect.includesFormula) formulaCells.push(...addresses);
     }
@@ -352,7 +170,7 @@ export class InteractionAuthorizer {
       if (merged === null) {
         return {
           allowed: false,
-          code: 'unsupported',
+          code: 'effectTooLarge',
           addr: requestedAddr,
           reason: 'merged cell range exceeds the authorization bound',
         };
@@ -396,12 +214,20 @@ export class InteractionAuthorizer {
         }
       }
     }
-    if (formulaCells.length > 0 && intent.operation !== 'formulaEdit') {
+    if (
+      (formulaCells.length > 0 || formulaBands.length > 0) &&
+      intent.operation !== 'formulaEdit'
+    ) {
       const formulaDecision = this.policyDecision(
         {
           ...intent,
           operation: 'formulaEdit',
-          effects: [{ kind: 'cells', cells: formulaCells, includesFormula: true }],
+          effects: [
+            ...(formulaCells.length > 0
+              ? [{ kind: 'cells' as const, cells: formulaCells, includesFormula: true }]
+              : []),
+            ...formulaBands,
+          ],
         },
         policy,
         isAddress,
@@ -415,15 +241,18 @@ export class InteractionAuthorizer {
   /** Authorize a complete intent, including every cell effect and any formula
    * capability implied by a value/paste/fill command. */
   preflightIntent(intent: OperationIntent, canExecute: CanExecute): PermissionDecision {
-    if (macSubtotalStructuralOperation(intent) !== null) return canExecute(intent);
     const global = canExecute({ ...intent, effects: [{ kind: 'workbook' }] });
     if (!global.allowed) return global;
     const cells: Addr[] = [];
     const formulaCells: Addr[] = [];
     for (const effect of intent.effects) {
+      if (bandRange(effect)) {
+        const decision = canExecute({ ...intent, effects: [effect] });
+        if (!decision.allowed) return decision;
+        continue;
+      }
       const addresses = effectCells(effect);
-      if (addresses === null)
-        return { allowed: false, code: 'unsupported', reason: 'invalid affected range' };
+      if (addresses === null) return unenumerableEffect(effect);
       cells.push(...addresses);
       if (effect.kind !== 'workbook' && effect.includesFormula) formulaCells.push(...addresses);
     }
@@ -455,34 +284,60 @@ export class InteractionAuthorizer {
   }
 
   guardHistory(entry: HistoryEntry, direction: HistoryDirection, canExecute: CanExecute): boolean {
+    // Under a policy every intent is preflighted; without one it still meets bounds and protection.
+    const replayable = (intent: OperationIntent): boolean =>
+      this.policy && !ownsAutomaticHyperlinkCommand(intent)
+        ? this.preflightIntent(intent, canExecute).allowed
+        : canExecute(intent).allowed;
     const replayAuthorization = entry.replayAuthorization;
     if (replayAuthorization) {
       const intents = direction === 'undo' ? replayAuthorization.undo : replayAuthorization.redo;
-      if (intents.length === 0) return false;
-      let allowed = true;
-      for (const intent of intents) {
-        if (
-          macSubtotalStructuralOperation(intent) !== null ||
-          ownsMacRemoveHyperlinkCommand(intent) ||
-          ownsAutomaticHyperlinkCommand(intent)
-        ) {
-          if (!canExecute(intent).allowed) allowed = false;
-        } else if (this.policy && !this.preflightIntent(intent, canExecute).allowed) {
-          allowed = false;
-        }
-      }
-      return allowed;
+      return intents.length > 0 && intents.every(replayable);
     }
     const intent = direction === 'undo' ? entry.inverseIntent : entry.intent;
     if (!intent) return this.policy === undefined;
-    if (
-      macSubtotalStructuralOperation(intent) !== null ||
-      ownsMacRemoveHyperlinkCommand(intent) ||
-      ownsAutomaticHyperlinkCommand(intent)
-    )
-      return canExecute(intent).allowed;
-    if (!this.policy) return true;
-    return this.preflightIntent(intent, canExecute).allowed;
+    return replayable(intent);
+  }
+
+  /** Decide a range too large to enumerate (a row/column shift band) as a
+   *  whole: bounds, workbook address, editable cells and sheet protection. */
+  private bandDecision(
+    intent: OperationIntent,
+    range: Range,
+    policy: InteractionPolicy | undefined,
+    isAddress: WorkbookAddressCheck,
+  ): PermissionDecision {
+    const first: Addr = { sheet: range.sheet, row: range.r0, col: range.c0 };
+    const last: Addr = { sheet: range.sheet, row: range.r1, col: range.c1 };
+    const bounds = policy ? this.getBounds?.() : undefined;
+    if (bounds && !rangeContainsRange(bounds, range)) {
+      return {
+        allowed: false,
+        code: 'outOfBounds',
+        addr: first,
+        reason: 'range is outside the configured bounds',
+      };
+    }
+    if (!isAddress(first) || !isAddress(last)) {
+      return {
+        allowed: false,
+        code: 'outOfBounds',
+        addr: first,
+        reason: 'range is outside the workbook',
+      };
+    }
+    if (!isMutatingInteraction(intent.operation)) return { allowed: true };
+    if (policy && !isPolicyRangeEligible(policy, range, this.getWb())) {
+      return {
+        allowed: false,
+        code: 'cellIneligible',
+        addr: first,
+        reason: 'range is outside editable cells',
+      };
+    }
+    if (isSheetProtected(this.store.getState(), range.sheet))
+      return { allowed: false, code: 'protected', addr: first, reason: 'sheet is protected' };
+    return { allowed: true };
   }
 
   private legacyDecision(
@@ -490,8 +345,15 @@ export class InteractionAuthorizer {
     isAddress: WorkbookAddressCheck,
   ): PermissionDecision {
     for (const effect of intent.effects) {
-      const addresses = effectCells(effect);
-      if (addresses === null) return { allowed: false, code: 'unsupported' };
+      const band = bandRange(effect);
+      if (band) {
+        const decision = this.bandDecision(intent, band, undefined, isAddress);
+        if (!decision.allowed) return decision;
+        continue;
+      }
+      // No host callback runs per cell without a policy, so a cell list of any length is checked.
+      const addresses = effect.kind === 'cells' ? effect.cells : effectCells(effect);
+      if (addresses === null) return unenumerableEffect(effect);
       for (const addr of addresses) {
         if (!isAddress(addr)) return { allowed: false, code: 'outOfBounds', addr };
         if (

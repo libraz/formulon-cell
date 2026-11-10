@@ -609,7 +609,7 @@ describe('Mac automation gallery', () => {
         commandId: 'other.hyperlink.command',
         effects: [{ kind: 'cells', cells: [{ sheet: 0, row: 60, col: 5 }] }],
       }),
-    ).toMatchObject({ allowed: false, code: 'unsupported' });
+    ).toMatchObject({ allowed: false, code: 'protected' });
   });
 
   it('replays singular hyperlink history through policy and legacy guards', async () => {
@@ -646,7 +646,8 @@ describe('Mac automation gallery', () => {
     expect(history.undo()).toBe(true);
     expect(history.redo()).toBe(true);
     expect(callbacks).toEqual(['undo', 'redo']);
-    expect(origins).toEqual(['undo', 'redo']);
+    // Replay preflight checks the intent as a whole, then each affected cell.
+    expect(origins).toEqual(['undo', 'undo', 'redo', 'redo']);
 
     controller.setPolicy(undefined);
     setProtectedSheet(store, 0, true);
