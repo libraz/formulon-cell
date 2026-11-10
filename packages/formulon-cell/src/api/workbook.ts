@@ -7,6 +7,8 @@ import {
   type Chart as EngineChart,
   type Drawing as EngineDrawing,
   type Picture as EnginePicture,
+  type Pivot as EnginePivot,
+  type PivotCache as EnginePivotCache,
   type Shape as EngineShape,
   type Sheet as EngineSheet,
   type Slicer as EngineSlicer,
@@ -55,6 +57,8 @@ import type {
 } from './facade-context.js';
 import { Lifecycle } from './lifecycle.js';
 import { SHEET_OOXML_MEMBERS, SheetOoxml, WORKBOOK_OOXML_MEMBERS, WorkbookOoxml } from './ooxml.js';
+import { PIVOT_MEMBERS, Pivot, SHEET_PIVOT_MEMBERS } from './pivot.js';
+import { PIVOT_CACHE_MEMBERS, PivotCache, WORKBOOK_PIVOT_CACHE_MEMBERS } from './pivot-cache.js';
 import { SHEET_CELL_MEMBERS } from './sheet-cells.js';
 import { SHEET_FORMAT_MEMBERS, WORKBOOK_FORMAT_MEMBERS } from './sheet-format.js';
 import { SHEET_STRUCTURE_MEMBERS, WORKBOOK_NAME_MEMBERS } from './sheet-structure.js';
@@ -548,7 +552,7 @@ const workbookContext = (wb: Workbook): WorkbookContext => {
     facade: (engine, cls) => facadeOf(wb, engine, cls),
     engineOf: (value) =>
       typeof value === 'object' && value !== null
-        ? (handleEngines.get(value)?.engine ?? value)
+        ? (handleEngines.get(value)?.engine ?? sheetEngines.get(value as Sheet)?.engine ?? value)
         : value,
   };
 };
@@ -810,6 +814,10 @@ installMembers(handleHost<EnginePicture>(Picture.prototype), PICTURE_MEMBERS);
 installMembers(handleHost<EngineShape>(Shape.prototype), SHAPE_MEMBERS);
 installMembers(handleHost<EngineSlicer>(Slicer.prototype), SLICER_MEMBERS);
 installMembers(handleHost<EngineChart>(Chart.prototype), CHART_MEMBERS);
+installMembers(SHEET_HOST, SHEET_PIVOT_MEMBERS);
+installMembers(WORKBOOK_HOST, WORKBOOK_PIVOT_CACHE_MEMBERS);
+installMembers(handleHost<EnginePivot>(Pivot.prototype), PIVOT_MEMBERS);
+installMembers(handleHost<EnginePivotCache>(PivotCache.prototype), PIVOT_CACHE_MEMBERS);
 
 /** @internal The engine binding behind a facade workbook. */
 export const workbookHandleOf = (wb: Workbook): WorkbookHandle => stateOf(wb).handle;

@@ -118,6 +118,7 @@ export type FacadeChangeKind =
   | 'table'
   | 'autoFilter'
   | 'drawing'
+  | 'pivot'
   | 'sparklineGroups'
   | 'print'
   | 'cf'

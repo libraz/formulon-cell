@@ -5,6 +5,12 @@ export type { Drawing, DrawingRef, Picture, Shape, Slicer } from './api/drawing.
 export { type SpreadsheetFailure, spreadsheetFailureOf } from './api/errors.js';
 export type { Disposer } from './api/events.js';
 export type { SheetOoxml, WorkbookOoxml } from './api/ooxml.js';
+export type { Pivot, PivotInput, PivotRef } from './api/pivot.js';
+export type {
+  PivotCache,
+  PivotCacheRef,
+  PivotWorksheetSourceInput,
+} from './api/pivot-cache.js';
 export type { ExportCsvOptions, ImportCsvOptions } from './api/sheet-cells.js';
 export type { ProtectOptions } from './api/sheet-format.js';
 export type { Table, TableRef } from './api/table.js';

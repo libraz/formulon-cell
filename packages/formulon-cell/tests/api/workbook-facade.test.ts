@@ -1,4 +1,12 @@
-import { ChartPlotType, FormulonError, StatusCode, ValueKind } from '@libraz/formulon';
+import {
+  ChartPlotType,
+  FormulonError,
+  PivotAggregation,
+  PivotAxis,
+  PivotCellKind,
+  StatusCode,
+  ValueKind,
+} from '@libraz/formulon';
 import { SAVE_FORMATS, Workbook } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it } from 'vitest';
 import { expectFailure, expectFailureAsync, expectFormulonError } from './helpers.js';
@@ -354,6 +362,21 @@ describe('slicer', () => {
   });
 });
 
+const pivotSource = async () => {
+  const wb = await createWorkbook();
+  const s = wb.sheet(0);
+  s.setValues('A1', [
+    ['Region', 'Amount'],
+    ['East', 10],
+    ['West', 20],
+    ['East', 5],
+  ]);
+  const cache = wb.addPivotCache();
+  cache.setWorksheetSource({ range: 'A1:B4', sheet: s });
+  cache.refresh();
+  return { wb, s, cache };
+};
+
 describe('pivot cache', () => {
   it('adds a cache with a worksheet source and removes it', async () => {
     const wb = await createWorkbook();
@@ -367,9 +390,57 @@ describe('pivot cache', () => {
     wb.removePivotCache(cache);
     expectFormulonError(() => cache.getWorksheetSource(), StatusCode.NotFound);
   });
+
+  it('lists its fields after a refresh and announces cache writes', async () => {
+    const { wb, cache } = await pivotSource();
+    expect(cache.listFields().map((f) => f.name)).toEqual(['Region', 'Amount']);
+    expect(cache.workbook).toBe(wb);
+    expect(wb.listPivotCaches()).toEqual([cache]);
+    const parts: unknown[] = [];
+    wb.on('change', (e) => parts.push(...e.parts));
+    cache.updateOptions({});
+    expect(parts).toEqual(['pivot']);
+  });
+
+  it('refuses to remove a cache a pivot still uses', async () => {
+    const { wb, s, cache } = await pivotSource();
+    s.addPivot({ name: 'P', cacheId: cache, anchor: 'D1' });
+    expectFormulonError(() => wb.removePivotCache(cache), StatusCode.PreconditionFailed);
+  });
 });
 
 describe('pivot', () => {
+  it('adds a pivot over a cache handle, lays it out and keeps one facade per pivot', async () => {
+    const { s, cache } = await pivotSource();
+    const p = s.addPivot({ name: 'ByRegion', cacheId: cache, anchor: 'D1' });
+    p.setFieldAxis('Region', PivotAxis.Row);
+    p.addDataField({ fieldIndex: 'Amount', aggregation: PivotAggregation.Sum });
+    expect(s.pivot('ByRegion')).toBe(p);
+    expect(s.listPivots()).toEqual([p]);
+    expect(p.cache()).toBe(cache);
+    expect(p.sheet).toBe(s);
+    expect(p.getLayout().range).not.toBeNull();
+    expect(s.getValue('D1')).not.toBeNull();
+  });
+
+  it('shows the details of a value cell on a new sheet facade', async () => {
+    const { wb, s, cache } = await pivotSource();
+    const p = s.addPivot({ name: 'P', cacheId: cache, anchor: 'D1' });
+    p.setFieldAxis('Region', PivotAxis.Row);
+    p.addDataField({ fieldIndex: 'Amount', aggregation: PivotAggregation.Sum });
+    const value = p.getLayout().cells.find((c) => c.kind === PivotCellKind.Data);
+    if (!value) throw new Error('no value cell');
+    const details = p.showDetails(value.row, value.col);
+    expect(wb.listSheets()).toContain(details);
+  });
+
+  it('removes a pivot; its stale handle throws NotFound', async () => {
+    const { s, cache } = await pivotSource();
+    const p = s.addPivot({ name: 'P', cacheId: cache, anchor: 'D1' });
+    s.removePivot(p);
+    expectFormulonError(() => p.getProperties(), StatusCode.NotFound);
+  });
+
   it('pivot lookups by an unknown name throw NotFound', async () => {
     const wb = await createWorkbook();
     expectFormulonError(() => wb.sheet(0).pivot('Missing'), StatusCode.NotFound);
