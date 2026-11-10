@@ -164,8 +164,8 @@ const emptyAutoFilterColumn = (columnOffset: number): AutoFilterColumnInput => (
   dynamicType: DynamicFilterType.Null,
   dynamicValue: null,
   dynamicMaxValue: null,
-  valueIso: '',
-  maxValueIso: '',
+  valueIso: null,
+  maxValueIso: null,
   dxfIndex: null,
   cellColor: false,
   iconSet: 0,
@@ -405,7 +405,7 @@ function sortStateFromSpec(spec: FilterSortSpec): AutoFilterSortStateInput {
       },
       descending: key.direction === 'desc',
       sortBy: SORT_BY_VALUE,
-      customList: '',
+      customList: null,
     })),
   };
 }
@@ -419,7 +419,7 @@ function sortSpecFromTyped(typed: AutoFilter, range: Range): FilterSortSpec | nu
     .filter(
       (condition) =>
         condition.sortBy === SORT_BY_VALUE &&
-        condition.customList === '' &&
+        condition.customList === null &&
         condition.range.firstCol >= range.c0 &&
         condition.range.firstCol <= range.c1,
     )

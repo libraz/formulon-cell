@@ -356,7 +356,7 @@ const hydrateEngineComments = (
     sheet: number;
     row: number;
     col: number;
-    author: string;
+    author: string | null;
     text: string;
     visible?: boolean;
   }> = [];

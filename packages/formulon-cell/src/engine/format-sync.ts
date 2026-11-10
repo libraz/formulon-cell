@@ -6,7 +6,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
 type EngineCommentEntry = {
   row: number;
   col: number;
-  author: string;
+  author: string | null;
   text: string;
   visible?: boolean;
 };
@@ -46,7 +46,7 @@ export function hydrateCommentsAndHyperlinksFromEngine(
           key: addrKey({ sheet, row: e.row, col: e.col }),
           patch: {
             comment: e.text,
-            commentAuthor: e.author,
+            commentAuthor: e.author ?? undefined,
             ...(e.visible ? { commentVisible: true } : {}),
           },
         });
@@ -64,7 +64,7 @@ export function hydrateCommentsAndHyperlinksFromEngine(
             key: addrKey(c.addr),
             patch: {
               comment: e.text,
-              commentAuthor: e.author,
+              commentAuthor: e.author ?? undefined,
               ...(e.visible ? { commentVisible: true } : {}),
             },
           });

@@ -60,7 +60,7 @@ interface ShiftCellRecord extends CellRecord {
 
 interface EngineCommentRecord {
   addr: Addr;
-  author: string;
+  author: string | null;
   text: string;
   visible: boolean;
 }

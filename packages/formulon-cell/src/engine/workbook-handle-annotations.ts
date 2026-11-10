@@ -36,7 +36,8 @@ type WorkbookHandleInternals = {
 
 /** A legacy note. `visible` is present only for a note shown without hovering. */
 export interface EngineNoteEntry {
-  author: string;
+  /** The note's author; null when it has none. */
+  author: string | null;
   text: string;
   visible?: true;
 }
@@ -250,7 +251,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
     sheet: number,
     row: number,
     col: number,
-    author: string,
+    author: string | null,
     text: string,
     visible?: boolean,
   ): boolean {

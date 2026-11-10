@@ -366,7 +366,7 @@ type CommentSnapshot = Array<{
 }>;
 type PhysicalCommentSnapshot = Array<{
   addr: Addr;
-  comment: { author: string; text: string; visible?: boolean } | null;
+  comment: { author: string | null; text: string; visible?: boolean } | null;
 }>;
 
 /** Read the comment text on a cell, or null when unset. */

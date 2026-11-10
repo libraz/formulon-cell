@@ -155,7 +155,7 @@ const hydrateSortComments = (
     formats.set(key, {
       ...rest,
       comment: comment.text,
-      commentAuthor: comment.author,
+      commentAuthor: comment.author ?? undefined,
       ...(visible ? { commentVisible: true } : {}),
     });
     changed = true;

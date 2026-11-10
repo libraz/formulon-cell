@@ -12,7 +12,7 @@ import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
 import type { History, HistoryEntry } from './history.js';
 
 type FormatMapSnapshot = ReadonlyMap<string, CellFormat | undefined>;
-type NoteSnapshot = { author: string; text: string; visible?: true };
+type NoteSnapshot = { author: string | null; text: string; visible?: true };
 type CommentSnapshot = ReadonlyMap<string, NoteSnapshot | null>;
 interface NativeXfSnapshotEntry {
   readonly directXfIndex: number;
@@ -158,7 +158,7 @@ const writeComments = (workbook: WorkbookHandle, desired: CommentSnapshot): void
       sheet,
       row,
       col,
-      comment?.author ?? '',
+      comment?.author ?? null,
       comment?.text ?? '',
       comment ? comment.visible === true : undefined,
     );

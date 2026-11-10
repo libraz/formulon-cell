@@ -1443,7 +1443,7 @@ export const chartDataFromEngine = (data: EngineChartData): ChartData => {
     domain: 'category',
     categories: data.categories.labels,
     categoryIds: data.categories.labels.map((_label, index) => `category-${index}`),
-    categoryFormatCode: data.categories.numberFormat,
+    categoryFormatCode: data.categories.numberFormat ?? undefined,
     series: data.series.map((series) => {
       const states = Array.from({ length: data.pointCount }, (_, index) =>
         pointState(series.states[index]),

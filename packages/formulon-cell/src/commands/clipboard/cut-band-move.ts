@@ -317,7 +317,7 @@ function hydrateSourceMergesInStore(
 
 interface SourceCommentSnapshot {
   addr: Addr;
-  author: string;
+  author: string | null;
   text: string;
   visible: boolean;
   format: CellFormat | undefined;
