@@ -73,7 +73,12 @@ const canCollapse = (group: HTMLElement): boolean =>
   !group.classList.contains('fc-tb__ribbon-group--styles') &&
   group.querySelectorAll('[data-ribbon-command]').length > 1;
 
+/** Document listeners an open popup holds; closing the popup releases them. */
+const popupListeners = new WeakMap<HTMLElement, () => void>();
+
 const closeGroupPopup = (group: HTMLElement): void => {
+  popupListeners.get(group)?.();
+  popupListeners.delete(group);
   group.classList.remove(GROUP_OPEN_CLASS);
   group.querySelector(`:scope > .${COLLAPSE_BUTTON_CLASS}`)?.setAttribute('aria-expanded', 'false');
   const tools = group.querySelector<HTMLElement>(':scope > .fc-tb__ribbon-tools');
@@ -85,6 +90,19 @@ const closeGroupPopup = (group: HTMLElement): void => {
 
 /** Controls that open their own list or menu; a click on them must keep the popup open. */
 const OPENS_OWN_LIST = '[aria-haspopup], .fc-tb__rb-dd, .fc-tb__rb-color, .fc-tb__menu';
+/** Lists and menus a control inside the popup opens; they may live outside the group. */
+const OPENED_LIST = '.fc-tb__menu, .fc-tb__rb-dd__list';
+/** What runs a command or picks a value: choosing one dismisses the whole popup chain. */
+const LEAF = '[data-ribbon-command], [role="menuitem"], [role="option"]';
+
+/** Whether a click at `target` chose a command or value rather than opening a nested list. */
+const choseLeaf = (target: Element): boolean => {
+  if (target.closest(OPENED_LIST)) {
+    const leaf = target.closest(LEAF);
+    return leaf !== null && !leaf.matches('[aria-haspopup]:not([aria-haspopup="false"])');
+  }
+  return target.closest('[data-ribbon-command]') !== null && !target.closest(OPENS_OWN_LIST);
+};
 
 const openGroupPopup = (group: HTMLElement, button: HTMLElement): void => {
   group.classList.add(GROUP_OPEN_CLASS);
@@ -101,17 +119,23 @@ const openGroupPopup = (group: HTMLElement, button: HTMLElement): void => {
     tools.style.left = `${Math.round(position.x)}px`;
     tools.style.top = `${Math.round(position.y)}px`;
   }
+  const doc = group.ownerDocument;
   const dismiss = (event: Event): void => {
     if (event.target instanceof Node && group.contains(event.target)) return;
-    if (
-      event.target instanceof Element &&
-      event.target.closest('.fc-tb__menu, .fc-tb__rb-dd__list')
-    )
-      return;
+    if (event.target instanceof Element && event.target.closest(OPENED_LIST)) return;
     closeGroupPopup(group);
-    group.ownerDocument.removeEventListener('pointerdown', dismiss, true);
   };
-  group.ownerDocument.addEventListener('pointerdown', dismiss, true);
+  // Bubble phase: the chosen command runs first, then the popup goes.
+  const choose = (event: Event): void => {
+    if (event.target instanceof Element && choseLeaf(event.target)) closeGroupPopup(group);
+  };
+  popupListeners.get(group)?.();
+  doc.addEventListener('pointerdown', dismiss, true);
+  doc.addEventListener('click', choose);
+  popupListeners.set(group, () => {
+    doc.removeEventListener('pointerdown', dismiss, true);
+    doc.removeEventListener('click', choose);
+  });
 };
 
 /** Fold `group` into one button named after it; the button opens the commands as a popup. */
@@ -131,12 +155,6 @@ const collapseGroup = (group: HTMLElement): void => {
       else openGroupPopup(group, created);
     });
     group.prepend(created);
-    // A plain command closes the popup; opening a dropdown or picking from its list does not.
-    group.querySelector(':scope > .fc-tb__ribbon-tools')?.addEventListener('click', (event) => {
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target?.closest('[data-ribbon-command]') || target.closest(OPENS_OWN_LIST)) return;
-      closeGroupPopup(group);
-    });
     button = created;
   }
   group.classList.add(RIBBON_GROUP_COLLAPSED_CLASS);

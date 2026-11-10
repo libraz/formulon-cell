@@ -260,6 +260,33 @@ describe('toolbar/ribbon group collapse', () => {
     expect(tools.style.maxWidth).toBe('');
   });
 
+  it('closes a folded group popup when a command is chosen from a menu it opened', () => {
+    const { panel, groups } = build(520);
+    fitRibbonPanel(panel, { collapse: true });
+    const group = groups[3] as HTMLElement;
+    group.querySelector<HTMLButtonElement>('.fc-tb__ribbon-group-collapse')?.click();
+    const menu = document.createElement('div');
+    menu.className = 'fc-tb__menu';
+    const submenu = document.createElement('button');
+    submenu.setAttribute('role', 'menuitem');
+    submenu.setAttribute('aria-haspopup', 'menu');
+    const leaf = document.createElement('button');
+    leaf.setAttribute('role', 'menuitem');
+    const label = document.createElement('span');
+    leaf.append(label);
+    menu.append(submenu, leaf);
+    document.body.append(menu);
+
+    submenu.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    submenu.click();
+    expect(group.classList.contains('fc-tb__ribbon-group--open')).toBe(true);
+
+    label.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    label.click();
+    expect(group.classList.contains('fc-tb__ribbon-group--open')).toBe(false);
+    menu.remove();
+  });
+
   it('expands every group again once the panel fits', () => {
     const { panel, groups, setWidth } = build(450);
     fitRibbonPanel(panel, { collapse: true });
