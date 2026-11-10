@@ -401,8 +401,12 @@ describe('table design commands', () => {
       const { wb, store, history } = await setup();
       toggleTableOption(store, history, wb, 'showTotal');
       for (const fn of ['average', 'count', 'countNums', 'max', 'min', 'stdDev', 'sum', 'var']) {
-        wb.setTableColumnTotals(0, 2, {
-          totalsRowFunction: totalsFunctionToEngine(fn as TableTotalsFunction),
+        wb.updateTable(0, {
+          columns: [
+            {},
+            {},
+            { totalsRowFunction: totalsFunctionToEngine(fn as TableTotalsFunction) },
+          ],
         });
         expect(totalsFromCell(wb, { sheet: 0, row: 4, col: 2 }).function).toBe(fn);
       }

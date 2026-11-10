@@ -1,5 +1,5 @@
 import {
-  type TableColumnTotalsInput,
+  type TableColumnPatch,
   type TableStyleOptionsPatch,
   TableTotalsRowFunction,
 } from '@libraz/formulon';
@@ -171,7 +171,7 @@ const keepLabel = (wb: WorkbookHandle, index: number, label: string): void => {
   ) {
     return;
   }
-  wb.setTableColumnTotals(index, 0, { totalsRowLabel: label });
+  wb.updateTable(index, { columns: [{ totalsRowLabel: label }] });
 };
 
 /** Write the columns of `desired` the engine holds differently. True when any
@@ -182,24 +182,24 @@ const writeTotals = (
   desired: readonly TableColumnTotals[] | undefined,
 ): boolean => {
   const columns = wb.getTableStyleDetails(index)?.columns ?? [];
-  let wrote = false;
-  columns.forEach((c, i) => {
+  let changed = false;
+  const patches = columns.map((c, i): TableColumnPatch => {
     const want = desired?.[i];
-    if (!want) return;
+    if (!want) return {};
     const same =
       want.function === totalsFunctionFromEngine(c.totalsRowFunction) &&
       (want.label ?? '') === (c.totalsRowLabel ?? '') &&
       (want.function !== 'custom' ||
         (want.formula ?? '') === totalsFormulaText(c.totalsRowFormula));
-    if (same) return;
-    const ok = wb.setTableColumnTotals(index, i, {
+    if (same) return {};
+    changed = true;
+    return {
       totalsRowFunction: totalsFunctionToEngine(want.function),
       totalsRowLabel: want.label ? want.label : null,
       ...(want.function === 'custom' ? { totalsRowFormula: want.formula ?? '' } : {}),
-    });
-    wrote = wrote || ok;
+    };
   });
-  return wrote;
+  return changed && wb.updateTable(index, { columns: patches });
 };
 
 /** Blank the cells of `row` across the columns of `range`. */
@@ -217,12 +217,12 @@ const writeHeaderNames = (wb: WorkbookHandle, index: number, range: Range): void
 
 /** Totals settings of the table at `index` by lower-cased column name. */
 const captureTotals = (wb: WorkbookHandle, index: number) => {
-  const out = new Map<string, TableColumnTotalsInput>();
+  const out = new Map<string, TableColumnPatch>();
   for (const c of wb.getTableStyleDetails(index)?.columns ?? []) {
     if (c.totalsRowFunction === TableTotalsRowFunction.None && !c.totalsRowLabel) continue;
     out.set(nameKey(c.name), {
       totalsRowFunction: c.totalsRowFunction,
-      totalsRowLabel: c.totalsRowLabel,
+      totalsRowLabel: c.totalsRowLabel || null,
       ...(c.totalsRowFormula ? { totalsRowFormula: c.totalsRowFormula } : {}),
     });
   }
@@ -236,11 +236,9 @@ const restoreTotals = (
   totals: ReturnType<typeof captureTotals>,
 ): void => {
   const columns = wb.getTableStyleDetails(index)?.columns ?? [];
-  columns.forEach((c, i) => {
-    const saved = totals.get(nameKey(c.name));
-    if (!saved) return;
-    wb.setTableColumnTotals(index, i, saved);
-  });
+  const patches = columns.map((c): TableColumnPatch => totals.get(nameKey(c.name)) ?? {});
+  if (patches.some((patch) => Object.keys(patch).length > 0))
+    wb.updateTable(index, { columns: patches });
 };
 
 const removeEngineTable = (wb: WorkbookHandle, index: number): boolean => {

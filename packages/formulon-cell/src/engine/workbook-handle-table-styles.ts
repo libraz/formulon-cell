@@ -1,9 +1,4 @@
-import type {
-  TableColumn,
-  TableColumnTotalsInput,
-  TableStyle,
-  TableStyleInput,
-} from '@libraz/formulon';
+import type { TableColumn, TableStyle, TableStyleInput } from '@libraz/formulon';
 import { orFallback } from './result.js';
 import type { EngineCapabilities, Workbook } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -86,19 +81,6 @@ export abstract class WorkbookHandleTableStylesMethods {
             : column,
         ),
       };
-    });
-  }
-
-  /** Set one table column's totals-row function and label. While the totals
-   *  row is shown the engine writes the column's totals cell to match. */
-  setTableColumnTotals(index: number, column: number, totals: TableColumnTotalsInput): boolean {
-    assertAlive(this);
-    if (!this.capabilities.tableStyleInfo) return false;
-    return orFallback(false, () => {
-      const table = workbookTableAt(wb(this), index);
-      if (!table) return false;
-      table.setColumnTotals(column, totals);
-      return true;
     });
   }
 

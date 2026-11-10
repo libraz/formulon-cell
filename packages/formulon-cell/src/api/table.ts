@@ -31,7 +31,7 @@ const TABLE_READ = [
   'evaluateAutoFilter',
 ] as const;
 const TABLE_CHANGES = {
-  table: ['update', 'rename', 'renameColumn', 'setColumnTotals', 'updateStyleOptions'],
+  table: ['update', 'rename', 'renameColumn', 'updateStyleOptions'],
   autoFilter: ['setAutoFilter', 'applyAutoFilter', 'clearAutoFilterCriteria'],
 } as const;
 

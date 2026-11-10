@@ -586,7 +586,7 @@ export interface EngineCapabilities {
   /** OOXML worksheet-table create/update/delete. */
   readonly tableMutate?: boolean;
   /** Table style name, show-flags and per-column totals (`tableAt` style
-   *  fields, `setTableColumnTotals`). */
+   *  fields). */
   readonly tableStyleInfo?: boolean;
   /** Custom `<tableStyles>` read/write and the default style names. */
   readonly customTableStyles?: boolean;
