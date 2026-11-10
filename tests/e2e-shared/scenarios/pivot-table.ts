@@ -142,3 +142,41 @@ export async function runPivotTableRibbonPrimaryDialogScenario(page: Page): Prom
 
   expect(consoleErrors.read()).toEqual([]);
 }
+
+/** P03 — on a protected sheet Insert PivotTable is unavailable from the ribbon and the instance
+ *  cannot open its dialog; both come back once the sheet is unprotected. */
+export async function runPivotTableProtectedSheetScenario(page: Page): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  const consoleErrors = sp.collectConsoleErrors();
+  await sp.mount();
+  await sp.expectNoStub();
+  const canOpenPivot = () =>
+    page.evaluate(() => {
+      const inst = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      return inst.dialogs.canOpen('pivotTable');
+    });
+
+  await page.evaluate(async () => {
+    const inst = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const sheet = inst.workbook.sheet(0);
+    sheet.setText(0, 0, 'Region');
+    sheet.setText(0, 1, 'Sales');
+    sheet.setText(1, 0, 'East');
+    sheet.setNumber(1, 1, 10);
+    inst.history.clear();
+    inst.selection.set('A1:B2');
+    await sheet.protect({ allowPivotTables: true });
+  });
+
+  await page.locator('[data-ribbon-tab="insert"]').click();
+  const pivotButton = page.locator('[data-ribbon-command="pivotTableInsert"]').first();
+  await expect(pivotButton).toBeDisabled();
+  expect(await canOpenPivot()).toBe(false);
+
+  await page.evaluate(() =>
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.workbook.sheet(0).unprotect(),
+  );
+  await expect(pivotButton).toBeEnabled();
+  expect(await canOpenPivot()).toBe(true);
+  expect(consoleErrors.read()).toEqual([]);
+}

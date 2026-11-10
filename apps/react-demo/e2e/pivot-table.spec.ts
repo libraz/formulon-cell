@@ -2,6 +2,7 @@ import { test } from '@playwright/test';
 
 import {
   runPivotTableFilterDialogScenario,
+  runPivotTableProtectedSheetScenario,
   runPivotTableRibbonPrimaryDialogScenario,
 } from '../../../tests/e2e-shared/scenarios/pivot-table.js';
 
@@ -15,4 +16,10 @@ test('P02 (react-demo): PivotTable ribbon primary click opens Create PivotTable 
   page,
 }) => {
   await runPivotTableRibbonPrimaryDialogScenario(page);
+});
+
+test('P03 (react-demo): a protected sheet makes Insert PivotTable unavailable until unprotected', async ({
+  page,
+}) => {
+  await runPivotTableProtectedSheetScenario(page);
 });
