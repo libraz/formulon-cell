@@ -2,18 +2,32 @@ import { expect, type Page } from '@playwright/test';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
-type PaintProbe = Window & { __fcPaintedText: string[] };
+type PaintedRun = { text: string; y: number; end: number };
+type PaintProbe = Window & { __fcPaintedText: PaintedRun[] };
 
 export async function runWholeSheetNumberFormat(
   page: Page,
   platform: 'default' | 'mac',
 ): Promise<void> {
   await page.addInitScript(() => {
-    const painted: string[] = [];
+    const painted: PaintedRun[] = [];
     (window as unknown as PaintProbe).__fcPaintedText = painted;
     const original = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (...args) {
-      if (this.canvas.classList.contains('fc-host__canvas')) painted.push(args[0]);
+      if (this.canvas.classList.contains('fc-host__canvas')) {
+        const [text, x, y] = args;
+        const width = this.measureText(text).width;
+        const start =
+          this.textAlign === 'right' ? x - width : this.textAlign === 'center' ? x - width / 2 : x;
+        // Mac lays text out one glyph per call; join calls that continue the previous run.
+        const last = painted[painted.length - 1];
+        if (last && last.y === y && Math.abs(start - last.end) <= 1.5) {
+          last.text += text;
+          last.end = start + width;
+        } else {
+          painted.push({ text, y, end: start + width });
+        }
+      }
       return Reflect.apply(original, this, args);
     };
   });
@@ -73,7 +87,7 @@ export async function runWholeSheetNumberFormat(
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const drawn = (window as unknown as PaintProbe).__fcPaintedText;
+        const drawn = (window as unknown as PaintProbe).__fcPaintedText.map((run) => run.text);
         return ['1234.50', '00123', 'abc', '1235.50', 'label'].filter((text) =>
           drawn.includes(text),
         );
@@ -87,7 +101,7 @@ export async function runWholeSheetNumberFormat(
       return {
         text: wb.getValue({ sheet: 0, row: 1, col: 0 }),
         formula: wb.cellFormula({ sheet: 0, row: 3, col: 0 }),
-        farFormat: wb.getEffectiveStyle(0, 1048575, 16383)?.numFmtCode,
+        farFormat: wb.getEffectiveStyle(0, 1048575, 16383)?.numberFormat,
         formatCount: instance.store.getState().format.formats.size,
         bold: instance.store.getState().format.formats.get('0:0:0')?.bold,
       };
@@ -103,7 +117,7 @@ export async function runWholeSheetNumberFormat(
   expect(
     await page.evaluate(() => {
       const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      return instance.workbook.getEffectiveStyle(0, 1048575, 16383)?.numFmtCode;
+      return instance.workbook.getEffectiveStyle(0, 1048575, 16383)?.numberFormat;
     }),
   ).toBe('General');
 }

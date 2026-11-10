@@ -97,7 +97,7 @@ export async function runAutomaticRowheight(
         const effective = instance.workbook.getEffectiveStyle(0, 100, 0);
         const xf = effective && instance.workbook.getCellXf(effective.xfIndex);
         return {
-          nativePoints: xf && instance.workbook.getResolvedFontRecord(xf.fontIndex)?.size,
+          nativePoints: xf && instance.workbook.getResolvedFontRecord(xf.fontIndex)?.sizePt,
           sheetPatch: state.format.sheetFontOverrides?.get(0)?.patch ?? null,
           axisOverride: state.format.sheetAxisOverrides?.has(0) ?? false,
         };

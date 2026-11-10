@@ -263,7 +263,7 @@ export async function runRepeatedPasteScenario(page: Page): Promise<void> {
   await expect.poll(() => sp.readFormula('G4')).toBe('=F4*2');
   await expect.poll(() => sp.readValue('G4')).toEqual({ kind: 'number', value: 6 });
   await expect.poll(() => sp.readFormat('G4')).toMatchObject({ bold: true });
-  await expect(page.locator('.fc-host__formulabar-tag').first()).toHaveValue('D1:G4');
+  await expect(page.locator('.fc-host__formulabar-tag').first()).toHaveValue('D1');
   await sp.shortcut('z');
   await expect.poll(() => sp.readValue('G4')).toEqual({ kind: 'blank' });
   expect((await sp.readFormat('G4')) ?? {}).not.toMatchObject({ bold: true });

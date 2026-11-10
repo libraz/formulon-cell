@@ -39,7 +39,7 @@ export async function runAxisFormatStructure(
                 axis === 'col' ? index : 16383,
               );
               const xf = style && instance.workbook.getCellXf(style.xfIndex);
-              return xf && instance.workbook.getFontRecord(xf.fontIndex)?.size;
+              return xf && instance.workbook.getFontRecord(xf.fontIndex)?.sizePt;
             });
           },
           { axis, indices },

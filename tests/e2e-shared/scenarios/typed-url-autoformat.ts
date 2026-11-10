@@ -26,12 +26,12 @@ async function linkState(page: Page) {
       target: format?.hyperlink ?? null,
       nativeTarget:
         wb.getHyperlinks(0).find((link) => link.row === 0 && link.col === 0)?.target ?? null,
-      points: font.size,
+      points: font.sizePt,
       family: font.name,
       normalPoints: normal.size,
       normalFamily: normal.name,
       underline: font.underline,
-      color: font.colorArgb >>> 0,
+      color: (font.color?.argb ?? 0) >>> 0,
       hlink: hlink >>> 0,
     };
   }, geometryUrl);
@@ -112,7 +112,11 @@ export async function runTypedUrlAutoformat(
   await sheet.shortcut('k');
   const dialog = page.locator('.fc-hldlg');
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('input[type="url"]')).toHaveValue(url);
+  // The Mac dialog's URL field is a plain text input labelled "URL".
+  const urlField = dialog
+    .locator('input[type="url"]')
+    .or(dialog.getByRole('textbox', { name: 'URL', exact: true }));
+  await expect(urlField).toHaveValue(url);
   await dialog.getByRole('button', { name: 'Remove link', exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(async () => (await linkState(page)).nativeTarget).toBeNull();

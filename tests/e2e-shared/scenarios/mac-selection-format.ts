@@ -12,7 +12,7 @@ const engineBold = (page: Page, ref: string): Promise<boolean> =>
           workbook: {
             getCellXfIndex(sheet: number, row: number, col: number): number;
             getCellXf(index: number): { fontIndex: number } | null;
-            getFontRecord(index: number): { bold: boolean } | null;
+            getFontRecord(index: number): { bold: boolean | null } | null;
           };
         };
       }
@@ -22,7 +22,7 @@ const engineBold = (page: Page, ref: string): Promise<boolean> =>
     if (!xf) throw new Error('Missing engine XF');
     const font = wb.getFontRecord(xf.fontIndex);
     if (!font) throw new Error('Missing engine font');
-    return font.bold;
+    return font.bold === true;
   }, a1Address(ref));
 
 async function commandClick(page: Page, row: number, col: number): Promise<void> {
@@ -279,14 +279,14 @@ const engineHorizontalAlign = (page: Page, ref: string): Promise<number> =>
         __fcInst: {
           workbook: {
             getCellXfIndex(sheet: number, row: number, col: number): number;
-            getCellXf(index: number): { horizontalAlign: number } | null;
+            getCellXf(index: number): { horizontal: number | null } | null;
           };
         };
       }
     ).__fcInst.workbook;
     const xf = wb.getCellXf(wb.getCellXfIndex(addr.sheet, addr.row, addr.col));
     if (!xf) throw new Error('Missing engine XF');
-    return xf.horizontalAlign;
+    return xf.horizontal ?? 0;
   }, a1Address(ref));
 
 export async function runMacSelectionFormatDialogWithHole(page: Page): Promise<void> {
@@ -368,7 +368,7 @@ const engineFill = (page: Page, ref: string): Promise<[number, number]> =>
           workbook: {
             getCellXfIndex(sheet: number, row: number, col: number): number;
             getCellXf(index: number): { fillIndex: number } | null;
-            getFillRecord(index: number): { pattern: number; fgArgb: number } | null;
+            getFillRecord(index: number): { pattern: number; foreground: { argb: number } } | null;
           };
         };
       }
@@ -377,7 +377,7 @@ const engineFill = (page: Page, ref: string): Promise<[number, number]> =>
     if (!xf) throw new Error('Missing engine XF');
     const fill = wb.getFillRecord(xf.fillIndex);
     if (!fill) throw new Error('Missing engine fill');
-    return [fill.pattern, fill.fgArgb & 0xffffff];
+    return [fill.pattern, fill.foreground.argb & 0xffffff];
   }, a1Address(ref));
 
 export async function runMacSelectionCellStyleWithHole(page: Page): Promise<void> {

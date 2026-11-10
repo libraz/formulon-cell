@@ -78,26 +78,9 @@ export class UserJourneyPage extends SpreadsheetPage {
     await nameBox.fill(ref);
     await nameBox.press('Enter');
     await expect(this.page.locator('.fc-host').first()).toBeFocused();
-    let displayedRef = ref;
-    const range = /^([A-Z]+\d+):([A-Z]+\d+)$/i.exec(ref);
-    if (range?.[1] && range[2]) {
-      const sheetIndex = await this.page.evaluate(() => {
-        const instance = (window as Window & { __fcInst?: WorkbookProbe }).__fcInst;
-        if (!instance) throw new Error('window.__fcInst is not available');
-        return instance.store.getState().data.sheetIndex;
-      });
-      const merge = await this.readMerge(range[1], sheetIndex);
-      const first = a1Address(range[1]);
-      const last = a1Address(range[2]);
-      if (
-        merge &&
-        merge.r0 === first.row &&
-        merge.c0 === first.col &&
-        merge.r1 === last.row &&
-        merge.c1 === last.col
-      )
-        displayedRef = range[1];
-    }
+    // A plain cell range shows only its active cell (top-left) in the name box.
+    const range = /^([A-Z]+\d+):[A-Z]+\d+$/i.exec(ref);
+    const displayedRef = range?.[1] ? range[1].toUpperCase() : ref;
     await expect.poll(() => nameBox.inputValue(), { timeout: 2_000 }).toBe(displayedRef);
   }
 

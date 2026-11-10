@@ -30,10 +30,10 @@ export async function runSelectionFormat(
         const xf = style && instance.workbook.getCellXf(style.xfIndex);
         const font = xf && instance.workbook.getFontRecord(xf.fontIndex);
         return {
-          size: font?.size,
+          size: font?.sizePt,
           family: font?.name,
           bold: font?.bold === true,
-          align: xf?.horizontalAlign,
+          align: xf?.horizontal,
         };
       });
     }, addresses);
@@ -251,7 +251,10 @@ export async function runSelectionFormat(
     await header(axis, 1);
     await page.locator('[data-ribbon-command="formatCellsHome"]').first().click();
     await page.locator('#menu-format-cells [data-cell-format="dialog"]').click();
-    const dialog = page.locator('[class="fc-fmtdlg"]').first();
+    const dialog = page
+      .locator('.fc-fmtdlg:not([hidden])')
+      .filter({ has: page.locator('button[data-fc-tab="font"]') })
+      .first();
     await expect(dialog).toBeVisible();
     await dialog.locator('button[data-fc-tab="font"]').click();
     await dialog.locator('.fc-fmtdlg__font-size-row input').fill('16');
@@ -312,7 +315,7 @@ export async function runSelectionFormat(
         const effective = workbook.getEffectiveStyle(0, row, col);
         const xf = effective && workbook.getCellXf(effective.xfIndex);
         const font = xf && workbook.getFontRecord(xf.fontIndex);
-        return { size: font?.size, family: font?.name, bold: font?.bold === true };
+        return { size: font?.sizePt, family: font?.name, bold: font?.bold === true };
       });
     } finally {
       workbook.dispose();

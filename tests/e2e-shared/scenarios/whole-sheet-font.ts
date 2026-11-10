@@ -29,7 +29,7 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
         const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
         const effective = instance.workbook.getEffectiveStyle(0, row, col);
         const xf = effective && instance.workbook.getCellXf(effective.xfIndex);
-        return xf && instance.workbook.getFontRecord(xf.fontIndex)?.size;
+        return xf && instance.workbook.getFontRecord(xf.fontIndex)?.sizePt;
       },
       { row, col },
     );
@@ -72,7 +72,7 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
 
   const familyPicker = page.locator('[data-ribbon-command="fontFamily"] button').first();
   await familyPicker.click();
-  const current = page.locator('.fc-tb__rb-dd__opt[data-value="游ゴシック"]');
+  const current = page.locator('.fc-tb__rb-dd__opt[data-value="游ゴシック"]:not([data-recent])');
   await expect(current).toContainText('游ゴシック Regular');
   await expect(page.locator('.fc-tb__rb-dd__submenu')).toHaveCount(0);
   await current.click();
@@ -109,7 +109,7 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
         const style = reloaded.getEffectiveStyle(0, row, col);
         const xf = reloaded.getCellXf(style.xfIndex);
         const font = reloaded.getFontRecord(xf.fontIndex);
-        return { size: font.size, name: font.name };
+        return { size: font.sizePt, name: font.name };
       });
     } finally {
       reloaded.dispose();
@@ -134,5 +134,9 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
   const last = families.locator('button').last();
   await last.scrollIntoViewIfNeeded();
   await expect(last).toBeInViewport();
-  await dialog.locator('.fc-fmtdlg__footer .fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)').click();
+  await dialog
+    .locator(
+      '.fc-fmtdlg__footer .fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary):not([data-fc-validation-clear-all])',
+    )
+    .click();
 }

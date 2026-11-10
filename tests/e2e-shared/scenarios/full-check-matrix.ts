@@ -91,8 +91,8 @@ type BrowserInstance = {
     getCellXf?(xfIndex: number): { fontIndex: number; [key: string]: unknown } | null;
     getFontRecord?(
       fontIndex: number,
-    ): { name: string; size: number; [key: string]: unknown } | null;
-    setWorkbookDefaultFont?(record: { name?: string; size?: number }): boolean;
+    ): { name: string; sizePt: number | null; [key: string]: unknown } | null;
+    setWorkbookDefaultFont?(record: { name?: string; sizePt?: number }): boolean;
     addFontRecord?(record: Record<string, unknown>): number;
     addXfRecord?(record: Record<string, unknown>): number;
     setColumnStyle?(sheet: number, first: number, last: number, xfIndex: number): boolean;
@@ -422,14 +422,14 @@ const readNativeFonts = async (
       const effective = workbook.getEffectiveStyle?.(address.sheet, address.row, address.col);
       const xf = effective ? workbook.getCellXf?.(effective.xfIndex) : null;
       const font = xf ? workbook.getFontRecord?.(xf.fontIndex) : null;
-      if (!font || typeof font.name !== 'string' || !Number.isFinite(font.size)) {
+      if (!font || typeof font.name !== 'string' || !Number.isFinite(font.sizePt)) {
         throw new Error(
           `full-check native font read failed at ${address.sheet}:${address.row}:${address.col}`,
         );
       }
       return {
         name: font.name,
-        size: font.size,
+        size: font.sizePt as number,
         ...(typeof effective?.source === 'number' ? { source: effective.source } : {}),
       };
     });
@@ -492,7 +492,7 @@ const setNativeInheritedClipboardFonts = async (page: Page): Promise<NativeFont[
       if (!baseXf || !baseFont) {
         throw new Error('full-check clipboard fixture failed: default native font is unavailable');
       }
-      const fontIndex = workbook.addFontRecord?.({ ...baseFont, size });
+      const fontIndex = workbook.addFontRecord?.({ ...baseFont, sizePt: size });
       if (fontIndex === undefined || fontIndex < 0) {
         throw new Error('full-check clipboard fixture failed: row/column font was not created');
       }
@@ -508,7 +508,7 @@ const setNativeInheritedClipboardFonts = async (page: Page): Promise<NativeFont[
     // they cannot acquire a direct cell XF from value seeding; the clipboard
     // resolver must capture their effective styles rather than silently
     // dropping the inherited font axis.
-    if (!workbook.setWorkbookDefaultFont({ size: 15 })) {
+    if (!workbook.setWorkbookDefaultFont({ sizePt: 15 })) {
       throw new Error('full-check clipboard fixture failed: workbook default font was rejected');
     }
     const columnXf = makeAxisXf(17);
@@ -524,7 +524,7 @@ const setNativeInheritedClipboardFonts = async (page: Page): Promise<NativeFont[
       const effective = workbook.getEffectiveStyle?.(address.sheet, address.row, address.col);
       const xf = effective ? workbook.getCellXf?.(effective.xfIndex) : null;
       const font = xf ? workbook.getFontRecord?.(xf.fontIndex) : null;
-      if (!font || typeof font.name !== 'string' || !Number.isFinite(font.size)) {
+      if (!font || typeof font.name !== 'string' || !Number.isFinite(font.sizePt)) {
         throw new Error(
           `full-check clipboard fixture failed: effective font missing at ${address.row}:${address.col}`,
         );
@@ -534,7 +534,7 @@ const setNativeInheritedClipboardFonts = async (page: Page): Promise<NativeFont[
           `full-check clipboard fixture failed: inherited source missing at ${address.row}:${address.col}`,
         );
       }
-      return { name: font.name, size: font.size, source: effective.source };
+      return { name: font.name, size: font.sizePt as number, source: effective.source };
     });
     return fonts;
   }, sourceAddresses);

@@ -109,24 +109,43 @@ export async function runStructuredReferenceCompletion(
       ]),
     );
     for (const table of [
-      { name: 'Sales', ref: 'A1:D2', columns: headers.slice(0, 4) },
-      { name: 'Data', ref: 'E1:E2', columns: ['Region'] },
-      { name: 'Sales.Data', ref: 'F1:F2', columns: ['Revenue'] },
-      { name: '売上', ref: 'G1:G2', columns: ['金額'] },
-      { name: '\\Ledger', ref: 'H1:H2', columns: ['Net'] },
+      { name: 'Sales', range: 'A1:D2', columns: headers.slice(0, 4) },
+      { name: 'Data', range: 'E1:E2', columns: ['Region'] },
+      { name: 'Sales.Data', range: 'F1:F2', columns: ['Revenue'] },
+      { name: '売上', range: 'G1:G2', columns: ['金額'] },
+      { name: '\\Ledger', range: 'H1:H2', columns: ['Net'] },
     ]) {
-      if (instance.workbook.createTable({ ...table, sheetIndex: 0 }) < 0)
+      if (instance.workbook.createTable(0, table) < 0)
         throw new Error(`Table fixture rejected: ${table.name}`);
     }
   });
   const input = page.locator(
     surface === 'inline' ? '.fc-host__editor' : '.fc-host__formulabar-input',
   );
+  // `stored` is the read-back form: a column-only reference collapses its inner brackets.
   const cases = [
-    { prefix: 'Sales[A', label: 'A]B', reference: "Sales[[A']B]]", value: 8 },
-    { prefix: "Sales[A']", label: 'A]B', reference: "Sales[[A']B]]", value: 8 },
-    { prefix: 'Sales[A', label: 'A,B', reference: 'Sales[[A,B]]', value: 12 },
-    { prefix: "Sales[O''", label: "O'Brien", reference: "Sales[[O''Brien]]", value: 14 },
+    {
+      prefix: 'Sales[A',
+      label: 'A]B',
+      reference: "Sales[[A']B]]",
+      stored: "Sales[A']B]",
+      value: 8,
+    },
+    {
+      prefix: "Sales[A']",
+      label: 'A]B',
+      reference: "Sales[[A']B]]",
+      stored: "Sales[A']B]",
+      value: 8,
+    },
+    { prefix: 'Sales[A', label: 'A,B', reference: 'Sales[[A,B]]', stored: 'Sales[A,B]', value: 12 },
+    {
+      prefix: "Sales[O''",
+      label: "O'Brien",
+      reference: "Sales[[O''Brien]]",
+      stored: "Sales[O''Brien]",
+      value: 14,
+    },
     { prefix: 'Sales.Data[Re', label: 'Revenue', reference: 'Sales.Data[Revenue]', value: 30 },
     { prefix: '売上[金', label: '金額', reference: '売上[金額]', value: 32 },
     { prefix: '\\Ledger[Ne', label: 'Net', reference: '\\Ledger[Net]', value: 38 },
@@ -153,7 +172,9 @@ export async function runStructuredReferenceCompletion(
     await page.keyboard.press(platform === 'mac' ? 'Meta+Shift+z' : 'Control+y');
     await expect(input).toHaveValue(`=SUM(${entry.reference})+1`);
     await page.keyboard.press('Enter');
-    await expect.poll(() => sheet.readFormula('J2')).toBe(`=SUM(${entry.reference})+1`);
+    await expect
+      .poll(() => sheet.readFormula('J2'))
+      .toBe(`=SUM(${entry.stored ?? entry.reference})+1`);
     expect(await sheet.readValue('J2')).toEqual({ kind: 'number', value: entry.value });
   }
   await sheet.expectNoConsoleErrors();
