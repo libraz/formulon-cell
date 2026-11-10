@@ -1,3 +1,4 @@
+import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 // Ribbon command dispatcher. Fans out a ribbon command id to the matching
 // handler — first via the declarative dispatch tables (dialog openers,
 // function-arg openers, format mutators, zoom presets, view modes, border-draw
@@ -629,7 +630,12 @@ const applyGenericRibbonCommand = (
     case 'pageLayoutGridlinesPrint': {
       const sheet = i.store.getState().data.sheetIndex;
       const setup = getPageSetup(i.store.getState(), sheet);
-      setPrintGridlines(i.store, sheet, !setup.showGridlines, i.history);
+      pageSetupWrite(
+        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+        sheet,
+        undefined,
+        () => setPrintGridlines(i.store, sheet, !setup.showGridlines, i.history),
+      );
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;
@@ -643,7 +649,12 @@ const applyGenericRibbonCommand = (
     case 'pageLayoutHeadingsPrint': {
       const sheet = i.store.getState().data.sheetIndex;
       const setup = getPageSetup(i.store.getState(), sheet);
-      setPrintHeadings(i.store, sheet, !setup.showHeadings, i.history);
+      pageSetupWrite(
+        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+        sheet,
+        undefined,
+        () => setPrintHeadings(i.store, sheet, !setup.showHeadings, i.history),
+      );
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;

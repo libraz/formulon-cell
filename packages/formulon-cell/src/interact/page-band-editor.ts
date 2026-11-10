@@ -1,3 +1,4 @@
+import { pageSetupWrite } from '../commands/page-setup-actions.js';
 // Inline editing of the header / footer slots drawn in Page Layout view.
 //
 // The bands sit in the page margins, which hold no cells, so a click there is
@@ -46,7 +47,17 @@ export function attachPageBandEditor(deps: PageBandEditorDeps): PageBandEditorHa
     if ((current ?? '') === next) return;
     // An emptied slot drops the field rather than storing "", so the print
     // document does not emit a blank margin box for it.
-    setPageSetup(store, sheet, { [key]: next || undefined }, deps.history ?? null);
+    pageSetupWrite(
+      {
+        store,
+        history: deps.history ?? null,
+        origin: 'editor',
+        commandId: 'mac.insert.headerFooter',
+      },
+      sheet,
+      undefined,
+      () => setPageSetup(store, sheet, { [key]: next || undefined }, deps.history ?? null),
+    );
   };
 
   const onEditBand = (event: Event): void => {

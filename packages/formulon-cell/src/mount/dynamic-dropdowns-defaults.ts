@@ -1,3 +1,4 @@
+import { openPageSetupDialogFrom } from '../interact/dialog-entry.js';
 // Default `DynamicDropdownsCtx` factory. Hosts that don't need a fully
 // custom ribbon (React / Vue / quick embed) can call this and pass the
 // result to `mountToolbar({ dynamicDropdowns })` — the toolbar's auto-wire
@@ -120,7 +121,10 @@ const buildPdfAction =
       pdfTitle: strings.ribbonMenu.pdfCreate,
     });
     if (result.kind === 'open-page-setup') {
-      instance.openPageSetup();
+      openPageSetupDialogFrom(instance.store, undefined, {
+        origin: 'ribbon',
+        commandId: 'pageSetup',
+      });
       return;
     }
     instance.print('pdf');

@@ -4,6 +4,7 @@
 // through `mutators.setPageSetup` wrapped in a single history entry so undo
 // reverts the whole apply atomically.
 import type { History } from '../commands/history.js';
+import { pageSetupWrite } from '../commands/page-setup-actions.js';
 import { printableMarginAdjustments } from '../commands/print.js';
 import {
   normalizePrintableBounds,
@@ -24,6 +25,7 @@ import {
 } from '../store/store.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { type DialogEntry, INSTANCE_API_PAGE_SETUP_ENTRY } from './dialog-entry.js';
 import {
   appendDialogActions,
   appendDialogIconButton,
@@ -61,7 +63,8 @@ export interface PageSetupDialogDeps {
 }
 
 export interface PageSetupDialogHandle {
-  open(tab?: PageSetupDialogTab): void;
+  /** `entry` names the entry point OK is authorized under; the instance API when absent. */
+  open(tab?: PageSetupDialogTab, entry?: DialogEntry): void;
   close(): void;
   detach(): void;
 }
@@ -71,6 +74,7 @@ export type PageSetupDialogTab = 'page' | 'margins' | 'headerFooter' | 'sheet';
 export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialogHandle {
   const { host, store } = deps;
   const history = deps.history ?? null;
+  let dialogEntry: DialogEntry = INSTANCE_API_PAGE_SETUP_ENTRY;
   const strings = deps.strings ?? defaultStrings;
   const mac = isMacHost(host);
   const t = mac ? { ...strings.pageSetup, ...strings.mac.pageSetup } : strings.pageSetup;
@@ -278,11 +282,15 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
         next.printableBounds = resolved ? normalizePrintableBounds(resolved) : undefined;
       }
     }
-    if (printerProfileChanged) deps.setPrinterProfileId?.(nextPrinterProfileId);
-    recordPageSetupChange(history, store, () => {
-      mutators.setPageSetup(store, sheet, next);
+    const ctx = { store, history, origin: dialogEntry.origin, commandId: dialogEntry.commandId };
+    const applied = pageSetupWrite(ctx, sheet, false, () => {
+      if (printerProfileChanged) deps.setPrinterProfileId?.(nextPrinterProfileId);
+      recordPageSetupChange(history, store, () => {
+        mutators.setPageSetup(store, sheet, next);
+      });
+      return true;
     });
-    api.close();
+    if (applied) api.close();
   };
 
   const onCancel = (): void => {
@@ -322,7 +330,8 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   }
 
   const api: PageSetupDialogHandle = {
-    open(tab: PageSetupDialogTab = 'page'): void {
+    open(tab: PageSetupDialogTab = 'page', entry = INSTANCE_API_PAGE_SETUP_ENTRY): void {
+      dialogEntry = entry;
       const sheet = store.getState().data.sheetIndex;
       hydrateFrom(getPageSetup(store.getState(), sheet));
       setActiveTab(tab);

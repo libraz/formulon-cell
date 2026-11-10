@@ -2,6 +2,7 @@ import {
   openDataValidationDialogFrom,
   openFormatDialogFrom,
   openNamedRangeDialogFrom,
+  openPageSetupDialogFrom,
 } from '../../interact/dialog-entry.js';
 // Dispatch tables for the playground ribbon — each map is one row per ribbon
 // command id, replacing what used to be a `case 'id': handler; return true;`
@@ -38,9 +39,15 @@ export type RibbonFormatMutator = (
 /** Plain "open this dialog / panel" buttons. Each value is a thunk over the
  *  instance to keep the lookup callable with one argument from the dispatcher. */
 export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInstance) => void>> = {
-  pageSetup: (i) => i.openPageSetup(),
-  pageSetupAdvanced: (i) => i.openPageSetup(),
-  printTitles: (i) => i.openPageSetup('sheet'),
+  pageSetup: (i) =>
+    openPageSetupDialogFrom(i.store, undefined, { origin: 'ribbon', commandId: 'pageSetup' }),
+  pageSetupAdvanced: (i) =>
+    openPageSetupDialogFrom(i.store, undefined, {
+      origin: 'ribbon',
+      commandId: 'pageSetupAdvanced',
+    }),
+  printTitles: (i) =>
+    openPageSetupDialogFrom(i.store, 'sheet', { origin: 'ribbon', commandId: 'printTitles' }),
   formatCells: (i) =>
     openFormatDialogFrom(i.store, undefined, { origin: 'ribbon', commandId: 'formatCells' }),
   moreBorders: (i) =>

@@ -9,6 +9,7 @@ import {
   INSTANCE_API_DEFINE_NAME_ENTRY,
   INSTANCE_API_FORMAT_ENTRY,
   INSTANCE_API_NAME_MANAGER_ENTRY,
+  INSTANCE_API_PAGE_SETUP_ENTRY,
   INSTANCE_API_VALIDATION_ENTRY,
   registerDialogOpeners,
 } from '../interact/dialog-entry.js';
@@ -100,7 +101,11 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
   const openDefineNameDialog: DialogOpeners['defineNameDialog'] = (entry) => {
     featureState.namedRangeDialog?.openNew(entry);
   };
+  const openPageSetupDialog: DialogOpeners['pageSetupDialog'] = (tab, entry) => {
+    featureState.pageSetupDialog?.open(tab, entry);
+  };
   registerDialogOpeners(store, {
+    pageSetupDialog: openPageSetupDialog,
     formatDialog: openFormatDialog,
     dataValidationDialog: openDataValidationDialog,
     namedRangeDialog: openNamedRangeDialog,
@@ -157,7 +162,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       openDefineNameDialog(INSTANCE_API_DEFINE_NAME_ENTRY);
     },
     openPageSetup(tab) {
-      featureState.pageSetupDialog?.open(tab);
+      openPageSetupDialog(tab, INSTANCE_API_PAGE_SETUP_ENTRY);
     },
     openFormatDialog(tab) {
       openFormatDialog(tab, INSTANCE_API_FORMAT_ENTRY);

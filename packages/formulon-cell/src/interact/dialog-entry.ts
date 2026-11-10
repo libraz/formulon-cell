@@ -1,6 +1,7 @@
 import type { InteractionOrigin } from '../commands/interaction-policy.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { TabId } from './format-dialog-model.js';
+import type { PageSetupDialogTab } from './page-setup-dialog.js';
 
 /** The UI entry point that opened a dialog: its commit, repeat and their
  *  undo/redo are authorized under this origin and command id. */
@@ -33,12 +34,19 @@ export const INSTANCE_API_DEFINE_NAME_ENTRY: DialogEntry = {
   commandId: 'defineName',
 };
 
+/** The entry of a Page Setup open through the public instance method. */
+export const INSTANCE_API_PAGE_SETUP_ENTRY: DialogEntry = {
+  origin: 'instanceApi',
+  commandId: 'pageSetup',
+};
+
 /** The mount's dialog openers that take the entry of an internal UI caller. */
 export interface DialogOpeners {
   readonly formatDialog: (tab: TabId | undefined, entry: DialogEntry) => void;
   readonly dataValidationDialog: (entry: DialogEntry) => void;
   readonly namedRangeDialog: (entry: DialogEntry) => void;
   readonly defineNameDialog: (entry: DialogEntry) => void;
+  readonly pageSetupDialog: (tab: PageSetupDialogTab | undefined, entry: DialogEntry) => void;
 }
 
 const openers = new WeakMap<SpreadsheetStore, DialogOpeners>();
@@ -70,4 +78,13 @@ export function openNamedRangeDialogFrom(store: SpreadsheetStore, entry: DialogE
 /** Open Define Name on behalf of an internal UI entry point. */
 export function openDefineNameDialogFrom(store: SpreadsheetStore, entry: DialogEntry): void {
   openers.get(store)?.defineNameDialog(entry);
+}
+
+/** Open Page Setup on behalf of an internal UI entry point. */
+export function openPageSetupDialogFrom(
+  store: SpreadsheetStore,
+  tab: PageSetupDialogTab | undefined,
+  entry: DialogEntry,
+): void {
+  openers.get(store)?.pageSetupDialog(tab, entry);
 }

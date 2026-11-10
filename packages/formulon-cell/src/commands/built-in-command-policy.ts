@@ -574,7 +574,6 @@ const WORKBOOK_EFFECT_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'sheet',
   'object',
   'protection',
-  'pageSetup',
   'print',
   'export',
 ]);
@@ -626,8 +625,10 @@ export const builtInCommandIntent = (
   const band = shiftedBand(operation, selection);
   let effects: readonly OperationEffect[];
   if (WORKBOOK_EFFECT_OPERATIONS.has(operation) || workbookTheme) effects = [{ kind: 'workbook' }];
-  // Its Protect Sheet option alone makes the command available; locked cells refuse it at run time.
-  else if (unlockedCellsOption(operation)) effects = [{ kind: 'sheet', sheet: selection.sheet }];
+  // A sheet-level write, or one whose Protect Sheet option alone makes it available (locked
+  // cells refuse it at run time): decided for the active sheet as a whole.
+  else if (operation === 'pageSetup' || unlockedCellsOption(operation))
+    effects = [{ kind: 'sheet', sheet: selection.sheet }];
   else if (band) effects = [{ kind: 'range', range: band }];
   else if (operation === 'format')
     effects = [selection, ...(state.selection.extraRanges ?? [])].map(

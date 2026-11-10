@@ -28,6 +28,7 @@ import {
   showOutlineLevel,
 } from '../commands/outline.js';
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
+import { pageSetupWrite } from '../commands/page-setup-actions.js';
 import { paginationFor } from '../commands/pagination.js';
 import { pivotTableAtRange } from '../commands/pivot-table.js';
 import { blockedByProtection, deferForAllowedRangeUnlock } from '../commands/protection.js';
@@ -1469,6 +1470,14 @@ export function attachPointer(
     }
   };
 
+  /** A page-setup change made by dragging on the grid (page breaks, print area, ruler margins). */
+  const gridPageSetup = (commandId: string) => ({
+    store,
+    history,
+    origin: 'editor' as const,
+    commandId,
+  });
+
   /**
    * Apply a released page-boundary drag.
    *
@@ -1485,11 +1494,15 @@ export function attachPointer(
       const pagination = paginationFor(s, sheet, { engine: wb });
       const origin = handle.axis === 'row' ? pagination.origin.row : pagination.origin.col;
       if (target < origin) return;
-      resizePrintArea(store, sheet, handle.axis, target, pagination.content, history);
+      pageSetupWrite(gridPageSetup('printArea'), sheet, undefined, () =>
+        resizePrintArea(store, sheet, handle.axis, target, pagination.content, history),
+      );
       return;
     }
     if (target === handle.index) return;
-    movePageBreak(store, sheet, handle.axis, handle.index, target, history);
+    pageSetupWrite(gridPageSetup('pageBreaks'), sheet, undefined, () =>
+      movePageBreak(store, sheet, handle.axis, handle.index, target, history),
+    );
   };
 
   applyDragAt = (x, y) => applyDrag(null, x, y);
@@ -1555,7 +1568,9 @@ export function attachPointer(
       drag = { kind: 'none' };
       host.style.cursor = '';
       const sheet = store.getState().data.sheetIndex;
-      setPageSetup(store, sheet, { margins: { [handle.side]: inches } }, history);
+      pageSetupWrite(gridPageSetup('marginsPreset'), sheet, undefined, () =>
+        setPageSetup(store, sheet, { margins: { [handle.side]: inches } }, history),
+      );
       onAfterCommit?.();
       return;
     }

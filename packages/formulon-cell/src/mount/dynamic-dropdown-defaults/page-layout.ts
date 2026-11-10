@@ -1,3 +1,4 @@
+import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
 import type { OperationIntent } from '../../commands/interaction-policy.js';
 import {
   addPrintArea,
@@ -7,6 +8,7 @@ import {
   resetManualPageBreaks,
   setPrintArea,
 } from '../../commands/page-setup.js';
+import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 import { clearSheetBackgroundImage, setSheetBackgroundImage } from '../../commands/view.js';
 import { formatA1Range } from '../../engine/address.js';
 import { workbookThemeMatchesPreset } from '../../engine/workbook-theme-presets.js';
@@ -81,25 +83,24 @@ const updatePageThemeMenu =
     }
   };
 
+/** A page-setup change run from the Page Layout ribbon under `commandId`. */
+const ribbonPageSetup = (instance: SpreadsheetInstance, commandId: string) => ({
+  store: instance.store,
+  history: instance.history,
+  origin: 'ribbon' as const,
+  commandId,
+});
+
 const buildPrintAreaAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyPrintAreaAction'] =>
   (action) => {
     const sheet = instance.store.getState().data.sheetIndex;
-    if (action === 'clear') clearPrintArea(instance.store, sheet, instance.history);
-    else if (action === 'add')
-      addPrintArea(
-        instance.store,
-        sheet,
-        formatA1Range(normalizedSelectionRange(instance)),
-        instance.history,
-      );
-    else
-      setPrintArea(
-        instance.store,
-        sheet,
-        formatA1Range(normalizedSelectionRange(instance)),
-        instance.history,
-      );
+    const area = formatA1Range(normalizedSelectionRange(instance));
+    pageSetupWrite(ribbonPageSetup(instance, 'printArea'), sheet, undefined, () => {
+      if (action === 'clear') clearPrintArea(instance.store, sheet, instance.history);
+      else if (action === 'add') addPrintArea(instance.store, sheet, area, instance.history);
+      else setPrintArea(instance.store, sheet, area, instance.history);
+    });
     instance.host.focus();
   };
 
@@ -111,8 +112,13 @@ const updatePrintAreaMenu =
     const disabledReason = instance.i18n.strings.ribbonMenu.printAreaRequiresExisting;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-print-area-action]')) {
       const action = button.dataset.printAreaAction;
-      const disabled = (action === 'add' || action === 'clear') && !hasPrintArea;
-      setMenuControlDisabled(button, disabled, disabledReason);
+      const denied = !canExecuteBuiltIn(instance.store, 'printArea', 'ribbon').allowed;
+      const disabled = denied || ((action === 'add' || action === 'clear') && !hasPrintArea);
+      setMenuControlDisabled(
+        button,
+        disabled,
+        denied ? instance.i18n.strings.backstage.commandUnavailable : disabledReason,
+      );
     }
   };
 
@@ -120,26 +126,37 @@ const buildPageBreakAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyPageBreakAction'] =>
   (action) => {
     const range = normalizedSelectionRange(instance);
-    if (action === 'insert') {
-      if (range.r0 > 0)
-        insertManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
-      if (range.c0 > 0)
-        insertManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
-    } else if (action === 'insert-row')
-      insertManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
-    else if (action === 'insert-col')
-      insertManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
-    else if (action === 'remove') {
-      removeManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
-      removeManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
-    } else if (action === 'remove-row')
-      removeManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
-    else if (action === 'remove-col')
-      removeManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
-    else if (action === 'reset-all')
-      resetManualPageBreaks(instance.store, range.sheet, instance.history);
+    pageSetupWrite(ribbonPageSetup(instance, 'pageBreaks'), range.sheet, undefined, () => {
+      writePageBreaks(instance, range, action);
+    });
     instance.host.focus();
   };
+
+/** Insert, remove or reset manual page breaks at `range` as the Breaks menu `action` asks. */
+const writePageBreaks = (
+  instance: SpreadsheetInstance,
+  range: ReturnType<typeof normalizedSelectionRange>,
+  action: string,
+): void => {
+  if (action === 'insert') {
+    if (range.r0 > 0)
+      insertManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
+    if (range.c0 > 0)
+      insertManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
+  } else if (action === 'insert-row')
+    insertManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
+  else if (action === 'insert-col')
+    insertManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
+  else if (action === 'remove') {
+    removeManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
+    removeManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
+  } else if (action === 'remove-row')
+    removeManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
+  else if (action === 'remove-col')
+    removeManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
+  else if (action === 'reset-all')
+    resetManualPageBreaks(instance.store, range.sheet, instance.history);
+};
 
 const updatePageBreaksMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updatePageBreaksMenu'] =>
@@ -152,9 +169,11 @@ const updatePageBreaksMenu =
     const canInsertAtSelection = range.r0 > 0 || range.c0 > 0;
     const hasBreakAtSelection = rowBreaks.has(range.r0) || colBreaks.has(range.c0);
     const strings = instance.i18n.strings.ribbonMenu;
+    const denied = !canExecuteBuiltIn(instance.store, 'pageBreaks', 'ribbon').allowed;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-page-break-action]')) {
       const action = button.dataset.pageBreakAction;
       const disabled =
+        denied ||
         (action === 'insert' && !canInsertAtSelection) ||
         (action === 'insert-row' && range.r0 <= 0) ||
         (action === 'insert-col' && range.c0 <= 0) ||
@@ -162,11 +181,13 @@ const updatePageBreaksMenu =
         (action === 'remove-row' && !rowBreaks.has(range.r0)) ||
         (action === 'remove-col' && !colBreaks.has(range.c0)) ||
         (action === 'reset-all' && !hasAnyBreak);
-      const reason = action?.startsWith('insert')
-        ? strings.pageBreakInsertRequiresSelection
-        : action === 'reset-all'
-          ? strings.pageBreakResetRequiresAny
-          : strings.pageBreakRemoveRequiresBreak;
+      const reason = denied
+        ? instance.i18n.strings.backstage.commandUnavailable
+        : action?.startsWith('insert')
+          ? strings.pageBreakInsertRequiresSelection
+          : action === 'reset-all'
+            ? strings.pageBreakResetRequiresAny
+            : strings.pageBreakRemoveRequiresBreak;
       setMenuControlDisabled(button, disabled, reason);
     }
   };
@@ -175,8 +196,11 @@ const buildSheetBackgroundAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applySheetBackgroundAction'] =>
   async (action) => {
     const sheet = instance.store.getState().data.sheetIndex;
+    const background = ribbonPageSetup(instance, 'sheetBackground');
     if (action === 'clear') {
-      clearSheetBackgroundImage(instance.store, sheet, instance.history);
+      pageSetupWrite(background, sheet, undefined, () =>
+        clearSheetBackgroundImage(instance.store, sheet, instance.history),
+      );
       instance.host.focus();
       return;
     }
@@ -185,7 +209,9 @@ const buildSheetBackgroundAction =
       instance.host.focus();
       return;
     }
-    setSheetBackgroundImage(instance.store, sheet, picked.src, instance.history);
+    pageSetupWrite(background, sheet, undefined, () =>
+      setSheetBackgroundImage(instance.store, sheet, picked.src, instance.history),
+    );
     instance.host.focus();
   };
 

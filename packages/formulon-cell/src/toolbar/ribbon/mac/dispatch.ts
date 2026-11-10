@@ -12,12 +12,14 @@ import {
 import { selectNextFormulaError } from '../../../commands/error-indicators.js';
 import { interactionControllerFor } from '../../../commands/interaction-controller.js';
 import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../commands/page-setup.js';
+import { pageSetupWrite } from '../../../commands/page-setup-actions.js';
 import { FUNCTION_SIGNATURES } from '../../../commands/refs.js';
 import { executeNoteVisibilityAction } from '../../../commands/ribbon-comment.js';
 import { formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import {
   openDataValidationDialogFrom,
   openDefineNameDialogFrom,
+  openPageSetupDialogFrom,
 } from '../../../interact/dialog-entry.js';
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
@@ -360,16 +362,28 @@ export function dispatchMacRibbonCommand(
     if (validationAction) return ctx.applyDataValidationAction(validationAction);
     if (id.startsWith('mac.function.'))
       return instance.openFunctionArguments(id.slice('mac.function.'.length));
+    // Page-setup writes run under the Mac command id that asked for them.
+    const pageSetup = <T>(write: () => T): T | undefined =>
+      pageSetupWrite(
+        { store: instance.store, history: instance.history, origin: 'ribbon', commandId: id },
+        sheet,
+        undefined,
+        write,
+      );
     if (id.startsWith('mac.page.margins.')) {
       const preset = id.slice('mac.page.margins.'.length);
-      if (preset === 'custom') return instance.openPageSetup('margins');
+      if (preset === 'custom')
+        return openPageSetupDialogFrom(instance.store, 'margins', {
+          origin: 'ribbon',
+          commandId: 'mac.page.margins.custom',
+        });
       if (preset === 'normal' || preset === 'wide' || preset === 'narrow')
-        return setMarginPreset(instance.store, sheet, preset, instance.history);
+        return pageSetup(() => setMarginPreset(instance.store, sheet, preset, instance.history));
     }
     if (id.startsWith('mac.page.orientation.')) {
       const value = id.slice('mac.page.orientation.'.length);
       if (value === 'portrait' || value === 'landscape')
-        return setPageOrientation(instance.store, sheet, value, instance.history);
+        return pageSetup(() => setPageOrientation(instance.store, sheet, value, instance.history));
     }
     const papers = {
       'mac.page.size.a4': 'A4',
@@ -378,7 +392,7 @@ export function dispatchMacRibbonCommand(
       'mac.page.size.legal': 'legal',
     } as const;
     const paper = papers[id as keyof typeof papers];
-    if (paper) return setPaperSize(instance.store, sheet, paper, instance.history);
+    if (paper) return pageSetup(() => setPaperSize(instance.store, sheet, paper, instance.history));
     const print = {
       'mac.page.printArea.set': 'set',
       'mac.page.printArea.add': 'add',
@@ -416,7 +430,10 @@ export function dispatchMacRibbonCommand(
       case 'mac.insert.screenshot':
         return ctx.insertScreenshotFromRibbon();
       case 'mac.insert.headerFooter':
-        return instance.openPageSetup('headerFooter');
+        return openPageSetupDialogFrom(instance.store, 'headerFooter', {
+          origin: 'ribbon',
+          commandId: 'mac.insert.headerFooter',
+        });
       case 'mac.insert.symbol':
         return ctx.applySymbolAction('more');
       case 'mac.formulas.autoSum':

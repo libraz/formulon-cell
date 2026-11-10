@@ -1,5 +1,6 @@
+import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 import type { Locale } from '../../i18n/strings.js';
-import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
+import { openFormatDialogFrom, openPageSetupDialogFrom } from '../../interact/dialog-entry.js';
 // Ribbon control dispatch extracted from main.ts. Owns the read/write side of
 // the ribbon: reading the current value of a control from the active cell or
 // page setup, and applying a control change (font, fill, number format,
@@ -188,16 +189,22 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       focusSheet();
       return;
     }
-    recordPageSetupChange(i.history, i.store, () => {
-      if (isScale)
-        mutators.setPageSetup(i.store, sheet, { scale: n / 100, fitWidth: 0, fitHeight: 0 });
-      else
-        mutators.setPageSetup(
-          i.store,
-          sheet,
-          id === 'scaleWidth' ? { fitWidth: n } : { fitHeight: n },
-        );
-    });
+    pageSetupWrite(
+      { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+      sheet,
+      undefined,
+      () =>
+        recordPageSetupChange(i.history, i.store, () => {
+          if (isScale)
+            mutators.setPageSetup(i.store, sheet, { scale: n / 100, fitWidth: 0, fitHeight: 0 });
+          else
+            mutators.setPageSetup(
+              i.store,
+              sheet,
+              id === 'scaleWidth' ? { fitWidth: n } : { fitHeight: n },
+            );
+        }),
+    );
     projectFormatToolbar();
     focusSheet();
   };
@@ -264,12 +271,21 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       const i = getInst();
       if (!i) return;
       if (value === 'custom') {
-        i.openPageSetup();
+        openPageSetupDialogFrom(i.store, undefined, {
+          origin: 'ribbon',
+          commandId: 'marginsPreset',
+        });
         return;
       }
       const sheet = i.store.getState().data.sheetIndex;
-      recordPageSetupChange(i.history, i.store, () =>
-        setMarginPreset(i.store, sheet, value as MarginPreset),
+      pageSetupWrite(
+        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+        sheet,
+        undefined,
+        () =>
+          recordPageSetupChange(i.history, i.store, () =>
+            setMarginPreset(i.store, sheet, value as MarginPreset),
+          ),
       );
       projectFormatToolbar();
       sheetEl.focus();
@@ -277,8 +293,14 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       const i = getInst();
       if (!i) return;
       const sheet = i.store.getState().data.sheetIndex;
-      recordPageSetupChange(i.history, i.store, () =>
-        setPageOrientation(i.store, sheet, value as PageOrientation),
+      pageSetupWrite(
+        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+        sheet,
+        undefined,
+        () =>
+          recordPageSetupChange(i.history, i.store, () =>
+            setPageOrientation(i.store, sheet, value as PageOrientation),
+          ),
       );
       projectFormatToolbar();
       sheetEl.focus();
@@ -286,8 +308,14 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       const i = getInst();
       if (!i) return;
       const sheet = i.store.getState().data.sheetIndex;
-      recordPageSetupChange(i.history, i.store, () =>
-        setPaperSize(i.store, sheet, value as PaperSize),
+      pageSetupWrite(
+        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+        sheet,
+        undefined,
+        () =>
+          recordPageSetupChange(i.history, i.store, () =>
+            setPaperSize(i.store, sheet, value as PaperSize),
+          ),
       );
       projectFormatToolbar();
       sheetEl.focus();
@@ -300,13 +328,19 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       }
       const sheet = i.store.getState().data.sheetIndex;
       const n = Math.max(0, Math.min(99, Number.parseInt(value, 10) || 0));
-      recordPageSetupChange(i.history, i.store, () => {
-        mutators.setPageSetup(
-          i.store,
-          sheet,
-          id === 'scaleWidth' ? { fitWidth: n } : { fitHeight: n },
-        );
-      });
+      pageSetupWrite(
+        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+        sheet,
+        undefined,
+        () =>
+          recordPageSetupChange(i.history, i.store, () => {
+            mutators.setPageSetup(
+              i.store,
+              sheet,
+              id === 'scaleWidth' ? { fitWidth: n } : { fitHeight: n },
+            );
+          }),
+      );
       projectFormatToolbar();
       sheetEl.focus();
     } else if (id === 'scalePercent') {
@@ -318,9 +352,15 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       }
       const sheet = i.store.getState().data.sheetIndex;
       const pct = Math.max(10, Math.min(400, Number.parseInt(value, 10) || 100));
-      recordPageSetupChange(i.history, i.store, () => {
-        mutators.setPageSetup(i.store, sheet, { scale: pct / 100, fitWidth: 0, fitHeight: 0 });
-      });
+      pageSetupWrite(
+        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+        sheet,
+        undefined,
+        () =>
+          recordPageSetupChange(i.history, i.store, () => {
+            mutators.setPageSetup(i.store, sheet, { scale: pct / 100, fitWidth: 0, fitHeight: 0 });
+          }),
+      );
       projectFormatToolbar();
       sheetEl.focus();
     } else if (id === 'sheetViewSelect') {
