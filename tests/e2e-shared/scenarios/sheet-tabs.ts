@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
+import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 /** T01 — adding a sheet via the `+` button in the sheetbar increases the
  *  tab count and makes the new tab the selected one.
@@ -44,4 +45,47 @@ export async function runSheetTabSwitchScenario(page: Page): Promise<void> {
   // Click the first tab and verify selection moves.
   await tabs.first().click();
   await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+}
+
+/** T03 — Move or Copy with "Create a copy" from the tab menu adds a named copy holding the source's
+ *  cells and activates it; undo removes the copy and redo restores it. */
+export async function runSheetTabCopyScenario(page: Page): Promise<void> {
+  const sheet = new UserJourneyPage(page);
+  await sheet.mount({ locale: 'en' });
+  await sheet.expectNoStub();
+  await sheet.seed({ A1: 42, B2: '=A1*2' });
+
+  const tabs = page.locator('.fc-host__sheetbar-tab');
+  const initial = await sheet.sheetCount();
+  const source = await sheet.sheetName(0);
+  await sheet.chooseSheet(source);
+
+  await tabs.filter({ hasText: source }).first().click({ button: 'right' });
+  const menu = page.locator('.fc-sheetmenu');
+  await expect(menu).toBeVisible();
+  await menu.getByRole('menuitem', { name: 'Move or Copy...' }).click();
+
+  const dialog = page.locator('.fc-movecopy');
+  await expect(dialog).toBeVisible();
+  await dialog.locator('.fc-movecopy__item').last().click();
+  await dialog.locator('.fc-movecopy__copy input[type="checkbox"]').check();
+  await dialog.getByRole('button', { name: 'OK' }).click();
+  await expect(dialog).toBeHidden();
+
+  const copyName = `${source} (2)`;
+  await expect.poll(() => sheet.sheetCount()).toBe(initial + 1);
+  expect(await sheet.sheetName(initial)).toBe(copyName);
+  await expect(page.locator('.fc-host__sheetbar-tab[aria-selected="true"]')).toHaveText(copyName);
+  expect(await sheet.readValue('A1', initial)).toMatchObject({ kind: 'number', value: 42 });
+  expect(await sheet.readFormula('B2', initial)).toBe('=A1*2');
+
+  await sheet.focusHost();
+  await sheet.shortcut('z');
+  await expect.poll(() => sheet.sheetCount()).toBe(initial);
+  await expect(tabs.filter({ hasText: copyName })).toHaveCount(0);
+
+  await sheet.shortcut('y');
+  await expect.poll(() => sheet.sheetCount()).toBe(initial + 1);
+  expect(await sheet.sheetName(initial)).toBe(copyName);
+  expect(await sheet.readValue('A1', initial)).toMatchObject({ kind: 'number', value: 42 });
 }
