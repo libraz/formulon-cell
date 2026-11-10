@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const PROFILES = [
@@ -169,7 +170,10 @@ const conditionalFormulaInput = (dialog: ReturnType<Page['locator']>) =>
   dialog.locator('input[placeholder*="="]').first();
 
 const addConditionalRule = async (dialog: ReturnType<Page['locator']>): Promise<void> => {
-  await dialog.locator('.fc-conddlg__addrow button').click();
+  // The Mac layout moves the add button into the footer.
+  await dialog
+    .locator('.fc-conddlg__addrow button, .fc-fmtdlg__footer .fc-fmtdlg__btn--primary')
+    .click();
   await expect(dialog).toBeHidden();
 };
 
@@ -295,7 +299,9 @@ export async function runConditionalFormulaLocaleScenario(
     mode: 'new',
     kind: 'formula',
   });
-  const kindSelect = germanFormulaDialog.locator('select:has(option[value="formula"])');
+  const kindSelect = germanFormulaDialog.locator(
+    platform === 'mac' ? 'select[data-cf-mac-type]' : 'select[data-cf-kind]',
+  );
   await kindSelect.selectOption('formula');
   await conditionalFormulaInput(germanFormulaDialog).fill('=UND(A1>1,5;A1<3;A1<>"a;b")');
   await addConditionalRule(germanFormulaDialog);
@@ -361,7 +367,7 @@ export async function runMacGoalSeekLocaleDialogScenario(page: Page): Promise<vo
   await sp.enter('E1', '3');
   await sp.enter('F1', '=E1*2');
   await sp.goTo('F1');
-  await page.locator('[data-ribbon-tab="data"]').click();
+  await selectRibbonTab(page, 'data');
   await sp.clickRibbon('mac.data.whatIf');
   await page.locator('#menu-mac-data-what-if [data-ribbon-command="mac.data.goalSeek"]').click();
   const goalSeek = page.locator('.fc-mac-goalseek');
@@ -383,7 +389,7 @@ export async function runMacGoalSeekLocaleDialogScenario(page: Page): Promise<vo
   await expect.poll(() => sp.readValue('E1')).toEqual({ kind: 'number', value: 0.75 });
   await expect.poll(() => sp.readValue('F1')).toEqual({ kind: 'number', value: 1.5 });
 
-  await page.locator('[data-ribbon-tab="data"]').click();
+  await selectRibbonTab(page, 'data');
   await sp.clickRibbon('mac.data.whatIf');
   await page.locator('#menu-mac-data-what-if [data-ribbon-command="mac.data.goalSeek"]').click();
   await expect(goalSeek).toBeVisible();
@@ -419,7 +425,11 @@ export async function runWatchWindowLocaleDialogScenario(
   });
   const watch = page.locator('.fc-watch').first();
   await expect(watch).toBeVisible();
-  await watch.locator('.fc-watch__btn').first().click();
+  // The Mac pane adds a watch through its toolbar instead of the header button.
+  await watch
+    .locator(platform === 'mac' ? '.fc-watch__tool--add' : '.fc-watch__btn')
+    .first()
+    .click();
   const watchRow = watch.locator('.fc-watch__row');
   await expect(watchRow).toHaveCount(1);
   await expect(watchRow.locator('td').nth(3)).toHaveText('C1');

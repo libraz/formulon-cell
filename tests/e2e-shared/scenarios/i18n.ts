@@ -314,9 +314,9 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   const colorScaleMenu = page.locator('#menu-conditional-colorScale');
   await expect(colorScaleMenu).toBeVisible();
   for (const label of [
-    '緑 - 黄 - 赤のカラー スケール',
-    '赤 - 黄 - 緑のカラー スケール',
-    '青 - 白 - 赤のカラー スケール',
+    '緑、黄、赤のカラー スケール',
+    '赤、黄、緑のカラー スケール',
+    '青、白、赤のカラー スケール',
   ]) {
     await expect(colorScaleMenu.getByRole('menuitem', { name: label, exact: true })).toBeVisible();
   }
@@ -327,7 +327,12 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   for (const label of ['方向', '図形', 'インジケーター', '評価']) {
     await expect(iconSetMenu.getByText(label, { exact: true }).first()).toBeVisible();
   }
-  for (const label of ['3 方向矢印', '3 色の信号', '3 フラグ', '5 評価']) {
+  for (const label of [
+    '3 つの矢印 (色分け)',
+    '3 つの信号 (枠なし)',
+    '3 つのフラグ',
+    '5 つの評価',
+  ]) {
     await expect(iconSetMenu.getByRole('menuitem', { name: label, exact: true })).toBeVisible();
   }
   await expect(iconSetMenu).not.toContainText('Directional');

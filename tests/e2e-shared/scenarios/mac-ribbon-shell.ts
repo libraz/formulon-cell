@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import { selectRibbonTab, setRibbonDisplayMode } from '../pages/ribbon-tabs.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -7,7 +8,7 @@ export async function runMacCollapsedRibbonScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
   await sp.expectNoStub();
-  await page.locator('[data-ribbon-tab="home"]').dblclick();
+  await page.locator('[data-ribbon-tab="home"]').click();
   await expect(page.locator('[data-ribbon-panel="home"]')).toBeHidden();
   const collapsedGrid = await page.locator('.fc-host__grid').boundingBox();
   await page.locator('[data-ribbon-tab="home"]').click();
@@ -53,7 +54,7 @@ export async function runMacRibbonSwitchingScenario(
     'automate',
   ];
   for (const id of [...tabs, ...[...tabs].reverse()]) {
-    await page.locator(`[data-ribbon-tab="${id}"]`).click();
+    await selectRibbonTab(page, id);
     await expect(page.locator('[data-ribbon-tab][aria-selected="true"]')).toHaveCount(1);
     await expect(page.locator(`[data-ribbon-tab="${id}"]`)).toHaveAttribute(
       'aria-selected',
@@ -78,7 +79,7 @@ export async function runMacRibbonSwitchingScenario(
   await expect(page.locator('[data-ribbon-tab="home"]')).toBeFocused();
   await expect(page.locator('[data-ribbon-panel="home"]')).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('[data-ribbon-tab="formulas"]').click();
+  await selectRibbonTab(page, 'formulas');
   const functionLibrary = page.locator(
     '[data-ribbon-panel="formulas"] .fc-tb__ribbon-group--function-library',
   );
@@ -204,10 +205,9 @@ export async function runMacRibbonSwitchingScenario(
       );
     }
   }
-  await page.locator('[data-ribbon-toggle]').click();
-  await page.locator('[data-ribbon-display-option="singleLine"]').click();
+  await setRibbonDisplayMode(page, 'singleLine');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('[data-ribbon-tab="formulas"]').click();
+  await selectRibbonTab(page, 'formulas');
   const singleLineGeometry = await functionLibrary.evaluate((group) => {
     const panel = group.closest<HTMLElement>('.fc-tb__ribbon');
     const buttons = Array.from(
@@ -284,19 +284,17 @@ export async function runMacRibbonSwitchingScenario(
       expect(Math.abs(chevronCenter - buttonCenter), button.id).toBeLessThanOrEqual(4);
     }
   }
-  await page.locator('[data-ribbon-toggle]').click();
-  await page.locator('[data-ribbon-display-option="full"]').click();
+  await setRibbonDisplayMode(page, 'full');
   await expect(page.locator('.fc-tb__ribbon-shell--full')).toHaveCount(1);
   // Compact groups must stay inside the ribbon in either display mode.
   for (const mode of ['full', 'singleLine']) {
     if (mode === 'singleLine') {
-      await page.locator('[data-ribbon-toggle]').click();
-      await page.locator('[data-ribbon-display-option="singleLine"]').click();
+      await setRibbonDisplayMode(page, 'singleLine');
     }
     for (const width of [1440, 1024, 768, 390]) {
       await page.setViewportSize({ width, height: 900 });
       for (const id of tabs) {
-        await page.locator(`[data-ribbon-tab="${id}"]`).click();
+        await selectRibbonTab(page, id);
         const clipped = await page.locator(`[data-ribbon-panel="${id}"]`).evaluate((panel) => {
           const bounds = panel.getBoundingClientRect();
           return Array.from(
@@ -328,7 +326,9 @@ export async function runMacRibbonSwitchingScenario(
         const overflow = await page.locator(`[data-ribbon-panel="${id}"]`).evaluate((panel) => {
           const scrollPanel = panel as HTMLElement;
           const commands = Array.from(
-            panel.querySelectorAll<HTMLElement>('[data-ribbon-command], [data-ribbon-control]'),
+            panel.querySelectorAll<HTMLElement>(
+              '[data-ribbon-command], [data-ribbon-control], .fc-tb__ribbon-group-collapse',
+            ),
           ).filter((command) => command.getBoundingClientRect().width > 0);
           const last = commands.at(-1);
           if (!last) throw new Error('Ribbon panel has no visible commands.');
@@ -339,7 +339,8 @@ export async function runMacRibbonSwitchingScenario(
             panel.querySelectorAll<HTMLElement>(':scope > .fc-tb__ribbon-group'),
           ).map((group) => group.getBoundingClientRect().left);
           return {
-            command: last.dataset.ribbonCommand ?? last.dataset.ribbonControl,
+            command:
+              last.dataset.ribbonCommand ?? last.dataset.ribbonControl ?? last.textContent ?? '',
             reachable: lastBounds.left >= bounds.left - 1 && lastBounds.right <= bounds.right + 1,
             pageOverflow: document.documentElement.scrollWidth > window.innerWidth,
             groupOrderMatchesModel: groupPositions.every(

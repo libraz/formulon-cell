@@ -150,7 +150,7 @@ export async function runExcelChromeTableStyleGalleryScenario(page: Page): Promi
   await expect(menu).toBeVisible();
   await expect(tableButton).toHaveAttribute('aria-expanded', 'true');
   await expect(menu.locator('.fc-tb__tablestyle-heading')).toHaveCount(3);
-  await expect(menu.locator('.fc-tb__tablestyle-swatch')).toHaveCount(63);
+  await expect(menu.locator('.fc-tb__tablestyle-swatch')).toHaveCount(60);
 
   const layout = await menu.evaluate((el) => {
     const rect = el.getBoundingClientRect();

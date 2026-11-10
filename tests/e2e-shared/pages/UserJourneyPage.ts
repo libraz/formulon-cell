@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
-
+import { revealRibbonCommand } from './ribbon-tabs.js';
 import { gridCellCenter, SpreadsheetPage } from './SpreadsheetPage.js';
 
 export interface CellAddress {
@@ -190,6 +190,7 @@ export class UserJourneyPage extends SpreadsheetPage {
 
   async clickRibbon(command: string): Promise<void> {
     const button = this.page.locator(`[data-ribbon-command="${command}"]`).first();
+    await revealRibbonCommand(button);
     await expect(button).toBeVisible();
     await button.click();
   }

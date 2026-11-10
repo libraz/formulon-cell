@@ -145,7 +145,7 @@ async function runOwnerDocumentMenuScenario(
   try {
     const frame = page.frameLocator('#menu-owner-frame');
     await frame.locator('#menu-owner-host').click({ button: 'right', position: { x: 600, y: 40 } });
-    const parent = frame.locator('[data-fc-submenu="ownerParent"]');
+    const parent = frame.locator('button[data-fc-submenu="ownerParent"]');
     const submenu = frame.locator('.fc-ctxmenu__sub');
     await parent.focus();
     await page.keyboard.press('ArrowRight');
@@ -457,10 +457,17 @@ export async function runMacSubmenuLayoutScenario(page: Page): Promise<void> {
         expect(bounds.left, `${locale}/${width}/${id}`).toBeGreaterThanOrEqual(0);
         expect(bounds.right, `${locale}/${width}/${id}`).toBeLessThanOrEqual(bounds.viewport);
         if (id === 'sortMenu') {
-          const rootWidth = await menu.evaluate((element) => element.getBoundingClientRect().width);
-          expect(bounds.width, `${locale}/${width}: short submenu fits its content`).toBeLessThan(
-            rootWidth,
-          );
+          // The sort submenu has its own measured minimum width; it neither follows the root's
+          // width nor grows past what its labels need.
+          const contentWidth = await submenu.evaluate((element) => element.scrollWidth);
+          expect(
+            bounds.width,
+            `${locale}/${width}: sort submenu keeps its minimum`,
+          ).toBeGreaterThanOrEqual(308);
+          expect(
+            bounds.width,
+            `${locale}/${width}: sort submenu fits its content`,
+          ).toBeLessThanOrEqual(Math.max(308, contentWidth) + 1);
         }
         if (width === 1280) {
           const clipped = await submenu

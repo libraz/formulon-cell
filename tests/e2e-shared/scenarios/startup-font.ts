@@ -18,6 +18,8 @@ const STARTUP = {
 type FontProbeWindow = Window & {
   __fcInst: SpreadsheetInstance;
   __startupText: Record<string, { font: string; width: number }>;
+  __startupGlyphs: { ch: string; font: string; x: number; y: number; width: number }[];
+  __startupFindRun: (text: string) => { font: string; width: number } | undefined;
   __startupPreviousWorkbook?: SpreadsheetInstance['workbook'];
   __startupDisposeCount?: number;
 };
@@ -29,11 +31,40 @@ export async function runStartupFont(
 ): Promise<void> {
   await page.addInitScript(() => {
     const probe = window as unknown as FontProbeWindow;
+    const words = ['item', 'London', 'Reykjavík', 'fahrenheit', 'Reykjavík ☼'];
+    const chars = new Set(words.flatMap((word) => [...word]));
     probe.__startupText = {};
+    probe.__startupGlyphs = [];
+    // Mac cell text is drawn one glyph at a time; a word is a run of consecutive glyph draws.
+    probe.__startupFindRun = (text) => {
+      const whole = probe.__startupText[text];
+      if (whole) return whole;
+      const glyphs = probe.__startupGlyphs;
+      const run = [...text];
+      for (let i = 0; i + run.length <= glyphs.length; i++) {
+        const slice = glyphs.slice(i, i + run.length);
+        if (slice.every((glyph, k) => glyph.ch === run[k] && glyph.y === slice[0]?.y)) {
+          const first = slice[0];
+          const last = slice[slice.length - 1];
+          if (first && last) {
+            return { font: first.font, width: last.x + last.width - first.x };
+          }
+        }
+      }
+      return undefined;
+    };
     const original = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (text, x, y, maxWidth) {
-      if (['item', 'London', 'Reykjavík', 'fahrenheit', 'Reykjavík ☼'].includes(text)) {
+      if (words.includes(text)) {
         probe.__startupText[text] = { font: this.font, width: this.measureText(text).width };
+      } else if ([...text].length === 1 && chars.has(text)) {
+        probe.__startupGlyphs.push({
+          ch: text,
+          font: this.font,
+          x,
+          y,
+          width: this.measureText(text).width,
+        });
       }
       if (maxWidth === undefined) original.call(this, text, x, y);
       else original.call(this, text, x, y, maxWidth);
@@ -43,7 +74,9 @@ export async function runStartupFont(
   const errors = spreadsheet.collectConsoleErrors();
   await spreadsheet.mount({ fixture: null, locale, platform });
   await spreadsheet.expectNoStub();
-  await page.waitForFunction(() => (window as unknown as FontProbeWindow).__startupText.Reykjavík);
+  await page.waitForFunction(() =>
+    (window as unknown as FontProbeWindow).__startupFindRun('Reykjavík'),
+  );
   const expected = STARTUP[platform][locale];
   const fontName = expected.font.name;
   const fontSize = String(expected.font.size);
@@ -55,7 +88,12 @@ export async function runStartupFont(
       font: instance.workbook.workbookDisplayFont,
       widths: [0, 1, 2, 3].map((col) => state.layout.colWidths.get(col)),
       rowHeight: state.layout.defaultRowHeight,
-      draws: probe.__startupText,
+      draws: Object.fromEntries(
+        ['item', 'London', 'Reykjavík', 'fahrenheit', 'Reykjavík ☼'].map((word) => [
+          word,
+          probe.__startupFindRun(word),
+        ]),
+      ),
       corner: { x: state.layout.headerColWidth + 12, y: state.layout.headerRowHeight + 8 },
     };
   });

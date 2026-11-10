@@ -1,10 +1,12 @@
 import { expect, type Page } from '@playwright/test';
 
+import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   const read = () =>
     page.evaluate(() => {
@@ -24,7 +26,7 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
         freezeRows: state.layout.freezeRows,
       };
     });
-  await page.locator('[data-ribbon-tab="pageLayout"]').click();
+  await selectRibbonTab(page, 'pageLayout');
   for (const [id, value] of [
     ['scaleWidth', '1'],
     ['scaleHeight', '2'],
@@ -34,7 +36,7 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
     await select.locator(`[role="option"][data-value="${value}"]`).click();
   }
   await expect.poll(async () => (await read()).setup).toMatchObject({ fitWidth: 1, fitHeight: 2 });
-  await page.locator('[data-ribbon-tab="view"]').click();
+  await selectRibbonTab(page, 'view');
   await sp.clickRibbon('mac.view.freeze');
   await page
     .locator('#menu-mac-view-freeze [data-ribbon-command="mac.view.freeze.firstRow"]')
@@ -65,16 +67,17 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
 export async function runMacViewShowScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
-  await page.locator('[data-ribbon-tab="view"]').click();
-  await sp.clickRibbon('mac.view.show');
-  const menu = page.locator('#menu-mac-view-show');
-  await expect(menu).toBeVisible();
-  await menu.locator('[data-ribbon-command="mac.view.formulaBar"]').click();
+  await selectRibbonTab(page, 'view');
+  const formulaBar = page.locator('[data-ribbon-command="mac.view.formulaBar"]').first();
+  await expect(formulaBar).toHaveAttribute('aria-pressed', 'true');
+  await sp.clickRibbon('mac.view.formulaBar');
   await expect(page.locator('.fc-host__formulabar')).toBeHidden();
-  await sp.clickRibbon('mac.view.show');
-  await menu.locator('[data-ribbon-command="mac.view.formulaBar"]').click();
+  await expect(formulaBar).toHaveAttribute('aria-pressed', 'false');
+  await sp.clickRibbon('mac.view.formulaBar');
   await expect(page.locator('.fc-host__formulabar')).toBeVisible();
+  await expect(formulaBar).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await sp.expectNoConsoleErrors();
 }
@@ -82,6 +85,7 @@ export async function runMacViewShowScenario(page: Page): Promise<void> {
 export async function runMacPageAndCalculationScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   const read = () =>
     page.evaluate(() => {
@@ -100,7 +104,7 @@ export async function runMacPageAndCalculationScenario(page: Page): Promise<void
         mode: inst.workbook.calcMode(),
       };
     });
-  await page.locator('[data-ribbon-tab="pageLayout"]').click();
+  await selectRibbonTab(page, 'pageLayout');
   await sp.clickRibbon('mac.page.orientation');
   await page
     .locator('#menu-mac-page-orientation [data-ribbon-command="mac.page.orientation.landscape"]')
@@ -124,7 +128,7 @@ export async function runMacPageAndCalculationScenario(page: Page): Promise<void
     .locator('[role=menu]:not([hidden]) [data-ribbon-command="mac.page.break.reset"]')
     .click();
   expect((await read()).setup?.manualPageBreakRows ?? []).toEqual([]);
-  await page.locator('[data-ribbon-tab="formulas"]').click();
+  await selectRibbonTab(page, 'formulas');
   await sp.clickRibbon('mac.formulas.calcOptions');
   await page
     .locator('[role=menu]:not([hidden]) [data-ribbon-command="mac.formulas.calc.manual"]')
@@ -145,8 +149,9 @@ export async function runMacPageAndCalculationScenario(page: Page): Promise<void
 export async function runMacPageToggleAndZoomScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
-  await page.locator('[data-ribbon-tab="pageLayout"]').click();
+  await selectRibbonTab(page, 'pageLayout');
   for (const [action, initial] of [
     ['showGridlines', true],
     ['printGridlines', false],
@@ -160,7 +165,7 @@ export async function runMacPageToggleAndZoomScenario(page: Page): Promise<void>
     await button.click();
     await expect(button).toHaveAttribute('aria-pressed', String(!initial));
   }
-  await page.locator('[data-ribbon-tab="view"]').click();
+  await selectRibbonTab(page, 'view');
   const panel = page.locator('[data-ribbon-panel="view"]');
   const views = panel
     .locator('section')
@@ -183,7 +188,7 @@ export async function runMacPageToggleAndZoomScenario(page: Page): Promise<void>
   await expect.poll(zoom).toBe(1.5);
   await sp.clickRibbon('mac.view.zoom100');
   await expect.poll(zoom).toBe(1);
-  await page.locator('[data-ribbon-tab="pageLayout"]').click();
+  await selectRibbonTab(page, 'pageLayout');
   await expect(page.locator('[data-ribbon-command="mac.page.printGridlines"]')).toHaveAttribute(
     'aria-pressed',
     'true',

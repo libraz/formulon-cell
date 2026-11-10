@@ -31,14 +31,17 @@ export async function runRecalcAfterEditScenario(page: Page): Promise<void> {
   await page.keyboard.type('=A1*2');
   await page.keyboard.press('Enter');
 
-  // Select the formula cell (A2) so the aggregates describe it alone.
+  // Select the formula cell (A2) and the blank cell below it: aggregates need two or
+  // more cells, and the blank one adds nothing to them.
   await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Shift+ArrowDown');
   await expect(aggs).toContainText('40');
 
   // Re-edit the precedent. Enter leaves the selection back on A2.
   await sp.focusHost();
   await page.keyboard.type('25');
   await page.keyboard.press('Enter');
+  await page.keyboard.press('Shift+ArrowDown');
 
   await expect(aggs).toContainText('50');
 }

@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -9,8 +10,9 @@ export async function runMacEditingPaletteScenario(
 ): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac', locale });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
-  await page.locator('[data-ribbon-tab="formulas"]').click();
+  await selectRibbonTab(page, 'formulas');
   const palette = page.locator('.fc-mac-formula-palette[role=complementary]');
   const raw = '=1+SUM(2,3)*4';
   for (const source of ['inline', 'formulaBar'] as const) {
@@ -30,10 +32,11 @@ export async function runMacEditingPaletteScenario(
     await edit.evaluate((element) => {
       (element as HTMLTextAreaElement).setSelectionRange(7, 10, 'backward');
     });
-    const opener =
-      source === 'inline'
-        ? page.locator('[data-ribbon-command="mac.formulas.insertFunction"]')
-        : page.locator('.fc-host__formulabar-fx');
+    // While the bar is being edited its fx button is inert, so the ribbon opens the palette.
+    if (source === 'formulaBar') {
+      await expect(page.locator('.fc-host__formulabar-fx')).toHaveCSS('pointer-events', 'none');
+    }
+    const opener = page.locator('[data-ribbon-command="mac.formulas.insertFunction"]');
     await opener.click();
     await expect(palette).toBeVisible();
     await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 9 });
@@ -92,13 +95,14 @@ export async function runMacEditingPaletteScenario(
 export async function runMacFormulaPaletteScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   await sp.enter('A1', '1');
   await sp.goTo('A1');
   const grid = page.locator('.fc-host__grid');
   const originalGrid = await grid.boundingBox();
   if (!originalGrid) throw new Error('Missing initial grid geometry.');
-  await page.locator('[data-ribbon-tab="formulas"]').click();
+  await selectRibbonTab(page, 'formulas');
   const originalOpener = await page
     .locator('[data-ribbon-command="mac.formulas.insertFunction"]')
     .elementHandle();
@@ -211,9 +215,10 @@ export async function runMacFormulaPaletteScenario(page: Page): Promise<void> {
 export async function runMacFunctionCatalogScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   await sp.goTo('C1');
-  await page.locator('[data-ribbon-tab="formulas"]').click();
+  await selectRibbonTab(page, 'formulas');
   await sp.clickRibbon('mac.formulas.math');
   const menu = page.locator('#menu-mac-formulas-math');
   await expect(menu.locator('[data-ribbon-command="mac.function.ACOS"]')).toBeVisible();
@@ -434,9 +439,10 @@ export async function runMacFunctionCatalogScenario(page: Page): Promise<void> {
 export async function runMacFormulaAndAutomationScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   await sp.goTo('B1');
-  await page.locator('[data-ribbon-tab="formulas"]').click();
+  await selectRibbonTab(page, 'formulas');
   await sp.clickRibbon('mac.formulas.logical');
   await page
     .locator('.fc-tb__menu--mac:not([hidden]) [data-ribbon-command="mac.function.IF"]')
@@ -454,7 +460,7 @@ export async function runMacFormulaAndAutomationScenario(page: Page): Promise<vo
   await expect.poll(() => sp.readValue('B1')).toEqual({ kind: 'number', value: 42 });
   await sp.enter('A3', '1');
   await sp.goTo('A1:A3');
-  await page.locator('[data-ribbon-tab="automate"]').click();
+  await selectRibbonTab(page, 'automate');
   await sp.clickRibbon('mac.automate.gallery');
   await page
     .locator('.fc-tb__menu--mac:not([hidden]) [data-ribbon-command="mac.automate.countEmptyRows"]')
@@ -464,7 +470,7 @@ export async function runMacFormulaAndAutomationScenario(page: Page): Promise<vo
   await expect(result.locator('.fc-macautomationresult__summary')).toContainText('1');
   await page.keyboard.press('Escape');
   await expect(result).toHaveCount(0);
-  await page.locator('[data-ribbon-tab="review"]').click();
+  await selectRibbonTab(page, 'review');
   await sp.clickRibbon('mac.review.stats');
   await expect(page.locator('.fc-macstatsdlg[role=dialog]')).toBeVisible();
   await sp.expectNoConsoleErrors();
@@ -473,12 +479,13 @@ export async function runMacFormulaAndAutomationScenario(page: Page): Promise<vo
 export async function runMacAuditMenusScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   await sp.enter('A1', '1');
   await sp.enter('B1', '=A1+1');
   await sp.enter('C1', '=B1+1');
   await sp.goTo('B1');
-  await page.locator('[data-ribbon-tab="formulas"]').click();
+  await selectRibbonTab(page, 'formulas');
   await sp.clickRibbon('mac.formulas.precedents');
   await sp.clickRibbon('mac.formulas.dependents');
   const traces = () =>
@@ -550,11 +557,12 @@ export async function runMacAuditMenusScenario(page: Page): Promise<void> {
 export async function runMacAutoSumMenuScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   await sp.enter('A1', '1');
   await sp.enter('A2', '3');
   await sp.goTo('A3');
-  await page.locator('[data-ribbon-tab="formulas"]').click();
+  await selectRibbonTab(page, 'formulas');
   await sp.clickRibbon('mac.formulas.autoSum');
   const menu = page.locator('#menu-mac-formulas-autosum');
   await expect(menu).toBeVisible();
@@ -562,6 +570,11 @@ export async function runMacAutoSumMenuScenario(page: Page): Promise<void> {
     await expect(menu.locator(`[data-ribbon-command="mac.autosum.${fn}"]`)).toBeEnabled();
   }
   await menu.locator('[data-ribbon-command="mac.autosum.AVERAGE"]').click();
+  // On an empty cell the proposal opens in the editor and commits with Enter.
+  const editor = page.locator('.fc-host__editor');
+  await expect(editor).toHaveValue('=AVERAGE(A1:A2)');
+  expect(await sp.readFormula('A3')).toBeNull();
+  await page.keyboard.press('Enter');
   await expect.poll(() => sp.readFormula('A3')).toBe('=AVERAGE(A1:A2)');
   await expect.poll(() => sp.readValue('A3')).toEqual({ kind: 'number', value: 2 });
   await sp.clickRibbon('mac.formulas.recent');
@@ -578,11 +591,12 @@ export async function runMacAutoSumMenuScenario(page: Page): Promise<void> {
 export async function runMacDirectAutomationScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   await sp.enter('A1', '1');
   await sp.enter('A3', '3');
   await sp.goTo('A1:A3');
-  await page.locator('[data-ribbon-tab="automate"]').click();
+  await selectRibbonTab(page, 'automate');
   const panel = page.locator('[data-ribbon-panel="automate"]');
   for (const id of [
     'allRowsColumns',

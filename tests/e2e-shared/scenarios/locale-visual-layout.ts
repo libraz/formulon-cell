@@ -1,4 +1,6 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
+
+import { revealRibbonCommand, selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 const LOCALES = ['en', 'ja', 'de', 'fr', 'zh', 'ko', 'th'] as const;
@@ -36,7 +38,7 @@ export async function runLocaleVisualLayout(
       );
     for (const tab of tabs) {
       const trigger = shell.locator(`[data-ribbon-tab="${tab}"]`).first();
-      await trigger.click();
+      await selectRibbonTab(page, tab as string);
       await expect(trigger).toHaveAttribute('aria-selected', 'true');
       const rail = shell.locator('.fc-tb__ribbon:not([hidden])').first();
       const geometry = await rail.evaluate((node) => ({
@@ -169,7 +171,7 @@ export async function runLocaleVisualLayout(
         );
       expect(iconFailures, `${locale}/${platform}/${tab} icons must retain their size`).toEqual([]);
     }
-    await shell.locator('[data-ribbon-tab="home"]').click();
+    await selectRibbonTab(page, 'home');
     if (locale === 'de') {
       await expect(shell.locator('[data-ribbon-command="bold"] svg text')).toHaveText('F');
       await expect(shell.locator('[data-ribbon-command="italic"] svg text')).toHaveText('K');
@@ -204,7 +206,9 @@ export async function runLocaleVisualLayout(
     await expect(paste).toHaveAttribute('aria-describedby', (await tip.getAttribute('id')) ?? '');
     await page.keyboard.press('Escape');
     await expect(tip).toHaveCount(0);
-    await shell.locator('[data-ribbon-command="fontFamily"] button').first().click();
+    const fontFamily = shell.locator('[data-ribbon-command="fontFamily"] button').first();
+    await revealRibbonCommand(fontFamily);
+    await fontFamily.click();
     const fontOptions = page.locator('.fc-tb__rb-dd__list [role="option"]');
     await expect(fontOptions.first()).toBeVisible();
     const missingFontLabels = await fontOptions.evaluateAll((options) =>

@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import { selectRibbonTab, setRibbonDisplayMode } from '../pages/ribbon-tabs.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -87,14 +88,11 @@ export async function runMacRibbonLayoutScenario(page: Page): Promise<void> {
     await sp.mount({ platform: 'mac', locale, fixture: 'empty' });
     await sp.expectNoStub();
     for (const mode of ['full', 'singleLine']) {
-      if (mode === 'singleLine') {
-        await page.locator('[data-ribbon-toggle]').click();
-        await page.locator('[data-ribbon-display-option="singleLine"]').click();
-      }
+      if (mode === 'singleLine') await setRibbonDisplayMode(page, 'singleLine');
       for (const width of [1440, 1024, 768, 390]) {
         await page.setViewportSize({ width, height: 900 });
         for (const tab of tabs) {
-          await page.locator(`[data-ribbon-tab="${tab}"]`).click();
+          await selectRibbonTab(page, tab);
           const panel = page.locator(`[data-ribbon-panel="${tab}"]`);
           const issues = await panel.evaluate((el) => {
             const errors: string[] = [];

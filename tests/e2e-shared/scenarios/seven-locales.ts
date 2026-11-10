@@ -27,7 +27,7 @@ export async function runSevenLocalesScenario(
   await sp.expectNoStub();
   await sp.typeIntoActiveCell('=DOLLAR(-1234.567)');
 
-  const panelToggle = page.locator('.demo__account .demo__share').nth(1);
+  const panelToggle = page.locator('.demo__account .demo__pane-toggle');
   await panelToggle.click();
   const panel = page.locator('aside.demo__panel');
   await expect(panel).toBeVisible();

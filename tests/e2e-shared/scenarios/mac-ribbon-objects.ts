@@ -1,16 +1,18 @@
 import { expect, type Page } from '@playwright/test';
 
+import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 export async function runMacSparklineScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   await sp.enter('A1', '1');
   await sp.enter('B1', '4');
   await sp.enter('C1', '2');
   await sp.goTo('A1:C1');
-  await page.locator('[data-ribbon-tab="insert"]').click();
+  await selectRibbonTab(page, 'insert');
   await sp.clickRibbon('mac.insert.sparkline');
   const dialog = page.locator('.fc-macsparkdlg[role=dialog]');
   await expect(dialog).toBeVisible();
@@ -39,8 +41,9 @@ export async function runMacSparklineScenario(page: Page): Promise<void> {
 export async function runMacInkScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
-  await page.locator('[data-ribbon-tab="draw"]').click();
+  await selectRibbonTab(page, 'draw');
   await sp.clickRibbon('mac.draw.penRed');
   await expect(
     page.locator(
@@ -115,11 +118,12 @@ export async function runMacInkScenario(page: Page): Promise<void> {
 export async function runMacChartKindScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   await sp.enter('A1', '1');
   await sp.enter('A2', '3');
   await sp.goTo('A1:A2');
-  await page.locator('[data-ribbon-tab="insert"]').click();
+  await selectRibbonTab(page, 'insert');
   await page.locator('.fc-tb__rb[data-ribbon-command="mac.insert.chartLine"]').click();
   await page
     .locator('[role=menu]:not([hidden]) [data-ribbon-command="mac.insert.chartArea"]')
@@ -140,7 +144,7 @@ export async function runMacChartKindScenario(page: Page): Promise<void> {
     'aria-selected',
     'true',
   );
-  await page.locator('[data-ribbon-tab="insert"]').click();
+  await selectRibbonTab(page, 'insert');
   await page.locator('.fc-tb__rb[data-ribbon-command="mac.insert.chartPie"]').click();
   await page
     .locator('[role=menu]:not([hidden]) [data-ribbon-command="mac.insert.chartPie"]')
@@ -155,9 +159,10 @@ export async function runMacChartKindScenario(page: Page): Promise<void> {
 export async function runMacInsertGalleryScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sp.expectNoStub();
   const menu = page.locator('#menu-mac-insert-shapes');
-  await page.locator('[data-ribbon-tab="insert"]').click();
+  await selectRibbonTab(page, 'insert');
   await sp.clickRibbon('mac.insert.shapes');
   await expect(menu.locator('.fc-tb__visual-tile')).toHaveCount(7);
   await expect(menu.locator('.fc-tb__visual-tile svg')).toHaveCount(7);
@@ -168,7 +173,7 @@ export async function runMacInsertGalleryScenario(page: Page): Promise<void> {
   const kinds = ['Line', 'Rectangle', 'RoundedRectangle', 'Oval', 'Triangle', 'Diamond'];
   for (const kind of kinds) {
     // Inserting a shape selects it and switches to the Shape Format tab.
-    await page.locator('[data-ribbon-tab="insert"]').click();
+    await selectRibbonTab(page, 'insert');
     await sp.clickRibbon('mac.insert.shapes');
     await menu.locator(`[data-ribbon-command="mac.insert.shape${kind}"]`).click();
     await expect(menu).toBeHidden();

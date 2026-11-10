@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 export async function runMacOutlineDetailScenario(page: Page): Promise<void> {
@@ -19,7 +20,7 @@ export async function runMacOutlineDetailScenario(page: Page): Promise<void> {
       return { rows: Array.from(layout.hiddenRows), cols: Array.from(layout.hiddenCols) };
     });
   await sp.goTo('A1:A3');
-  await page.locator('[data-ribbon-tab="data"]').click();
+  await selectRibbonTab(page, 'data');
   await sp.clickRibbon('mac.data.group');
   await sp.clickRibbon('mac.data.hideDetail');
   await expect.poll(hidden).toEqual({ rows: [0, 1, 2], cols: [] });
@@ -46,7 +47,7 @@ export async function runMacGoalSeekScenario(page: Page): Promise<void> {
   await sp.enter('A1', '3');
   await sp.enter('B1', '=A1*2');
   await sp.goTo('B1');
-  await page.locator('[data-ribbon-tab="data"]').click();
+  await selectRibbonTab(page, 'data');
   await sp.clickRibbon('mac.data.whatIf');
   await page.locator('#menu-mac-data-what-if [data-ribbon-command="mac.data.goalSeek"]').click();
   const dialog = page.locator('.fc-mac-goalseek');
@@ -88,12 +89,17 @@ export async function runMacConsolidateScenario(page: Page): Promise<void> {
   await sp.enter('A2', '2');
   await sp.enter('C1', '3');
   await sp.enter('C2', '4');
-  await page.locator('[data-ribbon-tab="data"]').click();
+  // The result starts at the active cell.
+  await sp.goTo('E1');
+  await selectRibbonTab(page, 'data');
   await sp.clickRibbon('mac.data.consolidate');
   const dialog = page.locator('.fc-mac-consolidate');
   await expect(dialog).toBeVisible();
-  await dialog.locator('#fc-mac-consolidate-sources').fill('A1:A2\nC1:C2');
-  await dialog.locator('#fc-mac-consolidate-destination').fill('E1');
+  const source = dialog.locator('#fc-mac-consolidate-sources');
+  await source.fill('A1:A2');
+  await dialog.locator('[data-fc-mac-action="consolidate-add"]').click();
+  await expect(dialog.locator('.fc-mac-consolidate__reference')).toHaveCount(1);
+  await source.fill('C1:C2');
   await dialog.locator('[data-fc-mac-action="consolidate-ok"]').click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => sp.readValue('E1')).toEqual({ kind: 'number', value: 4 });
@@ -121,13 +127,14 @@ export async function runMacSubtotalScenario(page: Page): Promise<void> {
   ])
     await sp.enter(addr as string, value as string);
   await sp.goTo('A1:B4');
-  await page.locator('[data-ribbon-tab="data"]').click();
+  await selectRibbonTab(page, 'data');
   await sp.clickRibbon('mac.data.subtotal');
   const dialog = page.locator('.fc-mac-subtotal[role=dialog]');
   await expect(dialog).toBeVisible();
-  await dialog.locator('#fc-mac-subtotal-range').fill('A1:B4');
-  await dialog.locator('#fc-mac-subtotal-group-by').fill('A');
-  await dialog.locator('#fc-mac-subtotal-columns').fill('B');
+  // The list is the selected region; column A groups and column B is totalled.
+  await expect(dialog.locator('#fc-mac-subtotal-group-by')).toHaveValue('0');
+  await expect(dialog.locator('.fc-mac-subtotal__field input[value="0"]')).not.toBeChecked();
+  await expect(dialog.locator('.fc-mac-subtotal__field input[value="1"]')).toBeChecked();
   await dialog.locator('[data-fc-mac-action="subtotal-ok"]').click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => sp.readValue('B4')).toEqual({ kind: 'number', value: 5 });
@@ -147,7 +154,7 @@ export async function runMacDirectDataControlsScenario(page: Page): Promise<void
   await sp.enter('A2', '1');
   await sp.enter('A3', '2');
   await sp.goTo('A1:A3');
-  await page.locator('[data-ribbon-tab="data"]').click();
+  await selectRibbonTab(page, 'data');
   const panel = page.locator('[data-ribbon-panel="data"]');
   for (const action of [
     'sortAsc',
@@ -174,15 +181,15 @@ export async function runMacDirectDataControlsScenario(page: Page): Promise<void
   await sp.clickRibbon('mac.data.filter');
   const filter = panel.locator('.fc-tb__ribbon-tools > [data-ribbon-command="mac.data.filter"]');
   await expect(filter).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('[data-ribbon-tab="view"]').click();
-  await page.locator('[data-ribbon-tab="data"]').click();
+  await selectRibbonTab(page, 'view');
+  await selectRibbonTab(page, 'data');
   await expect(filter).toHaveAttribute('aria-pressed', 'true');
   await sp.clickRibbon('mac.data.filter');
   await expect(filter).toHaveAttribute('aria-pressed', 'false');
-  await sp.clickRibbon('mac.data.workbookLinks');
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // A workbook without external links leaves the command unavailable.
+  await expect(
+    page.locator('[data-ribbon-command="mac.data.workbookLinks"]').first(),
+  ).toBeDisabled();
   await sp.clickRibbon('mac.data.sortCustom');
   await expect(page.locator('.fc-sortdlg__levels')).toBeVisible();
   await page.keyboard.press('Escape');
@@ -199,7 +206,7 @@ export async function runMacValidationMenuScenario(page: Page): Promise<void> {
   await sp.expectNoStub();
   await sp.enter('A1', '9');
   await sp.goTo('A1');
-  await page.locator('[data-ribbon-tab="data"]').click();
+  await selectRibbonTab(page, 'data');
   await sp.clickRibbon('mac.data.validation');
   const menu = page.locator('#menu-mac-data-validation');
   await expect(menu).toBeVisible();

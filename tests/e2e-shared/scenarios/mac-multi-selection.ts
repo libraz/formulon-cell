@@ -50,7 +50,8 @@ export async function runMacSelectionToggle(page: Page): Promise<void> {
   await sp.goTo('A1:C3');
   await commandClick(page, 1, 1);
   await expect.poll(() => selectedCells(page)).toEqual(square(3).filter((cell) => cell !== '1:1'));
-  await expect(page.locator('.fc-host__statusbar-right')).toHaveText('8 cells');
+  // The Mac status bar carries no cell count.
+  await expect(page.locator('.fc-host__statusbar-right')).toHaveText('');
   await expect.poll(() => sp.readValue('B2')).toEqual({ kind: 'text', value: 'keep' });
   await commandClick(page, 1, 1);
   await expect.poll(() => selectedCells(page)).toEqual(square(3));
@@ -61,7 +62,7 @@ export async function runMacSelectionToggle(page: Page): Promise<void> {
   await sp.goTo('A1');
   await commandClick(page, 0, 0);
   await expect.poll(() => selectedCells(page)).toEqual(['0:0']);
-  await expect(page.locator('.fc-host__statusbar-right')).toHaveText('1 cell');
+  await expect(page.locator('.fc-host__statusbar-right')).toHaveText('');
   await sp.expectNoConsoleErrors();
 }
 

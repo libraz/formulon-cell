@@ -7,7 +7,7 @@ type GeometryProbeWindow = Window & {
   __geometryDraws: string[];
 };
 
-const PROBE_TEXT = 'PITCH';
+const PROBE_TEXT = 'pitch';
 /** Screen px slack: the default profile's 8.43-char column lands at 64.01 px. */
 const PITCH_TOLERANCE = 0.05;
 
@@ -65,7 +65,10 @@ export async function runPlatformGeometry(
     probe.__geometryDraws = [];
     const original = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (text, x, y, maxWidth) {
-      if (text === probeText) probe.__geometryDraws.push(this.font);
+      // Mac cell text is drawn one glyph at a time.
+      if (text === probeText || (text.length === 1 && probeText.includes(text))) {
+        probe.__geometryDraws.push(this.font);
+      }
       if (maxWidth === undefined) original.call(this, text, x, y);
       else original.call(this, text, x, y, maxWidth);
     };
