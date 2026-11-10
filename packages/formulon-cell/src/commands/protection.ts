@@ -125,7 +125,8 @@ export const unlockedCellsOption = (
 
 /** Commands a protected sheet refuses whatever its Protect Sheet options: the formula auditing
  *  arrows (trace precedents/dependents/error, remove arrows), inserting or refreshing a pivot
- *  report, the sheet background, cell styles (Format > Style) and a What-If Data Table. */
+ *  report, the sheet background, cell styles (Format > Style), a What-If Data Table and inserting
+ *  sparklines. */
 const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'precedents',
   'dependents',
@@ -145,6 +146,7 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'mac.page.background',
   'cellStyles',
   'mac.data.dataTable',
+  'mac.insert.sparkline',
 ]);
 
 /** Outline structure commands: Group, Ungroup and the outline settings (summary position). Any

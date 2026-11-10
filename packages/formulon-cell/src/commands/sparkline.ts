@@ -2,11 +2,12 @@ import { addrKey, parseAddrKey, quoteSheetName } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type Sparkline, type SpreadsheetStore } from '../store/store.js';
+import { authorizedWrite } from './authorized-write.js';
 import { adjustInterval } from './axis-shift.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
-import type { History } from './history.js';
+import { History } from './history.js';
 import { type ObjectActionContext, objectWrite } from './object-actions.js';
-import { isCellWritable, warnProtected } from './protection.js';
+import { isCellWritable, isSheetProtected } from './protection.js';
 import { recordSparklineChange } from './slice-history.js';
 
 export interface SparklineEntry {
@@ -43,35 +44,27 @@ export const newSparklineGroupId = (): string => {
   return `sparkline-group-${groupSeq}`;
 };
 
-/** Run a sparkline change of `cells` as one authorized object step: the sheet they lie on and the
- *  cells themselves. */
-const sparklineWrite = (
-  ctx: ObjectActionContext,
-  cells: readonly Addr[],
-  refused: boolean,
-  write: () => boolean,
-): boolean => {
-  const first = cells[0];
-  if (!first) return refused;
-  return objectWrite(ctx, first.sheet, refused, write, [{ kind: 'cells', cells }]);
-};
-
 /** Attach several sparklines as one group from the entry point `ctx` names: one engine group and
- *  one undo step. Nothing is written when a host cell is protected. */
+ *  one undo step, an object change of the sheet and the location cells. Any sheet protection
+ *  refuses it, Edit objects included. */
 export function setSparklinesAction(
   ctx: ObjectActionContext,
   entries: readonly SparklineEntry[],
 ): boolean {
-  return sparklineWrite(
+  const cells = entries.map(({ addr }) => addr);
+  const first = cells[0];
+  if (!first) return false;
+  return objectWrite(
     ctx,
-    entries.map(({ addr }) => addr),
+    first.sheet,
     false,
     () => writeSparklines(ctx.store, entries, ctx.history),
+    [{ kind: 'cells', cells }],
   );
 }
 
 /** Attach several sparklines as one group, which is one engine group and one
- *  undo step. Nothing is written when a host cell is protected. */
+ *  undo step. Nothing is written on a protected sheet. */
 export function setSparklines(
   store: SpreadsheetStore,
   entries: readonly SparklineEntry[],
@@ -88,12 +81,8 @@ const writeSparklines = (
   entries: readonly SparklineEntry[],
   history: History | null,
 ): boolean => {
-  for (const { addr } of entries) {
-    if (!isCellWritable(store.getState(), addr)) {
-      warnProtected(addr);
-      return false;
-    }
-  }
+  // Inserting or regrouping sparklines is refused under any protection, silently.
+  if (entries.some(({ addr }) => isSheetProtected(store.getState(), addr.sheet))) return false;
   // A lone sparkline is its own group; several created together share one.
   const group = entries.length > 1 ? newSparklineGroupId() : undefined;
   recordSparklineChange(history, store, () => {
@@ -118,17 +107,13 @@ export function clearSparkline(
   addr: Addr,
   history: History | null = null,
 ): boolean {
-  const ctx = { store, history, origin: 'instanceApi', commandId: 'sparklineClear' } as const;
-  return sparklineWrite(ctx, [addr], false, () => {
-    if (!isCellWritable(store.getState(), addr)) {
-      warnProtected(addr);
-      return false;
-    }
-    recordSparklineChange(history, store, () => {
-      mutators.clearSparkline(store, addr);
-    });
-    return true;
-  });
+  const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
+  return (
+    clearSparklinesAction(
+      { store, history, origin: 'instanceApi', commandId: 'sparklineClear' },
+      range,
+    ) > 0
+  );
 }
 
 export function clearSparklinesInRange(
@@ -142,28 +127,37 @@ export function clearSparklinesInRange(
   );
 }
 
-/** Clear the sparklines in `range` from the entry point `ctx` names, as one authorized object
- *  step; a locked host cell keeps its sparkline. Returns how many were cleared. */
+/**
+ * Remove the sparklines of the cells in `range` from the entry point `ctx` names, as Clear All
+ * does: a clear of those cells, so each cell's lock decides it (Edit objects does not) and a
+ * locked cell keeps its sparkline. Only the cleared cells lose theirs; the rest of a group stays
+ * one group. Returns how many were removed.
+ */
 export function clearSparklinesAction(ctx: ObjectActionContext, range: Range): number {
   const { store, history } = ctx;
   const state = store.getState();
-  const targets = listSparklines(state)
-    .filter(({ addr }) => rangeContainsAddr(range, addr))
+  const writable = listSparklines(state)
+    .filter(({ addr }) => rangeContainsAddr(range, addr) && isCellWritable(state, addr))
     .map(({ addr }) => addr);
-  if (targets.length === 0) return 0;
-  const writable = targets.filter((addr) => {
-    if (isCellWritable(state, addr)) return true;
-    warnProtected(addr);
-    return false;
-  });
   if (writable.length === 0) return 0;
-  const cleared = sparklineWrite(ctx, writable, false, () => {
-    recordSparklineChange(history, store, () => {
-      for (const addr of writable) mutators.clearSparkline(store, addr);
-    });
-    return true;
+  const result = authorizedWrite({
+    store,
+    history: history ?? new History(),
+    intents: (origin) => [
+      {
+        operation: 'clear',
+        origin,
+        commandId: ctx.commandId,
+        effects: [{ kind: 'cells', cells: writable }],
+      },
+    ],
+    origin: ctx.origin,
+    write: () =>
+      recordSparklineChange(history, store, () => {
+        for (const addr of writable) mutators.clearSparkline(store, addr);
+      }),
   });
-  return cleared ? writable.length : 0;
+  return result.ok ? writable.length : 0;
 }
 
 /** Split `Sheet2!B2:B9` / `'My Sheet'!B2:B9` into its qualifier (with the `!`)

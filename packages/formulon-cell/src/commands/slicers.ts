@@ -208,12 +208,18 @@ export interface SlicerActionContext extends ObjectActionContext {
 
 /**
  * Change a slicer and recompute the rows its filter hides, as one authorized step: an object
- * change of the slicer's sheet and a filter use of the table it filters (Use AutoFilter on a
- * protected sheet). The slicer and the filter it drives both undo together.
+ * change of the slicer's sheet and, for a change of what it selects (`filters`), a filter use of
+ * the table it filters (Use AutoFilter on a protected sheet). The slicer and the filter it drives
+ * both undo together.
  */
-const slicerWrite = (ctx: SlicerActionContext, spec: SlicerSpec, mutate: () => void): boolean => {
+const slicerWrite = (
+  ctx: SlicerActionContext,
+  spec: SlicerSpec,
+  mutate: () => void,
+  filters = true,
+): boolean => {
   const sheet = spec.sheet ?? ctx.store.getState().data.sheetIndex;
-  const range = resolveSlicerSpec(ctx.workbook, spec)?.range;
+  const range = filters ? resolveSlicerSpec(ctx.workbook, spec)?.range : undefined;
   if (!objectChangeAllowed(ctx, sheet)) return false;
   const intents = (origin: OperationIntent['origin']): OperationIntent[] => [
     ...objectIntents(ctx, sheet)(origin),
@@ -251,8 +257,9 @@ export function setSlicerSelectionAction(
   return spec ? slicerWrite(ctx, spec, () => setSlicerSelected(ctx.store, id, values)) : false;
 }
 
-/** Delete slicer `id`, showing again the rows only it hid. */
+/** Delete slicer `id`, showing again the rows only it hid. The slicer is a drawing, so Edit
+ *  objects decides it on a protected sheet; Use AutoFilter does not. */
 export function removeSlicerAction(ctx: SlicerActionContext, id: string): boolean {
   const spec = listSlicers(ctx.store).find((entry) => entry.id === id);
-  return spec ? slicerWrite(ctx, spec, () => removeSlicer(ctx.store, id)) : false;
+  return spec ? slicerWrite(ctx, spec, () => removeSlicer(ctx.store, id), false) : false;
 }

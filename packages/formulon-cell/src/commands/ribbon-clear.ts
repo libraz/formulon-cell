@@ -37,6 +37,7 @@ import {
   MAX_MATERIALIZED_LOCK_CELLS,
 } from './protection.js';
 import { recordConditionalRulesChange } from './slice-history.js';
+import { clearSparklinesAction } from './sparkline.js';
 
 export type RibbonClearAction =
   | 'all'
@@ -622,6 +623,22 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
         history.abort(token);
         refreshCells(store, workbook, plan.sheet);
         return;
+      }
+
+      // Clear All removes the sparklines of the cleared, unlocked cells (read before the formats reset
+      // their lock); the rest of a group stays.
+      const { selection } = store.getState();
+      for (const range of [selection.range, ...(selection.extraRanges ?? [])]) {
+        clearSparklinesAction(
+          { store, history, origin: 'ribbon', commandId: 'clear-all' },
+          {
+            sheet: range.sheet,
+            r0: Math.min(range.r0, range.r1),
+            c0: Math.min(range.c0, range.c1),
+            r1: Math.max(range.r0, range.r1),
+            c1: Math.max(range.c0, range.c1),
+          },
+        );
       }
 
       if (plan.comments.length > 0) {

@@ -42,49 +42,31 @@ describe('sparkline commands', () => {
     expect(listSparklines(store.getState())).toEqual([]);
   });
 
-  it('blocks setting or clearing locked protected sparkline host cells', () => {
+  it('refuses inserting a sparkline under any protection, Edit objects included', () => {
     const store = createSpreadsheetStore();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    // Without Edit objects a protected sheet refuses sparklines outright.
-    setProtectedSheet(store, 0, true);
-    expect(
-      setSparkline(store, { sheet: 0, row: 0, col: 0 }, { kind: 'line', source: 'A1:A4' }),
-    ).toBe(false);
-    expect(warn).not.toHaveBeenCalled();
-    // With it, a locked host cell still refuses them.
-    setProtectedSheet(store, 0, true, { permissions: { objects: true } });
-
-    try {
-      expect(
-        setSparkline(store, { sheet: 0, row: 0, col: 0 }, { kind: 'line', source: 'A1:A4' }),
-      ).toBe(false);
-      expect(sparklineAt(store.getState(), { sheet: 0, row: 0, col: 0 })).toBeNull();
-      expect(clearSparkline(store, { sheet: 0, row: 0, col: 0 })).toBe(false);
-      expect(warn).toHaveBeenCalledTimes(2);
-    } finally {
-      warn.mockRestore();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    setCellLocked(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, false);
+    for (const permissions of [{}, { objects: true }]) {
+      setProtectedSheet(store, 0, true, { permissions });
+      expect(setSparkline(store, addr, { kind: 'line', source: 'A1:A4' })).toBe(false);
+      expect(sparklineAt(store.getState(), addr)).toBeNull();
     }
   });
 
-  it('clears only unlocked sparklines in a protected range', () => {
+  it('clears sparklines by the lock of their cells, whatever Edit objects says', () => {
     const store = createSpreadsheetStore();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     setSparkline(store, { sheet: 0, row: 0, col: 0 }, { kind: 'line', source: 'A1:A4' });
     setSparkline(store, { sheet: 0, row: 0, col: 1 }, { kind: 'line', source: 'B1:B4' });
     setCellLocked(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, false);
-    setProtectedSheet(store, 0, true, { permissions: { objects: true } });
+    setProtectedSheet(store, 0, true);
 
-    try {
-      expect(clearSparklinesInRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 })).toBe(1);
-      expect(sparklineAt(store.getState(), { sheet: 0, row: 0, col: 0 })).toEqual({
-        kind: 'line',
-        source: 'A1:A4',
-      });
-      expect(sparklineAt(store.getState(), { sheet: 0, row: 0, col: 1 })).toBeNull();
-      expect(warn).toHaveBeenCalledTimes(1);
-    } finally {
-      warn.mockRestore();
-    }
+    expect(clearSparkline(store, { sheet: 0, row: 0, col: 0 })).toBe(false);
+    expect(clearSparklinesInRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 })).toBe(1);
+    expect(sparklineAt(store.getState(), { sheet: 0, row: 0, col: 0 })).toEqual({
+      kind: 'line',
+      source: 'A1:A4',
+    });
+    expect(sparklineAt(store.getState(), { sheet: 0, row: 0, col: 1 })).toBeNull();
   });
 
   it('records sparkline set and clear operations in history', () => {
