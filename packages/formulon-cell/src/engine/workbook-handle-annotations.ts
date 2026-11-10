@@ -528,14 +528,27 @@ export abstract class WorkbookHandleAnnotationsMethods {
     return attempt(() => ws(this, sheet).setHyperlink(row, col, null));
   }
 
-  /** Remove the hyperlink at `index` of `getHyperlinksFull(sheet)`. */
+  /** Remove the hyperlink at `index` of `getHyperlinksFull(sheet)`, leaving others on the same
+   *  anchor in place. */
   removeHyperlinkAt(sheet: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
-    const link = this.getHyperlinksFull(sheet)?.[index];
-    if (!link) return false;
+    return attempt(() => ws(this, sheet).removeHyperlinkAt(index));
+  }
+
+  /** Insert `record` at `index` of `getHyperlinksFull(sheet)`, replacing nothing; `index` equal to
+   *  the count appends. Pairs with `removeHyperlinkAt` for a lossless undo. */
+  insertHyperlinkAt(sheet: number, index: number, record: EngineHyperlinkRecord): boolean {
+    assertAlive(this);
+    if (!this.capabilities.hyperlinks) return false;
     return attempt(() =>
-      ws(this, sheet).setHyperlink(link.range.firstRow, link.range.firstCol, null),
+      ws(this, sheet).insertHyperlinkAt(index, {
+        target: record.target,
+        location: record.location,
+        display: record.display,
+        tooltip: record.tooltip,
+        range: { ...record.range },
+      }),
     );
   }
 

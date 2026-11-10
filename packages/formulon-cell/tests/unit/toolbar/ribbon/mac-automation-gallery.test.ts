@@ -679,8 +679,8 @@ describe('Mac automation gallery', () => {
     );
     const before = workbook.getHyperlinksFull(0);
     let calls = 0;
-    const remove = workbook.removeHyperlink.bind(workbook);
-    workbook.removeHyperlink = (...args) => {
+    const remove = workbook.removeHyperlinkAt.bind(workbook);
+    workbook.removeHyperlinkAt = (...args) => {
       calls += 1;
       if (calls === 2) return false;
       return remove(...args);
@@ -697,6 +697,27 @@ describe('Mac automation gallery', () => {
     expect(host.dataset.fcMacAutomationResult).toBeUndefined();
   });
 
+  it('restores links sharing an anchor in their original order on undo', async () => {
+    const native = await makeNativeInstance(host);
+    const { instance, workbook, history, controller } = native;
+    expect(workbook.addHyperlinkRange(0, 80, 1, 81, 2, 'https://wide.example', '', '', '')).toBe(
+      true,
+    );
+    expect(workbook.addHyperlinkRange(0, 80, 1, 80, 1, 'https://cell.example', '', '', '')).toBe(
+      true,
+    );
+    const before = workbook.getHyperlinksFull(0);
+    expect(before).toHaveLength(2);
+    controller.setPolicy({ defaultOperation: 'deny', operations: { hyperlink: true } });
+
+    await runMacAutomationScript(instance, 'removeHyperlinks');
+    expect(workbook.getHyperlinksFull(0)).toEqual([]);
+    expect(history.undo()).toBe(true);
+    expect(workbook.getHyperlinksFull(0)).toEqual(before);
+    expect(history.redo()).toBe(true);
+    expect(workbook.getHyperlinksFull(0)).toEqual([]);
+  });
+
   it('rolls back a native add failure during hyperlink undo', async () => {
     const native = await makeNativeInstance(host);
     const { instance, workbook, store, history, controller } = native;
@@ -710,8 +731,8 @@ describe('Mac automation gallery', () => {
     expect(workbook.getHyperlinksFull(0)).toEqual([]);
     expect(history.canUndo()).toBe(true);
     const resultBefore = host.dataset.fcMacAutomationResult;
-    const add = workbook.addHyperlinkRange.bind(workbook);
-    workbook.addHyperlinkRange = () => false;
+    const insert = workbook.insertHyperlinkAt.bind(workbook);
+    workbook.insertHyperlinkAt = () => false;
 
     let caught: unknown;
     try {
@@ -727,7 +748,7 @@ describe('Mac automation gallery', () => {
     expect(history.canUndo()).toBe(true);
     expect(host.dataset.fcMacAutomationResult).toBe(resultBefore);
 
-    workbook.addHyperlinkRange = add;
+    workbook.insertHyperlinkAt = insert;
     expect(history.undo()).toBe(true);
     expect(workbook.getHyperlinksFull(0)).toEqual(before);
     expect(store.getState().format.formats.get('0:74:1')?.hyperlink).toBeUndefined();

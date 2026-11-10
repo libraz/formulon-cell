@@ -562,7 +562,6 @@ interface HyperlinkRemovalPlan {
   readonly cells: readonly Addr[];
   readonly storeBefore: ReadonlyMap<string, HyperlinkFormatFields>;
   readonly nativeBefore: readonly EngineHyperlinkRecord[];
-  readonly nativeAnchorKeys: ReadonlySet<string>;
   readonly removedAnchorCount: number;
 }
 
@@ -650,40 +649,25 @@ const restoreStoreHyperlinkFields = (
   });
 };
 
-const removeNativeHyperlinkAnchors = (
-  instance: SpreadsheetInstance,
-  sheet: number,
-  anchorKeys: ReadonlySet<string>,
-): void => {
-  for (const key of anchorKeys) {
-    const addr = parseAddrKey(key);
-    if (!addr) continue;
-    if (!instance.workbook.removeHyperlink(sheet, addr.row, addr.col))
-      throw new Error(`Could not remove hyperlink at ${addr.row}:${addr.col}.`);
+/** Removes the sheet's native links from the end of the list, so a partial run leaves a prefix. */
+const removeNativeHyperlinks = (instance: SpreadsheetInstance, sheet: number): void => {
+  const count = instance.workbook.getHyperlinksFull(sheet)?.length ?? 0;
+  for (let index = count - 1; index >= 0; index -= 1) {
+    if (!instance.workbook.removeHyperlinkAt(sheet, index))
+      throw new Error(`Could not remove hyperlink ${index}.`);
   }
 };
 
+/** Puts back the links a removal took, each at its original list position. */
 const restoreNativeHyperlinks = (
   instance: SpreadsheetInstance,
   sheet: number,
-  anchorKeys: ReadonlySet<string>,
   records: readonly EngineHyperlinkRecord[],
 ): void => {
-  removeNativeHyperlinkAnchors(instance, sheet, anchorKeys);
-  for (const record of records) {
-    if (
-      !instance.workbook.addHyperlinkRange(
-        sheet,
-        record.range.firstRow,
-        record.range.firstCol,
-        record.range.lastRow,
-        record.range.lastCol,
-        record.target ?? '',
-        record.display ?? '',
-        record.tooltip ?? '',
-        record.location ?? '',
-      )
-    )
+  const present = instance.workbook.getHyperlinksFull(sheet)?.length ?? 0;
+  for (let index = present; index < records.length; index += 1) {
+    const record = records[index] as EngineHyperlinkRecord;
+    if (!instance.workbook.insertHyperlinkAt(sheet, index, record))
       throw new Error(
         `Could not restore hyperlink at ${record.range.firstRow}:${record.range.firstCol}.`,
       );
@@ -755,7 +739,6 @@ const planHyperlinkRemoval = (instance: SpreadsheetInstance): HyperlinkRemovalPl
     cells: orderedCells,
     storeBefore,
     nativeBefore: native.map(cloneHyperlinkRecord),
-    nativeAnchorKeys,
     removedAnchorCount: anchorKeys.size,
   };
 };
@@ -778,13 +761,13 @@ const runRemoveHyperlinks = (instance: SpreadsheetInstance): void => {
   const applyRemoved = (): void => {
     try {
       instance.workbook.withEngineSyncMuted(() => {
-        removeNativeHyperlinkAnchors(instance, plan.sheet, plan.nativeAnchorKeys);
+        removeNativeHyperlinks(instance, plan.sheet);
         applyStoreRemoved();
       });
     } catch (error) {
       try {
         instance.workbook.withEngineSyncMuted(() => {
-          restoreNativeHyperlinks(instance, plan.sheet, plan.nativeAnchorKeys, plan.nativeBefore);
+          restoreNativeHyperlinks(instance, plan.sheet, plan.nativeBefore);
           restoreStoreBefore();
         });
       } catch (rollback) {
@@ -796,13 +779,13 @@ const runRemoveHyperlinks = (instance: SpreadsheetInstance): void => {
   const applyRestored = (): void => {
     try {
       instance.workbook.withEngineSyncMuted(() => {
-        restoreNativeHyperlinks(instance, plan.sheet, plan.nativeAnchorKeys, plan.nativeBefore);
+        restoreNativeHyperlinks(instance, plan.sheet, plan.nativeBefore);
         restoreStoreBefore();
       });
     } catch (error) {
       try {
         instance.workbook.withEngineSyncMuted(() => {
-          removeNativeHyperlinkAnchors(instance, plan.sheet, plan.nativeAnchorKeys);
+          removeNativeHyperlinks(instance, plan.sheet);
           applyStoreRemoved();
         });
       } catch (rollback) {
