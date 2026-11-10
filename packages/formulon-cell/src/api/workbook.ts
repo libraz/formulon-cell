@@ -218,6 +218,9 @@ const loadOptionsOf = (options: WorkbookOptions): LoadOptions => ({
  * Members follow the engine's conventions: a failure throws `FormulonError` with a `StatusCode`,
  * a lookup by natural key returns `null` when nothing matches, and a handle lookup throws
  * `NotFound`. Writes made inside {@link Workbook.batch} recalculate once and report one `change`.
+ *
+ * InteractionPolicy and sheet protection govern end-user interaction; the Workbook/Sheet API is
+ * host code and is not gated by them.
  */
 export class Workbook {
   /** @internal Use {@link Workbook.createDefault} or {@link Workbook.load}. */

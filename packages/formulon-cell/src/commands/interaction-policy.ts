@@ -99,6 +99,13 @@ export interface InteractionRestrictionContext {
   readonly commandId?: string;
 }
 
+/**
+ * Limits on what an end user can do through the spreadsheet UI: editing, structural and
+ * object operations, selection and copy.
+ *
+ * InteractionPolicy and sheet protection govern end-user interaction; the Workbook/Sheet API is
+ * host code and is not gated by them.
+ */
 export interface InteractionPolicy {
   readonly readOnly?: boolean;
   readonly editable?: EditableCells;
