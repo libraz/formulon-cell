@@ -182,4 +182,36 @@ describe('protection writes under the interaction policy', () => {
     expect(commit()).toBe(true);
     expect(locked()).toBe(false);
   });
+  it('lets formatting through on locked cells of a protected sheet only with Format cells on', async () => {
+    const { store, workbook, history, controller } = await setup();
+    const bold = () => store.getState().format.formats.get(addrKey(A1))?.bold;
+    const commit = () => {
+      const state = store.getState();
+      const plan = planSelectionFormat(state);
+      if (!plan) throw new Error('no plan');
+      return runFormatDialogTransaction({
+        store,
+        history,
+        getWb: () => workbook,
+        state,
+        liveWb: workbook,
+        plan,
+        action: { patch: { bold: true } },
+        merge: { action: null, range: state.selection.range },
+        entry: { origin: 'ribbon', commandId: 'formatCells' },
+      });
+    };
+    for (const policy of [undefined, allowAll]) {
+      controller.setPolicy(policy);
+      setProtectedSheet(store, 0, true);
+      expect(commit(), 'option off').toBe(false);
+      expect(bold()).toBeUndefined();
+      setProtectedSheet(store, 0, false);
+      setProtectedSheet(store, 0, true, { permissions: { formatCells: true } });
+      expect(commit(), 'option on').toBe(true);
+      expect(bold()).toBe(true);
+      setProtectedSheet(store, 0, false);
+      for (const row of [0, 1]) mutators.setCellFormat(store, { sheet: 0, row, col: 0 }, null);
+    }
+  });
 });

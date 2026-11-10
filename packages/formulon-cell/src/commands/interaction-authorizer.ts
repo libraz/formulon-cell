@@ -63,6 +63,7 @@ const PROTECTION_OPTION: Partial<Record<InteractionOperation, keyof SheetProtect
   deleteRows: 'deleteRows',
   insertColumns: 'insertColumns',
   deleteColumns: 'deleteColumns',
+  format: 'formatCells',
   pivot: 'pivotTables',
 };
 
