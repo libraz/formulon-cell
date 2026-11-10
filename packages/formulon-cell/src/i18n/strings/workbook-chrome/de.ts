@@ -86,7 +86,8 @@ export const workbookChromeDe: WorkbookChromeStrings = {
     moveCopyBefore: 'Vor Blatt:',
     moveCopyToEnd: '(ans Ende stellen)',
     moveCopyMakeCopy: 'Kopie erstellen',
-    moveCopyUnavailable: 'Das Kopieren von Blättern ist noch nicht verfügbar.',
+    moveCopyFailed:
+      'Dieses Blatt kann nicht kopiert werden. Es enthält Inhalte, die die Kopie nicht übernehmen kann, z. B. Formen oder Datenschnitte, oder die Arbeitsmappe hat die maximale Blattanzahl erreicht.',
     tabColor: 'Registerkartenfarbe',
     noColor: 'Keine Farbe',
     tabColorRed: 'Rot',

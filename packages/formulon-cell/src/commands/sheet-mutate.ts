@@ -1,3 +1,6 @@
+import { hydrateSheetProtectionFromEngine } from '../engine/protection-sync.js';
+import { hydrateSheetPrForSheet } from '../engine/sheet-pr-sync.js';
+import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import { SheetVisibility } from '../engine/types.js';
 import { nearestVisibleSheet } from '../engine/view-state-sync.js';
 import {
@@ -88,6 +91,41 @@ const recalcAndRefresh = (store: SpreadsheetStore | null | undefined, wb: Workbo
   if (store) mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
 };
 
+/** Per mounted store, how a newly active sheet is loaded from the engine. */
+const sheetActivationHydrators = new WeakMap<SpreadsheetStore, () => void>();
+
+/** Register how the mounted instance loads its active sheet (cells, layout,
+ *  merges, validation and the rest), so a structure change activates a sheet
+ *  the way switching tabs does. */
+export function registerSheetActivationHydrator(
+  store: SpreadsheetStore,
+  hydrate: () => void,
+): () => void {
+  sheetActivationHydrators.set(store, hydrate);
+  return () => {
+    if (sheetActivationHydrators.get(store) === hydrate) sheetActivationHydrators.delete(store);
+  };
+}
+
+/** Make `idx` the active sheet and load it. Without a mounted instance only
+ *  its cells are loaded. */
+const activateSheet = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  idx: number,
+  options?: Parameters<typeof mutators.setSheetIndex>[2],
+): void => {
+  mutators.setSheetIndex(store, idx, options);
+  const hydrate = sheetActivationHydrators.get(store);
+  if (hydrate) hydrate();
+  else mutators.replaceCells(store, wb.cells(idx));
+};
+
+/** Table overlays name their sheet; re-read them after the sheets were reordered. */
+const refreshTableOverlays = (store: SpreadsheetStore, wb: WorkbookHandle): void => {
+  if (typeof wb.getTables === 'function') hydrateTableOverlaysFromEngine(wb, store);
+};
+
 /** Slicers name a table, which goes away with its sheet. */
 const pruneOrphanSlicers = (store: SpreadsheetStore, wb: WorkbookHandle): void => {
   if (typeof wb.getTables !== 'function') return;
@@ -139,7 +177,7 @@ export function addSheet(
       undo: () => {
         const active = store.getState().data.sheetIndex;
         if (active === added || active >= wb.sheetCount) {
-          mutators.setSheetIndex(store, Math.min(beforeActive, Math.max(0, wb.sheetCount - 2)));
+          activateSheet(store, wb, Math.min(beforeActive, Math.max(0, wb.sheetCount - 2)));
         }
         if (wb.removeSheet(added)) {
           remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, added), wb);
@@ -147,7 +185,7 @@ export function addSheet(
       },
       redo: () => {
         const next = wb.addSheet(name);
-        if (next >= 0) mutators.setSheetIndex(store, next);
+        if (next >= 0) activateSheet(store, wb, next);
       },
     });
   }
@@ -251,13 +289,14 @@ export function removeSheet(store: SpreadsheetStore, wb: WorkbookHandle, idx: nu
   if (!ok) return false;
   remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, idx), wb);
   pruneOrphanSlicers(store, wb);
+  refreshTableOverlays(store, wb);
 
   const cur = store.getState().data.sheetIndex;
   if (idx < cur) {
     mutators.renumberActiveSheet(store, cur - 1);
   } else if (idx === cur) {
     const next = nearestVisibleSheet(wb.sheetCount, store.getState().layout.hiddenSheets, idx);
-    mutators.setSheetIndex(store, next < 0 ? cur : next, { discardCurrent: true });
+    activateSheet(store, wb, next < 0 ? cur : next, { discardCurrent: true });
   }
   recalcAndRefresh(store, wb);
   return true;
@@ -279,6 +318,7 @@ export function moveSheet(
   const ok = wb.moveSheet(from, to);
   if (!ok) return false;
   remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to), wb);
+  refreshTableOverlays(store, wb);
 
   const cur = store.getState().data.sheetIndex;
   mutators.renumberActiveSheet(store, shiftedAfterMove(cur, from, to));
@@ -288,16 +328,74 @@ export function moveSheet(
       undo: () => {
         if (!wb.moveSheet(to, from)) return;
         remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, to, from), wb);
+        refreshTableOverlays(store, wb);
         mutators.renumberActiveSheet(store, beforeActive);
       },
       redo: () => {
         if (!wb.moveSheet(from, to)) return;
         remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to), wb);
+        refreshTableOverlays(store, wb);
         mutators.renumberActiveSheet(store, afterActive);
       },
     });
   }
   return true;
+}
+
+/** Read the copy's sheet-level state from the engine, which copied it with the
+ *  sheet: protection and its allowed edit ranges (under fresh ids), tab colour
+ *  and outline summary. The store mirrors the engine; nothing is duplicated. */
+const hydrateCopiedSheet = (store: SpreadsheetStore, wb: WorkbookHandle, copy: number): void => {
+  const hydrate = (): void => {
+    hydrateSheetProtectionFromEngine(wb, store, copy);
+    hydrateSheetPrForSheet(wb, store, copy);
+  };
+  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
+  else hydrate();
+};
+
+/** Copy the sheet at `source` so the copy lands before the sheet at `before`
+ *  (the sheet count appends) and make it the active sheet. The engine names
+ *  the copy (`Sheet1 (2)`). Returns the copy's index, or -1 when refused. One
+ *  undo step removes the copy and restores the active sheet; redo re-creates
+ *  it under the same name. */
+export function copySheet(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  source: number,
+  before: number,
+  history?: History | null,
+): number {
+  if (!structureAllowed(store, 'copy sheet')) return -1;
+  const beforeActive = store.getState().data.sheetIndex;
+  const insert = (name?: string): number => {
+    const copy = wb.copySheet(source, before, name);
+    if (copy < 0) return copy;
+    remapWorkbookSheetLayout(store, (sheet) => (sheet >= copy ? sheet + 1 : sheet), wb);
+    hydrateCopiedSheet(store, wb, copy);
+    refreshTableOverlays(store, wb);
+    wb.recalcAuto();
+    activateSheet(store, wb, copy);
+    return copy;
+  };
+  const copy = insert();
+  if (copy < 0) return copy;
+  const name = wb.sheetName(copy);
+  if (history && !history.isReplaying()) {
+    history.push({
+      undo: () => {
+        if (!wb.removeSheet(copy)) return;
+        remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, copy), wb);
+        refreshTableOverlays(store, wb);
+        wb.recalcAuto();
+        activateSheet(store, wb, beforeActive, { discardCurrent: true });
+      },
+      redo: () => {
+        insert(name);
+      },
+    });
+  }
+  return copy;
 }
 
 /**

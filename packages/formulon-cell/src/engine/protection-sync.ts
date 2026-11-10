@@ -23,19 +23,26 @@ import type { WorkbookHandle } from './workbook-handle.js';
  */
 export function hydrateProtectionFromEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
   hydrateWorkbookProtectionFromEngine(wb, store);
-  for (let i = 0; i < wb.sheetCount; i += 1) {
-    hydrateProtectedRangesFromEngine(wb, store, i);
-    if (!wb.capabilities.sheetProtectionRoundtrip) continue;
-    const p = wb.getSheetProtection(i);
-    if (!p?.enabled) continue;
-    mutators.setSheetProtected(store, i, true, {
-      ...(p.legacyPassword ? { legacyPasswordHash: p.legacyPassword } : {}),
-      ...(sheetProtectionPasswordHashFromEngine(p)
-        ? { passwordHash: sheetProtectionPasswordHashFromEngine(p) }
-        : {}),
-      permissions: sheetProtectionPermissionsFromEngine(p),
-    });
-  }
+  for (let i = 0; i < wb.sheetCount; i += 1) hydrateSheetProtectionFromEngine(wb, store, i);
+}
+
+/** Read one sheet's `<sheetProtection>` and protected ranges into the store. */
+export function hydrateSheetProtectionFromEngine(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+): void {
+  hydrateProtectedRangesFromEngine(wb, store, sheet);
+  if (!wb.capabilities.sheetProtectionRoundtrip) return;
+  const p = wb.getSheetProtection(sheet);
+  if (!p?.enabled) return;
+  mutators.setSheetProtected(store, sheet, true, {
+    ...(p.legacyPassword ? { legacyPasswordHash: p.legacyPassword } : {}),
+    ...(sheetProtectionPasswordHashFromEngine(p)
+      ? { passwordHash: sheetProtectionPasswordHashFromEngine(p) }
+      : {}),
+    permissions: sheetProtectionPermissionsFromEngine(p),
+  });
 }
 
 /** Mirror `<workbookProtection lockStructure>` and its password into the store. */

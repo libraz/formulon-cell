@@ -17,6 +17,7 @@ import {
   setProtectedSheet,
   toggleProtectedSheet,
 } from './commands/protection.js';
+import { registerSheetActivationHydrator } from './commands/sheet-mutate.js';
 import {
   clearTraceArrows,
   traceDependents as traceDependentArrows,
@@ -363,6 +364,7 @@ export const Spreadsheet = {
     function hydrateActiveSheet(): void {
       hydrateActiveSheetFromEngine(wb, store);
     }
+    const unregisterSheetActivation = registerSheetActivationHydrator(store, hydrateActiveSheet);
 
     const cellRegistry = new CellRegistry();
     const renderer = new GridRenderer({
@@ -1213,6 +1215,7 @@ export const Spreadsheet = {
         cleanup(discardMacPalette);
         cleanup(formulaBar.discardFx);
         cleanup(unregisterCommands);
+        cleanup(unregisterSheetActivation);
         cleanup(unregisterRangeUnlockUi);
         cleanup(() => commands.dispose());
         cleanup(() => navigation.dispose());

@@ -1,3 +1,4 @@
+import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../../commands/row-col-dimension.js';
 import {
   autofitColsWidthForRanges,
@@ -6,6 +7,7 @@ import {
 import { addrKey } from '../../engine/address.js';
 import type { Locale } from '../../i18n/strings.js';
 import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
+import { showMessage } from '../dialogs/prompt.js';
 
 // Cell Format ribbon dispatcher. Extracted from main.ts so the playground
 // doesn't carry the dispatch table in module scope. Side effects live on the
@@ -20,6 +22,7 @@ import {
   showRows,
 } from '../../commands/row-col-layout.js';
 import {
+  copySheetAction,
   moveSheetAction,
   renameSheetAction,
   type SheetActionContext,
@@ -126,16 +129,35 @@ export const applyCellFormatAction = async (
         before: sheetTabs.moveCopyBefore,
         toEnd: sheetTabs.moveCopyToEnd,
         makeCopy: sheetTabs.moveCopyMakeCopy,
-        copyUnavailable: sheetTabs.moveCopyUnavailable,
         ok: i.i18n.strings.hyperlinkDialog.ok,
         cancel: i.i18n.strings.hyperlinkDialog.cancel,
       },
       bookName: '',
       sheets: shown.map((index) => i.workbook.sheetName(index)),
       current: Math.max(0, shown.indexOf(sheet)),
+      copyDisabledReason:
+        canExecuteBuiltIn(i.store, 'copySheet', 'ribbon').allowed &&
+        i.workbook.capabilities.sheetMutate
+          ? null
+          : i.i18n.strings.ribbonMenu.sheetActionUnavailable,
     });
     if (!result) return;
     const beforeSheet = shown[result.before];
+    if (result.copy) {
+      const copy = copySheetAction(sheetCtx, sheet, beforeSheet ?? i.workbook.sheetCount);
+      if (copy < 0) {
+        await showMessage({
+          host: i.host,
+          title: sheetTabs.moveCopyTitle,
+          message: sheetTabs.moveCopyFailed,
+          okLabel: i.i18n.strings.hyperlinkDialog.ok,
+        });
+        return;
+      }
+      // The copy is already the active sheet, loaded from the engine.
+      deps.renderSheetTabs();
+      return;
+    }
     const last = shown.at(-1) ?? sheet;
     const to =
       beforeSheet === undefined ? last : sheet < beforeSheet ? beforeSheet - 1 : beforeSheet;

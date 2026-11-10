@@ -3,6 +3,7 @@ import type { History } from '../commands/history.js';
 import type { InteractionOrigin } from '../commands/interaction-policy.js';
 import { isSheetProtected, isWorkbookStructureProtected } from '../commands/protection.js';
 import {
+  copySheetAction,
   deleteSheetAction,
   insertSheetAction,
   moveSheetAction,
@@ -22,6 +23,7 @@ import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { showMoveCopySheetDialog } from '../toolbar/dialogs/move-copy-sheet.js';
+import { showMessage } from '../toolbar/dialogs/prompt.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
 import { showUnhideSheetDialog } from '../toolbar/dialogs/unhide-sheet.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -321,16 +323,30 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           before: strings.sheetTabs.moveCopyBefore,
           toEnd: strings.sheetTabs.moveCopyToEnd,
           makeCopy: strings.sheetTabs.moveCopyMakeCopy,
-          copyUnavailable: strings.sheetTabs.moveCopyUnavailable,
           ok: strings.hyperlinkDialog.ok,
           cancel: strings.hyperlinkDialog.cancel,
         },
         bookName: input.getWorkbookName?.() ?? '',
         sheets: shown.map((i) => wb.sheetName(i)),
         current: Math.max(0, shown.indexOf(idx)),
+        copyDisabledReason: denied('copySheet') || !canMutate ? sheetActionReason() : null,
       });
       if (!result) return;
       const beforeSheet = shown[result.before];
+      if (result.copy) {
+        const copy = copySheetAction(sheetCtx(), idx, beforeSheet ?? wb.sheetCount);
+        if (copy < 0) {
+          await showMessage({
+            host: sheetTabs,
+            title: strings.sheetTabs.moveCopyTitle,
+            message: strings.sheetTabs.moveCopyFailed,
+            okLabel: strings.hyperlinkDialog.ok,
+          });
+          return;
+        }
+        refreshAfterSheetChange();
+        return;
+      }
       const last = shown.at(-1) ?? idx;
       const to =
         beforeSheet === undefined ? last : idx < beforeSheet ? beforeSheet - 1 : beforeSheet;

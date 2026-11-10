@@ -85,7 +85,8 @@ export const workbookChromeZh: WorkbookChromeStrings = {
     moveCopyBefore: '下列选定工作表之前:',
     moveCopyToEnd: '(移至最后)',
     moveCopyMakeCopy: '建立副本',
-    moveCopyUnavailable: '暂不支持复制工作表。',
+    moveCopyFailed:
+      '无法复制此工作表。其中包含副本无法保留的内容（例如形状或切片器），或工作簿的工作表数量已达上限。',
     tabColor: '选项卡颜色',
     noColor: '无颜色',
     tabColorRed: '红色',

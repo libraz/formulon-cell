@@ -86,7 +86,8 @@ export const workbookChromeKo: WorkbookChromeStrings = {
     moveCopyBefore: '다음 시트의 앞:',
     moveCopyToEnd: '(맨 뒤로 이동)',
     moveCopyMakeCopy: '복사본 만들기',
-    moveCopyUnavailable: '시트 복사는 아직 사용할 수 없습니다.',
+    moveCopyFailed:
+      '이 시트를 복사할 수 없습니다. 도형이나 슬라이서처럼 복사본에 포함할 수 없는 콘텐츠가 있거나 통합 문서의 시트 수가 한도에 도달했습니다.',
     tabColor: '탭 색',
     noColor: '색 없음',
     tabColorRed: '빨강',

@@ -26,15 +26,22 @@ function tabColorToCss(wb: WorkbookHandle, spec: SheetTabColorSpec): string | nu
  * workbook's `<sheetPr>`. Sheets that state neither add nothing to the store.
  */
 export function hydrateSheetPrFromEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
+  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) hydrateSheetPrForSheet(wb, store, sheet);
+}
+
+/** Seed one sheet's tab colour and outline summary position from its `<sheetPr>`. */
+export function hydrateSheetPrForSheet(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+): void {
   if (!wb.capabilities.sheetPrXml) return;
-  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
-    const pr = wb.getSheetPr(sheet);
-    if (!pr) continue;
-    const color = pr.tabColor ? tabColorToCss(wb, pr.tabColor) : null;
-    if (color) mutators.setSheetTabColor(store, sheet, color);
-    if (!pr.summaryBelow || !pr.summaryRight) {
-      mutators.setOutlineSummary(store, sheet, { below: pr.summaryBelow, right: pr.summaryRight });
-    }
+  const pr = wb.getSheetPr(sheet);
+  if (!pr) return;
+  const color = pr.tabColor ? tabColorToCss(wb, pr.tabColor) : null;
+  if (color) mutators.setSheetTabColor(store, sheet, color);
+  if (!pr.summaryBelow || !pr.summaryRight) {
+    mutators.setOutlineSummary(store, sheet, { below: pr.summaryBelow, right: pr.summaryRight });
   }
 }
 

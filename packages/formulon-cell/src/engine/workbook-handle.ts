@@ -105,7 +105,8 @@ export type ChangeEvent =
   | { kind: 'sheet-add'; index: number; name: string }
   | { kind: 'sheet-rename'; index: number; name: string }
   | { kind: 'sheet-remove'; index: number }
-  | { kind: 'sheet-move'; from: number; to: number };
+  | { kind: 'sheet-move'; from: number; to: number }
+  | { kind: 'sheet-copy'; source: number; index: number; name: string };
 
 /** Store slice a non-cell write through the public facade touched; the mount re-hydrates it. */
 export type FacadeChangeKind =
@@ -490,6 +491,32 @@ export class WorkbookHandle {
     }
     this.emit({ kind: 'sheet-move', from, to });
     return true;
+  }
+
+  /** Copy the sheet at `source` so the copy lands at `before` (the sheet count
+   *  appends), named `name` or, when omitted, by the engine (`Src (2)`).
+   *  Returns the copy's index, or -1 on failure or when the engine doesn't
+   *  mutate sheets. The active sheet does not change. Emits `sheet-copy`. */
+  copySheet(source: number, before: number, name?: string): number {
+    this.assertAlive();
+    const count = this.wb.sheetCount;
+    if (!this.capabilities.sheetMutate || !this.wb.hasSheet(source)) return -1;
+    if (!Number.isInteger(before) || before < 0 || before > count) return -1;
+    let index: number;
+    let copied: string;
+    try {
+      const sheet = this.wb.copySheet(source, {
+        insertBefore: before,
+        ...(name !== undefined ? { newName: name } : {}),
+      });
+      index = sheet.index;
+      copied = sheet.name;
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      return -1;
+    }
+    this.emit({ kind: 'sheet-copy', source, index, name: copied });
+    return index;
   }
 
   /** The engine gives sheets added to a Mac-profile book their profile

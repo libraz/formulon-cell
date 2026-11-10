@@ -90,7 +90,7 @@ export interface WorkbookChromeStrings {
     moveCopyBefore: string;
     moveCopyToEnd: string;
     moveCopyMakeCopy: string;
-    moveCopyUnavailable: string;
+    moveCopyFailed: string;
     tabColor: string;
     noColor: string;
     tabColorRed: string;

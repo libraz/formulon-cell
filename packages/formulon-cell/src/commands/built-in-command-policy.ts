@@ -530,6 +530,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   deleteSheet: 'sheet',
   renameSheet: 'sheet',
   moveSheet: 'sheet',
+  copySheet: 'sheet',
   hideSheet: 'sheet',
   unhideSheet: 'sheet',
   sheetTabColor: 'sheet',

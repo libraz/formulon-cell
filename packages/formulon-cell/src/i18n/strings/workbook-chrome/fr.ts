@@ -86,7 +86,8 @@ export const workbookChromeFr: WorkbookChromeStrings = {
     moveCopyBefore: 'Avant la feuille :',
     moveCopyToEnd: '(déplacer à la fin)',
     moveCopyMakeCopy: 'Créer une copie',
-    moveCopyUnavailable: 'La copie de feuille n’est pas encore disponible.',
+    moveCopyFailed:
+      'Impossible de copier cette feuille. Elle contient des éléments que la copie ne peut pas reprendre, comme des formes ou des segments, ou le classeur a atteint le nombre maximal de feuilles.',
     tabColor: 'Couleur de l’onglet',
     noColor: 'Aucune couleur',
     tabColorRed: 'Rouge',

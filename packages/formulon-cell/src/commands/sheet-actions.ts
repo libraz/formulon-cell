@@ -8,6 +8,7 @@ import type { InteractionOrigin } from './interaction-policy.js';
 import {
   addSheet,
   addSheetAfterActive,
+  copySheet,
   moveSheet,
   removeSheet,
   renameSheet,
@@ -27,6 +28,7 @@ export interface SheetActionContext {
 type SheetCommandId = Extract<
   BuiltInCommandId,
   | 'insertSheet'
+  | 'copySheet'
   | 'deleteSheet'
   | 'renameSheet'
   | 'moveSheet'
@@ -63,6 +65,14 @@ export function insertSheetAction(ctx: SheetActionContext, afterActive = false):
     afterActive
       ? addSheetAfterActive(store, workbook, history)
       : addSheet(store, workbook, history),
+  );
+}
+
+/** Copy the sheet at `source` before the sheet at `before` (the sheet count appends) and
+ *  switch to the copy; its index, or -1 when refused. */
+export function copySheetAction(ctx: SheetActionContext, source: number, before: number): number {
+  return run(ctx, 'copySheet', -1, () =>
+    copySheet(ctx.store, ctx.workbook, source, before, ctx.history),
   );
 }
 

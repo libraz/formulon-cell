@@ -85,7 +85,8 @@ export const workbookChromeJa: WorkbookChromeStrings = {
     moveCopyBefore: '挿入先:',
     moveCopyToEnd: '(末尾へ移動)',
     moveCopyMakeCopy: 'コピーを作成する',
-    moveCopyUnavailable: 'シートのコピーはまだ使用できません。',
+    moveCopyFailed:
+      'このシートはコピーできません。図形やスライサーなどコピーで引き継げない内容が含まれているか、ブックのシート数が上限に達しています。',
     tabColor: 'タブの色',
     noColor: '色なし',
     tabColorRed: '赤',

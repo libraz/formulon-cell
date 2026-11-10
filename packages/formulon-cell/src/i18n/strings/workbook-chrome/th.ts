@@ -85,7 +85,8 @@ export const workbookChromeTh: WorkbookChromeStrings = {
     moveCopyBefore: 'ก่อนแผ่นงาน:',
     moveCopyToEnd: '(ย้ายไปท้ายสุด)',
     moveCopyMakeCopy: 'สร้างสำเนา',
-    moveCopyUnavailable: 'ยังไม่รองรับการคัดลอกแผ่นงาน',
+    moveCopyFailed:
+      'ไม่สามารถคัดลอกแผ่นงานนี้ได้ เนื่องจากมีเนื้อหาที่สำเนาไม่สามารถรองรับได้ เช่น รูปร่างหรือตัวแบ่งส่วนข้อมูล หรือเวิร์กบุ๊กมีจำนวนแผ่นงานถึงขีดจำกัดแล้ว',
     tabColor: 'สีแท็บ',
     noColor: 'ไม่มีสี',
     tabColorRed: 'สีแดง',

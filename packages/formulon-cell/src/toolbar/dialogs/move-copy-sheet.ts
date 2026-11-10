@@ -13,7 +13,6 @@ export interface MoveCopySheetDialogStrings {
   before: string;
   toEnd: string;
   makeCopy: string;
-  copyUnavailable: string;
   ok: string;
   cancel: string;
 }
@@ -26,14 +25,18 @@ export interface MoveCopySheetDialogOptions {
   sheets: readonly string[];
   /** The sheet being moved. */
   current: number;
+  /** Why "Create a copy" is unavailable; null when the copy may be made. */
+  copyDisabledReason: string | null;
 }
 
 export interface MoveCopySheetDialogResult {
   /** Index of the sheet to go in front of; the sheet count means the end. */
   before: number;
+  /** True when "Create a copy" was checked: copy the sheet instead of moving it. */
+  copy: boolean;
 }
 
-/** Move or Copy dialog. Only moving is available: the copy checkbox is shown disabled. */
+/** Move or Copy dialog: the position to move the sheet to, or to copy it to. */
 export const showMoveCopySheetDialog = (
   opts: MoveCopySheetDialogOptions,
 ): Promise<MoveCopySheetDialogResult | null> =>
@@ -90,7 +93,7 @@ export const showMoveCopySheetDialog = (
     copyLabel.className = 'fc-movecopy__copy fc-fmtdlg__checkbox';
     const copy = document.createElement('input');
     copy.type = 'checkbox';
-    projectDisabledState(copy, true, strings.copyUnavailable);
+    projectDisabledState(copy, opts.copyDisabledReason !== null, opts.copyDisabledReason);
     copyLabel.append(copy, document.createTextNode(strings.makeCopy));
 
     shell.body.append(bookLabel, book, beforeLabel, list, copyLabel);
@@ -105,7 +108,8 @@ export const showMoveCopySheetDialog = (
       onCancel: () => null,
       onSubmit: () => onOk(),
     });
-    const onOk = (): void => lifecycle.finish({ before: selected });
+    const onOk = (): void =>
+      lifecycle.finish({ before: selected, copy: copy.checked && !copy.disabled });
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 

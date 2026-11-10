@@ -43,8 +43,13 @@ const structureEventBindings = new WeakMap<WorkbookHandle, StructureEventBinding
 export type SheetIndexMapper = (index: number) => number | null;
 
 const mapIndexForStructureEvent = (
-  event: { kind: 'sheet-remove'; index: number } | { kind: 'sheet-move'; from: number; to: number },
+  event:
+    | { kind: 'sheet-remove'; index: number }
+    | { kind: 'sheet-move'; from: number; to: number }
+    | { kind: 'sheet-copy'; index: number },
 ): SheetIndexMapper => {
+  // A copy is inserted at its index; every sheet from there on moves up one place.
+  if (event.kind === 'sheet-copy') return (index) => (index >= event.index ? index + 1 : index);
   if (event.kind === 'sheet-remove') {
     return (index) => {
       if (index === event.index) return null;
@@ -165,7 +170,7 @@ const remapAddrKeySet = (
 };
 
 /** Session-only objects hold a sheet index but are not re-read from the
- *  engine, so a sheet move or removal has to carry them along. Returns the
+ *  engine, so a sheet move, removal or copy has to carry them along. Returns the
  *  same state when nothing refers to a moved or removed sheet. */
 const remapSessionObjects = (state: State, mapIndex: SheetIndexMapper): State => {
   let next = state;
@@ -287,7 +292,8 @@ const ensureStructureEventBinding = (wb: WorkbookHandle): StructureEventBinding 
     unsubscribe: () => undefined,
   };
   binding.unsubscribe = wb.subscribe((event) => {
-    if (event.kind !== 'sheet-remove' && event.kind !== 'sheet-move') return;
+    if (event.kind !== 'sheet-remove' && event.kind !== 'sheet-move' && event.kind !== 'sheet-copy')
+      return;
     const mapIndex = mapIndexForStructureEvent(event);
     const remap = (): void => {
       remapActiveWholeSheetFontOverrides(wb, mapIndex);

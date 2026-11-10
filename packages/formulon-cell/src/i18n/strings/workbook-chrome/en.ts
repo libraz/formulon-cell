@@ -85,7 +85,8 @@ export const workbookChromeEn: WorkbookChromeStrings = {
     moveCopyBefore: 'Before sheet:',
     moveCopyToEnd: '(move to end)',
     moveCopyMakeCopy: 'Create a copy',
-    moveCopyUnavailable: 'Copying a sheet is not available yet.',
+    moveCopyFailed:
+      "This sheet can't be copied. It holds content the copy can't carry, such as shapes or slicers, or the workbook has reached its sheet limit.",
     tabColor: 'Tab Color',
     noColor: 'No Color',
     tabColorRed: 'Red',

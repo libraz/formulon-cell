@@ -627,11 +627,13 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       e.kind === 'sheet-add' ||
       e.kind === 'sheet-rename' ||
       e.kind === 'sheet-remove' ||
-      e.kind === 'sheet-move'
+      e.kind === 'sheet-move' ||
+      e.kind === 'sheet-copy'
     ) {
       getSheetTabs()?.update();
       if (e.kind !== 'sheet-add') reloadChartsFromEngine(wb, store);
-      if (e.kind === 'sheet-remove' || e.kind === 'sheet-move') reloadImagesFromEngine(wb, store);
+      if (e.kind === 'sheet-remove' || e.kind === 'sheet-move' || e.kind === 'sheet-copy')
+        reloadImagesFromEngine(wb, store);
     }
   });
 

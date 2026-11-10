@@ -46,6 +46,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'concatFormula',
   'conditional',
   'copy',
+  'copySheet',
   'currency',
   'cut',
   'dataValidation',
@@ -524,6 +525,7 @@ export type BuiltInCommandId = (typeof BUILT_IN_COMMAND_IDS)[number];
  * {@link BUILT_IN_COMMAND_IDS}; empty while every dispatched id comes from those sources. */
 /** Built-ins with no generated source: the sheet-tab menu and the sheet commands behind it. */
 export const OTHER_BUILT_IN_COMMAND_IDS: readonly BuiltInCommandId[] = [
+  'copySheet',
   'deleteSheet',
   'hideSheet',
   'insertSheet',
