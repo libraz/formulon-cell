@@ -1312,7 +1312,7 @@
     .fc-tb__ribbon-tools {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: 64px;
+    grid-auto-columns: max-content;
     grid-template-rows: repeat(3, 24px);
     align-content: center;
     gap: 0 4px;
@@ -1327,9 +1327,9 @@
     flex-direction: row;
     justify-content: flex-start;
     gap: 6px;
-    width: 64px;
+    width: auto;
     min-width: 64px;
-    max-width: 64px;
+    max-width: none;
     height: 22px;
     min-height: 22px;
     padding: 1px 4px;
@@ -1361,18 +1361,12 @@
     .fc-tb__ribbon-group--checks
     .fc-tb__rb
     > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-    display: -webkit-box;
-    flex: 1 1 auto;
+    display: block;
+    flex: 0 0 auto;
     min-width: 0;
-    max-width: 100%;
-    max-height: 2.2em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    overflow-wrap: break-word;
+    overflow: visible;
     line-height: 1.1;
-    white-space: normal;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    white-space: nowrap;
   }
 
   [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--tiles .fc-tb__rb,
@@ -2138,6 +2132,9 @@
     position: fixed;
     z-index: 90;
     display: flex;
+    flex-wrap: wrap;
+    box-sizing: border-box;
+    overflow: auto;
     padding: 6px;
     border: 1px solid var(--fc-tb-ribbon-line);
     border-radius: 4px;

@@ -499,6 +499,8 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   };
 
   const positionDynamicRibbonDropdown = (menu: HTMLElement, button: HTMLElement): void => {
+    // Measure the natural height: a limit left by an earlier placement would read back as the content height.
+    applyVerticalViewportLimit(menu, null, 0);
     const buttonRect = button.getBoundingClientRect();
     const { width, height } = viewportSize();
     const pad = RIBBON_DROPDOWN_VIEWPORT_PAD;

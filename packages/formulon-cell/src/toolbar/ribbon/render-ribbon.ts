@@ -12,7 +12,12 @@ import type { Locale } from '../../i18n/strings.js';
 // can branch without needing dedicated wrapper props.
 
 import type { FeatureFlags } from '../../extensions/index.js';
-import { clampPanelToViewport, panelSize, viewportSize } from '../../interact/overlay-position.js';
+import {
+  clamp,
+  clampPanelToViewport,
+  panelSize,
+  viewportSize,
+} from '../../interact/overlay-position.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import type { RibbonDisplayText, ToolbarMenuText } from '../menu-text.js';
@@ -349,7 +354,7 @@ const effectiveAxisScale = (renderedSize: number, layoutSize: number): number =>
 
 /** Position the display menu after it enters the document so its actual size
  * and the toggle's viewport rect determine the side and final fixed position. */
-const positionRibbonDisplayMenu = (toggle: HTMLElement, menu: HTMLElement): void => {
+export const positionRibbonDisplayMenu = (toggle: HTMLElement, menu: HTMLElement): void => {
   const ownerDocument = toggle.ownerDocument;
   const computed = ownerDocument.defaultView?.getComputedStyle(menu);
   const preferredBelow = computed?.top !== 'auto' && computed?.bottom === 'auto';
@@ -414,6 +419,17 @@ const positionRibbonDisplayMenu = (toggle: HTMLElement, menu: HTMLElement): void
   const position = clampPanelToViewport(menu, desiredX, desiredY, { pad });
   menu.style.left = `${Math.round(position.x)}px`;
   menu.style.top = `${Math.round(position.y)}px`;
+
+  // A scaled or scrolled host can leave the converted position off; correct from the rendered box.
+  const placed = menu.getBoundingClientRect();
+  const shiftX = clamp(placed.left, pad, viewport.width - placed.width - pad) - placed.left;
+  const shiftY = clamp(placed.top, pad, viewport.height - placed.height - pad) - placed.top;
+  if (Math.abs(shiftX) >= 0.5) {
+    menu.style.left = `${Math.round(Number.parseFloat(menu.style.left) + shiftX / scaleX)}px`;
+  }
+  if (Math.abs(shiftY) >= 0.5) {
+    menu.style.top = `${Math.round(Number.parseFloat(menu.style.top) + shiftY / scaleY)}px`;
+  }
 };
 
 export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {

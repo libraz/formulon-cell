@@ -11,6 +11,7 @@
  * first, into one named button that opens the group as a popup.
  */
 
+import { clampPanelToViewport, viewportSize } from '../../interact/overlay-position.js';
 import { createRibbonButton } from './button.js';
 
 export const RIBBON_GROUP_NARROW_CLASS = 'fc-tb__ribbon-group--narrow';
@@ -19,6 +20,8 @@ export const RIBBON_GROUP_ICON_ONLY_CLASS = 'fc-tb__ribbon-group--icon-only';
 export const RIBBON_GROUP_COLLAPSED_CLASS = 'fc-tb__ribbon-group--collapsed';
 const GROUP_OPEN_CLASS = 'fc-tb__ribbon-group--open';
 const COLLAPSE_BUTTON_CLASS = 'fc-tb__ribbon-group-collapse';
+const GROUP_POPUP_PAD = 8;
+const GROUP_POPUP_GAP = 2;
 
 const isTileGroup = (group: HTMLElement): boolean =>
   group.classList.contains('fc-tb__ribbon-group--tiles') ||
@@ -76,7 +79,12 @@ const closeGroupPopup = (group: HTMLElement): void => {
   const tools = group.querySelector<HTMLElement>(':scope > .fc-tb__ribbon-tools');
   tools?.style.removeProperty('left');
   tools?.style.removeProperty('top');
+  tools?.style.removeProperty('max-width');
+  tools?.style.removeProperty('max-height');
 };
+
+/** Controls that open their own list or menu; a click on them must keep the popup open. */
+const OPENS_OWN_LIST = '[aria-haspopup], .fc-tb__rb-dd, .fc-tb__rb-color, .fc-tb__menu';
 
 const openGroupPopup = (group: HTMLElement, button: HTMLElement): void => {
   group.classList.add(GROUP_OPEN_CLASS);
@@ -84,11 +92,22 @@ const openGroupPopup = (group: HTMLElement, button: HTMLElement): void => {
   const tools = group.querySelector<HTMLElement>(':scope > .fc-tb__ribbon-tools');
   const rect = button.getBoundingClientRect();
   if (tools) {
-    tools.style.left = `${Math.round(rect.left)}px`;
-    tools.style.top = `${Math.round(rect.bottom + 2)}px`;
+    // Cap the popup to the viewport (its tools wrap and scroll), then slide it back inside.
+    const viewport = viewportSize(group.ownerDocument);
+    const desiredY = rect.bottom + GROUP_POPUP_GAP;
+    tools.style.maxWidth = `${Math.max(0, viewport.width - GROUP_POPUP_PAD * 2)}px`;
+    tools.style.maxHeight = `${Math.max(0, viewport.height - GROUP_POPUP_PAD - desiredY)}px`;
+    const position = clampPanelToViewport(tools, rect.left, desiredY, { pad: GROUP_POPUP_PAD });
+    tools.style.left = `${Math.round(position.x)}px`;
+    tools.style.top = `${Math.round(position.y)}px`;
   }
   const dismiss = (event: Event): void => {
     if (event.target instanceof Node && group.contains(event.target)) return;
+    if (
+      event.target instanceof Element &&
+      event.target.closest('.fc-tb__menu, .fc-tb__rb-dd__list')
+    )
+      return;
     closeGroupPopup(group);
     group.ownerDocument.removeEventListener('pointerdown', dismiss, true);
   };
@@ -112,9 +131,12 @@ const collapseGroup = (group: HTMLElement): void => {
       else openGroupPopup(group, created);
     });
     group.prepend(created);
-    group
-      .querySelector(':scope > .fc-tb__ribbon-tools')
-      ?.addEventListener('click', () => closeGroupPopup(group));
+    // A plain command closes the popup; opening a dropdown or picking from its list does not.
+    group.querySelector(':scope > .fc-tb__ribbon-tools')?.addEventListener('click', (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target?.closest('[data-ribbon-command]') || target.closest(OPENS_OWN_LIST)) return;
+      closeGroupPopup(group);
+    });
     button = created;
   }
   group.classList.add(RIBBON_GROUP_COLLAPSED_CLASS);

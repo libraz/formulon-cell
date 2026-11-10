@@ -21,7 +21,10 @@
     width: auto;
     min-width: 236px;
     max-width: min(420px, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
     padding: 6px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .fc-tb__visual-grid {

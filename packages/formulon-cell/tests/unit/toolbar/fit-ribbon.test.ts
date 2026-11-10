@@ -222,8 +222,42 @@ describe('toolbar/ribbon group collapse', () => {
     button?.click();
     expect(groups[3]?.classList.contains('fc-tb__ribbon-group--open')).toBe(true);
     expect(button?.getAttribute('aria-expanded')).toBe('true');
-    groups[3]?.querySelector<HTMLElement>('.fc-tb__ribbon-tools')?.click();
+    groups[3]?.querySelector<HTMLElement>('[data-ribbon-command]')?.click();
     expect(groups[3]?.classList.contains('fc-tb__ribbon-group--open')).toBe(false);
+  });
+
+  it('keeps a folded group popup open for dropdowns and their lists, and inside the viewport', () => {
+    const { panel, groups } = build(520);
+    fitRibbonPanel(panel, { collapse: true });
+    const group = groups[3] as HTMLElement;
+    const tools = group.querySelector<HTMLElement>('.fc-tb__ribbon-tools') as HTMLElement;
+    const dropdown = document.createElement('button');
+    dropdown.dataset.ribbonCommand = 'fontFamily';
+    dropdown.setAttribute('aria-haspopup', 'listbox');
+    const option = document.createElement('div');
+    option.className = 'fc-tb__rb-dd__list';
+    tools.append(dropdown, option);
+
+    const previousWidth = window.innerWidth;
+    window.innerWidth = 390;
+    window.innerHeight = 800;
+    tools.getBoundingClientRect = () => ({ width: 600, height: 100 }) as DOMRect;
+    const open = group.querySelector<HTMLButtonElement>('.fc-tb__ribbon-group-collapse');
+    open?.click();
+    window.innerWidth = previousWidth;
+
+    expect(tools.style.maxWidth).toBe('374px');
+    expect(tools.style.left).toBe('8px');
+    expect(tools.style.maxHeight).toBe('790px');
+
+    dropdown.click();
+    option.click();
+    option.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    expect(group.classList.contains('fc-tb__ribbon-group--open')).toBe(true);
+
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    expect(group.classList.contains('fc-tb__ribbon-group--open')).toBe(false);
+    expect(tools.style.maxWidth).toBe('');
   });
 
   it('expands every group again once the panel fits', () => {
