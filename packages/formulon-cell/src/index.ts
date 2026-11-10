@@ -576,6 +576,7 @@ export type {
   ScreenClipCaptureResult,
   ScreenClipResult,
   SpreadsheetInstance,
+  SpreadsheetInstance as LegacySpreadsheetInstance,
   ToolbarInstance,
   ToolbarInstanceRef,
 } from './mount.js';
