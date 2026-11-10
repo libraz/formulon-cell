@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { LegacySpreadsheetInstance as SpreadsheetInstance } from '@libraz/formulon-cell';
 import { onBeforeUnmount, ref, watch } from 'vue';
 import {
   DEFAULT_DEMO_QUICK_ACCESS,

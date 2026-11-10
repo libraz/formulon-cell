@@ -1,4 +1,4 @@
-import type { SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { LegacySpreadsheetInstance as SpreadsheetInstance } from '@libraz/formulon-cell';
 import {
   type ReactElement,
   useCallback,

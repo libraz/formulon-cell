@@ -1,7 +1,7 @@
 import type {
   DynamicDropdownsCtx,
   RibbonTab,
-  SpreadsheetInstance,
+  LegacySpreadsheetInstance as SpreadsheetInstance,
   ToolbarInstance,
 } from '@libraz/formulon-cell';
 

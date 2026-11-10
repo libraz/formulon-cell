@@ -22,7 +22,7 @@ import type {
   ReviewCell,
   RibbonTab,
   ScriptCommand,
-  SpreadsheetInstance,
+  LegacySpreadsheetInstance as SpreadsheetInstance,
   SpreadsheetUiOptions,
   ThemeName,
   ToolbarInstance,

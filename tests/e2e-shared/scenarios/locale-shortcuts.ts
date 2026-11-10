@@ -1,4 +1,4 @@
-import type { SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { LegacySpreadsheetInstance as SpreadsheetInstance } from '@libraz/formulon-cell';
 import { expect, type Page } from '@playwright/test';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 

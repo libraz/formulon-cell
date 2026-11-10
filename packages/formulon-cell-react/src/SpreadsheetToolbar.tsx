@@ -11,7 +11,7 @@ import {
   dictionaryLocaleFor,
   openHostMenuFirstDropdown,
   Spreadsheet,
-  type SpreadsheetInstance,
+  type LegacySpreadsheetInstance as SpreadsheetInstance,
   type ToolbarInstance,
 } from '@libraz/formulon-cell';
 import { type ReactElement, useEffect, useRef } from 'react';

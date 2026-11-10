@@ -3,7 +3,7 @@ import {
   ADAPTER_FALLBACK_SELECTION,
   type SpreadsheetEventHandler,
   type SpreadsheetEventName,
-  type SpreadsheetInstance,
+  type LegacySpreadsheetInstance as SpreadsheetInstance,
 } from '@libraz/formulon-cell';
 import { onScopeDispose, type Ref, shallowRef, watchEffect } from 'vue';
 

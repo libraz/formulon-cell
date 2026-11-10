@@ -1,4 +1,8 @@
-import type { ExcelRibbonIconName, RibbonTab, SpreadsheetInstance } from '@libraz/formulon-cell';
+import type {
+  ExcelRibbonIconName,
+  RibbonTab,
+  LegacySpreadsheetInstance as SpreadsheetInstance,
+} from '@libraz/formulon-cell';
 import type { DemoUiStrings } from './demo-strings.js';
 
 /** Commands the Mac Quick Access Toolbar can show, in its customize-menu order. */

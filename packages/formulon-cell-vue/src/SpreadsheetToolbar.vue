@@ -9,7 +9,7 @@ import {
   openHostMenuFirstDropdown,
   type RibbonTab,
   Spreadsheet,
-  type SpreadsheetInstance,
+  type LegacySpreadsheetInstance as SpreadsheetInstance,
   type ToolbarInstance,
 } from '@libraz/formulon-cell';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';

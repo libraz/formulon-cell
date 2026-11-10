@@ -2,7 +2,7 @@ import type {
   CellValue,
   FeatureFlags,
   FeatureId,
-  SpreadsheetInstance,
+  LegacySpreadsheetInstance as SpreadsheetInstance,
   ThemeName,
 } from '@libraz/formulon-cell';
 import { useSelection } from '@libraz/formulon-cell-react';

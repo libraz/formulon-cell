@@ -3,7 +3,7 @@ import type {
   RibbonSearchItem,
   RibbonSearchUsagePrior,
   RibbonTab,
-  SpreadsheetInstance,
+  LegacySpreadsheetInstance as SpreadsheetInstance,
   ThemeName,
 } from '@libraz/formulon-cell';
 import {

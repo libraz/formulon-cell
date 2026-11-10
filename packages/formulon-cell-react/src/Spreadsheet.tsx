@@ -13,7 +13,7 @@ import {
   resolveAdapterTheme,
   type SelectionChangeEvent,
   Spreadsheet as SpreadsheetCore,
-  type SpreadsheetInstance,
+  type LegacySpreadsheetInstance as SpreadsheetInstance,
   type SpreadsheetUiOptions,
   type ThemeChangeEvent,
   type WorkbookChangeEvent,

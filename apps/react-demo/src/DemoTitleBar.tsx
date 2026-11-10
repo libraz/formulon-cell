@@ -1,4 +1,7 @@
-import type { RibbonTab, SpreadsheetInstance } from '@libraz/formulon-cell';
+import type {
+  RibbonTab,
+  LegacySpreadsheetInstance as SpreadsheetInstance,
+} from '@libraz/formulon-cell';
 import {
   type ReactElement,
   type RefObject,

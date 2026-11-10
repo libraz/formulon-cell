@@ -1,4 +1,7 @@
-import type { PrinterProfile, SpreadsheetInstance } from '@libraz/formulon-cell';
+import type {
+  PrinterProfile,
+  LegacySpreadsheetInstance as SpreadsheetInstance,
+} from '@libraz/formulon-cell';
 import {
   buildPrintDocument,
   getPageSetup,

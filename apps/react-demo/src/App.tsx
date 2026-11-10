@@ -4,7 +4,7 @@ import {
   type FeatureId,
   type parseScriptCommand,
   type ScriptCommand,
-  type SpreadsheetInstance,
+  type LegacySpreadsheetInstance as SpreadsheetInstance,
   type ThemeName,
   type ToolbarInstance,
   WorkbookHandle,
