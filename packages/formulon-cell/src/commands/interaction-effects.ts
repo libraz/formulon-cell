@@ -61,7 +61,8 @@ export const unenumerableEffect = (effect: OperationEffect): PermissionDecision 
 export const effectCells = (effect: OperationEffect): readonly Addr[] | null => {
   if (effect.kind === 'cells')
     return effect.cells.length <= MAX_MATERIALIZED_CELLS ? effect.cells : null;
-  if (effect.kind === 'workbook') return [];
+  // A sheet effect names no cells; the authorizer decides the sheet as a whole.
+  if (effect.kind === 'workbook' || effect.kind === 'sheet') return [];
   const { range } = effect;
   if (!isWellFormedRange(range)) return null;
   const area = rangeCellCount(range);

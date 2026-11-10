@@ -121,6 +121,9 @@ export type OperationEffect =
       readonly includesFormula?: boolean;
     }
   | { readonly kind: 'range'; readonly range: Range; readonly includesFormula?: boolean }
+  /** A sheet-level write (rename, tab color, page setup, protection): decided
+   *  for the sheet as a whole, never per cell. */
+  | { readonly kind: 'sheet'; readonly sheet: number }
   | { readonly kind: 'workbook' };
 
 export interface OperationIntent {

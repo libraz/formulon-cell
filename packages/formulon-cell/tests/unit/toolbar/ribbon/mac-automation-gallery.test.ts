@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../../src/commands/history.js';
-import { InteractionController } from '../../../../src/commands/interaction-controller.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../../src/commands/interaction-controller.js';
 import type {
   InteractionPolicy,
   OperationIntent,
@@ -123,6 +126,7 @@ const makeNativeInstance = async (
     getBounds: options.getBounds,
   });
   liveControllers.push(controller);
+  registerInteractionController(store, controller);
   workbook.attachHistory(history);
   const instance = {
     host,
@@ -307,13 +311,11 @@ describe('Mac automation gallery', () => {
   });
 
   it('authorizes show-all-rows-and-columns replay for both resize operations', async () => {
-    const { instance, history } = await makeNativeInstance(host);
+    const { instance, history, controller } = await makeNativeInstance(host);
     const seen = new Set<string>();
-    (instance as unknown as { commands: unknown }).commands = {
-      canExecute: (intent: OperationIntent): PermissionDecision => {
-        seen.add(`${intent.operation}:${intent.origin}`);
-        return { allowed: true };
-      },
+    controller.canExecute = (intent: OperationIntent): PermissionDecision => {
+      seen.add(`${intent.operation}:${intent.origin}`);
+      return { allowed: true };
     };
 
     await runMacAutomationScript(instance, 'allRowsColumns');

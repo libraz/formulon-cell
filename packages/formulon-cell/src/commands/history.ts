@@ -187,6 +187,12 @@ export class History {
     this.notify();
   }
 
+  /** Whether a `begin()` frame is open, so a nested writer joins it instead of
+   *  carrying its own transaction metadata. */
+  isInTransaction(): boolean {
+    return this.txnFrames.length > 0;
+  }
+
   isReplaying(): boolean {
     return this.replaying;
   }

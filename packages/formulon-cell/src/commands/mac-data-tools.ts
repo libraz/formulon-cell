@@ -8,9 +8,13 @@ import { sameAddr } from '../store/direct-format.js';
 import { outlineSummaryFor } from '../store/outline-summary.js';
 import { rangeArea, rangesIntersect, sameRange } from '../store/selection-geometry.js';
 import { getPageSetup, mutators, type SpreadsheetStore } from '../store/store.js';
+import {
+  type AuthorizedIntentFactory,
+  authorizedWrite,
+  authorizeWrite,
+} from './authorized-write.js';
 import { blockDataTableShift } from './data-table-guard.js';
 import { rowShiftBand } from './interaction-effects.js';
-import type { OperationIntent, PermissionDecision } from './interaction-policy.js';
 import { groupRows, ungroupRows } from './outline.js';
 import { isSheetProtected } from './protection.js';
 import { sameSavedWorkbook } from './saved-workbook-proof.js';
@@ -250,17 +254,11 @@ const dataIntent = (
     effects: [{ kind: 'cells', cells, includesFormula: operation === 'formulaEdit' }],
   });
 
-interface SubtotalIntents {
-  readonly apply: readonly OperationIntent[];
-  readonly undo: readonly OperationIntent[];
-  readonly redo: readonly OperationIntent[];
-}
-
 const subtotalIntents = (
   range: Range,
   outputCells: readonly Addr[],
   formulaCells: readonly Addr[],
-): SubtotalIntents => {
+): AuthorizedIntentFactory => {
   const cellsEffect = { kind: 'cells' as const, cells: outputCells };
   const formulasEffect = {
     kind: 'cells' as const,
@@ -271,12 +269,9 @@ const subtotalIntents = (
   // Every subtotal row lands at or below the first data row and shifts the rest of the sheet.
   const shiftedBand = rowShiftBand(range.sheet, range.r0 + 1);
   const structuralEffects = [{ kind: 'range' as const, range: shiftedBand }] as const;
-  const make = (
-    origin: 'ribbon' | 'undo' | 'redo',
-    structuralOperation: 'insertRows' | 'deleteRows',
-  ): readonly OperationIntent[] => [
+  return (origin) => [
     {
-      operation: structuralOperation,
+      operation: origin === 'undo' ? 'deleteRows' : 'insertRows',
       origin,
       commandId: 'mac.data.subtotal',
       effects: structuralEffects,
@@ -300,23 +295,6 @@ const subtotalIntents = (
       effects: [formatEffect],
     },
   ];
-  return {
-    apply: make('ribbon', 'insertRows'),
-    undo: make('undo', 'deleteRows'),
-    redo: make('redo', 'insertRows'),
-  };
-};
-
-const firstDeniedSubtotalIntent = (
-  instance: SpreadsheetInstance,
-  intents: SubtotalIntents,
-): PermissionDecision => {
-  let firstDenied: PermissionDecision | null = null;
-  for (const intent of [...intents.apply, ...intents.undo, ...intents.redo]) {
-    const decision = instance.commands.canExecute(intent);
-    if (!decision.allowed && firstDenied === null) firstDenied = decision;
-  }
-  return firstDenied ?? { allowed: true };
 };
 
 const parseDestination = (
@@ -1030,7 +1008,7 @@ export function planMacSubtotal(
   const output = subtotalOutputCells(range, columns, groups, request.summaryBelow !== false);
   if (!output) return failure('unsupported', 'groupLimit');
   const intents = subtotalIntents(range, output.outputCells, output.formulaCells);
-  const authorization = firstDeniedSubtotalIntent(instance, intents);
+  const authorization = authorizeWrite(instance.store, intents, 'ribbon');
   if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
   return success({ range: { ...range }, insertedRows: groups.length + 1, groups });
 }
@@ -1042,8 +1020,6 @@ export function commitMacSubtotal(
   instance: SpreadsheetInstance,
   request: SubtotalRequest,
   solution: SubtotalSolution,
-  /** True when the caller already holds the outer history transaction. */
-  nested = false,
 ): MacDataResult<void> {
   const { store, workbook: wb, history } = instance;
   const parsed = parseMacRange(wb, request.range, store.getState().data.sheetIndex);
@@ -1072,17 +1048,7 @@ export function commitMacSubtotal(
   const output = subtotalOutputCells(range, columns, solution.groups, below);
   if (!output) return failure('unsupported', 'groupLimit');
   const intents = subtotalIntents(range, output.outputCells, output.formulaCells);
-  const authorization = firstDeniedSubtotalIntent(instance, intents);
-  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
-  let token: ReturnType<typeof history.begin>;
-  try {
-    token = history.begin(
-      nested ? undefined : { replayAuthorization: { undo: intents.undo, redo: intents.redo } },
-    );
-  } catch (error) {
-    return failure('invalid', 'failed', thrownReason(error));
-  }
-  try {
+  const write = (): void => {
     const writeTotalRow = (row: number, label: string, from: number, to: number): void => {
       wb.setText({ sheet: range.sheet, row, col: range.c0 }, label);
       wb.withBatchedRecalc(() => {
@@ -1152,14 +1118,12 @@ export function commitMacSubtotal(
         });
       }
     }
-    history.end(token);
+  };
+  try {
+    const written = authorizedWrite({ store, history, intents, origin: 'ribbon', write });
+    if (!written.ok) return failure('rejected', 'notEditable', written.decision.reason);
     return success(undefined);
   } catch (error) {
-    try {
-      history.abort(token);
-    } catch (abortError) {
-      return failure('invalid', 'failed', thrownReason(abortError));
-    }
     return failure('invalid', 'failed', thrownReason(error));
   }
 }
@@ -1245,7 +1209,7 @@ export function replaceMacSubtotals(
     const request = makeRequest({ ...region, r1: region.r1 - removed.value });
     const plan = planMacSubtotal(instance, request);
     if (!plan.ok) return abort(plan);
-    const committed = commitMacSubtotal(instance, request, plan.value, true);
+    const committed = commitMacSubtotal(instance, request, plan.value);
     if (!committed.ok) return abort(committed);
     history.end(token);
     return success(undefined);

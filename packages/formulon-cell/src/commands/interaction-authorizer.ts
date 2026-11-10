@@ -64,6 +64,19 @@ const PROTECTION_OPTION: Partial<Record<InteractionOperation, keyof SheetProtect
   pivot: 'pivotTables',
 };
 
+/** Whether sheet protection lets a sheet-level `operation` change `sheet`. */
+const sheetProtectionPermits = (
+  state: State,
+  operation: InteractionOperation,
+  sheet: number,
+): boolean => {
+  // Unprotecting must work on a protected sheet, so protection never refuses itself.
+  if (operation === 'protection') return true;
+  // Protect Sheet leaves page setup (margins, print area, titles, header/footer) editable.
+  if (operation === 'pageSetup') return true;
+  return sheetPermits(state, sheet, PROTECTION_OPTION[operation]);
+};
+
 /** Whether sheet protection lets `operation` write `addr`. */
 const protectionPermits = (state: State, operation: InteractionOperation, addr: Addr): boolean => {
   const option = PROTECTION_OPTION[operation];
@@ -172,6 +185,11 @@ export class InteractionAuthorizer {
     const formulaCells: Addr[] = [];
     const formulaBands: OperationEffect[] = [];
     for (const effect of intent.effects) {
+      if (effect.kind === 'sheet') {
+        const decision = this.sheetDecision(intent, effect.sheet, policy, isAddress);
+        if (!decision.allowed) return decision;
+        continue;
+      }
       const band = bandRange(effect);
       if (band) {
         const decision = this.bandDecision(intent, band, policy, isAddress);
@@ -269,7 +287,7 @@ export class InteractionAuthorizer {
     const cells: Addr[] = [];
     const formulaCells: Addr[] = [];
     for (const effect of intent.effects) {
-      if (bandRange(effect)) {
+      if (effect.kind === 'sheet' || bandRange(effect)) {
         const decision = canExecute({ ...intent, effects: [effect] });
         if (!decision.allowed) return decision;
         continue;
@@ -277,7 +295,8 @@ export class InteractionAuthorizer {
       const addresses = effectCells(effect);
       if (addresses === null) return unenumerableEffect(effect);
       cells.push(...addresses);
-      if (effect.kind !== 'workbook' && effect.includesFormula) formulaCells.push(...addresses);
+      if ((effect.kind === 'cells' || effect.kind === 'range') && effect.includesFormula)
+        formulaCells.push(...addresses);
     }
     const formulaKeys = new Set(formulaCells.map(addrKey));
     for (const addr of cells) {
@@ -363,11 +382,41 @@ export class InteractionAuthorizer {
     return { allowed: true };
   }
 
+  /** Decide a sheet-level effect: the sheet must exist and be the bounds' sheet,
+   *  and sheet protection must let the operation through. No cell is checked. */
+  private sheetDecision(
+    intent: OperationIntent,
+    sheet: number,
+    policy: InteractionPolicy | undefined,
+    isAddress: WorkbookAddressCheck,
+  ): PermissionDecision {
+    const bounds = policy ? this.getBounds?.() : undefined;
+    if (bounds && bounds.sheet !== sheet) {
+      return {
+        allowed: false,
+        code: 'outOfBounds',
+        reason: 'sheet is outside the configured bounds',
+      };
+    }
+    if (!isAddress({ sheet, row: 0, col: 0 })) {
+      return { allowed: false, code: 'outOfBounds', reason: 'sheet is not in the workbook' };
+    }
+    if (!isMutatingInteraction(intent.operation)) return { allowed: true };
+    if (!sheetProtectionPermits(this.store.getState(), intent.operation, sheet))
+      return { allowed: false, code: 'protected', reason: 'sheet is protected' };
+    return { allowed: true };
+  }
+
   private legacyDecision(
     intent: OperationIntent,
     isAddress: WorkbookAddressCheck,
   ): PermissionDecision {
     for (const effect of intent.effects) {
+      if (effect.kind === 'sheet') {
+        const decision = this.sheetDecision(intent, effect.sheet, undefined, isAddress);
+        if (!decision.allowed) return decision;
+        continue;
+      }
       const band = bandRange(effect);
       if (band) {
         const decision = this.bandDecision(intent, band, undefined, isAddress);

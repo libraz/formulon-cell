@@ -2,7 +2,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import { InteractionController } from '../../../src/commands/interaction-controller.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
 import type { OperationIntent } from '../../../src/commands/interaction-policy.js';
 import {
   type ConsolidateRequest,
@@ -53,6 +56,7 @@ const makeInstance = (wb: WorkbookHandle, store: SpreadsheetStore): SpreadsheetI
       } as const;
     },
   };
+  registerInteractionController(store, commands as unknown as InteractionController);
   return { workbook: wb, store, commands } as unknown as SpreadsheetInstance;
 };
 
@@ -66,6 +70,7 @@ const makeControllerInstance = (
     getWb: () => wb,
     history,
   });
+  registerInteractionController(store, commands);
   wb.attachHistory(history);
   return {
     workbook: wb,

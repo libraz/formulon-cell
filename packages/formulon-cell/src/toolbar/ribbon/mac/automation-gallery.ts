@@ -1,8 +1,9 @@
+import {
+  type AuthorizedIntentFactory,
+  authorizedWrite,
+} from '../../../commands/authorized-write.js';
 import { formatAsTable, inferTableHasHeaders } from '../../../commands/format-as-table.js';
-import type {
-  InteractionOperation,
-  OperationIntent,
-} from '../../../commands/interaction-policy.js';
+import type { InteractionOperation } from '../../../commands/interaction-policy.js';
 import { applyFreezeMode, showCols, showRows } from '../../../commands/row-col-layout.js';
 import { recordTablesChange } from '../../../commands/slice-history.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../../engine/address.js';
@@ -481,59 +482,37 @@ const openMacAutomationResult = (
   shell.open();
 };
 
-type AutomationIntentFactory = (origin: 'ribbon' | 'undo' | 'redo') => readonly OperationIntent[];
-
-/** Authorize apply/undo/redo up front, then open a history transaction that replays under the same checks. */
-const beginAuthorizedHistory = (
+/** Run a ribbon automation write as one authorized history step. */
+const ribbonWrite = (
   instance: SpreadsheetInstance,
-  makeIntents: AutomationIntentFactory,
-): ReturnType<SpreadsheetInstance['history']['begin']> | null => {
-  const undo = makeIntents('undo');
-  const redo = makeIntents('redo');
-  const intents = [...makeIntents('ribbon'), ...undo, ...redo];
-  if (intents.some((intent) => !instance.commands.canExecute(intent).allowed)) return null;
-  try {
-    return instance.history.begin({ replayAuthorization: { undo, redo } });
-  } catch {
-    return null;
-  }
-};
-
-/** Run `apply` inside the transaction; on failure abort and rethrow so the caller can report it. */
-const commitOrAbort = (
-  instance: SpreadsheetInstance,
-  token: NonNullable<ReturnType<typeof beginAuthorizedHistory>>,
-  rollbackMessage: string,
-  apply: () => void,
-): void => {
-  try {
-    apply();
-    instance.history.end(token);
-  } catch (error) {
-    try {
-      instance.history.abort(token);
-    } catch (rollback) {
-      throw new AggregateError([error, rollback], rollbackMessage);
-    }
-    throw error;
-  }
-};
+  intents: AuthorizedIntentFactory,
+  write: () => void,
+): boolean =>
+  authorizedWrite({
+    store: instance.store,
+    history: instance.history,
+    intents,
+    origin: 'ribbon',
+    write,
+  }).ok;
 
 const runAllRowsColumns = (instance: SpreadsheetInstance): void => {
   const range = usedRangeForMacAutomation(instance);
-  const token = beginAuthorizedHistory(instance, (origin) =>
-    (['resizeRows', 'resizeColumns'] as const).map((operation) => ({
-      operation,
-      origin,
-      commandId: 'mac.automate.allRowsColumns',
-      effects: [{ kind: 'range' as const, range: { ...range } }],
-    })),
+  const shown = ribbonWrite(
+    instance,
+    (origin) =>
+      (['resizeRows', 'resizeColumns'] as const).map((operation) => ({
+        operation,
+        origin,
+        commandId: 'mac.automate.allRowsColumns',
+        effects: [{ kind: 'range' as const, range: { ...range } }],
+      })),
+    () => {
+      showRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+      showCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+    },
   );
-  if (!token) return;
-  commitOrAbort(instance, token, 'Show all rows and columns rollback failed.', () => {
-    showRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
-    showCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
-  });
+  if (!shown) return;
   markResult(instance, 'mac.automate.allRowsColumns', { range });
 };
 
@@ -746,15 +725,14 @@ const planHyperlinkRemoval = (instance: SpreadsheetInstance): HyperlinkRemovalPl
 const runRemoveHyperlinks = (instance: SpreadsheetInstance): void => {
   const plan = planHyperlinkRemoval(instance);
   if (!plan || plan.cells.length === 0) return;
-  const token = beginAuthorizedHistory(instance, (origin) => [
+  const intents: AuthorizedIntentFactory = (origin) => [
     {
       operation: 'hyperlink',
       origin,
       commandId: 'mac.automate.removeHyperlinks',
       effects: [{ kind: 'cells', cells: plan.cells }],
     },
-  ]);
-  if (!token) return;
+  ];
 
   const applyStoreRemoved = (): void => removeStoreHyperlinkFields(instance, plan.storeBefore);
   const restoreStoreBefore = (): void => restoreStoreHyperlinkFields(instance, plan.storeBefore);
@@ -795,10 +773,11 @@ const runRemoveHyperlinks = (instance: SpreadsheetInstance): void => {
     }
   };
 
-  commitOrAbort(instance, token, 'Remove hyperlinks history rollback failed.', () => {
+  const removed = ribbonWrite(instance, intents, () => {
     applyRemoved();
     instance.history.push({ undo: applyRestored, redo: applyRemoved });
   });
+  if (!removed) return;
   markResult(instance, 'mac.automate.removeHyperlinks', {
     removed: plan.removedAnchorCount,
     sheet: plan.sheet,
