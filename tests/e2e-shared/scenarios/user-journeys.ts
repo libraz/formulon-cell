@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const start = async (page: Page): Promise<UserJourneyPage> => {
@@ -257,7 +257,17 @@ export async function runMergedSummaryScenario(page: Page): Promise<void> {
     await page.keyboard.press('ArrowLeft');
     await expect(page.getByRole('textbox', { name: 'Name box', exact: true })).toHaveValue('A1');
     await page.keyboard.press('Shift+ArrowDown');
-    await expect(page.getByRole('textbox', { name: 'Name box', exact: true })).toHaveValue('A1:B2');
+    // The name box keeps showing the active cell; the range itself lives in the selection.
+    await expect(page.getByRole('textbox', { name: 'Name box', exact: true })).toHaveValue('A1');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState()
+              .selection.range,
+        ),
+      )
+      .toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
   });
 
   await test.step('AutoSum counts the merged balance once and places the total below the range', async () => {

@@ -1,7 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 
-import { SpreadsheetPage } from './SpreadsheetPage.js';
+import { gridCellCenter, SpreadsheetPage } from './SpreadsheetPage.js';
 
 export interface CellAddress {
   sheet: number;
@@ -234,10 +235,14 @@ export class UserJourneyPage extends SpreadsheetPage {
   }
 
   async insertCopiedCells(): Promise<void> {
-    await this.page
-      .locator('.fc-host__canvas')
-      .first()
-      .click({ button: 'right', position: { x: 200, y: 200 } });
+    // Right-click outside the selection moves the active cell, so open the menu on the active cell.
+    const active = await this.page.evaluate(
+      () =>
+        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().selection
+          .active,
+    );
+    const point = await gridCellCenter(this.page, active.row, active.col);
+    await this.page.mouse.click(point.x, point.y, { button: 'right' });
     const contextMenu = this.page.locator('.fc-ctxmenu').first();
     await expect(contextMenu).toBeVisible();
     await contextMenu.locator('[data-fc-action="insertCopiedCells"]').click();

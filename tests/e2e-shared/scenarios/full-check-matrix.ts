@@ -236,6 +236,14 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
         insertCopiedCells: string;
       };
       macContextMenu: { pasteSpecial: string };
+      macPasteSpecial: { title?: string };
+      macFilterPanel: {
+        search: string;
+        selectAll: string;
+        blanks: string;
+        apply: string;
+        clear: string;
+      };
       pasteSpecialDialog: { title: string; cancel: string };
       insertCopiedCellsDialog: { title: string; cancel: string };
       pasteOptions: {
@@ -256,10 +264,10 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       argHelper: { implicitIntersection: string };
       quickAnalysis: { title: string; actions: { dataBar: string } };
       errorMenu: { errorHeading: string; showInfo: string; ignore: string };
-      pivotTableDialog: { fieldList: string };
+      macErrorMenu: { divZeroHeading: string; help: string; ignore: string };
       slicer: { title: string; clear: string; close: string };
-      workbookObjects: { pivotBlankItem: string };
-      sessionCharts: { columnChart: string };
+      workbookObjects: { pivotBlankItem: string; pivotFieldList: string };
+      sessionCharts: { columnChart: string; elementsButton: string };
       ribbonDisplay: {
         label: string;
         expanded: string;
@@ -268,6 +276,7 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
         autoHide: string;
       };
     };
+    const mac = document.querySelector<HTMLElement>('.fc-host')?.dataset.fcPlatform === 'mac';
     return {
       home: strings.ribbon.tabs.home,
       profile: instance.workbook.spreadsheetProfileId?.() ?? null,
@@ -275,12 +284,12 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       copy: strings.contextMenu.copy,
       paste: strings.contextMenu.paste,
       // The Mac menu opens Paste Special as a submenu, so its label has no ellipsis.
-      pasteSpecial:
-        document.querySelector<HTMLElement>('.fc-host')?.dataset.fcPlatform === 'mac'
-          ? strings.macContextMenu.pasteSpecial
-          : strings.contextMenu.pasteSpecial,
+      pasteSpecial: mac ? strings.macContextMenu.pasteSpecial : strings.contextMenu.pasteSpecial,
       insertCopiedCells: strings.contextMenu.insertCopiedCells,
-      pasteSpecialTitle: strings.pasteSpecialDialog.title,
+      // The Mac host lays its own wording over the dialog's shared text.
+      pasteSpecialTitle: mac
+        ? (strings.macPasteSpecial.title ?? strings.pasteSpecialDialog.title)
+        : strings.pasteSpecialDialog.title,
       pasteCancel: strings.pasteSpecialDialog.cancel,
       insertCopiedTitle: strings.insertCopiedCellsDialog.title,
       insertCancel: strings.insertCopiedCellsDialog.cancel,
@@ -289,18 +298,20 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       pasteValues: strings.pasteOptions.values,
       pasteFormatting: strings.pasteOptions.formattingOnly,
       filterTitle: strings.filterDropdown.title,
-      filterSearch: strings.filterDropdown.searchPlaceholder,
-      filterSelectAll: strings.filterDropdown.selectAll,
-      filterBlanks: strings.filterDropdown.blanks,
-      filterApply: strings.filterDropdown.apply,
-      filterClear: strings.filterDropdown.clear,
+      // The Mac column filter panel carries its own wording.
+      filterSearch: mac ? strings.macFilterPanel.search : strings.filterDropdown.searchPlaceholder,
+      filterSelectAll: mac ? strings.macFilterPanel.selectAll : strings.filterDropdown.selectAll,
+      filterBlanks: mac ? strings.macFilterPanel.blanks : strings.filterDropdown.blanks,
+      filterApply: mac ? strings.macFilterPanel.apply : strings.filterDropdown.apply,
+      filterClear: mac ? strings.macFilterPanel.clear : strings.filterDropdown.clear,
       argHelperIntersection: strings.argHelper.implicitIntersection,
       quickTitle: strings.quickAnalysis.title,
       quickDataBar: strings.quickAnalysis.actions.dataBar,
-      errorHeading: strings.errorMenu.errorHeading,
-      errorShowInfo: strings.errorMenu.showInfo,
-      errorIgnore: strings.errorMenu.ignore,
-      pivotFieldList: strings.pivotTableDialog.fieldList,
+      // The Mac menu words the #DIV/0! rule itself.
+      errorHeading: mac ? strings.macErrorMenu.divZeroHeading : strings.errorMenu.errorHeading,
+      errorShowInfo: mac ? strings.macErrorMenu.help : strings.errorMenu.showInfo,
+      errorIgnore: mac ? strings.macErrorMenu.ignore : strings.errorMenu.ignore,
+      pivotFieldList: strings.workbookObjects.pivotFieldList,
       slicerTitle: strings.slicer.title,
       slicerClear: strings.slicer.clear,
       slicerClose: strings.slicer.close,
@@ -583,6 +594,23 @@ const cellCorner = async (
   );
 };
 
+/** Centre of the Mac error-check smart tag, or null until a frame has painted it. */
+const errorTagCenter = async (page: Page): Promise<{ x: number; y: number } | null> => {
+  const moduleUrl = `/@fs${
+    new URL('../../../packages/formulon-cell/src/render/grid/hit-state.ts', import.meta.url)
+      .pathname
+  }`;
+  return page.evaluate(async (nextModuleUrl) => {
+    const { gridHitState } = await import(nextModuleUrl);
+    const grid = document.querySelector<HTMLElement>('.fc-host__grid');
+    const canvas = document.querySelector<HTMLCanvasElement>('.fc-host__canvas');
+    const tag = grid ? gridHitState(grid).errorTag : null;
+    if (!tag || !canvas) return null;
+    const box = canvas.getBoundingClientRect();
+    return { x: box.x + tag.rect.x + tag.rect.w / 2, y: box.y + tag.rect.y + tag.rect.h / 2 };
+  }, moduleUrl);
+};
+
 const errorTriangleCenter = async (
   page: Page,
   row: number,
@@ -778,14 +806,12 @@ const runObjectsFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
     return instance.openActivePivotFieldList();
   });
   expect(opened).toBe(true);
-  const fieldList = page.locator('.fc-objects__pivot-field-list').first();
+  const fieldList = page.locator('.fc-objects--taskpane').first();
   await expect(fieldList).toBeVisible();
   let labels = await getStrings(page);
-  await expect(page.locator('.fc-objects__pivot-field-list-title').first()).toHaveText(
-    labels.pivotFieldList,
-  );
+  await expect(fieldList.locator('.fc-objects__title')).toHaveText(labels.pivotFieldList);
   await expect(
-    fieldList.locator('.fc-objects__pivot-field-list-item').filter({ hasText: 'Region' }),
+    fieldList.locator('.fc-pivotdlg__field-chip').filter({ hasText: 'Region' }),
   ).toBeVisible();
   await withinViewport(page, fieldList);
   await page.keyboard.press('Escape');
@@ -1043,6 +1069,9 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
     },
     { moduleUrl: autoFilterUrl, nextRange: range },
   );
+  // The Mac panel is titled by the column's header text.
+  const filterPanelLabel = (current: SurfaceLabels): string =>
+    row.platform === 'mac' ? 'Sales' : current.filterTitle;
   const openFilter = async (): Promise<void> => {
     await page.evaluate((nextRange) => {
       const instance = (window as ProbeWindow).__fcInst;
@@ -1054,7 +1083,7 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   const dropdown = page.locator('.fc-filter-dropdown:visible').first();
   await expect(dropdown).toBeVisible();
   let labels = await getStrings(page);
-  await expect(dropdown).toHaveAttribute('aria-label', labels.filterTitle);
+  await expect(dropdown).toHaveAttribute('aria-label', filterPanelLabel(labels));
   await expect(dropdown.locator('.fc-filter-dropdown__search')).toHaveAttribute(
     'placeholder',
     labels.filterSearch,
@@ -1069,13 +1098,18 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   // A floating filter is a live surface: changing the profile through the
   // host options must refresh its labels in place while preserving its
   // current range, criteria, and row visibility.
+  if (row.platform === 'mac') {
+    // The Mac panel floats over the host options panel, so it is closed first.
+    await page.keyboard.press('Escape');
+    await expect(dropdown).toBeHidden();
+  }
   await switchLocaleThroughDemoPanel(page, nextLocale);
   labels = await assertRuntime(page, { ...row, locale: nextLocale }, nextLocale);
   // The options panel rebuilds transient popups; verify the accepted locale on
   // a freshly opened filter surface before applying the condition.
   await openFilter();
   await expect(dropdown).toBeVisible();
-  await expect(dropdown).toHaveAttribute('aria-label', labels.filterTitle);
+  await expect(dropdown).toHaveAttribute('aria-label', filterPanelLabel(labels));
   await expect(dropdown.locator('.fc-filter-dropdown__search')).toHaveAttribute(
     'placeholder',
     labels.filterSearch,
@@ -1106,11 +1140,16 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await openFilter();
   await expect(dropdown).toBeVisible();
   await dropdown.locator('.fc-filter-dropdown__condition-op').selectOption('greaterThan');
-  await dropdown
-    .locator('.fc-filter-dropdown__condition-value')
-    .fill(localizedDecimal(nextLocale, 10));
-  await dropdown.locator('.fc-filter-dropdown__apply').click();
-  await expect(dropdown).toBeHidden();
+  const conditionValue = dropdown.locator('.fc-filter-dropdown__condition-value');
+  await conditionValue.fill(localizedDecimal(nextLocale, 10));
+  if (row.platform === 'mac') {
+    // Auto Apply is on: committing the value applies the filter and the panel stays open.
+    await conditionValue.press('Tab');
+    await expect(dropdown.locator('.fc-filter-dropdown__apply')).toBeDisabled();
+  } else {
+    await dropdown.locator('.fc-filter-dropdown__apply').click();
+    await expect(dropdown).toBeHidden();
+  }
   await expect.poll(async () => (await runtime(page)).filterRanges).toEqual([range]);
   await expect.poll(async () => (await runtime(page)).hiddenRows).toEqual([2, 5]);
   await expect
@@ -1126,10 +1165,14 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await openFilter();
   await expect(dropdown).toBeVisible();
   await dropdown.locator('.fc-filter-dropdown__clear').click();
-  await expect(dropdown).toBeHidden();
+  // The Mac panel stays open on the cleared column; the desktop panel closes.
+  if (row.platform === 'mac')
+    await expect(dropdown.locator('.fc-filter-dropdown__clear')).toBeDisabled();
+  else await expect(dropdown).toBeHidden();
   await expect.poll(async () => (await runtime(page)).hiddenRows).toEqual([]);
   await expect.poll(async () => (await runtime(page)).filterCriteria).toEqual([]);
-  await expect.poll(async () => (await runtime(page)).filterRanges).toEqual([]);
+  // Clear drops the criteria but keeps the filter buttons.
+  await expect.poll(async () => (await runtime(page)).filterRanges).toEqual([range]);
 
   await page.evaluate((nextRange) => {
     const instance = (window as ProbeWindow).__fcInst;
@@ -1277,16 +1320,22 @@ const runAnalysisFlow = async (page: Page, row: FullCheckRow): Promise<void> => 
       instance.openQuickAnalysis();
     });
   };
+  // The Mac profile has no Quick Analysis: the extension stays inert there.
+  const quickAvailable = row.platform !== 'mac';
   await openQuickAnalysis();
   // Locale changes rebuild the transient sheet. Ignore the detached old root
   // and always follow the visible, newly rendered quick-analysis surface.
   const quick = page.locator('.fc-quick:visible').first();
-  await expect(quick).toBeVisible();
   let labels = await getStrings(page);
-  await expect(quick.locator('.fc-quick__title')).toHaveText(labels.quickTitle);
-  await expect(quick.locator('.fc-quick__tab')).toHaveCount(5);
-  await expect(quick.locator('[data-action="format-data-bar"]')).toHaveText(labels.quickDataBar);
-  await withinViewport(page, quick);
+  if (quickAvailable) {
+    await expect(quick).toBeVisible();
+    await expect(quick.locator('.fc-quick__title')).toHaveText(labels.quickTitle);
+    await expect(quick.locator('.fc-quick__tab')).toHaveCount(5);
+    await expect(quick.locator('[data-action="format-data-bar"]')).toHaveText(labels.quickDataBar);
+    await withinViewport(page, quick);
+  } else {
+    await expect(page.locator('.fc-quick')).toHaveCount(0);
+  }
   await switchLocaleThroughDemoPanel(page, localeAfter(row.locale));
   labels = await assertRuntime(
     page,
@@ -1294,25 +1343,34 @@ const runAnalysisFlow = async (page: Page, row: FullCheckRow): Promise<void> => 
     localeAfter(row.locale),
   );
   await openQuickAnalysis();
-  await expect(quick.locator('.fc-quick__title')).toHaveText(labels.quickTitle);
-  await page.keyboard.press('Escape');
-  await expect(quick).toBeHidden();
-  await setSelection(page, range);
-  await openQuickAnalysis();
-  await expect(quick).toBeVisible();
-  const ruleCount = (await runtime(page)).conditionalRuleCount;
-  await quick.locator('[data-action="format-data-bar"]').click();
-  await expect
-    .poll(async () => (await runtime(page)).conditionalRuleCount)
-    .toBeGreaterThan(ruleCount);
-  const undone = await page.evaluate(() => {
-    const instance = (window as ProbeWindow).__fcInst;
-    if (!instance) throw new Error('full-check analysis undo requires __fcInst');
-    return (instance as BrowserInstance & { undo(): boolean }).undo();
-  });
-  expect(undone).toBe(true);
-  await expect.poll(async () => (await runtime(page)).conditionalRuleCount).toBe(ruleCount);
+  if (quickAvailable) {
+    await expect(quick.locator('.fc-quick__title')).toHaveText(labels.quickTitle);
+    await page.keyboard.press('Escape');
+    await expect(quick).toBeHidden();
+    await setSelection(page, range);
+    await openQuickAnalysis();
+    await expect(quick).toBeVisible();
+    const ruleCount = (await runtime(page)).conditionalRuleCount;
+    await quick.locator('[data-action="format-data-bar"]').click();
+    await expect
+      .poll(async () => (await runtime(page)).conditionalRuleCount)
+      .toBeGreaterThan(ruleCount);
+    const undone = await page.evaluate(() => {
+      const instance = (window as ProbeWindow).__fcInst;
+      if (!instance) throw new Error('full-check analysis undo requires __fcInst');
+      return (instance as BrowserInstance & { undo(): boolean }).undo();
+    });
+    expect(undone).toBe(true);
+    await expect.poll(async () => (await runtime(page)).conditionalRuleCount).toBe(ruleCount);
+  } else {
+    await expect(page.locator('.fc-quick')).toHaveCount(0);
+  }
 
+  // A selection frame grabs presses at its edge, so the pointer gestures below
+  // start from a selection far from both the drag origin and the marker.
+  const parkSelection = (): Promise<void> =>
+    setSelection(page, { sheet: 0, r0: 9, c0: 4, r1: 9, c1: 4 });
+  await parkSelection();
   const errorPoint = await errorTriangleCenter(page, 5, 0);
   const dragStart = await cellCorner(page, 0, 1);
   const ribbonBox = await page.locator('.fc-tb__ribbon-shell').first().boundingBox();
@@ -1329,6 +1387,7 @@ const runAnalysisFlow = async (page: Page, row: FullCheckRow): Promise<void> => 
   await page.mouse.move(errorPoint.x, errorPoint.y, { steps: 5 });
   await page.mouse.up();
   await expect(page.locator('.fc-errmenu:visible')).toHaveCount(0);
+  await parkSelection();
 
   // Leaving the marker while pressed disarms the hit. Returning before
   // release must remain a drag and still leave the menu closed.
@@ -1338,10 +1397,20 @@ const runAnalysisFlow = async (page: Page, row: FullCheckRow): Promise<void> => 
   await page.mouse.move(errorPoint.x, errorPoint.y, { steps: 5 });
   await page.mouse.up();
   await expect(page.locator('.fc-errmenu:visible')).toHaveCount(0);
+  await parkSelection();
 
   // The final physical click proves the legitimate marker path still opens
   // the localized menu after the drag guards have reset.
-  await page.mouse.click(errorPoint.x, errorPoint.y);
+  // The Mac triangle only marks its cell; the menu opens from the smart tag.
+  const openErrorMenu = async (): Promise<void> => {
+    await page.mouse.click(errorPoint.x, errorPoint.y);
+    if (row.platform !== 'mac') return;
+    await expect.poll(() => errorTagCenter(page)).not.toBeNull();
+    const tag = await errorTagCenter(page);
+    if (!tag) throw new Error('full-check error smart tag is missing');
+    await page.mouse.click(tag.x, tag.y);
+  };
+  await openErrorMenu();
   const errorMenu = page.locator('.fc-errmenu:visible').first();
   await expect(errorMenu).toBeVisible();
   labels = await getStrings(page);
@@ -1350,7 +1419,7 @@ const runAnalysisFlow = async (page: Page, row: FullCheckRow): Promise<void> => 
   await expect(errorMenu.locator('[data-fc-action="ignore"]')).toHaveText(labels.errorIgnore);
   await page.keyboard.press('Escape');
   await expect(errorMenu).toBeHidden();
-  await page.mouse.click(errorPoint.x, errorPoint.y);
+  await openErrorMenu();
   await expect(errorMenu).toBeVisible();
   await errorMenu.locator('[data-fc-action="ignore"]').click();
   await expect(errorMenu).toBeHidden();
@@ -1439,6 +1508,13 @@ const runMenusFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
     });
 
   await expect.poll(readDisplayMode).toEqual({ shell: 'full', toolbar: 'full' });
+  if (row.platform === 'mac') {
+    // Mac has no display-options button: pressing the active tab collapses the ribbon.
+    await expect(page.locator('[data-ribbon-toggle]')).toHaveCount(0);
+    await page.locator('[data-ribbon-tab][aria-selected="true"]').first().click();
+    await expect.poll(readDisplayMode).toEqual({ shell: 'tabsOnly', toolbar: 'tabsOnly' });
+    return;
+  }
   const displayToggle = page.locator('[data-ribbon-toggle]').first();
   await displayToggle.click();
   const displayMenu = page.locator('.fc-tb__ribbon-display-menu').first();
