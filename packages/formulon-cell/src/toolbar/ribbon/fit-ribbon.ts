@@ -249,7 +249,6 @@ const fitLabelToTwoLines = (label: HTMLElement): void => {
   label.style.width = `${width}px`;
 };
 
-/** Refit the active panel under `root` now and whenever `root` changes width. */
 /** The nearest ancestor of `el` that lays out a box, skipping `display: contents` wrappers. */
 const boxedAncestor = (el: HTMLElement): HTMLElement | null => {
   const view = el.ownerDocument.defaultView;
@@ -258,6 +257,7 @@ const boxedAncestor = (el: HTMLElement): HTMLElement | null => {
   return node;
 };
 
+/** Refit the active panel under `root` now and whenever `root` changes width. */
 export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): void } => {
   const refit = (): void => {
     const shell = root.querySelector<HTMLElement>(':scope > .fc-tb__ribbon-shell');
