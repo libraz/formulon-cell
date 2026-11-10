@@ -131,6 +131,9 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
     getValue(_addr: Addr) {
       return { kind: 'text' as const, value: 'かな' };
     },
+    showPhoneticCells(): Addr[] {
+      return [];
+    },
     cellXfIndices(sheet: number): { addr: Addr; xfIndex: number }[] {
       return [...xfIndices.entries()]
         .map(([key, xfIndex]) => {

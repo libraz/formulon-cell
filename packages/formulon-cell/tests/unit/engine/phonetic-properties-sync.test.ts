@@ -48,6 +48,7 @@ const makeFake = (
     getValue: () => ({ kind: 'text', value: '東京都' }) as CellValue,
     getCellXfIndex: () => 0,
     cellXfIndices: () => [],
+    showPhoneticCells: () => [],
     setCellXfIndex: () => true,
     getCellXf: () => null,
     getFontRecord: () => null,

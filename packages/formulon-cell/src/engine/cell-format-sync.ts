@@ -334,6 +334,11 @@ export function hydrateCellFormatsFromEngine(
     const key = addrKey(c.addr);
     xfByKey.set(key, { addr: c.addr, value: c.value, xfIndex: xfByKey.get(key)?.xfIndex ?? 0 });
   }
+  // A blank whose only state is the Show Phonetic flag is in neither list above.
+  for (const addr of wb.showPhoneticCells(sheet)) {
+    const key = addrKey(addr);
+    if (!xfByKey.has(key)) xfByKey.set(key, { addr, value: { kind: 'blank' }, xfIndex: 0 });
+  }
   for (const c of xfByKey.values()) {
     const phonetic = readPhoneticRuns(wb, c.addr, c.value);
     const xfIndex = c.xfIndex;

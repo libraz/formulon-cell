@@ -19,6 +19,7 @@ import type {
 } from '@libraz/formulon';
 import { isFormulonError } from './result.js';
 import type {
+  Addr,
   EngineCapabilities,
   PhoneticProperties,
   PhoneticPropertiesRead,
@@ -173,6 +174,15 @@ export abstract class WorkbookHandleAnnotationsMethods {
     assertAlive(this);
     if (!this.capabilities.showPhonetic) return null;
     return attemptRead(() => ws(this, sheet).getCellShowPhonetic(row, col));
+  }
+
+  /** Every stored cell on `sheet` whose "Show Phonetic" flag is on, blanks carrying only the flag
+   *  included, row-major. `[]` when the engine has no such surface or refuses. */
+  showPhoneticCells(sheet: number): readonly Addr[] {
+    assertAlive(this);
+    if (!this.capabilities.showPhonetic) return [];
+    const cells = attemptRead(() => ws(this, sheet).getShowPhoneticCells());
+    return cells ? cells.map((c) => ({ sheet, row: c.row, col: c.col })) : [];
   }
 
   /** Set the cell's "Show Phonetic" display flag. The engine keeps it on

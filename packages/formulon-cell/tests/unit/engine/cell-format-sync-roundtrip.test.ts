@@ -45,6 +45,9 @@ const makeEngine = (): {
         yield { addr: a, value: { kind: 'blank' } as never, formula: null };
       }
     },
+    showPhoneticCells(): Addr[] {
+      return [];
+    },
     cellXfIndices(sheet: number): { addr: Addr; xfIndex: number }[] {
       return [...cellXf.entries()]
         .map(([key, xfIndex]) => {

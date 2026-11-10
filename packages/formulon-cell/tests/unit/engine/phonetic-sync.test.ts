@@ -33,6 +33,7 @@ const makeFake = (opts: {
     },
     getCellXfIndex: () => 0,
     cellXfIndices: () => [],
+    showPhoneticCells: () => [],
     setCellXfIndex: () => true,
     getCellXf: () => null,
     getFontRecord: () => null,
