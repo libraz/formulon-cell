@@ -17,6 +17,8 @@ export default defineConfig({
       entry: {
         index: resolve(import.meta.dirname, 'src/index.ts'),
         'charts/index': resolve(import.meta.dirname, 'src/charts/index.ts'),
+        'toolbar/index': resolve(import.meta.dirname, 'src/toolbar/index.ts'),
+        'adapter/index': resolve(import.meta.dirname, 'src/adapter/index.ts'),
         'extensions/index': resolve(import.meta.dirname, 'src/extensions/index.ts'),
         'i18n/ja': resolve(import.meta.dirname, 'src/i18n/ja.ts'),
         'i18n/en': resolve(import.meta.dirname, 'src/i18n/en.ts'),
