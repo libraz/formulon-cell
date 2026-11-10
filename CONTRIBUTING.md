@@ -41,12 +41,13 @@ yarn lint             # Biome; yarn lint:fix applies fixes
 yarn typecheck
 ```
 
-End-to-end tests run Playwright against both demos:
+End-to-end tests run Playwright against both demos. Both demos share the same scenarios, so a local run takes every spec on the React demo and only the adapter-specific specs on the Vue demo (listed in `tests/e2e-shared/adapter-specs.ts`). CI runs every spec on both demos and both browsers.
 
 ```bash
-yarn test:e2e:install # once, to download the browsers
+yarn test:e2e:install      # once, to download the browsers
 yarn build:all
-yarn test:e2e
+yarn test:e2e              # React demo in full, Vue demo adapter-specific specs
+FC_E2E_FULL=1 yarn test:e2e  # every spec on both demos, as CI does
 ```
 
 ## What CI requires
@@ -55,7 +56,8 @@ A red check on your pull request is not a reason to hold it back; the maintainer
 
 | Workflow | Runs on | What it checks |
 | --- | --- | --- |
-| `ci.yml` (`build`) | pushes to `main` and pull requests to `main`, on Node 22 and 24 | `yarn lint`, `yarn build:all`, `yarn typecheck`, and the core unit tests with coverage |
+| `ci.yml` (`build`) | pushes to `main` and `develop`, and pull requests to them, on Node 22 and 24 | `yarn lint`, `yarn build:all`, `yarn typecheck`, and the core unit tests with coverage |
+| `ci.yml` (`e2e`) | the same events, one job per demo and browser | every end-to-end spec; not yet required while Linux-only differences are triaged |
 | `visual-baselines.yml` | started by hand | regenerates the visual regression snapshots |
 | `publish.yml` | version tags | publishes the three packages to npm |
 

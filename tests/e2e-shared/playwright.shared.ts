@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { ADAPTER_SPECS, PRIMARY_DEMO_APP, runFullE2E } from './adapter-specs.js';
 import type { DemoApp } from './types.js';
 
 const portFromEnv = (app: DemoApp): number => {
@@ -36,10 +37,15 @@ export function defineDemoAppConfig(app: DemoApp) {
     // Visual regression specs live under `e2e/visual/` and require a Linux
     // baseline. Normal e2e runs skip them; opt in with FC_VISUAL=1.
     testIgnore: process.env.FC_VISUAL ? [] : ['**/visual/**'],
+    // A secondary app runs only the adapter-specific specs unless the full run is requested.
+    ...(app.id === PRIMARY_DEMO_APP || runFullE2E()
+      ? {}
+      : { testMatch: ADAPTER_SPECS.map(({ spec }) => `**/${spec}`) }),
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    // Two workers: local machines are shared, and CI runners have four vCPUs.
+    workers: 2,
     reporter: process.env.CI ? [['github'], ['list']] : 'list',
     use: {
       baseURL,
