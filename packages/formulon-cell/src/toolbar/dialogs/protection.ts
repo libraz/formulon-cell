@@ -88,6 +88,20 @@ export interface AllowEditRangesManagerStrings {
   empty: string;
 }
 
+/** The commit buttons of the Windows layout: Cancel discards and Apply commits
+ *  without closing; Permissions... (Windows ACLs) stays disabled. */
+export interface AllowEditRangesManagerCommitStrings {
+  permissions: string;
+  protectSheet: string;
+  cancel: string;
+  apply: string;
+}
+
+/** How the manager closed: `commit` keeps the changes (OK, or Esc in the OK-only
+ *  layout), `discard` drops them (Cancel, Esc), `protectSheet` keeps them and
+ *  asks for Protect Sheet next. */
+export type AllowEditRangesManagerResult = 'commit' | 'discard' | 'protectSheet';
+
 export interface AllowEditRangesManagerRow {
   id: string;
   title: string;
@@ -406,8 +420,9 @@ export const showAllowEditRangeDialog = (
 
 /**
  * The Allow Users to Edit Ranges list: New, Modify and Delete act on the
- * selected row through the callbacks, and `rows` is re-read after each. Resolves
- * when the dialog is closed.
+ * selected row through the callbacks, and `rows` is re-read after each. With
+ * `commit` it takes the Windows layout (Permissions..., Protect Sheet..., OK,
+ * Cancel, Apply); without it, OK alone. Resolves with how it was closed.
  */
 export const showAllowEditRangesManagerDialog = (opts: {
   strings: AllowEditRangesManagerStrings;
@@ -415,8 +430,9 @@ export const showAllowEditRangesManagerDialog = (opts: {
   onNew: () => Promise<void>;
   onModify: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-}): Promise<void> =>
-  new Promise<void>((resolve) => {
+  commit?: { strings: AllowEditRangesManagerCommitStrings; onApply: () => void };
+}): Promise<AllowEditRangesManagerResult> =>
+  new Promise<AllowEditRangesManagerResult>((resolve) => {
     const { strings } = opts;
     const shell = createDialogShell({ title: strings.title, bodyVariant: 'app' });
     const list = document.createElement('div');
@@ -428,10 +444,24 @@ export const showAllowEditRangesManagerDialog = (opts: {
     const newBtn = appendDialogButton(shell.footer, { label: strings.newButton });
     const modifyBtn = appendDialogButton(shell.footer, { label: strings.modifyButton });
     const deleteBtn = appendDialogButton(shell.footer, { label: strings.deleteButton });
+    const commit = opts.commit;
+    const permissionsBtn = commit
+      ? appendDialogButton(shell.footer, { label: commit.strings.permissions })
+      : null;
+    if (permissionsBtn) projectDisabledState(permissionsBtn, true, null);
+    const protectBtn = commit
+      ? appendDialogButton(shell.footer, { label: commit.strings.protectSheet })
+      : null;
     const closeBtn = appendDialogButton(shell.footer, {
       label: strings.close,
       variant: 'primary',
     });
+    const cancelBtn = commit
+      ? appendDialogButton(shell.footer, { label: commit.strings.cancel })
+      : null;
+    const applyBtn = commit
+      ? appendDialogButton(shell.footer, { label: commit.strings.apply })
+      : null;
 
     let selected = '';
     const render = (): void => {
@@ -476,12 +506,15 @@ export const showAllowEditRangesManagerDialog = (opts: {
     modifyBtn.addEventListener('click', () => void run(() => opts.onModify(selected)));
     deleteBtn.addEventListener('click', () => void run(() => opts.onDelete(selected)));
 
-    const lifecycle = installDialogLifecycle<void>({
+    const lifecycle = installDialogLifecycle<AllowEditRangesManagerResult>({
       shell,
       resolve,
-      onCancel: () => undefined,
+      onCancel: () => (commit ? 'discard' : 'commit'),
     });
-    closeBtn.addEventListener('click', () => lifecycle.finish());
+    closeBtn.addEventListener('click', () => lifecycle.finish('commit'));
+    cancelBtn?.addEventListener('click', () => lifecycle.finish('discard'));
+    protectBtn?.addEventListener('click', () => lifecycle.finish('protectSheet'));
+    applyBtn?.addEventListener('click', () => commit?.onApply());
 
     render();
     mountDialog(shell, newBtn);

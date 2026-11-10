@@ -55,6 +55,8 @@ export {
   type AllowEditRangeDialogOptions,
   type AllowEditRangeDialogResult,
   type AllowEditRangeDialogStrings,
+  type AllowEditRangesManagerCommitStrings,
+  type AllowEditRangesManagerResult,
   type AllowEditRangesManagerRow,
   type AllowEditRangesManagerStrings,
   type ProtectSheetDialogResult,

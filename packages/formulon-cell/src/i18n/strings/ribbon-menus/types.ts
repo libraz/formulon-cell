@@ -376,6 +376,9 @@ export interface RibbonMenusStrings {
     allowEditRangesModifyButton: string;
     allowEditRangesDeleteButton: string;
     allowEditRangesEmpty: string;
+    allowEditRangesPermissionsButton: string;
+    allowEditRangesProtectSheetButton: string;
+    allowEditRangesApplyButton: string;
     protectWorkbookDialogTitle: string;
     unprotectWorkbookDialogTitle: string;
     allowedEditRangeAddedStatus: string;

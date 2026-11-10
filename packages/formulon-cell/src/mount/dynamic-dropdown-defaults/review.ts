@@ -6,6 +6,7 @@ import {
   isSheetProtected,
   isWorkbookStructureProtected,
   protectedSheetPermissions,
+  protectionCheckpoint,
   removeAllowedEditRange,
   setWorkbookStructureProtected,
   sheetHasPassword,
@@ -27,6 +28,7 @@ import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { showMessage } from '../../toolbar/dialogs/prompt.js';
 import {
+  type AllowEditRangesManagerResult,
   showAllowEditRangeDialog,
   showAllowEditRangesManagerDialog,
   showProtectSheetDialog,
@@ -102,8 +104,11 @@ const unlockAllowedRange = (instance: SpreadsheetInstance, id: string): Promise<
   );
 
 /** The Allow Users to Edit Ranges list for the active sheet, with New, Modify
- *  and Delete. Changing or deleting a password-guarded range asks for its password. */
-const openAllowEditRangesManager = async (instance: SpreadsheetInstance): Promise<void> => {
+ *  and Delete. Changing or deleting a password-guarded range asks for its password.
+ *  The Windows layout's Cancel puts back the ranges as of opening or the last Apply. */
+const openAllowEditRangesManager = async (
+  instance: SpreadsheetInstance,
+): Promise<AllowEditRangesManagerResult> => {
   const strings = instance.i18n.strings;
   const menu = strings.ribbonMenu;
   const sheet = (): number => instance.store.getState().data.sheetIndex;
@@ -165,7 +170,9 @@ const openAllowEditRangesManager = async (instance: SpreadsheetInstance): Promis
     }
   };
   const guard = (id: string): Promise<boolean> => unlockAllowedRange(instance, id);
-  await showAllowEditRangesManagerDialog({
+  let restore = protectionCheckpoint(instance.store, instance.workbook);
+  const mac = instance.host.dataset.fcPlatform === 'mac';
+  const result = await showAllowEditRangesManagerDialog({
     strings: {
       title: menu.allowEditRangesDialogTitle,
       newButton: menu.allowEditRangesNewButton,
@@ -189,7 +196,24 @@ const openAllowEditRangesManager = async (instance: SpreadsheetInstance): Promis
         removeAllowedEditRange(instance.store, id, { workbook: instance.workbook });
       }
     },
+    ...(mac
+      ? {}
+      : {
+          commit: {
+            strings: {
+              permissions: menu.allowEditRangesPermissionsButton,
+              protectSheet: menu.allowEditRangesProtectSheetButton,
+              cancel: strings.pageSetup.cancel,
+              apply: menu.allowEditRangesApplyButton,
+            },
+            onApply: () => {
+              restore = protectionCheckpoint(instance.store, instance.workbook);
+            },
+          },
+        }),
   });
+  if (result === 'discard') restore();
+  return result;
 };
 
 const buildProtectAction =
@@ -343,7 +367,10 @@ const buildProtectAction =
         return;
       }
       if (action === 'allow-edit-ranges') {
-        await openAllowEditRangesManager(instance);
+        if ((await openAllowEditRangesManager(instance)) === 'protectSheet') {
+          await buildProtectAction(instance)('protect-sheet');
+          return;
+        }
         instance.host.focus();
         return;
       }
