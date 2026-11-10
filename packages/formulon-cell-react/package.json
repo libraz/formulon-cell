@@ -24,12 +24,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./toolbar.css": "./src/spreadsheet-toolbar.css",
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "src/spreadsheet-toolbar.css",
     "LICENSE",
     "README.md"
   ],
