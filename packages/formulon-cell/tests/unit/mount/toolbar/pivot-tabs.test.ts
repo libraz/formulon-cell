@@ -47,7 +47,13 @@ describe('PivotTable tabs of the ribbon', () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
     expect(tabIds()).not.toContain('pivotAnalyze');
     const result = createPivotTableAtPlacement(
-      { store, workbook: sheet.workbook, history: sheet.instance.history },
+      {
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        store,
+        workbook: sheet.workbook,
+        history: sheet.instance.history,
+      },
       { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
       { row: 8, col: 4 },
     );
@@ -63,7 +69,13 @@ describe('PivotTable tabs of the ribbon', () => {
     const store = sheet.instance.store;
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
     createPivotTableAtPlacement(
-      { store, workbook: sheet.workbook, history: sheet.instance.history },
+      {
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        store,
+        workbook: sheet.workbook,
+        history: sheet.instance.history,
+      },
       { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
       { row: 8, col: 4 },
     );
@@ -91,7 +103,13 @@ describe('PivotTable tabs of the ribbon', () => {
       helpers: stubHelpers(),
     });
     createPivotTableAtPlacement(
-      { store, workbook: sheet.workbook, history: sheet.instance.history },
+      {
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        store,
+        workbook: sheet.workbook,
+        history: sheet.instance.history,
+      },
       { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
       { row: 8, col: 4 },
     );
@@ -113,7 +131,13 @@ describe('PivotTable tabs of the ribbon', () => {
     const store = sheet.instance.store;
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
     createPivotTableAtPlacement(
-      { store, workbook: sheet.workbook, history: sheet.instance.history },
+      {
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        store,
+        workbook: sheet.workbook,
+        history: sheet.instance.history,
+      },
       { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
       { row: 8, col: 4 },
     );

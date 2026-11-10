@@ -29,7 +29,12 @@ const setup = async () => {
   expect(created.ok).toBe(true);
   const store = createSpreadsheetStore();
   const history = new History();
-  return { wb, store, history, deps: { store, workbook: wb, history } };
+  return {
+    wb,
+    store,
+    history,
+    deps: { store, workbook: wb, history, origin: 'ribbon' as const, commandId: 'pivotMove' },
+  };
 };
 
 const boundsOf = (wb: WorkbookHandle, sheet: number) =>

@@ -1,4 +1,5 @@
 import type { History } from '../commands/history.js';
+import type { PivotAuthorization } from '../commands/pivot-actions.js';
 import { applyPivotEdit } from '../commands/pivot-edit.js';
 import { PivotAxis, PivotReportLayout } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -52,7 +53,7 @@ const LIST_MIN_HEIGHT = 44;
 const LIST_MAX_HEIGHT = 600;
 const LIST_KEY_STEP = 22;
 
-export interface PivotFieldPaneContext {
+export interface PivotFieldPaneContext extends PivotAuthorization {
   host: HTMLElement;
   wb: WorkbookHandle;
   strings: Strings;

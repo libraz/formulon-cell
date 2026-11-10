@@ -20,6 +20,7 @@ import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialog
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
 import type { SheetRange } from '../wrappers/toolbar-types.js';
+import { type DialogEntry, INSTANCE_API_PIVOT_TABLE_ENTRY } from './dialog-entry.js';
 import {
   appendDialogActions,
   appendDialogFrame,
@@ -43,6 +44,8 @@ export interface PivotTableDialogDeps {
 
 export interface PivotTableDialogOpenOptions {
   placement?: 'new' | 'existing';
+  /** Who opened the dialog; the instance API when absent. */
+  entry?: DialogEntry;
 }
 
 export interface PivotTableDialogHandle {
@@ -454,6 +457,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     shell.close();
   };
 
+  let dialogEntry: DialogEntry = INSTANCE_API_PIVOT_TABLE_ENTRY;
   const onSubmit = (e: SubmitEvent): void => {
     e.preventDefault();
     const range = rangeFromSourceInput();
@@ -476,7 +480,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     const placement = dest ?? 'new-sheet';
     const result = mac
       ? createPivotTableAtPlacement(
-          { store, workbook: wb, history: deps.history },
+          { store, workbook: wb, history: deps.history, ...dialogEntry },
           { source: range, name: nameInput.value, rowField: '', valueField: '' },
           placement,
         )
@@ -504,7 +508,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       numberFormat: numberFormatInput.value,
     });
     return createPivotTableAtPlacement(
-      { store, workbook: wb, history: deps.history },
+      { store, workbook: wb, history: deps.history, ...dialogEntry },
       {
         source: range,
         name: nameInput.value,
@@ -572,6 +576,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   return {
     open(opts = {}) {
+      dialogEntry = opts.entry ?? INSTANCE_API_PIVOT_TABLE_ENTRY;
       mac = isMacHost(host);
       if (mac) destInput.value = '';
       tableRangeInput.checked = true;

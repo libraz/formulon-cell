@@ -4,6 +4,7 @@ import { PivotAggregation, PivotAxis } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
+import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const setup = async (valueFields = ['Sales', 'Qty']) => {
   const wb = await WorkbookHandle.createDefault();
@@ -41,7 +42,12 @@ describe('PivotTable editors against the engine', () => {
   });
 
   const open = (wb: WorkbookHandle) => {
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
       .find((el) => el.textContent === en.workbookObjects.editPivotTable)
@@ -52,7 +58,12 @@ describe('PivotTable editors against the engine', () => {
   };
 
   const openFieldList = (wb: WorkbookHandle) => {
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     expect(handle.openPivotFieldList(0, 0)).toBe(true);
     const tick = (field: string, checked: boolean): void => {
       const check = host.querySelector<HTMLInputElement>(

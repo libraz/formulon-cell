@@ -4,6 +4,7 @@ import {
   disposeDataTableDialog,
   openDataTableDialog,
 } from '../../../interact/data-table-dialog.js';
+import { openPivotTableDialogFrom } from '../../../interact/dialog-entry.js';
 import {
   disposeMacConsolidateDialog,
   openMacConsolidateDialog,
@@ -135,7 +136,11 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
   });
 
   const actions: Record<string, MacRibbonAction> = {
-    'mac.insert.pivotTable': () => instance.openPivotTableDialog(),
+    'mac.insert.pivotTable': () =>
+      openPivotTableDialogFrom(instance.store, undefined, {
+        origin: 'ribbon',
+        commandId: 'mac.insert.pivotTable',
+      }),
     'mac.insert.sparkline': () => sparkline.open(),
     'mac.insert.slicer': () => slicer.open(),
     'mac.formulas.insertFunction': () => instance.openFunctionArguments(),

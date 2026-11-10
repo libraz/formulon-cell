@@ -1,5 +1,4 @@
-import type { History } from '../commands/history.js';
-import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { pivotReportEffects, pivotWrite } from '../commands/pivot-actions.js';
 import type { Strings } from '../i18n/strings.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -11,6 +10,7 @@ import {
   deferInitialFocus,
   focusAndSelectInput,
 } from './dialog-shell.js';
+import type { PivotCommitContext } from './pivot-field-settings-dialog-apply.js';
 
 export interface PivotOptionsDialogOptions {
   host: HTMLElement;
@@ -373,7 +373,7 @@ export const showPivotOptionsDialog = (
 
 /** Renames the report as one undo step; an empty or unchanged name does nothing. */
 export function applyPivotOptions(
-  ctx: { wb: WorkbookHandle; history?: History | null; onChanged(): void },
+  ctx: PivotCommitContext,
   sheetIndex: number,
   pivotIndex: number,
   previous: string,
@@ -381,6 +381,22 @@ export function applyPivotOptions(
 ): boolean {
   const next = result.name.trim();
   if (!next || next === previous) return true;
+  return pivotWrite(
+    ctx,
+    ctx.history,
+    pivotReportEffects(ctx.wb, sheetIndex, pivotIndex),
+    false,
+    () => renamePivot(ctx, sheetIndex, pivotIndex, previous, next),
+  );
+}
+
+const renamePivot = (
+  ctx: PivotCommitContext,
+  sheetIndex: number,
+  pivotIndex: number,
+  previous: string,
+  next: string,
+): boolean => {
   const { wb } = ctx;
   if (!wb.renamePivotTable(sheetIndex, pivotIndex, next)) return false;
   const history = ctx.history && !ctx.history.isReplaying() ? ctx.history : null;
@@ -396,17 +412,11 @@ export function applyPivotOptions(
   });
   ctx.onChanged();
   return true;
-}
+};
 
 /** Opens the dialog on a report and applies the result. */
 export function openPivotOptions(
-  ctx: {
-    host: HTMLElement;
-    strings: Strings;
-    wb: WorkbookHandle;
-    history?: History | null;
-    onChanged(): void;
-  },
+  ctx: PivotCommitContext & { host: HTMLElement; strings: Strings },
   sheetIndex: number,
   pivotIndex: number,
 ): Promise<boolean> {

@@ -155,7 +155,14 @@ describe('pivot definition read-back', () => {
       workbookStructureProtectedBlocked: 'Protected',
     };
     expect(
-      executeRibbonPivotTableAction({ store, workbook: wb, action: 'refresh', strings }),
+      executeRibbonPivotTableAction({
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        store,
+        workbook: wb,
+        action: 'refresh',
+        strings,
+      }),
     ).toEqual({ kind: 'refreshed', sheet: first.sheetIndex });
     wb.dispose();
   });

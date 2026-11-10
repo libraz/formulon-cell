@@ -204,7 +204,11 @@ describe('pivot field removal', () => {
     const range = wb.pivotBounds(SHEET)[0]?.range;
     if (!range) throw new Error('report has no extent');
     expect(
-      deletePivotTables({ store, workbook: wb, history }, SHEET, [{ pivotIndex: 0, range }]),
+      deletePivotTables(
+        { origin: 'ribbon' as const, commandId: 'test', store, workbook: wb, history },
+        SHEET,
+        [{ pivotIndex: 0, range }],
+      ),
     ).toBe(true);
     expect(wb.getPivotTables()).toEqual([]);
     expect(history.undo()).toBe(true);

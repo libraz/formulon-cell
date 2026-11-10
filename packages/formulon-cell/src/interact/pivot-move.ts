@@ -1,16 +1,23 @@
 import type { History } from '../commands/history.js';
+import type { OperationEffect } from '../commands/interaction-policy.js';
+import {
+  type PivotAuthorization,
+  pivotReportRange,
+  pivotWrite,
+} from '../commands/pivot-actions.js';
 import {
   PIVOT_NEW_SHEET_ANCHOR,
   recreatePivotTable,
   refreshPivotReportsAfterEdit,
 } from '../commands/pivot-table.js';
 import { addSheet, moveSheet } from '../commands/sheet-mutate.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import { PivotAxis, type Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { commitPivotChange } from './pivot-field-settings-dialog-apply.js';
 
-export interface MovePivotDeps {
+export interface MovePivotDeps extends PivotAuthorization {
   store: SpreadsheetStore;
   workbook: WorkbookHandle;
   history?: History | null;
@@ -24,6 +31,32 @@ export type PivotMoveTarget = { sheet: number; row: number; col: number } | 'new
  *  `target` is where its top-left lands. Returns the extent it occupies
  *  afterwards, or null when nothing moved. */
 export function movePivotTable(
+  deps: MovePivotDeps,
+  source: { sheet: number; pivotIndex: number },
+  target: PivotMoveTarget,
+): Range | null {
+  const { workbook: wb } = deps;
+  const bounds = pivotReportRange(wb, source.sheet, source.pivotIndex);
+  if (!bounds) return null;
+  const effects: OperationEffect[] = [{ kind: 'range', range: bounds }];
+  if (target !== 'new-sheet') {
+    effects.push({
+      kind: 'range',
+      range: {
+        sheet: target.sheet,
+        r0: target.row,
+        c0: target.col,
+        r1: Math.min(MAX_ROW, target.row + bounds.r1 - bounds.r0),
+        c1: Math.min(MAX_COL, target.col + bounds.c1 - bounds.c0),
+      },
+    });
+  }
+  return pivotWrite(deps, deps.history, effects, null, () => moveReport(deps, source, target), {
+    addsSheet: target === 'new-sheet',
+  });
+}
+
+function moveReport(
   deps: MovePivotDeps,
   source: { sheet: number; pivotIndex: number },
   target: PivotMoveTarget,
@@ -44,6 +77,9 @@ export function movePivotTable(
     const ctx = {
       wb,
       history,
+      store: deps.store,
+      origin: deps.origin,
+      commandId: deps.commandId,
       onChanged: () => {
         refreshPivotReportsAfterEdit(store, wb);
       },

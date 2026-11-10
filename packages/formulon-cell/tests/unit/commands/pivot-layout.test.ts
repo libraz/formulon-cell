@@ -15,6 +15,7 @@ import {
 import { PivotAxis, PivotReportLayout } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { commitPivotChange } from '../../../src/interact/pivot-field-settings-dialog-apply.js';
+import { createSpreadsheetStore } from '../../../src/store/store.js';
 import { loadFixture } from '../engine/pivot-excel-parity/fixture.js';
 
 // ja_c0_rows.xlsx: PivotTable1 at A3:C7 on the first sheet, Region on rows,
@@ -25,7 +26,19 @@ describe('PivotTable layout commands', () => {
   let wb: WorkbookHandle;
   let history: History;
   const commit = (apply: () => boolean): boolean =>
-    commitPivotChange({ wb, history, onChanged: () => {} }, 0, 0, apply);
+    commitPivotChange(
+      {
+        store: createSpreadsheetStore(),
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        wb,
+        history,
+        onChanged: () => {},
+      },
+      0,
+      0,
+      apply,
+    );
   const definition = () => wb.getPivotDefinition(0, 0);
 
   beforeEach(async () => {

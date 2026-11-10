@@ -17,6 +17,7 @@ import type {
   PermissionDecision,
 } from '../commands/interaction-policy.js';
 import { mergeAt } from '../commands/merge.js';
+import { pivotReportEffects, pivotWrite } from '../commands/pivot-actions.js';
 import { refreshPivotTable } from '../commands/pivot-table.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { executeNoteVisibilityAction } from '../commands/ribbon-comment.js';
@@ -1369,10 +1370,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'pivotRefresh': {
         if (!activePivot) return;
-        const result = refreshPivotTable(wb, {
-          sheet: activePivot.sheet,
-          pivotIndex: activePivot.pivotIndex,
-        });
+        const pivot = activePivot;
+        const result = pivotWrite(
+          { store, origin: 'contextMenu', commandId: 'pivotRefresh' },
+          history,
+          pivotReportEffects(wb, pivot.sheet, pivot.pivotIndex),
+          { ok: false } as ReturnType<typeof refreshPivotTable>,
+          () => refreshPivotTable(wb, { sheet: pivot.sheet, pivotIndex: pivot.pivotIndex }),
+        );
         if (result.ok) refreshPivotCells(activePivot.sheet);
         return;
       }

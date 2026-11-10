@@ -111,7 +111,13 @@ export const mountPivotSheet = async (locale: 'en' | 'ja' = 'en'): Promise<Mount
   const sheet = await mountStubSheet({ locale, workbook });
   mutators.replaceCells(sheet.instance.store, workbook.cells(0));
   createPivotTableAtPlacement(
-    { store: sheet.instance.store, workbook, history: sheet.instance.history },
+    {
+      origin: 'ribbon' as const,
+      commandId: 'test',
+      store: sheet.instance.store,
+      workbook,
+      history: sheet.instance.history,
+    },
     { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
     { row: 8, col: 4 },
   );

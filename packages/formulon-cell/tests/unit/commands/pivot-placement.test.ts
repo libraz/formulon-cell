@@ -73,7 +73,7 @@ describe('new-sheet placement', () => {
     expect(wb.addSheet('Sheet1')).toBe(1);
     // Source stays on the first sheet; the new sheet lands left of it.
     const result = createPivotTableAtPlacement(
-      { store, workbook: wb },
+      { origin: 'ribbon' as const, commandId: 'test', store, workbook: wb },
       { source: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 }, rowField: 'Region', valueField: 'Sales' },
       'new-sheet',
     );
@@ -86,7 +86,7 @@ describe('new-sheet placement', () => {
     const { wb, store } = await setup();
     const history = new History();
     const result = createPivotTableAtPlacement(
-      { store, workbook: wb, history },
+      { origin: 'ribbon' as const, commandId: 'test', store, workbook: wb, history },
       {
         source: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 },
         rowField: 'Region',
@@ -113,7 +113,7 @@ describe('new-sheet placement', () => {
     const { wb, store } = await setup();
     const history = new History();
     const result = createPivotTableAtPlacement(
-      { store, workbook: wb, history },
+      { origin: 'ribbon' as const, commandId: 'test', store, workbook: wb, history },
       {
         source: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 },
         rowField: 'Region',
@@ -132,7 +132,7 @@ describe('new-sheet placement', () => {
     const { wb, store } = await setup();
     const history = new History();
     const result = createPivotTableAtPlacement(
-      { store, workbook: wb, history },
+      { origin: 'ribbon' as const, commandId: 'test', store, workbook: wb, history },
       {
         source: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 },
         rowField: 'Missing',
@@ -154,6 +154,8 @@ describe('ribbon one-click', () => {
     expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
     mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
     const result = executeRibbonPivotTableAction({
+      origin: 'ribbon' as const,
+      commandId: 'test',
       store,
       workbook: wb,
       action: 'new-sheet',
@@ -177,6 +179,8 @@ describe('ribbon one-click', () => {
     const { wb, store } = await setup();
     mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
     executeRibbonPivotTableAction({
+      origin: 'ribbon' as const,
+      commandId: 'test',
       store,
       workbook: wb,
       action: 'new-sheet',
@@ -197,6 +201,8 @@ describe('ribbon one-click', () => {
     setWorkbookStructureProtected(store, true);
     mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
     const result = executeRibbonPivotTableAction({
+      origin: 'ribbon' as const,
+      commandId: 'test',
       store,
       workbook: wb,
       action: 'new-sheet',

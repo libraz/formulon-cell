@@ -17,6 +17,7 @@ import {
   buildSpreadsheetCompatibilityReport,
 } from '../../../src/interact/workbook-objects.js';
 import type { SessionIllustration } from '../../../src/store/store.js';
+import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -57,6 +58,7 @@ const wbWithObjects = () => {
     ],
     getPivotDefinition: () => null,
     getPivotField: () => null,
+    pivotBounds: () => [],
     getPivotTables: () => [
       {
         sheetIndex: 0,
@@ -227,7 +229,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('lists preserved OOXML categories, paths, and table names', () => {
     const { wb } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
 
     expect(host.textContent).toContain('Workbook Objects');
@@ -266,6 +273,7 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('lists session illustrations supplied by the host feature', () => {
     const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
       strings: en,
@@ -297,6 +305,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('updates editable session shape appearance from the illustrations section', () => {
     const onUpdateSessionIllustration = vi.fn();
     const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
       strings: en,
@@ -370,6 +379,7 @@ describe('attachWorkbookObjectsPanel', () => {
       },
     ];
     const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
       strings: en,
@@ -417,6 +427,7 @@ describe('attachWorkbookObjectsPanel', () => {
     const onDuplicateSessionIllustration = vi.fn();
     const onClearSessionIllustration = vi.fn();
     const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
       strings: en,
@@ -449,6 +460,7 @@ describe('attachWorkbookObjectsPanel', () => {
     let illustrations: SessionIllustration[] = [];
     const listeners = new Set<() => void>();
     const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
       strings: en,
@@ -489,6 +501,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('opens the PivotTable creation flow from pivot details when supplied', () => {
     let opened = 0;
     const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
       host,
       wb: wbWithObjects().wb,
       strings: en,
@@ -511,6 +524,7 @@ describe('attachWorkbookObjectsPanel', () => {
     const { wb, calls } = wbWithObjects();
     const onAfterPivotEdit = vi.fn();
     const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
       host,
       wb,
       strings: en,
@@ -546,7 +560,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('updates the PivotTable report layout from workbook object details', () => {
     const { wb, calls } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
 
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
@@ -568,7 +587,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('edits existing PivotTable field axis assignments', () => {
     const { wb, calls } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
       el.textContent?.includes('Edit'),
@@ -623,7 +647,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('updates row and column field order when editing axes', () => {
     const { wb, calls } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
       el.textContent?.includes('Edit'),
@@ -647,7 +676,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('opens an existing PivotTable Field List without the general edit controls', () => {
     const { wb, calls } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     const fieldList = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
       el.textContent?.includes('PivotTable Fields'),
@@ -724,7 +758,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('takes a field out of the report when its Field List box is unticked', () => {
     const { wb, calls } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     expect(handle.openPivotFieldList(0, 0)).toBe(true);
     const check = host.querySelector<HTMLInputElement>('[data-pivot-field-list-field="Sales"]');
     if (!check) throw new Error('missing field list checkbox');
@@ -741,7 +780,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('opens an existing PivotTable Field List through the shared panel handle', () => {
     const { wb } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
 
     expect(handle.openPivotFieldList(0, 0)).toBe(true);
     expect(host.querySelector('.fc-objects')?.classList.contains('fc-objects--taskpane')).toBe(
@@ -756,7 +800,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('edits existing PivotTable value aggregation and number format', () => {
     const { wb, calls, dataSpecs } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
       el.textContent?.includes('Edit'),
@@ -785,7 +834,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('edits existing PivotTable filter item visibility list', () => {
     const { wb, calls } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
       el.textContent?.includes('Edit'),
@@ -814,7 +868,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('names a cache-backed item by index and falls back to its label without one', () => {
     const { wb, calls } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
       el.textContent?.includes('Edit'),
@@ -849,7 +908,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('edits existing PivotTable filter conditions with the shared condition model', () => {
     const { wb, calls } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
       el.textContent?.includes('Edit'),
@@ -889,7 +953,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('opens the shared PivotTable filter dialog from existing PivotTable edit', async () => {
     const { wb } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
       el.textContent?.includes('Edit'),
@@ -949,7 +1018,12 @@ describe('attachWorkbookObjectsPanel', () => {
         ],
       },
     ];
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+    });
     handle.open();
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
       el.textContent?.includes('Edit'),
@@ -973,7 +1047,12 @@ describe('attachWorkbookObjectsPanel', () => {
   });
 
   it('refreshes when locale or workbook changes while open', () => {
-    const handle = attachWorkbookObjectsPanel({ host, wb: emptyWb(), strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb: emptyWb(),
+      strings: en,
+    });
     handle.open();
     expect(host.textContent).toContain('No preserved charts');
 
@@ -992,7 +1071,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('Escape closes the panel and restores focus to the opener', () => {
     host.tabIndex = -1;
-    const handle = attachWorkbookObjectsPanel({ host, wb: emptyWb(), strings: en });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb: emptyWb(),
+      strings: en,
+    });
     host.focus();
     handle.open();
     const root = host.querySelector<HTMLElement>('.fc-objects');

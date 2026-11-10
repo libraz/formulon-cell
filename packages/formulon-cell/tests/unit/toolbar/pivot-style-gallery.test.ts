@@ -23,7 +23,7 @@ const setup = async () => {
   mutators.replaceCells(store, wb.cells(0));
   const history = new History();
   createPivotTableAtPlacement(
-    { store, workbook: wb, history },
+    { origin: 'ribbon' as const, commandId: 'test', store, workbook: wb, history },
     { source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
     { row: 8, col: 4 },
   );

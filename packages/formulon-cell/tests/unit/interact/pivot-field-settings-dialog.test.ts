@@ -5,7 +5,7 @@ import { PivotAggregation, PivotAxis, PivotShowValuesAs } from '../../../src/eng
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
-import { mutators } from '../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 import { mountStubSheet } from '../../test-utils/index.js';
 import { loadFixture, pivotGrid } from '../engine/pivot-excel-parity/fixture.js';
 
@@ -49,7 +49,13 @@ describe('PivotTable Field dialog', () => {
   });
 
   const openPane = (wb: WorkbookHandle, strings = en, history: History | null = null) => {
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings, history });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings,
+      history,
+    });
     expect(handle.openPivotFieldList(0, 0)).toBe(true);
     return handle;
   };
@@ -419,7 +425,12 @@ describe('PivotTable Field dialog', () => {
     if (!spec) throw new Error('missing data field');
     expect(spec.name).toBe('Summe von Amt');
     expect(wb.setPivotDataField(sheetIndex, 0, 0, { ...spec, numberFormat: '#,##0.0' })).toBe(true);
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: ja });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: ja,
+    });
     expect(handle.openPivotFieldList(sheetIndex, 0)).toBe(true);
     const change = async (aggregation: number): Promise<string> => {
       host
@@ -461,7 +472,12 @@ describe('PivotTable Field dialog', () => {
   it('keeps a name typed in the dialog across a function change', async () => {
     const wb = await loadFixture('ja_c0_rows.xlsx');
     const sheetIndex = wb.getPivotTables()[0]?.sheetIndex ?? 0;
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: ja });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: ja,
+    });
     expect(handle.openPivotFieldList(sheetIndex, 0)).toBe(true);
     host
       .querySelector<HTMLButtonElement>('[data-pivot-area="values"] .fc-pivotdlg__area-settings')

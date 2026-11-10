@@ -55,8 +55,8 @@ export interface WorkbookObjectsPanelDeps {
   /** The host's task-pane dock beside the grid. The PivotTable Fields pane
    *  docks there; without one it floats over the right edge of `host`. */
   dock?: HTMLElement;
-  /** Lets the PivotTable Field dialog open Format Cells for a number format. */
-  store?: SpreadsheetStore;
+  /** Authorizes pivot edits; also lets the PivotTable Field dialog open Format Cells. */
+  store: SpreadsheetStore;
   getLocale?: () => string;
   onOpenPivotTableDialog?: () => void;
   onAfterPivotEdit?: () => void;
@@ -326,6 +326,10 @@ export function attachWorkbookObjectsPanel(
     host,
     wb,
     strings,
+    history: deps.history ?? null,
+    store: deps.store,
+    origin: 'ribbon',
+    commandId: 'pivotFieldList',
     errorText: pivotEditError,
     setError: (message) => {
       pivotEditError = message;
@@ -388,6 +392,9 @@ export function attachWorkbookObjectsPanel(
             wb,
             strings,
             history: deps.history ?? null,
+            store: deps.store,
+            origin: 'ribbon',
+            commandId: 'pivotFieldList',
             state: pivotPaneState,
             errorText: pivotEditError,
             setError: (message) => {
@@ -667,6 +674,9 @@ export function attachWorkbookObjectsPanel(
           strings,
           wb,
           history: deps.history ?? null,
+          store: deps.store,
+          origin: 'ribbon',
+          commandId: 'pivotFieldSettings',
           ...(numberFormatPicker ? { pickNumberFormat: numberFormatPicker.pick } : {}),
           onChanged: () => {
             deps.onAfterPivotEdit?.();
@@ -683,6 +693,9 @@ export function attachWorkbookObjectsPanel(
           strings,
           wb,
           history: deps.history ?? null,
+          store: deps.store,
+          origin: 'ribbon',
+          commandId: 'pivotOptions',
           onChanged: () => {
             deps.onAfterPivotEdit?.();
             refresh();

@@ -10,6 +10,7 @@ import {
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
+import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const fixture = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -24,7 +25,12 @@ const openEditor = async (
   if (profile) wb.setSpreadsheetProfileId(profile);
   const host = document.createElement('div');
   document.body.appendChild(host);
-  const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+  const handle = attachWorkbookObjectsPanel({
+    store: createSpreadsheetStore(),
+    host,
+    wb,
+    strings: en,
+  });
   handle.open();
   const label = fieldList ? en.workbookObjects.pivotFieldList : en.workbookObjects.editPivotTable;
   const button = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(

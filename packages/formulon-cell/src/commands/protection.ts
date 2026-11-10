@@ -124,8 +124,8 @@ export const unlockedCellsOption = (
 ): keyof SheetProtectionPermissions | undefined => UNLOCKED_CELLS_OPTION[operation];
 
 /** Commands a protected sheet refuses whatever its Protect Sheet options: the formula auditing
- *  arrows (trace precedents/dependents/error, remove arrows), refreshing a pivot report and the
- *  sheet background. */
+ *  arrows (trace precedents/dependents/error, remove arrows), inserting or refreshing a pivot
+ *  report and the sheet background. */
 const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'precedents',
   'dependents',
@@ -137,6 +137,10 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'mac.formulas.removeArrows.dependents',
   'mac.formulas.errorCheck.trace',
   'pivotRefresh',
+  'pivotTableInsert',
+  'mac.insert.pivotTable',
+  'mac.insert.recommendedPivotTable',
+  'mac.automate.newPivotTable',
   'sheetBackground',
   'mac.page.background',
 ]);

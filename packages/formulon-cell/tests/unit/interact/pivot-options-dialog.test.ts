@@ -4,7 +4,7 @@ import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js'
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { ja } from '../../../src/i18n/strings.js';
 import { openPivotOptions } from '../../../src/interact/pivot-options-dialog.js';
-import { mutators } from '../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 import { mountStubSheet } from '../../test-utils/index.js';
 
 const setup = async () => {
@@ -60,7 +60,19 @@ describe('PivotTable Options dialog', () => {
 
   it('lays out the desktop tabs and options, with only the name editable', async () => {
     const wb = await setup();
-    const done = openPivotOptions({ host, strings: ja, wb, onChanged: () => {} }, 0, 0);
+    const done = openPivotOptions(
+      {
+        store: createSpreadsheetStore(),
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        host,
+        strings: ja,
+        wb,
+        onChanged: () => {},
+      },
+      0,
+      0,
+    );
     const root = dialog();
     expect(root.getAttribute('aria-label')).toBe('ピボットテーブル オプション');
     expect(root.querySelector('.fc-pvoptdlg__name-row')?.textContent).toBe('ピボットテーブル名:');
@@ -139,7 +151,16 @@ describe('PivotTable Options dialog', () => {
     const history = new History();
     let changes = 0;
     const done = openPivotOptions(
-      { host, strings: ja, wb, history, onChanged: () => (changes += 1) },
+      {
+        store: createSpreadsheetStore(),
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        host,
+        strings: ja,
+        wb,
+        history,
+        onChanged: () => (changes += 1),
+      },
       0,
       0,
     );

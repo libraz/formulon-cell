@@ -11,6 +11,7 @@ import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../../engine/address
 import { parseRangeRef } from '../../../engine/range-resolver.js';
 import type { Addr, Range } from '../../../engine/types.js';
 import type { EngineHyperlinkRecord } from '../../../engine/workbook-handle-annotations.js';
+import { openPivotTableDialogFrom } from '../../../interact/dialog-entry.js';
 import {
   appendDialogFrame,
   createDialogButton,
@@ -988,7 +989,10 @@ export async function runMacAutomationScript(
       await runTableToJson(instance);
       return;
     case 'newPivotTable':
-      instance.openPivotTableDialog({ placement: 'new' });
+      openPivotTableDialogFrom(instance.store, 'new', {
+        origin: 'ribbon',
+        commandId: 'mac.automate.newPivotTable',
+      });
       return;
   }
 }

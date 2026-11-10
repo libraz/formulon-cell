@@ -46,6 +46,12 @@ export const INSTANCE_API_HYPERLINK_ENTRY: DialogEntry = {
   commandId: 'insertHyperlink',
 };
 
+/** The entry of an Insert PivotTable open through the public instance method. */
+export const INSTANCE_API_PIVOT_TABLE_ENTRY: DialogEntry = {
+  origin: 'instanceApi',
+  commandId: 'pivotTableInsert',
+};
+
 /** The mount's dialog openers that take the entry of an internal UI caller. */
 export interface DialogOpeners {
   readonly formatDialog: (tab: TabId | undefined, entry: DialogEntry) => void;
@@ -54,6 +60,10 @@ export interface DialogOpeners {
   readonly defineNameDialog: (entry: DialogEntry) => void;
   readonly pageSetupDialog: (tab: PageSetupDialogTab | undefined, entry: DialogEntry) => void;
   readonly hyperlinkDialog: (entry: DialogEntry) => void;
+  readonly pivotTableDialog: (
+    placement: 'new' | 'existing' | undefined,
+    entry: DialogEntry,
+  ) => void;
 }
 
 const openers = new WeakMap<SpreadsheetStore, DialogOpeners>();
@@ -99,4 +109,13 @@ export function openPageSetupDialogFrom(
 /** Open Insert Hyperlink on behalf of an internal UI entry point. */
 export function openHyperlinkDialogFrom(store: SpreadsheetStore, entry: DialogEntry): void {
   openers.get(store)?.hyperlinkDialog(entry);
+}
+
+/** Open Insert PivotTable on behalf of an internal UI entry point. */
+export function openPivotTableDialogFrom(
+  store: SpreadsheetStore,
+  placement: 'new' | 'existing' | undefined,
+  entry: DialogEntry,
+): void {
+  openers.get(store)?.pivotTableDialog(placement, entry);
 }

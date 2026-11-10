@@ -51,6 +51,8 @@ const setup = async () => {
 
 const recommend = (deps: Awaited<ReturnType<typeof setup>>) =>
   executeRibbonPivotTableAction({
+    origin: 'ribbon' as const,
+    commandId: 'test',
     store: deps.store,
     workbook: deps.wb,
     action: 'recommended-insert',
@@ -127,6 +129,8 @@ describe('Recommended PivotTables on the Mac profile', () => {
   it('keeps the plain Recommended action as it was', async () => {
     const deps = await setup();
     const result = executeRibbonPivotTableAction({
+      origin: 'ribbon' as const,
+      commandId: 'test',
       store: deps.store,
       workbook: deps.wb,
       action: 'recommended',

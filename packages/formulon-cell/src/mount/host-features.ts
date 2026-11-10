@@ -701,7 +701,10 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
               commandId: 'workbookObjects.update',
             }),
           subscribeSessionObjects: (listener) => input.store.subscribe(listener),
-          onOpenPivotTableDialog: () => s.pivotTableDialog?.open(),
+          onOpenPivotTableDialog: () =>
+            s.pivotTableDialog?.open({
+              entry: { origin: 'ribbon', commandId: 'pivotTableInsert' },
+            }),
           onAfterPivotEdit: () => {
             const { spilled } = refreshPivotReportsAfterEdit(input.store, input.wb(), {
               theme: resolveTheme(input.host),

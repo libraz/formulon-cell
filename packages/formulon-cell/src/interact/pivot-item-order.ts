@@ -86,6 +86,9 @@ export function movePivotItem(
   const ctx = {
     wb,
     history: deps.history ?? null,
+    store,
+    origin: 'editor' as const,
+    commandId: 'pivotMoveItem',
     onChanged: () => {
       refreshPivotReportsAfterEdit(store, wb);
     },

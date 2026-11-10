@@ -40,6 +40,21 @@ const REPORT_EDITS: Readonly<Record<string, (wb: WorkbookHandle, ref: PivotRef) 
   'clear-filters': clearPivotFilters,
 };
 
+/** The Design / Analyze command each report edit runs under. */
+const REPORT_EDIT_COMMAND: Readonly<Record<string, string>> = {
+  'totals-off': 'pivotGrandTotals',
+  'totals-on': 'pivotGrandTotals',
+  'totals-rows': 'pivotGrandTotals',
+  'totals-cols': 'pivotGrandTotals',
+  'layout-compact': 'pivotReportLayout',
+  'layout-outline': 'pivotReportLayout',
+  'layout-tabular': 'pivotReportLayout',
+  'subtotals-bottom': 'pivotSubtotals',
+  'subtotals-top': 'pivotSubtotals',
+  'clear-all': 'pivotClear',
+  'clear-filters': 'pivotClear',
+};
+
 export function createPivotDropdownDefaults(instance: SpreadsheetInstance): PivotDropdownDefaults {
   const activePivot = (): PivotRef | null => {
     const pivot = findPivotTableAtCell(
@@ -72,7 +87,14 @@ export function createPivotDropdownDefaults(instance: SpreadsheetInstance): Pivo
       const edit = REPORT_EDITS[action];
       if (!edit) return;
       commitPivotChange(
-        { wb, history: instance.history, onChanged },
+        {
+          wb,
+          history: instance.history,
+          store: instance.store,
+          origin: 'ribbon',
+          commandId: REPORT_EDIT_COMMAND[action] ?? 'pivotReportLayout',
+          onChanged,
+        },
         ref.sheetIndex,
         ref.pivotIndex,
         () => edit(wb, ref),

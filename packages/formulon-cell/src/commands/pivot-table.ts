@@ -11,6 +11,8 @@ import type { AutofitOptions } from './autofit-measurement.js';
 import { currentRegion } from './current-region.js';
 import { defaultObjectNames } from './format-as-table.js';
 import type { History } from './history.js';
+import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
+import { type PivotAuthorization, pivotReportEffects, pivotWrite } from './pivot-actions.js';
 import { reflowPivotFormats } from './pivot-format-reflow.js';
 import { autofitColsWidthForRanges } from './row-col-layout.js';
 import { addSheet, moveSheet, removeSheet } from './sheet-mutate.js';
@@ -534,11 +536,17 @@ export type CreatePlacedPivotResult =
     }
   | {
       ok: false;
-      reason: 'sheet-failed' | 'unsupported' | 'invalid-range' | 'invalid-field' | 'engine-failed';
+      reason:
+        | 'refused'
+        | 'sheet-failed'
+        | 'unsupported'
+        | 'invalid-range'
+        | 'invalid-field'
+        | 'engine-failed';
       step?: string;
     };
 
-export interface CreatePlacedPivotDeps {
+export interface CreatePlacedPivotDeps extends PivotAuthorization {
   store: SpreadsheetStore;
   workbook: WorkbookHandle;
   history?: History | null;
@@ -566,9 +574,29 @@ export function pivotSourceForSelection(store: SpreadsheetStore, wb: WorkbookHan
   return currentRegion(state, { sheet: range.sheet, row: range.r0, col: range.c0 }) ?? range;
 }
 
-/** Create a report at `placement` as one undo step (the new sheet, its
- *  position and the report revert together). */
+/** Create a report at `placement` as one authorized undo step (the new sheet,
+ *  its position and the report revert together). Its effect is the anchor cell
+ *  on an existing sheet, or a new sheet. */
 export function createPivotTableAtPlacement(
+  deps: CreatePlacedPivotDeps,
+  opts: Omit<CreatePivotTableOptions, 'destination'>,
+  placement: PivotPlacement,
+): CreatePlacedPivotResult {
+  const newSheet = placement === 'new-sheet';
+  const effects: readonly OperationEffect[] = newSheet
+    ? [{ kind: 'workbook' }]
+    : [{ kind: 'cells', cells: [{ sheet: opts.source.sheet, ...placement }] }];
+  return pivotWrite(
+    deps,
+    deps.history,
+    effects,
+    { ok: false, reason: 'refused' },
+    () => createPlacedReport(deps, opts, placement),
+    { addsSheet: newSheet },
+  );
+}
+
+function createPlacedReport(
   deps: CreatePlacedPivotDeps,
   opts: Omit<CreatePivotTableOptions, 'destination'>,
   placement: PivotPlacement,
@@ -811,6 +839,20 @@ export function pastePivotTableCopy(
   source: { sheet: number; pivotIndex: number },
   at: { sheet: number; row: number; col: number },
 ): Range | null {
+  return pivotWrite(
+    deps,
+    deps.history,
+    [{ kind: 'cells', cells: [{ sheet: at.sheet, row: at.row, col: at.col }] }],
+    null,
+    () => pasteReportCopy(deps, source, at),
+  );
+}
+
+function pasteReportCopy(
+  deps: CreatePlacedPivotDeps,
+  source: { sheet: number; pivotIndex: number },
+  at: { sheet: number; row: number; col: number },
+): Range | null {
   const { store, workbook: wb } = deps;
   const history = deps.history && !deps.history.isReplaying() ? deps.history : null;
   const definition = wb.getPivotDefinition(source.sheet, source.pivotIndex);
@@ -839,7 +881,7 @@ export function pastePivotTableCopy(
   return wb.pivotBounds(at.sheet).find((b) => b.pivotIndex === pivotIndex)?.range ?? null;
 }
 
-export interface DeletePivotTablesDeps {
+export interface DeletePivotTablesDeps extends PivotAuthorization {
   store: SpreadsheetStore;
   workbook: WorkbookHandle;
   history?: History | null;
@@ -850,6 +892,20 @@ export interface DeletePivotTablesDeps {
  *  workbook meanwhile. False, with nothing removed, when a definition cannot
  *  be read back (so the removal could not be undone). */
 export function deletePivotTables(
+  deps: DeletePivotTablesDeps,
+  sheet: number,
+  pivots: readonly { pivotIndex: number; range: Range }[],
+): boolean {
+  return pivotWrite(
+    deps,
+    deps.history,
+    pivots.map(({ range }) => ({ kind: 'range' as const, range: { ...range } })),
+    false,
+    () => removeReports(deps, sheet, pivots),
+  );
+}
+
+function removeReports(
   deps: DeletePivotTablesDeps,
   sheet: number,
   pivots: readonly { pivotIndex: number; range: Range }[],
@@ -937,6 +993,9 @@ export interface RibbonPivotTableActionStrings {
 export interface ExecuteRibbonPivotTableActionDeps {
   store: SpreadsheetStore;
   workbook: WorkbookHandle;
+  /** The entry point the action runs under. */
+  origin: InteractionOrigin;
+  commandId: string;
   action: RibbonPivotTableAction;
   strings: RibbonPivotTableActionStrings;
   history?: History | null;
@@ -983,7 +1042,7 @@ function insertRecommendedPivotTable(
   }
   const cacheId = cacheForSource(workbook, source);
   const result = createPivotTableAtPlacement(
-    { store, workbook, history },
+    { store, workbook, history, origin: deps.origin, commandId: deps.commandId },
     {
       source,
       name: nextPivotTableName(workbook),
@@ -1052,10 +1111,13 @@ export const executeRibbonPivotTableAction = (
         },
       };
     }
-    const result = refreshPivotTable(workbook, {
-      sheet: pivot.sheetIndex,
-      pivotIndex: pivot.pivotIndex,
-    });
+    const result = pivotWrite(
+      deps,
+      history,
+      pivotReportEffects(workbook, pivot.sheetIndex, pivot.pivotIndex),
+      { ok: false } as ReturnType<typeof refreshPivotTable>,
+      () => refreshPivotTable(workbook, { sheet: pivot.sheetIndex, pivotIndex: pivot.pivotIndex }),
+    );
     if (!result.ok) {
       return {
         kind: 'report',
@@ -1116,7 +1178,7 @@ export const executeRibbonPivotTableAction = (
     };
   }
   const result = createPivotTableAtPlacement(
-    { store, workbook, history },
+    { store, workbook, history, origin: deps.origin, commandId: deps.commandId },
     {
       source,
       name: nextPivotTableName(workbook),

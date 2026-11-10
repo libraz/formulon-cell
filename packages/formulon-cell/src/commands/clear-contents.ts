@@ -137,7 +137,13 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
   const txn = removesObjects ? history?.begin() : undefined;
   if (pivotPlan.whole.length > 0) {
     const removed = deletePivotTables(
-      { store, workbook, history },
+      {
+        store,
+        workbook,
+        history,
+        origin: options.origin ?? 'keyboard',
+        commandId: options.commandId ?? 'clear-contents',
+      },
       store.getState().selection.range.sheet,
       pivotPlan.whole,
     );

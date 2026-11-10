@@ -5,6 +5,7 @@ import { PivotAxis } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
+import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const setup = async () => {
   const wb = await WorkbookHandle.createDefault();
@@ -55,6 +56,7 @@ describe('PivotTable Fields pane', () => {
   const open = (wb: WorkbookHandle, history?: History, strings = en) => {
     let edits = 0;
     const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
       host,
       wb,
       strings,
@@ -271,6 +273,7 @@ describe('PivotTable Fields pane', () => {
     const history = new History();
     // The host pins a pushed-down report where it is after each edit.
     const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
       host,
       wb,
       strings: en,
@@ -414,7 +417,13 @@ describe('PivotTable Fields pane', () => {
     const dock = document.createElement('div');
     dock.hidden = true;
     host.appendChild(dock);
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en, dock });
+    const handle = attachWorkbookObjectsPanel({
+      store: createSpreadsheetStore(),
+      host,
+      wb,
+      strings: en,
+      dock,
+    });
     const root = host.querySelector<HTMLElement>('.fc-objects');
     handle.open();
     expect(root?.parentElement, 'the general panel floats over the host').toBe(host);

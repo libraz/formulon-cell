@@ -1630,7 +1630,7 @@ export function attachPointer(
       const report = pivotTableAtRange(wb, src);
       if (target && report !== null) {
         const moved = movePivotTable(
-          { store, workbook: wb, history },
+          { store, workbook: wb, history, origin: 'editor', commandId: 'pivotMove' },
           { sheet: src.sheet, pivotIndex: report },
           { sheet: target.sheet, row: target.r0, col: target.c0 },
         );

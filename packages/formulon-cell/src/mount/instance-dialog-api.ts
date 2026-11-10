@@ -11,6 +11,7 @@ import {
   INSTANCE_API_HYPERLINK_ENTRY,
   INSTANCE_API_NAME_MANAGER_ENTRY,
   INSTANCE_API_PAGE_SETUP_ENTRY,
+  INSTANCE_API_PIVOT_TABLE_ENTRY,
   INSTANCE_API_VALIDATION_ENTRY,
   registerDialogOpeners,
 } from '../interact/dialog-entry.js';
@@ -108,7 +109,20 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
   const openHyperlinkDialog: DialogOpeners['hyperlinkDialog'] = (entry) => {
     featureState.hyperlinkDialog?.open(entry);
   };
+  const openPivotTableDialog: DialogOpeners['pivotTableDialog'] = (placement, entry) => {
+    if (!permits('pivot')) return;
+    const opts = placement ? { placement } : undefined;
+    const userPivot = getUserHandle('pivotTableDialog') as
+      | (ExtensionHandle & { open?: (opts?: { placement?: 'new' | 'existing' }) => void })
+      | undefined;
+    if (userPivot?.open) {
+      userPivot.open(opts);
+      return;
+    }
+    featureState.pivotTableDialog?.open({ ...opts, entry });
+  };
   registerDialogOpeners(store, {
+    pivotTableDialog: openPivotTableDialog,
     hyperlinkDialog: openHyperlinkDialog,
     pageSetupDialog: openPageSetupDialog,
     formatDialog: openFormatDialog,
@@ -241,7 +255,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       return featureState.sessionCharts?.openSettings(tab) ?? false;
     },
     openPivotFieldList(sheetIndex, pivotIndex) {
-      if (!permits('table')) return false;
+      if (!permits('pivot')) return false;
       const userObjects = getUserHandle('workbookObjects') as
         | (ExtensionHandle & {
             openPivotFieldList?: (sheetIndex: number, pivotIndex: number) => boolean;
@@ -253,7 +267,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       return featureState.workbookObjects?.openPivotFieldList(sheetIndex, pivotIndex) ?? false;
     },
     openActivePivotFieldList() {
-      if (!permits('table')) return false;
+      if (!permits('pivot')) return false;
       const pivot = findPivotTableAtCell(getWb(), store.getState().selection.active);
       if (!pivot) return false;
       const userObjects = getUserHandle('workbookObjects') as
@@ -270,7 +284,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       );
     },
     openPivotFieldSettings() {
-      if (!permits('table')) return false;
+      if (!permits('pivot')) return false;
       const addr = store.getState().selection.active;
       const userObjects = getUserHandle('workbookObjects') as
         | (ExtensionHandle & { openPivotFieldSettings?: (addr: Addr) => boolean })
@@ -279,7 +293,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       return featureState.workbookObjects?.openPivotFieldSettings(addr) ?? false;
     },
     openPivotOptions(sheetIndex, pivotIndex) {
-      if (!permits('table')) return false;
+      if (!permits('pivot')) return false;
       const pivot =
         sheetIndex !== undefined && pivotIndex !== undefined
           ? { sheetIndex, pivotIndex }
@@ -298,15 +312,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       );
     },
     openPivotTableDialog(opts) {
-      if (!permits('table')) return;
-      const userPivot = getUserHandle('pivotTableDialog') as
-        | (ExtensionHandle & { open?: (opts?: { placement?: 'new' | 'existing' }) => void })
-        | undefined;
-      if (userPivot?.open) {
-        userPivot.open(opts);
-        return;
-      }
-      featureState.pivotTableDialog?.open(opts);
+      openPivotTableDialog(opts?.placement, INSTANCE_API_PIVOT_TABLE_ENTRY);
     },
     addSlicer(input) {
       if (!featureState.slicer) {

@@ -130,7 +130,17 @@ function attachPivotMoveDialog(instance: SpreadsheetInstance): PivotMoveDialogHa
       }
       destination = { sheet: parsed.range.sheet, row: parsed.range.r0, col: parsed.range.c0 };
     }
-    const moved = movePivotTable(instance, target, destination);
+    const moved = movePivotTable(
+      {
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        origin: 'ribbon',
+        commandId: 'pivotMove',
+      },
+      target,
+      destination,
+    );
     if (!moved) {
       status.dataset.state = 'error';
       status.textContent = t.engineFailed;

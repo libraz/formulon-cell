@@ -801,7 +801,7 @@ function applyPaste(
     const pivotIndex = pivotTableAtRange(wb, snap.range);
     if (pivotIndex !== null) {
       const written = pastePivotTableCopy(
-        { store, workbook: wb, history },
+        { store, workbook: wb, history, origin: 'clipboard', commandId: 'paste' },
         { sheet: snap.range.sheet, pivotIndex },
         {
           sheet: checked.destination.sheet,

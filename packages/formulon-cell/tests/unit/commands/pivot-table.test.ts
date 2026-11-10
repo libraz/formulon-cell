@@ -71,6 +71,7 @@ const makeWb = () => {
       sourceRows = range ? range.rect.lastRow - range.rect.firstRow + 1 : 0;
       return true;
     },
+    pivotBounds: () => [],
     // The engine refuses a source past its record cell limit.
     refreshPivotCache: () => {
       calls.push('refresh');
@@ -586,6 +587,8 @@ describe('pivot-table command helpers', () => {
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
 
     const result = executeRibbonPivotTableAction({
+      origin: 'ribbon' as const,
+      commandId: 'test',
       store,
       workbook: wb,
       action: 'recommended',
@@ -622,6 +625,8 @@ describe('pivot-table command helpers', () => {
     mutators.setActive(store, { sheet: 0, row: 5, col: 1 });
 
     const result = executeRibbonPivotTableAction({
+      origin: 'ribbon' as const,
+      commandId: 'test',
       store,
       workbook: wb,
       action: 'refresh',
@@ -647,6 +652,8 @@ describe('pivot-table command helpers', () => {
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
 
     const result = executeRibbonPivotTableAction({
+      origin: 'ribbon' as const,
+      commandId: 'test',
       store,
       workbook: wb,
       action: 'refresh',

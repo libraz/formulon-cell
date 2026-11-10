@@ -4,6 +4,7 @@ import {
   openHyperlinkDialogFrom,
   openNamedRangeDialogFrom,
   openPageSetupDialogFrom,
+  openPivotTableDialogFrom,
 } from '../../interact/dialog-entry.js';
 // Dispatch tables for the playground ribbon — each map is one row per ribbon
 // command id, replacing what used to be a `case 'id': handler; return true;`
@@ -68,7 +69,11 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   links: (i) => i.openExternalLinksDialog(),
   linksData: (i) => i.openExternalLinksDialog(),
   rules: (i) => i.openCfRulesDialog(),
-  pivotTableInsert: (i) => i.openPivotTableDialog(),
+  pivotTableInsert: (i) =>
+    openPivotTableDialogFrom(i.store, undefined, {
+      origin: 'ribbon',
+      commandId: 'pivotTableInsert',
+    }),
   evaluateFormula: (i) => i.openEvaluateFormulaDialog(),
   fxInsert: (i) => i.openFunctionArguments(),
   fx: (i) => i.openFunctionArguments(),

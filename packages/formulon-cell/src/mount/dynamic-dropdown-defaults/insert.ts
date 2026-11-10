@@ -11,7 +11,7 @@ import {
   warnProtected,
 } from '../../commands/protection.js';
 import { createRibbonChartFromSelection } from '../../commands/session-chart.js';
-import { openHyperlinkDialogFrom } from '../../interact/dialog-entry.js';
+import { openHyperlinkDialogFrom, openPivotTableDialogFrom } from '../../interact/dialog-entry.js';
 import { executeRibbonHyperlinkAction } from '../../interact/ribbon-hyperlink.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators, type SessionChartKind } from '../../store/store.js';
@@ -142,8 +142,9 @@ const buildPivotTableAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyPivotTableAction'] =>
   async (action) => {
     if (action === 'new-sheet' || action === 'existing-sheet') {
-      (instance.openPivotTableDialog as (opts?: { placement?: 'new' | 'existing' }) => void)({
-        placement: action === 'new-sheet' ? 'new' : 'existing',
+      openPivotTableDialogFrom(instance.store, action === 'new-sheet' ? 'new' : 'existing', {
+        origin: 'ribbon',
+        commandId: 'pivotTableInsert',
       });
       return;
     }
@@ -165,6 +166,8 @@ const buildPivotTableAction =
     const result = executeRibbonPivotTableAction({
       store: instance.store,
       workbook: instance.workbook,
+      origin: 'ribbon',
+      commandId: pivotAction === 'refresh' ? 'pivotRefresh' : 'pivotTableInsert',
       action: pivotAction,
       history: instance.history,
       strings: {
@@ -178,7 +181,10 @@ const buildPivotTableAction =
       },
     });
     if (result.kind === 'open-dialog') {
-      instance.openPivotTableDialog();
+      openPivotTableDialogFrom(instance.store, undefined, {
+        origin: 'ribbon',
+        commandId: 'pivotTableInsert',
+      });
       return;
     }
     if (result.kind === 'report') {

@@ -42,6 +42,8 @@ const setup = async () => {
   const ctx = {
     host,
     store,
+    origin: 'contextMenu' as const,
+    commandId: 'pivotFilterValue',
     wb,
     history,
     strings: ja,

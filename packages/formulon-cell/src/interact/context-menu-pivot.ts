@@ -155,7 +155,14 @@ export function runContextMenuPivotItem(
   const { addr, info } = ref;
   const sheet = addr.sheet;
   const pivot = { sheetIndex: sheet, pivotIndex: info.pivotIndex };
-  const commit = { wb, history: ctx.history, onChanged: () => ctx.refresh(sheet) };
+  const commit = {
+    wb,
+    history: ctx.history,
+    store: ctx.store,
+    origin: 'contextMenu' as const,
+    commandId: id,
+    onChanged: () => ctx.refresh(sheet),
+  };
   const definition = wb.getPivotDefinition(sheet, info.pivotIndex);
   const dataFieldIndex = (): number => {
     const list = definition?.dataFields ?? [];
@@ -205,9 +212,17 @@ export function runContextMenuPivotItem(
     case 'pivotDelete': {
       const range = wb.pivotBounds(sheet).find((b) => b.pivotIndex === info.pivotIndex)?.range;
       if (!range) return true;
-      deletePivotTables({ store: ctx.store, workbook: wb, history: ctx.history }, sheet, [
-        { pivotIndex: info.pivotIndex, range },
-      ]);
+      deletePivotTables(
+        {
+          store: ctx.store,
+          workbook: wb,
+          history: ctx.history,
+          origin: 'contextMenu',
+          commandId: id,
+        },
+        sheet,
+        [{ pivotIndex: info.pivotIndex, range }],
+      );
       ctx.refresh(sheet);
       return true;
     }
@@ -342,6 +357,9 @@ export function runContextMenuPivotItem(
           strings: ctx.strings,
           wb,
           history: ctx.history,
+          store: ctx.store,
+          origin: 'contextMenu',
+          commandId: id,
           onChanged: () => ctx.refresh(sheet),
         },
         sheet,

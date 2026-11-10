@@ -4,6 +4,7 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { syncTaskpaneDock } from '../../../src/interact/taskpane-dock.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
+import { createSpreadsheetStore } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
 import { setupPalette } from './mac-formula-palette/fixtures.js';
 
@@ -108,7 +109,13 @@ describe('task-pane dock', () => {
         valueField: 'Sales',
       });
       expect(created.ok).toBe(true);
-      const objects = attachWorkbookObjectsPanel({ host: sheet.host, wb, strings: en, dock });
+      const objects = attachWorkbookObjectsPanel({
+        store: createSpreadsheetStore(),
+        host: sheet.host,
+        wb,
+        strings: en,
+        dock,
+      });
 
       palette.open();
       expect(objects.openPivotFieldList(0, 0)).toBe(true);

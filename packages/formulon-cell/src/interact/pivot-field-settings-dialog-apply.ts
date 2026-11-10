@@ -1,5 +1,10 @@
 import type { History } from '../commands/history.js';
 import {
+  type PivotAuthorization,
+  pivotReportEffects,
+  pivotWrite,
+} from '../commands/pivot-actions.js';
+import {
   applyPivotEdit,
   type PivotEditField,
   restorePivotFieldLayout,
@@ -25,7 +30,7 @@ import {
 } from './pivot-field-settings-dialog.js';
 
 /** Where a pivot rewrite records its undo step and announces itself. */
-export interface PivotCommitContext {
+export interface PivotCommitContext extends PivotAuthorization {
   wb: WorkbookHandle;
   history?: History | null;
   /** The report was rewritten, by the change or by its undo or redo. */
@@ -57,6 +62,19 @@ function pivotAnchorOf(
  *  the report's position read before and after (after the host's own follow-up
  *  in `onChanged`) are what undo and redo restore. Returns what `apply` did. */
 export function commitPivotChange(
+  ctx: PivotCommitContext,
+  sheetIndex: number,
+  pivotIndex: number,
+  apply: () => boolean,
+): boolean {
+  const { wb } = ctx;
+  return pivotWrite(ctx, ctx.history, pivotReportEffects(wb, sheetIndex, pivotIndex), false, () =>
+    commitAuthorizedPivotChange(ctx, sheetIndex, pivotIndex, apply),
+  );
+}
+
+/** The change itself, with its undo entry restoring the report's layout and anchor. */
+function commitAuthorizedPivotChange(
   ctx: PivotCommitContext,
   sheetIndex: number,
   pivotIndex: number,

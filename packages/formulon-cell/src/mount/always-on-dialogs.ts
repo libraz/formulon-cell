@@ -141,7 +141,7 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
   // A report's drop-down button dispatches `fc:openpivotfilter` with the
   // button cell and the button's bottom-left corner in viewport coordinates.
   const onOpenPivotFilter = (e: Event): void => {
-    if (!deps.permits('table')) return;
+    if (!deps.permits('pivot')) return;
     const detail = (e as CustomEvent<{ addr: Addr; anchor: { x: number; y: number } }>).detail;
     if (!detail) return;
     const wb = getWb();
@@ -149,6 +149,8 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
       {
         host,
         store,
+        origin: 'contextMenu',
+        commandId: 'pivotFilterValue',
         wb,
         history,
         strings: getStrings(),

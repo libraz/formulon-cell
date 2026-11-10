@@ -13,6 +13,7 @@ import { setProtectedSheet } from '../../../../src/commands/protection.js';
 import type { CellValue, Range } from '../../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../../src/i18n/strings.js';
+import { registerDialogOpeners } from '../../../../src/interact/dialog-entry.js';
 import type { SpreadsheetInstance } from '../../../../src/mount/types.js';
 import {
   createSpreadsheetStore,
@@ -334,9 +335,18 @@ describe('Mac automation gallery', () => {
   it('reports a failing gallery script instead of leaving an unhandled rejection', async () => {
     const instance = makeInstance(host);
     (instance as unknown as { i18n: unknown }).i18n = { locale: 'en-US', strings: defaultStrings };
-    (instance as unknown as { openPivotTableDialog: () => void }).openPivotTableDialog = () => {
-      throw new Error('pivot exploded');
-    };
+    const unused = (): void => undefined;
+    registerDialogOpeners(instance.store, {
+      formatDialog: unused,
+      dataValidationDialog: unused,
+      namedRangeDialog: unused,
+      defineNameDialog: unused,
+      pageSetupDialog: unused,
+      hyperlinkDialog: unused,
+      pivotTableDialog: () => {
+        throw new Error('pivot exploded');
+      },
+    });
     const pending = openMacAutomationGallery(instance);
     document
       .querySelector<HTMLButtonElement>('[data-mac-automation-script="newPivotTable"]')
