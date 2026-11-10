@@ -107,6 +107,29 @@ describe('History stack', () => {
   });
 
   describe('transactions', () => {
+    it('transact commits what the closure recorded as one step, even when it throws', () => {
+      const log: string[] = [];
+      const record = (name: string): void =>
+        h.push({ undo: () => log.push(`undo ${name}`), redo: () => log.push(`redo ${name}`) });
+      const boom = new Error('boom');
+      expect(() =>
+        h.transact(() => {
+          record('a');
+          h.transact(() => record('b'));
+          throw boom;
+        }),
+      ).toThrow(boom);
+      expect(h.undo()).toBe(true);
+      expect(log).toEqual(['undo b', 'undo a']);
+      expect(h.canUndo()).toBe(false);
+    });
+
+    it('transact returns the closure result and records nothing for an empty closure', () => {
+      const result = h.transact(() => h.transact(() => 7));
+      expect(result).toBe(7);
+      expect(h.canUndo()).toBe(false);
+    });
+
     it('retains outer replay authorization and callback order for a composite entry', () => {
       const callbackLog: string[] = [];
       const guardCalls: Array<{

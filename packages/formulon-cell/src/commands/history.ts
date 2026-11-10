@@ -112,6 +112,19 @@ export class History {
     });
   }
 
+  /**
+   * Runs `fn` inside one transaction frame and closes it even when `fn` throws, so whatever `fn`
+   * recorded before failing stays one undo step. Nested calls flatten into the outermost frame.
+   */
+  transact<T>(fn: () => T, metadata?: HistoryBeginMetadata): T {
+    const token = this.begin(this.txnFrames.length > 0 ? undefined : metadata);
+    try {
+      return fn();
+    } finally {
+      this.end(token);
+    }
+  }
+
   private withMetadata(entry: HistoryEntry, metadata?: HistoryBeginMetadata): HistoryEntry {
     return metadata ? { ...entry, ...metadata } : entry;
   }
