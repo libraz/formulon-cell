@@ -335,12 +335,18 @@ export const RIBBON_MENU_FIRST_COMMANDS: ReadonlySet<string> = new Set(
   ),
 );
 
-/** Split buttons whose menu is the entry point for hosts that own the actions
- *  behind it (`applyScriptAction` / `applyAddInAction`). Core classifies them
- *  as primary-action splits so a standalone ribbon fires its built-in dialog;
- *  a host that supplies the menu actions wants the face click to open the
- *  menu instead. */
-export const RIBBON_HOST_MENU_FIRST_COMMANDS: ReadonlySet<string> = new Set(['script', 'addIn']);
+/** Split buttons whose menu is the entry point once the host supplies the
+ *  automation hook behind the face. Core classifies them as primary-action
+ *  splits, so without that hook the face runs the built-in action; with it,
+ *  the face opens the menu and the menu routes to the hook. */
+export const RIBBON_HOST_MENU_FIRST_HOOK: Readonly<Record<string, 'runScript' | 'addInManager'>> = {
+  script: 'runScript',
+  addIn: 'addInManager',
+};
+
+export const RIBBON_HOST_MENU_FIRST_COMMANDS: ReadonlySet<string> = new Set(
+  Object.keys(RIBBON_HOST_MENU_FIRST_HOOK),
+);
 
 /** Mac profile menu roots are intentionally kept outside the generic menu
  *  manifest. This predicate lets mount hosts apply the same menu-first click

@@ -105,10 +105,7 @@ export type {
   ToolbarInstance,
   ToolbarInstanceRef,
 } from './mount/toolbar.js';
-export {
-  openHostMenuFirstDropdown,
-  RIBBON_HOST_MENU_FIRST_COMMANDS,
-} from './mount/toolbar.js';
+export { RIBBON_HOST_MENU_FIRST_COMMANDS } from './mount/toolbar.js';
 export type {
   FunctionArgumentHelp,
   FunctionArgumentHelpProvider,

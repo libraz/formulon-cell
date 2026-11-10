@@ -591,7 +591,7 @@ export type {
   ToolbarInstance,
   ToolbarInstanceRef,
 } from './mount.js';
-export { openHostMenuFirstDropdown, Spreadsheet } from './mount.js';
+export { Spreadsheet } from './mount.js';
 export type {
   ErrorTriangleHit,
   ErrorTriangleKind,

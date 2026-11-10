@@ -44,7 +44,7 @@ import { ribbonDisplayText, type ToolbarMenuText, toolbarMenuText } from '../too
 import {
   isRibbonMenuFirstCommand,
   RIBBON_BORDERS_MENU_ID,
-  RIBBON_HOST_MENU_FIRST_COMMANDS,
+  RIBBON_HOST_MENU_FIRST_HOOK,
 } from '../toolbar/ribbon/activation.js';
 import {
   applyRibbonCommand,
@@ -299,22 +299,6 @@ export interface ToolbarInstance {
 }
 
 export { RIBBON_HOST_MENU_FIRST_COMMANDS } from '../toolbar/ribbon/activation.js';
-
-/** `interceptCommand` implementation for the menu-first contract above. Pass
- *  it straight through from a host's `mountToolbar` options; it returns false
- *  for every other command so the default dispatch still runs. */
-export const openHostMenuFirstDropdown = (
-  toolbar: ToolbarInstance | null,
-  command: string,
-  button: HTMLButtonElement,
-): boolean => {
-  if (!RIBBON_HOST_MENU_FIRST_COMMANDS.has(command)) return false;
-  const menuId = ribbonDropdownMenuIdForCommand(command);
-  const api = toolbar?.dropdownsApi;
-  if (!menuId || !api) return false;
-  api.openDynamicRibbonDropdown({ command, menuId }, button);
-  return true;
-};
 
 const defaultApplyRibbonFormat =
   (getInstance: () => SpreadsheetInstance | null) =>
@@ -634,6 +618,15 @@ export function mountToolbar(
     });
     dropdownsApi = dropdownsDelegation.api;
   }
+  // A host-menu-first face opens its dropdown once the host supplies the hook behind it.
+  const openHostMenuFirstDropdown = (command: string, button: HTMLButtonElement): boolean => {
+    const hook = RIBBON_HOST_MENU_FIRST_HOOK[command];
+    if (!hook || !opts.hooks?.automation?.[hook]) return false;
+    const menuId = ribbonDropdownMenuIdForCommand(command);
+    if (!menuId || !dropdownsApi) return false;
+    dropdownsApi.openDynamicRibbonDropdown({ command, menuId }, button);
+    return true;
+  };
 
   const createRibbonRenderer = () =>
     createRenderRibbon({
@@ -939,7 +932,7 @@ export function mountToolbar(
       if (document.activeElement !== cmdBtn && !isImmediateMacFormulaPrimary(target, id)) {
         cmdBtn.focus({ preventScroll: true });
       }
-      if (opts.interceptCommand?.(id, cmdBtn, e)) {
+      if (opts.interceptCommand?.(id, cmdBtn, e) || openHostMenuFirstDropdown(id, cmdBtn)) {
         const openMenu = host.querySelector(
           '.fc-tb__menu:not([hidden]), .fc-tb__submenu:not([hidden]), .fc-tb__rb-dd--open',
         );
