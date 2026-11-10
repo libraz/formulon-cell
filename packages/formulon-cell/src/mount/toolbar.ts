@@ -38,6 +38,7 @@ import { resolveSpreadsheetPlatform, type SpreadsheetPlatform } from '../extensi
 import { ensureMacInk, getMacInk, type MacInkController } from '../interact/mac-ink.js';
 import { mutators } from '../store/store.js';
 import type { CellBorderStyle, State } from '../store/types.js';
+import { showMessage as showRibbonMessage } from '../toolbar/dialogs/prompt.js';
 import { cancelOpenAppDialogs } from '../toolbar/dialogs/shell.js';
 import { ribbonDisplayText, type ToolbarMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
 import {
@@ -303,6 +304,42 @@ const defaultApplyRibbonFormat =
       withSelectionFormatOrigin(inst.store, 'ribbon', () => fn(inst.store.getState(), inst.store)),
     );
   };
+
+/** Runs a ribbon command on `instance` without a mounted ribbon, as a click on its button would. */
+export function runRibbonCommand(instance: SpreadsheetInstance, id: string): boolean {
+  const strings = instance.i18n.strings;
+  const lang = toolbarLangForLocale(instance.i18n.locale);
+  const refreshCells = (): void =>
+    mutators.replaceCells(
+      instance.store,
+      instance.workbook.cells(instance.store.getState().data.sheetIndex),
+    );
+  const applyRibbonFormat = defaultApplyRibbonFormat(() => instance);
+  return applyRibbonCommand(id, {
+    inst: instance,
+    text: toolbarText(strings),
+    menuText: toolbarMenuText(strings),
+    ui: {
+      theme: instance.store.getState().ui.theme as UiTheme,
+      borderStyle: DEFAULT_BORDER_STYLE,
+      borderColor: DEFAULT_BORDER_COLOR,
+      formulaBarVisible: instance.store.getState().ui.formulaBarVisible !== false,
+    },
+    runtime: {
+      focusSheet: () => instance.host.focus(),
+      refreshCells,
+      refreshZoom: () => undefined,
+      projectFormatToolbar: () => undefined,
+      applyRibbonFormat,
+      applyUiTheme: (next) => instance.setTheme(next),
+      setFormulaBarVisible: (next) => mutators.setFormulaBarVisible(instance.store, next),
+      featureFlags: () => ({ viewToolbar: false, watchWindow: true, workbookObjects: true }),
+      showMessage: (message) =>
+        showRibbonMessage({ ...message, host: instance.host, okLabel: strings.formatDialog.ok }),
+    },
+    hooks: createDefaultRibbonHooks(instance, { lang }),
+  });
+}
 
 export function mountToolbar(
   host: HTMLElement,

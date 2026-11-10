@@ -19,8 +19,9 @@ export interface WorkbookContext {
   readonly engine: EngineWorkbook;
   /** Runs `fn` as one facade operation: one recalc, one `change` event, one undo step. */
   run<T>(fn: () => T): T;
-  /** Runs a non-cell write and announces the store slice it touched. */
-  change<T>(kind: FacadeChangeKind, sheet: number | null, fn: () => T): T;
+  /** Runs a non-cell write and announces the store slice it touched; `range` names the cells a
+   *  range write reached. */
+  change<T>(kind: FacadeChangeKind, sheet: number | null, fn: () => T, range?: CellRect): T;
   /** The facade of an engine sheet handle. */
   sheet(engine: EngineSheet): Sheet;
   /** The facade of an engine object handle (a table, a picture, …): one facade per handle. */
@@ -52,7 +53,7 @@ export interface SheetContext extends WorkbookContext {
   /** The rectangle an A1 range or a `CellRect` names, on this sheet. */
   rectOf(range: string | CellRect): CellRect;
   /** `change` on this sheet. */
-  sheetChange<T>(kind: FacadeChangeKind, fn: () => T): T;
+  sheetChange<T>(kind: FacadeChangeKind, fn: () => T, range?: CellRect): T;
 }
 
 /** A hand-written facade member: receives the context first, then the caller's arguments. */

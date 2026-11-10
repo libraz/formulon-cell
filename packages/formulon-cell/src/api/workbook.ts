@@ -542,10 +542,10 @@ const workbookContext = (wb: Workbook): WorkbookContext => {
       return stateOf(wb).handle.engineWorkbook();
     },
     run,
-    change: (kind, sheet, fn) =>
+    change: (kind, sheet, fn, range) =>
       run(() => {
         const result = fn();
-        state.handle.noteFacadeChange({ kind, sheet });
+        state.handle.noteFacadeChange(range ? { kind, sheet, range } : { kind, sheet });
         return result;
       }),
     sheet: (engine) => wb.sheet(engine.index),
@@ -674,7 +674,7 @@ const sheetContext = (sheet: Sheet): SheetContext => {
     cellAt: (at) => cellOf(base.engine, at),
     rectOf: (range) =>
       typeof range === 'string' ? base.engine.parseReference(range).range : range,
-    sheetChange: (kind, fn) => base.change(kind, engine.index, fn),
+    sheetChange: (kind, fn, range) => base.change(kind, engine.index, fn, range),
   };
 };
 

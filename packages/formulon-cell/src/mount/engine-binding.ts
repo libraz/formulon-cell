@@ -1,14 +1,41 @@
+import type { CellRect } from '@libraz/formulon';
 import { setDataTableGuardSink } from '../commands/data-table-guard.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { setPivotGuardSink } from '../commands/pivot-guard.js';
 import { protectedCellMessage } from '../commands/protection.js';
 import { addrKey } from '../engine/address.js';
-import { refreshChartsAfterRecalc, reloadChartsFromEngine } from '../engine/charts-sync.js';
+import { hydrateThreadedCommentsFromEngine } from '../engine/annotations-sync.js';
+import { hydrateAutoFilterFromEngine } from '../engine/auto-filter-sync.js';
+import { hydrateCellFormatsFromEngine } from '../engine/cell-format-sync.js';
+import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
+import {
+  hydrateChartsFromEngine,
+  refreshChartsAfterRecalc,
+  reloadChartsFromEngine,
+} from '../engine/charts-sync.js';
 import { editSeedForAddr } from '../engine/edit-seed.js';
-import { reloadImagesFromEngine } from '../engine/images-sync.js';
+import { hydrateCommentsAndHyperlinksFromEngine } from '../engine/format-sync.js';
+import { hydrateImagesFromEngine, reloadImagesFromEngine } from '../engine/images-sync.js';
+import { hydrateLayoutFromEngine } from '../engine/layout-sync.js';
+import { hydrateMergesFromEngine } from '../engine/merges-sync.js';
+import { hydratePageSetupFromEngine } from '../engine/print-sync.js';
+import {
+  hydrateProtectedRangesFromEngine,
+  hydrateProtectionFromEngine,
+} from '../engine/protection-sync.js';
+import { hydrateSlicersFromEngine } from '../engine/slicer-sync.js';
+import { hydrateSparklinesFromEngine } from '../engine/sparkline-sync.js';
+import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import type { Addr, CellValue } from '../engine/types.js';
-import type { ChangeEvent, WorkbookHandle } from '../engine/workbook-handle.js';
+import { hydrateValidationsFromEngine } from '../engine/validation-sync.js';
+import { hydrateViewStateFromEngine } from '../engine/view-state-sync.js';
+import type {
+  ChangeEvent,
+  FacadeChange,
+  FacadeChangeKind,
+  WorkbookHandle,
+} from '../engine/workbook-handle.js';
 import type { CellChangeEvent, SpreadsheetEmitter } from '../events.js';
 import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
 import { isMacHost } from '../extensions/ui-options.js';
@@ -44,10 +71,52 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { resolveTheme } from '../theme/resolve.js';
 import { confirmMoveOverwrite } from '../toolbar/dialogs/move-overwrite-confirm.js';
-import { hydrateActiveSheetFromEngine } from './hydration.js';
+import { hydrateActiveSheetFromEngine, hydrateWorkbookMetadataFromEngine } from './hydration.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
 
 type FeatureFlags = ReturnType<typeof resolveFlags>;
+
+type SliceHydrator = (
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+  range?: CellRect,
+) => void;
+
+/** The store slices each kind of facade write leaves stale, re-read from the engine for the sheet
+ *  the write touched (the active sheet for a workbook-scoped write). */
+const FACADE_HYDRATORS: Readonly<Record<FacadeChangeKind, readonly SliceHydrator[]>> = {
+  format: [hydrateCellFormatsFromEngine, hydrateCommentsAndHyperlinksFromEngine],
+  comments: [hydrateCommentsAndHyperlinksFromEngine],
+  threadedComments: [hydrateThreadedCommentsFromEngine],
+  layout: [
+    (wb, store, sheet) => mutators.replaceCells(store, wb.cells(sheet)),
+    hydrateLayoutFromEngine,
+    hydrateMergesFromEngine,
+    hydrateCellFormatsFromEngine,
+  ],
+  view: [
+    (wb, store) => hydrateViewStateFromEngine(wb, store, { followActiveSheet: false }),
+    hydrateLayoutFromEngine,
+  ],
+  names: [],
+  table: [(wb, store) => hydrateTableOverlaysFromEngine(wb, store), hydrateAutoFilterFromEngine],
+  autoFilter: [hydrateAutoFilterFromEngine],
+  drawing: [
+    hydrateImagesFromEngine,
+    hydrateChartsFromEngine,
+    (wb, store) => hydrateSlicersFromEngine(wb, store),
+  ],
+  pivot: [(wb, store, sheet) => mutators.replaceCells(store, wb.cells(sheet))],
+  sparklineGroups: [hydrateSparklinesFromEngine],
+  print: [hydratePageSetupFromEngine],
+  cf: [hydrateConditionalRulesFromEngine],
+  validation: [hydrateValidationsFromEngine],
+  protection: [
+    (wb, store) => hydrateProtectionFromEngine(wb, store),
+    hydrateProtectedRangesFromEngine,
+  ],
+};
 
 export interface EngineBinding {
   editor: InlineEditor;
@@ -61,6 +130,8 @@ export interface EngineBinding {
   contextMenu: ExtensionHandle | null;
   /** Follow a hyperlink target: select an in-document location or open an external URL. */
   followHyperlink: (target: string) => boolean;
+  /** Make `sheet` the active sheet as a tab click does; false when it is hidden or out of range. */
+  activateSheet: (sheet: number) => boolean;
   unbind: () => void;
 }
 
@@ -558,6 +629,23 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     }
   });
 
+  // A write through the public facade changes the engine only; bring the store slice it touched
+  // back in line so the grid shows it.
+  const unsubFacade = wb.subscribeFacadeChanges((change: FacadeChange) => {
+    const active = store.getState().data.sheetIndex;
+    const sheet = change.sheet ?? active;
+    if (sheet < 0 || sheet >= wb.sheetCount) return;
+    const hydrate = (): void => {
+      for (const fn of FACADE_HYDRATORS[change.kind]) fn(wb, store, sheet, change.range);
+    };
+    if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
+    else hydrate();
+    if (change.kind === 'names' || change.kind === 'protection') {
+      hydrateWorkbookMetadataFromEngine(wb, store);
+    }
+    renderer.invalidate();
+  });
+
   return {
     editor,
     pasteSpecialDialog,
@@ -569,6 +657,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     clipboardH,
     contextMenu,
     followHyperlink: (target) => followHyperlink({ store, wb, ...hyperlinkFollow }, target),
+    activateSheet,
     unbind: () => {
       bound = false;
       detachPtr();
@@ -591,6 +680,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       quickAnalysis?.detach();
       grid.removeEventListener('dblclick', onDblClick);
       unsubWb();
+      unsubFacade();
       pendingAtomic.clear();
       if (editor.isActive()) editor.cancel();
     },

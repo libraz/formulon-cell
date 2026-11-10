@@ -56,7 +56,9 @@ describe('error model: engine failures propagate untouched', () => {
 
   it('Shape: an unknown patch key', async () => {
     const wb = await createWorkbook();
-    const shape = wb.sheet(0).addShape({ presetGeometry: 'rect' });
+    const shape = wb
+      .sheet(0)
+      .addShape({ presetGeometry: 'rect', anchor: { widthEmu: 952500, heightEmu: 476250 } });
     expect(thrownBy(() => shape.update({ bogus: 1 } as never))).toBeInstanceOf(TypeError);
   });
 
@@ -102,15 +104,15 @@ describe('error model: formulon-cell preconditions', () => {
   it('a command the policy denies throws policy-denied', async () => {
     const instance = await mount(makeHost(), { policy: viewerPolicy() });
     disposers.push(instance);
-    expectFailure(() => instance.commands.execute('insertRowsAbove'), 'policy-denied');
-    expect(instance.commands.can('insertRowsAbove')).toBe(false);
+    expectFailure(() => instance.commands.execute('insertRows'), 'policy-denied');
+    expect(instance.commands.can('insertRows')).toBe(false);
   });
 
   it('a command on a protected sheet throws protected', async () => {
     const instance = await mount(makeHost());
     disposers.push(instance);
     await instance.workbook.sheet(0).protect();
-    expectFailure(() => instance.commands.execute('insertRowsAbove'), 'protected');
+    expectFailure(() => instance.commands.execute('insertRows'), 'protected');
   });
 
   it('spreadsheetFailureOf returns null for anything that is not a formulon-cell failure', () => {

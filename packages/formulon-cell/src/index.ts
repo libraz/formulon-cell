@@ -13,6 +13,40 @@ export type {
 } from './api/pivot-cache.js';
 export type { ExportCsvOptions, ImportCsvOptions } from './api/sheet-cells.js';
 export type { ProtectOptions } from './api/sheet-format.js';
+export type { CommandId } from './api/spreadsheet/command-ids.js';
+export type { DialogId, DialogOptions, Dialogs } from './api/spreadsheet/dialogs.js';
+export {
+  type Audit,
+  type CellFormatter,
+  type CellRegistry,
+  type Commands,
+  type Extensions,
+  type FormulaHints,
+  type History,
+  type I18n,
+  mount,
+  type Selection,
+  SpreadsheetInstance,
+  type Viewport,
+} from './api/spreadsheet/instance.js';
+export type {
+  ApplyChangesOptions,
+  CellChange,
+  CellEvent,
+  ChangeEvent,
+  ErrorEvent,
+  FormulaHint,
+  HostProviders,
+  RecalcEvent,
+  RibbonToolbarConfig,
+  SelectionState,
+  SpreadsheetInstanceEvents,
+  SpreadsheetOptions,
+  SpreadsheetPatch,
+  UpdateEvent,
+  ViewportConfig,
+  WorkbookEvent,
+} from './api/spreadsheet/types.js';
 export type { Table, TableRef } from './api/table.js';
 export {
   type ChangedCell,
@@ -30,7 +64,6 @@ export {
   type WorkbookOptions,
 } from './api/workbook.js';
 export type { CellFormatterEntry, CellRenderInput } from './cells.js';
-export { CellRegistry } from './cells.js';
 export {
   formatChartNumber,
   formatChartValue,
@@ -157,13 +190,7 @@ export type {
   HistoryEntry,
   HistoryTransaction,
 } from './commands/history.js';
-export {
-  canRedo,
-  canUndo,
-  History,
-  redo,
-  undo,
-} from './commands/history.js';
+export { canRedo, canUndo, redo, undo } from './commands/history.js';
 export type { HyperlinkEntry } from './commands/hyperlinks.js';
 export {
   clearHyperlink,
@@ -174,10 +201,7 @@ export {
 } from './commands/hyperlinks.js';
 export type { ExportOptions, ImportCSVOptions, ImportResult } from './commands/import-export.js';
 export { exportCSV, importCSV } from './commands/import-export.js';
-export type {
-  ApplyChangesOptions,
-  InteractionControllerOptions,
-} from './commands/interaction-controller.js';
+export type { InteractionControllerOptions } from './commands/interaction-controller.js';
 export { InteractionController } from './commands/interaction-controller.js';
 export type {
   BatchDeniedMode,
@@ -428,7 +452,6 @@ export type {
   CellPatch,
   CellPatchAtomicResult,
   CellSnapshot,
-  ChangeEvent,
   ChangeListener,
   WorkbookSaveOptions,
 } from './engine/workbook-handle.js';
@@ -440,7 +463,6 @@ export type { WorkbookThemePresetId } from './engine/workbook-theme-presets.js';
 export type {
   CellChangeEvent,
   LocaleChangeEvent,
-  RecalcEvent,
   RecalcEvent as LegacyRecalcEvent,
   SelectionChangeEvent,
   SpreadsheetEventHandler,
@@ -577,7 +599,6 @@ export type {
   ScreenClipCapture,
   ScreenClipCaptureResult,
   ScreenClipResult,
-  SpreadsheetInstance,
   SpreadsheetInstance as LegacySpreadsheetInstance,
   ToolbarInstance,
   ToolbarInstanceRef,

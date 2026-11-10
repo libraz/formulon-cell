@@ -125,10 +125,12 @@ export type FacadeChangeKind =
   | 'validation'
   | 'protection';
 
-/** A non-cell facade write: its kind and the sheet it touched (`null` for workbook scope). */
+/** A non-cell facade write: its kind, the sheet it touched (`null` for workbook scope) and, for a
+ *  write to a range of cells, that range. */
 export interface FacadeChange {
   readonly kind: FacadeChangeKind;
   readonly sheet: number | null;
+  readonly range?: CellRect;
 }
 
 /** Snapshot of one cell's full state — enough to restore it on undo. */

@@ -75,6 +75,7 @@ import {
 } from './mount/hydration.js';
 import { createInsertCopiedCellsOpener } from './mount/insert-copied-cells.js';
 import { createInstanceDialogApi } from './mount/instance-dialog-api.js';
+import { registerSpreadsheetInternals } from './mount/internals.js';
 import { syncLocaleProfile } from './mount/locale-profile.js';
 import { attachPivotFieldListFollow } from './mount/pivot-field-list-follow.js';
 import { createPrinterProfiles } from './mount/printer-profiles.js';
@@ -193,12 +194,7 @@ export const Spreadsheet = {
     let requestedFeatures = { ...ui.features, ...opts.features };
     let contextMenuOptions = opts.contextMenu;
     const initialTheme = opts.theme ?? ui.theme;
-    let flags = resolveMountFlags(
-      requestedFeatures,
-      opts.policy !== undefined,
-      contextMenuOptions,
-      ui.platform,
-    );
+    let flags = resolveMountFlags(requestedFeatures, contextMenuOptions, ui.platform);
     const emitter = new SpreadsheetEmitter();
     const formulaRegistry = new FormulaRegistry();
     if (opts.functions) {
@@ -961,12 +957,7 @@ export const Spreadsheet = {
       setFeatures(next) {
         requestedFeatures = { ...next };
         const prevFlags = flags;
-        const nextFlags = resolveMountFlags(
-          next,
-          commands.policy !== undefined,
-          contextMenuOptions,
-          ui.platform,
-        );
+        const nextFlags = resolveMountFlags(next, contextMenuOptions, ui.platform);
         const shouldRebuildViewToolbarObjects =
           prevFlags.viewToolbar &&
           nextFlags.viewToolbar &&
@@ -1276,6 +1267,7 @@ export const Spreadsheet = {
       throw error;
     }
 
+    registerSpreadsheetInternals(instance, { store, binding: () => binding, controller: commands });
     return instance;
   },
 };

@@ -78,16 +78,16 @@ describe('spreadsheet: sub-objects', () => {
     const s = sheet.workbook.sheet(0);
     s.setNumber('A1', 7);
     sheet.selection.set('A1');
-    expect(sheet.commands.can('insertRowsAbove')).toBe(true);
-    sheet.commands.execute('insertRowsAbove');
+    expect(sheet.commands.can('insertRows')).toBe(true);
+    sheet.commands.execute('insertRows');
     expect(s.getTypedValue('A2')).toEqual({ kind: ValueKind.Number, number: 7 });
   });
 
   it('dialogs: open and close by id', async () => {
     const sheet = await mountSheet();
-    expect(sheet.dialogs.canOpen('formatCells')).toBe(true);
-    sheet.dialogs.open('formatCells');
-    sheet.dialogs.close('formatCells');
+    expect(sheet.dialogs.canOpen('format')).toBe(true);
+    sheet.dialogs.open('format');
+    sheet.dialogs.close('format');
   });
 
   it('audit: trace precedents and clear them', async () => {
@@ -151,12 +151,12 @@ describe('spreadsheet: update', () => {
     expect(updates).toHaveBeenCalledWith(expect.objectContaining({ keys: ['locale'] }));
     sheet.update({ policy: viewerPolicy() });
     sheet.update({ policy: null });
-    expect(sheet.commands.can('insertRowsAbove')).toBe(true);
+    expect(sheet.commands.can('insertRows')).toBe(true);
   });
 
   it('a policy does not disable dialogs whose features are on', async () => {
     const sheet = await mountSheet({ policy: viewerPolicy() });
-    expect(sheet.dialogs.canOpen('formatCells')).toBe(true);
+    expect(sheet.dialogs.canOpen('format')).toBe(true);
   });
 
   const PAIRWISE: ReadonlyArray<
@@ -207,7 +207,7 @@ describe('spreadsheet: update', () => {
       expect(sheet.i18n.locale).toBe(locale);
       expect(sheet.viewport.options.mode).toBe(viewport);
       expect(sheet.toolbar === null).toBe(toolbar === 'none');
-      expect(sheet.commands.can('insertRowsAbove')).toBe(policy === 'none');
+      expect(sheet.commands.can('insertRows')).toBe(policy === 'none');
     },
   );
 });

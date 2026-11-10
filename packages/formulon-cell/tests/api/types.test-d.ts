@@ -64,10 +64,10 @@ describe('types', () => {
   });
 
   it('command and dialog ids reject unknown names', () => {
-    expectTypeOf<'insertRowsAbove'>().toMatchTypeOf<CommandId>();
-    expectTypeOf<'formatCells'>().toMatchTypeOf<DialogId>();
+    expectTypeOf<'insertRows'>().toMatchTypeOf<CommandId>();
+    expectTypeOf<'format'>().toMatchTypeOf<DialogId>();
     // @ts-expect-error not a command id
-    instance.commands.execute('noSuchCommand');
+    instance.commands.execute('insertRowsAbove');
     // @ts-expect-error not a dialog id
     instance.dialogs.open('noSuchDialog');
   });

@@ -1,3 +1,4 @@
+import type { CellRect } from '@libraz/formulon';
 import { sameStructuredValue } from '../commands/prepared-change.js';
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
@@ -23,6 +24,7 @@ import {
   writeShowPhonetic,
 } from './phonetic-sync.js';
 import { formattedKeySet, seedSyncedFormatKeys } from './synced-format-keys.js';
+import type { Addr, CellValue } from './types.js';
 import { syncValidationsToEngine } from './validation-sync.js';
 import { sheetFontPatchFor, syncWholeSheetFontOverrides } from './whole-sheet-font-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -308,6 +310,7 @@ export function hydrateCellFormatsFromEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
+  written?: CellRect,
 ): void {
   if (!wb.capabilities.cellFormatting) return;
   const workbookDefaultFont = wb.workbookDefaultFont;
@@ -324,7 +327,9 @@ export function hydrateCellFormatsFromEngine(
     }));
   }
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
-  const physicalCells = wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet);
+  const physicalCells = [...(wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet))];
+  // A format written to empty cells leaves them out of the physical cells; read those too.
+  if (written) physicalCells.push(...blankCellsIn(sheet, written, physicalCells));
   for (const c of physicalCells) {
     const phonetic = readPhoneticRuns(wb, c.addr, c.value);
     const xfIndex = wb.getCellXfIndex(sheet, c.addr.row, c.addr.col);
@@ -370,6 +375,28 @@ export function hydrateCellFormatsFromEngine(
     }
     return { ...s, format: { ...s.format, formats } };
   });
+}
+
+/** Most empty cells of a written range read back one by one; a larger write (a whole column) is
+ *  carried by the row and column styles instead. */
+const MAX_WRITTEN_BLANK_CELLS = 100_000;
+
+function blankCellsIn(
+  sheet: number,
+  range: CellRect,
+  present: readonly { addr: Addr }[],
+): { addr: Addr; value: CellValue; formula: null }[] {
+  const area = (range.lastRow - range.firstRow + 1) * (range.lastCol - range.firstCol + 1);
+  if (area > MAX_WRITTEN_BLANK_CELLS) return [];
+  const seen = new Set(present.map((c) => addrKey(c.addr)));
+  const out: { addr: Addr; value: CellValue; formula: null }[] = [];
+  for (let row = range.firstRow; row <= range.lastRow; row += 1) {
+    for (let col = range.firstCol; col <= range.lastCol; col += 1) {
+      const addr = { sheet, row, col };
+      if (!seen.has(addrKey(addr))) out.push({ addr, value: { kind: 'blank' }, formula: null });
+    }
+  }
+  return out;
 }
 
 function pivotFormatPatch(numberFormat: string): Partial<CellFormat> {

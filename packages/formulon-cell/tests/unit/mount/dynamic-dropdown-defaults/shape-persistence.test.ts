@@ -3,7 +3,7 @@ import { History } from '../../../../src/commands/history.js';
 import { createSessionShape } from '../../../../src/commands/session-illustration.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { en } from '../../../../src/i18n/strings.js';
-import type { SpreadsheetInstance } from '../../../../src/index.js';
+import type { LegacySpreadsheetInstance as SpreadsheetInstance } from '../../../../src/index.js';
 import { createIllustrationDropdownDefaults } from '../../../../src/mount/dynamic-dropdown-defaults/illustrations.js';
 import { createShapeFormatDropdownDefaults } from '../../../../src/mount/dynamic-dropdown-defaults/shape-format.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';

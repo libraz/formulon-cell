@@ -1,4 +1,6 @@
 import {
+  type CellFormatPatch,
+  type CellRect,
   type Sheet as EngineSheet,
   type Workbook as EngineWorkbook,
   FormulonError,
@@ -94,7 +96,7 @@ export const SHEET_FORMAT_MEMBERS = {
     'listColumnBreaks',
   ],
   change: {
-    format: ['updateCellFormat', 'updateFormatDefaults'],
+    format: ['updateFormatDefaults'],
     cf: ['addCfRule', 'updateCfRule', 'removeCfRule', 'clearCfRules'],
     validation: ['addValidation', 'updateValidation', 'removeValidation', 'clearValidations'],
     protection: [
@@ -116,7 +118,16 @@ export const SHEET_FORMAT_MEMBERS = {
       'clearBreaks',
     ],
   },
-  methods: { protect, unprotect },
+  methods: {
+    protect,
+    unprotect,
+    updateCellFormat: (ctx: SheetContext, range: CellRect | string, patch: CellFormatPatch): void =>
+      ctx.sheetChange(
+        'format',
+        () => ctx.sheetEngine.updateCellFormat(range, patch),
+        ctx.rectOf(range),
+      ),
+  },
 } as const satisfies MemberSpec<SheetContext>;
 
 /** Cell styles, the default font, the theme and workbook protection: engine `Workbook` members. */
@@ -149,7 +160,8 @@ export const WORKBOOK_FORMAT_MEMBERS = {
 type SheetChanges = typeof SHEET_FORMAT_MEMBERS.change;
 type SheetFormatMemberName =
   | (typeof SHEET_FORMAT_MEMBERS.read)[number]
-  | SheetChanges[keyof SheetChanges][number];
+  | SheetChanges[keyof SheetChanges][number]
+  | 'updateCellFormat';
 type WorkbookChanges = typeof WORKBOOK_FORMAT_MEMBERS.change;
 type WorkbookFormatMemberName =
   | (typeof WORKBOOK_FORMAT_MEMBERS.read)[number]
