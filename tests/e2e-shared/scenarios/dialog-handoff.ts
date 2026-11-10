@@ -61,6 +61,7 @@ async function openPasteSpecial(page: Page): Promise<Locator> {
   const menu = await openCellMenu(page);
   const trigger = menu.locator('[data-fc-submenu="pasteSpecialMenu"]');
   await trigger.focus();
+  await expect(trigger).toBeFocused();
   await page.keyboard.press('ArrowRight');
   const submenu = page.locator('.fc-ctxmenu__sub');
   await expect(submenu).toBeVisible();
