@@ -105,4 +105,24 @@ describe('Spreadsheet.mountToolbar backstage and default tabs', () => {
     expect(tb.getActiveTab()).toBe('insert');
     tb.dispose();
   });
+
+  it('scrolls only its own tab strip to show the active tab, never the page around it', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
+    const strip = host.querySelector<HTMLElement>('.fc-tb__ribbon-tabs');
+    const tab = host.querySelector<HTMLElement>('[data-ribbon-tab="view"]');
+    if (!strip || !tab) throw new Error('missing tab strip');
+    const rect = (left: number, width: number) =>
+      ({ left, right: left + width, top: 0, bottom: 24, width, height: 24 }) as DOMRect;
+    Object.defineProperty(strip, 'scrollWidth', { get: () => 400 });
+    Object.defineProperty(strip, 'clientWidth', { get: () => 100 });
+    Object.defineProperty(strip, 'offsetWidth', { get: () => 100 });
+    strip.getBoundingClientRect = () => rect(0, 100);
+    tab.getBoundingClientRect = () => rect(150 - strip.scrollLeft, 50);
+    const pageScroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+    tab.click();
+    expect(pageScroll).not.toHaveBeenCalled();
+    expect(strip.scrollLeft).toBe(100);
+    pageScroll.mockRestore();
+    tb.dispose();
+  });
 });

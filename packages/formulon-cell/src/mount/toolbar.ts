@@ -116,10 +116,31 @@ const MAC_MENU_SELECTOR = '.fc-tb__menu--mac';
 
 const isAriaDisabled = (el: Element): boolean => el.getAttribute('aria-disabled') === 'true';
 
+/** Scroll the nearest scrolling box inside `host` just enough to show `el`. Unlike
+ *  `scrollIntoView`, it never scrolls the page the toolbar is mounted in. */
+const revealInToolbar = (host: HTMLElement, el: HTMLElement): void => {
+  for (
+    let box = el.parentElement;
+    box && box !== host && host.contains(box);
+    box = box.parentElement
+  ) {
+    if (box.scrollWidth <= box.clientWidth && box.scrollHeight <= box.clientHeight) continue;
+    const outer = box.getBoundingClientRect();
+    const inner = el.getBoundingClientRect();
+    // Client rects are in rendered pixels; scroll offsets are in the box's own layout pixels.
+    const scaleX = box.offsetWidth > 0 ? outer.width / box.offsetWidth : 1;
+    const scaleY = box.offsetHeight > 0 ? outer.height / box.offsetHeight : 1;
+    const nearest = (start: number, end: number, lo: number, hi: number): number =>
+      start < lo ? start - lo : end > hi ? Math.min(end - hi, start - lo) : 0;
+    box.scrollLeft += nearest(inner.left, inner.right, outer.left, outer.right) / (scaleX || 1);
+    box.scrollTop += nearest(inner.top, inner.bottom, outer.top, outer.bottom) / (scaleY || 1);
+    return;
+  }
+};
+
 const scrollActiveTabIntoView = (host: HTMLElement): void => {
-  host
-    .querySelector<HTMLElement>('[data-ribbon-tab][aria-selected="true"]')
-    ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  const tab = host.querySelector<HTMLElement>('[data-ribbon-tab][aria-selected="true"]');
+  if (tab) revealInToolbar(host, tab);
 };
 
 const isImmediateMacFormulaOpener = (commandId: string): boolean =>
@@ -785,7 +806,7 @@ export function mountToolbar(
     if (!target?.closest || !host.contains(target)) return;
     if (target.closest('.fc-tb__menu, .fc-tb__submenu, .fc-tb__rb-dd')) return;
     if (target.closest('.fc-tb__ribbon-tabs, .fc-tb__ribbon')) {
-      target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      revealInToolbar(host, target);
     }
   };
   host.addEventListener('focusin', onRibbonFocus, true);

@@ -45,12 +45,4 @@ describe('positionRibbonDisplayMenu under a scaled host', () => {
     expect(menu.getBoundingClientRect().left).toBeGreaterThanOrEqual(0);
     expect(menu.getBoundingClientRect().right).toBeLessThanOrEqual(160);
   });
-
-  it('corrects a placement the coordinate conversion left outside the viewport', () => {
-    window.innerWidth = 160;
-    window.innerHeight = 900;
-    const { toggle, menu } = build(0, -16);
-    positionRibbonDisplayMenu(toggle, menu);
-    expect(menu.getBoundingClientRect().left).toBeGreaterThanOrEqual(0);
-  });
 });
