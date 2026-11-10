@@ -2,8 +2,10 @@
 /**
  * Public-surface gate. Reads the built declaration files reachable from the
  * `exports` maps of the three packages and compares them with manifest.json:
- * per entry point, names that must be exported and names that must not be,
- * the root-size ceiling, and the allowed `./i18n/*` files.
+ * per entry point, names that must be exported (as a value or as a type) and
+ * names that must not be, the allowed `./i18n/*` files, and for the root entry
+ * the ceiling on runtime values plus the rule that every exported type is
+ * reachable from some exported value's signature (no orphan types).
  *
  * Usage: node scripts/api-surface/check.mjs [--absence]
  *   --absence  also reports public return types and required readonly fields
@@ -111,17 +113,129 @@ const scanAbsence = (sym, label) => {
   }
 };
 
+const resolve = (sym) => (sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym);
+// A type-only re-export of a class or const is a type on this entry point.
+const isValueExport = (sym) =>
+  (resolve(sym).flags & ts.SymbolFlags.Value) !== 0 &&
+  !(sym.declarations ?? []).some((d) => d.isTypeOnly || d.parent?.parent?.isTypeOnly);
+
+/** Symbols of every type reachable from the given values' types, members included. */
+const reachableTypes = (values) => {
+  const seenTypes = new Set();
+  const seenAlias = new Set();
+  const symbols = new Set();
+  const note = (s) => {
+    if (!s) return;
+    symbols.add(s);
+    if (s.flags & ts.SymbolFlags.Alias) symbols.add(resolve(s));
+  };
+  const typeOfSym = (s) => {
+    const d = s.valueDeclaration ?? s.declarations?.[0];
+    return d ? checker.getTypeOfSymbolAtLocation(s, d) : null;
+  };
+  // `T | undefined` and `T | null` drop T's alias symbol, so also follow the references as written.
+  const refsIn = (node, stack) => {
+    if (!node) return;
+    if (
+      ts.isTypeReferenceNode(node) ||
+      ts.isExpressionWithTypeArguments(node) ||
+      ts.isTypeQueryNode(node)
+    ) {
+      // Interned unions keep the alias of whichever declaration created them first, so record the name too.
+      const name = ts.isTypeReferenceNode(node)
+        ? node.typeName
+        : ts.isTypeQueryNode(node)
+          ? node.exprName
+          : node.expression;
+      const sym = checker.getSymbolAtLocation(name);
+      if (sym) {
+        note(sym);
+        if (resolve(sym).flags & ts.SymbolFlags.TypeAlias)
+          for (const d of resolve(sym).declarations ?? [])
+            if (!seenAlias.has(d)) {
+              seenAlias.add(d);
+              refsIn(d.type, stack);
+            }
+      }
+      stack.push(checker.getTypeFromTypeNode(node));
+    }
+    ts.forEachChild(node, (c) => refsIn(c, stack));
+  };
+  const visitSig = (sig, stack) => {
+    refsIn(sig.declaration, stack);
+    for (const p of sig.getParameters()) refsIn(p.valueDeclaration?.type, stack);
+    for (const tp of sig.getTypeParameters() ?? []) {
+      const c = tp.getConstraint();
+      if (c) stack.push(c);
+    }
+    for (const p of sig.getParameters()) {
+      const t = typeOfSym(p);
+      if (t) stack.push(t);
+    }
+    stack.push(sig.getReturnType());
+  };
+  const stack = [];
+  for (const v of values) {
+    const target = resolve(v);
+    const t = typeOfSym(target);
+    if (t) stack.push(t);
+    if (target.flags & ts.SymbolFlags.Class) stack.push(checker.getDeclaredTypeOfSymbol(target));
+  }
+  while (stack.length) {
+    const t = stack.pop();
+    if (!t || seenTypes.has(t)) continue;
+    seenTypes.add(t);
+    note(t.aliasSymbol);
+    note(t.symbol);
+    for (const a of t.aliasTypeArguments ?? []) stack.push(a);
+    if (t.isUnionOrIntersection()) stack.push(...t.types);
+    if (t.flags & ts.TypeFlags.Object && t.objectFlags & ts.ObjectFlags.Reference)
+      stack.push(...checker.getTypeArguments(t));
+    if (t.flags & ts.TypeFlags.Index) stack.push(t.type);
+    if (t.flags & ts.TypeFlags.IndexedAccess) stack.push(t.objectType, t.indexType);
+    if (t.flags & ts.TypeFlags.Conditional) stack.push(t.checkType, t.extendsType);
+    // Walk members only of this package family's own types, not lib or DOM types.
+    const decl = (t.aliasSymbol ?? t.symbol)?.declarations?.[0];
+    if (!decl || !ownFile(decl)) continue;
+    for (const sig of [...t.getCallSignatures(), ...t.getConstructSignatures()])
+      visitSig(sig, stack);
+    for (const p of checker.getPropertiesOfType(t)) {
+      for (const d of p.declarations ?? []) refsIn(d.type, stack);
+      const pt = typeOfSym(p);
+      if (pt) stack.push(pt);
+    }
+    for (const info of checker.getIndexInfosOfType(t)) stack.push(info.type);
+    for (const b of t.isClassOrInterface() ? checker.getBaseTypes(t) : []) stack.push(b);
+    if (t.aliasSymbol) for (const d of t.aliasSymbol.declarations ?? []) refsIn(d.type, stack);
+  }
+  return symbols;
+};
+
 for (const [entry, spec] of Object.entries(manifest.entries)) {
   const file = entries.get(entry);
   if (!file || !fs.existsSync(file)) continue;
   const syms = exportsOf(file);
   const names = new Set(syms.map((s) => s.getName()));
-  for (const n of spec.mustExport)
-    if (!names.has(n)) violations.push(`${entry}: missing export ${n}`);
+  const byName = new Map(syms.map((s) => [s.getName(), s]));
+  for (const [n, kind] of Object.entries(spec.mustExport)) {
+    const sym = byName.get(n);
+    if (!sym) violations.push(`${entry}: missing export ${n}`);
+    else if ((kind === 'value') !== isValueExport(sym))
+      violations.push(`${entry}: ${n} must be exported as a ${kind}`);
+  }
   for (const n of spec.mustNotExport)
     if (names.has(n)) violations.push(`${entry}: must not export ${n}`);
-  if (entry === '@libraz/formulon-cell' && names.size > manifest.rootMax)
-    violations.push(`${entry}: ${names.size} exports > ${manifest.rootMax}`);
+  if (entry === '@libraz/formulon-cell') {
+    const values = syms.filter(isValueExport);
+    if (values.length > manifest.rootValueMax)
+      violations.push(`${entry}: ${values.length} runtime values > ${manifest.rootValueMax}`);
+    const reached = reachableTypes(values);
+    for (const s of syms)
+      if (!isValueExport(s) && !reached.has(s) && !reached.has(resolve(s)))
+        violations.push(
+          `${entry}: orphan type ${s.getName()} (no exported value's signature reaches it)`,
+        );
+  }
   if (checkAbsence) for (const s of syms) scanAbsence(s, `${entry}#${s.getName()}`);
 }
 for (const f of i18nFiles)
