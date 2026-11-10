@@ -1,12 +1,15 @@
 import type { History } from '../commands/history.js';
+import type { InteractionOrigin } from '../commands/interaction-policy.js';
+import { objectWrite } from '../commands/object-actions.js';
 import { recordSlicersChange } from '../commands/slice-history.js';
 import {
   createSlicer,
   listSlicerValues,
   recomputeSlicerFilters,
-  removeSlicer,
+  removeSlicerAction,
   resolveSlicerSpec,
-  setSlicerSelected,
+  type SlicerActionContext,
+  setSlicerSelectionAction,
 } from '../commands/slicers.js';
 import { drawingClipPath, sessionPosition } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -130,12 +133,12 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
     host.appendChild(root);
 
     const onClear = (): void => {
-      withHistory(() => setSlicerSelected(store, spec.id, []));
-      recomputeAndRender();
+      setSlicerSelectionAction(slicerContext('editor', 'slicerClear'), spec.id, []);
+      renderAll();
     };
     const onClose = (): void => {
-      withHistory(() => removeSlicer(store, spec.id));
-      recomputeAndRender();
+      removeSlicerAction(slicerContext('editor', 'slicerDelete'), spec.id);
+      renderAll();
     };
     clearBtn.addEventListener('click', onClear);
     closeBtn.addEventListener('click', onClose);
@@ -209,8 +212,8 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
         //  "all" so the next click can re-narrow without going through
         //  every chip.
         const next = current.size === distinct.length ? [] : Array.from(current).sort();
-        withHistory(() => setSlicerSelected(store, spec.id, next));
-        recomputeAndRender();
+        setSlicerSelectionAction(slicerContext('editor', 'slicerFilter'), spec.id, next);
+        renderAll();
         restoreChipFocus(value);
       });
       chip.addEventListener('keydown', (e) => {
@@ -281,10 +284,14 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
     }
   };
 
-  const withHistory = (mutate: () => void): void => {
-    if (history) recordSlicersChange(history, store, mutate);
-    else mutate();
-  };
+  /** A slicer change from `origin`, as `commandId`. */
+  const slicerContext = (origin: InteractionOrigin, commandId: string): SlicerActionContext => ({
+    store,
+    history: history ?? null,
+    workbook: getWb(),
+    origin,
+    commandId,
+  });
 
   // Subscribe to store changes — chip repaint when slicers list changes,
   //  underlying cell map mutates (recalc), or the active sheet swaps.
@@ -313,10 +320,15 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
 
   const handle: SlicerHandle = {
     addSlicer(input): SlicerSpec {
-      let result = undefined as unknown as ReturnType<typeof createSlicer>;
-      withHistory(() => {
-        result = createSlicer(store, getWb(), input);
-      });
+      let result: ReturnType<typeof createSlicer> | null = null;
+      const ctx = slicerContext('instanceApi', 'mac.insert.slicer');
+      objectWrite(ctx, store.getState().data.sheetIndex, undefined, () =>
+        recordSlicersChange(history ?? null, store, () => {
+          result = createSlicer(store, getWb(), input);
+        }),
+      );
+      result = result as ReturnType<typeof createSlicer> | null;
+      if (!result) throw new Error('Slicer: insertion refused by protection or policy');
       if (!result.ok && result.reason === 'table-not-found') {
         throw new Error(`Slicer: table "${input.tableName}" not found`);
       }
@@ -327,8 +339,8 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       return result.spec;
     },
     removeSlicer(id): void {
-      withHistory(() => removeSlicer(store, id));
-      recomputeAndRender();
+      removeSlicerAction(slicerContext('instanceApi', 'slicerDelete'), id);
+      renderAll();
     },
     refresh(): void {
       renderAll();

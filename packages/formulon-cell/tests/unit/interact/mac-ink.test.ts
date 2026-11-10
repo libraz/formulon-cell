@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { ensureMacInk, getMacInk, type MacInkController } from '../../../src/interact/mac-ink.js';
@@ -309,7 +313,7 @@ describe('Mac ink controller', () => {
     expect(host.querySelector('[data-fc-mac-ink-id]')?.getAttribute('stroke-width')).toBe('4.5');
   });
 
-  it('does not mutate a protected or restricted sheet', () => {
+  it('does not mutate a protected or restricted sheet', async () => {
     const protectedController = ensureMacInk({ host, store });
     if (!protectedController) throw new Error('Mac ink controller did not attach');
     controller = protectedController;
@@ -323,11 +327,11 @@ describe('Mac ink controller', () => {
 
     protectedController.dispose();
     setProtectedSheet(store, 0, false);
-    const restricted = ensureMacInk({
-      host,
-      store,
-      commands: { canExecute: () => ({ allowed: false }) },
-    });
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const commands = new InteractionController({ store, getWb: () => wb, history: new History() });
+    const unregister = registerInteractionController(store, commands);
+    commands.setPolicy({ defaultOperation: 'allow', operations: { object: false } });
+    const restricted = ensureMacInk({ host, store });
     if (!restricted) throw new Error('Mac ink controller did not reattach');
     controller = restricted;
     restricted.activate('pen-black');
@@ -336,6 +340,9 @@ describe('Mac ink controller', () => {
     firePointer(restrictedInput, 'pointerdown');
     firePointer(restrictedInput, 'pointerup');
     expect(store.getState().illustrations.illustrations).toHaveLength(0);
+    unregister();
+    commands.dispose();
+    wb.dispose();
   });
 
   it('restores a stroke through shared history after erasing', () => {

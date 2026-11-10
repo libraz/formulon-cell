@@ -55,6 +55,7 @@ export function createIllustrationDropdownDefaults(
             instance.history as unknown as Parameters<typeof createRibbonImageFromSelection>[3],
             result.alt,
             { bytes: result.bytes, wb: instance.workbook },
+            { origin: 'ribbon', commandId: 'pictureInsert' },
           );
         }
         return;
@@ -101,6 +102,7 @@ export function createIllustrationDropdownDefaults(
         normalizedSelectionRange(instance),
         shape,
         instance.history as unknown as Parameters<typeof createRibbonShapeFromSelection>[3],
+        { origin: 'ribbon', commandId: 'shapesInsert' },
       );
     };
 
@@ -122,10 +124,25 @@ export function createIllustrationDropdownDefaults(
         instance.openWorkbookObjects();
         return;
       }
+      // Bring to Front runs as Bring Forward, Send to Back as Send Backward.
+      const arrange = {
+        origin: 'ribbon',
+        commandId:
+          action === 'bring-forward' || action === 'bring-front'
+            ? 'objectBringForward'
+            : 'objectSendBackward',
+      } as const;
       const chart = selectedSessionChart(instance.store.getState());
       if (chart) {
         // The chart stays selected, as it does in the spreadsheet.
-        arrangeSessionChart(instance.store, chart.id, action, instance.history, instance.workbook);
+        arrangeSessionChart(
+          instance.store,
+          chart.id,
+          action,
+          instance.history,
+          instance.workbook,
+          arrange,
+        );
         return;
       }
       const id = activeIllustrationId(instance);
@@ -135,7 +152,7 @@ export function createIllustrationDropdownDefaults(
           id,
           action,
           instance.history as unknown as Parameters<typeof arrangeSessionIllustration>[3],
-          undefined,
+          arrange,
           instance.workbook,
         );
       }
@@ -214,6 +231,7 @@ export function createIllustrationDropdownDefaults(
             instance.history as unknown as Parameters<typeof createRibbonImageFromSelection>[3],
             undefined,
             { bytes: dataUrlBytes(dataUrl), wb: instance.workbook },
+            { origin: 'ribbon', commandId: 'screenshotInsert' },
           );
           instance.host.focus();
           return;
@@ -233,6 +251,7 @@ export function createIllustrationDropdownDefaults(
             instance.history as unknown as Parameters<typeof createRibbonImageFromSelection>[3],
             clip.alt,
             { bytes: dataUrlBytes(clip.src), wb: instance.workbook },
+            { origin: 'ribbon', commandId: 'screenshotInsert' },
           );
           instance.host.focus();
           return;

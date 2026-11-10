@@ -175,7 +175,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   'mac.insert.chartCombo': 'object',
   'mac.insert.chartMap': 'object',
   'mac.insert.sparkline': 'object',
-  'mac.insert.slicer': 'table',
+  'mac.insert.slicer': 'object',
   'mac.insert.link': 'hyperlink',
   'mac.insert.newComment': 'comment',
   'mac.insert.headerFooter': 'pageSetup',
@@ -580,16 +580,17 @@ const SELECTING_NAVIGATION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<Bui
 const WORKBOOK_EFFECT_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'namedRange',
   'sheet',
-  'object',
   'protection',
   'print',
   'export',
 ]);
 
-/** Row and column layout operations: decided for the sheet, by its Format rows/columns option. */
+/** Row and column layout and drawing-object operations: decided for the sheet, by its Format
+ *  rows/columns or Edit objects option. */
 const SHEET_LAYOUT_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'resizeRows',
   'resizeColumns',
+  'object',
 ]);
 
 /** Show/Hide Detail: expanding or collapsing an outline is a row or a column layout change,
@@ -758,6 +759,7 @@ export const builtInProtectionDecision = (
     refusedOnProtectedSheet(state, sheet, id) ||
     filterRefused ||
     (operation === 'pivot' && !sheetPermits(state, sheet, 'pivotTables')) ||
+    (operation === 'object' && !sheetPermits(state, sheet, 'objects')) ||
     (operation === 'table' && !tableChangePermitted(state, sheet, id)) ||
     (option !== undefined && !sheetPermits(state, sheet, option));
   return refused

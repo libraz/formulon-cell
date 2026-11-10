@@ -557,7 +557,11 @@ const applyGenericRibbonCommand = (
       const state = i.store.getState();
       const chart = selectedSessionChart(state);
       const item = chart ? null : selectedSessionIllustration(state);
-      if (chart) arrangeSessionChart(i.store, chart.id, action, i.history, i.workbook);
+      if (chart)
+        arrangeSessionChart(i.store, chart.id, action, i.history, i.workbook, {
+          origin: 'ribbon',
+          commandId: id,
+        });
       else if (item) {
         arrangeSessionIllustration(
           i.store,

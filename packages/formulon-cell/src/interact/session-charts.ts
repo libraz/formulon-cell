@@ -6,10 +6,10 @@ import { accentsFromTheme } from '../charts/series-colors.js';
 import type { ChartData, ChartKind, ChartPrimitive, ChartScene } from '../charts/types.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { objectChangeAllowed } from '../commands/object-actions.js';
 import {
   addSessionChartSeries,
   arrangeSessionChart,
-  canMutateChart,
   clearSessionChart,
   duplicateSessionChart,
   removeSessionChartSeries,
@@ -316,19 +316,11 @@ export function attachSessionCharts(deps: {
     return accents ? { accents } : {};
   };
 
-  const canEditChart = (chart: SessionChart): boolean => {
-    if (!chartWorkbook()) return false;
-    const { fromRow, fromCol } = chart.nativeAnchor;
-    const cells = [{ sheet: chart.sheet, row: fromRow, col: fromCol }];
-    if (chart.source) {
-      cells.push({ sheet: chart.source.sheet, row: chart.source.r0, col: chart.source.c0 });
-    }
-    return canMutateChart(store, {
-      operation: 'object',
-      origin: 'instanceApi',
-      effects: cells.map((cell) => ({ kind: 'cells', cells: [cell] })),
-    });
-  };
+  /** The chart settings pane, which formats the selected chart. */
+  const SETTINGS = { origin: 'ribbon', commandId: 'chartFormatSelection' } as const;
+
+  const canEditChart = (chart: SessionChart): boolean =>
+    chartWorkbook() !== null && objectChangeAllowed({ store, ...SETTINGS }, chart.sheet);
 
   /** Series for a settings draft, resolved by the engine as the draft would split them. */
   const draftData = (chart: SessionChartSettingsShape): ChartData => {
@@ -352,7 +344,7 @@ export function attachSessionCharts(deps: {
     accents: workbookAccents,
     onApply: (id, patch, patchHistory) => {
       const wb = chartWorkbook();
-      if (wb) updateSessionChart(store, id, patch, patchHistory, wb);
+      if (wb) updateSessionChart(store, id, patch, patchHistory, wb, SETTINGS);
     },
     onAddSeries: (id, refs, seriesHistory) => {
       const wb = chartWorkbook();
@@ -373,13 +365,14 @@ export function attachSessionCharts(deps: {
         ...(x ? { x } : {}),
       };
       const before = new Set(chart.data.series.map((entry) => entry.id));
-      const updated = addSessionChartSeries(store, id, series, seriesHistory, wb);
+      const updated = addSessionChartSeries(store, id, series, seriesHistory, wb, SETTINGS);
       return updated?.data.series.find((entry) => !before.has(entry.id))?.id ?? null;
     },
     onRemoveSeries: (id, seriesId, seriesHistory) => {
       const wb = chartWorkbook();
       return (
-        wb !== null && removeSessionChartSeries(store, id, seriesId, seriesHistory, wb) !== null
+        wb !== null &&
+        removeSessionChartSeries(store, id, seriesId, seriesHistory, wb, SETTINGS) !== null
       );
     },
   });
@@ -471,6 +464,7 @@ export function attachSessionCharts(deps: {
   const placeChart = (
     chart: SessionChart,
     patch: { x?: number; y?: number; w?: number; h?: number },
+    origin: 'editor' | 'keyboard',
   ): boolean => {
     const wb = chartWorkbook();
     if (!wb) return false;
@@ -488,12 +482,21 @@ export function attachSessionCharts(deps: {
       widthEmu: placed.widthEmu,
       heightEmu: placed.heightEmu,
     };
-    return updateSessionChart(store, chart.id, { anchor }, history, wb) !== null;
+    return (
+      updateSessionChart(store, chart.id, { anchor }, history, wb, {
+        origin,
+        commandId: 'chartMove',
+      }) !== null
+    );
   };
 
   const removeChart = (chart: SessionChart): void => {
     const wb = chartWorkbook();
-    if (wb) clearSessionChart(store, chart.id, history, wb);
+    if (wb)
+      clearSessionChart(store, chart.id, history, wb, {
+        origin: 'keyboard',
+        commandId: 'chartDelete',
+      });
     host.focus({ preventScroll: true });
   };
 
@@ -519,7 +522,7 @@ export function attachSessionCharts(deps: {
       keepRatio: (move) => move.shiftKey,
       preview: (patch) => previewFrame(panel, patch),
       commit: (patch) => {
-        if (!placeChart(chart, patch)) render();
+        if (!placeChart(chart, patch, 'editor')) render();
       },
     });
   };
@@ -562,7 +565,11 @@ export function attachSessionCharts(deps: {
     const arrangeable = chartWorkbook() !== null && canEditChart(chart);
     const arrange = (action: 'bring-front' | 'send-back'): void => {
       const wb = chartWorkbook();
-      if (wb) arrangeSessionChart(store, chart.id, action, history, wb);
+      if (wb)
+        arrangeSessionChart(store, chart.id, action, history, wb, {
+          origin: 'contextMenu',
+          commandId: action === 'bring-front' ? 'objectBringForward' : 'objectSendBackward',
+        });
     };
     const entries: ObjectMenuEntry[] = [];
     if (isDrawable(chart)) {
@@ -632,7 +639,12 @@ export function attachSessionCharts(deps: {
     if (isDuplicateShortcut(e)) {
       e.preventDefault();
       const wb = chartWorkbook();
-      const copy = wb ? duplicateSessionChart(store, chart.id, history, wb) : null;
+      const copy = wb
+        ? duplicateSessionChart(store, chart.id, history, wb, {
+            origin: 'keyboard',
+            commandId: 'chartDuplicate',
+          })
+        : null;
       // Like the spreadsheet, the copy takes the selection.
       const copyPanel = Array.from(root.querySelectorAll<HTMLElement>('.fc-chart')).find(
         (candidate) => candidate.dataset.chartId === copy?.id,
@@ -660,13 +672,14 @@ export function attachSessionCharts(deps: {
     const [dx, dy] = delta;
     const current = sessionPosition(store, chart.nativeAnchor);
     if (e.shiftKey) {
-      placeChart(chart, {
-        w: Math.max(MIN_W, current.w + dx),
-        h: Math.max(MIN_H, current.h + dy),
-      });
+      placeChart(
+        chart,
+        { w: Math.max(MIN_W, current.w + dx), h: Math.max(MIN_H, current.h + dy) },
+        'keyboard',
+      );
       return;
     }
-    placeChart(chart, { x: current.x + dx, y: current.y + dy });
+    placeChart(chart, { x: current.x + dx, y: current.y + dy }, 'keyboard');
   };
 
   /** The tooltip of one data point, as Excel words it. */

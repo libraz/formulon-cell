@@ -311,17 +311,17 @@ export const workbookObjects = (): Extension =>
         },
         onClearSessionIllustration: (id) =>
           clearSessionIllustration(ctx.store, id, ctx.history, ctx.workbook, {
-            origin: 'contextMenu',
+            origin: 'ribbon',
             commandId: 'workbookObjects.delete',
           }),
         onDuplicateSessionIllustration: (id) =>
           duplicateSessionIllustration(ctx.store, id, ctx.history, ctx.workbook, {
-            origin: 'contextMenu',
+            origin: 'ribbon',
             commandId: 'workbookObjects.duplicate',
           }),
         onUpdateSessionIllustration: (id, patch) =>
           updateSessionIllustration(ctx.store, id, patch, ctx.history, ctx.workbook, {
-            origin: 'contextMenu',
+            origin: 'ribbon',
             commandId: 'workbookObjects.update',
           }),
         subscribeSessionObjects: (listener) => ctx.store.subscribe(listener),

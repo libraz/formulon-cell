@@ -1,5 +1,5 @@
 import type { History } from '../commands/history.js';
-import { setSparkline } from '../commands/sparkline.js';
+import { setSparklinesAction } from '../commands/sparkline.js';
 import { formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
@@ -235,15 +235,23 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   const onCancel = (): void => api.close();
   const onOk = (): void => {
     if (!validate() || !lastSource || !lastDestination) return;
-    const ok = setSparkline(
-      store,
-      lastDestination,
+    const ok = setSparklinesAction(
       {
-        kind: lastKind,
-        source: sourceForSpec(lastSource, lastDestination),
-        showNegative: lastKind !== 'line',
+        store,
+        history: deps.history ?? null,
+        origin: 'ribbon',
+        commandId: 'mac.insert.sparkline',
       },
-      deps.history ?? null,
+      [
+        {
+          addr: lastDestination,
+          spec: {
+            kind: lastKind,
+            source: sourceForSpec(lastSource, lastDestination),
+            showNegative: lastKind !== 'line',
+          },
+        },
+      ],
     );
     if (!ok) {
       setError(strings.mac.sparkline.protectedLocation);

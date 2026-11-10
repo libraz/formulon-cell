@@ -1,5 +1,5 @@
 import type { FunctionCategory } from '../../../commands/function-categories.js';
-import type { InteractionOperation } from '../../../commands/interaction-policy.js';
+import { objectChangeAllowed, objectWrite } from '../../../commands/object-actions.js';
 import {
   disposeDataTableDialog,
   openDataTableDialogFrom,
@@ -62,21 +62,6 @@ export type MacRibbonActionId = (typeof MAC_RIBBON_ACTION_IDS)[number];
 export type MacRibbonAction = () => void | Promise<void>;
 export type MacRibbonActions = Readonly<Record<string, MacRibbonAction>>;
 
-const policyAllows = (
-  instance: SpreadsheetInstance,
-  operation: InteractionOperation,
-  commandId: string,
-): boolean => {
-  if (!instance.commands.policy) return true;
-  const range = instance.store.getState().selection.range;
-  return instance.commands.canExecute({
-    operation,
-    origin: 'ribbon',
-    commandId,
-    effects: [{ kind: 'range', range }],
-  }).allowed;
-};
-
 const ACTIONS_BY_INSTANCE = new WeakMap<object, MacRibbonActions>();
 
 const formulaCategory = (instance: SpreadsheetInstance, category: FunctionCategory): void => {
@@ -96,15 +81,12 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
     history: instance.history,
     getWb: () => instance.workbook,
     strings: instance.i18n.strings,
-    canCommit: (_source, destination) => {
-      if (!instance.commands.policy) return true;
-      return instance.commands.canExecute({
-        operation: 'format',
-        origin: 'ribbon',
-        commandId: 'mac.insert.sparkline',
-        effects: [{ kind: 'cells', cells: [destination] }],
-      }).allowed;
-    },
+    canCommit: (_source, destination) =>
+      objectChangeAllowed(
+        { store: instance.store, origin: 'ribbon', commandId: 'mac.insert.sparkline' },
+        destination.sheet,
+        [{ kind: 'cells', cells: [destination] }],
+      ),
   });
   const slicer = attachMacSlicerDialog({
     host: instance.host,
@@ -112,12 +94,20 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
     getWb: () => instance.workbook,
     strings: instance.i18n.strings,
     onAdd: (input) => {
-      if (!policyAllows(instance, 'table', 'mac.insert.slicer')) return null;
-      try {
-        return instance.addSlicer(input);
-      } catch {
-        return null;
-      }
+      const ctx = {
+        store: instance.store,
+        history: instance.history,
+        origin: 'ribbon',
+        commandId: 'mac.insert.slicer',
+      } as const;
+      const sheet = instance.store.getState().data.sheetIndex;
+      return objectWrite(ctx, sheet, null, () => {
+        try {
+          return instance.addSlicer(input);
+        } catch {
+          return null;
+        }
+      });
     },
   });
   const statistics = attachMacWorkbookStatistics({

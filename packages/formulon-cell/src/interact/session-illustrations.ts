@@ -369,7 +369,7 @@ export function attachSessionIllustrations(deps: {
           { text },
           history,
           getWb() ?? undefined,
-          illustrationAuthorization('sessionIllustration.text'),
+          illustrationAuthorization('sessionIllustration.text', 'editor'),
         );
       }
       render();
@@ -406,7 +406,12 @@ export function attachSessionIllustrations(deps: {
       keepRatio: (move) => item.kind === 'image' || move.shiftKey,
       preview: (patch) => previewFrame(panel, patch),
       commit: (patch) => {
-        place(item, patch, handle ? 'sessionIllustration.resize' : 'sessionIllustration.move');
+        place(
+          item,
+          patch,
+          handle ? 'sessionIllustration.resize' : 'sessionIllustration.move',
+          'editor',
+        );
         // A refused change leaves the store as it was; put the frame back.
         render();
       },

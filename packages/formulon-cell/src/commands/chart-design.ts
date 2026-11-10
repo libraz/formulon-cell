@@ -180,7 +180,13 @@ export const applySessionChartElement = (
 ): boolean => {
   const chart = sessionChartById(store.getState(), id);
   const patch = chart ? chartElementPatch(chart, action) : null;
-  return patch !== null && updateSessionChart(store, id, patch, history, wb) !== null;
+  return (
+    patch !== null &&
+    updateSessionChart(store, id, patch, history, wb, {
+      origin: 'ribbon',
+      commandId: 'chartAddElement',
+    }) !== null
+  );
 };
 
 /** Plot the chart's rows as series where it plotted columns, and the reverse. */
@@ -193,7 +199,12 @@ export const switchSessionChartRowColumn = (
   const chart = sessionChartById(store.getState(), id);
   if (!chart || !isDrawable(chart) || chart.kind === 'scatter') return false;
   const seriesDirection = chart.seriesDirection === 'rows' ? 'columns' : 'rows';
-  return updateSessionChart(store, id, { seriesDirection }, history, wb) !== null;
+  return (
+    updateSessionChart(store, id, { seriesDirection }, history, wb, {
+      origin: 'ribbon',
+      commandId: 'chartSwitchRowColumn',
+    }) !== null
+  );
 };
 
 /** The colours of `preset` for the chart's sheet's workbook. */
@@ -243,6 +254,7 @@ export const applySessionChartColors = (
       },
       history,
       wb,
+      { origin: 'ribbon', commandId: 'chartColors' },
     ) !== null
   );
 };

@@ -101,11 +101,13 @@ const chartKindFromAction = (action: string): SessionChartKind => {
   return 'column';
 };
 
-/** Insert a chart of the selection with settings beyond its kind. */
+/** Insert a chart of the selection with settings beyond its kind, as the ribbon command
+ *  `commandId`. */
 export const createChartVariantFromSelection = (
   instance: SpreadsheetInstance,
   kind: SessionChartKind,
   settings?: Omit<ChartSpec, 'kind'>,
+  commandId = 'chartInsert',
 ): void => {
   // The sheet takes focus first, so the chart the insert selects can take it over.
   instance.host.focus();
@@ -116,6 +118,7 @@ export const createChartVariantFromSelection = (
     action: kind,
     settings,
     history: instance.history,
+    authorization: { origin: 'ribbon', commandId },
   });
 };
 
@@ -135,6 +138,7 @@ const buildRecommendedChartAction =
       range: normalizedSelectionRange(instance),
       action: 'recommended',
       history: instance.history,
+      authorization: { origin: 'ribbon', commandId: 'chartInsert' },
     });
   };
 

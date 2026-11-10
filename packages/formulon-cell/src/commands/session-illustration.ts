@@ -19,9 +19,8 @@ import {
   type SpreadsheetStore,
 } from '../store/store.js';
 import type { History } from './history.js';
-import { interactionControllerFor } from './interaction-controller.js';
-import type { InteractionOrigin, OperationEffect, OperationIntent } from './interaction-policy.js';
-import { isCellWritable, isSheetProtected } from './protection.js';
+import type { InteractionOrigin } from './interaction-policy.js';
+import { type ObjectActionContext, objectWrite } from './object-actions.js';
 import { applyIllustrationsSnapshot, captureIllustrationsSnapshot } from './slice-history.js';
 
 export interface CreateSessionShapeOptions {
@@ -86,17 +85,6 @@ export const canDeleteIllustration = (item: SessionIllustration): boolean =>
 /** Whether the illustration can be copied; the same objects can be deleted. */
 export const canDuplicateIllustration = canDeleteIllustration;
 
-const imageIntent = (
-  commandId: string,
-  sheet: number,
-  row: number,
-  col: number,
-  origin: OperationIntent['origin'] = 'instanceApi',
-): OperationIntent => {
-  const effects: readonly OperationEffect[] = [{ kind: 'cells', cells: [{ sheet, row, col }] }];
-  return { operation: 'object', origin, commandId, effects };
-};
-
 const sameIllustrations = (
   a: readonly SessionIllustration[],
   b: readonly SessionIllustration[],
@@ -106,7 +94,6 @@ const recordIllustrationChange = (
   history: History | null,
   store: SpreadsheetStore,
   mutate: () => void,
-  intent: OperationIntent,
 ): void => {
   if (!history || history.isReplaying()) {
     mutate();
@@ -119,63 +106,22 @@ const recordIllustrationChange = (
   history.push({
     undo: () => applyIllustrationsSnapshot(store, before),
     redo: () => applyIllustrationsSnapshot(store, after),
-    intent: { ...intent, origin: 'redo' },
-    inverseIntent: { ...intent, origin: 'undo' },
   });
 };
 
-const addressForItem = (item: SessionIllustration): { sheet: number; row: number; col: number } => {
-  const candidate = item.nativeAnchor;
-  return { sheet: item.sheet, row: candidate?.fromRow ?? 0, col: candidate?.fromCol ?? 0 };
-};
-
-const canMutateIllustration = (
+/** The entry point of an illustration change: `authorization`, or the instance API running
+ *  `commandId`. */
+const illustrationEntry = (
   store: SpreadsheetStore,
-  item: SessionIllustration,
-  authorization: IllustrationMutationAuthorization = {},
-  commandId = 'pictureUpdate',
-): boolean => {
-  const address = addressForItem(item);
-  if (!isCellWritable(store.getState(), address)) return false;
-  const controller = interactionControllerFor(store);
-  const resolvedCommandId = authorization.commandId ?? commandId;
-  return (
-    !controller ||
-    controller.canExecute(
-      imageIntent(
-        resolvedCommandId,
-        address.sheet,
-        address.row,
-        address.col,
-        authorization.origin ?? 'instanceApi',
-      ),
-    ).allowed
-  );
-};
-
-const canMutateRange = (
-  store: SpreadsheetStore,
-  range: Range,
-  authorization: IllustrationMutationAuthorization = {},
-  commandId = 'pictureInsert',
-): boolean => {
-  const address = { sheet: range.sheet, row: range.r0, col: range.c0 };
-  if (!isCellWritable(store.getState(), address)) return false;
-  const controller = interactionControllerFor(store);
-  const resolvedCommandId = authorization.commandId ?? commandId;
-  return (
-    !controller ||
-    controller.canExecute(
-      imageIntent(
-        resolvedCommandId,
-        address.sheet,
-        address.row,
-        address.col,
-        authorization.origin ?? 'instanceApi',
-      ),
-    ).allowed
-  );
-};
+  history: History | null,
+  authorization: IllustrationMutationAuthorization | undefined,
+  commandId: string,
+): ObjectActionContext => ({
+  store,
+  history,
+  origin: authorization?.origin ?? 'instanceApi',
+  commandId: authorization?.commandId ?? commandId,
+});
 
 const defaultShapeId = (range: Range, shape: SessionShapeKind): string =>
   `shape-${range.sheet}-${range.r0}-${range.c0}-${shape}`;
@@ -188,38 +134,29 @@ export function createSessionShape(
   options: CreateSessionShapeOptions,
   history: History | null = null,
 ): SessionIllustration | null {
-  if (
-    isSheetProtected(store.getState(), range.sheet) ||
-    !canMutateRange(store, range, options.authorization, 'shapeInsert')
-  )
-    return null;
-  const item: SessionIllustration = {
-    id: options.id ?? defaultShapeId(range, options.shape),
-    kind: 'shape',
-    shape: options.shape,
-    sheet: range.sheet,
-    x: options.x,
-    y: options.y,
-    w: options.w,
-    h: options.h,
-    color: options.color,
-    radius: options.radius,
-    lineWidth: options.lineWidth,
-    opacity: options.opacity,
-  };
-  recordIllustrationChange(
-    history,
-    store,
-    () => mutators.upsertIllustration(store, item),
-    imageIntent(
-      options.authorization?.commandId ?? 'shapeInsert',
-      range.sheet,
-      range.r0,
-      range.c0,
-      options.authorization?.origin ?? 'instanceApi',
-    ),
+  return objectWrite(
+    illustrationEntry(store, history, options.authorization, 'shapeInsert'),
+    range.sheet,
+    null,
+    () => {
+      const item: SessionIllustration = {
+        id: options.id ?? defaultShapeId(range, options.shape),
+        kind: 'shape',
+        shape: options.shape,
+        sheet: range.sheet,
+        x: options.x,
+        y: options.y,
+        w: options.w,
+        h: options.h,
+        color: options.color,
+        radius: options.radius,
+        lineWidth: options.lineWidth,
+        opacity: options.opacity,
+      };
+      recordIllustrationChange(history, store, () => mutators.upsertIllustration(store, item));
+      return item;
+    },
   );
-  return item;
 }
 
 export function createSessionImage(
@@ -228,216 +165,186 @@ export function createSessionImage(
   options: CreateSessionImageOptions,
   history: History | null = null,
 ): SessionIllustration | null {
-  if (
-    isSheetProtected(store.getState(), range.sheet) ||
-    !canMutateRange(store, range, options.authorization, 'pictureInsert')
-  )
-    return null;
-  const item: SessionIllustration = {
-    ...(options.extra as Partial<SessionIllustration> | undefined),
-    id: options.id ?? defaultImageId(range),
-    kind: 'image',
-    src: options.src,
-    alt: options.alt,
-    sheet: range.sheet,
-    x: options.x,
-    y: options.y,
-    w: options.w,
-    h: options.h,
-  };
-  const previous = sessionIllustrationById(store.getState(), item.id);
-  let nativeObjectId: number | null = null;
-  let nativeFormat: number | undefined;
-  let nativeWidthEmu: number | undefined;
-  let nativeHeightEmu: number | undefined;
-  if (options.bytes && options.bytes.length > 0 && options.wb?.capabilities.images) {
-    const probe = options.wb.probeImage(options.bytes);
-    if (!probe) return null;
-    nativeWidthEmu = Math.max(1, Math.round((options.w ?? probe.widthPx) * 9525));
-    nativeHeightEmu = Math.max(1, Math.round((options.h ?? probe.heightPx) * 9525));
-    const placed = options.anchorAtPixels
-      ? placementForPixels(
-          store,
-          {
-            kind: AnchorKind.OneCell,
-            editAs: AnchorEditAs.OneCell,
-            fromRow: range.r0,
-            fromCol: range.c0,
-            fromRowOffsetEmu: 0,
-            fromColOffsetEmu: 0,
-            toRow: 0,
-            toCol: 0,
-            toRowOffsetEmu: 0,
-            toColOffsetEmu: 0,
+  return objectWrite(
+    illustrationEntry(store, history, options.authorization, 'pictureInsert'),
+    range.sheet,
+    null,
+    () => {
+      const item: SessionIllustration = {
+        ...(options.extra as Partial<SessionIllustration> | undefined),
+        id: options.id ?? defaultImageId(range),
+        kind: 'image',
+        src: options.src,
+        alt: options.alt,
+        sheet: range.sheet,
+        x: options.x,
+        y: options.y,
+        w: options.w,
+        h: options.h,
+      };
+      const previous = sessionIllustrationById(store.getState(), item.id);
+      let nativeObjectId: number | null = null;
+      let nativeFormat: number | undefined;
+      let nativeWidthEmu: number | undefined;
+      let nativeHeightEmu: number | undefined;
+      if (options.bytes && options.bytes.length > 0 && options.wb?.capabilities.images) {
+        const probe = options.wb.probeImage(options.bytes);
+        if (!probe) return null;
+        nativeWidthEmu = Math.max(1, Math.round((options.w ?? probe.widthPx) * 9525));
+        nativeHeightEmu = Math.max(1, Math.round((options.h ?? probe.heightPx) * 9525));
+        const placed = options.anchorAtPixels
+          ? placementForPixels(
+              store,
+              {
+                kind: AnchorKind.OneCell,
+                editAs: AnchorEditAs.OneCell,
+                fromRow: range.r0,
+                fromCol: range.c0,
+                fromRowOffsetEmu: 0,
+                fromColOffsetEmu: 0,
+                toRow: 0,
+                toCol: 0,
+                toRowOffsetEmu: 0,
+                toColOffsetEmu: 0,
+                widthEmu: nativeWidthEmu,
+                heightEmu: nativeHeightEmu,
+              },
+              { x: options.x, y: options.y, w: options.w, h: options.h },
+            )
+          : null;
+        if (placed) {
+          nativeWidthEmu = placed.widthEmu ?? nativeWidthEmu;
+          nativeHeightEmu = placed.heightEmu ?? nativeHeightEmu;
+        }
+        nativeObjectId = options.wb.insertImage(range.sheet, options.bytes, {
+          name: options.alt ?? '',
+          description: options.alt ?? '',
+          anchor: {
+            fromRow: placed?.fromRow ?? range.r0,
+            fromCol: placed?.fromCol ?? range.c0,
+            ...(placed
+              ? {
+                  fromRowOffsetEmu: placed.fromRowOffsetEmu,
+                  fromColOffsetEmu: placed.fromColOffsetEmu,
+                }
+              : {}),
             widthEmu: nativeWidthEmu,
             heightEmu: nativeHeightEmu,
           },
-          { x: options.x, y: options.y, w: options.w, h: options.h },
-        )
-      : null;
-    if (placed) {
-      nativeWidthEmu = placed.widthEmu ?? nativeWidthEmu;
-      nativeHeightEmu = placed.heightEmu ?? nativeHeightEmu;
-    }
-    nativeObjectId = options.wb.insertImage(range.sheet, options.bytes, {
-      name: options.alt ?? '',
-      description: options.alt ?? '',
-      anchor: {
-        fromRow: placed?.fromRow ?? range.r0,
-        fromCol: placed?.fromCol ?? range.c0,
-        ...(placed
-          ? {
-              fromRowOffsetEmu: placed.fromRowOffsetEmu,
-              fromColOffsetEmu: placed.fromColOffsetEmu,
-            }
-          : {}),
-        widthEmu: nativeWidthEmu,
-        heightEmu: nativeHeightEmu,
-      },
-    });
-    if (nativeObjectId === null) return null;
-    nativeFormat = probe.format;
-  }
-  const requestedAnchor: EngineDrawingAnchor = {
-    kind: AnchorKind.OneCell,
-    editAs: AnchorEditAs.OneCell,
-    fromRow: range.r0,
-    fromCol: range.c0,
-    fromRowOffsetEmu: 0,
-    fromColOffsetEmu: 0,
-    toRow: 0,
-    toCol: 0,
-    toRowOffsetEmu: 0,
-    toColOffsetEmu: 0,
-    widthEmu: nativeWidthEmu ?? 1,
-    heightEmu: nativeHeightEmu ?? 1,
-  };
-  const persistedItem: SessionIllustration =
-    nativeObjectId === null
-      ? item
-      : {
-          ...item,
-          nativeObjectId,
-          nativeGeometryEditable: true,
-          imageBytes: Uint8Array.from(options.bytes ?? []),
-          imageFormat: nativeFormat,
-          nativeAnchor:
-            options.wb && nativeObjectId !== null
-              ? (nativeImageAnchor(options.wb, range.sheet, nativeObjectId) ?? requestedAnchor)
-              : requestedAnchor,
-        };
-  if (nativeObjectId !== null && options.wb) {
-    const nativeWb = options.wb;
-    const previousPersisted = previous ? persistentImageFromState(previous) : null;
-    const createdSnapshot = nativeWb.snapshotDrawing(range.sheet, nativeObjectId);
-    const previousSnapshot = previousPersisted
-      ? nativeWb.snapshotDrawing(previousPersisted.sheet, previousPersisted.nativeObjectId)
-      : null;
-    // A session id collision replaces the old projection. Remove its native
-    // object only after the new object exists, so a failed insertion leaves
-    // the original picture and projection untouched.
-    if (
-      !createdSnapshot ||
-      (previousPersisted &&
-        (!previousSnapshot ||
-          !nativeWb.removeDrawing(previousPersisted.sheet, previousPersisted.nativeObjectId)))
-    ) {
-      nativeWb.removeDrawing(range.sheet, nativeObjectId);
-      return null;
-    }
-    const inserted = persistentImageFromState(persistedItem);
-    if (!inserted) return null;
-    mutators.upsertIllustration(store, persistedItem);
-    if (history && !history.isReplaying()) {
-      const intent = imageIntent(
-        options.authorization?.commandId ?? 'pictureInsert',
-        inserted.sheet,
-        inserted.nativeAnchor.fromRow,
-        inserted.nativeAnchor.fromCol,
-        options.authorization?.origin ?? 'instanceApi',
-      );
-      history.push({
-        undo: () => {
-          const current = sessionIllustrationById(store.getState(), persistedItem.id);
-          const currentPersisted = current ? persistentImageFromState(current) : null;
-          if (
-            !currentPersisted ||
-            !current ||
-            !canMutateIllustration(
-              store,
-              current,
-              { origin: 'undo', commandId: 'pictureInsert' },
-              'pictureInsert',
-            ) ||
-            !nativeWb.removeDrawing(currentPersisted.sheet, currentPersisted.nativeObjectId)
-          ) {
-            throw new Error('image create undo failed');
-          }
-          mutators.removeIllustration(store, persistedItem.id);
-          if (previous) {
-            if (previousPersisted && previousSnapshot) {
-              const restoredId = nativeWb.restoreDrawing(previousPersisted.sheet, previousSnapshot);
-              if (restoredId === null) throw new Error('image create undo restore failed');
+        });
+        if (nativeObjectId === null) return null;
+        nativeFormat = probe.format;
+      }
+      const requestedAnchor: EngineDrawingAnchor = {
+        kind: AnchorKind.OneCell,
+        editAs: AnchorEditAs.OneCell,
+        fromRow: range.r0,
+        fromCol: range.c0,
+        fromRowOffsetEmu: 0,
+        fromColOffsetEmu: 0,
+        toRow: 0,
+        toCol: 0,
+        toRowOffsetEmu: 0,
+        toColOffsetEmu: 0,
+        widthEmu: nativeWidthEmu ?? 1,
+        heightEmu: nativeHeightEmu ?? 1,
+      };
+      const persistedItem: SessionIllustration =
+        nativeObjectId === null
+          ? item
+          : {
+              ...item,
+              nativeObjectId,
+              nativeGeometryEditable: true,
+              imageBytes: Uint8Array.from(options.bytes ?? []),
+              imageFormat: nativeFormat,
+              nativeAnchor:
+                options.wb && nativeObjectId !== null
+                  ? (nativeImageAnchor(options.wb, range.sheet, nativeObjectId) ?? requestedAnchor)
+                  : requestedAnchor,
+            };
+      if (nativeObjectId !== null && options.wb) {
+        const nativeWb = options.wb;
+        const previousPersisted = previous ? persistentImageFromState(previous) : null;
+        const createdSnapshot = nativeWb.snapshotDrawing(range.sheet, nativeObjectId);
+        const previousSnapshot = previousPersisted
+          ? nativeWb.snapshotDrawing(previousPersisted.sheet, previousPersisted.nativeObjectId)
+          : null;
+        // A session id collision replaces the old projection. Remove its native
+        // object only after the new object exists, so a failed insertion leaves
+        // the original picture and projection untouched.
+        if (
+          !createdSnapshot ||
+          (previousPersisted &&
+            (!previousSnapshot ||
+              !nativeWb.removeDrawing(previousPersisted.sheet, previousPersisted.nativeObjectId)))
+        ) {
+          nativeWb.removeDrawing(range.sheet, nativeObjectId);
+          return null;
+        }
+        const inserted = persistentImageFromState(persistedItem);
+        if (!inserted) return null;
+        mutators.upsertIllustration(store, persistedItem);
+        if (history && !history.isReplaying()) {
+          history.push({
+            undo: () => {
+              const current = sessionIllustrationById(store.getState(), persistedItem.id);
+              const currentPersisted = current ? persistentImageFromState(current) : null;
+              if (
+                !currentPersisted ||
+                !current ||
+                !nativeWb.removeDrawing(currentPersisted.sheet, currentPersisted.nativeObjectId)
+              ) {
+                throw new Error('image create undo failed');
+              }
+              mutators.removeIllustration(store, persistedItem.id);
+              if (previous) {
+                if (previousPersisted && previousSnapshot) {
+                  const restoredId = nativeWb.restoreDrawing(
+                    previousPersisted.sheet,
+                    previousSnapshot,
+                  );
+                  if (restoredId === null) throw new Error('image create undo restore failed');
+                  mutators.upsertIllustration(store, {
+                    ...previous,
+                    nativeObjectId: restoredId,
+                    nativeAnchor:
+                      nativeImageAnchor(nativeWb, previousPersisted.sheet, restoredId) ??
+                      previousPersisted.nativeAnchor,
+                  });
+                } else {
+                  mutators.upsertIllustration(store, previous);
+                }
+              }
+            },
+            redo: () => {
+              const current = sessionIllustrationById(store.getState(), persistedItem.id);
+              const currentPersisted = current ? persistentImageFromState(current) : null;
+              if (
+                currentPersisted &&
+                !nativeWb.removeDrawing(currentPersisted.sheet, currentPersisted.nativeObjectId)
+              ) {
+                throw new Error('image create redo cleanup failed');
+              }
+              const redoneId = nativeWb.restoreDrawing(range.sheet, createdSnapshot);
+              if (redoneId === null) throw new Error('image create redo failed');
               mutators.upsertIllustration(store, {
-                ...previous,
-                nativeObjectId: restoredId,
+                ...persistedItem,
+                nativeObjectId: redoneId,
                 nativeAnchor:
-                  nativeImageAnchor(nativeWb, previousPersisted.sheet, restoredId) ??
-                  previousPersisted.nativeAnchor,
+                  nativeImageAnchor(nativeWb, range.sheet, redoneId) ?? inserted.nativeAnchor,
               });
-            } else {
-              mutators.upsertIllustration(store, previous);
-            }
-          }
-        },
-        redo: () => {
-          const current = sessionIllustrationById(store.getState(), persistedItem.id);
-          const currentPersisted = current ? persistentImageFromState(current) : null;
-          if (
-            current &&
-            !canMutateIllustration(
-              store,
-              current,
-              { origin: 'redo', commandId: 'pictureInsert' },
-              'pictureInsert',
-            )
-          ) {
-            throw new Error('image create redo blocked by protection or policy');
-          }
-          if (
-            currentPersisted &&
-            !nativeWb.removeDrawing(currentPersisted.sheet, currentPersisted.nativeObjectId)
-          ) {
-            throw new Error('image create redo cleanup failed');
-          }
-          const redoneId = nativeWb.restoreDrawing(range.sheet, createdSnapshot);
-          if (redoneId === null) throw new Error('image create redo failed');
-          mutators.upsertIllustration(store, {
-            ...persistedItem,
-            nativeObjectId: redoneId,
-            nativeAnchor:
-              nativeImageAnchor(nativeWb, range.sheet, redoneId) ?? inserted.nativeAnchor,
+            },
           });
-        },
-        intent: { ...intent, origin: 'redo' },
-        inverseIntent: { ...intent, origin: 'undo' },
-      });
-    }
-    return persistedItem;
-  }
-  recordIllustrationChange(
-    history,
-    store,
-    () => mutators.upsertIllustration(store, persistedItem),
-    imageIntent(
-      options.authorization?.commandId ?? 'pictureInsert',
-      range.sheet,
-      range.r0,
-      range.c0,
-      options.authorization?.origin ?? 'instanceApi',
-    ),
+        }
+        return persistedItem;
+      }
+      recordIllustrationChange(history, store, () =>
+        mutators.upsertIllustration(store, persistedItem),
+      );
+      return persistedItem;
+    },
   );
-  return persistedItem;
 }
 
 /** Select a picture or shape the ribbon inserted, as the spreadsheet does;
@@ -538,80 +445,47 @@ export function clearSessionIllustration(
 ): boolean {
   const item = sessionIllustrationById(store.getState(), id);
   if (!item) return false;
-  if (
-    isSheetProtected(store.getState(), item.sheet) ||
-    !canMutateIllustration(store, item, authorization, 'pictureDelete') ||
-    !canDeleteIllustration(item)
-  )
-    return false;
-  const persisted = persistentImageFromState(item);
-  const snapshot =
-    persisted && wb ? wb.snapshotDrawing(item.sheet, persisted.nativeObjectId) : null;
-  if (persisted && (!wb || !snapshot || !wb.removeDrawing(item.sheet, persisted.nativeObjectId))) {
-    return false;
-  }
-  if (persisted && wb && snapshot) {
-    mutators.removeIllustration(store, id);
-    if (history && !history.isReplaying()) {
-      const intent = imageIntent(
-        authorization?.commandId ?? 'pictureDelete',
-        persisted.sheet,
-        persisted.nativeAnchor.fromRow,
-        persisted.nativeAnchor.fromCol,
-        authorization?.origin ?? 'instanceApi',
-      );
-      history.push({
-        undo: () => {
-          if (
-            !canMutateIllustration(
-              store,
-              item,
-              { origin: 'undo', commandId: 'pictureDelete' },
-              'pictureDelete',
-            )
-          )
-            throw new Error('image undo blocked by protection or policy');
-          const nativeObjectId = wb.restoreDrawing(item.sheet, snapshot);
-          if (nativeObjectId === null) throw new Error('image undo restore failed');
-          mutators.upsertIllustration(store, { ...item, nativeObjectId });
-        },
-        redo: () => {
-          if (
-            !canMutateIllustration(
-              store,
-              item,
-              { origin: 'redo', commandId: 'pictureDelete' },
-              'pictureDelete',
-            )
-          )
-            throw new Error('image redo blocked by protection or policy');
-          const current = persistentImageFromState(
-            sessionIllustrationById(store.getState(), id) ?? item,
-          );
-          if (!current || !wb.removeDrawing(item.sheet, current.nativeObjectId)) {
-            throw new Error('image redo delete failed');
-          }
-          mutators.removeIllustration(store, id);
-        },
-        intent: { ...intent, origin: 'redo' },
-        inverseIntent: { ...intent, origin: 'undo' },
-      });
-    }
-    return true;
-  }
-  recordIllustrationChange(
-    history,
-    store,
-    () => mutators.removeIllustration(store, id),
-    imageIntent(
-      authorization?.commandId ?? 'pictureDelete',
-      item.sheet,
-      item.nativeAnchor?.fromRow ?? 0,
-      item.nativeAnchor?.fromCol ?? 0,
-      authorization?.origin ?? 'instanceApi',
-    ),
+  if (!canDeleteIllustration(item)) return false;
+  return objectWrite(
+    illustrationEntry(store, history, authorization, 'pictureDelete'),
+    item.sheet,
+    false,
+    () => {
+      const persisted = persistentImageFromState(item);
+      const snapshot =
+        persisted && wb ? wb.snapshotDrawing(item.sheet, persisted.nativeObjectId) : null;
+      if (
+        persisted &&
+        (!wb || !snapshot || !wb.removeDrawing(item.sheet, persisted.nativeObjectId))
+      ) {
+        return false;
+      }
+      if (persisted && wb && snapshot) {
+        mutators.removeIllustration(store, id);
+        if (history && !history.isReplaying()) {
+          history.push({
+            undo: () => {
+              const nativeObjectId = wb.restoreDrawing(item.sheet, snapshot);
+              if (nativeObjectId === null) throw new Error('image undo restore failed');
+              mutators.upsertIllustration(store, { ...item, nativeObjectId });
+            },
+            redo: () => {
+              const current = persistentImageFromState(
+                sessionIllustrationById(store.getState(), id) ?? item,
+              );
+              if (!current || !wb.removeDrawing(item.sheet, current.nativeObjectId)) {
+                throw new Error('image redo delete failed');
+              }
+              mutators.removeIllustration(store, id);
+            },
+          });
+        }
+        return true;
+      }
+      recordIllustrationChange(history, store, () => mutators.removeIllustration(store, id));
+      return true;
+    },
   );
-  return true;
 }
 
 export function updateSessionIllustration(
@@ -624,101 +498,67 @@ export function updateSessionIllustration(
 ): SessionIllustration | null {
   const item = sessionIllustrationById(store.getState(), id);
   if (!item) return null;
-  if (
-    isSheetProtected(store.getState(), item.sheet) ||
-    !canMutateIllustration(store, item, authorization, 'pictureUpdate') ||
-    isGeometryLockedPicture(item)
-  )
-    return null;
-  const persisted = persistentImageFromState(item);
-  if (persisted && wb) {
-    const before = { ...item } as SessionIllustration;
-    if (!movePersistentImage(wb, persisted, patch, store)) return item;
-    const after = {
-      ...item,
-      ...patch,
-      nativeAnchor:
-        nativeImageAnchor(wb, item.sheet, persisted.nativeObjectId) ?? persisted.nativeAnchor,
-    } as SessionIllustration;
-    mutators.updateIllustration(store, id, after as SessionIllustrationPatch);
-    if (history && !history.isReplaying()) {
-      const intent = imageIntent(
-        authorization?.commandId ?? 'pictureUpdate',
-        persisted.sheet,
-        persisted.nativeAnchor.fromRow,
-        persisted.nativeAnchor.fromCol,
-        authorization?.origin ?? 'instanceApi',
+  if (isGeometryLockedPicture(item)) return null;
+  return objectWrite(
+    illustrationEntry(store, history, authorization, 'pictureUpdate'),
+    item.sheet,
+    null,
+    () => {
+      const persisted = persistentImageFromState(item);
+      if (persisted && wb) {
+        const before = { ...item } as SessionIllustration;
+        if (!movePersistentImage(wb, persisted, patch, store)) return item;
+        const after = {
+          ...item,
+          ...patch,
+          nativeAnchor:
+            nativeImageAnchor(wb, item.sheet, persisted.nativeObjectId) ?? persisted.nativeAnchor,
+        } as SessionIllustration;
+        mutators.updateIllustration(store, id, after as SessionIllustrationPatch);
+        if (history && !history.isReplaying()) {
+          history.push({
+            undo: () => {
+              const current = sessionIllustrationById(store.getState(), id);
+              if (!current) throw new Error('image undo state missing');
+              const currentPersisted = persistentImageFromState(current);
+              if (!currentPersisted) throw new Error('image undo native state missing');
+              if (!movePersistentImage(wb, currentPersisted, before, store)) {
+                throw new Error('image undo restore failed');
+              }
+              mutators.updateIllustration(store, id, {
+                ...before,
+                nativeAnchor:
+                  nativeImageAnchor(wb, item.sheet, currentPersisted.nativeObjectId) ??
+                  currentPersisted.nativeAnchor,
+              });
+            },
+            redo: () => {
+              const current = sessionIllustrationById(store.getState(), id);
+              if (!current) throw new Error('image redo state missing');
+              const currentPersisted = persistentImageFromState(current);
+              if (!currentPersisted) throw new Error('image redo native state missing');
+              if (!movePersistentImage(wb, currentPersisted, after, store)) {
+                throw new Error('image redo restore failed');
+              }
+              mutators.updateIllustration(store, id, {
+                ...after,
+                nativeAnchor:
+                  nativeImageAnchor(wb, item.sheet, currentPersisted.nativeObjectId) ??
+                  currentPersisted.nativeAnchor,
+              });
+            },
+          });
+        }
+        return sessionIllustrationById(store.getState(), id);
+      } else if (persisted && !wb) {
+        return item;
+      }
+      recordIllustrationChange(history, store, () =>
+        mutators.updateIllustration(store, id, patch as SessionIllustrationPatch),
       );
-      history.push({
-        undo: () => {
-          const current = sessionIllustrationById(store.getState(), id);
-          if (!current) throw new Error('image undo state missing');
-          if (
-            !canMutateIllustration(
-              store,
-              current,
-              { origin: 'undo', commandId: 'pictureUpdate' },
-              'pictureUpdate',
-            )
-          )
-            throw new Error('image undo blocked by protection or policy');
-          const currentPersisted = persistentImageFromState(current);
-          if (!currentPersisted) throw new Error('image undo native state missing');
-          if (!movePersistentImage(wb, currentPersisted, before, store)) {
-            throw new Error('image undo restore failed');
-          }
-          mutators.updateIllustration(store, id, {
-            ...before,
-            nativeAnchor:
-              nativeImageAnchor(wb, item.sheet, currentPersisted.nativeObjectId) ??
-              currentPersisted.nativeAnchor,
-          });
-        },
-        redo: () => {
-          const current = sessionIllustrationById(store.getState(), id);
-          if (!current) throw new Error('image redo state missing');
-          if (
-            !canMutateIllustration(
-              store,
-              current,
-              { origin: 'redo', commandId: 'pictureUpdate' },
-              'pictureUpdate',
-            )
-          )
-            throw new Error('image redo blocked by protection or policy');
-          const currentPersisted = persistentImageFromState(current);
-          if (!currentPersisted) throw new Error('image redo native state missing');
-          if (!movePersistentImage(wb, currentPersisted, after, store)) {
-            throw new Error('image redo restore failed');
-          }
-          mutators.updateIllustration(store, id, {
-            ...after,
-            nativeAnchor:
-              nativeImageAnchor(wb, item.sheet, currentPersisted.nativeObjectId) ??
-              currentPersisted.nativeAnchor,
-          });
-        },
-        intent: { ...intent, origin: 'redo' },
-        inverseIntent: { ...intent, origin: 'undo' },
-      });
-    }
-    return sessionIllustrationById(store.getState(), id);
-  } else if (persisted && !wb) {
-    return item;
-  }
-  recordIllustrationChange(
-    history,
-    store,
-    () => mutators.updateIllustration(store, id, patch as SessionIllustrationPatch),
-    imageIntent(
-      authorization?.commandId ?? 'pictureUpdate',
-      item.sheet,
-      item.nativeAnchor?.fromRow ?? 0,
-      item.nativeAnchor?.fromCol ?? 0,
-      authorization?.origin ?? 'instanceApi',
-    ),
+      return sessionIllustrationById(store.getState(), id);
+    },
   );
-  return sessionIllustrationById(store.getState(), id);
 }
 
 const duplicateId = (
@@ -745,32 +585,29 @@ export function duplicateSessionIllustration(
   const state = store.getState();
   const item = sessionIllustrationById(state, id);
   if (!item) return null;
-  if (
-    isSheetProtected(state, item.sheet) ||
-    !canMutateIllustration(store, item, authorization, 'pictureDuplicate')
-  )
-    return null;
-  const clip = copySessionIllustration(store, id, wb);
-  if (!clip) return null;
-  const from = item.nativeAnchor
-    ? sessionPosition(store, item.nativeAnchor)
-    : { x: item.x ?? 300, y: item.y ?? 88 };
-  return placeIllustrationCopy(
-    store,
-    clip,
-    {
-      id: duplicateId(state, id),
-      sheet: item.sheet,
-      row: item.nativeAnchor?.fromRow ?? 0,
-      col: item.nativeAnchor?.fromCol ?? 0,
-    },
-    { x: from.x + DUPLICATE_OFFSET_PX, y: from.y + DUPLICATE_OFFSET_PX },
-    history,
-    wb,
-    {
-      commandId: authorization?.commandId ?? 'pictureDuplicate',
-      origin: authorization?.origin ?? 'instanceApi',
-      historyCommandId: 'pictureDuplicate',
+  return objectWrite(
+    illustrationEntry(store, history, authorization, 'pictureDuplicate'),
+    item.sheet,
+    null,
+    () => {
+      const clip = copySessionIllustration(store, id, wb);
+      if (!clip) return null;
+      const from = item.nativeAnchor
+        ? sessionPosition(store, item.nativeAnchor)
+        : { x: item.x ?? 300, y: item.y ?? 88 };
+      return placeIllustrationCopy(
+        store,
+        clip,
+        {
+          id: duplicateId(state, id),
+          sheet: item.sheet,
+          row: item.nativeAnchor?.fromRow ?? 0,
+          col: item.nativeAnchor?.fromCol ?? 0,
+        },
+        { x: from.x + DUPLICATE_OFFSET_PX, y: from.y + DUPLICATE_OFFSET_PX },
+        history,
+        wb,
+      );
     },
   );
 }
@@ -811,23 +648,19 @@ export function pasteSessionIllustration(
   authorization?: IllustrationMutationAuthorization,
   offset: { x: number; y: number } = { x: 0, y: 0 },
 ): SessionIllustration | null {
-  const range = { sheet: at.sheet, r0: at.row, c0: at.col, r1: at.row, c1: at.col };
-  if (
-    isSheetProtected(store.getState(), at.sheet) ||
-    !canMutateRange(store, range, authorization, 'picturePaste')
-  )
-    return null;
-  return placeIllustrationCopy(
-    store,
-    clip,
-    { ...at, id: duplicateId(store.getState(), clip.item.id) },
-    (({ x, y }) => ({ x: x + offset.x, y: y + offset.y }))(cellOrigin(store, at.row, at.col)),
-    history,
-    wb,
-    {
-      commandId: authorization?.commandId ?? 'picturePaste',
-      origin: authorization?.origin ?? 'instanceApi',
-      historyCommandId: 'picturePaste',
+  return objectWrite(
+    illustrationEntry(store, history, authorization, 'picturePaste'),
+    at.sheet,
+    null,
+    () => {
+      return placeIllustrationCopy(
+        store,
+        clip,
+        { ...at, id: duplicateId(store.getState(), clip.item.id) },
+        (({ x, y }) => ({ x: x + offset.x, y: y + offset.y }))(cellOrigin(store, at.row, at.col)),
+        history,
+        wb,
+      );
     },
   );
 }
@@ -846,7 +679,6 @@ const placeIllustrationCopy = (
   to: { x: number; y: number },
   history: History | null,
   wb: WorkbookHandle | undefined,
-  command: { commandId: string; origin: InteractionOrigin; historyCommandId: string },
 ): SessionIllustration | null => {
   const { item } = source;
   const persisted = persistentImageFromState(item);
@@ -866,20 +698,8 @@ const placeIllustrationCopy = (
         }
       : {}),
   };
-  const intent = imageIntent(
-    command.commandId,
-    target.sheet,
-    target.row,
-    target.col,
-    command.origin,
-  );
   if (!persisted) {
-    recordIllustrationChange(
-      history,
-      store,
-      () => mutators.upsertIllustration(store, copy),
-      intent,
-    );
+    recordIllustrationChange(history, store, () => mutators.upsertIllustration(store, copy));
     return copy;
   }
   if (!wb || !source.drawing) return null;
@@ -901,11 +721,8 @@ const placeIllustrationCopy = (
   });
   mutators.upsertIllustration(store, copy);
   if (history && !history.isReplaying()) {
-    const commandId = command.historyCommandId;
     history.push({
       undo: () => {
-        if (!canMutateIllustration(store, copy, { origin: 'undo', commandId }, commandId))
-          throw new Error('image copy undo blocked by protection or policy');
         const current = persistentImageFromState(
           sessionIllustrationById(store.getState(), copy.id) ?? copy,
         );
@@ -915,15 +732,11 @@ const placeIllustrationCopy = (
         mutators.removeIllustration(store, copy.id);
       },
       redo: () => {
-        if (!canMutateIllustration(store, copy, { origin: 'redo', commandId }, commandId))
-          throw new Error('image copy redo blocked by protection or policy');
         const nativeObjectId = wb.restoreDrawing(copy.sheet, redoSnapshot);
         if (nativeObjectId === null) throw new Error('image copy redo failed');
         Object.assign(copy as object, { nativeObjectId });
         mutators.upsertIllustration(store, copy);
       },
-      intent: { ...intent, origin: 'redo' },
-      inverseIntent: { ...intent, origin: 'undo' },
     });
   }
   return copy;
@@ -1014,60 +827,44 @@ export function arrangeSessionIllustration(
   const state = store.getState();
   const item = sessionIllustrationById(state, id);
   if (!item) return null;
-  if (
-    isSheetProtected(state, item.sheet) ||
-    !canMutateIllustration(store, item, authorization, 'pictureArrange')
-  )
-    return null;
-  const arranged = reorderIllustrations(state.illustrations.illustrations, id, action);
-  if (!arranged) return null;
-  const intent = imageIntent(
-    authorization?.commandId ?? 'pictureArrange',
+  return objectWrite(
+    illustrationEntry(store, history, authorization, 'pictureArrange'),
     item.sheet,
-    item.nativeAnchor?.fromRow ?? 0,
-    item.nativeAnchor?.fromCol ?? 0,
-    authorization?.origin ?? 'instanceApi',
-  );
-  if (item.nativeObjectId !== undefined) {
-    // The engine orders pictures and charts only; a saved shape keeps its slot.
-    if (item.kind === 'shape' || !wb?.capabilities.drawings) return null;
-    const z = nativeZTarget(wb, item, arranged);
-    if (!z || !wb.setDrawingZOrder(item.sheet, item.nativeObjectId, z.to)) return null;
-    const before = state.illustrations.illustrations;
-    const apply = (list: readonly SessionIllustration[]): void =>
-      store.setState((current) => ({ ...current, illustrations: { illustrations: list } }));
-    apply(arranged);
-    if (history && !history.isReplaying()) {
-      const nativeObjectId = item.nativeObjectId;
-      const replay = (origin: 'undo' | 'redo', index: number, list: typeof before): void => {
-        const current = sessionIllustrationById(store.getState(), id);
-        if (
-          !current ||
-          !canMutateIllustration(store, current, { origin, commandId: 'pictureArrange' }) ||
-          !wb.setDrawingZOrder(item.sheet, nativeObjectId, index)
-        ) {
-          throw new Error(`image arrange ${origin} failed`);
-        }
-        apply(list);
-      };
-      history.push({
-        undo: () => replay('undo', z.from, before),
-        redo: () => replay('redo', z.to, arranged),
-        intent: { ...intent, origin: 'redo' },
-        inverseIntent: { ...intent, origin: 'undo' },
-      });
-    }
-    return sessionIllustrationById(store.getState(), id);
-  }
-  recordIllustrationChange(
-    history,
-    store,
+    null,
     () => {
-      store.setState((state) => {
-        return { ...state, illustrations: { illustrations: arranged } };
+      const arranged = reorderIllustrations(state.illustrations.illustrations, id, action);
+      if (!arranged) return null;
+      if (item.nativeObjectId !== undefined) {
+        // The engine orders pictures and charts only; a saved shape keeps its slot.
+        if (item.kind === 'shape' || !wb?.capabilities.drawings) return null;
+        const z = nativeZTarget(wb, item, arranged);
+        if (!z || !wb.setDrawingZOrder(item.sheet, item.nativeObjectId, z.to)) return null;
+        const before = state.illustrations.illustrations;
+        const apply = (list: readonly SessionIllustration[]): void =>
+          store.setState((current) => ({ ...current, illustrations: { illustrations: list } }));
+        apply(arranged);
+        if (history && !history.isReplaying()) {
+          const nativeObjectId = item.nativeObjectId;
+          const replay = (origin: 'undo' | 'redo', index: number, list: typeof before): void => {
+            const current = sessionIllustrationById(store.getState(), id);
+            if (!current || !wb.setDrawingZOrder(item.sheet, nativeObjectId, index)) {
+              throw new Error(`image arrange ${origin} failed`);
+            }
+            apply(list);
+          };
+          history.push({
+            undo: () => replay('undo', z.from, before),
+            redo: () => replay('redo', z.to, arranged),
+          });
+        }
+        return sessionIllustrationById(store.getState(), id);
+      }
+      recordIllustrationChange(history, store, () => {
+        store.setState((state) => {
+          return { ...state, illustrations: { illustrations: arranged } };
+        });
       });
+      return sessionIllustrationById(store.getState(), id);
     },
-    intent,
   );
-  return sessionIllustrationById(store.getState(), id);
 }

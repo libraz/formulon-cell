@@ -687,17 +687,17 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           },
           onClearSessionIllustration: (id) =>
             clearSessionIllustration(input.store, id, input.history, input.wb(), {
-              origin: 'contextMenu',
+              origin: 'ribbon',
               commandId: 'workbookObjects.delete',
             }),
           onDuplicateSessionIllustration: (id) =>
             duplicateSessionIllustration(input.store, id, input.history, input.wb(), {
-              origin: 'contextMenu',
+              origin: 'ribbon',
               commandId: 'workbookObjects.duplicate',
             }),
           onUpdateSessionIllustration: (id, patch) =>
             updateSessionIllustration(input.store, id, patch, input.history, input.wb(), {
-              origin: 'contextMenu',
+              origin: 'ribbon',
               commandId: 'workbookObjects.update',
             }),
           subscribeSessionObjects: (listener) => input.store.subscribe(listener),

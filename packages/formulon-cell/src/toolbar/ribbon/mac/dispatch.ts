@@ -349,10 +349,10 @@ export function dispatchMacRibbonCommand(
       return ctx.createRecommendedChartFromSelection();
     }
     const chart = chartKinds[id as keyof typeof chartKinds];
-    if (chart) return ctx.createChartFromSelection(chart);
+    if (chart) return createChartVariantFromSelection(instance, chart, undefined, id);
     const grouped = chartGroupings[id as keyof typeof chartGroupings];
     if (grouped)
-      return createChartVariantFromSelection(instance, grouped[0], { grouping: grouped[1] });
+      return createChartVariantFromSelection(instance, grouped[0], { grouping: grouped[1] }, id);
     const shape = shapeKinds[id as keyof typeof shapeKinds];
     if (shape) return ctx.insertShapeFromRibbon(shape);
     const autoSum = autoSumFunctions[id as keyof typeof autoSumFunctions];

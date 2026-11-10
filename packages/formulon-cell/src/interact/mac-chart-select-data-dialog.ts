@@ -115,7 +115,8 @@ interface SeriesRow {
   x: string;
 }
 
-const AUTH = { origin: 'instanceApi' as const, commandId: 'chartSelectData' };
+/** The dialog edits the chart as Chart Design > Select Data. */
+const AUTH = { origin: 'ribbon' as const, commandId: 'chartSelectData' };
 
 const refText = (source: ChartDataSource | undefined): string =>
   source && source.kind === ChartSourceKind.Ref && source.formula ? `=${source.formula}` : '';

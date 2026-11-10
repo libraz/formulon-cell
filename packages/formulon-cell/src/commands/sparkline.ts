@@ -5,6 +5,7 @@ import { mutators, type Sparkline, type SpreadsheetStore } from '../store/store.
 import { adjustInterval } from './axis-shift.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
 import type { History } from './history.js';
+import { type ObjectActionContext, objectWrite } from './object-actions.js';
 import { isCellWritable, warnProtected } from './protection.js';
 import { recordSparklineChange } from './slice-history.js';
 
@@ -42,6 +43,33 @@ export const newSparklineGroupId = (): string => {
   return `sparkline-group-${groupSeq}`;
 };
 
+/** Run a sparkline change of `cells` as one authorized object step: the sheet they lie on and the
+ *  cells themselves. */
+const sparklineWrite = (
+  ctx: ObjectActionContext,
+  cells: readonly Addr[],
+  refused: boolean,
+  write: () => boolean,
+): boolean => {
+  const first = cells[0];
+  if (!first) return refused;
+  return objectWrite(ctx, first.sheet, refused, write, [{ kind: 'cells', cells }]);
+};
+
+/** Attach several sparklines as one group from the entry point `ctx` names: one engine group and
+ *  one undo step. Nothing is written when a host cell is protected. */
+export function setSparklinesAction(
+  ctx: ObjectActionContext,
+  entries: readonly SparklineEntry[],
+): boolean {
+  return sparklineWrite(
+    ctx,
+    entries.map(({ addr }) => addr),
+    false,
+    () => writeSparklines(ctx.store, entries, ctx.history),
+  );
+}
+
 /** Attach several sparklines as one group, which is one engine group and one
  *  undo step. Nothing is written when a host cell is protected. */
 export function setSparklines(
@@ -49,6 +77,17 @@ export function setSparklines(
   entries: readonly SparklineEntry[],
   history: History | null = null,
 ): boolean {
+  return setSparklinesAction(
+    { store, history, origin: 'instanceApi', commandId: 'mac.insert.sparkline' },
+    entries,
+  );
+}
+
+const writeSparklines = (
+  store: SpreadsheetStore,
+  entries: readonly SparklineEntry[],
+  history: History | null,
+): boolean => {
   for (const { addr } of entries) {
     if (!isCellWritable(store.getState(), addr)) {
       warnProtected(addr);
@@ -63,7 +102,7 @@ export function setSparklines(
     }
   });
   return true;
-}
+};
 
 export function setSparkline(
   store: SpreadsheetStore,
@@ -79,14 +118,17 @@ export function clearSparkline(
   addr: Addr,
   history: History | null = null,
 ): boolean {
-  if (!isCellWritable(store.getState(), addr)) {
-    warnProtected(addr);
-    return false;
-  }
-  recordSparklineChange(history, store, () => {
-    mutators.clearSparkline(store, addr);
+  const ctx = { store, history, origin: 'instanceApi', commandId: 'sparklineClear' } as const;
+  return sparklineWrite(ctx, [addr], false, () => {
+    if (!isCellWritable(store.getState(), addr)) {
+      warnProtected(addr);
+      return false;
+    }
+    recordSparklineChange(history, store, () => {
+      mutators.clearSparkline(store, addr);
+    });
+    return true;
   });
-  return true;
 }
 
 export function clearSparklinesInRange(
@@ -105,10 +147,14 @@ export function clearSparklinesInRange(
     return false;
   });
   if (writable.length === 0) return 0;
-  recordSparklineChange(history, store, () => {
-    for (const addr of writable) mutators.clearSparkline(store, addr);
+  const ctx = { store, history, origin: 'instanceApi', commandId: 'sparklineClear' } as const;
+  const cleared = sparklineWrite(ctx, writable, false, () => {
+    recordSparklineChange(history, store, () => {
+      for (const addr of writable) mutators.clearSparkline(store, addr);
+    });
+    return true;
   });
-  return writable.length;
+  return cleared ? writable.length : 0;
 }
 
 /** Split `Sheet2!B2:B9` / `'My Sheet'!B2:B9` into its qualifier (with the `!`)

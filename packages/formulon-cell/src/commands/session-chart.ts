@@ -42,9 +42,8 @@ import {
 } from '../store/store.js';
 import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
 import type { History } from './history.js';
-import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOrigin, OperationIntent } from './interaction-policy.js';
-import { isSheetProtected } from './protection.js';
+import { objectChangeAllowed, objectWrite } from './object-actions.js';
 import type { SessionIllustrationArrangeAction } from './session-illustration.js';
 
 /** Placement of a chart frame: its anchor kind, top-left cell and offset inside it, and its size, in EMU.
@@ -99,6 +98,8 @@ export interface SessionChartSeriesInput {
 const DEFAULT_FRAME_CX = 4_572_000;
 const DEFAULT_FRAME_CY = 2_743_200;
 
+/** The object change of a chart on `ranges[0].sheet` (the sheet the chart lives on), as the entry
+ *  point `authorization` names; `commandId` is the default when it names none. */
 const chartIntent = (
   ranges: readonly Range[],
   commandId: string,
@@ -107,23 +108,35 @@ const chartIntent = (
   operation: 'object',
   origin: authorization.origin ?? 'instanceApi',
   commandId: authorization.commandId ?? commandId,
-  effects: ranges.map((range) => ({
-    kind: 'cells',
-    cells: [{ sheet: range.sheet, row: range.r0, col: range.c0 }],
-  })),
+  effects: [{ kind: 'sheet', sheet: ranges[0]?.sheet ?? 0 }],
 });
 
-/** Whether protection and the interaction policy allow `intent`. */
-export const canMutateChart = (store: SpreadsheetStore, intent: OperationIntent): boolean => {
-  for (const effect of intent.effects) {
-    if (
-      effect.kind === 'cells' &&
-      effect.cells.some((cell) => isSheetProtected(store.getState(), cell.sheet))
-    )
-      return false;
-  }
-  return interactionControllerFor(store)?.canExecute(intent).allowed ?? true;
+const intentSheet = (intent: OperationIntent): number => {
+  const effect = intent.effects[0];
+  return effect?.kind === 'sheet' ? effect.sheet : 0;
 };
+
+/** Whether protection (Edit objects) and the interaction policy allow `intent`. */
+export const canMutateChart = (store: SpreadsheetStore, intent: OperationIntent): boolean =>
+  objectChangeAllowed(
+    { store, origin: intent.origin, commandId: intent.commandId ?? '' },
+    intentSheet(intent),
+  );
+
+/** Run a chart change as one authorized object step. */
+const writeChart = <T>(
+  store: SpreadsheetStore,
+  history: History | null,
+  intent: OperationIntent,
+  refused: T,
+  write: () => T,
+): T =>
+  objectWrite(
+    { store, history, origin: intent.origin, commandId: intent.commandId ?? '' },
+    intentSheet(intent),
+    refused,
+    write,
+  );
 
 /** The cells a chart occupies for protection and policy: its anchor cell and its data. */
 const chartCells = (chart: SessionChart): Range[] => {
@@ -132,29 +145,11 @@ const chartCells = (chart: SessionChart): Range[] => {
   return chart.source ? [host, chart.source] : [host];
 };
 
-/** Push an undo step whose replay re-checks protection and policy first. */
-const pushChartHistory = (
-  history: History | null,
-  store: SpreadsheetStore,
-  intent: OperationIntent,
-  undo: () => void,
-  redo: () => void,
-): void => {
+/** Record a chart change; the authorized write around it replays the undo and redo under its
+ *  check. */
+const pushChartHistory = (history: History | null, undo: () => void, redo: () => void): void => {
   if (!history || history.isReplaying()) return;
-  const guarded =
-    (origin: 'undo' | 'redo', run: () => void): (() => void) =>
-    () => {
-      if (!canMutateChart(store, { ...intent, origin })) {
-        throw new Error(`chart ${origin} blocked by protection or policy`);
-      }
-      run();
-    };
-  history.push({
-    undo: guarded('undo', undo),
-    redo: guarded('redo', redo),
-    intent: { ...intent, origin: 'redo' },
-    inverseIntent: { ...intent, origin: 'undo' },
-  });
+  history.push({ undo, redo });
 };
 
 /** The `ChartSpec` part of a supported chart's projection. */
@@ -448,6 +443,8 @@ export interface CreateRibbonChartFromSelectionOptions {
   /** Settings of the new chart beyond its kind, such as a stacked grouping. */
   settings?: Omit<ChartSpec, 'kind'>;
   history?: History | null;
+  /** The entry point inserting the chart. */
+  authorization?: ChartMutationAuthorization;
 }
 
 /** Insert a chart of the selection the way every ribbon host does, and
@@ -459,9 +456,10 @@ export function createRibbonChartFromSelection({
   action,
   settings,
   history = null,
+  authorization,
 }: CreateRibbonChartFromSelectionOptions): SessionChart | null {
   const kind = action === 'recommended' ? inferRecommendedChartKind(range) : action;
-  const chart = createSessionChart(store, range, { ...settings, wb, kind }, history);
+  const chart = createSessionChart(store, range, { ...settings, wb, kind, authorization }, history);
   // The overlay showing the chart selects it and names it.
   if (chart) mutators.setSelectedObject(store, { id: chart.id, name: '' });
   return chart;
@@ -491,43 +489,43 @@ export function createSessionChart(
     'chartInsert',
     authorization,
   );
-  if (!canMutateChart(store, intent)) return null;
-  const spec: ChartSpec = { ...settings, kind };
-  const objectId = wb.insertChart(sheet, {
-    ...chartInsertOptions(spec),
-    range: sourceRef(wb, range),
-    // Without a title text the template's automatic title stays until the spec is applied;
-    // an empty title is none.
-    ...(typeof spec.title === 'string' ? { title: spec.title || null } : {}),
-    anchor: anchorInputOf(placement),
+  return writeChart(store, history, intent, null, () => {
+    const spec: ChartSpec = { ...settings, kind };
+    const objectId = wb.insertChart(sheet, {
+      ...chartInsertOptions(spec),
+      range: sourceRef(wb, range),
+      // Without a title text the template's automatic title stays until the spec is applied;
+      // an empty title is none.
+      ...(typeof spec.title === 'string' ? { title: spec.title || null } : {}),
+      anchor: anchorInputOf(placement),
+    });
+    if (objectId === null) return null;
+    const info = wb.getChart(sheet, objectId);
+    const template = info ? chartSpecFromEngine(info, wb.getChartData(sheet, objectId)) : null;
+    const snapshot =
+      template && applyChartSpec(wb, sheet, objectId, createdSpec(template, spec))
+        ? wb.snapshotDrawing(sheet, objectId)
+        : null;
+    if (!snapshot) {
+      wb.removeDrawing(sheet, objectId);
+      return null;
+    }
+    const created = syncChartFromEngine(wb, store, sheet, objectId);
+    if (!created) return null;
+    pushChartHistory(
+      history,
+      () => {
+        if (!wb.removeDrawing(sheet, objectId)) throw new Error('chart create undo failed');
+        syncChartFromEngine(wb, store, sheet, objectId);
+      },
+      () => {
+        if (wb.restoreDrawing(sheet, snapshot) === null)
+          throw new Error('chart create redo failed');
+        syncChartFromEngine(wb, store, sheet, objectId);
+      },
+    );
+    return cloneSessionChart(created);
   });
-  if (objectId === null) return null;
-  const info = wb.getChart(sheet, objectId);
-  const template = info ? chartSpecFromEngine(info, wb.getChartData(sheet, objectId)) : null;
-  const snapshot =
-    template && applyChartSpec(wb, sheet, objectId, createdSpec(template, spec))
-      ? wb.snapshotDrawing(sheet, objectId)
-      : null;
-  if (!snapshot) {
-    wb.removeDrawing(sheet, objectId);
-    return null;
-  }
-  const created = syncChartFromEngine(wb, store, sheet, objectId);
-  if (!created) return null;
-  pushChartHistory(
-    history,
-    store,
-    intent,
-    () => {
-      if (!wb.removeDrawing(sheet, objectId)) throw new Error('chart create undo failed');
-      syncChartFromEngine(wb, store, sheet, objectId);
-    },
-    () => {
-      if (wb.restoreDrawing(sheet, snapshot) === null) throw new Error('chart create redo failed');
-      syncChartFromEngine(wb, store, sheet, objectId);
-    },
-  );
-  return cloneSessionChart(created);
 }
 
 export function listSessionCharts(state: {
@@ -564,7 +562,6 @@ const editChart = (
   chart: SessionChart,
   history: History | null,
   wb: WorkbookHandle,
-  intent: OperationIntent,
   label: string,
   edit: () => boolean,
 ): SessionChart | null => {
@@ -581,8 +578,6 @@ const editChart = (
   const updated = sync();
   pushChartHistory(
     history,
-    store,
-    intent,
     () => {
       if (wb.restoreDrawing(sheet, before) === null) throw new Error(`chart ${label} undo failed`);
       sync();
@@ -601,7 +596,6 @@ const removeChart = (
   chart: SessionChart,
   history: History | null,
   wb: WorkbookHandle,
-  intent: OperationIntent,
 ): boolean => {
   const { sheet, nativeObjectId } = chart;
   const snapshot = wb.snapshotDrawing(sheet, nativeObjectId);
@@ -609,8 +603,6 @@ const removeChart = (
   syncChartFromEngine(wb, store, sheet, nativeObjectId);
   pushChartHistory(
     history,
-    store,
-    intent,
     () => {
       if (wb.restoreDrawing(sheet, snapshot) === null) throw new Error('chart delete undo failed');
       syncChartFromEngine(wb, store, sheet, nativeObjectId);
@@ -634,8 +626,9 @@ export function clearSessionChart(
   const chart = sessionChartById(store.getState(), id);
   if (!chart || !wb.capabilities.charts) return false;
   const intent = chartIntent(chartCells(chart), 'chartDelete', authorization);
-  if (!canMutateChart(store, intent)) return false;
-  return removeChart(store, chart, history, wb, intent);
+  return writeChart(store, history, intent, false, () => {
+    return removeChart(store, chart, history, wb);
+  });
 }
 
 /**
@@ -654,49 +647,48 @@ export function arrangeSessionChart(
   const chart = sessionChartById(store.getState(), id);
   if (!chart || !wb.capabilities.charts) return null;
   const intent = chartIntent(chartCells(chart), 'chartArrange', authorization);
-  if (!canMutateChart(store, intent)) return null;
-  const { sheet, nativeObjectId } = chart;
-  // Charts keep the slots they hold among the sheet's drawings, so pictures stay put.
-  const slots = wb
-    .listDrawingObjects(sheet)
-    .flatMap((object, index) => (object.kind === DrawingObjectKind.Chart ? [index] : []));
-  const rank = wb
-    .listDrawingObjects(sheet)
-    .filter((object) => object.kind === DrawingObjectKind.Chart)
-    .findIndex((object) => object.objectId === nativeObjectId);
-  if (rank < 0) return null;
-  const targetRank =
-    action === 'bring-front'
-      ? slots.length - 1
-      : action === 'send-back'
-        ? 0
-        : action === 'bring-forward'
-          ? Math.min(slots.length - 1, rank + 1)
-          : Math.max(0, rank - 1);
-  const from = slots[rank];
-  const to = slots[targetRank];
-  if (from === undefined || to === undefined || from === to) return null;
-  const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
-  if (!wb.setDrawingZOrder(sheet, nativeObjectId, to)) return null;
-  const arranged = sync();
-  pushChartHistory(
-    history,
-    store,
-    intent,
-    () => {
-      if (!wb.setDrawingZOrder(sheet, nativeObjectId, from)) {
-        throw new Error('chart arrange undo failed');
-      }
-      sync();
-    },
-    () => {
-      if (!wb.setDrawingZOrder(sheet, nativeObjectId, to)) {
-        throw new Error('chart arrange redo failed');
-      }
-      sync();
-    },
-  );
-  return arranged && cloneSessionChart(arranged);
+  return writeChart(store, history, intent, null, () => {
+    const { sheet, nativeObjectId } = chart;
+    // Charts keep the slots they hold among the sheet's drawings, so pictures stay put.
+    const slots = wb
+      .listDrawingObjects(sheet)
+      .flatMap((object, index) => (object.kind === DrawingObjectKind.Chart ? [index] : []));
+    const rank = wb
+      .listDrawingObjects(sheet)
+      .filter((object) => object.kind === DrawingObjectKind.Chart)
+      .findIndex((object) => object.objectId === nativeObjectId);
+    if (rank < 0) return null;
+    const targetRank =
+      action === 'bring-front'
+        ? slots.length - 1
+        : action === 'send-back'
+          ? 0
+          : action === 'bring-forward'
+            ? Math.min(slots.length - 1, rank + 1)
+            : Math.max(0, rank - 1);
+    const from = slots[rank];
+    const to = slots[targetRank];
+    if (from === undefined || to === undefined || from === to) return null;
+    const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
+    if (!wb.setDrawingZOrder(sheet, nativeObjectId, to)) return null;
+    const arranged = sync();
+    pushChartHistory(
+      history,
+      () => {
+        if (!wb.setDrawingZOrder(sheet, nativeObjectId, from)) {
+          throw new Error('chart arrange undo failed');
+        }
+        sync();
+      },
+      () => {
+        if (!wb.setDrawingZOrder(sheet, nativeObjectId, to)) {
+          throw new Error('chart arrange redo failed');
+        }
+        sync();
+      },
+    );
+    return arranged && cloneSessionChart(arranged);
+  });
 }
 
 /**
@@ -714,18 +706,18 @@ export function duplicateSessionChart(
   const chart = sessionChartById(store.getState(), id);
   if (!chart || !wb.capabilities.charts) return null;
   const intent = chartIntent(chartCells(chart), 'chartDuplicate', authorization);
-  if (!canMutateChart(store, intent)) return null;
-  const source = wb.snapshotDrawing(chart.sheet, chart.nativeObjectId);
-  if (!source) return null;
-  const at = sessionPosition(store, chart.nativeAnchor);
-  return placeChartCopy(
-    store,
-    wb,
-    { sheet: chart.sheet, drawing: source, anchor: chart.nativeAnchor },
-    { x: at.x + DUPLICATE_OFFSET_PX, y: at.y + DUPLICATE_OFFSET_PX },
-    intent,
-    history,
-  );
+  return writeChart(store, history, intent, null, () => {
+    const source = wb.snapshotDrawing(chart.sheet, chart.nativeObjectId);
+    if (!source) return null;
+    const at = sessionPosition(store, chart.nativeAnchor);
+    return placeChartCopy(
+      store,
+      wb,
+      { sheet: chart.sheet, drawing: source, anchor: chart.nativeAnchor },
+      { x: at.x + DUPLICATE_OFFSET_PX, y: at.y + DUPLICATE_OFFSET_PX },
+      history,
+    );
+  });
 }
 
 /** A chart as copied to the clipboard; it outlives the chart it was taken from. */
@@ -764,15 +756,15 @@ export function pasteSessionChart(
   if (!wb.capabilities.charts) return null;
   const cell = { sheet: at.sheet, r0: at.row, c0: at.col, r1: at.row, c1: at.col };
   const intent = chartIntent([cell], 'chartPaste', authorization);
-  if (!canMutateChart(store, intent)) return null;
-  return placeChartCopy(
-    store,
-    wb,
-    { ...clip, sheet: at.sheet },
-    offsetPoint(cellOrigin(store, at.row, at.col), offset),
-    intent,
-    history,
-  );
+  return writeChart(store, history, intent, null, () => {
+    return placeChartCopy(
+      store,
+      wb,
+      { ...clip, sheet: at.sheet },
+      offsetPoint(cellOrigin(store, at.row, at.col), offset),
+      history,
+    );
+  });
 }
 
 const offsetPoint = (p: { x: number; y: number }, by: { x: number; y: number }) => ({
@@ -787,7 +779,6 @@ const placeChartCopy = (
   wb: WorkbookHandle,
   source: ChartClip,
   to: { x: number; y: number },
-  intent: OperationIntent,
   history: History | null,
 ): SessionChart | null => {
   const { sheet } = source;
@@ -806,8 +797,6 @@ const placeChartCopy = (
   if (!copy) return null;
   pushChartHistory(
     history,
-    store,
-    intent,
     () => {
       if (!wb.removeDrawing(sheet, objectId)) throw new Error('chart copy undo failed');
       sync();
@@ -844,60 +833,58 @@ export function updateSessionChart(
     'chartUpdate',
     authorization,
   );
-  if (!canMutateChart(store, intent)) return null;
-  const { sheet, nativeObjectId } = chart;
-  const placement = anchor ? anchorPatchOf(store, chart.nativeAnchor, anchor) : null;
-  const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
+  return writeChart(store, history, intent, null, () => {
+    const { sheet, nativeObjectId } = chart;
+    const placement = anchor ? anchorPatchOf(store, chart.nativeAnchor, anchor) : null;
+    const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
 
-  if (Object.keys(settings).length === 0 && !source) {
-    if (!placement) return chart;
-    const before = placementForAnchor(store, chart.nativeAnchor);
-    if (!wb.setDrawingAnchor(sheet, nativeObjectId, placement)) return null;
-    const moved = sync();
-    pushChartHistory(
-      history,
+    if (Object.keys(settings).length === 0 && !source) {
+      if (!placement) return chart;
+      const before = placementForAnchor(store, chart.nativeAnchor);
+      if (!wb.setDrawingAnchor(sheet, nativeObjectId, placement)) return null;
+      const moved = sync();
+      pushChartHistory(
+        history,
+        () => {
+          if (!wb.setDrawingAnchor(sheet, nativeObjectId, before)) {
+            throw new Error('chart move undo failed');
+          }
+          sync();
+        },
+        () => {
+          if (!wb.setDrawingAnchor(sheet, nativeObjectId, placement)) {
+            throw new Error('chart move redo failed');
+          }
+          sync();
+        },
+      );
+      return moved && cloneSessionChart(moved);
+    }
+
+    if (chart.kind === 'unsupported') return null;
+    const target = patchedSpec(specOf(chart), settings as Partial<ChartSpec>);
+    const split = chartInsertOptions(target);
+    return editChart(
       store,
-      intent,
-      () => {
-        if (!wb.setDrawingAnchor(sheet, nativeObjectId, before)) {
-          throw new Error('chart move undo failed');
-        }
-        sync();
-      },
-      () => {
-        if (!wb.setDrawingAnchor(sheet, nativeObjectId, placement)) {
-          throw new Error('chart move redo failed');
-        }
-        sync();
-      },
+      chart,
+      history,
+      wb,
+      'update',
+      () =>
+        (!placement || wb.setDrawingAnchor(sheet, nativeObjectId, placement)) &&
+        (!source ||
+          (chart.source !== undefined && sameRange(source, chart.source)) ||
+          wb.setChartSource(
+            sheet,
+            nativeObjectId,
+            sourceRef(wb, source),
+            split.direction,
+            split.headerRow ?? undefined,
+            split.headerColumn ?? undefined,
+          )) &&
+        applyChartSpec(wb, sheet, nativeObjectId, target),
     );
-    return moved && cloneSessionChart(moved);
-  }
-
-  if (chart.kind === 'unsupported') return null;
-  const target = patchedSpec(specOf(chart), settings as Partial<ChartSpec>);
-  const split = chartInsertOptions(target);
-  return editChart(
-    store,
-    chart,
-    history,
-    wb,
-    intent,
-    'update',
-    () =>
-      (!placement || wb.setDrawingAnchor(sheet, nativeObjectId, placement)) &&
-      (!source ||
-        (chart.source !== undefined && sameRange(source, chart.source)) ||
-        wb.setChartSource(
-          sheet,
-          nativeObjectId,
-          sourceRef(wb, source),
-          split.direction,
-          split.headerRow ?? undefined,
-          split.headerColumn ?? undefined,
-        )) &&
-      applyChartSpec(wb, sheet, nativeObjectId, target),
-  );
+  });
 }
 
 /**
@@ -918,25 +905,25 @@ export function addSessionChartSeries(
   const { name, values, categories, x } = series;
   const refs = [name, values, categories, x].filter((range) => range !== undefined);
   const intent = chartIntent([...chartCells(chart), ...refs], 'chartUpdate', authorization);
-  if (!canMutateChart(store, intent)) return null;
-  const patch: ChartSeriesPatch =
-    chart.kind === 'scatter'
-      ? { y: sourceRef(wb, values), ...(x ? { x: sourceRef(wb, x) } : {}) }
-      : {
-          values: sourceRef(wb, values),
-          ...(categories ? { categories: sourceRef(wb, categories) } : {}),
-        };
-  if (name) patch.name = sourceRef(wb, name);
-  const { sheet, nativeObjectId } = chart;
-  return editChart(
-    store,
-    chart,
-    history,
-    wb,
-    intent,
-    'series add',
-    () => wb.addChartSeries(sheet, nativeObjectId, 0, patch) !== null,
-  );
+  return writeChart(store, history, intent, null, () => {
+    const patch: ChartSeriesPatch =
+      chart.kind === 'scatter'
+        ? { y: sourceRef(wb, values), ...(x ? { x: sourceRef(wb, x) } : {}) }
+        : {
+            values: sourceRef(wb, values),
+            ...(categories ? { categories: sourceRef(wb, categories) } : {}),
+          };
+    if (name) patch.name = sourceRef(wb, name);
+    const { sheet, nativeObjectId } = chart;
+    return editChart(
+      store,
+      chart,
+      history,
+      wb,
+      'series add',
+      () => wb.addChartSeries(sheet, nativeObjectId, 0, patch) !== null,
+    );
+  });
 }
 
 /**
@@ -969,16 +956,17 @@ export function setSessionChartSeries(
   const { name, values, categories, x } = series;
   const refs = [name, values, categories, x].filter((range) => range !== undefined);
   const intent = chartIntent([...chartCells(chart), ...refs], 'chartUpdate', authorization);
-  if (!canMutateChart(store, intent)) return null;
-  const patch: ChartSeriesPatch = {};
-  if (name) patch.name = sourceRef(wb, name);
-  if (values) patch[chart.kind === 'scatter' ? 'y' : 'values'] = sourceRef(wb, values);
-  if (categories && chart.kind !== 'scatter') patch.categories = sourceRef(wb, categories);
-  if (x && chart.kind === 'scatter') patch.x = sourceRef(wb, x);
-  if (Object.keys(patch).length === 0) return chart;
-  return editChart(store, chart, history, wb, intent, 'series edit', () =>
-    targets.every((idx) => wb.setChartSeries(sheet, nativeObjectId, 0, idx, patch)),
-  );
+  return writeChart(store, history, intent, null, () => {
+    const patch: ChartSeriesPatch = {};
+    if (name) patch.name = sourceRef(wb, name);
+    if (values) patch[chart.kind === 'scatter' ? 'y' : 'values'] = sourceRef(wb, values);
+    if (categories && chart.kind !== 'scatter') patch.categories = sourceRef(wb, categories);
+    if (x && chart.kind === 'scatter') patch.x = sourceRef(wb, x);
+    if (Object.keys(patch).length === 0) return chart;
+    return editChart(store, chart, history, wb, 'series edit', () =>
+      targets.every((idx) => wb.setChartSeries(sheet, nativeObjectId, 0, idx, patch)),
+    );
+  });
 }
 
 /**
@@ -1008,10 +996,11 @@ export function removeSessionChartSeries(
     return null;
   }
   const intent = chartIntent(chartCells(chart), 'chartUpdate', authorization);
-  if (!canMutateChart(store, intent)) return null;
-  return editChart(store, chart, history, wb, intent, 'series remove', () =>
-    wb.removeChartSeries(sheet, nativeObjectId, 0, seriesIdx),
-  );
+  return writeChart(store, history, intent, null, () => {
+    return editChart(store, chart, history, wb, 'series remove', () =>
+      wb.removeChartSeries(sheet, nativeObjectId, 0, seriesIdx),
+    );
+  });
 }
 
 /** Delete every chart whose data range intersects `range`, as one undo step. */
@@ -1025,15 +1014,16 @@ export function clearSessionChartsInRange(
   const charts = sessionChartsForRange(store.getState(), range);
   if (charts.length === 0 || !wb.capabilities.charts) return 0;
   const intent = chartIntent(charts.flatMap(chartCells), 'chartDelete', authorization);
-  if (!canMutateChart(store, intent)) return 0;
-  let count = 0;
-  history?.begin();
-  try {
-    for (const chart of charts) {
-      if (removeChart(store, chart, history, wb, intent)) count += 1;
+  return writeChart(store, history, intent, 0, () => {
+    let count = 0;
+    history?.begin();
+    try {
+      for (const chart of charts) {
+        if (removeChart(store, chart, history, wb)) count += 1;
+      }
+    } finally {
+      history?.end();
     }
-  } finally {
-    history?.end();
-  }
-  return count;
+    return count;
+  });
 }

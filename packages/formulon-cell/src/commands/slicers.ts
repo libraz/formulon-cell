@@ -2,7 +2,17 @@ import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SlicerSpec, type SpreadsheetStore } from '../store/store.js';
-import { applyValueFilter, distinctValues, resetFilterCriteria } from './filter.js';
+import { authorizedWrite } from './authorized-write.js';
+import {
+  applyValueFilter,
+  distinctValues,
+  recordFilterChange,
+  resetFilterCriteria,
+} from './filter.js';
+import { History } from './history.js';
+import type { OperationIntent } from './interaction-policy.js';
+import { type ObjectActionContext, objectChangeAllowed, objectIntents } from './object-actions.js';
+import { recordSlicersChange } from './slice-history.js';
 
 export interface CreateSlicerOptions {
   id?: string;
@@ -190,3 +200,59 @@ const slug = (value: string): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'item';
+
+/** A slicer change and the entry point that asked for it. */
+export interface SlicerActionContext extends ObjectActionContext {
+  readonly workbook: WorkbookHandle;
+}
+
+/**
+ * Change a slicer and recompute the rows its filter hides, as one authorized step: an object
+ * change of the slicer's sheet and a filter use of the table it filters (Use AutoFilter on a
+ * protected sheet). The slicer and the filter it drives both undo together.
+ */
+const slicerWrite = (ctx: SlicerActionContext, spec: SlicerSpec, mutate: () => void): boolean => {
+  const sheet = spec.sheet ?? ctx.store.getState().data.sheetIndex;
+  const range = resolveSlicerSpec(ctx.workbook, spec)?.range;
+  if (!objectChangeAllowed(ctx, sheet)) return false;
+  const intents = (origin: OperationIntent['origin']): OperationIntent[] => [
+    ...objectIntents(ctx, sheet)(origin),
+    ...(range
+      ? [
+          {
+            operation: 'filter' as const,
+            origin,
+            commandId: ctx.commandId,
+            effects: [{ kind: 'range' as const, range }],
+          },
+        ]
+      : []),
+  ];
+  const history = ctx.history ?? new History();
+  return authorizedWrite({
+    store: ctx.store,
+    history,
+    intents,
+    origin: ctx.origin,
+    write: () => {
+      recordSlicersChange(history, ctx.store, mutate);
+      recordFilterChange(history, ctx.store, () => recomputeSlicerFilters(ctx.store, ctx.workbook));
+    },
+  }).ok;
+};
+
+/** Select `values` in slicer `id` (none selects every item), filtering the rows it drives. */
+export function setSlicerSelectionAction(
+  ctx: SlicerActionContext,
+  id: string,
+  values: readonly string[],
+): boolean {
+  const spec = listSlicers(ctx.store).find((entry) => entry.id === id);
+  return spec ? slicerWrite(ctx, spec, () => setSlicerSelected(ctx.store, id, values)) : false;
+}
+
+/** Delete slicer `id`, showing again the rows only it hid. */
+export function removeSlicerAction(ctx: SlicerActionContext, id: string): boolean {
+  const spec = listSlicers(ctx.store).find((entry) => entry.id === id);
+  return spec ? slicerWrite(ctx, spec, () => removeSlicer(ctx.store, id)) : false;
+}

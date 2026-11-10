@@ -69,6 +69,8 @@ const CELL_PROTECTION_OPTION: Partial<
   // Using an existing filter (its range): criteria, clear, reapply.
   filter: 'autoFilter',
   pivot: 'pivotTables',
+  // Charts, pictures, shapes, ink, slicers and sparklines: Edit objects.
+  object: 'objects',
 };
 
 /** The option a protected sheet needs for `operation`: a row/column option or a cell one. */

@@ -7,6 +7,7 @@ import type { SelectionStats } from './aggregate.js';
 import { blockDataTableCells } from './data-table-guard.js';
 import { formatAsTable as applyFormatAsTable } from './format-as-table.js';
 import type { History } from './history.js';
+import { objectChangeAllowed } from './object-actions.js';
 import {
   isCellWritable,
   isRangeInAllowedEditRange,
@@ -20,6 +21,7 @@ import {
   recordSparklineChange,
   recordTablesChange,
 } from './slice-history.js';
+import { setSparklinesAction } from './sparkline.js';
 import { tableWrite } from './table-actions.js';
 
 /**
@@ -476,25 +478,34 @@ function addSparkline(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteRes
   const col = range.c1 + 1;
   if (col > MAX_COL) return { ok: false, reason: 'out-of-bounds' };
   const addr = { sheet: range.sheet, row: range.r0, col };
-  if (!isCellWritable(store.getState(), addr)) {
-    warnProtected(addr);
-    return { ok: false, reason: 'protected' };
-  }
-  recordSparklineChange(input.history ?? null, store, () => {
-    mutators.setSparkline(store, addr, {
-      kind,
-      source: formatA1Range(range, { collapse: false }),
-      showNegative: kind !== 'line',
-    });
-  });
+  const spec = {
+    kind,
+    source: formatA1Range(range, { collapse: false }),
+    showNegative: kind !== 'line',
+  };
+  const ctx = {
+    store,
+    history: input.history ?? null,
+    origin: 'editor',
+    commandId: 'mac.insert.sparkline',
+  } as const;
+  if (!setSparklinesAction(ctx, [{ addr, spec }])) return { ok: false, reason: 'protected' };
   return { ok: true, kind: 'sparkline', count: 1 };
 }
 
 function addChart(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
   const { actionId, range, store } = input;
-  if (isSheetProtected(store.getState(), range.sheet)) return { ok: false, reason: 'protected' };
+  // The grid's Quick Analysis button inserts a chart as Insert > Chart does.
+  const authorization = { origin: 'editor', commandId: 'chartInsert' } as const;
+  if (!objectChangeAllowed({ store, ...authorization }, range.sheet))
+    return { ok: false, reason: 'protected' };
   const kind = actionId === 'charts-line' ? 'line' : 'column';
-  const chart = createSessionChart(store, range, { wb: input.wb, kind }, input.history ?? null);
+  const chart = createSessionChart(
+    store,
+    range,
+    { wb: input.wb, kind, authorization },
+    input.history ?? null,
+  );
   if (!chart) return { ok: false, reason: 'unsupported' };
   // Like the ribbon, the new chart is selected; its overlay names it.
   mutators.setSelectedObject(store, { id: chart.id, name: '' });
@@ -550,7 +561,10 @@ function clearAnalysisFormatting(input: QuickAnalysisExecuteInput): QuickAnalysi
       recordSparklineChange(history, store, () => {
         mutators.clearSparklinesInRange(store, range);
       });
-      clearSessionChartsInRange(store, range, history, input.wb);
+      clearSessionChartsInRange(store, range, history, input.wb, {
+        origin: 'editor',
+        commandId: 'chartDelete',
+      });
       recordTablesChange(history, store, () => {
         mutators.clearTableOverlaysInRange(store, range);
       });

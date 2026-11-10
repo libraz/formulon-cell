@@ -1,6 +1,6 @@
 import { finite } from '../charts/numeric.js';
 import type { History } from '../commands/history.js';
-import type { OperationIntent } from '../commands/interaction-policy.js';
+import { objectChangeAllowed, objectWrite } from '../commands/object-actions.js';
 import { clearSessionIllustration, createSessionImage } from '../commands/session-illustration.js';
 import { recordIllustrationsChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -37,14 +37,21 @@ export type MacInkTool =
 
 export type MacInkDrawingTool = Exclude<MacInkTool, 'eraser' | 'lasso' | 'add-pen' | 'trackpad'>;
 
+/** The Draw command each stroke tool and the eraser run as. */
+const INK_COMMAND_IDS: Readonly<Record<MacInkDrawingTool | 'eraser', string>> = {
+  'pen-black': 'mac.draw.penBlack',
+  'pen-red': 'mac.draw.penRed',
+  pencil: 'mac.draw.pencil',
+  highlighter: 'mac.draw.highlighter',
+  eraser: 'mac.draw.eraser',
+};
+
 export interface MacInkInstance {
   host: HTMLElement;
   store: SpreadsheetStore;
   history?: History | null;
   /** Workbook that stores the stroke as a picture, so ink survives a save. */
   workbook?: WorkbookHandle | null;
-  /** Optional mount command policy. Restricted embeds reject object mutation. */
-  commands?: { canExecute(intent: OperationIntent): { allowed: boolean } };
   /** Source of the accessible labels; the default dictionary is used when absent. */
   i18n?: { readonly strings: Strings };
 }
@@ -247,14 +254,6 @@ const pointToLocal = (
   return { x: rect.x + point.u * rect.w, y: rect.y + point.v * rect.h };
 };
 
-const rangeForMetadata = (sheet: number, metadata: MacInkMetadata) => ({
-  sheet,
-  r0: Math.min(...metadata.points.map((point) => point.row)),
-  c0: Math.min(...metadata.points.map((point) => point.col)),
-  r1: Math.max(...metadata.points.map((point) => point.row)),
-  c1: Math.max(...metadata.points.map((point) => point.col)),
-});
-
 const localPoints = (
   state: ReturnType<SpreadsheetStore['getState']>,
   metadata: MacInkMetadata,
@@ -404,15 +403,12 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
   const inkStrings = (): Strings['mac']['ink'] =>
     (instance.i18n?.strings ?? defaultStrings).mac.ink;
 
-  const canMutate = (range: ReturnType<typeof rangeForMetadata>): boolean => {
-    const commands = instance.commands;
-    if (!commands) return true;
-    return commands.canExecute({
-      operation: 'object',
-      origin: 'ribbon',
-      effects: [{ kind: 'range', range }],
-    }).allowed;
-  };
+  /** A stroke or an erase on the grid, run as the Draw tool that made it. */
+  const inkAuthorization = (mode: MacInkDrawingTool | 'eraser') =>
+    ({ origin: 'editor', commandId: INK_COMMAND_IDS[mode] }) as const;
+
+  const canMutate = (mode: MacInkDrawingTool | 'eraser', sheet: number): boolean =>
+    objectChangeAllowed({ store: instance.store, ...inkAuthorization(mode) }, sheet);
 
   const display = createSvg('svg', {
     class: 'fc-mac-ink__display',
@@ -610,7 +606,7 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
       r1: Math.max(...points.map((point) => point.row)),
       c1: Math.max(...points.map((point) => point.col)),
     };
-    if (!canMutate(range)) {
+    if (!canMutate(mode, sheet)) {
       renderInProgress();
       return;
     }
@@ -638,14 +634,22 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
           wb: workbook,
           anchorAtPixels: true,
           extra: { macInk: metadata },
+          authorization: inkAuthorization(mode),
         },
         instance.history ?? null,
       );
     } else {
-      recordIllustrationsChange(instance.history ?? null, instance.store, () => {
-        const created = createSessionImage(instance.store, range, options, null);
-        if (created) addMetadata(instance.store, created, metadata);
-      });
+      const ctx = {
+        store: instance.store,
+        history: instance.history ?? null,
+        ...inkAuthorization(mode),
+      };
+      objectWrite(ctx, sheet, undefined, () =>
+        recordIllustrationsChange(instance.history ?? null, instance.store, () => {
+          const created = createSessionImage(instance.store, range, options, null);
+          if (created) addMetadata(instance.store, created, metadata);
+        }),
+      );
     }
     render();
   };
@@ -740,12 +744,13 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
             .illustrations.illustrations.find((candidate) => candidate.id === id)
         : undefined;
       const metadata = item ? metadataFor(item) : null;
-      if (id && item && metadata && canMutate(rangeForMetadata(item.sheet, metadata)))
+      if (id && item && metadata && canMutate('eraser', item.sheet))
         clearSessionIllustration(
           instance.store,
           id,
           instance.history ?? null,
           instance.workbook ?? undefined,
+          inkAuthorization('eraser'),
         );
     }
   };

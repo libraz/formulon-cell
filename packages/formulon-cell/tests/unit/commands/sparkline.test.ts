@@ -45,7 +45,14 @@ describe('sparkline commands', () => {
   it('blocks setting or clearing locked protected sparkline host cells', () => {
     const store = createSpreadsheetStore();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    // Without Edit objects a protected sheet refuses sparklines outright.
     setProtectedSheet(store, 0, true);
+    expect(
+      setSparkline(store, { sheet: 0, row: 0, col: 0 }, { kind: 'line', source: 'A1:A4' }),
+    ).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+    // With it, a locked host cell still refuses them.
+    setProtectedSheet(store, 0, true, { permissions: { objects: true } });
 
     try {
       expect(
@@ -65,7 +72,7 @@ describe('sparkline commands', () => {
     setSparkline(store, { sheet: 0, row: 0, col: 0 }, { kind: 'line', source: 'A1:A4' });
     setSparkline(store, { sheet: 0, row: 0, col: 1 }, { kind: 'line', source: 'B1:B4' });
     setCellLocked(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, false);
-    setProtectedSheet(store, 0, true);
+    setProtectedSheet(store, 0, true, { permissions: { objects: true } });
 
     try {
       expect(clearSparklinesInRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 })).toBe(1);
