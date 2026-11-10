@@ -335,6 +335,8 @@ const buildSortMenuAction =
             workbook: instance.workbook,
             history: instance.history,
             direction: action,
+            origin: 'ribbon',
+            commandId: action === 'asc' ? 'sortAsc' : 'sortDesc',
           });
           instance.host.focus();
         },
@@ -399,6 +401,8 @@ const buildSortMenuAction =
             orientation: result.orientation,
             matchCase: result.matchCase,
           },
+          origin: 'ribbon',
+          commandId: 'sortData',
         });
         instance.host.focus();
       });

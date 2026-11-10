@@ -104,7 +104,14 @@ describe('Sort A to Z from one cell of a filtered list', () => {
       ui: { ...s.ui, filterRanges: [filter] },
       selection: { active, anchor: active, range: { sheet: 0, r0: 4, c0: 2, r1: 4, c1: 2 } },
     }));
-    sortActiveColumnAuto({ store, workbook: wb, history: new History(), direction: 'asc' });
+    sortActiveColumnAuto({
+      store,
+      workbook: wb,
+      history: new History(),
+      direction: 'asc',
+      origin: 'ribbon',
+      commandId: 'sortAsc',
+    });
     const col = Array.from({ length: 12 }, (_, r) => wb.getValue({ sheet: 0, row: r, col: 2 }));
     const at = (r: number) =>
       col[r]?.kind === 'number' ? (col[r] as { value: number }).value : null;

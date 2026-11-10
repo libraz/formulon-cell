@@ -15,10 +15,10 @@ import {
   toggleItalic,
   toggleUnderline,
 } from '../commands/format.js';
-import type { History } from '../commands/history.js';
+import { History } from '../commands/history.js';
 import { phoneticReading, setPhoneticReading, toggleShowPhonetic } from '../commands/phonetic.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import { inferSortHasHeader, sortRange } from '../commands/sort.js';
+import { inferSortHasHeader, sortRangeWithHistory } from '../commands/sort.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import { localeForWorkbook, profileTextKey } from '../engine/profile-text-semantics.js';
 import type { Range } from '../engine/types.js';
@@ -165,25 +165,19 @@ export function runContextMenuFormatSortItem(
       ) {
         return true;
       }
-      // A sort rewrites every cell in the range; group them so one undo
-      // restores the original order.
-      if (history) history.begin();
-      try {
-        sortRange(
-          state,
-          store,
-          wb,
-          range,
-          {
-            byCol: state.selection.active.col,
-            direction: id === 'sortAsc' ? 'asc' : 'desc',
-            hasHeader: inferSortHasHeader(state, range),
-          },
-          history,
-        );
-      } finally {
-        if (history) history.end();
-      }
+      sortRangeWithHistory({
+        store,
+        workbook: wb,
+        history: history ?? new History(),
+        range,
+        options: {
+          byCol: state.selection.active.col,
+          direction: id === 'sortAsc' ? 'asc' : 'desc',
+          hasHeader: inferSortHasHeader(state, range),
+        },
+        origin: 'contextMenu',
+        commandId: id,
+      });
       ctx.afterCommit();
       return true;
     }

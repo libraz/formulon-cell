@@ -561,6 +561,8 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
             history: deps.history,
             range: activeRange,
             options: { byCol: activeCol, direction, hasHeader: true },
+            origin: 'contextMenu',
+            commandId: direction === 'asc' ? 'sortAsc' : 'sortDesc',
           });
         });
         projectDisabledState(button, !deps.getWb || !deps.history, m.unavailable);

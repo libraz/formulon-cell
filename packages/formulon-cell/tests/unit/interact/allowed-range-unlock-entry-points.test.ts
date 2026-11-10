@@ -225,6 +225,8 @@ describe('ribbon commands on a mounted sheet', () => {
     const { store } = sheet.instance;
     select(store, area(0, 0, 0, 0));
     const ui = guard(store, area(0, 0, 2, 0), [PASSWORD]);
+    // Sorting on a protected sheet needs the Sort option as well as editable cells.
+    setProtectedSheet(store, 0, true, { permissions: { sort: true } });
     createEditingDropdownDefaults(sheet.instance).applySortMenuAction('asc');
     expect(num(sheet.workbook, 0, 0)).toBe(3);
     await settle();

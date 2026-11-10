@@ -77,10 +77,21 @@ const sheetProtectionPermits = (
   return sheetPermits(state, sheet, PROTECTION_OPTION[operation]);
 };
 
+/** Operations a Protect Sheet option enables on a protected sheet for unlocked cells only:
+ *  a sort never reorders a range holding a locked cell, whatever its option says. */
+const UNLOCKED_PROTECTION_OPTION: Partial<
+  Record<InteractionOperation, keyof SheetProtectionPermissions>
+> = {
+  sort: 'sort',
+};
+
 /** Whether sheet protection lets `operation` write `addr`. */
 const protectionPermits = (state: State, operation: InteractionOperation, addr: Addr): boolean => {
   const option = PROTECTION_OPTION[operation];
-  return option ? sheetPermits(state, addr.sheet, option) : isCellWritable(state, addr);
+  if (option) return sheetPermits(state, addr.sheet, option);
+  const unlockedOption = UNLOCKED_PROTECTION_OPTION[operation];
+  if (unlockedOption && !sheetPermits(state, addr.sheet, unlockedOption)) return false;
+  return isCellWritable(state, addr);
 };
 
 const ownsAutomaticHyperlinkCommand = (intent: OperationIntent): boolean =>

@@ -5,6 +5,7 @@ import { fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
 import { customListsFor } from './autofill-series.js';
 import { recordCommentChange } from './comment.js';
 import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
@@ -13,6 +14,7 @@ import { filterRangeForSort, inferAutoFilterRange, setFilterSort } from './filte
 import { filterRangeAt } from './filter-ranges.js';
 import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';
+import type { InteractionOrigin } from './interaction-policy.js';
 import { isCellWritable, warnProtected } from './protection.js';
 import { recordFormatChange } from './slice-history.js';
 
@@ -656,6 +658,21 @@ const filterHidesRow = (state: State, range: Range, row: number): boolean =>
       f.sheet === range.sheet && row > f.r0 && row <= f.r1 && f.c0 <= range.c1 && f.c1 >= range.c0,
   );
 
+/** The cells a sort of `range` rewrites: everything below a kept header row
+ *  (a left-to-right sort keeps none), or null when nothing is left to sort. */
+export const sortedDataRange = (range: Range, opts: SortOptions): Range | null => {
+  const horizontal = opts.orientation === 'leftToRight';
+  if (horizontal || !opts.hasHeader) return { ...range };
+  return range.r0 + 1 > range.r1 ? null : { ...range, r0: range.r0 + 1 };
+};
+
+/** The intents of a sort that rewrites `dataRange`. */
+export const sortIntents =
+  (dataRange: Range, commandId: string): AuthorizedIntentFactory =>
+  (origin) => [
+    { operation: 'sort', origin, commandId, effects: [{ kind: 'range', range: { ...dataRange } }] },
+  ];
+
 /** Sort the rows of `range` in place by the values in `byCol`. Writes the
  *  resulting cells back through `wb`. Ascending value order is number, text,
  *  bool, error, blank; blanks stay last for either direction. */
@@ -671,12 +688,10 @@ export function sortRange(
   const matchCase = opts.matchCase === true;
   // A "line" is one sortable unit: a row, or a column when sorting left to
   // right. `pos` walks across the line.
-  const first = horizontal ? range.c0 : range.r0;
-  // Excel ignores the header flag for left-to-right sorts.
-  const start = opts.hasHeader && !horizontal ? first + 1 : first;
+  const dataRange = sortedDataRange(range, opts);
+  if (!dataRange) return false;
+  const start = horizontal ? dataRange.c0 : dataRange.r0;
   const last = horizontal ? range.c1 : range.r1;
-  if (start > last) return false;
-  const dataRange: Range = horizontal ? { ...range, c0: start } : { ...range, r0: start };
   const sortKeys = normalizedSortKeys(opts);
   if (sortKeys.length === 0) return false;
   const keyLo = horizontal ? range.r0 : range.c0;
@@ -950,21 +965,26 @@ export interface SortRangeWithHistoryDeps {
   history: History;
   range: Range;
   options: SortOptions;
+  origin: InteractionOrigin;
+  commandId: string;
 }
 
-/** Wrap [[sortRange]] in a history transaction and refresh the affected
+/** Run [[sortRange]] as one authorized history step and refresh the affected
  *  sheet's cells when anything actually moved. Returns whether the sort
  *  changed any data, so callers can short-circuit follow-up side effects. */
 export const sortRangeWithHistory = (deps: SortRangeWithHistoryDeps): boolean => {
   const { store, workbook, history, range, options } = deps;
+  const dataRange = sortedDataRange(range, options);
+  if (!dataRange) return false;
   const state = store.getState();
-  history.begin();
-  let ok = false;
-  try {
-    ok = sortRange(state, store, workbook, range, options, history);
-  } finally {
-    history.end();
-  }
+  const result = authorizedWrite({
+    store,
+    history,
+    intents: sortIntents(dataRange, deps.commandId),
+    origin: deps.origin,
+    write: () => sortRange(state, store, workbook, range, options, history),
+  });
+  const ok = result.ok && result.value;
   if (ok) mutators.replaceCells(store, workbook.cells(state.data.sheetIndex));
   return ok;
 };
@@ -974,6 +994,8 @@ export interface SortActiveColumnAutoOptions {
   workbook: WorkbookHandle;
   history: History;
   direction: SortDirection;
+  origin: InteractionOrigin;
+  commandId: string;
 }
 
 /** "Sort A→Z / Z→A" toolbar action. Auto-detects the contiguous range around
@@ -981,7 +1003,7 @@ export interface SortActiveColumnAutoOptions {
  *  cell's column, and refreshes the sheet cells. Returns whether anything
  *  actually changed so the host can skip side effects on a no-op. */
 export const sortActiveColumnAuto = (deps: SortActiveColumnAutoOptions): boolean => {
-  const { store, workbook, history, direction } = deps;
+  const { store, workbook, history, direction, origin, commandId } = deps;
   const state = store.getState();
   const sel = state.selection.range;
   const single = sel.r0 === sel.r1 && sel.c0 === sel.c1;
@@ -999,5 +1021,7 @@ export const sortActiveColumnAuto = (deps: SortActiveColumnAutoOptions): boolean
       direction,
       hasHeader: filter ? true : inferSortHasHeader(state, range),
     },
+    origin,
+    commandId,
   });
 };
