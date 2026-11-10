@@ -35,7 +35,7 @@ import type { ClipboardHandle } from '../../interact/clipboard.js';
 import type { FormatPainterHandle } from '../../interact/format-painter.js';
 import type { ViewportOptions } from '../../interact/navigation-policy.js';
 import { shareSpreadsheetInternals, spreadsheetInternals } from '../../mount/internals.js';
-import type { ToolbarInstance } from '../../mount/toolbar.js';
+import type { MountToolbarOptions, ToolbarInstance } from '../../mount/toolbar.js';
 import { runRibbonCommand } from '../../mount/toolbar.js';
 import type {
   SpreadsheetInstance as LegacyInstance,
@@ -62,6 +62,7 @@ import type {
   ApplyChangesOptions,
   CellChange,
   FormulaHint,
+  RibbonToolbarConfig,
   SelectionState,
   SpreadsheetInstanceEvents,
   SpreadsheetOptions,
@@ -215,6 +216,17 @@ const stateOf = (instance: SpreadsheetInstance): InstanceState => {
   if (!state) throw new TypeError('not a SpreadsheetInstance');
   state.life.assertLive();
   return state;
+};
+
+/** The mount behind a public instance, for the ribbon placed on its own. Exported from no entry
+ *  point. */
+export const legacyInstanceOf = (instance: SpreadsheetInstance): LegacyInstance =>
+  stateOf(instance).legacy;
+
+/** The ribbon options `ribbon(options)` carries, under the names the ribbon mount reads. */
+const ribbonOptionsOf = (config: RibbonToolbarConfig): MountToolbarOptions => {
+  const { kind: _kind, ...options } = config as RibbonToolbarConfig & MountToolbarOptions;
+  return options;
 };
 
 const toRect = (r: Range): CellRect => ({
@@ -548,7 +560,7 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
       legacy.setOverlayOptions((value as SpreadsheetOptions['overlays']) ?? undefined);
       break;
     case 'toolbar':
-      legacy.setToolbar(value !== null);
+      legacy.setToolbar(value === null ? false : ribbonOptionsOf(value as RibbonToolbarConfig));
       break;
     case 'theme':
       legacy.setTheme((value as string | null) ?? 'paper');
@@ -845,7 +857,7 @@ const legacyOptionsOf = (options: SpreadsheetOptions, handle: WorkbookHandle): M
     ...(legacyViewport(options.viewport) ? { viewport: legacyViewport(options.viewport) } : {}),
     ...(options.contextMenu ? { contextMenu: options.contextMenu } : {}),
     ...(options.overlays ? { overlays: options.overlays } : {}),
-    toolbar: options.toolbar != null,
+    toolbar: options.toolbar != null && ribbonOptionsOf(options.toolbar),
     ...(options.theme ? { theme: options.theme } : {}),
     locale: options.locale ?? 'en',
     ...(options.strings ? { strings: options.strings } : {}),
