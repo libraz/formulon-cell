@@ -23,6 +23,21 @@ export interface WorkbookContext {
   change<T>(kind: FacadeChangeKind, sheet: number | null, fn: () => T): T;
   /** The facade of an engine sheet handle. */
   sheet(engine: EngineSheet): Sheet;
+  /** The facade of an engine object handle (a table, a picture, …): one facade per handle. */
+  facade<F extends object>(engine: object, cls: FacadeClass<F>): F;
+  /** The engine handle behind a facade argument; any other value as it is. */
+  engineOf(value: unknown): unknown;
+}
+
+/** A facade class: its instances are made by the workbook, never by `new`. */
+export type FacadeClass<F> = abstract new (...args: never[]) => F;
+
+/** The context of a facade over an engine object handle. */
+export interface HandleContext<H> extends WorkbookContext {
+  /** The engine handle the facade fronts. */
+  readonly target: H;
+  /** The sheet the object lives on; `null` for a workbook-level object. */
+  readonly sheetIndex: number | null;
 }
 
 export interface SheetContext extends WorkbookContext {
@@ -56,4 +71,8 @@ export interface MemberSpec<C> {
   readonly change?: Readonly<Partial<Record<FacadeChangeKind, readonly string[]>>>;
   /** Hand-written members. */
   readonly methods?: Readonly<Record<string, ContextMethod<C>>>;
+  /** Engine properties forwarded as read-only getters. */
+  readonly props?: readonly string[];
+  /** Hand-written read-only getters. */
+  readonly getters?: Readonly<Record<string, (ctx: C) => unknown>>;
 }

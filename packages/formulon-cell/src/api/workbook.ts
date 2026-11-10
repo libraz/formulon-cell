@@ -4,7 +4,13 @@ import {
   type CellRect,
   type CellValueInput,
   type DisplayText,
+  type Chart as EngineChart,
+  type Drawing as EngineDrawing,
+  type Picture as EnginePicture,
+  type Shape as EngineShape,
   type Sheet as EngineSheet,
+  type Slicer as EngineSlicer,
+  type Table as EngineTable,
   type Workbook as EngineWorkbook,
   FormulonError,
   type LocaleFacts,
@@ -27,13 +33,32 @@ import {
   type ChangeEvent as HandleChangeEvent,
   WorkbookHandle,
 } from '../engine/workbook-handle.js';
+import { CHART_MEMBERS, Chart, SHEET_CHART_MEMBERS } from './chart.js';
+import {
+  DRAWING_MEMBERS,
+  Drawing,
+  PICTURE_MEMBERS,
+  Picture,
+  SHAPE_MEMBERS,
+  SHEET_DRAWING_MEMBERS,
+  Shape,
+  SLICER_MEMBERS,
+  Slicer,
+} from './drawing.js';
 import { type Disposer, Emitter } from './events.js';
-import type { MemberSpec, SheetContext, WorkbookContext } from './facade-context.js';
+import type {
+  FacadeClass,
+  HandleContext,
+  MemberSpec,
+  SheetContext,
+  WorkbookContext,
+} from './facade-context.js';
 import { Lifecycle } from './lifecycle.js';
 import { SHEET_OOXML_MEMBERS, SheetOoxml, WORKBOOK_OOXML_MEMBERS, WorkbookOoxml } from './ooxml.js';
 import { SHEET_CELL_MEMBERS } from './sheet-cells.js';
 import { SHEET_FORMAT_MEMBERS, WORKBOOK_FORMAT_MEMBERS } from './sheet-format.js';
 import { SHEET_STRUCTURE_MEMBERS, WORKBOOK_NAME_MEMBERS } from './sheet-structure.js';
+import { SHEET_TABLE_MEMBERS, TABLE_MEMBERS, Table, WORKBOOK_TABLE_MEMBERS } from './table.js';
 
 /** File container a workbook saves to. */
 export type SaveFormat = WorkbookSaveFormat;
@@ -520,6 +545,45 @@ const workbookContext = (wb: Workbook): WorkbookContext => {
         return result;
       }),
     sheet: (engine) => wb.sheet(engine.index),
+    facade: (engine, cls) => facadeOf(wb, engine, cls),
+    engineOf: (value) =>
+      typeof value === 'object' && value !== null
+        ? (handleEngines.get(value)?.engine ?? value)
+        : value,
+  };
+};
+
+/** The engine handle behind each object facade, and each handle's facade. */
+const handleEngines = new WeakMap<
+  object,
+  { readonly workbook: Workbook; readonly engine: object }
+>();
+const handleFacades = new WeakMap<object, object>();
+
+const facadeOf = <F extends object>(wb: Workbook, engine: object, cls: FacadeClass<F>): F => {
+  let facade = handleFacades.get(engine);
+  if (!facade || !(facade instanceof cls)) {
+    facade = Object.create(cls.prototype) as object;
+    handleEngines.set(facade, { workbook: wb, engine });
+    handleFacades.set(engine, facade);
+  }
+  return facade as F;
+};
+
+const handleContext = <H>(facade: unknown): HandleContext<H> => {
+  const entry = handleEngines.get(facade as object);
+  if (!entry) throw new TypeError('not a facade object');
+  const base = workbookContext(entry.workbook);
+  const target = entry.engine as H & { readonly sheet?: EngineSheet };
+  return {
+    ...base,
+    get engine() {
+      return base.engine;
+    },
+    target,
+    get sheetIndex() {
+      return target.sheet?.index ?? null;
+    },
   };
 };
 
@@ -675,7 +739,31 @@ const installMembers = <C>(host: MemberHost<C>, spec: MemberSpec<C>): void => {
       return (method as (ctx: C, ...rest: unknown[]) => unknown)(host.contextOf(this), ...args);
     };
   }
+  for (const name of spec.props ?? []) {
+    Object.defineProperty(proto, name, {
+      configurable: true,
+      get(this: unknown) {
+        return (host.target(host.contextOf(this)) as Record<string, unknown>)[name];
+      },
+    });
+  }
+  for (const [name, read] of Object.entries(spec.getters ?? {})) {
+    Object.defineProperty(proto, name, {
+      configurable: true,
+      get(this: unknown) {
+        return (read as (ctx: C) => unknown)(host.contextOf(this));
+      },
+    });
+  }
 };
+
+/** The host of a facade over an engine object handle. */
+const handleHost = <H>(proto: object): MemberHost<HandleContext<H>> => ({
+  proto,
+  contextOf: (self) => handleContext<H>(self),
+  target: (ctx) => ctx.target as object,
+  change: (ctx, kind, fn) => ctx.change(kind, ctx.sheetIndex, fn),
+});
 
 const SHEET_HOST: MemberHost<SheetContext> = {
   proto: Sheet.prototype,
@@ -712,6 +800,16 @@ installMembers(WORKBOOK_HOST, WORKBOOK_NAME_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_FORMAT_MEMBERS);
 installMembers(WORKBOOK_OOXML_HOST, WORKBOOK_OOXML_MEMBERS);
 installMembers(SHEET_OOXML_HOST, SHEET_OOXML_MEMBERS);
+installMembers(SHEET_HOST, SHEET_TABLE_MEMBERS);
+installMembers(WORKBOOK_HOST, WORKBOOK_TABLE_MEMBERS);
+installMembers(handleHost<EngineTable>(Table.prototype), TABLE_MEMBERS);
+installMembers(SHEET_HOST, SHEET_DRAWING_MEMBERS);
+installMembers(SHEET_HOST, SHEET_CHART_MEMBERS);
+installMembers(handleHost<EngineDrawing>(Drawing.prototype), DRAWING_MEMBERS);
+installMembers(handleHost<EnginePicture>(Picture.prototype), PICTURE_MEMBERS);
+installMembers(handleHost<EngineShape>(Shape.prototype), SHAPE_MEMBERS);
+installMembers(handleHost<EngineSlicer>(Slicer.prototype), SLICER_MEMBERS);
+installMembers(handleHost<EngineChart>(Chart.prototype), CHART_MEMBERS);
 
 /** @internal The engine binding behind a facade workbook. */
 export const workbookHandleOf = (wb: Workbook): WorkbookHandle => stateOf(wb).handle;

@@ -305,7 +305,11 @@ describe('drawing', () => {
   it('lists every drawing object and removes one by handle', async () => {
     const wb = await createWorkbook();
     const s = wb.sheet(0);
-    const shape = s.addShape({ presetGeometry: 'rect', text: 'Note' });
+    const shape = s.addShape({
+      presetGeometry: 'rect',
+      text: 'Note',
+      anchor: { widthEmu: 952500, heightEmu: 476250 },
+    });
     expect(s.listDrawings()).toEqual([shape]);
     expect(s.drawing(shape.objectId)).toBe(shape);
     s.removeDrawing(shape);
@@ -316,7 +320,9 @@ describe('drawing', () => {
 describe('shape', () => {
   it('updates a shape through its handle', async () => {
     const wb = await createWorkbook();
-    const shape = wb.sheet(0).addShape({ presetGeometry: 'rect' });
+    const shape = wb
+      .sheet(0)
+      .addShape({ presetGeometry: 'rect', anchor: { widthEmu: 952500, heightEmu: 476250 } });
     shape.update({ text: 'Hello' });
     expect(shape.getProperties().text).toBe('Hello');
   });
