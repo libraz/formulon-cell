@@ -1665,7 +1665,7 @@ export function attachPointer(
       }
       if (target) {
         void moveSelectionTo(
-          { store, wb, history, confirmOverwrite: confirmMoveOverwrite },
+          { store, wb, history, commandId: 'moveCells', confirmOverwrite: confirmMoveOverwrite },
           { row: target.r0, col: target.c0 },
         ).then((moved) => {
           if (moved) onAfterCommit?.();

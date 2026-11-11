@@ -1,4 +1,3 @@
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -14,7 +13,7 @@ import {
 } from './cell-shift.js';
 import { tableForCell } from './format-as-table.js';
 import { History } from './history.js';
-import { columnShiftBand, rowShiftBand } from './interaction-effects.js';
+import { cellShiftBand, columnShiftBand, rowShiftBand } from './interaction-effects.js';
 import type {
   InteractionOperation,
   InteractionOrigin,
@@ -125,13 +124,6 @@ export const deleteColumnsAction = (ctx: RowColActionContext, at: number, count 
     false,
     () => deleteCols(ctx.store, ctx.workbook, ctx.history, at, count),
   );
-
-/** The band a cell shift of `range` moves: its columns down to the sheet end, or its rows right
- *  to the sheet end. */
-const cellShiftBand = (range: Range, vertical: boolean): Range =>
-  vertical
-    ? { sheet: range.sheet, r0: range.r0, c0: range.c0, r1: MAX_ROW, c1: range.c1 }
-    : { sheet: range.sheet, r0: range.r0, c0: range.c0, r1: range.r1, c1: MAX_COL };
 
 /** Insert cells over `range`, shifting the cells below down or those to the right across; whole
  *  rows or columns are inserted as such, whatever the direction. */

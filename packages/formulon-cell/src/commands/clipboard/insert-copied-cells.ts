@@ -154,6 +154,22 @@ function insertCutCells(
   return result;
 }
 
+/** The block Insert Copied Cells writes: the snapshot's size, else the parsed text's. Null when
+ *  there is nothing to insert or the block is too large. */
+export function copiedBlock(
+  text: string,
+  snapshot?: ClipboardSnapshot | null,
+): { rows: string[][]; height: number; width: number } | null {
+  if (!text && !snapshot) return null;
+  const rows = snapshot ? [] : parseTSV(text);
+  if (!snapshot && rows.length === 0) return null;
+  const height = snapshot?.rows ?? rows.length;
+  const width = snapshot?.cols ?? rows.reduce((max, row) => Math.max(max, row.length), 0);
+  if (width <= 0) return null;
+  if (height * width > MAX_INSERT_COPIED_CELLS) return null;
+  return { rows, height, width };
+}
+
 function insertCellsAtActive(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
@@ -162,13 +178,9 @@ function insertCellsAtActive(
   direction: InsertCopiedCellsDirection,
   snapshot?: ClipboardSnapshot | null,
 ): InsertCopiedCellsResult | null {
-  if (!text && !snapshot) return null;
-  const rows = snapshot ? [] : parseTSV(text);
-  if (!snapshot && rows.length === 0) return null;
-  const height = snapshot?.rows ?? rows.length;
-  const width = snapshot?.cols ?? rows.reduce((max, row) => Math.max(max, row.length), 0);
-  if (width <= 0) return null;
-  if (height * width > MAX_INSERT_COPIED_CELLS) return null;
+  const block = copiedBlock(text, snapshot);
+  if (!block) return null;
+  const { rows, height, width } = block;
 
   const state = store.getState();
   const inputLocale = inputLocaleForWorkbook(wb);
@@ -702,7 +714,8 @@ function prepareBandSnapshot(
   };
 }
 
-function targetAddress(state: State, target?: InsertCopiedBandTarget): Addr | null {
+/** The cell a copied band is inserted at: `target`'s top-left, else the selection's. */
+export function targetAddress(state: State, target?: InsertCopiedBandTarget): Addr | null {
   if (!target) {
     const selected = state.selection.range;
     return {

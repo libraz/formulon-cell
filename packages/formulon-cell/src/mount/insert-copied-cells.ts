@@ -1,13 +1,14 @@
 import {
-  insertCopiedBand,
-  insertCopiedCellsFromTSV,
-} from '../commands/clipboard/insert-copied-cells.js';
+  insertCopiedBandAction,
+  insertCopiedCellsAction,
+} from '../commands/clipboard/paste-actions.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
 import type { InteractionOperation } from '../commands/interaction-policy.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { readClipboard } from '../interact/context-menu-clipboard.js';
+import type { DialogEntry } from '../interact/dialog-entry.js';
 import { openInsertCopiedCellsDialog } from '../interact/insert-copied-cells-dialog.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -26,9 +27,13 @@ export interface InsertCopiedCellsDeps {
   invalidate: () => void;
 }
 
-export function createInsertCopiedCellsOpener(deps: InsertCopiedCellsDeps): () => void {
+/** Insert Copied Cells, run as the entry point it is opened from. */
+export function createInsertCopiedCellsOpener(
+  deps: InsertCopiedCellsDeps,
+): (entry: DialogEntry) => void {
   const { host, store, history, getWb, getStrings } = deps;
-  return () => {
+  return (entry) => {
+    const ctx = { store, history, ...entry };
     if (!deps.permits('paste')) return;
     const wb = getWb();
 
@@ -43,7 +48,7 @@ export function createInsertCopiedCellsOpener(deps: InsertCopiedCellsDeps): () =
       (isWholeRowRange(copiedLogical) || isWholeColumnRange(copiedLogical));
     if (copiedWholeBand && copied) {
       const target = store.getState().selection.range;
-      const result = insertCopiedBand(store, wb, history, copied, target);
+      const result = insertCopiedBandAction(ctx, wb, copied, target);
       if (result) {
         mutators.setRange(store, result.writtenRange);
         deps.refreshCells();
@@ -63,7 +68,7 @@ export function createInsertCopiedCellsOpener(deps: InsertCopiedCellsDeps): () =
           const snap = deps.getClipboardSnapshot();
           if (!text && !snap) return;
           // The workbook may have been swapped while the clipboard read was pending.
-          const result = insertCopiedCellsFromTSV(store, getWb(), history, text, direction, snap);
+          const result = insertCopiedCellsAction(ctx, getWb(), text, direction, snap);
           if (!result) return;
           // Marquee stays up, same as the context-menu variants.
           mutators.setRange(store, result.writtenRange);

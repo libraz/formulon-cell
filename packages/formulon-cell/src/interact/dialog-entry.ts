@@ -1,3 +1,4 @@
+import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { InteractionOrigin } from '../commands/interaction-policy.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { TabId } from './format-dialog-model.js';
@@ -58,6 +59,18 @@ export const INSTANCE_API_COMMENT_ENTRY: DialogEntry = {
   commandId: 'newCommentReview',
 };
 
+/** The entry of a Paste Special open or apply through the public instance methods. */
+export const INSTANCE_API_PASTE_SPECIAL_ENTRY: DialogEntry = {
+  origin: 'instanceApi',
+  commandId: 'pasteSpecial',
+};
+
+/** The entry of Insert Copied Cells through the public instance method. */
+export const INSTANCE_API_INSERT_COPIED_CELLS_ENTRY: DialogEntry = {
+  origin: 'instanceApi',
+  commandId: 'insertCopiedCells',
+};
+
 /** The mount's dialog openers that take the entry of an internal UI caller. */
 export interface DialogOpeners {
   readonly formatDialog: (tab: TabId | undefined, entry: DialogEntry) => void;
@@ -71,6 +84,9 @@ export interface DialogOpeners {
     entry: DialogEntry,
   ) => void;
   readonly commentDialog: (mode: 'note' | 'thread' | undefined, entry: DialogEntry) => void;
+  readonly pasteSpecialDialog: (entry: DialogEntry) => void;
+  readonly pasteSpecial: (options: PasteSpecialOptions, entry: DialogEntry) => boolean;
+  readonly insertCopiedCells: (entry: DialogEntry) => void;
 }
 
 const openers = new WeakMap<SpreadsheetStore, DialogOpeners>();
@@ -134,4 +150,23 @@ export function openCommentDialogFrom(
   entry: DialogEntry,
 ): void {
   openers.get(store)?.commentDialog(mode, entry);
+}
+
+/** Open Paste Special on behalf of an internal UI entry point. */
+export function openPasteSpecialFrom(store: SpreadsheetStore, entry: DialogEntry): void {
+  openers.get(store)?.pasteSpecialDialog(entry);
+}
+
+/** Run a Paste Special preset on behalf of an internal UI entry point. */
+export function applyPasteSpecialFrom(
+  store: SpreadsheetStore,
+  options: PasteSpecialOptions,
+  entry: DialogEntry,
+): boolean {
+  return openers.get(store)?.pasteSpecial(options, entry) ?? false;
+}
+
+/** Run Insert Copied Cells on behalf of an internal UI entry point. */
+export function openInsertCopiedCellsFrom(store: SpreadsheetStore, entry: DialogEntry): void {
+  openers.get(store)?.insertCopiedCells(entry);
 }

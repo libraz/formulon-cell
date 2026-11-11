@@ -1,11 +1,13 @@
-import {
-  insertCopiedBand,
-  insertCopiedCellsFromTSV,
-} from '../commands/clipboard/insert-copied-cells.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
+import {
+  insertCopiedBandAction,
+  insertCopiedCellsAction,
+  pasteWrite,
+} from '../commands/clipboard/paste-actions.js';
 import { pasteSpecial } from '../commands/clipboard/paste-special.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
+import { columnShiftBand, rowShiftBand } from '../commands/interaction-effects.js';
 import { insertCols, insertRows } from '../commands/structure.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -33,6 +35,9 @@ export interface ContextMenuInsertCopiedContext {
   readonly clipboard: Pick<ContextMenuClipboard, 'snapshot'>;
 }
 
+/** Every context-menu Insert Copied Cells runs as this entry. */
+const INSERT_COPIED_ENTRY = { origin: 'contextMenu', commandId: 'insertCopiedCells' } as const;
+
 export const wholeBandAxisFor = (snapshot: ClipboardSnapshot): 'row' | 'col' | null => {
   const logical = snapshot.logicalRange ?? snapshot.range;
   const wholeRow = isWholeRowRange(logical);
@@ -52,6 +57,7 @@ export const wholeBandAxisFor = (snapshot: ClipboardSnapshot): 'row' | 'col' | n
  *  drops the copy into them. */
 function runInsertCopiedBand(ctx: ContextMenuInsertCopiedContext, kind: 'row' | 'col'): void {
   const { store, wb, history } = ctx;
+  const action = { store, history, ...INSERT_COPIED_ENTRY };
   const source = store.getState().ui.copyRange;
   if (!source) return;
 
@@ -66,7 +72,7 @@ function runInsertCopiedBand(ctx: ContextMenuInsertCopiedContext, kind: 'row' | 
       // full-band paste as one transaction. A failed preflight must not
       // fall through to the legacy direction-based inserter because that
       // would leave a different shape behind.
-      const result = insertCopiedBand(store, wb, history, snap, store.getState().selection.range);
+      const result = insertCopiedBandAction(action, wb, snap, store.getState().selection.range);
       if (result) {
         if (snap.mode === 'cut') consumeCutMarquee(store);
         mutators.setRange(store, result.writtenRange);
@@ -84,38 +90,59 @@ function runInsertCopiedBand(ctx: ContextMenuInsertCopiedContext, kind: 'row' | 
       kind === 'col'
         ? { ...target, c1: target.c0 + count - 1 }
         : { ...target, r1: target.r0 + count - 1 };
-    if (history) history.begin();
-    try {
-      let inserted = false;
-      if (kind === 'col') {
-        inserted = insertCols(store, wb, history, target.c0, count);
-      } else {
-        inserted = insertRows(store, wb, history, target.r0, count);
-      }
-      if (!inserted) return;
-      mutators.setActive(store, {
-        sheet: target.sheet,
-        row: kind === 'row' ? target.r0 : (snap?.range.r0 ?? 0),
-        col: kind === 'col' ? target.c0 : (snap?.range.c0 ?? 0),
-      });
-      const next = store.getState();
-      if (snap) {
-        pasteSpecial(
-          next,
-          store,
-          wb,
-          snap,
-          { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
-          history,
-        );
-      } else {
-        pasteTSV(next, store, wb, text, history);
-      }
-    } catch (err) {
-      console.warn('formulon-cell: insert copied cells failed', err);
-    } finally {
-      if (history) history.end();
-    }
+    // The inserted lines are a row (column) insert; the copy is pasted into them.
+    const inserted = pasteWrite(
+      action,
+      { destination: band, skipsLocked: !snap },
+      false,
+      () => {
+        try {
+          const opened =
+            kind === 'col'
+              ? insertCols(store, wb, history, target.c0, count)
+              : insertRows(store, wb, history, target.r0, count);
+          if (!opened) return false;
+          mutators.setActive(store, {
+            sheet: target.sheet,
+            row: kind === 'row' ? target.r0 : (snap?.range.r0 ?? 0),
+            col: kind === 'col' ? target.c0 : (snap?.range.c0 ?? 0),
+          });
+          const next = store.getState();
+          if (snap) {
+            pasteSpecial(
+              next,
+              store,
+              wb,
+              snap,
+              { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
+              history,
+            );
+          } else {
+            pasteTSV(next, store, wb, text, history);
+          }
+        } catch (err) {
+          console.warn('formulon-cell: insert copied cells failed', err);
+        }
+        return true;
+      },
+      (origin) => [
+        {
+          operation: kind === 'col' ? 'insertColumns' : 'insertRows',
+          origin,
+          commandId: INSERT_COPIED_ENTRY.commandId,
+          effects: [
+            {
+              kind: 'range',
+              range:
+                kind === 'col'
+                  ? columnShiftBand(target.sheet, target.c0)
+                  : rowShiftBand(target.sheet, target.r0),
+            },
+          ],
+        },
+      ],
+    );
+    if (!inserted) return;
     mutators.setRange(store, band);
     ctx.afterCommit();
   };
@@ -140,6 +167,7 @@ export function runContextMenuInsertCopiedCells(
   menuKind: MenuKind,
 ): void {
   const { store, wb, history } = ctx;
+  const action = { store, history, ...INSERT_COPIED_ENTRY };
   if (menuKind !== 'cell') {
     runInsertCopiedBand(ctx, menuKind);
     return;
@@ -151,7 +179,7 @@ export function runContextMenuInsertCopiedCells(
       void readClipboard().then((text) => {
         const snap = ctx.clipboard.snapshot();
         if (!hasPastePayload(text, snap)) return;
-        const r = insertCopiedCellsFromTSV(store, wb, history, text, direction, snap);
+        const r = insertCopiedCellsAction(action, wb, text, direction, snap);
         if (r) {
           // Marquee stays up, same as the row/column header variant.
           mutators.setRange(store, r.writtenRange);

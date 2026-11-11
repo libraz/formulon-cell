@@ -343,6 +343,9 @@ describe('Mac automation gallery', () => {
       defineNameDialog: unused,
       pageSetupDialog: unused,
       hyperlinkDialog: unused,
+      pasteSpecialDialog: unused,
+      pasteSpecial: () => false,
+      insertCopiedCells: unused,
       commentDialog: unused,
       pivotTableDialog: () => {
         throw new Error('pivot exploded');

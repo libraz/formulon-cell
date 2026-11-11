@@ -1,3 +1,4 @@
+import { openPasteSpecialFrom } from '../../interact/dialog-entry.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import {
@@ -34,7 +35,7 @@ const buildPasteAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyRibbonPasteAction'] =>
   (action) => {
     if (action === 'dialog') {
-      instance.openPasteSpecial();
+      openPasteSpecialFrom(instance.store, { origin: 'ribbon', commandId: 'pasteSpecial' });
       return;
     }
     // PASTE_SPECIAL_PRESETS is private to handlePasteAction; the action ids

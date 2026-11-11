@@ -4,6 +4,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { cut } from './clipboard/cut.js';
 import { createCopyFormatResolver } from './clipboard/format-resolver.js';
+import { pasteWrite } from './clipboard/paste-actions.js';
 import { pasteSpecial } from './clipboard/paste-special.js';
 import { captureSnapshotFromCopyResult } from './clipboard/snapshot.js';
 import type { History } from './history.js';
@@ -12,6 +13,8 @@ export interface MoveCellsDeps {
   store: SpreadsheetStore;
   wb: WorkbookHandle;
   history: History | null;
+  /** The gesture's command id; the move is authorized as an `editor` paste under it. */
+  commandId: string;
   /** Asked before the move overwrites data outside the source. */
   confirmOverwrite: () => Promise<boolean>;
 }
@@ -48,7 +51,7 @@ const overwritesData = (state: State, src: Range, dest: Range): boolean => {
 /**
  * Drag-move the selection so its top-left lands on `topLeft`: one cut-paste
  * transaction, so formulas pointing at the moved cells follow them and Undo
- * restores both ranges. Dropping onto data asks first. Resolves true when
+ * restores both ranges. It is authorized as a paste over the target and the cleared source. Dropping onto data asks first. Resolves true when
  * the block moved.
  */
 export async function moveSelectionTo(
@@ -75,10 +78,11 @@ export async function moveSelectionTo(
   );
   if (!snap) return false;
   mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
-  history?.begin();
-  let written: Range | null = null;
-  try {
-    written =
+  const written = pasteWrite(
+    { store, history, origin: 'editor', commandId: deps.commandId },
+    { destination: dest, cutSource: src },
+    null,
+    () =>
       pasteSpecial(
         store.getState(),
         store,
@@ -86,10 +90,8 @@ export async function moveSelectionTo(
         snap,
         { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
         history,
-      )?.writtenRange ?? null;
-  } finally {
-    history?.end();
-  }
+      )?.writtenRange ?? null,
+  );
   if (!written) {
     mutators.setActive(store, { sheet: src.sheet, row: src.r0, col: src.c0 });
     mutators.setRange(store, src);

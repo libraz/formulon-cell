@@ -1,3 +1,4 @@
+import { pasteWrite } from '../commands/clipboard/paste-actions.js';
 import {
   type PasteSpecialOptions,
   type PasteSpecialResult,
@@ -138,16 +139,13 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
         runPaste(current.source, 'formats');
       }
     };
-    if (history) {
-      history.begin();
-      try {
-        recordFormatChange(history, store, apply);
-      } finally {
-        history.end();
-      }
-    } else {
-      apply();
-    }
+    // Re-pasting over the pasted range is one authorized paste of that range.
+    pasteWrite(
+      { store, history, origin: 'editor', commandId: 'pasteOptions' },
+      { destination: current.range },
+      undefined,
+      () => recordFormatChange(history, store, apply),
+    );
     if (result) deps.onAfterCommit?.();
     hide();
   };

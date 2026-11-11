@@ -39,6 +39,13 @@ export const columnShiftBand = (sheet: number, firstCol: number): Range => ({
   c1: MAX_COL,
 });
 
+/** The band a cell shift of `range` moves: its columns down to the sheet end, or its rows right
+ *  to the sheet end. */
+export const cellShiftBand = (range: Range, vertical: boolean): Range =>
+  vertical
+    ? { sheet: range.sheet, r0: range.r0, c0: range.c0, r1: MAX_ROW, c1: range.c1 }
+    : { sheet: range.sheet, r0: range.r0, c0: range.c0, r1: range.r1, c1: MAX_COL };
+
 /** The range of a well-formed range effect too large to enumerate cell by
  *  cell (a row/column shift band); such a range is checked as a whole. */
 export const bandRange = (effect: OperationEffect): Range | null => {

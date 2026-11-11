@@ -10,6 +10,7 @@ import {
   pasteHtml,
 } from '../commands/clipboard/html.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
+import { pasteWrite } from '../commands/clipboard/paste-actions.js';
 import {
   materializedPasteCells,
   pasteSpecial,
@@ -32,6 +33,7 @@ import type { Range } from '../engine/types.js';
 import { formatBoolean, formatCell, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import type { DialogEntry } from './dialog-entry.js';
 import { navigationBoundsFor } from './navigation-policy.js';
 import type { PasteOptionsActivation } from './paste-options.js';
 
@@ -459,6 +461,29 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     return { result: pasteTSV(state, store, wb, text, history), activation: null };
   };
 
+  /** Paste the clipboard as one authorized step from `entry`: the destination cells it writes
+   *  and, for a cut of this workbook, the source cells it clears. */
+  const authorizedPaste = (
+    entry: DialogEntry,
+    text: string,
+    html: string,
+  ): { result: { writtenRange: Range } | null; activation: PasteOptionsActivation | null } => {
+    const state = store.getState();
+    const internal =
+      snapshot && snapshotText === text && hasLiveInternalPayload(state) ? snapshot : null;
+    const none = { result: null, activation: null };
+    return pasteWrite(
+      { store, history: history ?? null, ...entry },
+      {
+        destination: pasteDestinationRange(state, text),
+        cutSource: internal?.mode === 'cut' ? internal.range : null,
+        skipsLocked: internal === null,
+      },
+      none,
+      () => pasteFromClipboard(store.getState(), text, html),
+    );
+  };
+
   const onCopy = (e: ClipboardEvent): void => {
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return; // let the input handle it
@@ -559,15 +584,9 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       return;
     }
     e.preventDefault();
+    const entry = NATIVE_PASTE_ENTRY;
     const applyPaste = (): void => {
-      if (history) history.begin();
-      let r: { writtenRange: Range } | null = null;
-      let activation: PasteOptionsActivation | null = null;
-      try {
-        ({ result: r, activation } = pasteFromClipboard(store.getState(), text, html));
-      } finally {
-        if (history) history.end();
-      }
+      const { result: r, activation } = authorizedPaste(entry, text, html);
       if (r) {
         consumeCutMarquee();
         mutators.setRange(store, r.writtenRange);
@@ -619,7 +638,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     return { text: (await clipboard?.readText?.()) ?? '', html: '' };
   };
 
-  const runShortcut = async (kind: 'copy' | 'cut' | 'paste'): Promise<void> => {
+  const runShortcut = async (
+    kind: 'copy' | 'cut' | 'paste',
+    entry: DialogEntry = { origin: 'instanceApi', commandId: kind },
+  ): Promise<void> => {
     if (disposed) return;
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return;
@@ -706,14 +728,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     const destination = pasteDestinationRange(pasteState, text);
     if (!isWithinNavigationBounds(destination)) return;
     const applyPaste = (): void => {
-      if (history) history.begin();
-      let r: { writtenRange: Range } | null = null;
-      let activation: PasteOptionsActivation | null = null;
-      try {
-        ({ result: r, activation } = pasteFromClipboard(store.getState(), text, html));
-      } finally {
-        if (history) history.end();
-      }
+      const { result: r, activation } = authorizedPaste(entry, text, html);
       if (r) {
         consumeCutMarquee();
         mutators.setRange(store, r.writtenRange);
@@ -725,7 +740,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     else applyPaste();
   };
 
-  return {
+  const handle: ClipboardHandle = {
     getSnapshot: () => {
       const state = store.getState();
       return snapshot && hasLiveInternalPayload(state) ? snapshot : null;
@@ -738,4 +753,24 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       host.removeEventListener('paste', onPaste);
     },
   };
+  clipboardRunners.set(handle, runShortcut);
+  return handle;
 }
+
+/** The internal runner of each clipboard handle, which takes the entry point it runs as. */
+const clipboardRunners = new WeakMap<
+  ClipboardHandle,
+  (kind: 'copy' | 'cut' | 'paste', entry: DialogEntry) => Promise<void>
+>();
+
+/** Run a clipboard shortcut on behalf of an internal UI entry point (ribbon, keyboard, menu). */
+export function runClipboardShortcutFrom(
+  handle: ClipboardHandle,
+  kind: 'copy' | 'cut' | 'paste',
+  entry: DialogEntry,
+): Promise<void> {
+  return clipboardRunners.get(handle)?.(kind, entry) ?? handle.runShortcut(kind);
+}
+
+/** A native paste event (the platform's paste key or Edit menu). */
+const NATIVE_PASTE_ENTRY: DialogEntry = { origin: 'clipboard', commandId: 'paste' };

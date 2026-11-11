@@ -1,5 +1,5 @@
 import { canExecuteBuiltIn, cellShiftChoices } from '../commands/built-in-command-policy.js';
-import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
+import { insertCopiedBandAction } from '../commands/clipboard/paste-actions.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { executeRibbonFillAction, fillOutputRange } from '../commands/fill.js';
 import {
@@ -41,6 +41,7 @@ import { isMacHost } from '../extensions/ui-options.js';
 import { excelSerialFromParts } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
 import { openCellShiftDialog, runCellShiftChoice } from '../interact/cell-shift-dialog.js';
+import type { DialogEntry } from '../interact/dialog-entry.js';
 import type { FormatDialogHandle } from '../interact/format-dialog.js';
 import type { HyperlinkDialogHandle } from '../interact/hyperlink-dialog.js';
 import { toggleAutoFilterFromSelection } from '../interact/ribbon-filter-data.js';
@@ -100,13 +101,16 @@ interface HostShortcutInput {
   createTable: () => void;
   invalidate: () => void;
   namedRangeDialog: () => { open(): void } | null;
-  pasteSpecialDialog: () => { open(): void } | null;
+  pasteSpecialDialog: () => { open(opts: undefined, entry: DialogEntry): void } | null;
   quickAnalysis: () => { open(): void } | null;
   getLocale: () => string;
   store: SpreadsheetStore;
   strings: () => Strings;
   wb: () => WorkbookHandle;
 }
+
+/** Ctrl+Alt+V / Ctrl+Shift+V / Cmd+Ctrl+V open Paste Special as a keyboard entry. */
+const PASTE_SPECIAL_KEY_ENTRY: DialogEntry = { origin: 'keyboard', commandId: 'pasteSpecial' };
 
 export function createHostShortcutHandler(input: HostShortcutInput): (e: KeyboardEvent) => void {
   return (e: KeyboardEvent): void => {
@@ -150,7 +154,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       if (!dialog) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (!restricted) dialog.open();
+      if (!restricted) dialog.open(undefined, PASTE_SPECIAL_KEY_ENTRY);
       return;
     }
     /** Write a number into the active cell through the protection gate and range unlock. */
@@ -325,7 +329,12 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
           sourceRange !== undefined &&
           (isWholeRowRange(sourceRange) || isWholeColumnRange(sourceRange));
         if (snapshot && sourceIsWholeBand) {
-          const inserted = insertCopiedBand(input.store, currentWb, input.history, snapshot, range);
+          const inserted = insertCopiedBandAction(
+            { ...cellShiftEntry(), commandId: 'insertCopiedCells' },
+            currentWb,
+            snapshot,
+            range,
+          );
           if (inserted) {
             mutators.replaceCells(
               input.store,
@@ -393,7 +402,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       if (!dialog) return;
       e.preventDefault();
       if (restricted) return;
-      dialog.open();
+      dialog.open(undefined, PASTE_SPECIAL_KEY_ENTRY);
       return;
     }
     if (e.altKey && k === 'v') {
@@ -401,7 +410,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       if (!dialog) return;
       e.preventDefault();
       if (restricted) return;
-      dialog.open();
+      dialog.open(undefined, PASTE_SPECIAL_KEY_ENTRY);
       return;
     }
     if (e.ctrlKey && !e.metaKey && k === 'q') {

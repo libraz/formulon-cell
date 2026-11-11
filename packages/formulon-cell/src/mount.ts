@@ -38,6 +38,7 @@ import { FormulaRegistry } from './formula.js';
 import { createI18nController } from './i18n/controller.js';
 import { dictionaryLocaleFor, type Strings } from './i18n/strings.js';
 import { disposeCellShiftDialog } from './interact/cell-shift-dialog.js';
+import { INSTANCE_API_INSERT_COPIED_CELLS_ENTRY } from './interact/dialog-entry.js';
 import { deactivateMacInk, disposeMacInk } from './interact/mac-ink.js';
 import {
   attachNavigationPolicy,
@@ -843,6 +844,7 @@ export const Spreadsheet = {
       getUserHandle: extensionRegistry.getUserHandle,
       permits: (operation) => policyPermits(commands.policy, operation),
       ensureWatchWindow,
+      insertCopiedCells: openInsertCopiedCells,
       refreshFeaturesView,
     });
 
@@ -1038,7 +1040,7 @@ export const Spreadsheet = {
       pasteSpecial(options, opts) {
         return binding.pasteSpecialDialog?.apply(options, opts) ?? false;
       },
-      openInsertCopiedCells,
+      openInsertCopiedCells: () => openInsertCopiedCells(INSTANCE_API_INSERT_COPIED_CELLS_ENTRY),
       printDocument: () => sheetPrintDocument(),
       print(mode = 'print') {
         if (!ui.print) return;

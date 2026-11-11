@@ -28,6 +28,12 @@ import {
   insertSheetAction,
   type SheetActionContext,
 } from '../commands/sheet-actions.js';
+import { runClipboardShortcutFrom } from '../interact/clipboard.js';
+import {
+  applyPasteSpecialFrom,
+  openInsertCopiedCellsFrom,
+  openPasteSpecialFrom,
+} from '../interact/dialog-entry.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { mutators } from '../store/store.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
@@ -76,7 +82,7 @@ export const dispatchHostClipboard = (
   if (!instance) return;
   instance.host.focus();
   if (instance.clipboard) {
-    void instance.clipboard.runShortcut(kind);
+    void runClipboardShortcutFrom(instance.clipboard, kind, { origin: 'ribbon', commandId: kind });
     return;
   }
   try {
@@ -118,15 +124,16 @@ export const handlePasteAction = (
     return;
   }
   if (action === 'insertCopiedCells') {
-    instance.openInsertCopiedCells();
+    openInsertCopiedCellsFrom(instance.store, { origin: 'ribbon', commandId: 'insertCopiedCells' });
     return;
   }
   if (action === 'pasteSpecial') {
-    instance.openPasteSpecial();
+    openPasteSpecialFrom(instance.store, { origin: 'ribbon', commandId: 'pasteSpecial' });
     return;
   }
   const preset = PASTE_SPECIAL_PRESETS[action];
-  if (preset) instance.pasteSpecial(preset);
+  if (preset)
+    applyPasteSpecialFrom(instance.store, preset, { origin: 'ribbon', commandId: action });
 };
 
 export const handleFreezeAction = (

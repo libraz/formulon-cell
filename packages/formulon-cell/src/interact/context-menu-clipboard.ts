@@ -2,6 +2,7 @@ import { copy, planCopyRanges } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
+import { pasteWrite } from '../commands/clipboard/paste-actions.js';
 import {
   type PasteWhat,
   pasteLink,
@@ -116,11 +117,14 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
     return localSnapshot;
   };
 
-  /** Runs a quick paste of the structured snapshot; `write` does the paste. */
+  /** Runs a quick paste of the structured snapshot as the menu item `id`; `write` does the
+   *  paste, as one authorized step (the destination, and a cut's source). */
   function runQuickPaste(
+    id: ItemId,
     transpose: boolean,
     retry: () => void,
     write: (snap: ClipboardSnapshot) => void,
+    columnWidths = false,
   ): void {
     if (ctx.hasExplicitPolicy()) {
       void readClipboard().then((text) => {
@@ -134,21 +138,37 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
     const destination = resolvePasteDestination(state, snap, transpose);
     if (!ctx.canPasteToRange(destination)) return;
     if (destination && deferForAllowedRangeUnlock(store, [destination], retry)) return;
-    if (history) history.begin();
+    const paste = { store, history, origin: 'contextMenu', commandId: id } as const;
     try {
-      write(snap);
+      pasteWrite(
+        paste,
+        columnWidths
+          ? { destination: null }
+          : { destination, cutSource: snap.mode === 'cut' ? snap.range : null },
+        undefined,
+        () => write(snap),
+        columnWidths
+          ? (origin) => [
+              {
+                operation: 'resizeColumns',
+                origin,
+                commandId: id,
+                effects: [{ kind: 'sheet', sheet: destination?.sheet ?? state.data.sheetIndex }],
+              },
+            ]
+          : undefined,
+      );
     } catch (err) {
       console.warn('formulon-cell: paste special failed', err);
-    } finally {
-      if (history) history.end();
     }
     ctx.afterCommit();
   }
 
-  function runPasteSpecial(what: PasteWhat, transpose: boolean): void {
+  function runPasteSpecial(id: ItemId, what: PasteWhat, transpose: boolean): void {
     runQuickPaste(
+      id,
       transpose,
-      () => runPasteSpecial(what, transpose),
+      () => runPasteSpecial(id, what, transpose),
       (snap) =>
         pasteSpecial(
           store.getState(),
@@ -158,11 +178,12 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
           { what, operation: 'none', skipBlanks: false, transpose },
           history,
         ),
+      what === 'column-widths',
     );
   }
 
   function runPasteLink(): void {
-    runQuickPaste(false, runPasteLink, (snap) =>
+    runQuickPaste('pasteLink', false, runPasteLink, (snap) =>
       pasteLink(store.getState(), store, wb, snap, history),
     );
   }
@@ -246,24 +267,29 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
           ) {
             return;
           }
-          if (history) history.begin();
-          let r: ReturnType<typeof pasteTSV> | ReturnType<typeof pasteSpecial> = null;
-          try {
-            r = snap
-              ? pasteSpecial(
-                  store.getState(),
-                  store,
-                  wb,
-                  snap,
-                  { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
-                  history,
-                )
-              : text
-                ? pasteTSV(store.getState(), store, wb, text, history)
-                : null;
-          } finally {
-            if (history) history.end();
-          }
+          const paste = { store, history, origin: 'contextMenu', commandId: 'paste' } as const;
+          const r = pasteWrite(
+            paste,
+            {
+              destination,
+              cutSource: snap?.mode === 'cut' ? snap.range : null,
+              skipsLocked: !snap,
+            },
+            null,
+            (): ReturnType<typeof pasteTSV> | ReturnType<typeof pasteSpecial> =>
+              snap
+                ? pasteSpecial(
+                    store.getState(),
+                    store,
+                    wb,
+                    snap,
+                    { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
+                    history,
+                  )
+                : text
+                  ? pasteTSV(store.getState(), store, wb, text, history)
+                  : null,
+          );
           if (r) {
             consumeCutMarquee(store);
             mutators.setRange(store, r.writtenRange);
@@ -273,34 +299,34 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
         return true;
       }
       case 'pasteAll':
-        runPasteSpecial('all', false);
+        runPasteSpecial('pasteAll', 'all', false);
         return true;
       case 'pasteFormulas':
-        runPasteSpecial('formulas', false);
+        runPasteSpecial('pasteFormulas', 'formulas', false);
         return true;
       case 'pasteFormulasNumFmt':
-        runPasteSpecial('formulas-and-numfmt', false);
+        runPasteSpecial('pasteFormulasNumFmt', 'formulas-and-numfmt', false);
         return true;
       case 'pasteValues':
-        runPasteSpecial('values', false);
+        runPasteSpecial('pasteValues', 'values', false);
         return true;
       case 'pasteValuesNumFmt':
-        runPasteSpecial('values-and-numfmt', false);
+        runPasteSpecial('pasteValuesNumFmt', 'values-and-numfmt', false);
         return true;
       case 'pasteFormatsOnly':
-        runPasteSpecial('formats', false);
+        runPasteSpecial('pasteFormatsOnly', 'formats', false);
         return true;
       case 'pasteTranspose':
-        runPasteSpecial('all', true);
+        runPasteSpecial('pasteTranspose', 'all', true);
         return true;
       case 'pasteKeepSource':
-        runPasteSpecial('all-using-source-theme', false);
+        runPasteSpecial('pasteKeepSource', 'all-using-source-theme', false);
         return true;
       case 'pasteNoBorders':
-        runPasteSpecial('all-except-borders', false);
+        runPasteSpecial('pasteNoBorders', 'all-except-borders', false);
         return true;
       case 'pasteColumnWidths':
-        runPasteSpecial('column-widths', false);
+        runPasteSpecial('pasteColumnWidths', 'column-widths', false);
         return true;
       case 'pasteLink':
         runPasteLink();

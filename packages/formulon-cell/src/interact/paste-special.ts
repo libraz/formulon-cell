@@ -1,3 +1,4 @@
+import { pasteWrite } from '../commands/clipboard/paste-actions.js';
 import {
   type PasteOperation,
   type PasteSpecialOptions,
@@ -15,6 +16,7 @@ import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { type DialogEntry, INSTANCE_API_PASTE_SPECIAL_ENTRY } from './dialog-entry.js';
 import {
   appendDialogActions,
   appendDialogFrame,
@@ -52,8 +54,9 @@ export interface PasteSpecialOpenOptions {
 }
 
 export interface PasteSpecialHandle {
-  open(opts?: PasteSpecialOpenOptions): void;
-  apply(options: PasteSpecialOptions, opts?: PasteSpecialOpenOptions): boolean;
+  /** `entry` is the UI entry point the paste runs as; omitted, the instance API. */
+  open(opts?: PasteSpecialOpenOptions, entry?: DialogEntry): void;
+  apply(options: PasteSpecialOptions, opts?: PasteSpecialOpenOptions, entry?: DialogEntry): boolean;
   close(): void;
   detach(): void;
 }
@@ -183,7 +186,8 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     host.focus();
   };
 
-  const open = (openOpts?: PasteSpecialOpenOptions): void => {
+  const open = (openOpts?: PasteSpecialOpenOptions, from?: DialogEntry): void => {
+    entry = from ?? INSTANCE_API_PASTE_SPECIAL_ENTRY;
     const snap = openOpts?.snapshot ?? deps.getSnapshot();
     if (!snap) {
       // Nothing on the internal clipboard — the dialog has nothing to paste.
@@ -200,6 +204,8 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   };
 
   const history = deps.history ?? null;
+  // The entry point the current paste runs as.
+  let entry: DialogEntry = INSTANCE_API_PASTE_SPECIAL_ENTRY;
   /** Run one paste into the snapshot's destination as a single undoable step:
    *  cell writes go through the workbook, the format slice through
    *  recordFormatChange. A locked destination defers to the unlock prompt. */
@@ -208,24 +214,39 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     transpose: boolean,
     paste: () => ReturnType<typeof pasteSpecial>,
     retry: () => void,
+    columnWidths = false,
   ): boolean => {
-    const destination = resolvePasteDestination(store.getState(), snap, transpose);
+    const state = store.getState();
+    const destination = resolvePasteDestination(state, snap, transpose);
     if (destination && deferForAllowedRangeUnlock(store, [destination], retry)) {
       return false;
     }
-    let result: ReturnType<typeof pasteSpecial> = null;
-    if (history) {
-      history.begin();
-      try {
+    const ctx = { store, history, ...entry };
+    const result = pasteWrite(
+      ctx,
+      columnWidths
+        ? { destination: null }
+        : { destination, cutSource: snap.mode === 'cut' ? snap.range : null },
+      null,
+      () => {
+        let written: ReturnType<typeof pasteSpecial> = null;
         recordFormatChange(history, store, () => {
-          result = paste();
+          written = paste();
         });
-      } finally {
-        history.end();
-      }
-    } else {
-      result = paste();
-    }
+        return written;
+      },
+      // Column widths write no cell: a column layout change of the destination's sheet.
+      columnWidths
+        ? (origin) => [
+            {
+              operation: 'resizeColumns',
+              origin,
+              commandId: entry.commandId,
+              effects: [{ kind: 'sheet', sheet: destination?.sheet ?? state.data.sheetIndex }],
+            },
+          ]
+        : undefined,
+    );
     if (result) deps.onAfterCommit();
     return !!result;
   };
@@ -233,7 +254,12 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const currentSnapshot = (openOpts?: PasteSpecialOpenOptions): ClipboardSnapshot | null =>
     openOpts?.snapshot ?? openSnapshot ?? deps.getSnapshot();
 
-  const applyOptions = (opts: PasteSpecialOptions, openOpts?: PasteSpecialOpenOptions): boolean => {
+  const applyOptions = (
+    opts: PasteSpecialOptions,
+    openOpts?: PasteSpecialOpenOptions,
+    from?: DialogEntry,
+  ): boolean => {
+    if (from) entry = from;
     const snap = currentSnapshot(openOpts);
     if (!snap) return false;
     return runPaste(
@@ -241,6 +267,7 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
       opts.transpose,
       () => pasteSpecial(store.getState(), store, wb, snap, opts, history),
       () => void applyOptions(opts, openOpts),
+      opts.what === 'column-widths',
     );
   };
 

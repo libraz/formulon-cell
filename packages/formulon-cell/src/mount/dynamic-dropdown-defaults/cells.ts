@@ -3,7 +3,7 @@ import {
   canExecuteBuiltInRequest,
   cellShiftChoices,
 } from '../../commands/built-in-command-policy.js';
-import { insertCopiedBand } from '../../commands/clipboard/insert-copied-cells.js';
+import { insertCopiedBandAction } from '../../commands/clipboard/paste-actions.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { addrKey } from '../../engine/address.js';
 import { isMacHost } from '../../extensions/ui-options.js';
@@ -91,10 +91,14 @@ const buildCellInsertAction =
           sourceRange !== undefined &&
           (isWholeRowRange(sourceRange) || isWholeColumnRange(sourceRange));
         if (snapshot && sourceIsWholeBand) {
-          const inserted = insertCopiedBand(
-            instance.store,
+          const inserted = insertCopiedBandAction(
+            {
+              store: instance.store,
+              history: instance.history,
+              origin: 'ribbon',
+              commandId: 'insertCopiedCells',
+            },
             instance.workbook,
-            instance.history,
             snapshot,
             range,
           );

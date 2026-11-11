@@ -5,6 +5,7 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ExtensionHandle } from '../extensions/index.js';
 import {
+  type DialogEntry,
   type DialogOpeners,
   INSTANCE_API_COMMENT_ENTRY,
   INSTANCE_API_DEFINE_NAME_ENTRY,
@@ -75,6 +76,8 @@ export interface InstanceDialogApiDeps {
   permits: (operation: InteractionOperation | null) => boolean;
   ensureWatchWindow: () => void;
   refreshFeaturesView: () => void;
+  /** Insert Copied Cells as the entry point that asked for it. */
+  insertCopiedCells: (entry: DialogEntry) => void;
 }
 
 /** Instance methods that route to host dialogs, with user-extension overrides. */
@@ -132,6 +135,10 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
     defineNameDialog: openDefineNameDialog,
     commentDialog: (mode, entry) =>
       featureState.commentDialog?.open({ ...(mode ? { mode } : {}), entry }),
+    pasteSpecialDialog: (entry) => getBinding().pasteSpecialDialog?.open(undefined, entry),
+    pasteSpecial: (options, entry) =>
+      getBinding().pasteSpecialDialog?.apply(options, undefined, entry) ?? false,
+    insertCopiedCells: deps.insertCopiedCells,
   });
   return {
     openConditionalDialog(options) {

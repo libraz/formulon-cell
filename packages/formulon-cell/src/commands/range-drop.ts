@@ -5,8 +5,13 @@ import { rangesIntersect } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { copy } from './clipboard/copy.js';
 import { createCopyFormatResolver } from './clipboard/format-resolver.js';
-import { insertCopiedCellsFromTSV } from './clipboard/insert-copied-cells.js';
-import { type PasteWhat, pasteLink, pasteSpecial } from './clipboard/paste-special.js';
+import {
+  insertCopiedCellsAction,
+  pasteSpecialAction,
+  pasteWrite,
+} from './clipboard/paste-actions.js';
+import { resolvePasteDestination } from './clipboard/paste-destination.js';
+import { type PasteWhat, pasteLink } from './clipboard/paste-special.js';
 import { captureSnapshotFromCopyResult } from './clipboard/snapshot.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from './coerce-input.js';
 import { History } from './history.js';
@@ -57,7 +62,7 @@ export async function applyRangeDrop(
 
   if (action === 'move') {
     return moveSelectionTo(
-      { store, wb, history, confirmOverwrite: async () => true },
+      { store, wb, history, commandId: action, confirmOverwrite: async () => true },
       { row: dest.r0, col: dest.c0 },
     );
   }
@@ -105,13 +110,17 @@ export async function applyRangeDrop(
   }
 
   mutators.setActive(store, first);
-  history?.begin();
+  // Each drop is one authorized step of the gesture, named by the dropped action.
+  const ctx = { store, history, origin: 'editor', commandId: action } as const;
   let written: Range | null = null;
-  try {
-    if (shift) {
-      written =
-        insertCopiedCellsFromTSV(store, wb, history, copied.tsv, shift, snap)?.writtenRange ?? null;
-      if (written && movesSource) {
+  if (shift && !movesSource) {
+    written = insertCopiedCellsAction(ctx, wb, copied.tsv, shift, snap)?.writtenRange ?? null;
+  } else if (shift) {
+    // A shifting move inserts the copy, then clears the source, as one step.
+    written = pasteWrite(ctx, { destination: null, cutSource: src }, null, () => {
+      const inserted =
+        insertCopiedCellsAction(ctx, wb, copied.tsv, shift, snap)?.writtenRange ?? null;
+      if (inserted) {
         mutators.setActive(store, { sheet: src.sheet, row: src.r0, col: src.c0 });
         mutators.setRange(store, src);
         executeRibbonClearAction({
@@ -121,22 +130,24 @@ export async function applyRangeDrop(
           action: 'all',
         });
       }
-    } else if (action === 'link') {
-      written = pasteLink(store.getState(), store, wb, snap, history)?.writtenRange ?? null;
-    } else {
-      const what = PASTE_KIND[action] ?? 'all';
-      written =
-        pasteSpecial(
-          store.getState(),
-          store,
-          wb,
-          snap,
-          { what, operation: 'none', skipBlanks: false, transpose: false },
-          history,
-        )?.writtenRange ?? null;
-    }
-  } finally {
-    history?.end();
+      return inserted;
+    });
+  } else if (action === 'link') {
+    written = pasteWrite(
+      ctx,
+      { destination: resolvePasteDestination(store.getState(), snap, false) },
+      null,
+      () => pasteLink(store.getState(), store, wb, snap, history)?.writtenRange ?? null,
+    );
+  } else {
+    const what = PASTE_KIND[action] ?? 'all';
+    written =
+      pasteSpecialAction(ctx, wb, snap, {
+        what,
+        operation: 'none',
+        skipBlanks: false,
+        transpose: false,
+      })?.writtenRange ?? null;
   }
   if (!written) {
     mutators.setActive(store, { sheet: src.sheet, row: src.r0, col: src.c0 });

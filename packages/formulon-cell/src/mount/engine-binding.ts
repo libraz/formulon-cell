@@ -43,7 +43,7 @@ import { isMacHost } from '../extensions/ui-options.js';
 import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';
 import { attachAutoFillOptions } from '../interact/auto-fill-options.js';
-import { attachClipboard } from '../interact/clipboard.js';
+import { attachClipboard, runClipboardShortcutFrom } from '../interact/clipboard.js';
 import { attachContextMenu } from '../interact/context-menu.js';
 import type {
   ContextMenuInteractionController,
@@ -406,8 +406,14 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         onSwitchSheet: (delta) => getSheetTabs()?.switchRelative(delta),
         onEditComment: () =>
           getCommentDialog()?.open({ entry: { origin: 'keyboard', commandId: 'insertComment' } }),
-        onClipboardShortcut: clipboardH ? (kind) => clipboardH.runShortcut(kind) : undefined,
-        onPasteSpecial: pasteSpecialDialog ? () => pasteSpecialDialog.open() : undefined,
+        onClipboardShortcut: clipboardH
+          ? (kind) =>
+              runClipboardShortcutFrom(clipboardH, kind, { origin: 'keyboard', commandId: kind })
+          : undefined,
+        onPasteSpecial: pasteSpecialDialog
+          ? () =>
+              pasteSpecialDialog.open(undefined, { origin: 'keyboard', commandId: 'pasteSpecial' })
+          : undefined,
       })
     : (): void => {};
   const detachContextMenu = flags.contextMenu
@@ -421,12 +427,16 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         interactionController: interactionControllerFor(store) as ContextMenuInteractionController,
         history,
         onAfterCommit: refreshCells,
-        onClipboardShortcut: clipboardH ? (kind) => clipboardH.runShortcut(kind) : undefined,
+        onClipboardShortcut: clipboardH
+          ? (kind) =>
+              runClipboardShortcutFrom(clipboardH, kind, { origin: 'contextMenu', commandId: kind })
+          : undefined,
         onFormatDialog: () =>
           getFormatDialog()?.open(undefined, {
             entry: { origin: 'contextMenu', commandId: 'formatCells' },
           }),
-        onPasteSpecial: () => pasteSpecialDialog?.open(),
+        onPasteSpecial: () =>
+          pasteSpecialDialog?.open(undefined, { origin: 'contextMenu', commandId: 'pasteSpecial' }),
         onInsertHyperlink: () =>
           getHyperlinkDialog()?.open({ origin: 'contextMenu', commandId: 'insertHyperlink' }),
         onOpenHyperlink: (url) => {

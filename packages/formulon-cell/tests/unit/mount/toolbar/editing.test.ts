@@ -3,6 +3,7 @@ import { captureSnapshot } from '../../../../src/commands/clipboard/snapshot.js'
 import { commentAt, setComment } from '../../../../src/commands/comment.js';
 import { hyperlinkAt, setHyperlink } from '../../../../src/commands/hyperlinks.js';
 import { addrKey } from '../../../../src/engine/address.js';
+import { registerDialogOpeners } from '../../../../src/interact/dialog-entry.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
@@ -513,10 +514,22 @@ describe('Spreadsheet.mountToolbar', () => {
         runShortcut: vi.fn(),
       },
     });
-    const openPasteSpecial = vi
-      .spyOn(sheet.instance, 'openPasteSpecial')
-      .mockImplementation(() => undefined);
-    const pasteSpecial = vi.spyOn(sheet.instance, 'pasteSpecial').mockReturnValue(true);
+    const openPasteSpecial = vi.fn();
+    const pasteSpecial = vi.fn(() => true);
+    const unused = (): void => undefined;
+    registerDialogOpeners(sheet.instance.store, {
+      formatDialog: unused,
+      dataValidationDialog: unused,
+      namedRangeDialog: unused,
+      defineNameDialog: unused,
+      pageSetupDialog: unused,
+      hyperlinkDialog: unused,
+      pivotTableDialog: unused,
+      commentDialog: unused,
+      pasteSpecialDialog: openPasteSpecial,
+      pasteSpecial,
+      insertCopiedCells: unused,
+    });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,
       helpers: stubHelpers(),
@@ -545,6 +558,7 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(dialogEvent, 'target', { value: pasteSpecialButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(dialogEvent)).toBe(true);
     expect(openPasteSpecial).toHaveBeenCalledTimes(1);
+    expect(openPasteSpecial).toHaveBeenCalledWith({ origin: 'ribbon', commandId: 'pasteSpecial' });
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'paste', menuId: 'menu-paste' },
@@ -553,12 +567,10 @@ describe('Spreadsheet.mountToolbar', () => {
     const valuesEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(valuesEvent, 'target', { value: pasteValuesButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(valuesEvent)).toBe(true);
-    expect(pasteSpecial).toHaveBeenCalledWith({
-      operation: 'none',
-      skipBlanks: false,
-      transpose: false,
-      what: 'values',
-    });
+    expect(pasteSpecial).toHaveBeenCalledWith(
+      { operation: 'none', skipBlanks: false, transpose: false, what: 'values' },
+      { origin: 'ribbon', commandId: 'pasteValues' },
+    );
 
     tb.dispose();
   });
