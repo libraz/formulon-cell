@@ -1,0 +1,14 @@
+{
+  // Type-checks against core's source, as the demos do, so a stale core build cannot hide or
+  // invent an error. The build (tsconfig.json) keeps resolving the published declarations.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "../..",
+    "paths": {
+      "@libraz/formulon-cell": ["../formulon-cell/src/index.ts"],
+      "@libraz/formulon-cell/toolbar": ["../formulon-cell/src/toolbar/index.ts"],
+      "@libraz/formulon-cell/adapter": ["../formulon-cell/src/adapter/index.ts"]
+    }
+  }
+}
