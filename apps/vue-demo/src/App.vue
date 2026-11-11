@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import {
   type CellEvent,
-  type FeatureFlags,
-  type FeatureId,
   type HostProviders,
-  type LocaleChangeEvent,
-  parseScriptCommand,
-  type ScriptCommand,
   type SpreadsheetInstance,
   type ThemeName,
   Workbook,
 } from '@libraz/formulon-cell';
+import type { FeatureFlags, FeatureId } from '@libraz/formulon-cell/extensions';
 import type { RibbonHooks, RibbonTab, Toolbar } from '@libraz/formulon-cell/toolbar';
 import { Spreadsheet, SpreadsheetToolbar } from '@libraz/formulon-cell-vue';
 import {
@@ -25,7 +21,6 @@ import {
   adoptDemoWorkbook,
   buildDemoCommands,
   buildDemoReviewDialog,
-  buildDemoReviewFindings,
   buildDemoSearchItems,
   composeDemoUiOptions,
   createDemoStrings,
@@ -40,7 +35,6 @@ import {
   pushDemoChangeLog,
   nextDemoFeatureOverrides,
   openDemoWorkbookFile,
-  installDemoScriptMenu,
   type ChangeLogEntry,
   type DemoReviewDialogState,
   demoCommandText,
@@ -58,7 +52,6 @@ import {
   resolveInitialPlatform,
   type DemoPlatform,
   type DemoUploadStatus,
-  reportDemoScriptRun,
   runDemoBackstageAction,
   saveDemoWorkbookAsToDownload,
   saveDemoWorkbookToDownload,
@@ -66,7 +59,6 @@ import {
 import DemoBackstage from './DemoBackstage.vue';
 import DemoOptionsPanel from './DemoOptionsPanel.vue';
 import DemoReviewDialog from './DemoReviewDialog.vue';
-import DemoScriptDialog from './DemoScriptDialog.vue';
 import DemoTitleBar from './DemoTitleBar.vue';
 
 const UI = createDemoStrings('Vue');
@@ -99,7 +91,6 @@ const backstageAction = ref<DemoBackstageAction>('info');
 const bookName = ref('Book1');
 const loadError = ref<string | null>(null);
 const reviewDialog = ref<DemoReviewDialogState | null>(null);
-const scriptOpen = ref(false);
 const uploadStatus = ref<'saved' | 'saving' | 'error' | null>(null);
 let demoAlive = true;
 let workbookOwner: Workbook | null = null;
@@ -196,40 +187,8 @@ const onReady = (inst: SpreadsheetInstance): void => {
   instance.value = inst;
 };
 
-const onSpellingReview = (): void => {
-  const inst = instance.value;
-  if (!inst) return;
-  reviewDialog.value = buildDemoReviewFindings('spelling', inst, locale.value, commandText.value);
-};
-
-const onAccessibilityCheck = (): void => {
-  const inst = instance.value;
-  if (!inst) return;
-  // The Mac host docks its own checker; other platforms keep the review list.
-  if (platform.value === 'mac' && inst.dialogs.canOpen('accessibilityChecker')) {
-    inst.dialogs.open('accessibilityChecker');
-    return;
-  }
-  reviewDialog.value = buildDemoReviewFindings(
-    'accessibility',
-    inst,
-    locale.value,
-    commandText.value,
-  );
-};
-
-const onRunScript = (): void => {
-  const inst = instance.value;
-  if (!inst) return;
-  scriptOpen.value = true;
-};
-
 const closeReviewDialog = (): void => {
   reviewDialog.value = null;
-};
-
-const closeScriptDialog = (): void => {
-  scriptOpen.value = false;
 };
 
 const showRibbonNotice = (title: string, detail: string): void => {
@@ -240,8 +199,6 @@ const ribbonHooks = computed<RibbonHooks>(() => {
   const text = commandText.value;
   return {
     review: {
-      spelling: onSpellingReview,
-      accessibility: onAccessibilityCheck,
       translate: () => showRibbonNotice(text.translate, text.translationUnavailable),
     },
     drawing: {
@@ -249,31 +206,9 @@ const ribbonHooks = computed<RibbonHooks>(() => {
         showRibbonNotice(text.draw, mode === 'pen' ? text.inkNotPersisted : text.selectInkFirst),
     },
     automation: {
-      runScript: onRunScript,
       addInManager: () => showRibbonNotice(text.addIns, text.addInsHostCallbacks),
     },
   };
-});
-
-const applyParsedScript = (command: ReturnType<typeof parseScriptCommand>): void => {
-  const inst = instance.value;
-  if (!inst || !command) return;
-  reviewDialog.value = reportDemoScriptRun(inst, command, commandText.value);
-};
-
-const onScriptSubmit = (command: ScriptCommand): void => {
-  scriptOpen.value = false;
-  applyParsedScript(command);
-};
-
-let disposeScriptMenu: (() => void) | undefined;
-
-onMounted(() => {
-  disposeScriptMenu = installDemoScriptMenu(applyParsedScript);
-});
-onBeforeUnmount(() => {
-  disposeScriptMenu?.();
-  disposeScriptMenu = undefined;
 });
 
 const demoSaveOptions = () => ({
@@ -398,7 +333,7 @@ const setLocale = (next: string): void => {
   if (resolved) locale.value = resolved;
 };
 
-const onCoreLocaleChange = (event: LocaleChangeEvent): void => {
+const onCoreLocaleChange = (event: { readonly locale: string }): void => {
   setLocale(event.locale);
 };
 
@@ -528,7 +463,6 @@ onBeforeUnmount(() => {
           :locale="locale"
           :host="host"
           :upload-status="uploadStatus"
-          :macro-recording="scriptOpen"
           @ready="onReady"
           @error="onSpreadsheetError"
           @locale-change="onCoreLocaleChange"
@@ -568,13 +502,6 @@ onBeforeUnmount(() => {
       :dialog="reviewDialog"
       :ui="ui"
       @close="closeReviewDialog"
-    />
-    <DemoScriptDialog
-      v-if="scriptOpen"
-      :ui="ui"
-      :command-text="commandText"
-      @submit="onScriptSubmit"
-      @close="closeScriptDialog"
     />
   </div>
 </template>

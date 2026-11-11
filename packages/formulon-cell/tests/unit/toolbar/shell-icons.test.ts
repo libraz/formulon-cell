@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createExcelRibbonSvg, type ExcelRibbonIconName } from '../../../src/index.js';
+import {
+  createExcelRibbonSvg,
+  type ExcelRibbonIconName,
+} from '../../../src/toolbar/excel-ribbon-icons.js';
 
 describe('title-bar glyphs and the public ribbon icon export', () => {
   it.each<ExcelRibbonIconName>(['home', 'repeat', 'moreCommands', 'feedback'])(

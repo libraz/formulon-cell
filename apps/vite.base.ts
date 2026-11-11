@@ -55,6 +55,10 @@ export function baseConfig(rootDir: string): UserConfig {
     },
     { find: '@libraz/formulon-cell/toolbar', replacement: `${corePkg}/src/toolbar/index.ts` },
     { find: '@libraz/formulon-cell/adapter', replacement: `${corePkg}/src/adapter/index.ts` },
+    {
+      find: '@libraz/formulon-cell/extensions',
+      replacement: `${corePkg}/src/extensions/index.ts`,
+    },
     // Broad alias goes LAST so the subpath rewrites above win.
     { find: '@libraz/formulon-cell', replacement: `${corePkg}/src/index.ts` },
   ];

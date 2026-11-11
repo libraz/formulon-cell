@@ -1,23 +1,20 @@
-import type {
-  ExcelRibbonIconName,
-  RibbonSearchItem,
-  RibbonSearchUsagePrior,
-  RibbonTab,
-  SpreadsheetInstance,
-  ThemeName,
-} from '@libraz/formulon-cell';
+import type { SpreadsheetInstance, ThemeName } from '@libraz/formulon-cell';
 import {
   buildRibbonSearchIndex,
-  dictionaryLocaleFor,
   EXCEL365_STANDARD_RIBBON_TABS,
+  type ExcelRibbonIconName,
   queryRibbonSearchIndex,
-} from '@libraz/formulon-cell';
+  type RibbonSearchItem,
+  type RibbonSearchUsagePrior,
+  type RibbonTab,
+} from '@libraz/formulon-cell/toolbar';
 import {
   openDemoDialog,
   runDemoCommand,
   toggleDemoSheetProtection,
   traceDemoPrecedents,
 } from './demo-actions.js';
+import { demoDictionaryLocale } from './demo-locale.js';
 import type { DemoCommandStrings, DemoUiStrings } from './demo-strings.js';
 
 export interface DemoCommandItem {
@@ -261,7 +258,7 @@ export const buildDemoSearchItems = (
   ribbonTabs: readonly RibbonTab[] = EXCEL365_STANDARD_RIBBON_TABS,
 ): readonly DemoSearchItem[] => {
   const commandKeys = new Set(commandItems.flatMap((item) => [item.id, item.label]));
-  const ribbonItems = buildRibbonSearchIndex(dictionaryLocaleFor(locale), {
+  const ribbonItems = buildRibbonSearchIndex(demoDictionaryLocale(locale), {
     includeDisabled: true,
     tabs: ribbonTabs,
   })

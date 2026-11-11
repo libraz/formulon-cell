@@ -39,7 +39,8 @@ import type {
   WorkbookHandle,
 } from '../engine/workbook-handle.js';
 import type { CellChangeEvent, SpreadsheetEmitter } from '../events.js';
-import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
+import type { resolveFlags } from '../extensions/features.js';
+import type { ExtensionHandle } from '../extensions/index.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';

@@ -183,6 +183,11 @@ const helpSearchText = (
       };
 };
 
+/**
+ * The ribbon's tabs and commands as search entries, in the ribbon's own labels and
+ * availability: what a host's window search box ("Tell me") lists, so it finds what the
+ * ribbon shows. Disabled commands are left out unless `includeDisabled`.
+ */
 export function buildRibbonSearchIndex(
   input: Strings | ToolbarLang,
   opts: BuildRibbonSearchIndexOptions = {},
@@ -250,6 +255,8 @@ export function buildRibbonSearchIndex(
   return items;
 }
 
+/** The best `limit` entries of `items` for `query`, ranked by label and keyword matches and by
+ *  the usage prior. */
 export function queryRibbonSearchIndex(
   items: readonly RibbonSearchItem[],
   query: string,

@@ -11,14 +11,10 @@ import type {
 import type { PrinterProfile } from '../commands/printer-profile.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEventHandler, SpreadsheetEventName } from '../events.js';
-import type {
-  ExtensionHandle,
-  ExtensionInput,
-  FeatureFlags,
-  SpreadsheetUiOptions,
-  ThemeName,
-} from '../extensions/index.js';
-import type { CustomFunction, CustomFunctionMeta, FormulaRegistry } from '../formula.js';
+import type { ExtensionHandle, ExtensionInput, FeatureFlags } from '../extensions/index.js';
+import type { ThemeName } from '../extensions/types.js';
+import type { SpreadsheetUiOptions } from '../extensions/ui-options.js';
+import type { FormulaRegistry } from '../formula.js';
 import type { I18nController } from '../i18n/controller.js';
 import type { DeepPartial, Locale, Strings } from '../i18n/strings.js';
 import type { BorderDrawHandle } from '../interact/border-draw.js';
@@ -73,11 +69,6 @@ export interface MountOptions {
   strings?: DeepPartial<Strings>;
   features?: FeatureFlags;
   extensions?: ExtensionInput[];
-  functions?: readonly {
-    name: string;
-    impl: CustomFunction['impl'];
-    meta?: CustomFunctionMeta;
-  }[];
   /** Optional host-provided printer profiles. Browser print APIs do not expose
    *  physical printer non-printable areas, so hosts can pass paper/orientation
    *  profiles here for the built-in print/PDF flow. */

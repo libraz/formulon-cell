@@ -208,11 +208,6 @@ export const Spreadsheet = {
     let flags = resolveMountFlags(requestedFeatures, contextMenuOptions, ui.platform);
     const emitter = new SpreadsheetEmitter();
     const formulaRegistry = new FormulaRegistry();
-    if (opts.functions) {
-      for (const f of opts.functions) {
-        formulaRegistry.register(f.name, f.impl, f.meta ?? {});
-      }
-    }
 
     const previousHostLanguage = host.getAttribute('lang');
     const languageTag = (): string => {

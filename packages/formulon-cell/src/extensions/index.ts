@@ -43,28 +43,13 @@ export {
   workbookObjects,
 } from './built-ins.js';
 export type { FeatureFlags, FeatureId } from './features.js';
-export {
-  ALL_FEATURE_IDS,
-  DEFAULT_OFF_FEATURE_IDS,
-  isFeatureDefaultOff,
-  resolveFlags,
-} from './features.js';
-export { full, minimal, presets, standard } from './presets.js';
+export { ALL_FEATURE_IDS, isFeatureDefaultOff } from './features.js';
 export type {
   Extension,
   ExtensionContext,
   ExtensionHandle,
   ExtensionInput,
   ExtensionSpreadsheet,
-  ThemeName,
 } from './types.js';
-export { dedupeById, flattenExtensions, sortByPriority } from './types.js';
-export type {
-  ResolvedSpreadsheetPlatform,
-  ResolvedSpreadsheetUiOptions,
-  SpreadsheetFeatureSwitches,
-  SpreadsheetPlatform,
-  SpreadsheetUiOptions,
-  SpreadsheetUiProfile,
-} from './ui-options.js';
-export { resolveSpreadsheetPlatform, resolveSpreadsheetUiOptions } from './ui-options.js';
+export type { ResolvedSpreadsheetUiOptions } from './ui-options.js';
+export { resolveSpreadsheetUiOptions } from './ui-options.js';

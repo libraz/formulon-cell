@@ -6,12 +6,12 @@
  * back to the palette's catalog labels with no hint or reference link.
  */
 
-import {
-  dictionaryLocaleFor,
-  type FunctionArgumentHelp,
-  type FunctionArgumentHelpProvider,
-  type Locale,
+import type {
+  FunctionArgumentHelp,
+  FunctionArgumentHelpProvider,
+  Locale,
 } from '@libraz/formulon-cell';
+import { demoDictionaryLocale } from './demo-locale.js';
 
 type DemoHelpLocale = Locale;
 
@@ -74,7 +74,7 @@ const REFERENCE_REGION: Record<DemoHelpLocale, string> = {
   th: 'th-th',
 };
 
-const helpLocale = (locale: string): DemoHelpLocale => dictionaryLocaleFor(locale);
+const helpLocale = (locale: string): DemoHelpLocale => demoDictionaryLocale(locale);
 
 export const demoFunctionArgumentHelp: FunctionArgumentHelpProvider = (
   functionName,

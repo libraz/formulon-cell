@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import type { EngineCapabilities } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import en from '../../../src/i18n/en.js';
+import en from '../../../src/i18n/locales/en.js';
 import type { Strings } from '../../../src/i18n/strings.js';
 import { attachSheetTabsController } from '../../../src/mount/sheet-tabs-controller.js';
 import {

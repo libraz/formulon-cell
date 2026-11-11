@@ -244,7 +244,6 @@ describe('toolbar/ribbon menu primitives', () => {
     const toolbarDefaultsSource = readFileSync(join(mountDir, 'toolbar-defaults.ts'), 'utf8');
     const reportSource = readFileSync(join(root, 'src/toolbar/dialogs/report.ts'), 'utf8');
     const dialogsIndexSource = readFileSync(join(root, 'src/toolbar/dialogs/index.ts'), 'utf8');
-    const indexSource = readFileSync(join(root, 'src/index.ts'), 'utf8');
 
     for (const source of [dynamicDefaultsSource, toolbarDefaultsSource]) {
       const calls = source.match(/showReport\(\{/g) ?? [];
@@ -266,8 +265,6 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(reportSource).toContain('warningLabel: string');
     expect(dialogsIndexSource).toContain('reportDialogLabels');
     expect(dialogsIndexSource).toContain('type ReportDialogLabels');
-    expect(indexSource).toContain('reportDialogLabels');
-    expect(indexSource).toContain('ReportDialogLabels');
     expect(reportSource).not.toContain('No issues found.');
     expect(reportSource).not.toContain("'Warning'");
     expect(reportSource).not.toContain("'Info'");

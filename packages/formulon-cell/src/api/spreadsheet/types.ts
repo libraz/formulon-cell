@@ -1,7 +1,9 @@
 import type { CellAddress, CellRect, Value } from '@libraz/formulon';
 import type { InteractionPolicy } from '../../commands/interaction-policy.js';
 import type { PrinterProfile } from '../../commands/printer-profile.js';
-import type { ExtensionInput, SpreadsheetUiOptions, ThemeName } from '../../extensions/index.js';
+import type { ExtensionInput } from '../../extensions/index.js';
+import type { ThemeName } from '../../extensions/types.js';
+import type { SpreadsheetUiOptions } from '../../extensions/ui-options.js';
 import type { DeepPartial, Locale, Strings } from '../../i18n/strings.js';
 import type { ContextMenuOptions } from '../../interact/context-menu-options.js';
 import type { FunctionArgumentHelpProvider } from '../../interact/mac-formula-palette.js';

@@ -1,16 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  buildRibbonModel,
-  CONTEXTUAL_RIBBON_TABS,
-  EXCEL365_MAC_RIBBON_TABS,
-  EXCEL365_STANDARD_RIBBON_TABS,
-  OPTIONAL_RIBBON_TABS,
-  ribbonActivatableCommandIds,
-  ribbonActivatableSurfaceCommandIds,
-  ribbonSurfaceCommandIds,
-} from '../../../src/index.js';
 import { excelRibbonIconPaths } from '../../../src/toolbar/excel-ribbon-icons.js';
 import { fluentIconPaths } from '../../../src/toolbar/fluent-icons.js';
 import {
@@ -22,12 +12,20 @@ import {
   viewToggleMenuText,
 } from '../../../src/toolbar/menu-text.js';
 import {
+  buildRibbonModel,
+  CONTEXTUAL_RIBBON_TABS,
+  EXCEL365_MAC_RIBBON_TABS,
+  EXCEL365_STANDARD_RIBBON_TABS,
   HOME_MIXED_LAYOUT_GROUP_VARIANTS,
   HOME_STACKED_LAYOUT_GROUP_VARIANTS,
   HOME_TILE_LAYOUT_GROUP_VARIANTS,
   matchesRibbonShortcut,
+  OPTIONAL_RIBBON_TABS,
+  ribbonActivatableCommandIds,
+  ribbonActivatableSurfaceCommandIds,
   ribbonCommandIds,
   ribbonCommands,
+  ribbonSurfaceCommandIds,
   ribbonTabCommandIds,
 } from '../../../src/toolbar/ribbon-model.js';
 import { readCssWithImports } from '../../helpers/css.js';

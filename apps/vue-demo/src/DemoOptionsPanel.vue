@@ -1,11 +1,6 @@
 <script setup lang="ts">
-import type {
-  FeatureFlags,
-  FeatureId,
-  SelectionState,
-  SpreadsheetInstance,
-  ThemeName,
-} from '@libraz/formulon-cell';
+import type { SelectionState, SpreadsheetInstance, ThemeName } from '@libraz/formulon-cell';
+import type { FeatureFlags, FeatureId } from '@libraz/formulon-cell/extensions';
 import { useSelection } from '@libraz/formulon-cell-vue';
 import { computed, toRef } from 'vue';
 import {

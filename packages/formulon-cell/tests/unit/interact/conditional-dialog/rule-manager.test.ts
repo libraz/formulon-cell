@@ -9,11 +9,13 @@ import { en, ja } from '../../../../src/i18n/strings.js';
 import {
   appendConditionalApplyFormatControls,
   applyPatchToConditionalApplyControls,
-  attachRangePickerButton,
   collectConditionalApplyPatch,
-  updateRangePickerLabel,
-} from '../../../../src/index.js';
+} from '../../../../src/interact/conditional-apply-controls.js';
 import { attachConditionalDialog } from '../../../../src/interact/conditional-dialog.js';
+import {
+  attachRangePickerButton,
+  updateRangePickerLabel,
+} from '../../../../src/interact/range-picker-control.js';
 import {
   createSpreadsheetStore,
   mutators,

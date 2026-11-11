@@ -14,42 +14,36 @@
  */
 
 import type {
-  CellChange,
   CellEvent,
   CellFormatter,
-  FeatureFlags,
-  FeatureId,
   FormulaHint,
-  ReviewCell,
-  RibbonTab,
-  ScriptCommand,
+  SaveFormat,
   Sheet,
   SpreadsheetInstance,
   ThemeName,
-  WorkbookSaveFormat,
 } from '@libraz/formulon-cell';
+import { resolveSpreadsheetPlatform, SAVE_FORMATS, Workbook } from '@libraz/formulon-cell';
 import {
-  analyzeAccessibilityCells,
-  analyzeSpellingCells,
+  type FeatureFlags,
+  type FeatureId,
+  isFeatureDefaultOff,
+  resolveSpreadsheetUiOptions,
+} from '@libraz/formulon-cell/extensions';
+import {
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
-  isFeatureDefaultOff,
-  parseScriptCommand,
-  presets,
-  resolveSpreadsheetPlatform,
-  resolveSpreadsheetUiOptions,
-  WORKBOOK_SAVE_FORMATS,
-  Workbook,
-} from '@libraz/formulon-cell';
-import { saveWithPrompts } from '@libraz/formulon-cell/toolbar';
+  type RibbonTab,
+  saveWithPrompts,
+} from '@libraz/formulon-cell/toolbar';
 import { nextDemoSearchIndex } from './demo-search.js';
-import type { DemoCommandStrings, DemoStrings, DemoUiStrings } from './demo-strings.js';
+import type { DemoStrings, DemoUiStrings } from './demo-strings.js';
 
 export * from './demo-actions.js';
 export * from './demo-backstage.js';
 export * from './demo-document-menu.js';
 export * from './demo-function-help.js';
 export * from './demo-glyphs.js';
+export * from './demo-locale.js';
 export * from './demo-quick-access.js';
 export * from './demo-search.js';
 export * from './demo-select.js';
@@ -76,8 +70,8 @@ export const LOCALES = [
   { value: 'th', label: 'ไทย' },
 ] as const;
 
-/** The Microsoft 365 baseline plus the optional tabs this demo actually
- *  wires: the Automate tab is backed by the demo's Script menu and dialog. */
+/** The Microsoft 365 baseline plus the Automate tab, whose Script menu and dialog the ribbon
+ *  provides. */
 export const DEMO_RIBBON_TABS: readonly RibbonTab[] = [
   ...EXCEL365_STANDARD_RIBBON_TABS,
   'automate',
@@ -103,7 +97,7 @@ export interface SaveDemoWorkbookOptions {
   instance: SpreadsheetInstance | null;
   bookName: string;
   setUploadStatus: (status: DemoUploadStatus) => void;
-  format?: WorkbookSaveFormat;
+  format?: SaveFormat;
   documentRef?: Pick<Document, 'body' | 'createElement'>;
   urlApi?: Pick<typeof URL, 'createObjectURL' | 'revokeObjectURL'>;
   setTimeoutFn?: (handler: () => void, timeout: number) => unknown;
@@ -128,7 +122,7 @@ const downloadDemoWorkbook = async ({
       setUploadStatus(null);
       return;
     }
-    const { extension, mimeType } = WORKBOOK_SAVE_FORMATS[outcome.format];
+    const { extension, mimeType } = SAVE_FORMATS[outcome.format];
     const blob = new Blob([outcome.bytes as BlobPart], { type: mimeType });
     const url = urlApi.createObjectURL(blob);
     const a = documentRef.createElement('a');
@@ -583,26 +577,6 @@ const seedRows = (sheet: Sheet): void => {
   });
 };
 
-/** Projects a workbook's cells for the demo review dialog. */
-export const reviewCellsForInstance = (inst: SpreadsheetInstance): ReviewCell[] =>
-  inst.workbook
-    .sheet(inst.selection.get().sheet)
-    .listCells()
-    .map((cell) => ({
-      label: `${demoColLabel(cell.col)}${cell.row + 1}`,
-      value:
-        cell.value === null
-          ? { kind: 'blank' as const }
-          : typeof cell.value === 'string'
-            ? { kind: 'text' as const, value: cell.value }
-            : typeof cell.value === 'number'
-              ? { kind: 'number' as const }
-              : typeof cell.value === 'boolean'
-                ? { kind: 'bool' as const }
-                : { kind: 'error' as const, text: String(cell.value) },
-      formula: cell.formula,
-    }));
-
 /** Creates the demo's initial workbook; the caller owns it. Core only auto-seeds when it owns the
  *  workbook, so the demo seeds by hand; `?fixture=empty` (deterministic blank
  *  workbook for E2E specs) skips the seed. */
@@ -691,74 +665,6 @@ export const adoptDemoWorkbook = async (
   return true;
 };
 
-/** Routes clicks on the built-in `#menu-script` items to `onCommand`. The
- *  toolbar owns the rest of the click (closing the menu, restoring focus and
- *  routing `custom` to its own dialog), so `custom` is ignored here. */
-export const installDemoScriptMenu = (
-  onCommand: (command: ScriptCommand) => void,
-): (() => void) => {
-  const onMenuClick = (e: MouseEvent): void => {
-    const target = e.target;
-    if (!(target instanceof Element)) return;
-    const btn = target.closest<HTMLButtonElement>('[data-script-action]');
-    if (!btn) return;
-    if (!btn.closest<HTMLDivElement>('#menu-script')) return;
-    const action = btn.dataset.scriptAction ?? '';
-    if (action === 'custom') return;
-    const command = parseScriptCommand(action);
-    if (command) onCommand(command);
-  };
-  document.addEventListener('click', onMenuClick);
-  return () => document.removeEventListener('click', onMenuClick);
-};
-
-const transformDemoScriptText = (
-  value: string,
-  command: Exclude<ScriptCommand, 'clear'>,
-): string => {
-  switch (command) {
-    case 'uppercase':
-      return value.toUpperCase();
-    case 'lowercase':
-      return value.toLowerCase();
-    case 'trim':
-      return value.trim().replace(/\s+/g, ' ');
-  }
-};
-
-/** Applies a text-script command to the selection as one undo step (protected
- *  cells are skipped) and returns the number of changed cells. */
-export const runDemoScript = (inst: SpreadsheetInstance, command: ScriptCommand): number => {
-  const { sheet, range } = inst.selection.get();
-  const changes = new Map<string, CellChange>();
-  for (const cell of inst.workbook.sheet(sheet).listCells(range)) {
-    const at = { row: cell.row, col: cell.col };
-    const key = `${cell.row}:${cell.col}`;
-    if (command === 'clear') {
-      changes.set(key, { sheet, at, value: { kind: VALUE_KIND.blank }, formula: null });
-    } else if (typeof cell.value === 'string') {
-      const next = transformDemoScriptText(cell.value, command);
-      if (next !== cell.value) {
-        changes.set(key, {
-          sheet,
-          at,
-          value: { kind: VALUE_KIND.text, text: next },
-          formula: null,
-        });
-      }
-    }
-  }
-  // A protected sheet refuses the whole batch and names the locked cell that decided it; drop
-  // that cell and write the rest.
-  let result = inst.applyChanges([...changes.values()], { history: 'record' });
-  while (result.status === 'refused') {
-    const at = result.rejections[0]?.at;
-    if (!at || !changes.delete(`${at.row}:${at.col}`) || changes.size === 0) return 0;
-    result = inst.applyChanges([...changes.values()], { history: 'record' });
-  }
-  return result.applied.length;
-};
-
 /** A few features ship default-off; everything else is opt-out. */
 export const isDemoFeatureOn = (features: FeatureFlags, id: FeatureId): boolean =>
   isFeatureDefaultOff(id) ? features[id] === true : features[id] !== false;
@@ -772,7 +678,7 @@ export const nextDemoFeatureOverrides = (input: {
   id: FeatureId;
 }): FeatureFlags => {
   const { id } = input;
-  const presetFlags = presets[input.preset]();
+  const presetFlags = resolveSpreadsheetUiOptions({ profile: input.preset }).features;
   const presetDefault = isFeatureDefaultOff(id)
     ? presetFlags[id] === true
     : presetFlags[id] !== false;
@@ -811,33 +717,6 @@ export const buildDemoReviewDialog = (
   label: string,
   detail: string,
 ): DemoReviewDialogState => ({ title, items: [{ label, detail }] });
-
-/** Review dialog state for the ribbon's spelling / accessibility checks. */
-export const buildDemoReviewFindings = (
-  kind: 'spelling' | 'accessibility',
-  inst: SpreadsheetInstance,
-  locale: string,
-  commandText: DemoCommandStrings,
-): DemoReviewDialogState => {
-  const cells = reviewCellsForInstance(inst);
-  const lang = normalizeDemoLocale(locale) ?? 'ja';
-  return kind === 'spelling'
-    ? { title: commandText.spellingReview, items: analyzeSpellingCells(cells, lang) }
-    : { title: commandText.accessibilityCheck, items: analyzeAccessibilityCells(cells, lang) };
-};
-
-/** Runs a script command on the selection and reports the changed-cell count
- *  as a review dialog. */
-export const reportDemoScriptRun = (
-  inst: SpreadsheetInstance,
-  command: ScriptCommand,
-  commandText: DemoCommandStrings,
-): DemoReviewDialogState =>
-  buildDemoReviewDialog(
-    commandText.script,
-    commandText.selection,
-    commandText.cellsUpdated.replace('{count}', String(runDemoScript(inst, command))),
-  );
 
 export interface ChangeLogEntry {
   readonly id: number;

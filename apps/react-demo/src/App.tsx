@@ -1,14 +1,11 @@
 import {
   type CellEvent,
-  type FeatureFlags,
-  type FeatureId,
   type HostProviders,
-  type parseScriptCommand,
-  type ScriptCommand,
   type SpreadsheetInstance,
   type ThemeName,
   Workbook,
 } from '@libraz/formulon-cell';
+import type { FeatureFlags, FeatureId } from '@libraz/formulon-cell/extensions';
 import type { RibbonHooks, RibbonTab, Toolbar } from '@libraz/formulon-cell/toolbar';
 import { Spreadsheet, SpreadsheetToolbar } from '@libraz/formulon-cell-react';
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,7 +13,6 @@ import {
   adoptDemoWorkbook,
   buildDemoCommands,
   buildDemoReviewDialog,
-  buildDemoReviewFindings,
   buildDemoSearchItems,
   type ChangeLogEntry,
   composeDemoUiOptions,
@@ -39,14 +35,12 @@ import {
   FORMATTERS,
   formatLoadError,
   installDemoF6Navigation,
-  installDemoScriptMenu,
   nextDemoFeatureOverrides,
   normalizeDemoLocale,
   openDemoWorkbookFile,
   type PresetKey,
   pushDemoChangeLog,
   refreshDemoPrinterProfiles,
-  reportDemoScriptRun,
   resolveInitialLocale,
   resolveInitialPlatform,
   runDemoBackstageAction,
@@ -56,7 +50,6 @@ import {
 import { DemoBackstage } from './DemoBackstage.js';
 import { DemoOptionsPanel } from './DemoOptionsPanel.js';
 import { DemoReviewDialog } from './DemoReviewDialog.js';
-import { DemoScriptDialog } from './DemoScriptDialog.js';
 import { DemoTitleBar } from './DemoTitleBar.js';
 
 const UI = createDemoStrings('React');
@@ -81,7 +74,6 @@ export const App = (): ReactElement => {
   const [backstageAction, setBackstageAction] = useState<DemoBackstageAction>('info');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reviewDialog, setReviewDialog] = useState<DemoReviewDialogState | null>(null);
-  const [scriptOpen, setScriptOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
   // Workbook display name. Untitled until the user opens or saves a file —
   // mirrors the spreadsheet titlebar convention. Stripping the extension
@@ -105,7 +97,6 @@ export const App = (): ReactElement => {
   const ui = demoUiStringsForLocale(UI, locale);
   const commandText = useMemo(() => demoCommandText(locale), [locale]);
   const closeReviewDialog = useCallback(() => setReviewDialog(null), []);
-  const closeScriptDialog = useCallback(() => setScriptOpen(false), []);
   const host = useMemo<HostProviders>(
     () => ({
       workbookName: () => bookName,
@@ -197,26 +188,6 @@ export const App = (): ReactElement => {
     };
   }, [instance]);
 
-  const onSpellingReview = useCallback(() => {
-    if (!instance) return;
-    setReviewDialog(buildDemoReviewFindings('spelling', instance, locale, commandText));
-  }, [commandText, instance, locale]);
-
-  const onAccessibilityCheck = useCallback(() => {
-    if (!instance) return;
-    // The Mac host docks its own checker; other platforms keep the review list.
-    if (platform === 'mac' && instance.dialogs.canOpen('accessibilityChecker')) {
-      instance.dialogs.open('accessibilityChecker');
-      return;
-    }
-    setReviewDialog(buildDemoReviewFindings('accessibility', instance, locale, commandText));
-  }, [commandText, instance, locale, platform]);
-
-  const onRunScript = useCallback(() => {
-    if (!instance) return;
-    setScriptOpen(true);
-  }, [instance]);
-
   const showRibbonNotice = useCallback(
     (title: string, detail: string) => {
       setReviewDialog(buildDemoReviewDialog(title, commandText.ribbonCommand, detail));
@@ -227,8 +198,6 @@ export const App = (): ReactElement => {
   const ribbonHooks = useMemo<RibbonHooks>(
     () => ({
       review: {
-        spelling: onSpellingReview,
-        accessibility: onAccessibilityCheck,
         translate: () =>
           showRibbonNotice(commandText.translate, commandText.translationUnavailable),
       },
@@ -240,35 +209,11 @@ export const App = (): ReactElement => {
           ),
       },
       automation: {
-        runScript: onRunScript,
         addInManager: () => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks),
       },
     }),
-    [commandText, onAccessibilityCheck, onRunScript, onSpellingReview, showRibbonNotice],
+    [commandText, showRibbonNotice],
   );
-
-  const applyParsedScript = useCallback(
-    (command: ReturnType<typeof parseScriptCommand>) => {
-      if (!instance || !command) return;
-      setReviewDialog(reportDemoScriptRun(instance, command, commandText));
-    },
-    [commandText, instance],
-  );
-
-  const onScriptSubmit = useCallback(
-    (command: ScriptCommand) => {
-      setScriptOpen(false);
-      applyParsedScript(command);
-    },
-    [applyParsedScript],
-  );
-
-  // Runs the built-in script commands from `#menu-script`. The toolbar owns the
-  // rest of that click: it closes the menu, moves focus back to the Script
-  // command, and routes `custom` to the `automation.runScript` hook — so this handler
-  // neither reopens that dialog nor touches focus, which would pull focus back
-  // out of the dialog the action just opened.
-  useEffect(() => installDemoScriptMenu(applyParsedScript), [applyParsedScript]);
 
   const onSave = useCallback(() => {
     void saveDemoWorkbookToDownload({ instance, bookName, setUploadStatus });
@@ -487,7 +432,6 @@ export const App = (): ReactElement => {
             locale={locale}
             host={host}
             uploadStatus={uploadStatus}
-            macroRecording={scriptOpen}
             onReady={(next) => {
               instanceRef.current = next;
               setInstance(next);
@@ -533,14 +477,6 @@ export const App = (): ReactElement => {
       </main>
       {reviewDialog ? (
         <DemoReviewDialog dialog={reviewDialog} ui={ui} onClose={closeReviewDialog} />
-      ) : null}
-      {scriptOpen ? (
-        <DemoScriptDialog
-          ui={ui}
-          commandText={commandText}
-          onSubmit={onScriptSubmit}
-          onClose={closeScriptDialog}
-        />
       ) : null}
     </div>
   );

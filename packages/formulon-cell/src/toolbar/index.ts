@@ -3,8 +3,22 @@ import type { RibbonOptions } from './toolbar-object.js';
 
 export type { RibbonToolbarConfig } from '../api/spreadsheet/types.js';
 export { type SaveWithPromptsOptions, saveWithPrompts } from './dialogs/workbook-save.js';
+export { createExcelRibbonSvg, type ExcelRibbonIconName } from './excel-ribbon-icons.js';
+export {
+  type DisabledReasonProjectionOptions,
+  projectDisabledReason,
+} from './menu-a11y.js';
 export type { RibbonHooks } from './ribbon/apply-ribbon-command.js';
 export type { RibbonDisplayMode } from './ribbon/render-ribbon.js';
+export {
+  type BuildRibbonSearchIndexOptions,
+  buildRibbonSearchIndex,
+  type QueryRibbonSearchIndexOptions,
+  queryRibbonSearchIndex,
+  type RibbonSearchItem,
+  type RibbonSearchItemKind,
+  type RibbonSearchUsagePrior,
+} from './ribbon/search-index.js';
 export type {
   BuildRibbonModelOptions,
   RibbonCommand,

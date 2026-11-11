@@ -3,14 +3,14 @@
 // `HTMLInputElement` plus a container the menu can be appended to. React/Vue
 // demos call it from `useEffect` / `onMounted`.
 
+import type { Locale } from '@libraz/formulon-cell';
 import {
   buildRibbonSearchIndex,
-  type Locale,
   projectDisabledReason,
   queryRibbonSearchIndex,
   type RibbonSearchItem,
   type RibbonTab,
-} from '@libraz/formulon-cell';
+} from '@libraz/formulon-cell/toolbar';
 
 import { createDemoStrings } from './demo-strings.js';
 

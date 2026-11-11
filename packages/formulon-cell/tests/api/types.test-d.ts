@@ -1,6 +1,5 @@
 import type { Value } from '@libraz/formulon';
 import type {
-  applyPasteSpecial,
   BatchRejection,
   ChangeBatchResult,
   CommandId,
@@ -9,9 +8,6 @@ import type {
   Disposer,
   InteractionOperation,
   InteractionPolicy,
-  importCSV,
-  LegacySpreadsheetInstance,
-  pasteLink,
   SaveResult,
   Sheet,
   SheetPrintDocument,
@@ -143,19 +139,15 @@ describe('types', () => {
       ReturnType<SpreadsheetInstance['applyChanges']>
     >().toEqualTypeOf<ChangeBatchResult>();
     expectTypeOf<ReturnType<Sheet['importCsv']>>().toEqualTypeOf<ChangeBatchResult>();
-    expectTypeOf<ReturnType<typeof importCSV>>().toEqualTypeOf<ChangeBatchResult>();
+    expectTypeOf<ReturnType<SpreadsheetInstance['importCsv']>>().toEqualTypeOf<ChangeBatchResult>();
+    expectTypeOf<ReturnType<Sheet['replaceAll']>>().toEqualTypeOf<ChangeBatchResult>();
     expectTypeOf<ChangeBatchResult['rejections'][number]>().toEqualTypeOf<BatchRejection>();
     expectTypeOf<keyof ChangeBatchResult>().toEqualTypeOf<
       'status' | 'applied' | 'rejections' | 'range'
     >();
     expectTypeOf<
-      ReturnType<LegacySpreadsheetInstance['pasteSpecial']>
-    >().toEqualTypeOf<ChangeBatchResult>();
-    expectTypeOf<
       ReturnType<NonNullable<SpreadsheetInstance['clipboard']>['pasteSpecial']>
     >().toEqualTypeOf<ChangeBatchResult>();
-    expectTypeOf<ReturnType<typeof applyPasteSpecial>>().toEqualTypeOf<ChangeBatchResult>();
-    expectTypeOf<ReturnType<typeof pasteLink>>().toEqualTypeOf<ChangeBatchResult>();
     expectTypeOf<Extract<keyof InteractionPolicy, 'batchDenied'>>().toEqualTypeOf<never>();
   });
 });

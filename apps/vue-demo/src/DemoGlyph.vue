@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ExcelRibbonIconName } from '@libraz/formulon-cell';
+import type { ExcelRibbonIconName } from '@libraz/formulon-cell/toolbar';
 import { onMounted, ref, watch } from 'vue';
 import { createDemoGlyph } from '../../demo-shared/index.js';
 

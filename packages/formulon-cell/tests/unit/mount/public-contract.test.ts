@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { workbookOf } from '../../../src/api/workbook.js';
-import type { CellValue } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { Extension } from '../../../src/extensions/types.js';
 import { Spreadsheet } from '../../../src/mount.js';
@@ -64,39 +63,6 @@ describe('mount/public contract', () => {
       kind: 'text',
       value: 'caller data',
     });
-  });
-
-  it('registers initial host custom functions case-insensitively with metadata', async () => {
-    const double = vi.fn((value: CellValue) => (value.kind === 'number' ? value.value * 2 : null));
-    sheet = await mountStubSheet({
-      functions: [
-        {
-          name: 'host_double',
-          impl: double,
-          meta: {
-            description: 'Doubles a number',
-            args: ['value'],
-            returnType: 'number',
-          },
-        },
-      ],
-    });
-
-    expect(sheet.instance.formula.has('HOST_DOUBLE')).toBe(true);
-    expect(sheet.instance.formula.has('host_double')).toBe(true);
-    expect(sheet.instance.formula.list()).toContain('HOST_DOUBLE');
-    expect(sheet.instance.formula.get('HOST_DOUBLE')?.meta).toEqual({
-      description: 'Doubles a number',
-      args: ['value'],
-      returnType: 'number',
-    });
-    expect(sheet.instance.formula.evaluate('host_double', [{ kind: 'number', value: 21 }])).toEqual(
-      {
-        kind: 'number',
-        value: 42,
-      },
-    );
-    expect(double).toHaveBeenCalledWith({ kind: 'number', value: 21 });
   });
 
   it('normalizes screen clipping hook results before exposing them to UI features', async () => {

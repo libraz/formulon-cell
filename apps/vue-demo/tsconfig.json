@@ -8,6 +8,7 @@
       "@libraz/formulon-cell": ["../../packages/formulon-cell/src/index.ts"],
       "@libraz/formulon-cell/toolbar": ["../../packages/formulon-cell/src/toolbar/index.ts"],
       "@libraz/formulon-cell/adapter": ["../../packages/formulon-cell/src/adapter/index.ts"],
+      "@libraz/formulon-cell/extensions": ["../../packages/formulon-cell/src/extensions/index.ts"],
       "@libraz/formulon-cell/styles.css": ["../../packages/formulon-cell/src/styles/index.css"],
       "@libraz/formulon-cell/styles/contrast.css": [
         "../../packages/formulon-cell/src/styles/theme-contrast.css"

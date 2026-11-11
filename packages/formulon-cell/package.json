@@ -45,8 +45,8 @@
       "import": "./dist/adapter/index.js"
     },
     "./i18n/*": {
-      "types": "./dist/i18n/*.d.ts",
-      "import": "./dist/i18n/*.js"
+      "types": "./dist/i18n/locales/*.d.ts",
+      "import": "./dist/i18n/locales/*.js"
     },
     "./styles.css": "./dist/styles/index.css",
     "./styles/paper.css": "./dist/styles/theme-paper.css",
@@ -80,9 +80,7 @@
     "test:coverage": "vitest run --coverage --config vitest.config.ts"
   },
   "dependencies": {
-    "@libraz/formulon": "0.18.0"
-  },
-  "peerDependencies": {
+    "@libraz/formulon": "0.18.0",
     "zustand": "^5"
   },
   "devDependencies": {
@@ -91,7 +89,6 @@
     "typescript": "6.0.3",
     "unplugin-dts": "1.1.2",
     "vite": "8.3.5",
-    "vitest": "5.0.5",
-    "zustand": "^5"
+    "vitest": "5.0.5"
   }
 }

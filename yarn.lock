@@ -542,8 +542,6 @@ __metadata:
     vite: "npm:8.3.5"
     vitest: "npm:5.0.5"
     zustand: "npm:^5"
-  peerDependencies:
-    zustand: ^5
   languageName: unknown
   linkType: soft
 

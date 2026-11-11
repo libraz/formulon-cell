@@ -16,7 +16,6 @@ import {
   DEMO_QUICK_ACCESS_COMMANDS,
   DEMO_QUICK_ACCESS_GLYPHS,
   demoChangeLogEntry,
-  demoCommandText,
   demoQuickAccessEnabled,
   demoQuickAccessMenu,
   demoSelectionLabel,
@@ -28,11 +27,11 @@ import {
   reduceDemoSearch,
   refreshDemoPrinterProfiles,
   resolveDemoSearchKey,
-  runDemoScript,
   saveDemoWorkbookToDownload,
   toggleDemoQuickAccess,
 } from '../../../../apps/demo-shared/index.ts';
-import { createExcelRibbonSvg, mount } from '../../src/index.ts';
+import { mount } from '../../src/index.ts';
+import { createExcelRibbonSvg } from '../../src/toolbar/index.ts';
 import { createHostElement, installDomStubs, uninstallDomStubs } from '../test-utils/dom.ts';
 
 const repoRoot = join(import.meta.dirname, '../../../..');
@@ -58,8 +57,6 @@ const withDemoInstance = async (body) => {
   }
 };
 
-const text = (instance, ref) => instance.workbook.sheet(0).getValue(...cellOf(ref));
-const cellOf = (ref) => [Number(ref.slice(1)) - 1, ref.charCodeAt(0) - 65];
 const writeText = (instance, values) =>
   instance.applyChanges(
     Object.entries(values).map(([ref, input]) => ({ sheet: 0, at: ref, input })),
@@ -106,14 +103,6 @@ describe('demo-shared Search/Tell me items', () => {
     expect(react.ja.noIssuesFound).toBe('問題は見つかりませんでした。');
     expect(react.en.loadingEngine).toBe('Loading engine...');
     expect(react.ja.loadingEngine).toBe('エンジンを読み込んでいます...');
-    expect(react.en.command).toBe('Command');
-    expect(react.ja.command).toBe('コマンド');
-    expect(demoCommandText('en').spellingReview).toBe('Spelling Review');
-    expect(demoCommandText('ja').spellingReview).toBe('スペル チェック');
-    expect(react.en.cancel).toBe('Cancel');
-    expect(react.ja.cancel).toBe('キャンセル');
-    expect(react.en.run).toBe('Run');
-    expect(react.ja.run).toBe('実行');
     expect(react.en.backstageSub).toBe('Workbook · spreadsheet layout');
     expect(vue.en.backstageSub).toBe('Workbook · spreadsheet layout');
     expect(react.ja.backstageSub).toBe('ブック · スプレッドシート レイアウト');
@@ -556,27 +545,6 @@ describe('demo-shared Search/Tell me items', () => {
         log = pushDemoChangeLog(log, demoChangeLogEntry(instance.workbook, event(row)));
       expect(log).toHaveLength(8);
       expect(log[0]?.cell).toBe('A12');
-    });
-  });
-
-  it('runs demo scripts as one undo step, skipping protected cells', async () => {
-    await withDemoInstance(async (instance) => {
-      writeText(instance, { A1: 'locked', B1: 'open', C1: 'also' });
-      const sheet = instance.workbook.sheet(0);
-      sheet.updateCellFormat('B1:C1', { protection: { locked: false } });
-      await sheet.protect({});
-      // Reversed drag: the range must be normalized before it is applied.
-      instance.selection.set('C1');
-      instance.selection.extend('A1');
-
-      expect(runDemoScript(instance, 'uppercase')).toBe(2);
-      expect(text(instance, 'A1')).toBe('locked');
-      expect(text(instance, 'B1')).toBe('OPEN');
-      expect(text(instance, 'C1')).toBe('ALSO');
-
-      instance.history.undo();
-      expect(text(instance, 'B1')).toBe('open');
-      expect(text(instance, 'C1')).toBe('also');
     });
   });
 

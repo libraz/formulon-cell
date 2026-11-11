@@ -1,4 +1,4 @@
-import type { ExcelRibbonIconName } from '@libraz/formulon-cell';
+import type { ExcelRibbonIconName } from '@libraz/formulon-cell/toolbar';
 import { type ReactElement, useLayoutEffect, useRef } from 'react';
 import { createDemoGlyph } from '../../demo-shared/index.js';
 

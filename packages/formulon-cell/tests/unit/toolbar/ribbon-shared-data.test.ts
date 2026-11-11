@@ -551,22 +551,6 @@ describe('toolbar/ribbon shared data', () => {
     expect(searchSource).not.toContain('"select", "color"');
   });
 
-  it('keeps ribbon surface helpers exported from the public entrypoint', () => {
-    const indexSource = source('src/index.ts');
-
-    for (const symbol of [
-      'isRibbonActivatableCommand',
-      'ribbonActivatableCommandIds',
-      'ribbonActivatableCommands',
-      'ribbonActivatableSurfaceCommandIds',
-      'ribbonActivatableSurfaceCommands',
-      'ribbonSurfaceCommandIds',
-      'ribbonSurfaceCommands',
-    ]) {
-      expect(indexSource, symbol).toContain(symbol);
-    }
-  });
-
   it('keeps framework toolbar wrappers delegated to the core toolbar implementation', () => {
     const wrappers = [
       source('../formulon-cell-react/src/SpreadsheetToolbar.tsx'),

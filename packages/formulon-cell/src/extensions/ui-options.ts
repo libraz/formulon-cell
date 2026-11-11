@@ -105,6 +105,8 @@ const profileFlags = (profile: SpreadsheetUiProfile): FeatureFlags => {
   }
 };
 
+/** The profile, platform, theme and feature switches `mount` resolves from `ui`: what a host's
+ *  options panel shows as the current state before the user changes anything. */
 export function resolveSpreadsheetUiOptions(
   opts: SpreadsheetUiOptions = {},
 ): ResolvedSpreadsheetUiOptions {

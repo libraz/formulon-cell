@@ -11,6 +11,6 @@ export const entryAliases = [
   { find: /^@libraz\/formulon-cell\/adapter$/, replacement: src('adapter/index.ts') },
   { find: /^@libraz\/formulon-cell\/extensions$/, replacement: src('extensions/index.ts') },
   { find: /^@libraz\/formulon-cell\/charts$/, replacement: src('charts/index.ts') },
-  { find: /^@libraz\/formulon-cell\/i18n\/(.+)$/, replacement: src('i18n/$1.ts') },
+  { find: /^@libraz\/formulon-cell\/i18n\/(.+)$/, replacement: src('i18n/locales/$1.ts') },
   { find: /^@libraz\/formulon-cell$/, replacement: src('index.ts') },
 ];

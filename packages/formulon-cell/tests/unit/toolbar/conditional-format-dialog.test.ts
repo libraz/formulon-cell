@@ -1,15 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
-
+import {
+  showConditionalFormatNumberDialog,
+  showConditionalFormatTextDialog,
+} from '../../../src/toolbar/dialogs/conditional-format.js';
 import {
   applyConditionalStylePreview,
   conditionalStyleFromValue,
   conditionalStyleOptions,
   showConditionalFormatCustomStyleDialog,
-} from '../../../src/index.js';
-import {
-  showConditionalFormatNumberDialog,
-  showConditionalFormatTextDialog,
-} from '../../../src/toolbar/dialogs/conditional-format.js';
+} from '../../../src/toolbar/dialogs/conditional-format-style.js';
 
 const strings = {
   ok: 'OK',

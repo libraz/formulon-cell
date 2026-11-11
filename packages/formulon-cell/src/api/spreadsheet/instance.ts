@@ -45,6 +45,12 @@ import type {
 import { Spreadsheet } from '../../mount.js';
 import { mutators } from '../../store/store.js';
 import type { TraceArrow } from '../../store/types.js';
+import {
+  type InstanceRibbon,
+  type RibbonEvents,
+  RibbonView,
+  ribbonStateOf,
+} from '../../toolbar/ribbon-view.js';
 import type { BatchCell, ChangeBatchResult } from '../change-batch.js';
 import { failureOfDecision, spreadsheetFailure } from '../errors.js';
 import { type Disposer, Emitter } from '../events.js';
@@ -246,6 +252,11 @@ interface InstanceState {
   origin: ChangeOrigin | null;
   /** True while `update` applies a patch: the view changes it causes are the API's, not the user's. */
   applyingPatch: boolean;
+  readonly ribbonEvents: Emitter<RibbonEvents>;
+  /** Reports the ribbon's state to `toolbar.on('change')` listeners. */
+  readonly notifyRibbon: () => void;
+  /** The view of the current ribbon handle; a new handle gets a new view. */
+  ribbon: { readonly handle: ToolbarInstance; readonly view: InstanceRibbon } | null;
   readonly life: Lifecycle;
   readonly events: Emitter<SpreadsheetInstanceEvents>;
   readonly selection: Selection;
@@ -280,10 +291,17 @@ const stateOf = (instance: SpreadsheetInstance): InstanceState => {
 export const legacyInstanceOf = (instance: SpreadsheetInstance): LegacyInstance =>
   stateOf(instance).legacy;
 
-/** The ribbon options `ribbon(options)` carries, under the names the ribbon mount reads. */
-const ribbonOptionsOf = (config: RibbonToolbarConfig): MountToolbarOptions => {
+/** The ribbon options `ribbon(options)` carries, under the names the ribbon mount reads, with
+ *  `notify` called on every state change the ribbon reports. */
+const ribbonOptionsOf = (config: RibbonToolbarConfig, notify: () => void): MountToolbarOptions => {
   const { kind: _kind, ...options } = config as RibbonToolbarConfig & MountToolbarOptions;
-  return options;
+  return {
+    ...options,
+    onTabChange: notify,
+    onDisplayModeChange: notify,
+    onFormulaBarChange: notify,
+    onBackstageOpenChange: notify,
+  };
 };
 
 const toRect = (r: Range): CellRect => ({
@@ -450,8 +468,18 @@ export class SpreadsheetInstance {
   }
 
   /** The ribbon mounted inside the host, or `null`. */
-  get toolbar(): ToolbarInstance | null {
-    return stateOf(this).legacy.toolbar;
+  /** The ribbon `update({ toolbar: ribbon() })` put above the grid, or `null` when there is none. */
+  get toolbar(): InstanceRibbon | null {
+    const state = stateOf(this);
+    const handle = state.legacy.toolbar;
+    if (!handle) return null;
+    if (state.ribbon?.handle !== handle) {
+      const view = new RibbonView(handle, state.legacy, state.ribbonEvents, () =>
+        state.life.assertLive(),
+      );
+      state.ribbon = { handle, view };
+    }
+    return state.ribbon.view;
   }
 
   /** Applies a patch to the options: keys present are replaced, `null` resets one to its default,
@@ -644,7 +672,9 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
       legacy.setOverlayOptions((value as SpreadsheetOptions['overlays']) ?? undefined);
       break;
     case 'toolbar':
-      legacy.setToolbar(value === null ? false : ribbonOptionsOf(value as RibbonToolbarConfig));
+      legacy.setToolbar(
+        value === null ? false : ribbonOptionsOf(value as RibbonToolbarConfig, state.notifyRibbon),
+      );
       break;
     case 'theme':
       legacy.setTheme((value as string | null) ?? 'paper');
@@ -977,19 +1007,10 @@ const createFormulaHints = (legacy: () => LegacyInstance): FormulaHints => {
   return {
     add(entry) {
       hints.set(key(entry.name), entry);
-      const off = registry().register(
-        entry.name,
-        () => {
-          throw new FormulonError(
-            StatusCode.NotImplemented,
-            `${entry.name} is a hint, not a function`,
-          );
-        },
-        {
-          ...(entry.args ? { args: entry.args } : {}),
-          ...(entry.description ? { description: entry.description } : {}),
-        },
-      );
+      const off = registry().register(entry.name, {
+        ...(entry.args ? { args: entry.args } : {}),
+        ...(entry.description ? { description: entry.description } : {}),
+      });
       return () => {
         if (hints.get(key(entry.name)) !== entry) return;
         hints.delete(key(entry.name));
@@ -1015,6 +1036,7 @@ const legacyOptionsOf = (
   options: SpreadsheetOptions,
   handle: WorkbookHandle,
   hostProviders: { readonly current: HostProviders },
+  notifyRibbon: () => void,
 ): MountOptions => {
   const host = options.host ?? {};
   return {
@@ -1026,7 +1048,7 @@ const legacyOptionsOf = (
     ...(legacyViewport(options.viewport) ? { viewport: legacyViewport(options.viewport) } : {}),
     ...(options.contextMenu ? { contextMenu: options.contextMenu } : {}),
     ...(options.overlays ? { overlays: options.overlays } : {}),
-    toolbar: options.toolbar != null && ribbonOptionsOf(options.toolbar),
+    toolbar: options.toolbar != null && ribbonOptionsOf(options.toolbar, notifyRibbon),
     ...(options.theme ? { theme: options.theme } : {}),
     locale: options.locale ?? 'en',
     ...(options.strings ? { strings: options.strings } : {}),
@@ -1079,9 +1101,17 @@ export async function mount(
   const handle = workbookHandleOf(workbook);
   let legacy: LegacyInstance | null = null;
   const hostProviders = { current: options.host ?? {} };
+  const ribbonEvents = new Emitter<RibbonEvents>();
+  const notifyRibbon = (): void => {
+    const ribbonHandle = legacy?.toolbar;
+    if (ribbonHandle) ribbonEvents.emit('change', ribbonStateOf(ribbonHandle));
+  };
   try {
     if (options.seed) options.seed(workbook);
-    legacy = await Spreadsheet.mount(host, legacyOptionsOf(options, handle, hostProviders));
+    legacy = await Spreadsheet.mount(
+      host,
+      legacyOptionsOf(options, handle, hostProviders, notifyRibbon),
+    );
   } finally {
     // A failed seed or mount releases the workbook the instance created; one passed in stays.
     if (!legacy && ownsWorkbook) workbook.dispose();
@@ -1124,6 +1154,9 @@ export async function mount(
     swaps: Promise.resolve(),
     origin: null,
     applyingPatch: false,
+    ribbonEvents,
+    notifyRibbon,
+    ribbon: null,
     life,
     events,
     selection: createSelection(current, selectionEvents),
@@ -1217,6 +1250,7 @@ export async function mount(
     offBatch();
     offRecalc();
     events.clear();
+    ribbonEvents.clear();
     selectionEvents.clear();
   });
   return instance;

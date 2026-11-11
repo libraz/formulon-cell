@@ -10,7 +10,7 @@
  * Usage: node scripts/api-surface/check.mjs [--absence]
  *   --absence  also reports public return types and required readonly fields
  *              that include `undefined` (the surface uses `null` for absence).
- * Run after `yarn build`. Exit code 1 when any violation is found.
+ * `yarn check:api` builds the libraries and runs it. Exit code 1 when any violation is found.
  */
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -40,7 +40,8 @@ for (const dir of packages) {
     const name = sub === '.' ? pkg.name : `${pkg.name}/${sub.slice(2)}`;
     if (sub.includes('*')) {
       const [pre, post] = types.split('*');
-      const base = path.join(root, dir, path.dirname(pre));
+      // `./dist/i18n/locales/*.d.ts` splits into a directory prefix and a file suffix.
+      const base = path.join(root, dir, pre.endsWith('/') ? pre : path.dirname(pre));
       if (fs.existsSync(base))
         for (const f of fs.readdirSync(base))
           if (f.endsWith(post.replace(/^\//, ''))) i18nFiles.push(f.slice(0, -post.length));

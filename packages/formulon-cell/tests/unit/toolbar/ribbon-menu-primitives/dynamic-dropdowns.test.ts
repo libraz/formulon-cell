@@ -179,19 +179,6 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS).toEqual(expected);
   });
 
-  it('keeps dynamic dropdown manifests exported from the public entrypoint', () => {
-    const indexSource = readFileSync(join(root, 'src/index.ts'), 'utf8');
-
-    for (const symbol of [
-      'DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS',
-      'DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS',
-      'DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS',
-      'DynamicDropdownMenuRefresherKey',
-    ]) {
-      expect(indexSource, symbol).toContain(symbol);
-    }
-  });
-
   it('keeps dynamic dropdown dispatcher attrs aligned with registered handlers', () => {
     const dynamicDropdownsSource = readFileSync(join(ribbonDir, 'dynamic-dropdowns.ts'), 'utf8');
     const handlersBlock = dynamicDropdownsSource.match(

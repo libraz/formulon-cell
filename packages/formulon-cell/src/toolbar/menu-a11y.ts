@@ -11,6 +11,8 @@ export interface DisabledReasonProjectionOptions {
   titlePrefix?: string;
 }
 
+/** Shows why a control is unavailable: as its tooltip, as its accessible description, or both.
+ *  A host's search results or menus use it the way the ribbon does; `null` clears it. */
 export function projectDisabledReason(
   el: HTMLElement,
   reason: string | null,

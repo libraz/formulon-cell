@@ -14,7 +14,7 @@ import {
 } from '../../../../src/engine/cell-style-writeback.js';
 import { argbToCssColor } from '../../../../src/engine/format-writeback.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, mutators } from '../../../../src/index.js';
+import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 import { macStyleOracle } from './fixtures.js';
 
 describe('CELL_STYLES', () => {

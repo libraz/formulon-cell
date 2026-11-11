@@ -66,9 +66,8 @@ export const DEFAULT_OFF_FEATURE_IDS: ReadonlySet<FeatureId> = new Set([
   'localeSwitcher',
 ]);
 
-/** Whether `id` starts disabled. Hosts rendering a feature-toggle UI need this
- *  to read the current value the same way `resolveFlags` does — an absent flag
- *  means "on" for most features and "off" for these. */
+/** Whether `id` starts disabled: an absent switch means "on" for most features and "off" for
+ *  these. A host's feature-toggle panel reads a switch's current value this way. */
 export const isFeatureDefaultOff = (id: FeatureId): boolean => DEFAULT_OFF_FEATURE_IDS.has(id);
 
 /** Flags built-ins inside mount.ts gate against. Defaults to `true` for

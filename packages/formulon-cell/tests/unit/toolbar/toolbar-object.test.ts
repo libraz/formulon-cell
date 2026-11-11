@@ -28,9 +28,22 @@ describe('toolbar object', () => {
   it('opens an inline ribbon with the options ribbon() carries', async () => {
     const instance = await mount(makeHost(), { toolbar: ribbon({ activeTab: 'data' }) });
     live.push(instance);
-    expect(instance.toolbar?.getActiveTab()).toBe('data');
+    expect(instance.toolbar?.activeTab).toBe('data');
     instance.update({ toolbar: ribbon({ activeTab: 'insert' }) });
-    expect(instance.toolbar?.getActiveTab()).toBe('insert');
+    expect(instance.toolbar?.activeTab).toBe('insert');
+  });
+
+  it('reports the inline ribbon state changes through toolbar.on', async () => {
+    const instance = await mount(makeHost(), { toolbar: ribbon({ activeTab: 'home' }) });
+    live.push(instance);
+    const toolbar = instance.toolbar;
+    const states: unknown[] = [];
+    toolbar?.on('change', (state) => states.push(state.activeTab));
+    toolbar?.update({ activeTab: 'data' });
+    expect(states).toEqual(['data']);
+    expect(instance.toolbar).toBe(toolbar);
+    instance.update({ toolbar: null });
+    expect(instance.toolbar).toBeNull();
   });
 
   it('mounts apart from the grid, reports state changes and leaves the instance untouched', async () => {

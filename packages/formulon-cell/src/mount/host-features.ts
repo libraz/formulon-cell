@@ -16,7 +16,8 @@ import { editSeedForAddr } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEmitter } from '../events.js';
-import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
+import type { resolveFlags } from '../extensions/features.js';
+import type { ExtensionHandle } from '../extensions/index.js';
 import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';
 import {

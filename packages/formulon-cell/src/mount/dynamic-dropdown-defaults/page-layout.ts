@@ -12,7 +12,7 @@ import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 import { clearSheetBackgroundImage, setSheetBackgroundImage } from '../../commands/view.js';
 import { formatA1Range } from '../../engine/address.js';
 import { workbookThemeMatchesPreset } from '../../engine/workbook-theme-presets.js';
-import type { ThemeName } from '../../extensions/index.js';
+import type { ThemeName } from '../../extensions/types.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { getPageSetup } from '../../store/store.js';
 import { pickImageFileDataUrl } from '../../toolbar/dialogs/image-file.js';

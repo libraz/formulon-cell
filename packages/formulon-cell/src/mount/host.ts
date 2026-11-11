@@ -1,4 +1,5 @@
-import type { resolveSpreadsheetUiOptions, ThemeName } from '../extensions/index.js';
+import type { resolveSpreadsheetUiOptions } from '../extensions/index.js';
+import type { ThemeName } from '../extensions/types.js';
 import {
   type ResolvedSpreadsheetPlatform,
   resolveSpreadsheetPlatform,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import en from '../../../src/i18n/en.js';
+import en from '../../../src/i18n/locales/en.js';
 import type { Strings } from '../../../src/i18n/strings.js';
 import {
   applyPlatformChrome,

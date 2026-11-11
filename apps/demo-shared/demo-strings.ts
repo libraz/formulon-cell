@@ -1,4 +1,5 @@
-import type { FeatureId, ThemeName } from '@libraz/formulon-cell';
+import type { ThemeName } from '@libraz/formulon-cell';
+import type { FeatureId } from '@libraz/formulon-cell/extensions';
 import { deCommands, deUi } from './demo-strings-de.js';
 import { frCommands, frUi } from './demo-strings-fr.js';
 import { koCommands, koUi } from './demo-strings-ko.js';
@@ -30,9 +31,6 @@ export interface DemoUiStrings {
   signedInUser: string;
   close: string;
   ok: string;
-  cancel: string;
-  run: string;
-  command: string;
   noIssuesFound: string;
   preset: string;
   presetHint: string;
@@ -157,15 +155,10 @@ export interface DemoCommandStrings {
   ribbonCommand: string;
   selection: string;
   workbook: string;
-  cellsUpdated: string;
   draw: string;
   translate: string;
   addIns: string;
   openFailed: string;
-  script: string;
-  scriptCommandError: string;
-  spellingReview: string;
-  accessibilityCheck: string;
   inkNotPersisted: string;
   selectInkFirst: string;
   translationUnavailable: string;
@@ -238,9 +231,6 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       signedInUser: 'Signed in user',
       close: 'Close',
       ok: 'OK',
-      cancel: 'Cancel',
-      run: 'Run',
-      command: 'Command',
       noIssuesFound: 'No issues found.',
       preset: 'Preset',
       presetHint:
@@ -423,9 +413,6 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       signedInUser: 'サインイン中のユーザー',
       close: '閉じる',
       ok: 'OK',
-      cancel: 'キャンセル',
-      run: '実行',
-      command: 'コマンド',
       noIssuesFound: '問題は見つかりませんでした。',
       preset: 'プリセット',
       presetHint:
@@ -606,15 +593,10 @@ export const demoCommandText = (locale: string): DemoCommandStrings => {
         ribbonCommand: 'リボン コマンド',
         selection: '選択範囲',
         workbook: 'ブック',
-        cellsUpdated: '{count} 個のセルを更新しました。',
         draw: '描画',
         translate: '翻訳',
         addIns: 'アドイン',
         openFailed: 'ファイルを開けませんでした',
-        script: 'スクリプト',
-        scriptCommandError: '次のいずれかを使用してください: uppercase, lowercase, trim, clear.',
-        spellingReview: 'スペル チェック',
-        accessibilityCheck: 'アクセシビリティ チェック',
         inkNotPersisted: 'このデモ ブックではインク ストロークは保存されません。',
         selectInkFirst: '消しゴムを使うには、先にインク ストロークを選択してください。',
         translationUnavailable: 'このデモには翻訳サービスが接続されていません。',
@@ -649,15 +631,10 @@ export const demoCommandText = (locale: string): DemoCommandStrings => {
         ribbonCommand: 'Ribbon command',
         selection: 'Selection',
         workbook: 'Workbook',
-        cellsUpdated: '{count} cells updated.',
         draw: 'Draw',
         translate: 'Translate',
         addIns: 'Add-ins',
         openFailed: 'Open failed',
-        script: 'Script',
-        scriptCommandError: 'Use one of: uppercase, lowercase, trim, clear.',
-        spellingReview: 'Spelling Review',
-        accessibilityCheck: 'Accessibility Check',
         inkNotPersisted: 'Ink strokes are not persisted in this demo workbook.',
         selectInkFirst: 'Select an ink stroke first to use the eraser.',
         translationUnavailable: 'No translation service is connected in this demo.',

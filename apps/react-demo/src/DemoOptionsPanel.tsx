@@ -1,10 +1,5 @@
-import type {
-  FeatureFlags,
-  FeatureId,
-  SelectionState,
-  SpreadsheetInstance,
-  ThemeName,
-} from '@libraz/formulon-cell';
+import type { SelectionState, SpreadsheetInstance, ThemeName } from '@libraz/formulon-cell';
+import type { FeatureFlags, FeatureId } from '@libraz/formulon-cell/extensions';
 import { useSelection } from '@libraz/formulon-cell-react';
 import { type ReactElement, useMemo } from 'react';
 import {

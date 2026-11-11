@@ -2,19 +2,13 @@ import { workbookOf } from '../api/workbook.js';
 import { createHistoryView } from '../commands/history-view.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isBuiltInExtension } from '../extensions/built-in-mark.js';
-import {
-  dedupeById,
-  type Extension,
-  type ExtensionHandle,
-  type ExtensionInput,
-  flattenExtensions,
-  sortByPriority,
-} from '../extensions/index.js';
+import type { Extension, ExtensionHandle, ExtensionInput } from '../extensions/index.js';
 import type {
   BuiltInExtensionContext,
   BuiltInExtensionHandle,
   ExtensionContext,
 } from '../extensions/types.js';
+import { dedupeById, flattenExtensions, sortByPriority } from '../extensions/types.js';
 import type { Strings } from '../i18n/strings.js';
 import { type EngineBinding, WB_REGISTRY_IDS } from './engine-binding.js';
 

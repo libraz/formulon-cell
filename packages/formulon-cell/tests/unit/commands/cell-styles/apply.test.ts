@@ -16,7 +16,7 @@ import {
 } from '../../../../src/commands/interaction-controller.js';
 import { fixedFormPolicy } from '../../../../src/commands/interaction-policy.js';
 import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, mutators } from '../../../../src/index.js';
+import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 import { namedStyleWorkbook } from './fixtures.js';
 
 describe('applyCellStyle', () => {
