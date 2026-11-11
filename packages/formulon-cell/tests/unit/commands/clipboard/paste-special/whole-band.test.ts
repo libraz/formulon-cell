@@ -54,7 +54,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
     wb.recalc();
-    expect(got?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1_048_575, c1: 3 });
+    expect(got.range).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1_048_575, c1: 3 });
     expect(num(wb, 4, 3)).toBe(7);
     expect(wb.getValue({ sheet: 0, row: 1, col: 3 })).toEqual({ kind: 'blank' });
     expect(
@@ -92,7 +92,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
     wb.recalc();
-    expect(got?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 0, r1: 3, c1: 16_383 });
+    expect(got.range).toEqual({ sheet: 0, r0: 3, c0: 0, r1: 3, c1: 16_383 });
     expect(num(wb, 3, 4)).toBe(7);
     expect(wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'blank' });
     expect(store.getState().layout.rowHeights.get(3)).toBe(35);
@@ -116,7 +116,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
     wb.recalc();
-    expect(got?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1_048_575, c1: 4 });
+    expect(got.range).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1_048_575, c1: 4 });
     expect(num(wb, 4, 3)).toBe(1);
     expect(num(wb, 4, 4)).toBe(2);
     expect(num(wb, 4, 5)).toBe(9);
@@ -135,8 +135,8 @@ describe('pasteSpecial', () => {
         operation: 'none',
         skipBlanks: false,
         transpose: false,
-      }),
-    ).toBeNull();
+      }).status,
+    ).toBe('refused');
     expect(wb.getValue({ sheet: 0, row: 2, col: 5 })).toEqual({ kind: 'blank' });
   });
 
@@ -166,7 +166,7 @@ describe('pasteSpecial', () => {
     });
     wb.recalc();
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 5, r1: 1_048_575, c1: 8 });
+    expect(result.range).toEqual({ sheet: 0, r0: 0, c0: 5, r1: 1_048_575, c1: 8 });
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'number', value: 1 });
     expect(wb.getValue({ sheet: 0, row: 5, col: 7 })).toEqual({ kind: 'number', value: 1 });
     expect(wb.cellFormula({ sheet: 0, row: 6, col: 5 })).toBe('=D1+3');
@@ -224,7 +224,7 @@ describe('pasteSpecial', () => {
     });
     wb.recalc();
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 8, c0: 0, r1: 11, c1: 16_383 });
+    expect(result.range).toEqual({ sheet: 0, r0: 8, c0: 0, r1: 11, c1: 16_383 });
     expect(wb.getValue({ sheet: 0, row: 8, col: 3 })).toEqual({ kind: 'number', value: 1 });
     expect(wb.getValue({ sheet: 0, row: 10, col: 3 })).toEqual({ kind: 'number', value: 1 });
     expect(wb.cellFormula({ sheet: 0, row: 9, col: 3 })).toBe('=A4+3');

@@ -129,7 +129,7 @@ describe('pasting an HTML table as Excel measures it', () => {
     const wb = await newWb();
     setActive(store, 0, 0);
     const result = pasteHtml(store.getState(), store, wb, html, null);
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 });
+    expect(result.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 });
     expect(value(wb, 0, 0)).toEqual({ kind: 'text', value: 'H' });
     expect(value(wb, 3, 0)).toEqual({ kind: 'text', value: 'y' });
     const fmt = (row: number, col: number) =>

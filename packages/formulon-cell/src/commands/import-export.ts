@@ -8,7 +8,8 @@ import type { Addr, Range } from '../engine/types.js';
 import { formatBoolean, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
-import type { State } from '../store/store.js';
+import type { SpreadsheetStore, State } from '../store/store.js';
+import { authorizedWrite } from './authorized-write.js';
 import {
   type CSVEncodeOptions,
   type CSVParseOptions,
@@ -21,21 +22,24 @@ import {
   inputLocaleForWorkbook,
   writeCoerced,
 } from './coerce-input.js';
-import { blockDataTableEdit, blockTableFunction } from './data-table-guard.js';
-import type { History } from './history.js';
+import {
+  blockDataTableEdit,
+  blockTableFunction,
+  dataTableGuardAlert,
+  tableFunctionAlert,
+} from './data-table-guard.js';
+import { History } from './history.js';
+import {
+  appliedBatch,
+  type ChangeBatchResult,
+  type OperationEffect,
+  refusedBatch,
+  refusedByDecision,
+} from './interaction-policy.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 /** The most cells one CSV import or export covers. */
 export const MAX_CSV_CELLS = 100_000;
-
-export interface ImportResult {
-  /** Range that received writes. r0/c0 = anchor; r1/c1 = far corner. */
-  writtenRange: Range;
-  /** Total cells written (including blanks that overwrote prior values). */
-  cellsWritten: number;
-  /** Rows parsed from the input (== writtenRange.r1 - writtenRange.r0 + 1). */
-  rows: number;
-}
 
 export interface ImportCSVOptions extends CSVParseOptions {
   /**
@@ -45,79 +49,95 @@ export interface ImportCSVOptions extends CSVParseOptions {
   locale?: string;
 }
 
+/** The first cell of the parsed `rows` at `origin` that sheet protection refuses, or null. */
+const firstRefusedCell = (state: State, rows: readonly string[][], origin: Addr): Addr | null => {
+  for (let r = 0; r < rows.length; r += 1) {
+    for (let c = 0; c < (rows[r]?.length ?? 0); c += 1) {
+      const addr = { sheet: origin.sheet, row: origin.row + r, col: origin.col + c };
+      if (!isCellWritable(state, addr)) return addr;
+    }
+  }
+  return null;
+};
+
 /**
  * Parse a CSV blob and write the resulting cells starting at `anchor` (or the
  * active cell when omitted). Each value runs through `coerceInput` so a leading
  * `=` becomes a formula, `"42"` becomes a number, etc. — same semantics as
- * paste-from-clipboard, but for full-document loads.
+ * paste-from-clipboard, but for full-document loads. One authorized `paste` of the target range
+ * from the instance API, all or nothing: refused when the interaction policy or sheet protection
+ * refuses any target cell, and undone as one step.
  */
 export function importCSV(
-  state: State,
+  store: SpreadsheetStore,
   wb: WorkbookHandle,
   text: string,
   anchor?: Addr,
   history?: History | null,
   options: ImportCSVOptions = {},
-): ImportResult | null {
-  if (!text) return null;
-  const rows = parseCSV(text, options);
-  if (rows.length === 0) return null;
+): ChangeBatchResult {
+  const rows = text ? parseCSV(text, options) : [];
+  if (rows.length === 0) return appliedBatch([], null);
 
+  const state = store.getState();
   const origin: Addr = anchor ?? state.selection.active;
   const sheet = origin.sheet;
   const width = rows.reduce((widest, row) => Math.max(widest, row.length), 0);
-  if (
-    blockDataTableEdit(wb, {
-      sheet,
-      r0: origin.row,
-      c0: origin.col,
-      r1: origin.row + rows.length - 1,
-      c1: origin.col + Math.max(0, width - 1),
-    })
-  ) {
-    return null;
+  const target: Range = {
+    sheet,
+    r0: origin.row,
+    c0: origin.col,
+    r1: origin.row + rows.length - 1,
+    c1: origin.col + Math.max(0, width - 1),
+  };
+  if (blockDataTableEdit(wb, target))
+    return refusedBatch({ code: 'protected', reason: dataTableGuardAlert(wb).message });
+  // One write, all or nothing: a target cell the protected sheet refuses refuses the import.
+  const refused = firstRefusedCell(state, rows, origin);
+  if (refused) {
+    warnProtected(refused);
+    return refusedBatch({ addr: refused, code: 'protected' });
   }
   const inputLocale = options.locale ?? inputLocaleForWorkbook(wb);
   const csvFormulas = rows
     .flat()
     .filter((raw) => raw.trim().startsWith('='))
     .map((raw) => canonicalizeLocalizedFormulaForInput(wb, raw.trim(), inputLocale));
-  if (blockTableFunction(wb, csvFormulas)) return null;
-  let maxCols = 0;
-  let cellsWritten = 0;
+  if (blockTableFunction(wb, csvFormulas))
+    return refusedBatch({ code: 'invalid', reason: tableFunctionAlert(wb).message });
 
-  if (history) history.begin();
-  try {
-    wb.withBatchedRecalc(() => {
-      for (let r = 0; r < rows.length; r += 1) {
-        const cells = rows[r] ?? [];
-        if (cells.length > maxCols) maxCols = cells.length;
-        for (let c = 0; c < cells.length; c += 1) {
-          const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
-          if (!isCellWritable(state, addr)) {
-            warnProtected(addr);
-            continue;
-          }
-          writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? '', inputLocale, wb));
-          cellsWritten += 1;
-        }
-      }
-    });
-  } finally {
-    if (history) history.end();
-  }
-
-  return {
-    writtenRange: {
-      sheet,
-      r0: origin.row,
-      c0: origin.col,
-      r1: origin.row + rows.length - 1,
-      c1: origin.col + Math.max(0, maxCols - 1),
-    },
-    cellsWritten,
-    rows: rows.length,
+  const effect: OperationEffect = {
+    kind: 'range',
+    range: target,
+    ...(csvFormulas.length > 0 ? { includesFormula: true } : {}),
   };
+  let changed: Addr[] = [];
+  const result = authorizedWrite({
+    store,
+    history: history ?? new History(),
+    intents: (intentOrigin) => [
+      { operation: 'paste', origin: intentOrigin, commandId: 'importCSV', effects: [effect] },
+    ],
+    origin: 'instanceApi',
+    write: () => {
+      changed = wb.trackChangedCells(() =>
+        wb.withBatchedRecalc(() => {
+          for (let r = 0; r < rows.length; r += 1) {
+            const cells = rows[r] ?? [];
+            for (let c = 0; c < cells.length; c += 1) {
+              const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
+              writeCoerced(
+                wb,
+                addr,
+                coerceInputForCell(state, addr, cells[c] ?? '', inputLocale, wb),
+              );
+            }
+          }
+        }),
+      ).changed;
+    },
+  });
+  return result.ok ? appliedBatch(changed, target) : refusedByDecision(result.decision);
 }
 
 export interface ExportOptions extends CSVEncodeOptions {

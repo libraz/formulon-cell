@@ -111,7 +111,7 @@ describe('paste onto merged targets', () => {
     assertSnap(snap);
     setSelection(store, 13, 5, 14, 8);
     const result = pasteSpecial(store.getState(), store, wb, snap, opts());
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 13, c0: 5, r1: 16, c1: 8 });
+    expect(result.range).toEqual({ sheet: 0, r0: 13, c0: 5, r1: 16, c1: 8 });
     expect(merges(store)).toEqual([]);
     expect(wb.getValue({ sheet: 0, row: 15, col: 7 })).toEqual({ kind: 'number', value: 1 });
     expect(wb.getValue({ sheet: 0, row: 16, col: 8 })).toEqual({ kind: 'number', value: 4 });
@@ -128,7 +128,9 @@ describe('paste onto merged targets', () => {
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 });
     assertSnap(snap);
     setSelection(store, 13, 5, 16, 6);
-    expect(pasteSpecial(store.getState(), store, wb, snap, opts({ what: 'values' }))).toBeNull();
+    expect(pasteSpecial(store.getState(), store, wb, snap, opts({ what: 'values' })).status).toBe(
+      'refused',
+    );
     expect(merges(store)).toHaveLength(2);
   });
 });
@@ -156,7 +158,7 @@ describe('Formats paste tiling', () => {
     assertSnap(snap);
     setSelection(store, 7, 5, 8, 8);
     const result = pasteSpecial(store.getState(), store, wb, snap, opts({ what: 'formats' }));
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 7, c0: 5, r1: 8, c1: 8 });
+    expect(result.range).toEqual({ sheet: 0, r0: 7, c0: 5, r1: 8, c1: 8 });
     for (const row of [7, 8]) {
       expect(numFmt(store, row, 5)).toEqual(fmts[0]);
       expect(numFmt(store, row, 7)).toEqual(fmts[2]);
@@ -171,7 +173,7 @@ describe('Formats paste tiling', () => {
     assertSnap(snap);
     setSelection(store, 1, 5, 2, 5);
     const result = pasteSpecial(store.getState(), store, wb, snap, opts({ what: 'formats' }));
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 1, c0: 5, r1: 2, c1: 5 });
+    expect(result.range).toEqual({ sheet: 0, r0: 1, c0: 5, r1: 2, c1: 5 });
     expect(merges(store)).toEqual([[0, 0, 0, 1]]);
   });
 });

@@ -376,14 +376,14 @@ describe('pasteTSV', () => {
   });
 
   it('returns null on empty payload', () => {
-    expect(pasteTSV(store.getState(), store, wb, '')).toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, '').status).toBe('refused');
   });
 
   it('writes coerced values starting at the active cell', () => {
     setRange(store, 1, 2, 1, 2);
     const got = pasteTSV(store.getState(), store, wb, 'foo\t42\r\nTRUE\t=A1');
     wb.recalc();
-    expect(got?.writtenRange).toEqual({ sheet: 0, r0: 1, c0: 2, r1: 2, c1: 3 });
+    expect(got.range).toEqual({ sheet: 0, r0: 1, c0: 2, r1: 2, c1: 3 });
     const v00 = wb.getValue({ sheet: 0, row: 1, col: 2 });
     expect(v00.kind === 'text' && v00.value).toBe('foo');
     const v01 = wb.getValue({ sheet: 0, row: 1, col: 3 });
@@ -428,9 +428,9 @@ describe('pasteTSV', () => {
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 1 })).toBeNull();
   });
 
-  it('reports the widest row in writtenRange when rows have unequal column counts', () => {
+  it('reports the widest row in range when rows have unequal column counts', () => {
     setRange(store, 0, 0, 0, 0);
     const got = pasteTSV(store.getState(), store, wb, 'a\nb\tc\td');
-    expect(got?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 2 });
+    expect(got.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 2 });
   });
 });

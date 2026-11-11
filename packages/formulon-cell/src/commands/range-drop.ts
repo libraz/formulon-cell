@@ -7,8 +7,8 @@ import { copy } from './clipboard/copy.js';
 import { createCopyFormatResolver } from './clipboard/format-resolver.js';
 import {
   insertCopiedCellsAction,
+  pasteBatchWrite,
   pasteSpecialAction,
-  pasteWrite,
 } from './clipboard/paste-actions.js';
 import { resolvePasteDestination } from './clipboard/paste-destination.js';
 import { type PasteWhat, pasteLink } from './clipboard/paste-special.js';
@@ -114,13 +114,12 @@ export async function applyRangeDrop(
   const ctx = { store, history, origin: 'editor', commandId: action } as const;
   let written: Range | null = null;
   if (shift && !movesSource) {
-    written = insertCopiedCellsAction(ctx, wb, copied.tsv, shift, snap)?.writtenRange ?? null;
+    written = insertCopiedCellsAction(ctx, wb, copied.tsv, shift, snap).range;
   } else if (shift) {
     // A shifting move inserts the copy, then clears the source, as one step.
-    written = pasteWrite(ctx, { destination: null, cutSource: src }, null, () => {
-      const inserted =
-        insertCopiedCellsAction(ctx, wb, copied.tsv, shift, snap)?.writtenRange ?? null;
-      if (inserted) {
+    written = pasteBatchWrite(ctx, { destination: null, cutSource: src }, () => {
+      const inserted = insertCopiedCellsAction(ctx, wb, copied.tsv, shift, snap);
+      if (inserted.status === 'applied') {
         mutators.setActive(store, { sheet: src.sheet, row: src.r0, col: src.c0 });
         mutators.setRange(store, src);
         executeRibbonClearAction({
@@ -132,23 +131,21 @@ export async function applyRangeDrop(
         });
       }
       return inserted;
-    });
+    }).range;
   } else if (action === 'link') {
-    written = pasteWrite(
+    written = pasteBatchWrite(
       ctx,
       { destination: resolvePasteDestination(store.getState(), snap, false) },
-      null,
-      () => pasteLink(store.getState(), store, wb, snap, history)?.writtenRange ?? null,
-    );
+      () => pasteLink(store.getState(), store, wb, snap, history),
+    ).range;
   } else {
     const what = PASTE_KIND[action] ?? 'all';
-    written =
-      pasteSpecialAction(ctx, wb, snap, {
-        what,
-        operation: 'none',
-        skipBlanks: false,
-        transpose: false,
-      })?.writtenRange ?? null;
+    written = pasteSpecialAction(ctx, wb, snap, {
+      what,
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    }).range;
   }
   if (!written) {
     mutators.setActive(store, { sheet: src.sheet, row: src.r0, col: src.c0 });

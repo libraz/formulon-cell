@@ -85,7 +85,9 @@ describe('edits on a filtered list act on visible rows only', () => {
 
   it('Fill Down on one cell copies the row above even when the filter hides it', () => {
     select({ sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 });
-    expect(executeRibbonFillAction({ store, workbook: wb, history, action: 'down' })).toBe(true);
+    expect(executeRibbonFillAction({ store, workbook: wb, history, action: 'down' }).status).toBe(
+      'applied',
+    );
     expect(num(3, 2)).toBe(22);
   });
 

@@ -170,12 +170,9 @@ describe('restricted interaction routes', () => {
     expect(instance.store.getState().selection.active).toEqual(active);
   });
 
-  it('keeps pasted matrix positions when skipIneligible partially applies a fixed form', async () => {
+  it('refuses a paste over a fixed form as a whole when it reaches a cell outside the form', async () => {
     sheet = await mountStubSheet({
-      policy: {
-        ...fixedFormPolicy([addrRange(0, 0), addrRange(0, 2)]),
-        batchDenied: 'skipIneligible',
-      },
+      policy: fixedFormPolicy([addrRange(0, 0), addrRange(0, 2)]),
       features: { clipboard: true },
     });
     const { host, instance, workbook } = sheet;
@@ -189,9 +186,9 @@ describe('restricted interaction routes', () => {
     mutators.setActive(instance.store, a1);
 
     expect(paste(host, '8\t9\t10').defaultPrevented).toBe(true);
-    expect(workbook.getValue(a1)).toEqual({ kind: 'number', value: 8 });
+    expect(workbook.getValue(a1)).toEqual({ kind: 'number', value: 1 });
     expect(workbook.getValue(b1)).toEqual({ kind: 'number', value: 2 });
-    expect(workbook.getValue(c1)).toEqual({ kind: 'number', value: 10 });
+    expect(workbook.getValue(c1)).toEqual({ kind: 'number', value: 3 });
   });
 
   it('preflights legacy paste against a viewport range before touching cells', async () => {

@@ -254,18 +254,15 @@ describe('protection', () => {
     await expectFailureAsync(s.unprotect(), 'protected');
   });
 
-  it('skips locked cells of a protected sheet on CSV import and lists them', async () => {
+  it('writes every CSV field on a protected sheet: host code is not gated by protection', async () => {
     const wb = await createWorkbook();
     const s = wb.sheet(0);
     s.updateCellFormat('B1', { protection: { locked: false } });
     await s.protect();
     const result = s.importCsv('1,2', { at: 'A1' });
-    expect(result.status).toBe('partial');
-    expect(result.applied).toEqual([{ sheet: 0, at: { row: 0, col: 1 } }]);
-    expect(result.rejections).toEqual([
-      { sheet: 0, at: { row: 0, col: 0 }, code: 'protected', reason: expect.any(String) },
-    ]);
-    expect(s.getTypedValue('A1').kind).toBe(ValueKind.Blank);
+    expect(result.status).toBe('applied');
+    expect(result.rejections).toEqual([]);
+    expect(s.getTypedValue('A1')).toEqual({ kind: ValueKind.Number, number: 1 });
     expect(s.getTypedValue('B1')).toEqual({ kind: ValueKind.Number, number: 2 });
   });
 });

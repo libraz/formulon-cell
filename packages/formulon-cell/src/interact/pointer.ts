@@ -3,20 +3,20 @@ import { clearSelectedContents } from '../commands/clear-contents.js';
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { isPopulated } from '../commands/current-region.js';
 import {
+  executeFillHandle,
   fillDestFor,
   fillLastValue,
   fillOutputRange,
-  fillRange,
   fillShrinkDropped,
   fillShrinkFor,
 } from '../commands/fill.js';
-import { autoFillDownExtent, restrictedFillChanges } from '../commands/fill-plan.js';
+import { autoFillDownExtent } from '../commands/fill-plan.js';
 import { headerFilterRanges } from '../commands/filter-ranges.js';
 import { tableOverlayById } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
 import { hyperlinkAt, isInDocumentHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { applyUnmerge, expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
+import { expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
 import { moveSelectionTo, moveTargetFits, moveTargetRange } from '../commands/move-cells.js';
 import {
   collapseColGroup,
@@ -546,48 +546,23 @@ export function attachPointer(
    *  interaction controller; others write straight to the workbook in one undo
    *  step. Merges the destination cuts are unmerged first. */
   const commitFill = (
-    s: State,
     src: Range,
     dest: Range,
     opts: { copyOnly: boolean; announce?: { clientX: number; clientY: number } },
   ): { applied: boolean; restricted: boolean } => {
-    const controller = interactionControllerFor(store);
-    const restricted = controller?.policy !== undefined;
-    let applied: boolean;
-    if (controller?.policy) {
-      const result = controller.execute({
-        type: 'cellBatch',
-        operation: 'fill',
-        origin: 'fillHandle',
-        changes: restrictedFillChanges(s, src, dest, opts.copyOnly),
-        denied: controller.policy.batchDenied,
-      });
-      applied = result.status === 'applied';
-    } else {
-      // A password-guarded range in the way is unlocked first; the fill then repeats.
-      if (
-        deferForAllowedRangeUnlock(store, [fillOutputRange(src, dest)], () =>
-          commitFill(store.getState(), src, dest, opts),
-        )
-      ) {
-        return { applied: false, restricted };
-      }
-      // Bundle every per-cell write into a single undoable transaction.
-      if (history) history.begin();
-      applied = false;
-      try {
-        // Fill cannot tear merged rectangles apart silently.
-        applyUnmerge(store, wb, history, dest);
-        // Re-read the state: the unmerge above changed the merge maps the fill checks.
-        applied = fillRange(store.getState(), wb, src, dest, {
-          copyOnly: opts.copyOnly,
-          formatting: 'with',
-          store,
-        });
-      } finally {
-        if (history) history.end();
-      }
+    const restricted = interactionControllerFor(store)?.policy !== undefined;
+    // A password-guarded range in the way is unlocked first; the fill then repeats.
+    if (
+      !restricted &&
+      deferForAllowedRangeUnlock(store, [fillOutputRange(src, dest)], () =>
+        commitFill(src, dest, opts),
+      )
+    ) {
+      return { applied: false, restricted };
     }
+    const applied =
+      executeFillHandle({ store, workbook: wb, history, src, dest, copyOnly: opts.copyOnly })
+        .status === 'applied';
     if (applied) {
       onAfterCommit?.();
       mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
@@ -1665,7 +1640,7 @@ export function attachPointer(
       }
       if (target) {
         void moveSelectionTo(
-          { store, wb, history, commandId: 'moveCells', confirmOverwrite: confirmMoveOverwrite },
+          { store, wb, history, commandId: 'dragMove', confirmOverwrite: confirmMoveOverwrite },
           { row: target.r0, col: target.c0 },
         ).then((moved) => {
           if (moved) onAfterCommit?.();
@@ -1749,7 +1724,7 @@ export function attachPointer(
         const filled = fillOutputRange(drag.src, dest);
         const last = cellRect(geometryLayout(s), s.viewport, filled.r1, filled.c1);
         const at = localXY(e);
-        commitFill(s, drag.src, dest, {
+        commitFill(drag.src, dest, {
           copyOnly,
           announce: {
             clientX: e.clientX - at.x + last.x + last.w,
@@ -1822,7 +1797,7 @@ export function attachPointer(
       const dest = autoFillDownExtent(s, src);
       if (!dest) return;
       if (!isNavigationRangeAllowed(store, dest)) return;
-      commitFill(s, src, dest, { copyOnly: false });
+      commitFill(src, dest, { copyOnly: false });
       return;
     }
 

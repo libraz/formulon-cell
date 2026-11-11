@@ -511,15 +511,15 @@ describe('pasteTSV protection gate', () => {
     // A1 and C1 are locked, so not even the unlocked B1 is written.
     for (let col = 0; col < 3; col += 1)
       expect(wb.getValue({ sheet: 0, row: 0, col }).kind).toBe('blank');
-    expect(result).toBeNull();
+    expect(result.status).toBe('refused');
 
     // A destination of unlocked cells alone takes the paste.
-    expect(pasteTSV(store.getState(), store, wb, 'only')).toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, 'only').status).toBe('refused');
     store.setState((s) => ({
       ...s,
       selection: { ...s.selection, active: { sheet: 0, row: 0, col: 1 } },
     }));
-    expect(pasteTSV(store.getState(), store, wb, 'bar')?.writtenRange).toBeDefined();
+    expect(pasteTSV(store.getState(), store, wb, 'bar').range).toBeDefined();
     const b1 = wb.getValue({ sheet: 0, row: 0, col: 1 });
     expect(b1.kind === 'text' && b1.value).toBe('bar');
   });

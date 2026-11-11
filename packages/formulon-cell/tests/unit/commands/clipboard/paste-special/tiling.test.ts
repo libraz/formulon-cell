@@ -56,7 +56,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 4, r1: 5, c1: 6 });
+    expect(result.range).toEqual({ sheet: 0, r0: 3, c0: 4, r1: 5, c1: 6 });
     for (let row = 3; row <= 5; row += 1) {
       for (let col = 4; col <= 6; col += 1) {
         expect(num(wb, row, col)).toBe(7);
@@ -86,7 +86,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 });
+    expect(result.range).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 });
     expect(num(wb, 3, 3)).toBe(1);
     expect(num(wb, 4, 4)).toBe(4);
     expect(num(wb, 5, 5)).toBe(99);
@@ -108,7 +108,7 @@ describe('pasteSpecial', () => {
       transpose: true,
     });
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 6, c1: 4 });
+    expect(result.range).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 6, c1: 4 });
     for (let col = 3; col <= 4; col += 1) {
       expect(num(wb, 3, col)).toBe(1);
       expect(num(wb, 4, col)).toBe(2);
@@ -135,7 +135,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 });
+    expect(result.range).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 });
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
     expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'blank' });
     expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 1 });

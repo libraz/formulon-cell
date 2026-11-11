@@ -1,3 +1,4 @@
+import type { CellAddress } from '@libraz/formulon';
 import {
   assertPatternSheet,
   type CellInput,
@@ -18,7 +19,6 @@ export const INTERACTION_OPERATIONS = [
   'clear',
   'paste',
   'fill',
-  'moveCells',
   'format',
   'insertRows',
   'deleteRows',
@@ -73,8 +73,6 @@ export type PermissionDecision =
   | { allowed: true }
   | { allowed: false; code: PermissionCode; reason?: string; addr?: Addr };
 
-export type BatchDeniedMode = 'reject' | 'skipIneligible';
-
 export interface EditablePredicateContext {
   readonly addr: Addr;
   readonly operation: InteractionOperation;
@@ -113,7 +111,6 @@ export interface InteractionPolicy {
   readonly defaultOperation?: 'allow' | 'deny';
   readonly selection?: boolean;
   readonly copy?: boolean;
-  readonly batchDenied?: BatchDeniedMode;
   /** A final synchronous restriction. It may deny a result, but never grant
    * an operation already denied by the policy. */
   readonly restrict?: (
@@ -150,13 +147,7 @@ export type HostCellChangeInput =
   | { readonly addr: CellInput; readonly input: string }
   | { readonly addr: CellInput; readonly value: CellValue; readonly formula?: string | null };
 
-export type CellBatchOperation =
-  | 'valueEdit'
-  | 'formulaEdit'
-  | 'clear'
-  | 'paste'
-  | 'fill'
-  | 'moveCells';
+export type CellBatchOperation = 'valueEdit' | 'formulaEdit' | 'clear' | 'paste' | 'fill';
 
 export interface CellBatchCommand {
   readonly type: 'cellBatch';
@@ -164,21 +155,105 @@ export interface CellBatchCommand {
   readonly origin: InteractionOrigin;
   readonly commandId?: string;
   readonly changes: readonly CellChangeInput[];
-  readonly denied?: BatchDeniedMode;
 }
 
+/** The refusal that decided a batch: the cell it fell on (`null` when it concerns no single
+ *  cell), its code and why. */
 export interface BatchRejection {
+  readonly sheet: number | null;
+  readonly at: CellAddress | null;
+  readonly code: PermissionCode;
+  readonly reason: string;
+}
+
+/** A cell a batch wrote. */
+export interface BatchCell {
+  readonly sheet: number;
+  readonly at: CellAddress;
+}
+
+/**
+ * The outcome of every write of many cells, all or nothing: `applied`, or `refused` with nothing
+ * written and the one refusal that decided it in `rejections`.
+ */
+export interface ChangeBatchResult {
+  readonly status: 'applied' | 'refused';
+  /**
+   * The cells whose content actually changed, bounded by the data. A cell written with the
+   * content it already had lies inside `range` but is not listed here.
+   */
+  readonly applied: readonly BatchCell[];
+  readonly rejections: readonly BatchRejection[];
+  /**
+   * The rectangle the batch wrote: the target of a paste or fill, whole rows or columns
+   * included; the bounding box of the cells a sparse batch targeted. `null` when refused, when
+   * nothing was targeted, or when the targets span more than one sheet.
+   */
+  readonly range: Range | null;
+}
+
+/** A refusal before it is reported: the cell it fell on, if any. */
+export interface CellRefusal {
   readonly addr?: Addr;
   readonly code: PermissionCode;
   readonly reason?: string;
 }
 
-export interface ChangeBatchResult {
-  readonly status: 'applied' | 'rejected' | 'noop';
-  readonly applied: readonly Addr[];
-  readonly rejected: readonly BatchRejection[];
-  readonly revision: number;
-}
+/** The rectangle around `cells`, or null when there are none or they span sheets. */
+export const boundingRange = (cells: readonly Addr[]): Range | null => {
+  const [first] = cells;
+  if (!first) return null;
+  const range = { sheet: first.sheet, r0: first.row, c0: first.col, r1: first.row, c1: first.col };
+  for (const { sheet, row, col } of cells) {
+    if (sheet !== range.sheet) return null;
+    range.r0 = Math.min(range.r0, row);
+    range.c0 = Math.min(range.c0, col);
+    range.r1 = Math.max(range.r1, row);
+    range.c1 = Math.max(range.c1, col);
+  }
+  return range;
+};
+
+/** The result of a batch over `range` that changed `cells`. */
+export const appliedBatch = (cells: readonly Addr[], range: Range | null): ChangeBatchResult => ({
+  status: 'applied',
+  applied: cells.map(({ sheet, row, col }) => ({ sheet, at: { row, col } })),
+  rejections: [],
+  range,
+});
+
+/** Run `write` on `wb` as a batch over `range`: refused when it returns false, else applied with
+ *  the cells whose content it changed. */
+export const trackedBatch = (
+  wb: WorkbookHandle,
+  range: Range | null,
+  write: () => boolean,
+  refusal: CellRefusal = { code: 'invalid' },
+): ChangeBatchResult => {
+  const { value, changed } = wb.trackChangedCells(write);
+  return value ? appliedBatch(changed, range) : refusedBatch(refusal);
+};
+
+/** The result of a batch `refusal` refused: nothing written. */
+export const refusedBatch = (refusal: CellRefusal): ChangeBatchResult => ({
+  status: 'refused',
+  applied: [],
+  rejections: [
+    {
+      sheet: refusal.addr?.sheet ?? null,
+      at: refusal.addr ? { row: refusal.addr.row, col: refusal.addr.col } : null,
+      code: refusal.code,
+      reason: refusal.reason ?? refusal.code,
+    },
+  ],
+  range: null,
+});
+
+/** The result of a batch refused by `decision`. */
+export const refusedByDecision = (
+  decision: Extract<PermissionDecision, { allowed: false }>,
+): ChangeBatchResult =>
+  refusedBatch({ addr: decision.addr, code: decision.code, reason: decision.reason });
 
 const MUTATING_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'valueEdit',
@@ -186,7 +261,6 @@ const MUTATING_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'clear',
   'paste',
   'fill',
-  'moveCells',
   'format',
   'insertRows',
   'deleteRows',
@@ -340,7 +414,6 @@ export function viewerPolicy(): InteractionPolicy {
     defaultOperation: 'deny',
     selection: true,
     copy: true,
-    batchDenied: 'reject',
   };
 }
 
@@ -361,6 +434,5 @@ export function fixedFormPolicy(editable: EditableCells): InteractionPolicy {
     },
     selection: true,
     copy: true,
-    batchDenied: 'reject',
   };
 }

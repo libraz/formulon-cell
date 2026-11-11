@@ -1,8 +1,16 @@
 import type { Value } from '@libraz/formulon';
 import type {
+  applyPasteSpecial,
+  BatchRejection,
+  ChangeBatchResult,
   CommandId,
   DialogId,
   Disposer,
+  InteractionOperation,
+  InteractionPolicy,
+  importCSV,
+  LegacySpreadsheetInstance,
+  pasteLink,
   SaveResult,
   Sheet,
   SheetPrintDocument,
@@ -104,5 +112,32 @@ describe('types', () => {
       format?: 'xlsx' | 'xlsb';
       host?: HTMLElement;
     }>();
+  });
+
+  it('keeps batches all or nothing: no partial result, skip mode or moveCells operation', () => {
+    type FacadeStatus = ReturnType<SpreadsheetInstance['applyChanges']>['status'];
+    expectTypeOf<FacadeStatus>().toEqualTypeOf<'applied' | 'refused'>();
+    expectTypeOf<ReturnType<Sheet['importCsv']>['status']>().toEqualTypeOf<FacadeStatus>();
+    expectTypeOf<ChangeBatchResult['status']>().toEqualTypeOf<'applied' | 'refused'>();
+    expectTypeOf<Extract<InteractionOperation, 'moveCells'>>().toEqualTypeOf<never>();
+    // One shape for every batch of cell writes, refusals included.
+    expectTypeOf<
+      ReturnType<SpreadsheetInstance['applyChanges']>
+    >().toEqualTypeOf<ChangeBatchResult>();
+    expectTypeOf<ReturnType<Sheet['importCsv']>>().toEqualTypeOf<ChangeBatchResult>();
+    expectTypeOf<ReturnType<typeof importCSV>>().toEqualTypeOf<ChangeBatchResult>();
+    expectTypeOf<ChangeBatchResult['rejections'][number]>().toEqualTypeOf<BatchRejection>();
+    expectTypeOf<keyof ChangeBatchResult>().toEqualTypeOf<
+      'status' | 'applied' | 'rejections' | 'range'
+    >();
+    expectTypeOf<
+      ReturnType<LegacySpreadsheetInstance['pasteSpecial']>
+    >().toEqualTypeOf<ChangeBatchResult>();
+    expectTypeOf<
+      ReturnType<NonNullable<SpreadsheetInstance['clipboard']>['pasteSpecial']>
+    >().toEqualTypeOf<ChangeBatchResult>();
+    expectTypeOf<ReturnType<typeof applyPasteSpecial>>().toEqualTypeOf<ChangeBatchResult>();
+    expectTypeOf<ReturnType<typeof pasteLink>>().toEqualTypeOf<ChangeBatchResult>();
+    expectTypeOf<Extract<keyof InteractionPolicy, 'batchDenied'>>().toEqualTypeOf<never>();
   });
 });

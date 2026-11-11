@@ -1,4 +1,5 @@
-import { hyperlinkOperation, hyperlinkWrite } from './hyperlink-actions.js';
+import { authorizedBatch, type RefusedDecision } from './authorized-write.js';
+import { hyperlinkIntents, hyperlinkOperation } from './hyperlink-actions.js';
 // Shared "Clear" ribbon split-button action — invoked by every host wrapper.
 // The command owns selection planning, policy preflight, sparse metadata
 // mutation, and the history boundary so all ribbon hosts have the same
@@ -20,6 +21,7 @@ import {
   type ClearContentsCommands,
   clearSelectedContents,
   collectSelectedContentAddresses,
+  selectionBounds,
 } from './clear-contents.js';
 import {
   clearComments,
@@ -28,7 +30,7 @@ import {
   recordThreadedChange,
   removeThreadedComment,
 } from './comment.js';
-import { type CommentActionContext, commentWrite, threadWrite } from './comment-actions.js';
+import { type CommentActionContext, commentIntents, threadWrite } from './comment-actions.js';
 import { withSelectionFormatOrigin } from './format.js';
 import type { History, HistoryEntry } from './history.js';
 import type { InteractionController } from './interaction-controller.js';
@@ -36,10 +38,14 @@ import {
   InteractionController as FullInteractionController,
   interactionControllerFor,
 } from './interaction-controller.js';
-import type {
-  InteractionOperation,
-  InteractionOrigin,
-  OperationEffect,
+import {
+  appliedBatch,
+  type ChangeBatchResult,
+  type InteractionOperation,
+  type InteractionOrigin,
+  type OperationEffect,
+  refusedBatch,
+  refusedByDecision,
 } from './interaction-policy.js';
 import {
   isAllowedEditRangeOpen,
@@ -416,15 +422,17 @@ const effectsForCells = (
 const effectsForRanges = (ranges: readonly Range[]): readonly OperationEffect[] =>
   ranges.map((range) => ({ kind: 'range' as const, range }));
 
+/** The decision that refuses one category of a planned clear, or null. */
 const preflight = (
   controller: FullInteractionController | undefined,
   origin: InteractionOrigin,
   operation: InteractionOperation,
   commandId: string,
   effects: readonly OperationEffect[],
-): boolean => {
-  if (!controller || effects.length === 0 || !controller.policy) return true;
-  return controller.canExecute({ operation, origin, commandId, effects }).allowed;
+): RefusedDecision | null => {
+  if (!controller || effects.length === 0 || !controller.policy) return null;
+  const decision = controller.canExecute({ operation, origin, commandId, effects });
+  return decision.allowed ? null : decision;
 };
 
 const resolveTransactionController = (
@@ -455,41 +463,27 @@ const resolveTransactionController = (
   return { controller, mismatch: false, ephemeral: true };
 };
 
+/** The decision that refuses the planned clear under the host policy, or null. */
 const preflightPlan = (
   deps: ExecuteRibbonClearActionDeps,
   plan: SelectionClearPlan,
   controller: FullInteractionController | undefined,
   origin: InteractionOrigin,
   commandId: string,
-): boolean => {
-  if (!controller?.policy) return true;
-  if (!preflight(controller, origin, 'clear', commandId, effectsForCells(plan.content))) {
-    return false;
-  }
-  if (!preflight(controller, origin, 'comment', commandId, effectsForCells(plan.comments)))
-    return false;
-  if (
-    !preflight(
-      controller,
-      origin,
-      hyperlinkOperation(true),
-      commandId,
-      effectsForCells(plan.hyperlinks),
+): RefusedDecision | null => {
+  if (!controller?.policy) return null;
+  const check = (operation: InteractionOperation, effects: readonly OperationEffect[]) =>
+    preflight(controller, origin, operation, commandId, effects);
+  return (
+    check('clear', effectsForCells(plan.content)) ??
+    check('comment', effectsForCells(plan.comments)) ??
+    check(hyperlinkOperation(true), effectsForCells(plan.hyperlinks)) ??
+    check('validation', effectsForCells(plan.validations)) ??
+    check('format', effectsForCells(plan.formatEntries)) ??
+    check(
+      'format',
+      effectsForRanges(rangesForRuleIndexes(deps.store.getState(), plan.conditionalRuleIndexes)),
     )
-  ) {
-    return false;
-  }
-  if (!preflight(controller, origin, 'validation', commandId, effectsForCells(plan.validations)))
-    return false;
-  if (!preflight(controller, origin, 'format', commandId, effectsForCells(plan.formatEntries))) {
-    return false;
-  }
-  return preflight(
-    controller,
-    origin,
-    'format',
-    commandId,
-    effectsForRanges(rangesForRuleIndexes(deps.store.getState(), plan.conditionalRuleIndexes)),
   );
 };
 
@@ -498,8 +492,8 @@ const clearSelectedThreads = (
   ctx: CommentActionContext,
   workbook: WorkbookHandle,
   plan: SelectionClearPlan,
-): void => {
-  if (!workbook.capabilities.threadedComments) return;
+): boolean => {
+  if (!workbook.capabilities.threadedComments) return false;
   const { sheet } = plan;
   const threads = listThreadedComments(ctx.store, sheet, workbook).filter((entry) =>
     plan.ranges.some(
@@ -510,9 +504,9 @@ const clearSelectedThreads = (
         entry.cell.col <= Math.max(range.c0, range.c1),
     ),
   );
-  if (threads.length === 0) return;
+  if (threads.length === 0) return false;
   const cells = threads.map((entry) => ({ sheet, row: entry.cell.row, col: entry.cell.col }));
-  threadWrite(ctx, cells, undefined, () =>
+  return threadWrite(ctx, cells, false, () => {
     recordThreadedChange(
       ctx.history,
       ctx.store,
@@ -525,17 +519,21 @@ const clearSelectedThreads = (
           removeThreadedComment(ctx.store, sheet, entry.id, workbook, ctx);
       },
       ctx,
-    ),
-  );
+    );
+    return true;
+  });
 };
 
 const refreshCells = (store: SpreadsheetStore, workbook: WorkbookHandle, sheet: number): void => {
   mutators.replaceCells(store, workbook.cells(sheet));
 };
 
-export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): void => {
+/** A Home ribbon Clear action, as one batch result: `range` is the selection, `applied` the cells
+ *  whose content it changed (none for the clears that leave content as it is). */
+export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): ChangeBatchResult => {
   const { store, workbook, history, action } = deps;
   const origin = deps.entry?.origin ?? 'ribbon';
+  const selected = selectionBounds(store.getState());
 
   // Contents keeps its public command adapter behavior. Clear All runs its
   // content child through the resolved controller inside one History step.
@@ -549,16 +547,17 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       origin,
       ...(deps.entry ? { commandId: deps.entry.commandId } : {}),
     });
-    if (result.status !== 'rejected') refreshCells(store, workbook, range.sheet);
-    return;
+    if (result.status !== 'refused') refreshCells(store, workbook, range.sheet);
+    return result;
   }
 
   const resolved = resolveTransactionController(deps, action === 'all');
-  if (resolved.mismatch) return;
+  if (resolved.mismatch)
+    return refusedBatch({ code: 'invalid', reason: 'the commands do not belong to this store' });
   const plan = buildPlan(store, workbook);
   if (!plan) {
     if (resolved.ephemeral) resolved.controller?.dispose();
-    return;
+    return refusedBatch({ code: 'invalid', reason: 'the selection cannot be cleared' });
   }
 
   const controller = resolved.controller;
@@ -618,10 +617,12 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
           : action === 'hyperlinks'
             ? 'clear-hyperlinks'
             : 'clear-conditional');
-  if (!preflightPlan(deps, policyPlan, controller, origin, commandId)) {
+  const refusal = preflightPlan(deps, policyPlan, controller, origin, commandId);
+  if (refusal) {
     if (resolved.ephemeral) controller?.dispose();
-    return;
+    return refusedByDecision(refusal);
   }
+  const unchangedContent = appliedBatch([], selected);
 
   try {
     if (action === 'formats') {
@@ -641,38 +642,49 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
           ),
         { repeat: () => executeRibbonClearAction(deps) },
       );
-      return;
+      return unchangedContent;
     }
     if (action === 'comments') {
       // A protected sheet keeps its notes unless Edit objects is on; it never keeps threads.
       const notes = plan.comments.filter((addr) => noteChangePermitted(store.getState(), addr));
       const ctx = { store, history, origin, commandId };
-      commentWrite(ctx, notes, undefined, () =>
-        recordCommentChange(history, store, workbook, notes, () => {
-          clearComments(store, notes, workbook);
-        }),
-      );
-      clearSelectedThreads(ctx, workbook, plan);
-      return;
+      const noteResult =
+        notes.length === 0
+          ? unchangedContent
+          : authorizedBatch({
+              store,
+              history,
+              intents: commentIntents(ctx, notes, false),
+              origin,
+              write: () => {
+                recordCommentChange(history, store, workbook, notes, () => {
+                  clearComments(store, notes, workbook);
+                });
+                return unchangedContent;
+              },
+            });
+      return clearSelectedThreads(ctx, workbook, plan) ? unchangedContent : noteResult;
     }
     if (action === 'hyperlinks') {
-      hyperlinkWrite(
-        { store, history, workbook, origin, commandId },
-        plan.hyperlinks,
-        undefined,
-        () =>
+      if (plan.hyperlinks.length === 0) return unchangedContent;
+      return authorizedBatch({
+        store,
+        history,
+        intents: hyperlinkIntents({ commandId }, plan.hyperlinks, true),
+        origin,
+        write: () => {
           recordClearFormatEntries(history, store, workbook, plan.sheet, plan.hyperlinks, () => {
             clearPlannedHyperlinks(store, plan);
-          }),
-        true,
-      );
-      return;
+          });
+          return unchangedContent;
+        },
+      });
     }
     if (action === 'conditional') {
       recordConditionalRulesChange(history, store, () => {
         clearPlannedConditionalRules(store, plan);
       });
-      return;
+      return unchangedContent;
     }
 
     const token = history.begin();
@@ -685,10 +697,10 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
         origin,
         commandId,
       });
-      if (result.status === 'rejected') {
+      if (result.status === 'refused') {
         history.abort(token);
         refreshCells(store, workbook, plan.sheet);
-        return;
+        return result;
       }
 
       // Clear All removes the sparklines of the cleared, unlocked cells (read before the formats reset
@@ -733,6 +745,7 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
 
       refreshCells(store, workbook, plan.sheet);
       history.end(token);
+      return result;
     } catch (error) {
       try {
         history.abort(token);

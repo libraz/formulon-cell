@@ -66,7 +66,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
 
     const history = new History();
     wb.attachHistory(history);
-    expect(insertCopiedBand(store, wb, history, snapshot)?.writtenRange).toEqual(colRange(1));
+    expect(insertCopiedBand(store, wb, history, snapshot).range).toEqual(colRange(1));
     wb.recalc();
 
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 7 });
@@ -131,7 +131,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
       const result = insertCopiedBand(store, wb, history, snapshot);
       unsubscribe();
 
-      expect(result).toBeNull();
+      expect(result.status).toBe('refused');
       expect(triggered).toBe(true);
       expect(wb.getValue({ sheet: 0, row: 0, col: 3 })).toEqual({ kind: 'number', value: 7 });
       expect(wb.getValue({ sheet: 0, row: 0, col: 4 })).toEqual({ kind: 'number', value: 8 });
@@ -164,7 +164,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
 
     const history = new History();
     wb.attachHistory(history);
-    expect(insertCopiedBand(store, wb, history, snapshot)?.writtenRange).toEqual(rowRange(1));
+    expect(insertCopiedBand(store, wb, history, snapshot).range).toEqual(rowRange(1));
     wb.recalc();
     expect(wb.cellFormula({ sheet: 0, row: 1, col: 0 })).toBe('=A1');
     expect(wb.cellFormula({ sheet: 0, row: 4, col: 0 })).toBe('=A2');
@@ -205,9 +205,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
 
     const history = new History();
     wb.attachHistory(history);
-    expect(insertCopiedBand(store, wb, history, snapshot)?.writtenRange).toEqual(
-      colRange(3, targetSheet),
-    );
+    expect(insertCopiedBand(store, wb, history, snapshot).range).toEqual(colRange(3, targetSheet));
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
     expect(wb.getValue({ sheet: targetSheet, row: 0, col: 3 })).toEqual({
@@ -244,7 +242,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
     mutators.selectCol(store, 4);
     const rejectedHistory = new History();
     wb.attachHistory(rejectedHistory);
-    expect(insertCopiedBand(store, wb, rejectedHistory, partialSnapshot)).toBeNull();
+    expect(insertCopiedBand(store, wb, rejectedHistory, partialSnapshot).status).toBe('refused');
     expect(wb.getMerges(0)).toContainEqual(partialSourceMerge);
     expect(rejectedHistory.canUndo()).toBe(false);
 
@@ -292,7 +290,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
     wb.attachHistory(history);
     const result = insertCopiedBand(store, wb, history, snapshot);
 
-    expect(result?.writtenRange).toEqual(colRange(1));
+    expect(result.range).toEqual(colRange(1));
     wb.recalc();
     expect(wb.cellFormula({ sheet: 0, row: 4, col: 1 })).toBe('=$F5');
     expect(wb.cellFormula({ sheet: 0, row: 4, col: 4 })).toBe('=$F5');
@@ -325,7 +323,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
     wb.attachHistory(history);
     const cells = vi.spyOn(wb, 'cells');
 
-    expect(insertCopiedBand(store, wb, history, snapshot)).toBeNull();
+    expect(insertCopiedBand(store, wb, history, snapshot).status).toBe('refused');
     expect(cells).not.toHaveBeenCalled();
     expect(history.canUndo()).toBe(false);
   });
@@ -371,7 +369,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
 
     const history = new History();
     wb.attachHistory(history);
-    expect(insertCopiedBand(store, wb, history, snapshot)?.writtenRange).toEqual(rowRange(1));
+    expect(insertCopiedBand(store, wb, history, snapshot).range).toEqual(rowRange(1));
     wb.recalc();
     expect(wb.cellFormula({ sheet: 0, row: 1, col: 9 })).toBe('=J$6');
     expect(wb.cellFormula({ sheet: 0, row: 4, col: 9 })).toBe('=J$6');
@@ -448,7 +446,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
     const history = new History();
     wb.attachHistory(history);
 
-    expect(insertCopiedBand(store, wb, history, snapshot)).toBeNull();
+    expect(insertCopiedBand(store, wb, history, snapshot).status).toBe('refused');
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'A' });
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: 'B' });
     expect(history.canUndo()).toBe(false);
@@ -470,14 +468,14 @@ describe('native Insert Copied Cells whole-band parity', () => {
     const history = new History();
     wb.attachHistory(history);
 
-    expect(insertCopiedBand(store, wb, history, snapshot)).toBeNull();
+    expect(insertCopiedBand(store, wb, history, snapshot).status).toBe('refused');
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'keep' });
     expect(history.canUndo()).toBe(false);
 
     const outsideLogical = { ...snapshot, range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 } };
-    expect(insertCopiedBand(store, wb, history, outsideLogical)).toBeNull();
+    expect(insertCopiedBand(store, wb, history, outsideLogical).status).toBe('refused');
     const missingMatrix = { ...snapshot, merges: undefined, cells: [] };
-    expect(insertCopiedBand(store, wb, history, missingMatrix)).toBeNull();
+    expect(insertCopiedBand(store, wb, history, missingMatrix).status).toBe('refused');
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'keep' });
     expect(history.canUndo()).toBe(false);
   });
@@ -496,7 +494,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
     const history = new History();
     wb.attachHistory(history);
 
-    expect(insertCopiedBand(store, wb, history, snapshot)).toBeNull();
+    expect(insertCopiedBand(store, wb, history, snapshot).status).toBe('refused');
     expect(wb.getComment(0, MAX_ROW, 0)).toEqual({ author: 'author', text: 'tail' });
     expect(history.canUndo()).toBe(false);
 
@@ -512,7 +510,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
     };
     const colHistory = new History();
     wb.attachHistory(colHistory);
-    expect(insertCopiedBand(store, wb, colHistory, colSnapshot)).toBeNull();
+    expect(insertCopiedBand(store, wb, colHistory, colSnapshot).status).toBe('refused');
     expect(wb.getComment(0, 0, MAX_COL)).toEqual({
       author: 'column-author',
       text: 'column-tail',
@@ -535,7 +533,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
     mutators.selectRow(store, MAX_ROW - 1);
     const rowHistory = new History();
     wb.attachHistory(rowHistory);
-    expect(insertCopiedBand(store, wb, rowHistory, twoRows)).toBeNull();
+    expect(insertCopiedBand(store, wb, rowHistory, twoRows).status).toBe('refused');
     expect(rowHistory.canUndo()).toBe(false);
 
     const twoCols = {
@@ -554,7 +552,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
     mutators.selectCol(store, MAX_COL - 1);
     const colHistory = new History();
     wb.attachHistory(colHistory);
-    expect(insertCopiedBand(store, wb, colHistory, twoCols)).toBeNull();
+    expect(insertCopiedBand(store, wb, colHistory, twoCols).status).toBe('refused');
     expect(colHistory.canUndo()).toBe(false);
   });
 
@@ -579,9 +577,7 @@ describe('native Insert Copied Cells whole-band parity', () => {
     mutators.selectCol(store, 1);
     const history = new History();
     wb.attachHistory(history);
-    expect(insertCopiedBand(store, wb, history, snapshot)?.writtenRange).toEqual(
-      colRange(1, targetSheet),
-    );
+    expect(insertCopiedBand(store, wb, history, snapshot).range).toEqual(colRange(1, targetSheet));
 
     expect(wb.getMerges(0)).toEqual([sourceMerge]);
     expect(wb.getMerges(targetSheet)).toContainEqual({

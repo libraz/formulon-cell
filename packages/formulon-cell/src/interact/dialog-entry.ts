@@ -1,5 +1,6 @@
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { InteractionOrigin } from '../commands/interaction-policy.js';
+import { type ChangeBatchResult, refusedBatch } from '../commands/interaction-policy.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { TabId } from './format-dialog-model.js';
 import type { PageSetupDialogTab } from './page-setup-dialog.js';
@@ -59,6 +60,12 @@ export const INSTANCE_API_COMMENT_ENTRY: DialogEntry = {
   commandId: 'newCommentReview',
 };
 
+/** The result of Paste Special on an instance without its dialog. */
+export const PASTE_SPECIAL_UNAVAILABLE: ChangeBatchResult = refusedBatch({
+  code: 'invalid',
+  reason: 'Paste Special is not available',
+});
+
 /** The entry of a Paste Special open or apply through the public instance methods. */
 export const INSTANCE_API_PASTE_SPECIAL_ENTRY: DialogEntry = {
   origin: 'instanceApi',
@@ -85,7 +92,7 @@ export interface DialogOpeners {
   ) => void;
   readonly commentDialog: (mode: 'note' | 'thread' | undefined, entry: DialogEntry) => void;
   readonly pasteSpecialDialog: (entry: DialogEntry) => void;
-  readonly pasteSpecial: (options: PasteSpecialOptions, entry: DialogEntry) => boolean;
+  readonly pasteSpecial: (options: PasteSpecialOptions, entry: DialogEntry) => ChangeBatchResult;
   readonly insertCopiedCells: (entry: DialogEntry) => void;
 }
 
@@ -162,8 +169,8 @@ export function applyPasteSpecialFrom(
   store: SpreadsheetStore,
   options: PasteSpecialOptions,
   entry: DialogEntry,
-): boolean {
-  return openers.get(store)?.pasteSpecial(options, entry) ?? false;
+): ChangeBatchResult {
+  return openers.get(store)?.pasteSpecial(options, entry) ?? PASTE_SPECIAL_UNAVAILABLE;
 }
 
 /** Run Insert Copied Cells on behalf of an internal UI entry point. */

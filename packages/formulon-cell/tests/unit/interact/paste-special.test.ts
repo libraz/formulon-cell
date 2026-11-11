@@ -198,8 +198,8 @@ describe('attachPasteSpecial', () => {
         operation: 'none',
         skipBlanks: false,
         transpose: false,
-      }),
-    ).toBe(true);
+      }).status,
+    ).toBe('applied');
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 6, col: 6 })).toEqual({ kind: 'number', value: 11 });
     expect(onAfterCommit).toHaveBeenCalledTimes(1);
@@ -222,8 +222,8 @@ describe('attachPasteSpecial', () => {
         operation: 'none',
         skipBlanks: false,
         transpose: false,
-      }),
-    ).toBe(false);
+      }).status,
+    ).toBe('refused');
     expect(onAfterCommit).not.toHaveBeenCalled();
     handle.detach();
   });
@@ -757,8 +757,8 @@ describe('attachPasteSpecial', () => {
       handle.apply(
         { what: 'values', operation: 'none', skipBlanks: false, transpose: false },
         { snapshot: ribbonSnap },
-      ),
-    ).toBe(true);
+      ).status,
+    ).toBe('applied');
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 8, col: 8 })).toEqual({ kind: 'number', value: 13 });
     expect(onAfterCommit).toHaveBeenCalledTimes(1);

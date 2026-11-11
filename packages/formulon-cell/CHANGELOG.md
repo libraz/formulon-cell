@@ -28,6 +28,21 @@ versioning is [SemVer](https://semver.org/).
 - Formulas that refer to a deleted range on another sheet keep the sheet qualifier (`=Sheet1!#REF!`), and structured references read back in their short form (`=[@Qty]*10`), both as the desktop app shows them.
 - Legacy array (Ctrl+Shift+Enter) formulas are no longer outlined as spill ranges.
 - XLSB saves keep pictures, charts and shapes.
+- **Breaking:** `applyChanges` is all or nothing: when any change is refused, nothing is written and the result carries the one refusal.
+- **Breaking:** `applyChanges` is decided by the interaction policy and sheet protection whatever its history mode, `'reset'` included. Ungated writes go through the Sheet facade's setters and `Sheet.importCsv`.
+- **Breaking:** `importCSV` takes the store instead of its state, and is one write decided by the interaction policy and sheet protection: it writes nothing when any target cell is refused. `Sheet.importCsv` is host code and writes every field, protected sheet or not.
+- **Breaking:** One `ChangeBatchResult` for every batch of cell writes: `status` is `'applied'` or `'refused'`, `applied` lists the `{ sheet, at }` cells whose content changed, and `rejections` holds the one `BatchRejection { sheet, at, code, reason }` that refused it, with `sheet` and `at` `null` when no single cell decided it. The interaction controller's results take this shape, and `rejected` becomes `rejections`.
+- `ChangeBatchResult.range`: the rectangle a batch wrote (the target of a paste or fill, whole rows or columns included; the bounding box of a sparse batch), `null` when refused or across sheets. A cell written with its existing content lies inside `range` but is not in `applied`.
+- **Breaking:** `ChangeBatchResult` has no `revision`; read `InteractionController.revision`.
+- **Breaking:** `ChangeBatchResult` has no `'noop'` status: a batch that changes nothing is `'applied'` with an empty `applied`.
+- **Breaking:** `ChangeBatchResult` has no `'rejected'` status: a refused batch is `'refused'`.
+- **Breaking:** `importCSV` returns a `ChangeBatchResult` instead of `ImportResult | null`; `ImportResult` is removed.
+- **Breaking:** `applyPasteSpecial` returns a `ChangeBatchResult` instead of `PasteSpecialResult | null`; `PasteSpecialResult` is removed.
+- **Breaking:** `pasteLink` returns a `ChangeBatchResult` instead of `PasteSpecialResult | null`.
+- **Breaking:** `SpreadsheetInstance.pasteSpecial` (mount instance) returns a `ChangeBatchResult` instead of a boolean.
+- **Breaking:** The instance facade's `clipboard.pasteSpecial` returns a `ChangeBatchResult` instead of a boolean.
+- **Breaking:** `InteractionPolicy.batchDenied` and `BatchDeniedMode` are removed; a cell batch is refused as a whole by its first refused cell.
+- **Breaking:** The `moveCells` interaction operation is removed. Cut, drag-move and Insert Copied Cells are decided as the paste and insert they perform.
 
 ### Added
 

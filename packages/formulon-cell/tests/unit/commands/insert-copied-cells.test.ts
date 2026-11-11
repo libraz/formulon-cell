@@ -62,7 +62,7 @@ describe('insertCopiedCellsFromTSV', () => {
 
     const result = insertCopiedCellsFromTSV(store, wb, null, 'x\ty', 'down');
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 });
+    expect(result.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 });
     expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'x' });
     expect(wb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({ kind: 'text', value: 'y' });
     expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'text', value: 'B2' });
@@ -120,7 +120,7 @@ describe('insertCopiedCellsFromTSV', () => {
 
     const result = insertCopiedCellsFromTSV(store, wb, null, 'x', 'down');
 
-    expect(result).toBeNull();
+    expect(result.status).toBe('refused');
     expect(warn).toHaveBeenCalledWith(
       'formulon-cell: insert copied cells blocked — merge would be split',
     );
@@ -203,7 +203,9 @@ describe('insertCopiedCellsFromTSV', () => {
       mode: 'copy',
     };
 
-    expect(insertCopiedCellsFromTSV(store, wb, null, '', 'down', hugeSnapshot)).toBeNull();
+    expect(insertCopiedCellsFromTSV(store, wb, null, '', 'down', hugeSnapshot).status).toBe(
+      'refused',
+    );
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'keep' });
   });
 

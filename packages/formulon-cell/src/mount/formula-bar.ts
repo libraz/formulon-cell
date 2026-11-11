@@ -742,16 +742,15 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         operation: batch.operation,
         origin: 'formulaBar',
         changes: batch.changes,
-        denied: 'reject',
       });
     } catch (err) {
       console.warn('formulon-cell: formula-bar selection fill failed', err);
       showCommitFailure('The selected cells could not be filled.');
       return;
     }
-    if (result.status === 'rejected') {
+    if (result.status === 'refused') {
       showCommitFailure(
-        result.rejected[0]?.reason ?? `The ${batch.operation} operation was rejected.`,
+        result.rejections[0]?.reason ?? `The ${batch.operation} operation was rejected.`,
       );
       return;
     }

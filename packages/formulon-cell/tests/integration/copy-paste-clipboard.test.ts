@@ -68,7 +68,7 @@ describe('integration: clipboard copy → paste', () => {
   it('refuses to paste empty payload', () => {
     const { instance, workbook } = sheet;
     const res = pasteTSV(instance.store.getState(), instance.store, workbook, '');
-    expect(res).toBeNull();
+    expect(res.status).toBe('refused');
   });
 
   it('a 1M-cell range is refused (OOM guard)', () => {

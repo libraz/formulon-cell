@@ -1,4 +1,4 @@
-import { pasteWrite } from '../commands/clipboard/paste-actions.js';
+import { pasteBatchWrite } from '../commands/clipboard/paste-actions.js';
 import {
   type PasteOperation,
   type PasteSpecialOptions,
@@ -9,6 +9,7 @@ import {
 } from '../commands/clipboard/paste-special.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
+import { type ChangeBatchResult, refusedBatch } from '../commands/interaction-policy.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -56,7 +57,11 @@ export interface PasteSpecialOpenOptions {
 export interface PasteSpecialHandle {
   /** `entry` is the UI entry point the paste runs as; omitted, the instance API. */
   open(opts?: PasteSpecialOpenOptions, entry?: DialogEntry): void;
-  apply(options: PasteSpecialOptions, opts?: PasteSpecialOpenOptions, entry?: DialogEntry): boolean;
+  apply(
+    options: PasteSpecialOptions,
+    opts?: PasteSpecialOpenOptions,
+    entry?: DialogEntry,
+  ): ChangeBatchResult;
   close(): void;
   detach(): void;
 }
@@ -212,24 +217,23 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const runPaste = (
     snap: ClipboardSnapshot,
     transpose: boolean,
-    paste: () => ReturnType<typeof pasteSpecial>,
+    paste: () => ChangeBatchResult,
     retry: () => void,
     columnWidths = false,
-  ): boolean => {
+  ): ChangeBatchResult => {
     const state = store.getState();
     const destination = resolvePasteDestination(state, snap, transpose);
     if (destination && deferForAllowedRangeUnlock(store, [destination], retry)) {
-      return false;
+      return refusedBatch({ code: 'protected', reason: 'the destination waits for its password' });
     }
     const ctx = { store, history, ...entry };
-    const result = pasteWrite(
+    const result = pasteBatchWrite(
       ctx,
       columnWidths
         ? { destination: null }
         : { destination, cutSource: snap.mode === 'cut' ? snap.range : null },
-      null,
       () => {
-        let written: ReturnType<typeof pasteSpecial> = null;
+        let written = refusedBatch({ code: 'invalid' });
         recordFormatChange(history, store, () => {
           written = paste();
         });
@@ -247,8 +251,8 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
           ]
         : undefined,
     );
-    if (result) deps.onAfterCommit();
-    return !!result;
+    if (result.status === 'applied') deps.onAfterCommit();
+    return result;
   };
 
   const currentSnapshot = (openOpts?: PasteSpecialOpenOptions): ClipboardSnapshot | null =>
@@ -258,10 +262,10 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     opts: PasteSpecialOptions,
     openOpts?: PasteSpecialOpenOptions,
     from?: DialogEntry,
-  ): boolean => {
+  ): ChangeBatchResult => {
     if (from) entry = from;
     const snap = currentSnapshot(openOpts);
-    if (!snap) return false;
+    if (!snap) return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
     return runPaste(
       snap,
       opts.transpose,
@@ -271,9 +275,9 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     );
   };
 
-  const applyLink = (): boolean => {
+  const applyLink = (): ChangeBatchResult => {
     const snap = currentSnapshot();
-    if (!snap) return false;
+    if (!snap) return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
     return runPaste(
       snap,
       false,

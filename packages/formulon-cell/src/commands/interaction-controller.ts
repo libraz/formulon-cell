@@ -39,10 +39,10 @@ import {
   mergeCellsFor,
 } from './interaction-effects.js';
 import type {
-  BatchRejection,
   CellBatchCommand,
   CellBatchOperation,
   CellChangeInput,
+  CellRefusal,
   ChangeBatchResult,
   HostCellChangeInput,
   InteractionOrigin,
@@ -50,7 +50,12 @@ import type {
   OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
-import { validateInteractionPolicy } from './interaction-policy.js';
+import {
+  appliedBatch,
+  boundingRange,
+  refusedBatch,
+  validateInteractionPolicy,
+} from './interaction-policy.js';
 import {
   changedFormatAddresses,
   type PreparedChange,
@@ -68,7 +73,6 @@ const CELL_OPERATIONS: ReadonlySet<CellBatchOperation> = new Set([
   'clear',
   'paste',
   'fill',
-  'moveCells',
 ]);
 
 /** `EffectiveStyleSource` ordinals from the native engine. A row/column
@@ -224,28 +228,16 @@ export class InteractionController {
     // a mutation result through the host's onChanged callback.
     interactionPolicyEpochs.set(this, interactionPolicyEpochFor(this) + 1);
     this.revisionValue += 1;
-    const update: ChangeBatchResult = {
-      status: 'noop',
-      applied: [],
-      rejected: [],
-      revision: this.revisionValue,
-    };
-    this.notifySubscribers(update);
+    this.notifySubscribers(appliedBatch([], null));
   }
 
   execute(command: CellBatchCommand): ChangeBatchResult {
-    const initial: ChangeBatchResult = {
-      status: 'noop',
-      applied: [],
-      rejected: [],
-      revision: this.revisionValue,
-    };
     if (this.disposed)
       return this.rejectResult([{ code: 'invalid', reason: 'controller is disposed' }]);
     if (command.type !== 'cellBatch' || !CELL_OPERATIONS.has(command.operation)) {
       return this.rejectResult([{ code: 'invalid', reason: 'unknown cell batch command' }]);
     }
-    if (command.changes.length === 0) return initial;
+    if (command.changes.length === 0) return appliedBatch([], null);
 
     let wb: WorkbookHandle;
     try {
@@ -256,7 +248,7 @@ export class InteractionController {
     const state = this.store.getState();
     const inputLocale = inputLocaleForWorkbook(wb);
     const prepared: PreparedChange[] = [];
-    const globalRejections: BatchRejection[] = [];
+    const globalRejections: CellRefusal[] = [];
     let includesFormula = false;
     let typedUrlCandidate: TypedUrlCandidate | undefined;
     for (const change of command.changes) {
@@ -330,53 +322,11 @@ export class InteractionController {
           .map((change) => change.patch.addr),
       ),
     };
-    const operationDecision = this.canExecute({ ...intent, effects: [{ kind: 'workbook' }] });
-    if (!operationDecision.allowed) return this.rejectResult([this.asRejection(operationDecision)]);
-    if (includesFormula && command.operation !== 'formulaEdit') {
-      const formulaDecision = this.canExecute({
-        operation: 'formulaEdit',
-        origin: command.origin,
-        commandId: command.commandId,
-        effects: [{ kind: 'workbook' }],
-      });
-      if (!formulaDecision.allowed) return this.rejectResult([this.asRejection(formulaDecision)]);
-    }
-
-    const denied = command.denied ?? this.authorizer.policy?.batchDenied ?? 'reject';
-    const eligible: PreparedChange[] = [];
-    const rejected: BatchRejection[] = [];
-    for (const change of prepared) {
-      const decision = this.canExecute({
-        ...intent,
-        effects: cellEffects(
-          [change.patch.addr],
-          change.patch.formula !== null ? [change.patch.addr] : [],
-        ),
-      });
-      if (decision.allowed) {
-        eligible.push(change);
-        continue;
-      }
-      const skippable = decision.code === 'cellIneligible' || decision.code === 'protected';
-      if (denied === 'skipIneligible' && skippable) {
-        rejected.push(this.asRejection(decision));
-      } else {
-        return this.rejectResult([this.asRejection(decision)]);
-      }
-    }
-    if (eligible.length === 0) return this.noopResult(rejected);
-    const committedIntent: OperationIntent = {
-      ...intent,
-      effects: cellEffects(
-        eligible.map((change) => change.patch.addr),
-        eligible
-          .filter((change) => change.patch.formula !== null)
-          .map((change) => change.patch.addr),
-      ),
-    };
+    const refusal = this.batchRefusal(intent, prepared, includesFormula);
+    if (refusal) return this.rejectResult([this.asRejection(refusal)]);
     const historyPlan = this.planHistory(
-      committedIntent,
-      eligible,
+      intent,
+      prepared,
       wb,
       false,
       this.authorizer.policy === undefined && command.operation === 'clear',
@@ -387,7 +337,7 @@ export class InteractionController {
       ? (applied: readonly Addr[]): void =>
           this.applyAutomaticHyperlink(wb, typedUrlCandidate as TypedUrlCandidate, applied)
       : undefined;
-    return this.commitPrepared(eligible, rejected, true, historyPlan.plan, beforeNotify);
+    return this.commitPrepared(prepared, true, historyPlan.plan, beforeNotify);
   }
 
   applyChanges(
@@ -406,7 +356,7 @@ export class InteractionController {
     const state = this.store.getState();
     const inputLocale = inputLocaleForWorkbook(wb);
     const prepared: PreparedChange[] = [];
-    const rejections: BatchRejection[] = [];
+    const rejections: CellRefusal[] = [];
     let includesFormula = false;
     for (const [index, hostChange] of changes.entries()) {
       let change: CellChangeInput;
@@ -444,6 +394,9 @@ export class InteractionController {
           .map((change) => change.patch.addr),
       ),
     };
+    // A host batch is gated as any batch, whatever its history mode: all or nothing.
+    const refusal = this.batchRefusal(intent, prepared, includesFormula);
+    if (refusal) return this.rejectResult([this.asRejection(refusal)]);
     let historyPlan: HistoryIntents | undefined;
     if (options.history === 'record') {
       const planned = this.planHistory(intent, prepared, wb, true);
@@ -453,11 +406,41 @@ export class InteractionController {
     const resetHistory = (options.history ?? 'reset') === 'reset';
     return this.commitPrepared(
       prepared,
-      [],
       options.history === 'record',
       historyPlan,
       resetHistory ? () => this.history.clear() : undefined,
     );
+  }
+
+  /** The decision that refuses a cell batch of `intent`, or null: the operation itself, formula
+   *  entry when it writes formulas, then each cell. All or nothing: the first refusal decides. */
+  private batchRefusal(
+    intent: OperationIntent,
+    prepared: readonly PreparedChange[],
+    includesFormula: boolean,
+  ): Extract<PermissionDecision, { allowed: false }> | null {
+    const operation = this.canExecute({ ...intent, effects: [{ kind: 'workbook' }] });
+    if (!operation.allowed) return operation;
+    if (includesFormula && intent.operation !== 'formulaEdit') {
+      const formula = this.canExecute({
+        operation: 'formulaEdit',
+        origin: intent.origin,
+        commandId: intent.commandId,
+        effects: [{ kind: 'workbook' }],
+      });
+      if (!formula.allowed) return formula;
+    }
+    for (const change of prepared) {
+      const decision = this.canExecute({
+        ...intent,
+        effects: cellEffects(
+          [change.patch.addr],
+          change.patch.formula !== null ? [change.patch.addr] : [],
+        ),
+      });
+      if (!decision.allowed) return decision;
+    }
+    return null;
   }
 
   subscribe(listener: (result: ChangeBatchResult) => void): () => void {
@@ -491,7 +474,7 @@ export class InteractionController {
     wb: WorkbookHandle,
     respectNavigationBounds: boolean,
     inputLocale?: string,
-  ): PreparedChange | { rejection: BatchRejection } {
+  ): PreparedChange | { rejection: CellRefusal } {
     const addr = change.addr;
     if (
       !Number.isInteger(addr.sheet) ||
@@ -820,7 +803,6 @@ export class InteractionController {
 
   private commitPrepared(
     prepared: readonly PreparedChange[],
-    rejected: readonly BatchRejection[],
     recordHistory = true,
     historyPlan?: HistoryIntents,
     beforeNotify?: (applied: readonly Addr[]) => void,
@@ -849,7 +831,7 @@ export class InteractionController {
       const applied = unionAddresses(atomic.changed, changedFormats);
       if (applied.length === 0) {
         beforeNotify?.([]);
-        return this.noopResult(rejected);
+        return this.emptyResult();
       }
       if (recordHistory) {
         const intents = historyPlan;
@@ -891,12 +873,10 @@ export class InteractionController {
         });
       }
       this.revisionValue += 1;
-      const result: ChangeBatchResult = {
-        status: 'applied',
+      const result = appliedBatch(
         applied,
-        rejected,
-        revision: this.revisionValue,
-      };
+        boundingRange(prepared.map((change) => change.patch.addr)),
+      );
       beforeNotify?.(applied);
       this.notifyChanged(result);
       return result;
@@ -933,34 +913,21 @@ export class InteractionController {
     }
   }
 
-  private asRejection(decision: PermissionDecision): BatchRejection {
+  private asRejection(decision: PermissionDecision): CellRefusal {
     return decision.allowed
       ? { code: 'invalid', reason: 'unexpected allowed decision' }
       : { addr: decision.addr, code: decision.code, reason: decision.reason };
   }
 
   private emptyResult(): ChangeBatchResult {
-    return this.noopResult([]);
-  }
-
-  private noopResult(rejected: readonly BatchRejection[]): ChangeBatchResult {
-    const result: ChangeBatchResult = {
-      status: 'noop',
-      applied: [],
-      rejected,
-      revision: this.revisionValue,
-    };
+    const result = appliedBatch([], null);
     this.notifySubscribers(result);
     return result;
   }
 
-  private rejectResult(rejected: readonly BatchRejection[]): ChangeBatchResult {
-    const result: ChangeBatchResult = {
-      status: 'rejected',
-      applied: [],
-      rejected,
-      revision: this.revisionValue,
-    };
+  /** A refused batch writes nothing and reports the one refusal that decided it. */
+  private rejectResult(rejected: readonly CellRefusal[]): ChangeBatchResult {
+    const result = refusedBatch(rejected[0] ?? { code: 'invalid' });
     this.notifySubscribers(result);
     return result;
   }

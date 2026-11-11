@@ -13,7 +13,10 @@ import { setProtectedSheet } from '../../../../src/commands/protection.js';
 import type { CellValue, Range } from '../../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../../src/i18n/strings.js';
-import { registerDialogOpeners } from '../../../../src/interact/dialog-entry.js';
+import {
+  PASTE_SPECIAL_UNAVAILABLE,
+  registerDialogOpeners,
+} from '../../../../src/interact/dialog-entry.js';
 import type { SpreadsheetInstance } from '../../../../src/mount/types.js';
 import {
   createSpreadsheetStore,
@@ -344,7 +347,7 @@ describe('Mac automation gallery', () => {
       pageSetupDialog: unused,
       hyperlinkDialog: unused,
       pasteSpecialDialog: unused,
-      pasteSpecial: () => false,
+      pasteSpecial: () => PASTE_SPECIAL_UNAVAILABLE,
       insertCopiedCells: unused,
       commentDialog: unused,
       pivotTableDialog: () => {

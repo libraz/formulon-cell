@@ -1,10 +1,12 @@
 import type { SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
 import { interactionControllerFor } from './interaction-controller.js';
-import type {
-  InteractionOrigin,
-  OperationIntent,
-  PermissionDecision,
+import {
+  type ChangeBatchResult,
+  type InteractionOrigin,
+  type OperationIntent,
+  type PermissionDecision,
+  refusedByDecision,
 } from './interaction-policy.js';
 
 /** The intents of one logical write for an origin: the action's own origin
@@ -73,4 +75,13 @@ export function authorizedWrite<T>(request: AuthorizedWriteRequest<T>): Authoriz
   }
   history.end(token);
   return { ok: true, value };
+}
+
+/** {@link authorizedWrite} of a batch command: the write's own result, or the refusal as a batch
+ *  result naming the decision that refused it. */
+export function authorizedBatch(
+  request: AuthorizedWriteRequest<ChangeBatchResult>,
+): ChangeBatchResult {
+  const result = authorizedWrite(request);
+  return result.ok ? result.value : refusedByDecision(result.decision);
 }

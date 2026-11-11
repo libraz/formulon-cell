@@ -17,9 +17,10 @@ import {
   workbookDate1904,
 } from '../commands/coerce-input.js';
 import { MAX_CSV_CELLS } from '../commands/import-export.js';
+import { appliedBatch } from '../commands/interaction-policy.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import { formatBoolean, formatEditableNumber } from '../engine/value.js';
-import { type BatchRejection, type ChangeBatchResult, changeBatchResult } from './change-batch.js';
+import type { ChangeBatchResult } from './change-batch.js';
 import { spreadsheetFailure } from './errors.js';
 import type { MemberSpec, SheetContext } from './facade-context.js';
 
@@ -51,22 +52,6 @@ const assertWithinLimit = (rows: number, cols: number, member: string): void => 
     `${member}: ${cells} cells exceed the limit of ${MAX_CSV_CELLS}`,
     { context: { limit: MAX_CSV_CELLS } },
   );
-};
-
-const contains = (rect: CellRect, row: number, col: number): boolean =>
-  row >= rect.firstRow && row <= rect.lastRow && col >= rect.firstCol && col <= rect.lastCol;
-
-/** Whether the sheet's protection lets a cell's content change: an unprotected sheet, an unlocked
- *  cell, or a cell inside a protected range that needs no password. */
-const writableCells = (sheet: EngineSheet): ((at: CellAddress) => boolean) => {
-  if (sheet.getSheetProtection() === null) return () => true;
-  const open = sheet
-    .listProtectedRanges()
-    .filter((range) => range.legacyPasswordHash === null && range.hashValue === null)
-    .flatMap((range) => range.ranges);
-  return ({ row, col }) =>
-    open.some((rect) => contains(rect, row, col)) ||
-    !sheet.getCellFormat(row, col).protection.locked;
 };
 
 const writeCoerced = (
@@ -117,30 +102,29 @@ function importCsv(ctx: SheetContext, text: string, options: ImportCsvOptions): 
     date1904: workbookDate1904(ctx.handle),
     mac: isMacWorkbook(ctx.handle),
   };
-  const writable = writableCells(ctx.sheetEngine);
-  const applied: { sheet: number; at: CellAddress }[] = [];
-  const rejections: BatchRejection[] = [];
-  ctx.run(() => {
-    rows.forEach((fields, r) => {
-      fields.forEach((raw, c) => {
-        const at = { row: anchor.row + r, col: anchor.col + c };
-        if (!writable(at)) {
-          rejections.push({
-            sheet,
-            at,
-            code: 'protected',
-            reason: 'the cell is locked on a protected sheet',
-          });
-          return;
-        }
-        const forceText = ctx.sheetEngine.getCellFormat(at.row, at.col).numberFormat === '@';
-        const input = coerceInput(raw, { ...coerceOptions, forceText });
-        ctx.cellWrite([at.row, at.col], () => writeCoerced(ctx, at, input, locale));
-        applied.push({ sheet, at });
+  const { changed } = ctx.handle.trackChangedCells(() =>
+    ctx.run(() => {
+      rows.forEach((fields, r) => {
+        fields.forEach((raw, c) => {
+          const at = { row: anchor.row + r, col: anchor.col + c };
+          const forceText = ctx.sheetEngine.getCellFormat(at.row, at.col).numberFormat === '@';
+          const input = coerceInput(raw, { ...coerceOptions, forceText });
+          ctx.cellWrite([at.row, at.col], () => writeCoerced(ctx, at, input, locale));
+        });
       });
-    });
-  });
-  return changeBatchResult(applied, rejections);
+    }),
+  );
+  const range =
+    width === 0
+      ? null
+      : {
+          sheet,
+          r0: anchor.row,
+          c0: anchor.col,
+          r1: anchor.row + rows.length - 1,
+          c1: anchor.col + width - 1,
+        };
+  return appliedBatch(changed, range);
 }
 
 function exportCsv(ctx: SheetContext, options: ExportCsvOptions = {}): string {
@@ -287,8 +271,8 @@ declare module './workbook.js' {
     /**
      * Reads CSV text into the sheet from `options.at`, the way typing each field would: a leading
      * `=` makes a formula, numbers, dates and logical values are recognised in `options.locale`,
-     * and a cell formatted as text keeps the field as text. Locked cells of a protected sheet are
-     * skipped and listed in `rejections`. One undo step and one `change` event.
+     * and a cell formatted as text keeps the field as text. Host code is not gated by sheet
+     * protection: every field is written. One undo step and one `change` event.
      *
      * @throws FormulonError `limit-exceeded` above 100,000 cells.
      */

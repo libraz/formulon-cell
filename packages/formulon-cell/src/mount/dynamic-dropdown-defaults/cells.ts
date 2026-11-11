@@ -102,7 +102,7 @@ const buildCellInsertAction =
             snapshot,
             range,
           );
-          if (inserted) {
+          if (inserted.status === 'applied') {
             mutators.replaceCells(
               instance.store,
               instance.workbook.cells(instance.store.getState().data.sheetIndex),

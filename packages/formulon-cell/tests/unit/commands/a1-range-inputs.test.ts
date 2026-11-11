@@ -51,14 +51,14 @@ describe('A1 text in host range options', () => {
     controller.setPolicy(fixedFormPolicy(['B2:B11']));
     expect(controller.execute(edit({ sheet: 0, row: 1, col: 1 })).status).toBe('applied');
     expect(controller.execute(edit({ sheet: 1, row: 10, col: 1 })).status).toBe('applied');
-    expect(controller.execute(edit({ sheet: 0, row: 1, col: 2 })).status).toBe('rejected');
+    expect(controller.execute(edit({ sheet: 0, row: 1, col: 2 })).status).toBe('refused');
   });
 
   it('pins qualified editable text to its sheet', async () => {
     const { controller } = await setup();
     controller.setPolicy(fixedFormPolicy({ ranges: ['Input!B2'] }));
     expect(controller.execute(edit({ sheet: 1, row: 1, col: 1 })).status).toBe('applied');
-    expect(controller.execute(edit({ sheet: 0, row: 1, col: 1 })).status).toBe('rejected');
+    expect(controller.execute(edit({ sheet: 0, row: 1, col: 1 })).status).toBe('refused');
   });
 
   it('rejects bad editable text and unknown sheets when the policy is set', async () => {
@@ -81,8 +81,8 @@ describe('A1 text in host range options', () => {
       { addr: 'D4', input: '1' },
       { addr: 'D4:E5', input: '1' },
     ]);
-    expect(bad.status).toBe('rejected');
-    expect(bad.rejected[0]?.reason).toMatch(
+    expect(bad.status).toBe('refused');
+    expect(bad.rejections[0]?.reason).toMatch(
       /applyChanges\[1\]\.addr: "D4:E5" is not a single cell/,
     );
     expect(wb.getValue({ sheet: 1, row: 3, col: 3 }).kind).toBe('blank');

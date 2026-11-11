@@ -34,7 +34,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
     wb.recalc();
-    expect(got?.writtenRange).toEqual({ sheet: 0, r0: 5, c0: 5, r1: 5, c1: 6 });
+    expect(got.range).toEqual({ sheet: 0, r0: 5, c0: 5, r1: 5, c1: 6 });
     expect(num(wb, 5, 5)).toBe(10);
     expect(wb.getValue({ sheet: 0, row: 5, col: 6 })).toEqual({ kind: 'text', value: 'hi' });
   });

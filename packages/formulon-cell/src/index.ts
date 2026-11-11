@@ -123,7 +123,6 @@ export { cut } from './commands/clipboard/cut.js';
 export type {
   PasteOperation,
   PasteSpecialOptions,
-  PasteSpecialResult,
   PasteWhat,
 } from './commands/clipboard/paste-special.js';
 export {
@@ -202,12 +201,12 @@ export {
   listHyperlinks,
   setHyperlink,
 } from './commands/hyperlinks.js';
-export type { ExportOptions, ImportCSVOptions, ImportResult } from './commands/import-export.js';
+export type { ExportOptions, ImportCSVOptions } from './commands/import-export.js';
 export { exportCSV, importCSV } from './commands/import-export.js';
 export type { InteractionControllerOptions } from './commands/interaction-controller.js';
 export { InteractionController } from './commands/interaction-controller.js';
 export type {
-  BatchDeniedMode,
+  BatchCell,
   BatchRejection,
   CellBatchCommand,
   CellBatchOperation,

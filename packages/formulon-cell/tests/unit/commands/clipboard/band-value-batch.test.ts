@@ -111,7 +111,7 @@ describe('whole-band Paste All value batching', () => {
     const result = pasteAll(mounted);
     unsubscribe();
 
-    expect(result?.writtenRange).toEqual(destinationColumn);
+    expect(result.range).toEqual(destinationColumn);
     expect(cellMapPublications).toBe(1);
     expect(callbackCellMaps).toHaveLength(1_001);
     const publishedCells = store.getState().data.cells;
@@ -146,7 +146,7 @@ describe('whole-band Paste All value batching', () => {
     );
     mountedSheets.push(mounted);
 
-    expect(pasteAll(mounted, true)?.writtenRange).toEqual(destinationColumn);
+    expect(pasteAll(mounted, true).range).toEqual(destinationColumn);
     expect(mounted.workbook.getValue({ sheet: 0, row: 0, col: 1 })).toEqual(value(1));
     expect(mounted.workbook.getValue({ sheet: 0, row: 1, col: 1 })).toEqual(value(11));
     expect(mounted.workbook.getValue({ sheet: 0, row: 2, col: 1 })).toEqual(value(3));

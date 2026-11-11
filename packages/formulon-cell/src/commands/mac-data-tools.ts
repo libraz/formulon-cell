@@ -716,7 +716,6 @@ export function commitMacGoalSeek(
     operation: 'valueEdit',
     origin: 'ribbon',
     commandId: 'mac.data.goalSeek',
-    denied: 'reject',
     changes: [
       {
         addr: request.changingCell,
@@ -725,9 +724,9 @@ export function commitMacGoalSeek(
       },
     ],
   });
-  return result.status === 'applied' || (result.status === 'noop' && result.rejected.length === 0)
+  return result.status === 'applied'
     ? success(undefined)
-    : failure('rejected', 'writeFailed', result.rejected[0]?.reason);
+    : failure('rejected', 'writeFailed', result.rejections[0]?.reason);
 }
 
 /** Consolidate that matches columns by top-row label and/or rows by left-column label;
@@ -890,16 +889,15 @@ export function commitMacConsolidate(
     operation: 'valueEdit',
     origin: 'ribbon',
     commandId: 'mac.data.consolidate',
-    denied: 'reject',
     changes: addresses.map((addr, index) => ({
       addr,
       value: solution.values[index] ?? { kind: 'blank' },
       formula: null,
     })),
   });
-  return result.status === 'applied' || (result.status === 'noop' && result.rejected.length === 0)
+  return result.status === 'applied'
     ? success(undefined)
-    : failure('rejected', 'writeFailed', result.rejected[0]?.reason);
+    : failure('rejected', 'writeFailed', result.rejections[0]?.reason);
 }
 
 const subtotalFunctionCode = (fn: MacDataFunction): number => {

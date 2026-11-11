@@ -1,11 +1,8 @@
 import { pasteWrite } from '../commands/clipboard/paste-actions.js';
-import {
-  type PasteSpecialOptions,
-  type PasteSpecialResult,
-  pasteSpecial,
-} from '../commands/clipboard/paste-special.js';
+import { type PasteSpecialOptions, pasteSpecial } from '../commands/clipboard/paste-special.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
+import type { ChangeBatchResult } from '../commands/interaction-policy.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { Range } from '../engine/types.js';
@@ -124,7 +121,7 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
     const current = activation;
     if (!current) return;
     if (deferForAllowedRangeUnlock(store, [current.range], () => applyMode(mode))) return;
-    let result: PasteSpecialResult | null = null;
+    let result: ChangeBatchResult | null = null;
     const apply = (): void => {
       mutators.setRange(store, current.range);
       if (mode === 'source') {
@@ -146,7 +143,7 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
       undefined,
       () => recordFormatChange(history, store, apply),
     );
-    if (result) deps.onAfterCommit?.();
+    if ((result as ChangeBatchResult | null)?.status === 'applied') deps.onAfterCommit?.();
     hide();
   };
 

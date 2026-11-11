@@ -192,8 +192,9 @@ describe('partial cell-shift native style checkpoints', () => {
       wb.attachHistory(history);
       setActive(store, source);
 
-      expect(insertCopiedCellsFromTSV(store, wb, history, 'new', 'down')).toEqual({
-        writtenRange: { sheet: 0, r0: 2, c0: 3, r1: 2, c1: 3 },
+      expect(insertCopiedCellsFromTSV(store, wb, history, 'new', 'down')).toMatchObject({
+        status: 'applied',
+        range: { sheet: 0, r0: 2, c0: 3, r1: 2, c1: 3 },
       });
       expect(value(wb, inserted)).toEqual({ kind: 'text', value: 'new' });
       expect(value(wb, shifted)).toEqual({ kind: 'text', value: 'axis' });

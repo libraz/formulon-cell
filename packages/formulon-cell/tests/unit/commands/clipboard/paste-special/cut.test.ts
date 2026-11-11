@@ -88,7 +88,7 @@ describe('pasteSpecial', () => {
     });
     wb.recalc();
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1_048_575, c1: 3 });
+    expect(result.range).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1_048_575, c1: 3 });
     expect(wb.cellFormula({ sheet: 0, row: 5, col: 2 })).toBeNull();
     expect(wb.cellFormula({ sheet: 0, row: 5, col: 3 })).toBe('=D20');
     expect(wb.cellFormula({ sheet: 0, row: 6, col: 3 })).toBe('=A7');
@@ -131,7 +131,7 @@ describe('pasteSpecial', () => {
     );
     history.end();
 
-    expect(result?.writtenRange).toEqual({ sheet: 1, r0: 2, c0: 3, r1: 2, c1: 3 });
+    expect(result.range).toEqual({ sheet: 1, r0: 2, c0: 3, r1: 2, c1: 3 });
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
     expect(wb.cellFormula({ sheet: 1, row: 2, col: 3 })).toBe(`=${sourceName}!A1`);
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 2 })).toBe('=Target!D3');
@@ -184,7 +184,7 @@ describe('pasteSpecial', () => {
       { what: 'all' as const, operation: 'none' as const, skipBlanks: true, transpose: false },
       { what: 'all' as const, operation: 'none' as const, skipBlanks: false, transpose: true },
     ]) {
-      expect(pasteSpecial(store.getState(), store, wb, snap, options)).toBeNull();
+      expect(pasteSpecial(store.getState(), store, wb, snap, options).status).toBe('refused');
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 7 });
       expect(wb.getValue({ sheet: 0, row: 2, col: 2 }).kind).toBe('blank');
     }

@@ -95,7 +95,7 @@ describe('Delete over a whole PivotTable report', () => {
     setPivotGuardSink(wb, (alert) => alerts.push(alert.message));
 
     mutators.setRange(store, { ...bounds, r1: bounds.r1 - 1 });
-    expect(clearSelectedContents({ store, workbook: wb }).status).toBe('rejected');
+    expect(clearSelectedContents({ store, workbook: wb }).status).toBe('refused');
     expect(alerts).toHaveLength(1);
 
     // Two ranges that together cover the report remove it.

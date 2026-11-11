@@ -1,7 +1,7 @@
 import { type ErrorCode, type FontScheme, WorkbookFormat } from '@libraz/formulon';
 import type { History } from '../commands/history.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { addrKey } from './address.js';
+import { addrKey, parseAddrKey } from './address.js';
 import { CALC_MODE_AUTO_NO_TABLE, CALC_MODE_MANUAL } from './calc-mode.js';
 import { detectCapabilities } from './capabilities.js';
 import { type ExternalLinkKind, externalLinkKindLabel } from './external-links.js';
@@ -694,6 +694,7 @@ export class WorkbookHandle {
       return { before, after: before, changed: [] };
     }
 
+    for (const entry of changedEntries) this.noteWriteBefore(entry.before);
     const pendingBefore = this.pendingRecalc;
     const dirtyBefore = new Set(this.dirtySinceRecalc);
     const manual = this.isManualCalcMode();
@@ -1242,6 +1243,8 @@ export class WorkbookHandle {
   /** `writeCellUnjournaled` for one engine write that covers every cell of `cells`. */
   writeCellsUnjournaled(cells: readonly Addr[], write: () => void): void {
     this.assertAlive();
+    if (this.changeTrackers.length > 0)
+      for (const a of cells) this.noteWriteBefore(this.captureSnapshot(a));
     write();
     for (const a of cells) {
       this.scheduleRecalc(a);
@@ -1299,7 +1302,49 @@ export class WorkbookHandle {
     this.wb.dispose();
   }
 
+  /** Open change trackers, innermost last: per cell, its content before the first write. */
+  private changeTrackers: Map<string, CellSnapshot | null>[] = [];
+
+  /** Record `before` as the content of its cell ahead of a write, for every open tracker. */
+  private noteWriteBefore(before: CellSnapshot): void {
+    if (this.replaying) return;
+    const key = addrKey(before.addr);
+    for (const tracker of this.changeTrackers) if (!tracker.has(key)) tracker.set(key, before);
+  }
+
+  /**
+   * Run `fn` and report the cells whose content (value, or formula for a formula cell) it
+   * changed. A cell written with the content it already had is not reported.
+   */
+  trackChangedCells<T>(fn: () => T): { value: T; changed: Addr[] } {
+    const tracker = new Map<string, CellSnapshot | null>();
+    this.changeTrackers.push(tracker);
+    let value: T;
+    try {
+      value = fn();
+    } finally {
+      this.changeTrackers.splice(this.changeTrackers.lastIndexOf(tracker), 1);
+    }
+    const changed: Addr[] = [];
+    for (const [key, before] of tracker) {
+      const addr = parseAddrKey(key);
+      if (!addr) continue;
+      const after = this.captureSnapshot(addr);
+      const same =
+        before !== null &&
+        before.formula === after.formula &&
+        (after.formula !== null || sameCellValue(before.value, after.value));
+      if (!same) changed.push(addr);
+    }
+    return { value, changed };
+  }
+
   private emit(e: ChangeEvent): void {
+    // A value announced by a path that recorded no prior content counts as changed.
+    if (e.kind === 'value' && this.changeTrackers.length > 0 && !this.replaying) {
+      const key = addrKey(e.addr);
+      for (const tracker of this.changeTrackers) if (!tracker.has(key)) tracker.set(key, null);
+    }
     // Events are emitted only after the engine commit. Listener failures must
     // therefore stay isolated from the committed workbook and from siblings.
     for (const fn of [...this.listeners]) {
@@ -1384,6 +1429,7 @@ export class WorkbookHandle {
       return;
     }
     const before = this.captureSnapshot(a);
+    this.noteWriteBefore(before);
     fn();
     if (this.history) {
       const after = this.captureSnapshot(a);

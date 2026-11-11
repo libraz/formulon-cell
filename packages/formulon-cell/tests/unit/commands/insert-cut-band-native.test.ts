@@ -86,7 +86,7 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
     wb.setFormula(formulaAddr, `=${sourceRef}+${terminalRef}`);
     const captured = snapshot(1, 2);
     wb.attachHistory(history);
-    expect(insertCopiedBand(store, wb, history, captured, address(axis, 5))?.writtenRange).toEqual(
+    expect(insertCopiedBand(store, wb, history, captured, address(axis, 5)).range).toEqual(
       band(axis, 3, 2),
     );
     expect(values()).toEqual([1, 4, 5, 2, 3, 6, 7, 8].map((value) => ({ kind: 'number', value })));
@@ -113,7 +113,9 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
     wb.attachHistory(history);
     for (const target of [1, 2]) {
       const beforeSelection = store.getState().selection;
-      expect(insertCopiedBand(store, wb, history, captured, address(axis, target))).toBeNull();
+      expect(insertCopiedBand(store, wb, history, captured, address(axis, target)).status).toBe(
+        'refused',
+      );
       expect(store.getState().selection).toEqual(beforeSelection);
       expect(store.getState().ui.copyMode).toBe('cut');
       expect(values()).toEqual(
@@ -121,7 +123,7 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
       );
       expect(history.canUndo()).toBe(false);
     }
-    expect(insertCopiedBand(store, wb, history, captured, address(axis, 3))?.writtenRange).toEqual(
+    expect(insertCopiedBand(store, wb, history, captured, address(axis, 3)).range).toEqual(
       band(axis, 1, 2),
     );
     expect(store.getState().ui.copyMode).toBeNull();
@@ -137,9 +139,9 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
     wb.setNumber(address(axis, terminal), 99);
     const captured = snapshot(1, 2);
     wb.attachHistory(history);
-    expect(
-      insertCopiedBand(store, wb, history, captured, address(axis, terminal))?.writtenRange,
-    ).toEqual(band(axis, terminal - 2, 2));
+    expect(insertCopiedBand(store, wb, history, captured, address(axis, terminal)).range).toEqual(
+      band(axis, terminal - 2, 2),
+    );
     expect(wb.getValue(address(axis, terminal - 2))).toEqual({ kind: 'number', value: 7 });
     expect(wb.getValue(address(axis, terminal - 1))).toEqual({ kind: 'number', value: 8 });
     expect(wb.getValue(address(axis, terminal))).toEqual({ kind: 'number', value: 99 });
@@ -169,8 +171,7 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
     setSize(3, targetSize, targetSheet);
     wb.attachHistory(history);
     expect(
-      insertCopiedBand(store, wb, history, captured, address(axis, 3, 0, targetSheet))
-        ?.writtenRange,
+      insertCopiedBand(store, wb, history, captured, address(axis, 3, 0, targetSheet)).range,
     ).toEqual(band(axis, 3, 1, targetSheet));
     expect(wb.getValue(address(axis, 1))).toEqual({ kind: 'blank' });
     expect(wb.getValue(address(axis, 2))).toEqual({ kind: 'number', value: 8 });
@@ -387,7 +388,9 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
       const captured = snapshot(1);
       const beforeSelection = store.getState().selection;
       wb.attachHistory(history);
-      expect(insertCopiedBand(store, wb, history, captured, address(axis, 5))).toBeNull();
+      expect(insertCopiedBand(store, wb, history, captured, address(axis, 5)).status).toBe(
+        'refused',
+      );
       expect(values()).toEqual(
         [1, 2, 3, 4, 5, 6, 7, 8].map((value) => ({ kind: 'number', value })),
       );
@@ -400,9 +403,9 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
       expect(store.getState().selection).toEqual(beforeSelection);
       expect(store.getState().ui.copyMode).toBe('cut');
       expect(history.canUndo()).toBe(false);
-      expect(
-        insertCopiedBand(store, wb, history, captured, address(axis, 2))?.writtenRange,
-      ).toEqual(band(axis, 1));
+      expect(insertCopiedBand(store, wb, history, captured, address(axis, 2)).range).toEqual(
+        band(axis, 1),
+      );
       expect(store.getState().protection.allowedEditRanges).toEqual(beforePermissions);
       expect(store.getState().sheetViews.views).toEqual(beforeViews);
       expect(wb.getPivotTables()).toEqual(beforePivots);
@@ -423,8 +426,8 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
     mutators.replaceCells(store, wb.cells(targetSheet));
     wb.attachHistory(history);
     expect(
-      insertCopiedBand(store, wb, history, captured, address(axis, 3, 0, targetSheet)),
-    ).toBeNull();
+      insertCopiedBand(store, wb, history, captured, address(axis, 3, 0, targetSheet)).status,
+    ).toBe('refused');
     expect(wb.getValue(address(axis, 1))).toEqual({ kind: 'number', value: 7 });
     expect(wb.getValue(address(axis, 3, 0, targetSheet))).toEqual({ kind: 'number', value: 9 });
     expect(store.getState().ui.copyMode).toBe('cut');
@@ -441,7 +444,7 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
     mutators.mergeRange(store, merge);
     const captured = snapshot(1);
     wb.attachHistory(history);
-    expect(insertCopiedBand(store, wb, history, captured, address(axis, 5))).toBeNull();
+    expect(insertCopiedBand(store, wb, history, captured, address(axis, 5)).status).toBe('refused');
     expect(wb.getMerges(0)).toEqual([merge]);
     expect(wb.getValue(address(axis, 1))).toEqual({ kind: 'number', value: 7 });
     expect(history.canUndo()).toBe(false);
@@ -458,7 +461,7 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
     mutators.setCellFormat(store, address(axis, 0), { bold: true });
     const captured = snapshot(0);
     wb.attachHistory(history);
-    expect(insertCopiedBand(store, wb, history, captured, address(axis, 3))?.writtenRange).toEqual(
+    expect(insertCopiedBand(store, wb, history, captured, address(axis, 3)).range).toEqual(
       band(axis, 2),
     );
     expect(wb.getMerges(0)).toEqual([]);

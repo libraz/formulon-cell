@@ -108,7 +108,7 @@ describe('pasteSpecial', () => {
     });
     wb.recalc();
     // Source value of 0 -> divide-by-zero -> static spreadsheet error.
-    expect(result?.skippedNonFiniteOperations).toBe(1);
+    expect(result.status).toBe('applied');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('static error value'));
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toMatchObject({
       kind: 'error',

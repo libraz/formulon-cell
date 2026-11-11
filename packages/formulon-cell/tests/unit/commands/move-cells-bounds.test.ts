@@ -24,7 +24,7 @@ describe('move target bounds', () => {
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
     const confirm = vi.fn(async () => true);
     const moved = await moveSelectionTo(
-      { store, wb, history: null, commandId: 'moveCells', confirmOverwrite: confirm },
+      { store, wb, history: null, commandId: 'dragMove', confirmOverwrite: confirm },
       { row: MAX_ROW, col: 0 },
     );
     expect(moved).toBe(false);

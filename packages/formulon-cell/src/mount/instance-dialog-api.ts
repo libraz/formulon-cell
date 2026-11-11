@@ -15,6 +15,7 @@ import {
   INSTANCE_API_PAGE_SETUP_ENTRY,
   INSTANCE_API_PIVOT_TABLE_ENTRY,
   INSTANCE_API_VALIDATION_ENTRY,
+  PASTE_SPECIAL_UNAVAILABLE,
   registerDialogOpeners,
 } from '../interact/dialog-entry.js';
 import type { FxDialogOpenOptions } from '../interact/fx-dialog.js';
@@ -137,7 +138,8 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       featureState.commentDialog?.open({ ...(mode ? { mode } : {}), entry }),
     pasteSpecialDialog: (entry) => getBinding().pasteSpecialDialog?.open(undefined, entry),
     pasteSpecial: (options, entry) =>
-      getBinding().pasteSpecialDialog?.apply(options, undefined, entry) ?? false,
+      getBinding().pasteSpecialDialog?.apply(options, undefined, entry) ??
+      PASTE_SPECIAL_UNAVAILABLE,
     insertCopiedCells: deps.insertCopiedCells,
   });
   return {

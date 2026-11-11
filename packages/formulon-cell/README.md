@@ -93,12 +93,12 @@ A policy allows or denies 28 operations one by one, takes editable cells as A1 r
 | `workbook.withBatchedRecalc(fn)` | run a multi-cell write with a single recalc |
 | `instance.setLocale(loc)` / `instance.setTheme(theme)` | swap locale or theme at runtime |
 | `instance.setPolicy` / `setViewportOptions` / `setContextMenu` / `setUi` / `setToolbar` | change embedding settings at runtime |
-| `instance.applyChanges(changes)` | trusted host update that bypasses the user policy |
+| `instance.applyChanges(changes)` | batch cell update, all or nothing, decided by the policy and sheet protection |
 | `instance.on(event, handler)` | `cellChange`, `selectionChange`, `changeBatch`, `recalc`, … |
 
 The full option and API reference is on the [documentation site](https://formulon.libraz.net/cell/).
 
-CSV export accepts an explicit locale and delimiter: `exportCSV(state, { locale: 'de', delimiter: ';' })`. Pass the same settings as the sixth argument to `importCSV(state, workbook, text, anchor, history, settings)` for matching numeric and boolean input. Export defaults to canonical English values and comma delimiters; import uses the active workbook profile unless `settings.locale` is supplied.
+CSV export accepts an explicit locale and delimiter: `exportCSV(state, { locale: 'de', delimiter: ';' })`. Pass the same settings as the sixth argument to `importCSV(store, workbook, text, anchor, history, settings)` for matching numeric and boolean input. Export defaults to canonical English values and comma delimiters; import uses the active workbook profile unless `settings.locale` is supplied.
 
 Formula editors and external clipboard input use the active profile's syntax. For example, German `=SUMME(1,5;2)` is stored as `=SUM(1.5,2)`. Programmatic `workbook.setFormula()` accepts canonical syntax; use `workbook.canonicalizeLocalizedFormula()` first when supplying localized text. `workbook.localizeFormulaText()` converts display text, and `workbook.localeFacts()` returns the active profile's separators and scalar names.
 

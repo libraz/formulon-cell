@@ -93,12 +93,12 @@ form.setPolicy(viewerPolicy()); // 送信後は選択とコピーだけ
 | `workbook.withBatchedRecalc(fn)` | 複数セルへの書き込みを 1 回の再計算にまとめる |
 | `instance.setLocale(loc)` / `instance.setTheme(theme)` | 実行時にロケールやテーマを切り替える |
 | `instance.setPolicy` / `setViewportOptions` / `setContextMenu` / `setUi` / `setToolbar` | 埋め込み設定を実行時に変更する |
-| `instance.applyChanges(changes)` | ユーザー向けポリシーを通さない、ホストからの更新 |
+| `instance.applyChanges(changes)` | ポリシーとシート保護で判定する、全部か無しかのセル一括更新 |
 | `instance.on(event, handler)` | `cellChange`、`selectionChange`、`changeBatch`、`recalc` など |
 
 オプションと API の一覧は [ドキュメントサイト](https://formulon.libraz.net/ja/cell/) にあります。
 
-CSV出力にはロケールと区切り文字を指定できます。例: `exportCSV(state, { locale: 'de', delimiter: ';' })`。取り込みでは `importCSV(state, workbook, text, anchor, history, settings)` の第6引数へ同じ設定を渡すと、数値と真偽値を同じ規則で解析します。出力の既定値は英語の正規表記とカンマ区切りです。取り込みは `settings.locale` が未指定の場合、現在のワークブックのプロファイルを使います。
+CSV出力にはロケールと区切り文字を指定できます。例: `exportCSV(state, { locale: 'de', delimiter: ';' })`。取り込みでは `importCSV(store, workbook, text, anchor, history, settings)` の第6引数へ同じ設定を渡すと、数値と真偽値を同じ規則で解析します。出力の既定値は英語の正規表記とカンマ区切りです。取り込みは `settings.locale` が未指定の場合、現在のワークブックのプロファイルを使います。
 
 数式の編集と外部クリップボードからの入力には、現在のプロファイルの構文を使います。たとえば独語の `=SUMME(1,5;2)` は `=SUM(1.5,2)` として保存されます。コードから呼ぶ `workbook.setFormula()` には正規構文を渡してください。ローカライズされた文字列は、先に `workbook.canonicalizeLocalizedFormula()` で変換できます。表示用の変換は `workbook.localizeFormulaText()`、区切り文字や真偽値などの定義取得は `workbook.localeFacts()` を使います。
 

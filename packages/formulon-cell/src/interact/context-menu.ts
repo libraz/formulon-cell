@@ -1209,7 +1209,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       operation: 'paste',
       origin: 'contextMenu',
       changes,
-      denied: interactionController?.policy?.batchDenied,
     });
   };
 
@@ -1302,7 +1301,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
             origin: 'contextMenu',
             commandId: 'clear',
             changes: addresses.map((addr) => ({ addr, value: { kind: 'blank' as const } })),
-            denied: interactionController?.policy?.batchDenied,
           });
           return;
         }
@@ -1314,7 +1312,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
             origin: 'contextMenu',
             commandId: 'clear',
           });
-          if (result.status === 'applied') deps.onAfterCommit?.();
+          if (result.status === 'applied' && result.applied.length > 0) deps.onAfterCommit?.();
         } catch (err) {
           console.warn('formulon-cell: context-menu clear failed', err);
         }

@@ -4,6 +4,7 @@ import {
   InteractionController,
   registerInteractionController,
 } from '../../../src/commands/interaction-controller.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachKeyboard } from '../../../src/interact/keyboard.js';
 import { attachNavigationPolicy } from '../../../src/interact/navigation-policy.js';
@@ -1259,6 +1260,44 @@ describe('attachKeyboard', () => {
         expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 2 });
         expect(history.redo()).toBe(true);
         expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+      } finally {
+        unregister();
+        controller.dispose();
+      }
+    });
+
+    it('Delete over a protected selection holding a locked cell does nothing, silently', () => {
+      const history = new History();
+      const controller = new InteractionController({ store, getWb: () => wb, history });
+      const unregister = registerInteractionController(store, controller);
+      setup(history);
+      seed(store, wb, [
+        { row: 1, col: 1, value: 2 },
+        { row: 2, col: 1, value: 3 },
+        { row: 3, col: 1, value: 4 },
+      ]);
+      // B2:B4 with only B3 unlocked.
+      mutators.setCellFormat(store, { sheet: 0, row: 2, col: 1 }, { locked: false });
+      setProtectedSheet(store, 0, true);
+      store.setState((s) => ({
+        ...s,
+        selection: {
+          ...s.selection,
+          active: { sheet: 0, row: 1, col: 1 },
+          anchor: { sheet: 0, row: 1, col: 1 },
+          range: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 1 },
+        },
+      }));
+      try {
+        fire(host, 'Delete');
+        for (const [row, value] of [
+          [1, 2],
+          [2, 3],
+          [3, 4],
+        ] as const)
+          expect(wb.getValue({ sheet: 0, row, col: 1 })).toEqual({ kind: 'number', value });
+        expect(document.querySelector('[role="alertdialog"], [role="dialog"]')).toBeNull();
+        expect(history.canUndo()).toBe(false);
       } finally {
         unregister();
         controller.dispose();

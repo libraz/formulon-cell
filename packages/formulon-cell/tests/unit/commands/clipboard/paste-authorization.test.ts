@@ -99,7 +99,9 @@ describe('paste writes under the interaction policy', () => {
     if (!snap) throw new Error('expected snapshot');
     at({ sheet: 0, row: 0, col: 2 });
     const ctx = { store, history, origin: 'ribbon', commandId: 'pasteValues' } as const;
-    expect(pasteSpecialAction(ctx, workbook, snap, { ...ALL, what: 'values' })).toBeNull();
+    expect(pasteSpecialAction(ctx, workbook, snap, { ...ALL, what: 'values' }).status).toBe(
+      'refused',
+    );
     expect(value(0, 2)).toEqual({ kind: 'blank' });
     expect(history.canUndo()).toBe(false);
   });
@@ -128,7 +130,7 @@ describe('paste writes under the interaction policy', () => {
     setProtectedSheet(store, 0, true);
     at({ sheet: 0, row: 0, col: 2 });
     const ctx = { store, history, origin: 'ribbon', commandId: 'pasteAll' } as const;
-    expect(pasteSpecialAction(ctx, workbook, snap, ALL)).toBeNull();
+    expect(pasteSpecialAction(ctx, workbook, snap, ALL).status).toBe('refused');
     expect(value(1, 2)).toEqual({ kind: 'blank' });
     expect(history.canUndo()).toBe(false);
   });
@@ -138,7 +140,7 @@ describe('paste writes under the interaction policy', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 1, col: 2 }, { locked: false });
     setProtectedSheet(store, 0, true);
     at({ sheet: 0, row: 0, col: 2 });
-    expect(pasteTSV(store.getState(), store, workbook, '7\n8', history)).toBeNull();
+    expect(pasteTSV(store.getState(), store, workbook, '7\n8', history).status).toBe('refused');
     controller.setPolicy(record());
     const ctx = { store, history, origin: 'clipboard', commandId: 'paste' } as const;
     expect(
@@ -187,7 +189,7 @@ describe('paste writes under the interaction policy', () => {
     if (!snap) throw new Error('expected snapshot');
     at({ sheet: 0, row: 0, col: 2 });
     const ctx = { store, history, origin: 'contextMenu', commandId: 'insertCopiedCells' } as const;
-    expect(insertCopiedCellsAction(ctx, workbook, '', 'down', snap)).toBeNull();
+    expect(insertCopiedCellsAction(ctx, workbook, '', 'down', snap).status).toBe('refused');
     expect(value(0, 2)).toEqual({ kind: 'blank' });
     expect(seen.has('insertRows:contextMenu:insertCopiedCells')).toBe(true);
 

@@ -137,8 +137,8 @@ describe('paste special as Excel measures it', () => {
     setCellLocked(store, { sheet: 0, r0: 61, c0: 13, r1: 61, c1: 13 }, false);
     setProtectedSheet(store, 0, true);
     expect(
-      pasteSpecial(store.getState(), store, wb, snap, opts({ what: 'column-widths' })),
-    ).toBeNull();
+      pasteSpecial(store.getState(), store, wb, snap, opts({ what: 'column-widths' })).status,
+    ).toBe('refused');
     expect(store.getState().layout.colWidths.get(13)).toBeUndefined();
     // The option opens them even over locked cells.
     setActive(store, 61, 14);
@@ -275,7 +275,7 @@ describe('paste special as Excel measures it', () => {
     assertSnap(snap);
     setActive(store, 149, 67);
     const result = pasteLink(store.getState(), store, wb, snap);
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 149, c0: 67, r1: 150, c1: 68 });
+    expect(result.range).toEqual({ sheet: 0, r0: 149, c0: 67, r1: 150, c1: 68 });
     expect(wb.cellFormula({ sheet: 0, row: 149, col: 67 })).toBe('=A1');
     expect(wb.cellFormula({ sheet: 0, row: 149, col: 68 })).toBe('=B1');
     expect(wb.cellFormula({ sheet: 0, row: 150, col: 67 })).toBe('=A2');
@@ -308,7 +308,7 @@ describe('insert cut cells as Excel measures it', () => {
     wb.recalc();
     expect([0, 1, 2, 3].map((row) => num(wb, row, 29))).toEqual([3, 1, 2, 4]);
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 30 })).toBe('=SUM(AD1:AD4)');
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 1, c0: 29, r1: 2, c1: 29 });
+    expect(result.range).toEqual({ sheet: 0, r0: 1, c0: 29, r1: 2, c1: 29 });
     expect(store.getState().ui.copyRange ?? null).toBeNull();
   });
 
@@ -335,7 +335,7 @@ describe('insert cut cells as Excel measures it', () => {
 
       const result = insertCopiedCellsFromTSV(store, wb, history, '1\r\n2', 'down', snap);
 
-      expect(result).toBeNull();
+      expect(result.status).toBe('refused');
       wb.recalc();
       expect([0, 1, 2].map((row) => num(wb, row, 0))).toEqual([1, 2, 3]);
       expect(wb.cellFormula({ sheet: 0, row: 0, col: 1 })).toBe('=A3');

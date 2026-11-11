@@ -27,7 +27,12 @@ import { encodeTSV, parseTSV } from '../commands/clipboard/tsv.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { policyPermits, valuesOnlyClipboard } from '../commands/interaction-policy.js';
+import {
+  type ChangeBatchResult,
+  policyPermits,
+  refusedBatch,
+  valuesOnlyClipboard,
+} from '../commands/interaction-policy.js';
 import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
@@ -145,11 +150,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     );
   };
 
-  const restrictedPaste = (
-    entry: DialogEntry,
-    state: State,
-    text: string,
-  ): { writtenRange: Range } | null => {
+  const restrictedPaste = (entry: DialogEntry, state: State, text: string): Range | null => {
     const controller = interactionControllerFor(store);
     if (!controller || controller.policy === undefined) return null;
     const internal =
@@ -230,25 +231,17 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       }
     }
     if (changes.length === 0) return null;
-    const write = (): { writtenRange: Range } | null => {
+    const write = (): Range | null => {
       const result = controller.execute({
         type: 'cellBatch',
         operation: 'paste',
         origin: entry.origin,
         commandId: entry.commandId,
         changes,
-        // Keep the matrix coordinates stable when a fixed form opts into
-        // positional partial application. The controller's policy supplies the
-        // default when this is omitted; an explicit value here would silently
-        // turn `skipIneligible` back into an atomic rejection.
-        denied: controller.policy?.batchDenied,
       });
-      if (result.status === 'rejected' || result.status === 'noop') return null;
-      return { writtenRange: destination };
+      if (result.status === 'refused' || result.applied.length === 0) return null;
+      return destination;
     };
-    // A policy that skips ineligible cells writes part of the destination: the batch decides
-    // and records each written cell itself.
-    if (controller.policy.batchDenied === 'skipIneligible') return write();
     return pasteWrite({ store, history: history ?? null, ...entry }, { destination }, null, write);
   };
 
@@ -428,13 +421,12 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     state: State,
     text: string,
     html: string,
-  ): { result: { writtenRange: Range } | null; activation: PasteOptionsActivation | null } => {
+  ): { result: ChangeBatchResult; activation: PasteOptionsActivation | null } => {
     if (snapshot && snapshotText === text && hasLiveInternalPayload(state)) {
       const source = snapshot;
       const beforeRange = snapshotDestRange(state, source);
       const before = beforeRange ? captureDestinationSnapshot(state, beforeRange) : null;
-      let result: { writtenRange: Range } | null = null;
-      result = pasteSpecial(
+      const result = pasteSpecial(
         state,
         store,
         wb,
@@ -447,12 +439,11 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
         },
         history,
       );
-      const applied = result as { writtenRange: Range } | null;
       return {
-        result: applied,
+        result,
         activation:
-          applied && before && source.mode === 'copy'
-            ? { source, before, range: { ...applied.writtenRange } }
+          result.range && before && source.mode === 'copy'
+            ? { source, before, range: { ...result.range } }
             : null,
       };
     }
@@ -471,11 +462,14 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     entry: DialogEntry,
     text: string,
     html: string,
-  ): { result: { writtenRange: Range } | null; activation: PasteOptionsActivation | null } => {
+  ): { result: ChangeBatchResult; activation: PasteOptionsActivation | null } => {
     const state = store.getState();
     const internal =
       snapshot && snapshotText === text && hasLiveInternalPayload(state) ? snapshot : null;
-    const none = { result: null, activation: null };
+    const none = {
+      result: refusedBatch({ code: 'invalid', reason: 'the paste was refused' }),
+      activation: null,
+    };
     return pasteWrite(
       { store, history: history ?? null, ...entry },
       {
@@ -573,10 +567,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (!hasPastePayload(text)) return;
     if (valuesOnly()) {
       e.preventDefault();
-      const r = restrictedPaste(NATIVE_PASTE_ENTRY, s, text);
-      if (r) {
+      const written = restrictedPaste(NATIVE_PASTE_ENTRY, s, text);
+      if (written) {
         consumeCutMarquee();
-        mutators.setRange(store, r.writtenRange);
+        mutators.setRange(store, written);
         deps.onAfterCommit();
       }
       return;
@@ -589,9 +583,9 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     const entry = NATIVE_PASTE_ENTRY;
     const applyPaste = (): void => {
       const { result: r, activation } = authorizedPaste(entry, text, html);
-      if (r) {
+      if (r.range) {
         consumeCutMarquee();
-        mutators.setRange(store, r.writtenRange);
+        mutators.setRange(store, r.range);
         deps.onAfterCommit();
         if (activation) deps.onPasteOptions?.(activation);
       }
@@ -720,10 +714,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (pasteDrawing(text)) return;
     if (!hasPastePayload(text)) return;
     if (valuesOnly()) {
-      const r = restrictedPaste(entry, pasteState, text);
-      if (!r) return;
+      const written = restrictedPaste(entry, pasteState, text);
+      if (!written) return;
       consumeCutMarquee();
-      mutators.setRange(store, r.writtenRange);
+      mutators.setRange(store, written);
       deps.onAfterCommit();
       return;
     }
@@ -731,9 +725,9 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (!isWithinNavigationBounds(destination)) return;
     const applyPaste = (): void => {
       const { result: r, activation } = authorizedPaste(entry, text, html);
-      if (r) {
+      if (r.range) {
         consumeCutMarquee();
-        mutators.setRange(store, r.writtenRange);
+        mutators.setRange(store, r.range);
         deps.onAfterCommit();
         if (activation) deps.onPasteOptions?.(activation);
       }

@@ -73,9 +73,9 @@ function runInsertCopiedBand(ctx: ContextMenuInsertCopiedContext, kind: 'row' | 
       // fall through to the legacy direction-based inserter because that
       // would leave a different shape behind.
       const result = insertCopiedBandAction(action, wb, snap, store.getState().selection.range);
-      if (result) {
+      if (result.range) {
         if (snap.mode === 'cut') consumeCutMarquee(store);
-        mutators.setRange(store, result.writtenRange);
+        mutators.setRange(store, result.range);
         ctx.afterCommit();
       }
       return;
@@ -180,9 +180,9 @@ export function runContextMenuInsertCopiedCells(
         const snap = ctx.clipboard.snapshot();
         if (!hasPastePayload(text, snap)) return;
         const r = insertCopiedCellsAction(action, wb, text, direction, snap);
-        if (r) {
+        if (r.range) {
           // Marquee stays up, same as the row/column header variant.
-          mutators.setRange(store, r.writtenRange);
+          mutators.setRange(store, r.range);
           ctx.afterCommit();
         }
       });

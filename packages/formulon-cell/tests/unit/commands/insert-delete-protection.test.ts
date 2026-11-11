@@ -47,6 +47,23 @@ describe('row and column insert and delete on a protected sheet', () => {
     return { instance, ctx, value };
   };
 
+  it('greys the whole Home Clear control over a selection holding a locked cell', async () => {
+    const { instance, ctx } = await setup();
+    // B2:B4 with only B3 unlocked.
+    mutators.setCellFormat(instance.store, { sheet: 0, row: 2, col: 1 }, { locked: false });
+    setProtectedSheet(instance.store, 0, true);
+    mutators.setRange(instance.store, { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 1 });
+    const menu = document.createElement('div');
+    for (const action of ['all', 'formats', 'contents', 'comments', 'hyperlinks']) {
+      const button = document.createElement('button');
+      button.dataset.clear = action;
+      menu.appendChild(button);
+    }
+    ctx.updateClearMenu(menu);
+    expect(canExecuteBuiltIn(instance.store, 'clearFormat', 'ribbon').allowed).toBe(false);
+    expect([...menu.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+  });
+
   it('opens no cell dialog and offers nothing without an insert option', async () => {
     const { instance, ctx } = await setup();
     setProtectedSheet(instance.store, 0, true);

@@ -12,8 +12,9 @@ import { type CellFormat, mutators, type SpreadsheetStore, type State } from '..
 import { escapeHtml } from '../../text-escape.js';
 import { formatNumber } from '../format.js';
 import type { History } from '../history.js';
+import { type ChangeBatchResult, refusedBatch } from '../interaction-policy.js';
 import { recordFormatChange } from '../slice-history.js';
-import { type PasteResult, pasteTSV } from './paste.js';
+import { pasteTSV } from './paste.js';
 import type { ClipboardFormatResolver } from './snapshot.js';
 import { encodeTSV } from './tsv.js';
 
@@ -216,9 +217,10 @@ export function pasteHtml(
   wb: WorkbookHandle,
   html: string,
   history: History | null = null,
-): PasteResult | null {
+): ChangeBatchResult {
   const rows = parseHtmlTable(html);
-  if (!rows || rows.length === 0) return null;
+  if (!rows || rows.length === 0)
+    return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
   const transaction = history?.begin();
   try {
     const result = pasteTSV(
@@ -228,8 +230,8 @@ export function pasteHtml(
       encodeTSV(rows.map((row) => row.map((cell) => cell.text))),
       history,
     );
-    if (!result) return null;
-    const { sheet, r0, c0 } = result.writtenRange;
+    if (result.status !== 'applied' || !result.range) return result;
+    const { sheet, r0, c0 } = result.range;
     const bold = rows.flatMap((row, r) =>
       row.flatMap((cell, c) => (cell.bold ? [{ sheet, row: r0 + r, col: c0 + c }] : [])),
     );

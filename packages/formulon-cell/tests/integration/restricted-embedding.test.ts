@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 describe('restricted embedding public API', () => {
-  it('prefills readonly cells through the host while rejecting user edits', async () => {
+  it('prefills readonly cells through the workbook API while applyChanges is gated like user edits', async () => {
     sheet = await mountStubSheet({
       ui: { profile: 'embedded' },
       policy: viewerPolicy(),
@@ -23,7 +23,14 @@ describe('restricted embedding public API', () => {
     });
     const { instance, workbook, host } = sheet;
     expect(host.querySelector('.fc-tb')).toBeNull();
-    expect(instance.applyChanges([{ addr: a1, input: 'Prefilled' }]).status).toBe('applied');
+    // A batch of changes is decided by the policy whatever its history mode.
+    expect(instance.applyChanges([{ addr: a1, input: 'Prefilled' }]).status).toBe('refused');
+    expect(
+      instance.applyChanges([{ addr: a1, input: 'Prefilled' }], { history: 'record' }).status,
+    ).toBe('refused');
+    expect(workbook.getValue(a1).kind).toBe('blank');
+    // The workbook API is host code, ungated.
+    workbook.setText(a1, 'Prefilled');
     expect(
       instance.commands.execute({
         type: 'cellBatch',
@@ -31,12 +38,9 @@ describe('restricted embedding public API', () => {
         origin: 'editor',
         changes: [{ addr: a1, input: 'Changed' }],
       }).status,
-    ).toBe('rejected');
+    ).toBe('refused');
     expect(workbook.getValue(a1)).toEqual({ kind: 'text', value: 'Prefilled' });
-    expect(instance.history.canUndo()).toBe(false);
-    expect(
-      instance.applyChanges([{ addr: { ...a1, row: 20 }, input: 'Hidden dependency' }]).status,
-    ).toBe('applied');
+    workbook.setText({ ...a1, row: 20 }, 'Hidden dependency');
     expect(workbook.getValue({ ...a1, row: 20 })).toEqual({
       kind: 'text',
       value: 'Hidden dependency',
@@ -59,14 +63,12 @@ describe('restricted embedding public API', () => {
       origin: 'clipboard' as const,
       changes,
     };
-    expect(instance.commands.execute(command).status).toBe('rejected');
+    const result = instance.commands.execute(command);
+    expect(result.status).toBe('refused');
+    expect(result.rejections).toHaveLength(1);
+    expect(result.rejections[0]).toMatchObject({ sheet: 0, at: { row: 0, col: 1 } });
     expect(workbook.getValue(a1).kind).toBe('blank');
-    const result = instance.commands.execute({ ...command, denied: 'skipIneligible' });
-    expect(result.applied).toEqual([a1]);
-    expect(result.rejected[0]?.addr).toEqual(b1);
     expect(workbook.getValue(b1).kind).toBe('blank');
-    expect(instance.undo()).toBe(true);
-    expect(workbook.getValue(a1).kind).toBe('blank');
   });
 
   it('rechecks undo after policy changes and resumes it when permitted again', async () => {
@@ -87,7 +89,7 @@ describe('restricted embedding public API', () => {
   });
 
   it('emits one batch event only for a successful host update', async () => {
-    sheet = await mountStubSheet({ policy: viewerPolicy(), viewport: { range } });
+    sheet = await mountStubSheet({ policy: fixedFormPolicy([range]), viewport: { range } });
     const batches: unknown[] = [];
     sheet.instance.on('changeBatch', (event) => batches.push(event));
     expect(
@@ -97,7 +99,7 @@ describe('restricted embedding public API', () => {
       ]).status,
     ).toBe('applied');
     expect(sheet.instance.applyChanges([{ addr: { ...a1, sheet: 5 }, input: '3' }]).status).toBe(
-      'rejected',
+      'refused',
     );
     expect(batches).toHaveLength(1);
   });
@@ -109,7 +111,7 @@ describe('restricted embedding public API', () => {
     try {
       sheet = await mountStubSheet({
         workbook: original,
-        policy: viewerPolicy(),
+        policy: fixedFormPolicy([otherSheetRange]),
         viewport: { range: otherSheetRange },
       });
       expect(sheet.instance.store.getState().data.sheetIndex).toBe(1);

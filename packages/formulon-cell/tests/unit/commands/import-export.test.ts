@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { exportCSV, importCSV } from '../../../src/commands/import-export.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
+import { fixedFormPolicy } from '../../../src/commands/interaction-policy.js';
 import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -51,11 +56,11 @@ describe('importCSV', () => {
 
   it('writes a 2x3 CSV grid starting at the active cell', () => {
     mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
-    const result = importCSV(store.getState(), wb, 'a,b,c\n1,2,3');
-    expect(result).not.toBeNull();
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 2, c0: 1, r1: 3, c1: 3 });
-    expect(result?.cellsWritten).toBe(6);
-    expect(result?.rows).toBe(2);
+    const result = importCSV(store, wb, 'a,b,c\n1,2,3');
+    expect(result.status).toBe('applied');
+    expect(result.applied).toHaveLength(6);
+    expect(result.applied[0]).toEqual({ sheet: 0, at: { row: 2, col: 1 } });
+    expect(result.applied[5]).toEqual({ sheet: 0, at: { row: 3, col: 3 } });
 
     mirrorEngine(store, wb);
     const cells = store.getState().data.cells;
@@ -70,7 +75,7 @@ describe('importCSV', () => {
   });
 
   it('coerces numeric strings to numbers and = strings to formulas', () => {
-    importCSV(store.getState(), wb, '=1+2,42,hello');
+    importCSV(store, wb, '=1+2,42,hello');
     mirrorEngine(store, wb);
     const cells = store.getState().data.cells;
     // 0:0 is a formula cell whose evaluated value is 3.
@@ -88,7 +93,7 @@ describe('importCSV', () => {
   it('uses the workbook profile when importing localized numeric strings', () => {
     vi.spyOn(wb, 'spreadsheetProfileId').mockReturnValue('windows-de_DE');
 
-    importCSV(store.getState(), wb, '"1,25"');
+    importCSV(store, wb, '"1,25"');
 
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
       kind: 'number',
@@ -99,7 +104,7 @@ describe('importCSV', () => {
   it('lets an explicit import locale override the workbook profile', () => {
     vi.spyOn(wb, 'spreadsheetProfileId').mockReturnValue('windows-de_DE');
 
-    importCSV(store.getState(), wb, '1.25,TRUE', undefined, undefined, {
+    importCSV(store, wb, '1.25,TRUE', undefined, undefined, {
       locale: 'en-US',
     });
 
@@ -122,16 +127,11 @@ describe('importCSV', () => {
       expect(targetWb.capabilities.localeFacts).toBe(true);
       expect(targetWb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
 
-      const result = importCSV(
-        targetStore.getState(),
-        targetWb,
-        '"=SUM(1.5,2)"',
-        undefined,
-        undefined,
-        { locale: 'en-US' },
-      );
+      const result = importCSV(targetStore, targetWb, '"=SUM(1.5,2)"', undefined, undefined, {
+        locale: 'en-US',
+      });
 
-      expect(result?.cellsWritten).toBe(1);
+      expect(result?.applied).toHaveLength(1);
       expect(targetWb.spreadsheetProfileId()).toBe('windows-de_DE');
       expect(targetWb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe('=SUM(1.5,2)');
       expect(targetWb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
@@ -148,26 +148,30 @@ describe('importCSV', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { numFmt: { kind: 'text' } });
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { numFmt: { kind: 'text' } });
 
-    const result = importCSV(store.getState(), wb, '00123,=A1');
+    const result = importCSV(store, wb, '00123,=A1');
 
-    expect(result?.cellsWritten).toBe(2);
+    expect(result?.applied).toHaveLength(2);
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: '00123' });
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: '=A1' });
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 1 })).toBeNull();
   });
 
   it('uses the explicit anchor when provided', () => {
-    const result = importCSV(store.getState(), wb, 'x', { sheet: 0, row: 9, col: 5 });
-    expect(result?.writtenRange.r0).toBe(9);
-    expect(result?.writtenRange.c0).toBe(5);
+    const result = importCSV(store, wb, 'x', { sheet: 0, row: 9, col: 5 });
+    expect(result.applied).toEqual([{ sheet: 0, at: { row: 9, col: 5 } }]);
   });
 
   it('returns null on empty input', () => {
-    expect(importCSV(store.getState(), wb, '')).toBeNull();
+    expect(importCSV(store, wb, '')).toEqual({
+      status: 'applied',
+      applied: [],
+      rejections: [],
+      range: null,
+    });
   });
 
-  it('handles ragged rows (cellsWritten reflects per-row width)', () => {
-    importCSV(store.getState(), wb, 'a,b,c\n1\n9,8,7,6');
+  it('handles ragged rows (applied reflects per-row width)', () => {
+    importCSV(store, wb, 'a,b,c\n1\n9,8,7,6');
     mirrorEngine(store, wb);
     const cells = store.getState().data.cells;
     // (1, 1) was never written by the CSV (row 2 is "1" only) — stays blank.
@@ -179,7 +183,7 @@ describe('importCSV', () => {
     });
   });
 
-  it('skips locked protected destinations while importing into unlocked cells', () => {
+  it('refuses the import as a whole when a target cell is locked on a protected sheet', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     seedAndMirror(store, wb, [{ row: 0, col: 1, value: 'locked' }]);
     setCellLocked(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, false);
@@ -187,18 +191,19 @@ describe('importCSV', () => {
     setProtectedSheet(store, 0, true);
 
     try {
-      const result = importCSV(store.getState(), wb, 'a,b\n1,2');
-
-      expect(result?.cellsWritten).toBe(3);
-      expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
-      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'a' });
+      expect(importCSV(store, wb, 'a,b\n1,2').status).toBe('refused');
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
       expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({
         kind: 'text',
         value: 'locked',
       });
-      expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 1 });
-      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 2 });
+      expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
       expect(warn).toHaveBeenCalledTimes(1);
+
+      // Unlocked targets alone take the import.
+      const result = importCSV(store, wb, '1,2', { sheet: 0, row: 1, col: 0 });
+      expect(result?.applied).toHaveLength(2);
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 2 });
     } finally {
       warn.mockRestore();
     }
@@ -209,9 +214,9 @@ describe('importCSV', () => {
     wb.attachHistory(history);
     history.clear();
 
-    const result = importCSV(store.getState(), wb, 'a,b\n1,2', undefined, history);
+    const result = importCSV(store, wb, 'a,b\n1,2', undefined, history);
 
-    expect(result?.cellsWritten).toBe(4);
+    expect(result?.applied).toHaveLength(4);
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'a' });
     expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 2 });
 
@@ -220,6 +225,25 @@ describe('importCSV', () => {
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
     expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'blank' });
+  });
+
+  it('writes nothing when the interaction policy refuses a target cell', () => {
+    const history = new History();
+    const controller = new InteractionController({ store, getWb: () => wb, history });
+    const unregister = registerInteractionController(store, controller);
+    try {
+      // B1 sits outside the form, so the whole import is refused.
+      controller.setPolicy(fixedFormPolicy([{ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }]));
+      expect(importCSV(store, wb, 'a,b\n1,2', undefined, history).status).toBe('refused');
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
+      expect(history.canUndo()).toBe(false);
+      // Inside the form the import goes through as one step.
+      expect(importCSV(store, wb, 'a\n1', undefined, history)?.applied).toHaveLength(2);
+    } finally {
+      unregister();
+      controller.dispose();
+    }
   });
 });
 
@@ -386,7 +410,7 @@ describe('exportCSV', () => {
     const targetStore = createSpreadsheetStore();
     const targetWb = await WorkbookHandle.createDefault();
     expect(targetWb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
-    importCSV(targetStore.getState(), targetWb, '1.25,TRUE', undefined, undefined, {
+    importCSV(targetStore, targetWb, '1.25,TRUE', undefined, undefined, {
       locale: 'en-US',
     });
     expect(targetWb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
@@ -415,7 +439,7 @@ describe('exportCSV', () => {
         delimiter,
         range: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
       });
-      importCSV(targetStore.getState(), targetWb, csv, undefined, undefined, {
+      importCSV(targetStore, targetWb, csv, undefined, undefined, {
         delimiter,
         locale,
       });

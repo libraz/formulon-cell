@@ -3,7 +3,10 @@ import { captureSnapshot } from '../../../../src/commands/clipboard/snapshot.js'
 import { commentAt, setComment } from '../../../../src/commands/comment.js';
 import { hyperlinkAt, setHyperlink } from '../../../../src/commands/hyperlinks.js';
 import { addrKey } from '../../../../src/engine/address.js';
-import { registerDialogOpeners } from '../../../../src/interact/dialog-entry.js';
+import {
+  PASTE_SPECIAL_UNAVAILABLE,
+  registerDialogOpeners,
+} from '../../../../src/interact/dialog-entry.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
@@ -515,7 +518,7 @@ describe('Spreadsheet.mountToolbar', () => {
       },
     });
     const openPasteSpecial = vi.fn();
-    const pasteSpecial = vi.fn(() => true);
+    const pasteSpecial = vi.fn(() => PASTE_SPECIAL_UNAVAILABLE);
     const unused = (): void => undefined;
     registerDialogOpeners(sheet.instance.store, {
       formatDialog: unused,

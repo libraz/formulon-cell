@@ -2,7 +2,7 @@ import { copy, planCopyRanges } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
-import { pasteWrite } from '../commands/clipboard/paste-actions.js';
+import { pasteBatchWrite, pasteWrite } from '../commands/clipboard/paste-actions.js';
 import {
   type PasteWhat,
   pasteLink,
@@ -268,14 +268,13 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
             return;
           }
           const paste = { store, history, origin: 'contextMenu', commandId: 'paste' } as const;
-          const r = pasteWrite(
+          const r = pasteBatchWrite(
             paste,
             {
               destination,
               cutSource: snap?.mode === 'cut' ? snap.range : null,
             },
-            null,
-            (): ReturnType<typeof pasteTSV> | ReturnType<typeof pasteSpecial> =>
+            () =>
               snap
                 ? pasteSpecial(
                     store.getState(),
@@ -285,13 +284,11 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
                     { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
                     history,
                   )
-                : text
-                  ? pasteTSV(store.getState(), store, wb, text, history)
-                  : null,
+                : pasteTSV(store.getState(), store, wb, text, history),
           );
-          if (r) {
+          if (r.range) {
             consumeCutMarquee(store);
-            mutators.setRange(store, r.writtenRange);
+            mutators.setRange(store, r.range);
           }
           ctx.afterCommit();
         });

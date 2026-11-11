@@ -13,9 +13,12 @@ import { rowHiddenByFilter } from './filter-visible.js';
 import { History } from './history.js';
 import { InteractionController, interactionControllerFor } from './interaction-controller.js';
 import {
+  appliedBatch,
+  boundingRange,
   type ChangeBatchResult,
   type InteractionOrigin,
   operationPermission,
+  refusedBatch,
 } from './interaction-policy.js';
 import { alertPivotEdit, pivotGuardAlert, planPivotSelection } from './pivot-guard.js';
 import { deletePivotTables } from './pivot-table.js';
@@ -86,12 +89,16 @@ export const collectSelectedContentAddresses = (
   return addresses;
 };
 
-const emptyResult = (revision = 0): ChangeBatchResult => ({
-  status: 'noop',
-  applied: [],
-  rejected: [],
-  revision,
-});
+/** The rectangle around the selected ranges, or null when they span sheets. */
+export const selectionBounds = (state: State): Range | null => {
+  const { range, extraRanges } = state.selection;
+  return boundingRange(
+    [range, ...(extraRanges ?? [])].flatMap((r) => [
+      { sheet: r.sheet, row: r.r0, col: r.c0 },
+      { sheet: r.sheet, row: r.r1, col: r.c1 },
+    ]),
+  );
+};
 
 /**
  * Clear the selected contents through the mounted interaction controller.
@@ -110,12 +117,7 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
     (operationPermission(commands.policy, 'clear') && !commands.policy.editable);
   const rejectPivotEdit = (): ChangeBatchResult => {
     alertPivotEdit(workbook);
-    return {
-      status: 'rejected',
-      applied: [],
-      rejected: [{ code: 'protected', reason: pivotGuardAlert(workbook).message }],
-      revision: commands?.revision ?? 0,
-    };
+    return refusedBatch({ code: 'protected', reason: pivotGuardAlert(workbook).message });
   };
   if (pivotPlan.partial || (pivotPlan.whole.length > 0 && !mayDeleteObjects)) {
     return rejectPivotEdit();
@@ -123,12 +125,7 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
   const dataTablePlan = planDataTableSelection(workbook, store.getState().selection);
   if (dataTablePlan.partial || (dataTablePlan.whole.length > 0 && !mayDeleteObjects)) {
     alertDataTableEdit(workbook);
-    return {
-      status: 'rejected',
-      applied: [],
-      rejected: [{ code: 'protected', reason: dataTableGuardAlert(workbook).message }],
-      revision: commands?.revision ?? 0,
-    };
+    return refusedBatch({ code: 'protected', reason: dataTableGuardAlert(workbook).message });
   }
   const removesObjects = pivotPlan.whole.length > 0 || dataTablePlan.whole.length > 0;
   // Deleting a whole report or data table and clearing the rest of the
@@ -157,10 +154,13 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
   }
   const cleared = clearCollectedContents(options, commands);
   if (history && txn) {
-    if (cleared.status === 'rejected') history.abort(txn);
+    if (cleared.status === 'refused') history.abort(txn);
     else history.end(txn);
   }
-  return cleared.status === 'noop' && removesObjects ? { ...cleared, status: 'applied' } : cleared;
+  // The clear targets the selection, whichever of its cells held content.
+  return cleared.status === 'applied'
+    ? { ...cleared, range: selectionBounds(store.getState()) }
+    : cleared;
 };
 
 const clearCollectedContents = (
@@ -169,7 +169,7 @@ const clearCollectedContents = (
 ): ChangeBatchResult => {
   const { store, workbook } = options;
   const addresses = collectSelectedContentAddresses(store, workbook);
-  if (addresses.length === 0) return emptyResult(commands?.revision ?? 0);
+  if (addresses.length === 0) return appliedBatch([], null);
 
   let resolvedCommands: ClearContentsCommands | undefined = commands;
   let ephemeral: InteractionController | undefined;
@@ -190,9 +190,6 @@ const clearCollectedContents = (
       origin: options.origin ?? 'keyboard',
       commandId: options.commandId ?? 'clear-contents',
       changes: addresses.map((addr) => ({ addr, value: { kind: 'blank' as const } })),
-      // A host policy is an atomic authorization boundary. Legacy/no-policy
-      // calls preserve the historical writable-only partial clear behavior.
-      denied: resolvedCommands.policy ? 'reject' : 'skipIneligible',
     });
   } finally {
     ephemeral?.dispose();

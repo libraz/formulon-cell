@@ -87,7 +87,7 @@ describe('PivotTable edit guard', () => {
     setPivotGuardSink(wb, (alert) => alerts.push(alert.message));
     mutators.setRange(store, { sheet: 0, r0: 4, c0: 0, r1: 6, c1: 1 });
     const result = clearSelectedContents({ store, workbook: wb });
-    expect(result.status).toBe('rejected');
+    expect(result.status).toBe('refused');
     expect(alerts).toEqual([en.pivotTableDialog.cannotChange]);
     expect([...wb.pivotCells(0)].length).toBeGreaterThan(0);
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'Region' });
@@ -107,7 +107,7 @@ describe('PivotTable edit guard', () => {
       paste: ja.pivotTableDialog.cannotChangePaste,
     });
     mutators.setActive(store, { sheet: 0, row: 4, col: 0 });
-    expect(pasteTSV(store.getState(), store, wb, 'a\tb\nc\td')).toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, 'a\tb\nc\td').status).toBe('refused');
     expect(alerts).toEqual([
       'ピボットテーブルに影響するため、選択したセルに対してこの変更を行うことはできません。レポートを変更するには、フィールド リストを使ってください。セルを挿入または削除するには、ピボットテーブルを移動してからもう一度お試しください。',
     ]);

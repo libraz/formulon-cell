@@ -20,9 +20,9 @@ import type {
 import { valuesOnlyClipboard } from './interaction-policy.js';
 import { outlineDetailAxis } from './outline.js';
 import {
-  hasWritableCell,
   isPartialShift,
   noteChangePermitted,
+  rangeCellsWritable,
   refusedOnProtectedSheet,
   rowColumnOption,
   sheetPermits,
@@ -632,6 +632,9 @@ const builtInOperation = (
   return outlineDetailAxis(store, selection.range) === 'col' ? 'resizeColumns' : 'resizeRows';
 };
 
+/** Clear Contents and the Home Clear control, which a locked selected cell greys as a whole. */
+const CLEAR_CONTROL_COMMANDS: ReadonlySet<string> = new Set(['clear', 'clearFormat']);
+
 /** Commands that change threaded comments, which sheet protection never decides. */
 const THREAD_COMMANDS: ReadonlySet<string> = new Set([
   'mac.insert.newComment',
@@ -851,10 +854,11 @@ export const builtInProtectionDecision = (
     (operation === 'table' && !tableChangePermitted(state, sheet)) ||
     partial ||
     noteCommandRefused(state, id, operation) ||
-    // Clear Contents skips locked cells, so it is greyed when every selected cell is locked.
-    (id === 'clear' &&
-      ![state.selection.range, ...(state.selection.extraRanges ?? [])].some((range) =>
-        hasWritableCell(state, normalized(range)),
+    // Clearing is all or nothing, so a locked selected cell greys Clear Contents and the whole
+    // Home Clear control.
+    (CLEAR_CONTROL_COMMANDS.has(id) &&
+      ![state.selection.range, ...(state.selection.extraRanges ?? [])].every((range) =>
+        rangeCellsWritable(state, normalized(range)),
       )) ||
     (option !== undefined && !sheetPermits(state, sheet, option));
   return refused

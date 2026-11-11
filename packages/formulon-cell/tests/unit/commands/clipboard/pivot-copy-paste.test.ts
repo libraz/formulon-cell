@@ -62,7 +62,7 @@ describe('copying part of a PivotTable', () => {
   it('pastes values with the style flattened into direct formats (A4:B7 -> E4)', async () => {
     const { wb, store } = await setup();
     const result = copyAndPaste(wb, store, { r0: 3, c0: 0, r1: 6, c1: 1 }, { row: 3, col: 4 });
-    expect(result?.writtenRange).toMatchObject({ r0: 3, c0: 4, r1: 6, c1: 5 });
+    expect(result.range).toMatchObject({ r0: 3, c0: 4, r1: 6, c1: 5 });
     expect(wb.getPivotTables()).toHaveLength(1);
     expect(wb.getValue({ sheet: 0, row: 6, col: 4 })).toEqual({
       kind: 'text',
@@ -93,7 +93,7 @@ describe('copying a whole PivotTable', () => {
     const { wb, store } = await setup();
     const widthBefore = store.getState().layout.colWidths.get(4);
     const result = copyAndPaste(wb, store, { r0: 2, c0: 0, r1: 6, c1: 2 }, { row: 9, col: 4 });
-    expect(result?.writtenRange).toMatchObject({ r0: 9, c0: 4, r1: 13, c1: 6 });
+    expect(result.range).toMatchObject({ r0: 9, c0: 4, r1: 13, c1: 6 });
     const pivots = wb.getPivotTables();
     expect(pivots).toHaveLength(2);
     const copy = pivots.find((p) => p.top === 9 && p.left === 4);

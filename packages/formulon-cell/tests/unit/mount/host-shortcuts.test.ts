@@ -67,6 +67,7 @@ function makeSetup(
       recalc,
       cells,
       setNumber,
+      trackChangedCells: <T>(fn: () => T) => ({ value: fn(), changed: [] }),
     } as unknown as WorkbookHandle);
   getWb.mockReturnValue(wb);
   const store = createSpreadsheetStore();

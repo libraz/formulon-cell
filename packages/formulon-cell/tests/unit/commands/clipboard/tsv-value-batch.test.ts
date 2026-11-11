@@ -100,7 +100,7 @@ describe('TSV paste value batching', () => {
       const result = pasteTSV(store.getState(), store, wb, tsv, history);
       const expectedDate = coerceInput('31.12.2024', { locale: 'de-DE' });
 
-      expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 6 });
+      expect(result.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 6 });
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1.25 });
       expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 0.05 });
       expect(expectedDate.kind).toBe('number');
@@ -151,7 +151,7 @@ describe('TSV paste value batching', () => {
 
       const result = pasteTSV(store.getState(), store, wb, 'allowed\tlocked', history);
 
-      expect(result).toBeNull();
+      expect(result.status).toBe('refused');
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
       expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
       expect(history.canUndo()).toBe(false);

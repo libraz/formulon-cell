@@ -335,7 +335,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
             snapshot,
             range,
           );
-          if (inserted) {
+          if (inserted.status === 'applied') {
             mutators.replaceCells(
               input.store,
               currentWb.cells(input.store.getState().data.sheetIndex),
@@ -534,7 +534,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
             history: input.history,
             action: 'down',
           });
-          if (changed) {
+          if (changed.status === 'applied') {
             mutators.replaceCells(
               input.store,
               currentWb.cells(input.store.getState().data.sheetIndex),
@@ -556,7 +556,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
             history: input.history,
             action: 'right',
           });
-          if (changed) {
+          if (changed.status === 'applied') {
             mutators.replaceCells(
               input.store,
               currentWb.cells(input.store.getState().data.sheetIndex),

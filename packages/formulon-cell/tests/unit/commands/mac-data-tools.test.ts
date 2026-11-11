@@ -49,10 +49,9 @@ const makeInstance = (wb: WorkbookHandle, store: SpreadsheetStore): SpreadsheetI
     }) {
       const atomic = wb.applyCellPatchAtomic(command.changes);
       return {
-        status: atomic.changed.length > 0 ? 'applied' : 'noop',
-        applied: atomic.changed,
-        rejected: [],
-        revision: 1,
+        status: 'applied',
+        applied: atomic.changed.map(({ sheet, row, col }) => ({ sheet, at: { row, col } })),
+        rejections: [],
       } as const;
     },
   };

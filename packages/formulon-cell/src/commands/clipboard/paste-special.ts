@@ -32,6 +32,7 @@ import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import { rowHiddenByFilter } from '../filter-visible.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
+import { appliedBatch, type ChangeBatchResult, refusedBatch } from '../interaction-policy.js';
 import { moveDefinedNamesForCut } from '../named-ranges.js';
 import { blockPivotEdit } from '../pivot-guard.js';
 import { pastePivotTableCopy, pivotTableAtRange } from '../pivot-table.js';
@@ -85,7 +86,8 @@ export interface PasteSpecialOptions {
   transpose: boolean;
 }
 
-export interface PasteSpecialResult {
+/** What one paste wrote, before it becomes a batch result. */
+interface PasteSpecialResult {
   writtenRange: Range;
   /** Arithmetic operations that produced NaN/Infinity and were written as
    *  static spreadsheet error values. */
@@ -693,10 +695,22 @@ const consumeCutMarquee = (store: SpreadsheetStore): void => {
   mutators.setCopyRanges(store, null);
 };
 
+/** A paste as a batch result: `range` is the destination it wrote, `applied` the cells whose
+ *  content changed. */
+const pasteBatch = (
+  wb: WorkbookHandle,
+  paste: () => PasteSpecialResult | null,
+): ChangeBatchResult => {
+  const { value, changed } = wb.trackChangedCells(paste);
+  return value
+    ? appliedBatch(changed, value.writtenRange)
+    : refusedBatch({ code: 'invalid', reason: 'the paste was refused' });
+};
+
 /**
  * Apply a clipboard snapshot to the destination starting at `state.selection.active`,
- * filtered by the spreadsheet-style "Paste Special" options. Returns the range that was
- * actually written. Caller is responsible for refreshing the cached cell map.
+ * filtered by the spreadsheet-style "Paste Special" options. `range` in the result is the range
+ * that was written. Caller is responsible for refreshing the cached cell map.
  */
 export function pasteSpecial(
   state: State,
@@ -705,8 +719,8 @@ export function pasteSpecial(
   snap: ClipboardSnapshot,
   opt: PasteSpecialOptions,
   history: History | null = null,
-): PasteSpecialResult | null {
-  return applyPaste(state, store, wb, snap, opt, history);
+): ChangeBatchResult {
+  return pasteBatch(wb, () => applyPaste(state, store, wb, snap, opt, history));
 }
 
 /**
@@ -721,15 +735,18 @@ export function pasteLink(
   wb: WorkbookHandle,
   snap: ClipboardSnapshot,
   history: History | null = null,
-): PasteSpecialResult | null {
-  if (snap.mode === 'cut') return null;
-  return applyPaste(
-    state,
-    store,
-    wb,
-    snap,
-    { what: 'link', operation: 'none', skipBlanks: false, transpose: false },
-    history,
+): ChangeBatchResult {
+  if (snap.mode === 'cut')
+    return refusedBatch({ code: 'invalid', reason: 'a cut has nothing to link to' });
+  return pasteBatch(wb, () =>
+    applyPaste(
+      state,
+      store,
+      wb,
+      snap,
+      { what: 'link', operation: 'none', skipBlanks: false, transpose: false },
+      history,
+    ),
   );
 }
 

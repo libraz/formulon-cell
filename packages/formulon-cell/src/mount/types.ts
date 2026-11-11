@@ -141,7 +141,11 @@ export interface SpreadsheetInstance {
    */
   setLocale(locale: string): boolean;
   setToolbar(next: boolean | MountToolbarOptions): void;
-  /** Trusted host update; defaults to resetting user history after success. */
+  /**
+   * Write cell changes as one batch, decided by the interaction policy and sheet protection in
+   * every history mode: all or nothing, one refusal on failure. Defaults to resetting user history
+   * after success. Ungated writes go through the Sheet facade's setters and `Sheet.importCsv`.
+   */
   applyChanges(
     changes: readonly HostCellChangeInput[],
     options?: { history?: 'reset' | 'record'; origin?: string },
@@ -192,7 +196,8 @@ export interface SpreadsheetInstance {
   openFindReplace(tab?: 'find' | 'replace'): void;
   closeFindReplace(): void;
   openPasteSpecial(opts?: PasteSpecialOpenOptions): void;
-  pasteSpecial(options: PasteSpecialOptions, opts?: PasteSpecialOpenOptions): boolean;
+  /** Paste Special of the clipboard with `options`, as one batch result. */
+  pasteSpecial(options: PasteSpecialOptions, opts?: PasteSpecialOpenOptions): ChangeBatchResult;
   openInsertCopiedCells(): void;
   openPageSetup(tab?: 'page' | 'margins' | 'headerFooter' | 'sheet'): void;
   print(mode?: 'print' | 'pdf'): void;

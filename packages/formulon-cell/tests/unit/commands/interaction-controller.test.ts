@@ -16,6 +16,11 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const A1 = { sheet: 0, row: 0, col: 0 } as const;
+/** The batch-result entry of an address. */
+const cell = (addr: { sheet: number; row: number; col: number }) => ({
+  sheet: addr.sheet,
+  at: { row: addr.row, col: addr.col },
+});
 const B1 = { sheet: 0, row: 0, col: 1 } as const;
 const D4 = { sheet: 0, row: 3, col: 3 } as const;
 const SUBTOTAL_BAND = { sheet: 0, r0: 1, c0: 0, r1: MAX_ROW, c1: MAX_COL } as const;
@@ -68,20 +73,20 @@ describe('InteractionController', () => {
     changes: [{ addr, input }],
   });
 
-  it('rejects user mutation in a viewer while allowing trusted host reset', async () => {
+  it('refuses user mutation and a host batch alike in a viewer, whatever the history mode', async () => {
     const { controller: service, workbook: wb, history } = await createController();
     service.setPolicy(viewerPolicy());
 
     const rejected = service.execute(edit(A1, '42'));
-    expect(rejected.status).toBe('rejected');
-    expect(rejected.rejected[0]?.code).toBe('readOnly');
+    expect(rejected.status).toBe('refused');
+    expect(rejected.rejections[0]?.code).toBe('readOnly');
     expect(wb.getValue(A1)).toEqual({ kind: 'blank' });
     expect(history.canUndo()).toBe(false);
 
     const host = service.applyChanges([{ addr: A1, input: '42' }]);
-    expect(host.status).toBe('applied');
-    expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 42 });
-    expect(history.canUndo()).toBe(false);
+    expect(host.status).toBe('refused');
+    expect(host.rejections[0]?.code).toBe('readOnly');
+    expect(wb.getValue(A1)).toEqual({ kind: 'blank' });
   });
 
   it('keeps automatic hyperlink authorization to one non-formula cell and both write permissions', async () => {
@@ -216,7 +221,7 @@ describe('InteractionController', () => {
         });
 
         expect(result.status).toBe('applied');
-        expect(result.applied).toEqual([A1, B1]);
+        expect(result.applied).toEqual([A1, B1].map(cell));
         expect(wb.cellFormula(A1)).toBe('=SUM(1.5,2)');
         expect(wb.cellFormula(B1)).toBe('=SUM(1.5,2)');
         expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 3.5 });
@@ -242,15 +247,12 @@ describe('InteractionController', () => {
       ],
     };
     const rejected = service.execute(command);
-    expect(rejected.status).toBe('rejected');
+    expect(rejected.status).toBe('refused');
     expect(rejected.applied).toEqual([]);
+    expect(rejected.rejections).toEqual([
+      expect.objectContaining({ sheet: B1.sheet, at: { row: B1.row, col: B1.col } }),
+    ]);
     expect(wb.getValue(A1)).toEqual({ kind: 'blank' });
-
-    const skipped = service.execute({ ...command, denied: 'skipIneligible' });
-    expect(skipped.status).toBe('applied');
-    expect(skipped.applied).toEqual([A1]);
-    expect(skipped.rejected[0]?.addr).toEqual(B1);
-    expect(wb.getValue(A1)).toEqual({ kind: 'text', value: 'left' });
     expect(wb.getValue(B1)).toEqual({ kind: 'blank' });
   });
 
@@ -264,7 +266,7 @@ describe('InteractionController', () => {
       origin: 'editor',
       changes: [{ addr: A1, input: '=1+1' }],
     });
-    expect(formula.status).toBe('rejected');
+    expect(formula.status).toBe('refused');
     expect(wb.cellFormula(A1)).toBeNull();
 
     const applied = service.execute(edit(A1, '7'));
@@ -784,13 +786,13 @@ describe('InteractionController', () => {
         { addr: B1, input: '2' },
       ],
     });
-    expect(result.status).toBe('rejected');
-    expect(result.rejected[0]?.code).toBe('cellIneligible');
+    expect(result.status).toBe('refused');
+    expect(result.rejections[0]?.code).toBe('cellIneligible');
     expect(wb.cellFormula(A1)).toBeNull();
     expect(wb.getValue(B1)).toEqual({ kind: 'blank' });
   });
 
-  it('preflights the inverse formula and lets trusted updates cross navigation bounds', async () => {
+  it('preflights the inverse formula and keeps host batches inside navigation bounds', async () => {
     const store = createSpreadsheetStore();
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     wb.setFormula(A1, '=1+1');
@@ -803,11 +805,11 @@ describe('InteractionController', () => {
     });
     service.setPolicy(fixedFormPolicy({ ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 }] }));
     const deniedRecord = service.applyChanges([{ addr: A1, input: '7' }], { history: 'record' });
-    expect(deniedRecord.status).toBe('rejected');
+    expect(deniedRecord.status).toBe('refused');
     expect(wb.cellFormula(A1)).toBe('=1+1');
     const hiddenHost = service.applyChanges([{ addr: { sheet: 0, row: 1, col: 0 }, input: '8' }]);
-    expect(hiddenHost.status).toBe('applied');
-    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 8 });
+    expect(hiddenHost.status).toBe('refused');
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 }).kind).toBe('blank');
     service.dispose();
     wb.dispose();
   });
@@ -930,8 +932,8 @@ describe('InteractionController', () => {
       >,
     });
     const result = service.execute(edit(A1, 'Disallowed'));
-    expect(result.status).toBe('rejected');
-    expect(result.rejected[0]?.reason).toBe('restriction hook must be synchronous');
+    expect(result.status).toBe('refused');
+    expect(result.rejections[0]?.reason).toBe('restriction hook must be synchronous');
     expect(wb.getValue(A1).kind).toBe('blank');
   });
 
@@ -1070,8 +1072,8 @@ describe('InteractionController', () => {
     });
     restrictedController.setPolicy({ defaultOperation: 'allow' });
     const rejected = restrictedController.execute(command);
-    expect(rejected.status).toBe('rejected');
-    expect(rejected.rejected[0]?.code).toBe('effectTooLarge');
+    expect(rejected.status).toBe('refused');
+    expect(rejected.rejections[0]?.code).toBe('effectTooLarge');
     expect(restricted.atomicCalls()).toBe(0);
     expect(restricted.formulaScanCalls()).toBe(1);
     expect(restrictedHistory.canUndo()).toBe(false);
@@ -1085,8 +1087,8 @@ describe('InteractionController', () => {
     });
     deniedController.setPolicy(viewerPolicy());
     const policyRejected = deniedController.execute(command);
-    expect(policyRejected.status).toBe('rejected');
-    expect(policyRejected.rejected[0]?.code).toBe('readOnly');
+    expect(policyRejected.status).toBe('refused');
+    expect(policyRejected.rejections[0]?.code).toBe('readOnly');
     expect(denied.atomicCalls()).toBe(0);
     expect(denied.formulaScanCalls()).toBe(0);
     deniedController.dispose();
@@ -1131,8 +1133,8 @@ describe('InteractionController', () => {
       } as unknown as ReturnType<typeof wb.evalFormula>);
 
       const result = service.execute(edit(A1, '-5'));
-      expect(result.status).toBe('rejected');
-      expect(result.rejected[0]?.code).toBe('invalid');
+      expect(result.status).toBe('refused');
+      expect(result.rejections[0]?.code).toBe('invalid');
     });
 
     it('lets a warning-severity rule through on a value change', async () => {
@@ -1142,7 +1144,7 @@ describe('InteractionController', () => {
       });
 
       const result = service.execute(valueChange({ kind: 'number', value: 99 }));
-      expect(result.status).not.toBe('rejected');
+      expect(result.status).not.toBe('refused');
       expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 99 });
     });
 
@@ -1160,7 +1162,7 @@ describe('InteractionController', () => {
       });
 
       const result = service.execute(valueChange({ kind: 'number', value: 99 }));
-      expect(result.status).not.toBe('rejected');
+      expect(result.status).not.toBe('refused');
       expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 99 });
     });
 
@@ -1171,8 +1173,8 @@ describe('InteractionController', () => {
       });
 
       const result = service.execute(valueChange({ kind: 'number', value: 99 }));
-      expect(result.status).toBe('rejected');
-      expect(result.rejected[0]?.code).toBe('invalid');
+      expect(result.status).toBe('refused');
+      expect(result.rejections[0]?.code).toBe('invalid');
     });
   });
 });

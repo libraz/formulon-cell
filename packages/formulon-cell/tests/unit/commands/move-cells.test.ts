@@ -38,7 +38,7 @@ describe('moveSelectionTo', () => {
     const confirm = vi.fn(async () => true);
     expect(
       await moveSelectionTo(
-        { store, wb, history, commandId: 'moveCells', confirmOverwrite: confirm },
+        { store, wb, history, commandId: 'dragMove', confirmOverwrite: confirm },
         { row: 1, col: 6 },
       ),
     ).toBe(true);
@@ -57,7 +57,7 @@ describe('moveSelectionTo', () => {
     const cancel = vi.fn(async () => false);
     expect(
       await moveSelectionTo(
-        { store, wb, history, commandId: 'moveCells', confirmOverwrite: cancel },
+        { store, wb, history, commandId: 'dragMove', confirmOverwrite: cancel },
         { row: 4, col: 3 },
       ),
     ).toBe(false);
@@ -68,7 +68,7 @@ describe('moveSelectionTo', () => {
     const ok = vi.fn(async () => true);
     expect(
       await moveSelectionTo(
-        { store, wb, history, commandId: 'moveCells', confirmOverwrite: ok },
+        { store, wb, history, commandId: 'dragMove', confirmOverwrite: ok },
         { row: 4, col: 3 },
       ),
     ).toBe(true);
@@ -80,7 +80,7 @@ describe('moveSelectionTo', () => {
     const confirm = vi.fn(async () => true);
     expect(
       await moveSelectionTo(
-        { store, wb, history, commandId: 'moveCells', confirmOverwrite: confirm },
+        { store, wb, history, commandId: 'dragMove', confirmOverwrite: confirm },
         { row: 0, col: 0 },
       ),
     ).toBe(false);

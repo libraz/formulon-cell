@@ -6,6 +6,7 @@ import {
 } from '../commands/cell-input-commit.js';
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { refusedBatch } from '../commands/interaction-policy.js';
 import { deferForAllowedRangeUnlock, isCellWritable } from '../commands/protection.js';
 import { dblClickRange, editorRefHighlights, extractRefs, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
@@ -516,18 +517,17 @@ export class InlineEditor {
           operation,
           origin: 'editor',
           changes,
-          denied: 'reject',
         });
       } catch (err) {
         console.warn('formulon-cell: restricted editor fill failed', err);
-        result = { status: 'rejected', applied: [], rejected: [], revision: 0 };
+        result = refusedBatch({ code: 'invalid', reason: String(err) });
       }
-      if (result.status === 'rejected') {
+      if (result.status === 'refused') {
         input.focus();
         input.select();
         this.deps.onValidation?.({
           severity: 'stop',
-          message: result.rejected[0]?.reason ?? policyRejection(operation).message,
+          message: result.rejections[0]?.reason ?? policyRejection(operation).message,
         });
         return;
       }

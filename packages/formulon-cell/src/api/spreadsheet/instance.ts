@@ -17,7 +17,6 @@ import { createHistoryView } from '../../commands/history-view.js';
 import type {
   HostCellChangeInput,
   InteractionOperation,
-  ChangeBatchResult as LegacyBatchResult,
 } from '../../commands/interaction-policy.js';
 import { sheetPermits } from '../../commands/protection.js';
 import { clearTraceArrows, traceDependents, tracePrecedents } from '../../commands/traces.js';
@@ -43,7 +42,7 @@ import type {
 import { Spreadsheet } from '../../mount.js';
 import { mutators } from '../../store/store.js';
 import type { TraceArrow } from '../../store/types.js';
-import { type BatchRejection, type ChangeBatchResult, changeBatchResult } from '../change-batch.js';
+import type { ChangeBatchResult } from '../change-batch.js';
 import { failureOfDecision, spreadsheetFailure } from '../errors.js';
 import { type Disposer, Emitter } from '../events.js';
 import { Lifecycle } from '../lifecycle.js';
@@ -248,20 +247,6 @@ const legacyViewport = (config: ViewportConfig | null | undefined): ViewportOpti
       }
     : undefined;
 
-const legacyBatch = (result: LegacyBatchResult): ChangeBatchResult => {
-  const at = (a: Addr): { sheet: number; at: CellAddress } => ({
-    sheet: a.sheet,
-    at: { row: a.row, col: a.col },
-  });
-  const rejections: BatchRejection[] = result.rejected.map((r) => ({
-    sheet: r.addr?.sheet ?? -1,
-    at: { row: r.addr?.row ?? -1, col: r.addr?.col ?? -1 },
-    code: r.code,
-    reason: r.reason ?? r.code,
-  }));
-  return changeBatchResult(result.applied.map(at), rejections);
-};
-
 /** Protect Sheet option a command's operation needs on a protected sheet; `null` when the
  *  operation is checked cell by cell instead, `undefined` when no option allows it. */
 const PROTECTION_PERMISSION: Partial<
@@ -272,7 +257,6 @@ const PROTECTION_PERMISSION: Partial<
   clear: null,
   paste: null,
   fill: null,
-  moveCells: null,
   format: 'formatCells',
   insertRows: 'insertRows',
   deleteRows: 'deleteRows',
@@ -387,7 +371,7 @@ export class SpreadsheetInstance {
 
   /** Copy, cut and paste; `null` when the `clipboard` feature is off. */
   get clipboard():
-    | (ClipboardHandle & { pasteSpecial(options: PasteSpecialOptions): boolean })
+    | (ClipboardHandle & { pasteSpecial(options: PasteSpecialOptions): ChangeBatchResult })
     | null {
     const legacy = stateOf(this).legacy;
     const handle = legacy.clipboard;
@@ -425,8 +409,10 @@ export class SpreadsheetInstance {
     state.events.emit('update', event);
   }
 
-  /** Writes host cell changes as one batch. Cells the policy or protection refuses are reported in
-   *  `rejections`; nothing throws for them. */
+  /** Writes cell changes as one batch, decided by the interaction policy and sheet protection in
+   *  every history mode: all or nothing, so a refused change writes none of them and is reported
+   *  in `rejections`; nothing throws for it. Ungated writes go through the Sheet facade's setters
+   *  and `Sheet.importCsv`. */
   applyChanges(changes: readonly CellChange[], options: ApplyChangesOptions): ChangeBatchResult {
     const state = stateOf(this);
     const legacy = state.legacy;
@@ -457,7 +443,7 @@ export class SpreadsheetInstance {
           ...(options.origin ? { origin: options.origin } : {}),
         }),
       );
-      return legacyBatch(result);
+      return result;
     } finally {
       state.origin = previous;
     }
@@ -1011,7 +997,7 @@ export async function mount(
     }),
   );
   const offBatch = legacy.on('changeBatch', (result) =>
-    events.emit('change', { ...legacyBatch(result), origin: state.origin ?? 'editor' }),
+    events.emit('change', { ...result, origin: state.origin ?? 'editor' }),
   );
   const offRecalc = legacy.on('recalc', (e) =>
     events.emit('recalc', {

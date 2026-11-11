@@ -81,7 +81,7 @@ describe.skipIf(!canLoadWasm())('data table edit guard', () => {
     const history = new History();
     wb.attachHistory(history);
     mutators.setRange(store, { sheet: 0, r0: 3, c0: 1, r1: 4, c1: 2 });
-    expect(clearSelectedContents({ store, workbook: wb, history }).status).toBe('rejected');
+    expect(clearSelectedContents({ store, workbook: wb, history }).status).toBe('refused');
     expect(alerts).toEqual([en.dataTableDialog.cannotChange]);
     expect(wb.getValue(at(4, 1))).toEqual({ kind: 'number', value: 3 });
 
@@ -106,7 +106,7 @@ describe.skipIf(!canLoadWasm())('data table edit guard', () => {
   it('refuses a paste that reaches the results', async () => {
     const { wb, store, alerts } = await setup();
     mutators.setActive(store, at(4, 1));
-    expect(pasteTSV(store.getState(), store, wb, 'a\tb')).toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, 'a\tb').status).toBe('refused');
     expect(alerts).toEqual([en.dataTableDialog.cannotChange]);
     expect(wb.getValue(at(4, 1))).toEqual({ kind: 'number', value: 3 });
     mutators.setActive(store, at(10, 0));
@@ -170,7 +170,7 @@ describe.skipIf(!canLoadWasm())('data table edit guard', () => {
         { addr: at(4, 2), input: '2' },
       ],
     });
-    expect(batch.status).toBe('rejected');
+    expect(batch.status).toBe('refused');
     expect(wb.getValue(at(8, 8))).toEqual({ kind: 'blank' });
     expect(alerts).toHaveLength(4);
     expect(wb.getValue(at(4, 2))).toEqual({ kind: 'number', value: 6 });
@@ -206,7 +206,7 @@ describe.skipIf(!canLoadWasm())('data table edit guard', () => {
       origin: 'instanceApi',
       changes: [{ addr: at(8, 8), input: '=table(A1,)' }],
     });
-    expect(batch.status).toBe('rejected');
+    expect(batch.status).toBe('refused');
     expect(wb.getValue(at(8, 8))).toEqual({ kind: 'blank' });
     wb.dispose();
   });
@@ -283,7 +283,7 @@ describe.skipIf(!canLoadWasm())('data table edit guard', () => {
       { ok: false, reason: 'protected' },
     );
     expectRefused('text script', applyTextScriptToRange(store.getState(), wb, results, 'clear'), 0);
-    expectRefused('csv import', importCSV(store.getState(), wb, '1,2', at(4, 1)), null);
+    expectRefused('csv import', importCSV(store, wb, '1,2', at(4, 1)).status, 'refused');
     expectRefused(
       'advanced filter copy',
       copyAdvancedFilterResult(
@@ -321,8 +321,8 @@ describe.skipIf(!canLoadWasm())('data table edit guard', () => {
     );
     expectRefused(
       'cut rows',
-      insertCopiedBand(store, wb, history, band, { sheet: 0, row: 10, col: 0 }),
-      null,
+      insertCopiedBand(store, wb, history, band, { sheet: 0, row: 10, col: 0 }).status,
+      'refused',
     );
     expect(wb.dataTableAt(at(3, 2))?.range).toEqual(results);
     wb.dispose();
@@ -347,7 +347,7 @@ describe.skipIf(!canLoadWasm())('data table edit guard', () => {
     expect(text.status).toBe('applied');
 
     mutators.setActive(store, at(10, 0));
-    expect(pasteTSV(store.getState(), store, wb, '1\t=SUM(1,TABLE(,A1))')).toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, '1\t=SUM(1,TABLE(,A1))').status).toBe('refused');
     expect(alerts).toEqual([en.dataTableDialog.tableFunction]);
     expect(wb.getValue(at(10, 0))).toEqual({ kind: 'blank' });
     wb.dispose();

@@ -254,8 +254,14 @@ const updateClearMenu =
       .filter((selected) => selected.sheet === range.sheet)
       .some((selected) => conditionalRulesForRange(state, selected).length > 0);
     const disabledReason = instance.i18n.strings.ribbon.clearRequiresTarget;
+    // The items follow the Clear control's own decision, so a refused control greys them all.
+    const controlDenied = !canExecuteBuiltIn(instance.store, 'clearFormat', 'ribbon').allowed;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-clear]')) {
       const action = button.dataset.clear;
+      if (controlDenied) {
+        setMenuControlDisabled(button, true, instance.i18n.strings.backstage.commandUnavailable);
+        continue;
+      }
       const disabled =
         (action === 'contents' && !hasContentsSelection) ||
         (action === 'formats' && !hasFormats) ||

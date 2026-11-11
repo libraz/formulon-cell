@@ -18,6 +18,8 @@ import {
 } from '../../../src/store/store.js';
 
 const addr = (row: number, col: number, sheet = 0): Addr => ({ sheet, row, col });
+/** The batch-result entry of an address. */
+const cell = ({ sheet, row, col }: Addr) => ({ sheet, at: { row, col } });
 
 describe('clearSelectedContents', () => {
   let workbook: WorkbookHandle | undefined;
@@ -69,7 +71,7 @@ describe('clearSelectedContents', () => {
     const history = new History();
     const result = clearSelectedContents({ store, workbook, history, origin: 'ribbon' });
     expect(result.status).toBe('applied');
-    expect(result.applied).toEqual(selected);
+    expect(result.applied).toEqual(selected.map(cell));
     expect(workbook.getValue(addr(1, 1))).toEqual({ kind: 'number', value: 5 });
     expect(workbook.cellFormula(addr(2, 2))).toBeNull();
     expect(history.canUndo()).toBe(true);
@@ -106,7 +108,7 @@ describe('clearSelectedContents', () => {
 
     const result = clearSelectedContents({ store, workbook, history: new History() });
     expect(result.status).toBe('applied');
-    expect(result.applied).toEqual([addr(0, 1), addr(0, 3)]);
+    expect(result.applied).toEqual([addr(0, 1), addr(0, 3)].map(cell));
     expect(workbook.getValue(addr(0, 1))).toEqual({ kind: 'blank' });
     expect(workbook.getValue(addr(0, 3))).toEqual({ kind: 'blank' });
     expect(store.getState().merges.byAnchor).toEqual(new Map([['0:0:1', merge]]));
@@ -145,12 +147,12 @@ describe('clearSelectedContents', () => {
 
     const result = clearSelectedContents({ store, workbook });
     expect(result.status).toBe('applied');
-    expect(result.applied).toEqual([first, second]);
+    expect(result.applied).toEqual([first, second].map(cell));
     expect(workbook.getValue(first)).toEqual({ kind: 'blank' });
     expect(workbook.getValue(second)).toEqual({ kind: 'blank' });
   });
 
-  it('reports a registered controller revision for an empty selection', async () => {
+  it('reports an empty applied batch for an empty selection', async () => {
     workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const store = createSpreadsheetStore();
     const history = new History();
@@ -165,7 +167,12 @@ describe('clearSelectedContents', () => {
     try {
       controller.setPolicy({ defaultOperation: 'allow' });
       const result = clearSelectedContents({ store, workbook, history });
-      expect(result).toMatchObject({ status: 'noop', applied: [], revision: 1 });
+      expect(result).toEqual({
+        status: 'applied',
+        applied: [],
+        rejections: [],
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      });
       expect(history.canUndo()).toBe(false);
     } finally {
       unregister();
@@ -191,7 +198,7 @@ describe('clearSelectedContents', () => {
 
     try {
       const result = clearSelectedContents({ store, workbook, history, commands: controller });
-      expect(result.status).toBe('rejected');
+      expect(result.status).toBe('refused');
       expect(result.applied).toEqual([]);
       expect(workbook.getValue(addr(0, 0))).toEqual({ kind: 'number', value: 1 });
       expect(workbook.getValue(addr(0, 1))).toEqual({ kind: 'number', value: 2 });

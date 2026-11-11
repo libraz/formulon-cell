@@ -1,6 +1,6 @@
 import type { Addr } from '../engine/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { authorizedWrite } from './authorized-write.js';
+import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
 import { History } from './history.js';
 import type { InteractionOrigin, OperationIntent } from './interaction-policy.js';
 import { asThreadIntent } from './thread-intent.js';
@@ -50,18 +50,29 @@ function commentStep<T>(
   thread: boolean,
 ): T {
   if (cells.length === 0) return refused;
-  const intent = (origin: InteractionOrigin): OperationIntent => ({
-    operation: 'comment',
-    origin,
-    commandId: ctx.commandId,
-    effects: [{ kind: 'cells', cells }],
-  });
   const result = authorizedWrite({
     store: ctx.store,
     history: ctx.history ?? new History(),
-    intents: (origin) => [thread ? asThreadIntent(intent(origin)) : intent(origin)],
+    intents: commentIntents(ctx, cells, thread),
     origin: ctx.origin,
     write,
   });
   return result.ok ? result.value : refused;
 }
+
+/** The intents of a note (or, with `thread`, a threaded-comment) change of `cells`. */
+export const commentIntents =
+  (
+    ctx: Pick<CommentActionContext, 'commandId'>,
+    cells: readonly Addr[],
+    thread: boolean,
+  ): AuthorizedIntentFactory =>
+  (origin) => {
+    const intent: OperationIntent = {
+      operation: 'comment',
+      origin,
+      commandId: ctx.commandId,
+      effects: [{ kind: 'cells', cells }],
+    };
+    return [thread ? asThreadIntent(intent) : intent];
+  };

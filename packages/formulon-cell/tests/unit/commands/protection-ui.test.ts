@@ -75,13 +75,17 @@ describe('measured protection rules of the UI', () => {
     return env;
   };
 
-  it('greys Clear Contents only when every selected cell is locked', async () => {
+  it('greys Clear Contents when any selected cell is locked: the clear is all or nothing', async () => {
     const { store } = await setup();
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
     setProtectedSheet(store, 0, true);
-    expect(canExecuteBuiltIn(store, 'clear', 'contextMenu').allowed).toBe(false);
     mutators.setCellFormat(store, { sheet: 0, row: 1, col: 0 }, { locked: false });
+    expect(canExecuteBuiltIn(store, 'clear', 'contextMenu').allowed).toBe(false);
+    // The Home Clear control is greyed as a whole on the same selection.
+    expect(canExecuteBuiltIn(store, 'clearFormat', 'ribbon').allowed).toBe(false);
+    mutators.setRange(store, { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 });
     expect(canExecuteBuiltIn(store, 'clear', 'contextMenu').allowed).toBe(true);
+    expect(canExecuteBuiltIn(store, 'clearFormat', 'ribbon').allowed).toBe(true);
   });
 
   it('opens no filter dropdown on a protected sheet without Use AutoFilter', async () => {

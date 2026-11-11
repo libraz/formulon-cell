@@ -448,9 +448,8 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
             operation: 'clear',
             origin: 'keyboard',
             changes: [{ addr: a, value: { kind: 'blank' } }],
-            denied: 'reject',
           });
-          if (result.status !== 'rejected') {
+          if (result.status !== 'refused') {
             deps.onClearActive();
             deps.onBeginEdit('', { mode: 'point' });
           }
@@ -485,7 +484,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
             history: deps.history,
             origin: 'keyboard',
           });
-          if (result.status !== 'rejected') deps.onClearActive();
+          if (result.status !== 'refused') deps.onClearActive();
         },
       );
       return;

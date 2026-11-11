@@ -218,7 +218,7 @@ describe('whole-sheet copy', () => {
     history.end();
     wb.recalc();
 
-    expect(result?.writtenRange).toEqual({ ...fullSheet, sheet: 1 });
+    expect(result.range).toEqual({ ...fullSheet, sheet: 1 });
     expect(wb.cellFormula({ sheet: 1, row: 4, col: 3 })).toBe('=A1');
     expect(wb.getValue({ sheet: 1, row: 5, col: 4 })).toEqual({ kind: 'text', value: 'source' });
     expect(wb.getValue({ sheet: 1, row: 100, col: 100 })).toEqual({ kind: 'blank' });

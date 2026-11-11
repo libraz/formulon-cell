@@ -4,7 +4,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { cut } from './clipboard/cut.js';
 import { createCopyFormatResolver } from './clipboard/format-resolver.js';
-import { pasteWrite } from './clipboard/paste-actions.js';
+import { pasteBatchWrite } from './clipboard/paste-actions.js';
 import { pasteSpecial } from './clipboard/paste-special.js';
 import { captureSnapshotFromCopyResult } from './clipboard/snapshot.js';
 import type { History } from './history.js';
@@ -78,10 +78,9 @@ export async function moveSelectionTo(
   );
   if (!snap) return false;
   mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
-  const written = pasteWrite(
+  const written = pasteBatchWrite(
     { store, history, origin: 'editor', commandId: deps.commandId },
     { destination: dest, cutSource: src },
-    null,
     () =>
       pasteSpecial(
         store.getState(),
@@ -90,8 +89,8 @@ export async function moveSelectionTo(
         snap,
         { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
         history,
-      )?.writtenRange ?? null,
-  );
+      ),
+  ).range;
   if (!written) {
     mutators.setActive(store, { sheet: src.sheet, row: src.r0, col: src.c0 });
     mutators.setRange(store, src);

@@ -6,6 +6,7 @@
       "mustExport": {
         "ApplyChangesOptions": "type",
         "BUILT_IN_LOCALES": "value",
+        "BatchCell": "type",
         "BatchRejection": "type",
         "BorderDrawHandle": "type",
         "BorderDrawMode": "type",
@@ -696,6 +697,7 @@
       "mustNotExport": [
         "ApplyChangesOptions",
         "BUILT_IN_LOCALES",
+        "BatchCell",
         "BatchRejection",
         "BorderDrawHandle",
         "BorderDrawMode",
@@ -791,6 +793,7 @@
       "mustNotExport": [
         "ApplyChangesOptions",
         "BUILT_IN_LOCALES",
+        "BatchCell",
         "BatchRejection",
         "BorderDrawHandle",
         "BorderDrawMode",

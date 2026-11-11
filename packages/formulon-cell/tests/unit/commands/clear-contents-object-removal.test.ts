@@ -33,7 +33,7 @@ describe('clearSelectedContents object removal', () => {
       workbook: {} as unknown as WorkbookHandle,
       history,
     });
-    expect(result.status).toBe('rejected');
+    expect(result.status).toBe('refused');
     expect(deleteDataTables).not.toHaveBeenCalled();
     expect(history.canUndo()).toBe(false);
   });

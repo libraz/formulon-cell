@@ -183,10 +183,9 @@ export function commitCellInput({
         operation,
         origin,
         changes: [{ addr, input: raw }],
-        denied: 'reject',
       });
-      if (result.status === 'rejected') {
-        const reason = result.rejected[0]?.reason;
+      if (result.status === 'refused') {
+        const reason = result.rejections[0]?.reason;
         return {
           status: 'rejected',
           operation,

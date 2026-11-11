@@ -1,7 +1,7 @@
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { authorizedWrite } from './authorized-write.js';
+import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
 import { History } from './history.js';
 import { clearHyperlink, type SetHyperlinkOptions, setHyperlink } from './hyperlinks.js';
 import type { InteractionOperation, InteractionOrigin } from './interaction-policy.js';
@@ -38,19 +38,28 @@ export function hyperlinkWrite<T>(
   const result = authorizedWrite({
     store: ctx.store,
     history: ctx.history ?? new History(),
-    intents: (origin) => [
-      {
-        operation: hyperlinkOperation(removes),
-        origin,
-        commandId: ctx.commandId,
-        effects: [{ kind: 'cells', cells }],
-      },
-    ],
+    intents: hyperlinkIntents(ctx, cells, removes),
     origin: ctx.origin,
     write,
   });
   return result.ok ? result.value : refused;
 }
+
+/** The intents of a hyperlink change of `cells`; `removes` marks a removal. */
+export const hyperlinkIntents =
+  (
+    ctx: Pick<HyperlinkActionContext, 'commandId'>,
+    cells: readonly Addr[],
+    removes: boolean,
+  ): AuthorizedIntentFactory =>
+  (origin) => [
+    {
+      operation: hyperlinkOperation(removes),
+      origin,
+      commandId: ctx.commandId,
+      effects: [{ kind: 'cells', cells }],
+    },
+  ];
 
 /** Set the hyperlink of `addr` (or remove it when `target` is empty), as one undoable step. */
 export function setHyperlinkAction(

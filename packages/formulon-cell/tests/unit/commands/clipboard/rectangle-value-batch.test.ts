@@ -119,7 +119,7 @@ describe('rectangular Paste All value batching', () => {
     const result = pasteAll(mounted);
     unsubscribe();
 
-    expect(result?.writtenRange).toEqual(destinationRange);
+    expect(result.range).toEqual(destinationRange);
     expect(cellMapPublications).toBe(1);
     expect(callbackCellMaps).toHaveLength(1_000);
     const publishedCells = store.getState().data.cells;

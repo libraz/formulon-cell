@@ -308,7 +308,7 @@ describe('paste-special — what × operation × transpose × skipBlanks matrix'
   });
 
   describe('active range update after paste', () => {
-    it('writtenRange equals the destination block for non-transpose', () => {
+    it('range equals the destination block for non-transpose', () => {
       seed(store, wb, [
         { row: 0, col: 0, value: 1 },
         { row: 0, col: 1, value: 2 },
@@ -319,10 +319,10 @@ describe('paste-special — what × operation × transpose × skipBlanks matrix'
       if (!snap) throw new Error('no snapshot');
       setActive(store, 10, 10);
       const res = pasteSpecial(store.getState(), store, wb, snap, opt());
-      expect(res?.writtenRange).toEqual({ sheet: 0, r0: 10, c0: 10, r1: 11, c1: 11 });
+      expect(res.range).toEqual({ sheet: 0, r0: 10, c0: 10, r1: 11, c1: 11 });
     });
 
-    it('writtenRange reflects the transposed dimensions', () => {
+    it('range reflects the transposed dimensions', () => {
       seed(store, wb, [
         { row: 0, col: 0, value: 1 },
         { row: 0, col: 1, value: 2 },
@@ -333,7 +333,7 @@ describe('paste-special — what × operation × transpose × skipBlanks matrix'
       setActive(store, 10, 10);
       const res = pasteSpecial(store.getState(), store, wb, snap, opt({ transpose: true }));
       // 1×3 → 3×1
-      expect(res?.writtenRange).toEqual({ sheet: 0, r0: 10, c0: 10, r1: 12, c1: 10 });
+      expect(res.range).toEqual({ sheet: 0, r0: 10, c0: 10, r1: 12, c1: 10 });
     });
   });
 });

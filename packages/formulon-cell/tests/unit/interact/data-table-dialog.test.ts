@@ -127,7 +127,7 @@ describe.skipIf(!canLoadWasm())('Data Table dialog', () => {
       value: 4,
     });
     mutators.setRange(instance.store, { sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 });
-    expect(clearSelectedContents({ store: instance.store, workbook }).status).toBe('rejected');
+    expect(clearSelectedContents({ store: instance.store, workbook }).status).toBe('refused');
     expect(document.body.textContent).toContain(en.dataTableDialog.cannotChange);
   });
 

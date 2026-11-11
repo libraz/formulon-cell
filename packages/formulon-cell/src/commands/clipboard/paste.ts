@@ -8,18 +8,20 @@ import {
   inputLocaleForWorkbook,
   writeCoerced,
 } from '../coerce-input.js';
-import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
+import {
+  blockDataTableEdit,
+  blockTableFunction,
+  dataTableGuardAlert,
+  tableFunctionAlert,
+} from '../data-table-guard.js';
 import type { History } from '../history.js';
-import { blockPivotEdit } from '../pivot-guard.js';
+import { appliedBatch, type ChangeBatchResult, refusedBatch } from '../interaction-policy.js';
+import { blockPivotEdit, pivotGuardAlert } from '../pivot-guard.js';
 import { isCellWritable, isSheetProtected } from '../protection.js';
 import { recordFormatChange } from '../slice-history.js';
 import { applyPatchesAtomic } from './apply-patches-atomic.js';
 import { extendTablesForPaste } from './table-extension.js';
 import { parseTSV } from './tsv.js';
-
-export interface PasteResult {
-  writtenRange: Range;
-}
 
 /**
  * Paste a TSV payload at the current active cell. Each value is run through
@@ -41,10 +43,9 @@ export function pasteTSV(
   wb: WorkbookHandle,
   text: string,
   history: History | null = null,
-): PasteResult | null {
-  if (!text) return null;
-  const rows = parseTSV(text);
-  if (rows.length === 0) return null;
+): ChangeBatchResult {
+  const rows = text ? parseTSV(text) : [];
+  if (rows.length === 0) return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
 
   const origin: Addr = state.selection.active;
   const sheet = origin.sheet;
@@ -56,8 +57,11 @@ export function pasteTSV(
     r1: origin.row + rows.length - 1,
     c1: origin.col + pastedCols - 1,
   };
-  if (!rangeWritable(state, pasteArea)) return null;
-  if (blockPivotEdit(wb, pasteArea, 'paste') || blockDataTableEdit(wb, pasteArea)) return null;
+  if (!rangeWritable(state, pasteArea)) return refusedBatch({ code: 'protected' });
+  if (blockPivotEdit(wb, pasteArea, 'paste'))
+    return refusedBatch({ code: 'protected', reason: pivotGuardAlert(wb, 'paste').message });
+  if (blockDataTableEdit(wb, pasteArea))
+    return refusedBatch({ code: 'protected', reason: dataTableGuardAlert(wb).message });
   const inputLocale = inputLocaleForWorkbook(wb);
   let maxCols = 0;
   const writes: { addr: Addr; input: ReturnType<typeof coerceInputForCell> }[] = [];
@@ -73,20 +77,23 @@ export function pasteTSV(
     }
   }
   const formulas = writes.map(({ input }) => (input.kind === 'formula' ? input.text : null));
-  if (blockTableFunction(wb, formulas)) return null;
+  if (blockTableFunction(wb, formulas))
+    return refusedBatch({ code: 'invalid', reason: tableFunctionAlert(wb).message });
 
   const transaction = history?.begin();
-  if (history) {
-    applyPatchesAtomic(
-      wb,
-      writes.map(({ addr, input }) => coercedInputToPatch(addr, input)),
-      history,
-    );
-  } else {
-    wb.withBatchedRecalc(() => {
-      for (const { addr, input } of writes) writeCoerced(wb, addr, input);
-    });
-  }
+  const { changed } = wb.trackChangedCells(() => {
+    if (history) {
+      applyPatchesAtomic(
+        wb,
+        writes.map(({ addr, input }) => coercedInputToPatch(addr, input)),
+        history,
+      );
+    } else {
+      wb.withBatchedRecalc(() => {
+        for (const { addr, input } of writes) writeCoerced(wb, addr, input);
+      });
+    }
+  });
 
   const writtenRange: Range = {
     sheet,
@@ -98,7 +105,7 @@ export function pasteTSV(
   applyImplicitFormats(store, history, writes);
   extendTablesForPaste(store, history, writtenRange);
   if (transaction !== undefined) history?.end(transaction);
-  return { writtenRange };
+  return appliedBatch(changed, writtenRange);
 }
 
 /** Whether every cell of `range` is writable under sheet protection. */

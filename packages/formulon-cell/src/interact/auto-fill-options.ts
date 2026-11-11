@@ -280,7 +280,10 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
     if (!history) return;
     mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
     mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
-    if (executeRibbonFillAction({ store, workbook: wb, history, action: 'flash' })) {
+    if (
+      executeRibbonFillAction({ store, workbook: wb, history, action: 'flash' }).status ===
+      'applied'
+    ) {
       deps.onAfterCommit?.();
     }
   };

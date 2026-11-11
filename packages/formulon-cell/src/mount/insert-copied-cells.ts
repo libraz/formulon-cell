@@ -49,8 +49,8 @@ export function createInsertCopiedCellsOpener(
     if (copiedWholeBand && copied) {
       const target = store.getState().selection.range;
       const result = insertCopiedBandAction(ctx, wb, copied, target);
-      if (result) {
-        mutators.setRange(store, result.writtenRange);
+      if (result.range) {
+        mutators.setRange(store, result.range);
         deps.refreshCells();
         deps.updateChrome();
         deps.invalidate();
@@ -69,9 +69,9 @@ export function createInsertCopiedCellsOpener(
           if (!text && !snap) return;
           // The workbook may have been swapped while the clipboard read was pending.
           const result = insertCopiedCellsAction(ctx, getWb(), text, direction, snap);
-          if (!result) return;
+          if (!result.range) return;
           // Marquee stays up, same as the context-menu variants.
-          mutators.setRange(store, result.writtenRange);
+          mutators.setRange(store, result.range);
           deps.refreshCells();
           deps.updateChrome();
           deps.invalidate();

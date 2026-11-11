@@ -122,7 +122,7 @@ describe('pasteSpecial', () => {
     });
     wb.recalc();
     // 1x3 → 3x1
-    expect(got?.writtenRange).toEqual({ sheet: 0, r0: 5, c0: 5, r1: 7, c1: 5 });
+    expect(got.range).toEqual({ sheet: 0, r0: 5, c0: 5, r1: 7, c1: 5 });
     expect(num(wb, 5, 5)).toBe(1);
     expect(num(wb, 6, 5)).toBe(2);
     expect(num(wb, 7, 5)).toBe(3);

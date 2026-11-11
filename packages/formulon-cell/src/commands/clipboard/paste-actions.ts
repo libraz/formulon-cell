@@ -1,14 +1,22 @@
 import type { Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../../store/store.js';
-import { type AuthorizedIntentFactory, authorizedWrite } from '../authorized-write.js';
+import {
+  type AuthorizedIntentFactory,
+  type AuthorizedWriteResult,
+  authorizedWrite,
+} from '../authorized-write.js';
 import { History } from '../history.js';
-import type { InteractionOrigin } from '../interaction-policy.js';
+import {
+  type ChangeBatchResult,
+  type InteractionOrigin,
+  refusedBatch,
+  refusedByDecision,
+} from '../interaction-policy.js';
 import {
   copiedBlock,
   type InsertCopiedBandTarget,
   type InsertCopiedCellsDirection,
-  type InsertCopiedCellsResult,
   insertCopiedBand,
   insertCopiedCellsFromTSV,
   targetAddress,
@@ -31,22 +39,31 @@ export interface PasteActionContext {
 }
 
 /** Run `write` as one authorized step of `intents`, whose undo and redo replay under the same
- *  check; `refused` when there is nothing to authorize or the step is refused. */
-function runPaste<T>(
+ *  check; null when there is nothing to authorize. */
+function authorizePaste<T>(
   ctx: PasteActionContext,
   intents: AuthorizedIntentFactory,
-  refused: T,
   write: () => T,
-): T {
-  if (intents(ctx.origin).length === 0) return refused;
-  const result = authorizedWrite({
+): AuthorizedWriteResult<T> | null {
+  if (intents(ctx.origin).length === 0) return null;
+  return authorizedWrite({
     store: ctx.store,
     history: ctx.history ?? new History(),
     intents,
     origin: ctx.origin,
     write,
   });
-  return result.ok ? result.value : refused;
+}
+
+/** {@link authorizePaste} as a batch result: a refusal reports the decision that refused it. */
+function runPasteBatch(
+  ctx: PasteActionContext,
+  intents: AuthorizedIntentFactory,
+  write: () => ChangeBatchResult,
+): ChangeBatchResult {
+  const result = authorizePaste(ctx, intents, write);
+  if (!result) return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
+  return result.ok ? result.value : refusedByDecision(result.decision);
 }
 
 /**
@@ -62,17 +79,33 @@ export function pasteWrite<T>(
   write: () => T,
   extra: AuthorizedIntentFactory = () => [],
 ): T {
-  const state = ctx.store.getState();
-  return runPaste(
-    ctx,
-    (origin) => [
+  const result = authorizePaste(ctx, pasteIntentsOf(ctx, ranges, extra), write);
+  return result?.ok ? result.value : refused;
+}
+
+/** {@link pasteWrite} of a paste command, as a batch result. */
+export function pasteBatchWrite(
+  ctx: PasteActionContext,
+  ranges: { readonly destination: Range | null; readonly cutSource?: Range | null },
+  write: () => ChangeBatchResult,
+  extra: AuthorizedIntentFactory = () => [],
+): ChangeBatchResult {
+  return runPasteBatch(ctx, pasteIntentsOf(ctx, ranges, extra), write);
+}
+
+const pasteIntentsOf =
+  (
+    ctx: PasteActionContext,
+    ranges: { readonly destination: Range | null; readonly cutSource?: Range | null },
+    extra: AuthorizedIntentFactory,
+  ): AuthorizedIntentFactory =>
+  (origin) => {
+    const state = ctx.store.getState();
+    return [
       ...pasteIntents(state, origin, ctx.commandId, ranges.destination, ranges.cutSource ?? null),
       ...extra(origin),
-    ],
-    refused,
-    write,
-  );
-}
+    ];
+  };
 
 /** Paste Special of `snap` from the entry point `ctx` names, as one authorized step. Column
  *  widths write no cell and are decided as a column layout change of the destination's sheet. */
@@ -81,15 +114,14 @@ export function pasteSpecialAction(
   wb: WorkbookHandle,
   snap: ClipboardSnapshot,
   opts: PasteSpecialOptions,
-): ReturnType<typeof pasteSpecial> {
+): ChangeBatchResult {
   const state = ctx.store.getState();
   const destination = resolvePasteDestination(state, snap, opts.transpose, opts.what === 'formats');
   if (opts.what === 'column-widths') {
     const sheet = destination?.sheet ?? state.data.sheetIndex;
-    return pasteWrite(
+    return pasteBatchWrite(
       ctx,
       { destination: null },
-      null,
       () => pasteSpecial(ctx.store.getState(), ctx.store, wb, snap, opts, ctx.history),
       (origin) => [
         {
@@ -101,10 +133,9 @@ export function pasteSpecialAction(
       ],
     );
   }
-  return pasteWrite(
+  return pasteBatchWrite(
     ctx,
     { destination, cutSource: snap.mode === 'cut' ? snap.range : null },
-    null,
     () => pasteSpecial(ctx.store.getState(), ctx.store, wb, snap, opts, ctx.history),
   );
 }
@@ -116,19 +147,19 @@ export function insertCopiedBandAction(
   wb: WorkbookHandle,
   snapshot: ClipboardSnapshot | null | undefined,
   target?: InsertCopiedBandTarget,
-): InsertCopiedCellsResult | null {
-  if (!snapshot) return null;
+): ChangeBatchResult {
+  const nothing = refusedBatch({ code: 'invalid', reason: 'nothing to insert' });
+  if (!snapshot) return nothing;
   const state = ctx.store.getState();
   const at = targetAddress(state, target);
-  if (!at) return null;
+  if (!at) return nothing;
   const source = snapshot.logicalRange ?? snapshot.range;
   const cut = snapshot.mode === 'cut';
   if (insertCopiedBandIntents(state, ctx.origin, ctx.commandId, source, cut, at) === null)
-    return null;
-  return runPaste(
+    return nothing;
+  return runPasteBatch(
     ctx,
     (origin) => insertCopiedBandIntents(state, origin, ctx.commandId, source, cut, at) ?? [],
-    null,
     () => insertCopiedBand(ctx.store, wb, ctx.history, snapshot, target),
   );
 }
@@ -141,18 +172,17 @@ export function insertCopiedCellsAction(
   text: string,
   direction: InsertCopiedCellsDirection,
   snapshot?: ClipboardSnapshot | null,
-): InsertCopiedCellsResult | null {
+): ChangeBatchResult {
   const block = copiedBlock(text, snapshot);
-  if (!block) return null;
+  if (!block) return refusedBatch({ code: 'invalid', reason: 'nothing to insert' });
   const state = ctx.store.getState();
   const size = { rows: block.height, cols: block.width };
   const cutSource = snapshot?.mode === 'cut' ? snapshot.range : null;
   const at = state.selection.active;
-  return runPaste(
+  return runPasteBatch(
     ctx,
     (origin) =>
       insertCopiedBlockIntents(state, origin, ctx.commandId, size, cutSource, at, direction),
-    null,
     () => insertCopiedCellsFromTSV(ctx.store, wb, ctx.history, text, direction, snapshot),
   );
 }

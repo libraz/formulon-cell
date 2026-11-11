@@ -136,7 +136,7 @@ describe('mount/formula-bar — native commit result', () => {
     draft.setValue('denied');
     let rejected = false;
     const unsubscribe = sheet.instance.commands.subscribe((result) => {
-      if (rejected || result.status !== 'rejected') return;
+      if (rejected || result.status !== 'refused') return;
       rejected = true;
       harness.fxInput.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }),
@@ -177,7 +177,7 @@ describe('mount/formula-bar — native commit result', () => {
     draft.setValue('denied');
     let detached = false;
     const unsubscribe = sheet.instance.commands.subscribe((result) => {
-      if (detached || result.status !== 'rejected') return;
+      if (detached || result.status !== 'refused') return;
       detached = true;
       harness.controller.detach();
     });

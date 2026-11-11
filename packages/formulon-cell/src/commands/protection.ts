@@ -1087,17 +1087,17 @@ export function isBandUnlocked(
   return columnsUnlocked(state, sheet, start, end);
 }
 
-/** Whether a clear of `range` would reach any cell: always off a protected sheet; on one, some
- *  cell must be writable. A range too large to read cell by cell is taken as reachable. */
-export function hasWritableCell(state: State, range: Range): boolean {
+/** Whether every cell of `range` is writable: always off a protected sheet. A range too large to
+ *  read cell by cell is taken as writable and left to the write itself. */
+export function rangeCellsWritable(state: State, range: Range): boolean {
   if (!isSheetProtected(state, range.sheet)) return true;
   if (rangeArea(range) > MAX_MATERIALIZED_LOCK_CELLS) return true;
   for (let row = range.r0; row <= range.r1; row += 1) {
     for (let col = range.c0; col <= range.c1; col += 1) {
-      if (isCellWritable(state, { sheet: range.sheet, row, col })) return true;
+      if (!isCellWritable(state, { sheet: range.sheet, row, col })) return false;
     }
   }
-  return false;
+  return true;
 }
 
 /** Soft warn-and-return helper used by writeInput / writeCoerced wrappers.

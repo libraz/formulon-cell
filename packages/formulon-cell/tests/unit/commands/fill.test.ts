@@ -381,7 +381,9 @@ describe('fillRange', () => {
 
     const history = new History();
     wb.attachHistory(history);
-    expect(executeRibbonFillAction({ store, workbook: wb, history, action: 'down' })).toBe(true);
+    expect(executeRibbonFillAction({ store, workbook: wb, history, action: 'down' }).status).toBe(
+      'applied',
+    );
     expect(text(wb, 0, 1, 0)).toBe('Item 1');
     expect(text(wb, 0, 2, 0)).toBe('Item 1');
     expect(getFormat(store, 1, 0)).toEqual({ bold: true });
@@ -418,7 +420,8 @@ describe('fillRange', () => {
         },
       }));
     const run = (action: 'down' | 'right' | 'up' | 'left'): boolean =>
-      executeRibbonFillAction({ store, workbook: wb, history: new History(), action });
+      executeRibbonFillAction({ store, workbook: wb, history: new History(), action }).status ===
+      'applied';
     select(1, 1);
     expect(run('down')).toBe(true);
     expect(text(wb, 0, 1, 1)).toBe('above');
@@ -452,7 +455,7 @@ describe('fillRange', () => {
     const history = new History();
     wb.attachHistory(history);
     const measure = (text: string): number => text.length * 10;
-    expect(justifySelection({ store, workbook: wb, history, measure })).toBe(true);
+    expect(justifySelection({ store, workbook: wb, history, measure }).status).toBe('applied');
     expect([0, 1, 2, 3].map((row) => text(wb, 0, row, 0))).toEqual([
       'alpha beta',
       'gamma delta',
@@ -487,8 +490,8 @@ describe('fillRange', () => {
         workbook: wb,
         history: new History(),
         action: 'flash',
-      }),
-    ).toBe(true);
+      }).status,
+    ).toBe('applied');
     wb.recalc();
     expect(text(wb, 0, 1, 0)).toBe('Jane');
     expect(text(wb, 0, 2, 0)).toBe('Ada');
@@ -518,8 +521,8 @@ describe('fillRange', () => {
         workbook: wb,
         history: new History(),
         action: 'flash',
-      }),
-    ).toBe(true);
+      }).status,
+    ).toBe('applied');
     wb.recalc();
     expect(text(wb, 0, 1, 1)).toBe('left-b!');
   });
@@ -546,8 +549,8 @@ describe('fillRange', () => {
         workbook: wb,
         history: new History(),
         action: 'flash',
-      }),
-    ).toBe(false);
+      }).status,
+    ).toBe('refused');
     expect(text(wb, 0, 1, 0)).toBe('');
   });
 

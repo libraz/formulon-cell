@@ -50,7 +50,7 @@ const makeWorkbook = (
 };
 
 describe('executeRibbonClearAction', () => {
-  it('clears contents only for writable cells and synchronizes store cells from the workbook', async () => {
+  it('refuses Clear Contents as a whole over a locked cell, and clears writable cells alone', async () => {
     const a1 = { sheet: 0, row: 0, col: 0 };
     const b1 = { sheet: 0, row: 0, col: 1 };
     const store = createSpreadsheetStore();
@@ -71,6 +71,10 @@ describe('executeRibbonClearAction', () => {
       });
 
       expect(workbook.getValue(a1)).toEqual({ kind: 'number', value: 10 });
+      expect(workbook.getValue(b1)).toEqual({ kind: 'number', value: 20 });
+
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 });
+      executeRibbonClearAction({ store, workbook, history: new History(), action: 'contents' });
       expect(workbook.getValue(b1)).toEqual({ kind: 'blank' });
       expect(store.getState().data.cells.get(key(a1))?.value).toEqual({
         kind: 'number',
@@ -391,7 +395,8 @@ describe('executeRibbonClearAction', () => {
     workbook.setNumber(addr, 7);
     workbook.setNumber(locked, 8);
     mutators.replaceCells(store, workbook.cells(0));
-    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+    // Clear All is all or nothing, so the selection holds the unlocked cell alone.
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     mutators.setCellFormat(store, addr, { bold: true });
     setCellLocked(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, false);
     setProtectedSheet(store, 0, true);
@@ -777,7 +782,7 @@ describe('executeRibbonClearAction', () => {
     }
   });
 
-  it('skips protected cells and retains an indivisible conditional rule spanning a lock', async () => {
+  it('refuses Clear All as a whole over a locked cell, notes and conditional rules included', async () => {
     const store = createSpreadsheetStore();
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const history = new History();
@@ -808,10 +813,11 @@ describe('executeRibbonClearAction', () => {
 
     try {
       executeRibbonClearAction({ store, workbook, history, action: 'all' });
-      expect(workbook.getValue(writable)).toEqual({ kind: 'blank' });
+      expect(workbook.getValue(writable)).toEqual({ kind: 'number', value: 1 });
       expect(workbook.getValue(locked)).toEqual({ kind: 'number', value: 2 });
-      expect(commentAt(store.getState(), writable)).toBeNull();
+      expect(commentAt(store.getState(), writable)).toBe('writable');
       expect(commentAt(store.getState(), locked)).toBe('locked');
+      expect(history.canUndo()).toBe(false);
       expect(store.getState().format.formats.get(key(locked))?.italic).toBe(true);
       expect(store.getState().conditional.rules).toHaveLength(1);
     } finally {

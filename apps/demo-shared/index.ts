@@ -748,12 +748,15 @@ export const runDemoScript = (inst: SpreadsheetInstance, command: ScriptCommand)
       }
     }
   }
-  const result = inst.applyChanges([...changes.values()], { history: 'record' });
-  if (result.status !== 'refused' || result.rejections.length === 0) return result.applied.length;
-  // A protected sheet refuses the whole batch and names the locked cells; write the rest.
-  for (const { at } of result.rejections) changes.delete(`${at.row}:${at.col}`);
-  if (changes.size === 0) return 0;
-  return inst.applyChanges([...changes.values()], { history: 'record' }).applied.length;
+  // A protected sheet refuses the whole batch and names the locked cell that decided it; drop
+  // that cell and write the rest.
+  let result = inst.applyChanges([...changes.values()], { history: 'record' });
+  while (result.status === 'refused') {
+    const at = result.rejections[0]?.at;
+    if (!at || !changes.delete(`${at.row}:${at.col}`) || changes.size === 0) return 0;
+    result = inst.applyChanges([...changes.values()], { history: 'record' });
+  }
+  return result.applied.length;
 };
 
 /** A few features ship default-off; everything else is opt-out. */

@@ -541,7 +541,8 @@ export function insertCutCopiedBand(
         { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
         history,
       );
-      if (!pasted) throw new Error('formulon-cell: cut band paste failed after structural edit');
+      if (pasted.status !== 'applied')
+        throw new Error('formulon-cell: cut band paste failed after structural edit');
       recordFormulaOwnerRewrite(
         wb,
         history,
@@ -606,7 +607,8 @@ export function insertCutCopiedBand(
       { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
       history,
     );
-    if (!pasted) throw new Error('formulon-cell: cross-sheet cut band paste failed');
+    if (pasted.status !== 'applied')
+      throw new Error('formulon-cell: cross-sheet cut band paste failed');
     recordAxisVisibilityTransfer(store, wb, history, logical, band, wholeRows, sourceVisibility);
     resetCrossSheetSourceDimensions(store, wb, history, snapshot, wholeRows);
     mutators.setActive(store, pasteOrigin);

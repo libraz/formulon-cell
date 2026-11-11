@@ -27,6 +27,7 @@ import {
 } from '../coerce-input.js';
 import { blockDataTableShift, blockTableFunction } from '../data-table-guard.js';
 import type { History } from '../history.js';
+import { appliedBatch, type ChangeBatchResult, refusedBatch } from '../interaction-policy.js';
 import { alertPivotEdit, axisEditCrossesPivot } from '../pivot-guard.js';
 import { blockedByProtection, isCellWritable, isSheetProtected } from '../protection.js';
 import {
@@ -55,6 +56,7 @@ import { parseTSV } from './tsv.js';
 
 export type InsertCopiedCellsDirection = 'right' | 'down';
 
+/** What one insertion wrote, before it becomes a batch result. */
 export interface InsertCopiedCellsResult {
   writtenRange: Range;
 }
@@ -65,7 +67,30 @@ export type InsertCopiedBandTarget = Range | Addr;
 
 const MAX_INSERT_COPIED_CELLS = 100_000;
 
+/** An insertion as a batch result: `range` is the pasted target after the insert. */
+const insertedBatch = (
+  wb: WorkbookHandle,
+  insert: () => InsertCopiedCellsResult | null,
+): ChangeBatchResult => {
+  const { value, changed } = wb.trackChangedCells(insert);
+  return value
+    ? appliedBatch(changed, value.writtenRange)
+    : refusedBatch({ code: 'invalid', reason: 'the insertion was refused' });
+};
+
+/** Insert Copied (Cut) Cells of a block at the active cell, shifting cells `direction`. */
 export function insertCopiedCellsFromTSV(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  text: string,
+  direction: InsertCopiedCellsDirection,
+  snapshot?: ClipboardSnapshot | null,
+): ChangeBatchResult {
+  return insertedBatch(wb, () => insertCopiedBlock(store, wb, history, text, direction, snapshot));
+}
+
+function insertCopiedBlock(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
   history: History | null,
@@ -322,6 +347,16 @@ export function insertCopiedBand(
   history: History | null,
   snapshot: ClipboardSnapshot | null | undefined,
   target?: InsertCopiedBandTarget,
+): ChangeBatchResult {
+  return insertedBatch(wb, () => insertCopiedBandInto(store, wb, history, snapshot, target));
+}
+
+function insertCopiedBandInto(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  snapshot: ClipboardSnapshot | null | undefined,
+  target?: InsertCopiedBandTarget,
 ): InsertCopiedCellsResult | null {
   if (!snapshot || (snapshot.mode !== 'copy' && snapshot.mode !== 'cut')) return null;
   const state = store.getState();
@@ -536,7 +571,8 @@ export function insertCopiedBand(
       { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
       history,
     );
-    if (!pasted) throw new Error('formulon-cell: copied band paste failed after structural insert');
+    if (pasted.status !== 'applied')
+      throw new Error('formulon-cell: copied band paste failed after structural insert');
     mutators.setRange(store, band);
     if (history && structureReplayCheckpoint) {
       // This is the outer transaction's final child. The structure native

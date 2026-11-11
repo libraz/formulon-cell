@@ -1,4 +1,4 @@
-import { FormulonError, StatusCode } from '@libraz/formulon';
+import { FormulonError, StatusCode, ValueKind } from '@libraz/formulon';
 import { mount, spreadsheetFailureOf, viewerPolicy, Workbook } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it } from 'vitest';
 import { expectFailure, expectFormulonError, makeHost, thrownBy } from './helpers.js';
@@ -127,13 +127,34 @@ describe('error model: formulon-cell preconditions', () => {
   });
 });
 
-describe('error model: partial application', () => {
-  it('applyChanges reports refused cells instead of throwing or returning false', async () => {
+describe('error model: all-or-nothing batches', () => {
+  it('applyChanges writes nothing when one change is refused and reports that one refusal', async () => {
     const instance = await mount(makeHost());
     disposers.push(instance);
-    await instance.workbook.sheet(0).protect();
-    const result = instance.applyChanges([{ at: 'A1', input: '1' }], { history: 'record' });
+    const sheet = instance.workbook.sheet(0);
+    sheet.updateCellFormat('B1', { protection: { locked: false } });
+    await sheet.protect();
+    const result = instance.applyChanges(
+      [
+        { at: 'B1', input: '2' },
+        { at: 'A1', input: '1' },
+      ],
+      { history: 'record' },
+    );
     expect(result.status).toBe('refused');
-    expect(result.rejections.length).toBeGreaterThan(0);
+    expect(result.applied).toEqual([]);
+    expect(result.rejections).toHaveLength(1);
+    expect(sheet.getTypedValue('B1').kind).toBe(ValueKind.Blank);
+  });
+
+  it("gates applyChanges whatever its history mode: 'reset' on a locked cell writes nothing", async () => {
+    const instance = await mount(makeHost());
+    disposers.push(instance);
+    const sheet = instance.workbook.sheet(0);
+    await sheet.protect();
+    const result = instance.applyChanges([{ at: 'A1', input: '1' }], { history: 'reset' });
+    expect(result.status).toBe('refused');
+    expect(result.rejections).toHaveLength(1);
+    expect(sheet.getTypedValue('A1').kind).toBe(ValueKind.Blank);
   });
 });

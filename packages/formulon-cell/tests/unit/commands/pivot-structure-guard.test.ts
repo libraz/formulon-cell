@@ -117,12 +117,16 @@ describe('row / column / cell edits around a PivotTable', () => {
 
   it('refuses a cut row band taken from inside the report', () => {
     const snap = cutRows(6, 6);
-    expect(insertCopiedBand(store, wb, history, snap, { sheet: 0, row: 25, col: 0 })).toBeNull();
+    expect(insertCopiedBand(store, wb, history, snap, { sheet: 0, row: 25, col: 0 }).status).toBe(
+      'refused',
+    );
   });
 
   it('refuses inserting a cut row band inside the report', () => {
     wb.setNumber({ sheet: 0, row: 20, col: 0 }, 42);
     const snap = cutRows(20, 20);
-    expect(insertCopiedBand(store, wb, history, snap, { sheet: 0, row: 7, col: 0 })).toBeNull();
+    expect(insertCopiedBand(store, wb, history, snap, { sheet: 0, row: 7, col: 0 }).status).toBe(
+      'refused',
+    );
   });
 });

@@ -106,7 +106,7 @@ describe('whole-band paste native persistence', () => {
                 transpose: false,
               },
               history,
-            )?.writtenRange,
+            ).range,
           ).toEqual(destinationRange);
         } finally {
           history.end();

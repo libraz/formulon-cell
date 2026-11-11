@@ -856,7 +856,7 @@ describe('attachContextMenu', () => {
       const pending = new Promise<void>((done) => {
         resolve = done;
       });
-      const policy = { batchDenied: 'skipIneligible' as const };
+      const policy = { defaultOperation: 'allow' as const };
       const execute = vi.fn((_command: CellBatchCommand) => pending);
       const controller: ContextMenuInteractionController = {
         policy,
@@ -887,7 +887,6 @@ describe('attachContextMenu', () => {
         operation: 'clear',
         origin: 'contextMenu',
         commandId: 'clear',
-        denied: policy.batchDenied,
       });
       expect(command?.changes.map((change) => change.addr)).toEqual([
         { sheet: 0, row: 0, col: 0 },
@@ -916,7 +915,7 @@ describe('attachContextMenu', () => {
         getWb: () => wb,
       });
       const formPolicy = fixedFormPolicy({ ranges: [primary] });
-      controller.setPolicy({ ...formPolicy, batchDenied: 'reject' });
+      controller.setPolicy(formPolicy);
       unregisterController = registerInteractionController(store, controller);
       setSelectionRanges(store, primary, [{ sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 }]);
       detach = attachContextMenu({ host, store, wb, onAfterCommit });

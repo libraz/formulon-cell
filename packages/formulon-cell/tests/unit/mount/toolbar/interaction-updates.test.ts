@@ -89,7 +89,7 @@ describe('mounted toolbar interaction updates', () => {
     expect(executeInput('7').status).toBe('applied');
     let bold = host.querySelector<HTMLButtonElement>('[data-ribbon-command="bold"]');
     let created = countDomCreations(() => {
-      expect(executeInput('7').status).toBe('noop');
+      expect(executeInput('7')).toMatchObject({ status: 'applied', applied: [] });
     });
     expect(host.querySelector('[data-ribbon-command="bold"]')).toBe(bold);
     expect(created).toBe(0);
@@ -97,7 +97,7 @@ describe('mounted toolbar interaction updates', () => {
     sheet.instance.setPolicy({ operations: { valueEdit: false } });
     bold = host.querySelector<HTMLButtonElement>('[data-ribbon-command="bold"]');
     created = countDomCreations(() => {
-      expect(executeInput('9').status).toBe('rejected');
+      expect(executeInput('9').status).toBe('refused');
     });
     expect(host.querySelector('[data-ribbon-command="bold"]')).toBe(bold);
     expect(created).toBe(0);
@@ -105,10 +105,10 @@ describe('mounted toolbar interaction updates', () => {
 
   it('does not treat a nested ordinary no-op as a policy update', () => {
     toolbar?.dispose();
-    let nestedNoopStatus: string | undefined;
+    let nestedNoopStatus: number | undefined;
     const unsubscribeBeforeToolbar = sheet.instance.commands.subscribe((result) => {
-      if (result.status === 'applied' && nestedNoopStatus === undefined) {
-        nestedNoopStatus = executeInput('7').status;
+      if (result.applied.length > 0 && nestedNoopStatus === undefined) {
+        nestedNoopStatus = executeInput('7').applied.length;
       }
     });
     toolbar = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
@@ -119,7 +119,7 @@ describe('mounted toolbar interaction updates', () => {
     });
     unsubscribeBeforeToolbar();
 
-    expect(nestedNoopStatus).toBe('noop');
+    expect(nestedNoopStatus).toBe(0);
     expect(host.querySelector('[data-ribbon-command="bold"]')).toBe(bold);
     expect(created).toBe(0);
   });

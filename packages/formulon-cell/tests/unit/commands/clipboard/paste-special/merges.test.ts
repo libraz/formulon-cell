@@ -36,7 +36,7 @@ describe('pasteSpecial', () => {
     });
     wb.recalc();
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 });
+    expect(result.range).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 });
     expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual({
       sheet: 0,
       r0: 3,
@@ -64,7 +64,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
 
-    expect(result?.writtenRange).toEqual(destinationMerge);
+    expect(result.range).toEqual(destinationMerge);
     expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual(
       destinationMerge,
     );
@@ -119,7 +119,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
 
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 3, c1: 6 });
+    expect(result.range).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 3, c1: 6 });
     expect([...store.getState().merges.byAnchor.values()]).toEqual([
       sourceMerge,
       { sheet: 0, r0: 0, c0: 3, r1: 1, c1: 4 },
@@ -177,7 +177,7 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
 
-    expect(result).toBeNull();
+    expect(result.status).toBe('refused');
     expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 2, col: 2 }))).toEqual(
       destinationMerge,
     );
@@ -206,7 +206,7 @@ describe('pasteSpecial', () => {
     });
 
     // D1:G4 grows to D1:H5, which the 2x2 source does not tile: one copy lands.
-    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1, c1: 4 });
+    expect(result.range).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1, c1: 4 });
     expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 3, col: 6 }))).toEqual(
       crossingMerge,
     );

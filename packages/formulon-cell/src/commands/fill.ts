@@ -14,9 +14,13 @@ import {
 import { createAutofitMeasureContext } from './autofit-measurement.js';
 import { inputLocaleForWorkbook } from './coerce-input.js';
 import { blockDataTableEdit } from './data-table-guard.js';
+import { restrictedFillChanges } from './fill-plan.js';
 import { rowHiddenByFilter, rowsVisibleToFilter } from './filter-visible.js';
 import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
 import type { History } from './history.js';
+import { interactionControllerFor } from './interaction-controller.js';
+import { appliedBatch, type ChangeBatchResult, refusedBatch } from './interaction-policy.js';
+import { applyUnmerge } from './merge.js';
 import { isCellWritable } from './protection.js';
 import { shiftFormulaRefs } from './refs.js';
 import { recordFormatChange } from './slice-history.js';
@@ -922,7 +926,12 @@ const defaultMeasure = (): ((text: string) => number) => {
  * line per row, so that each line fits the selection's width. Lines that no longer fit the
  * rows continue below; rows left empty are cleared. One undo step.
  */
-export function justifySelection(deps: JustifySelectionDeps): boolean {
+export function justifySelection(deps: JustifySelectionDeps): ChangeBatchResult {
+  const selected = deps.store.getState().selection.range;
+  return fillBatch(deps.workbook, () => (justifyInto(deps) ? normalizedRange(selected) : null));
+}
+
+function justifyInto(deps: JustifySelectionDeps): boolean {
   const { store, workbook, history } = deps;
   const state = store.getState();
   const selected = state.selection.range;
@@ -1079,11 +1088,30 @@ const executeRibbonFlashFill = (
 
 const DATE_SERIES_ACTIONS = new Set(['days', 'weekdays', 'months', 'years']);
 
+const normalizedRange = (selected: Range): Range => ({
+  sheet: selected.sheet,
+  r0: Math.min(selected.r0, selected.r1),
+  c0: Math.min(selected.c0, selected.c1),
+  r1: Math.max(selected.r0, selected.r1),
+  c1: Math.max(selected.c0, selected.c1),
+});
+
+/** A fill as a batch result: `range` is the rectangle `fill` wrote (null when it wrote nothing),
+ *  `applied` the cells whose content changed. */
+const fillBatch = (wb: WorkbookHandle, fill: () => Range | null): ChangeBatchResult => {
+  const { value, changed } = wb.trackChangedCells(fill);
+  return value
+    ? appliedBatch(changed, value)
+    : refusedBatch({ code: 'invalid', reason: 'the fill wrote nothing' });
+};
+
 /** Shared "Fill" ribbon split-button action. Covers flash-fill, directional
- *  copy (down/right/up/left), series, and date-series variants. Returns
- *  whether anything actually changed so hosts can short-circuit dropdown
- *  closure or status updates. */
-export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): boolean => {
+ *  copy (down/right/up/left), series, and date-series variants, as one batch result. */
+export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): ChangeBatchResult =>
+  fillBatch(deps.workbook, () => ribbonFillInto(deps));
+
+/** Run the Fill action; the rectangle it wrote, or null when it changed nothing. */
+const ribbonFillInto = (deps: ExecuteRibbonFillActionDeps): Range | null => {
   const { store, workbook, history, action } = deps;
   const selected = store.getState().selection.range;
   let range: Range = {
@@ -1093,8 +1121,9 @@ export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): bool
     r1: Math.max(selected.r0, selected.r1),
     c1: Math.max(selected.c0, selected.c1),
   };
-  if (action === 'flash') return executeRibbonFlashFill(store, workbook, history, range);
-  if (action === 'justify') return justifySelection({ store, workbook, history });
+  if (action === 'flash')
+    return executeRibbonFlashFill(store, workbook, history, range) ? range : null;
+  if (action === 'justify') return justifyInto({ store, workbook, history }) ? range : null;
 
   const direction: 'down' | 'right' | 'up' | 'left' =
     action === 'down' || action === 'right' || action === 'up' || action === 'left'
@@ -1118,7 +1147,7 @@ export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): bool
   else if (direction === 'right') src = { ...range, c1: range.c0 };
   else src = { ...range, c0: range.c1 };
   if (src.r0 === range.r0 && src.r1 === range.r1 && src.c0 === range.c0 && src.c1 === range.c1)
-    return false;
+    return null;
 
   const isDateSeries = DATE_SERIES_ACTIONS.has(action);
   let changed = false;
@@ -1136,5 +1165,49 @@ export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): bool
     history.end();
   }
   if (changed) mutators.replaceCells(store, workbook.cells(range.sheet));
-  return changed;
+  return changed ? range : null;
 };
+
+export interface FillHandleDeps {
+  readonly store: SpreadsheetStore;
+  readonly workbook: WorkbookHandle;
+  readonly history: History | null;
+  readonly src: Range;
+  readonly dest: Range;
+  readonly copyOnly: boolean;
+}
+
+/**
+ * The fill-handle drag from `src` into `dest`, as one batch result. Under a host policy the whole
+ * destination is authorized as one cell batch; otherwise the merges the destination cuts are
+ * unmerged and the fill runs in one undo step.
+ */
+export function executeFillHandle(deps: FillHandleDeps): ChangeBatchResult {
+  const { store, workbook, history, src, dest, copyOnly } = deps;
+  const controller = interactionControllerFor(store);
+  if (controller?.policy) {
+    const result = controller.execute({
+      type: 'cellBatch',
+      operation: 'fill',
+      origin: 'fillHandle',
+      changes: restrictedFillChanges(store.getState(), src, dest, copyOnly),
+    });
+    return result.status === 'applied' ? { ...result, range: dest } : result;
+  }
+  return fillBatch(workbook, () => {
+    if (history) history.begin();
+    try {
+      // Fill cannot tear merged rectangles apart silently.
+      applyUnmerge(store, workbook, history, dest);
+      // Re-read the state: the unmerge above changed the merge maps the fill checks.
+      const wrote = fillRange(store.getState(), workbook, src, dest, {
+        copyOnly,
+        formatting: 'with',
+        store,
+      });
+      return wrote ? dest : null;
+    } finally {
+      if (history) history.end();
+    }
+  });
+}
