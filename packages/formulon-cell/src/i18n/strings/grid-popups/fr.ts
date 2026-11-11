@@ -193,6 +193,7 @@ export const gridPopupsFr: GridPopupsStrings = {
     pickFromList: 'Choisir dans la liste',
     functions: 'Fonctions',
     namedRanges: 'Plages nommées',
+    structuredReferences: 'Références structurées',
   },
   argHelper: {
     implicitIntersection: 'Intersection implicite',

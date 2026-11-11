@@ -191,6 +191,7 @@ export const gridPopupsKo: GridPopupsStrings = {
     pickFromList: '목록에서 선택',
     functions: '함수',
     namedRanges: '이름 지정된 범위',
+    structuredReferences: '구조적 참조',
   },
   argHelper: {
     implicitIntersection: '암시적 교집합',

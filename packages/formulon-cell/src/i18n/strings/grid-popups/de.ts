@@ -193,6 +193,7 @@ export const gridPopupsDe: GridPopupsStrings = {
     pickFromList: 'Aus Liste auswählen',
     functions: 'Funktionen',
     namedRanges: 'Benannte Bereiche',
+    structuredReferences: 'Strukturierte Verweise',
   },
   argHelper: {
     implicitIntersection: 'Implizite Schnittmenge',

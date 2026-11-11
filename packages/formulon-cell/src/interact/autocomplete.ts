@@ -50,6 +50,8 @@ export interface AutocompleteLabels {
   functions: string;
   /** Header of the name group in a grouped list. */
   namedRanges: string;
+  /** Header of the table name group in a grouped list. */
+  structuredReferences: string;
 }
 
 /** Subset of `WorkbookHandle.getTables()` consumed by the structured-ref
@@ -60,10 +62,11 @@ export interface AutocompleteTable {
 }
 
 /** A defined or table name offered next to function names. `detail` is the
- *  secondary line (the name's refers-to text). */
+ *  secondary line (the name's refers-to text); `table` marks a table name. */
 export interface AutocompleteName {
   name: string;
   detail: string;
+  table?: boolean;
 }
 
 type AutocompleteDefinedName = {
@@ -119,7 +122,7 @@ export function collectAutocompleteNames(
     if (!visibleFrom(dn, sheetIndex) || lambdaParameters(dn.formula)) continue;
     out.push({ name: dn.name, detail: dn.formula.startsWith('=') ? dn.formula : `=${dn.formula}` });
   }
-  for (const t of tables) out.push({ name: t.name, detail: t.columns.join(', ') });
+  for (const t of tables) out.push({ name: t.name, detail: t.columns.join(', '), table: true });
   return out;
 }
 
@@ -221,8 +224,15 @@ interface SuggestionContext {
 /** A headed run of the list from `start` up to the next group. */
 interface AutocompleteGroup {
   start: number;
-  kind: 'name' | 'function';
+  kind: 'name' | 'table' | 'function';
 }
+
+const GROUP_LABEL: Readonly<Record<AutocompleteGroup['kind'], (l: AutocompleteLabels) => string>> =
+  {
+    name: (l) => l.namedRanges,
+    table: (l) => l.structuredReferences,
+    function: (l) => l.functions,
+  };
 
 interface AutocompleteItemButtonInput {
   id: string;
@@ -279,6 +289,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     pickFromList: 'Pick from list',
     functions: 'Functions',
     namedRanges: 'Named Ranges',
+    structuredReferences: 'Structured References',
     ...deps.labels,
   };
   let root: HTMLDivElement | null = null;
@@ -302,7 +313,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
       header.setAttribute('role', 'presentation');
       headersByKind.set(kind, header);
     }
-    header.textContent = kind === 'name' ? labels.namedRanges : labels.functions;
+    header.textContent = GROUP_LABEL[kind](labels);
     return header;
   };
   let nextOptionIndex = 0;
@@ -765,20 +776,30 @@ function computeContext(
   const nameEntries = sortCaseless(
     names.matches.filter((n) => !seen.has(n.name.toLocaleLowerCase())),
     (n) => n.name,
-  ).map((n) => ({ label: n.name, kind: 'name' as const, detail: n.detail }));
+  ).map((n) => ({ label: n.name, kind: 'name' as const, detail: n.detail, table: n.table }));
   const functionEntries = functions.map((label) => ({
     label,
     kind: 'function' as const,
     detail: '',
   }));
-  // The Mac lists names in their own group above the functions; Windows mixes them alphabetically.
-  const entries = grouped
-    ? [...nameEntries, ...functionEntries]
-    : sortCaseless([...functionEntries, ...nameEntries], (e) => e.label);
+  // The Mac heads defined names, then table names, then functions; Windows mixes them
+  // alphabetically.
+  type Entry = { label: string; kind: 'name' | 'function'; detail: string };
+  const runs: [AutocompleteGroup['kind'], Entry[]][] = [
+    ['name', nameEntries.filter((e) => !e.table)],
+    ['table', nameEntries.filter((e) => e.table)],
+    ['function', functionEntries],
+  ];
   const groups: AutocompleteGroup[] = [];
-  if (grouped && nameEntries.length > 0) groups.push({ start: 0, kind: 'name' });
-  if (grouped && functionEntries.length > 0) {
-    groups.push({ start: nameEntries.length, kind: 'function' });
+  const entries: Entry[] = [];
+  if (grouped) {
+    for (const [kind, run] of runs) {
+      if (run.length === 0) continue;
+      groups.push({ start: entries.length, kind });
+      entries.push(...run);
+    }
+  } else {
+    entries.push(...sortCaseless([...functionEntries, ...nameEntries], (e) => e.label));
   }
   return {
     matches: entries.map((e) => e.label),

@@ -194,6 +194,7 @@ export interface GridPopupsStrings {
     pickFromList: string;
     functions: string;
     namedRanges: string;
+    structuredReferences: string;
   };
   argHelper: {
     implicitIntersection: string;

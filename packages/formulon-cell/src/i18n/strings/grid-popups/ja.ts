@@ -192,6 +192,7 @@ export const gridPopupsJa: GridPopupsStrings = {
     pickFromList: 'リストから選択',
     functions: '関数',
     namedRanges: '名前付き一覧',
+    structuredReferences: '構造化参照',
   },
   argHelper: {
     implicitIntersection: '暗黙的な交差',

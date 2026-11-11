@@ -191,6 +191,7 @@ export const gridPopupsEn: GridPopupsStrings = {
     pickFromList: 'Pick from list',
     functions: 'Functions',
     namedRanges: 'Named Ranges',
+    structuredReferences: 'Structured References',
   },
   argHelper: {
     implicitIntersection: 'Implicit intersection',

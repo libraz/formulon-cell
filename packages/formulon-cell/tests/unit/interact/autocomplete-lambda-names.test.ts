@@ -53,7 +53,11 @@ describe('LAMBDA names', () => {
 });
 
 describe('formula autocomplete list layout', () => {
-  const open = (value: string, grouped: boolean) => {
+  const open = (
+    value: string,
+    grouped: boolean,
+    tables: { name: string; columns: string[] }[] = [],
+  ) => {
     const input = document.createElement('textarea');
     input.value = value;
     document.body.appendChild(input);
@@ -66,10 +70,14 @@ describe('formula autocomplete list layout', () => {
     const handle = attachAutocomplete({
       input,
       ...custom,
-      getNames: () => collectAutocompleteNames(DEFINED, [], 0),
+      getNames: () => collectAutocompleteNames(DEFINED, tables, 0),
       getFunctionNames: () => ['RATE', 'INTRATE', 'SUM'],
       groupNames: () => grouped,
-      labels: { functions: '関数', namedRanges: '名前付き一覧' },
+      labels: {
+        functions: '関数',
+        namedRanges: '名前付き一覧',
+        structuredReferences: '構造化参照',
+      },
     });
     handle.refresh();
     return { input, handle, custom };
@@ -98,6 +106,27 @@ describe('formula autocomplete list layout', () => {
     expect(listRows()).toEqual(['# 名前付き一覧', 'RATE1', '# 関数', 'RATE']);
     expect(handle.acceptHighlighted()).toBe(true);
     expect(input.value).toBe('=RATE1');
+    handle.detach();
+  });
+
+  it('on the Mac, heads table names as structured references between names and functions', () => {
+    const { input, handle } = open('=RAT', true, [
+      { name: 'RatesTable', columns: ['Rate'] },
+      { name: 'Ratio', columns: ['x'] },
+    ]);
+    expect(listRows()).toEqual([
+      '# 名前付き一覧',
+      'RATE1',
+      '# 構造化参照',
+      'RatesTable',
+      'Ratio',
+      '# 関数',
+      'RATE',
+    ]);
+    handle.move(1);
+    handle.move(1);
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe('=Ratio');
     handle.detach();
   });
 

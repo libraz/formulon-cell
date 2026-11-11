@@ -191,6 +191,7 @@ export const gridPopupsTh: GridPopupsStrings = {
     pickFromList: 'เลือกจากรายการ',
     functions: 'ฟังก์ชัน',
     namedRanges: 'ช่วงที่มีชื่อ',
+    structuredReferences: 'การอ้างอิงแบบโครงสร้าง',
   },
   argHelper: {
     implicitIntersection: 'จุดตัดโดยนัย',
