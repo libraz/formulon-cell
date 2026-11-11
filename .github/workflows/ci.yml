@@ -81,8 +81,6 @@ jobs:
   e2e:
     name: e2e (${{ matrix.app }}, ${{ matrix.browser }})
     runs-on: ubuntu-latest
-    # Not required yet: Linux-only rendering differences are still being triaged.
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
