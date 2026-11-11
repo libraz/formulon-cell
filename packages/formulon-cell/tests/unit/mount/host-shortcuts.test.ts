@@ -103,6 +103,7 @@ function makeSetup(
     namedRangeDialog: () => feature.namedRangeDialog,
     pasteSpecialDialog: () => feature.pasteSpecialDialog,
     quickAnalysis: () => feature.quickAnalysis,
+    spelling: () => undefined,
     store,
     strings: () => en,
     wb: getWb,

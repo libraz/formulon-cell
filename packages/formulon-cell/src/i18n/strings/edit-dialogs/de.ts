@@ -143,7 +143,7 @@ export const editDialogsDe: EditDialogsStrings = {
   spellingDialog: {
     title: 'Rechtschreibung: {language}',
     notInDictionary: 'Nicht im Wörterbuch:',
-    repeatedWord: 'Wiederholtes Wort',
+    repeatedWord: 'Wiederholtes Wort:',
     changeTo: 'Ändern in:',
     suggestions: 'Vorschläge:',
     ignoreOnce: 'Einmal ignorieren',
@@ -151,6 +151,8 @@ export const editDialogsDe: EditDialogsStrings = {
     add: 'Hinzufügen',
     change: 'Ändern',
     changeAll: 'Alle ändern',
+    delete: 'Löschen',
+    deleteAll: 'Alle löschen',
     autoCorrect: 'AutoKorrektur',
     suggest: 'Vorschlagen',
     undoLast: 'Rückgängig',
@@ -158,6 +160,8 @@ export const editDialogsDe: EditDialogsStrings = {
     close: 'Schließen',
     alwaysSuggest: 'Immer vorschlagen',
     ignoreUppercase: 'Großschreibung ignorieren',
+    addWordsTo: 'Wörter hinzufügen zu:',
+    customDictionaries: 'Benutzerwörterbücher',
   },
   autoCorrectDialog: {
     title: 'AutoKorrektur-Optionen',

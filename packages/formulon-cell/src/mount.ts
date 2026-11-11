@@ -141,7 +141,7 @@ export type {
 import { disposeDataTableDialog } from './interact/data-table-dialog.js';
 import { disposeMacGoalSeekDialog } from './interact/mac-goal-seek-dialog.js';
 import { disposeMacPivotMoveDialog } from './interact/mac-pivot-move-dialog.js';
-import { closeSpellingDialog } from './interact/spelling-dialog.js';
+import { closeSpellingDialog, openSpellingDialog } from './interact/spelling-dialog.js';
 
 function normalizeScreenClipResult(result: string | ScreenClipResult | null | undefined) {
   if (!result) return null;
@@ -567,6 +567,7 @@ export const Spreadsheet = {
       namedRangeDialog: () => featureState.namedRangeDialog,
       pasteSpecialDialog: () => binding.pasteSpecialDialog,
       quickAnalysis: () => binding.quickAnalysis,
+      spelling: () => openSpellingDialog(instance),
       store,
       strings: () => strings,
       wb: () => wb,

@@ -35,7 +35,7 @@ interface Issue {
 interface SpellingSession {
   /** Words ignored with Ignore All or added with Add, lower-cased. */
   readonly accepted: Set<string>;
-  // Neither default is measured yet; both start on.
+  // The desktop app starts with Always suggest on and Ignore UPPERCASE off.
   alwaysSuggest: boolean;
   ignoreUppercase: boolean;
 }
@@ -46,7 +46,7 @@ const openDialogs = new WeakMap<SpreadsheetInstance, () => void>();
 const sessionOf = (instance: SpreadsheetInstance): SpellingSession => {
   let session = sessions.get(instance);
   if (!session) {
-    session = { accepted: new Set(), alwaysSuggest: true, ignoreUppercase: true };
+    session = { accepted: new Set(), alwaysSuggest: true, ignoreUppercase: false };
     sessions.set(instance, session);
   }
   return session;
@@ -99,6 +99,10 @@ const textOf = (instance: SpreadsheetInstance, target: SpellingTarget): string |
   const value = instance.workbook.getValue(target.addr);
   return value.kind === 'text' ? value.value : null;
 };
+
+/** The language the check runs in: the UI language, except Japanese, which the desktop app
+ *  checks in English. */
+const proofingLocale = (locale: string): string => (/^ja\b/i.test(locale) ? 'en' : locale);
 
 const languageName = (locale: string): string => {
   try {
@@ -165,7 +169,8 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
   openDialogs.get(instance)?.();
   const session = sessionOf(instance);
   const targets = spellingTargets(instance);
-  const locale = instance.i18n.locale;
+  const locale = proofingLocale(instance.i18n.locale);
+  const mac = instance.host.dataset.fcPlatform === 'mac';
   const t = instance.i18n.strings.spellingDialog;
   const rules = () => ({
     service: instance.spellingService(),
@@ -175,8 +180,9 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
   });
   const cursor: Cursor = { index: 0, offset: 0 };
   let issue: Issue | null = null;
-  /** Where each change left the cursor, for Undo Last. */
-  const changes: Cursor[] = [];
+  /** Every action on a word, for Undo Last: where it started, and whether it wrote the text or
+   *  accepted the word for the session. */
+  const actions: { at: Cursor; wrote: boolean; accepted?: string }[] = [];
 
   const findNext = (): Issue | null => {
     while (cursor.index < targets.length) {
@@ -225,6 +231,8 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
   };
   const word = field('fc-spelling-word');
   word.input.readOnly = true;
+  // The Mac dialog names the word in its label and has no field for it.
+  word.input.hidden = mac;
   const changeTo = field('fc-spelling-change-to');
   const suggestionsLabel = document.createElement('div');
   suggestionsLabel.className = 'fc-spelling__label';
@@ -245,6 +253,19 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
     suggestionsLabel,
     suggestions,
   );
+  if (mac) {
+    const dictionary = document.createElement('select');
+    dictionary.id = 'fc-spelling-dictionary';
+    dictionary.className = 'fc-fmtdlg__select fc-spelling__dictionary';
+    const custom = document.createElement('option');
+    custom.textContent = t.customDictionaries;
+    dictionary.append(custom);
+    const dictionaryLabel = document.createElement('label');
+    dictionaryLabel.className = 'fc-spelling__label';
+    dictionaryLabel.htmlFor = dictionary.id;
+    dictionaryLabel.textContent = t.addWordsTo;
+    fields.append(dictionaryLabel, dictionary);
+  }
   const buttons = document.createElement('div');
   buttons.className = 'fc-spelling__buttons';
   const button = (label: string, primary = false): HTMLButtonElement =>
@@ -252,10 +273,11 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
       label,
       variant: primary ? 'primary' : 'secondary',
     });
-  const ignoreOnce = button(t.ignoreOnce);
+  // Ignore Once is the default button: Return leaves the word as it is.
+  const ignoreOnce = button(t.ignoreOnce, true);
   const ignoreAll = button(t.ignoreAll);
   const add = button(t.add);
-  const change = button(t.change, true);
+  const change = button(t.change);
   const changeAll = button(t.changeAll);
   const autoCorrect = button(t.autoCorrect);
   const suggest = button(t.suggest);
@@ -276,7 +298,7 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
   };
   check(t.alwaysSuggest, session.alwaysSuggest, (on) => {
     session.alwaysSuggest = on;
-    if (on && issue) showSuggestions(issue.word.word);
+    if (issue) render(issue);
   });
   check(t.ignoreUppercase, session.ignoreUppercase, (on) => {
     session.ignoreUppercase = on;
@@ -311,7 +333,8 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
 
   const render = (current: Issue): void => {
     const repeated = current.kind === 'repeated';
-    word.label.textContent = repeated ? t.repeatedWord : t.notInDictionary;
+    const wordLabel = repeated ? t.repeatedWord : t.notInDictionary;
+    word.label.textContent = mac ? `${wordLabel} ${current.word.word}` : wordLabel;
     word.input.value = current.word.word;
     changeTo.label.textContent = t.changeTo;
     suggestionsLabel.textContent = t.suggestions;
@@ -320,12 +343,15 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
     suggestions.replaceChildren();
     changeTo.input.value = repeated ? '' : current.word.word;
     if (!repeated && session.alwaysSuggest) showSuggestions(current.word.word);
-    // A repeated word can only be deleted or skipped once.
-    for (const control of [ignoreAll, add, changeAll, autoCorrect, suggest]) {
-      projectDisabledState(control, repeated, null);
-    }
-    projectDisabledState(undoLast, changes.length === 0, null);
-    cancel.textContent = changes.length > 0 ? t.close : t.cancel;
+    // A repeated word is deleted, not changed, and never deleted everywhere at once.
+    change.textContent = repeated ? t.delete : t.change;
+    changeAll.textContent = repeated ? t.deleteAll : t.changeAll;
+    projectDisabledState(ignoreAll, repeated, null);
+    projectDisabledState(changeAll, repeated, null);
+    // Always suggest lists the suggestions already, so Suggest has nothing to add.
+    projectDisabledState(suggest, repeated || session.alwaysSuggest, null);
+    projectDisabledState(undoLast, actions.length === 0, null);
+    cancel.textContent = actions.some((action) => action.wrote) ? t.close : t.cancel;
     // A selected range stays selected while the active cell moves through it.
     const { range } = instance.store.getState().selection;
     const { row, col } = current.target.addr;
@@ -360,7 +386,7 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
     } else {
       edits.push({
         target: current.target,
-        text: replaceSpellingWord(text, current.word, replacement, current.kind),
+        text: replaceSpellingWord(text, current.word, replacement),
       });
     }
     const before: Cursor = { index: cursor.index, offset: current.word.start };
@@ -372,29 +398,38 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
       return;
     }
     onWritten?.();
-    changes.push(before);
+    actions.push({ at: before, wrote: true });
     // Continue after the replacement: the text up to the word, changed the same way.
     const head = text.slice(0, current.word.end);
     advance(
       all
         ? replaceWholeWord(head, current.word.word, replacement).length
-        : replaceSpellingWord(head, current.word, replacement, current.kind).length,
+        : replaceSpellingWord(head, current.word, replacement).length,
     );
   };
 
-  shell.on(ignoreOnce, 'click', () => {
-    if (issue) advance(issue.word.end);
-  });
-  shell.on(ignoreAll, 'click', () => {
+  /** Leaves the current word as it is, remembering where it was for Undo Last. */
+  const skip = (accepted?: string): void => {
     if (!issue) return;
-    session.accepted.add(issue.word.word.toLowerCase());
+    actions.push({ at: { index: cursor.index, offset: issue.word.start }, wrote: false, accepted });
+    if (accepted !== undefined) session.accepted.add(accepted);
     advance(issue.word.end);
+  };
+  shell.on(ignoreOnce, 'click', () => skip());
+  shell.on(ignoreAll, 'click', () => {
+    if (issue) skip(issue.word.word.toLowerCase());
   });
   shell.on(add, 'click', () => {
     if (!issue) return;
-    session.accepted.add(issue.word.word.toLowerCase());
     instance.spellingService().addWord?.(issue.word.word, locale);
-    advance(issue.word.end);
+    skip(issue.word.word.toLowerCase());
+  });
+  // Return anywhere but on a button presses the default button.
+  shell.on(body, 'keydown', (event) => {
+    const key = event as KeyboardEvent;
+    if (key.key !== 'Enter' || key.target instanceof HTMLButtonElement) return;
+    key.preventDefault();
+    ignoreOnce.click();
   });
   shell.on(change, 'click', () => applyChange(false));
   shell.on(changeAll, 'click', () => applyChange(true));
@@ -407,11 +442,12 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
   });
   shell.on(suggest, 'click', () => showSuggestions(changeTo.input.value));
   shell.on(undoLast, 'click', () => {
-    const previous = changes.at(-1);
-    if (!previous || !instance.history.undo()) return;
-    changes.pop();
-    cursor.index = previous.index;
-    advance(previous.offset);
+    const previous = actions.at(-1);
+    if (!previous || (previous.wrote && !instance.history.undo())) return;
+    actions.pop();
+    if (previous.accepted !== undefined) session.accepted.delete(previous.accepted);
+    cursor.index = previous.at.index;
+    advance(previous.at.offset);
   });
   shell.on(cancel, 'click', () => close());
   shell.on(suggestions, 'click', (event) => {
@@ -451,7 +487,7 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
 
   render(issue);
   shell.open();
-  change.focus({ preventScroll: true });
+  ignoreOnce.focus({ preventScroll: true });
 }
 
 /** Closes an open spelling dialog, as unmounting does. */

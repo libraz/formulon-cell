@@ -157,6 +157,9 @@ export interface EditDialogsStrings {
     add: string;
     change: string;
     changeAll: string;
+    /** Change and Change All while the flagged word is a repeated one. */
+    delete: string;
+    deleteAll: string;
     autoCorrect: string;
     suggest: string;
     undoLast: string;
@@ -164,6 +167,9 @@ export interface EditDialogsStrings {
     close: string;
     alwaysSuggest: string;
     ignoreUppercase: string;
+    /** The Mac dialog's dictionary list: its label and the custom dictionaries entry. */
+    addWordsTo: string;
+    customDictionaries: string;
   };
   /** The AutoCorrect options, labelled as the desktop preference pane. */
   autoCorrectDialog: {

@@ -141,7 +141,7 @@ export const editDialogsTh: EditDialogsStrings = {
   spellingDialog: {
     title: 'การสะกด: {language}',
     notInDictionary: 'ไม่มีในพจนานุกรม:',
-    repeatedWord: 'คำซ้ำ',
+    repeatedWord: 'คำซ้ำ:',
     changeTo: 'เปลี่ยนเป็น:',
     suggestions: 'ข้อเสนอแนะ:',
     ignoreOnce: 'ละเว้นหนึ่งครั้ง',
@@ -149,6 +149,8 @@ export const editDialogsTh: EditDialogsStrings = {
     add: 'เพิ่ม',
     change: 'เปลี่ยน',
     changeAll: 'เปลี่ยนทั้งหมด',
+    delete: 'ลบ',
+    deleteAll: 'ลบทั้งหมด',
     autoCorrect: 'การแก้ไขอัตโนมัติ',
     suggest: 'แนะนำ',
     undoLast: 'เลิกทำหลังสุด',
@@ -156,6 +158,8 @@ export const editDialogsTh: EditDialogsStrings = {
     close: 'ปิด',
     alwaysSuggest: 'แนะนำเสมอ',
     ignoreUppercase: 'ละเว้นตัวพิมพ์ใหญ่',
+    addWordsTo: 'เพิ่มคำลงใน:',
+    customDictionaries: 'พจนานุกรมแบบกำหนดเอง',
   },
   autoCorrectDialog: {
     title: 'ตัวเลือกการแก้ไขอัตโนมัติ',

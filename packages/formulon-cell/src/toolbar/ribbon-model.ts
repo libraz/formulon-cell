@@ -164,6 +164,7 @@ export const RIBBON_KEYSHORTCUTS: Readonly<Record<string, string>> = {
   paste: 'Control+V Meta+V',
   recalcNow: 'F9',
   recalcSheet: 'Shift+F9',
+  spellingReview: 'F7',
   redoHome: 'Control+Y Meta+Y Meta+Shift+Z',
   undoHome: 'Control+Z Meta+Z',
 };

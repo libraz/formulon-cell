@@ -153,10 +153,10 @@ describe('Review > Spelling dialog', () => {
     seedText(sheet, 0, 0, 'the the end');
     select([0, 0], [0, 0, 0, 0]);
     spell();
-    expect(dialog()?.textContent).toContain('Repeated Word');
+    expect(dialog()?.textContent).toContain('Repeated Word:');
     expect(changeTo().value).toBe('');
-    button('Change').click();
-    expect(text(0, 0)).toEqual({ kind: 'text', value: 'the end' });
+    button('Delete').click();
+    expect(text(0, 0)).toEqual({ kind: 'text', value: 'the  end' });
   });
 
   it('checks a note after its cell and changes it as one undo step', () => {

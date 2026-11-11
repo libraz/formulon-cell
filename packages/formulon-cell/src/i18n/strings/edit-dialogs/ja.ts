@@ -143,7 +143,7 @@ export const editDialogsJa: EditDialogsStrings = {
   spellingDialog: {
     title: 'スペル チェック :{language}',
     notInDictionary: '辞書にない単語:',
-    repeatedWord: '繰り返し使われる単語',
+    repeatedWord: '同じ語の繰り返し:',
     changeTo: '修正候補:',
     suggestions: '修正候補:',
     ignoreOnce: '無視',
@@ -151,6 +151,8 @@ export const editDialogsJa: EditDialogsStrings = {
     add: '追加',
     change: '修正',
     changeAll: 'すべて修正',
+    delete: '削除',
+    deleteAll: 'すべて削除',
     autoCorrect: 'オートコレクト',
     suggest: '候補表示',
     undoLast: '直前の修正を元に戻す',
@@ -158,6 +160,8 @@ export const editDialogsJa: EditDialogsStrings = {
     close: '閉じる',
     alwaysSuggest: '常に修正候補を表示する',
     ignoreUppercase: 'すべて大文字の単語は無視する',
+    addWordsTo: '追加先の辞書:',
+    customDictionaries: 'ユーザー辞書',
   },
   autoCorrectDialog: {
     title: 'オートコレクト オプション',

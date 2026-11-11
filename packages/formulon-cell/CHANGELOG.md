@@ -8,6 +8,8 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- Spelling follows the desktop app: Ignore Once is the default button, so Return leaves the word as it is; Ignore UPPERCASE starts off; Undo Last steps back over any action, an Ignore included; Suggest is greyed while Always suggest is on; a repeated word offers Delete and Delete All, with Add and AutoCorrect available, and Delete removes only the word, keeping the spaces around it. A Japanese UI checks English. On the Mac the word appears in its label and an Add words to list follows the suggestions.
+- F7 opens Spelling.
 - Adding a slicer or sparklines through the instance API asks the interaction policy under the feature-level command ids `slicerInsert` and `sparklineInsert`, beside `slicerDelete` and `sparklineClear`, instead of a Mac ribbon button's id.
 - The Mac host's dialogs and panes use the Mac app's own wording in English, German, French, Korean, Thai and Chinese wherever the desktop strings settle it for the same control; the rest keeps the shared wording. The default profile's English is unchanged.
 - A new table from Format as Table, Insert > Table or Ctrl+T takes the workbook's default table style, and Table Style Medium 2 when none is set. The ribbon hook `insert.createTable` takes no argument.

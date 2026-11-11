@@ -141,7 +141,7 @@ export const editDialogsZh: EditDialogsStrings = {
   spellingDialog: {
     title: '拼写检查: {language}',
     notInDictionary: '不在词典中:',
-    repeatedWord: '重复字词',
+    repeatedWord: '重复字:',
     changeTo: '更改为:',
     suggestions: '建议:',
     ignoreOnce: '忽略一次',
@@ -149,6 +149,8 @@ export const editDialogsZh: EditDialogsStrings = {
     add: '添加',
     change: '更改',
     changeAll: '全部更改',
+    delete: '删除',
+    deleteAll: '全部删除',
     autoCorrect: '自动更正',
     suggest: '建议',
     undoLast: '撤消上次操作',
@@ -156,6 +158,8 @@ export const editDialogsZh: EditDialogsStrings = {
     close: '关闭',
     alwaysSuggest: '始终建议',
     ignoreUppercase: '忽略大写',
+    addWordsTo: '将词添至:',
+    customDictionaries: '自定义词典',
   },
   autoCorrectDialog: {
     title: '自动更正选项',

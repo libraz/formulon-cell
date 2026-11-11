@@ -131,17 +131,8 @@ export function replaceWholeWord(text: string, word: string, replacement: string
   return out + text.slice(last);
 }
 
-/** The text with the word at `[start, end)` replaced. Deleting a repeated word also drops the
- *  white space before it. */
-export function replaceSpellingWord(
-  text: string,
-  word: SpellingWord,
-  replacement: string,
-  kind: SpellingIssueKind,
-): string {
-  let start = word.start;
-  if (kind === 'repeated' && replacement === '') {
-    while (start > 0 && /\s/.test(text.charAt(start - 1))) start -= 1;
-  }
-  return text.slice(0, start) + replacement + text.slice(word.end);
+/** The text with the word at `[start, end)` replaced. Deleting a repeated word removes only the
+ *  word and keeps the white space around it, as the desktop app does. */
+export function replaceSpellingWord(text: string, word: SpellingWord, replacement: string): string {
+  return text.slice(0, word.start) + replacement + text.slice(word.end);
 }

@@ -103,6 +103,8 @@ interface HostShortcutInput {
   namedRangeDialog: () => { open(): void } | null;
   pasteSpecialDialog: () => { open(opts: undefined, entry: DialogEntry): void } | null;
   quickAnalysis: () => { open(): void } | null;
+  /** Opens Review > Spelling at the active cell (F7). */
+  spelling: () => void;
   getLocale: () => string;
   store: SpreadsheetStore;
   strings: () => Strings;
@@ -285,6 +287,11 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         return;
       }
       if (input.history.repeatLast()) e.preventDefault();
+      return;
+    }
+    if (matchesRibbonShortcut(e, 'spellingReview')) {
+      e.preventDefault();
+      if (canExecuteBuiltIn(input.store, 'spellingReview', 'keyboard').allowed) input.spelling();
       return;
     }
     if (matchesRibbonShortcut(e, 'namedRanges')) {

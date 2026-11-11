@@ -85,6 +85,7 @@ describe('fill shortcuts (Ctrl+D / Ctrl+R / Ctrl+E)', () => {
       namedRangeDialog: () => null,
       pasteSpecialDialog: () => null,
       quickAnalysis: () => null,
+      spelling: () => undefined,
       store,
       strings: () => en,
       wb: () => wb,

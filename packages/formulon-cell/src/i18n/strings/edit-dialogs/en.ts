@@ -141,7 +141,7 @@ export const editDialogsEn: EditDialogsStrings = {
   spellingDialog: {
     title: 'Spelling: {language}',
     notInDictionary: 'Not in Dictionary:',
-    repeatedWord: 'Repeated Word',
+    repeatedWord: 'Repeated Word:',
     changeTo: 'Change to:',
     suggestions: 'Suggestions:',
     ignoreOnce: 'Ignore Once',
@@ -149,6 +149,8 @@ export const editDialogsEn: EditDialogsStrings = {
     add: 'Add',
     change: 'Change',
     changeAll: 'Change All',
+    delete: 'Delete',
+    deleteAll: 'Delete All',
     autoCorrect: 'AutoCorrect',
     suggest: 'Suggest',
     undoLast: 'Undo Last',
@@ -156,6 +158,8 @@ export const editDialogsEn: EditDialogsStrings = {
     close: 'Close',
     alwaysSuggest: 'Always suggest',
     ignoreUppercase: 'Ignore UPPERCASE',
+    addWordsTo: 'Add words to:',
+    customDictionaries: 'Custom Dictionaries',
   },
   autoCorrectDialog: {
     title: 'AutoCorrect Options',

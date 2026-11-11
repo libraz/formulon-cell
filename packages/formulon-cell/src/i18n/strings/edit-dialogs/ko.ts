@@ -141,7 +141,7 @@ export const editDialogsKo: EditDialogsStrings = {
   spellingDialog: {
     title: '맞춤법 검사: {language}',
     notInDictionary: '사전에 없는 단어:',
-    repeatedWord: '반복된 단어',
+    repeatedWord: '반복된 단어:',
     changeTo: '바꿀 단어:',
     suggestions: '추천 단어:',
     ignoreOnce: '한 번 건너뛰기',
@@ -149,6 +149,8 @@ export const editDialogsKo: EditDialogsStrings = {
     add: '추가',
     change: '변경',
     changeAll: '모두 변경',
+    delete: '삭제',
+    deleteAll: '모두 삭제',
     autoCorrect: '자동 고침',
     suggest: '단어 추천...',
     undoLast: '마지막 실행 취소',
@@ -156,6 +158,8 @@ export const editDialogsKo: EditDialogsStrings = {
     close: '닫기',
     alwaysSuggest: '항상 추천',
     ignoreUppercase: '대문자 무시',
+    addWordsTo: '단어를 추가할 사전:',
+    customDictionaries: '사용자 지정 사전',
   },
   autoCorrectDialog: {
     title: '자동 고침 옵션',

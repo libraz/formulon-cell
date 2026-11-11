@@ -55,15 +55,13 @@ describe('spelling', () => {
   it('replaces one word, or every same-case whole word', () => {
     const [word] = spellingWords('teh tehx teh');
     if (!word) throw new Error('no word');
-    expect(replaceSpellingWord('teh tehx teh', word, 'the', 'notInDictionary')).toBe(
-      'the tehx teh',
-    );
+    expect(replaceSpellingWord('teh tehx teh', word, 'the')).toBe('the tehx teh');
     expect(replaceWholeWord('teh tehx Teh teh', 'teh', 'the')).toBe('the tehx Teh the');
   });
 
-  it('deletes a repeated word with the space before it', () => {
-    const issue = firstSpellingIssue('the  the end', 0, rules());
+  it('deletes only a repeated word, keeping the spaces around it', () => {
+    const issue = firstSpellingIssue('the the cat', 0, rules());
     if (issue?.kind !== 'repeated') throw new Error('no repeated word');
-    expect(replaceSpellingWord('the  the end', issue.word, '', 'repeated')).toBe('the end');
+    expect(replaceSpellingWord('the the cat', issue.word, '')).toBe('the  cat');
   });
 });
