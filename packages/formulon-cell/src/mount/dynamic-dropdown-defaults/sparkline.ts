@@ -19,7 +19,6 @@ import { unionSparklineSources } from '../../commands/sparkline-layout.js';
 import { sparklineSourceText } from '../../commands/sparkline-ranges.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../../components/color-palette.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
-import { attachMacSparklineDialog } from '../../interact/mac-sparkline-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { showNumberPrompt } from '../../toolbar/dialogs/prompt.js';
 import {
@@ -30,6 +29,7 @@ import type {
   DynamicDropdownsCtx,
   SparklineMenuAction,
 } from '../../toolbar/ribbon/dynamic-dropdowns.js';
+import { openMacSparklineDialog } from '../../toolbar/ribbon/mac/actions.js';
 import {
   SPARKLINE_AXIS_DISABLED_ITEMS,
   SPARKLINE_COMMANDS,
@@ -116,16 +116,9 @@ export function createSparklineDropdownDefaults(
       r1: Math.max(...rows),
       c1: Math.max(...cols),
     });
-    const dialog = attachMacSparklineDialog({
-      host: instance.host,
-      store: instance.store,
-      history: instance.history,
-      getWb: () => instance.workbook,
-      strings: strings(),
-      onClosed: () => dialog.detach(),
-    });
-    dialog.open({
+    openMacSparklineDialog(instance, {
       groupId: group.id,
+      sheet: first.addr.sheet,
       data: unionSparklineSources(members.map(({ spec }) => spec.source)),
       location,
     });
@@ -331,7 +324,8 @@ export function createSparklineDropdownDefaults(
       }
       // The Style presets are unmeasured, so every slot stays disabled whatever the selection.
       if (menu.id === SPARKLINE_MENU_IDS.style) {
-        for (const button of buttons) setMenuControlDisabled(button, true);
+        const waiting = instance.i18n.strings.ribbon.disabled;
+        for (const button of buttons) setMenuControlDisabled(button, true, waiting);
       }
     },
   };

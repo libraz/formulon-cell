@@ -13,14 +13,23 @@ import {
   disposeMacGoalSeekDialog,
   openMacGoalSeekDialog,
 } from '../../../interact/mac-goal-seek-dialog.js';
-import { attachMacSlicerDialog } from '../../../interact/mac-slicer-dialog.js';
-import { attachMacSparklineDialog } from '../../../interact/mac-sparkline-dialog.js';
+import {
+  attachMacSlicerDialog,
+  type MacSlicerDialogHandle,
+  type MacSlicerOpenOptions,
+} from '../../../interact/mac-slicer-dialog.js';
+import {
+  attachMacSparklineDialog,
+  type MacSparklineDialogHandle,
+  type MacSparklineEditTarget,
+} from '../../../interact/mac-sparkline-dialog.js';
 import {
   disposeMacSubtotalDialog,
   openMacSubtotalDialog,
 } from '../../../interact/mac-subtotal-dialog.js';
 import { attachMacWorkbookStatistics } from '../../../interact/mac-workbook-statistics.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
+import type { SlicerSpec } from '../../../store/store.js';
 import {
   disposeMacAutomationDialogs,
   openMacAutomationGallery,
@@ -63,6 +72,26 @@ export type MacRibbonAction = () => void | Promise<void>;
 export type MacRibbonActions = Readonly<Record<string, MacRibbonAction>>;
 
 const ACTIONS_BY_INSTANCE = new WeakMap<object, MacRibbonActions>();
+const SPARKLINE_DIALOGS = new WeakMap<object, MacSparklineDialogHandle>();
+const SLICER_DIALOGS = new WeakMap<object, MacSlicerDialogHandle>();
+
+/** Open the instance's shared sparkline dialog: Insert Sparkline, or Edit Sparklines for `edit`. */
+export const openMacSparklineDialog = (
+  instance: SpreadsheetInstance,
+  edit?: MacSparklineEditTarget,
+): void => {
+  createMacRibbonActions(instance);
+  SPARKLINE_DIALOGS.get(instance)?.open(edit);
+};
+
+/** Open the instance's shared Insert Slicer dialog for the ribbon command that invoked it. */
+export const openMacSlicerDialog = (
+  instance: SpreadsheetInstance,
+  options?: MacSlicerOpenOptions,
+): void => {
+  createMacRibbonActions(instance);
+  SLICER_DIALOGS.get(instance)?.open(options);
+};
 
 const formulaCategory = (instance: SpreadsheetInstance, category: FunctionCategory): void => {
   instance.openFunctionArguments(undefined, { category });
@@ -93,23 +122,31 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
     store: instance.store,
     getWb: () => instance.workbook,
     strings: instance.i18n.strings,
-    onAdd: (input) => {
+    onAdd: (inputs, commandId) => {
       const ctx = {
         store: instance.store,
         history: instance.history,
         origin: 'ribbon',
-        commandId: 'mac.insert.slicer',
+        commandId,
       } as const;
       const sheet = instance.store.getState().data.sheetIndex;
-      return objectWrite(ctx, sheet, null, () => {
-        try {
-          return instance.addSlicer(input);
-        } catch {
-          return null;
-        }
-      });
+      // One undo step; a refused slicer rolls back the ones already added.
+      const token = instance.history.begin();
+      let added: SlicerSpec[] | null = null;
+      try {
+        added = objectWrite(ctx, sheet, null, () =>
+          inputs.map((input) => instance.addSlicer(input)),
+        );
+      } catch {
+        added = null;
+      }
+      if (added) instance.history.end(token);
+      else instance.history.abort(token);
+      return added;
     },
   });
+  SPARKLINE_DIALOGS.set(instance, sparkline);
+  SLICER_DIALOGS.set(instance, slicer);
   const statistics = attachMacWorkbookStatistics({
     host: instance.host,
     getWb: () => instance.workbook,

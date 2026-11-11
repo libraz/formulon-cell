@@ -20,14 +20,27 @@ export interface MacSlicerDialogDeps {
   store: SpreadsheetStore;
   getWb: () => WorkbookHandle;
   strings?: Strings;
-  /** Called after the user picks a table and field. Returning `null` leaves
-   *  the dialog open with an error, which lets the public instance API own
-   *  feature/policy validation. */
-  onAdd: (input: MacSlicerDialogInput) => SlicerSpec | null;
+  /** Called with every checked field at once, under the ribbon command that opened the dialog.
+   *  Returning `null` means nothing was added and leaves the dialog open with an error, which
+   *  lets the public instance API own feature/policy validation. */
+  onAdd: (
+    inputs: readonly MacSlicerDialogInput[],
+    commandId: string,
+  ) => readonly SlicerSpec[] | null;
 }
 
+/** What opens the dialog. */
+export interface MacSlicerOpenOptions {
+  /** Ribbon command that invoked the dialog; it authorizes the write. */
+  commandId?: string;
+  /** Opened for a PivotTable: slicers attach to tables only, so the chooser stays unavailable. */
+  pivot?: boolean;
+}
+
+const DEFAULT_COMMAND_ID = 'mac.insert.slicer';
+
 export interface MacSlicerDialogHandle {
-  open(): void;
+  open(options?: MacSlicerOpenOptions): void;
   close(): void;
   refresh(): void;
   setStrings(next: Strings): void;
@@ -47,6 +60,7 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
   const { host } = deps;
   let strings = deps.strings ?? defaultStrings;
   let tables: TableOption[] = [];
+  let opened: MacSlicerOpenOptions = {};
 
   const shell = createDialogShell({
     host,
@@ -85,10 +99,11 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     });
   };
 
-  /** The table under the active cell, else the first one. */
+  /** The engine table under the active cell; slicers attach to nothing else. */
   const targetTable = (): TableOption | undefined => {
     const active = activeTableOverlay(deps.store.getState());
-    return tables.find((entry) => entry.name === active?.name) ?? tables[0];
+    if (opened.pivot || active?.source !== 'engine') return undefined;
+    return tables.find((entry) => entry.name === active.name);
   };
 
   const renderFields = (): void => {
@@ -103,7 +118,7 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     fieldList.replaceChildren();
     const table = targetTable();
     if (!table || table.columns.length === 0) {
-      setError(tables.length === 0 ? strings.mac.slicer.noTable : strings.mac.slicer.noColumns);
+      setError(table ? strings.mac.slicer.noColumns : strings.mac.slicer.noTable);
       return;
     }
     for (const column of table.columns) {
@@ -130,11 +145,13 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
       api.close();
       return;
     }
-    for (const column of checked) {
-      if (!deps.onAdd({ tableName: table.name, column })) {
-        setError(strings.mac.slicer.insertFailed);
-        return;
-      }
+    const added = deps.onAdd(
+      checked.map((column) => ({ tableName: table.name, column })),
+      opened.commandId ?? DEFAULT_COMMAND_ID,
+    );
+    if (!added) {
+      setError(strings.mac.slicer.insertFailed);
+      return;
     }
     api.close();
   };
@@ -152,7 +169,8 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
   };
 
   const api: MacSlicerDialogHandle = {
-    open(): void {
+    open(options?: MacSlicerOpenOptions): void {
+      opened = options ?? {};
       renderFields();
       shell.open();
       deferInitialFocus(shell.overlay, () => fieldList.querySelector('input')?.focus());

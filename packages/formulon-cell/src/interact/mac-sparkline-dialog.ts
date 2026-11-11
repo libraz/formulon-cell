@@ -48,6 +48,8 @@ export interface MacSparklineDialogDeps {
  *  group keeps its settings and gets one sparkline per location cell. */
 export interface MacSparklineEditTarget {
   groupId: string;
+  /** Sheet hosting the group; its location cannot move to another sheet. */
+  sheet: number;
   data: string;
   location: string;
 }
@@ -203,7 +205,10 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       setError(strings.mac.sparkline.chooseType);
       return false;
     }
-    if (deps.canCommit && !deps.canCommit(source, destinationAddr)) {
+    if (
+      (editing && destination.sheet !== editing.sheet) ||
+      deps.canCommit?.(source, destinationAddr) === false
+    ) {
       lastSource = null;
       lastDestination = null;
       setError(strings.mac.sparkline.unavailable);

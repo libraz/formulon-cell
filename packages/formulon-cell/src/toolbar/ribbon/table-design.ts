@@ -95,6 +95,20 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
     table?.source === 'engine' &&
     canExecuteBuiltInRequest(instance.store, 'tableName', 'ribbon').allowed;
   if (input) projectDisabledState(input, !renamable, sessionOnly ? reason : null);
+  // Both read the engine's table, which a session table is not.
+  for (const command of ['tableSummarizePivot', 'tableInsertSlicer']) {
+    const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+    if (!button) continue;
+    if (sessionOnly) {
+      button.dataset.tableSessionTitle ??= button.title;
+      projectDisabledState(button, true, reason, { titlePrefix: button.dataset.tableSessionTitle });
+      button.dataset.tableSessionOnly = 'true';
+    } else if (button.dataset.tableSessionOnly) {
+      projectDisabledState(button, false, null, { titlePrefix: button.dataset.tableSessionTitle });
+      delete button.dataset.tableSessionOnly;
+      delete button.dataset.tableSessionTitle;
+    }
+  }
   for (const [command, option] of Object.entries(TABLE_OPTION_COMMANDS)) {
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
     if (!button) continue;

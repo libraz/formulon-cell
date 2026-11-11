@@ -91,7 +91,7 @@ import {
   RIBBON_ZOOM_PRESETS,
   type RibbonFormatMutator,
 } from './command-tables.js';
-import { createMacRibbonActions } from './mac/actions.js';
+import { openMacSlicerDialog } from './mac/actions.js';
 import { dispatchMacRibbonCommand } from './mac/dispatch.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
 
@@ -420,8 +420,12 @@ const applyGenericRibbonCommand = (
     }
     case 'tableInsertSlicer':
     case 'pivotInsertSlicer':
-      // One Insert Slicer dialog serves the table, the PivotTable and the Mac Insert tab.
-      void createMacRibbonActions(i)['mac.insert.slicer']?.();
+      // One Insert Slicer dialog serves the table, the PivotTable and the Mac Insert tab; the
+      // engine slicer takes a table only, so the PivotTable face opens it unavailable.
+      openMacSlicerDialog(i, {
+        commandId: policyCommandId,
+        pivot: id === 'pivotInsertSlicer',
+      });
       return true;
     case 'pivotFieldList':
       i.openActivePivotFieldList();

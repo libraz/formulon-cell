@@ -1,9 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { defaultTableOverlay } from '../../../src/commands/format-as-table.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { ja } from '../../../src/i18n/strings/ja.js';
 import { attachMacSlicerDialog } from '../../../src/interact/mac-slicer-dialog.js';
-import { createSpreadsheetStore, type SlicerSpec } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SlicerSpec,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
+
+/** A store whose active cell sits in the engine table `Sales`. */
+const storeInTable = (): SpreadsheetStore => {
+  const store = createSpreadsheetStore();
+  mutators.upsertTableOverlay(store, {
+    ...defaultTableOverlay('t1', { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 }),
+    source: 'engine',
+    name: 'Sales',
+  });
+  return store;
+};
 
 const workbookWithTable = (): WorkbookHandle =>
   ({
@@ -41,7 +58,7 @@ describe('attachMacSlicerDialog', () => {
   it('lists every column of the table as an unchecked checkbox, in source order', () => {
     const handle = attachMacSlicerDialog({
       host,
-      store: createSpreadsheetStore(),
+      store: storeInTable(),
       getWb: workbookWithTable,
       strings: ja,
       onAdd: () => null,
@@ -65,11 +82,13 @@ describe('attachMacSlicerDialog', () => {
     const selected: Array<{ tableName: string; column: string }> = [];
     const handle = attachMacSlicerDialog({
       host,
-      store: createSpreadsheetStore(),
+      store: storeInTable(),
       getWb: workbookWithTable,
-      onAdd: (input) => {
-        selected.push(input);
-        return { id: `slicer-${selected.length}`, ...input, selected: [] } satisfies SlicerSpec;
+      onAdd: (inputs) => {
+        selected.push(...inputs);
+        return inputs.map(
+          (input, i) => ({ id: `slicer-${i}`, ...input, selected: [] }) satisfies SlicerSpec,
+        );
       },
     });
     handle.open();
@@ -87,10 +106,10 @@ describe('attachMacSlicerDialog', () => {
     const selected: unknown[] = [];
     const handle = attachMacSlicerDialog({
       host,
-      store: createSpreadsheetStore(),
+      store: storeInTable(),
       getWb: workbookWithTable,
-      onAdd: (input) => {
-        selected.push(input);
+      onAdd: (inputs) => {
+        selected.push(...inputs);
         return null;
       },
     });
@@ -119,7 +138,7 @@ describe('attachMacSlicerDialog', () => {
   it('keeps the strings set last across refresh and relabels every control', () => {
     const handle = attachMacSlicerDialog({
       host,
-      store: createSpreadsheetStore(),
+      store: storeInTable(),
       getWb: workbookWithTable,
       strings: ja,
       onAdd: () => null,
@@ -136,7 +155,7 @@ describe('attachMacSlicerDialog', () => {
   it('applies the shared dialog class to the overlay without leaking it onto the panel', () => {
     const handle = attachMacSlicerDialog({
       host,
-      store: createSpreadsheetStore(),
+      store: storeInTable(),
       getWb: workbookWithTable,
       onAdd: () => null,
     });

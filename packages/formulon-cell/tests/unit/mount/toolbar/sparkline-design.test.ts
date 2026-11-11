@@ -340,7 +340,10 @@ describe('Sparkline tab of the ribbon', () => {
     expect(Array.from(swatches).every((swatch) => swatch.disabled)).toBe(true);
     expect(swatches[0]?.getAttribute('aria-label')).toBe('Sparkline Style Accent 1, Darker 50%');
     expect(swatches[35]?.getAttribute('aria-label')).toBe('Sparkline Style Colorful #6');
+    // A slot waits for its measured colours and says so, like other unbuilt commands.
+    expect(swatches[0]?.getAttribute('aria-description')).toBe('Coming soon');
     command('sparklineStyleGallery').click();
     expect(Array.from(swatches).every((swatch) => swatch.disabled)).toBe(true);
+    expect(swatches[0]?.getAttribute('aria-description')).toBe('Coming soon');
   });
 });

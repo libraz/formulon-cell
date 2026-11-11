@@ -1,4 +1,4 @@
-import { formatA1Range } from '../engine/address.js';
+import { formatA1Range, quoteSheetName } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -8,14 +8,12 @@ export interface ResolvedSparklineRange extends Range {
   explicitSheet: boolean;
 }
 
-const formatSheetRange = (sheetName: string, range: Range): string => {
-  const body = formatA1Range(range);
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(sheetName)) return `${sheetName}!${body}`;
-  return `'${sheetName.replace(/'/g, "''")}'!${body}`;
-};
+/** Most cells a typed sparkline range may cover: one full-width row. An unmeasured bound that
+ *  keeps a pasted whole-sheet range from being read cell by cell on every paint. */
+export const MAX_SPARKLINE_RANGE_CELLS = 16_384;
 
-/** Resolve typed range text against `fallbackSheet`; null when it does not parse or names an
- *  unknown sheet. */
+/** Resolve typed range text against `fallbackSheet`; null when it does not parse, names an
+ *  unknown sheet or covers more than `MAX_SPARKLINE_RANGE_CELLS` cells. */
 export const resolveSparklineRange = (
   raw: string,
   fallbackSheet: number,
@@ -30,6 +28,9 @@ export const resolveSparklineRange = (
         ? (wb.sheetIndexByName(parsed.sheetName) ?? -1)
         : -1;
   if (sheet < 0) return null;
+  if ((parsed.r1 - parsed.r0 + 1) * (parsed.c1 - parsed.c0 + 1) > MAX_SPARKLINE_RANGE_CELLS) {
+    return null;
+  }
   return {
     sheet,
     r0: parsed.r0,
@@ -48,7 +49,8 @@ export const sparklineSourceText = (
   wb: WorkbookHandle | null,
 ): string => {
   if (source.explicitSheet || source.sheet !== hostSheet) {
-    return formatSheetRange(wb?.sheetName(source.sheet) ?? `Sheet${source.sheet + 1}`, source);
+    const name = wb?.sheetName(source.sheet) ?? `Sheet${source.sheet + 1}`;
+    return `${quoteSheetName(name)}!${formatA1Range(source)}`;
   }
   return formatA1Range(source);
 };

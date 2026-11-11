@@ -618,9 +618,13 @@ export function paintSparkline(
   const range = max - min || 1;
   const yOf = (v: number): number => y + h - ((Math.min(Math.max(v, min), max) - min) / range) * h;
   const count = input.points.length;
-  const xs = input.points.map((p) => p.x);
-  const xMin = Math.min(...xs);
-  const xSpan = Math.max(...xs) - xMin;
+  let xMin = Number.POSITIVE_INFINITY;
+  let xMax = Number.NEGATIVE_INFINITY;
+  for (const p of input.points) {
+    if (p.x < xMin) xMin = p.x;
+    if (p.x > xMax) xMax = p.x;
+  }
+  const xSpan = xMax - xMin;
   const slot = w / count;
 
   // Colour of one point: high, low, first, last, then negative override the series colour.
@@ -644,8 +648,10 @@ export function paintSparkline(
   ctx.clip();
   ctx.globalAlpha = 1;
 
-  if (settings.displayXAxis && min <= 0 && max >= 0) {
-    const ay = Math.round(yOf(0)) + 0.5;
+  // Win/loss bars hang off the mid line whatever the axis limits; others rest on zero.
+  const winLoss = settings.type === SparklineType.Stacked;
+  if (settings.displayXAxis && (winLoss || (min <= 0 && max >= 0))) {
+    const ay = Math.round(winLoss ? y + h / 2 : yOf(0)) + 0.5;
     ctx.strokeStyle = colors.axis ?? '#000000';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -683,25 +689,30 @@ export function paintSparkline(
   } else {
     const gap = Math.min(1, slot * 0.2);
     const barW = Math.max(1, slot - gap);
-    const xOf = (p: SparklinePoint): number =>
-      settings.dateAxis && xSpan > 0 ? x + ((p.x - xMin) / xSpan) * (w - slot) : x + p.x * slot;
+    // A date axis with no spread (one point, equal dates) falls back to the point's position.
+    const xOf = (p: SparklinePoint, i: number): number =>
+      settings.dateAxis
+        ? xSpan > 0
+          ? x + ((p.x - xMin) / xSpan) * (w - slot)
+          : x + i * slot
+        : x + p.x * slot;
     if (settings.type === SparklineType.Column) {
       // Bars rest on zero when the axis spans it, else on the axis limit nearest zero.
       const base = Math.min(Math.max(0, min), max);
       const baseY = yOf(base);
-      for (const p of points) {
+      for (const [i, p] of points.entries()) {
         if (p.value === null) continue;
         const vy = yOf(p.value);
         ctx.fillStyle = colorOf(p);
-        ctx.fillRect(xOf(p), Math.min(vy, baseY), barW, Math.max(1, Math.abs(vy - baseY)));
+        ctx.fillRect(xOf(p, i), Math.min(vy, baseY), barW, Math.max(1, Math.abs(vy - baseY)));
       }
     } else {
       const half = h / 2;
       const bar = Math.max(1, half - 1);
-      for (const p of points) {
+      for (const [i, p] of points.entries()) {
         if (p.value === null || p.value === 0) continue;
         ctx.fillStyle = colorOf(p);
-        ctx.fillRect(xOf(p), p.value < 0 ? y + half : y + half - bar, barW, bar);
+        ctx.fillRect(xOf(p, i), p.value < 0 ? y + half : y + half - bar, barW, bar);
       }
     }
   }

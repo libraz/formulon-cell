@@ -154,7 +154,8 @@ export function updateSparklineGroup(
 
 /** Merge the groups of the sparklines at `addrs` (those on `active`'s sheet) into one new
  *  group that takes the settings of `active`'s group, or of the first cell's. Returns the new
- *  group id, or null when no cell hosts a sparkline. */
+ *  group id (the existing one when the cells already share a group), or null when no cell hosts
+ *  a sparkline. */
 export function groupSparklines(
   store: SpreadsheetStore,
   addrs: readonly Addr[],
@@ -174,6 +175,8 @@ export function groupSparklines(
     activeGroup && touched.has(activeGroup) ? activeGroup : ([...touched][0] as string),
   );
   if (!settings) return null;
+  // One group already is the merge: nothing to write.
+  if (touched.size === 1) return [...touched][0] as string;
   const id = newSparklineGroupId();
   store.setState((s) => {
     const sparklines = new Map(
@@ -190,7 +193,8 @@ export function groupSparklines(
 }
 
 /** Give each member of the groups of the sparklines at `addrs` its own group with a copy of
- *  the group's settings. Returns how many sparklines were regrouped. */
+ *  the group's settings. Groups of one are left alone. Returns how many sparklines were
+ *  regrouped. */
 export function ungroupSparklines(store: SpreadsheetStore, addrs: readonly Addr[]): number {
   const state = store.getState();
   const touched = new Set<string>();
@@ -198,6 +202,13 @@ export function ungroupSparklines(store: SpreadsheetStore, addrs: readonly Addr[
     const member = state.sparkline.sparklines.get(addrKey(addr));
     if (member) touched.add(member.group);
   }
+  // A group of one is already single.
+  const sizes = new Map<string, number>();
+  for (const member of state.sparkline.sparklines.values()) {
+    sizes.set(member.group, (sizes.get(member.group) ?? 0) + 1);
+  }
+  for (const id of touched) if ((sizes.get(id) ?? 0) < 2) touched.delete(id);
+  if (touched.size === 0) return 0;
   let count = 0;
   store.setState((s) => {
     const sparklines = new Map(s.sparkline.sparklines);

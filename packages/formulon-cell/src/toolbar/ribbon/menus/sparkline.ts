@@ -156,7 +156,8 @@ export const createSparklineMenuFactories = (
         title: name,
         ariaLabel: name,
       });
-      projectDisabledState(swatch, true, null);
+      // The preset colours are not measured yet, so every slot waits, as other unbuilt commands do.
+      projectDisabledState(swatch, true, ribbonText.disabled, { titlePrefix: name });
       grid.appendChild(swatch);
     }
     menu.appendChild(grid);
@@ -214,7 +215,7 @@ export const createSparklineMenuFactories = (
       checkable(item(label, 'sparklineAxis', value), 'menuitemradio');
     // The engine models no right-to-left plot, so the entry stays greyed.
     const rtl = checkable(item(t.plotRtl, 'sparklineAxis', 'rtl'), 'menuitemcheckbox');
-    projectDisabledState(rtl, true, null);
+    projectDisabledState(rtl, true, null, { titlePrefix: t.plotRtl });
     menu.append(
       menuSectionHeader(t.horizontalAxis),
       radio(t.generalAxis, 'general'),

@@ -1,3 +1,4 @@
+import { MAX_SPARKLINE_RANGE_CELLS } from '../commands/sparkline-ranges.js';
 import { parseAddrKey } from '../engine/address.js';
 import { parseRangeRef, rangeForRef } from '../engine/range-resolver.js';
 import { cssOfColorSpec } from '../engine/theme-color.js';
@@ -44,6 +45,8 @@ const readNumbers = (
   return out;
 };
 
+const rangeCells = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
 const rangeOfSource = (
   wb: WorkbookHandle | null,
   source: string,
@@ -67,17 +70,20 @@ export function readSparklinePoints(
 ): SparklinePoint[] | null {
   const range = rangeOfSource(wb, member.source, hostSheet);
   if (!range) return null;
+  if (rangeCells(range) > MAX_SPARKLINE_RANGE_CELLS) return null;
   const cells = readNumbers(state, wb, range);
   const dateRange = settings.dateAxis ? settings.dateAxisRange : null;
-  const dates = dateRange
-    ? readNumbers(state, wb, {
-        sheet: dateRange.sheet,
-        r0: dateRange.rect.firstRow,
-        c0: dateRange.rect.firstCol,
-        r1: dateRange.rect.lastRow,
-        c1: dateRange.rect.lastCol,
-      })
-    : null;
+  const dateCells: Range | null = dateRange && {
+    sheet: dateRange.sheet,
+    r0: dateRange.rect.firstRow,
+    c0: dateRange.rect.firstCol,
+    r1: dateRange.rect.lastRow,
+    c1: dateRange.rect.lastCol,
+  };
+  const dates =
+    dateCells && rangeCells(dateCells) <= MAX_SPARKLINE_RANGE_CELLS
+      ? readNumbers(state, wb, dateCells)
+      : null;
   const byDate =
     dates !== null && dates.length === cells.length && dates.every((d) => d.value !== null);
   const visibleSheet = range.sheet === state.data.sheetIndex;
@@ -111,7 +117,9 @@ export function createSparklineGroupExtents(
         const at = parseAddrKey(key);
         if (member.group !== groupId || !at) continue;
         const points = readSparklinePoints(state, wb, member, at.sheet, settings);
-        if (points) values.push(...sparklineValues(points, settings.emptyCellsAs));
+        if (points) {
+          for (const v of sparklineValues(points, settings.emptyCellsAs)) values.push(v);
+        }
       }
     }
     const extent = sparklineExtent(values);
