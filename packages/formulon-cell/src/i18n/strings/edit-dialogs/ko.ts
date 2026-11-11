@@ -157,6 +157,18 @@ export const editDialogsKo: EditDialogsStrings = {
     alwaysSuggest: '항상 추천',
     ignoreUppercase: '대문자 무시',
   },
+  autoCorrectDialog: {
+    title: '자동 고침 옵션',
+    description:
+      '[바꾸기] 목록의 일치하는 단어를 자동으로 [바꿀 단어] 목록의 해당 단어로 바꿉니다.',
+    replaceAsYouType: '다음 목록에 있는 내용대로 자동으로 바꾸기',
+    replaceHyperlinks: '인터넷 및 네트워크 경로를 하이퍼링크로 바꾸기',
+    replace: '바꾸기:',
+    with: '결과:',
+    add: '추가',
+    delete: '삭제',
+    close: '닫기',
+  },
   goToDialog: {
     title: '이동 옵션',
     goToTitle: '이동',

@@ -159,6 +159,18 @@ export const editDialogsFr: EditDialogsStrings = {
     alwaysSuggest: 'Toujours suggérer',
     ignoreUppercase: 'Ignorer les CAPITALES',
   },
+  autoCorrectDialog: {
+    title: 'Options de correction automatique',
+    description:
+      'Remplace automatiquement un mot figurant dans la liste Remplacer par le mot correspondant dans la liste Par.',
+    replaceAsYouType: 'Correction en cours de frappe',
+    replaceHyperlinks: 'Remplacer les chemins d’accès Internet et réseau par des liens hypertexte',
+    replace: 'Remplacer\u00a0:',
+    with: 'Par\u00a0:',
+    add: 'Ajouter',
+    delete: 'Supprimer',
+    close: 'Fermer',
+  },
   goToDialog: {
     title: 'Atteindre spécial',
     goToTitle: 'Atteindre',

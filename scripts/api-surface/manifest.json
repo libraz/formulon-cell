@@ -5,6 +5,9 @@
     "@libraz/formulon-cell": {
       "mustExport": {
         "ApplyChangesOptions": "type",
+        "AutoCorrectEntry": "type",
+        "AutoCorrectOptions": "type",
+        "AutoCorrectState": "type",
         "Audit": "type",
         "BUILT_IN_LOCALES": "value",
         "BatchCell": "type",

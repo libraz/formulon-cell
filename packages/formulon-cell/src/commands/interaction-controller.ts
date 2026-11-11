@@ -17,6 +17,7 @@ import {
   detectTypedWebUrl,
   getTypedWebUrlFormatPatch,
 } from './auto-hyperlink.js';
+import { autoCorrectFor } from './autocorrect.js';
 import {
   type CoercedInput,
   coerceInputForCell,
@@ -271,7 +272,8 @@ export class InteractionController {
         'input' in change &&
         preparedChange.input?.kind === 'text' &&
         preparedChange.patch.formula === null &&
-        detectTypedWebUrl(change.input) === change.input
+        detectTypedWebUrl(change.input) === change.input &&
+        autoCorrectFor(this.store)?.state().replaceHyperlinks !== false
       ) {
         try {
           const previousValue = wb.getValue(preparedChange.patch.addr);

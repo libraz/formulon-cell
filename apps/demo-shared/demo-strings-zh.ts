@@ -117,6 +117,8 @@ export const zhUi: DemoUiStrings = {
   shareDesc: '显示此主机驱动工作簿的共享状态。',
   options: '选项',
   optionsDesc: '显示集成窗格和功能切换。',
+  autoCorrectOptions: '自动更正选项',
+  autoCorrectOptionsDesc: '自动将“替换”列表中的匹配单词替换为“替换为”列表中对应的单词。',
   noCommands: '未找到命令',
   documentMenu: {
     button: '文档操作',

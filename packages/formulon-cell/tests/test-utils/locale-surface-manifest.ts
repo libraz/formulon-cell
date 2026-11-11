@@ -34,6 +34,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'dimensionDialog',
   'findReplace',
   'spellingDialog',
+  'autoCorrectDialog',
   'goToDialog',
   'moveCells',
   'protection',
@@ -578,6 +579,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'interact/pivot-table-dialog.ts',
     'attachPivotTableDialog',
     'pivotTableDialog',
+    'block',
+  ),
+  shell(
+    'interact.autoCorrectDialog',
+    'interact/autocorrect-dialog.ts',
+    'openAutoCorrectDialog',
+    'autoCorrectDialog',
     'block',
   ),
   shell(

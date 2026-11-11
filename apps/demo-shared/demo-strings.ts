@@ -84,6 +84,8 @@ export interface DemoUiStrings {
   shareDesc: string;
   options: string;
   optionsDesc: string;
+  autoCorrectOptions: string;
+  autoCorrectOptionsDesc: string;
   noCommands: string;
   /** Mac title bar: the document-actions popover under the book name. */
   documentMenu: {
@@ -325,6 +327,9 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       shareDesc: 'Show the sharing status for this host-driven workbook.',
       options: 'Options',
       optionsDesc: 'Show the integration panel and feature toggles.',
+      autoCorrectOptions: 'AutoCorrect Options',
+      autoCorrectOptionsDesc:
+        'Automatically replaces a matched word in the Replace list with the corresponding word in the With list.',
       noCommands: 'No commands found',
       documentMenu: {
         button: 'Document Actions',
@@ -507,6 +512,9 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       shareDesc: 'このホスト管理ブックの共有状態を表示します。',
       options: 'オプション',
       optionsDesc: '統合パネルと機能トグルを表示します。',
+      autoCorrectOptions: 'オートコレクト オプション',
+      autoCorrectOptionsDesc:
+        '[自動で変更する項目] リストで一致した単語を、[修正後の文字列] リストにある対応する単語で自動的に置き換えます。',
       noCommands: 'コマンドが見つかりません',
       documentMenu: {
         button: 'ドキュメントの操作',

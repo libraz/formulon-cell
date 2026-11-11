@@ -118,6 +118,9 @@ export const koUi: DemoUiStrings = {
   shareDesc: '이 호스트 기반 통합 문서의 공유 상태를 표시합니다.',
   options: '옵션',
   optionsDesc: '통합 창과 기능 토글을 표시합니다.',
+  autoCorrectOptions: '자동 고침 옵션',
+  autoCorrectOptionsDesc:
+    '[바꾸기] 목록의 일치하는 단어를 자동으로 [바꿀 단어] 목록의 해당 단어로 바꿉니다.',
   noCommands: '명령을 찾을 수 없음',
   documentMenu: {
     button: '문서 작업',

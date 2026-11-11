@@ -79,16 +79,22 @@ describe('Review > Spelling dialog', () => {
     expect(dialog()).toBeNull();
   });
 
-  it('labels itself as the desktop dialog, with AutoCorrect unavailable', () => {
+  it('labels itself as the desktop dialog', () => {
     select([0, 0], [0, 0, 0, 0]);
     spell();
     expect(dialog()?.querySelector('.fc-fmtdlg__header')?.textContent).toBe('Spelling: English');
     expect(dialog()?.textContent).toContain('Not in Dictionary:');
     expect(changeTo().value).toBe('the');
-    const autoCorrect = button('AutoCorrect');
-    expect(autoCorrect.disabled).toBe(true);
-    expect(autoCorrect.dataset.disabledReason).toBeTruthy();
     expect(button('Cancel')).toBeTruthy();
+  });
+
+  it('adds the word and its correction to AutoCorrect, then changes it', () => {
+    select([0, 0], [0, 0, 0, 0]);
+    spell();
+    button('AutoCorrect').click();
+    expect(text(0, 0)).toEqual({ kind: 'text', value: 'the' });
+    expect(sheet.instance.autoCorrect.state().entries).toContainEqual({ from: 'teh', to: 'the' });
+    expect(flagged()).toBe('recieve');
   });
 
   it('changes the word as one undo step, then offers Close and Undo Last', () => {

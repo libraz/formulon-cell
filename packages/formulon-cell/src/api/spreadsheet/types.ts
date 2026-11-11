@@ -1,4 +1,5 @@
 import type { CellAddress, CellRect, Value } from '@libraz/formulon';
+import type { AutoCorrectOptions } from '../../commands/autocorrect.js';
 import type { InteractionPolicy } from '../../commands/interaction-policy.js';
 import type { PrinterProfile } from '../../commands/printer-profile.js';
 import type { SpellingService } from '../../commands/spelling.js';
@@ -83,6 +84,9 @@ export interface SpreadsheetOptions {
   /** The spell checker Review > Spelling asks; by default a short list of common English typos,
    *  which passes every word of other languages. */
   readonly spelling?: SpellingService;
+  /** AutoCorrect: the replacement list per language, the starting switches and a callback with
+   *  what the user changes. By default the desktop's symbol replacements, such as `(c)` → `©`. */
+  readonly autoCorrect?: AutoCorrectOptions;
   readonly host?: HostProviders;
   readonly uploadStatus?: StatusBarUploadStatus;
   readonly macroRecording?: boolean | null;

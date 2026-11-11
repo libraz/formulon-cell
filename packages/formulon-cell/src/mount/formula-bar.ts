@@ -763,7 +763,14 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const commitRawAt = (a: Addr, raw: string, draft?: ExternalDraftState): boolean => {
     const currentWb = wb();
-    const result = commitCellInput({ store, wb: currentWb, addr: a, raw, origin: 'formulaBar' });
+    const result = commitCellInput({
+      store,
+      wb: currentWb,
+      addr: a,
+      raw,
+      origin: 'formulaBar',
+      typed: true,
+    });
     if (result.status === 'rejected') {
       showCommitFailure(
         result.alert?.message ?? `The ${result.operation} operation was rejected.`,

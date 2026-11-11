@@ -1,5 +1,6 @@
 import type { SheetPrintDocument } from '../api/spreadsheet/types.js';
 import type { CellRegistry } from '../cells.js';
+import type { AutoCorrectOptions, AutoCorrectStore } from '../commands/autocorrect.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { History } from '../commands/history.js';
 import type { InteractionController } from '../commands/interaction-controller.js';
@@ -94,6 +95,8 @@ export interface MountOptions {
   getFunctionArgumentHelp?: FunctionArgumentHelpProvider;
   /** The host's spell checker for Review > Spelling; the built-in one when it returns nothing. */
   getSpellingService?: () => SpellingService | undefined;
+  /** The host's AutoCorrect list, starting switches and change callback. */
+  getAutoCorrectOptions?: () => AutoCorrectOptions | undefined;
   /** Optional host-driven status bar Upload Status indicator. */
   uploadStatus?: StatusBarUploadStatus;
   /** Optional host-driven status bar Macro Recording indicator. */
@@ -203,6 +206,8 @@ export interface SpreadsheetInstance {
   captureScreenClip(): Promise<ScreenClipResult | null>;
   /** The spell checker Review > Spelling uses now. */
   spellingService(): SpellingService;
+  /** The AutoCorrect list and switches typed entries follow. */
+  readonly autoCorrect: AutoCorrectStore;
   setUploadStatus(next: StatusBarUploadStatus): void;
   setMacroRecording(next: boolean | null): void;
   recalc(): void;

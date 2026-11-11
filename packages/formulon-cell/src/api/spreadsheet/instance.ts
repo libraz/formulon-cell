@@ -5,6 +5,7 @@ import {
   StatusCode,
   type Value,
 } from '@libraz/formulon';
+import type { AutoCorrectOptions } from '../../commands/autocorrect.js';
 import { autofitColWidth, autofitRowHeight } from '../../commands/autofit-measurement.js';
 import { isBuiltInCommandId } from '../../commands/built-in-command-ids.js';
 import {
@@ -247,6 +248,8 @@ interface InstanceState {
   readonly host: { current: HostProviders };
   /** The host's spell checker, read when Review > Spelling runs. */
   readonly spelling: { current: SpellingService | undefined };
+  /** The host's AutoCorrect options, read when AutoCorrect runs. */
+  readonly autoCorrect: { current: AutoCorrectOptions | undefined };
   /** The workbook the latest `update({ workbook })` asked for; differs from `workbook` while the
    *  mount is still switching to it. */
   requestedWorkbook: Workbook;
@@ -706,6 +709,9 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
     case 'spelling':
       state.spelling.current = (value as SpellingService | null) ?? undefined;
       break;
+    case 'autoCorrect':
+      state.autoCorrect.current = (value as AutoCorrectOptions | null) ?? undefined;
+      break;
     case 'host':
       applyHostProviders(state, (value as SpreadsheetOptions['host'] | null) ?? {});
       break;
@@ -1043,6 +1049,7 @@ const legacyOptionsOf = (
   handle: WorkbookHandle,
   hostProviders: { readonly current: HostProviders },
   spelling: { readonly current: SpellingService | undefined },
+  autoCorrect: { readonly current: AutoCorrectOptions | undefined },
   notifyRibbon: () => void,
 ): MountOptions => {
   const host = options.host ?? {};
@@ -1070,6 +1077,7 @@ const legacyOptionsOf = (
     getFunctionArgumentHelp: (name, index, locale) =>
       hostProviders.current.functionArgumentHelp?.(name, index, locale),
     getSpellingService: () => spelling.current,
+    getAutoCorrectOptions: () => autoCorrect.current,
     ...(options.uploadStatus !== undefined ? { uploadStatus: options.uploadStatus } : {}),
     ...(options.macroRecording !== undefined ? { macroRecording: options.macroRecording } : {}),
     renderError: false,
@@ -1110,6 +1118,7 @@ export async function mount(
   let legacy: LegacyInstance | null = null;
   const hostProviders = { current: options.host ?? {} };
   const spelling = { current: options.spelling };
+  const autoCorrect = { current: options.autoCorrect };
   const ribbonEvents = new Emitter<RibbonEvents>();
   const notifyRibbon = (): void => {
     const ribbonHandle = legacy?.toolbar;
@@ -1119,7 +1128,7 @@ export async function mount(
     if (options.seed) options.seed(workbook);
     legacy = await Spreadsheet.mount(
       host,
-      legacyOptionsOf(options, handle, hostProviders, spelling, notifyRibbon),
+      legacyOptionsOf(options, handle, hostProviders, spelling, autoCorrect, notifyRibbon),
     );
   } finally {
     // A failed seed or mount releases the workbook the instance created; one passed in stays.
@@ -1160,6 +1169,7 @@ export async function mount(
     options: { ...options, locale: options.locale ?? 'en' },
     host: hostProviders,
     spelling,
+    autoCorrect,
     requestedWorkbook: workbook,
     swaps: Promise.resolve(),
     origin: null,

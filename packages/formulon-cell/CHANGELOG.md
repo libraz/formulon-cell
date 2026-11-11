@@ -45,7 +45,7 @@ versioning is [SemVer](https://semver.org/).
 - **Breaking:** The `moveCells` interaction operation is removed. Cut, drag-move and Insert Copied Cells are decided as the paste and insert they perform.
 - On a protected sheet, Format Cells, the phonetic commands and every formatting command need the Format cells option whatever the selection, as writes already did; Define Name, Create from Selection and Data Validation are unavailable, while the Name Manager and New Comment stay available.
 - The Home Clear control is decided by the selected cells, and its Clear Hyperlinks item needs the Insert hyperlinks option on a protected sheet; without it the item is greyed as unavailable, not as having nothing to clear.
-- Review > Spelling opens the desktop Spelling dialog in place of the issue list: one word at a time with Ignore Once, Ignore All, Add, Change, Change All, Suggest and Undo Last. One selected cell checks the whole sheet and a range only that range, by rows from the active cell, wrapping to the top; cell text and notes are checked, and each change is one undo step decided as typed entry is. AutoCorrect stays unavailable for now.
+- Review > Spelling opens the desktop Spelling dialog in place of the issue list: one word at a time with Ignore Once, Ignore All, Add, Change, Change All, Suggest and Undo Last. One selected cell checks the whole sheet and a range only that range, by rows from the active cell, wrapping to the top; cell text and notes are checked, and each change is one undo step decided as typed entry is.
 - Formula autocomplete treats a defined name whose value is a LAMBDA as a function: it carries the function glyph, inserts with an opening parenthesis and shows its parameters in the argument tooltip. On the Mac, other names sit in a Named Ranges group above the Functions group, each under its header.
 - The Mac cell context menu follows the desktop order and groups, with New Comment and the note rows beside it.
 - The Windows cell context menu offers New Comment, which starts a thread, before New Note.
@@ -72,6 +72,8 @@ versioning is [SemVer](https://semver.org/).
 - `WorkbookHandle.sheetIndexByName`, `tableIndexByName`, `renameTable` and `updateTableStyleOptions`. Sheet and table names resolve with the engine's name rules instead of ASCII-only case folding.
 - `ChartPlacement` is exported for `createSessionChart` placements.
 - `SpreadsheetOptions.spelling` supplies the spell checker for Review > Spelling (`check`, `suggest` and an optional `addWord` that receives the words the user adds); `SpellingService` is exported. Without it, a short list of common English typos is checked and other languages pass.
+- AutoCorrect: typed text is corrected on entry from a replacement list per language, edited in AutoCorrect Options (`dialogs.open('autoCorrect')`) or with the Spelling dialog's AutoCorrect button. The built-in lists hold the desktop's symbol replacements and the two Japanese greeting corrections; the desktop's full word lists are not bundled. `SpreadsheetOptions.autoCorrect` supplies the list and the starting switches, and `onChange` receives the whole state after each user change; `AutoCorrectEntry`, `AutoCorrectOptions` and `AutoCorrectState` are exported. Replace internet and network paths with hyperlinks now switches the existing formatting of a typed web address.
+- `dialogs.open('spelling')` opens Review > Spelling.
 
 ### Removed
 

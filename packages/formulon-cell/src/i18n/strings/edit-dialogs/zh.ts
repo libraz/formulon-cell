@@ -157,6 +157,17 @@ export const editDialogsZh: EditDialogsStrings = {
     alwaysSuggest: '始终建议',
     ignoreUppercase: '忽略大写',
   },
+  autoCorrectDialog: {
+    title: '自动更正选项',
+    description: '自动将“替换”列表中的匹配单词替换为“替换为”列表中对应的单词。',
+    replaceAsYouType: '键入时替换文本',
+    replaceHyperlinks: '使用超链接替换 Internet 和网络路径',
+    replace: '替换:',
+    with: '替换为:',
+    add: '添加',
+    delete: '删除',
+    close: '关闭',
+  },
   goToDialog: {
     title: '定位条件',
     goToTitle: '定位',

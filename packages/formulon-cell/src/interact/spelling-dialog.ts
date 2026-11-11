@@ -251,10 +251,6 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
   const suggest = button(t.suggest);
   const undoLast = button(t.undoLast);
   const cancel = button(t.cancel);
-  // AutoCorrect has no replacement list to write to yet.
-  projectDisabledState(autoCorrect, true, instance.i18n.strings.backstage.commandUnavailable, {
-    datasetKey: 'disabledReason',
-  });
   body.append(fields, buttons);
 
   const check = (label: string, checked: boolean, set: (on: boolean) => void): HTMLInputElement => {
@@ -315,7 +311,7 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
     changeTo.input.value = repeated ? '' : current.word.word;
     if (!repeated && session.alwaysSuggest) showSuggestions(current.word.word);
     // A repeated word can only be deleted or skipped once.
-    for (const control of [ignoreAll, add, changeAll, suggest]) {
+    for (const control of [ignoreAll, add, changeAll, autoCorrect, suggest]) {
       projectDisabledState(control, repeated, null);
     }
     projectDisabledState(undoLast, changes.length === 0, null);
@@ -390,6 +386,12 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
   });
   shell.on(change, 'click', () => applyChange(false));
   shell.on(changeAll, 'click', () => applyChange(true));
+  // AutoCorrect keeps the word and its correction in the AutoCorrect list, then changes it.
+  shell.on(autoCorrect, 'click', () => {
+    if (!issue || changeTo.input.value === '') return;
+    instance.autoCorrect.add(issue.word.word, changeTo.input.value);
+    applyChange(false);
+  });
   shell.on(suggest, 'click', () => showSuggestions(changeTo.input.value));
   shell.on(undoLast, 'click', () => {
     const previous = changes.pop();

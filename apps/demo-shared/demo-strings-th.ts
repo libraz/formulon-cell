@@ -117,6 +117,8 @@ export const thUi: DemoUiStrings = {
   shareDesc: 'แสดงสถานะการแชร์ของเวิร์กบุ๊กที่โฮสต์นี้จัดการ',
   options: 'ตัวเลือก',
   optionsDesc: 'แสดงบานหน้าต่างการผสานรวมและตัวสลับฟีเจอร์',
+  autoCorrectOptions: 'ตัวเลือกการแก้ไขอัตโนมัติ',
+  autoCorrectOptionsDesc: 'แทนที่คำที่ตรงกันในรายการ แทนที่ ด้วยคำที่เกี่ยวข้องในรายการ ด้วย โดยอัตโนมัติ',
   noCommands: 'ไม่พบคำสั่ง',
   documentMenu: {
     button: 'การดำเนินการกับเอกสาร',

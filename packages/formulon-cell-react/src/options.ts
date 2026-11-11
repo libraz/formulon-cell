@@ -16,6 +16,7 @@ export const OPTION_KEYS = [
   'extensions',
   'formulaHints',
   'spelling',
+  'autoCorrect',
   'host',
   'uploadStatus',
   'macroRecording',

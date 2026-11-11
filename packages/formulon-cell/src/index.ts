@@ -69,6 +69,11 @@ export {
 export type { CellFormatterEntry, CellRenderInput } from './cells.js';
 export type { CategoryChartPoint, ChartCategory } from './charts/types.js';
 export type {
+  AutoCorrectEntry,
+  AutoCorrectOptions,
+  AutoCorrectState,
+} from './commands/autocorrect.js';
+export type {
   BatchCell,
   BatchRejection,
   ChangeBatchResult,

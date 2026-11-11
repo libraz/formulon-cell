@@ -1,3 +1,4 @@
+import { correctTypedEntry } from '../commands/autocorrect.js';
 import {
   type CellInputAlert,
   commitCellInput,
@@ -450,6 +451,7 @@ export class InlineEditor {
       addr: this.editingAddr,
       raw: this.input.value,
       origin: 'editor',
+      typed: true,
     });
     if (result.status === 'rejected') {
       // Keep the editor open with the offending value so the user can correct.
@@ -500,7 +502,7 @@ export class InlineEditor {
     this.pointNavigation = null;
     if (!this.input || !this.editingAddr) return;
     const input = this.input;
-    const raw = input.value;
+    const raw = correctTypedEntry(this.deps.store, input.value);
     const anchor = this.editingAddr;
     const s = this.deps.store.getState();
     const controller = interactionControllerFor(this.deps.store);

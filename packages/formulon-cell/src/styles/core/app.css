@@ -39,6 +39,7 @@
 @import "./app/dialog-modules/dimension.css";
 @import "./app/dialog-modules/custom-select.css";
 @import "./app/dialog-modules/spelling.css";
+@import "./app/dialog-modules/autocorrect.css";
 @import "./app/editor-popups.css";
 @import "./app/dialogs/iterative.css";
 @import "./app/dialogs/evaluate-formula.css";

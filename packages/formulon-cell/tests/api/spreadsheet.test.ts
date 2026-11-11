@@ -306,6 +306,52 @@ describe('spreadsheet: update', () => {
     expect(legacy.spellingService().check('zork', 'en')).toBe(true);
   });
 
+  it('autoCorrect takes the host list and switches, reports user changes, and is replaced by update', async () => {
+    const onChange = vi.fn();
+    const sheet = await mountSheet({
+      autoCorrect: {
+        entries: () => [{ from: 'teh', to: 'the' }],
+        replaceHyperlinks: false,
+        onChange,
+      },
+    });
+    const autoCorrect = legacyInstanceOf(sheet).autoCorrect;
+    expect(autoCorrect.state()).toEqual({
+      entries: [{ from: 'teh', to: 'the' }],
+      replaceAsYouType: true,
+      replaceHyperlinks: false,
+    });
+    autoCorrect.add('adn', 'and');
+    expect(onChange).toHaveBeenCalledWith(
+      {
+        entries: [
+          { from: 'teh', to: 'the' },
+          { from: 'adn', to: 'and' },
+        ],
+        replaceAsYouType: true,
+        replaceHyperlinks: false,
+      },
+      'en',
+    );
+
+    sheet.update({ autoCorrect: null });
+    expect(autoCorrect.state().replaceHyperlinks).toBe(true);
+  });
+
+  it('opens and closes Spelling and AutoCorrect through dialogs', async () => {
+    const sheet = await mountSheet();
+    sheet.workbook.sheet(0).setText(0, 0, 'teh');
+    expect(sheet.dialogs.canOpen('autoCorrect')).toBe(true);
+    sheet.dialogs.open('autoCorrect');
+    expect(document.querySelector('.fc-autocorrect:not([hidden])')).not.toBeNull();
+    sheet.dialogs.close('autoCorrect');
+    expect(document.querySelector('.fc-autocorrect')).toBeNull();
+    sheet.dialogs.open('spelling');
+    expect(document.querySelector('.fc-spelling:not([hidden])')).not.toBeNull();
+    sheet.dialogs.close('spelling');
+    expect(document.querySelector('.fc-spelling')).toBeNull();
+  });
+
   it('showAllNotes set at mount draws every note from the start', async () => {
     const sheet = await mountSheet({ showAllNotes: true });
     expect(sheet.options.showAllNotes).toBe(true);

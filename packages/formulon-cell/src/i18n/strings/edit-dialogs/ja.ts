@@ -159,6 +159,18 @@ export const editDialogsJa: EditDialogsStrings = {
     alwaysSuggest: '常に修正候補を表示する',
     ignoreUppercase: 'すべて大文字の単語は無視する',
   },
+  autoCorrectDialog: {
+    title: 'オートコレクト オプション',
+    description:
+      '[自動で変更する項目] リストで一致した単語を、[修正後の文字列] リストにある対応する単語で自動的に置き換えます。',
+    replaceAsYouType: '入力中に自動修正する',
+    replaceHyperlinks: 'インターネットとネットワークのアドレスをハイパーリンクに変更する',
+    replace: '置換前のフォント:',
+    with: '置換後のフォント:',
+    add: '追加',
+    delete: '削除',
+    close: '閉じる',
+  },
   goToDialog: {
     title: '選択オプション',
     goToTitle: 'ジャンプ',

@@ -121,6 +121,9 @@ export const frUi: DemoUiStrings = {
   shareDesc: 'Afficher l’état du partage de ce classeur géré par l’hôte.',
   options: 'Options',
   optionsDesc: 'Afficher le volet d’intégration et les bascules de fonctionnalités.',
+  autoCorrectOptions: 'Options de correction automatique',
+  autoCorrectOptionsDesc:
+    'Remplace automatiquement un mot figurant dans la liste Remplacer par le mot correspondant dans la liste Par.',
   noCommands: 'Aucune commande trouvée',
   documentMenu: {
     button: 'Actions du document',

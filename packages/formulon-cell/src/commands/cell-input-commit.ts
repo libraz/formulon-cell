@@ -13,6 +13,7 @@ import { formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
 import { directCellFormat } from '../store/direct-format.js';
 import { validationAt } from '../store/range-validations.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { correctTypedEntry } from './autocorrect.js';
 import { extendTablesForEntry } from './clipboard/table-extension.js';
 import {
   coerceInputForCell,
@@ -62,6 +63,8 @@ export interface CellInputCommit {
   addr: Addr;
   raw: string;
   origin: 'editor' | 'formulaBar';
+  /** The user typed `raw`, so AutoCorrect applies; a list pick or a conversion is entered as is. */
+  typed?: boolean;
 }
 
 /** Batch operation a typed entry performs; Text-formatted cells keep `=` literal. */
@@ -73,9 +76,11 @@ export function commitCellInput({
   store,
   wb,
   addr,
-  raw,
+  raw: entered,
   origin,
+  typed = false,
 }: CellInputCommit): CellInputCommitResult {
+  const raw = typed ? correctTypedEntry(store, entered) : entered;
   const state = store.getState();
   const anchor = mergeAnchorFor(state, addr);
   const fmt = directCellFormat(state, anchor);

@@ -1,0 +1,62 @@
+@layer fc.app {
+  /* AutoCorrect options: the switch, the Replace/With fields over the list, Add and Delete
+     beside it, and the hyperlink switch below. */
+  .fc-autocorrect__panel {
+    width: min(480px, 92vw);
+  }
+  .fc-autocorrect__body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .fc-autocorrect__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .fc-autocorrect__description {
+    margin: 0;
+    font-size: 12px;
+    color: var(--fc-fg-mute);
+  }
+  .fc-autocorrect__fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .fc-autocorrect__field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+  }
+  .fc-autocorrect__list {
+    height: 160px;
+    overflow-y: auto;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
+    background: var(--fc-bg, Canvas);
+    font-size: 12px;
+  }
+  .fc-autocorrect__list:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: -2px;
+  }
+  .fc-autocorrect__entry {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 2px 6px;
+    cursor: default;
+  }
+  .fc-autocorrect__entry[aria-selected="true"] {
+    background: var(--fc-accent);
+    color: var(--fc-accent-contrast, Canvas);
+  }
+  .fc-autocorrect__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+}

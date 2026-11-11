@@ -157,6 +157,18 @@ export const editDialogsEn: EditDialogsStrings = {
     alwaysSuggest: 'Always suggest',
     ignoreUppercase: 'Ignore UPPERCASE',
   },
+  autoCorrectDialog: {
+    title: 'AutoCorrect Options',
+    description:
+      'Automatically replaces a matched word in the Replace list with the corresponding word in the With list.',
+    replaceAsYouType: 'Replace text as you type',
+    replaceHyperlinks: 'Replace internet and network paths with hyperlinks',
+    replace: 'Replace:',
+    with: 'With:',
+    add: 'Add',
+    delete: 'Delete',
+    close: 'Close',
+  },
   goToDialog: {
     title: 'Go To Special',
     goToTitle: 'Go To',

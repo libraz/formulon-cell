@@ -543,4 +543,24 @@ describe('typed URL autoformat', () => {
       }
     },
   );
+
+  it('formats only while Replace internet and network paths with hyperlinks is on', async () => {
+    const workbook = await WorkbookHandle.createDefault({ locale: 'en' });
+    addLocalizedHyperlinkStyle(workbook, false);
+    const mounted = await mountStubSheet({ workbook, locale: 'en' });
+    try {
+      const { store, autoCorrect } = mounted.instance;
+      autoCorrect.update({ replaceHyperlinks: false });
+      commitCellInput({ store, wb: workbook, addr: A1, raw: URL, origin: 'editor', typed: true });
+      expect(workbook.getValue(A1)).toEqual({ kind: 'text', value: URL });
+      expect(hyperlinkAt(store.getState(), A1)).toBeNull();
+
+      autoCorrect.update({ replaceHyperlinks: true });
+      commitCellInput({ store, wb: workbook, addr: B1, raw: URL, origin: 'editor', typed: true });
+      expect(hyperlinkAt(store.getState(), B1)).toBe(URL);
+    } finally {
+      mounted.dispose();
+      workbook.dispose();
+    }
+  });
 });

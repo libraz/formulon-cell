@@ -118,6 +118,9 @@ export const deUi: DemoUiStrings = {
   shareDesc: 'Den Freigabestatus dieser hostgesteuerten Arbeitsmappe anzeigen.',
   options: 'Optionen',
   optionsDesc: 'Integrationsbereich und Funktionsumschalter anzeigen.',
+  autoCorrectOptions: 'AutoKorrektur-Optionen',
+  autoCorrectOptionsDesc:
+    'Ersetzt ein in der Liste "Ersetzen" vorhandenes Wort automatisch durch das entsprechende Wort in der Liste "Durch".',
   noCommands: 'Keine Befehle gefunden',
   documentMenu: {
     button: 'Dokumentaktionen',

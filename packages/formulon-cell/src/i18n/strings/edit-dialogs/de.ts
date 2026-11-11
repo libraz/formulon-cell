@@ -159,6 +159,18 @@ export const editDialogsDe: EditDialogsStrings = {
     alwaysSuggest: 'Immer vorschlagen',
     ignoreUppercase: 'Großschreibung ignorieren',
   },
+  autoCorrectDialog: {
+    title: 'AutoKorrektur-Optionen',
+    description:
+      'Ersetzt ein in der Liste "Ersetzen" vorhandenes Wort automatisch durch das entsprechende Wort in der Liste "Durch".',
+    replaceAsYouType: 'Während der Eingabe ersetzen',
+    replaceHyperlinks: 'Internet- und Netzwerkpfade durch Links ersetzen',
+    replace: 'Ersetzen:',
+    with: 'Durch:',
+    add: 'Hinzufügen',
+    delete: 'Löschen',
+    close: 'Schließen',
+  },
   goToDialog: {
     title: 'Gehe zu Spezial',
     goToTitle: 'Gehe zu',

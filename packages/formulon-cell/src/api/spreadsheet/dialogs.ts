@@ -2,10 +2,15 @@ import type { BuiltInCommandId } from '../../commands/built-in-command-ids.js';
 import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import type { Range } from '../../engine/types.js';
 import type { FeatureId } from '../../extensions/features.js';
+import {
+  closeAutoCorrectDialog,
+  openAutoCorrectDialog,
+} from '../../interact/autocorrect-dialog.js';
 import type { ConditionalDialogOpenOptions } from '../../interact/conditional-dialog.js';
 import type { FxDialogOpenOptions } from '../../interact/fx-dialog.js';
 import type { PasteSpecialOpenOptions } from '../../interact/paste-special.js';
 import type { ChartSettingsTarget } from '../../interact/session-chart-settings.js';
+import { closeSpellingDialog, openSpellingDialog } from '../../interact/spelling-dialog.js';
 import type { SpreadsheetInstance as LegacyInstance } from '../../mount/types.js';
 import { failureOfDecision, spreadsheetFailure } from '../errors.js';
 
@@ -43,6 +48,8 @@ export interface DialogOptions {
   pivotFieldSettings: undefined;
   pivotOptions: { readonly sheet?: number; readonly pivotIndex?: number };
   pivotTable: { readonly placement?: 'new' | 'existing' };
+  spelling: undefined;
+  autoCorrect: undefined;
 }
 
 /** A dialog `SpreadsheetInstance.dialogs` opens: the opener's name without `open` and `Dialog`. */
@@ -76,6 +83,18 @@ type Route<K extends DialogId> = Omit<DialogRoute, 'open'> & {
 };
 
 const ROUTES: { readonly [K in DialogId]: Route<K> } = {
+  spelling: {
+    feature: null,
+    commandId: 'spellingReview',
+    open: (l) => openSpellingDialog(l),
+    close: (l) => closeSpellingDialog(l),
+  },
+  autoCorrect: {
+    feature: null,
+    commandId: null,
+    open: (l) => openAutoCorrectDialog(l),
+    close: (l) => closeAutoCorrectDialog(l),
+  },
   conditional: {
     feature: 'conditional',
     commandId: 'conditional',

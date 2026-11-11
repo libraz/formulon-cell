@@ -109,6 +109,8 @@ CSV出力にはロケールと区切り文字を指定できます。例: `wb.sh
 
 校閲 > スペル チェックは、デスクトップ版と同じダイアログでシートを 1 語ずつ確認します。組み込みのチェッカーは英語のよくある誤字の短い一覧だけを持ち、ほかの言語の単語はすべて通します。実際の辞書で確認するには `spelling: { check(word, locale), suggest(word, locale), addWord?(word, locale) }` を渡してください。ユーザーが追加した単語は `addWord` に渡されるので、ホスト側で保存できます。ライブラリ自体はセッションを超えて何も保存しません。
 
+オートコレクトは、入力した文字列を確定するときに修正します。組み込みの一覧は、デスクトップ版の記号の置換（`(c)` → `©`、`...` → `…` など）と、日本語のあいさつ 2 語の修正だけです。デスクトップ版の単語の一覧は同梱していません。独自の一覧を使うには `autoCorrect: { entries(locale), replaceAsYouType?, replaceHyperlinks?, onChange?(state, locale) }` を渡してください。ユーザーがオートコレクト オプション（`instance.dialogs.open('autoCorrect')`）で一覧や設定を変えるたびに、`onChange` に全体の状態が渡されるので、ホスト側で保存できます。
+
 ## ドキュメント
 
 - [デモ](https://formulon.libraz.net/ja/cell/demo)

@@ -165,6 +165,18 @@ export interface EditDialogsStrings {
     alwaysSuggest: string;
     ignoreUppercase: string;
   };
+  /** The AutoCorrect options, labelled as the desktop preference pane. */
+  autoCorrectDialog: {
+    title: string;
+    description: string;
+    replaceAsYouType: string;
+    replaceHyperlinks: string;
+    replace: string;
+    with: string;
+    add: string;
+    delete: string;
+    close: string;
+  };
   goToDialog: {
     /** Go To Special modal title (header and aria-label). */
     title: string;

@@ -47,6 +47,7 @@ export type DemoBackstageAction =
   | 'share'
   | 'export'
   | 'options'
+  | 'autocorrect-options'
   | 'close';
 
 export interface DemoBackstageItem {
@@ -89,7 +90,8 @@ export const demoBackstageRequiresWorkbook = (action: DemoBackstageAction): bool
   action === 'print' ||
   action === 'page-setup' ||
   action === 'edit-links' ||
-  action === 'export';
+  action === 'export' ||
+  action === 'autocorrect-options';
 
 export const isDemoBackstageActionDisabled = (
   action: DemoBackstageAction,
@@ -123,6 +125,7 @@ export const runDemoBackstageAction = (opts: RunDemoBackstageActionOptions): voi
   else if (action === 'edit-links') openDemoDialog(instance, 'externalLinks');
   else if (action === 'share') opts.showNotice(opts.ui.share, opts.ui.shareDesc);
   else if (action === 'options') opts.toggleOptions();
+  else if (action === 'autocorrect-options') openDemoDialog(instance, 'autoCorrect');
   else if (action === 'close') opts.closeBackstage();
 };
 
@@ -287,4 +290,5 @@ export const buildDemoBackstageCards = (ui: DemoUiStrings): readonly DemoBacksta
   { action: 'share', label: ui.share, desc: ui.shareDesc },
   { action: 'export', label: ui.export, desc: ui.exportDesc },
   { action: 'options', label: ui.options, desc: ui.optionsDesc },
+  { action: 'autocorrect-options', label: ui.autoCorrectOptions, desc: ui.autoCorrectOptionsDesc },
 ];

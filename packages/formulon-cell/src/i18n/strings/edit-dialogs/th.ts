@@ -157,6 +157,17 @@ export const editDialogsTh: EditDialogsStrings = {
     alwaysSuggest: 'แนะนำเสมอ',
     ignoreUppercase: 'ละเว้นตัวพิมพ์ใหญ่',
   },
+  autoCorrectDialog: {
+    title: 'ตัวเลือกการแก้ไขอัตโนมัติ',
+    description: 'แทนที่คำที่ตรงกันในรายการ แทนที่ ด้วยคำที่เกี่ยวข้องในรายการ ด้วย โดยอัตโนมัติ',
+    replaceAsYouType: 'แทนที่ข้อความขณะพิมพ์',
+    replaceHyperlinks: 'แทนที่เส้นทางอินเทอร์เน็ตและเครือข่ายด้วยไฮเปอร์ลิงก์',
+    replace: 'แทนที่:',
+    with: 'ด้วย:',
+    add: 'เพิ่ม',
+    delete: 'ลบ',
+    close: 'ปิด',
+  },
   goToDialog: {
     title: 'ไปที่แบบพิเศษ',
     goToTitle: 'ไปที่',

@@ -1,5 +1,6 @@
 import type { SheetPrintDocument } from './api/spreadsheet/types.js';
 import { CellRegistry } from './cells.js';
+import { AutoCorrectStore, registerAutoCorrect } from './commands/autocorrect.js';
 import { registerChromePlatform } from './commands/chrome-platform.js';
 import { History } from './commands/history.js';
 import {
@@ -38,6 +39,7 @@ import { isMacHost } from './extensions/ui-options.js';
 import { FormulaRegistry } from './formula.js';
 import { createI18nController } from './i18n/controller.js';
 import { dictionaryLocaleFor, type Strings } from './i18n/strings.js';
+import { closeAutoCorrectDialog } from './interact/autocorrect-dialog.js';
 import { disposeCellShiftDialog } from './interact/cell-shift-dialog.js';
 import {
   INSTANCE_API_INSERT_COPIED_CELLS_ENTRY,
@@ -202,6 +204,7 @@ export const Spreadsheet = {
     const captureScreenClipHook = opts.captureScreenClip;
     const getFunctionArgumentHelp = opts.getFunctionArgumentHelp;
     const getSpellingService = opts.getSpellingService;
+    const getAutoCorrectOptions = opts.getAutoCorrectOptions;
     let uploadStatus = opts.uploadStatus ?? null;
     let macroRecording = opts.macroRecording ?? null;
     let ui = resolveSpreadsheetUiOptions(opts.ui);
@@ -312,6 +315,11 @@ export const Spreadsheet = {
     });
 
     const store = createSpreadsheetStore();
+    const autoCorrect = new AutoCorrectStore(
+      () => getAutoCorrectOptions?.(),
+      () => i18n.locale,
+    );
+    registerAutoCorrect(store, autoCorrect);
     const viewportSheet = viewportRangeSheet(opts.viewport, wb);
     if (viewportSheet !== undefined) mutators.setSheetIndex(store, viewportSheet);
     mutators.setTheme(store, initialTheme);
@@ -1074,6 +1082,7 @@ export const Spreadsheet = {
       refreshPrinterProfiles: printers.refresh,
       captureScreenClip,
       spellingService: () => getSpellingService?.() ?? defaultSpellingService,
+      autoCorrect,
       setUploadStatus(next) {
         uploadStatus = next;
         if (next !== null) declareStatusIndicator('uploadStatus');
@@ -1252,6 +1261,7 @@ export const Spreadsheet = {
         cleanup(() => disposeMacInk(instance));
         cleanup(() => disposeMacGoalSeekDialog(instance));
         cleanup(() => closeSpellingDialog(instance));
+        cleanup(() => closeAutoCorrectDialog(instance));
         cleanup(() => disposeMacPivotMoveDialog(instance));
         cleanup(() => disposeDataTableDialog(instance));
         cleanup(() => ribbon.dispose());

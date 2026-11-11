@@ -109,6 +109,8 @@ Formula editors and external clipboard input use the active profile's syntax. Fo
 
 Review > Spelling walks the sheet word by word in the desktop Spelling dialog. The built-in checker knows only a short list of common English typos and passes every word of other languages. To check against a real dictionary, pass `spelling: { check(word, locale), suggest(word, locale), addWord?(word, locale) }`. `addWord` receives the words the user adds, so the host can keep them; the library itself stores nothing beyond the session.
 
+AutoCorrect corrects typed text on entry. The built-in lists hold only the desktop's symbol replacements, such as `(c)` → `©` and `...` → `…`, and the two Japanese greeting corrections; the desktop's full word lists are not bundled. To supply your own list, pass `autoCorrect: { entries(locale), replaceAsYouType?, replaceHyperlinks?, onChange?(state, locale) }`. `onChange` receives the whole state whenever the user edits the list or a switch in AutoCorrect Options (`instance.dialogs.open('autoCorrect')`), so the host can keep it.
+
 ## Documentation
 
 - [Live demo](https://formulon.libraz.net/cell/demo)
