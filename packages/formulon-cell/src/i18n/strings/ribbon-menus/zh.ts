@@ -430,6 +430,7 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     pivotTableStyleCustom: '自定义数据透视表',
     tableStyleNew: '新建表格样式…',
     tableStyleNewPivot: '新建数据透视表样式…',
+    tableStyleClear: '清除',
     tableStyleSwatches: {
       TableStyleLight1: '表格样式 (浅色) 1',
       TableStyleLight2: '表格样式 (浅色) 2',

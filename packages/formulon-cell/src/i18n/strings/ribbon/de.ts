@@ -134,6 +134,8 @@ export const ribbonDe: RibbonStrings = {
     tableProperties: 'Eigenschaften',
     tableName: 'Tabellenname',
     tableStyleOptions: 'Optionen für Tabellenformatvorlagen',
+    tableStyles: 'Tabellenformatvorlagen',
+    quickStyles: 'Schnellformatvorlagen',
     externalTableData: 'Externe Tabellendaten',
     headerRow: 'Kopfzeile',
     totalRow: 'Ergebniszeile',

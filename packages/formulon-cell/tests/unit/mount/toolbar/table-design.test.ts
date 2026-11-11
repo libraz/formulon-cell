@@ -222,4 +222,41 @@ describe('Table Design tab of the ribbon', () => {
     expect(workbook.getValue({ sheet: 0, row: 3, col: 0 })).toMatchObject({ value: '集計' });
     tb.dispose();
   });
+
+  it('restyles the table from the Table Styles strip and opens the full gallery from its arrow', () => {
+    makeTable();
+    mutators.setActive(store(), { sheet: 0, row: 1, col: 1 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    tb.setActiveTab('tableDesign');
+    const gallery = host.querySelector<HTMLElement>('[data-ribbon-gallery="tableQuickStyles"]');
+    expect(gallery).toBeTruthy();
+    const chips = (): HTMLButtonElement[] =>
+      Array.from(
+        gallery?.querySelectorAll<HTMLButtonElement>('.fc-tb__tablestyle-quick-chip') ?? [],
+      );
+    // The strip opens on the row holding the table's style, Table Style Medium 2.
+    expect(chips()).toHaveLength(7);
+    expect(
+      chips().find((chip) => chip.getAttribute('aria-pressed') === 'true')?.dataset.tableQuickStyle,
+    ).toBe('TableStyleMedium2');
+    chips()[0]?.click();
+    expect(table()?.styleName).toBe('TableStyleMedium1');
+    sheet.instance.history.undo();
+    // The new table's style is named by its family and hue, Table Style Medium 2.
+    expect(table()).toMatchObject({ style: 'medium', color: '#4472c4' });
+    expect(table()?.styleName).toBeUndefined();
+
+    command('tableQuickStyles').click();
+    const menu = host.querySelector<HTMLElement>('#menu-table-quick-styles');
+    expect(menu?.hidden).toBe(false);
+    expect(menu?.querySelectorAll('.fc-tb__tablestyle-swatch')).toHaveLength(60);
+    expect(
+      menu?.querySelector<HTMLButtonElement>('[data-table-style-footer="clear-table-style"]')
+        ?.hidden,
+    ).toBe(false);
+    tb.dispose();
+  });
 });

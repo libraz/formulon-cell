@@ -1,3 +1,4 @@
+import type { StyleElementFormats } from '../engine/table-style-elements.js';
 import { defaultTotals } from '../engine/table-totals-defaults.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -16,6 +17,23 @@ import { recordTablesChange } from './slice-history.js';
  * backed by an engine table of the same `name`, which the store mirror keeps
  * in step; without one it decorates a plain range for the session only. */
 export type TableStyle = 'light' | 'medium' | 'dark';
+
+/** The elements a custom table style paints: its family and hue. */
+export function approximateTableStyleElements(
+  style: TableStyle,
+  color?: string,
+): StyleElementFormats {
+  const swatch = tableStyleSwatch(style, color);
+  const header = { fill: swatch.header, color: swatch.headerText, bold: true };
+  return {
+    headerRow: header,
+    totalRow: header,
+    firstRowStripe: { fill: swatch.band },
+    firstColumnStripe: { fill: swatch.band },
+    firstColumn: { bold: true },
+    lastColumn: { bold: true },
+  };
+}
 
 /** Built-in table-style hues — one column per swatch in the style gallery,
  *  ordered to mirror the desktop spreadsheet's themed accent columns. */
@@ -551,6 +569,35 @@ export function tableStyleOptionsById(
     styleName: undefined,
     ...tableVariantOptions(variant),
   };
+}
+
+/** The built-in style a new table takes when the workbook names no default table style. */
+export const FALLBACK_TABLE_STYLE = 'TableStyleMedium2';
+
+/** The style id a new table takes: the workbook's default table style, else Table Style Medium 2. */
+export function defaultTableStyleId(
+  state: { tables: { customTableStyles?: readonly CustomTableStyle[] } },
+  workbook: Pick<WorkbookHandle, 'getTableStyleDefaults'> | null | undefined,
+): string {
+  const name = workbook?.getTableStyleDefaults()?.tableStyle ?? '';
+  if (name === '') return FALLBACK_TABLE_STYLE;
+  if (parseTableStyleName(name)) return name;
+  return (
+    listCustomTableStyles(state).find((style) => style.label === name)?.id ?? FALLBACK_TABLE_STYLE
+  );
+}
+
+/** Makes `styleId` the workbook's default table style, as Set As Default does. False when the
+ *  engine keeps no defaults or the id names no table style. */
+export function setDefaultTableStyle(
+  state: { tables: { customTableStyles?: readonly CustomTableStyle[] } },
+  workbook: Pick<WorkbookHandle, 'setTableStyleDefaults'> | null | undefined,
+  styleId: string,
+): boolean {
+  const name =
+    customTableStyleById(state, styleId)?.label ?? (parseTableStyleName(styleId) ? styleId : null);
+  if (!workbook || name === null) return false;
+  return workbook.setTableStyleDefaults({ tableStyle: name });
 }
 
 export function formatAsTableByStyleId(

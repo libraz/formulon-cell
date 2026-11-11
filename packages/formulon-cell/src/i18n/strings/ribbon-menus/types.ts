@@ -431,6 +431,8 @@ export interface RibbonMenusStrings {
     pivotTableStyleCustom: string;
     tableStyleNew: string;
     tableStyleNewPivot: string;
+    /** Clear in the table style gallery: removes the active table's style. */
+    tableStyleClear: string;
     /** Format as Table swatch names, keyed by built-in style name. */
     tableStyleSwatches: Readonly<
       Record<`TableStyle${'Light' | 'Medium' | 'Dark'}${number}`, string>

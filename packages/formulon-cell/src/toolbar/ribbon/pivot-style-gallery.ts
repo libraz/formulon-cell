@@ -2,13 +2,9 @@ import { updatePivotStyleInfo } from '../../commands/pivot-style-info.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import { builtinPivotStyleElements } from '../../engine/pivot-style.js';
 import type { StyleElementFormat } from '../../engine/table-style-elements.js';
-import {
-  createInteractionButton,
-  createInteractionChipButton,
-} from '../../interact/chip-button.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
-import { projectDisabledState } from '../menu-a11y.js';
 import type { ToolbarLang } from '../ribbon-model.js';
+import { createQuickStyleStrip } from './quick-style-strip.js';
 
 const FAMILIES = [
   { id: 'Light', ja: '淡色', en: 'Light' },
@@ -126,83 +122,44 @@ export interface PivotStyleGalleryOptions {
 export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDivElement => {
   const { lang, getInst } = opts;
   const styles = galleryStyles(lang);
-  const wrap = document.createElement('div');
-  wrap.className = 'fc-tb__pivotstyle-gallery';
-  wrap.dataset.ribbonCommand = 'pivotStyleGallery';
-  const strip = document.createElement('div');
-  strip.className = 'fc-tb__pivotstyle-strip';
-  strip.setAttribute('role', 'group');
-  const prev = createInteractionButton({
-    className: 'fc-tb__pivotstyle-prev',
-    ariaLabel: lang === 'ja' ? '前のクイック スタイル ギャラリー' : 'Previous Quick Styles gallery',
-  });
-  const next = createInteractionButton({
-    className: 'fc-tb__pivotstyle-next',
-    ariaLabel: lang === 'ja' ? '次のクイック スタイル ギャラリー' : 'Next Quick Styles gallery',
-  });
-  wrap.append(prev, strip, next);
-
-  let page = 0;
-  const lastPage = Math.ceil(styles.length / PAGE_SIZE) - 1;
   const activePivot = (): { sheetIndex: number; pivotIndex: number } | null => {
     const inst = getInst();
     return inst
       ? findPivotTableAtCell(inst.workbook, inst.store.getState().selection.active)
       : null;
   };
-  const currentName = (): string | null => {
-    const inst = getInst();
-    const pivot = activePivot();
-    if (!inst || !pivot) return null;
-    return inst.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)?.name ?? null;
-  };
-
-  const render = (): void => {
-    const inst = getInst();
-    const theme = inst?.workbook.getTheme()?.colors;
-    const current = currentName();
-    strip.replaceChildren(
-      ...styles.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE).map((style) => {
-        const chip = createInteractionChipButton({
-          className: 'fc-tb__pivotstyle-chip',
-          label: '',
-          dataset: { pivotStyle: style.name },
-          pressed: current === style.name || (current === null && style.name === ''),
-        });
-        chip.setAttribute('aria-label', style.label);
-        chip.title = style.label;
-        chip.appendChild(thumbnail(style.name, theme));
-        chip.addEventListener('click', () => {
-          const target = getInst();
-          const pivot = activePivot();
-          if (!target || !pivot) return;
-          updatePivotStyleInfo(
-            { store: target.store, workbook: target.workbook, history: target.history },
-            pivot,
-            { name: style.name },
-          );
-          target.host.focus();
-          render();
-        });
-        return chip;
-      }),
-    );
-    projectDisabledState(prev, page === 0, null);
-    projectDisabledState(next, page === lastPage, null);
-  };
-  // The ribbon refreshes its controls when the selection or the report changes.
-  wrap.addEventListener('fc-ribbon-control-refresh', () => render());
-  prev.addEventListener('click', () => {
-    page = Math.max(0, page - 1);
-    render();
+  const wrap = createQuickStyleStrip({
+    lang,
+    classPrefix: 'fc-tb__pivotstyle',
+    chipKey: 'pivotStyle',
+    pageSize: PAGE_SIZE,
+    entries: () => {
+      const theme = getInst()?.workbook.getTheme()?.colors;
+      return styles.map((style) => ({
+        id: style.name,
+        label: style.label,
+        thumbnail: () => thumbnail(style.name, theme),
+      }));
+    },
+    // No report, or one without a style element, shows None as current.
+    current: () => {
+      const inst = getInst();
+      const pivot = activePivot();
+      if (!inst || !pivot) return '';
+      return inst.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)?.name ?? '';
+    },
+    apply: (name) => {
+      const target = getInst();
+      const pivot = activePivot();
+      if (!target || !pivot) return;
+      updatePivotStyleInfo(
+        { store: target.store, workbook: target.workbook, history: target.history },
+        pivot,
+        { name },
+      );
+      target.host.focus();
+    },
   });
-  next.addEventListener('click', () => {
-    page = Math.min(lastPage, page + 1);
-    render();
-  });
-  // Open on the page holding the report's current style.
-  const currentIndex = styles.findIndex((style) => style.name === currentName());
-  if (currentIndex >= 0) page = Math.floor(currentIndex / PAGE_SIZE);
-  render();
+  wrap.dataset.ribbonCommand = 'pivotStyleGallery';
   return wrap;
 };

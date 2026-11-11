@@ -433,6 +433,7 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     pivotTableStyleCustom: 'ピボットテーブル ユーザー設定',
     tableStyleNew: '新しい表スタイル...',
     tableStyleNewPivot: '新しいピボットテーブル スタイル...',
+    tableStyleClear: 'クリア',
     tableStyleSwatches: {
       TableStyleLight1: '白, テーブル スタイル (淡色) 1',
       TableStyleLight2: 'アイスブルー, テーブル スタイル (淡色) 2',

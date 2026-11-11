@@ -13,6 +13,7 @@ import {
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
   DEFAULT_TABLE_COLOR,
+  defaultTableStyleId,
   formatAsTableByStyleId,
   inferTableHasHeaders,
   nextTableName,
@@ -20,13 +21,12 @@ import {
   pivotTableStyleAssignment,
   tableNameError,
   tableOverlayAt,
-  tableStyleOptionsById,
   tableVariantFromOptions,
-  updateTableOverlay,
 } from '../../commands/format-as-table.js';
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
 import { recordConditionalRulesChange, recordTablesChange } from '../../commands/slice-history.js';
 import { tableSourceForSelection, tableWrite } from '../../commands/table-actions.js';
+import { applyTableStyle, clearTableStyle } from '../../commands/table-style-actions.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { Range } from '../../engine/types.js';
@@ -156,8 +156,9 @@ const buildConditionalMenuAction =
 
 const buildTableStyleAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createTableFromSelection'] =>
-  (style = 'medium', color, variant = 'banded') => {
+  (picked, color, variant = 'banded') => {
     const state = instance.store.getState();
+    const style = picked ?? defaultTableStyleId(state, instance.workbook);
     const active = state.selection.active;
     const table = tableOverlayAt(state, active.sheet, active.row, active.col);
     const entry = { origin: 'ribbon', commandId: 'formatTableHome' } as const;
@@ -165,23 +166,8 @@ const buildTableStyleAction =
       void showCreateTableDialog(instance, { style, color, variant }, entry);
       return;
     }
-    // Inside a table the gallery restyles it and keeps the table's own style options; a refused
-    // restyle is silent.
-    const {
-      banded: _banded,
-      firstCol: _firstCol,
-      ...look
-    } = tableStyleOptionsById(state, style, color, variant);
-    tableWrite(
-      { store: instance.store, history: instance.history, ...entry },
-      table.range,
-      undefined,
-      () => {
-        recordTablesChange(instance.history, instance.store, () => {
-          updateTableOverlay(instance.store, table.id, look);
-        });
-      },
-    );
+    // Inside a table the gallery restyles it; a refused restyle is silent.
+    applyTableStyle({ store: instance.store, history: instance.history, ...entry }, table, style);
     instance.host.focus();
   };
 
@@ -198,6 +184,10 @@ const updateTableStylesMenu =
       button.setAttribute('aria-checked', String(activeStyle));
       button.classList.toggle('fc-tb__menu-item--active', activeStyle);
     }
+    const clear = menu.querySelector<HTMLButtonElement>(
+      '[data-table-style-footer="clear-table-style"]',
+    );
+    if (clear) clear.hidden = !activeTable;
 
     const activePivot = findPivotTableAtCell(
       instance.workbook as unknown as Parameters<typeof findPivotTableAtCell>[0],
@@ -295,7 +285,7 @@ export const showCreateTableDialog = async (
         formatAsTableByStyleId(
           instance.store,
           range,
-          options.style ?? 'medium',
+          options.style ?? defaultTableStyleId(instance.store.getState(), instance.workbook),
           options.color,
           options.variant ?? 'banded',
           {
@@ -353,6 +343,21 @@ const buildTableStyleFooterAction =
     const state = instance.store.getState();
     const active = state.selection.active;
     const activeTable = tableOverlayAt(state, active.sheet, active.row, active.col);
+    if (action === 'clear-table-style') {
+      if (activeTable) {
+        clearTableStyle(
+          {
+            store: instance.store,
+            history: instance.history,
+            origin: 'ribbon',
+            commandId: 'formatTableHome',
+          },
+          activeTable,
+        );
+      }
+      instance.host.focus();
+      return;
+    }
     const initial = {
       name: strings.ribbonMenu.tableStyleMedium,
       style: activeTable?.style ?? 'medium',

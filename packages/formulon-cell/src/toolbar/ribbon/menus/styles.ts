@@ -173,19 +173,8 @@ const swatchBorder = (side: CellBorderSide | undefined): string => {
   return `${width}px ${side.style === 'double' ? 'double' : 'solid'} ${side.color ?? SWATCH_TEXT}`;
 };
 
-const createBuiltinTableStyleSwatch = (
-  name: string,
-  elements: StyleElementFormats,
-  label: string,
-): HTMLButtonElement => {
-  // A built-in style is applied by name and leaves the table's options alone.
-  const btn = createMenuButton({
-    className: 'fc-tb__tablestyle-swatch fc-tb__tablestyle-swatch--builtin',
-    attr: 'tableStyle',
-    value: name,
-    title: label,
-    ariaLabel: label,
-  });
+/** A table style drawn as the desktop gallery draws it: a header row over striped body rows. */
+export const tableStyleSwatchGrid = (elements: StyleElementFormats): HTMLDivElement => {
   const grid = tableStyleSwatchPart('fc-tb__tablestyle-swatch__grid');
   for (let row = 0; row < SWATCH_SIZE; row += 1) {
     for (let col = 0; col < SWATCH_SIZE; col += 1) {
@@ -203,7 +192,23 @@ const createBuiltinTableStyleSwatch = (
       grid.appendChild(cell);
     }
   }
-  btn.appendChild(grid);
+  return grid;
+};
+
+const createBuiltinTableStyleSwatch = (
+  name: string,
+  elements: StyleElementFormats,
+  label: string,
+): HTMLButtonElement => {
+  // A built-in style is applied by name and leaves the table's options alone.
+  const btn = createMenuButton({
+    className: 'fc-tb__tablestyle-swatch fc-tb__tablestyle-swatch--builtin',
+    attr: 'tableStyle',
+    value: name,
+    title: label,
+    ariaLabel: label,
+  });
+  btn.appendChild(tableStyleSwatchGrid(elements));
   return btn;
 };
 
@@ -212,7 +217,11 @@ const tableStyleFooterButton = (label: string, action: string): HTMLButtonElemen
     label,
     'tableStyleFooter',
     action,
-    action === 'new-pivot-style' ? 'pivot-style-new' : 'table-style-new',
+    action === 'new-pivot-style'
+      ? 'pivot-style-new'
+      : action === 'clear-table-style'
+        ? 'clear'
+        : 'table-style-new',
   );
   btn.classList.add('fc-tb__tablestyle-footer');
   return btn;
@@ -381,6 +390,10 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     menu.appendChild(menuSeparator());
     menu.appendChild(tableStyleFooterButton(t.tableStyleNew, 'new-table-style'));
     menu.appendChild(tableStyleFooterButton(t.tableStyleNewPivot, 'new-pivot-style'));
+    // Clear shows only while a table is active; updateTableStylesMenu toggles it.
+    const clear = tableStyleFooterButton(t.tableStyleClear, 'clear-table-style');
+    clear.hidden = true;
+    menu.appendChild(clear);
     return menu;
   };
 

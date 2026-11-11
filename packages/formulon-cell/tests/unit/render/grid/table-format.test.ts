@@ -43,6 +43,11 @@ describe('render/grid/table-format', () => {
       expect(fmt).toEqual({ fill: '#cbd8ee', color: '#1f1f1f', bold: true });
     });
 
+    it('paints nothing for a table whose style was cleared', () => {
+      expect(tableCellFormat(builtin('', { firstCol: true }), 0, 0)).toBeUndefined();
+      expect(tableCellFormat(builtin(''), 1, 1)).toBeUndefined();
+    });
+
     it('returns undefined for the header row when showHeader is off', () => {
       const fmt = tableCellFormat(table('medium', { showHeader: false, banded: false }), 0, 1);
       expect(fmt).toBeUndefined();

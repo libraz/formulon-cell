@@ -62,6 +62,7 @@ const COMMAND_SEARCH_ALIASES: Readonly<Record<string, string>> = {
     'edit links external links workbook links hyperlink clear links リンク 外部リンク ハイパーリンク',
   removeDupes: 'dedupe deduplicate duplicates unique remove duplicate 重複 一意',
   formatTableHome: 'format as table table style テーブルとして書式設定',
+  tableQuickStyles: 'table styles quick styles テーブル スタイル クイック スタイル',
   formatTableInsert: 'table insert table create table listobject テーブル 挿入 作成',
   pivotTableInsert: 'pivot pivot table summarize cross tab ピボット 集計',
   pivotFieldListView:

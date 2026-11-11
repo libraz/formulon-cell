@@ -4,7 +4,8 @@
     grid-row: span 2;
   }
 
-  /* PivotTable Design: Quick Styles strip, 73 x 56 swatches between two arrows. */
+  /* PivotTable and Table Design Quick Styles strips: 73 x 56 swatches between two arrows. The
+     table strip's size is unmeasured. */
   .fc-tb__pivotstyle-gallery {
     display: flex;
     align-items: stretch;
@@ -12,14 +13,16 @@
     height: 60px;
   }
 
-  .fc-tb__pivotstyle-strip {
+  .fc-tb__pivotstyle-strip,
+  .fc-tb__tablestyle-quick-strip {
     display: flex;
     flex: 1 1 auto;
     gap: 2px;
     min-width: 0;
   }
 
-  .fc-tb__pivotstyle-chip {
+  .fc-tb__pivotstyle-chip,
+  .fc-tb__tablestyle-quick-chip {
     flex: 0 0 73px;
     width: 73px;
     height: 56px;
@@ -29,7 +32,8 @@
     cursor: pointer;
   }
 
-  .fc-tb__pivotstyle-chip[aria-pressed="true"] {
+  .fc-tb__pivotstyle-chip[aria-pressed="true"],
+  .fc-tb__tablestyle-quick-chip[aria-pressed="true"] {
     outline: 2px solid var(--fc-accent);
     outline-offset: -2px;
   }
@@ -47,7 +51,10 @@
   }
 
   .fc-tb__pivotstyle-prev,
-  .fc-tb__pivotstyle-next {
+  .fc-tb__pivotstyle-next,
+  .fc-tb__tablestyle-quick-prev,
+  .fc-tb__tablestyle-quick-next,
+  .fc-tb__tablestyle-quick-gallery > .fc-tb__rb {
     flex: 0 0 18px;
     width: 18px;
     height: 58px;
@@ -61,17 +68,41 @@
     cursor: pointer;
   }
 
-  .fc-tb__pivotstyle-prev {
+  .fc-tb__pivotstyle-prev,
+  .fc-tb__tablestyle-quick-prev {
     transform: rotate(90deg);
   }
 
-  .fc-tb__pivotstyle-next {
+  .fc-tb__pivotstyle-next,
+  .fc-tb__tablestyle-quick-next {
     transform: rotate(-90deg);
   }
 
   .fc-tb__pivotstyle-prev:disabled,
-  .fc-tb__pivotstyle-next:disabled {
+  .fc-tb__pivotstyle-next:disabled,
+  .fc-tb__tablestyle-quick-prev:disabled,
+  .fc-tb__tablestyle-quick-next:disabled {
     opacity: 0.35;
     cursor: default;
+  }
+
+  .fc-tb__tablestyle-quick-gallery {
+    display: flex;
+    align-items: stretch;
+    height: 60px;
+  }
+
+  /* The Quick Styles button is the strip's more arrow: a chevron without its label. */
+  .fc-tb__tablestyle-quick-gallery > .fc-tb__rb {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .fc-tb__tablestyle-quick-gallery > .fc-tb__rb > :is(span, svg) {
+    display: none;
+  }
+
+  .fc-tb__tablestyle-quick-chip .fc-tb__tablestyle-swatch__grid {
+    pointer-events: none;
   }
 }

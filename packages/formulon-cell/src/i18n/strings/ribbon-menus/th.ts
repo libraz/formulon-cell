@@ -430,6 +430,7 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     pivotTableStyleCustom: 'PivotTable แบบกำหนดเอง',
     tableStyleNew: 'สไตล์ตารางใหม่…',
     tableStyleNewPivot: 'สไตล์ PivotTable ใหม่…',
+    tableStyleClear: 'ล้าง',
     tableStyleSwatches: {
       TableStyleLight1: 'สไตล์ตาราง (สว่าง) 1',
       TableStyleLight2: 'สไตล์ตาราง (สว่าง) 2',

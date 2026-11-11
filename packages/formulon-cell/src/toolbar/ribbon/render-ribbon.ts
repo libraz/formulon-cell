@@ -39,6 +39,7 @@ import { createMacRibbonMenuFactory, type MacRibbonMenuFactory } from './mac/men
 import type { MenuVariant } from './menus/mac-variants.js';
 import { createPivotStyleGallery } from './pivot-style-gallery.js';
 import { createPivotReadout, createTableNameInput } from './table-design.js';
+import { createTableStyleGallery } from './table-style-gallery.js';
 
 export type RibbonDisplayMode = 'full' | 'singleLine' | 'tabsOnly' | 'autoHide';
 
@@ -570,6 +571,18 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
             // The Mac Home tab embeds the cell-styles gallery; the button becomes its more arrow.
             tools.appendChild(
               createMacCellStylesGallery({
+                lang: ctx.ribbonLang,
+                getInst: ctx.getInst,
+                arrow: b,
+                menu: submenu?.() ?? null,
+              }),
+            );
+            continue;
+          }
+          if (profile !== 'excel365Mac' && c.id === 'tableQuickStyles') {
+            // The Table Design tab embeds the table style gallery; the button becomes its more arrow.
+            tools.appendChild(
+              createTableStyleGallery({
                 lang: ctx.ribbonLang,
                 getInst: ctx.getInst,
                 arrow: b,

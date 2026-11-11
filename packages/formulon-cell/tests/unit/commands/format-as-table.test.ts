@@ -9,6 +9,7 @@ import {
   customTableStyleId,
   defaultObjectNames,
   defaultTableOverlay,
+  defaultTableStyleId,
   engineTableOverlays,
   formatAsTable,
   formatAsTableByStyleId,
@@ -21,6 +22,7 @@ import {
   listTableOverlays,
   removeTable,
   sessionTableOverlays,
+  setDefaultTableStyle,
   type TableOverlay,
   tableColumns,
   tableForCell,
@@ -479,5 +481,46 @@ describe('default table and header names follow the workbook language', () => {
     const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 };
     expect(tableColumns(blank, range, true, '列')).toEqual(['列1', '列2']);
     expect(tableColumns(blank, range, true, 'Column')).toEqual(['Column1', 'Column2']);
+  });
+});
+
+describe('default table style', () => {
+  const state = {
+    tables: {
+      customTableStyles: [
+        {
+          id: 'custom-table:Review',
+          label: 'Review',
+          style: 'dark' as const,
+          color: '#4472c4',
+          variant: 'banded' as const,
+        },
+      ],
+    },
+  };
+  const workbook = (tableStyle: string) => ({
+    getTableStyleDefaults: () => ({ tableStyle, pivotStyle: '' }),
+  });
+
+  it('takes the workbook default, else Table Style Medium 2', () => {
+    expect(defaultTableStyleId(state, workbook('TableStyleDark3'))).toBe('TableStyleDark3');
+    expect(defaultTableStyleId(state, workbook('Review'))).toBe('custom-table:Review');
+    expect(defaultTableStyleId(state, workbook(''))).toBe('TableStyleMedium2');
+    expect(defaultTableStyleId(state, workbook('Missing'))).toBe('TableStyleMedium2');
+    expect(defaultTableStyleId(state, null)).toBe('TableStyleMedium2');
+  });
+
+  it('sets a built-in or custom style as the workbook default by its name', () => {
+    const setTableStyleDefaults = vi.fn(() => true);
+    expect(setDefaultTableStyle(state, { setTableStyleDefaults }, 'TableStyleLight4')).toBe(true);
+    expect(setDefaultTableStyle(state, { setTableStyleDefaults }, 'custom-table:Review')).toBe(
+      true,
+    );
+    expect(setTableStyleDefaults.mock.calls).toEqual([
+      [{ tableStyle: 'TableStyleLight4' }],
+      [{ tableStyle: 'Review' }],
+    ]);
+    expect(setDefaultTableStyle(state, { setTableStyleDefaults }, 'nope')).toBe(false);
+    expect(setDefaultTableStyle(state, null, 'TableStyleLight4')).toBe(false);
   });
 });

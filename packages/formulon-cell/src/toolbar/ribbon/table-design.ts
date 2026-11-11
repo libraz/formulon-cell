@@ -113,6 +113,9 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
       delete button.dataset.tableSessionOnly;
     }
   }
+  host
+    .querySelector('[data-ribbon-gallery="tableQuickStyles"]')
+    ?.dispatchEvent(new Event('fc-ribbon-control-refresh'));
 };
 
 /** Sync the PivotTable Design controls under `host` with the report under the active cell. */

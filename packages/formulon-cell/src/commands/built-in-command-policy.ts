@@ -126,6 +126,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   namedRanges: 'namedRange',
   formatTableInsert: 'table',
   formatTableHome: 'table',
+  tableQuickStyles: 'table',
   pivotTableInsert: 'pivot',
   tableName: 'table',
   // Refresh All runs data connections, not a table change: enabled on a protected sheet too.

@@ -1,4 +1,5 @@
 import {
+  approximateTableStyleElements,
   isBandedCol,
   isBandedRow,
   isFirstCol,
@@ -8,33 +9,17 @@ import {
   overlayStyleName,
   type TableOverlay,
   tableForCell,
-  tableStyleSwatch,
 } from '../../commands/format-as-table.js';
 import { builtinTableStyleElements } from '../../engine/builtin-table-styles.js';
 import { pivotStyleLayer } from '../../engine/pivot-style.js';
 import {
   composeStyleElements,
-  type StyleElementFormats,
   type StyleElementRegion,
   TABLE_ELEMENT_ORDER,
 } from '../../engine/table-style-elements.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ViewState } from '../geometry.js';
-
-/** The elements a custom table style paints: its family and hue. */
-function approximateStyleElements(table: TableOverlay): StyleElementFormats {
-  const swatch = tableStyleSwatch(table.style, table.color);
-  const header = { fill: swatch.header, color: swatch.headerText, bold: true };
-  return {
-    headerRow: header,
-    totalRow: header,
-    firstRowStripe: { fill: swatch.band },
-    firstColumnStripe: { fill: swatch.band },
-    firstColumn: { bold: true },
-    lastColumn: { bold: true },
-  };
-}
 
 /** A body cell: inside the table, below the header and above the total row. */
 const inBody = (table: TableOverlay, row: number, col: number): boolean =>
@@ -67,10 +52,11 @@ export function tableCellFormat(
   }
   if (isFirstCol(table, row, col)) regions.push({ type: 'firstColumn', r0, r1, c0, c1: c0 });
   if (isLastCol(table, row, col)) regions.push({ type: 'lastColumn', r0, r1, c0: c1, c1 });
-  if (regions.length === 0) return undefined;
+  const name = overlayStyleName(table);
+  if (regions.length === 0 || name === '') return undefined;
   const elements =
-    builtinTableStyleElements(overlayStyleName(table), themeColors) ??
-    approximateStyleElements(table);
+    builtinTableStyleElements(name, themeColors) ??
+    approximateTableStyleElements(table.style, table.color);
   return composeStyleElements(elements, TABLE_ELEMENT_ORDER, regions, row, col);
 }
 

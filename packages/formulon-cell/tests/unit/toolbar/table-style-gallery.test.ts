@@ -103,7 +103,9 @@ describe('Format as Table gallery', () => {
     expect(swatches(menu).map((b) => b.title)).toEqual(JA_SWATCHES);
     expect(menu.textContent).not.toContain('なし');
     expect(
-      Array.from(menu.querySelectorAll('.fc-tb__tablestyle-footer')).map((b) => b.textContent),
+      Array.from(menu.querySelectorAll('.fc-tb__tablestyle-footer:not([hidden])')).map(
+        (b) => b.textContent,
+      ),
     ).toEqual(['新しい表スタイル...', '新しいピボットテーブル スタイル...']);
   });
 

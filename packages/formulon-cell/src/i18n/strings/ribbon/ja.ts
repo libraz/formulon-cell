@@ -134,6 +134,8 @@ export const ribbonJa: RibbonStrings = {
     tableProperties: 'プロパティ',
     tableName: 'テーブル名',
     tableStyleOptions: 'テーブル スタイルのオプション',
+    tableStyles: 'テーブル スタイル',
+    quickStyles: 'クイック スタイル',
     externalTableData: '外部テーブル データ',
     headerRow: '見出し行',
     totalRow: '集計行',

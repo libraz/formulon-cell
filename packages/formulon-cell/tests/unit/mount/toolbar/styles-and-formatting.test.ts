@@ -232,7 +232,7 @@ describe('Spreadsheet.mountToolbar', () => {
         host.querySelectorAll<HTMLElement>('#menu-table-style-home .fc-tb__tablestyle-heading'),
       ).map((heading) => heading.textContent),
     ).toEqual(['淡色', '中間', '濃色']);
-    expect(menuTexts('#menu-table-style-home > .fc-tb__tablestyle-footer')).toEqual([
+    expect(menuTexts('#menu-table-style-home > .fc-tb__tablestyle-footer:not([hidden])')).toEqual([
       '新しい表スタイル...',
       '新しいピボットテーブル スタイル...',
     ]);
@@ -294,7 +294,10 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(footerActions.map((button) => button.dataset.tableStyleFooter)).toEqual([
       'new-table-style',
       'new-pivot-style',
+      'clear-table-style',
     ]);
+    // Clear appears only while a table is active.
+    expect(footerActions.map((button) => button.hidden)).toEqual([false, false, true]);
     expect(
       footerActions.every((button) => button.classList.contains('fc-tb__menu-item--iconic')),
     ).toBe(true);
@@ -362,6 +365,61 @@ describe('Spreadsheet.mountToolbar', () => {
     sheet.instance.history.undo();
     expect(sheet.instance.store.getState().tables.tables).toMatchObject([{ style: 'dark' }]);
 
+    tb.dispose();
+  });
+
+  it('clears the active table style from the gallery as one undo step', async () => {
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableInsert"]')?.click();
+    await Promise.resolve();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    await Promise.resolve();
+    expect(sheet.instance.store.getState().tables.tables).toMatchObject([
+      { styleName: 'TableStyleMedium2' },
+    ]);
+
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'formatTableHome', menuId: 'menu-table-style-home' },
+      host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableHome"]'),
+    );
+    const clear = host.querySelector<HTMLButtonElement>(
+      '[data-table-style-footer="clear-table-style"]',
+    );
+    expect(clear?.hidden).toBe(false);
+    expect(clear?.textContent).toBe('Clear');
+    const event = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(event, 'target', { value: clear });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+    await Promise.resolve();
+    expect(sheet.instance.store.getState().tables.tables).toMatchObject([{ styleName: '' }]);
+    sheet.instance.history.undo();
+    expect(sheet.instance.store.getState().tables.tables).toMatchObject([
+      { styleName: 'TableStyleMedium2' },
+    ]);
+    tb.dispose();
+  });
+
+  it('creates a table in the workbook default table style', async () => {
+    vi.spyOn(sheet.workbook, 'getTableStyleDefaults').mockReturnValue({
+      tableStyle: 'TableStyleLight9',
+      pivotStyle: '',
+    });
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableInsert"]')?.click();
+    await Promise.resolve();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    await Promise.resolve();
+    expect(sheet.instance.store.getState().tables.tables).toMatchObject([
+      { style: 'light', styleName: 'TableStyleLight9' },
+    ]);
     tb.dispose();
   });
 

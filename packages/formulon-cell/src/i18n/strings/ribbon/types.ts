@@ -137,6 +137,10 @@ export interface RibbonStrings {
     tableProperties: string;
     tableName: string;
     tableStyleOptions: string;
+    /** Table Design group holding the table style gallery. */
+    tableStyles: string;
+    /** The table style gallery button; on a wide ribbon it heads the in-ribbon strip. */
+    quickStyles: string;
     /** Group of the Table Design Refresh split button. */
     externalTableData: string;
     headerRow: string;

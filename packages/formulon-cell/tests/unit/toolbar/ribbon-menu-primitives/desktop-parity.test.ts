@@ -427,7 +427,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(grids.map((grid) => grid.querySelectorAll('.fc-tb__tablestyle-swatch').length)).toEqual([
       21, 28, 11,
     ]);
-    expect(menu.querySelectorAll('.fc-tb__tablestyle-footer')).toHaveLength(2);
+    expect(menu.querySelectorAll('.fc-tb__tablestyle-footer:not([hidden])')).toHaveLength(2);
 
     expect(menusCss).toMatch(/\.fc-tb__tablestyle-menu\s*\{[\s\S]*?width: 515px;/);
     expect(menusCss).toMatch(

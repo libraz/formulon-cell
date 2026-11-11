@@ -140,6 +140,7 @@ export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> 
   symbolInsert: 'menu-symbol',
   script: 'menu-script',
   formatTableHome: 'menu-table-style-home',
+  tableQuickStyles: 'menu-table-quick-styles',
   cellStyles: 'menu-cell-styles-home',
   currency: 'menu-currency-home',
   textToColumns: 'menu-text-to-columns',
@@ -205,6 +206,7 @@ export const RIBBON_MENU_FACTORY_FOR_COMMAND: Readonly<Record<string, RibbonMenu
   screenshotInsert: 'screenshotInsert',
   chartInsert: 'chartInsert',
   formatTableHome: 'tableStyle',
+  tableQuickStyles: 'tableStyle',
   cellStyles: 'cellStyles',
   currency: 'currency',
   pageTheme: 'pageTheme',
@@ -266,6 +268,7 @@ export const RIBBON_AUDITED_GALLERY_COMMANDS = [
   'shapesInsert',
   'screenshotInsert',
   'formatTableHome',
+  'tableQuickStyles',
   'cellStyles',
 ] as const;
 

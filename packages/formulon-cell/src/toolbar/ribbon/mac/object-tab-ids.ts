@@ -2,7 +2,6 @@
 export const MAC_OBJECT_TAB_DISABLED_COMMAND_IDS: readonly string[] = [
   'tableSummarizePivot',
   'tableConvertRange',
-  'tableQuickStyles',
   'chartQuickLayout',
   'chartQuickStyles',
   'chartMove',

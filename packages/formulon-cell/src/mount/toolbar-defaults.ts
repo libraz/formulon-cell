@@ -428,7 +428,7 @@ export function createDefaultRibbonHooks(
       splitTextToColumnsCustom: () => void dropdowns.splitTextToColumnsCustom(),
     },
     insert: {
-      createTable: () => dropdowns.createTableFromSelection('medium'),
+      createTable: () => dropdowns.createTableFromSelection(),
       createTableDialog: () =>
         showCreateTableDialog(instance as unknown as Parameters<typeof showCreateTableDialog>[0]),
       createChart: () => {

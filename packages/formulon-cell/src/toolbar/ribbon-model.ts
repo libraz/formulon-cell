@@ -905,6 +905,9 @@ export function buildRibbonModel(
           ),
           cmd('tableFilterButton', tr.filterButton, tr.filterButton, 'filterToggle', 'wide'),
         ]),
+        group(tr.tableStyles, [
+          cmd('tableQuickStyles', tr.quickStyles, tr.quickStyles, 'tableStyle', 'wide'),
+        ]),
       ]),
       contextual: true,
     },

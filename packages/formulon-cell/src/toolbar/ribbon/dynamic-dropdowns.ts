@@ -348,6 +348,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-sort': 'updateSortMenu',
   'menu-sort-home': 'updateSortMenu',
   'menu-table-refresh': 'updateTableRefreshMenu',
+  'menu-table-quick-styles': 'updateTableStylesMenu',
   'menu-table-style-home': 'updateTableStylesMenu',
   'menu-text-orientation': 'updateTextOrientationMenu',
   'menu-watch-formulas': 'updateWatchMenu',

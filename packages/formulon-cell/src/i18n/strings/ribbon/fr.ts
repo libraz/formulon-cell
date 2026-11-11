@@ -134,6 +134,8 @@ export const ribbonFr: RibbonStrings = {
     tableProperties: 'Propriétés',
     tableName: 'Nom du tableau',
     tableStyleOptions: 'Options de style de tableau',
+    tableStyles: 'Styles de tableau',
+    quickStyles: 'Styles rapides',
     externalTableData: 'Données de table externe',
     headerRow: "Ligne d'en-tête",
     totalRow: 'Ligne de total',

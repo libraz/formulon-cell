@@ -129,7 +129,7 @@ export interface RibbonHooks {
     splitTextToColumnsCustom?: () => Promise<unknown> | unknown;
   };
   insert?: {
-    createTable?: (variant: 'medium') => Promise<unknown> | unknown;
+    createTable?: () => Promise<unknown> | unknown;
     createTableDialog?: () => Promise<unknown> | unknown;
     createChart?: () => void;
     createRecommendedChart?: () => Promise<unknown> | unknown;
@@ -393,7 +393,7 @@ const applyGenericRibbonCommand = (
       return true;
     }
     case 'formatTableHome':
-      void hooks?.insert?.createTable?.('medium');
+      void hooks?.insert?.createTable?.();
       return true;
     case 'pivotFieldList':
       i.openActivePivotFieldList();
@@ -602,7 +602,7 @@ const applyGenericRibbonCommand = (
       return true;
     case 'formatTableInsert':
       if (hooks?.insert?.createTableDialog) void hooks.insert.createTableDialog();
-      else void hooks?.insert?.createTable?.('medium');
+      else void hooks?.insert?.createTable?.();
       return true;
     case 'removeDupes':
       hooks?.sortFilter?.removeDuplicates?.();

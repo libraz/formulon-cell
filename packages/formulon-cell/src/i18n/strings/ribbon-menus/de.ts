@@ -442,6 +442,7 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     pivotTableStyleCustom: 'Benutzerdefinierte PivotTable',
     tableStyleNew: 'Neue Tabellenformatvorlage …',
     tableStyleNewPivot: 'Neue PivotTable-Formatvorlage …',
+    tableStyleClear: 'Löschen',
     tableStyleSwatches: {
       TableStyleLight1: 'Tabellenformatvorlage (Hell) 1',
       TableStyleLight2: 'Tabellenformatvorlage (Hell) 2',
