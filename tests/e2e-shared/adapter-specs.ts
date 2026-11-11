@@ -23,6 +23,7 @@ export const ADAPTER_SPECS: readonly { readonly spec: string; readonly reason: s
   { spec: 'demo-modal-focus.spec.ts', reason: 'framework demo shell modals' },
   { spec: 'host-modal-collision.spec.ts', reason: 'framework demo shell modals over the grid' },
   { spec: 'user-journeys.spec.ts', reason: 'end-to-end journeys through the demo shell' },
+  { spec: 'note-visibility-undo.spec.ts', reason: 'framework demo shell Undo button state' },
 ];
 
 /** True when every spec should run on every app. */
