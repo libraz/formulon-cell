@@ -164,6 +164,9 @@ export const editDialogsFr: EditDialogsStrings = {
     description:
       'Remplace automatiquement un mot figurant dans la liste Remplacer par le mot correspondant dans la liste Par.',
     replaceAsYouType: 'Correction en cours de frappe',
+    correctTwoInitialCapitals: 'Supprimer la 2e majuscule d’un mot',
+    capitalizeSentences: 'Majuscule en début de phrase',
+    capitalizeDays: 'Majuscules aux jours de la semaine',
     replaceHyperlinks: 'Remplacer les chemins d’accès Internet et réseau par des liens hypertexte',
     replace: 'Remplacer\u00a0:',
     with: 'Par\u00a0:',

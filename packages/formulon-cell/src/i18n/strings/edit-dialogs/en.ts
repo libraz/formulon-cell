@@ -162,6 +162,9 @@ export const editDialogsEn: EditDialogsStrings = {
     description:
       'Automatically replaces a matched word in the Replace list with the corresponding word in the With list.',
     replaceAsYouType: 'Replace text as you type',
+    correctTwoInitialCapitals: 'Correct TWo INitial CApitals',
+    capitalizeSentences: 'Capitalize first letter of sentences',
+    capitalizeDays: 'Capitalize names of days',
     replaceHyperlinks: 'Replace internet and network paths with hyperlinks',
     replace: 'Replace:',
     with: 'With:',

@@ -170,6 +170,9 @@ export interface EditDialogsStrings {
     title: string;
     description: string;
     replaceAsYouType: string;
+    correctTwoInitialCapitals: string;
+    capitalizeSentences: string;
+    capitalizeDays: string;
     replaceHyperlinks: string;
     replace: string;
     with: string;

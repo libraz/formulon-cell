@@ -162,6 +162,9 @@ export const editDialogsKo: EditDialogsStrings = {
     description:
       '[바꾸기] 목록의 일치하는 단어를 자동으로 [바꿀 단어] 목록의 해당 단어로 바꿉니다.',
     replaceAsYouType: '다음 목록에 있는 내용대로 자동으로 바꾸기',
+    correctTwoInitialCapitals: '처음 두 문자가 대문자인 경우 고침[THe → The]',
+    capitalizeSentences: '문장의 첫 글자를 대문자로[the → The]',
+    capitalizeDays: '요일을 대문자로[monday → Monday]',
     replaceHyperlinks: '인터넷 및 네트워크 경로를 하이퍼링크로 바꾸기',
     replace: '바꾸기:',
     with: '결과:',

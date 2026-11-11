@@ -79,6 +79,15 @@ export function openAutoCorrectDialog(instance: SpreadsheetInstance): void {
   const add = appendDialogButton(actions, { label: t.add, variant: 'secondary' });
   const remove = appendDialogButton(actions, { label: t.delete, variant: 'secondary' });
 
+  check(t.correctTwoInitialCapitals, store.state().correctTwoInitialCapitals, (on) =>
+    store.update({ correctTwoInitialCapitals: on }),
+  );
+  check(t.capitalizeSentences, store.state().capitalizeSentences, (on) =>
+    store.update({ capitalizeSentences: on }),
+  );
+  check(t.capitalizeDays, store.state().capitalizeDays, (on) =>
+    store.update({ capitalizeDays: on }),
+  );
   check(t.replaceHyperlinks, store.state().replaceHyperlinks, (on) =>
     store.update({ replaceHyperlinks: on }),
   );

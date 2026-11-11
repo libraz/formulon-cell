@@ -312,6 +312,7 @@ describe('spreadsheet: update', () => {
       autoCorrect: {
         entries: () => [{ from: 'teh', to: 'the' }],
         replaceHyperlinks: false,
+        capitalizeSentences: false,
         onChange,
       },
     });
@@ -320,7 +321,11 @@ describe('spreadsheet: update', () => {
       entries: [{ from: 'teh', to: 'the' }],
       replaceAsYouType: true,
       replaceHyperlinks: false,
+      correctTwoInitialCapitals: true,
+      capitalizeSentences: false,
+      capitalizeDays: true,
     });
+    expect(autoCorrect.correct('teh end. monday')).toBe('the end. Monday');
     autoCorrect.add('adn', 'and');
     expect(onChange).toHaveBeenCalledWith(
       {
@@ -330,12 +335,18 @@ describe('spreadsheet: update', () => {
         ],
         replaceAsYouType: true,
         replaceHyperlinks: false,
+        correctTwoInitialCapitals: true,
+        capitalizeSentences: false,
+        capitalizeDays: true,
       },
       'en',
     );
 
     sheet.update({ autoCorrect: null });
-    expect(autoCorrect.state().replaceHyperlinks).toBe(true);
+    expect(autoCorrect.state()).toMatchObject({
+      replaceHyperlinks: true,
+      capitalizeSentences: true,
+    });
   });
 
   it('opens and closes Spelling and AutoCorrect through dialogs', async () => {

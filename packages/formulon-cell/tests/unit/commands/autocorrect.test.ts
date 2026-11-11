@@ -5,6 +5,9 @@ import {
   autoCorrectBefore,
   autoCorrectText,
   builtInAutoCorrectEntries,
+  capitalizeDays,
+  capitalizeSentences,
+  correctTwoInitialCapitals,
 } from '../../../src/commands/autocorrect.js';
 
 const symbols = builtInAutoCorrectEntries('en');
@@ -56,6 +59,32 @@ describe('AutoCorrect', () => {
     expect(autoCorrectBefore('a(c) ', 4, symbols)).toBeNull();
   });
 
+  // The capitalisation rules are not measured against the desktop yet.
+  it('lowers the second of two initial capitals', () => {
+    expect(correctTwoInitialCapitals('THe CApitals TWO Ok IDs')).toBe('The Capitals TWO Ok Ids');
+  });
+
+  it('capitalises English day names in lower case, whatever the language', () => {
+    expect(capitalizeDays('monday, Friday and sundays')).toBe('Monday, Friday and sundays');
+  });
+
+  it('capitalises a sentence after a sentence end and leaves the cell start as typed', () => {
+    expect(capitalizeSentences('done. next! why? ok.no')).toBe('done. Next! Why? Ok.no');
+  });
+
+  it('applies each switch on its own', () => {
+    let options: AutoCorrectOptions = {};
+    const store = new AutoCorrectStore(
+      () => options,
+      () => 'ja',
+    );
+    expect(store.correct('THe end. monday')).toBe('The end. Monday');
+    options = { correctTwoInitialCapitals: false, capitalizeSentences: false };
+    expect(store.correct('THe end. monday')).toBe('THe end. Monday');
+    store.update({ capitalizeDays: false });
+    expect(store.correct('THe end. monday')).toBe('THe end. monday');
+  });
+
   it('keeps edits for the session and hands the whole state to the host', () => {
     const onChange = vi.fn();
     let options: AutoCorrectOptions = { onChange };
@@ -68,6 +97,9 @@ describe('AutoCorrect', () => {
       entries: symbols,
       replaceAsYouType: true,
       replaceHyperlinks: true,
+      correctTwoInitialCapitals: true,
+      capitalizeSentences: true,
+      capitalizeDays: true,
     });
     store.add('teh', 'the');
     expect(store.correct('teh (c)')).toBe('the ©');
@@ -76,6 +108,9 @@ describe('AutoCorrect', () => {
         entries: [...symbols, { from: 'teh', to: 'the' }],
         replaceAsYouType: true,
         replaceHyperlinks: true,
+        correctTwoInitialCapitals: true,
+        capitalizeSentences: true,
+        capitalizeDays: true,
       },
       'en',
     );
@@ -94,6 +129,9 @@ describe('AutoCorrect', () => {
       entries: [{ from: 'ｘ', to: 'y' }],
       replaceAsYouType: false,
       replaceHyperlinks: false,
+      correctTwoInitialCapitals: true,
+      capitalizeSentences: true,
+      capitalizeDays: true,
     });
   });
 });

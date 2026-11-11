@@ -13,7 +13,22 @@ export interface AutoCorrectState {
   readonly replaceAsYouType: boolean;
   /** Replace internet and network paths with hyperlinks. */
   readonly replaceHyperlinks: boolean;
+  /** Correct TWo INitial CApitals. */
+  readonly correctTwoInitialCapitals: boolean;
+  /** Capitalize first letter of sentences. */
+  readonly capitalizeSentences: boolean;
+  /** Capitalize names of days. */
+  readonly capitalizeDays: boolean;
 }
+
+type AutoCorrectSwitch = Exclude<keyof AutoCorrectState, 'entries'>;
+const SWITCHES: readonly AutoCorrectSwitch[] = [
+  'replaceAsYouType',
+  'replaceHyperlinks',
+  'correctTwoInitialCapitals',
+  'capitalizeSentences',
+  'capitalizeDays',
+];
 
 /** The host's part in AutoCorrect: a list per language, the starting switches, and a callback to
  *  keep what the user changes. `locale` is the spreadsheet's UI language. */
@@ -24,6 +39,12 @@ export interface AutoCorrectOptions {
   readonly replaceAsYouType?: boolean;
   /** Replace internet and network paths with hyperlinks; on by default. */
   readonly replaceHyperlinks?: boolean;
+  /** Correct TWo INitial CApitals; on by default. */
+  readonly correctTwoInitialCapitals?: boolean;
+  /** Capitalize first letter of sentences; on by default. */
+  readonly capitalizeSentences?: boolean;
+  /** Capitalize names of days; on by default. */
+  readonly capitalizeDays?: boolean;
   /** Called with the whole state after the user changes the list or a switch. */
   readonly onChange?: (state: AutoCorrectState, locale: string) => void;
 }
@@ -130,14 +151,52 @@ export function autoCorrectText(text: string, entries: readonly AutoCorrectEntry
   return out;
 }
 
+const WORD = /\p{L}+/gu;
+const DAYS = new Set([
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+]);
+const isLower = (text: string): boolean =>
+  text === text.toLowerCase() && text !== text.toUpperCase();
+const isUpper = (text: string): boolean =>
+  text === text.toUpperCase() && text !== text.toLowerCase();
+
+/** `text` with the second capital of a word like `THe` lowered: two capitals followed only by
+ *  lower-case letters. */
+export const correctTwoInitialCapitals = (text: string): string =>
+  text.replace(WORD, (word) =>
+    word.length > 2 && isUpper(word.slice(0, 2)) && isLower(word.slice(2))
+      ? word.charAt(0) + word.charAt(1).toLowerCase() + word.slice(2)
+      : word,
+  );
+
+/** `text` with English day names typed in lower case given a capital, in every language, as the
+ *  desktop labels say. */
+export const capitalizeDays = (text: string): string =>
+  text.replace(WORD, (word) =>
+    DAYS.has(word) ? word.charAt(0).toUpperCase() + word.slice(1) : word,
+  );
+
+/** `text` with the first letter after a sentence end and white space given a capital. The start
+ *  of the cell is left as typed. */
+export const capitalizeSentences = (text: string): string =>
+  text.replace(
+    /([.!?]\s+)(\p{Ll})/gu,
+    (_, end: string, letter: string) => end + letter.toUpperCase(),
+  );
+
 /** The AutoCorrect state of one spreadsheet. User edits last for the instance's lifetime and are
  *  handed to the host through `onChange`. */
 export class AutoCorrectStore {
   readonly #options: () => AutoCorrectOptions | undefined;
   readonly #locale: () => string;
   readonly #edited = new Map<string, readonly AutoCorrectEntry[]>();
-  #replaceAsYouType: boolean | undefined;
-  #replaceHyperlinks: boolean | undefined;
+  readonly #switches: Partial<Record<AutoCorrectSwitch, boolean>> = {};
 
   constructor(options: () => AutoCorrectOptions | undefined, locale: () => string) {
     this.#options = options;
@@ -147,11 +206,15 @@ export class AutoCorrectStore {
   state(): AutoCorrectState {
     const locale = this.#locale();
     const options = this.#options();
+    const on = (key: AutoCorrectSwitch): boolean => this.#switches[key] ?? options?.[key] ?? true;
     return {
       entries:
         this.#edited.get(locale) ?? options?.entries?.(locale) ?? builtInAutoCorrectEntries(locale),
-      replaceAsYouType: this.#replaceAsYouType ?? options?.replaceAsYouType ?? true,
-      replaceHyperlinks: this.#replaceHyperlinks ?? options?.replaceHyperlinks ?? true,
+      replaceAsYouType: on('replaceAsYouType'),
+      replaceHyperlinks: on('replaceHyperlinks'),
+      correctTwoInitialCapitals: on('correctTwoInitialCapitals'),
+      capitalizeSentences: on('capitalizeSentences'),
+      capitalizeDays: on('capitalizeDays'),
     };
   }
 
@@ -159,8 +222,10 @@ export class AutoCorrectStore {
   update(patch: Partial<AutoCorrectState>): void {
     const locale = this.#locale();
     if (patch.entries) this.#edited.set(locale, [...patch.entries]);
-    if (patch.replaceAsYouType !== undefined) this.#replaceAsYouType = patch.replaceAsYouType;
-    if (patch.replaceHyperlinks !== undefined) this.#replaceHyperlinks = patch.replaceHyperlinks;
+    for (const key of SWITCHES) {
+      const value = patch[key];
+      if (value !== undefined) this.#switches[key] = value;
+    }
     this.#options()?.onChange?.(this.state(), locale);
   }
 
@@ -177,8 +242,12 @@ export class AutoCorrectStore {
 
   /** Typed text as AutoCorrect leaves it on entry. */
   correct(text: string): string {
-    const { entries, replaceAsYouType } = this.state();
-    return replaceAsYouType ? autoCorrectText(text, entries) : text;
+    const state = this.state();
+    let out = state.replaceAsYouType ? autoCorrectText(text, state.entries) : text;
+    if (state.correctTwoInitialCapitals) out = correctTwoInitialCapitals(out);
+    if (state.capitalizeDays) out = capitalizeDays(out);
+    if (state.capitalizeSentences) out = capitalizeSentences(out);
+    return out;
   }
 }
 

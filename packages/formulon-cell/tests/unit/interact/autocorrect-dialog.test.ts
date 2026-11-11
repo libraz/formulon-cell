@@ -69,13 +69,19 @@ describe('AutoCorrect options dialog', () => {
     expect(sheet.instance.autoCorrect.correct('(c)')).toBe('(c)');
   });
 
-  it('switches replacing as you type and hyperlinks, and closes', () => {
+  it('switches each option, and closes', () => {
     openAutoCorrectDialog(sheet.instance);
     checkbox('Replace text as you type').click();
+    checkbox('Correct TWo INitial CApitals').click();
+    checkbox('Capitalize first letter of sentences').click();
+    checkbox('Capitalize names of days').click();
     checkbox('Replace internet and network paths with hyperlinks').click();
     expect(sheet.instance.autoCorrect.state()).toMatchObject({
       replaceAsYouType: false,
       replaceHyperlinks: false,
+      correctTwoInitialCapitals: false,
+      capitalizeSentences: false,
+      capitalizeDays: false,
     });
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ replaceAsYouType: false, replaceHyperlinks: false }),

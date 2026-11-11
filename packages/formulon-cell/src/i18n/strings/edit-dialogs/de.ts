@@ -164,6 +164,9 @@ export const editDialogsDe: EditDialogsStrings = {
     description:
       'Ersetzt ein in der Liste "Ersetzen" vorhandenes Wort automatisch durch das entsprechende Wort in der Liste "Durch".',
     replaceAsYouType: 'Während der Eingabe ersetzen',
+    correctTwoInitialCapitals: 'ZWei GRoßbuchstaben am WOrtanfang korrigieren',
+    capitalizeSentences: 'Jeden Satz mit einem Großbuchstaben beginnen',
+    capitalizeDays: 'Wochentage immer groß schreiben',
     replaceHyperlinks: 'Internet- und Netzwerkpfade durch Links ersetzen',
     replace: 'Ersetzen:',
     with: 'Durch:',

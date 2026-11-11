@@ -57,6 +57,13 @@ describe('AutoCorrect on cell entry', () => {
     expect(wb.cellFormula(A1)).toBe('="(c) x"');
   });
 
+  it('applies the capitalisation rules to a typed constant', () => {
+    expect(typed('THe end. see you monday')).toEqual({
+      kind: 'text',
+      value: 'The end. See you Monday',
+    });
+  });
+
   it('leaves an entry that was not typed, such as a list pick, as it is', () => {
     expect(typed('(c) 2026', false)).toEqual({ kind: 'text', value: '(c) 2026' });
   });

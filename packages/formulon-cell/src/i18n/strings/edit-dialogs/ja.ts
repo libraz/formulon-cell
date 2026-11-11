@@ -164,6 +164,9 @@ export const editDialogsJa: EditDialogsStrings = {
     description:
       '[自動で変更する項目] リストで一致した単語を、[修正後の文字列] リストにある対応する単語で自動的に置き換えます。',
     replaceAsYouType: '入力中に自動修正する',
+    correctTwoInitialCapitals: '2 文字目を小文字にする [THe ... → The ...]',
+    capitalizeSentences: '文の先頭文字を大文字にする [the ... → The ...]',
+    capitalizeDays: '曜日の先頭文字を大文字にする [monday → Monday]',
     replaceHyperlinks: 'インターネットとネットワークのアドレスをハイパーリンクに変更する',
     replace: '置換前のフォント:',
     with: '置換後のフォント:',
