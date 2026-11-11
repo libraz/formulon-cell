@@ -105,7 +105,8 @@ export async function runTypedUrlAutoformat(
   await formulaBar.fill(url);
   await formulaBar.press('Enter');
   await expect.poll(() => sheet.readValue('C1')).toEqual({ kind: 'text', value: url });
-  expect((await sheet.readFormat('C1'))?.hyperlink).toBeUndefined();
+  // A URL committed from the formula bar is linked the same way as one typed in the cell.
+  expect((await sheet.readFormat('C1'))?.hyperlink).toBe(url);
 
   await sheet.goTo('A1');
   await sheet.shortcut('k');
