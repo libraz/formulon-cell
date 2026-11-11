@@ -855,12 +855,18 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   const spellingCommand = page.getByRole('button', { name: /スペル/ }).first();
   await expect(spellingCommand).toBeVisible();
   await spellingCommand.click();
-  // Outside English only the repeated word is flagged.
+  // A Japanese UI checks English: "teh" is not in the dictionary, then repeated.
   const dialog = page.getByRole('dialog', { name: /^スペル チェック/ });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('繰り返し使われる単語');
+  await expect(dialog).toContainText('辞書にない単語:');
   await expect(dialog.locator('#fc-spelling-word')).toHaveValue('teh');
   await expect(dialog.getByRole('button', { name: 'すべて無視', exact: true })).toBeVisible();
+  await expect(dialog).not.toContainText('Not in Dictionary');
+  // Return presses Ignore Once, the default button.
+  await page.keyboard.press('Enter');
+  await expect(dialog).toContainText('同じ語の繰り返し:');
+  await expect(dialog.getByRole('button', { name: '削除', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'すべて削除', exact: true })).toBeDisabled();
   await expect(dialog).not.toContainText('Repeated Word');
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
   await expect(dialog).toHaveCount(0);
