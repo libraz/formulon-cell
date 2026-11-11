@@ -18,7 +18,6 @@ import {
   defaultTableStyleId,
   overlayStyleName,
   pivotTableStyleAssignment,
-  repointTableStyle,
   sameStyleName,
   type TableOverlay,
   tableOverlayAt,
@@ -27,6 +26,7 @@ import {
 } from './format-as-table.js';
 import type { History } from './history.js';
 import { updatePivotStyleInfo } from './pivot-style-info.js';
+import { isSheetProtected } from './protection.js';
 import { recordFormatChange, recordTablesChange } from './slice-history.js';
 import { type TableActionContext, tableChangeAllowed, tableWrite } from './table-actions.js';
 
@@ -128,6 +128,35 @@ type StyleDefaultsWorkbook = Pick<
 type DeleteStyleWorkbook = StyleDefaultsWorkbook &
   Pick<WorkbookHandle, 'getPivotTables' | 'getPivotStyleInfo' | 'setPivotStyleInfo' | 'cells'>;
 
+/** What a workbook tells about the PivotTables that use a style. */
+type PivotStyleUsers = Pick<WorkbookHandle, 'getPivotTables' | 'getPivotStyleInfo'>;
+
+/** Whether a table or PivotTable using the custom style `name` sits on a protected sheet, which
+ *  keeps the style from being deleted or modified. */
+export function customStyleUsedOnProtectedSheet(
+  state: ReturnType<TableActionContext['store']['getState']>,
+  workbook: PivotStyleUsers | null,
+  name: string,
+): boolean {
+  const pivotStyle = (state.tables.customPivotTableStyles ?? []).find((style) =>
+    sameStyleName(style.label, name),
+  );
+  return (
+    state.tables.tables.some(
+      (table) =>
+        sameStyleName(overlayStyleName(table), name) && isSheetProtected(state, table.range.sheet),
+    ) ||
+    (state.tables.pivotTableStyles ?? []).some(
+      (a) => a.styleId === pivotStyle?.id && isSheetProtected(state, a.sheetIndex),
+    ) ||
+    (workbook?.getPivotTables() ?? []).some(
+      (p) =>
+        isSheetProtected(state, p.sheetIndex) &&
+        sameStyleName(workbook?.getPivotStyleInfo(p.sheetIndex, p.pivotIndex)?.name ?? '', name),
+    )
+  );
+}
+
 /** Writes the workbook's style defaults that differ from what it holds and records the change on
  *  `history` (the open transaction, if any) so it undoes with the style change. An empty name
  *  clears a default. False when the engine keeps no defaults. */
@@ -177,6 +206,7 @@ export function deleteCustomStyle(
   const forTables = (state.tables.customTableStyles ?? []).some(named);
   const forPivots = (state.tables.customPivotTableStyles ?? []).some(named);
   if (!forTables && !forPivots) return false;
+  if (customStyleUsedOnProtectedSheet(state, workbook, name)) return false;
   const history = ctx.history;
   const transaction = history?.begin();
   try {
@@ -206,7 +236,7 @@ export function deleteCustomStyle(
       if (!look) return;
       for (const table of ctx.store.getState().tables.tables) {
         if (sameStyleName(overlayStyleName(table), name))
-          repointTableStyle(ctx.store, table.id, look);
+          updateTableOverlay(ctx.store, table.id, look);
       }
     });
     if (workbook) {
@@ -227,7 +257,7 @@ export function deleteCustomStyle(
 
 /** How a Modify dialog's Set As Default checkbox applies to `kind`'s workbook default. */
 export interface ModifyStyleDefault {
-  workbook: StyleDefaultsWorkbook | null;
+  workbook: (StyleDefaultsWorkbook & PivotStyleUsers) | null;
   kind: TableStyleKind;
   setAsDefault: boolean;
 }
@@ -249,6 +279,7 @@ export function modifyCustomStyle(
   const pivot = (state.tables.customPivotTableStyles ?? []).find(named);
   const label = next.label.trim();
   if ((!table && !pivot) || !label) return false;
+  if (customStyleUsedOnProtectedSheet(state, defaults?.workbook ?? null, name)) return false;
   if (customStyleNameError(state, label, { exceptLabel: name })) return false;
   inTransaction(ctx.history, () => {
     // The engine resets a default whose style it removes: a default naming the old name moves
@@ -278,7 +309,7 @@ export function modifyCustomStyle(
         const look = styleLook(ctx.store.getState(), id);
         for (const overlay of ctx.store.getState().tables.tables) {
           if (look && sameStyleName(overlayStyleName(overlay), name)) {
-            repointTableStyle(ctx.store, overlay.id, look);
+            updateTableOverlay(ctx.store, overlay.id, look);
           }
         }
       }

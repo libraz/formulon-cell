@@ -906,37 +906,22 @@ export function updateTableOverlay(
   id: string,
   patch: TableOverlayPatch,
 ): TableOverlay | null {
-  return patchTableOverlay(store, id, patch, false);
-}
-
-/** Re-points a table to the look of another style after a workbook-level style change (delete or
- *  modify). Only the derived look changes, and a protected sheet takes it too; every other table
- *  option stays gated. Desktop behaviour on a protected sheet is unmeasured. */
-export function repointTableStyle(
-  store: SpreadsheetStore,
-  id: string,
-  look: Pick<TableOverlay, 'style' | 'color' | 'styleName'>,
-): TableOverlay | null {
-  const { style, color, styleName } = look;
-  return patchTableOverlay(store, id, { style, color, styleName }, true);
+  return patchTableOverlay(store, id, patch);
 }
 
 function patchTableOverlay(
   store: SpreadsheetStore,
   id: string,
   patch: TableOverlayPatch,
-  styleDriven: boolean,
 ): TableOverlay | null {
   const current = tableOverlayById(store.getState(), id);
   if (!current) return null;
   // A protected sheet still lets the style toggles change, and a total cell it leaves unlocked.
-  const permitted =
-    styleDriven ||
-    Object.keys(patch).every(
-      (key) =>
-        TABLE_FIELDS_ALLOWED_ON_PROTECTED_SHEET.has(key) ||
-        (key === 'totals' && totalCellsWritable(store, current, patch.totals)),
-    );
+  const permitted = Object.keys(patch).every(
+    (key) =>
+      TABLE_FIELDS_ALLOWED_ON_PROTECTED_SHEET.has(key) ||
+      (key === 'totals' && totalCellsWritable(store, current, patch.totals)),
+  );
   if (!permitted && blockedByProtection(store, current.range.sheet, 'updateTableOverlay'))
     return null;
   if (patch.range && overlapsOtherTable(store, id, patch.range)) return null;

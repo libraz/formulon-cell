@@ -11,6 +11,7 @@ import {
   applyTableStyle,
   clearTableStyle,
   createCustomStyle,
+  customStyleUsedOnProtectedSheet,
   deleteCustomStyle,
   modifyCustomStyle,
 } from '../../../src/commands/table-style-actions.js';
@@ -154,17 +155,54 @@ describe('table style commands', () => {
       setProtectedSheet(store(), 0, true);
     };
 
-    it('re-points a protected sheet table when its style is deleted', () => {
+    it('refuses to delete or modify a style a protected sheet table uses', () => {
       useBrand();
+      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Brand')).toBe(false);
+      expect(modifyCustomStyle(ctx(), 'Brand', { label: 'Brand 2', elements })).toBe(false);
       expect(table().styleName).toBe('Brand');
+      expect(
+        store()
+          .getState()
+          .tables.customTableStyles?.map((s) => s.label),
+      ).toEqual(['Brand']);
+      setProtectedSheet(store(), 0, false);
       expect(deleteCustomStyle(ctx(), sheet.workbook, 'Brand')).toBe(true);
-      expect(table().styleName).toBe('TableStyleMedium2');
     });
 
-    it('re-points a protected sheet table when its style is modified', () => {
+    it('refuses to delete or modify a style a protected sheet PivotTable uses', () => {
+      createPivotTableStyleFromActivePivot(store(), history(), 'Pivot Brand', { elements });
+      mutators.upsertPivotTableStyle(store(), {
+        sheetIndex: 0,
+        pivotIndex: 0,
+        styleId: 'custom-pivot-table:Pivot Brand',
+      });
+      setProtectedSheet(store(), 0, true);
+      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Pivot Brand')).toBe(false);
+      expect(modifyCustomStyle(ctx(), 'Pivot Brand', { label: 'P2', elements })).toBe(false);
+      expect(
+        store()
+          .getState()
+          .tables.customPivotTableStyles?.map((s) => s.label),
+      ).toEqual(['Pivot Brand']);
+    });
+
+    it('counts a PivotTable whose workbook style names the style', () => {
+      const workbook = {
+        getPivotTables: () => [{ sheetIndex: 0, pivotIndex: 0 }],
+        getPivotStyleInfo: () => ({ name: 'Pivot Brand' }),
+      } as unknown as Parameters<typeof customStyleUsedOnProtectedSheet>[1];
+      const used = () =>
+        customStyleUsedOnProtectedSheet(store().getState(), workbook, 'pivot brand');
+      expect(used()).toBe(false);
+      setProtectedSheet(store(), 0, true);
+      expect(used()).toBe(true);
+    });
+
+    it('leaves a table on a protected sheet alone when a style it does not use is deleted', () => {
       useBrand();
-      expect(modifyCustomStyle(ctx(), 'Brand', { label: 'Brand 2', elements })).toBe(true);
-      expect(table().styleName).toBe('Brand 2');
+      createCustomStyle(ctx(), null, 'table', value('Other', false));
+      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Other')).toBe(true);
+      expect(table().styleName).toBe('Brand');
     });
 
     it('still refuses every other table change on a protected sheet', () => {

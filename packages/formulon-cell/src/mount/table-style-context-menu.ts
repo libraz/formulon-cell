@@ -1,6 +1,8 @@
 import { customPivotTableStyleById, customTableStyleById } from '../commands/format-as-table.js';
+import { permissionReasonText } from '../commands/permission-reasons.js';
 import {
   activeStyleTarget,
+  customStyleUsedOnProtectedSheet,
   deleteCustomStyle,
   setStyleDefault,
   type TableStyleKind,
@@ -107,14 +109,31 @@ export function attachTableStyleContextMenu(
     close(false);
     const from = kind === 'pivot' ? 'pivotQuickStyles' : 'tableQuickStyles';
     const t = instance.i18n.strings.ribbonMenu;
-    const custom = customStyleOf(instance, kind, styleId) !== null;
+    const customStyle = customStyleOf(instance, kind, styleId);
+    const custom = customStyle !== null;
+    // A style a protected sheet's table or PivotTable uses can be neither modified nor deleted.
+    const locked =
+      customStyle !== null &&
+      customStyleUsedOnProtectedSheet(
+        instance.store.getState(),
+        instance.workbook,
+        customStyle.label,
+      );
+    const lockedReason = locked
+      ? permissionReasonText(instance.i18n.strings, 'sheetProtected')
+      : null;
     const menu = document.createElement('div');
     menu.className = 'fc-tb__menu fc-tb__tablestyle-ctx';
     menu.setAttribute('role', 'menu');
     menu.style.position = 'fixed';
     menu.style.left = `${event.clientX}px`;
     menu.style.top = `${event.clientY}px`;
-    const button = (action: Action, label: string, disabled = false): HTMLButtonElement => {
+    const button = (
+      action: Action,
+      label: string,
+      disabled = false,
+      reason: string | null = null,
+    ): HTMLButtonElement => {
       const node = menuTextChip({
         label,
         attr: 'tableStyleContext',
@@ -122,7 +141,7 @@ export function attachTableStyleContextMenu(
         className: 'fc-tb__menu-item',
         labelClassName: 'fc-tb__menu-item__text',
       });
-      projectDisabledState(node, disabled, null);
+      projectDisabledState(node, disabled, reason);
       node.addEventListener('click', () => {
         close(false);
         run(instance, kind, action, styleId, from);
@@ -134,9 +153,9 @@ export function attachTableStyleContextMenu(
       button('applyClear', t.tableStyleApplyClear),
       button('applyMaintain', t.tableStyleApplyMaintain),
       menuSeparator(),
-      button('modify', t.tableStyleModify, !custom),
+      button('modify', t.tableStyleModify, !custom || locked, lockedReason),
       button('duplicate', t.tableStyleDuplicate, none),
-      button('delete', t.tableStyleDelete, !custom),
+      button('delete', t.tableStyleDelete, !custom || locked, lockedReason),
       menuSeparator(),
       button(
         'setDefault',

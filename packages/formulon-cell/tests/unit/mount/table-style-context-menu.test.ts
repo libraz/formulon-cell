@@ -5,9 +5,11 @@ import {
   formatAsTable,
   galleryStyleElements,
 } from '../../../src/commands/format-as-table.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { applyTableStyle } from '../../../src/commands/table-style-actions.js';
 import { builtinTableStyleElements } from '../../../src/engine/builtin-table-styles.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en } from '../../../src/i18n/strings.js';
 import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
@@ -150,6 +152,35 @@ describe('table style gallery context menu', () => {
     sheet.instance.history.undo();
     expect(sheet.instance.store.getState().tables.customTableStyles).toHaveLength(1);
     expect(table()?.styleName).toBe('Review');
+  });
+
+  it('greys Modify and Delete with the protected reason while a protected sheet table uses the style', () => {
+    createTableStyleFromActiveTable(sheet.instance.store, sheet.instance.history, 'Review', {
+      elements: galleryStyleElements('dark', '#4472c4', 'banded'),
+    });
+    const id = customTableStyleId('Review');
+    const current = table();
+    if (!current) throw new Error('no table');
+    applyTableStyle(
+      {
+        store: sheet.instance.store,
+        history: sheet.instance.history,
+        origin: 'ribbon',
+        commandId: 'tableQuickStyles',
+      },
+      current,
+      id,
+    );
+    setProtectedSheet(sheet.instance.store, 0, true);
+    toolbar.rerender();
+    toolbar.setActiveTab('tableDesign');
+    rightClick(`[data-table-quick-style="${id}"]`);
+    for (const label of ['Modify...', 'Delete']) {
+      expect(item(label).disabled).toBe(true);
+      expect(item(label).title).toContain(en.protection.protectedCellEdit);
+    }
+    expect(item('Duplicate...').disabled).toBe(false);
+    expect(item('Set As Default').disabled).toBe(false);
   });
 
   it('deletes a custom style, moving its tables to the workbook default table style', () => {
