@@ -13,6 +13,7 @@ import type { RibbonHooks, RibbonTab, Toolbar } from '@libraz/formulon-cell/tool
 import { Spreadsheet, SpreadsheetToolbar } from '@libraz/formulon-cell-react';
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  adoptDemoWorkbook,
   buildDemoCommands,
   buildDemoReviewDialog,
   buildDemoReviewFindings,
@@ -63,35 +64,6 @@ const UI = createDemoStrings('React');
 /** The ribbon as F6 navigation reads it: the wrapper element around it and its tab focus. */
 const f6ToolbarOf = (toolbar: Toolbar | null, host: HTMLElement | null): DemoF6Toolbar | null =>
   host ? { host, focusActiveTab: () => toolbar?.focusActiveTab() ?? false } : null;
-
-/** Shows `next` in `live`. Settles on the instance's `workbook` event for it, or rejects with the
- *  swap's synchronous refusal or its `error` event. */
-const swapWorkbook = (live: SpreadsheetInstance, next: Workbook): Promise<void> =>
-  new Promise<void>((resolve, reject) => {
-    if (live.workbook === next) {
-      resolve();
-      return;
-    }
-    const offs: (() => void)[] = [];
-    const settle = (done: () => void): void => {
-      for (const off of offs.splice(0)) off();
-      done();
-    };
-    offs.push(
-      live.on('workbook', (event) => {
-        if (event.workbook === next) settle(resolve);
-      }),
-      // `workbook` is the source the instance reports a refused workbook swap under.
-      live.on('error', (event) => {
-        if (event.source === 'workbook') settle(() => reject(event.error));
-      }),
-    );
-    try {
-      live.update({ workbook: next });
-    } catch (error) {
-      settle(() => reject(error));
-    }
-  });
 
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
@@ -312,26 +284,17 @@ export const App = (): ReactElement => {
 
   const onNewWorkbook = useCallback(async () => {
     const wb = await Workbook.createDefault({ locale, platform });
-    if (!aliveRef.current) {
-      wb.dispose();
-      return;
-    }
     const previous = workbookOwnerRef.current;
     const live = instanceRef.current ?? instance;
     try {
       // Swapping here rather than through the prop reports a refused swap to this flow; the
       // prop then already matches the instance.
-      if (live) await swapWorkbook(live, wb);
+      if (!(await adoptDemoWorkbook(live, wb, () => aliveRef.current))) return;
     } catch (error) {
-      wb.dispose();
       if (!aliveRef.current) return;
       setReviewDialog(
         buildDemoReviewDialog(commandText.openFailed, commandText.workbook, formatLoadError(error)),
       );
-      return;
-    }
-    if (!aliveRef.current) {
-      wb.dispose();
       return;
     }
     workbookOwnerRef.current = wb;
@@ -347,19 +310,10 @@ export const App = (): ReactElement => {
       const live = instance;
       if (!live || !aliveRef.current) return;
       const previous = workbookOwnerRef.current;
-      let opened: Workbook | null = null;
       try {
         const { workbook: next, name } = await openDemoWorkbookFile(file);
-        opened = next;
-        if (!aliveRef.current || instanceRef.current !== live) {
-          next.dispose();
-          return;
-        }
-        await swapWorkbook(live, next);
-        if (!aliveRef.current) {
-          next.dispose();
-          return;
-        }
+        const current = () => aliveRef.current && instanceRef.current === live;
+        if (!(await adoptDemoWorkbook(live, next, current))) return;
         workbookOwnerRef.current = next;
         setWorkbook(next);
         // The instance no longer shows the previous workbook; release the one the demo owned.
@@ -367,7 +321,6 @@ export const App = (): ReactElement => {
         setBookName(name);
         setLoadError(null);
       } catch (err) {
-        opened?.dispose();
         if (!aliveRef.current) return;
         setReviewDialog(
           buildDemoReviewDialog(commandText.openFailed, commandText.workbook, formatLoadError(err)),

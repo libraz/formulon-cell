@@ -634,6 +634,63 @@ export const openDemoWorkbookFile = async (
   name: file.name.replace(/\.(xlsx|xlsm)$/i, ''),
 });
 
+/** Shows `next` in `live`. Settles on the instance's `workbook` event for it, or rejects with the
+ *  swap's synchronous refusal or its `error` event. */
+const showWorkbook = (live: SpreadsheetInstance, next: Workbook): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    if (live.workbook === next) {
+      resolve();
+      return;
+    }
+    const offs: (() => void)[] = [];
+    const settle = (done: () => void): void => {
+      for (const off of offs.splice(0)) off();
+      done();
+    };
+    offs.push(
+      live.on('workbook', (event) => {
+        if (event.workbook === next) settle(resolve);
+      }),
+      // `workbook` is the source the instance reports a refused workbook swap under.
+      live.on('error', (event) => {
+        if (event.source === 'workbook') settle(() => reject(event.error));
+      }),
+    );
+    try {
+      live.update({ workbook: next });
+    } catch (error) {
+      settle(() => reject(error));
+    }
+  });
+
+/**
+ * Hands a workbook the demo owns to the live instance. Resolves `true` once `live` shows it, after
+ * which the caller owns it and releases the workbook it replaced. Otherwise `next` is disposed
+ * here: resolves `false` when `isCurrent()` turns false before or after the swap (the demo or
+ * the instance went away), and rejects with the swap's refusal.
+ */
+export const adoptDemoWorkbook = async (
+  live: SpreadsheetInstance | null,
+  next: Workbook,
+  isCurrent: () => boolean,
+): Promise<boolean> => {
+  try {
+    if (!isCurrent()) {
+      next.dispose();
+      return false;
+    }
+    if (live) await showWorkbook(live, next);
+  } catch (error) {
+    next.dispose();
+    throw error;
+  }
+  if (!isCurrent()) {
+    next.dispose();
+    return false;
+  }
+  return true;
+};
+
 /** Routes clicks on the built-in `#menu-script` items to `onCommand`. The
  *  toolbar owns the rest of the click (closing the menu, restoring focus and
  *  routing `custom` to its own dialog), so `custom` is ignored here. */

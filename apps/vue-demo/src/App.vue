@@ -28,6 +28,7 @@ import {
   buildDemoSearchItems,
   composeDemoUiOptions,
   createDemoStrings,
+  adoptDemoWorkbook,
   createInitialDemoWorkbook,
   DEMO_FORMULA_HINTS,
   demoFunctionArgumentHelp,
@@ -73,35 +74,6 @@ const UI = createDemoStrings('Vue');
 /** The ribbon as F6 navigation reads it: the wrapper element around it and its tab focus. */
 const f6ToolbarOf = (toolbar: Toolbar | null, host: HTMLElement | null): DemoF6Toolbar | null =>
   host ? { host, focusActiveTab: () => toolbar?.focusActiveTab() ?? false } : null;
-
-/** Shows `next` in `live`. Settles on the instance's `workbook` event for it, or rejects with the
- *  swap's synchronous refusal or its `error` event. */
-const swapWorkbook = (live: SpreadsheetInstance, next: Workbook): Promise<void> =>
-  new Promise<void>((resolve, reject) => {
-    if (live.workbook === next) {
-      resolve();
-      return;
-    }
-    const offs: (() => void)[] = [];
-    const settle = (done: () => void): void => {
-      for (const off of offs.splice(0)) off();
-      done();
-    };
-    offs.push(
-      live.on('workbook', (event) => {
-        if (event.workbook === next) settle(resolve);
-      }),
-      // `workbook` is the source the instance reports a refused workbook swap under.
-      live.on('error', (event) => {
-        if (event.source === 'workbook') settle(() => reject(event.error));
-      }),
-    );
-    try {
-      live.update({ workbook: next });
-    } catch (error) {
-      settle(() => reject(error));
-    }
-  });
 
 let disposeF6Navigation: (() => void) | undefined;
 
@@ -326,28 +298,19 @@ const onSpreadsheetError = (error: unknown): void => {
 
 const onNewWorkbook = async (): Promise<void> => {
   const wb = await Workbook.createDefault({ locale: locale.value, platform: platform.value });
-  if (!demoAlive) {
-    wb.dispose();
-    return;
-  }
   const previous = workbookOwner;
   const live = instance.value;
   try {
     // Swapping here rather than through the prop reports a refused swap to this flow; the prop
     // then already matches the instance.
-    if (live) await swapWorkbook(live, wb);
+    if (!(await adoptDemoWorkbook(live, wb, () => demoAlive))) return;
   } catch (error) {
-    wb.dispose();
     if (!demoAlive) return;
     reviewDialog.value = buildDemoReviewDialog(
       commandText.value.openFailed,
       commandText.value.workbook,
       formatLoadError(error),
     );
-    return;
-  }
-  if (!demoAlive) {
-    wb.dispose();
     return;
   }
   workbookOwner = wb;
@@ -391,19 +354,10 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
   const live = instance.value;
   if (!live || !demoAlive) return;
   const previous = workbookOwner;
-  let opened: Workbook | null = null;
   try {
     const { workbook: next, name } = await openDemoWorkbookFile(file);
-    opened = next;
-    if (!demoAlive || instance.value !== live) {
-      next.dispose();
-      return;
-    }
-    await swapWorkbook(live, next);
-    if (!demoAlive) {
-      next.dispose();
-      return;
-    }
+    const current = () => demoAlive && instance.value === live;
+    if (!(await adoptDemoWorkbook(live, next, current))) return;
     workbookOwner = next;
     workbook.value = next;
     // The instance no longer shows the previous workbook; release the one the demo owned.
@@ -411,7 +365,6 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
     bookName.value = name;
     loadError.value = null;
   } catch (err) {
-    opened?.dispose();
     if (!demoAlive) return;
     reviewDialog.value = buildDemoReviewDialog(
       commandText.value.openFailed,

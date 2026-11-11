@@ -1,57 +1,37 @@
+import { mount } from '@libraz/formulon-cell';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  adoptDemoWorkbook,
   createInitialDemoWorkbook,
   openDemoWorkbookFile,
 } from '../../../../apps/demo-shared/index.ts';
-import { WorkbookHandle } from '../../src/engine/workbook-handle.ts';
-import { Spreadsheet } from '../../src/mount.ts';
 import { createHostElement, installDomStubs, uninstallDomStubs } from '../test-utils/dom.ts';
 
-const columnWidths = (workbook) =>
-  workbook
-    .getColumnLayouts(0)
-    .flatMap(({ first, last, width, hasWidth }) =>
-      hasWidth === false
-        ? []
-        : Array.from({ length: last - first + 1 }, (_, offset) => [first + offset, width]),
-    );
+const SEEDED_WIDTHS_PT = [84, 60, 78, 96];
+
+const columnWidthsPt = (workbook, count) =>
+  Array.from({ length: count }, (_, col) => workbook.sheet(0).getColumnWidthPt(col));
+
+const xlsxFile = async (name) => {
+  const source = await createInitialDemoWorkbook('?locale=en&fixture=empty');
+  const bytes = source.save().bytes;
+  source.dispose();
+  return new File([bytes], name, {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+};
 
 describe('demo startup workbook font and seeded layout', () => {
-  it('releases a loaded handle when the instance rejects file replacement', async () => {
-    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
-    const load = vi.spyOn(WorkbookHandle, 'loadBytes').mockResolvedValueOnce(workbook);
-    const original = new Error('instance disposed');
-    try {
-      await expect(
-        openDemoWorkbookFile(
-          {
-            setWorkbook: async () => {
-              throw original;
-            },
-          },
-          { name: 'late.xlsx', arrayBuffer: async () => new ArrayBuffer(0) },
-        ),
-      ).rejects.toBe(original);
-      expect(() => workbook.getValue({ sheet: 0, row: 0, col: 0 })).toThrow('disposed');
-    } finally {
-      load.mockRestore();
-      workbook.dispose();
-    }
-  });
   it.each([
     ['ja', '游ゴシック'],
     ['en', 'Calibri'],
   ])('uses the locale Normal font and seeded column widths for %s', async (locale, fontName) => {
     const workbook = await createInitialDemoWorkbook(`?locale=${locale}`);
     try {
-      expect(workbook.isStub).toBe(false);
-      expect(workbook.workbookDisplayFont).toEqual({ name: fontName, size: 11 });
-      const widths = columnWidths(workbook);
-      expect(widths.map(([col]) => col)).toEqual([0, 1, 2, 3]);
-      expect(widths[0]?.[1]).toBeCloseTo(112, 6);
-      expect(widths[1]?.[1]).toBeCloseTo(80, 6);
-      expect(widths[2]?.[1]).toBeCloseTo(104, 6);
-      expect(widths[3]?.[1]).toBeCloseTo(128, 6);
+      expect(workbook.engine).toBe('wasm');
+      expect(workbook.getDefaultFont()).toMatchObject({ name: fontName, sizePt: 11 });
+      const widths = columnWidthsPt(workbook, 4);
+      for (const [col, pt] of SEEDED_WIDTHS_PT.entries()) expect(widths[col]).toBeCloseTo(pt, 0);
     } finally {
       workbook.dispose();
     }
@@ -60,54 +40,69 @@ describe('demo startup workbook font and seeded layout', () => {
   it('keeps the empty fixture free of seeded values and column overrides', async () => {
     const workbook = await createInitialDemoWorkbook('?locale=ja&fixture=empty');
     try {
-      expect(workbook.isStub).toBe(false);
-      expect(workbook.workbookDisplayFont).toEqual({ name: '游ゴシック', size: 11 });
-      expect(workbook.getColumnLayouts(0)).toEqual([]);
-      expect([...workbook.cells(0)]).toEqual([]);
+      expect(workbook.engine).toBe('wasm');
+      expect(workbook.getDefaultFont()).toMatchObject({ name: '游ゴシック', sizePt: 11 });
+      const standard = workbook.sheet(0).getColumnWidthPt(20);
+      expect(columnWidthsPt(workbook, 4)).toEqual([standard, standard, standard, standard]);
+      expect(workbook.sheet(0).listCells()).toEqual([]);
+    } finally {
+      workbook.dispose();
+    }
+  });
+});
+
+describe('opening a workbook file in the demo', () => {
+  it('reads the file into a workbook the caller owns and names it without its extension', async () => {
+    const { workbook, name } = await openDemoWorkbookFile(await xlsxFile('opened.xlsx'));
+    try {
+      expect(name).toBe('opened');
+      expect(workbook.disposed).toBe(false);
+      expect(workbook.sheet(0).listCells()).toEqual([]);
     } finally {
       workbook.dispose();
     }
   });
 
-  it('hands an opened workbook to a live mount and releases both owners on teardown', async () => {
+  it('releases the opened workbook when the instance refuses it', async () => {
+    const { workbook } = await openDemoWorkbookFile(await xlsxFile('refused.xlsx'));
+    const refusal = new Error('instance disposed');
+    const live = {
+      workbook: null,
+      on: () => () => {},
+      update: () => {
+        throw refusal;
+      },
+    };
+    await expect(adoptDemoWorkbook(live, workbook, () => true)).rejects.toBe(refusal);
+    expect(workbook.disposed).toBe(true);
+  });
+
+  it('releases the opened workbook when the demo goes away before the swap', async () => {
+    const { workbook } = await openDemoWorkbookFile(await xlsxFile('late.xlsx'));
+    const update = vi.fn();
+    const live = { workbook: null, on: () => () => {}, update };
+    await expect(adoptDemoWorkbook(live, workbook, () => false)).resolves.toBe(false);
+    expect(update).not.toHaveBeenCalled();
+    expect(workbook.disposed).toBe(true);
+  });
+
+  it('hands the opened workbook to a live mount and leaves it with the caller', async () => {
     installDomStubs();
-    const source = await WorkbookHandle.createDefault();
-    const bytes = source.save();
-    source.dispose();
-
-    const original = await WorkbookHandle.createDefault();
-    const originalDispose = vi.spyOn(original, 'dispose');
+    const original = await createInitialDemoWorkbook('?locale=en&fixture=empty');
     const { host, cleanup } = createHostElement();
-    const instance = await Spreadsheet.mount(host, { workbook: original });
-    let adopted;
-    let adoptedDispose;
+    const instance = await mount(host, { workbook: original });
+    const { workbook: opened } = await openDemoWorkbookFile(await xlsxFile('handoff.xlsx'));
     try {
-      const name = await openDemoWorkbookFile(
-        instance,
-        new File([bytes], 'opened.xlsx', {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        }),
-      );
-      adopted = instance.workbook;
-      adoptedDispose = vi.spyOn(adopted, 'dispose');
-
-      expect(name).toBe('opened');
-      expect(adopted).not.toBe(original);
-      expect(adopted.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
-
-      // The demo owns the borrowed original after a successful handoff.
+      await expect(adoptDemoWorkbook(instance, opened, () => true)).resolves.toBe(true);
+      expect(instance.workbook).toBe(opened);
+      expect(opened.disposed).toBe(false);
+      // The caller releases the workbook the instance no longer shows.
       original.dispose();
-      expect(originalDispose).toHaveBeenCalledTimes(1);
-
-      // Core owns the workbook adopted by setWorkbook and releases it when
-      // the live wrapper instance unmounts.
-      instance.dispose();
-      expect(adoptedDispose).toHaveBeenCalledTimes(1);
+      expect(original.disposed).toBe(true);
     } finally {
-      try {
-        instance.dispose();
-      } catch {}
-      if (!originalDispose.mock.calls.length) original.dispose();
+      instance.dispose();
+      if (!opened.disposed) opened.dispose();
+      if (!original.disposed) original.dispose();
       cleanup();
       uninstallDomStubs();
     }
