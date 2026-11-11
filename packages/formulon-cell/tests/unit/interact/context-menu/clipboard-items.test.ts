@@ -445,7 +445,7 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       document
         .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
-        ?.dispatchEvent(new MouseEvent('mouseenter'));
+        ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       document
         .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="pasteAll"]')
         ?.click();
@@ -479,7 +479,7 @@ describe('attachContextMenu', () => {
       const at = store.getState().selection.active;
       document
         .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
-        ?.dispatchEvent(new MouseEvent('mouseenter'));
+        ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       document
         .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="pasteValues"]')
         ?.click();
@@ -516,7 +516,7 @@ describe('attachContextMenu', () => {
       const at = store.getState().selection.active;
       document
         .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
-        ?.dispatchEvent(new MouseEvent('mouseenter'));
+        ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       document
         .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="pasteTranspose"]')
         ?.click();
@@ -533,7 +533,7 @@ describe('attachContextMenu', () => {
       // Paste Special is a submenu — open it, then click the dialog entry.
       document
         .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
-        ?.dispatchEvent(new MouseEvent('mouseenter'));
+        ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       document
         .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="pasteSpecial"]')
         ?.click();
@@ -551,7 +551,7 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       document
         .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
-        ?.dispatchEvent(new MouseEvent('mouseenter'));
+        ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
 
       const pasteValues = document.querySelector<HTMLButtonElement>(
         '.fc-ctxmenu__sub [data-fc-action="pasteValues"]',

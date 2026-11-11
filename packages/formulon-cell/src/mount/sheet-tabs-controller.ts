@@ -26,7 +26,7 @@ import { showMoveCopySheetDialog } from '../toolbar/dialogs/move-copy-sheet.js';
 import { showMessage } from '../toolbar/dialogs/prompt.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
 import { showUnhideSheetDialog } from '../toolbar/dialogs/unhide-sheet.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { onPointerArrive, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { hiddenSheetIndexes, visibleSheetIndexes } from './sheet-indexes.js';
 import {
   createSheetMenuButton,
@@ -571,7 +571,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         if (open) openColorSub(colorTrigger);
       };
       colorTrigger.addEventListener('click', () => toggleColorSub(true));
-      colorTrigger.addEventListener('pointerenter', () => toggleColorSub(true));
+      onPointerArrive(colorTrigger, () => toggleColorSub(true));
       colorTrigger.addEventListener('keydown', (e) => {
         if (e.key !== 'ArrowRight') return;
         e.preventDefault();
@@ -654,7 +654,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     sheetMenu.replaceChildren(...(isMacWorkbook(wb) ? macItems() : desktopItems));
     for (const entry of sheetMenu.querySelectorAll<HTMLElement>('.fc-sheetmenu__item')) {
       if (entry.getAttribute('aria-haspopup')) continue;
-      entry.addEventListener('pointerenter', () => {
+      onPointerArrive(entry, () => {
         sheetMenu.querySelector('.fc-sheetmenu__sub')?.remove();
         sheetMenu.querySelector('[aria-haspopup="menu"]')?.setAttribute('aria-expanded', 'false');
       });

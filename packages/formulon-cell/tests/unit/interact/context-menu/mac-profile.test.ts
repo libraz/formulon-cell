@@ -273,7 +273,7 @@ describe('context menu on the Mac platform profile', () => {
     const root = visibleMenu();
     expect(document.activeElement).toBe(root);
     const copy = item('copy');
-    copy?.dispatchEvent(new MouseEvent('mouseenter'));
+    copy?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
     expect(document.activeElement).toBe(copy);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     expect(document.activeElement).toBe(item('paste'));

@@ -34,7 +34,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { bodyBandOrigin, layoutForView, rangeRects } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { onPointerArrive, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { canReadClipboard, createContextMenuClipboard } from './context-menu-clipboard.js';
 import {
   contextItemIds,
@@ -504,7 +504,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         btn.dataset.policyDisabled = 'true';
         setContextMenuItemDisabled(btn, true, decisionReason(decision));
       }
-      btn.addEventListener('mouseenter', () => {
+      onPointerArrive(btn, () => {
         if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
           if (panel === 'root' && openSub && openSub.parentBtn !== btn) scheduleSubClose();
           followPointer(panel, btn);
@@ -549,7 +549,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       if (btn.disabled) return;
       invokeMenuAction(() => runEntry(entry), btn);
     });
-    btn.addEventListener('mouseenter', () => {
+    onPointerArrive(btn, () => {
       if (panel === 'root') {
         if (openSub && openSub.parentBtn !== btn) scheduleSubClose();
       } else if (!btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
@@ -1127,7 +1127,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     activeIndex = -1;
     root.focus({ preventScroll: true });
   });
-  sub.addEventListener('mouseenter', () => {
+  onPointerArrive(sub, () => {
     cancelSubClose();
     if (!openSub) return;
     setPanelActiveItem(root, openSub.parentBtn);

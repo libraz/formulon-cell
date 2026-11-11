@@ -9,7 +9,7 @@ import { setBorderPreset } from '../../commands/format.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../../components/color-palette.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import type { CellBorderStyle } from '../../store/store.js';
-import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
+import { focusMenuItem, handleMenuKeydown, onPointerArrive } from '../menu-a11y.js';
 import { RIBBON_BORDERS_MENU_ID } from './activation.js';
 
 export interface BorderMenuCtx {
@@ -235,7 +235,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   };
 
   borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border-submenu]').forEach((btn) => {
-    btn.addEventListener('mouseenter', () => {
+    onPointerArrive(btn, () => {
       const which = btn.dataset.borderSubmenu as 'lineColor' | 'lineStyle' | undefined;
       if (which) openSubmenu(which);
     });
@@ -251,7 +251,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   borderMenu
     ?.querySelectorAll<HTMLButtonElement>('[data-border-preset], [data-border-draw]')
     .forEach((btn) => {
-      btn.addEventListener('mouseenter', closeBorderSubmenus);
+      onPointerArrive(btn, closeBorderSubmenus);
     });
 
   // Line-color picks are handled by the shared palette's onPick callback,

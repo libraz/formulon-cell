@@ -321,7 +321,7 @@ describe('attachContextMenu', () => {
         Object.defineProperty(sub, 'offsetHeight', { configurable: true, value: 130 });
       }
 
-      trigger?.dispatchEvent(new MouseEvent('mouseenter'));
+      trigger?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
 
       expect(sub?.style.display).toBe('block');
       expect(sub?.style.left).toBe('72px');
@@ -582,7 +582,7 @@ describe('attachContextMenu', () => {
           Object.defineProperty(sub, 'offsetHeight', { configurable: true, value: 100 });
         }
 
-        trigger?.dispatchEvent(new MouseEvent('mouseenter'));
+        trigger?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
 
         expect(sub?.style.display).toBe('block');
         expect(sub?.style.left).toBe('82px');
@@ -608,7 +608,7 @@ describe('attachContextMenu', () => {
         );
         const root = document.querySelector<HTMLElement>('.fc-ctxmenu--managed');
         const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
-        trigger?.dispatchEvent(new MouseEvent('mouseenter'));
+        trigger?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
         sub?.dispatchEvent(new MouseEvent('mouseleave'));
 
         expect(vi.getTimerCount()).toBeGreaterThan(0);
@@ -1033,7 +1033,7 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       document
         .querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]')
-        ?.dispatchEvent(new MouseEvent('mouseenter'));
+        ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       document
         .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="app.nested"]')
         ?.click();
@@ -1402,8 +1402,8 @@ describe('attachContextMenu', () => {
         if (!root || !sub || !parent || !sibling) throw new Error('submenu fixture is incomplete');
         expect(root?.classList.contains('fc-ctxmenu--managed')).toBe(true);
         expect(sub?.classList.contains('fc-ctxmenu--managed')).toBe(true);
-        parent?.dispatchEvent(new MouseEvent('mouseenter'));
-        sibling?.dispatchEvent(new MouseEvent('mouseenter'));
+        parent?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+        sibling?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
 
         expect(directActiveItems(root)).toEqual([sibling]);
         expect(sub?.style.display).toBe('block');
@@ -1443,14 +1443,15 @@ describe('attachContextMenu', () => {
         const parent = root?.querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]');
         const sibling = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.other"]');
         if (!root || !sub || !parent || !sibling) throw new Error('submenu fixture is incomplete');
-        parent?.dispatchEvent(new MouseEvent('mouseenter'));
+        parent?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
         const nested = sub?.querySelector<HTMLButtonElement>('[data-fc-action="app.nested"]');
         if (!nested) throw new Error('submenu item is missing');
-        nested?.dispatchEvent(new MouseEvent('mouseenter'));
-        sibling?.dispatchEvent(new MouseEvent('mouseenter'));
+        nested?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+        sub.dispatchEvent(new MouseEvent('mouseleave'));
+        sibling?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
         expect(directActiveItems(root)).toEqual([sibling]);
 
-        sub.dispatchEvent(new MouseEvent('mouseenter'));
+        sub.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
         expect(directActiveItems(root)).toEqual([parent]);
         expect(directActiveItems(sub)).toEqual([nested]);
         vi.advanceTimersByTime(260);
@@ -1524,13 +1525,13 @@ describe('attachContextMenu', () => {
       const parent = root?.querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]');
       const sibling = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.other"]');
       if (!root || !parent || !sibling) throw new Error('submenu fixture is incomplete');
-      parent.dispatchEvent(new MouseEvent('mouseenter'));
+      parent.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
       if (!sub) throw new Error('submenu panel is missing');
-      sibling.dispatchEvent(new MouseEvent('mouseenter'));
+      sibling.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       expect(document.activeElement).toBe(sibling);
 
-      sub.dispatchEvent(new MouseEvent('mouseenter'));
+      sub.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       expect(document.activeElement).toBe(sub);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
 
@@ -1564,9 +1565,9 @@ describe('attachContextMenu', () => {
         const blocked = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.blocked"]');
         const first = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.first"]');
         if (!blocked || !first) throw new Error('disabled-item fixture is incomplete');
-        first?.dispatchEvent(new MouseEvent('mouseenter'));
+        first?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
         expect(first?.classList.contains('fc-ctxmenu__item--active')).toBe(true);
-        blocked?.dispatchEvent(new MouseEvent('mouseenter'));
+        blocked?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
         expect(blocked?.classList.contains('fc-ctxmenu__item--active')).toBe(false);
         expect(directActiveItems(root)).toEqual([]);
         expect(document.activeElement).toBe(root);

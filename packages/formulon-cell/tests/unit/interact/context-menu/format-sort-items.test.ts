@@ -228,7 +228,7 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       document
         .querySelector<HTMLButtonElement>('[data-fc-submenu="sortMenu"]')
-        ?.dispatchEvent(new MouseEvent('mouseenter'));
+        ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       item('sortAsc')?.click();
 
       expect(setBlank).toHaveBeenCalledWith({ sheet: 0, row: 50000, col: 0 });
@@ -248,7 +248,7 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 60, 30);
       document
         .querySelector<HTMLButtonElement>('[data-fc-submenu="sortMenu"]')
-        ?.dispatchEvent(new MouseEvent('mouseenter'));
+        ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       item('sortDesc')?.click();
 
       const col = [0, 1, 2].map((row) => wb.getValue({ sheet: 0, row, col: 0 }));
@@ -276,7 +276,7 @@ describe('attachContextMenu', () => {
         fireContextMenu(host, 60, 50);
         document
           .querySelector<HTMLButtonElement>('[data-fc-submenu="filterMenu"]')
-          ?.dispatchEvent(new MouseEvent('mouseenter'));
+          ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
       };
 
       openFilterMenu();

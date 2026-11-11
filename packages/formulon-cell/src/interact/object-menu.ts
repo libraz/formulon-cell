@@ -1,5 +1,10 @@
 import { isMacHost } from '../extensions/ui-options.js';
-import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
+import {
+  focusMenuItem,
+  handleMenuKeydown,
+  onPointerArrive,
+  projectDisabledState,
+} from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { placeMacMenu } from './context-menu-placement.js';
 import { overlayPortalFor } from './overlay-portal.js';
@@ -133,7 +138,7 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
           close(true);
           entry.run();
         });
-        button.addEventListener('mouseenter', () => {
+        onPointerArrive(button, () => {
           if (!isEnabledMenuItem(button)) {
             clearActiveItem();
             root.focus({ preventScroll: true });

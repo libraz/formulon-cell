@@ -65,6 +65,21 @@ const menuItems = (menu: HTMLElement): HTMLButtonElement[] =>
       item.closest<HTMLElement>('[role="menu"]') === menu,
   );
 
+/** Runs `handler` once the pointer moves onto `item`, and again after it leaves and returns. An
+ *  item that appears under a resting pointer (a menu opened from the keyboard) fires
+ *  `mouseenter` without a move, so hover never takes keyboard focus or opens a submenu then. */
+export function onPointerArrive(item: HTMLElement, handler: () => void): void {
+  let arrived = false;
+  item.addEventListener('mousemove', () => {
+    if (arrived) return;
+    arrived = true;
+    handler();
+  });
+  item.addEventListener('mouseleave', () => {
+    arrived = false;
+  });
+}
+
 export function prepareMenu(menu: HTMLElement, label?: string): void {
   menu.setAttribute('role', 'menu');
   if (label) menu.setAttribute('aria-label', label);

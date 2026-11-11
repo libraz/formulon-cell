@@ -54,7 +54,7 @@ describe('createObjectMenu', () => {
     ]);
     const [first, second] = root.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item');
 
-    second?.dispatchEvent(new MouseEvent('mouseenter'));
+    second?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
 
     expect(document.activeElement).toBe(second);
     expect(activeItems(root)).toEqual([second]);
@@ -100,7 +100,7 @@ describe('createObjectMenu', () => {
     ]);
     const items = root.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item');
     const disabled = items[1];
-    disabled?.dispatchEvent(new MouseEvent('mouseenter'));
+    disabled?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
 
     expect(document.activeElement).toBe(root);
     expect(activeItems(root)).toHaveLength(0);
