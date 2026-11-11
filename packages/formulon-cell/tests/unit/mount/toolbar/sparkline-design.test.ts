@@ -310,21 +310,28 @@ describe('Sparkline tab of the ribbon', () => {
     expect(groupOfCell(store().getState(), at(0, 7))?.settings.type).toBe(SparklineType.Line);
   });
 
-  it('disables the whole tab on a protected sheet except Axis, whose entries are inert', () => {
-    mountOnSparklines();
-    setProtectedSheet(store(), 0, true, { permissions: { objects: true } });
-    mutators.setActive(store(), at(0));
-    const ids = Array.from(host.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]'))
-      .filter((el) => el.dataset.ribbonCommand?.startsWith('sparkline'))
-      .map((el) => [el.dataset.ribbonCommand, el.disabled] as const);
-    expect(ids.filter(([id]) => id !== 'sparklineAxis').every(([, off]) => off)).toBe(true);
-    expect(ids.find(([id]) => id === 'sparklineAxis')?.[1]).toBe(false);
-    command('sparklineAxis').click();
-    const items = host.querySelectorAll<HTMLButtonElement>('[data-sparkline-axis]');
-    expect(items).toHaveLength(10);
-    expect(Array.from(items).every((item) => item.disabled)).toBe(true);
-    expect(settings()?.type).toBe(SparklineType.Line);
-  });
+  // The default protection refuses object edits; allowing them must not change what the tab shows.
+  it.each([
+    ['default options', undefined],
+    ['objects allowed', { permissions: { objects: true } }],
+  ] as const)(
+    'disables the whole tab on a protected sheet except Axis, whose entries are inert (%s)',
+    (_label, options) => {
+      mountOnSparklines();
+      setProtectedSheet(store(), 0, true, options);
+      mutators.setActive(store(), at(0));
+      const ids = Array.from(host.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]'))
+        .filter((el) => el.dataset.ribbonCommand?.startsWith('sparkline'))
+        .map((el) => [el.dataset.ribbonCommand, el.disabled] as const);
+      expect(ids.filter(([id]) => id !== 'sparklineAxis').every(([, off]) => off)).toBe(true);
+      expect(ids.find(([id]) => id === 'sparklineAxis')?.[1]).toBe(false);
+      command('sparklineAxis').click();
+      const items = host.querySelectorAll<HTMLButtonElement>('[data-sparkline-axis]');
+      expect(items).toHaveLength(10);
+      expect(Array.from(items).every((item) => item.disabled)).toBe(true);
+      expect(settings()?.type).toBe(SparklineType.Line);
+    },
+  );
 
   it('lists the 36 style slots, all disabled', () => {
     mountOnSparklines();
