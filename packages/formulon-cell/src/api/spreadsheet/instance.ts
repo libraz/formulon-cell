@@ -70,7 +70,7 @@ import { type CELL_COMMAND_IDS, type CommandId, isCommandId } from './command-id
 type CellCommandId = (typeof CELL_COMMAND_IDS)[number];
 
 /** The options the user can change from the UI. */
-type UserOptionKey = 'showAllNotes' | 'theme' | 'locale';
+type UserOptionKey = 'showAllNotes' | 'theme' | 'locale' | 'autoCorrect';
 
 import { createDialogs, type Dialogs } from './dialogs.js';
 import type {
@@ -1049,7 +1049,8 @@ const legacyOptionsOf = (
   handle: WorkbookHandle,
   hostProviders: { readonly current: HostProviders },
   spelling: { readonly current: SpellingService | undefined },
-  autoCorrect: { readonly current: AutoCorrectOptions | undefined },
+  autoCorrect: { current: AutoCorrectOptions | undefined },
+  reportAutoCorrect: { readonly current: (next: AutoCorrectOptions) => void },
   notifyRibbon: () => void,
 ): MountOptions => {
   const host = options.host ?? {};
@@ -1078,6 +1079,10 @@ const legacyOptionsOf = (
       hostProviders.current.functionArgumentHelp?.(name, index, locale),
     getSpellingService: () => spelling.current,
     getAutoCorrectOptions: () => autoCorrect.current,
+    setAutoCorrectOptions: (next) => {
+      autoCorrect.current = next;
+      reportAutoCorrect.current(next);
+    },
     ...(options.uploadStatus !== undefined ? { uploadStatus: options.uploadStatus } : {}),
     ...(options.macroRecording !== undefined ? { macroRecording: options.macroRecording } : {}),
     renderError: false,
@@ -1119,6 +1124,8 @@ export async function mount(
   const hostProviders = { current: options.host ?? {} };
   const spelling = { current: options.spelling };
   const autoCorrect = { current: options.autoCorrect };
+  // Bound once the instance can report a user edit as `update`.
+  const reportAutoCorrect: { current: (next: AutoCorrectOptions) => void } = { current: () => {} };
   const ribbonEvents = new Emitter<RibbonEvents>();
   const notifyRibbon = (): void => {
     const ribbonHandle = legacy?.toolbar;
@@ -1128,7 +1135,15 @@ export async function mount(
     if (options.seed) options.seed(workbook);
     legacy = await Spreadsheet.mount(
       host,
-      legacyOptionsOf(options, handle, hostProviders, spelling, autoCorrect, notifyRibbon),
+      legacyOptionsOf(
+        options,
+        handle,
+        hostProviders,
+        spelling,
+        autoCorrect,
+        reportAutoCorrect,
+        notifyRibbon,
+      ),
     );
   } finally {
     // A failed seed or mount releases the workbook the instance created; one passed in stays.
@@ -1227,6 +1242,7 @@ export async function mount(
   const reportTheme = userOption('theme', legacy.store.getState().ui.theme);
   const offTheme = legacy.on('themeChange', (e) => reportTheme(e.theme));
   const reportLocale = userOption('locale', legacy.i18n.locale);
+  reportAutoCorrect.current = userOption('autoCorrect', options.autoCorrect);
   const offLocale = legacy.on('localeChange', (e) => reportLocale(e.locale));
 
   let lastSelection = selectionOf(legacy);

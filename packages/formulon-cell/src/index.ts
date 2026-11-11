@@ -72,7 +72,6 @@ export type {
   AutoCorrectEntry,
   AutoCorrectExceptions,
   AutoCorrectOptions,
-  AutoCorrectState,
 } from './commands/autocorrect.js';
 export type {
   BatchCell,

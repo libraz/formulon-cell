@@ -1,5 +1,14 @@
 {
   "rootValueMax": 70,
+  "optionFunctionAllow": {
+    "seed": "a behaviour hook: code that fills a new workbook once, at mount",
+    "policy": "host decisions evaluated per interaction (editable predicate, restrict)",
+    "contextMenu": "transform rewrites the built-in menu; onOpen hands the host its own menu in host mode",
+    "overlays": "root provides the host element overlays mount into",
+    "extensions": "extensions carry behaviour: setup runs the extension",
+    "spelling": "a host service: check, suggest and addWord call the host's dictionary",
+    "host": "host providers: workbook name, printer profiles, screen clip and argument help"
+  },
   "i18nLocales": ["de", "en", "fr", "ja", "ko", "th", "zh"],
   "entries": {
     "@libraz/formulon-cell": {
@@ -8,7 +17,6 @@
         "AutoCorrectEntry": "type",
         "AutoCorrectExceptions": "type",
         "AutoCorrectOptions": "type",
-        "AutoCorrectState": "type",
         "Audit": "type",
         "BUILT_IN_LOCALES": "value",
         "BatchCell": "type",
@@ -239,6 +247,7 @@
         "CustomFunction",
         "CustomFunctionMeta",
         "CustomFunctionReturn",
+        "AutoCorrectState",
         "CustomTableStyle",
         "DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS",
         "DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS",

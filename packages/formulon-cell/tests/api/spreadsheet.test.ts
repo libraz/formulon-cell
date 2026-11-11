@@ -306,17 +306,17 @@ describe('spreadsheet: update', () => {
     expect(legacy.spellingService().check('zork', 'en')).toBe(true);
   });
 
-  it('autoCorrect takes the host list and switches, reports user changes, and is replaced by update', async () => {
-    const onChange = vi.fn();
+  it('autoCorrect is configuration: user edits update options and report update from the user', async () => {
     const sheet = await mountSheet({
       autoCorrect: {
-        entries: () => [{ from: 'teh', to: 'the' }],
-        exceptions: () => ({ firstLetter: ['approx'], initialCaps: [] }),
+        entries: { en: [{ from: 'teh', to: 'the' }] },
+        exceptions: { en: { firstLetter: ['approx'], initialCaps: [] } },
         replaceHyperlinks: false,
         capitalizeSentences: false,
-        onChange,
       },
     });
+    const updates = vi.fn();
+    sheet.on('update', updates);
     const autoCorrect = legacyInstanceOf(sheet).autoCorrect;
     expect(autoCorrect.state()).toEqual({
       entries: [{ from: 'teh', to: 'the' }],
@@ -329,27 +329,21 @@ describe('spreadsheet: update', () => {
     });
     expect(autoCorrect.correct('teh end. monday')).toBe('the end. Monday');
     autoCorrect.add('adn', 'and');
-    expect(onChange).toHaveBeenCalledWith(
-      {
-        entries: [
-          { from: 'teh', to: 'the' },
-          { from: 'adn', to: 'and' },
-        ],
-        exceptions: { firstLetter: ['approx'], initialCaps: [] },
-        replaceAsYouType: true,
-        replaceHyperlinks: false,
-        correctTwoInitialCapitals: true,
-        capitalizeSentences: false,
-        capitalizeDays: true,
-      },
-      'en',
-    );
+    expect(sheet.options.autoCorrect?.entries?.en).toEqual([
+      { from: 'teh', to: 'the' },
+      { from: 'adn', to: 'and' },
+    ]);
+    expect(updates).toHaveBeenLastCalledWith({ keys: ['autoCorrect'], source: 'user' });
 
+    // An update replaces the configuration and is reported as the API's.
     sheet.update({ autoCorrect: null });
     expect(autoCorrect.state()).toMatchObject({
       replaceHyperlinks: true,
       capitalizeSentences: true,
     });
+    expect(updates).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keys: ['autoCorrect'], source: 'api' }),
+    );
   });
 
   it('opens and closes Spelling and AutoCorrect through dialogs', async () => {

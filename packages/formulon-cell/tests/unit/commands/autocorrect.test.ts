@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   type AutoCorrectOptions,
   AutoCorrectStore,
@@ -79,86 +79,69 @@ describe('AutoCorrect', () => {
     expect(capitalizeSentences('approx! ten', ['approx'])).toBe('approx! Ten');
   });
 
-  it('applies each switch on its own', () => {
-    let options: AutoCorrectOptions = {};
+  /** A store over `initial` that keeps each committed configuration, as a host does. */
+  const storeOver = (initial: AutoCorrectOptions, locale: () => string = () => 'en') => {
+    const commits: AutoCorrectOptions[] = [];
+    let options = initial;
     const store = new AutoCorrectStore(
       () => options,
-      () => 'ja',
+      locale,
+      (next) => {
+        options = next;
+        commits.push(next);
+      },
     );
+    return { store, commits, set: (next: AutoCorrectOptions) => (options = next) };
+  };
+
+  it('applies each switch on its own', () => {
+    const { store, set } = storeOver({}, () => 'ja');
     expect(store.correct('THe end. monday')).toBe('The end. Monday');
-    options = { correctTwoInitialCapitals: false, capitalizeSentences: false };
+    set({ correctTwoInitialCapitals: false, capitalizeSentences: false });
     expect(store.correct('THe end. monday')).toBe('THe end. Monday');
     store.update({ capitalizeDays: false });
     expect(store.correct('THe end. monday')).toBe('THe end. monday');
   });
 
-  it('takes the host exceptions per language and hands edited ones back', () => {
-    const onChange = vi.fn();
-    const store = new AutoCorrectStore(
-      () => ({
-        exceptions: (locale) =>
-          locale === 'en' ? { firstLetter: ['approx'], initialCaps: ['CDrom'] } : undefined,
-        onChange,
-      }),
-      () => 'en',
-    );
+  it('takes the exceptions per language and commits edited ones', () => {
+    const { store, commits } = storeOver({
+      exceptions: { en: { firstLetter: ['approx'], initialCaps: ['CDrom'] } },
+    });
     expect(store.correct('approx. ten CDrom')).toBe('approx. ten CDrom');
     const exceptions = { firstLetter: [], initialCaps: [] };
     store.update({ exceptions });
     expect(store.correct('approx. ten CDrom')).toBe('approx. Ten Cdrom');
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ exceptions }), 'en');
+    expect(commits.at(-1)).toEqual({ exceptions: { en: exceptions } });
   });
 
-  it('keeps edits for the session and hands the whole state to the host', () => {
-    const onChange = vi.fn();
-    let options: AutoCorrectOptions = { onChange };
+  it('commits every edit as a new configuration, keyed by language', () => {
     let locale = 'en';
-    const store = new AutoCorrectStore(
-      () => options,
-      () => locale,
-    );
+    const { store, commits, set } = storeOver({ replaceHyperlinks: false }, () => locale);
     expect(store.state()).toEqual({
       entries: symbols,
       exceptions: { firstLetter: [], initialCaps: [] },
       replaceAsYouType: true,
-      replaceHyperlinks: true,
+      replaceHyperlinks: false,
       correctTwoInitialCapitals: true,
       capitalizeSentences: true,
       capitalizeDays: true,
     });
     store.add('teh', 'the');
     expect(store.correct('teh (c)')).toBe('the ©');
-    expect(onChange).toHaveBeenLastCalledWith(
-      {
-        entries: [...symbols, { from: 'teh', to: 'the' }],
-        exceptions: { firstLetter: [], initialCaps: [] },
-        replaceAsYouType: true,
-        replaceHyperlinks: true,
-        correctTwoInitialCapitals: true,
-        capitalizeSentences: true,
-        capitalizeDays: true,
-      },
-      'en',
-    );
+    expect(commits.at(-1)).toEqual({
+      replaceHyperlinks: false,
+      entries: { en: [...symbols, { from: 'teh', to: 'the' }] },
+    });
     store.update({ replaceAsYouType: false });
     expect(store.correct('teh')).toBe('teh');
-    expect(onChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ replaceAsYouType: false }),
-      'en',
-    );
+    expect(commits.at(-1)).toMatchObject({ replaceAsYouType: false, replaceHyperlinks: false });
     store.remove('teh');
     expect(store.state().entries).toEqual(symbols);
 
+    // Another language keeps its own list and the built-in one until edited.
     locale = 'ja';
-    options = { entries: () => [{ from: 'ｘ', to: 'y' }], replaceHyperlinks: false };
-    expect(store.state()).toEqual({
-      entries: [{ from: 'ｘ', to: 'y' }],
-      exceptions: { firstLetter: [], initialCaps: [] },
-      replaceAsYouType: false,
-      replaceHyperlinks: false,
-      correctTwoInitialCapitals: true,
-      capitalizeSentences: true,
-      capitalizeDays: true,
-    });
+    expect(store.state().entries).toEqual(builtInAutoCorrectEntries('ja'));
+    set({ entries: { ja: [{ from: 'ｘ', to: 'y' }] } });
+    expect(store.state().entries).toEqual([{ from: 'ｘ', to: 'y' }]);
   });
 });

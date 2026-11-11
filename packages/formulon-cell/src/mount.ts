@@ -1,6 +1,10 @@
 import type { SheetPrintDocument } from './api/spreadsheet/types.js';
 import { CellRegistry } from './cells.js';
-import { AutoCorrectStore, registerAutoCorrect } from './commands/autocorrect.js';
+import {
+  type AutoCorrectOptions,
+  AutoCorrectStore,
+  registerAutoCorrect,
+} from './commands/autocorrect.js';
 import { registerChromePlatform } from './commands/chrome-platform.js';
 import { History } from './commands/history.js';
 import {
@@ -205,6 +209,9 @@ export const Spreadsheet = {
     const getFunctionArgumentHelp = opts.getFunctionArgumentHelp;
     const getSpellingService = opts.getSpellingService;
     const getAutoCorrectOptions = opts.getAutoCorrectOptions;
+    const setAutoCorrectOptions = opts.setAutoCorrectOptions;
+    // Without a host to keep it, a user edit lasts for this mount.
+    let ownAutoCorrect: AutoCorrectOptions | undefined;
     let uploadStatus = opts.uploadStatus ?? null;
     let macroRecording = opts.macroRecording ?? null;
     let ui = resolveSpreadsheetUiOptions(opts.ui);
@@ -316,8 +323,12 @@ export const Spreadsheet = {
 
     const store = createSpreadsheetStore();
     const autoCorrect = new AutoCorrectStore(
-      () => getAutoCorrectOptions?.(),
+      () => (getAutoCorrectOptions ? getAutoCorrectOptions() : ownAutoCorrect),
       () => i18n.locale,
+      (next) => {
+        if (setAutoCorrectOptions) setAutoCorrectOptions(next);
+        else ownAutoCorrect = next;
+      },
     );
     registerAutoCorrect(store, autoCorrect);
     const viewportSheet = viewportRangeSheet(opts.viewport, wb);

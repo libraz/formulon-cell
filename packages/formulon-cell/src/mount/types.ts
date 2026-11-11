@@ -95,8 +95,10 @@ export interface MountOptions {
   getFunctionArgumentHelp?: FunctionArgumentHelpProvider;
   /** The host's spell checker for Review > Spelling; the built-in one when it returns nothing. */
   getSpellingService?: () => SpellingService | undefined;
-  /** The host's AutoCorrect list, starting switches and change callback. */
+  /** The AutoCorrect configuration typed entries follow. */
   getAutoCorrectOptions?: () => AutoCorrectOptions | undefined;
+  /** Receives the configuration a user edit in AutoCorrect Options makes. */
+  setAutoCorrectOptions?: (next: AutoCorrectOptions) => void;
   /** Optional host-driven status bar Upload Status indicator. */
   uploadStatus?: StatusBarUploadStatus;
   /** Optional host-driven status bar Macro Recording indicator. */

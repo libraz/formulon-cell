@@ -30,6 +30,9 @@ describe('AutoCorrect on cell entry', () => {
     autoCorrect = new AutoCorrectStore(
       () => options,
       () => 'en',
+      (next) => {
+        options = next;
+      },
     );
     registerAutoCorrect(store, autoCorrect);
     const controller = new InteractionController({

@@ -40,13 +40,14 @@ const SWITCHES: readonly AutoCorrectSwitch[] = [
   'capitalizeDays',
 ];
 
-/** The host's part in AutoCorrect: a list per language, the starting switches, and a callback to
- *  keep what the user changes. `locale` is the spreadsheet's UI language. */
+/** AutoCorrect configuration: the lists per UI language and the switches. A language is keyed as
+ *  `instance.i18n.locale` reports it. The user's edits in AutoCorrect Options write a new value
+ *  here and report `update` with `source: 'user'`, so the host keeps it from `instance.options`. */
 export interface AutoCorrectOptions {
-  /** The list for `locale`, in place of the built-in one; `undefined` keeps the built-in one. */
-  readonly entries?: (locale: string) => readonly AutoCorrectEntry[] | undefined;
-  /** The exceptions for `locale`; `undefined` keeps none beyond the rules' own. */
-  readonly exceptions?: (locale: string) => AutoCorrectExceptions | undefined;
+  /** Replacement lists by language; a language not listed keeps its built-in list. */
+  readonly entries?: Readonly<Record<string, readonly AutoCorrectEntry[]>>;
+  /** Capitalisation exceptions by language; a language not listed has none beyond the rules'. */
+  readonly exceptions?: Readonly<Record<string, AutoCorrectExceptions>>;
   /** Replace text as you type; on by default. */
   readonly replaceAsYouType?: boolean;
   /** Replace internet and network paths with hyperlinks; on by default. */
@@ -57,8 +58,6 @@ export interface AutoCorrectOptions {
   readonly capitalizeSentences?: boolean;
   /** Capitalize names of days; on by default. */
   readonly capitalizeDays?: boolean;
-  /** Called with the whole state after the user changes the list or a switch. */
-  readonly onChange?: (state: AutoCorrectState, locale: string) => void;
 }
 
 const SYMBOLS: readonly AutoCorrectEntry[] = [
@@ -225,29 +224,30 @@ export const capitalizeSentences = (
   );
 };
 
-/** The AutoCorrect state of one spreadsheet. User edits last for the instance's lifetime and are
- *  handed to the host through `onChange`. */
+/** The AutoCorrect state of one spreadsheet, read from its configuration. A user edit writes a new
+ *  configuration through `commit`. */
 export class AutoCorrectStore {
   readonly #options: () => AutoCorrectOptions | undefined;
   readonly #locale: () => string;
-  readonly #edited = new Map<string, readonly AutoCorrectEntry[]>();
-  readonly #editedExceptions = new Map<string, AutoCorrectExceptions>();
-  readonly #switches: Partial<Record<AutoCorrectSwitch, boolean>> = {};
+  readonly #commit: (next: AutoCorrectOptions) => void;
 
-  constructor(options: () => AutoCorrectOptions | undefined, locale: () => string) {
+  constructor(
+    options: () => AutoCorrectOptions | undefined,
+    locale: () => string,
+    commit: (next: AutoCorrectOptions) => void,
+  ) {
     this.#options = options;
     this.#locale = locale;
+    this.#commit = commit;
   }
 
   state(): AutoCorrectState {
     const locale = this.#locale();
     const options = this.#options();
-    const on = (key: AutoCorrectSwitch): boolean => this.#switches[key] ?? options?.[key] ?? true;
+    const on = (key: AutoCorrectSwitch): boolean => options?.[key] ?? true;
     return {
-      entries:
-        this.#edited.get(locale) ?? options?.entries?.(locale) ?? builtInAutoCorrectEntries(locale),
-      exceptions:
-        this.#editedExceptions.get(locale) ?? options?.exceptions?.(locale) ?? NO_EXCEPTIONS,
+      entries: options?.entries?.[locale] ?? builtInAutoCorrectEntries(locale),
+      exceptions: options?.exceptions?.[locale] ?? NO_EXCEPTIONS,
       replaceAsYouType: on('replaceAsYouType'),
       replaceHyperlinks: on('replaceHyperlinks'),
       correctTwoInitialCapitals: on('correctTwoInitialCapitals'),
@@ -256,16 +256,21 @@ export class AutoCorrectStore {
     };
   }
 
-  /** Applies the user's change and tells the host. */
+  /** Applies the user's change as a new configuration. */
   update(patch: Partial<AutoCorrectState>): void {
     const locale = this.#locale();
-    if (patch.entries) this.#edited.set(locale, [...patch.entries]);
-    if (patch.exceptions) this.#editedExceptions.set(locale, patch.exceptions);
-    for (const key of SWITCHES) {
-      const value = patch[key];
-      if (value !== undefined) this.#switches[key] = value;
-    }
-    this.#options()?.onChange?.(this.state(), locale);
+    const options = this.#options() ?? {};
+    const switches = Object.fromEntries(
+      SWITCHES.flatMap((key) => (patch[key] === undefined ? [] : [[key, patch[key]]])),
+    ) as Partial<Record<AutoCorrectSwitch, boolean>>;
+    this.#commit({
+      ...options,
+      ...switches,
+      ...(patch.entries ? { entries: { ...options.entries, [locale]: [...patch.entries] } } : {}),
+      ...(patch.exceptions
+        ? { exceptions: { ...options.exceptions, [locale]: patch.exceptions } }
+        : {}),
+    });
   }
 
   /** Adds `from` → `to`, replacing an entry with the same `from`. */

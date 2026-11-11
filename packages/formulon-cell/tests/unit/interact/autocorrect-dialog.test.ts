@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AutoCorrectOptions } from '../../../src/commands/autocorrect.js';
 import { openAutoCorrectDialog } from '../../../src/interact/autocorrect-dialog.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 
@@ -30,11 +31,19 @@ const entries = (): string[] =>
 
 describe('AutoCorrect options dialog', () => {
   let sheet: MountedStubSheet;
-  const onChange = vi.fn();
+  let options: AutoCorrectOptions = {};
+  const setAutoCorrectOptions = vi.fn((next: AutoCorrectOptions) => {
+    options = next;
+  });
 
   beforeEach(async () => {
-    onChange.mockClear();
-    sheet = await mountStubSheet({ locale: 'en', getAutoCorrectOptions: () => ({ onChange }) });
+    options = {};
+    setAutoCorrectOptions.mockClear();
+    sheet = await mountStubSheet({
+      locale: 'en',
+      getAutoCorrectOptions: () => options,
+      setAutoCorrectOptions,
+    });
   });
 
   afterEach(() => {
@@ -52,16 +61,15 @@ describe('AutoCorrect options dialog', () => {
     expect(button('Delete').disabled).toBe(true);
   });
 
-  it('adds, replaces and deletes entries, telling the host each time', () => {
+  it('adds, replaces and deletes entries, committing each edit', () => {
     openAutoCorrectDialog(sheet.instance);
     type('fc-autocorrect-replace', 'teh');
     type('fc-autocorrect-with', 'the');
     button('Add').click();
     expect(entries()).toContain('teh→the');
-    expect(onChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ entries: expect.arrayContaining([{ from: 'teh', to: 'the' }]) }),
-      'en',
-    );
+    expect(setAutoCorrectOptions).toHaveBeenLastCalledWith({
+      entries: { en: expect.arrayContaining([{ from: 'teh', to: 'the' }]) },
+    });
     type('fc-autocorrect-replace', '(c)');
     expect(input('fc-autocorrect-with').value).toBe('©');
     button('Delete').click();
@@ -83,9 +91,8 @@ describe('AutoCorrect options dialog', () => {
       capitalizeSentences: false,
       capitalizeDays: false,
     });
-    expect(onChange).toHaveBeenLastCalledWith(
+    expect(setAutoCorrectOptions).toHaveBeenLastCalledWith(
       expect.objectContaining({ replaceAsYouType: false, replaceHyperlinks: false }),
-      'en',
     );
     button('Close').click();
     expect(dialog()).toBeNull();

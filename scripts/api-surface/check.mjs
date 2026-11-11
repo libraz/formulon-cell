@@ -239,6 +239,57 @@ for (const [entry, spec] of Object.entries(manifest.entries)) {
   }
   if (checkAbsence) for (const s of syms) scanAbsence(s, `${entry}#${s.getName()}`);
 }
+/**
+ * Configuration is data. A function anywhere under `SpreadsheetOptions` is either an event
+ * callback (events go through `on()`, D6) or data passed as code (pass the value, D24); only
+ * the keys `manifest.optionFunctionAllow` names, each a host service or behaviour hook with its
+ * reason, may hold functions.
+ */
+const optionFunctions = (rootFile) => {
+  const sym = exportsOf(rootFile).find((s) => s.getName() === 'SpreadsheetOptions');
+  if (!sym) return ['SpreadsheetOptions not exported'];
+  const found = [];
+  const seen = new Set();
+  const walk = (type, at) => {
+    if (seen.has(type)) return;
+    seen.add(type);
+    if (type.isUnion()) {
+      for (const t of type.types) walk(t, at);
+      return;
+    }
+    if (type.getCallSignatures().length > 0) {
+      found.push(at);
+      return;
+    }
+    const elem = checker.isArrayType?.(type) ? checker.getTypeArguments(type)[0] : null;
+    if (elem) {
+      walk(elem, `${at}[]`);
+      return;
+    }
+    const typeSym = type.getSymbol();
+    const decl = typeSym?.declarations?.[0];
+    // A class instance (a Workbook, an AbortSignal) is an object handed over, not configuration.
+    if (!decl || !ownFile(decl) || (typeSym.flags & ts.SymbolFlags.Class) !== 0) return;
+    for (const p of checker.getPropertiesOfType(type)) {
+      const pd = p.valueDeclaration ?? p.declarations?.[0];
+      if (pd) walk(checker.getTypeOfSymbolAtLocation(p, pd), `${at}.${p.getName()}`);
+    }
+    for (const info of checker.getIndexInfosOfType(type)) walk(info.type, `${at}[key]`);
+  };
+  const options = checker.getDeclaredTypeOfSymbol(resolve(sym));
+  for (const p of checker.getPropertiesOfType(options)) {
+    if (Object.hasOwn(manifest.optionFunctionAllow ?? {}, p.getName())) continue;
+    const pd = p.valueDeclaration ?? p.declarations?.[0];
+    if (pd) walk(checker.getTypeOfSymbolAtLocation(p, pd), `SpreadsheetOptions.${p.getName()}`);
+  }
+  return found;
+};
+{
+  const rootFile = entries.get('@libraz/formulon-cell');
+  if (rootFile && fs.existsSync(rootFile))
+    for (const at of optionFunctions(rootFile))
+      violations.push(`options: ${at} is a function (configuration is data; events use on())`);
+}
 for (const f of i18nFiles)
   if (!manifest.i18nLocales.includes(f))
     violations.push(`@libraz/formulon-cell/i18n/*: unexpected entry ${f}`);
