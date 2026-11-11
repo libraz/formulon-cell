@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit",
+    "typecheck": "vue-tsc --noEmit && tsc --noEmit -p e2e",
     "test:e2e": "../../node_modules/.bin/playwright test",
     "test:e2e:visual": "FC_VISUAL=1 ../../node_modules/.bin/playwright test e2e/visual/excel-chrome.visual.spec.ts --project='chromium*'",
     "test:e2e:visual:update": "FC_VISUAL=1 ../../node_modules/.bin/playwright test e2e/visual/excel-chrome.visual.spec.ts --project='chromium*' --update-snapshots",

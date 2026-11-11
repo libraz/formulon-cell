@@ -500,14 +500,7 @@ export async function runFormulaHelperGeometry(page: Page): Promise<void> {
     panel.style.cssText = 'position:fixed;width:452px;height:200px;box-sizing:border-box';
     owner.append(panel);
     document.body.append(owner);
-    positionFormulaHelper(panel, {
-      left: 300,
-      right: 300,
-      top: 200,
-      bottom: 220,
-      width: 0,
-      height: 20,
-    });
+    positionFormulaHelper(panel, new DOMRect(300, 200, 0, 20));
     const placed = panel.getBoundingClientRect().toJSON();
     owner.remove();
     return { alignment, placed, width: innerWidth, height: innerHeight };

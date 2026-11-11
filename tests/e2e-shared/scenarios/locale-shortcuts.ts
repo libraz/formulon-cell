@@ -56,7 +56,7 @@ export async function runLocaleShortcutsScenario(
     ['ko', '₩'],
     ['th', '฿'],
     ['en', '$'],
-  ]) {
+  ] as const) {
     await select.focus();
     await select.selectOption(locale);
     await expect(select).toBeFocused();

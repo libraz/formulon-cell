@@ -130,7 +130,7 @@ export async function runStartupFont(
     ['Reykjavík ☼', 3],
   ] as const) {
     const draw = startup.draws[text];
-    expect(draw, `missing actual canvas draw: ${text}`).toBeDefined();
+    if (!draw) throw new Error(`missing actual canvas draw: ${text}`);
     expect(draw.font).toContain(fontName);
     expect(draw.font).toContain('sans-serif');
     expect(draw.width).toBeLessThan((startup.widths[col] ?? 0) - 8);

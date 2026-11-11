@@ -14,7 +14,7 @@ const readTables = (page: Page) =>
       .map((table) => ({
         name: table.name,
         headerRow: table.getProperties().headerRow,
-        showRowStripes: table.getStyleOptions().showRowStripes,
+        showRowStripes: table.getStyleOptions()?.showRowStripes ?? null,
       })),
   );
 

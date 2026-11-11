@@ -104,11 +104,6 @@ type RuntimeSnapshot = {
 };
 
 type NativeFont = { name: string; size: number; source?: number };
-type ErrorTriangleProbe = {
-  addr: { sheet: number; row: number; col: number };
-  rect: { x: number; y: number; w: number; h: number };
-};
-
 interface SurfaceLabels {
   home: string;
   profile: string | null;
@@ -570,7 +565,7 @@ const errorTriangleCenter = async (
       ];
       const grid = document.querySelector<HTMLElement>('.fc-host__grid');
       if (!grid) throw new Error('full-check error geometry cannot find grid');
-      const hit = (gridHitState(grid).errorTriangles as ErrorTriangleProbe[]).find(
+      const hit = gridHitState(grid).errorTriangles.find(
         ({ addr }) => addr.sheet === 0 && addr.row === targetRow && addr.col === targetCol,
       );
       if (!hit) {

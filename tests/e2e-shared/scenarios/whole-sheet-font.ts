@@ -108,14 +108,16 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
     ];
     const reloaded = await WorkbookHandle.loadBytes(instance.workbook.save().bytes);
     try {
-      return [
+      const cells: [number, number][] = [
         [0, 0],
         [0, 1],
         [1048575, 16383],
-      ].map(([row, col]) => {
+      ];
+      return cells.map(([row, col]) => {
         const style = reloaded.getEffectiveStyle(0, row, col);
-        const xf = reloaded.getCellXf(style.xfIndex);
-        const font = reloaded.getFontRecord(xf.fontIndex);
+        const xf = style && reloaded.getCellXf(style.xfIndex);
+        const font = xf && reloaded.getFontRecord(xf.fontIndex);
+        if (!font) throw new Error(`no font record at R${row}C${col}`);
         return { size: font.sizePt, name: font.name };
       });
     } finally {

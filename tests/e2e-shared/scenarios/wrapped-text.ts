@@ -73,18 +73,20 @@ export async function runWrappedText(page: Page): Promise<void> {
         // height minus one Normal line pitch.
         const defaultHeight = store.getState().layout.defaultRowHeight;
         const pitch = Math.round(format.fontSize * 1.28);
+        const atFullZoom = painted[1];
+        if (!atFullZoom) throw new Error('no paint at 100% zoom');
         return {
           painted,
           height,
           expectedHeight: Math.max(
             defaultHeight,
-            painted[1].length * pitch + Math.max(0, defaultHeight - pitch),
+            atFullZoom.length * pitch + Math.max(0, defaultHeight - pitch),
           ),
         };
       },
       { locale, text },
     );
-    expect(result.painted[1].length, `${locale} wraps in the real browser font`).toBeGreaterThan(1);
+    expect(result.painted[1]?.length ?? 0, `${locale} wraps in the real browser font`).toBeGreaterThan(1);
     expect(result.painted[0], `${locale} 50%`).toEqual(result.painted[1]);
     expect(result.painted[2], `${locale} 200%`).toEqual(result.painted[1]);
     expect(result.height, `${locale} AutoFit matches painted line count`).toBe(
