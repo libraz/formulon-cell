@@ -411,6 +411,24 @@ export abstract class WorkbookHandleFormulasMethods {
   }
 
   /**
+   * Stored (en-invariant) formula text spelled in R1C1 with the profile's row / column letters,
+   * separators and function names, relative references measured from `base`. Null when the
+   * engine has no profile to localize for or cannot localize the formula.
+   */
+  localizeFormulaR1C1Text(formula: string, base: { row: number; col: number }): string | null {
+    assertAlive(this);
+    const profile = this.spreadsheetProfileId();
+    if (!this.capabilities.formulaLocale || !profile) return null;
+    return attempt(() =>
+      moduleOf(this).localizeFormula(formula, engineProfile(profile), {
+        r1c1: true,
+        baseRow: base.row,
+        baseCol: base.col,
+      }),
+    );
+  }
+
+  /**
    * Convert a formula written with a profile's display syntax back to
    * formulon's canonical en-invariant text. The conversion is intentionally
    * opt-in at this public method; setFormula and evaluation retain the

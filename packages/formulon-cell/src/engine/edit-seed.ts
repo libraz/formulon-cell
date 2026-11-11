@@ -30,6 +30,12 @@ export function formulaForEdit(
       ? wb.getFormulaForDisplay(formula)
       : formula;
   }
+  // The engine spells the references in the profile's R1C1 letters along with its separators.
+  const localized =
+    typeof wb.localizeFormulaR1C1Text === 'function'
+      ? wb.localizeFormulaR1C1Text(formula, addr)
+      : null;
+  if (localized !== null) return localized;
   let native: string | null = null;
   if (wb.capabilities.formulaR1C1 && addr.sheet >= 0 && addr.sheet < wb.sheetCount) {
     try {

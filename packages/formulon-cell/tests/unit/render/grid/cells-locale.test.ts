@@ -157,7 +157,7 @@ describe('grid formula painting follows the active language profile', () => {
       expect(a1).toContain('=SUMME(A1;$B$2)');
 
       const r1c1 = paintOne({ formula: '=SUM(A1,$B$2)', wb, r1c1: true }).texts;
-      expect(r1c1).toContain('=SUMME(R[-2]C[-2];R2C2)');
+      expect(r1c1).toContain('=SUMME(Z(-2)S(-2);Z2S2)');
     } finally {
       wb.dispose();
     }
