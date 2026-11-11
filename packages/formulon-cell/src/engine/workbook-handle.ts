@@ -124,7 +124,8 @@ export type FacadeChangeKind =
   | 'print'
   | 'cf'
   | 'validation'
-  | 'protection';
+  | 'protection'
+  | 'calc';
 
 /** A non-cell facade write: its kind, the sheet it touched (`null` for workbook scope) and, for a
  *  write to a range of cells, that range. */

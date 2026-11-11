@@ -55,6 +55,9 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- `Workbook.getCalcMode` / `setCalcMode`, `getIterative` / `updateIterative`, `getProfileId` and `listFunctionNames`. Leaving Manual recalculates what the edits made under it left dirty, and a mounted ribbon shows the new mode; `on('change')` reports the `'calc'` part.
+- `Sheet.copy({ insertBefore, newName })` copies a sheet with its cells, formats and objects; `SheetCopyOptions` is exported.
+- `Workbook.listPeople` / `getPerson` / `addPerson` / `removePerson` manage the people threaded comments name, and `Workbook.listExternalLinks` lists the external books the workbook references.
 - `SpreadsheetOptions.showAllNotes` sets Show All Notes at mount and through `update`; `instance.options.showAllNotes` reads it back. `UpdateEvent.source` is `'api'` for `update` and `'user'` when the user toggles Show All Notes from the UI.
 - Pick From Drop-down List in the cell context menu, and Alt+Down on a cell without a list validation: the text entries of the column's filled block around the active cell, the active cell left out, folded case-insensitively with the topmost spelling kept, sorted. A locked active cell on a protected sheet greys it.
 - `WorkbookHandle.sheetIndexByName`, `tableIndexByName`, `renameTable` and `updateTableStyleOptions`. Sheet and table names resolve with the engine's name rules instead of ASCII-only case folding.

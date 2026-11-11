@@ -58,6 +58,7 @@ export {
   type SaveOptions,
   type SaveResult,
   Sheet,
+  type SheetCopyOptions,
   type SheetRef,
   Workbook,
   type WorkbookChange,

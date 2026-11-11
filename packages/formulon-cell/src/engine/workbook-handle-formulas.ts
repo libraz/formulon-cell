@@ -475,20 +475,25 @@ export abstract class WorkbookHandleFormulasMethods {
     return attempt(() => wb(this).getCalcMode());
   }
 
-  /** Sets the calc-mode metadata. Returns `false` (no-op) under stub or
-   *  older engine package builds. Leaving Manual runs the recalc that the
-   *  edits made while in Manual were denied, so switching back to Auto
+  /** Sets the calc mode, throwing the engine's error for a mode it refuses. Leaving Manual runs
+   *  the recalc that the edits made while in Manual were denied, so switching back to Auto
    *  settles the sheet the way a spreadsheet does. */
-  setCalcMode(mode: CalcModeCode): boolean {
+  changeCalcMode(mode: CalcModeCode): void {
     assertAlive(this);
-    if (!this.capabilities.calcMode) return false;
-    const previous = this.calcMode();
-    if (!attemptWrite(() => wb(this).setCalcMode(mode as CalcMode))) return false;
+    const previous = wb(this).getCalcMode();
+    wb(this).setCalcMode(mode as CalcMode);
     // These methods are mixed into WorkbookHandle at runtime, so the base
     // class's own members need the cast to be visible here.
     if (previous === CALC_MODE_MANUAL && mode !== CALC_MODE_MANUAL)
       (this as unknown as WorkbookHandle).recalc();
-    return true;
+  }
+
+  /** {@link changeCalcMode}, returning `false` (no-op) under stub or older engine package builds
+   *  and when the engine refuses the mode. */
+  setCalcMode(mode: CalcModeCode): boolean {
+    assertAlive(this);
+    if (!this.capabilities.calcMode) return false;
+    return attemptWrite(() => this.changeCalcMode(mode));
   }
 
   /** The `<calcPr>` / `<workbookPr>` settings outside the calc mode, or

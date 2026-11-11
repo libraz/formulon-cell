@@ -7,6 +7,7 @@ import { setProtectionAlertSink } from '../commands/protection-alert.js';
 import { addrKey } from '../engine/address.js';
 import { hydrateThreadedCommentsFromEngine } from '../engine/annotations-sync.js';
 import { hydrateAutoFilterFromEngine } from '../engine/auto-filter-sync.js';
+import { hydrateCalcSettingsFromEngine } from '../engine/calc-settings-sync.js';
 import { hydrateCellFormatsFromEngine } from '../engine/cell-format-sync.js';
 import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
 import {
@@ -120,6 +121,12 @@ const FACADE_HYDRATORS: Readonly<Record<FacadeChangeKind, readonly SliceHydrator
   sparklineGroups: [hydrateSparklinesFromEngine],
   print: [hydratePageSetupFromEngine],
   cf: [hydrateConditionalRulesFromEngine],
+  // The calc mode and iterative settings live in the workbook alone; a new state object makes
+  // the chrome re-read them.
+  calc: [
+    (wb, store) => hydrateCalcSettingsFromEngine(wb, store),
+    (_wb, store) => store.setState((s) => ({ ...s })),
+  ],
   validation: [hydrateValidationsFromEngine],
   protection: [
     (wb, store) => hydrateProtectionFromEngine(wb, store),

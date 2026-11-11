@@ -58,6 +58,7 @@
         "Sheet": "value",
         "SheetPrintDocument": "type",
         "SheetRef": "type",
+        "SheetCopyOptions": "type",
         "Slicer": "type",
         "SpreadsheetFailure": "type",
         "SpreadsheetFeatureSwitches": "type",

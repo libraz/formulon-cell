@@ -63,6 +63,8 @@ import { SHEET_CELL_MEMBERS } from './sheet-cells.js';
 import { SHEET_FORMAT_MEMBERS, WORKBOOK_FORMAT_MEMBERS } from './sheet-format.js';
 import { SHEET_STRUCTURE_MEMBERS, WORKBOOK_NAME_MEMBERS } from './sheet-structure.js';
 import { SHEET_TABLE_MEMBERS, TABLE_MEMBERS, Table, WORKBOOK_TABLE_MEMBERS } from './table.js';
+import { WORKBOOK_CALC_MEMBERS } from './workbook-calc.js';
+import { WORKBOOK_PEOPLE_MEMBERS } from './workbook-people.js';
 
 /** File container a workbook saves to. */
 export type SaveFormat = WorkbookSaveFormat;
@@ -649,6 +651,36 @@ export class Sheet {
       ctx.handle.noteSheetChange({ kind: 'sheet-move', from, to: ctx.sheetEngine.index });
     });
   }
+
+  /** Copies the sheet with its cells, formats and objects, in front of `insertBefore` (the end
+   *  when omitted or `null`), named `newName` or `Name (2)`. Formulas in the copy keep pointing
+   *  where they pointed. */
+  copy(options: SheetCopyOptions = {}): Sheet {
+    const ctx = sheetContext(this);
+    return ctx.run(() => {
+      const source = ctx.sheetEngine.index;
+      const { insertBefore, newName } = options;
+      const copied = ctx.engine.copySheet(ctx.sheetEngine, {
+        ...(insertBefore != null ? { insertBefore: engineSheetRef(insertBefore) } : {}),
+        ...(newName !== undefined ? { newName } : {}),
+      });
+      ctx.handle.noteSheetChange({
+        kind: 'sheet-copy',
+        source,
+        index: copied.index,
+        name: copied.name,
+      });
+      return ctx.sheet(copied);
+    });
+  }
+}
+
+/** Where `Sheet.copy` puts the copy and what it calls it. */
+export interface SheetCopyOptions {
+  /** The sheet the copy goes in front of; omitted or `null` appends it. */
+  readonly insertBefore?: SheetRef | null;
+  /** The copy's name; omitted, `Name (2)` and onward. */
+  readonly newName?: string;
 }
 
 const sheetContext = (sheet: Sheet): SheetContext => {
@@ -805,6 +837,8 @@ installMembers(SHEET_HOST, SHEET_STRUCTURE_MEMBERS);
 installMembers(SHEET_HOST, SHEET_FORMAT_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_NAME_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_FORMAT_MEMBERS);
+installMembers(WORKBOOK_HOST, WORKBOOK_CALC_MEMBERS);
+installMembers(WORKBOOK_HOST, WORKBOOK_PEOPLE_MEMBERS);
 installMembers(WORKBOOK_OOXML_HOST, WORKBOOK_OOXML_MEMBERS);
 installMembers(SHEET_OOXML_HOST, SHEET_OOXML_MEMBERS);
 installMembers(SHEET_HOST, SHEET_TABLE_MEMBERS);
