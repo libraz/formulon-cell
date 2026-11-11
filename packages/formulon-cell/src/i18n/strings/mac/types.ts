@@ -228,10 +228,11 @@ export interface MacStrings {
     insert: string;
     delete: string;
     clear: string;
-    newNote: string;
+    newComment: string;
     editNote: string;
     deleteNote: string;
     formatCells: string;
+    pickFromList: string;
     insertCopiedCells: string;
     insertBand: string;
     deleteBand: string;

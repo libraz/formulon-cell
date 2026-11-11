@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { noteVisibleAt } from '../../../../src/commands/comment.js';
 import { setProtectedSheet } from '../../../../src/commands/protection.js';
-import type { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { en } from '../../../../src/i18n/strings/en.js';
 import { ja } from '../../../../src/i18n/strings/ja.js';
 import { zh } from '../../../../src/i18n/strings/zh.js';
@@ -16,7 +16,7 @@ import {
   syncOverlayPortalTheme,
 } from '../../../../src/interact/overlay-portal.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
-import { fireContextMenu, item, newWb, setFormat, visibleMenu } from './fixtures.js';
+import { fireContextMenu, item, setFormat, visibleMenu } from './fixtures.js';
 
 const label = (id: string): string | null | undefined =>
   item(id)?.querySelector('.fc-ctxmenu__label')?.textContent;
@@ -38,6 +38,7 @@ describe('context menu on the Mac platform profile', () => {
       onEditComment: () => {},
       onDefineName: () => {},
       onInsertHyperlink: () => {},
+      onPickFromList: () => {},
       onOpenHyperlink: () => {},
       onToggleWatch: () => {},
     });
@@ -50,7 +51,8 @@ describe('context menu on the Mac platform profile', () => {
     host.dataset.fcPlatform = 'mac';
     document.body.appendChild(host);
     store = createSpreadsheetStore();
-    wb = await newWb();
+    // The real engine: New Comment needs threaded comments.
+    wb = await WorkbookHandle.createDefault();
     detach = null;
   });
 
@@ -104,12 +106,44 @@ describe('context menu on the Mac platform profile', () => {
       '数式と値のクリア',
       'フィルター',
       '並べ替え',
-      '新しいメモ',
+      '新しいコメント',
       'セルの書式設定...',
+      'ドロップダウン リストから選択...',
       'ふりがなの表示',
       '名前の定義...',
       'ハイパーリンク...',
       'ハイパーリンクを開く',
+    ]);
+  });
+
+  it('groups the cell menu as the desktop does, with the note items beside New Comment', () => {
+    const groups = (): string[][] => {
+      const out: string[][] = [[]];
+      for (const node of visibleMenu()?.children ?? []) {
+        if (node.classList.contains('fc-ctxmenu__sep')) out.push([]);
+        const label = node.querySelector('.fc-ctxmenu__label')?.textContent;
+        if (node.classList.contains('fc-ctxmenu__item') && label) out[out.length - 1]?.push(label);
+      }
+      return out.filter((group) => group.length > 0);
+    };
+    attach();
+    fireContextMenu(host, 200, 70);
+    expect(groups()).toEqual([
+      ['カット', 'コピー', 'ペースト', '形式を選択してペースト'],
+      ['挿入...', '削除...', '数式と値のクリア'],
+      ['フィルター', '並べ替え'],
+      ['新しいコメント'],
+      ['セルの書式設定...', 'ドロップダウン リストから選択...', 'ふりがなの表示', '名前の定義...'],
+      ['ハイパーリンク...', 'ハイパーリンクを開く'],
+    ]);
+    document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    setFormat(store, 0, 0, { comment: 'memo' });
+    fireContextMenu(host, 200, 70);
+    expect(groups()[3]).toEqual([
+      '新しいコメント',
+      'メモの編集',
+      'メモの削除',
+      'メモの表示/非表示',
     ]);
   });
 
@@ -138,8 +172,9 @@ describe('context menu on the Mac platform profile', () => {
       '数式と値のクリア',
       'フィルター',
       '並べ替え',
-      '新しいメモ',
+      '新しいコメント',
       'セルの書式設定...',
+      'ドロップダウン リストから選択...',
       'ふりがなの表示',
       '名前の定義...',
       'ハイパーリンク...',
@@ -211,7 +246,7 @@ describe('context menu on the Mac platform profile', () => {
     expect(hint('formatCells')).toBe('⌘1');
     expect(hint('insertHyperlink')).toBe('⌘K');
     expect(hint('clear')).toBe('');
-    expect(hint('insertComment')).toBe('');
+    expect(hint('newComment')).toBe('');
     const pasteSpecial = buildMacCellEntries(ja, false).find((e) => e.id === 'pasteSpecialMenu');
     const dialog =
       pasteSpecial?.kind === 'submenu'

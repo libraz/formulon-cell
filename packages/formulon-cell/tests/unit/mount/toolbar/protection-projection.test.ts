@@ -6,8 +6,17 @@ import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
 import { stubHelpers } from './fixtures.js';
 
-const REFUSED = ['sortAsc', 'sortDesc', 'precedents', 'dependents', 'clearArrows', 'pivotRefresh'];
-const KEPT = ['bold', 'copy'];
+// Bold follows Format cells, as the write does; the formula auditing and pivot refresh never come back.
+const REFUSED = [
+  'sortAsc',
+  'sortDesc',
+  'precedents',
+  'dependents',
+  'clearArrows',
+  'pivotRefresh',
+  'bold',
+];
+const KEPT = ['copy'];
 
 describe('ribbon projection of sheet protection without a host policy', () => {
   let sheet: MountedStubSheet;
@@ -42,7 +51,7 @@ describe('ribbon projection of sheet protection without a host policy', () => {
       projection.project();
       expect(disabled()).toEqual(REFUSED);
 
-      setProtectedSheet(store, 0, true, { permissions: { sort: true } });
+      setProtectedSheet(store, 0, true, { permissions: { sort: true, formatCells: true } });
       projection.project();
       expect(disabled()).toEqual(['precedents', 'dependents', 'clearArrows', 'pivotRefresh']);
 

@@ -19,7 +19,12 @@ import {
 } from '../../commands/filter-actions.js';
 import { activeFilterRange } from '../../commands/filter-ranges.js';
 import { executeRibbonFindAction } from '../../commands/goto-special.js';
-import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
+import {
+  runAfterAllowedRangeUnlock,
+  selectionEditRanges,
+  sheetPermits,
+  unlockedCellsOption,
+} from '../../commands/protection.js';
 import { executeRibbonClearAction } from '../../commands/ribbon-clear.js';
 import { recordFormatChange } from '../../commands/slice-history.js';
 import {
@@ -256,6 +261,8 @@ const updateClearMenu =
     const disabledReason = instance.i18n.strings.ribbon.clearRequiresTarget;
     // The items follow the Clear control's own decision, so a refused control greys them all.
     const controlDenied = !canExecuteBuiltIn(instance.store, 'clearFormat', 'ribbon').allowed;
+    // Clearing hyperlinks needs Insert hyperlinks on a protected sheet, whatever the selection.
+    const hyperlinksRefused = !sheetPermits(state, range.sheet, unlockedCellsOption('hyperlink'));
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-clear]')) {
       const action = button.dataset.clear;
       if (controlDenied) {
@@ -266,7 +273,8 @@ const updateClearMenu =
         (action === 'contents' && !hasContentsSelection) ||
         (action === 'formats' && !hasFormats) ||
         (action === 'comments' && !hasComments) ||
-        ((action === 'hyperlinks' || action === 'remove-hyperlinks') && !hasHyperlinks) ||
+        ((action === 'hyperlinks' || action === 'remove-hyperlinks') &&
+          (!hasHyperlinks || hyperlinksRefused)) ||
         (action === 'conditional' && !hasConditional);
       setMenuControlDisabled(button, disabled, disabledReason);
     }

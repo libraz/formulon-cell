@@ -22,6 +22,7 @@ export const gridPopupsZh: GridPopupsStrings = {
     borders: '边框',
     clearFormat: '清除格式',
     formatCells: '设置单元格格式…',
+    pickFromList: '从下拉列表中选择…',
     selectAll: '全选',
     insert: '插入…',
     delete: '删除…',

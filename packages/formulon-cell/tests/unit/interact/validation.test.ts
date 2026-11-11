@@ -149,6 +149,45 @@ describe('attachValidationList', () => {
     handle.detach();
   });
 
+  it('Alt+Down on a cell without a list opens Pick From Drop-down List: the column block, sorted', () => {
+    for (const [row, text] of [
+      [0, 'pear'],
+      [1, 'apple'],
+      [2, 'pear'],
+      [4, 'fig'],
+      [6, 'kiwi'],
+    ] as const)
+      wb.setText({ sheet: 0, row, col: 1 }, text);
+    wb.setNumber({ sheet: 0, row: 5, col: 1 }, 7);
+    mutators.replaceCells(store, wb.cells(0));
+    mutators.setActive(store, { sheet: 0, row: 3, col: 1 });
+    const handle = attachValidationList({ grid, store, wb, onAfterCommit });
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    grid.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    // Rows 0-2 above and 4-6 below the blank-free block; numbers stay out, duplicates once.
+    expect(items().map((item) => item.textContent)).toEqual(['apple', 'fig', 'kiwi', 'pear']);
+    items()
+      .find((item) => item.textContent === 'fig')
+      ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    expect(wb.getValue({ sheet: 0, row: 3, col: 1 })).toEqual({ kind: 'text', value: 'fig' });
+    expect(handle.openPickList()).toBe(true);
+    handle.detach();
+  });
+
+  it('opens nothing from Pick From Drop-down List when the column offers no text', () => {
+    mutators.setActive(store, { sheet: 0, row: 3, col: 1 });
+    const handle = attachValidationList({ grid, store, wb, onAfterCommit });
+    expect(handle.openPickList()).toBe(false);
+    expect(popover()).toBeNull();
+    handle.detach();
+  });
+
   it('clicking an item writes the chosen value to the workbook and notifies onAfterCommit', () => {
     mutators.setCellFormat(
       store,

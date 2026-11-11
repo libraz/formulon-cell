@@ -37,6 +37,7 @@ export type ItemId =
   | 'alignRight'
   | 'borders'
   | 'formatCells'
+  | 'pickFromList'
   | 'defineName'
   | 'filterClear'
   | 'filterReapply'
@@ -60,6 +61,7 @@ export type ItemId =
   | 'rowUngroup'
   | 'colGroup'
   | 'colUngroup'
+  | 'newComment'
   | 'insertComment'
   | 'deleteComment'
   | 'showHideNote'
@@ -205,6 +207,7 @@ export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
   'alignRight',
   'borders',
   'formatCells',
+  'pickFromList',
   'defineName',
   'filterClear',
   'filterReapply',
@@ -228,6 +231,7 @@ export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
   'rowUngroup',
   'colGroup',
   'colUngroup',
+  'newComment',
   'insertComment',
   'deleteComment',
   'showHideNote',
@@ -450,6 +454,7 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'item', id: 'showHideNote', label: t.showHideNote },
     { kind: 'sep', id: 'sep4' },
     { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
+    { kind: 'item', id: 'pickFromList', label: t.pickFromList },
     { kind: 'item', id: 'defineName', label: t.defineName },
     { kind: 'sep', id: 'sep5' },
     { kind: 'item', id: 'insertHyperlink', label: t.insertHyperlink, hint: '⌘K' },
@@ -823,8 +828,9 @@ function macPasteSpecialSubmenu(s: Strings): MenuEntry {
   };
 }
 
-/** Cell menu in the Mac desktop order. A note is edited or created through
- *  the same command, so its label (and the delete row) follow `hasNote`. */
+/** Cell menu in the Mac desktop order and groups. A note cell adds its note rows beside New
+ *  Comment. Thesaurus and the macOS service rows are left out: a dictionary service and system
+ *  entries, not spreadsheet commands. */
 export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
   const t = s.contextMenu;
   const m = s.mac.contextMenu;
@@ -842,15 +848,18 @@ export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
     filterSubmenu(s),
     sortSubmenu(s),
     { kind: 'sep', id: 'sep3' },
-    { kind: 'item', id: 'insertComment', label: hasNote ? m.editNote : m.newNote },
+    { kind: 'item', id: 'newComment', label: m.newComment },
+    // A note cell adds its note items to the comment group.
     ...(hasNote
       ? ([
+          { kind: 'item', id: 'insertComment', label: m.editNote },
           { kind: 'item', id: 'deleteComment', label: m.deleteNote },
           { kind: 'item', id: 'showHideNote', label: t.showHideNote },
         ] as const)
       : []),
     { kind: 'sep', id: 'sep4' },
     { kind: 'item', id: 'formatCells', label: m.formatCells, hint: '⌘1' },
+    { kind: 'item', id: 'pickFromList', label: m.pickFromList },
     { kind: 'item', id: 'showPhonetic', label: m.showPhonetic },
     { kind: 'item', id: 'defineName', label: m.defineName },
     { kind: 'sep', id: 'sep5' },

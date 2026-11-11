@@ -22,6 +22,7 @@ export const gridPopupsFr: GridPopupsStrings = {
     borders: 'Bordures',
     clearFormat: 'Effacer la mise en forme',
     formatCells: 'Format de cellule…',
+    pickFromList: 'Liste déroulante de choix…',
     selectAll: 'Sélectionner tout',
     insert: 'Insérer…',
     delete: 'Supprimer…',

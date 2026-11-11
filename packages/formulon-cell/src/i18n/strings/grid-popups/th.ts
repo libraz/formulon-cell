@@ -22,6 +22,7 @@ export const gridPopupsTh: GridPopupsStrings = {
     borders: 'เส้นขอบ',
     clearFormat: 'ล้างการจัดรูปแบบ',
     formatCells: 'จัดรูปแบบเซลล์…',
+    pickFromList: 'เลือกจากรายการดรอปดาวน์…',
     selectAll: 'เลือกทั้งหมด',
     insert: 'แทรก…',
     delete: 'ลบ…',

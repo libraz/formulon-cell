@@ -88,6 +88,7 @@ import {
   runContextMenuStructureItem,
 } from './context-menu-structure.js';
 import { type MenuTarget, resolveContextMenuTarget } from './context-menu-target.js';
+import { openCommentDialogFrom } from './dialog-entry.js';
 import { withDialogAnchor } from './dialog-placement.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import {
@@ -139,6 +140,8 @@ export interface ContextMenuDeps {
   /** Called when the user clicks "Insert hyperlink…". When omitted the menu
    *  entry is hidden. */
   onInsertHyperlink?: () => void;
+  /** Opens Pick From Drop-down List on the active cell. When omitted the menu entry is hidden. */
+  onPickFromList?: () => void;
   /** Opens the active cell's hyperlink after the menu validates its target. */
   onOpenHyperlink?: (url: string) => void;
   /** Called when the user clicks the Add/Remove Watch entry. When omitted the
@@ -685,6 +688,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         .filter((e) => !(e.kind === 'item' && e.id === 'insertCopiedCells' && !hasCopiedCells))
         .filter((e) => !(e.kind === 'item' && hasCopiedCells && PLAIN_INSERT_IDS.includes(e.id)))
         .filter((e) => !(e.kind === 'item' && e.id === 'insertComment' && !deps.onEditComment))
+        .filter((e) => !(e.kind === 'item' && e.id === 'pickFromList' && !deps.onPickFromList))
+        .filter(
+          (e) => !(e.kind === 'item' && e.id === 'newComment' && !wb.capabilities.threadedComments),
+        )
         .filter(
           (e) =>
             !(
@@ -1370,6 +1377,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'insertHyperlink': {
         deps.onInsertHyperlink?.();
+        return;
+      }
+      case 'newComment': {
+        openCommentDialogFrom(store, 'thread', { origin: 'contextMenu', commandId: 'newComment' });
+        return;
+      }
+      case 'pickFromList': {
+        deps.onPickFromList?.();
         return;
       }
       case 'openHyperlink': {

@@ -3,7 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import type { SheetProtectionPermissions, State } from '../store/types.js';
+import type { State } from '../store/types.js';
 import { AUTO_HYPERLINK_COMMAND_ID } from './auto-hyperlink.js';
 import type { HistoryDirection, HistoryEntry } from './history.js';
 import {
@@ -31,8 +31,8 @@ import {
   isSheetProtected,
   noteChangePermitted,
   protectedSheetPermissions,
+  protectionOption,
   refusedOnProtectedSheet,
-  rowColumnOption,
   sheetPermits,
   tableChangePermitted,
   unlockedCellsOption,
@@ -61,26 +61,6 @@ const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
     ? cell
     : null;
 };
-
-/** Cell operations a Protect Sheet option lets through on a protected sheet, locked cells
- *  included; the row and column ones are `rowColumnOption`'s. Every other mutation needs an
- *  unlocked cell. */
-const CELL_PROTECTION_OPTION: Partial<
-  Record<InteractionOperation, keyof SheetProtectionPermissions>
-> = {
-  format: 'formatCells',
-  // Using an existing filter (its range): criteria, clear, reapply.
-  filter: 'autoFilter',
-  pivot: 'pivotTables',
-  // Charts, pictures, shapes, ink, slicers and sparklines: Edit objects.
-  object: 'objects',
-};
-
-/** The option a protected sheet needs for `operation`: a row/column option or a cell one. */
-const protectionOption = (
-  operation: InteractionOperation,
-): keyof SheetProtectionPermissions | undefined =>
-  rowColumnOption(operation) ?? CELL_PROTECTION_OPTION[operation];
 
 /** Whether sheet protection lets a sheet-level `operation` change `sheet`. */
 const sheetProtectionPermits = (

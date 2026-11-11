@@ -729,6 +729,30 @@ export function pickListValues(
   return out;
 }
 
+/** Pick From Drop-down List: the distinct text entries of the column's block of filled cells
+ *  above and below `row`, sorted. Formulas and non-text values are left out. */
+export function pickFromListValues(
+  cells: Iterable<{ addr: Addr; value: CellValue; formula: string | null }>,
+  col: number,
+  row: number,
+): string[] {
+  const byRow = new Map<number, { value: CellValue; formula: string | null }>();
+  for (const e of cells) {
+    if (e.addr.col === col && e.value.kind !== 'blank') byRow.set(e.addr.row, e);
+  }
+  const texts = new Set<string>();
+  const take = (r: number): boolean => {
+    const entry = byRow.get(r);
+    if (!entry) return false;
+    if (entry.formula === null && entry.value.kind === 'text' && entry.value.value.length > 0)
+      texts.add(entry.value.value);
+    return true;
+  };
+  for (let r = row - 1; r >= 0 && take(r); r -= 1);
+  for (let r = row + 1; take(r); r += 1);
+  return [...texts].sort((a, b) => a.localeCompare(b));
+}
+
 /** column-history autocomplete: when editing a plain-text cell, match
  *  what the user has typed so far against the values already entered above in
  *  the same column. `values` must already be deduped, blanks excluded, in

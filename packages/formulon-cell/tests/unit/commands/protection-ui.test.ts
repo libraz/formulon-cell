@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { BuiltInCommandId } from '../../../src/commands/built-in-command-ids.js';
 import { canExecuteBuiltIn } from '../../../src/commands/built-in-command-policy.js';
 import {
   addThreadedComment,
@@ -86,6 +87,45 @@ describe('measured protection rules of the UI', () => {
     mutators.setRange(store, { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 });
     expect(canExecuteBuiltIn(store, 'clear', 'contextMenu').allowed).toBe(true);
     expect(canExecuteBuiltIn(store, 'clearFormat', 'ribbon').allowed).toBe(true);
+  });
+
+  it('keeps the option-gated items off on unlocked cells and the selection-gated ones by the cells', async () => {
+    const { store } = await setup();
+    const decide = (id: BuiltInCommandId) => canExecuteBuiltIn(store, id, 'contextMenu').allowed;
+    for (const col of [1, 2])
+      mutators.setCellFormat(store, { sheet: 0, row: 2, col }, { locked: false });
+    setProtectedSheet(store, 0, true);
+    const OPTION_GATED: BuiltInCommandId[] = [
+      'formatCells',
+      'showPhonetic',
+      'editPhonetic',
+      'defineName',
+      'dataValidation',
+      'insertHyperlink',
+      'bold',
+    ];
+    const ALWAYS: BuiltInCommandId[] = ['namedRanges', 'mac.formulas.namesManager', 'newComment'];
+    const select = (range: { r0: number; c0: number; r1: number; c1: number }): void => {
+      mutators.setActive(store, { sheet: 0, row: range.r0, col: range.c0 });
+      mutators.setRange(store, { sheet: 0, ...range });
+    };
+    // Every selected cell unlocked (B3:C3), active B3.
+    select({ r0: 2, c0: 1, r1: 2, c1: 2 });
+    for (const id of OPTION_GATED) expect(decide(id), id).toBe(false);
+    for (const id of ALWAYS) expect(decide(id), id).toBe(true);
+    expect(decide('clear')).toBe(true);
+    expect(decide('pickFromList')).toBe(true);
+    // A locked active cell (B2:B4, active B2) greys Clear and Pick From Drop-down List too.
+    select({ r0: 1, c0: 1, r1: 3, c1: 1 });
+    for (const id of OPTION_GATED) expect(decide(id), id).toBe(false);
+    for (const id of ALWAYS) expect(decide(id), id).toBe(true);
+    expect(decide('clear')).toBe(false);
+    expect(decide('pickFromList')).toBe(false);
+    // Format cells brings the formatting items back; Define Name and Data Validation stay off.
+    setProtectedSheet(store, 0, true, { permissions: { formatCells: true } });
+    for (const id of ['formatCells', 'showPhonetic', 'bold'] as const)
+      expect(decide(id), id).toBe(true);
+    for (const id of ['defineName', 'dataValidation'] as const) expect(decide(id), id).toBe(false);
   });
 
   it('opens no filter dropdown on a protected sheet without Use AutoFilter', async () => {

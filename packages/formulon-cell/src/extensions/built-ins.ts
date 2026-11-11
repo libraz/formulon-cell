@@ -57,7 +57,7 @@ import { attachSessionCharts } from '../interact/session-charts.js';
 import { attachSessionIllustrations } from '../interact/session-illustrations.js';
 import { attachSlicer } from '../interact/slicer.js';
 import { attachStatusBar } from '../interact/status-bar.js';
-import { attachValidationList } from '../interact/validation.js';
+import { attachValidationList, type ValidationListHandle } from '../interact/validation.js';
 import { attachViewToolbar } from '../interact/view-toolbar.js';
 import { attachWatchPanel } from '../interact/watch-panel.js';
 import { attachWheel } from '../interact/wheel.js';
@@ -668,6 +668,7 @@ export const validation = (): Extension =>
         });
       let handle = attach(ctx.workbook);
       return {
+        openPickList: () => handle.openPickList(),
         rebindWorkbook: (wb) => {
           handle.detach();
           handle = attach(wb);
@@ -786,6 +787,10 @@ export const contextMenu = (): Extension =>
               .resolve<ExtensionHandle & HyperlinkDialogHandle>('hyperlink')
               ?.open({ origin: 'contextMenu', commandId: 'insertHyperlink' }),
           onEditComment: () => callOpen('commentDialog'),
+          onPickFromList: () =>
+            ctx
+              .resolve<ExtensionHandle & Pick<ValidationListHandle, 'openPickList'>>('validation')
+              ?.openPickList(),
           onDefineName: () =>
             ctx
               .resolve<ExtensionHandle & NamedRangeDialogHandle>('namedRanges')

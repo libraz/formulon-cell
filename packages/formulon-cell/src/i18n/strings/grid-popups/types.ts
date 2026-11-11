@@ -24,6 +24,7 @@ export interface GridPopupsStrings {
     borders: string;
     clearFormat: string;
     formatCells: string;
+    pickFromList: string;
     selectAll: string;
     insert: string;
     delete: string;

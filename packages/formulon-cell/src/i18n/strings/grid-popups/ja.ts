@@ -22,6 +22,7 @@ export const gridPopupsJa: GridPopupsStrings = {
     borders: '罫線',
     clearFormat: '書式のクリア',
     formatCells: 'セルの書式設定…',
+    pickFromList: 'ドロップダウン リストから選択…',
     selectAll: 'すべて選択',
     insert: '挿入…',
     delete: '削除…',

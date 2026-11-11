@@ -117,8 +117,8 @@ export const unlockedCellsOption = (
 
 /** Commands a protected sheet refuses whatever its Protect Sheet options: the formula auditing
  *  arrows (trace precedents/dependents/error, remove arrows), inserting or refreshing a pivot
- *  report, the sheet background, cell styles (Format > Style), a What-If Data Table and inserting
- *  sparklines. */
+ *  report, the sheet background, cell styles (Format > Style), a What-If Data Table, inserting
+ *  sparklines, Define Name and Data Validation. */
 const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'precedents',
   'dependents',
@@ -141,6 +141,17 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'mac.insert.sparkline',
   // Refused by the insertion itself whatever the sheet's options.
   'insertCopiedCells',
+  // Define Name and Create from Selection; the Name Manager stays available.
+  'defineName',
+  'mac.formulas.defineName',
+  'mac.formulas.createFromSelection',
+  'mac.formulas.createNames.topRow',
+  'mac.formulas.createNames.bottomRow',
+  'mac.formulas.createNames.leftColumn',
+  'mac.formulas.createNames.rightColumn',
+  // The Data Validation dialog.
+  'dataValidation',
+  'mac.data.validation.settings',
 ]);
 
 /** Outline structure commands: Group, Ungroup and the outline settings (summary position). Any
@@ -206,6 +217,27 @@ const ROW_COLUMN_OPTION: Partial<Record<InteractionOperation, keyof SheetProtect
   resizeRows: 'formatRows',
   resizeColumns: 'formatColumns',
 };
+
+/** Cell operations a Protect Sheet option lets through on a protected sheet, locked cells
+ *  included; the row and column ones are `rowColumnOption`'s. Every other mutation needs an
+ *  unlocked cell. */
+const CELL_PROTECTION_OPTION: Partial<
+  Record<InteractionOperation, keyof SheetProtectionPermissions>
+> = {
+  // Format Cells, the phonetic settings and every formatting command, whatever the selection.
+  format: 'formatCells',
+  // Using an existing filter (its range): criteria, clear, reapply.
+  filter: 'autoFilter',
+  pivot: 'pivotTables',
+  // Charts, pictures, shapes, ink, slicers and sparklines: Edit objects.
+  object: 'objects',
+};
+
+/** The option a protected sheet needs for `operation`: a row/column option or a cell one. */
+export const protectionOption = (
+  operation: InteractionOperation,
+): keyof SheetProtectionPermissions | undefined =>
+  rowColumnOption(operation) ?? CELL_PROTECTION_OPTION[operation];
 
 /** Whether a row (column) insert or delete over `range` moves only part of its rows (columns):
  *  a cell shift, or a table's own rows or columns. A protected sheet refuses those whatever its

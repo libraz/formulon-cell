@@ -1,5 +1,4 @@
-import type { CellInputAlert } from '../commands/cell-input-commit.js';
-import { writeInput } from '../commands/coerce-input.js';
+import { type CellInputAlert, commitCellInput } from '../commands/cell-input-commit.js';
 import { blockDataTableCells } from '../commands/data-table-guard.js';
 import {
   deferForAllowedRangeUnlock,
@@ -17,6 +16,7 @@ import { gridHitState } from '../render/grid.js';
 import { validationAt } from '../store/range-validations.js';
 import { renderScale } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { pickFromListValues } from './autocomplete.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
@@ -30,6 +30,8 @@ export interface ValidationListDeps {
 }
 
 export interface ValidationListHandle {
+  /** Opens Pick From Drop-down List on the active cell; false when the column offers nothing. */
+  openPickList(): boolean;
   detach(): void;
 }
 
@@ -74,6 +76,19 @@ export interface ValidationAlertHandle {
  * Hit-tests against the chevron rect surfaced by the renderer; clicking opens
  * a popover, picking writes the chosen value to the cell.
  */
+
+/** The active value of a cell as the list shows it selected. */
+const cellText = (
+  s: ReturnType<SpreadsheetStore['getState']>,
+  row: number,
+  col: number,
+): string => {
+  const current = s.data.cells.get(addrKey({ sheet: s.data.sheetIndex, row, col }))?.value;
+  if (current?.kind === 'text') return current.value;
+  if (current?.kind === 'number') return String(current.value);
+  if (current?.kind === 'bool') return current.value ? 'TRUE' : 'FALSE';
+  return '';
+};
 
 export function attachValidationList(deps: ValidationListDeps): ValidationListHandle {
   const { grid, store, wb } = deps;
@@ -135,11 +150,9 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
       close();
       return;
     }
-    try {
-      writeInput(wb, addr, value, store);
-    } catch (err) {
-      console.warn('formulon-cell: validation write failed', err);
-    }
+    // The pick is a typed entry: one authorized, undoable cell write.
+    const result = commitCellInput({ store, wb, addr, raw: value, origin: 'editor' });
+    if (result.status === 'failed') console.warn('formulon-cell: list pick failed', result.error);
     deps.onAfterCommit();
     close();
   };
@@ -148,8 +161,11 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     close();
     if (list.length === 0) return;
     const rect = grid.getBoundingClientRect();
-    const chevron = gridHitState(grid).validationChevron;
-    if (!chevron) return;
+    // A list validation hangs from its chevron; Pick From Drop-down List from the cell itself.
+    const painted = gridHitState(grid).validationChevron;
+    const chevron = painted && painted.row === row && painted.col === col ? painted : null;
+    const state = store.getState();
+    const cell = chevron?.cell ?? cellRect(layoutForView(state), state.viewport, row, col);
 
     const div = document.createElement('div');
     div.className = 'fc-validation-list';
@@ -158,11 +174,10 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     const macPt = isMacHost(grid)
       ? fontPointsToCssPx(1) * renderScale(store.getState().layout, store.getState().viewport)
       : undefined;
-    if (macPt !== undefined) {
-      const { cell } = chevron;
+    if (macPt !== undefined || !chevron) {
       div.style.left = `${rect.left + cell.x}px`;
       div.style.top = `${rect.top + cell.y + cell.h}px`;
-      div.style.width = `${cell.w + 4 * macPt}px`;
+      if (macPt !== undefined) div.style.width = `${cell.w + 4 * macPt}px`;
     } else {
       div.style.left = `${rect.left + chevron.rect.x}px`;
       div.style.top = `${rect.top + chevron.rect.y + chevron.rect.h}px`;
@@ -230,19 +245,8 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     const s = store.getState();
     const validation = validationAt(s.format, { sheet: s.data.sheetIndex, row, col });
     if (validation?.kind !== 'list') return false;
-    const current = s.data.cells.get(addrKey({ sheet: s.data.sheetIndex, row, col }))?.value;
-    const currentValue =
-      current?.kind === 'text'
-        ? current.value
-        : current?.kind === 'number'
-          ? String(current.value)
-          : current?.kind === 'bool'
-            ? current.value
-              ? 'TRUE'
-              : 'FALSE'
-            : '';
     const values = resolveListValues(validation, makeRangeResolver(wb, s.data.sheetIndex));
-    open(row, col, values, currentValue);
+    open(row, col, values, cellText(s, row, col));
     return values.length > 0;
   };
 
@@ -276,10 +280,20 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     openForCell(chevron.row, chevron.col);
   };
 
+  /** Pick From Drop-down List: the column's entries around the active cell. */
+  const openPickList = (): boolean => {
+    const s = store.getState();
+    const { row, col } = s.selection.active;
+    const values = pickFromListValues(wb.cells(s.data.sheetIndex), col, row);
+    open(row, col, values, cellText(s, row, col));
+    return values.length > 0;
+  };
+
   const onGridKeyDown = (e: KeyboardEvent): void => {
     if (!e.altKey || e.key !== 'ArrowDown') return;
     const active = store.getState().selection.active;
-    if (!openForCell(active.row, active.col)) return;
+    // A list validation opens its own list; any other cell opens Pick From Drop-down List.
+    if (!openForCell(active.row, active.col) && !openPickList()) return;
     e.preventDefault();
     e.stopPropagation();
   };
@@ -289,6 +303,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
   grid.addEventListener('keydown', onGridKeyDown, true);
 
   return {
+    openPickList,
     detach() {
       close();
       grid.removeEventListener('pointerdown', onDown, true);

@@ -20,11 +20,12 @@ import type {
 import { valuesOnlyClipboard } from './interaction-policy.js';
 import { outlineDetailAxis } from './outline.js';
 import {
+  isCellWritable,
   isPartialShift,
   noteChangePermitted,
+  protectionOption,
   rangeCellsWritable,
   refusedOnProtectedSheet,
-  rowColumnOption,
   sheetPermits,
   tableChangePermitted,
   unlockedCellsOption,
@@ -108,6 +109,9 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   sortAsc: 'sort',
   sortDesc: 'sort',
   insertComment: 'comment',
+  newComment: 'comment',
+  // Pick From Drop-down List edits the active cell.
+  pickFromList: 'valueEdit',
   deleteComment: 'comment',
   insertHyperlink: 'hyperlink',
   showPhonetic: 'format',
@@ -430,7 +434,8 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   autosumFormula: 'formulaEdit',
   avg: 'formulaEdit',
   clearArrows: null,
-  clearFormat: 'format',
+  // The Home Clear control's face: decided as clearing, by the selection, not by Format cells.
+  clearFormat: 'clear',
   colGroup: 'resizeColumns',
   colHide: 'resizeColumns',
   colUngroup: 'resizeColumns',
@@ -637,6 +642,7 @@ const CLEAR_CONTROL_COMMANDS: ReadonlySet<string> = new Set(['clear', 'clearForm
 
 /** Commands that change threaded comments, which sheet protection never decides. */
 const THREAD_COMMANDS: ReadonlySet<string> = new Set([
+  'newComment',
   'mac.insert.newComment',
   'mac.review.newComment',
   'mac.review.deleteComment',
@@ -644,6 +650,7 @@ const THREAD_COMMANDS: ReadonlySet<string> = new Set([
 
 /** Commands that start a thread at the active cell, which a cell holding a note cannot take. */
 const THREAD_ADD_COMMANDS: ReadonlySet<string> = new Set([
+  'newComment',
   'mac.insert.newComment',
   'mac.review.newComment',
 ]);
@@ -806,6 +813,7 @@ export const builtInCommandIntent = (
     effects = [{ kind: 'sheet', sheet: selection.sheet }];
   // A command on an existing report or table is decided on the one the active cell is in.
   else if (report) effects = [{ kind: 'range', range: report }];
+  else if (id === 'pickFromList') effects = [{ kind: 'cells', cells: [state.selection.active] }];
   else if (band) effects = [{ kind: 'range', range: band }];
   else if (operation === 'format')
     effects = [selection, ...(state.selection.extraRanges ?? [])].map(
@@ -839,7 +847,7 @@ export const builtInProtectionDecision = (
       : null;
   const partial = shift !== null && operation !== null && isPartialShift(operation, shift);
   const option = operation
-    ? (unlockedCellsOption(operation) ?? rowColumnOption(operation))
+    ? (unlockedCellsOption(operation) ?? protectionOption(operation))
     : undefined;
   // Turning AutoFilter on or off is refused on a protected sheet; using a filter needs Use AutoFilter.
   const filterRefused =
@@ -854,6 +862,8 @@ export const builtInProtectionDecision = (
     (operation === 'table' && !tableChangePermitted(state, sheet)) ||
     partial ||
     noteCommandRefused(state, id, operation) ||
+    // Pick From Drop-down List edits the active cell, so a locked one greys it.
+    (id === 'pickFromList' && !isCellWritable(state, state.selection.active)) ||
     // Clearing is all or nothing, so a locked selected cell greys Clear Contents and the whole
     // Home Clear control.
     (CLEAR_CONTROL_COMMANDS.has(id) &&

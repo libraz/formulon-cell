@@ -95,15 +95,22 @@ describe('defined-name writes under the interaction policy', () => {
     ['without a policy', undefined],
     ['under an allow-all policy', allowAll],
   ] as const satisfies readonly (readonly [string, InteractionPolicy | undefined])[]) {
-    it(`ignores sheet and workbook-structure protection ${label}`, async () => {
+    it(`writes names under workbook-structure protection ${label}; Define Name is refused on a protected sheet`, async () => {
       const { store, controller, names, define } = await setup();
       controller.setPolicy(policy);
-      setProtectedSheet(store, 0, true);
       setWorkbookStructureProtected(store, true);
       for (const id of NAME_IDS) {
         expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(true);
       }
       expect(define('Total')).toMatchObject({ ok: true });
+      setProtectedSheet(store, 0, true);
+      // Define Name and Create from Selection are unavailable; the Name Manager stays.
+      for (const id of NAME_IDS) {
+        expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(
+          id === 'namedRanges' || id === 'mac.formulas.namesManager',
+        );
+      }
+      expect(define('Other')).toMatchObject({ ok: false, decision: { code: 'protected' } });
       expect(names()).toEqual(['Total']);
     });
   }

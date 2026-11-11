@@ -22,6 +22,7 @@ export const gridPopupsKo: GridPopupsStrings = {
     borders: '테두리',
     clearFormat: '서식 지우기',
     formatCells: '셀 서식…',
+    pickFromList: '드롭다운 목록에서 선택…',
     selectAll: '모두 선택',
     insert: '삽입…',
     delete: '삭제…',

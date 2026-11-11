@@ -442,6 +442,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
           pasteSpecialDialog?.open(undefined, { origin: 'contextMenu', commandId: 'pasteSpecial' }),
         onInsertHyperlink: () =>
           getHyperlinkDialog()?.open({ origin: 'contextMenu', commandId: 'insertHyperlink' }),
+        onPickFromList: flags.validation ? () => validation?.openPickList() : undefined,
         onOpenHyperlink: (url) => {
           followHyperlink({ store, wb, ...hyperlinkFollow }, url);
         },

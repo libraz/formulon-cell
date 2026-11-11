@@ -135,6 +135,8 @@ describe('attachContextMenu', () => {
       'deleteComment',
       'showHideNote',
       'formatCells',
+      // Placed as the desktop Windows menu documents it; not measured on this host.
+      'pickFromList',
       'defineName',
       'insertHyperlink',
       'openHyperlink',

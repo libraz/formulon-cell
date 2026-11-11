@@ -43,9 +43,15 @@ versioning is [SemVer](https://semver.org/).
 - **Breaking:** The instance facade's `clipboard.pasteSpecial` returns a `ChangeBatchResult` instead of a boolean.
 - **Breaking:** `InteractionPolicy.batchDenied` and `BatchDeniedMode` are removed; a cell batch is refused as a whole by its first refused cell.
 - **Breaking:** The `moveCells` interaction operation is removed. Cut, drag-move and Insert Copied Cells are decided as the paste and insert they perform.
+- On a protected sheet, Format Cells, the phonetic commands and every formatting command need the Format cells option whatever the selection, as writes already did; Define Name, Create from Selection and Data Validation are unavailable, while the Name Manager and New Comment stay available.
+- The Home Clear control is decided by the selected cells, and its Clear Hyperlinks item needs the Insert hyperlinks option on a protected sheet.
+- The Mac cell context menu follows the desktop order and groups, with New Comment and the note rows beside it.
+- A pick from a validation list is an authorized, undoable cell entry.
+- **Breaking:** `Strings.mac.contextMenu.newNote` is now `newComment`.
 
 ### Added
 
+- Pick From Drop-down List in the cell context menu, and Alt+Down on a cell without a list validation: the distinct text entries of the column's filled block around the active cell, sorted. A locked active cell on a protected sheet greys it.
 - `WorkbookHandle.sheetIndexByName`, `tableIndexByName`, `renameTable` and `updateTableStyleOptions`. Sheet and table names resolve with the engine's name rules instead of ASCII-only case folding.
 - `ChartPlacement` is exported for `createSessionChart` placements.
 
