@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { customPivotTableStyleId } from '../../../../src/commands/format-as-table.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
@@ -52,6 +52,16 @@ vi.setConfig({ testTimeout: 20_000 });
 describe('Spreadsheet.mountToolbar', () => {
   let sheet: MountedStubSheet;
   let host: HTMLElement;
+  // The PivotTable tabs need a report on the real engine; the tests only read it, so they share one.
+  let pivotSheet: MountedStubSheet;
+
+  beforeAll(async () => {
+    pivotSheet = await mountPivotSheet();
+  });
+
+  afterAll(() => {
+    pivotSheet.dispose();
+  });
 
   beforeEach(async () => {
     sheet = await mountStubSheet({ locale: 'en' });
@@ -176,10 +186,8 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('wires every registered dynamic ribbon dropdown to a rendered button and menu', async () => {
-    // A contextual tab shows only while its kind of object is selected; the
-    // PivotTable tabs need a report on the real engine.
+    // A contextual tab shows only while its kind of object is selected.
     const rendered = new Set<string>();
-    const pivotSheet = await mountPivotSheet();
     const contexts = [
       ...CONTEXTUAL_SELECTIONS.map((select) => () => {
         select(sheet.instance.store);
@@ -229,7 +237,6 @@ describe('Spreadsheet.mountToolbar', () => {
       }
       tb.dispose();
     }
-    pivotSheet.dispose();
     expect(new Set(Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND)).size).toBe(
       Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND).length,
     );
@@ -237,12 +244,10 @@ describe('Spreadsheet.mountToolbar', () => {
   }, 30_000);
 
   it('opens every dropdown and gallery command menu from primary click', async () => {
-    // A contextual tab shows only while its kind of object is selected; the
-    // PivotTable tabs need a report on the real engine.
+    // A contextual tab shows only while its kind of object is selected.
     const misses = new Set<string>(
       Array.from(RIBBON_DYNAMIC_MENU_FIRST_COMMANDS, (c) => `${c}:missing`),
     );
-    const pivotSheet = await mountPivotSheet();
     const contexts = [
       ...CONTEXTUAL_SELECTIONS.map((select) => () => {
         select(sheet.instance.store);
@@ -281,7 +286,6 @@ describe('Spreadsheet.mountToolbar', () => {
       }
       tb.dispose();
     }
-    pivotSheet.dispose();
 
     expect([...misses]).toEqual([]);
   });
@@ -486,7 +490,6 @@ describe('Spreadsheet.mountToolbar', () => {
       }
       tb.dispose();
     }
-    const pivotSheet = await mountPivotSheet();
     const pivotTb = Spreadsheet.mountToolbar(host, pivotSheet.instance, {
       ribbonTabs: RIBBON_TABS,
       helpers: stubHelpers(),
@@ -495,14 +498,12 @@ describe('Spreadsheet.mountToolbar', () => {
       rendered.add(button.dataset.ribbonCommand ?? '');
     }
     pivotTb.dispose();
-    pivotSheet.dispose();
 
     expect([...rendered].sort()).toEqual([...new Set(ribbonActivatableSurfaceCommandIds())].sort());
   });
 
   it('renders disabled activation commands with disabled accessibility state', async () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
-    const pivotSheet = await mountPivotSheet();
     const pivotHost = document.createElement('div');
     document.body.appendChild(pivotHost);
     const pivotTb = Spreadsheet.mountToolbar(pivotHost, pivotSheet.instance, {
@@ -530,7 +531,6 @@ describe('Spreadsheet.mountToolbar', () => {
     }
 
     pivotTb.dispose();
-    pivotSheet.dispose();
     pivotHost.remove();
     tb.dispose();
   });
@@ -757,9 +757,7 @@ describe('Spreadsheet.mountToolbar', () => {
       variant: 'bandedFirstCol',
     });
     const renderedKeys = new Set<string>();
-    // A contextual tab shows only while its kind of object is selected; the
-    // PivotTable tabs need a report on the real engine.
-    const pivotSheet = await mountPivotSheet();
+    // A contextual tab shows only while its kind of object is selected.
     const contexts = [
       ...CONTEXTUAL_SELECTIONS.map((select) => () => {
         select(sheet.instance.store);
@@ -782,7 +780,6 @@ describe('Spreadsheet.mountToolbar', () => {
       }
       tb.dispose();
     }
-    pivotSheet.dispose();
 
     const missing = Array.from(DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS)
       .filter((key) => !renderedKeys.has(key))

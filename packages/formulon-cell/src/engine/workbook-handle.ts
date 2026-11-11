@@ -1168,11 +1168,20 @@ export class WorkbookHandle {
     this.storeMirror.flushViewState();
     // Manual calculation still recalculates before saving unless the
     // workbook turned that off.
-    if (!options.snapshot && this.isManualCalcMode() && this.calcSettings()?.calcOnSave !== false) {
+    const calcOnSave = this.isManualCalcMode() && this.calcSettings()?.calcOnSave !== false;
+    if (calcOnSave && !options.snapshot) {
       this.recalc();
       this.storeMirror.refreshCells();
     }
-    const raw = this.wb.saveWithDiagnostics(SAVE_FORMAT[format]);
+    // The engine save runs the Manual-mode calc-on-save itself, so a snapshot turns it off.
+    const suspend = calcOnSave && options.snapshot === true;
+    if (suspend) this.setCalcSetting('calcOnSave', false);
+    let raw: ReturnType<typeof this.wb.saveWithDiagnostics>;
+    try {
+      raw = this.wb.saveWithDiagnostics(SAVE_FORMAT[format]);
+    } finally {
+      if (suspend) this.setCalcSetting('calcOnSave', true);
+    }
     this.saveLosses = saveDiagnosticsFromEngine(raw);
     return { bytes: raw.bytes, diagnostics: { ...this.saveLosses } };
   }

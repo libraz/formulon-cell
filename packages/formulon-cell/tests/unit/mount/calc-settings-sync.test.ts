@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { solveMacGoalSeek } from '../../../src/commands/mac-data-tools.js';
 import { setR1C1ReferenceStyle } from '../../../src/commands/view.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -93,6 +93,49 @@ describe.skipIf(!canLoadWasm())('calc settings follow the workbook', () => {
     });
     expect(result.ok).toBe(true);
     expect(workbook.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 10 });
+    expect(workbook.calcSettings()?.calcOnSave).toBe(true);
+  });
+
+  it('takes a Manual snapshot without events, undo steps or recalculation', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    sheet = await mountStubSheet({ workbook });
+    workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+    workbook.setFormula({ sheet: 0, row: 0, col: 1 }, '=A1*10');
+    workbook.setCalcMode(1);
+    workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 2);
+    const changes = vi.fn();
+    const facadeChanges = vi.fn();
+    const offChanges = workbook.subscribe(changes);
+    const offFacade = workbook.subscribeFacadeChanges(facadeChanges);
+    const { history } = sheet.instance;
+    const undoable = history.canUndo();
+    workbook.save({ snapshot: true });
+    offChanges();
+    offFacade();
+    expect(changes).not.toHaveBeenCalled();
+    expect(facadeChanges).not.toHaveBeenCalled();
+    expect(history.canUndo()).toBe(undoable);
+    expect(workbook.calcSettings()?.calcOnSave).toBe(true);
+    // The pending recalculation is still pending: a user save runs it.
+    expect(workbook.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 10 });
+    workbook.save();
+    expect(workbook.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 20 });
+  });
+
+  it('restores calculate-on-save when a snapshot save fails', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    workbook.setCalcMode(1);
+    const engine = (workbook as unknown as { wb: { saveWithDiagnostics: () => unknown } }).wb;
+    const failing = vi.spyOn(engine, 'saveWithDiagnostics').mockImplementation(() => {
+      throw new Error('write failed');
+    });
+    try {
+      expect(() => workbook.save({ snapshot: true })).toThrow('write failed');
+    } finally {
+      failing.mockRestore();
+    }
+    expect(workbook.calcSettings()?.calcOnSave).toBe(true);
+    workbook.dispose();
   });
 
   it('hydrates Set precision as displayed so typed numbers round', async () => {
