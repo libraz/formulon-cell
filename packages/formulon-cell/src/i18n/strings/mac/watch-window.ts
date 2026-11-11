@@ -22,7 +22,7 @@ export const macWatchWindowJa: MacWatchWindowStrings = {
   remove: '削除',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: add, remove. */
 export const macWatchWindowDe: MacWatchWindowStrings = {
   title: 'Überwachungsfenster',
   close: 'Schließen',
@@ -38,7 +38,7 @@ export const macWatchWindowFr: MacWatchWindowStrings = {
   remove: 'Supprimer',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: add, remove. */
 export const macWatchWindowZh: MacWatchWindowStrings = {
   title: '监视窗口',
   close: '关闭',
@@ -46,7 +46,7 @@ export const macWatchWindowZh: MacWatchWindowStrings = {
   remove: '删除',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: add, remove. */
 export const macWatchWindowKo: MacWatchWindowStrings = {
   title: '조사식 창',
   close: '닫기',

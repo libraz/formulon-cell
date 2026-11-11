@@ -69,16 +69,16 @@ export const macTextToColumnsWizardJa: TextToColumnsWizardStrings = {
   finish: '完了',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 6 more. */
 export const macTextToColumnsWizardDe: TextToColumnsWizardStrings = {
   title: 'Textkonvertierungs-Assistent - Schritt {step} von 3',
   step1Intro:
     'Der Textkonvertierungs-Assistent hat erkannt, dass Ihre Daten mit Trennzeichen versehen sind.',
   step1Prompt:
     'Klicken Sie auf „Weiter“, oder wählen Sie den Dateityp, der Ihre Daten am besten beschreibt.',
-  delimitedHint: '- Felder werden durch Zeichen wie Kommas oder Tabstopps getrennt.',
+  delimitedHint: '- Zeichen wie z.B. Kommas oder Tabstopps trennen die Felder.',
   fixedWidth: 'Feste Breite',
-  fixedHint: '- Felder sind in Spalten ausgerichtet, mit Leerzeichen zwischen den Feldern.',
+  fixedHint: '- Felder sind in Spalten ausgerichtet, mit Leerzeichen zwischen jedem Feld.',
   preview: 'Vorschau der markierten Daten:',
   step2Prompt: 'Wählen Sie die Trennzeichen für Ihre Daten.',
   fixedPrompt: 'Legen Sie die Feldbreiten fest.',
@@ -96,15 +96,15 @@ export const macTextToColumnsWizardDe: TextToColumnsWizardStrings = {
   general: 'Standard',
   text: 'Text',
   date: 'Datum:',
-  skip: 'Spalte nicht importieren (überspringen)',
+  skip: 'Spalten nicht importieren (überspringen)',
   destination: 'Ziel:',
-  details: 'Weitere...',
+  details: 'Erweitert...',
   back: '< Zurück',
   next: 'Weiter >',
   finish: 'Fertig stellen',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 8 more. */
 export const macTextToColumnsWizardFr: TextToColumnsWizardStrings = {
   title: 'Assistant Conversion - Étape {step} sur 3',
   step1Intro: 'L’Assistant a déterminé que vos données sont délimitées.',
@@ -112,8 +112,8 @@ export const macTextToColumnsWizardFr: TextToColumnsWizardStrings = {
     'Cliquez sur Suivant, ou choisissez le type de fichier qui décrit le mieux vos données.',
   delimitedHint: '- Des caractères tels que des virgules ou des tabulations séparent chaque champ.',
   fixedWidth: 'Largeur fixe',
-  fixedHint: '- Les champs sont alignés en colonnes avec des espaces entre chaque champ.',
-  preview: 'Aperçu des données sélectionnées :',
+  fixedHint: '- Les champs sont alignés en colonnes et séparés par des espaces.',
+  preview: 'Aperçu des données sélectionnées :',
   step2Prompt: 'Choisissez les séparateurs de vos données.',
   fixedPrompt: 'Définissez la largeur des champs.',
   fixedSteps: [
@@ -121,9 +121,9 @@ export const macTextToColumnsWizardFr: TextToColumnsWizardStrings = {
     'Pour supprimer un saut, double-cliquez dessus.',
     'Pour déplacer un saut, faites-le glisser.',
   ],
-  delimiters: 'Séparateurs',
+  delimiters: 'Délimiteurs',
   other: 'Autre :',
-  qualifier: 'Identificateur de texte :',
+  qualifier: 'Identificateur de texte :',
   qualifierNone: 'aucun',
   step3Prompt: 'Sélectionnez chaque colonne et définissez le format des données.',
   columnFormat: 'Format des données en colonne',
@@ -131,22 +131,22 @@ export const macTextToColumnsWizardFr: TextToColumnsWizardStrings = {
   text: 'Texte',
   date: 'Date :',
   skip: 'Colonne non distribuée',
-  destination: 'Destination :',
+  destination: 'Destination :',
   details: 'Avancé...',
   back: '< Précédent',
   next: 'Suivant >',
   finish: 'Terminer',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 5 more. */
 export const macTextToColumnsWizardZh: TextToColumnsWizardStrings = {
   title: '文本分列向导 - 第 {step} 步，共 3 步',
   step1Intro: '文本分列向导判定您的数据具有分隔符。',
   step1Prompt: '单击“下一步”，或选择最合适的数据类型。',
   delimitedHint: '- 用分隔字符，如逗号或制表符分隔每个字段',
   fixedWidth: '固定宽度',
-  fixedHint: '- 每列字段加空格对齐',
-  preview: '数据预览:',
+  fixedHint: '- 每列字段加空格对齐。',
+  preview: '预览选定数据:',
   step2Prompt: '请设置分列数据所包含的分隔符号。',
   fixedPrompt: '设置字段宽度。',
   fixedSteps: [
@@ -154,9 +154,9 @@ export const macTextToColumnsWizardZh: TextToColumnsWizardStrings = {
     '要删除分列线，请双击该线。',
     '要移动分列线，请拖动它。',
   ],
-  delimiters: '分隔符号',
+  delimiters: '分隔符',
   other: '其他:',
-  qualifier: '文本识别符号:',
+  qualifier: '文本限定符:',
   qualifierNone: '无',
   step3Prompt: '请选择各列，并设置其数据格式。',
   columnFormat: '列数据格式',
@@ -164,19 +164,19 @@ export const macTextToColumnsWizardZh: TextToColumnsWizardStrings = {
   text: '文本',
   date: '日期:',
   skip: '不导入此列(跳过)',
-  destination: '目标区域:',
+  destination: '目标:',
   details: '高级...',
   back: '< 上一步',
   next: '下一步 >',
   finish: '完成',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 5 more. */
 export const macTextToColumnsWizardKo: TextToColumnsWizardStrings = {
   title: '텍스트 마법사 - {step}/3단계',
   step1Intro: '텍스트 마법사에서 데이터가 구분 기호로 분리되어 있는 것으로 판단했습니다.',
   step1Prompt: '[다음]을 클릭하거나 데이터에 가장 적합한 파일 유형을 선택하십시오.',
-  delimitedHint: '- 각 필드가 쉼표나 탭과 같은 문자로 분리되어 있습니다.',
+  delimitedHint: '- 각 필드가 쉼표나 탭과 같은 문자로 나누어져 있습니다.',
   fixedWidth: '너비가 일정함',
   fixedHint: '- 각 필드가 일정한 너비로 정렬되어 있습니다.',
   preview: '선택한 데이터 미리 보기:',
@@ -204,14 +204,14 @@ export const macTextToColumnsWizardKo: TextToColumnsWizardStrings = {
   finish: '마침',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 6 more. */
 export const macTextToColumnsWizardTh: TextToColumnsWizardStrings = {
   title: 'ตัวช่วยสร้างการแปลงข้อความเป็นคอลัมน์ - ขั้นตอนที่ {step} จาก 3',
   step1Intro: 'ตัวช่วยสร้างข้อความพบว่าข้อมูลของคุณมีตัวคั่น',
   step1Prompt: 'คลิก ถัดไป หรือเลือกชนิดแฟ้มที่อธิบายข้อมูลของคุณได้ดีที่สุด',
-  delimitedHint: '- อักขระ เช่น จุลภาคหรือแท็บ คั่นแต่ละเขตข้อมูล',
+  delimitedHint: '- อักขระเช่นเครื่องหมายจุลภาค (,) หรือแท็บ แยกแต่ละเขตข้อมูล',
   fixedWidth: 'ความกว้างคงที่',
-  fixedHint: '- เขตข้อมูลถูกจัดแนวในคอลัมน์โดยมีช่องว่างระหว่างแต่ละเขตข้อมูล',
+  fixedHint: '- เขตข้อมูลถูกจัดให้อยู่ในรูปแบบคอลัมน์โดยมีช่องว่างเป็นตัวแบ่งระหว่างเขตข้อมูล',
   preview: 'แสดงตัวอย่างข้อมูลที่เลือก:',
   step2Prompt: 'เลือกตัวคั่นสำหรับข้อมูลของคุณ',
   fixedPrompt: 'กำหนดความกว้างของเขตข้อมูล',
@@ -229,7 +229,7 @@ export const macTextToColumnsWizardTh: TextToColumnsWizardStrings = {
   general: 'ทั่วไป',
   text: 'ข้อความ',
   date: 'วันที่:',
-  skip: 'ไม่นำเข้าคอลัมน์ (ข้าม)',
+  skip: 'ไม่ต้องนำเข้าคอลัมน์ (ข้าม)',
   destination: 'ปลายทาง:',
   details: 'ขั้นสูง...',
   back: '< ย้อนกลับ',

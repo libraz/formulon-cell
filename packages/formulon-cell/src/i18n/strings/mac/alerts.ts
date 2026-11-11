@@ -19,7 +19,7 @@ export interface MacAlertStrings {
   overwriteOnMove: MacConfirmAlertStrings;
 }
 
-/** A locale whose Mac wording is not measured keeps its shared merge warning. */
+/** Each locale starts from its shared alert texts and overrides the fields the Excel bundle answers. */
 export const macAlertsFrom = (
   ribbon: RibbonStrings['ribbon'],
   deleteSheet: MacConfirmAlertStrings,
@@ -38,6 +38,19 @@ export const macAlertsFrom = (
   },
 });
 
+/** Per-alert overrides of the shared texts. */
+export type MacAlertsBundle = { [K in keyof MacAlertStrings]?: Partial<MacAlertStrings[K]> };
+
+/** Applies a locale's bundle overrides over its shared alert texts. */
+export const mergeMacAlerts = (
+  base: MacAlertStrings,
+  bundle: MacAlertsBundle,
+): MacAlertStrings => ({
+  mergeLoseData: { ...base.mergeLoseData, ...bundle.mergeLoseData },
+  deleteSheet: { ...base.deleteSheet, ...bundle.deleteSheet },
+  overwriteOnMove: { ...base.overwriteOnMove, ...bundle.overwriteOnMove },
+});
+
 /** Japanese Mac app wording, measured from Excel for Mac. */
 export const macAlertsJa: MacAlertStrings = {
   mergeLoseData: {
@@ -54,5 +67,57 @@ export const macAlertsJa: MacAlertStrings = {
     message: '既にデータがありますが、置き換えますか?',
     confirm: 'OK',
     cancel: 'キャンセル',
+  },
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.confirm, mergeLoseData.cancel, deleteSheet.message, deleteSheet.confirm, deleteSheet.cancel, and 2 more. */
+export const macAlertsDe: MacAlertsBundle = {
+  overwriteOnMove: {
+    message: 'Hier gibt es schon Daten. Möchten Sie diese ersetzen?',
+  },
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.confirm, mergeLoseData.cancel, deleteSheet.message, deleteSheet.confirm, deleteSheet.cancel, and 2 more. */
+export const macAlertsFr: MacAlertsBundle = {
+  overwriteOnMove: {
+    message: 'Cette cellule contient déjà des données. Voulez-vous les remplacer ?',
+  },
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, deleteSheet.message, deleteSheet.confirm, overwriteOnMove.message. */
+export const macAlertsKo: MacAlertsBundle = {
+  mergeLoseData: {
+    confirm: '확인',
+    cancel: '취소',
+  },
+  deleteSheet: {
+    cancel: '취소',
+  },
+  overwriteOnMove: {
+    confirm: '확인',
+    cancel: '취소',
+  },
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.confirm, mergeLoseData.cancel, deleteSheet.message, deleteSheet.confirm, deleteSheet.cancel, and 2 more. */
+export const macAlertsTh: MacAlertsBundle = {
+  overwriteOnMove: {
+    message: 'มีข้อมูลอยู่ที่นี่แล้ว คุณต้องการแทนที่ข้อมูลนั้นหรือไม่',
+  },
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, deleteSheet.message, deleteSheet.confirm. */
+export const macAlertsZh: MacAlertsBundle = {
+  mergeLoseData: {
+    confirm: '确定',
+    cancel: '取消',
+  },
+  deleteSheet: {
+    cancel: '取消',
+  },
+  overwriteOnMove: {
+    message: '此处已有数据。是否替换它?',
+    confirm: '确定',
+    cancel: '取消',
   },
 };

@@ -17,8 +17,7 @@ export interface MacPivotTableDialogLabels {
 export type MacPivotTableDialogStrings = Partial<PivotTableDialogStrings> &
   MacPivotTableDialogLabels;
 
-/** The `pivotTableDialog` keys the Mac dialog can override. A locale whose Mac
- *  wording is not measured repeats its own shared text. */
+/** The `pivotTableDialog` keys the Mac dialog can override. Each locale starts from its own shared text and overrides the fields the Excel bundle answers. */
 const MAC_PIVOT_TABLE_DIALOG_KEYS = [
   'source',
   'destinationSection',
@@ -41,4 +40,38 @@ export const macPivotTableDialogJa: MacPivotTableDialogStrings = {
   chooseConnection: '接続の選択...',
   moveTitle: 'ピボットテーブルの移動',
   moveLocation: '場所:',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, moveLocation. */
+export const macPivotTableDialogDe: Partial<MacPivotTableDialogStrings> = {
+  source: 'Tabelle/Bereich:',
+  chooseConnection: 'Verbindung auswählen...',
+  moveTitle: 'PivotTable verschieben',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, chooseConnection, moveLocation. */
+export const macPivotTableDialogFr: Partial<MacPivotTableDialogStrings> = {
+  source: 'Tableau/Plage :',
+  moveTitle: 'Déplacer le tableau croisé dynamique',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, moveLocation. */
+export const macPivotTableDialogKo: Partial<MacPivotTableDialogStrings> = {
+  source: '표/범위:',
+  chooseConnection: '연결 선택...',
+  moveTitle: '피벗 테이블 이동',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, moveLocation. */
+export const macPivotTableDialogTh: Partial<MacPivotTableDialogStrings> = {
+  source: 'ตาราง/ช่วง:',
+  chooseConnection: 'เลือกการเชื่อมต่อ...',
+  moveTitle: 'ย้าย PivotTable',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, moveLocation. */
+export const macPivotTableDialogZh: Partial<MacPivotTableDialogStrings> = {
+  source: '表/区域:',
+  chooseConnection: '选择连接...',
+  moveTitle: '移动数据透视表',
 };

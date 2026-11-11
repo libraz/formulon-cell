@@ -135,9 +135,9 @@ export const macAccessibilityPaneJa: MacAccessibilityPaneStrings = {
   statusIssues: 'アクセシビリティ: 検討が必要です',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, help, cleanTitle, cleanText, issuesTitle, issuesText, and 21 more. */
 export const macAccessibilityPaneDe: MacAccessibilityPaneStrings = {
-  title: 'Barrierefreiheits-Assistent',
+  title: 'Barrierefreiheit-Assistent',
   close: 'Barrierefreiheits-Assistent schließen',
   help: 'Hilfe',
   back: 'Zurück',
@@ -172,7 +172,7 @@ export const macAccessibilityPaneDe: MacAccessibilityPaneStrings = {
   contrastSwatch: 'Schriftfarbe {color}',
   moreFontColors: 'Weitere Schriftfarben',
   fillColor: 'Füllfarbe',
-  formatCellFont: 'Zellschriftart formatieren',
+  formatCellFont: 'Zellenschriftart formatieren',
   tableHeaderTitle: 'Fehlende Tabellenüberschrift',
   tableHeaderText:
     'Tabellenüberschriften machen die Daten einer Tabelle verständlich und leicht navigierbar.',
@@ -181,9 +181,9 @@ export const macAccessibilityPaneDe: MacAccessibilityPaneStrings = {
   statusIssues: 'Barrierefreiheit: Untersuchen',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, back, cleanTitle, cleanText, issuesTitle, issuesText, and 22 more. */
 export const macAccessibilityPaneFr: MacAccessibilityPaneStrings = {
-  title: 'Assistant Accessibilité',
+  title: 'Assistant d’accessibilité',
   close: 'Fermer Assistant Accessibilité',
   help: 'Aide',
   back: 'Précédent',
@@ -227,7 +227,7 @@ export const macAccessibilityPaneFr: MacAccessibilityPaneStrings = {
   statusIssues: 'Accessibilité : examen requis',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, back, cleanTitle, cleanText, issuesTitle, issuesText, and 23 more. */
 export const macAccessibilityPaneZh: MacAccessibilityPaneStrings = {
   title: '辅助功能助手',
   close: '关闭辅助功能助手',
@@ -270,7 +270,7 @@ export const macAccessibilityPaneZh: MacAccessibilityPaneStrings = {
   statusIssues: '辅助功能: 需要调查',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, cleanTitle, cleanText, issuesTitle, issuesText, counter, and 21 more. */
 export const macAccessibilityPaneKo: MacAccessibilityPaneStrings = {
   title: '접근성 도우미',
   close: '접근성 도우미 닫기',
@@ -295,7 +295,7 @@ export const macAccessibilityPaneKo: MacAccessibilityPaneStrings = {
     contrast: '읽기 어려운 텍스트 대비',
     redFormat: '빨간색 서식 사용 안 함',
     altText: '대체 텍스트 없음',
-    tableHeader: '표 머리글 없음',
+    tableHeader: '표 머리글 누락',
     mergedCells: '병합된 셀',
     defaultSheetName: '기본 시트 이름',
     restrictedAccess: '제한된 액세스',
@@ -305,17 +305,17 @@ export const macAccessibilityPaneKo: MacAccessibilityPaneStrings = {
   contrastSwatch: '글꼴 색 {color}',
   moreFontColors: '다른 글꼴 색',
   fillColor: '채우기 색',
-  formatCellFont: '셀 글꼴 서식',
-  tableHeaderTitle: '표 머리글 없음',
+  formatCellFont: '셀 글꼴 서식 지정',
+  tableHeaderTitle: '표 머리글 누락',
   tableHeaderText: '표 머리글은 표의 데이터를 명확하고 쉽게 탐색하고 이해하는 데 필수적입니다.',
   insertHeaderRow: '머리글 행 삽입',
   statusClean: '접근성: 문제 없음',
   statusIssues: '접근성: 조사 필요',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, help, cleanTitle, cleanText, issuesTitle, issuesText, and 21 more. */
 export const macAccessibilityPaneTh: MacAccessibilityPaneStrings = {
-  title: 'ผู้ช่วยการช่วยสำหรับการเข้าถึง',
+  title: 'ตัวช่วยสำหรับการเข้าถึง',
   close: 'ปิดผู้ช่วยการช่วยสำหรับการเข้าถึง',
   help: 'วิธีใช้',
   back: 'ย้อนกลับ',
@@ -338,18 +338,18 @@ export const macAccessibilityPaneTh: MacAccessibilityPaneStrings = {
     contrast: 'คอนทราสต์ข้อความอ่านยาก',
     redFormat: 'อย่าใช้การจัดรูปแบบสีแดง',
     altText: 'ไม่มีข้อความแสดงแทน',
-    tableHeader: 'ไม่มีส่วนหัวของตาราง',
+    tableHeader: 'ส่วนหัวของตารางขาดหายไป',
     mergedCells: 'เซลล์ที่ผสาน',
     defaultSheetName: 'ชื่อแผ่นงานเริ่มต้น',
     restrictedAccess: 'การเข้าถึงแบบจำกัด',
   },
-  contrastTitle: 'คอนทราสต์ข้อความอ่านยาก',
+  contrastTitle: 'ความคมชัดของข้อความที่อ่านยาก',
   contrastText: 'สีข้อความปัจจุบันมองเห็นได้ยาก ลองใช้สีที่มีคอนทราสต์สูงเพื่อให้ข้อความชัดเจน',
   contrastSwatch: 'สีแบบอักษร {color}',
   moreFontColors: 'สีแบบอักษรเพิ่มเติม',
   fillColor: 'สีเติม',
-  formatCellFont: 'จัดรูปแบบแบบอักษรของเซลล์',
-  tableHeaderTitle: 'ไม่มีส่วนหัวของตาราง',
+  formatCellFont: 'จัดรูปแบบฟอนต์ของเซลล์',
+  tableHeaderTitle: 'ส่วนหัวของตารางขาดหายไป',
   tableHeaderText: 'ส่วนหัวของตารางจำเป็นต่อการทำให้ข้อมูลในตารางชัดเจน นำทางและเข้าใจได้ง่าย',
   insertHeaderRow: 'แทรกแถวส่วนหัว',
   statusClean: 'การช่วยสำหรับการเข้าถึง: พร้อมใช้งาน',

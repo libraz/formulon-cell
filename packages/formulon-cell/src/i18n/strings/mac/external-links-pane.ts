@@ -16,15 +16,15 @@ export const macExternalLinksPaneJa: ExternalLinksPaneStrings = {
   help: 'ブック リンクの作成方法の詳細',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, empty, help. */
 export const macExternalLinksPaneDe: ExternalLinksPaneStrings = {
-  title: 'Arbeitsmappenlinks',
+  title: 'Links zu Arbeitsmappen',
   close: 'Arbeitsmappenlinks schließen',
   empty: 'Es gibt keine Links zu externen Arbeitsmappen.',
   help: 'Weitere Informationen zum Erstellen von Arbeitsmappenlinks',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, empty, help. */
 export const macExternalLinksPaneFr: ExternalLinksPaneStrings = {
   title: 'Liens de classeur',
   close: 'Fermer Liens de classeur',
@@ -32,7 +32,7 @@ export const macExternalLinksPaneFr: ExternalLinksPaneStrings = {
   help: 'En savoir plus sur la création de liens de classeur',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, empty, help. */
 export const macExternalLinksPaneZh: ExternalLinksPaneStrings = {
   title: '工作簿链接',
   close: '关闭工作簿链接',
@@ -40,15 +40,15 @@ export const macExternalLinksPaneZh: ExternalLinksPaneStrings = {
   help: '详细了解如何创建工作簿链接',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, empty, help. */
 export const macExternalLinksPaneKo: ExternalLinksPaneStrings = {
-  title: '통합 문서 링크',
+  title: '통합 문서 연결',
   close: '통합 문서 링크 닫기',
   empty: '외부 통합 문서에 대한 링크가 없습니다.',
   help: '통합 문서 링크 만들기에 대해 자세히 알아보기',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: close, empty, help. */
 export const macExternalLinksPaneTh: ExternalLinksPaneStrings = {
   title: 'ลิงก์เวิร์กบุ๊ก',
   close: 'ปิดลิงก์เวิร์กบุ๊ก',

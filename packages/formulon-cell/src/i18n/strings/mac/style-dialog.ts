@@ -86,7 +86,7 @@ export const macStyleDialogJa: MacStyleDialogStrings = {
   },
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.number, properties.alignment, properties.font, and 13 more. */
 export const macStyleDialogDe: MacStyleDialogStrings = {
   title: 'Zellenformatvorlage ändern',
   nameLabel: 'Name der Formatvorlage:',
@@ -119,16 +119,16 @@ export const macStyleDialogDe: MacStyleDialogStrings = {
     },
     noBorder: 'Keine Rahmen',
     border: 'Rahmen',
-    noFill: 'Keine Schattierung',
+    noFill: 'Nicht schattiert',
     locked: 'Gesperrt',
     unlocked: 'Nicht gesperrt',
   },
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.number, properties.alignment, properties.font, and 13 more. */
 export const macStyleDialogFr: MacStyleDialogStrings = {
   title: 'Modifier le style de cellule',
-  nameLabel: 'Nom du style :',
+  nameLabel: 'Nom du style :',
   previewLabel: 'Aperçu :',
   caption: 'Le style inclut les propriétés suivantes :',
   propertyColumn: 'Propriété du style',
@@ -158,16 +158,16 @@ export const macStyleDialogFr: MacStyleDialogStrings = {
     },
     noBorder: 'Aucune bordure',
     border: 'Bordures',
-    noFill: 'Aucun ombrage',
-    locked: 'Verrouillée',
+    noFill: "Pas d'ombrage",
+    locked: 'Verrouillé',
     unlocked: 'Déverrouillée',
   },
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.number, properties.alignment, properties.font, and 10 more. */
 export const macStyleDialogZh: MacStyleDialogStrings = {
   title: '修改单元格样式',
-  nameLabel: '样式名:',
+  nameLabel: '样式名称:',
   previewLabel: '预览:',
   caption: '样式包括(例):',
   propertyColumn: '样式属性',
@@ -203,7 +203,7 @@ export const macStyleDialogZh: MacStyleDialogStrings = {
   },
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.alignment, properties.font, properties.protection, and 6 more. */
 export const macStyleDialogKo: MacStyleDialogStrings = {
   title: '셀 스타일 수정',
   nameLabel: '스타일 이름:',
@@ -242,20 +242,20 @@ export const macStyleDialogKo: MacStyleDialogStrings = {
   },
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.alignment, properties.font, properties.protection, and 7 more. */
 export const macStyleDialogTh: MacStyleDialogStrings = {
   title: 'ปรับเปลี่ยนสไตล์เซลล์',
   nameLabel: 'ชื่อสไตล์:',
   previewLabel: 'แสดงตัวอย่าง:',
   caption: 'สไตล์ประกอบด้วย (ตามตัวอย่าง):',
-  propertyColumn: 'คุณสมบัติสไตล์',
+  propertyColumn: 'คุณสมบัติของสไตล์',
   formatColumn: 'รูปแบบ',
   properties: {
     number: 'ตัวเลข',
     alignment: 'การจัดแนว',
     font: 'ฟอนต์',
     border: 'เส้นขอบ',
-    fill: 'การเติม',
+    fill: 'เติม',
     protection: 'การป้องกัน',
   },
   formatButton: 'รูปแบบ...',
@@ -275,7 +275,7 @@ export const macStyleDialogTh: MacStyleDialogStrings = {
     },
     noBorder: 'ไม่มีเส้นขอบ',
     border: 'มีเส้นขอบ',
-    noFill: 'ไม่มีการแรเงา',
+    noFill: 'ไม่แรเงา',
     locked: 'ล็อก',
     unlocked: 'ไม่ล็อก',
   },

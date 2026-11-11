@@ -65,12 +65,12 @@ export const macPivotFieldSettingsJa: MacPivotFieldSettingsStrings = {
   unavailable: 'このバージョンでは使用できません。',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sourceName, customName, showAsTab, baseField, numberFormat, and 5 more. */
 export const macPivotFieldSettingsDe: MacPivotFieldSettingsStrings = {
   title: 'PivotTable-Feld',
   sourceName: 'Quellname:',
   customName: 'Feldname:',
-  summarizeTab: 'Zusammenfassen nach',
+  summarizeTab: 'Zusammenfassen mit',
   showAsTab: 'Werte anzeigen als',
   baseField: 'Basisfeld:',
   baseItem: 'Basiselement:',
@@ -86,15 +86,15 @@ export const macPivotFieldSettingsDe: MacPivotFieldSettingsStrings = {
   unavailable: 'In dieser Version nicht verfügbar.',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sourceName, customName, numberFormat, subtotalAutomatic, subtotalCustom, and 4 more. */
 export const macPivotFieldSettingsFr: MacPivotFieldSettingsStrings = {
   title: 'Champ de tableau croisé dynamique',
   sourceName: 'Nom de la source :',
   customName: 'Nom du champ :',
   summarizeTab: 'Synthèse par',
-  showAsTab: 'Afficher les valeurs',
-  baseField: 'Champ de base :',
-  baseItem: 'Élément de base :',
+  showAsTab: 'Afficher les données',
+  baseField: 'Champ de base :',
+  baseItem: 'Élément de base :',
   numberFormat: 'Format de nombre…',
   subtotals: 'Sous-totaux',
   subtotalAutomatic: 'Automatique',
@@ -107,13 +107,13 @@ export const macPivotFieldSettingsFr: MacPivotFieldSettingsStrings = {
   unavailable: 'Non disponible dans cette version.',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sourceName, customName, baseField, numberFormat, subtotals, and 5 more. */
 export const macPivotFieldSettingsZh: MacPivotFieldSettingsStrings = {
   title: '数据透视表字段',
   sourceName: '源名称:',
   customName: '字段名称:',
   summarizeTab: '汇总方式',
-  showAsTab: '值显示方式',
+  showAsTab: '数据显示方式',
   baseField: '基本字段:',
   baseItem: '基本项:',
   numberFormat: '数字格式…',
@@ -128,12 +128,12 @@ export const macPivotFieldSettingsZh: MacPivotFieldSettingsStrings = {
   unavailable: '此版本中不可用。',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sourceName, customName, showAsTab, baseField, numberFormat, and 5 more. */
 export const macPivotFieldSettingsKo: MacPivotFieldSettingsStrings = {
   title: '피벗 테이블 필드',
   sourceName: '원본 이름:',
   customName: '필드 이름:',
-  summarizeTab: '값 요약 기준',
+  summarizeTab: '사용할 함수:',
   showAsTab: '값 표시 형식',
   baseField: '기준 필드:',
   baseItem: '기준 항목:',
@@ -149,15 +149,15 @@ export const macPivotFieldSettingsKo: MacPivotFieldSettingsStrings = {
   unavailable: '이 버전에서는 사용할 수 없습니다.',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sourceName, customName, baseField, numberFormat, subtotalCustom, and 5 more. */
 export const macPivotFieldSettingsTh: MacPivotFieldSettingsStrings = {
   title: 'เขตข้อมูล PivotTable',
   sourceName: 'ชื่อแหล่งข้อมูล:',
   customName: 'ชื่อเขตข้อมูล:',
-  summarizeTab: 'สรุปตาม',
-  showAsTab: 'แสดงค่าเป็น',
+  summarizeTab: 'สรุปโดย',
+  showAsTab: 'แสดงข้อมูลเป็น',
   baseField: 'เขตข้อมูลฐาน:',
-  baseItem: 'รายการฐาน:',
+  baseItem: 'รายการพื้นฐาน:',
   numberFormat: 'รูปแบบตัวเลข…',
   subtotals: 'ผลรวมย่อย',
   subtotalAutomatic: 'อัตโนมัติ',

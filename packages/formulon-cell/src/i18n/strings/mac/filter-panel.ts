@@ -136,7 +136,7 @@ const extrasJa: MacFilterPanelExtras = {
   unavailable: 'この機能は未実装です。',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasDe: MacFilterPanelExtras = {
   sortSection: 'Sortieren',
   filterSection: 'Filtern',
@@ -159,7 +159,7 @@ const extrasDe: MacFilterPanelExtras = {
   unavailable: 'Diese Funktion ist noch nicht implementiert.',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasFr: MacFilterPanelExtras = {
   sortSection: 'Trier',
   filterSection: 'Filtrer',
@@ -182,7 +182,7 @@ const extrasFr: MacFilterPanelExtras = {
   unavailable: 'Cette fonctionnalité n’est pas encore implémentée.',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasZh: MacFilterPanelExtras = {
   sortSection: '排序',
   filterSection: '筛选',
@@ -205,7 +205,7 @@ const extrasZh: MacFilterPanelExtras = {
   unavailable: '此功能尚未实现。',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasKo: MacFilterPanelExtras = {
   sortSection: '정렬',
   filterSection: '필터',
@@ -228,7 +228,7 @@ const extrasKo: MacFilterPanelExtras = {
   unavailable: '이 기능은 아직 구현되지 않았습니다.',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasTh: MacFilterPanelExtras = {
   sortSection: 'เรียงลำดับ',
   filterSection: 'ตัวกรอง',
@@ -273,16 +273,86 @@ export const macFilterPanelJa = (t: FilterDropdownStrings): MacFilterPanelString
   });
 
 export const macFilterPanelDe = (t: FilterDropdownStrings): MacFilterPanelStrings =>
-  macFilterPanelFrom(t, extrasDe);
+  macFilterPanelFrom(t, extrasDe, {
+    chooseOne: 'Eine Option auswählen',
+    blanks: '(Leere)',
+    close: 'Schließen',
+    sortAsc: 'Aufsteigend',
+    sortDesc: 'Absteigend',
+    byColor: 'Nach Farbe:',
+    cellColor: 'Zellenfarbe',
+    cellIcon: 'Zellensymbol',
+    autoApply: 'Automatisch anwenden',
+    top10: 'oberer Bereich',
+    bottom10: 'unterer Bereich',
+    items: 'Elemente',
+    percent: 'Prozent',
+  });
 
 export const macFilterPanelFr = (t: FilterDropdownStrings): MacFilterPanelStrings =>
-  macFilterPanelFrom(t, extrasFr);
+  macFilterPanelFrom(t, extrasFr, {
+    chooseOne: 'Choisir',
+    selectAll: '(Sélectionner tout)',
+    blanks: '(Vides)',
+    sortAsc: 'Croissant',
+    sortDesc: 'Décroissant',
+    byColor: 'Par couleur :',
+    cellColor: 'Couleur de cellule',
+    cellIcon: 'Icône de cellule',
+    autoApply: 'Appliquer automatiquement',
+    top10: '10 premiers',
+    bottom10: '10 derniers',
+    items: 'Éléments',
+  });
 
 export const macFilterPanelZh = (t: FilterDropdownStrings): MacFilterPanelStrings =>
-  macFilterPanelFrom(t, extrasZh);
+  macFilterPanelFrom(t, extrasZh, {
+    chooseOne: '选择一个',
+    contains: '包含',
+    notContains: '不包含',
+    selectAll: '(全选)',
+    blanks: '(空白)',
+    close: '关闭',
+    sortAsc: '升序',
+    sortDesc: '降序',
+    byColor: '按颜色:',
+    colorNone: '无',
+    cellColor: '单元格颜色',
+    cellIcon: '单元格图标',
+    autoApply: '自动应用',
+    top10: '前 10 个',
+    bottom10: '最小的 10 项',
+    percent: '百分比',
+  });
 
 export const macFilterPanelKo = (t: FilterDropdownStrings): MacFilterPanelStrings =>
-  macFilterPanelFrom(t, extrasKo);
+  macFilterPanelFrom(t, extrasKo, {
+    chooseOne: '항목 선택',
+    contains: '포함',
+    blanks: '(필드 값 없음)',
+    close: '닫기',
+    sortAsc: '오름차순',
+    sortDesc: '내림차순',
+    byColor: '색상 기준:',
+    cellColor: '셀 색',
+    cellIcon: '셀 아이콘',
+    autoApply: '자동 적용',
+    top10: '상위 10개',
+    bottom10: '하위 10개',
+  });
 
 export const macFilterPanelTh = (t: FilterDropdownStrings): MacFilterPanelStrings =>
-  macFilterPanelFrom(t, extrasTh);
+  macFilterPanelFrom(t, extrasTh, {
+    chooseOne: 'เลือกหนึ่งรายการ',
+    contains: 'มี',
+    notContains: 'ไม่มี',
+    selectAll: '(เลือกทั้งหมด)',
+    blanks: '(ว่าง)',
+    byColor: 'ตามสี:',
+    cellColor: 'สีของเซลล์',
+    cellIcon: 'ไอคอนของเซลล์',
+    autoApply: 'นำไปใช้โดยอัตโนมัติ',
+    top10: '10 อันดับแรก',
+    bottom10: '10 รายการสุดท้าย',
+    items: 'รายการ',
+  });

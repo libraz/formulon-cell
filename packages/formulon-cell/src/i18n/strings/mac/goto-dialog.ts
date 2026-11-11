@@ -15,8 +15,7 @@ export interface MacGoToDialogLabels {
 /** Overrides of `goToDialog`, plus the Mac-only lines, that apply on the Mac host only. */
 export type MacGoToDialogStrings = Partial<GoToDialogStrings> & MacGoToDialogLabels;
 
-/** The `goToDialog` keys the Mac dialog can override. A locale whose Mac
- *  wording is not measured repeats its own shared text. */
+/** The `goToDialog` keys the Mac dialog can override. Each locale starts from its own shared text and overrides the fields the Excel bundle answers. */
 const MAC_GO_TO_DIALOG_KEYS = [
   'kindComments',
   'kindBlanks',
@@ -39,4 +38,9 @@ export const macGoToDialogJa: MacGoToDialogStrings = {
   selectCaption: '選択',
   optionsGroup: 'オプション',
   noOptions: 'この選択項目にはオプションはありません。',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: kindComments, reference, selectCaption, optionsGroup, noOptions. */
+export const macGoToDialogTh: Partial<MacGoToDialogStrings> = {
+  kindBlanks: 'ว่าง',
 };

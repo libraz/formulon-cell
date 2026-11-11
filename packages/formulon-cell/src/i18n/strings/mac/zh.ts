@@ -8,33 +8,33 @@ import { ribbonZh } from '../ribbon/zh.js';
 import { ribbonMenusZh } from '../ribbon-menus/zh.js';
 import { workbookChromeZh } from '../workbook-chrome/zh.js';
 import { macAccessibilityPaneZh } from './accessibility-pane.js';
-import { macAdvancedFilterFrom } from './advanced-filter.js';
-import { macAlertsFrom } from './alerts.js';
-import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
-import { macChromeFrom } from './chrome.js';
+import { macAdvancedFilterFrom, macAdvancedFilterZh } from './advanced-filter.js';
+import { macAlertsFrom, macAlertsZh, mergeMacAlerts } from './alerts.js';
+import { macCfRulesDialogFrom, macCfRulesDialogZh } from './cf-rules-dialog.js';
+import { macChromeFrom, macChromeZh } from './chrome.js';
 import { macErrorMenuZh } from './error-menu.js';
 import { macExternalLinksPaneZh } from './external-links-pane.js';
 import { macFilterPanelZh } from './filter-panel.js';
-import { macFindReplaceFrom } from './find-replace.js';
-import { macFormatDialogFrom } from './format-dialog.js';
+import { macFindReplaceFrom, macFindReplaceZh } from './find-replace.js';
+import { macFormatDialogFrom, macFormatDialogZh } from './format-dialog.js';
 import { macGoToDialogFrom } from './goto-dialog.js';
-import { macHyperlinkDialogFrom } from './hyperlink-dialog.js';
-import { macIterativeDialogFrom } from './iterative-dialog.js';
-import { macNamedRangeDialogFrom } from './named-range-dialog.js';
-import { macPageSetupFrom } from './page-setup.js';
-import { macPasteSpecialFrom } from './paste-special.js';
+import { macHyperlinkDialogFrom, macHyperlinkDialogZh } from './hyperlink-dialog.js';
+import { macIterativeDialogFrom, macIterativeDialogZh } from './iterative-dialog.js';
+import { macNamedRangeDialogFrom, macNamedRangeDialogZh } from './named-range-dialog.js';
+import { macPageSetupFrom, macPageSetupZh } from './page-setup.js';
+import { macPasteSpecialFrom, macPasteSpecialZh } from './paste-special.js';
 import { macPivotFieldSettingsZh } from './pivot-field-settings.js';
 import { macPivotOptionsZh } from './pivot-options.js';
-import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
-import { macProtectSheetFrom } from './protect-sheet.js';
+import { macPivotTableDialogFrom, macPivotTableDialogZh } from './pivot-table-dialog.js';
+import { macProtectSheetFrom, macProtectSheetZh } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSheetTabMenuZh } from './sheet-tab-menu.js';
-import { macSortDialogFrom } from './sort-dialog.js';
+import { macSortDialogFrom, macSortDialogZh } from './sort-dialog.js';
 import { macStyleDialogZh } from './style-dialog.js';
 import { macTextToColumnsWizardZh } from './text-to-columns-wizard.js';
 import type { MacStrings } from './types.js';
 import { macWatchWindowZh } from './watch-window.js';
-import { macZoomDialogFrom } from './zoom-dialog.js';
+import { macZoomDialogFrom, macZoomDialogZh } from './zoom-dialog.js';
 
 export const macZh: MacStrings = {
   data: {
@@ -212,64 +212,88 @@ export const macZh: MacStrings = {
     cellStyles: '单元格样式',
     autoSum: '自动求和',
   },
-  formatDialog: macFormatDialogFrom(cellFormatZh.formatDialog),
-  iterativeDialog: macIterativeDialogFrom(formulaDialogsZh.iterativeDialog, {
-    calcAutoNoTable: ribbonMenusZh.ribbonMenu.calcAutoNoTable,
-  }),
-  namedRangeDialog: macNamedRangeDialogFrom(formulaDialogsZh.namedRangeDialog, {
-    defineTitle: '定义名称',
-    defineNames: '名称:',
-    defineNamePrompt: '请输入数据区域的名称:',
-    defineRangePrompt: '请选择单元格区域:',
-  }),
-  pasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
-  zoomDialog: macZoomDialogFrom(ribbonZh.ribbon, cellFormatZh.formatDialog),
-  alerts: macAlertsFrom(
-    ribbonZh.ribbon,
-    {
-      message: '此工作表将被永久删除。是否继续?',
-      confirm: '删除',
-      cancel: '取消',
-    },
-    editDialogsZh.moveCells,
+  formatDialog: { ...macFormatDialogFrom(cellFormatZh.formatDialog), ...macFormatDialogZh },
+  iterativeDialog: {
+    ...macIterativeDialogFrom(formulaDialogsZh.iterativeDialog, {
+      calcAutoNoTable: ribbonMenusZh.ribbonMenu.calcAutoNoTable,
+    }),
+    ...macIterativeDialogZh,
+  },
+  namedRangeDialog: {
+    ...macNamedRangeDialogFrom(formulaDialogsZh.namedRangeDialog, {
+      defineTitle: '定义名称',
+      defineNames: '名称:',
+      defineNamePrompt: '请输入数据区域的名称:',
+      defineRangePrompt: '请选择单元格区域:',
+    }),
+    ...macNamedRangeDialogZh,
+  },
+  pasteSpecial: { ...macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog), ...macPasteSpecialZh },
+  zoomDialog: {
+    ...macZoomDialogFrom(ribbonZh.ribbon, cellFormatZh.formatDialog),
+    ...macZoomDialogZh,
+  },
+  alerts: mergeMacAlerts(
+    macAlertsFrom(
+      ribbonZh.ribbon,
+      {
+        message: '此工作表将被永久删除。是否继续?',
+        confirm: '删除',
+        cancel: '取消',
+      },
+      editDialogsZh.moveCells,
+    ),
+    macAlertsZh,
   ),
-  protectSheet: macProtectSheetFrom(editDialogsZh.protection, {
-    heading: '保护工作表及锁定的单元格内容',
-    note: '默认情况下所有单元格均已锁定，但可以解除锁定。',
-  }),
-  advancedFilter: macAdvancedFilterFrom(ribbonMenusZh.ribbonMenu, {
-    filterInPlace: '在原有区域显示筛选结果',
-    copyToLocation: '将筛选结果复制到其他位置',
-  }),
-  chrome: macChromeFrom(workbookChromeZh, formulaDialogsZh),
+  protectSheet: {
+    ...macProtectSheetFrom(editDialogsZh.protection, {
+      heading: '保护工作表及锁定的单元格内容',
+      note: '默认情况下所有单元格均已锁定，但可以解除锁定。',
+    }),
+    ...macProtectSheetZh,
+  },
+  advancedFilter: {
+    ...macAdvancedFilterFrom(ribbonMenusZh.ribbonMenu, {
+      filterInPlace: '在原有区域显示筛选结果',
+      copyToLocation: '将筛选结果复制到其他位置',
+    }),
+    ...macAdvancedFilterZh,
+  },
+  chrome: { ...macChromeFrom(workbookChromeZh, formulaDialogsZh), ...macChromeZh },
   textToColumnsWizard: macTextToColumnsWizardZh,
   styleDialog: macStyleDialogZh,
   externalLinksPane: macExternalLinksPaneZh,
   watchWindow: macWatchWindowZh,
   accessibilityPane: macAccessibilityPaneZh,
-  cfRulesDialog: macCfRulesDialogFrom(cellFormatZh.cfRulesDialog, {
-    orderLabel: '更改规则顺序:',
-    appliesToLabel: '应用于:',
-  }),
-  hyperlinkDialog: macHyperlinkDialogFrom(editDialogsZh.hyperlinkDialog, {
-    displayText: '要显示的文字:',
-    selectionInDocument: '<<文档中的选定内容>>',
-    screenTip: '屏幕提示...',
-    screenTipTitle: '设置超链接屏幕提示',
-    screenTipLabel: '屏幕提示文字:',
-    tabWeb: '网页或文件',
-    tabDocument: '本文档',
-    tabEmail: '电子邮件地址',
-    webIntro: '链接到现有文件或网页。',
-    browse: '选择...',
-    browseUnavailable: '浏览器中无法选择文件。请输入地址。',
-    cellReference: '请键入单元格引用:',
-    documentPlace: '或在此文档中选择一个位置:',
-    emailAddress: '电子邮件地址:',
-    subject: '主题:',
-    recentEmails: '最近用过的电子邮件地址:',
-  }),
-  pageSetup: macPageSetupFrom(pageLayoutZh.pageSetup),
+  cfRulesDialog: {
+    ...macCfRulesDialogFrom(cellFormatZh.cfRulesDialog, {
+      orderLabel: '更改规则顺序:',
+      appliesToLabel: '应用于:',
+    }),
+    ...macCfRulesDialogZh,
+  },
+  hyperlinkDialog: {
+    ...macHyperlinkDialogFrom(editDialogsZh.hyperlinkDialog, {
+      displayText: '要显示的文字:',
+      selectionInDocument: '<<文档中的选定内容>>',
+      screenTip: '屏幕提示...',
+      screenTipTitle: '设置超链接屏幕提示',
+      screenTipLabel: '屏幕提示文字:',
+      tabWeb: '网页或文件',
+      tabDocument: '本文档',
+      tabEmail: '电子邮件地址',
+      webIntro: '链接到现有文件或网页。',
+      browse: '选择...',
+      browseUnavailable: '浏览器中无法选择文件。请输入地址。',
+      cellReference: '请键入单元格引用:',
+      documentPlace: '或在此文档中选择一个位置:',
+      emailAddress: '电子邮件地址:',
+      subject: '主题:',
+      recentEmails: '最近用过的电子邮件地址:',
+    }),
+    ...macHyperlinkDialogZh,
+  },
+  pageSetup: { ...macPageSetupFrom(pageLayoutZh.pageSetup), ...macPageSetupZh },
   dataValidation: {
     inputCaption: '选定单元格时显示下列输入信息:',
     errorCaption: '输入无效数据时显示下列出错警告:',
@@ -294,31 +318,40 @@ export const macZh: MacStrings = {
   }),
   pivotFieldSettings: macPivotFieldSettingsZh,
   pivotOptions: macPivotOptionsZh,
-  pivotTableDialog: macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
-    chooseConnection: '选择连接...',
-    moveTitle: '移动数据透视表',
-    moveLocation: '位置:',
-  }),
+  pivotTableDialog: {
+    ...macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
+      chooseConnection: '选择连接...',
+      moveTitle: '移动数据透视表',
+      moveLocation: '位置:',
+    }),
+    ...macPivotTableDialogZh,
+  },
   removeDuplicates: macRemoveDuplicatesFrom(ribbonMenusZh.ribbonMenu),
-  sortDialog: macSortDialogFrom(ribbonMenusZh.ribbonMenu, {
-    levelsHeading: '添加排序级别:',
-    columnHeading: '列',
-    sortOnHeading: '排序依据',
-    sortOnValues: editDialogsZh.findReplace.values,
-    colorHeading: '颜色/图标',
-    copyLevel: gridPopupsZh.contextMenu.copy,
-    options: '选项...',
-    rowHeading: '行',
-    orientation: '方向',
-    sortTopToBottom: '从上到下排序',
-    sortLeftToRight: '从左到右排序',
-    method: '方法',
-    usePhonetic: '使用拼音',
-    noPhonetic: '不使用拼音',
-    caseSensitive: '区分大小写',
-  }),
+  sortDialog: {
+    ...macSortDialogFrom(ribbonMenusZh.ribbonMenu, {
+      levelsHeading: '添加排序级别:',
+      columnHeading: '列',
+      sortOnHeading: '排序依据',
+      sortOnValues: editDialogsZh.findReplace.values,
+      colorHeading: '颜色/图标',
+      copyLevel: gridPopupsZh.contextMenu.copy,
+      options: '选项...',
+      rowHeading: '行',
+      orientation: '方向',
+      sortTopToBottom: '从上到下排序',
+      sortLeftToRight: '从左到右排序',
+      method: '方法',
+      usePhonetic: '使用拼音',
+      noPhonetic: '不使用拼音',
+      caseSensitive: '区分大小写',
+    }),
+    ...macSortDialogZh,
+  },
   errorMenu: macErrorMenuZh,
   filterPanel: macFilterPanelZh(gridPopupsZh.filterDropdown),
   sheetTabMenu: macSheetTabMenuZh,
-  findReplace: macFindReplaceFrom(editDialogsZh.findReplace, '区分全/半角'),
+  findReplace: {
+    ...macFindReplaceFrom(editDialogsZh.findReplace, '区分全/半角'),
+    ...macFindReplaceZh,
+  },
 };

@@ -6,8 +6,7 @@ type RibbonMenuStrings = RibbonMenusStrings['ribbonMenu'];
  *  the Mac host only. */
 export type MacRemoveDuplicatesStrings = Partial<RibbonMenuStrings>;
 
-/** The `ribbonMenu` keys the Mac Remove Duplicates dialog can override. A
- *  locale whose Mac wording is not measured repeats its own shared text. */
+/** The `ribbonMenu` keys the Mac Remove Duplicates dialog can override. Each locale starts from its own shared text and overrides the fields the Excel bundle answers. */
 const MAC_REMOVE_DUPLICATES_KEYS = [
   'sortDialogHeader',
 ] as const satisfies readonly (keyof RibbonMenuStrings)[];

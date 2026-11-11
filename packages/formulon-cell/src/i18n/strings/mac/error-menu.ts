@@ -40,22 +40,22 @@ export const macErrorMenuJa: MacErrorMenuStrings = {
   optionsUnavailable: 'この機能は未実装です。',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar, optionsUnavailable. */
 export const macErrorMenuDe: MacErrorMenuStrings = {
-  divZeroHeading: 'Fehler: Division durch Null',
-  numberAsTextHeading: 'Zahl als Text gespeichert',
+  divZeroHeading: 'Division durch Null',
+  numberAsTextHeading: 'Als Text gespeicherte Zahlen',
   convertToNumber: 'In Zahl umwandeln',
   help: 'Hilfe zu diesem Fehler',
   trace: 'Fehler überprüfen',
   ignore: 'Fehler ignorieren',
   editInFormulaBar: 'In Bearbeitungsleiste bearbeiten',
-  options: 'Optionen für Fehlerüberprüfung...',
+  options: 'Optionen zur Fehlerüberprüfung...',
   optionsUnavailable: 'Diese Funktion ist noch nicht implementiert.',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar, optionsUnavailable. */
 export const macErrorMenuFr: MacErrorMenuStrings = {
-  divZeroHeading: 'Erreur de division par zéro',
+  divZeroHeading: 'Erreur lors de la division par zéro',
   numberAsTextHeading: 'Nombre stocké sous forme de texte',
   convertToNumber: 'Convertir en nombre',
   help: 'Aide sur cette erreur',
@@ -66,7 +66,7 @@ export const macErrorMenuFr: MacErrorMenuStrings = {
   optionsUnavailable: 'Cette fonctionnalité n’est pas encore implémentée.',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: divZeroHeading, convertToNumber, help, trace, ignore, editInFormulaBar, and 1 more. */
 export const macErrorMenuZh: MacErrorMenuStrings = {
   divZeroHeading: '除以零错误',
   numberAsTextHeading: '以文本形式存储的数字',
@@ -79,10 +79,10 @@ export const macErrorMenuZh: MacErrorMenuStrings = {
   optionsUnavailable: '此功能尚未实现。',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar, optionsUnavailable. */
 export const macErrorMenuKo: MacErrorMenuStrings = {
   divZeroHeading: '0으로 나누기 오류',
-  numberAsTextHeading: '텍스트로 저장된 숫자',
+  numberAsTextHeading: '텍스트 형식으로 저장된 숫자',
   convertToNumber: '숫자로 변환',
   help: '이 오류에 대한 도움말',
   trace: '오류 추적',
@@ -92,10 +92,10 @@ export const macErrorMenuKo: MacErrorMenuStrings = {
   optionsUnavailable: '이 기능은 아직 구현되지 않았습니다.',
 };
 
-/** Mac wording for this locale; not measured. */
+/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar, optionsUnavailable. */
 export const macErrorMenuTh: MacErrorMenuStrings = {
-  divZeroHeading: 'ข้อผิดพลาดหารด้วยศูนย์',
-  numberAsTextHeading: 'ตัวเลขที่จัดเก็บเป็นข้อความ',
+  divZeroHeading: 'ข้อผิดพลาดจากการหารด้วยศูนย์',
+  numberAsTextHeading: 'ตัวเลขที่ถูกเก็บในรูปข้อความ',
   convertToNumber: 'แปลงเป็นตัวเลข',
   help: 'วิธีใช้เกี่ยวกับข้อผิดพลาดนี้',
   trace: 'ติดตามข้อผิดพลาด',
