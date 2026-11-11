@@ -2409,4 +2409,12 @@
     max-height: none;
     box-sizing: border-box;
   }
+
+  .fc-fmtdlg--mac .fc-fmtdlg__btn--clear {
+    margin-right: auto;
+  }
+
+  .fc-fmtdlg--mac .fc-fmtdlg__color-auto {
+    margin-left: 8px;
+  }
 }

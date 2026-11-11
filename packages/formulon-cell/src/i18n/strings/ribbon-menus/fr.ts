@@ -437,6 +437,7 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     tableStyleNew: 'Nouveau style de tableau…',
     tableStyleNewPivot: 'Nouveau style de tableau croisé dynamique…',
     tableStyleClear: 'Effacer',
+    tableStyleNone: 'Aucun',
     tableStyleApplyMaintain: 'Appliquer (et conserver la mise en forme)',
     tableStyleApplyClear: 'Appliquer et supprimer la mise en forme',
     tableStyleModify: 'Modifier...',

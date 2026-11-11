@@ -388,7 +388,11 @@ export function activeStyleTarget(
     return {
       kind,
       currentId: currentTableStyleId(state, overlayStyleName(table)),
-      apply: (styleId, options) => applyTableStyle(ctx, table, styleId, options),
+      // None is no style.
+      apply: (styleId, options) =>
+        styleId === ''
+          ? clearTableStyle(ctx, table)
+          : applyTableStyle(ctx, table, styleId, options),
       clear: () => clearTableStyle(ctx, table),
     };
   }

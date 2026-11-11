@@ -7,11 +7,10 @@ import {
 } from '../commands/table-style-actions.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { menuSeparator, menuTextChip } from '../toolbar/ribbon/menus/general.js';
-import { showCreateTableDialog } from './dynamic-dropdown-defaults/styles.js';
 import type { SpreadsheetInstance } from './types.js';
 
-const ITEM_SELECTOR =
-  '[data-table-style], [data-table-quick-style], [data-pivot-table-style], [data-pivot-style]';
+/** The in-ribbon strip chips; the expanded galleries have no context menu. */
+const ITEM_SELECTOR = '[data-table-quick-style], [data-pivot-style]';
 
 type Action = 'applyMaintain' | 'applyClear' | 'modify' | 'duplicate' | 'delete' | 'setDefault';
 
@@ -74,10 +73,9 @@ export function attachTableStyleContextMenu(
       case 'applyMaintain':
       case 'applyClear': {
         const clearFormatting = action === 'applyClear';
-        const target = activeStyleTarget({ ...ctx, workbook: instance.workbook }, kind);
-        if (target) target.apply(styleId, { clearFormatting });
-        else if (kind === 'table')
-          void showCreateTableDialog(instance, { style: styleId, clearFormatting }, entry);
+        activeStyleTarget({ ...ctx, workbook: instance.workbook }, kind)?.apply(styleId, {
+          clearFormatting,
+        });
         break;
       }
       case 'modify':
@@ -99,28 +97,15 @@ export function attachTableStyleContextMenu(
     const item = target?.closest<HTMLElement>(ITEM_SELECTOR);
     const instance = getInstance();
     if (!item || !instance || !host.contains(item)) return;
-    const kind: TableStyleKind =
-      item.dataset.pivotTableStyle !== undefined || item.dataset.pivotStyle !== undefined
-        ? 'pivot'
-        : 'table';
-    const styleId =
-      item.dataset.tableStyle ??
-      item.dataset.tableQuickStyle ??
-      item.dataset.pivotTableStyle ??
-      item.dataset.pivotStyle ??
-      '';
+    const kind: TableStyleKind = item.dataset.pivotStyle !== undefined ? 'pivot' : 'table';
+    const styleId = item.dataset.tableQuickStyle ?? item.dataset.pivotStyle ?? '';
     // None is a gallery entry without a style to edit.
     const none = styleId === '';
     if (kind === 'table' && none) return;
     event.preventDefault();
     event.stopPropagation();
     close(false);
-    const from =
-      kind === 'pivot'
-        ? 'pivotQuickStyles'
-        : item.dataset.tableQuickStyle !== undefined || item.closest('#menu-table-quick-styles')
-          ? 'tableQuickStyles'
-          : 'formatTableHome';
+    const from = kind === 'pivot' ? 'pivotQuickStyles' : 'tableQuickStyles';
     const t = instance.i18n.strings.ribbonMenu;
     const custom = customStyleOf(instance, kind, styleId) !== null;
     const menu = document.createElement('div');
@@ -146,8 +131,8 @@ export function attachTableStyleContextMenu(
     };
     // Built-in styles cannot be modified or deleted; the defaults need an engine that keeps them.
     menu.append(
-      button('applyMaintain', t.tableStyleApplyMaintain),
       button('applyClear', t.tableStyleApplyClear),
+      button('applyMaintain', t.tableStyleApplyMaintain),
       menuSeparator(),
       button('modify', t.tableStyleModify, !custom),
       button('duplicate', t.tableStyleDuplicate, none),

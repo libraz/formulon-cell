@@ -589,11 +589,12 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
                 getInst: ctx.getInst,
                 arrow: b,
                 menu: submenu?.() ?? null,
+                pageArrows: profile !== 'excel365Mac',
               }),
             );
             continue;
           }
-          if (profile !== 'excel365Mac' && c.id === 'tableQuickStyles') {
+          if (c.id === 'tableQuickStyles') {
             // The Table Design tab embeds the table style gallery; the button becomes its more arrow.
             tools.appendChild(
               createTableStyleGallery({
@@ -601,6 +602,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
                 getInst: ctx.getInst,
                 arrow: b,
                 menu: submenu?.() ?? null,
+                pageArrows: profile !== 'excel365Mac',
               }),
             );
             continue;

@@ -511,12 +511,26 @@ describe('table style gallery order', () => {
       style: 'dark' as const,
       variant: 'banded' as const,
     };
-    expect(tableStyleGallerySections([custom]).map((s) => [s.kind, s.styles.length])).toEqual([
-      ['custom', 1],
-      ['light', 21],
-      ['medium', 28],
-      ['dark', 11],
+    const home = { none: false };
+    expect(tableStyleGallerySections([custom], home).map((s) => [s.kind, s.styles.length])).toEqual(
+      [
+        ['custom', 1],
+        ['light', 21],
+        ['medium', 28],
+        ['dark', 11],
+      ],
+    );
+    expect(tableStyleGallerySections([], home).map((s) => s.kind)).toEqual([
+      'light',
+      'medium',
+      'dark',
     ]);
-    expect(tableStyleGallerySections([]).map((s) => s.kind)).toEqual(['light', 'medium', 'dark']);
+  });
+
+  it('starts Light with None only in the Table Design gallery', () => {
+    const [light] = tableStyleGallerySections([], { none: true });
+    expect(light?.styles.length).toBe(22);
+    expect(light?.styles[0]?.name).toBe('');
+    expect(light?.styles[1]?.name).toBe('TableStyleLight1');
   });
 });

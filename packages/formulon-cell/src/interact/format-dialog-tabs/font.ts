@@ -82,6 +82,10 @@ export interface FontTabRefs {
   normalFontCk: ReturnType<typeof makeCheckbox>;
   fontStyleList: HTMLDivElement;
   familyInput: HTMLInputElement;
+  familyList: HTMLDivElement;
+  sizeList: HTMLDivElement;
+  /** Mac presentation: the "Automatic" caption beside an unset color. */
+  colorAutoLabel: HTMLSpanElement;
   sizeInput: HTMLInputElement;
   colorInput: HTMLInputElement;
   colorReset: HTMLButtonElement;
@@ -376,7 +380,11 @@ export function createFontTab(
   colorControl.className = 'fc-fmtdlg__color-control';
   colorControl.append(colorInput, fontSwatchesToggle);
   const colorReset = makeButton(mac ? t.automatic : t.resetToDefault);
-  if (mac) colorRow.append(colorLabel, colorControl);
+  const colorAutoLabel = document.createElement('span');
+  colorAutoLabel.className = 'fc-fmtdlg__color-auto';
+  colorAutoLabel.textContent = t.automatic;
+  colorAutoLabel.hidden = true;
+  if (mac) colorRow.append(colorLabel, colorControl, colorAutoLabel);
   else colorRow.append(colorLabel, colorControl, colorReset);
   panel.appendChild(colorRow);
   const fontSwatches = makeSwatches('font', t.themeColors, t.standardColors);
@@ -413,6 +421,9 @@ export function createFontTab(
     normalFontCk,
     fontStyleList,
     familyInput,
+    familyList,
+    sizeList,
+    colorAutoLabel,
     sizeInput,
     colorInput,
     colorReset,

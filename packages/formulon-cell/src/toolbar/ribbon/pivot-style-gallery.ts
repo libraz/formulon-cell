@@ -115,6 +115,8 @@ export interface PivotStyleGalleryOptions {
   /** The ribbon's Quick Styles button; it opens the full gallery. */
   arrow: HTMLButtonElement;
   menu: HTMLElement | null;
+  /** Page arrows beside the strip; off on the Mac profile. */
+  pageArrows: boolean;
 }
 
 /** The PivotTable Design Quick Styles: custom styles, None and the built-in styles, a page at a
@@ -139,25 +141,27 @@ export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDiv
   const wrap = createQuickStyleStrip({
     lang,
     classPrefix: 'fc-tb__pivotstyle',
+    arrows: opts.pageArrows,
     chipKey: 'pivotStyle',
     pageSize: PAGE_SIZE,
     entries: () => {
       const inst = getInst();
       if (!inst) return [];
       const theme = inst.workbook.getTheme()?.colors;
-      return pivotStyleGallerySections(listCustomPivotTableStyles(inst.store.getState())).flatMap(
-        (section): QuickStyleEntry[] =>
-          section.kind === 'custom'
-            ? section.styles.map((style) => ({
-                id: style.id,
-                label: style.label,
-                thumbnail: () => pivotStyleThumbnail(style.elements),
-              }))
-            : section.names.map((name) => ({
-                id: name,
-                label: pivotStyleLabel(name, lang),
-                thumbnail: () => pivotStyleThumbnail(builtinPivotThumbnailElements(name, theme)),
-              })),
+      return pivotStyleGallerySections(listCustomPivotTableStyles(inst.store.getState()), {
+        none: true,
+      }).flatMap((section): QuickStyleEntry[] =>
+        section.kind === 'custom'
+          ? section.styles.map((style) => ({
+              id: style.id,
+              label: style.label,
+              thumbnail: () => pivotStyleThumbnail(style.elements),
+            }))
+          : section.names.map((name) => ({
+              id: name,
+              label: pivotStyleLabel(name, lang),
+              thumbnail: () => pivotStyleThumbnail(builtinPivotThumbnailElements(name, theme)),
+            })),
       );
     },
     // No report, or one without a style element, shows None as current.

@@ -21,6 +21,8 @@ export interface QuickStyleStripOptions {
   /** Dataset key each chip carries its entry id under. */
   readonly chipKey: string;
   readonly pageSize: number;
+  /** Previous and next page arrows; the Mac strip has none and shows only the current page. */
+  readonly arrows: boolean;
   readonly entries: () => readonly QuickStyleEntry[];
   /** The id of the style in use; null when nothing is selected that takes a style. */
   readonly current: () => string | null;
@@ -34,8 +36,8 @@ const ARROW_LABELS = {
   next: { ja: '次のクイック スタイル ギャラリー', en: 'Next Quick Styles gallery' },
 } as const;
 
-/** An in-ribbon style gallery: a page of style chips with arrows, refreshed by an
- *  `fc-ribbon-control-refresh` event on the wrapper, opening on the page of the current style. */
+/** An in-ribbon style gallery: a page of style chips, refreshed by an `fc-ribbon-control-refresh`
+ *  event on the wrapper, that turns to the page of the current style whenever it changes. */
 export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElement => {
   const { classPrefix, pageSize } = opts;
   const arrowLabel = (key: keyof typeof ARROW_LABELS): string =>
@@ -53,20 +55,27 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
     className: `${classPrefix}-next`,
     ariaLabel: arrowLabel('next'),
   });
-  wrap.append(prev, strip, next);
+  if (opts.arrows) wrap.append(prev, strip, next);
+  else wrap.append(strip);
   if (opts.more) {
     wrap.appendChild(opts.more.arrow);
     if (opts.more.menu) wrap.appendChild(opts.more.menu);
   }
 
   let page = 0;
+  let shownCurrent: string | null | undefined;
   const lastPage = (entries: readonly QuickStyleEntry[]): number =>
     Math.max(0, Math.ceil(entries.length / pageSize) - 1);
 
   const render = (): void => {
     const entries = opts.entries();
-    page = Math.min(page, lastPage(entries));
     const current = opts.current();
+    if (current !== shownCurrent) {
+      shownCurrent = current;
+      const at = entries.findIndex((entry) => entry.id === current);
+      if (at >= 0) page = Math.floor(at / pageSize);
+    }
+    page = Math.min(page, lastPage(entries));
     strip.replaceChildren(
       ...entries.slice(page * pageSize, page * pageSize + pageSize).map((entry) => {
         const chip = createInteractionChipButton({
@@ -97,8 +106,6 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
     page = Math.min(lastPage(opts.entries()), page + 1);
     render();
   });
-  const currentIndex = opts.entries().findIndex((entry) => entry.id === opts.current());
-  if (currentIndex >= 0) page = Math.floor(currentIndex / pageSize);
   render();
   return wrap;
 };

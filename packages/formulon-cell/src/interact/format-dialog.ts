@@ -31,6 +31,7 @@ import { rangeContainsAddr, sameRange } from '../store/selection-geometry.js';
 import type { CellFormat, NumFmt, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { syncCustomSelects } from './custom-select.js';
 import { type DialogEntry, INSTANCE_API_FORMAT_ENTRY } from './dialog-entry.js';
 import { deferInitialFocus } from './dialog-shell.js';
@@ -96,6 +97,9 @@ export interface FormatDialogOpenOptions {
   /** Receives the editable differential-format dimensions instead of writing
    *  to the active cell. Used by conditional-format Custom Format. */
   onApplyDxf?: (format: Partial<CellFormat>) => void;
+  /** A table or PivotTable style element's format in `dxf` mode: on the Mac profile, the
+   *  desktop's element form (Font, Border and Fill only, a Clear button, tri-state strike). */
+  styleElement?: boolean;
   /** Receives the chosen number format in `numberFormat` mode. */
   onApplyNumberFormat?: (numFmt: NumFmt) => void;
   /** The value the sample shows in `numberFormat` mode; the active cell's by default. */
@@ -295,6 +299,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     closeBtn,
     okBtn,
     cancelBtn,
+    clearBtn,
     hintBar,
   } = view;
   overlay.classList.toggle('fc-fmtdlg--mac', isMacHost(host));
@@ -324,6 +329,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── State ──────────────────────────────────────────────────────────────
   let activeTab: TabId = 'number';
   let applyDxf: ((format: Partial<CellFormat>) => void) | null = null;
+  // A style element's format on the Mac profile (`styleElement`).
+  let elementDxf = false;
   let submitting = false;
   let waitingForConfirmation = false;
   let previewValue: CellValue = { kind: 'blank' };
@@ -374,6 +381,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
           nativeFontSamples,
         );
     for (const field of summary.mixed) mixedFields.add(field);
+    // Strikethrough is tri-state there: unset until the user picks a side.
+    if (elementDxf && initialFormat?.strike === undefined) mixedFields.add('strike');
     const displayMerge = mergeAt(state, active);
     const displayAddr = displayMerge
       ? { sheet: displayMerge.sheet, row: displayMerge.r0, col: displayMerge.c0 }
@@ -431,9 +440,19 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     previewValue: () => (dialogMode === 'dxf' ? null : previewValue),
     fontEffects: () => isMacHost(host),
   });
+  const elementDxfHasContent = (): boolean => {
+    const { numFmt: _numFmt, ...dxf } = buildDialogDxf(
+      draft,
+      defaultPatternFor,
+      padsNumberRows(getWb()),
+    );
+    if (isMixedField('strike')) dxf.strike = undefined;
+    return Object.values(dxf).some((v) => v !== undefined && v !== false && v !== '');
+  };
   const renderPreview = (): void => {
     alignTab.syncRotationDial();
     renderPreviewBody();
+    if (elementDxf) projectDisabledState(clearBtn, !elementDxfHasContent(), null);
   };
 
   const defaultPatternFor = (cat: NumberCategory): string =>
@@ -535,6 +554,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
     const dataValidationMode = mode === 'dataValidation';
     const dxfMode = mode === 'dxf';
+    clearBtn.hidden = !elementDxf;
     const numberMode = mode === 'numberFormat';
     overlay.classList.toggle('fc-fmtdlg--data-validation', dataValidationMode);
     overlay.classList.toggle('fc-fmtdlg--number-format', numberMode);
@@ -554,10 +574,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       const macHidden = isMacHost(host) && tabId === 'more' && !showMoreTab;
       button.hidden =
         macHidden ||
+        (elementDxf && tabId === 'number') ||
         (numberMode && tabId !== 'number') ||
         (dxfMode && (tabId === 'align' || tabId === 'protection' || tabId === 'more'));
     }
-    if (
+    if (elementDxf && activeTab === 'number') {
+      setActiveTab('font');
+    } else if (
       numberMode ||
       (dxfMode && (activeTab === 'align' || activeTab === 'protection' || activeTab === 'more'))
     ) {
@@ -568,7 +591,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── Apply OK ───────────────────────────────────────────────────────────
   const applyAndClose = async (): Promise<void> => {
     if (applyDxf) {
-      applyDxf(buildDialogDxf(draft, defaultPatternFor, padsNumberRows(getWb())));
+      const dxf = buildDialogDxf(draft, defaultPatternFor, padsNumberRows(getWb()));
+      if (elementDxf && isMixedField('strike')) dxf.strike = undefined;
+      applyDxf(dxf);
       api.close();
       return;
     }
@@ -767,6 +792,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
   };
   const onCancel = (): void => api.close();
+  const onClear = (): void => {
+    const tab = activeTab;
+    hydrateFromActive({});
+    setActiveTab(tab);
+  };
 
   const onOverlayKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
@@ -804,6 +834,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     getLocale: getFormatLocale,
     getDate1904,
     isDxfMode: () => dialogMode === 'dxf',
+    isElementDxfMode: () => elementDxf,
     isMacPlatform: () => isMacHost(host),
   };
   shell.on(tabsStrip, 'click', onTabClick as EventListener);
@@ -828,6 +859,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(closeBtn, 'click', onCancel);
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', onCancel);
+  shell.on(clearBtn, 'click', onClear);
   shell.on(overlay, 'click', (e) => {
     if ((e as MouseEvent).target === overlay) e.stopPropagation();
   });
@@ -839,6 +871,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       pickFormat.begin();
       dialogMode = options?.mode ?? 'format';
       dialogEntry = options?.entry ?? INSTANCE_API_FORMAT_ENTRY;
+      elementDxf = options?.mode === 'dxf' && options.styleElement === true && isMacHost(host);
       const onNumberFormat = options?.onApplyNumberFormat;
       applyDxf =
         options?.mode === 'dxf'

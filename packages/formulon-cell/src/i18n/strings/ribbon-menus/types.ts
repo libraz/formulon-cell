@@ -432,6 +432,8 @@ export interface RibbonMenusStrings {
     tableStyleNewPivot: string;
     /** Clear in the table style gallery: removes the active table's style. */
     tableStyleClear: string;
+    /** The gallery entry for no style. */
+    tableStyleNone: string;
     /** Context menu of a table style gallery item. */
     tableStyleApplyMaintain: string;
     tableStyleApplyClear: string;

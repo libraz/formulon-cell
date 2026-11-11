@@ -62,10 +62,12 @@ describe('table style dialog wiring', () => {
   const ok = () => dialog()?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
   const labels = () =>
     (sheet.instance.store.getState().tables.customTableStyles ?? []).map((style) => style.label);
+  /** Right-clicks a strip chip, paging the strip back to the custom styles first. */
   const menuItem = (chip: string, label: string): HTMLButtonElement => {
-    host.querySelector<HTMLButtonElement>('[data-ribbon-command="tableQuickStyles"]')?.click();
+    const prev = host.querySelector<HTMLButtonElement>('.fc-tb__tablestyle-quick-prev');
+    while (prev && prev.getAttribute('aria-disabled') !== 'true') prev.click();
     host
-      .querySelector<HTMLElement>(`#menu-table-quick-styles [data-table-style="${chip}"]`)
+      .querySelector<HTMLElement>(`[data-table-quick-style="${chip}"]`)
       ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     const found = [
       ...host.querySelectorAll<HTMLButtonElement>('.fc-tb__tablestyle-ctx button'),

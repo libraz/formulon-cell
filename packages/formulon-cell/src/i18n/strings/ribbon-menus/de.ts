@@ -442,6 +442,7 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     tableStyleNew: 'Neue Tabellenformatvorlage …',
     tableStyleNewPivot: 'Neue PivotTable-Formatvorlage …',
     tableStyleClear: 'Löschen',
+    tableStyleNone: 'Keine',
     tableStyleApplyMaintain: 'Übernehmen (und Formatierung beibehalten)',
     tableStyleApplyClear: 'Übernehmen und Formatierung löschen',
     tableStyleModify: 'Ändern...',

@@ -94,9 +94,9 @@ export const buildMacObjectTabs = (
           command('tableSummarizePivot', 'summarizePivot'),
           command('mac.data.removeDuplicates', 'removeDuplicates'),
           command('tableConvertRange', 'convertRange'),
-          command('mac.insert.slicer', 'insertSlicer'),
         ]),
-        group([command('tableRefresh', 'refresh')]),
+        group([command('mac.insert.slicer', 'insertSlicer', { kind: 'large' })]),
+        group([command('tableRefresh', 'refresh', { kind: 'large' })]),
         group([
           command('tableHeaderRow', 'headerRow'),
           command('tableTotalRow', 'totalRow'),

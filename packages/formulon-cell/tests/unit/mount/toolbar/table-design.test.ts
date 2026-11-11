@@ -242,8 +242,9 @@ describe('Table Design tab of the ribbon', () => {
     expect(
       chips().find((chip) => chip.getAttribute('aria-pressed') === 'true')?.dataset.tableQuickStyle,
     ).toBe('TableStyleMedium2');
+    // None leads Light, so this row starts at Table Style Light 21.
     chips()[0]?.click();
-    expect(table()?.styleName).toBe('TableStyleMedium1');
+    expect(table()?.styleName).toBe('TableStyleLight21');
     sheet.instance.history.undo();
     // The new table's style is named by its family and hue, Table Style Medium 2.
     expect(table()).toMatchObject({ style: 'medium', color: '#4472c4' });
@@ -252,7 +253,8 @@ describe('Table Design tab of the ribbon', () => {
     command('tableQuickStyles').click();
     const menu = host.querySelector<HTMLElement>('#menu-table-quick-styles');
     expect(menu?.hidden).toBe(false);
-    expect(menu?.querySelectorAll('.fc-tb__tablestyle-swatch')).toHaveLength(60);
+    expect(menu?.querySelectorAll('.fc-tb__tablestyle-swatch')).toHaveLength(61);
+    expect(menu?.querySelector('[data-table-style=""]')?.getAttribute('aria-label')).toBe('None');
     expect(
       menu?.querySelector<HTMLButtonElement>('[data-table-style-footer="clear-table-style"]')
         ?.hidden,

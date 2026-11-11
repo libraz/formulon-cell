@@ -19,7 +19,8 @@ describe('Mac table and chart tabs', () => {
     expect(macTab('tableDesign')?.label).toBe('テーブル');
     expect(labels('tableDesign')).toEqual([
       ['テーブル名:'],
-      ['ピボットテーブルで集計', '重複を削除', '範囲に変換', 'スライサーの挿入'],
+      ['ピボットテーブルで集計', '重複を削除', '範囲に変換'],
+      ['スライサーの挿入'],
       ['更新'],
       [
         '見出し行',
@@ -32,6 +33,11 @@ describe('Mac table and chart tabs', () => {
       ],
       ['クイック スタイル'],
     ]);
+  });
+
+  it('names the PivotTable design tab デザイン and groups it as Excel does', () => {
+    expect(macTab('pivotDesign')?.label).toBe('デザイン');
+    expect(labels('pivotDesign').map((group) => group.length)).toEqual([2, 2, 4, 1]);
   });
 
   it('lists the chart design tab', () => {

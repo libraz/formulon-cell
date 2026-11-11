@@ -432,6 +432,7 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     tableStyleNew: '새 표 스타일…',
     tableStyleNewPivot: '새 피벗 테이블 스타일…',
     tableStyleClear: '지우기',
+    tableStyleNone: '없음',
     tableStyleApplyMaintain: '서식 적용 및 유지',
     tableStyleApplyClear: '서식 적용 및 지우기',
     tableStyleModify: '수정...',

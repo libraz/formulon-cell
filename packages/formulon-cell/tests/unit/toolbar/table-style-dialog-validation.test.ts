@@ -47,7 +47,7 @@ describe('table style dialog result', () => {
     expect((await pending)?.stripeSizes).toEqual({ firstRowStripe: 2 });
   });
 
-  it('keeps the default flag when the dialog has no checkbox for it', async () => {
+  it('keeps the default flag the dialog opens with', async () => {
     const pending = open({
       kind: 'pivot',
       mode: 'modify',

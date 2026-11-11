@@ -60,7 +60,6 @@ import {
 } from '../../toolbar/dialogs/table-style.js';
 import { applyConditionalMenuAction } from '../../toolbar/ribbon/conditional-menu-action.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
-import { pivotStyleLabel } from '../../toolbar/ribbon/pivot-style-gallery.js';
 import { formatSheetAbsoluteRange, parseA1Range } from '../../wrappers/toolbar-a1.js';
 import { showInstanceReport } from './menu-feedback.js';
 import { normalizedSelectionRange } from './selection.js';
@@ -381,7 +380,12 @@ const runTableStyleDialog = async (
           getWb: () => instance.workbook,
           getLocale: () => instance.i18n.locale,
         });
-        format.dialog.open('font', { mode: 'dxf', initialFormat: initial, onApplyDxf: apply });
+        format.dialog.open('font', {
+          mode: 'dxf',
+          styleElement: true,
+          initialFormat: initial,
+          onApplyDxf: apply,
+        });
       },
       // The element line names what the element sets: its font, border and fill.
       describe: (format) => {
@@ -436,17 +440,15 @@ export const openNewTableStyle = async (
   instance.host.focus();
 };
 
-/** Modify or Duplicate from a style gallery item's context menu, for a table or PivotTable
- *  style. Duplicate names the copy after its source with the first free number from 2; that
- *  name is unmeasured. */
+/** Modify or Duplicate from a style gallery chip's context menu, for a table or PivotTable style.
+ *  Duplicate opens under the Modify title and names the copy after its source's style name (a
+ *  built-in's engine name, such as `TableStyleLight20`) with the first free number from 2. */
 export const openTableStyleEditor = async (
   instance: SpreadsheetInstance,
   kind: TableStyleKind,
   mode: 'modify' | 'duplicate',
   styleId: string,
 ): Promise<void> => {
-  const t = instance.i18n.strings.ribbonMenu;
-  const lang = dictionaryLocaleFor(instance.i18n.locale);
   const state = instance.store.getState();
   const custom =
     kind === 'table'
@@ -460,13 +462,7 @@ export const openTableStyleEditor = async (
       : styleId
         ? builtinPivotStyleElements(styleId, themeColors)
         : null;
-  const label = custom
-    ? custom.label
-    : !builtinElements
-      ? null
-      : kind === 'table'
-        ? (t.tableStyleSwatches[styleId as keyof typeof t.tableStyleSwatches] ?? styleId)
-        : pivotStyleLabel(styleId, lang);
+  const label = custom ? custom.label : builtinElements ? styleId : null;
   if (label === null || (mode === 'modify' && !custom)) return;
   const defaults = instance.workbook.getTableStyleDefaults();
   const currentDefault = kind === 'table' ? defaults?.tableStyle : defaults?.pivotStyle;
@@ -474,7 +470,7 @@ export const openTableStyleEditor = async (
     instance,
     {
       kind,
-      mode: mode === 'modify' ? 'modify' : 'new',
+      mode,
       initial: {
         name: mode === 'modify' ? label : freeStyleName(instance, `${label} {n}`, 2),
         elements: structuredClone(custom?.elements ?? builtinElements ?? {}),

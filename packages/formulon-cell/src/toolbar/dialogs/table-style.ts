@@ -22,8 +22,8 @@ import {
 
 type ElementLabel = keyof Strings['ribbonMenu']['tableStyleElements'];
 
-/** The elements the dialog lists for a table style, in the desktop order, and the label each
- *  shows. The Mac order is measured down to First Column; the rest follows the desktop list. */
+/** The elements the dialog lists for a table style, in the Mac desktop order, and the label each
+ *  shows. */
 const TABLE_ELEMENTS: readonly (readonly [TableStyleElementType, ElementLabel])[] = [
   ['wholeTable', 'wholeTable'],
   ['firstColumnStripe', 'firstColumnStripe'],
@@ -40,7 +40,7 @@ const TABLE_ELEMENTS: readonly (readonly [TableStyleElementType, ElementLabel])[
   ['lastTotalCell', 'lastTotalCell'],
 ];
 
-/** The PivotTable style elements, in the desktop order; unmeasured on the Mac app. */
+/** The PivotTable style elements, in the Mac desktop order. */
 const PIVOT_ELEMENTS: readonly (readonly [TableStyleElementType, ElementLabel])[] = [
   ['wholeTable', 'wholeTable'],
   ['pageFieldLabels', 'pageFieldLabels'],
@@ -55,10 +55,10 @@ const PIVOT_ELEMENTS: readonly (readonly [TableStyleElementType, ElementLabel])[
   ['firstSubtotalColumn', 'firstSubtotalColumn'],
   ['secondSubtotalColumn', 'secondSubtotalColumn'],
   ['thirdSubtotalColumn', 'thirdSubtotalColumn'],
+  ['blankRow', 'blankRow'],
   ['firstSubtotalRow', 'firstSubtotalRow'],
   ['secondSubtotalRow', 'secondSubtotalRow'],
   ['thirdSubtotalRow', 'thirdSubtotalRow'],
-  ['blankRow', 'blankRow'],
   ['firstColumnSubheading', 'firstColumnSubheading'],
   ['secondColumnSubheading', 'secondColumnSubheading'],
   ['thirdColumnSubheading', 'thirdColumnSubheading'],
@@ -87,8 +87,9 @@ export interface TableStyleDialogValue {
 
 export interface TableStyleDialogOptions {
   kind: TableStyleKind;
-  mode: 'new' | 'modify';
-  /** The Mac host: its own titles and labels, and no PivotTable default checkbox. */
+  /** Duplicate writes a new style under the Modify dialog's title. */
+  mode: 'new' | 'modify' | 'duplicate';
+  /** The Mac host: its own titles and labels. */
   mac: boolean;
   strings: Strings;
   initial: Omit<TableStyleDialogValue, 'setAsDefault'> & { setAsDefault?: boolean };
@@ -112,22 +113,25 @@ export const showTableStyleDialog = (
     const { strings, mac, kind } = opts;
     const t = strings.ribbonMenu;
     const m = strings.mac.tableStyleDialog;
-    const title =
+    const modifyTitle =
       kind === 'table'
-        ? opts.mode === 'new'
-          ? mac
-            ? m.newTitle
-            : t.tableStyleNewTitle
-          : mac
-            ? m.modifyTitle
-            : t.tableStyleModifyTitle
-        : opts.mode === 'new'
-          ? mac
-            ? m.newPivotTitle
-            : t.tableStyleNewPivotTitle
-          : mac
-            ? m.modifyPivotTitle
-            : t.tableStyleModifyPivotTitle;
+        ? mac
+          ? m.modifyTitle
+          : t.tableStyleModifyTitle
+        : mac
+          ? m.modifyPivotTitle
+          : t.tableStyleModifyPivotTitle;
+    const newTitle =
+      kind === 'table'
+        ? mac
+          ? m.newTitle
+          : t.tableStyleNewTitle
+        : mac
+          ? m.newPivotTitle
+          : t.tableStyleNewPivotTitle;
+    // The Mac Modify dialog names the style in its title.
+    const title =
+      opts.mode === 'new' ? newTitle : mac ? `${modifyTitle} ${opts.initial.name}` : modifyTitle;
     const elements: StyleElementFormats = structuredClone(opts.initial.elements);
     const stripeSizes: Partial<Record<StripeElement, number>> = { ...opts.initial.stripeSizes };
     const list = kind === 'table' ? TABLE_ELEMENTS : PIVOT_ELEMENTS;
@@ -190,20 +194,17 @@ export const showTableStyleDialog = (
     describeRow.hidden = mac;
     shell.body.appendChild(describeRow);
 
-    // The Mac PivotTable Quick Style dialog has no default checkbox.
-    const setDefault =
-      kind === 'pivot' && mac
-        ? null
-        : appendCheckboxRow(
-            shell.body,
-            kind === 'table'
-              ? mac
-                ? m.setDefault
-                : t.tableStyleSetDefaultTable
-              : t.tableStyleSetDefaultPivot,
-            opts.initial.setAsDefault === true,
-            'setAsDefault',
-          );
+    // The Mac dialog words the default checkbox the same for both kinds.
+    const setDefault = appendCheckboxRow(
+      shell.body,
+      mac
+        ? m.setDefault
+        : kind === 'table'
+          ? t.tableStyleSetDefaultTable
+          : t.tableStyleSetDefaultPivot,
+      opts.initial.setAsDefault === true,
+      'setAsDefault',
+    );
 
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
@@ -298,8 +299,7 @@ export const showTableStyleDialog = (
         name: label,
         elements,
         stripeSizes: sizes,
-        // Without the checkbox the style keeps the default it had.
-        setAsDefault: setDefault ? setDefault.checked : opts.initial.setAsDefault === true,
+        setAsDefault: setDefault.checked,
       };
       lifecycle.finish(value);
       return value;

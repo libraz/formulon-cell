@@ -430,6 +430,7 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     tableStyleNew: 'สไตล์ตารางใหม่…',
     tableStyleNewPivot: 'สไตล์ PivotTable ใหม่…',
     tableStyleClear: 'ล้าง',
+    tableStyleNone: 'ไม่มี',
     tableStyleApplyMaintain: 'นำไปใช้ (และคงการจัดรูปแบบเดิม)',
     tableStyleApplyClear: 'ใช้และล้างการจัดรูปแบบ',
     tableStyleModify: 'ปรับเปลี่ยน...',

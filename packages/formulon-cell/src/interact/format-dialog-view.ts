@@ -361,6 +361,9 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     normalFontCk,
     fontStyleList,
     familyInput,
+    familyList,
+    sizeList,
+    colorAutoLabel,
     sizeInput,
     colorInput,
     colorReset,
@@ -492,7 +495,11 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   // ── Footer buttons ─────────────────────────────────────────────────────
   const cancelBtn = makeButton(t.cancel);
   const okBtn = makeButton(t.ok, true);
-  footer.append(cancelBtn, okBtn);
+  // Offered only for a table style element on the Mac profile.
+  const clearBtn = makeButton(t.clearField);
+  clearBtn.classList.add('fc-fmtdlg__btn--clear');
+  clearBtn.hidden = true;
+  footer.append(clearBtn, cancelBtn, okBtn);
 
   return {
     shell,
@@ -553,6 +560,9 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     normalFontCk,
     fontStyleList,
     familyInput,
+    familyList,
+    sizeList,
+    colorAutoLabel,
     sizeInput,
     colorInput,
     colorReset,
@@ -647,6 +657,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     closeBtn,
     okBtn,
     cancelBtn,
+    clearBtn,
     hintBar,
   };
 }

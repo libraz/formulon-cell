@@ -72,8 +72,8 @@ describe('table style gallery context menu', () => {
   it('offers the desktop items, with Modify and Delete only for a custom style', () => {
     rightClick('[data-table-quick-style="TableStyleMedium3"]');
     expect(items().map((button) => [button.textContent, button.disabled])).toEqual([
-      ['Apply (and Maintain Formatting)', false],
       ['Apply and Clear Formatting', false],
+      ['Apply (and Maintain Formatting)', false],
       ['Modify...', true],
       ['Duplicate...', false],
       ['Delete', true],
@@ -187,9 +187,10 @@ describe('table style gallery context menu', () => {
     item('Duplicate...').click();
     await Promise.resolve();
     const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
-    expect(dialog?.textContent).toContain('New Table Style');
+    // Duplicate opens under the Modify title and names the copy after the engine style name.
+    expect(dialog?.textContent).toContain('Modify Table Style');
     const name = dialog?.querySelector<HTMLInputElement>('input');
-    expect(name?.value).toMatch(/ 2$/);
+    expect(name?.value).toBe('TableStyleMedium3 2');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     const created = sheet.instance.store.getState().tables.customTableStyles ?? [];
@@ -199,24 +200,14 @@ describe('table style gallery context menu', () => {
     );
   });
 
-  it('creates a table with cleared formatting when no table is active', async () => {
-    const cell = { sheet: 0, row: 5, col: 4 };
-    sheet.workbook.setText(cell, 'x');
-    mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
-    mutators.setCellFormat(sheet.instance.store, cell, { fill: '#00ff00' });
-    mutators.setActive(sheet.instance.store, cell);
+  it('offers no context menu in the expanded galleries', () => {
     toolbar.setActiveTab('home');
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableHome"]')?.click();
     rightClick('#menu-table-style-home [data-table-style="TableStyleLight2"]');
-    item('Apply and Clear Formatting').click();
-    await Promise.resolve();
-    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
-    await Promise.resolve();
-    const tables = sheet.instance.store.getState().tables.tables;
-    expect(tables.at(-1)).toMatchObject({ styleName: 'TableStyleLight2' });
-    expect(sheet.instance.store.getState().format.formats.get('0:5:4')?.fill).toBeUndefined();
-    sheet.instance.history.undo();
-    expect(sheet.instance.store.getState().tables.tables).toHaveLength(1);
-    expect(sheet.instance.store.getState().format.formats.get('0:5:4')?.fill).toBe('#00ff00');
+    expect(items()).toHaveLength(0);
+    toolbar.setActiveTab('tableDesign');
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="tableQuickStyles"]')?.click();
+    rightClick('#menu-table-quick-styles [data-table-style="TableStyleLight2"]');
+    expect(items()).toHaveLength(0);
   });
 });

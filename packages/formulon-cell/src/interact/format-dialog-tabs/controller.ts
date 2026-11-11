@@ -27,6 +27,9 @@ export interface FormatTabContext {
   /** Editing a conditional-format differential format, which carries no
    *  gradient fill and no font effects. */
   isDxfMode(): boolean;
+  /** Editing a table style element's format on the Mac profile: the font
+   *  family and size are fixed and strikethrough starts unset. */
+  isElementDxfMode(): boolean;
   /** Whether the host renders the Mac desktop profile. */
   isMacPlatform(): boolean;
 }

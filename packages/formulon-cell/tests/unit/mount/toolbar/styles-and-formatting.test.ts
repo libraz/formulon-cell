@@ -291,13 +291,12 @@ describe('Spreadsheet.mountToolbar', () => {
     const footerActions = Array.from(
       menu?.querySelectorAll<HTMLButtonElement>(':scope > .fc-tb__tablestyle-footer') ?? [],
     );
+    // Home > Format as Table offers New PivotTable Style and has no Clear.
     expect(footerActions.map((button) => button.dataset.tableStyleFooter)).toEqual([
       'new-table-style',
       'new-pivot-style',
-      'clear-table-style',
     ]);
-    // Clear appears only while a table is active.
-    expect(footerActions.map((button) => button.hidden)).toEqual([false, false, true]);
+    expect(footerActions.map((button) => button.hidden)).toEqual([false, false]);
     expect(
       footerActions.every((button) => button.classList.contains('fc-tb__menu-item--iconic')),
     ).toBe(true);
@@ -382,12 +381,11 @@ describe('Spreadsheet.mountToolbar', () => {
       { styleName: 'TableStyleMedium2' },
     ]);
 
-    tb.dropdownsApi?.openDynamicRibbonDropdown(
-      { command: 'formatTableHome', menuId: 'menu-table-style-home' },
-      host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableHome"]'),
-    );
+    // Clear lives in the Table Design gallery.
+    tb.setActiveTab('tableDesign');
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="tableQuickStyles"]')?.click();
     const clear = host.querySelector<HTMLButtonElement>(
-      '[data-table-style-footer="clear-table-style"]',
+      '#menu-table-quick-styles [data-table-style-footer="clear-table-style"]',
     );
     expect(clear?.hidden).toBe(false);
     expect(clear?.textContent).toBe('Clear');

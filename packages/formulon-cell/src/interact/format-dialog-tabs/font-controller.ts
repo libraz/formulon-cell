@@ -39,7 +39,17 @@ const NORMAL_FONT_FIELDS: readonly FormatDialogField[] = [
 ];
 
 export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTabController {
-  const { draft, getLocale, on, touch, isMixed, syncControls, renderPreview, isMacPlatform } = ctx;
+  const {
+    draft,
+    getLocale,
+    on,
+    touch,
+    isMixed,
+    syncControls,
+    renderPreview,
+    isMacPlatform,
+    isElementDxfMode,
+  } = ctx;
   const {
     boldCk,
     italicCk,
@@ -52,6 +62,9 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     normalFontCk,
     fontStyleList,
     familyInput,
+    familyList,
+    sizeList,
+    colorAutoLabel,
     sizeInput,
     colorInput,
     colorReset,
@@ -127,6 +140,26 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     }
   };
 
+  // A table style element cannot change the font itself, only its style,
+  // underline, strikethrough and color; an unset color reads as Automatic.
+  const syncElementLock = (): void => {
+    const locked = isElementDxfMode();
+    for (const control of [
+      familyInput,
+      sizeInput,
+      superscriptCk.input,
+      subscriptCk.input,
+      ...familyList.querySelectorAll<HTMLButtonElement>('button'),
+      ...sizeList.querySelectorAll<HTMLButtonElement>('button'),
+    ]) {
+      projectDisabledState(control, locked, null);
+    }
+    const automatic = locked && draft.color === undefined;
+    colorAutoLabel.hidden = !automatic;
+    if (automatic) colorInput.dataset.fcAutomatic = 'true';
+    else delete colorInput.dataset.fcAutomatic;
+  };
+
   const sync = (): void => {
     boldCk.input.checked = draft.bold;
     italicCk.input.checked = draft.italic;
@@ -166,6 +199,7 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     }
     colorInput.value = draft.color && isHexColor(draft.color) ? draft.color : '#000000';
     fontSwatches.setValue(draft.color && isHexColor(draft.color) ? draft.color : null);
+    syncElementLock();
   };
 
   const syncMixed = (): void => {
@@ -205,6 +239,7 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
       fontSwatches.setValue(null);
       markMixed(colorInput, true, 'color');
     }
+    syncElementLock();
   };
 
   // ── Events ─────────────────────────────────────────────────────────────

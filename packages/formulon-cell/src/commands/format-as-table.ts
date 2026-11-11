@@ -295,15 +295,29 @@ export type TableStyleGallerySection<C = CustomTableStyle> =
   | { readonly kind: 'custom'; readonly styles: readonly C[] }
   | { readonly kind: TableStyle; readonly styles: readonly BuiltinTableStyle[] };
 
-/** The table style gallery's sections in order, shared by the menu and the in-ribbon strip:
- *  Custom first, when there is one, then Light, Medium and Dark. The Custom position is
- *  unmeasured on the Mac app. */
-export function tableStyleGallerySections<C>(customs: readonly C[]): TableStyleGallerySection<C>[] {
+/** Which gallery a section list is for: the Table Design and PivotTable Design galleries start
+ *  their Light section with None; Home > Format as Table does not. */
+export interface StyleGallerySurface {
+  readonly none: boolean;
+}
+
+/** The None entry of the table style gallery: no style. */
+export const TABLE_STYLE_NONE: BuiltinTableStyle = { family: 'light', index: 0, name: '' };
+
+/** The table style gallery's sections in order, shared by the menus and the in-ribbon strip:
+ *  Custom first, when there is one, then Light (after None on `surface.none`), Medium and Dark. */
+export function tableStyleGallerySections<C>(
+  customs: readonly C[],
+  surface: StyleGallerySurface,
+): TableStyleGallerySection<C>[] {
   return [
     ...(customs.length > 0 ? [{ kind: 'custom' as const, styles: customs }] : []),
     ...(['light', 'medium', 'dark'] as const).map((kind) => ({
       kind,
-      styles: BUILTIN_TABLE_STYLES.filter((entry) => entry.family === kind),
+      styles: [
+        ...(kind === 'light' && surface.none ? [TABLE_STYLE_NONE] : []),
+        ...BUILTIN_TABLE_STYLES.filter((entry) => entry.family === kind),
+      ],
     })),
   ];
 }
@@ -316,15 +330,18 @@ export type PivotStyleGallerySection<C = CustomTableStyle> =
 const PIVOT_FAMILY_NAMES = { light: 'Light', medium: 'Medium', dark: 'Dark' } as const;
 
 /** The PivotTable style gallery's sections in order, shared by its strip and menu: Custom first,
- *  as in the table gallery, then None and Light 1-28, Medium 1-28 and Dark 1-28. The layout is
- *  unmeasured on the Mac app. */
-export function pivotStyleGallerySections<C>(customs: readonly C[]): PivotStyleGallerySection<C>[] {
+ *  as in the table gallery, then Light 1-28 (after None on `surface.none`), Medium 1-28 and
+ *  Dark 1-28. */
+export function pivotStyleGallerySections<C>(
+  customs: readonly C[],
+  surface: StyleGallerySurface,
+): PivotStyleGallerySection<C>[] {
   return [
     ...(customs.length > 0 ? [{ kind: 'custom' as const, styles: customs }] : []),
     ...(['light', 'medium', 'dark'] as const).map((kind) => ({
       kind,
       names: [
-        ...(kind === 'light' ? [''] : []),
+        ...(kind === 'light' && surface.none ? [''] : []),
         ...Array.from({ length: 28 }, (_, i) => `PivotStyle${PIVOT_FAMILY_NAMES[kind]}${i + 1}`),
       ],
     })),
@@ -476,8 +493,8 @@ export const currentPivotStyleId = (
 /** Every built-in table and PivotTable style name. */
 const builtinStyleNames = (): string[] => [
   ...BUILTIN_TABLE_STYLES.map((entry) => entry.name),
-  ...pivotStyleGallerySections([]).flatMap((section) =>
-    section.kind === 'custom' ? [] : section.names.filter((name) => name !== ''),
+  ...pivotStyleGallerySections([], { none: false }).flatMap((section) =>
+    section.kind === 'custom' ? [] : section.names,
   ),
 ];
 

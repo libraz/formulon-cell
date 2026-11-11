@@ -114,9 +114,8 @@ export const buildPivotContextualTabs = (
       label: tabLabels.pivotDesign,
       contextual: true,
       groups: [
+        group([command('pivotSubtotals', 'subtotals'), command('pivotGrandTotals', 'grandTotals')]),
         group([
-          command('pivotSubtotals', 'subtotals'),
-          command('pivotGrandTotals', 'grandTotals'),
           command('pivotReportLayout', 'reportLayout'),
           command('pivotBlankRows', 'blankRows'),
         ]),

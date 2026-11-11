@@ -46,6 +46,7 @@ describe('PivotTable style gallery', () => {
       getInst: () => inst,
       arrow: document.createElement('button'),
       menu: null,
+      pageArrows: true,
     });
     document.body.appendChild(gallery);
     const labels = (): string[] =>
@@ -76,6 +77,7 @@ describe('PivotTable style gallery', () => {
       getInst: () => inst,
       arrow: document.createElement('button'),
       menu: null,
+      pageArrows: true,
     });
     document.body.appendChild(gallery);
     const before = wb.getPivotTables()[0];
@@ -106,6 +108,7 @@ describe('PivotTable style gallery', () => {
       getInst: () => inst,
       arrow: document.createElement('button'),
       menu: null,
+      pageArrows: true,
     });
     for (let i = 0; i < 20; i += 1) {
       gallery.querySelector<HTMLButtonElement>('.fc-tb__pivotstyle-prev')?.click();
@@ -129,6 +132,7 @@ describe('PivotTable style gallery', () => {
       getInst: () => inst,
       arrow: document.createElement('button'),
       menu: null,
+      pageArrows: true,
     });
     for (let i = 0; i < 20; i += 1) {
       gallery.querySelector<HTMLButtonElement>('.fc-tb__pivotstyle-prev')?.click();

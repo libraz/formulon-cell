@@ -432,6 +432,7 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     tableStyleNew: 'New Table Style…',
     tableStyleNewPivot: 'New PivotTable Style…',
     tableStyleClear: 'Clear',
+    tableStyleNone: 'None',
     tableStyleApplyMaintain: 'Apply (and Maintain Formatting)',
     tableStyleApplyClear: 'Apply and Clear Formatting',
     tableStyleModify: 'Modify...',

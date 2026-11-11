@@ -286,7 +286,10 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     });
   };
 
+  /** Home > Format as Table, or the Table Design gallery (`tableQuickStyles`): only the latter
+   *  offers None and Clear, and only the former New PivotTable Style. */
   const createTableStyleMenu = (id: string): HTMLDivElement => {
+    const tableDesign = id === 'tableQuickStyles';
     const menu = createMenu(menuIdForCommand(id));
     menu.classList.add('fc-tb__tablestyle-menu');
     const scrollBody = menuScrollBody('fc-tb__tablestyle-scroll', ribbonText.formatTable);
@@ -300,9 +303,13 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       createStyleSwatch(
         entry.name,
         builtinTableStyleElements(entry.name, themeColors) ?? {},
-        t.tableStyleSwatches[entry.name as keyof typeof t.tableStyleSwatches] ?? entry.name,
+        entry.name === ''
+          ? t.tableStyleNone
+          : (t.tableStyleSwatches[entry.name as keyof typeof t.tableStyleSwatches] ?? entry.name),
       );
-    for (const section of tableStyleGallerySections(deps.customTableStyles?.() ?? [])) {
+    for (const section of tableStyleGallerySections(deps.customTableStyles?.() ?? [], {
+      none: tableDesign,
+    })) {
       scrollBody.append(
         ...menuLabeledGrid({
           label: section.kind === 'custom' ? t.tableStyleCustom : familyLabels[section.kind],
@@ -320,8 +327,11 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     menu.appendChild(scrollBody);
     menu.appendChild(menuSeparator());
     menu.appendChild(tableStyleFooterButton(t.tableStyleNew, 'new-table-style'));
-    menu.appendChild(tableStyleFooterButton(t.tableStyleNewPivot, 'new-pivot-style'));
-    // Clear shows only while a table is active; updateTableStylesMenu toggles it.
+    if (!tableDesign) {
+      menu.appendChild(tableStyleFooterButton(t.tableStyleNewPivot, 'new-pivot-style'));
+      return menu;
+    }
+    // Clear shows only while a table is active; the menu's update toggles it.
     const clear = tableStyleFooterButton(t.tableStyleClear, 'clear-table-style');
     clear.hidden = true;
     menu.appendChild(clear);
@@ -351,7 +361,9 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       btn.appendChild(thumb);
       return btn;
     };
-    for (const section of pivotStyleGallerySections(deps.customPivotTableStyles?.() ?? [])) {
+    for (const section of pivotStyleGallerySections(deps.customPivotTableStyles?.() ?? [], {
+      none: true,
+    })) {
       scrollBody.append(
         ...menuLabeledGrid({
           label: section.kind === 'custom' ? t.tableStyleCustom : familyLabels[section.kind],
@@ -375,7 +387,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     menu.appendChild(scrollBody);
     menu.appendChild(menuSeparator());
     menu.appendChild(tableStyleFooterButton(t.tableStyleNewPivot, 'new-pivot-style'));
-    // Clear shows only while a PivotTable is active; updatePivotStylesMenu toggles it.
+    // Clear shows only while a PivotTable is active; the menu's update toggles it.
     const clear = tableStyleFooterButton(t.tableStyleClear, 'clear-pivot-style');
     clear.hidden = true;
     menu.appendChild(clear);

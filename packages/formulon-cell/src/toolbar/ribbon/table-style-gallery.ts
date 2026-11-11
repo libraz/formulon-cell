@@ -19,6 +19,8 @@ export interface TableStyleGalleryOptions {
   /** The ribbon's Quick Styles button; it opens the full gallery. */
   arrow: HTMLButtonElement;
   menu: HTMLElement | null;
+  /** Page arrows beside the strip; off on the Mac profile. */
+  pageArrows: boolean;
 }
 
 /** Table Design > Table Styles: the custom and built-in styles a row at a time, with the Quick
@@ -43,27 +45,32 @@ export const createTableStyleGallery = (opts: TableStyleGalleryOptions): HTMLDiv
   const wrap = createQuickStyleStrip({
     lang,
     classPrefix: 'fc-tb__tablestyle-quick',
+    arrows: opts.pageArrows,
     chipKey: 'tableQuickStyle',
     pageSize: PAGE_SIZE,
     entries: () => {
       const inst = getInst();
       if (!inst) return [];
-      const names = dictionaries[lang].ribbonMenu.tableStyleSwatches;
+      const { tableStyleSwatches: names, tableStyleNone } = dictionaries[lang].ribbonMenu;
       const theme = inst.workbook.getTheme()?.colors;
-      return tableStyleGallerySections(listCustomTableStyles(inst.store.getState())).flatMap(
-        (section): QuickStyleEntry[] =>
-          section.kind === 'custom'
-            ? section.styles.map((style) => ({
-                id: style.id,
-                label: style.label,
-                thumbnail: () => tableStyleSwatchGrid(style.elements),
-              }))
-            : section.styles.map((entry) => ({
-                id: entry.name,
-                label: names[entry.name as keyof typeof names] ?? entry.name,
-                thumbnail: () =>
-                  tableStyleSwatchGrid(builtinTableStyleElements(entry.name, theme) ?? {}),
-              })),
+      return tableStyleGallerySections(listCustomTableStyles(inst.store.getState()), {
+        none: true,
+      }).flatMap((section): QuickStyleEntry[] =>
+        section.kind === 'custom'
+          ? section.styles.map((style) => ({
+              id: style.id,
+              label: style.label,
+              thumbnail: () => tableStyleSwatchGrid(style.elements),
+            }))
+          : section.styles.map((entry) => ({
+              id: entry.name,
+              label:
+                entry.name === ''
+                  ? tableStyleNone
+                  : (names[entry.name as keyof typeof names] ?? entry.name),
+              thumbnail: () =>
+                tableStyleSwatchGrid(builtinTableStyleElements(entry.name, theme) ?? {}),
+            })),
       );
     },
     current: () => target()?.currentId ?? null,
