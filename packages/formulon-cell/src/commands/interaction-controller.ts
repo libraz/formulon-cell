@@ -266,7 +266,7 @@ export class InteractionController {
         continue;
       }
       if (
-        command.origin === 'editor' &&
+        (command.origin === 'editor' || command.origin === 'formulaBar') &&
         command.operation === 'valueEdit' &&
         command.changes.length === 1 &&
         'input' in change &&
@@ -670,6 +670,7 @@ export class InteractionController {
           allowed: false,
           code: 'invalid',
           reason: error instanceof Error ? error.message : 'could not inspect the inverse patch',
+          reasonKey: 'codeInvalid',
         },
       };
     }
@@ -917,8 +918,13 @@ export class InteractionController {
 
   private asRejection(decision: PermissionDecision): CellRefusal {
     return decision.allowed
-      ? { code: 'invalid', reason: 'unexpected allowed decision' }
-      : { addr: decision.addr, code: decision.code, reason: decision.reason };
+      ? { code: 'invalid', reason: 'unexpected allowed decision', reasonKey: 'codeInvalid' }
+      : {
+          addr: decision.addr,
+          code: decision.code,
+          reason: decision.reason,
+          reasonKey: decision.reasonKey,
+        };
   }
 
   private emptyResult(): ChangeBatchResult {

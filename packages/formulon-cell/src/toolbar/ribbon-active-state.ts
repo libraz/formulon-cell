@@ -6,6 +6,7 @@ import { tableForCell } from '../commands/format-as-table.js';
 import { mergeAt } from '../commands/merge.js';
 import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
+import { localizedDecisionReason } from '../commands/permission-reasons.js';
 import { isCellFormattable, isCellWritable } from '../commands/protection.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
@@ -474,7 +475,10 @@ const projectProtectedCellCommands = (
   const state = instance.store.getState();
   const active = state.selection.active;
   const mac = isMacWorkbook(instance.workbook);
-  const reason = instance.i18n.strings.protection.protectedCellEdit;
+  const reason = localizedDecisionReason(
+    { code: 'protected', reasonKey: 'cellProtected' },
+    instance.i18n.strings,
+  );
   for (const [command, open] of [
     ['bold', !mac || isCellFormattable(state, active)],
     ['clearFormat', !mac || isCellWritable(state, active)],

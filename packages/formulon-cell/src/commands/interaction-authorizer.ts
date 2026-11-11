@@ -25,6 +25,7 @@ import {
   operationDecision,
   type PermissionDecision,
 } from './interaction-policy.js';
+import { deny } from './permission-reasons.js';
 import {
   isCellWritable,
   isPartialShift,
@@ -143,21 +144,20 @@ export class InteractionAuthorizer {
 
   canSelect(): PermissionDecision {
     if (this.policy?.selection !== false) return { allowed: true };
-    return { allowed: false, code: 'operationDenied', reason: 'selection is disabled' };
+    return deny('operationDenied', 'selectionDisabled');
   }
 
   canCopy(): PermissionDecision {
     if (this.policy?.copy !== false) return { allowed: true };
-    return { allowed: false, code: 'operationDenied', reason: 'copy is disabled' };
+    return deny('operationDenied', 'copyDisabled');
   }
 
   canExecute(intent: OperationIntent): PermissionDecision {
-    if (this.isDisposed())
-      return { allowed: false, code: 'invalid', reason: 'controller is disposed' };
+    if (this.isDisposed()) return deny('invalid', 'controllerDisposed');
     const policy = this.policy;
     try {
       const wb = this.getWb();
-      if (!wb) return { allowed: false, code: 'invalid', reason: 'workbook is unavailable' };
+      if (!wb) return deny('invalid', 'workbookUnavailable');
       const cachedAddressCheck = createWorkbookAddressCheck(wb);
       // Host callbacks may change the workbook between per-cell checks; keep reads live.
       const isAddress =
@@ -167,21 +167,12 @@ export class InteractionAuthorizer {
       if (ownsAutomaticHyperlinkCommand(intent)) {
         const addr = automaticHyperlinkCell(intent);
         if (!addr) {
-          return {
-            allowed: false,
-            code: 'invalid',
-            reason: 'Automatic hyperlink authorization needs one cell and no formula effect',
-          };
+          return deny('invalid', 'hyperlinkNeedsOneCell');
         }
         if (isSheetProtected(this.store.getState(), addr.sheet)) {
           const permissions = protectedSheetPermissions(this.store.getState(), addr.sheet);
           if (permissions?.formatCells !== true || permissions.insertHyperlinks !== true) {
-            return {
-              allowed: false,
-              code: 'protected',
-              addr,
-              reason: 'Automatic hyperlink needs protected-sheet format and hyperlink permission',
-            };
+            return deny('protected', 'hyperlinkNeedsPermission', { addr });
           }
         }
         if (!policy) return this.legacyDecision(intent, isAddress);
@@ -190,7 +181,7 @@ export class InteractionAuthorizer {
       if (!policy) return this.legacyDecision(intent, isAddress);
       return this.policyDecision(intent, policy, isAddress);
     } catch {
-      return { allowed: false, code: 'invalid', reason: 'workbook is unavailable' };
+      return deny('invalid', 'workbookUnavailable');
     }
   }
 
@@ -232,12 +223,7 @@ export class InteractionAuthorizer {
       if (authorizedKeys.has(addrKey(requestedAddr))) continue;
       const merged = mergeCellsFor(state, requestedAddr);
       if (merged === null) {
-        return {
-          allowed: false,
-          code: 'effectTooLarge',
-          addr: requestedAddr,
-          reason: 'merged cell range exceeds the authorization bound',
-        };
+        return deny('effectTooLarge', 'mergedRangeTooLarge', { addr: requestedAddr });
       }
       for (const expandedAddr of merged) {
         const key = addrKey(expandedAddr);
@@ -249,32 +235,17 @@ export class InteractionAuthorizer {
     for (const addr of authorizedCells) {
       const bounds = this.getBounds?.();
       if (bounds && !rangeContainsAddr(bounds, addr)) {
-        return {
-          allowed: false,
-          code: 'outOfBounds',
-          addr,
-          reason: 'cell is outside the configured bounds',
-        };
+        return deny('outOfBounds', 'cellOutsideBounds', { addr });
       }
       if (!isAddress(addr)) {
-        return {
-          allowed: false,
-          code: 'outOfBounds',
-          addr,
-          reason: 'cell address is outside the workbook',
-        };
+        return deny('outOfBounds', 'cellOutsideWorkbook', { addr });
       }
       if (isMutatingInteraction(intent.operation)) {
         if (!isPolicyCellEligible(policy, addr, intent.operation, intent.origin, this.getWb())) {
-          return {
-            allowed: false,
-            code: 'cellIneligible',
-            addr,
-            reason: 'cell is outside editable cells',
-          };
+          return deny('cellIneligible', 'cellNotEditable', { addr });
         }
         if (!isThreadIntent(intent) && !protectionPermits(state, intent.operation, addr)) {
-          return { allowed: false, code: 'protected', addr, reason: 'cell is protected' };
+          return deny('protected', 'cellProtected', { addr });
         }
       }
     }
@@ -376,35 +347,20 @@ export class InteractionAuthorizer {
     const last: Addr = { sheet: range.sheet, row: range.r1, col: range.c1 };
     const bounds = policy ? this.getBounds?.() : undefined;
     if (bounds && !rangeContainsRange(bounds, range)) {
-      return {
-        allowed: false,
-        code: 'outOfBounds',
-        addr: first,
-        reason: 'range is outside the configured bounds',
-      };
+      return deny('outOfBounds', 'rangeOutsideBounds', { addr: first });
     }
     if (!isAddress(first) || !isAddress(last)) {
-      return {
-        allowed: false,
-        code: 'outOfBounds',
-        addr: first,
-        reason: 'range is outside the workbook',
-      };
+      return deny('outOfBounds', 'rangeOutsideWorkbook', { addr: first });
     }
     if (!isMutatingInteraction(intent.operation)) return { allowed: true };
     if (policy && !isPolicyRangeEligible(policy, range, this.getWb())) {
-      return {
-        allowed: false,
-        code: 'cellIneligible',
-        addr: first,
-        reason: 'range is outside editable cells',
-      };
+      return deny('cellIneligible', 'rangeNotEditable', { addr: first });
     }
     if (
       intent.operation !== 'table' &&
       !sheetPermits(this.store.getState(), range.sheet, protectionOption(intent.operation))
     )
-      return { allowed: false, code: 'protected', addr: first, reason: 'sheet is protected' };
+      return deny('protected', 'sheetProtected', { addr: first });
     return { allowed: true };
   }
 
@@ -418,18 +374,14 @@ export class InteractionAuthorizer {
   ): PermissionDecision {
     const bounds = policy ? this.getBounds?.() : undefined;
     if (bounds && bounds.sheet !== sheet) {
-      return {
-        allowed: false,
-        code: 'outOfBounds',
-        reason: 'sheet is outside the configured bounds',
-      };
+      return deny('outOfBounds', 'sheetOutsideBounds');
     }
     if (!isAddress({ sheet, row: 0, col: 0 })) {
-      return { allowed: false, code: 'outOfBounds', reason: 'sheet is not in the workbook' };
+      return deny('outOfBounds', 'sheetNotInWorkbook');
     }
     if (!isMutatingInteraction(intent.operation)) return { allowed: true };
     if (!sheetProtectionPermits(this.store.getState(), intent.operation, sheet))
-      return { allowed: false, code: 'protected', reason: 'sheet is protected' };
+      return deny('protected', 'sheetProtected');
     return { allowed: true };
   }
 
@@ -440,13 +392,13 @@ export class InteractionAuthorizer {
     const state = this.store.getState();
     if (isThreadIntent(intent)) return { allowed: true };
     if (!workbookStructurePermits(state, intent.operation))
-      return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
+      return deny('protected', 'workbookStructureProtected');
     for (const sheet of effectSheets(intent, state.data.sheetIndex)) {
       if (
         refusedOnProtectedSheet(state, sheet, intent.commandId) ||
         (intent.operation === 'table' && !tableChangePermitted(state, sheet))
       )
-        return { allowed: false, code: 'protected', reason: 'sheet is protected' };
+        return deny('protected', 'sheetProtected');
     }
     for (const effect of intent.effects) {
       if (
@@ -454,7 +406,7 @@ export class InteractionAuthorizer {
         isPartialShift(intent.operation, effect.range) &&
         isSheetProtected(state, effect.range.sheet)
       )
-        return { allowed: false, code: 'protected', reason: 'sheet is protected' };
+        return deny('protected', 'sheetProtected');
     }
     return { allowed: true };
   }
@@ -481,13 +433,13 @@ export class InteractionAuthorizer {
       const addresses = effect.kind === 'cells' ? effect.cells : effectCells(effect);
       if (addresses === null) return unenumerableEffect(effect);
       for (const addr of addresses) {
-        if (!isAddress(addr)) return { allowed: false, code: 'outOfBounds', addr };
+        if (!isAddress(addr)) return deny('outOfBounds', 'cellOutsideWorkbook', { addr });
         if (
           isMutatingInteraction(intent.operation) &&
           !isThreadIntent(intent) &&
           !protectionPermits(this.store.getState(), intent.operation, addr)
         ) {
-          return { allowed: false, code: 'protected', addr };
+          return deny('protected', 'cellProtected', { addr });
         }
       }
     }
@@ -517,18 +469,21 @@ export class InteractionAuthorizer {
         typeof restricted.then === 'function'
       ) {
         void Promise.resolve(restricted).catch(() => {});
-        return { allowed: false, code: 'invalid', reason: 'restriction hook must be synchronous' };
+        return deny('invalid', 'restrictionHookAsync');
       }
-      if (restricted === false)
-        return { allowed: false, code: 'operationDenied', reason: 'restricted by host' };
-      if (restricted && typeof restricted === 'object' && restricted.allowed === false)
-        return restricted;
+      if (restricted === false) return deny('operationDenied', 'restrictedByHost');
+      if (restricted && typeof restricted === 'object' && restricted.allowed === false) {
+        // A key survives only on the refusal it describes; a host rewording drops it.
+        const same = !decision.allowed && restricted.reason === decision.reason;
+        const { reasonKey: _hostKey, ...own } = restricted;
+        return !decision.allowed && decision.reasonKey && same
+          ? { ...own, reasonKey: decision.reasonKey }
+          : own;
+      }
     } catch (error) {
-      return {
-        allowed: false,
-        code: 'invalid',
-        reason: error instanceof Error ? error.message : 'restriction callback failed',
-      };
+      return error instanceof Error
+        ? { allowed: false, code: 'invalid', reason: error.message }
+        : deny('invalid', 'restrictionCallbackFailed');
     }
     return decision;
   }

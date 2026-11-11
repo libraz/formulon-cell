@@ -7,6 +7,7 @@ import type { GridPopupsStrings } from './grid-popups/types.js';
 import type { LocaleSwitcherStrings } from './locale-switcher/types.js';
 import type { MacStrings } from './mac/types.js';
 import type { PageLayoutStrings } from './page-layout/types.js';
+import type { PermissionReasonsStrings } from './permission-reasons/types.js';
 import type { RibbonStrings } from './ribbon/types.js';
 import type { RibbonMenusStrings } from './ribbon-menus/types.js';
 import type { WorkbookChromeStrings } from './workbook-chrome/types.js';
@@ -33,6 +34,7 @@ export interface Strings
     FormulaDialogsStrings,
     DataObjectsStrings,
     PageLayoutStrings,
+    PermissionReasonsStrings,
     WorkbookChromeStrings,
     LocaleSwitcherStrings {
   /** Wording used by the Mac host layout. */

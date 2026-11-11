@@ -24,6 +24,7 @@ import {
 import { dataTableGuardAlert, dataTableOccupies, tableFunctionAlert } from './data-table-guard.js';
 import { interactionControllerFor, nativeAxisFontFormatFor } from './interaction-controller.js';
 import { mergeAnchorFor, mergeCellsFor } from './interaction-effects.js';
+import type { RefusalLike } from './permission-reasons.js';
 import { pivotGuardAlert, pivotOccupies } from './pivot-guard.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
@@ -37,6 +38,9 @@ export interface CellInputAlert {
   /** Set when the presenting surface words the alert itself: `protectedCell`
    *  is a change to a locked cell of a protected sheet. */
   code?: 'protectedCell';
+  /** The refusal behind `message`; the presenting surface localizes its
+   *  built-in reason and shows host text as is. */
+  refusal?: RefusalLike;
 }
 
 /** The alert raised by a change to a locked cell of a protected sheet. The
@@ -190,11 +194,13 @@ export function commitCellInput({
         changes: [{ addr, input: raw }],
       });
       if (result.status === 'refused') {
-        const reason = result.rejections[0]?.reason;
+        const rejection = result.rejections[0];
         return {
           status: 'rejected',
           operation,
-          alert: reason ? { severity: 'stop', message: reason } : null,
+          alert: rejection?.reason
+            ? { severity: 'stop', message: rejection.reason, refusal: rejection }
+            : null,
         };
       }
       if (raw !== '') extendTablesForEntry(store, wb, controller.history, anchor);

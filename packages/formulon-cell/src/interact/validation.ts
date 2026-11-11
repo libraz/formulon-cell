@@ -1,5 +1,6 @@
 import { type CellInputAlert, commitCellInput } from '../commands/cell-input-commit.js';
 import { blockDataTableCells } from '../commands/data-table-guard.js';
+import type { RefusalLike } from '../commands/permission-reasons.js';
 import {
   deferForAllowedRangeUnlock,
   isCellWritable,
@@ -52,6 +53,8 @@ export interface ValidationAlertLabels {
   information: string;
   /** Wording of the `protectedCell` alert. */
   protectedCell: string;
+  /** Localized text of an alert's refusal. */
+  reason: (refusal: RefusalLike) => string;
 }
 
 export interface ValidationAlertDeps {
@@ -64,6 +67,7 @@ export interface ValidationAlertMessage {
   title?: string;
   message: string;
   code?: CellInputAlert['code'];
+  refusal?: CellInputAlert['refusal'];
 }
 
 export interface ValidationAlertHandle {
@@ -442,7 +446,11 @@ export function attachValidationAlert(deps: ValidationAlertDeps): ValidationAler
   return {
     show(message) {
       const protectedCell = message.code === 'protectedCell';
-      const text = protectedCell ? labels.protectedCell : message.message;
+      const text = protectedCell
+        ? labels.protectedCell
+        : message.refusal
+          ? labels.reason(message.refusal)
+          : message.message;
       const title = message.title?.trim() || defaultTitle(message.severity);
       // The Mac desktop's protected-cell panel carries no title.
       const untitled = protectedCell && isMacHost(host);

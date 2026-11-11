@@ -487,9 +487,15 @@ describe('Mac Data command operations', () => {
       destination: 'C1',
       function: 'sum',
     });
-    expect(plan).toEqual({
+    // The refusal travels with the error so the dialog can localize it.
+    expect(plan).toMatchObject({
       ok: false,
-      error: { status: 'rejected', code: 'notEditable', reason: 'blocked' },
+      error: {
+        status: 'rejected',
+        code: 'notEditable',
+        reason: 'blocked',
+        refusal: { allowed: false },
+      },
     });
     expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'blank' });
   });

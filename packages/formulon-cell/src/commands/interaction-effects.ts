@@ -3,6 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { State } from '../store/types.js';
 import type { OperationEffect, PermissionDecision } from './interaction-policy.js';
+import { deny } from './permission-reasons.js';
 
 const MAX_MATERIALIZED_CELLS = 100_000;
 
@@ -58,12 +59,8 @@ export const bandRange = (effect: OperationEffect): Range | null => {
  *  is invalid input, anything else names more cells than the bound. */
 export const unenumerableEffect = (effect: OperationEffect): PermissionDecision =>
   effect.kind === 'range' && !isWellFormedRange(effect.range)
-    ? { allowed: false, code: 'invalid', reason: 'affected range is malformed' }
-    : {
-        allowed: false,
-        code: 'effectTooLarge',
-        reason: 'affected range exceeds the authorization bound',
-      };
+    ? deny('invalid', 'affectedRangeMalformed')
+    : deny('effectTooLarge', 'affectedRangeTooLarge');
 
 export const effectCells = (effect: OperationEffect): readonly Addr[] | null => {
   if (effect.kind === 'cells')

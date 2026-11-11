@@ -6,6 +6,7 @@ import { gridPopupsKo } from './grid-popups/ko.js';
 import { localeSwitcherKo } from './locale-switcher/ko.js';
 import { macKo } from './mac/ko.js';
 import { pageLayoutKo } from './page-layout/ko.js';
+import { permissionReasonsKo } from './permission-reasons/ko.js';
 import { ribbonKo } from './ribbon/ko.js';
 import { ribbonMenusKo } from './ribbon-menus/ko.js';
 import type { Strings } from './types.js';
@@ -21,6 +22,7 @@ export const ko: Strings = {
   ...dataObjectsKo,
   mac: macKo,
   ...pageLayoutKo,
+  ...permissionReasonsKo,
   ...workbookChromeKo,
   ...localeSwitcherKo,
 };

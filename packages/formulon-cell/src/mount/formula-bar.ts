@@ -1,3 +1,4 @@
+import { correctTypedEntry } from '../commands/autocorrect.js';
 import {
   type CellInputAlert,
   commitCellInput,
@@ -5,6 +6,7 @@ import {
 } from '../commands/cell-input-commit.js';
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { localizedDecisionReason } from '../commands/permission-reasons.js';
 import {
   deferForAllowedRangeUnlock,
   isCellWritable,
@@ -712,7 +714,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       return;
     }
     const anchor = state.selection.active;
-    const batch = buildSelectionInputBatch(state, fxInput.value, anchor);
+    const raw = correctTypedEntry(store, fxInput.value);
+    const batch = buildSelectionInputBatch(state, raw, anchor);
     if (!batch) {
       showCommitFailure(SELECTION_INPUT_LIMIT_MESSAGE);
       return;
@@ -720,7 +723,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const controller = interactionControllerFor(store);
     if (!controller) {
       // The direct path serves only hosts without a registered controller.
-      const written = writeSelectionInput(wb(), store, state, fxInput.value, anchor);
+      const written = writeSelectionInput(wb(), store, state, raw, anchor);
       if (written.status === 'limitExceeded') {
         showCommitFailure(SELECTION_INPUT_LIMIT_MESSAGE);
         return;
@@ -745,12 +748,17 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       });
     } catch (err) {
       console.warn('formulon-cell: formula-bar selection fill failed', err);
-      showCommitFailure('The selected cells could not be filled.');
+      showCommitFailure(
+        localizedDecisionReason({ code: 'invalid', reasonKey: 'cellsNotFilled' }, getStrings()),
+      );
       return;
     }
     if (result.status === 'refused') {
+      const [rejection] = result.rejections;
       showCommitFailure(
-        result.rejections[0]?.reason ?? `The ${batch.operation} operation was rejected.`,
+        rejection
+          ? localizedDecisionReason(rejection, getStrings())
+          : localizedDecisionReason({ code: 'operationDenied' }, getStrings()),
       );
       return;
     }
@@ -773,7 +781,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     });
     if (result.status === 'rejected') {
       showCommitFailure(
-        result.alert?.message ?? `The ${result.operation} operation was rejected.`,
+        result.alert?.message ?? localizedDecisionReason({ code: 'operationDenied' }, getStrings()),
         result.alert?.title,
         result.alert?.code,
       );
@@ -781,7 +789,9 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
     if (result.status === 'failed') {
       console.warn('formulon-cell: formula-bar write failed', result.error);
-      showCommitFailure('The formula-bar value could not be written.');
+      showCommitFailure(
+        localizedDecisionReason({ code: 'invalid', reasonKey: 'valueNotWritten' }, getStrings()),
+      );
       return false;
     }
     if (result.notice) {

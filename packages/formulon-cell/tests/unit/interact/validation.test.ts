@@ -595,6 +595,7 @@ describe('attachValidationAlert', () => {
         warning: 'Warning',
         information: 'Information',
         protectedCell: 'Protected.',
+        reason: (refusal) => refusal.reason ?? '',
       },
     });
 
@@ -622,6 +623,7 @@ describe('attachValidationAlert', () => {
         warning: 'Warning',
         information: 'Information',
         protectedCell: 'The cell is on a protected sheet.',
+        reason: (refusal) => refusal.reason ?? '',
       },
     });
     handle.show({ severity: 'stop', code: 'protectedCell', message: 'cell is protected' });
@@ -640,6 +642,7 @@ describe('attachValidationAlert', () => {
       warning: 'Warning',
       information: 'Information',
       protectedCell: 'The cell is on a protected sheet.',
+      reason: (refusal: { reason?: string }) => refusal.reason ?? '',
     };
     const alert = { severity: 'stop', code: 'protectedCell', message: 'x' } as const;
     host.classList.add('fc-host');

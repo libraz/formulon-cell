@@ -3,12 +3,10 @@ import {
   builtInProtectionDecision,
   canExecuteBuiltIn,
 } from '../commands/built-in-command-policy.js';
-import type {
-  OperationIntent,
-  PermissionCode,
-  PermissionDecision,
-} from '../commands/interaction-policy.js';
+import type { OperationIntent, PermissionDecision } from '../commands/interaction-policy.js';
+import { deny, localizedDecisionReason } from '../commands/permission-reasons.js';
 import type { Range } from '../engine/types.js';
+import type { Strings } from '../i18n/strings/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { ContextMenuInteractionController, ContextMenuItem } from './context-menu-options.js';
 import type { ItemId } from './context-menu-spec.js';
@@ -17,6 +15,8 @@ import { navigationBoundsFor } from './navigation-policy.js';
 export interface ContextMenuPermissionsContext {
   readonly store: SpreadsheetStore;
   readonly interactionController: ContextMenuInteractionController | undefined;
+  /** Current dictionary; read per call because the locale can change. */
+  readonly strings: () => Strings;
 }
 
 /** Host policy and bounded-viewport decisions for context-menu items. */
@@ -33,7 +33,7 @@ export interface ContextMenuPermissions {
 export function createContextMenuPermissions(
   ctx: ContextMenuPermissionsContext,
 ): ContextMenuPermissions {
-  const { store, interactionController } = ctx;
+  const { store, interactionController, strings } = ctx;
   const boundedViewportStructuralIds = new Set<ItemId>([
     'insertCopiedCells',
     'insertCells',
@@ -80,19 +80,13 @@ export function createContextMenuPermissions(
     );
   };
 
-  const deniedDecision = (code: PermissionCode, reason?: string): PermissionDecision => ({
-    allowed: false,
-    code,
-    ...(reason ? { reason } : {}),
-  });
-
   const decisionForIntent = (intent: OperationIntent): PermissionDecision => {
     if (!interactionController) return { allowed: true };
     return interactionController.canExecute(intent);
   };
 
   const decisionReason = (decision: PermissionDecision): string | null =>
-    decision.allowed ? null : (decision.reason ?? null);
+    decision.allowed ? null : localizedDecisionReason(decision, strings());
 
   const decisionForItem = (
     item: ItemId | ContextMenuItem | OperationIntent,
@@ -120,13 +114,10 @@ export function createContextMenuPermissions(
       });
     }
     if (itemId === 'copy' && interactionController?.policy?.copy === false) {
-      return deniedDecision('operationDenied', 'Copy is disabled by the host policy.');
+      return deny('operationDenied', 'hostCopyDisabled');
     }
     if (navigationBounded() && boundedViewportStructuralIds.has(itemId)) {
-      return deniedDecision(
-        'outOfBounds',
-        'This structural operation is unavailable with a bounded viewport.',
-      );
+      return deny('outOfBounds', 'boundedViewportStructural');
     }
     const protection = builtInProtectionDecision(store, itemId);
     if (!protection.allowed) return protection;

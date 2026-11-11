@@ -8,6 +8,7 @@ import {
   insertDefinedNameFormula,
   listDefinedNames,
 } from '../../commands/named-ranges.js';
+import { localizedDecisionReason } from '../../commands/permission-reasons.js';
 import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
 import { executeRibbonFormulaAuditingAction } from '../../commands/ribbon-formula-auditing.js';
 import { clearTraceArrowsByKind } from '../../commands/traces.js';
@@ -153,7 +154,7 @@ const updateWhatIfMenu =
     setMenuControlDisabled(
       dataTable,
       !decision.allowed,
-      decision.allowed ? undefined : (decision.reason ?? decision.code),
+      decision.allowed ? undefined : localizedDecisionReason(decision, instance.i18n.strings),
     );
   };
 

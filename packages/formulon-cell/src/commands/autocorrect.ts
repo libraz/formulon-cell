@@ -1,4 +1,5 @@
 import type { SpreadsheetStore } from '../store/store.js';
+import { isAddress } from './spelling.js';
 
 /** One AutoCorrect replacement: typing `from` enters `to`. */
 export interface AutoCorrectEntry {
@@ -40,8 +41,9 @@ const SWITCHES: readonly AutoCorrectSwitch[] = [
   'capitalizeDays',
 ];
 
-/** AutoCorrect configuration: the lists per UI language and the switches. A language is keyed as
- *  `instance.i18n.locale` reports it. The user's edits in AutoCorrect Options write a new value
+/** AutoCorrect configuration: the lists per UI language and the switches. A key is a language
+ *  (`'ja'`) or a full locale (`'ja-JP'`); the full locale wins over its language, and the user's
+ *  edits are written under the locale `instance.i18n.locale` reports. The user's edits in AutoCorrect Options write a new value
  *  here and report `update` with `source: 'user'`, so the host keeps it from `instance.options`. */
 export interface AutoCorrectOptions {
   /** Replacement lists by language; a language not listed keeps its built-in list. */
@@ -79,6 +81,17 @@ const SEED: Readonly<Record<string, readonly AutoCorrectEntry[]>> = {
     { from: 'こんにちわ', to: 'こんにちは' },
     { from: 'こんばんわ', to: 'こんばんは' },
   ],
+};
+
+/** The value keyed by the full `locale`, else by its language; the full locale wins. */
+const byLocale = <T>(
+  record: Readonly<Record<string, T>> | undefined,
+  locale: string,
+): T | undefined => {
+  if (!record) return undefined;
+  if (Object.hasOwn(record, locale)) return record[locale];
+  const language = locale.split(/[-_]/)[0] ?? '';
+  return Object.hasOwn(record, language) ? record[language] : undefined;
 };
 
 /** The built-in list for `locale`. */
@@ -183,6 +196,15 @@ const lowerSet = (words: readonly string[], strip = ''): Set<string> =>
     words.map((word) => (strip && word.endsWith(strip) ? word.slice(0, -1) : word).toLowerCase()),
   );
 
+/** True when the white-space-delimited token around `index` is an address or path. */
+const inAddress = (text: string, index: number): boolean => {
+  let start = index;
+  while (start > 0 && !/\s/.test(text.charAt(start - 1))) start -= 1;
+  let end = index;
+  while (end < text.length && !/\s/.test(text.charAt(end))) end += 1;
+  return isAddress(text.slice(start, end));
+};
+
 /** `text` with the second capital of a word like `THe` lowered: two capitals followed only by
  *  lower-case letters. A plural acronym such as `PCs` and the `exceptions` stay as typed. */
 export const correctTwoInitialCapitals = (
@@ -190,12 +212,13 @@ export const correctTwoInitialCapitals = (
   exceptions: readonly string[] = [],
 ): string => {
   const keep = lowerSet(exceptions);
-  return text.replace(WORD, (word) =>
+  return text.replace(WORD, (word, at: number) =>
     word.length > 2 &&
     isUpper(word.slice(0, 2)) &&
     isLower(word.slice(2)) &&
     word.slice(2) !== 's' &&
-    !keep.has(word.toLowerCase())
+    !keep.has(word.toLowerCase()) &&
+    !inAddress(text, at)
       ? word.charAt(0) + word.charAt(1).toLowerCase() + word.slice(2)
       : word,
   );
@@ -204,8 +227,8 @@ export const correctTwoInitialCapitals = (
 /** `text` with English day names typed in lower case given a capital, in every language, as the
  *  desktop labels say. */
 export const capitalizeDays = (text: string): string =>
-  text.replace(WORD, (word) =>
-    DAYS.has(word) ? word.charAt(0).toUpperCase() + word.slice(1) : word,
+  text.replace(WORD, (word, at: number) =>
+    DAYS.has(word) && !inAddress(text, at) ? word.charAt(0).toUpperCase() + word.slice(1) : word,
   );
 
 /** `text` with the first letter after a sentence end and white space given a capital. The start
@@ -217,8 +240,9 @@ export const capitalizeSentences = (
   const keep = lowerSet(abbreviations, '.');
   return text.replace(
     /(\p{L}*)([.!?]\s+)(\p{Ll})/gu,
-    (match, word: string, end: string, letter: string) =>
-      end.startsWith('.') && keep.has(word.toLowerCase())
+    (match, word: string, end: string, letter: string, at: number) =>
+      (end.startsWith('.') && keep.has(word.toLowerCase())) ||
+      inAddress(text, at + match.length - 1)
         ? match
         : word + end + letter.toUpperCase(),
   );
@@ -246,8 +270,8 @@ export class AutoCorrectStore {
     const options = this.#options();
     const on = (key: AutoCorrectSwitch): boolean => options?.[key] ?? true;
     return {
-      entries: options?.entries?.[locale] ?? builtInAutoCorrectEntries(locale),
-      exceptions: options?.exceptions?.[locale] ?? NO_EXCEPTIONS,
+      entries: byLocale(options?.entries, locale) ?? builtInAutoCorrectEntries(locale),
+      exceptions: byLocale(options?.exceptions, locale) ?? NO_EXCEPTIONS,
       replaceAsYouType: on('replaceAsYouType'),
       replaceHyperlinks: on('replaceHyperlinks'),
       correctTwoInitialCapitals: on('correctTwoInitialCapitals'),

@@ -1,4 +1,5 @@
 import { commentAt, recordCommentChange, setComment } from '../commands/comment.js';
+import { localizedDecisionReason } from '../commands/permission-reasons.js';
 import {
   firstSpellingIssue,
   replaceSpellingWord,
@@ -108,7 +109,8 @@ const languageName = (locale: string): string => {
 };
 
 /** Writes new texts as one undo step: cells through the same authorization as a typed entry,
- *  notes through the note path. Returns the refusal reason, or null once written. */
+ *  notes through the note path. Returns the refusal reason, or null once written. A refusal
+ *  rolls back whatever the group already applied. */
 function writeTexts(
   instance: SpreadsheetInstance,
   edits: readonly { target: SpellingTarget; text: string }[],
@@ -116,7 +118,8 @@ function writeTexts(
   const { history, store, workbook } = instance;
   const cells = edits.filter((edit) => edit.target.source === 'cell');
   const notes = edits.filter((edit) => edit.target.source === 'note');
-  history.begin();
+  const token = history.begin();
+  let written = false;
   try {
     if (cells.length > 0) {
       const result = instance.commands.execute({
@@ -130,11 +133,16 @@ function writeTexts(
           formula: null,
         })),
       });
-      if (result.status !== 'applied') return result.rejections[0]?.reason ?? '';
+      if (result.status !== 'applied') {
+        const rejection = result.rejections[0];
+        return rejection
+          ? localizedDecisionReason(rejection, instance.i18n.strings)
+          : localizedDecisionReason({ code: 'operationDenied' }, instance.i18n.strings);
+      }
     }
     const authorization = { origin: 'ribbon', commandId: COMMAND_ID } as const;
     for (const edit of notes) {
-      const written = recordCommentChange(
+      const noted = recordCommentChange(
         history,
         store,
         workbook,
@@ -142,11 +150,13 @@ function writeTexts(
         () => setComment(store, edit.target.addr, edit.text, workbook, authorization),
         authorization,
       );
-      if (!written) return '';
+      if (!noted) return '';
     }
+    written = true;
     return null;
   } finally {
-    history.end();
+    if (written) history.end(token);
+    else history.abort(token);
   }
 }
 
@@ -334,7 +344,7 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
     else close();
   };
 
-  const applyChange = (all: boolean): void => {
+  const applyChange = (all: boolean, onWritten?: () => void): void => {
     if (!issue) return;
     const current = issue;
     const replacement = changeTo.input.value;
@@ -357,9 +367,11 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
     const refused = writeTexts(instance, edits);
     if (refused !== null) {
       status.dataset.state = 'error';
-      status.textContent = refused;
+      status.textContent =
+        refused || localizedDecisionReason({ code: 'operationDenied' }, instance.i18n.strings);
       return;
     }
+    onWritten?.();
     changes.push(before);
     // Continue after the replacement: the text up to the word, changed the same way.
     const head = text.slice(0, current.word.end);
@@ -389,13 +401,15 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
   // AutoCorrect keeps the word and its correction in the AutoCorrect list, then changes it.
   shell.on(autoCorrect, 'click', () => {
     if (!issue || changeTo.input.value === '') return;
-    instance.autoCorrect.add(issue.word.word, changeTo.input.value);
-    applyChange(false);
+    const { word: typo } = issue.word;
+    const correction = changeTo.input.value;
+    applyChange(false, () => instance.autoCorrect.add(typo, correction));
   });
   shell.on(suggest, 'click', () => showSuggestions(changeTo.input.value));
   shell.on(undoLast, 'click', () => {
-    const previous = changes.pop();
+    const previous = changes.at(-1);
     if (!previous || !instance.history.undo()) return;
+    changes.pop();
     cursor.index = previous.index;
     advance(previous.offset);
   });

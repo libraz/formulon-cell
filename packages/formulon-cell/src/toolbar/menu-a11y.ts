@@ -3,6 +3,9 @@ type MenuOptions = {
   restoreFocusTo?: HTMLElement | null;
 };
 
+/** Dataset key holding an element's own title while a reason replaces it. */
+const BASE_TITLE_KEY = 'fcBaseTitle';
+
 export interface DisabledReasonProjectionOptions {
   ariaDescription?: boolean;
   describedById?: string | null;
@@ -21,13 +24,23 @@ export function projectDisabledReason(
   const useTitle = options.title ?? true;
   const useAriaDescription = options.ariaDescription ?? !options.describedById;
   if (reason) {
-    if (useTitle) el.title = options.titlePrefix ? `${options.titlePrefix}\n${reason}` : reason;
+    if (useTitle) {
+      // Remember the title the element had before its first reason so re-enabling restores it.
+      if (!options.titlePrefix && el.dataset[BASE_TITLE_KEY] === undefined)
+        el.dataset[BASE_TITLE_KEY] = el.title;
+      el.title = options.titlePrefix ? `${options.titlePrefix}\n${reason}` : reason;
+    }
     if (options.describedById) el.setAttribute('aria-describedby', options.describedById);
     if (useAriaDescription) el.setAttribute('aria-description', reason);
     if (options.datasetKey) el.dataset[options.datasetKey] = reason;
     return;
   }
-  if (useTitle) el.title = options.titlePrefix ?? '';
+  if (useTitle) {
+    const base = el.dataset[BASE_TITLE_KEY];
+    if (options.titlePrefix !== undefined) el.title = options.titlePrefix;
+    else if (base !== undefined) el.title = base;
+    delete el.dataset[BASE_TITLE_KEY];
+  }
   if (options.describedById !== undefined) el.removeAttribute('aria-describedby');
   if (useAriaDescription) el.removeAttribute('aria-description');
   if (options.datasetKey) delete el.dataset[options.datasetKey];

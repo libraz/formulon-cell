@@ -7,6 +7,7 @@ import {
 import { rowShiftBand } from '../../../../src/commands/interaction-effects.js';
 import { type OperationIntent, viewerPolicy } from '../../../../src/commands/interaction-policy.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { defaultStrings } from '../../../../src/i18n/strings.js';
 import type { ContextMenuInteractionController } from '../../../../src/interact/context-menu-options.js';
 import { createContextMenuPermissions } from '../../../../src/interact/context-menu-permissions.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
@@ -15,6 +16,7 @@ const build = (interactionController?: ContextMenuInteractionController) =>
   createContextMenuPermissions({
     store: createSpreadsheetStore(),
     interactionController,
+    strings: () => defaultStrings,
   });
 
 const controller = (
@@ -47,6 +49,7 @@ describe('context-menu permissions', () => {
       const permissions = createContextMenuPermissions({
         store,
         interactionController: restricted,
+        strings: () => defaultStrings,
       });
       expect(permissions.hasExplicitPolicy()).toBe(true);
       expect(permissions.decisionForItem('rowDelete')).toMatchObject({ allowed: false });

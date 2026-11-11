@@ -9,6 +9,7 @@ import {
 } from '../engine/range-input.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { deny, type PermissionReasonKey } from './permission-reasons.js';
 
 /** Operations that can be authorized by an embedded instance. Keep this list
  * finite: a new command must be classified before a restricted profile can
@@ -71,7 +72,15 @@ export type PermissionCode =
 
 export type PermissionDecision =
   | { allowed: true }
-  | { allowed: false; code: PermissionCode; reason?: string; addr?: Addr };
+  | {
+      allowed: false;
+      code: PermissionCode;
+      /** English text; host-supplied when the refusal has no `reasonKey`. */
+      reason?: string;
+      /** Set on built-in refusals; UI surfaces localize through it. */
+      reasonKey?: PermissionReasonKey;
+      addr?: Addr;
+    };
 
 export interface EditablePredicateContext {
   readonly addr: Addr;
@@ -164,6 +173,8 @@ export interface BatchRejection {
   readonly at: CellAddress | null;
   readonly code: PermissionCode;
   readonly reason: string;
+  /** Set when the refusal is built in; see `PermissionDecision`. */
+  readonly reasonKey?: PermissionReasonKey;
 }
 
 /** A cell a batch wrote. */
@@ -197,6 +208,7 @@ export interface CellRefusal {
   readonly addr?: Addr;
   readonly code: PermissionCode;
   readonly reason?: string;
+  readonly reasonKey?: PermissionReasonKey;
 }
 
 /** The rectangle around `cells`, or null when there are none or they span sheets. */
@@ -244,6 +256,7 @@ export const refusedBatch = (refusal: CellRefusal): ChangeBatchResult => ({
       at: refusal.addr ? { row: refusal.addr.row, col: refusal.addr.col } : null,
       code: refusal.code,
       reason: refusal.reason ?? refusal.code,
+      ...(refusal.reasonKey ? { reasonKey: refusal.reasonKey } : {}),
     },
   ],
   range: null,
@@ -253,7 +266,12 @@ export const refusedBatch = (refusal: CellRefusal): ChangeBatchResult => ({
 export const refusedByDecision = (
   decision: Extract<PermissionDecision, { allowed: false }>,
 ): ChangeBatchResult =>
-  refusedBatch({ addr: decision.addr, code: decision.code, reason: decision.reason });
+  refusedBatch({
+    addr: decision.addr,
+    code: decision.code,
+    reason: decision.reason,
+    reasonKey: decision.reasonKey,
+  });
 
 const MUTATING_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'valueEdit',
@@ -372,12 +390,12 @@ export function operationDecision(
   operation: InteractionOperation,
 ): PermissionDecision {
   const readOnly = policy.readOnly === true && isMutatingInteraction(operation);
-  if (readOnly) return { allowed: false, code: 'readOnly', reason: 'instance policy is read-only' };
+  if (readOnly) return deny('readOnly', 'readOnlyPolicy');
   const configured = policy.operations?.[operation];
   const allowed =
     configured !== undefined ? configured : (policy.defaultOperation ?? 'deny') === 'allow';
   if (allowed) return { allowed: true };
-  return { allowed: false, code: 'operationDenied', reason: `operation ${operation} is denied` };
+  return deny('operationDenied', 'operationDenied', { reason: `operation ${operation} is denied` });
 }
 
 export function operationPermission(

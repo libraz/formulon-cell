@@ -6,6 +6,7 @@ import { gridPopupsEn } from './grid-popups/en.js';
 import { localeSwitcherEn } from './locale-switcher/en.js';
 import { macEn } from './mac/en.js';
 import { pageLayoutEn } from './page-layout/en.js';
+import { permissionReasonsEn } from './permission-reasons/en.js';
 import { ribbonEn } from './ribbon/en.js';
 import { ribbonMenusEn } from './ribbon-menus/en.js';
 import type { Strings } from './types.js';
@@ -21,6 +22,7 @@ export const en: Strings = {
   ...dataObjectsEn,
   mac: macEn,
   ...pageLayoutEn,
+  ...permissionReasonsEn,
   ...workbookChromeEn,
   ...localeSwitcherEn,
 };

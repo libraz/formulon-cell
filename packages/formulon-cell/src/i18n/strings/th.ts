@@ -6,6 +6,7 @@ import { gridPopupsTh } from './grid-popups/th.js';
 import { localeSwitcherTh } from './locale-switcher/th.js';
 import { macTh } from './mac/th.js';
 import { pageLayoutTh } from './page-layout/th.js';
+import { permissionReasonsTh } from './permission-reasons/th.js';
 import { ribbonTh } from './ribbon/th.js';
 import { ribbonMenusTh } from './ribbon-menus/th.js';
 import type { Strings } from './types.js';
@@ -21,6 +22,7 @@ export const th: Strings = {
   ...dataObjectsTh,
   mac: macTh,
   ...pageLayoutTh,
+  ...permissionReasonsTh,
   ...workbookChromeTh,
   ...localeSwitcherTh,
 };

@@ -4,6 +4,7 @@ import {
   type GoToSpecialOptions,
   selectionFromRanges,
 } from '../commands/goto-special.js';
+import { localizedDecisionReason } from '../commands/permission-reasons.js';
 import { formatA1Range, quoteSheetName } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -117,6 +118,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       warning: strings.formatDialog.validationErrorWarning,
       information: strings.formatDialog.validationErrorInfo,
       protectedCell: strings.protection.protectedCellEdit,
+      reason: (refusal) => localizedDecisionReason(refusal, strings),
     },
   });
 

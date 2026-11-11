@@ -16,6 +16,7 @@ import {
 import { blockDataTableShift } from './data-table-guard.js';
 import { rowShiftBand } from './interaction-effects.js';
 import { groupRows, ungroupRows } from './outline.js';
+import { localizedDecisionReason, type RefusalLike } from './permission-reasons.js';
 import { isSheetProtected } from './protection.js';
 import { sameSavedWorkbook } from './saved-workbook-proof.js';
 import { recordFormatChange, recordPageSetupChange } from './slice-history.js';
@@ -60,12 +61,17 @@ export interface MacDataError {
   /** Detail supplied by the host policy, command pipeline, or a thrown error.
    *  Absent when the code alone describes the failure. */
   readonly reason?: string;
+  /** The refusal that decided the failure; its built-in reason is localized
+   *  by `describeMacDataError`, host text is shown as is. */
+  readonly refusal?: RefusalLike;
 }
 
-/** Localized text for a failure: the host-supplied detail when present,
- *  otherwise the table entry for its code. */
+/** Localized text for a failure: the refusal's reason, the detail supplied by
+ *  the host or a thrown error, otherwise the table entry for its code. */
 export const describeMacDataError = (strings: Strings, error: MacDataError): string =>
-  error.reason ?? strings.mac.data.errors[error.code];
+  error.refusal
+    ? localizedDecisionReason(error.refusal, strings)
+    : (error.reason ?? strings.mac.data.errors[error.code]);
 
 export type MacDataResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -146,11 +152,20 @@ export interface ParsedMacRange {
 const failure = (
   status: MacDataError['status'],
   code: MacDataErrorCode,
-  reason?: string,
-): MacDataResult<never> => ({
-  ok: false,
-  error: reason === undefined ? { status, code } : { status, code, reason },
-});
+  detail?: string | RefusalLike,
+): MacDataResult<never> => {
+  if (detail === undefined) return { ok: false, error: { status, code } };
+  if (typeof detail === 'string') return { ok: false, error: { status, code, reason: detail } };
+  return {
+    ok: false,
+    error: {
+      status,
+      code,
+      ...(detail.reason === undefined ? {} : { reason: detail.reason }),
+      refusal: detail,
+    },
+  };
+};
 
 /** The message of a thrown value, when it carries one. */
 const thrownReason = (error: unknown): string | undefined =>
@@ -496,7 +511,7 @@ export async function solveMacGoalSeek(
     [request.changingCell],
     'mac.data.goalSeek',
   );
-  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
+  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization);
 
   let scratch: WorkbookHandle | null = null;
   try {
@@ -726,7 +741,7 @@ export function commitMacGoalSeek(
   });
   return result.status === 'applied'
     ? success(undefined)
-    : failure('rejected', 'writeFailed', result.rejections[0]?.reason);
+    : failure('rejected', 'writeFailed', result.rejections[0]);
 }
 
 /** Consolidate that matches columns by top-row label and/or rows by left-column label;
@@ -804,7 +819,7 @@ function planLabelledConsolidate(
     cellAddresses(destination),
     'mac.data.consolidate',
   );
-  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
+  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization);
   return success({ destination, values: output });
 }
 
@@ -874,7 +889,7 @@ export function planMacConsolidate(
   }
   const outputAddresses = cellAddresses(destination);
   const authorization = dataIntent(instance, 'valueEdit', outputAddresses, 'mac.data.consolidate');
-  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
+  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization);
   return success({ destination, values: output });
 }
 
@@ -897,7 +912,7 @@ export function commitMacConsolidate(
   });
   return result.status === 'applied'
     ? success(undefined)
-    : failure('rejected', 'writeFailed', result.rejections[0]?.reason);
+    : failure('rejected', 'writeFailed', result.rejections[0]);
 }
 
 const subtotalFunctionCode = (fn: MacDataFunction): number => {
@@ -1082,7 +1097,7 @@ export function planMacSubtotal(
     request.pageBreaks === true,
   );
   const authorization = authorizeWrite(instance.store, intents, 'ribbon');
-  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
+  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization);
   return success({ range: { ...range }, insertedRows: groups.length + 1, groups });
 }
 
@@ -1199,7 +1214,7 @@ export function commitMacSubtotal(
   };
   try {
     const written = authorizedWrite({ store, history, intents, origin: 'ribbon', write });
-    if (!written.ok) return failure('rejected', 'notEditable', written.decision.reason);
+    if (!written.ok) return failure('rejected', 'notEditable', written.decision);
     return success(undefined);
   } catch (error) {
     return failure('invalid', 'failed', thrownReason(error));
@@ -1250,7 +1265,7 @@ export function removeMacSubtotals(
           ungroupRows(store, history, range.r0, lastRow, wb);
       },
     });
-    if (!written.ok) return failure('rejected', 'notEditable', written.decision.reason);
+    if (!written.ok) return failure('rejected', 'notEditable', written.decision);
     return success(rows.length);
   } catch (error) {
     return failure('invalid', 'failed', thrownReason(error));
@@ -1288,7 +1303,7 @@ export function replaceMacSubtotals(
         if (!committed.ok) throw new Failed(committed);
       },
     });
-    if (!written.ok) return failure('rejected', 'notEditable', written.decision.reason);
+    if (!written.ok) return failure('rejected', 'notEditable', written.decision);
     return success(undefined);
   } catch (error) {
     if (error instanceof Failed) return error.result;

@@ -38,6 +38,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'goToDialog',
   'moveCells',
   'protection',
+  'permissionReasons',
   'namedRangeDialog',
   'iterativeDialog',
   'dataTableDialog',

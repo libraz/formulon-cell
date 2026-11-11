@@ -6,6 +6,7 @@ import { gridPopupsZh } from './grid-popups/zh.js';
 import { localeSwitcherZh } from './locale-switcher/zh.js';
 import { macZh } from './mac/zh.js';
 import { pageLayoutZh } from './page-layout/zh.js';
+import { permissionReasonsZh } from './permission-reasons/zh.js';
 import { ribbonZh } from './ribbon/zh.js';
 import { ribbonMenusZh } from './ribbon-menus/zh.js';
 import type { Strings } from './types.js';
@@ -21,6 +22,7 @@ export const zh: Strings = {
   ...dataObjectsZh,
   mac: macZh,
   ...pageLayoutZh,
+  ...permissionReasonsZh,
   ...workbookChromeZh,
   ...localeSwitcherZh,
 };

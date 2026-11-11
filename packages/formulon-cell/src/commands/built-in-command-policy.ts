@@ -19,6 +19,7 @@ import type {
 } from './interaction-policy.js';
 import { valuesOnlyClipboard } from './interaction-policy.js';
 import { outlineDetailAxis } from './outline.js';
+import { deny } from './permission-reasons.js';
 import {
   isCellWritable,
   isPartialShift,
@@ -783,11 +784,8 @@ const shiftedBand = (
 const isBuiltInCommandRequest = (id: string): id is BuiltInCommandRequest =>
   isBuiltInCommandId(id) || id.startsWith(FUNCTION_COMMAND_PREFIX);
 
-const invalidCommand = (id: string): PermissionDecision => ({
-  allowed: false,
-  code: 'invalid',
-  reason: `${id} is not a built-in command`,
-});
+const invalidCommand = (id: string): PermissionDecision =>
+  deny('invalid', 'notBuiltInCommand', { reason: `${id} is not a built-in command` });
 
 /** A function leaf edits a formula when its name is a known function or was recorded from the
  * live catalog; any other name is not a command. */
@@ -862,7 +860,7 @@ export const builtInProtectionDecision = (
   const sheet = state.data.sheetIndex;
   const operation = builtInOperation(store, id);
   if (operation !== null && !workbookStructurePermits(state, operation))
-    return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
+    return deny('protected', 'workbookStructureProtected');
   // A cell shift is refused on a protected sheet whatever its options, so Insert / Delete Cells
   // over part of the rows never opens its dialog there; over whole rows or columns it acts at once.
   const shift =
@@ -895,9 +893,7 @@ export const builtInProtectionDecision = (
         rangeCellsWritable(state, normalized(range)),
       )) ||
     (option !== undefined && !sheetPermits(state, sheet, option));
-  return refused
-    ? { allowed: false, code: 'protected', reason: 'sheet is protected' }
-    : { allowed: true };
+  return refused ? deny('protected', 'sheetProtected') : { allowed: true };
 };
 
 const decideBuiltIn = (
@@ -907,14 +903,10 @@ const decideBuiltIn = (
 ): PermissionDecision => {
   // A cell holds a note or a thread, never both.
   if (THREAD_ADD_COMMANDS.has(id) && activeHasNote(store.getState()))
-    return { allowed: false, code: 'invalid', reason: 'the cell holds a note' };
+    return deny('invalid', 'cellHoldsNote');
   // The Mac desktop has no Allow Edit Ranges; stored ranges are still enforced.
   if (id === 'protectionReview' && isMacChrome(store))
-    return {
-      allowed: false,
-      code: 'invalid',
-      reason: 'Allow Edit Ranges is not on the Mac desktop',
-    };
+    return deny('invalid', 'allowEditRangesUnavailable');
   const protection = builtInProtectionDecision(store, id);
   if (!protection.allowed) return protection;
   if (
@@ -922,24 +914,20 @@ const decideBuiltIn = (
     TABLE_CREATION_COMMANDS.has(id) &&
     selectionOverlapsTable(store.getState())
   )
-    return { allowed: false, code: 'invalid', reason: 'selection overlaps a table' };
+    return deny('invalid', 'selectionOverlapsTable');
   const controller = interactionControllerFor(store);
   if (!controller?.restricted) return { allowed: true };
   if (CELL_SHIFT_DIALOG_COMMANDS.has(id) && !wholeLineSelection(store)) {
     const choices = cellShiftChoices(store, id === 'insertCells' ? 'insert' : 'delete', origin);
     return choices.shift || choices.rows || choices.cols
       ? { allowed: true }
-      : { allowed: false, code: 'operationDenied', reason: 'no choice of the dialog is allowed' };
+      : deny('operationDenied', 'dialogNoChoiceAllowed');
   }
   // Ids arrive from DOM datasets and public command APIs; validate at the boundary.
   if (!isBuiltInCommandRequest(id)) return invalidCommand(id);
   if (id === 'copy') return controller.canCopy();
   if (id === 'cut' && valuesOnlyClipboard(controller.policy))
-    return {
-      allowed: false,
-      code: 'operationDenied',
-      reason: 'a values-only clipboard cannot cut',
-    };
+    return deny('operationDenied', 'valuesOnlyClipboardCannotCut');
   if (id === 'insertCopiedCells') {
     const decision = insertCopiedDecision(store, origin);
     if (decision) return decision;

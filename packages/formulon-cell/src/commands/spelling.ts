@@ -30,12 +30,17 @@ const matchCase = (word: string, like: string): string => {
 
 const coveredLocale = (locale: string): boolean => locale.toLowerCase().startsWith('en');
 
+const typoFix = (word: string): string | undefined => {
+  const key = word.toLowerCase();
+  return Object.hasOwn(COMMON_TYPOS, key) ? COMMON_TYPOS[key] : undefined;
+};
+
 /** The built-in checker: a short list of common English typos. Every word of another language
  *  passes, so it never flags what it cannot judge. */
 export const defaultSpellingService: SpellingService = {
-  check: (word, locale) => !coveredLocale(locale) || !(word.toLowerCase() in COMMON_TYPOS),
+  check: (word, locale) => !coveredLocale(locale) || typoFix(word) === undefined,
   suggest: (word, locale) => {
-    const fix = coveredLocale(locale) ? COMMON_TYPOS[word.toLowerCase()] : undefined;
+    const fix = coveredLocale(locale) ? typoFix(word) : undefined;
     return fix === undefined ? [] : [matchCase(fix, word)];
   },
 };
@@ -49,14 +54,18 @@ export interface SpellingWord {
 
 const WORD = /[\p{L}\p{M}\p{N}]+(?:['’][\p{L}\p{M}\p{N}]+)*/gu;
 const DIGIT = /\p{N}/u;
-const ADDRESS = /^(?:[a-z][a-z\d+.-]*:\/\/|www\.)|^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+const ADDRESS = /^(?:[a-z][a-z\d+.-]*:\/\/|www\.|\\\\[^\s\\])|^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+/** True when the white-space-delimited `token` is an internet address, an e-mail address or a
+ *  network path. */
+export const isAddress = (token: string): boolean => ADDRESS.test(token);
 
 /** The words of `text` a spelling check reads. Internet and e-mail addresses are skipped
  *  whole. */
 export function spellingWords(text: string): SpellingWord[] {
   const words: SpellingWord[] = [];
   for (const chunk of text.matchAll(/\S+/g)) {
-    if (ADDRESS.test(chunk[0])) continue;
+    if (isAddress(chunk[0])) continue;
     for (const match of chunk[0].matchAll(WORD)) {
       const start = (chunk.index ?? 0) + (match.index ?? 0);
       words.push({ word: match[0], start, end: start + match[0].length });
@@ -91,6 +100,7 @@ export function firstSpellingIssue(
   for (let i = 0; i < words.length; i += 1) {
     const word = words[i] as SpellingWord;
     if (word.start < from) continue;
+    if (DIGIT.test(word.word)) continue;
     const previous = words[i - 1];
     if (
       previous &&
@@ -99,7 +109,6 @@ export function firstSpellingIssue(
     ) {
       return { kind: 'repeated', word };
     }
-    if (DIGIT.test(word.word)) continue;
     if (rules.ignoreUppercase && isUppercase(word.word)) continue;
     if (rules.accepted.has(word.word.toLowerCase())) continue;
     if (!rules.service.check(word.word, rules.locale)) return { kind: 'notInDictionary', word };

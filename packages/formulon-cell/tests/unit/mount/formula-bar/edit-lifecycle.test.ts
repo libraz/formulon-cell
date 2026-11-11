@@ -369,7 +369,7 @@ describe('mount/formula-bar — edit lifecycle', () => {
     expect(onValidation).toHaveBeenCalledWith(
       expect.objectContaining({
         severity: 'stop',
-        message: 'The formula-bar value could not be written.',
+        message: 'The value could not be written.',
       }),
     );
     setNumber.mockRestore();

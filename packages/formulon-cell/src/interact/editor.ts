@@ -528,9 +528,11 @@ export class InlineEditor {
       if (result.status === 'refused') {
         input.focus();
         input.select();
+        const rejection = result.rejections[0];
         this.deps.onValidation?.({
           severity: 'stop',
-          message: result.rejections[0]?.reason ?? policyRejection(operation).message,
+          message: rejection?.reason ?? policyRejection(operation).message,
+          ...(rejection ? { refusal: rejection } : {}),
         });
         return;
       }

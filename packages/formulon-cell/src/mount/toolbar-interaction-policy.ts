@@ -6,12 +6,16 @@
 
 import { canExecuteBuiltInRequest } from '../commands/built-in-command-policy.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { localizedDecisionReason, permissionReasonText } from '../commands/permission-reasons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { MAC_FORMULAS_MORE_MENU_ID } from '../toolbar/ribbon/mac/model.js';
 import type { SpreadsheetInstance } from './types.js';
 
-/** Dataset key holding the reason this projection disabled a button with. */
-const PROJECTED_REASON = 'ribbonDecisionReason';
+/** The one dataset key every projector writes a disabled reason under. */
+const REASON_KEY = 'ribbonDisabledReason';
+/** Marks a button this projection disabled; its value is the text it wrote. */
+const PROJECTED_MARK = 'ribbonPolicyDisabled';
+const REASON_OPTIONS = { datasetKey: REASON_KEY } as const;
 
 export interface RibbonInteractionPolicyDeps {
   getInstance: () => SpreadsheetInstance | null;
@@ -34,6 +38,7 @@ export function attachRibbonInteractionPolicy(
     if (!current) return;
     // Sheet protection refuses some built-ins with or without a host policy, so
     // every button follows the one built-in decision; the rest is policy-only.
+    const { strings } = current.i18n;
     const restricted = interactionControllerFor(current.store)?.policy !== undefined;
     if (restricted) closeDynamicDropdowns();
     for (const button of host.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
@@ -46,26 +51,31 @@ export function attachRibbonInteractionPolicy(
         button.dataset.ribbonCommand ?? '',
         'ribbon',
       );
-      const projected = button.dataset[PROJECTED_REASON];
+      const projected = button.dataset[PROJECTED_MARK];
       if (decision.allowed) {
         if (projected === undefined) continue;
-        delete button.dataset[PROJECTED_REASON];
+        delete button.dataset[PROJECTED_MARK];
         // Re-enable only what this projection disabled and nothing has re-disabled since.
         if (button.getAttribute('aria-description') === projected)
-          projectDisabledState(button, false, null);
+          projectDisabledState(button, false, null, REASON_OPTIONS);
         continue;
       }
       // A button another projector already disabled keeps its own (localized) reason.
       if (projected === undefined && button.disabled) continue;
-      const reason = decision.reason ?? decision.code;
-      projectDisabledState(button, true, reason);
-      button.dataset[PROJECTED_REASON] = reason;
+      const reason = localizedDecisionReason(decision, strings);
+      projectDisabledState(button, true, reason, REASON_OPTIONS);
+      button.dataset[PROJECTED_MARK] = reason;
     }
     if (!restricted) return;
     for (const input of host.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
       'input, select',
     )) {
-      projectDisabledState(input, true, 'Unavailable in restricted embedding');
+      projectDisabledState(
+        input,
+        true,
+        permissionReasonText(strings, 'restrictedEmbedding'),
+        REASON_OPTIONS,
+      );
     }
   };
 

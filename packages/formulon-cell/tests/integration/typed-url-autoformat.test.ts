@@ -169,19 +169,14 @@ describe('typed URL autoformat', () => {
     }
   });
 
-  it('keeps non-editor origins, apostrophe input, formulas, no-ops, and spanning links unconverted', async () => {
+  it('keeps clipboard origins, apostrophe input, formulas, no-ops, and spanning links unconverted', async () => {
     const workbook = await WorkbookHandle.createDefault({ locale: 'en' });
     addLocalizedHyperlinkStyle(workbook, false);
     const mounted = await mountStubSheet({ workbook, locale: 'en' });
     const controller = interactionControllerFor(mounted.instance.store);
     try {
-      const commit = (addr: Addr, raw: string, origin: 'editor' | 'formulaBar') =>
+      const commit = (addr: Addr, raw: string, origin: 'editor') =>
         commitCellInput({ store: mounted.instance.store, wb: workbook, addr, raw, origin });
-
-      expect(commit(B1, URL, 'formulaBar').status).toBe('applied');
-      expect(hyperlinkAt(mounted.instance.store.getState(), B1)).toBeNull();
-      expect(commit(B1, URL, 'editor').status).toBe('applied');
-      expect(hyperlinkAt(mounted.instance.store.getState(), B1)).toBeNull();
 
       expect(commit(C1, `'${URL}`, 'editor').status).toBe('applied');
       expect(workbook.getValue(C1)).toEqual({ kind: 'text', value: URL });

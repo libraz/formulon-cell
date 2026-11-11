@@ -11,7 +11,8 @@ import {
 } from '../../../commands/function-categories.js';
 import { getRecentFunctions } from '../../../commands/function-history.js';
 import { interactionControllerFor } from '../../../commands/interaction-controller.js';
-import type { Locale } from '../../../i18n/strings.js';
+import { localizedDecisionReason } from '../../../commands/permission-reasons.js';
+import { dictionaries, type Locale } from '../../../i18n/strings.js';
 import { catalogLocaleOrdinal, catalogLocaleTag } from '../../../interact/function-catalog-text.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import type { SpreadsheetStore } from '../../../store/store.js';
@@ -128,7 +129,7 @@ const projectFunctionButtonState = (
     ? reason
     : decision.allowed
       ? null
-      : (decision.reason ?? decision.code);
+      : localizedDecisionReason(decision, dictionaries[lang]);
   projectDisabledState(button, unavailable || !decision.allowed, disabledReason, {
     datasetKey: 'ribbonDisabledReason',
     titlePrefix: displayName,
@@ -465,7 +466,7 @@ const projectMacRecentMenuPrepared = (
       projectDisabledState(
         button,
         !decision.allowed,
-        decision.allowed ? null : (decision.reason ?? decision.code ?? null),
+        decision.allowed ? null : localizedDecisionReason(decision, dictionaries[lang]),
         {
           datasetKey: 'ribbonDisabledReason',
           titlePrefix: button.textContent ?? '',

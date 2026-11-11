@@ -6,6 +6,7 @@ import { gridPopupsJa } from './grid-popups/ja.js';
 import { localeSwitcherJa } from './locale-switcher/ja.js';
 import { macJa } from './mac/ja.js';
 import { pageLayoutJa } from './page-layout/ja.js';
+import { permissionReasonsJa } from './permission-reasons/ja.js';
 import { ribbonJa } from './ribbon/ja.js';
 import { ribbonMenusJa } from './ribbon-menus/ja.js';
 import type { Strings } from './types.js';
@@ -21,6 +22,7 @@ export const ja: Strings = {
   ...dataObjectsJa,
   mac: macJa,
   ...pageLayoutJa,
+  ...permissionReasonsJa,
   ...workbookChromeJa,
   ...localeSwitcherJa,
 };
