@@ -363,7 +363,7 @@ function queryPattern(opts: FindOptions): RegExp {
 }
 
 /** A predicate for cell texts the query finds. */
-function matcherFor(opts: FindOptions): (display: string) => boolean {
+export function matcherFor(opts: FindOptions): (display: string) => boolean {
   if (opts.query === '') return () => false;
   const pattern = queryPattern(opts);
   const caseSensitive = opts.caseSensitive ?? false;

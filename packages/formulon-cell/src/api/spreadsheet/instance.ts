@@ -45,7 +45,7 @@ import type {
 import { Spreadsheet } from '../../mount.js';
 import { mutators } from '../../store/store.js';
 import type { TraceArrow } from '../../store/types.js';
-import type { ChangeBatchResult } from '../change-batch.js';
+import type { BatchCell, ChangeBatchResult } from '../change-batch.js';
 import { failureOfDecision, spreadsheetFailure } from '../errors.js';
 import { type Disposer, Emitter } from '../events.js';
 import { Lifecycle } from '../lifecycle.js';
@@ -153,6 +153,27 @@ export interface Audit {
   list(): readonly TraceArrow[];
 }
 
+/** One cell, addressed as `applyChanges` and `commands.can` address cells: an A1 cell
+ *  (sheet-qualified or on `sheet`, the active sheet when omitted) or a `CellAddress`. */
+export interface CellTarget {
+  readonly sheet?: SheetRef;
+  readonly at: string | CellAddress;
+}
+
+/** The cells the Watch Window shows: a view of this spreadsheet, not saved with the workbook. */
+export interface Watches {
+  /** Watches a cell; a cell already watched stays where it is. */
+  add(cell: CellTarget): void;
+  /** Stops watching a cell; throws `NotFound` when it is not watched. */
+  remove(cell: CellTarget): void;
+  has(cell: CellTarget): boolean;
+  /** The watched cells, in the Watch Window's order. */
+  list(): readonly BatchCell[];
+  clear(): void;
+  /** The watched cells changed, from the API or the Watch Window. */
+  on(name: 'change', listener: () => void): Disposer;
+}
+
 /** Extensions mounted next to the built-in features. */
 export interface Extensions {
   /** Mounts an extension; the returned disposer removes it. Adding an id already in use replaces
@@ -232,6 +253,7 @@ interface InstanceState {
   readonly commands: Commands;
   readonly dialogs: Dialogs;
   readonly audit: Audit;
+  readonly watches: Watches;
   readonly viewport: Viewport;
   readonly extensions: Extensions;
   readonly i18n: I18n;
@@ -385,6 +407,10 @@ export class SpreadsheetInstance {
     return stateOf(this).audit;
   }
 
+  get watches(): Watches {
+    return stateOf(this).watches;
+  }
+
   get extensions(): Extensions {
     return stateOf(this).extensions;
   }
@@ -460,10 +486,7 @@ export class SpreadsheetInstance {
     const legacy = state.legacy;
     const handle = workbookHandleOf(state.workbook);
     const active = legacy.store.getState().data.sheetIndex;
-    const at =
-      typeof options.at === 'string'
-        ? resolveCellInput(options.at, handle, active, 'importCsv.at')
-        : { sheet: active, row: options.at.row, col: options.at.col };
+    const at = cellOfTarget(state.workbook, active, { at: options.at }, 'importCsv.at');
     const parse = options.delimiter ? { delimiter: options.delimiter } : {};
     const rows = parseCSV(text, parse);
     const width = rows.reduce((widest, row) => Math.max(widest, row.length), 0);
@@ -486,15 +509,9 @@ export class SpreadsheetInstance {
   applyChanges(changes: readonly CellChange[], options: ApplyChangesOptions): ChangeBatchResult {
     const state = stateOf(this);
     const legacy = state.legacy;
-    const handle = workbookHandleOf(state.workbook);
     const active = legacy.store.getState().data.sheetIndex;
     const input: HostCellChangeInput[] = changes.map((change, index) => {
-      const sheet =
-        change.sheet === undefined ? active : state.workbook.sheet(change.sheet as SheetRef).index;
-      const addr =
-        typeof change.at === 'string'
-          ? resolveCellInput(change.at, handle, sheet, `applyChanges[${index}].at`)
-          : { sheet, row: change.at.row, col: change.at.col };
+      const addr = cellOfTarget(state.workbook, active, change, `applyChanges[${index}].at`);
       return 'input' in change
         ? { addr, input: change.input }
         : {
@@ -759,6 +776,19 @@ const createSelection = (
   };
 };
 
+/** The cell `target` names; its sheet defaults to `active`. */
+const cellOfTarget = (
+  workbook: Workbook,
+  active: number,
+  target: CellTarget,
+  label: string,
+): Addr => {
+  const sheet = target.sheet === undefined ? active : workbook.sheet(target.sheet).index;
+  return typeof target.at === 'string'
+    ? resolveCellInput(target.at, workbookHandleOf(workbook), sheet, label)
+    : { sheet, row: target.at.row, col: target.at.col };
+};
+
 const intentRange = (target: LegacyInstance, workbook: Workbook, intent: EditIntent): Range => {
   const sheet =
     intent.sheet === undefined
@@ -810,6 +840,35 @@ const createCommands = (legacy: () => LegacyInstance, workbook: () => Workbook):
     return isCommandId(request) && commandRefusal(legacy(), request) === null;
   },
 });
+
+const createWatches = (
+  legacy: () => LegacyInstance,
+  addrOf: (cell: CellTarget) => Addr,
+): Watches => {
+  const watched = () => legacy().store.getState().watch.watches;
+  const isWatched = (addr: Addr): boolean =>
+    watched().some((w) => w.sheet === addr.sheet && w.row === addr.row && w.col === addr.col);
+  return {
+    add: (cell) => mutators.addWatch(legacy().store, addrOf(cell)),
+    remove(cell) {
+      const addr = addrOf(cell);
+      if (!isWatched(addr)) throw notFound(`cell ${addr.row}:${addr.col} is not watched`);
+      mutators.removeWatch(legacy().store, addr);
+    },
+    has: (cell) => isWatched(addrOf(cell)),
+    list: () => watched().map(({ sheet, row, col }) => ({ sheet, at: { row, col } })),
+    clear: () => mutators.clearWatches(legacy().store),
+    on(_name, listener) {
+      let last = watched();
+      return legacy().store.subscribe(() => {
+        const next = watched();
+        if (next === last) return;
+        last = next;
+        listener();
+      });
+    },
+  };
+};
 
 const createAudit = (legacy: () => LegacyInstance, at: (ref: string) => Addr): Audit => ({
   tracePrecedents(ref) {
@@ -1052,6 +1111,8 @@ export async function mount(
       state.legacy.store.getState().data.sheetIndex,
       'at',
     );
+  const targetOf = (cell: CellTarget): Addr =>
+    cellOfTarget(state.workbook, state.legacy.store.getState().data.sheetIndex, cell, 'at');
   const formulaHints = createFormulaHints(currentLegacy);
   state = {
     legacy,
@@ -1070,6 +1131,7 @@ export async function mount(
     commands: createCommands(currentLegacy, () => current().workbook),
     dialogs: createDialogs(currentLegacy),
     audit: createAudit(currentLegacy, addrOf),
+    watches: createWatches(currentLegacy, targetOf),
     viewport: {
       scrollTo(ref) {
         const target = currentLegacy();

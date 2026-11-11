@@ -9,7 +9,7 @@
  *   theme    ∈ { paper, ink, contrast }
  *   locale   ∈ { en, ja }
  */
-import { PageOrientation, PaperSize, ValueKind } from '@libraz/formulon';
+import { PageOrientation, PaperSize, StatusCode, ValueKind } from '@libraz/formulon';
 import {
   fixedFormPolicy,
   mount,
@@ -24,7 +24,7 @@ import { legacyInstanceOf } from '../../src/api/spreadsheet/instance.js';
 import { workbookHandleOf } from '../../src/api/workbook.js';
 import { setComment } from '../../src/commands/comment.js';
 import { spreadsheetInternals } from '../../src/mount/internals.js';
-import { expectFailure, makeHost } from './helpers.js';
+import { expectFailure, expectFormulonError, makeHost } from './helpers.js';
 
 const live: Array<{ dispose(): void }> = [];
 
@@ -268,6 +268,27 @@ describe('spreadsheet: update', () => {
       [{ keys: ['theme'], source: 'api' }],
     ]);
     expect(sheet.options.theme).toBeUndefined();
+  });
+
+  it('keeps a watch list addressed like applyChanges, reported on change', async () => {
+    const sheet = await mountSheet();
+    sheet.workbook.addSheet('Data');
+    const changes = vi.fn();
+    sheet.watches.on('change', changes);
+    sheet.watches.add({ at: 'B2' });
+    sheet.watches.add({ sheet: 'Data', at: { row: 0, col: 0 } });
+    sheet.watches.add({ at: 'Data!A1' });
+    expect(sheet.watches.list()).toEqual([
+      { sheet: 0, at: { row: 1, col: 1 } },
+      { sheet: 1, at: { row: 0, col: 0 } },
+    ]);
+    expect(sheet.watches.has({ sheet: 1, at: 'A1' })).toBe(true);
+    expect(changes).toHaveBeenCalledTimes(2);
+    sheet.watches.remove({ at: 'B2' });
+    expectFormulonError(() => sheet.watches.remove({ at: 'B2' }), StatusCode.NotFound);
+    sheet.watches.clear();
+    expect(sheet.watches.list()).toEqual([]);
+    expect(changes).toHaveBeenCalledTimes(4);
   });
 
   it('showAllNotes set at mount draws every note from the start', async () => {

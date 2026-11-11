@@ -54,7 +54,7 @@ const assertWithinLimit = (rows: number, cols: number, member: string): void => 
   );
 };
 
-const writeCoerced = (
+export const writeCoerced = (
   ctx: SheetContext,
   { row, col }: CellAddress,
   input: CoercedInput,

@@ -12,6 +12,7 @@ export type {
   PivotWorksheetSourceInput,
 } from './api/pivot-cache.js';
 export type { ExportCsvOptions, ImportCsvOptions } from './api/sheet-cells.js';
+export type { FindCellsOptions, ReplaceCellsOptions } from './api/sheet-find.js';
 export type { ProtectOptions } from './api/sheet-format.js';
 export type { CommandId } from './api/spreadsheet/command-ids.js';
 export type { DialogId, DialogOptions, Dialogs } from './api/spreadsheet/dialogs.js';
@@ -19,6 +20,7 @@ export {
   type Audit,
   type CellFormatter,
   type CellRegistry,
+  type CellTarget,
   type CommandIntent,
   type Commands,
   type Extensions,
@@ -29,6 +31,7 @@ export {
   type Selection,
   SpreadsheetInstance,
   type Viewport,
+  type Watches,
 } from './api/spreadsheet/instance.js';
 export type {
   ApplyChangesOptions,

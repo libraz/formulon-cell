@@ -60,6 +60,7 @@ import { SHEET_OOXML_MEMBERS, SheetOoxml, WORKBOOK_OOXML_MEMBERS, WorkbookOoxml 
 import { PIVOT_MEMBERS, Pivot, SHEET_PIVOT_MEMBERS } from './pivot.js';
 import { PIVOT_CACHE_MEMBERS, PivotCache, WORKBOOK_PIVOT_CACHE_MEMBERS } from './pivot-cache.js';
 import { SHEET_CELL_MEMBERS } from './sheet-cells.js';
+import { SHEET_FIND_MEMBERS } from './sheet-find.js';
 import { SHEET_FORMAT_MEMBERS, WORKBOOK_FORMAT_MEMBERS } from './sheet-format.js';
 import { SHEET_STRUCTURE_MEMBERS, WORKBOOK_NAME_MEMBERS } from './sheet-structure.js';
 import { SHEET_TABLE_MEMBERS, TABLE_MEMBERS, Table, WORKBOOK_TABLE_MEMBERS } from './table.js';
@@ -835,6 +836,7 @@ const SHEET_OOXML_HOST: MemberHost<SheetContext> = {
 installMembers(SHEET_HOST, SHEET_CELL_MEMBERS);
 installMembers(SHEET_HOST, SHEET_STRUCTURE_MEMBERS);
 installMembers(SHEET_HOST, SHEET_FORMAT_MEMBERS);
+installMembers(SHEET_HOST, SHEET_FIND_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_NAME_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_FORMAT_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_CALC_MEMBERS);
