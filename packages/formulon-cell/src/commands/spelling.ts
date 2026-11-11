@@ -20,6 +20,10 @@ const COMMON_TYPOS: Readonly<Record<string, string>> = {
   wierd: 'weird',
 };
 
+/** The language Spelling and AutoCorrect name for a UI `locale`: the UI language, except
+ *  Japanese, which the desktop app proofs in English. */
+export const proofingLocale = (locale: string): string => (/^ja\b/i.test(locale) ? 'en' : locale);
+
 /** Gives `word` the capitalisation of `like`: all caps (two or more cased letters, no lower
  *  case), a leading capital, or as is. Spelling suggestions and AutoCorrect share it. */
 export const carryCase = (word: string, like: string): string => {

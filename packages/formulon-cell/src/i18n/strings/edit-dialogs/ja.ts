@@ -164,7 +164,7 @@ export const editDialogsJa: EditDialogsStrings = {
     customDictionaries: 'ユーザー辞書',
   },
   autoCorrectDialog: {
-    title: 'オートコレクト オプション',
+    title: 'オートコレクト: {language}',
     description:
       '[自動で変更する項目] リストで一致した単語を、[修正後の文字列] リストにある対応する単語で自動的に置き換えます。',
     replaceAsYouType: '入力中に自動修正する',

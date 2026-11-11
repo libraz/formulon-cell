@@ -30,4 +30,16 @@ describe('mount/formula-bar - Control+Enter fill', () => {
     });
     harness.detach();
   });
+
+  it('replaces a word as soon as a delimiter is typed', () => {
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+    harness.fxInput.value = '(c) ';
+    harness.fxInput.setSelectionRange(4, 4);
+    harness.fxInput.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: ' ' }));
+    expect(harness.fxInput.value).toBe('© ');
+    expect(harness.fxInput.selectionStart).toBe(2);
+    harness.detach();
+  });
 });

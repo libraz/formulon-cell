@@ -1,4 +1,4 @@
-import { correctTypedEntry } from '../commands/autocorrect.js';
+import { autoCorrectInput, correctTypedEntry } from '../commands/autocorrect.js';
 import {
   type CellInputAlert,
   commitCellInput,
@@ -1100,6 +1100,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     // preserve it because the browser updates textarea.value before input.
     if (!fxEditing) beginFormulaBarEdit(fxBaseline);
     commitRejected = false;
+    if (event?.inputType === 'insertText') autoCorrectInput(store, fxInput);
     draftHistory.input(captureDraftSnapshot(), {
       composing,
       inputType: event?.inputType,

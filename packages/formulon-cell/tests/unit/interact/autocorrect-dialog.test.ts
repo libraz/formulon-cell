@@ -51,9 +51,35 @@ describe('AutoCorrect options dialog', () => {
     document.body.replaceChildren();
   });
 
+  it('names the Japanese UI pane after the English it proofs, with the Japanese list', async () => {
+    sheet.dispose();
+    sheet = await mountStubSheet({
+      locale: 'ja',
+      getAutoCorrectOptions: () => options,
+      setAutoCorrectOptions,
+    });
+    openAutoCorrectDialog(sheet.instance);
+    expect(dialog()?.querySelector('.fc-fmtdlg__header')?.textContent).toBe('オートコレクト: 英語');
+    expect(entries()).toEqual(['こんにちわ→こんにちは', 'こんばんわ→こんばんは']);
+    expect(button('追加').disabled).toBe(true);
+    expect(button('削除').disabled).toBe(true);
+  });
+
   it('lists the replacements and labels itself as the desktop pane', () => {
     openAutoCorrectDialog(sheet.instance);
-    expect(dialog()?.querySelector('.fc-fmtdlg__header')?.textContent).toBe('AutoCorrect Options');
+    expect(dialog()?.querySelector('.fc-fmtdlg__header')?.textContent).toBe('AutoCorrect: English');
+    expect(
+      [...(dialog()?.querySelectorAll('.fc-autocorrect__check') ?? [])].map((row) => [
+        row.textContent,
+        row.querySelector('input')?.checked,
+      ]),
+    ).toEqual([
+      ['Replace internet and network paths with hyperlinks', true],
+      ['Capitalize names of days', true],
+      ['Correct TWo INitial CApitals', true],
+      ['Capitalize first letter of sentences', true],
+      ['Replace text as you type', true],
+    ]);
     expect(entries()).toEqual(['(c)→©', '(e)→€', '(r)→®', '(tm)→™', '...→…']);
     expect(checkbox('Replace text as you type').checked).toBe(true);
     expect(checkbox('Replace internet and network paths with hyperlinks').checked).toBe(true);

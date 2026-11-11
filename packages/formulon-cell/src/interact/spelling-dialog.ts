@@ -2,6 +2,7 @@ import { commentAt, recordCommentChange, setComment } from '../commands/comment.
 import { localizedDecisionReason } from '../commands/permission-reasons.js';
 import {
   firstSpellingIssue,
+  proofingLocale,
   replaceSpellingWord,
   replaceWholeWord,
   type SpellingIssueKind,
@@ -99,10 +100,6 @@ const textOf = (instance: SpreadsheetInstance, target: SpellingTarget): string |
   const value = instance.workbook.getValue(target.addr);
   return value.kind === 'text' ? value.value : null;
 };
-
-/** The language the check runs in: the UI language, except Japanese, which the desktop app
- *  checks in English. */
-const proofingLocale = (locale: string): string => (/^ja\b/i.test(locale) ? 'en' : locale);
 
 const languageName = (locale: string): string => {
   try {

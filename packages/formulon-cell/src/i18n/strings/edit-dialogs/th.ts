@@ -162,7 +162,7 @@ export const editDialogsTh: EditDialogsStrings = {
     customDictionaries: 'พจนานุกรมแบบกำหนดเอง',
   },
   autoCorrectDialog: {
-    title: 'ตัวเลือกการแก้ไขอัตโนมัติ',
+    title: 'การแก้ไขอัตโนมัติ: {language}',
     description: 'แทนที่คำที่ตรงกันในรายการ แทนที่ ด้วยคำที่เกี่ยวข้องในรายการ ด้วย โดยอัตโนมัติ',
     replaceAsYouType: 'แทนที่ข้อความขณะพิมพ์',
     correctTwoInitialCapitals: 'แก้ไขอักษรนำที่เป็นตัวพิมพ์ใหญ่ 2 ตัว',

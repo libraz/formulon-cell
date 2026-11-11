@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   type AutoCorrectOptions,
   AutoCorrectStore,
-  autoCorrectBefore,
   autoCorrectText,
   builtInAutoCorrectEntries,
   capitalizeDays,
@@ -53,17 +52,12 @@ describe('AutoCorrect', () => {
     );
   });
 
-  it('finds the entry typed just before a delimiter, as replacing while typing does', () => {
-    expect(autoCorrectBefore('see (c) ', 7, symbols)).toEqual({ start: 4, end: 7, to: '©' });
-    expect(autoCorrectBefore('see (c)x', 7, symbols)).toBeNull();
-    expect(autoCorrectBefore('a(c) ', 4, symbols)).toBeNull();
-  });
-
-  // The capitalisation rules are not measured against the desktop yet.
-  it('lowers the second of two initial capitals, except plural acronyms and exceptions', () => {
+  it('lowers the second of two initial capitals, except plural acronyms a delimiter follows', () => {
     expect(correctTwoInitialCapitals('THe CApitals TWO Ok')).toBe('The Capitals TWO Ok');
-    // A plural acronym keeps its capitals by rule, unmeasured; listed exceptions stay too.
-    expect(correctTwoInitialCapitals('IDs PCs')).toBe('IDs PCs');
+    // The last word of a committed entry is corrected; one a delimiter follows is not.
+    expect(correctTwoInitialCapitals('IDs PCs')).toBe('IDs Pcs');
+    expect(correctTwoInitialCapitals('IDs PCs ', [], false)).toBe('IDs PCs ');
+    expect(correctTwoInitialCapitals('IDs PCs', [], false)).toBe('IDs PCs');
     expect(correctTwoInitialCapitals('MHz CDrom', ['cdrom'])).toBe('Mhz CDrom');
   });
 

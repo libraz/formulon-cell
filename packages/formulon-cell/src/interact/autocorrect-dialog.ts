@@ -1,9 +1,21 @@
 import type { AutoCorrectEntry } from '../commands/autocorrect.js';
+import { proofingLocale } from '../commands/spelling.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogButton, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 
 const openDialogs = new WeakMap<SpreadsheetInstance, () => void>();
+
+/** The name of the language the lists are for, in the UI language. */
+const languageName = (locale: string): string => {
+  try {
+    return (
+      new Intl.DisplayNames([locale], { type: 'language' }).of(proofingLocale(locale)) ?? locale
+    );
+  } catch {
+    return locale;
+  }
+};
 
 /** Opens the AutoCorrect options: the replacement list and its switches. Every change applies at
  *  once and reaches the host through `autoCorrect.onChange`. */
@@ -11,15 +23,16 @@ export function openAutoCorrectDialog(instance: SpreadsheetInstance): void {
   openDialogs.get(instance)?.();
   const store = instance.autoCorrect;
   const t = instance.i18n.strings.autoCorrectDialog;
+  const title = t.title.replace('{language}', languageName(instance.i18n.locale));
   const shell = createDialogShell({
     host: instance.host,
     className: 'fc-autocorrect',
-    ariaLabel: t.title,
+    ariaLabel: title,
     onDismiss: () => close(),
   });
   shell.overlay.classList.add('fc-fmtdlg');
   const { body, footer } = appendDialogFrame(shell, {
-    title: t.title,
+    title,
     panelClasses: ['fc-fmtdlg__panel', 'fc-autocorrect__panel'],
     bodyClass: 'fc-fmtdlg__body fc-autocorrect__body',
     footerClass: 'fc-fmtdlg__footer fc-autocorrect__footer',
@@ -35,14 +48,22 @@ export function openAutoCorrectDialog(instance: SpreadsheetInstance): void {
     row.append(box, document.createTextNode(label));
     body.appendChild(row);
   };
+  // The desktop pane's order: hyperlinks, days, two capitals, sentences, then the list switch.
+  check(t.replaceHyperlinks, store.state().replaceHyperlinks, (on) =>
+    store.update({ replaceHyperlinks: on }),
+  );
+  check(t.capitalizeDays, store.state().capitalizeDays, (on) =>
+    store.update({ capitalizeDays: on }),
+  );
+  check(t.correctTwoInitialCapitals, store.state().correctTwoInitialCapitals, (on) =>
+    store.update({ correctTwoInitialCapitals: on }),
+  );
+  check(t.capitalizeSentences, store.state().capitalizeSentences, (on) =>
+    store.update({ capitalizeSentences: on }),
+  );
   check(t.replaceAsYouType, store.state().replaceAsYouType, (on) =>
     store.update({ replaceAsYouType: on }),
   );
-
-  const description = document.createElement('p');
-  description.className = 'fc-autocorrect__description';
-  description.textContent = t.description;
-  body.appendChild(description);
 
   const field = (id: string, label: string): HTMLInputElement => {
     const wrap = document.createElement('label');
@@ -69,7 +90,8 @@ export function openAutoCorrectDialog(instance: SpreadsheetInstance): void {
   const list = document.createElement('div');
   list.className = 'fc-autocorrect__list';
   list.setAttribute('role', 'listbox');
-  list.setAttribute('aria-label', t.title);
+  list.setAttribute('aria-label', title);
+  list.title = t.description;
   list.tabIndex = 0;
   body.appendChild(list);
 
@@ -79,18 +101,6 @@ export function openAutoCorrectDialog(instance: SpreadsheetInstance): void {
   const add = appendDialogButton(actions, { label: t.add, variant: 'secondary' });
   const remove = appendDialogButton(actions, { label: t.delete, variant: 'secondary' });
 
-  check(t.correctTwoInitialCapitals, store.state().correctTwoInitialCapitals, (on) =>
-    store.update({ correctTwoInitialCapitals: on }),
-  );
-  check(t.capitalizeSentences, store.state().capitalizeSentences, (on) =>
-    store.update({ capitalizeSentences: on }),
-  );
-  check(t.capitalizeDays, store.state().capitalizeDays, (on) =>
-    store.update({ capitalizeDays: on }),
-  );
-  check(t.replaceHyperlinks, store.state().replaceHyperlinks, (on) =>
-    store.update({ replaceHyperlinks: on }),
-  );
   const closeButton = appendDialogButton(footer, { label: t.close, variant: 'primary' });
 
   const entryOf = (key: string): AutoCorrectEntry | undefined =>

@@ -164,7 +164,7 @@ export const editDialogsDe: EditDialogsStrings = {
     customDictionaries: 'Benutzerwörterbücher',
   },
   autoCorrectDialog: {
-    title: 'AutoKorrektur-Optionen',
+    title: 'AutoKorrektur: {language}',
     description:
       'Ersetzt ein in der Liste "Ersetzen" vorhandenes Wort automatisch durch das entsprechende Wort in der Liste "Durch".',
     replaceAsYouType: 'Während der Eingabe ersetzen',

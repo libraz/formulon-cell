@@ -1,4 +1,4 @@
-import { correctTypedEntry } from '../commands/autocorrect.js';
+import { autoCorrectInput, correctTypedEntry } from '../commands/autocorrect.js';
 import {
   type CellInputAlert,
   commitCellInput,
@@ -854,6 +854,9 @@ export class InlineEditor {
     }
     this.referenceGesture = null;
     this.pointNavigation = null;
+    if (event?.inputType === 'insertText' && this.input) {
+      autoCorrectInput(this.deps.store, this.input);
+    }
     this.draftHistory.input(this.captureDraftSnapshot(), {
       composing: this.composing,
       inputType: event?.inputType,

@@ -162,7 +162,7 @@ export const editDialogsEn: EditDialogsStrings = {
     customDictionaries: 'Custom Dictionaries',
   },
   autoCorrectDialog: {
-    title: 'AutoCorrect Options',
+    title: 'AutoCorrect: {language}',
     description:
       'Automatically replaces a matched word in the Replace list with the corresponding word in the With list.',
     replaceAsYouType: 'Replace text as you type',

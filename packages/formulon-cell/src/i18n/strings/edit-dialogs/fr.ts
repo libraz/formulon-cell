@@ -164,7 +164,7 @@ export const editDialogsFr: EditDialogsStrings = {
     customDictionaries: 'Dictionnaires personnels',
   },
   autoCorrectDialog: {
-    title: 'Options de correction automatique',
+    title: 'Correction automatique\u00a0: {language}',
     description:
       'Remplace automatiquement un mot figurant dans la liste Remplacer par le mot correspondant dans la liste Par.',
     replaceAsYouType: 'Correction en cours de frappe',

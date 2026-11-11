@@ -119,23 +119,6 @@ const endsWord = (text: string, at: number): boolean =>
 const longestFirst = (entries: readonly AutoCorrectEntry[]): AutoCorrectEntry[] =>
   entries.filter((entry) => entry.from !== '').sort((a, b) => b.from.length - a.from.length);
 
-/** The replacement of the entry typed just before `end`, the point where a delimiter was typed:
- *  what replacing as you type does. Null when none ends there. */
-export function autoCorrectBefore(
-  text: string,
-  end: number,
-  entries: readonly AutoCorrectEntry[],
-): { readonly start: number; readonly end: number; readonly to: string } | null {
-  if (!endsWord(text, end)) return null;
-  for (const entry of longestFirst(entries)) {
-    const start = end - entry.from.length;
-    if (start < 0 || !startsWord(text, start)) continue;
-    const to = replacementAt(text, start, entry);
-    if (to !== null) return { start, end, to };
-  }
-  return null;
-}
-
 /** `text` with every entry replaced where it stands as a word: at the start or after white
  *  space, and before the end, white space or punctuation. */
 export function autoCorrectText(text: string, entries: readonly AutoCorrectEntry[]): string {
@@ -196,17 +179,20 @@ const inAddress = (text: string, index: number): boolean => {
 };
 
 /** `text` with the second capital of a word like `THe` lowered: two capitals followed only by
- *  lower-case letters. A plural acronym such as `PCs` and the `exceptions` stay as typed. */
+ *  lower-case letters. A plural acronym such as `PCs` stays as typed when a delimiter follows it,
+ *  but not as the last word of a committed entry (`endsEntry`), as on the desktop; the
+ *  `exceptions` always stay. */
 export const correctTwoInitialCapitals = (
   text: string,
   exceptions: readonly string[] = [],
+  endsEntry = true,
 ): string => {
   const keep = lowerSet(exceptions);
   return text.replace(WORD, (word, at: number) =>
     word.length > 2 &&
     isUpper(word.slice(0, 2)) &&
     isLower(word.slice(2)) &&
-    word.slice(2) !== 's' &&
+    (word.slice(2) !== 's' || (endsEntry && at + word.length === text.length)) &&
     !keep.has(word.toLowerCase()) &&
     !inAddress(text, at)
       ? word.charAt(0) + word.charAt(1).toLowerCase() + word.slice(2)
@@ -298,18 +284,39 @@ export class AutoCorrectStore {
     this.update({ entries: this.state().entries.filter((entry) => entry.from !== from) });
   }
 
-  /** Typed text as AutoCorrect leaves it on entry. */
-  correct(text: string): string {
+  /** Typed text as AutoCorrect leaves it on entry. `endsEntry` is false for text a delimiter
+   *  follows, such as the words before the caret while typing. */
+  correct(text: string, endsEntry = true): string {
     const state = this.state();
     let out = state.replaceAsYouType ? autoCorrectText(text, state.entries) : text;
     if (state.correctTwoInitialCapitals) {
-      out = correctTwoInitialCapitals(out, state.exceptions.initialCaps);
+      out = correctTwoInitialCapitals(out, state.exceptions.initialCaps, endsEntry);
     }
     if (state.capitalizeDays) out = capitalizeDays(out);
     if (state.capitalizeSentences) {
       out = capitalizeSentences(out, state.exceptions.firstLetter);
     }
     return out;
+  }
+
+  /** A typed entry as AutoCorrect leaves it: a constant whole, a formula inside its strings. */
+  correctEntry(raw: string, endsEntry = true): string {
+    if (!raw.trimStart().startsWith('=')) return this.correct(raw, endsEntry);
+    // A closed string has its quote after the last word; an open one ends where the entry does.
+    return raw.replace(
+      /"((?:[^"]|"")*)("|$)/g,
+      (_match, inner: string, close: string) =>
+        `"${this.correct(inner, endsEntry && close === '')}${close}`,
+    );
+  }
+
+  /** Replacing as you type: when the character before `caret` ends a word, the entry with the
+   *  text up to it corrected and the caret after the correction. Null when nothing changes. */
+  live(value: string, caret: number): { readonly value: string; readonly caret: number } | null {
+    if (caret === 0 || !END.test(value.charAt(caret - 1))) return null;
+    const head = value.slice(0, caret);
+    const fixed = this.correctEntry(head, false);
+    return fixed === head ? null : { value: fixed + value.slice(caret), caret: fixed.length };
   }
 }
 
@@ -323,6 +330,20 @@ export function autoCorrectFor(store: SpreadsheetStore): AutoCorrectStore | unde
   return stores.get(store);
 }
 
-/** A typed entry as AutoCorrect leaves it: constants are corrected, formulas left as typed. */
+/** A typed entry as AutoCorrect leaves it on commit: the last word gets its correction here,
+ *  the words before it already had theirs at their delimiters. */
 export const correctTypedEntry = (store: SpreadsheetStore, raw: string): string =>
-  raw.trimStart().startsWith('=') ? raw : (stores.get(store)?.correct(raw) ?? raw);
+  stores.get(store)?.correctEntry(raw) ?? raw;
+
+/** Replacing as you type in an entry field: corrects `input` in place after a typed delimiter. */
+export function autoCorrectInput(
+  store: SpreadsheetStore,
+  input: HTMLInputElement | HTMLTextAreaElement,
+): void {
+  const caret = input.selectionStart;
+  if (caret === null || caret !== input.selectionEnd) return;
+  const fixed = stores.get(store)?.live(input.value, caret);
+  if (!fixed) return;
+  input.value = fixed.value;
+  input.setSelectionRange(fixed.caret, fixed.caret);
+}

@@ -173,7 +173,9 @@ export interface EditDialogsStrings {
   };
   /** The AutoCorrect options, labelled as the desktop preference pane. */
   autoCorrectDialog: {
+    /** Title; `{language}` is the language the lists are for. */
     title: string;
+    /** The list's tooltip. */
     description: string;
     replaceAsYouType: string;
     correctTwoInitialCapitals: string;

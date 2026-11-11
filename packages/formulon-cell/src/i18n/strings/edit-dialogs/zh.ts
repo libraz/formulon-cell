@@ -162,7 +162,7 @@ export const editDialogsZh: EditDialogsStrings = {
     customDictionaries: '自定义词典',
   },
   autoCorrectDialog: {
-    title: '自动更正选项',
+    title: '自动更正: {language}',
     description: '自动将“替换”列表中的匹配单词替换为“替换为”列表中对应的单词。',
     replaceAsYouType: '键入时替换文本',
     correctTwoInitialCapitals: '更正前两个字母连续大写',

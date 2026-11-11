@@ -162,7 +162,7 @@ export const editDialogsKo: EditDialogsStrings = {
     customDictionaries: '사용자 지정 사전',
   },
   autoCorrectDialog: {
-    title: '자동 고침 옵션',
+    title: '자동 고침: {language}',
     description:
       '[바꾸기] 목록의 일치하는 단어를 자동으로 [바꿀 단어] 목록의 해당 단어로 바꿉니다.',
     replaceAsYouType: '다음 목록에 있는 내용대로 자동으로 바꾸기',

@@ -54,10 +54,10 @@ describe('AutoCorrect on cell entry', () => {
     return wb.getValue(A1);
   };
 
-  it('corrects a typed constant and leaves formulas as typed', () => {
+  it('corrects a typed constant, and a formula inside its strings only', () => {
     expect(typed('(c) 2026')).toEqual({ kind: 'text', value: '© 2026' });
     typed('="(c) x"');
-    expect(wb.cellFormula(A1)).toBe('="(c) x"');
+    expect(wb.cellFormula(A1)).toBe('="© x"');
   });
 
   it('applies the capitalisation rules to a typed constant', () => {
@@ -74,6 +74,23 @@ describe('AutoCorrect on cell entry', () => {
   it('stops correcting when Replace text as you type is off', () => {
     autoCorrect.update({ replaceAsYouType: false });
     expect(typed('(c) 2026')).toEqual({ kind: 'text', value: '(c) 2026' });
+  });
+
+  it('replaces a word in the cell editor as soon as a delimiter is typed', () => {
+    const host = document.createElement('div');
+    const grid = document.createElement('div');
+    host.appendChild(grid);
+    document.body.appendChild(host);
+    const editor = new InlineEditor({ host, grid, store, wb, onAfterCommit: () => {} });
+    editor.begin('(c)');
+    const input = host.querySelector<HTMLTextAreaElement>('textarea');
+    if (!input) throw new Error('no editor input');
+    input.value = '(c) ';
+    input.setSelectionRange(4, 4);
+    input.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: ' ' }));
+    expect(input.value).toBe('© ');
+    expect(input.selectionStart).toBe(2);
+    editor.cancel();
   });
 
   it('corrects every cell Ctrl+Enter fills', () => {
