@@ -90,7 +90,11 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
   if (input && input !== input.ownerDocument.activeElement) input.value = table?.name ?? '';
   const reason = instance.i18n.strings.ribbon.tableSessionOnly;
   const sessionOnly = table?.source === 'session';
-  if (input) projectDisabledState(input, table?.source !== 'engine', sessionOnly ? reason : null);
+  // The box is disabled exactly when its commit would be refused (protection, policy).
+  const renamable =
+    table?.source === 'engine' &&
+    canExecuteBuiltInRequest(instance.store, 'tableName', 'ribbon').allowed;
+  if (input) projectDisabledState(input, !renamable, sessionOnly ? reason : null);
   for (const [command, option] of Object.entries(TABLE_OPTION_COMMANDS)) {
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
     if (!button) continue;

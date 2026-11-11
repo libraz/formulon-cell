@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatAsTable } from '../../../../src/commands/format-as-table.js';
+import { setProtectedSheet } from '../../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
@@ -152,6 +153,19 @@ describe('Table Design tab of the ribbon', () => {
       expect(command(id).getAttribute('aria-disabled')).toBe('true');
       expect(command(id).title).toContain('not stored in the workbook');
     }
+    tb.dispose();
+  });
+
+  it('disables the table name box on a protected sheet, as its rename is refused', () => {
+    makeTable();
+    mutators.setActive(store(), { sheet: 0, row: 1, col: 1 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
+    expect(nameInput().disabled).toBe(false);
+    setProtectedSheet(store(), 0, true);
+    expect(nameInput().disabled).toBe(true);
+    expect(nameInput().getAttribute('aria-disabled')).toBe('true');
+    setProtectedSheet(store(), 0, false);
+    expect(nameInput().disabled).toBe(false);
     tb.dispose();
   });
 
