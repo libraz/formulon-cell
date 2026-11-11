@@ -482,11 +482,6 @@ export const ribbonJa: RibbonStrings = {
     workbookStructureLabel: 'ブック構造',
     workbookStructureDetail:
       'このシートに数式が見つかりません。計算結果が文字列として貼り付けられていないか確認してください。',
-    repeatedWord: '同じ語が繰り返されています: "{word}"。',
-    repeatedSpaces: '連続した空白が含まれています。',
-    spaceBeforePunctuation: '句読点の前に空白が含まれています。',
-    lowercaseSentence: '英文の文頭が小文字で始まっている可能性があります。',
-    typo: 'スペルミスの可能性: "{wrong}"。候補: "{suggestion}"。',
     translateEmptyLabel: '翻訳',
     translateEmptyDetail: '翻訳対象のテキストセルが見つかりません。',
     translateReady: '翻訳対象テキスト',

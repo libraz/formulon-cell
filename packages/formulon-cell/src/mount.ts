@@ -18,6 +18,7 @@ import {
   setSheetProtectionAction,
 } from './commands/protection-actions.js';
 import { registerSheetActivationHydrator } from './commands/sheet-mutate.js';
+import { defaultSpellingService } from './commands/spelling.js';
 import {
   clearTraceArrows,
   traceDependents as traceDependentArrows,
@@ -134,6 +135,7 @@ export type {
 import { disposeDataTableDialog } from './interact/data-table-dialog.js';
 import { disposeMacGoalSeekDialog } from './interact/mac-goal-seek-dialog.js';
 import { disposeMacPivotMoveDialog } from './interact/mac-pivot-move-dialog.js';
+import { closeSpellingDialog } from './interact/spelling-dialog.js';
 
 function normalizeScreenClipResult(result: string | ScreenClipResult | null | undefined) {
   if (!result) return null;
@@ -199,6 +201,7 @@ export const Spreadsheet = {
     });
     const captureScreenClipHook = opts.captureScreenClip;
     const getFunctionArgumentHelp = opts.getFunctionArgumentHelp;
+    const getSpellingService = opts.getSpellingService;
     let uploadStatus = opts.uploadStatus ?? null;
     let macroRecording = opts.macroRecording ?? null;
     let ui = resolveSpreadsheetUiOptions(opts.ui);
@@ -1070,6 +1073,7 @@ export const Spreadsheet = {
       setPrinterProfileId: printers.setProfileId,
       refreshPrinterProfiles: printers.refresh,
       captureScreenClip,
+      spellingService: () => getSpellingService?.() ?? defaultSpellingService,
       setUploadStatus(next) {
         uploadStatus = next;
         if (next !== null) declareStatusIndicator('uploadStatus');
@@ -1247,6 +1251,7 @@ export const Spreadsheet = {
         cleanup(() => disposeMacRibbonActions(instance));
         cleanup(() => disposeMacInk(instance));
         cleanup(() => disposeMacGoalSeekDialog(instance));
+        cleanup(() => closeSpellingDialog(instance));
         cleanup(() => disposeMacPivotMoveDialog(instance));
         cleanup(() => disposeDataTableDialog(instance));
         cleanup(() => ribbon.dispose());

@@ -476,11 +476,6 @@ export const ribbonFr: RibbonStrings = {
     workbookStructureLabel: 'Structure du classeur',
     workbookStructureDetail:
       'Aucune formule n’a été trouvée sur cette feuille. Vérifiez que les valeurs calculées n’ont pas été collées comme texte.',
-    repeatedWord: 'Mot répété : « {word}. »',
-    repeatedSpaces: 'Contient des espaces répétés.',
-    spaceBeforePunctuation: 'Contient un espace avant un signe de ponctuation.',
-    lowercaseSentence: 'Une phrase semble commencer par une minuscule.',
-    typo: 'Fausse possible : « {wrong}. » Orthographe suggérée : « {suggestion}. »',
     translateEmptyLabel: 'Traduire',
     translateEmptyDetail: 'Aucune cellule de texte à traduire n’a été trouvée.',
     translateReady: 'Texte prêt à être traduit',

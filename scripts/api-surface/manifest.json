@@ -95,6 +95,7 @@
         "SheetPrintDocument": "type",
         "SheetRef": "type",
         "Slicer": "type",
+        "SpellingService": "type",
         "SpreadsheetFailure": "type",
         "SpreadsheetFeatureSwitches": "type",
         "SpreadsheetInstance": "value",

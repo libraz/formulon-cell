@@ -9,6 +9,7 @@ import type {
   InteractionPolicy,
 } from '../commands/interaction-policy.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
+import type { SpellingService } from '../commands/spelling.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEventHandler, SpreadsheetEventName } from '../events.js';
 import type { ExtensionHandle, ExtensionInput, FeatureFlags } from '../extensions/index.js';
@@ -91,6 +92,8 @@ export interface MountOptions {
    *  and reference URL here; called with the active UI locale on each render.
    *  When omitted, the palette shows catalog labels with no hint or link. */
   getFunctionArgumentHelp?: FunctionArgumentHelpProvider;
+  /** The host's spell checker for Review > Spelling; the built-in one when it returns nothing. */
+  getSpellingService?: () => SpellingService | undefined;
   /** Optional host-driven status bar Upload Status indicator. */
   uploadStatus?: StatusBarUploadStatus;
   /** Optional host-driven status bar Macro Recording indicator. */
@@ -198,6 +201,8 @@ export interface SpreadsheetInstance {
   setPrinterProfileId(next: string | undefined): void;
   refreshPrinterProfiles(): Promise<readonly PrinterProfile[] | undefined>;
   captureScreenClip(): Promise<ScreenClipResult | null>;
+  /** The spell checker Review > Spelling uses now. */
+  spellingService(): SpellingService;
   setUploadStatus(next: StatusBarUploadStatus): void;
   setMacroRecording(next: boolean | null): void;
   recalc(): void;

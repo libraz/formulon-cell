@@ -107,6 +107,8 @@ CSV export accepts an explicit locale and delimiter: `wb.sheet(0).exportCsv({ lo
 
 Formula editors and external clipboard input use the active profile's syntax. For example, German `=SUMME(1,5;2)` is stored as `=SUM(1.5,2)`. Programmatic `Sheet.setFormula()` accepts canonical syntax; use `workbook.canonicalizeFormula()` first when supplying localized text. `workbook.localizeFormula()` converts display text, and `workbook.getLocaleFacts()` returns the active profile's separators and scalar names.
 
+Review > Spelling walks the sheet word by word in the desktop Spelling dialog. The built-in checker knows only a short list of common English typos and passes every word of other languages. To check against a real dictionary, pass `spelling: { check(word, locale), suggest(word, locale), addWord?(word, locale) }`. `addWord` receives the words the user adds, so the host can keep them; the library itself stores nothing beyond the session.
+
 ## Documentation
 
 - [Live demo](https://formulon.libraz.net/cell/demo)

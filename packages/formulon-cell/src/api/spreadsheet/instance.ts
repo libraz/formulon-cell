@@ -22,6 +22,7 @@ import type {
 } from '../../commands/interaction-policy.js';
 import { refusedBatch } from '../../commands/interaction-policy.js';
 import { sheetPermits } from '../../commands/protection.js';
+import type { SpellingService } from '../../commands/spelling.js';
 import { clearTraceArrows, traceDependents, tracePrecedents } from '../../commands/traces.js';
 import { resolveCellInput, resolveRangeInput } from '../../engine/range-input.js';
 import type { Addr, Range } from '../../engine/types.js';
@@ -244,6 +245,8 @@ interface InstanceState {
   options: SpreadsheetOptions;
   /** The current host providers; the mounted spreadsheet reads them through it at call time. */
   readonly host: { current: HostProviders };
+  /** The host's spell checker, read when Review > Spelling runs. */
+  readonly spelling: { current: SpellingService | undefined };
   /** The workbook the latest `update({ workbook })` asked for; differs from `workbook` while the
    *  mount is still switching to it. */
   requestedWorkbook: Workbook;
@@ -700,6 +703,9 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
       for (const hint of (value as readonly FormulaHint[] | null) ?? [])
         state.formulaHints.add(hint);
       break;
+    case 'spelling':
+      state.spelling.current = (value as SpellingService | null) ?? undefined;
+      break;
     case 'host':
       applyHostProviders(state, (value as SpreadsheetOptions['host'] | null) ?? {});
       break;
@@ -1036,6 +1042,7 @@ const legacyOptionsOf = (
   options: SpreadsheetOptions,
   handle: WorkbookHandle,
   hostProviders: { readonly current: HostProviders },
+  spelling: { readonly current: SpellingService | undefined },
   notifyRibbon: () => void,
 ): MountOptions => {
   const host = options.host ?? {};
@@ -1062,6 +1069,7 @@ const legacyOptionsOf = (
     captureScreenClip: () => hostProviders.current.captureScreenClip?.(),
     getFunctionArgumentHelp: (name, index, locale) =>
       hostProviders.current.functionArgumentHelp?.(name, index, locale),
+    getSpellingService: () => spelling.current,
     ...(options.uploadStatus !== undefined ? { uploadStatus: options.uploadStatus } : {}),
     ...(options.macroRecording !== undefined ? { macroRecording: options.macroRecording } : {}),
     renderError: false,
@@ -1101,6 +1109,7 @@ export async function mount(
   const handle = workbookHandleOf(workbook);
   let legacy: LegacyInstance | null = null;
   const hostProviders = { current: options.host ?? {} };
+  const spelling = { current: options.spelling };
   const ribbonEvents = new Emitter<RibbonEvents>();
   const notifyRibbon = (): void => {
     const ribbonHandle = legacy?.toolbar;
@@ -1110,7 +1119,7 @@ export async function mount(
     if (options.seed) options.seed(workbook);
     legacy = await Spreadsheet.mount(
       host,
-      legacyOptionsOf(options, handle, hostProviders, notifyRibbon),
+      legacyOptionsOf(options, handle, hostProviders, spelling, notifyRibbon),
     );
   } finally {
     // A failed seed or mount releases the workbook the instance created; one passed in stays.
@@ -1150,6 +1159,7 @@ export async function mount(
     ownsWorkbook,
     options: { ...options, locale: options.locale ?? 'en' },
     host: hostProviders,
+    spelling,
     requestedWorkbook: workbook,
     swaps: Promise.resolve(),
     origin: null,

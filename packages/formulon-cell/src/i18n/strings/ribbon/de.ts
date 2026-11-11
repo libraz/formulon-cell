@@ -478,11 +478,6 @@ export const ribbonDe: RibbonStrings = {
     workbookStructureLabel: 'Arbeitsmappenstruktur',
     workbookStructureDetail:
       'Auf diesem Blatt wurden keine Formeln gefunden. Bestätigen Sie, dass berechnete Werte nicht als Text eingefügt wurden.',
-    repeatedWord: 'Wiederholtes Wort: „{word}.“',
-    repeatedSpaces: 'Enthält wiederholte Leerzeichen.',
-    spaceBeforePunctuation: 'Enthält ein Leerzeichen vor einem Satzzeichen.',
-    lowercaseSentence: 'Ein Satz beginnt möglicherweise mit einem Kleinbuchstaben.',
-    typo: 'Möglicher Tippfehler: „{wrong}.“ Vorgeschlagene Schreibweise: „{suggestion}.“',
     translateEmptyLabel: 'Übersetzen',
     translateEmptyDetail: 'Keine Textzellen zum Übersetzen gefunden.',
     translateReady: 'Text zur Übersetzung bereit',

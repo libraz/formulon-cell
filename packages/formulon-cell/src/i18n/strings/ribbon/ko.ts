@@ -469,11 +469,6 @@ export const ribbonKo: RibbonStrings = {
     workbookStructureLabel: '통합 문서 구조',
     workbookStructureDetail:
       '이 시트에서 수식을 찾을 수 없습니다. 계산된 값이 텍스트로 붙여넣어지지 않았는지 확인하세요.',
-    repeatedWord: '반복된 단어: "{word}".',
-    repeatedSpaces: '반복된 공백이 포함되어 있습니다.',
-    spaceBeforePunctuation: '문장 부호 앞에 공백이 있습니다.',
-    lowercaseSentence: '문장이 소문자로 시작하는 것 같습니다.',
-    typo: '오타일 수 있음: "{wrong}". 추천 철자: "{suggestion}".',
     translateEmptyLabel: '번역',
     translateEmptyDetail: '번역할 텍스트 셀을 찾을 수 없습니다.',
     translateReady: '번역할 텍스트 준비 완료',

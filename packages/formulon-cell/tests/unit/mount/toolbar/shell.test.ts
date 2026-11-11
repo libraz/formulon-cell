@@ -184,11 +184,12 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(sheet.instance.store.getState().sheetViews.views).toHaveLength(0);
 
     expect(tb.applyCommand('spellingReview')).toBe(true);
-    await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
-      'Possible typo',
-    );
-    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    const spelling = document.body.querySelector<HTMLElement>('.fc-spelling:not([hidden])');
+    expect(spelling?.querySelector<HTMLInputElement>('#fc-spelling-word')?.value).toBe('teh');
+    [...(spelling?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+      .find((button) => button.textContent === 'Cancel')
+      ?.click();
+    expect(document.body.querySelector('.fc-spelling')).toBeNull();
 
     expect(tb.applyCommand('filter')).toBe(true);
     expect(sheet.instance.store.getState().ui.filterRanges).toEqual([

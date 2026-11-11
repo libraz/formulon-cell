@@ -35,17 +35,6 @@ interface ReviewRange {
   c1: number;
 }
 
-const COMMON_TYPOS: Readonly<Record<string, string>> = {
-  accomodate: 'accommodate',
-  adress: 'address',
-  definately: 'definitely',
-  occured: 'occurred',
-  recieve: 'receive',
-  seperate: 'separate',
-  teh: 'the',
-  wierd: 'weird',
-};
-
 export function parseScriptCommand(value: string): ScriptCommand | null {
   const normalized = value.trim().toLowerCase();
   return normalized === 'uppercase' ||
@@ -67,13 +56,11 @@ export function applyTextScript(value: string, command: Exclude<ScriptCommand, '
   }
 }
 
-/** The cells and notes a review reads, by rows. With `startAt`, the order starts at that cell
- *  and wraps from the end to the top, as the spelling check walks a sheet. */
+/** The cells and notes a review reads, by rows; a note follows its cell. */
 export function reviewCellsFromState(
   state: State,
   sheet = state.data.sheetIndex,
   range?: ReviewRange,
-  startAt?: { row: number; col: number },
 ): ReviewCell[] {
   const entries: { row: number; col: number; cell: ReviewCell }[] = [];
   const inScope = (addr: { sheet: number; row: number; col: number }): boolean =>
@@ -110,14 +97,9 @@ export function reviewCellsFromState(
       cell: { label, value: { kind: 'text', value: fmt.comment }, source: 'comment' },
     });
   }
-  const before = (a: { row: number; col: number }, b: { row: number; col: number }): boolean =>
-    a.row < b.row || (a.row === b.row && a.col < b.col);
-  const wrapped = (entry: { row: number; col: number }): number =>
-    startAt && before(entry, startAt) ? 1 : 0;
   return entries
     .sort(
       (a, b) =>
-        wrapped(a) - wrapped(b) ||
         a.row - b.row ||
         a.col - b.col ||
         (a.cell.source === 'comment' ? 1 : 0) - (b.cell.source === 'comment' ? 1 : 0),
@@ -255,56 +237,5 @@ export function analyzeAccessibilityCells(
     });
   }
 
-  return items;
-}
-
-export function analyzeSpellingCells(
-  cells: readonly ReviewCell[],
-  lang: RibbonReportLang = 'en',
-): RibbonReportItem[] {
-  const messages = reviewText(lang);
-  const items: RibbonReportItem[] = [];
-  for (const entry of cells) {
-    if (entry.value.kind !== 'text') continue;
-    const cellText = entry.value.value;
-    const repeated = cellText.match(/\b([A-Za-z]+)\s+\1\b/i);
-    if (repeated) {
-      items.push({
-        severity: 'warning',
-        label: entry.label,
-        detail: interpolate(messages.repeatedWord, { word: repeated[0] }),
-      });
-    }
-    if (/\s{2,}/.test(cellText)) {
-      items.push({
-        severity: 'info',
-        label: entry.label,
-        detail: messages.repeatedSpaces,
-      });
-    }
-    if (/[A-Za-z]\s+[,.!?;:]/.test(cellText)) {
-      items.push({
-        severity: 'info',
-        label: entry.label,
-        detail: messages.spaceBeforePunctuation,
-      });
-    }
-    if (/[.!?]\s+[a-z]/.test(cellText)) {
-      items.push({
-        severity: 'info',
-        label: entry.label,
-        detail: messages.lowercaseSentence,
-      });
-    }
-    for (const [wrong, suggestion] of Object.entries(COMMON_TYPOS)) {
-      if (new RegExp(`\\b${wrong}\\b`, 'i').test(cellText)) {
-        items.push({
-          severity: 'warning',
-          label: entry.label,
-          detail: interpolate(messages.typo, { wrong, suggestion }),
-        });
-      }
-    }
-  }
   return items;
 }

@@ -41,13 +41,13 @@ import { setSheetZoom } from '../commands/view.js';
 import { formatA1Range, MAX_COL } from '../engine/address.js';
 import { dictionaries } from '../i18n/strings.js';
 import { isNavigationAddrAllowed } from '../interact/navigation-policy.js';
+import { openSpellingDialog } from '../interact/spelling-dialog.js';
 import { mutators } from '../store/store.js';
 import { reportDialogLabels, showReport } from '../toolbar/dialogs/report.js';
 import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
 import { backstageMenuText, pageScaleMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
 import {
   analyzeAccessibilityCells,
-  analyzeSpellingCells,
   buildTranslationReviewItems,
   type RibbonReportLang,
   reviewCellsFromState,
@@ -364,24 +364,9 @@ export function createDefaultRibbonHooks(
     buildItems: (
       cells: ReturnType<typeof reviewCellsFromState>,
     ) => { severity: 'info' | 'warning'; label: string; detail: string }[],
-    scope: 'selection' | 'spelling' = 'selection',
   ): void => {
     const state = instance.store.getState();
-    const { active, range, extraRanges } = state.selection;
-    // Spelling from one selected cell checks the whole sheet; a selected range limits it. Either
-    // way it starts at the active cell and wraps from the end to the top.
-    const spelling = scope === 'spelling';
-    const wholeSheet =
-      spelling &&
-      range.r0 === range.r1 &&
-      range.c0 === range.c1 &&
-      (extraRanges?.length ?? 0) === 0;
-    const cells = reviewCellsFromState(
-      state,
-      state.data.sheetIndex,
-      wholeSheet ? undefined : range,
-      spelling ? active : undefined,
-    );
+    const cells = reviewCellsFromState(state, state.data.sheetIndex, state.selection.range);
     void showSharedReport(title, buildItems(cells));
   };
   const applyOutline = (action: 'group' | 'ungroup' | 'show-detail' | 'hide-detail'): void => {
@@ -482,11 +467,7 @@ export function createDefaultRibbonHooks(
     },
     review: {
       spelling: () => {
-        showReviewReport(
-          instance.i18n.strings.ribbon.spelling,
-          (cells) => analyzeSpellingCells(cells, reportLang),
-          'spelling',
-        );
+        openSpellingDialog(instance);
       },
       translate: () => {
         showReviewReport(instance.i18n.strings.ribbon.translate, (cells) =>

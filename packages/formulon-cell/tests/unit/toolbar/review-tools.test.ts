@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 import {
   analyzeAccessibilityCells,
-  analyzeSpellingCells,
   applyTextScript,
   buildTranslationReviewItems,
   formatRibbonReport,
@@ -87,15 +86,6 @@ describe('toolbar/review-tools', () => {
         },
       ]),
     );
-    expect(analyzeSpellingCells(cells)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ label: 'A1 comment', detail: 'Repeated word: "note note".' }),
-        expect.objectContaining({
-          label: 'A1 comment',
-          detail: 'Possible typo: "teh". Suggested spelling: "the".',
-        }),
-      ]),
-    );
   });
 
   it('formats a compact review report for built-in ribbon actions', () => {
@@ -135,41 +125,7 @@ describe('toolbar/review-tools', () => {
     ]);
   });
 
-  it('detects spelling and prose issues', () => {
-    const items = analyzeSpellingCells([
-      { label: 'B2', value: { kind: 'text', value: 'teh  report report . next sentence' } },
-    ]);
-
-    expect(items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ detail: 'Repeated word: "report report".' }),
-        expect.objectContaining({ detail: 'Contains repeated spaces.' }),
-        expect.objectContaining({ detail: 'Contains a space before punctuation.' }),
-        expect.objectContaining({
-          detail: 'A sentence appears to start with a lowercase letter.',
-        }),
-        expect.objectContaining({
-          detail: 'Possible typo: "teh". Suggested spelling: "the".',
-        }),
-      ]),
-    );
-  });
-
   it('localizes built-in review findings for Japanese ribbon actions', () => {
-    expect(
-      analyzeSpellingCells(
-        [{ label: 'B2', value: { kind: 'text', value: 'teh  report report .' } }],
-        'ja',
-      ),
-    ).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ detail: '同じ語が繰り返されています: "report report"。' }),
-        expect.objectContaining({ detail: '連続した空白が含まれています。' }),
-        expect.objectContaining({
-          detail: 'スペルミスの可能性: "teh"。候補: "the"。',
-        }),
-      ]),
-    );
     expect(
       analyzeAccessibilityCells([{ label: 'A4', value: { kind: 'text', value: '   ' } }], 'ja'),
     ).toEqual(

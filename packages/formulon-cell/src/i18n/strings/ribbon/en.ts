@@ -469,11 +469,6 @@ export const ribbonEn: RibbonStrings = {
     workbookStructureLabel: 'Workbook Structure',
     workbookStructureDetail:
       'No formulas were found on this sheet. Confirm calculated values were not pasted as text.',
-    repeatedWord: 'Repeated word: "{word}".',
-    repeatedSpaces: 'Contains repeated spaces.',
-    spaceBeforePunctuation: 'Contains a space before punctuation.',
-    lowercaseSentence: 'A sentence appears to start with a lowercase letter.',
-    typo: 'Possible typo: "{wrong}". Suggested spelling: "{suggestion}".',
     translateEmptyLabel: 'Translate',
     translateEmptyDetail: 'No text cells were found to translate.',
     translateReady: 'Text Ready for Translation',

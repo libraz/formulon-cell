@@ -465,11 +465,6 @@ export interface RibbonStrings {
     allCapsDetail: string;
     workbookStructureLabel: string;
     workbookStructureDetail: string;
-    repeatedWord: string;
-    repeatedSpaces: string;
-    spaceBeforePunctuation: string;
-    lowercaseSentence: string;
-    typo: string;
     translateEmptyLabel: string;
     translateEmptyDetail: string;
     translateReady: string;

@@ -144,6 +144,27 @@ export interface EditDialogsStrings {
     cellsFound: string;
     replacedCount: string;
   };
+  /** Review > Spelling, labelled as the desktop dialog. */
+  spellingDialog: {
+    /** Title; `{language}` is the language being checked. */
+    title: string;
+    notInDictionary: string;
+    repeatedWord: string;
+    changeTo: string;
+    suggestions: string;
+    ignoreOnce: string;
+    ignoreAll: string;
+    add: string;
+    change: string;
+    changeAll: string;
+    autoCorrect: string;
+    suggest: string;
+    undoLast: string;
+    cancel: string;
+    close: string;
+    alwaysSuggest: string;
+    ignoreUppercase: string;
+  };
   goToDialog: {
     /** Go To Special modal title (header and aria-label). */
     title: string;

@@ -291,6 +291,21 @@ describe('spreadsheet: update', () => {
     expect(changes).toHaveBeenCalledTimes(4);
   });
 
+  it('spelling hands Review > Spelling the host checker, replaced by update and reset by null', async () => {
+    const check = vi.fn((word: string) => word !== 'zork');
+    const sheet = await mountSheet({ spelling: { check, suggest: () => [] } });
+    const legacy = legacyInstanceOf(sheet);
+    expect(legacy.spellingService().check('zork', 'en')).toBe(false);
+    expect(check).toHaveBeenCalledWith('zork', 'en');
+
+    const next = { check: () => true, suggest: () => [] };
+    sheet.update({ spelling: next });
+    expect(legacy.spellingService()).toBe(next);
+    sheet.update({ spelling: null });
+    expect(legacy.spellingService().check('teh', 'en')).toBe(false);
+    expect(legacy.spellingService().check('zork', 'en')).toBe(true);
+  });
+
   it('showAllNotes set at mount draws every note from the start', async () => {
     const sheet = await mountSheet({ showAllNotes: true });
     expect(sheet.options.showAllNotes).toBe(true);

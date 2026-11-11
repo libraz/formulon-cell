@@ -88,6 +88,7 @@ export type {
   PrinterProfile,
 } from './commands/page-setup.js';
 export { printerProfilesFromHostDevices } from './commands/page-setup.js';
+export type { SpellingService } from './commands/spelling.js';
 export { formatA1Cell } from './engine/address.js';
 export type { WorkbookThemePresetId } from './engine/workbook-theme-presets.js';
 export type { ExtensionSpreadsheet, ThemeName } from './extensions/types.js';

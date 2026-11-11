@@ -1,6 +1,7 @@
 import type { CellAddress, CellRect, Value } from '@libraz/formulon';
 import type { InteractionPolicy } from '../../commands/interaction-policy.js';
 import type { PrinterProfile } from '../../commands/printer-profile.js';
+import type { SpellingService } from '../../commands/spelling.js';
 import type { ExtensionInput } from '../../extensions/index.js';
 import type { ThemeName } from '../../extensions/types.js';
 import type { SpreadsheetUiOptions } from '../../extensions/ui-options.js';
@@ -79,6 +80,9 @@ export interface SpreadsheetOptions {
   readonly strings?: DeepPartial<Strings>;
   readonly extensions?: readonly ExtensionInput[];
   readonly formulaHints?: readonly FormulaHint[];
+  /** The spell checker Review > Spelling asks; by default a short list of common English typos,
+   *  which passes every word of other languages. */
+  readonly spelling?: SpellingService;
   readonly host?: HostProviders;
   readonly uploadStatus?: StatusBarUploadStatus;
   readonly macroRecording?: boolean | null;

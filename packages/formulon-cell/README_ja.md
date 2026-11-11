@@ -107,6 +107,8 @@ CSV出力にはロケールと区切り文字を指定できます。例: `wb.sh
 
 数式の編集と外部クリップボードからの入力には、現在のプロファイルの構文を使います。たとえば独語の `=SUMME(1,5;2)` は `=SUM(1.5,2)` として保存されます。コードから呼ぶ `Sheet.setFormula()` には正規構文を渡してください。ローカライズされた文字列は、先に `workbook.canonicalizeFormula()` で変換できます。表示用の変換は `workbook.localizeFormula()`、区切り文字や真偽値などの定義取得は `workbook.getLocaleFacts()` を使います。
 
+校閲 > スペル チェックは、デスクトップ版と同じダイアログでシートを 1 語ずつ確認します。組み込みのチェッカーは英語のよくある誤字の短い一覧だけを持ち、ほかの言語の単語はすべて通します。実際の辞書で確認するには `spelling: { check(word, locale), suggest(word, locale), addWord?(word, locale) }` を渡してください。ユーザーが追加した単語は `addWord` に渡されるので、ホスト側で保存できます。ライブラリ自体はセッションを超えて何も保存しません。
+
 ## ドキュメント
 
 - [デモ](https://formulon.libraz.net/ja/cell/demo)
