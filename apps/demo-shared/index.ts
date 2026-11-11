@@ -730,19 +730,30 @@ const transformDemoScriptText = (
  *  cells are skipped) and returns the number of changed cells. */
 export const runDemoScript = (inst: SpreadsheetInstance, command: ScriptCommand): number => {
   const { sheet, range } = inst.selection.get();
-  const changes: CellChange[] = [];
+  const changes = new Map<string, CellChange>();
   for (const cell of inst.workbook.sheet(sheet).listCells(range)) {
     const at = { row: cell.row, col: cell.col };
+    const key = `${cell.row}:${cell.col}`;
     if (command === 'clear') {
-      changes.push({ sheet, at, value: { kind: VALUE_KIND.blank }, formula: null });
+      changes.set(key, { sheet, at, value: { kind: VALUE_KIND.blank }, formula: null });
     } else if (typeof cell.value === 'string') {
       const next = transformDemoScriptText(cell.value, command);
       if (next !== cell.value) {
-        changes.push({ sheet, at, value: { kind: VALUE_KIND.text, text: next }, formula: null });
+        changes.set(key, {
+          sheet,
+          at,
+          value: { kind: VALUE_KIND.text, text: next },
+          formula: null,
+        });
       }
     }
   }
-  return inst.applyChanges(changes, { history: 'record' }).applied.length;
+  const result = inst.applyChanges([...changes.values()], { history: 'record' });
+  if (result.status !== 'refused' || result.rejections.length === 0) return result.applied.length;
+  // A protected sheet refuses the whole batch and names the locked cells; write the rest.
+  for (const { at } of result.rejections) changes.delete(`${at.row}:${at.col}`);
+  if (changes.size === 0) return 0;
+  return inst.applyChanges([...changes.values()], { history: 'record' }).applied.length;
 };
 
 /** A few features ship default-off; everything else is opt-out. */
