@@ -24,9 +24,52 @@ const canUndo = (page: Page) =>
 const sparklineCommand = (page: Page, id: string) =>
   page.locator(`[data-ribbon-panel="sparklineDesign"] [data-ribbon-command="${id}"]`).first();
 
+/** Axis on the Windows chrome: a menu whose entries are all unavailable. */
+const expectAxisMenuUnavailable = async (page: Page) => {
+  const axis = sparklineCommand(page, 'sparklineAxis');
+  await revealRibbonCommand(axis);
+  await expect(axis).toBeEnabled();
+  await axis.click();
+  const menu = page.locator('#menu-sparkline-axis');
+  await expect(menu).toBeVisible();
+  const entries = menu.locator('[data-sparkline-axis]');
+  expect(await entries.count()).toBeGreaterThan(0);
+  for (const entry of await entries.all()) await expect(entry).toBeDisabled();
+  await entries.first().click({ force: true });
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+};
+
+/** Axis on the Mac chrome: a dialog whose inputs and OK are all unavailable; Cancel closes it. */
+const expectAxisDialogUnavailable = async (page: Page) => {
+  const axis = sparklineCommand(page, 'sparklineAxisDialog');
+  await revealRibbonCommand(axis);
+  await expect(axis).toBeEnabled();
+  await axis.click();
+  const dialog = page.getByRole('dialog', { name: '軸', exact: true });
+  await expect(dialog).toBeVisible();
+  for (const name of ['横', '縦']) {
+    await dialog.getByRole('tab', { name, exact: true }).click();
+    await expect(dialog.getByRole('tabpanel')).toBeVisible();
+  }
+  const inputs = dialog.locator('input');
+  expect(await inputs.count()).toBeGreaterThan(0);
+  expect(
+    await inputs.evaluateAll(
+      (els) => els.filter((el) => !(el as HTMLInputElement).disabled).length,
+    ),
+  ).toBe(0);
+  await expect(dialog.locator('.fc-fmtdlg__btn--primary')).toBeDisabled();
+  const cancel = dialog.locator('[data-dialog-action="cancel"]');
+  await expect(cancel).toBeEnabled();
+  await cancel.click();
+  await expect(dialog).toBeHidden();
+};
+
 /** The Sparkline tab on a sparkline cell of a protected sheet: every control is unavailable except
- *  Axis, which opens a menu of unavailable entries, so the group cannot change. */
-const expectTabUnavailable = async (page: Page) => {
+ *  Axis, which opens a menu (Windows) or dialog (Mac) of unavailable controls, so the group cannot
+ *  change. */
+const expectTabUnavailable = async (page: Page, platform: Platform) => {
   await selectRibbonTab(page, 'sparklineDesign');
   const commands = page.locator('[data-ribbon-panel="sparklineDesign"] [data-ribbon-command]');
   const ids = await commands.evaluateAll((els) =>
@@ -42,20 +85,11 @@ const expectTabUnavailable = async (page: Page) => {
   expect(sparklineIds.map(([id]) => id)).toEqual(
     expect.arrayContaining(['sparklineEditData', 'sparklineTypeColumn', 'sparklineClear']),
   );
-  expect(sparklineIds.filter(([id, off]) => id !== 'sparklineAxis' && !off)).toEqual([]);
+  const axisId = platform === 'mac' ? 'sparklineAxisDialog' : 'sparklineAxis';
+  expect(sparklineIds.filter(([id, off]) => id !== axisId && !off)).toEqual([]);
 
-  const axis = sparklineCommand(page, 'sparklineAxis');
-  await revealRibbonCommand(axis);
-  await expect(axis).toBeEnabled();
-  await axis.click();
-  const menu = page.locator('#menu-sparkline-axis');
-  await expect(menu).toBeVisible();
-  const entries = menu.locator('[data-sparkline-axis]');
-  expect(await entries.count()).toBeGreaterThan(0);
-  for (const entry of await entries.all()) await expect(entry).toBeDisabled();
-  await entries.first().click({ force: true });
-  await page.keyboard.press('Escape');
-  await expect(menu).toBeHidden();
+  if (platform === 'mac') await expectAxisDialogUnavailable(page);
+  else await expectAxisMenuUnavailable(page);
 };
 
 /** On a protected sheet a sparkline cell still shows the Sparkline tab, but nothing on it edits the
@@ -107,7 +141,7 @@ export async function runSparklineProtectionScenario(
 
   await sheet.goTo('E2');
   await expect(page.locator('[data-ribbon-tab="sparklineDesign"]')).toBeVisible();
-  await expectTabUnavailable(page);
+  await expectTabUnavailable(page, platform);
 
   if (platform === 'mac') {
     await selectRibbonTab(page, 'insert');
