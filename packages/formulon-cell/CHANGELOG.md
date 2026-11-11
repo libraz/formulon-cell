@@ -57,6 +57,7 @@ versioning is [SemVer](https://semver.org/).
 - Formula autocomplete treats a defined name whose value is a LAMBDA as a function: it carries the function glyph, inserts with an opening parenthesis and shows its parameters in the argument tooltip. On the Mac, other defined names sit in a Named Ranges group and table names in a Structured References group, above the Functions group, each under its header.
 - The Mac cell context menu follows the desktop order and groups, with New Comment beside New Note, or beside the note rows on a cell with a note.
 - The Windows cell context menu offers New Comment, which starts a thread, before New Note.
+- A sheet may be named `History` on the Mac, as in the Mac app. Elsewhere the name stays reserved, as the Windows app reserves it.
 - On the Mac, the Review Notes menu shows Edit Note in place of New Note when the active cell has a note, and drops it while that note is locked on a protected sheet.
 - Show All Notes is a view preference of the spreadsheet: it draws every note while each note keeps its own Show/Hide state, and the workbook and its saved file stay unchanged. Show/Hide Note on one cell is still saved with the workbook.
 - A pick from a validation list is an authorized, undoable cell entry.

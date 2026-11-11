@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { registerChromePlatform } from '../../../src/commands/chrome-platform.js';
 import { History } from '../../../src/commands/history.js';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import {
@@ -202,8 +203,20 @@ describe('renameSheet', () => {
     expect(renameSheet(wb, 1, 'x'.repeat(31))).toBe(true);
     expect(renameSheet(wb, 2, 'x'.repeat(32))).toBe(false);
     expect(renameSheet(wb, 2, "it's")).toBe(true);
-    // 'History' is an ordinary name (object model accepts it; UI unmeasured).
-    expect(renameSheet(wb, 2, 'History')).toBe(true);
+  });
+
+  it('reserves History on the default profile and accepts it on the Mac', () => {
+    const { wb, fake } = makeFake();
+    for (const name of ['History', 'history', 'HISTORY']) {
+      expect(renameSheet(wb, 2, name)).toBe(false);
+      expect(renameSheet(wb, 2, name, createSpreadsheetStore())).toBe(false);
+    }
+    expect(fake.rename).toEqual([]);
+    expect(renameSheet(wb, 2, 'Histories')).toBe(true);
+    const mac = createSpreadsheetStore();
+    const unregister = registerChromePlatform(mac, () => true);
+    expect(renameSheet(wb, 1, 'History', mac)).toBe(true);
+    unregister();
   });
 
   it('returns false without touching the engine when workbook structure is protected', () => {

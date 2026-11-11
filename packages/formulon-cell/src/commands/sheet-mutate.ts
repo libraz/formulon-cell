@@ -11,6 +11,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { withSparklineMembers } from '../store/sparkline-slice.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import type { OutlineSummary } from '../store/types.js';
+import { isMacChrome } from './chrome-platform.js';
 import type { History } from './history.js';
 import { isWorkbookStructureProtected } from './protection.js';
 import { recordLayoutChangeWithEngine, recordSparklineChange } from './slice-history.js';
@@ -217,9 +218,16 @@ const MAX_SHEET_NAME_LENGTH = 31;
 
 /** Whether `name` is a legal name for the sheet at `idx`: 1-31 characters,
  *  none of \\ / ? * [ ] :, no leading or trailing apostrophe, and unique among
- *  the other sheets ignoring case. */
-export function isValidSheetName(wb: WorkbookHandle, idx: number, name: string): boolean {
+ *  the other sheets ignoring case. Off the Mac (`mac` false), `History` is reserved in any case,
+ *  as the Windows desktop app reserves it; the Mac app accepts it. */
+export function isValidSheetName(
+  wb: WorkbookHandle,
+  idx: number,
+  name: string,
+  mac = false,
+): boolean {
   if (name.length === 0 || name.length > MAX_SHEET_NAME_LENGTH) return false;
+  if (!mac && name.toLowerCase() === 'history') return false;
   if (/[\\/?*[\]:]/.test(name) || name.startsWith("'") || name.endsWith("'")) return false;
   const existing = wb.sheetIndexByName(name);
   return existing === null || existing === idx;
@@ -236,7 +244,7 @@ export function renameSheet(
   history?: History | null,
 ): boolean {
   if (!structureAllowed(store, 'rename sheet')) return false;
-  if (!isValidSheetName(wb, idx, name)) return false;
+  if (!isValidSheetName(wb, idx, name, store ? isMacChrome(store) : false)) return false;
   const beforeName = 'sheetName' in wb ? wb.sheetName(idx) : null;
   const ok = wb.renameSheet(idx, name);
   if (!ok) return false;
