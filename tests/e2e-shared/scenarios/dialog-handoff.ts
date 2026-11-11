@@ -6,6 +6,8 @@ import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 const host = (page: Page): Locator => page.locator('.fc-host').first();
 
 async function openCellMenu(page: Page): Promise<Locator> {
+  // Menu items take focus on hover; a pointer left over the active cell would steal keyboard focus.
+  await page.mouse.move(0, 0);
   await page.keyboard.press('Shift+F10');
   const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
   await expect(menu).toBeVisible();
@@ -68,7 +70,10 @@ async function openPasteSpecial(page: Page): Promise<Locator> {
   await page.keyboard.press('ArrowRight');
   const submenu = page.locator('.fc-ctxmenu__sub');
   await expect(submenu).toBeVisible();
-  await submenu.locator('[data-fc-action="pasteSpecial"]').click();
+  const item = submenu.locator('[data-fc-action="pasteSpecial"]');
+  await item.focus();
+  await expect(item).toBeFocused();
+  await page.keyboard.press('Enter');
   const dialog = page.locator('.fc-pastesp');
   await expect(dialog).toBeVisible();
   return dialog;
