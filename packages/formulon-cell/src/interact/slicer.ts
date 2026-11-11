@@ -324,7 +324,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
   const handle: SlicerHandle = {
     addSlicer(input): SlicerSpec {
       let result: ReturnType<typeof createSlicer> | null = null;
-      const ctx = slicerContext('instanceApi', 'mac.insert.slicer');
+      const ctx = slicerContext('instanceApi', 'slicerInsert');
       objectWrite(ctx, store.getState().data.sheetIndex, undefined, () =>
         recordSlicersChange(history ?? null, store, () => {
           result = createSlicer(store, getWb(), input);

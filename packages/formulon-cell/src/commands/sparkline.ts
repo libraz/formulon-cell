@@ -255,7 +255,7 @@ export function setSparklines(
   history: History | null = null,
 ): boolean {
   return setSparklinesAction(
-    { store, history, origin: 'instanceApi', commandId: 'mac.insert.sparkline' },
+    { store, history, origin: 'instanceApi', commandId: 'sparklineInsert' },
     entries,
     settings,
   );
