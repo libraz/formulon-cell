@@ -190,6 +190,8 @@ export const gridPopupsJa: GridPopupsStrings = {
     customFunction: 'カスタム関数',
     structuredTableColumn: '構造化テーブル列',
     pickFromList: 'リストから選択',
+    functions: '関数',
+    namedRanges: '名前付き一覧',
   },
   argHelper: {
     implicitIntersection: '暗黙的な交差',

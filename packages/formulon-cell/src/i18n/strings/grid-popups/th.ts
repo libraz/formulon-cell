@@ -189,6 +189,8 @@ export const gridPopupsTh: GridPopupsStrings = {
     customFunction: 'ฟังก์ชันแบบกำหนดเอง',
     structuredTableColumn: 'คอลัมน์ตารางแบบมีโครงสร้าง',
     pickFromList: 'เลือกจากรายการ',
+    functions: 'ฟังก์ชัน',
+    namedRanges: 'ช่วงที่มีชื่อ',
   },
   argHelper: {
     implicitIntersection: 'จุดตัดโดยนัย',

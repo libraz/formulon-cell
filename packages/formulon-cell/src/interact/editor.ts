@@ -60,6 +60,7 @@ import { advanceAfterCommit } from './selection-navigation.js';
 import {
   workbookArgHelperCatalog,
   workbookAutocompleteCatalog,
+  workbookCustomFunctions,
 } from './workbook-function-catalog.js';
 
 const syncEditorRefs = (store: SpreadsheetStore, text: string, editedAddr: Addr): void => {
@@ -1142,6 +1143,14 @@ export class InlineEditor {
     for (const [type, listener] of this.inputListeners()) {
       input.addEventListener(type, listener as EventListener);
     }
+    const customFunctions = workbookCustomFunctions(
+      () => this.deps.wb,
+      () => addr.sheet,
+      {
+        list: () => this.deps.getCustomFunctions?.() ?? [],
+        args: (name) => this.deps.getCustomFunctionArgs?.(name),
+      },
+    );
     this.autocomplete = attachAutocomplete({
       input,
       onBeforeInsert: () => {
@@ -1162,18 +1171,15 @@ export class InlineEditor {
       editingAddr: addr,
       getColumnValues: (sheet, col, beforeRow) =>
         pickListValues(this.deps.wb.cells(sheet), col, beforeRow),
-      getCustomFunctions: () => this.deps.getCustomFunctions?.() ?? [],
-      getCustomFunctionArgs: (name) => this.deps.getCustomFunctionArgs?.(name),
-      ...workbookAutocompleteCatalog(
-        () => this.deps.wb,
-        (name) => this.deps.getCustomFunctionArgs?.(name),
-      ),
+      ...customFunctions,
+      ...workbookAutocompleteCatalog(() => this.deps.wb, customFunctions.getCustomFunctionArgs),
+      groupNames: () => this.isMacPlatform(),
       labels: this.deps.getLabels?.().autocomplete,
     });
     this.argHelper = attachArgHelper({
       input,
       ...workbookArgHelperCatalog(() => this.deps.wb),
-      getCustomFunctionArgs: (name) => this.deps.getCustomFunctionArgs?.(name),
+      getCustomFunctionArgs: customFunctions.getCustomFunctionArgs,
       labels: this.deps.getLabels?.().argHelper,
     });
     this.argHelper.refresh();

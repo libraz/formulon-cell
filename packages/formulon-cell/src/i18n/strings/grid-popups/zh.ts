@@ -189,6 +189,8 @@ export const gridPopupsZh: GridPopupsStrings = {
     customFunction: '自定义函数',
     structuredTableColumn: '结构化表列',
     pickFromList: '从列表中选择',
+    functions: '函数',
+    namedRanges: '命名范围',
   },
   argHelper: {
     implicitIntersection: '隐式交集',

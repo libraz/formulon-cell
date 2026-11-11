@@ -46,6 +46,10 @@ export interface AutocompleteLabels {
   customFunction: string;
   structuredTableColumn: string;
   pickFromList: string;
+  /** Header of the function group in a grouped list. */
+  functions: string;
+  /** Header of the name group in a grouped list. */
+  namedRanges: string;
 }
 
 /** Subset of `WorkbookHandle.getTables()` consumed by the structured-ref
@@ -62,20 +66,75 @@ export interface AutocompleteName {
   detail: string;
 }
 
+type AutocompleteDefinedName = {
+  name: string;
+  formula: string;
+  localSheetId: number;
+  hidden?: boolean;
+};
+
+/** The parameter names of a `LAMBDA(…)` formula, or null when the formula is not a LAMBDA. */
+export function lambdaParameters(formula: string): string[] | null {
+  const head = /^\s*=?\s*LAMBDA\s*\(/iu.exec(formula);
+  if (!head) return null;
+  const args: string[] = [];
+  let depth = 0;
+  let start = head[0].length;
+  let quoted = false;
+  for (let i = start; i < formula.length; i += 1) {
+    const ch = formula[i];
+    if (quoted) {
+      // A doubled quote is a literal quote inside the string.
+      if (ch === '"' && formula[i + 1] === '"') i += 1;
+      else if (ch === '"') quoted = false;
+      continue;
+    }
+    if (ch === '"') quoted = true;
+    else if (ch === '(' || ch === '{' || ch === '[') depth += 1;
+    else if (depth > 0 && (ch === ')' || ch === '}' || ch === ']')) depth -= 1;
+    else if (depth === 0 && (ch === ',' || ch === ';')) {
+      args.push(formula.slice(start, i).trim());
+      start = i + 1;
+    } else if (depth === 0 && ch === ')') {
+      // The last argument is the body; the ones before it are the parameters.
+      return args;
+    }
+  }
+  return null;
+}
+
+const visibleFrom = (dn: AutocompleteDefinedName, sheetIndex: number): boolean =>
+  dn.name.trim() !== '' && !dn.hidden && (dn.localSheetId === -1 || dn.localSheetId === sheetIndex);
+
 /** Names usable from `sheetIndex`: workbook-scoped and that sheet's own names,
- *  plus table names. Names scoped to another sheet are excluded. */
+ *  plus table names. Names scoped to another sheet are excluded, and so are
+ *  LAMBDA names, which complete as functions (`collectLambdaFunctions`). */
 export function collectAutocompleteNames(
-  definedNames: Iterable<{ name: string; formula: string; localSheetId: number; hidden?: boolean }>,
+  definedNames: Iterable<AutocompleteDefinedName>,
   tables: readonly AutocompleteTable[],
   sheetIndex: number,
 ): AutocompleteName[] {
   const out: AutocompleteName[] = [];
   for (const dn of definedNames) {
-    if (!dn.name.trim() || dn.hidden) continue;
-    if (dn.localSheetId !== -1 && dn.localSheetId !== sheetIndex) continue;
+    if (!visibleFrom(dn, sheetIndex) || lambdaParameters(dn.formula)) continue;
     out.push({ name: dn.name, detail: dn.formula.startsWith('=') ? dn.formula : `=${dn.formula}` });
   }
   for (const t of tables) out.push({ name: t.name, detail: t.columns.join(', ') });
+  return out;
+}
+
+/** LAMBDA names usable from `sheetIndex` with their parameter names, keyed by the
+ *  lower-cased name. They complete, insert and show arguments as functions do. */
+export function collectLambdaFunctions(
+  definedNames: Iterable<AutocompleteDefinedName>,
+  sheetIndex: number,
+): Map<string, { name: string; params: string[] }> {
+  const out = new Map<string, { name: string; params: string[] }>();
+  for (const dn of definedNames) {
+    if (!visibleFrom(dn, sheetIndex)) continue;
+    const params = lambdaParameters(dn.formula);
+    if (params) out.set(dn.name.toLocaleLowerCase(), { name: dn.name, params });
+  }
   return out;
 }
 
@@ -129,6 +188,9 @@ export interface AutocompleteDeps {
   ) => { signature?: string; description?: string } | undefined;
   /** Read the workbook's live formula list separator. */
   getListSeparator?: () => string;
+  /** True to list names in their own headed group above the headed functions, as the Mac
+   *  desktop does; otherwise names and functions share one alphabetical list. */
+  groupNames?: () => boolean;
   labels?: Partial<AutocompleteLabels>;
 }
 
@@ -152,6 +214,14 @@ interface SuggestionContext {
   /** Number of existing characters after the replacement that place the caret
    *  inside a call parenthesis already present in the formula. */
   existingCallParenLength?: number;
+  /** Headed groups, in list order, when the list is grouped. */
+  groups?: AutocompleteGroup[];
+}
+
+/** A headed run of the list from `start` up to the next group. */
+interface AutocompleteGroup {
+  start: number;
+  kind: 'name' | 'function';
 }
 
 interface AutocompleteItemButtonInput {
@@ -207,6 +277,8 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     customFunction: 'Custom function',
     structuredTableColumn: 'Structured table column',
     pickFromList: 'Pick from list',
+    functions: 'Functions',
+    namedRanges: 'Named Ranges',
     ...deps.labels,
   };
   let root: HTMLDivElement | null = null;
@@ -221,6 +293,18 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
   let isComposing = false;
   let dismissed: { value: string; caret: number } | null = null;
   const optionsByKey = new Map<string, HTMLButtonElement>();
+  const headersByKind = new Map<AutocompleteGroup['kind'], HTMLDivElement>();
+  const groupHeader = (kind: AutocompleteGroup['kind']): HTMLDivElement => {
+    let header = headersByKind.get(kind);
+    if (!header) {
+      header = document.createElement('div');
+      header.className = 'fc-autocomplete__group';
+      header.setAttribute('role', 'presentation');
+      headersByKind.set(kind, header);
+    }
+    header.textContent = kind === 'name' ? labels.namedRanges : labels.functions;
+    return header;
+  };
   let nextOptionIndex = 0;
   const positioner = createFormulaCaretPositioner(input);
 
@@ -235,6 +319,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     highlight = 0;
     highlightKey = null;
     optionsByKey.clear();
+    headersByKind.clear();
     input.setAttribute('aria-expanded', 'false');
     input.removeAttribute('aria-controls');
     input.removeAttribute('aria-activedescendant');
@@ -381,7 +466,16 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     input.setAttribute('aria-expanded', 'true');
     input.setAttribute('aria-controls', listbox?.id ?? rootId);
     const present = new Set<string>();
+    const groupStarts = new Map((ctx.groups ?? []).map((group) => [group.start, group.kind]));
+    let child = 0;
     for (let i = 0; i < ctx.matches.length; i += 1) {
+      const groupKind = groupStarts.get(i);
+      if (groupKind) {
+        const header = groupHeader(groupKind);
+        const currentAtChild = listbox?.children[child] ?? null;
+        if (header !== currentAtChild) listbox?.insertBefore(header, currentAtChild);
+        child += 1;
+      }
       const pick = ctx.matches[i] ?? '';
       const kind = ctx.kinds?.[i] ?? ctx.kind;
       const key = candidateKey(kind, pick);
@@ -424,13 +518,19 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
         });
       }
       item.dataset.fcIndex = String(i);
-      const currentAtIndex = listbox?.children[i] ?? null;
-      if (item !== currentAtIndex) listbox?.insertBefore(item, currentAtIndex);
+      const currentAtChild = listbox?.children[child] ?? null;
+      if (item !== currentAtChild) listbox?.insertBefore(item, currentAtChild);
+      child += 1;
     }
     for (const [key, item] of optionsByKey) {
       if (present.has(key)) continue;
       item.remove();
       optionsByKey.delete(key);
+    }
+    for (const [kind, header] of headersByKind) {
+      if ([...groupStarts.values()].includes(kind)) continue;
+      header.remove();
+      headersByKind.delete(kind);
     }
     updateScreenTip();
     updateActive();
@@ -649,38 +749,46 @@ function computeContext(
     merged.push(n);
   }
   const tokenStart = fn?.tokenStart ?? custom?.tokenStart ?? names?.tokenStart ?? caret;
-  if (names) {
-    // Functions and names share one alphabetical list, as the desktop app does.
-    const entries = [
-      ...merged.map((label) => ({ label, kind: 'function' as const, detail: '' })),
-      ...names.matches.map((n) => ({ label: n.name, kind: 'name' as const, detail: n.detail })),
-    ];
-    const unique: typeof entries = [];
-    const entryNames = new Set<string>();
-    for (const entry of entries) {
-      const key = entry.label.toLocaleLowerCase();
-      if (entryNames.has(key)) continue;
-      entryNames.add(key);
-      unique.push(entry);
-    }
-    const sorted = sortCaseless(unique, (e) => e.label);
+  const functions = sortCaseless(merged, (label) => label);
+  const grouped = deps.groupNames?.() ?? false;
+  if (!names) {
     return {
-      matches: sorted.map((e) => e.label),
+      matches: functions,
       tokenStart,
       tokenEnd: caret,
-      insertSuffix: '(',
+      insertSuffix: existingCallParenLength ? '' : '(',
       kind: 'function',
-      kinds: sorted.map((e) => e.kind),
-      details: sorted.map((e) => e.detail),
+      existingCallParenLength: existingCallParenLength ?? undefined,
+      groups: grouped && functions.length > 0 ? [{ start: 0, kind: 'function' }] : undefined,
     };
   }
+  const nameEntries = sortCaseless(
+    names.matches.filter((n) => !seen.has(n.name.toLocaleLowerCase())),
+    (n) => n.name,
+  ).map((n) => ({ label: n.name, kind: 'name' as const, detail: n.detail }));
+  const functionEntries = functions.map((label) => ({
+    label,
+    kind: 'function' as const,
+    detail: '',
+  }));
+  // The Mac lists names in their own group above the functions; Windows mixes them alphabetically.
+  const entries = grouped
+    ? [...nameEntries, ...functionEntries]
+    : sortCaseless([...functionEntries, ...nameEntries], (e) => e.label);
+  const groups: AutocompleteGroup[] = [];
+  if (grouped && nameEntries.length > 0) groups.push({ start: 0, kind: 'name' });
+  if (grouped && functionEntries.length > 0) {
+    groups.push({ start: nameEntries.length, kind: 'function' });
+  }
   return {
-    matches: sortCaseless(merged, (label) => label),
+    matches: entries.map((e) => e.label),
     tokenStart,
     tokenEnd: caret,
-    insertSuffix: existingCallParenLength ? '' : '(',
+    insertSuffix: '(',
     kind: 'function',
-    existingCallParenLength: existingCallParenLength ?? undefined,
+    kinds: entries.map((e) => e.kind),
+    details: entries.map((e) => e.detail),
+    groups: groups.length > 0 ? groups : undefined,
   };
 }
 

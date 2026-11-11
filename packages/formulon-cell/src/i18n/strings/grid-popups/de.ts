@@ -191,6 +191,8 @@ export const gridPopupsDe: GridPopupsStrings = {
     customFunction: 'Benutzerdefinierte Funktion',
     structuredTableColumn: 'Strukturierte Tabellenspalte',
     pickFromList: 'Aus Liste auswählen',
+    functions: 'Funktionen',
+    namedRanges: 'Benannte Bereiche',
   },
   argHelper: {
     implicitIntersection: 'Implizite Schnittmenge',

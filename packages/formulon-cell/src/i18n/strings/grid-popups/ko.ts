@@ -189,6 +189,8 @@ export const gridPopupsKo: GridPopupsStrings = {
     customFunction: '사용자 지정 함수',
     structuredTableColumn: '구조화된 테이블 열',
     pickFromList: '목록에서 선택',
+    functions: '함수',
+    namedRanges: '이름 지정된 범위',
   },
   argHelper: {
     implicitIntersection: '암시적 교집합',

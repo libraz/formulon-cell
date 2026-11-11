@@ -66,6 +66,7 @@ import { attachWheel } from '../interact/wheel.js';
 import {
   workbookArgHelperCatalog,
   workbookAutocompleteCatalog,
+  workbookCustomFunctions,
 } from '../interact/workbook-function-catalog.js';
 import {
   attachWorkbookObjectsPanel,
@@ -858,8 +859,16 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           input.wrapHandle(s.errorMenu, () => s.errorMenu?.detach()),
         );
         break;
-      case 'autocomplete':
+      case 'autocomplete': {
         if (s.fxAutocomplete !== input.autocompleteStub) return;
+        const customFunctions = workbookCustomFunctions(
+          input.wb,
+          () => input.store.getState().selection.active.sheet,
+          {
+            list: () => input.formulaRegistry.list(),
+            args: (name) => input.formulaRegistry.get(name)?.meta.args,
+          },
+        );
         s.fxAutocomplete = attachAutocomplete({
           input: input.fxInput,
           onBeforeInsert: () => {
@@ -876,21 +885,19 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
               input.wb().getTables(),
               input.store.getState().selection.active.sheet,
             ),
-          getCustomFunctions: () => input.formulaRegistry.list(),
-          getCustomFunctionArgs: (name) => input.formulaRegistry.get(name)?.meta.args,
-          ...workbookAutocompleteCatalog(
-            input.wb,
-            (name) => input.formulaRegistry.get(name)?.meta.args,
-          ),
+          ...customFunctions,
+          ...workbookAutocompleteCatalog(input.wb, customFunctions.getCustomFunctionArgs),
+          groupNames: input.isMacPlatform,
           labels: strings.autocomplete,
         });
         s.fxArgHelper = attachArgHelper({
           input: input.fxInput,
           ...workbookArgHelperCatalog(input.wb),
-          getCustomFunctionArgs: (name) => input.formulaRegistry.get(name)?.meta.args,
+          getCustomFunctionArgs: customFunctions.getCustomFunctionArgs,
           labels: strings.argHelper,
         });
         break;
+      }
       case 'wheel': {
         s.detachWheel();
         const detachWheel = attachWheel({ grid: input.grid, store: input.store, getWb: input.wb });

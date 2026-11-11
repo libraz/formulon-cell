@@ -191,6 +191,8 @@ export const gridPopupsFr: GridPopupsStrings = {
     customFunction: 'Fonction personnalisée',
     structuredTableColumn: 'Colonne de tableau structurée',
     pickFromList: 'Choisir dans la liste',
+    functions: 'Fonctions',
+    namedRanges: 'Plages nommées',
   },
   argHelper: {
     implicitIntersection: 'Intersection implicite',

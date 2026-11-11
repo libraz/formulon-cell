@@ -2,7 +2,7 @@ import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { CatalogLocaleOrdinal } from '../commands/function-categories.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ArgHelperDeps } from './arg-helper.js';
-import type { AutocompleteDeps } from './autocomplete.js';
+import { type AutocompleteDeps, collectLambdaFunctions } from './autocomplete.js';
 import { resolveFormulaHelperDetails } from './formula-helper-catalog.js';
 import {
   catalogLocaleOrdinal,
@@ -23,6 +23,24 @@ const inputCatalogLocale = (wb: WorkbookHandle): { tag: string; ordinal: Catalog
 const resolveFunctionName = (wb: WorkbookHandle, rawName: string): string =>
   wb.canonicalizeFunctionName(rawName, inputCatalogLocale(wb).ordinal) ||
   rawName.toLocaleUpperCase();
+
+/** The custom functions a formula can call from the edited sheet: the host's registered
+ *  hints, then the workbook's LAMBDA names with their parameters as argument labels. */
+export function workbookCustomFunctions(
+  getWb: () => WorkbookHandle,
+  getSheet: () => number,
+  hints: { list: () => readonly string[]; args: CustomFunctionArgs },
+): Required<Pick<AutocompleteDeps, 'getCustomFunctions' | 'getCustomFunctionArgs'>> {
+  const lambdas = () => collectLambdaFunctions(getWb().definedNames(), getSheet());
+  return {
+    getCustomFunctions: () => [
+      ...hints.list(),
+      ...Array.from(lambdas().values(), (lambda) => lambda.name),
+    ],
+    getCustomFunctionArgs: (name) =>
+      hints.args(name) ?? lambdas().get(name.toLocaleLowerCase())?.params,
+  };
+}
 
 /** Autocomplete deps backed by the workbook's function registry, shared by
  *  the in-cell editor and the formula bar. `getWb` is read on every call so a

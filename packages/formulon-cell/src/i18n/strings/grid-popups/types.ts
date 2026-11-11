@@ -192,6 +192,8 @@ export interface GridPopupsStrings {
     customFunction: string;
     structuredTableColumn: string;
     pickFromList: string;
+    functions: string;
+    namedRanges: string;
   };
   argHelper: {
     implicitIntersection: string;
