@@ -24,16 +24,23 @@ export async function runMacSparklineScenario(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
   const read = () =>
     page.evaluate(() => {
-      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
-      const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
-      return store.getState().sparkline.sparklines.get('0:0:4') ?? null;
+      const w = window as unknown as { __fcInst: SpreadsheetInstance };
+      for (const group of w.__fcInst.workbook.sheet(0).listSparklineGroups()) {
+        const at = group.sparklines.find((s) => s.location.row === 0 && s.location.col === 4);
+        if (at) return { type: group.type, source: at.source?.rect ?? null };
+      }
+      return null;
     });
-  await expect.poll(read).toMatchObject({ kind: 'line' });
+  await expect
+    .poll(read)
+    .toEqual({ type: 0, source: { firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 } });
   await page.locator('.fc-host').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(read).toBeNull();
   await page.keyboard.press('Meta+Shift+z');
-  await expect.poll(read).toMatchObject({ kind: 'line' });
+  await expect
+    .poll(read)
+    .toEqual({ type: 0, source: { firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 } });
   await sp.expectNoConsoleErrors();
 }
 
