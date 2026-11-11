@@ -86,7 +86,10 @@ export async function runWrappedText(page: Page): Promise<void> {
       },
       { locale, text },
     );
-    expect(result.painted[1]?.length ?? 0, `${locale} wraps in the real browser font`).toBeGreaterThan(1);
+    expect(
+      result.painted[1]?.length ?? 0,
+      `${locale} wraps in the real browser font`,
+    ).toBeGreaterThan(1);
     expect(result.painted[0], `${locale} 50%`).toEqual(result.painted[1]);
     expect(result.painted[2], `${locale} 200%`).toEqual(result.painted[1]);
     expect(result.height, `${locale} AutoFit matches painted line count`).toBe(

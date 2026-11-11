@@ -105,7 +105,6 @@ export async function runMiniToolbarFeedbackScenario(page: Page): Promise<void> 
           defaultOperation: 'deny',
           selection: true,
           copy: true,
-          batchDenied: 'reject',
         },
       });
     });
