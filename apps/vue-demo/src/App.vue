@@ -22,13 +22,13 @@ import {
   watch,
 } from 'vue';
 import {
+  adoptDemoWorkbook,
   buildDemoCommands,
   buildDemoReviewDialog,
   buildDemoReviewFindings,
   buildDemoSearchItems,
   composeDemoUiOptions,
   createDemoStrings,
-  adoptDemoWorkbook,
   createInitialDemoWorkbook,
   DEMO_FORMULA_HINTS,
   demoFunctionArgumentHelp,
