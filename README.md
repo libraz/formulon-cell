@@ -24,9 +24,9 @@
 - **Charts** — seven chart types with a settings panel, edited in place and saved back. [Charts](https://formulon.libraz.net/cell/charts)
 - **XLSX persistence** — comments, images, charts, tables, PivotTables, slicers, protection and more survive a save; Save As can write `.xlsb`. [Host integration](https://formulon.libraz.net/cell/host-integration)
 - **Restricted embedding** — `fixedFormPolicy(ranges)` and `viewerPolicy()` limit what users may change on every input path, independently of which UI is shown. [Embedding and use cases](https://formulon.libraz.net/cell/embedding)
-- **Presets and extensions** — `presets.minimal()`, `standard()` and `full()`, with any piece swappable or left out, down to a headless canvas and store. [Extensions](https://formulon.libraz.net/cell/extensions)
+- **UI profiles and extensions** — `ui.profile` (`embedded`, `minimal`, `standard`, `full`), with any piece swappable or left out through extensions. [Extensions](https://formulon.libraz.net/cell/extensions)
 - **Mac profile** — `ui: { platform: 'mac' }` switches to the Mac ribbon, shortcuts and argument palette. [Platform and Mac UI](https://formulon.libraz.net/cell/platform)
-- **Runtime i18n** — seven languages built in, more through `sheet.i18n.register()`. [Internationalization](https://formulon.libraz.net/cell/i18n)
+- **Runtime i18n** — seven languages built in, strings overridable through `instance.i18n.override()`. [Internationalization](https://formulon.libraz.net/cell/i18n)
 
 ## Installation
 
@@ -36,7 +36,7 @@ npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zu
 npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand                # Vue 3
 ```
 
-`zustand` is a peer dependency so the host can read the same store the chrome subscribes to. The default engine is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `WorkbookHandle.createDefault()` rejects if the engine fails to initialize; there is no silent fallback, and the in-memory stub engine runs only when you pass `preferStub: true`. Node.js integrations require Node 22 or later.
+`zustand` is a peer dependency so the host can read the same store the chrome subscribes to. The default engine is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `Workbook.createDefault()` rejects if the engine fails to initialize; there is no silent fallback, and the in-memory stub engine runs only when you pass `engine: 'stub'`. Node.js integrations require Node 22 or later.
 
 ### Bundler integration
 
@@ -57,19 +57,20 @@ Serving the `.wasm` from a CDN (`locateFile`) and the threaded engine build are 
 ### JavaScript / TypeScript
 
 ```ts
-import { Spreadsheet, WorkbookHandle, presets } from '@libraz/formulon-cell';
+import { mount, Workbook } from '@libraz/formulon-cell';
+import { ribbon } from '@libraz/formulon-cell/toolbar';
 import '@libraz/formulon-cell/styles.css';
 
-const wb = await WorkbookHandle.createDefault();
-const sheet = await Spreadsheet.mount(document.getElementById('sheet')!, {
+const wb = await Workbook.createDefault();
+const sheet = await mount(document.getElementById('sheet')!, {
   workbook: wb,
-  features: { ...presets.full(), localeSwitcher: true },
+  ui: { profile: 'full', features: { localeSwitcher: true } },
   locale: 'en',
-  toolbar: true,
+  toolbar: ribbon(),
 });
 
-sheet.setLocale('ja'); // swap locale without re-mounting
-sheet.setTheme('ink'); // dark theme
+sheet.update({ locale: 'ja' }); // swap locale without re-mounting
+sheet.update({ theme: 'ink' }); // dark theme
 ```
 
 → [Options](https://formulon.libraz.net/cell/options)
@@ -77,10 +78,10 @@ sheet.setTheme('ink'); // dark theme
 ### React
 
 ```tsx
-import { Spreadsheet, presets } from '@libraz/formulon-cell-react';
+import { Spreadsheet } from '@libraz/formulon-cell-react';
 import '@libraz/formulon-cell/styles.css';
 
-<Spreadsheet features={presets.full()} locale="en" style={{ height: '100vh' }} />;
+<Spreadsheet ui={{ profile: 'full' }} locale="en" style={{ height: '100vh' }} />;
 ```
 
 → [React / Vue](https://formulon.libraz.net/cell/frameworks)
@@ -89,12 +90,12 @@ import '@libraz/formulon-cell/styles.css';
 
 ```vue
 <script setup lang="ts">
-import { Spreadsheet, presets } from '@libraz/formulon-cell-vue';
+import { Spreadsheet } from '@libraz/formulon-cell-vue';
 import '@libraz/formulon-cell/styles.css';
 </script>
 
 <template>
-  <Spreadsheet :features="presets.full()" locale="en" style="height: 100vh" />
+  <Spreadsheet :ui="{ profile: 'full' }" locale="en" style="height: 100vh" />
 </template>
 ```
 
@@ -114,23 +115,23 @@ The checks CI runs are listed in [`CONTRIBUTING.md`](./CONTRIBUTING.md); release
 
 ## Embedding
 
-Three independent options decide what an embedded sheet shows and what users may do with it, and each one can be changed later without re-mounting (`setUi`, `setPolicy`, `setViewportOptions`).
+Three independent options decide what an embedded sheet shows and what users may do with it, and each one can be changed later without re-mounting (`update({ ui, policy, viewport })`).
 
 ```ts
-import { Spreadsheet, WorkbookHandle, fixedFormPolicy, viewerPolicy } from '@libraz/formulon-cell';
+import { mount, Workbook, fixedFormPolicy, viewerPolicy } from '@libraz/formulon-cell';
 
-const sheet = await Spreadsheet.mount(host, {
-  workbook: await WorkbookHandle.createDefault(),
+const sheet = await mount(host, {
+  workbook: await Workbook.createDefault(),
   ui: { profile: 'embedded', features: { formulaBar: true } }, // grid plus formula bar
   policy: fixedFormPolicy(['B2:B11']), // only B2:B11 accept input, on every sheet
-  viewport: { range: 'A1:D12', tabNavigation: 'editable' },
+  viewport: { mode: 'fixed', range: 'A1:D12', tabNavigation: 'editable' },
 });
 
-sheet.setPolicy(viewerPolicy()); // after submit: select and copy only
+sheet.update({ policy: viewerPolicy() }); // after submit: select and copy only
 ```
 
 - **`ui`** — what is shown: a profile (`embedded`, `minimal`, `standard`, `full`) plus about thirty switches such as `sheetTabs`, `contextMenu`, `charts` or `clipboard`.
-- **`policy`** — what users may change: 28 operations (value edit, paste, format, row insert, sort, ...) allowed or denied one by one, editable cells as A1 ranges (`'B2:B11'` applies on every sheet, `'Input!B2:B11'` on one) or a predicate, and a `restrict` hook that can deny but never grant. It applies to every input path, so hiding the ribbon is not what makes a cell readonly.
+- **`policy`** — what users may change: 27 operations (value edit, paste, format, row insert, sort, ...) allowed or denied one by one, editable cells as A1 ranges (`'B2:B11'` applies on every sheet, `'Input!B2:B11'` on one) or a predicate, and a `restrict` hook that can deny but never grant. It applies to every input path, so hiding the ribbon is not what makes a cell readonly.
 - **`viewport`** — which cells are visible and selectable, and whether Tab walks only the editable cells.
 - **`contextMenu`** and **`overlays`** — pick or replace the right-click menu, and keep popups inside a host modal or fullscreen element.
 

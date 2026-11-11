@@ -24,9 +24,9 @@
 - **グラフ** — 7 種類のグラフを設定パネルで扱い、その場で編集して保存できます。[グラフ](https://formulon.libraz.net/ja/cell/charts)
 - **XLSX への保存** — コメント、画像、グラフ、テーブル、ピボットテーブル、スライサー、保護などを保存でき、名前を付けて保存では `.xlsb` も書き出せます。[ホストとの連携](https://formulon.libraz.net/ja/cell/host-integration)
 - **制限付きの埋め込み** — `fixedFormPolicy(ranges)` と `viewerPolicy()` で、ユーザーが変更できる範囲をすべての入力経路で制限します。表示する UI とは独立に設定します。[埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding)
-- **プリセットと拡張** — `presets.minimal()`、`standard()`、`full()` から選び、個々の部品は差し替えも省略もできます。キャンバスとストアだけのヘッドレス構成にもできます。[拡張](https://formulon.libraz.net/ja/cell/extensions)
+- **UI プロファイルと拡張** — `ui.profile`（`embedded`、`minimal`、`standard`、`full`）から選び、個々の部品は拡張で差し替えも省略もできます。[拡張](https://formulon.libraz.net/ja/cell/extensions)
 - **Mac プロファイル** — `ui: { platform: 'mac' }` で Mac 向けのリボン、ショートカット、関数引数パレットに切り替わります。[プラットフォームと Mac UI](https://formulon.libraz.net/ja/cell/platform)
-- **実行時の言語切り替え** — 7 言語を同梱し、`sheet.i18n.register()` で追加できます。[国際化](https://formulon.libraz.net/ja/cell/i18n)
+- **実行時の言語切り替え** — 7 言語を同梱し、`instance.i18n.override()` で文言を上書きできます。[国際化](https://formulon.libraz.net/ja/cell/i18n)
 
 ## インストール
 
@@ -36,7 +36,7 @@ npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zu
 npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand                # Vue 3
 ```
 
-`zustand` はピア依存です。UI が購読しているストアを、ホスト側からも同じインスタンスで読めるようにしています。標準のエンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `WorkbookHandle.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。インメモリのスタブエンジンは `preferStub: true` を渡したときだけ使われます。Node.js で使う場合は 22 以降が必要です。
+`zustand` はピア依存です。UI が購読しているストアを、ホスト側からも同じインスタンスで読めるようにしています。標準のエンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `Workbook.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。インメモリのスタブエンジンは `engine: 'stub'` を渡したときだけ使われます。Node.js で使う場合は 22 以降が必要です。
 
 ### バンドラの設定
 
@@ -57,19 +57,20 @@ CDN からの `.wasm` の配信（`locateFile`）とスレッド版エンジン�
 ### JavaScript / TypeScript
 
 ```ts
-import { Spreadsheet, WorkbookHandle, presets } from '@libraz/formulon-cell';
+import { mount, Workbook } from '@libraz/formulon-cell';
+import { ribbon } from '@libraz/formulon-cell/toolbar';
 import '@libraz/formulon-cell/styles.css';
 
-const wb = await WorkbookHandle.createDefault();
-const sheet = await Spreadsheet.mount(document.getElementById('sheet')!, {
+const wb = await Workbook.createDefault();
+const sheet = await mount(document.getElementById('sheet')!, {
   workbook: wb,
-  features: { ...presets.full(), localeSwitcher: true },
+  ui: { profile: 'full', features: { localeSwitcher: true } },
   locale: 'ja',
-  toolbar: true,
+  toolbar: ribbon(),
 });
 
-sheet.setLocale('en'); // 再マウントせずにロケールを切り替え
-sheet.setTheme('ink'); // ダークテーマ
+sheet.update({ locale: 'en' }); // 再マウントせずにロケールを切り替え
+sheet.update({ theme: 'ink' }); // ダークテーマ
 ```
 
 → [設定オプション](https://formulon.libraz.net/ja/cell/options)
@@ -77,10 +78,10 @@ sheet.setTheme('ink'); // ダークテーマ
 ### React
 
 ```tsx
-import { Spreadsheet, presets } from '@libraz/formulon-cell-react';
+import { Spreadsheet } from '@libraz/formulon-cell-react';
 import '@libraz/formulon-cell/styles.css';
 
-<Spreadsheet features={presets.full()} locale="ja" style={{ height: '100vh' }} />;
+<Spreadsheet ui={{ profile: 'full' }} locale="ja" style={{ height: '100vh' }} />;
 ```
 
 → [React / Vue](https://formulon.libraz.net/ja/cell/frameworks)
@@ -89,12 +90,12 @@ import '@libraz/formulon-cell/styles.css';
 
 ```vue
 <script setup lang="ts">
-import { Spreadsheet, presets } from '@libraz/formulon-cell-vue';
+import { Spreadsheet } from '@libraz/formulon-cell-vue';
 import '@libraz/formulon-cell/styles.css';
 </script>
 
 <template>
-  <Spreadsheet :features="presets.full()" locale="ja" style="height: 100vh" />
+  <Spreadsheet :ui="{ profile: 'full' }" locale="ja" style="height: 100vh" />
 </template>
 ```
 
@@ -114,23 +115,23 @@ CI が実行するチェックは [`CONTRIBUTING.md`](./CONTRIBUTING.md) に、�
 
 ## 埋め込み
 
-埋め込んだシートに何を表示し、ユーザーに何をさせるかは、独立した3つのオプションで決めます。どれもあとから再マウントせずに変更できます（`setUi`、`setPolicy`、`setViewportOptions`）。
+埋め込んだシートに何を表示し、ユーザーに何をさせるかは、独立した3つのオプションで決めます。どれもあとから再マウントせずに変更できます（`update({ ui, policy, viewport })`）。
 
 ```ts
-import { Spreadsheet, WorkbookHandle, fixedFormPolicy, viewerPolicy } from '@libraz/formulon-cell';
+import { mount, Workbook, fixedFormPolicy, viewerPolicy } from '@libraz/formulon-cell';
 
-const sheet = await Spreadsheet.mount(host, {
-  workbook: await WorkbookHandle.createDefault(),
+const sheet = await mount(host, {
+  workbook: await Workbook.createDefault(),
   ui: { profile: 'embedded', features: { formulaBar: true } }, // グリッドと数式バーだけ
   policy: fixedFormPolicy(['B2:B11']), // どのシートでも B2:B11 だけ入力可能
-  viewport: { range: 'A1:D12', tabNavigation: 'editable' },
+  viewport: { mode: 'fixed', range: 'A1:D12', tabNavigation: 'editable' },
 });
 
-sheet.setPolicy(viewerPolicy()); // 送信後は選択とコピーだけ
+sheet.update({ policy: viewerPolicy() }); // 送信後は選択とコピーだけ
 ```
 
 - **`ui`** — 何を表示するか。プロファイル（`embedded`、`minimal`、`standard`、`full`）と、`sheetTabs`、`contextMenu`、`charts`、`clipboard` など約 30 個のスイッチで指定します。
-- **`policy`** — ユーザーが何を変更できるか。値の編集、貼り付け、書式、行の挿入、並べ替えなど 28 種類の操作を個別に許可・拒否し、編集できるセルは A1 形式の範囲（`'B2:B11'` は全シート、`'Input!B2:B11'` はそのシートだけ）か述語で指定します。`restrict` フックは拒否を追加できますが、許可を足すことはできません。どの入力経路にも効くので、リボンを隠すことでセルが読み取り専用になるわけではありません。
+- **`policy`** — ユーザーが何を変更できるか。値の編集、貼り付け、書式、行の挿入、並べ替えなど 27 種類の操作を個別に許可・拒否し、編集できるセルは A1 形式の範囲（`'B2:B11'` は全シート、`'Input!B2:B11'` はそのシートだけ）か述語で指定します。`restrict` フックは拒否を追加できますが、許可を足すことはできません。どの入力経路にも効くので、リボンを隠すことでセルが読み取り専用になるわけではありません。
 - **`viewport`** — 表示・選択できるセルの範囲と、Tab で編集可能なセルだけを巡回するかどうか。
 - **`contextMenu`** と **`overlays`** — 右クリックメニューの項目選択や差し替えと、ポップアップをホストのモーダルや全画面要素の中に収める設定。
 

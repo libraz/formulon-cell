@@ -9,7 +9,7 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/cell/demo)
 
-**A working spreadsheet for any web page, no framework required.** Mount it into a DOM element and you get a canvas-rendered grid with chrome built to match desktop Excel (formula bar, ribbon, sheet tabs, context menu) over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Features are composed from presets and extension factories, and locales and themes swap at runtime without re-mounting.
+**A working spreadsheet for any web page, no framework required.** Mount it into a DOM element and you get a canvas-rendered grid with chrome built to match desktop Excel (formula bar, ribbon, sheet tabs, context menu) over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Features are composed from UI profiles and extension factories, and locales and themes swap at runtime without re-mounting.
 
 Try it in the [live demo](https://formulon.libraz.net/cell/demo).
 
@@ -23,62 +23,68 @@ This is the vanilla TypeScript / DOM core. [`@libraz/formulon-cell-react`](https
 npm install @libraz/formulon-cell zustand
 ```
 
-`zustand` is a peer dependency. The default WASM engine is single-threaded and needs no COOP/COEP headers. `WorkbookHandle.createDefault()` rejects if the engine fails to initialize; the in-memory stub is used only when you pass `preferStub: true`. Bundler settings are in the [project README](https://github.com/libraz/formulon-cell#bundler-integration).
+`zustand` is a peer dependency. The default WASM engine is single-threaded and needs no COOP/COEP headers. `Workbook.createDefault()` rejects if the engine fails to initialize; the in-memory stub is used only when you pass `engine: 'stub'`. Bundler settings are in the [project README](https://github.com/libraz/formulon-cell#bundler-integration).
 
 ## Quick start
 
 ```ts
-import { Spreadsheet, WorkbookHandle, presets } from '@libraz/formulon-cell';
+import { mount, Workbook } from '@libraz/formulon-cell';
+import { ribbon } from '@libraz/formulon-cell/toolbar';
 import '@libraz/formulon-cell/styles.css';
 
-const wb = await WorkbookHandle.createDefault();
-const sheet = await Spreadsheet.mount(document.getElementById('sheet')!, {
+const wb = await Workbook.createDefault();
+const sheet = await mount(document.getElementById('sheet')!, {
   workbook: wb,
-  features: { ...presets.full(), localeSwitcher: true },
+  ui: { profile: 'full', features: { localeSwitcher: true } },
   locale: 'en',
-  toolbar: true, // ribbon mounted in the same call, available as sheet.toolbar
+  toolbar: ribbon(), // ribbon mounted in the same call, available as sheet.toolbar
 });
 
-sheet.setLocale('ja');
-sheet.setTheme('ink'); // themes the grid and the ribbon together
+sheet.update({ locale: 'ja' });
+sheet.update({ theme: 'ink' }); // themes the grid and the ribbon together
 ```
 
-Pass `getWorkbookName: () => currentFilename` to show the current workbook name in Watch Window. The React and Vue components accept the same callback.
+Pass `host: { workbookName: () => currentFilename }` to show the current workbook name in Watch Window. The React and Vue components accept the same option.
 
-The language selector is hidden by default. Enable it with `features.localeSwitcher: true`, or toggle it with `sheet.setFeatures({ localeSwitcher: false })`. `sheet.setLocale()` updates the dictionary and calculation profile together; it returns `false` when the change is rejected and keeps the current locale. Close open dialogs, Find/Replace, comment edits and filter menus before switching; their drafts are preserved when a switch is rejected.
+The language selector is hidden by default. Enable it with `ui.features.localeSwitcher: true`, or toggle it with `sheet.update({ ui: { features: { localeSwitcher: false } } })`, which replaces `ui` as a whole. `update({ locale })` updates the dictionary and calculation profile together; it throws a `FormulonError` when the change is rejected and keeps the current locale. Close open dialogs, Find/Replace, comment edits and filter menus before switching; their drafts are preserved when a switch is rejected.
 
 ## Embedding
 
-`ui` decides what is shown, `policy` what users may change, and `viewport` which cells are visible and selectable; each has a runtime setter (`setUi`, `setPolicy`, `setViewportOptions`).
+`ui` decides what is shown, `policy` what users may change, and `viewport` which cells are visible and selectable; each can be changed at runtime with `update({ ui, policy, viewport })`.
 
 ```ts
-import { fixedFormPolicy, viewerPolicy } from '@libraz/formulon-cell';
+import { fixedFormPolicy, mount, viewerPolicy } from '@libraz/formulon-cell';
 
-const form = await Spreadsheet.mount(host, {
+const form = await mount(host, {
   workbook: wb,
   ui: { profile: 'embedded', features: { formulaBar: true } }, // grid plus formula bar
   policy: fixedFormPolicy(['B2:B11']), // only B2:B11 accept input, on every sheet
-  viewport: { range: 'A1:D12', tabNavigation: 'editable' },
+  viewport: { mode: 'fixed', range: 'A1:D12', tabNavigation: 'editable' },
 });
 
-form.setPolicy(viewerPolicy()); // after submit: select and copy only
+form.update({ policy: viewerPolicy() }); // after submit: select and copy only
 ```
 
-A policy allows or denies 28 operations one by one, takes editable cells as A1 ranges (`'B2:B11'` applies on every sheet, `'Input!B2:B11'` on one) or a predicate, and applies to every input path: editor, clipboard, fill handle, context menu, ribbon and instance API. Its `restrict` hook can add a denial but never a grant. Under a policy, ribbon commands that are not classified by operation stay disabled, so a restricted sheet is best shown without the ribbon or with host-built controls. See [Embedding and use cases](https://formulon.libraz.net/cell/embedding).
+A policy allows or denies 27 operations one by one, takes editable cells as A1 ranges (`'B2:B11'` applies on every sheet, `'Input!B2:B11'` on one) or a predicate, and applies to every input path: editor, clipboard, fill handle, context menu, ribbon and instance API. Its `restrict` hook can add a denial but never a grant. Under a policy, ribbon commands that are not classified by operation stay disabled, so a restricted sheet is best shown without the ribbon or with host-built controls. See [Embedding and use cases](https://formulon.libraz.net/cell/embedding).
 
-## Presets
+## UI profiles
 
-| preset | what's in it |
-|--------|--------------|
-| `presets.minimal()`  | formula bar, status bar, basic keymap |
-| `presets.standard()` | + Quick Analysis, context menu, find/replace, clipboard, format painter |
-| `presets.full()`     | + format dialog, paste special, conditional formatting, named ranges, hyperlink dialog, PivotTable creation, validation, autocomplete, hover comments |
+`ui.profile` picks the starting set of features (default `'full'`); `ui.features` switches individual ones on or off over it.
+
+| profile | what's in it |
+|---------|--------------|
+| `embedded`  | grid only: every feature, the ribbon and printing off |
+| `minimal`   | formula bar, status bar, basic keymap |
+| `standard`  | + Quick Analysis, context menu, find/replace, clipboard, format painter |
+| `full`      | + format dialog, paste special, conditional formatting, named ranges, hyperlink dialog, PivotTable creation, validation, autocomplete, hover comments |
 
 ## Subpath exports
 
 | import path | contents |
 |---|---|
-| `@libraz/formulon-cell` | `Spreadsheet`, `WorkbookHandle`, `presets`, policies, extension factories |
+| `@libraz/formulon-cell` | `mount`, `Workbook`, policies, extension factories |
+| `@libraz/formulon-cell/toolbar` | `ribbon()` and the ribbon model |
+| `@libraz/formulon-cell/charts` | chart layout helpers |
 | `@libraz/formulon-cell/extensions` | all extension factories |
 | `@libraz/formulon-cell/i18n/{en,ja,de,fr,zh,ko,th}` | seven locale dictionaries |
 | `@libraz/formulon-cell/styles.css` | grid, dialogs, overlays, ribbon, and all themes in one file |
@@ -88,19 +94,18 @@ A policy allows or denies 28 operations one by one, takes editable cells as A1 r
 
 | API | description |
 |-----|-------------|
-| `Spreadsheet.mount(host, opts)` | mount the spreadsheet into a DOM element |
-| `WorkbookHandle.createDefault()` | create a workbook backed by the WASM engine |
-| `workbook.withBatchedRecalc(fn)` | run a multi-cell write with a single recalc |
-| `instance.setLocale(loc)` / `instance.setTheme(theme)` | swap locale or theme at runtime |
-| `instance.setPolicy` / `setViewportOptions` / `setContextMenu` / `setUi` / `setToolbar` | change embedding settings at runtime |
-| `instance.applyChanges(changes)` | batch cell update, all or nothing, decided by the policy and sheet protection |
-| `instance.on(event, handler)` | `cellChange`, `selectionChange`, `changeBatch`, `recalc`, … |
+| `mount(host, options)` | mount the spreadsheet into a DOM element |
+| `Workbook.createDefault()` / `Workbook.load(bytes)` | create or open a workbook backed by the WASM engine |
+| `workbook.batch(fn)` | run a multi-cell write with a single recalc |
+| `instance.update(patch)` | change `locale`, `theme`, `ui`, `policy`, `viewport`, `contextMenu`, `toolbar` and other options at runtime |
+| `instance.applyChanges(changes, { history })` | batch cell update, all or nothing, decided by the policy and sheet protection |
+| `instance.on(event, handler)` | `change`, `cell`, `workbook`, `recalc`, `error`, `update` |
 
 The full option and API reference is on the [documentation site](https://formulon.libraz.net/cell/).
 
-CSV export accepts an explicit locale and delimiter: `exportCSV(state, { locale: 'de', delimiter: ';' })`. Pass the same settings as the sixth argument to `importCSV(store, workbook, text, anchor, history, settings)` for matching numeric and boolean input. Export defaults to canonical English values and comma delimiters; import uses the active workbook profile unless `settings.locale` is supplied.
+CSV export accepts an explicit locale and delimiter: `wb.sheet(0).exportCsv({ locale: 'de', delimiter: ';' })`. Pass the same settings to `wb.sheet(0).importCsv(text, { at: 'A1', locale: 'de', delimiter: ';' })` for matching numeric and boolean input. Export defaults to the workbook's locale and comma delimiters; import uses the active workbook profile unless `locale` is supplied.
 
-Formula editors and external clipboard input use the active profile's syntax. For example, German `=SUMME(1,5;2)` is stored as `=SUM(1.5,2)`. Programmatic `workbook.setFormula()` accepts canonical syntax; use `workbook.canonicalizeLocalizedFormula()` first when supplying localized text. `workbook.localizeFormulaText()` converts display text, and `workbook.localeFacts()` returns the active profile's separators and scalar names.
+Formula editors and external clipboard input use the active profile's syntax. For example, German `=SUMME(1,5;2)` is stored as `=SUM(1.5,2)`. Programmatic `Sheet.setFormula()` accepts canonical syntax; use `workbook.canonicalizeFormula()` first when supplying localized text. `workbook.localizeFormula()` converts display text, and `workbook.getLocaleFacts()` returns the active profile's separators and scalar names.
 
 ## Documentation
 
