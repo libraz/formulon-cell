@@ -1,4 +1,6 @@
+import { listCustomCellStyles } from '../commands/cell-styles.js';
 import { selectedSessionChart } from '../commands/chart-design.js';
+import { listCustomPivotTableStyles, listCustomTableStyles } from '../commands/format-as-table.js';
 import { subscribeRecentFunctions } from '../commands/function-history.js';
 import { selectedSessionIllustration } from '../commands/session-illustration.js';
 import { activeTableOverlay } from '../commands/table-design.js';
@@ -108,6 +110,16 @@ import {
 } from './toolbar-dropdown-delegation.js';
 import { attachRibbonInteractionPolicy } from './toolbar-interaction-policy.js';
 import type { SpreadsheetInstance } from './types.js';
+
+/** The custom cell, table and PivotTable styles the ribbon's style galleries are built with. */
+const customStyleLists = (instance: SpreadsheetInstance): readonly (readonly unknown[])[] => {
+  const state = instance.store.getState();
+  return [
+    listCustomCellStyles(state),
+    listCustomTableStyles(state),
+    listCustomPivotTableStyles(state),
+  ];
+};
 
 type UiTheme = 'paper' | 'ink' | 'contrast';
 
@@ -1220,14 +1232,21 @@ export function mountToolbar(
         : null;
     if (current) refreshLocale(current);
     syncContextualTabs(current, false);
+    let customStyles = current ? customStyleLists(current) : null;
     unsubStore =
       current?.store.subscribe(() => {
         const nextInstance = getInstance();
         const platformChanged = syncInheritedPlatform(nextInstance);
         const tabsChanged = syncContextualTabs(nextInstance, true);
         syncMacInkSubscription(nextInstance);
+        // The style galleries are built with the custom styles, so a new, changed or deleted
+        // custom style rebuilds them.
+        const nextStyles = nextInstance ? customStyleLists(nextInstance) : null;
+        const stylesChanged =
+          nextStyles?.some((list, i) => list !== customStyles?.[i]) ?? customStyles !== null;
+        customStyles = nextStyles;
         projectFormatToolbar();
-        if (platformChanged || tabsChanged) renderToolbar();
+        if (platformChanged || tabsChanged || stylesChanged) renderToolbar();
         else interactionPolicy.project();
       }) ?? null;
     unsubFunctionHistory = current

@@ -1,17 +1,10 @@
+import { customPivotTableStyleById, customTableStyleById } from '../commands/format-as-table.js';
 import {
-  customPivotTableStyleById,
-  customTableStyleById,
-  tableOverlayAt,
-} from '../commands/format-as-table.js';
-import {
-  applyPivotStyle,
-  applyTableStyle,
-  clearTableRangeFormatting,
+  activeStyleTarget,
   deleteCustomStyle,
   setStyleDefault,
+  type TableStyleKind,
 } from '../commands/table-style-actions.js';
-import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
-import type { TableStyleKind } from '../toolbar/dialogs/table-style.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { menuSeparator, menuTextChip } from '../toolbar/ribbon/menus/general.js';
 import { showCreateTableDialog } from './dynamic-dropdown-defaults/styles.js';
@@ -74,8 +67,6 @@ export function attachTableStyleContextMenu(
     styleId: string,
     from: string,
   ): void => {
-    const state = instance.store.getState();
-    const { sheet, row, col } = state.selection.active;
     const entry = { origin: 'ribbon', commandId: from } as const;
     const ctx = { store: instance.store, history: instance.history, ...entry };
     const custom = customStyleOf(instance, kind, styleId);
@@ -83,30 +74,10 @@ export function attachTableStyleContextMenu(
       case 'applyMaintain':
       case 'applyClear': {
         const clearFormatting = action === 'applyClear';
-        if (kind === 'pivot') {
-          const pivot = findPivotTableAtCell(instance.workbook, state.selection.active);
-          if (!pivot) break;
-          const history = instance.history;
-          const transaction = history.begin();
-          try {
-            if (clearFormatting) {
-              clearTableRangeFormatting(ctx, {
-                sheet: pivot.sheetIndex,
-                r0: pivot.top,
-                c0: pivot.left,
-                r1: pivot.top + pivot.rows - 1,
-                c1: pivot.left + pivot.cols - 1,
-              });
-            }
-            applyPivotStyle(ctx, instance.workbook, pivot, styleId);
-          } finally {
-            history.end(transaction);
-          }
-          break;
-        }
-        const table = tableOverlayAt(state, sheet, row, col);
-        if (table) applyTableStyle(ctx, table, styleId, { clearFormatting });
-        else void showCreateTableDialog(instance, { style: styleId, clearFormatting }, entry);
+        const target = activeStyleTarget({ ...ctx, workbook: instance.workbook }, kind);
+        if (target) target.apply(styleId, { clearFormatting });
+        else if (kind === 'table')
+          void showCreateTableDialog(instance, { style: styleId, clearFormatting }, entry);
         break;
       }
       case 'modify':

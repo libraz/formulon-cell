@@ -1,4 +1,5 @@
 import type { StripeElement } from '../../commands/format-as-table.js';
+import type { TableStyleKind } from '../../commands/table-style-actions.js';
 import type {
   StyleElementFormat,
   StyleElementFormats,
@@ -19,7 +20,6 @@ import {
   mountDialog,
 } from './shell.js';
 
-export type TableStyleKind = 'table' | 'pivot';
 type ElementLabel = keyof Strings['ribbonMenu']['tableStyleElements'];
 
 /** The elements the dialog lists for a table style, in the desktop order, and the label each

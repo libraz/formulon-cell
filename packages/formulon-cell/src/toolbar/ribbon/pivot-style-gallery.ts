@@ -1,10 +1,8 @@
 import {
-  currentPivotStyleId,
   listCustomPivotTableStyles,
   pivotStyleGallerySections,
 } from '../../commands/format-as-table.js';
-import { applyPivotStyle } from '../../commands/table-style-actions.js';
-import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
+import { activeStyleTarget } from '../../commands/table-style-actions.js';
 import { builtinPivotStyleElements } from '../../engine/pivot-style.js';
 import type { StyleElementFormat, StyleElementFormats } from '../../engine/table-style-elements.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
@@ -123,10 +121,19 @@ export interface PivotStyleGalleryOptions {
  *  time, with the Quick Styles button as the more arrow. */
 export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDivElement => {
   const { lang, getInst } = opts;
-  const activePivot = (): { sheetIndex: number; pivotIndex: number } | null => {
+  const target = () => {
     const inst = getInst();
     return inst
-      ? findPivotTableAtCell(inst.workbook, inst.store.getState().selection.active)
+      ? activeStyleTarget(
+          {
+            store: inst.store,
+            history: inst.history,
+            workbook: inst.workbook,
+            origin: 'ribbon',
+            commandId: 'pivotQuickStyles',
+          },
+          'pivot',
+        )
       : null;
   };
   const wrap = createQuickStyleStrip({
@@ -154,19 +161,12 @@ export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDiv
       );
     },
     // No report, or one without a style element, shows None as current.
-    current: () => {
-      const inst = getInst();
-      const pivot = activePivot();
-      if (!inst || !pivot) return '';
-      const name = inst.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)?.name ?? '';
-      return currentPivotStyleId(inst.store.getState(), name);
-    },
+    current: () => target()?.currentId ?? '',
     apply: (id) => {
-      const target = getInst();
-      const pivot = activePivot();
-      if (!target || !pivot) return;
-      applyPivotStyle({ store: target.store, history: target.history }, target.workbook, pivot, id);
-      target.host.focus();
+      const picked = target();
+      if (!picked) return;
+      picked.apply(id);
+      getInst()?.host.focus();
     },
     more: { arrow: opts.arrow, menu: opts.menu },
   });

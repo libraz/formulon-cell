@@ -1,3 +1,4 @@
+import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators } from '../store/store.js';
@@ -7,6 +8,8 @@ import {
   type CustomTableStyle,
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
+  currentPivotStyleId,
+  currentTableStyleId,
   customPivotTableStyleById,
   customPivotTableStyleId,
   customStyleNameError,
@@ -18,6 +21,7 @@ import {
   repointTableStyle,
   sameStyleName,
   type TableOverlay,
+  tableOverlayAt,
   tableStyleOptionsById,
   updateTableOverlay,
 } from './format-as-table.js';
@@ -25,6 +29,9 @@ import type { History } from './history.js';
 import { updatePivotStyleInfo } from './pivot-style-info.js';
 import { recordFormatChange, recordTablesChange } from './slice-history.js';
 import { type TableActionContext, tableChangeAllowed, tableWrite } from './table-actions.js';
+
+/** A table or a PivotTable: the two kinds of object a table style gallery styles. */
+export type TableStyleKind = 'table' | 'pivot';
 
 /** Gives `table` the style `styleId` as one undo step. The table keeps its own style options, as
  *  a gallery pick does; `clearFormatting` first clears the direct formatting of its cells, as
@@ -221,7 +228,7 @@ export function deleteCustomStyle(
 /** How a Modify dialog's Set As Default checkbox applies to `kind`'s workbook default. */
 export interface ModifyStyleDefault {
   workbook: StyleDefaultsWorkbook | null;
-  kind: 'table' | 'pivot';
+  kind: TableStyleKind;
   setAsDefault: boolean;
 }
 
@@ -292,7 +299,7 @@ export function modifyCustomStyle(
 export function createCustomStyle(
   ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
   workbook: StyleDefaultsWorkbook | null,
-  kind: 'table' | 'pivot',
+  kind: TableStyleKind,
   value: {
     name: string;
     elements: CustomTableStyle['elements'];
@@ -345,7 +352,7 @@ export function applyPivotStyle(
  *  recorded on it. False when the engine keeps no defaults. */
 export function setStyleDefault(
   workbook: (Pick<WorkbookHandle, 'setTableStyleDefaults'> & Partial<StyleDefaultsWorkbook>) | null,
-  kind: 'table' | 'pivot',
+  kind: TableStyleKind,
   name: string,
   history: History | null = null,
 ): boolean {
@@ -354,4 +361,67 @@ export function setStyleDefault(
   return history && workbook.getTableStyleDefaults
     ? recordStyleDefaults(history, workbook as StyleDefaultsWorkbook, change)
     : workbook.setTableStyleDefaults(change);
+}
+
+/** The table or PivotTable under the active cell, as one shape for both galleries. */
+export interface ActiveStyleTarget {
+  readonly kind: TableStyleKind;
+  /** The gallery id of its current style: a custom style's id, a built-in name, or '' for none. */
+  readonly currentId: string;
+  /** Gives it the style `styleId` as one undo step; `clearFormatting` first clears its cells'
+   *  direct formatting. False when the change is refused, leaving the cells as they were. */
+  apply(styleId: string, options?: { readonly clearFormatting?: boolean }): boolean;
+  /** Removes its style (Clear in the gallery). False when refused. */
+  clear(): boolean;
+}
+
+/** The `kind` object under the active cell, or null when the active cell is outside one. */
+export function activeStyleTarget(
+  ctx: TableActionContext & { readonly workbook: WorkbookHandle },
+  kind: TableStyleKind,
+): ActiveStyleTarget | null {
+  const state = ctx.store.getState();
+  const active = state.selection.active;
+  if (kind === 'table') {
+    const table = tableOverlayAt(state, active.sheet, active.row, active.col);
+    if (!table) return null;
+    return {
+      kind,
+      currentId: currentTableStyleId(state, overlayStyleName(table)),
+      apply: (styleId, options) => applyTableStyle(ctx, table, styleId, options),
+      clear: () => clearTableStyle(ctx, table),
+    };
+  }
+  const pivot = findPivotTableAtCell(ctx.workbook, active);
+  if (!pivot) return null;
+  const name = ctx.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)?.name ?? '';
+  const restyle = (styleId: string): boolean => applyPivotStyle(ctx, ctx.workbook, pivot, styleId);
+  return {
+    kind,
+    currentId: currentPivotStyleId(state, name),
+    apply: (styleId, options) => {
+      if (!options?.clearFormatting) return restyle(styleId);
+      const history = ctx.history;
+      const transaction = history?.begin();
+      let applied = false;
+      try {
+        clearTableRangeFormatting(ctx, {
+          sheet: pivot.sheetIndex,
+          r0: pivot.top,
+          c0: pivot.left,
+          r1: pivot.top + pivot.rows - 1,
+          c1: pivot.left + pivot.cols - 1,
+        });
+        applied = restyle(styleId);
+        return applied;
+      } finally {
+        if (history && transaction) {
+          // A refused restyle leaves the cells' formatting as it was.
+          if (applied) history.end(transaction);
+          else history.abort(transaction);
+        }
+      }
+    },
+    clear: () => restyle(''),
+  };
 }

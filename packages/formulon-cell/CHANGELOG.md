@@ -8,6 +8,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- Adding a slicer or sparklines through the instance API asks the interaction policy under the feature-level command ids `slicerInsert` and `sparklineInsert`, beside `slicerDelete` and `sparklineClear`, instead of a Mac ribbon button's id.
 - The Mac host's dialogs and panes use the Mac app's own wording in English, German, French, Korean, Thai and Chinese wherever the desktop strings settle it for the same control; the rest keeps the shared wording. The default profile's English is unchanged.
 - A new table from Format as Table, Insert > Table or Ctrl+T takes the workbook's default table style, and Table Style Medium 2 when none is set. The ribbon hook `insert.createTable` takes no argument.
 - **Breaking:** Requires `@libraz/formulon` 0.19.0. `WorkbookHandle` follows the engine's 0.19 model:
@@ -92,6 +93,7 @@ versioning is [SemVer](https://semver.org/).
 - Spelling: a refused Change All applies nothing, AutoCorrect from the dialog records an entry only once the change is written, Undo Last keeps its record when the undo fails, repeated numbers pass, and words such as `constructor` are no longer flagged.
 - AutoCorrect: the capitalisation rules leave web addresses, e-mail addresses and paths alone; a Ctrl+Enter fill from the formula bar is corrected; lists keyed by language (`ja`) apply to a full locale (`ja-JP`); a web address typed in the formula bar becomes a hyperlink as in the cell.
 - Table styles: a new, duplicated or renamed style may not take another style's name; a custom style shows as current in the gallery; Set As Default and default changes made with a style undo with it; deleting or modifying a style re-points tables on protected sheets as well; multi-row stripes draw their borders on the band edges; a refused Create Table leaves the cells' formatting alone; New PivotTable Style no longer restyles the selected PivotTable.
+- A custom cell, table or PivotTable style made, changed or deleted after the ribbon is shown appears in its gallery at once. A refused Apply and Clear Formatting on a PivotTable leaves its cells' formatting alone, as on a table.
 - Sparklines: an oversized source is refused instead of stalling the grid, column sparklines on a flat date axis stay in the cell, the win/loss axis sits on the bars' baseline, a source on a sheet named like a cell reference is quoted, grouping an existing group or ungrouping a single sparkline records nothing, and Edit Group Location & Data keeps the group on its sheet.
 - Insert Slicer adds every chosen field as one undo step or none, targets only the active table, and is unavailable for a session-only table or a PivotTable.
 

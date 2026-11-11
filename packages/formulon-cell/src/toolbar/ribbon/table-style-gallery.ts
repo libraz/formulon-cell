@@ -1,11 +1,8 @@
 import {
-  currentTableStyleId,
   listCustomTableStyles,
-  overlayStyleName,
-  tableOverlayAt,
   tableStyleGallerySections,
 } from '../../commands/format-as-table.js';
-import { applyTableStyle } from '../../commands/table-style-actions.js';
+import { activeStyleTarget } from '../../commands/table-style-actions.js';
 import { builtinTableStyleElements } from '../../engine/builtin-table-styles.js';
 import { dictionaries } from '../../i18n/strings.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
@@ -28,10 +25,20 @@ export interface TableStyleGalleryOptions {
  *  Styles button as the more arrow. A pick restyles the active table. */
 export const createTableStyleGallery = (opts: TableStyleGalleryOptions): HTMLDivElement => {
   const { lang, getInst } = opts;
-  const activeTable = (inst: SpreadsheetInstance) => {
-    const state = inst.store.getState();
-    const { sheet, row, col } = state.selection.active;
-    return tableOverlayAt(state, sheet, row, col);
+  const target = () => {
+    const inst = getInst();
+    return inst
+      ? activeStyleTarget(
+          {
+            store: inst.store,
+            history: inst.history,
+            workbook: inst.workbook,
+            origin: 'ribbon',
+            commandId: 'tableQuickStyles',
+          },
+          'table',
+        )
+      : null;
   };
   const wrap = createQuickStyleStrip({
     lang,
@@ -59,27 +66,12 @@ export const createTableStyleGallery = (opts: TableStyleGalleryOptions): HTMLDiv
               })),
       );
     },
-    current: () => {
-      const inst = getInst();
-      const table = inst ? activeTable(inst) : null;
-      if (!inst || !table) return null;
-      return currentTableStyleId(inst.store.getState(), overlayStyleName(table));
-    },
+    current: () => target()?.currentId ?? null,
     apply: (id) => {
-      const inst = getInst();
-      const table = inst ? activeTable(inst) : null;
-      if (!inst || !table) return;
-      applyTableStyle(
-        {
-          store: inst.store,
-          history: inst.history,
-          origin: 'ribbon',
-          commandId: 'tableQuickStyles',
-        },
-        table,
-        id,
-      );
-      inst.host.focus();
+      const picked = target();
+      if (!picked) return;
+      picked.apply(id);
+      getInst()?.host.focus();
     },
     more: { arrow: opts.arrow, menu: opts.menu },
   });
