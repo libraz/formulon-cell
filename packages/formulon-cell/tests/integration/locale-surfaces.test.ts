@@ -226,6 +226,7 @@ function cancelToolbarDialog(host: HTMLElement): HTMLElement {
 }
 
 const toolbarFixtureRange = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 2 } as const;
+const toolbarFreeRange = { sheet: 0, r0: 0, c0: 4, r1: 4, c1: 5 } as const;
 
 function seedToolbarFixture(mountedSheet: MountedStubSheet): void {
   const { workbook, instance } = mountedSheet;
@@ -583,6 +584,11 @@ describe('seven-language locale surface manifest', () => {
         if (route.id === 'toolbar.protection.unprotectSheet') {
           instance.setSheetProtected(true, 'toolbar-locale-password');
         }
+        // Insert > Table is refused inside a table, so it opens over the empty columns beside it.
+        mutators.setRange(
+          instance.store,
+          route.id === 'toolbar.formatAsTable' ? toolbarFreeRange : toolbarFixtureRange,
+        );
         const trackTables =
           route.id === 'toolbar.formatAsTable' || route.id === 'toolbar.tableStyle';
         const beforeCells = toolbarFixtureSnapshot(mounted, trackTables);
