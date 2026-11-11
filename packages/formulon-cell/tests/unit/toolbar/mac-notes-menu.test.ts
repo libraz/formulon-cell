@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { mutators } from '../../../src/store/store.js';
 import { macRibbonLabelForCommand } from '../../../src/toolbar/ribbon/mac/labels.js';
@@ -78,5 +79,38 @@ describe('Mac Review > Notes menu', () => {
     mutators.setCellFormat(instance.store, { sheet: 0, row: 4, col: 4 }, { commentVisible: true });
     projectMacRibbonState(host, instance);
     expect(buttons.get('mac.review.showNotes')?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('turns New Note into Edit Note on a note cell, absent while that note is locked', async () => {
+    sheet = await mountStubSheet({
+      workbook: await WorkbookHandle.createDefault({ preferStub: true }),
+      locale: 'ja',
+    });
+    const { instance } = sheet;
+    const menu = document.createElement('div');
+    menu.className = 'fc-tb__menu';
+    const button = document.createElement('button');
+    button.dataset.ribbonCommand = 'mac.review.newNote';
+    button.textContent = '新しいメモ';
+    menu.appendChild(button);
+    const host = document.createElement('div');
+    host.appendChild(menu);
+
+    projectMacRibbonState(host, instance);
+    expect([button.textContent, button.hidden]).toEqual(['新しいメモ', false]);
+
+    mutators.setCellFormat(instance.store, { sheet: 0, row: 0, col: 0 }, { comment: 'note text' });
+    projectMacRibbonState(host, instance);
+    expect([button.textContent, button.hidden]).toEqual(['メモの編集', false]);
+
+    // Protected with Edit objects off: the note can't be edited, so its row is gone.
+    setProtectedSheet(instance.store, 0, true);
+    projectMacRibbonState(host, instance);
+    expect(button.hidden).toBe(true);
+
+    setProtectedSheet(instance.store, 0, false);
+    mutators.setActive(instance.store, { sheet: 0, row: 3, col: 3 });
+    projectMacRibbonState(host, instance);
+    expect([button.textContent, button.hidden]).toEqual(['新しいメモ', false]);
   });
 });

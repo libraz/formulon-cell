@@ -445,6 +445,7 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
   'mac.data.scenarioManager': { ja: 'シナリオ マネージャー', en: 'Scenario Manager' },
   'mac.data.dataTable': { ja: 'データ テーブル', en: 'Data Table' },
   'mac.review.newNote': { ja: '新しいメモ', en: 'New Note' },
+  'mac.review.editNote': { ja: 'メモの編集', en: 'Edit Note' },
   'mac.review.nextNote': { ja: '次のメモ', en: 'Next Note' },
   'mac.review.previousNote': { ja: '前のメモ', en: 'Previous Note' },
   'mac.review.showHideNote': { ja: 'メモの表示/非表示', en: 'Show/Hide Note' },

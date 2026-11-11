@@ -47,6 +47,7 @@ versioning is [SemVer](https://semver.org/).
 - The Home Clear control is decided by the selected cells, and its Clear Hyperlinks item needs the Insert hyperlinks option on a protected sheet.
 - The Mac cell context menu follows the desktop order and groups, with New Comment and the note rows beside it.
 - The Windows cell context menu offers New Comment, which starts a thread, before New Note.
+- On the Mac, the Review Notes menu shows Edit Note in place of New Note when the active cell has a note, and drops it while that note is locked on a protected sheet.
 - A pick from a validation list is an authorized, undoable cell entry.
 - **Breaking:** `Strings.mac.contextMenu.newNote` is now `newComment`.
 

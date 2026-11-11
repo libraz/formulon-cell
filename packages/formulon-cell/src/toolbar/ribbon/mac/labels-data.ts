@@ -1313,6 +1313,13 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     ko: '새 메모',
     th: 'บันทึกย่อใหม่',
   },
+  'mac.review.editNote': {
+    de: 'Notiz bearbeiten',
+    fr: 'Modifier la note',
+    zh: '编辑备注',
+    ko: '메모 편집',
+    th: 'แก้ไขบันทึกย่อ',
+  },
   'mac.review.nextNote': {
     de: 'Nächste Notiz',
     fr: 'Note suivante',

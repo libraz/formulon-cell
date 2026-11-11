@@ -4,6 +4,7 @@ import { commentAt } from '../../../commands/comment.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
 import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
+import { noteChangePermitted } from '../../../commands/protection.js';
 import { arrangeStackPosition } from '../../../commands/session-illustration.js';
 import { activeTableOverlay } from '../../../commands/table-design.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
@@ -337,6 +338,22 @@ export const projectMacRibbonState = (
     button.textContent = label;
     button.title = label;
     button.setAttribute('aria-label', label);
+  }
+
+  // The Notes menu's first item edits the active cell's note, and is absent when that note is
+  // locked against editing.
+  const noteState = instance.store.getState();
+  const activeNote = commentAt(noteState, noteState.selection.active) !== null;
+  for (const button of buttons.get('mac.review.newNote') ?? []) {
+    if (!button.closest('.fc-tb__menu')) continue;
+    button.dataset.newNoteLabel ??= button.textContent ?? '';
+    const label = activeNote
+      ? macRibbonLabelForCommand('mac.review.editNote', lang)
+      : button.dataset.newNoteLabel;
+    button.textContent = label;
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.hidden = activeNote && !noteChangePermitted(noteState, noteState.selection.active);
   }
 
   // Recommended Charts offers its action only once the selection holds data.
