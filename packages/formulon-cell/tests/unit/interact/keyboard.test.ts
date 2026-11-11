@@ -844,6 +844,16 @@ describe('attachKeyboard', () => {
         c1: 16383,
       });
     });
+
+    it('Shift+Space and Ctrl+Space keep the active cell', () => {
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 4, col: 3 });
+      fire(host, ' ', { shiftKey: true });
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 4, col: 3 });
+      // Ctrl+Space follows Shift+Space; pinned until the desktop behaviour is measured.
+      fire(host, ' ', { ctrlKey: true });
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 4, col: 3 });
+    });
   });
 
   describe('Ctrl+Arrow jumpEdge', () => {

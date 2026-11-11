@@ -89,6 +89,7 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
+import { firstVisibleCol, firstVisibleRow } from '../store/visible-axis.js';
 import { jumpToDataEdge } from './data-edge-navigation.js';
 import { type AutoscrollBounds, createDragAutoscroll } from './drag-autoscroll.js';
 import { createFillValueTooltip } from './fill-value-tooltip.js';
@@ -950,7 +951,7 @@ export function attachPointer(
           const anchorCol = isWholeColumnRange(s.selection.range)
             ? s.selection.anchor.col
             : s.selection.active.col;
-          mutators.selectCols(store, anchorCol, zone.col);
+          mutators.selectCols(store, anchorCol, zone.col, s.selection.active.row);
           drag = { kind: 'col-header', anchorCol };
           return;
         }
@@ -958,7 +959,8 @@ export function attachPointer(
           startHeaderMarquee(s, 'col', zone.col, x, y);
           return;
         }
-        mutators.selectCol(store, zone.col);
+        // The active cell lands on the column's top visible row; the view does not move.
+        mutators.selectCol(store, zone.col, firstVisibleRow(s));
         drag = { kind: 'col-header', anchorCol: zone.col };
         return;
       }
@@ -999,7 +1001,7 @@ export function attachPointer(
           const anchorRow = isWholeRowRange(s.selection.range)
             ? s.selection.anchor.row
             : s.selection.active.row;
-          mutators.selectRows(store, anchorRow, zone.row);
+          mutators.selectRows(store, anchorRow, zone.row, s.selection.active.col);
           drag = { kind: 'row-header', anchorRow };
           return;
         }
@@ -1007,7 +1009,8 @@ export function attachPointer(
           startHeaderMarquee(s, 'row', zone.row, x, y);
           return;
         }
-        mutators.selectRow(store, zone.row);
+        // The active cell lands on the row's leftmost visible column; the view does not move.
+        mutators.selectRow(store, zone.row, firstVisibleCol(s));
         drag = { kind: 'row-header', anchorRow: zone.row };
         return;
       }
@@ -1306,9 +1309,9 @@ export function attachPointer(
         const layout = geometryLayout(s);
         const zone = hitZone(layout, s.viewport, x, y, [], { resizeHandles: false });
         if (zone && (zone.kind === 'col-header' || zone.kind === 'cell')) {
-          mutators.selectCols(store, drag.anchorCol, zone.col);
+          mutators.selectCols(store, drag.anchorCol, zone.col, s.selection.active.row);
         } else if (zone === null) {
-          mutators.selectCols(store, drag.anchorCol, lastVisibleCol(s));
+          mutators.selectCols(store, drag.anchorCol, lastVisibleCol(s), s.selection.active.row);
         }
         return;
       }
@@ -1316,9 +1319,9 @@ export function attachPointer(
         const layout = geometryLayout(s);
         const zone = hitZone(layout, s.viewport, x, y, [], { resizeHandles: false });
         if (zone && (zone.kind === 'row-header' || zone.kind === 'cell')) {
-          mutators.selectRows(store, drag.anchorRow, zone.row);
+          mutators.selectRows(store, drag.anchorRow, zone.row, s.selection.active.col);
         } else if (zone === null) {
-          mutators.selectRows(store, drag.anchorRow, lastVisibleRow(s));
+          mutators.selectRows(store, drag.anchorRow, lastVisibleRow(s), s.selection.active.col);
         }
         return;
       }

@@ -294,6 +294,27 @@ describe('attachPointer', () => {
       });
     });
 
+    it('a header click puts the active cell on the first visible cell and keeps the view', () => {
+      store.setState((st) => ({ ...st, viewport: { ...st.viewport, rowStart: 9, colStart: 4 } }));
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 10, 40); // row 9 header, the first row on screen
+      fireUp(host, 10, 40);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 9, col: 4 });
+      fireDown(host, 100, 10); // col 4 header, the first column on screen
+      fireUp(host, 100, 10);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 9, col: 4 });
+      expect(store.getState().viewport).toMatchObject({ rowStart: 9, colStart: 4 });
+    });
+
+    it('a row header click under frozen panes puts the active cell in the frozen column', () => {
+      mutators.setFreezePanes(store, 0, 2);
+      store.setState((st) => ({ ...st, viewport: { ...st.viewport, colStart: 5 } }));
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 10, 40); // row 0 header
+      fireUp(host, 10, 40);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
+    });
+
     it('Ctrl/Cmd-click on row headers builds a disjoint row selection', () => {
       detach = attachPointer(host, store, wb);
 

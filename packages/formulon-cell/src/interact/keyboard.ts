@@ -257,14 +257,16 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     if (meta && k === ' ') {
       e.preventDefault();
       if (selectionDisabled) return;
-      mutators.selectCol(store, a.col);
+      // Ctrl+Space keeps the active cell, as Shift+Space does.
+      mutators.selectCol(store, a.col, a.row);
       return;
     }
 
     if (shift && k === ' ' && !meta && !e.altKey) {
       e.preventDefault();
       if (selectionDisabled) return;
-      mutators.selectRow(store, a.row);
+      // Shift+Space keeps the active cell, unlike a row header click.
+      mutators.selectRow(store, a.row, a.col);
       return;
     }
 
