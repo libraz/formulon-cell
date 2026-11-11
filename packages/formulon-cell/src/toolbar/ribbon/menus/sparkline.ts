@@ -1,6 +1,6 @@
 // Sparkline tab menus: Edit Data, the Style gallery, the two colour menus, Axis and Clear.
 
-import type { Color } from '@libraz/formulon';
+import { BlanksAs, type Color } from '@libraz/formulon';
 import { SHAPE_LINE_WEIGHTS } from '../../../commands/shape-format.js';
 import type { SparklineStylePreset } from '../../../commands/sparkline-presets.js';
 import { createColorPalette } from '../../../components/color-palette.js';
@@ -118,6 +118,9 @@ export const sparklineStyleThumbnail = (
   return svg;
 };
 
+/** The menu value of a colour palette's More Colors row. */
+export const MORE_COLORS = 'more';
+
 export interface SparklineMenuFactories {
   createSparklineEditDataMenu: () => HTMLDivElement;
   createSparklineStyleMenu: () => HTMLDivElement;
@@ -147,12 +150,17 @@ export const createSparklineMenuFactories = (
     const colors = createColorPalette({
       themeLabel: ribbonText.themeColors,
       standardLabel: ribbonText.standardColors,
+      highContrastOnlyLabel: ribbonText.highContrastOnly,
+      moreColorsLabel: ribbonText.moreColors,
       ariaLabel: title,
       onPick: () => undefined,
     });
     for (const swatch of colors.el.querySelectorAll<HTMLButtonElement>('[data-color]')) {
       swatch.dataset[attr] = `${prefix}${swatch.dataset.color}`;
     }
+    // More Colors runs through the menu like a swatch; the defaults open the system picker.
+    const more = colors.el.querySelector<HTMLButtonElement>('.fc-colorpalette__action--more');
+    if (more) more.dataset[attr] = `${prefix}${MORE_COLORS}`;
     return colors.el;
   };
 
@@ -182,10 +190,23 @@ export const createSparklineMenuFactories = (
 
   const createSparklineEditDataMenu = (): HTMLDivElement => {
     const menu = createMenu(SPARKLINE_MENU_IDS.editData);
+    const empty = (label: string, value: string) =>
+      checkable(item(label, 'sparklineEmpty', value), 'menuitemradio');
+    const [hidden, panel] = submenu(SPARKLINE_MENU_IDS.editData, 'hidden-empty', t.hiddenEmpty, [
+      empty(t.emptyAsGaps, String(BlanksAs.Gap)),
+      empty(t.emptyAsZero, String(BlanksAs.Zero)),
+      empty(t.connectPoints, String(BlanksAs.Span)),
+      menuSeparator(),
+      checkable(item(t.showHiddenData, 'sparklineEmpty', 'hidden'), 'menuitemcheckbox'),
+    ]);
+    // Hovering the entry opens its submenu; clicking it opens the Hidden and Empty Cell Settings dialog.
+    hidden.dataset.sparklineEdit = 'hidden-empty';
     menu.append(
       item(t.editGroup, 'sparklineEdit', 'group'),
       item(t.editSingle, 'sparklineEdit', 'single'),
-      item(t.hiddenEmpty, 'sparklineEdit', 'hidden-empty'),
+      menuSeparator(),
+      hidden,
+      panel,
       item(t.switchRowCol, 'sparklineEdit', 'switch'),
     );
     return menu;
@@ -230,7 +251,7 @@ export const createSparklineMenuFactories = (
       ...submenu(SPARKLINE_MENU_IDS.color, 'weight', t.weight, [
         ...weights,
         menuSeparator(),
-        item(t.customValue, 'sparklineWeight', 'custom'),
+        item(t.customWeight, 'sparklineWeight', 'custom'),
       ]),
     );
     return menu;

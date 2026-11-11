@@ -62,6 +62,12 @@ describe('Sparkline tab of the ribbon', () => {
     });
     tb.setActiveTab('sparklineDesign');
   };
+  /** Open the menu of a split button from its arrow; its face runs the command itself. */
+  const openMenu = (id: string): void => {
+    command(id)
+      .querySelector('.fc-tb__rb-split-chevron')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  };
   /** Click the menu entry `selector` the way the ribbon's click delegation sees it. */
   const pick = (selector: string): void => {
     const target = host.querySelector<HTMLElement>(selector);
@@ -259,7 +265,7 @@ describe('Sparkline tab of the ribbon', () => {
     mountOnSparklines();
     mutators.setActive(store(), at(1));
     mutators.setRange(store(), { sheet: 0, r0: 1, c0: 5, r1: 1, c1: 5 });
-    command('sparklineEditData').click();
+    openMenu('sparklineEditData');
     pick('[data-sparkline-edit="single"]');
     const single = await dialog();
     expect(single.querySelector<HTMLInputElement>('input')?.value).toBe('A2:C2');
@@ -269,7 +275,7 @@ describe('Sparkline tab of the ribbon', () => {
       expect(listSparklines(store().getState())[1]?.spec.source).toBe('D2:F2'),
     );
 
-    command('sparklineEditData').click();
+    openMenu('sparklineEditData');
     pick('[data-sparkline-edit="hidden-empty"]');
     const hidden = await dialog();
     field(hidden, `input[value="${BlanksAs.Span}"]`).click();
@@ -283,7 +289,7 @@ describe('Sparkline tab of the ribbon', () => {
     sheet.instance.history.undo();
     mutators.setActive(store(), at(0));
     mutators.setRange(store(), { sheet: 0, r0: 0, c0: 5, r1: 2, c1: 5 });
-    command('sparklineEditData').click();
+    openMenu('sparklineEditData');
     pick('[data-sparkline-edit="switch"]');
     expect(listSparklines(store().getState()).map(({ spec }) => spec.source)).toEqual([
       'A1:A3',
@@ -294,13 +300,15 @@ describe('Sparkline tab of the ribbon', () => {
 
   it('edits the group location and data in the Edit Sparklines dialog', async () => {
     mountOnSparklines();
-    command('sparklineEditData').click();
+    openMenu('sparklineEditData');
     pick('[data-sparkline-edit="group"]');
     await vi.waitFor(() => expect(document.querySelector('.fc-macsparkdlg')).toBeTruthy());
     const dlg = document.querySelector('.fc-macsparkdlg') as HTMLElement;
-    expect(dlg.querySelector<HTMLInputElement>('.fc-macsparkdlg__source')?.value).toBe('A1:C3');
+    expect(dlg.querySelector<HTMLInputElement>('.fc-macsparkdlg__source')?.value).toBe(
+      'Sheet1!A1:C3',
+    );
     expect(dlg.querySelector<HTMLInputElement>('.fc-macsparkdlg__destination')?.value).toBe(
-      'F1:F3',
+      'Sheet1!$F$1:$F$3',
     );
     const destination = field(dlg, '.fc-macsparkdlg__destination');
     destination.value = 'H1:H3';

@@ -1,5 +1,10 @@
 import type { FunctionCategory } from '../../../commands/function-categories.js';
 import { objectChangeAllowed, objectWrite } from '../../../commands/object-actions.js';
+import { membersOfGroup } from '../../../commands/sparkline.js';
+import { activeSparklineGroup } from '../../../commands/sparkline-design.js';
+import { unionSparklineSources } from '../../../commands/sparkline-layout.js';
+import { resolveSparklineRange } from '../../../commands/sparkline-ranges.js';
+import { formatA1Range, quoteSheetName } from '../../../engine/address.js';
 import {
   disposeDataTableDialog,
   openDataTableDialogFrom,
@@ -82,6 +87,41 @@ export const openMacSparklineDialog = (
 ): void => {
   createMacRibbonActions(instance);
   SPARKLINE_DIALOGS.get(instance)?.open(edit);
+};
+
+/** Open Edit Sparklines on the group of the active cell. Both ranges name their sheet, and the
+ *  location is pinned with `$`, as the desktop dialog fills them. */
+export const openSparklineGroupEditor = (instance: SpreadsheetInstance): void => {
+  const state = instance.store.getState();
+  const group = activeSparklineGroup(state);
+  if (!group) return;
+  const members = membersOfGroup(state, group.id);
+  const first = members[0];
+  if (!first) return;
+  const wb = instance.workbook;
+  const sheet = first.addr.sheet;
+  const qualified = (on: number, a1: string): string => `${quoteSheetName(wb.sheetName(on))}!${a1}`;
+  const union = unionSparklineSources(members.map(({ spec }) => spec.source));
+  const data = resolveSparklineRange(union, sheet, wb);
+  const rows = members.map(({ addr }) => addr.row);
+  const cols = members.map(({ addr }) => addr.col);
+  openMacSparklineDialog(instance, {
+    groupId: group.id,
+    sheet,
+    data: data ? qualified(data.sheet, formatA1Range(data)) : union,
+    location: qualified(
+      sheet,
+      formatA1Range(
+        {
+          r0: Math.min(...rows),
+          c0: Math.min(...cols),
+          r1: Math.max(...rows),
+          c1: Math.max(...cols),
+        },
+        { absolute: true },
+      ),
+    ),
+  });
 };
 
 /** Open the instance's shared Insert Slicer dialog for the ribbon command that invoked it. */

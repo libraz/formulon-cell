@@ -257,6 +257,7 @@ export const RIBBON_MENU_FACTORY_FOR_COMMAND: Readonly<Record<string, RibbonMenu
 export const RIBBON_AUDITED_PRIMARY_ACTION_SPLIT_COMMANDS = [
   'paste',
   'tableRefresh',
+  'sparklineEditData',
   'sparklineClear',
   'pivotTableInsert',
   'autosum',
@@ -310,7 +311,6 @@ export const RIBBON_AUDITED_DROPDOWN_COMMANDS = [
   'chartColors',
   'shapeFill',
   'shapeOutline',
-  'sparklineEditData',
   'sparklineColor',
   'sparklineMarkerColor',
   'sparklineAxis',
@@ -492,6 +492,7 @@ export const RIBBON_DROPDOWN_COMMANDS: ReadonlySet<string> = new Set(
 );
 
 export const RIBBON_DIALOG_COMMANDS: ReadonlySet<string> = new Set([
+  'sparklineAxisDialog',
   'chartChangeType',
   'chartFormatSelection',
   'chartSelectData',

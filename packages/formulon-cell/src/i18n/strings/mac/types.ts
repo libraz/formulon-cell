@@ -205,7 +205,19 @@ export interface MacStrings {
     weightLabel: string;
     dateTitle: string;
     dateRangeLabel: string;
-    customValueTitle: string;
+    /** The Axis dialog: its tabs, the horizontal axis options and the two vertical bounds. */
+    axisHorizontal: string;
+    axisVertical: string;
+    axisGeneral: string;
+    axisShow: string;
+    axisPlotRtl: string;
+    axisMinimum: string;
+    axisMaximum: string;
+    axisAutoEach: string;
+    axisSameAll: string;
+    /** Why Plot Data Right-to-Left stays greyed. */
+    axisRtlUnsupported: string;
+    axisTitle: string;
     customValueLabel: string;
     emptyCellsLabel: string;
     showHiddenLabel: string;

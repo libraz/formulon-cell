@@ -4,10 +4,18 @@ import {
   activeSparklineGroup,
   SPARKLINE_SHOW_COMMANDS,
   SPARKLINE_TYPE_COMMANDS,
+  selectedSparklineCells,
+  sparklineGroupIds,
 } from '../../commands/sparkline-design.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
+
+/** The Axis menu and the Mac Axis dialog stay enabled on a protected sheet, their controls inert. */
+const AXIS_COMMANDS: ReadonlySet<string> = new Set([
+  SPARKLINE_COMMANDS.axis,
+  SPARKLINE_COMMANDS.axisDialog,
+]);
 
 /** Marks a button this projection disabled, so a disabled state set elsewhere is left alone. */
 const OWN_DISABLED = 'sparklineDisabled';
@@ -15,15 +23,16 @@ const OWN_DISABLED = 'sparklineDisabled';
 const OWN_TITLE = 'sparklineTitle';
 
 /** Sync the Sparkline tab under `host` with the group of the active cell: the pressed Type and
- *  Show toggles, Markers (line sparklines only), and the greying a protected sheet asks for. The
- *  Axis menu stays enabled on a protected sheet, with every entry inert. The Style strip is
- *  refreshed to the group's preset. */
+ *  Show toggles, Markers (line sparklines only), Group (two or more groups selected), and the
+ *  greying a protected sheet asks for. The Axis menu and the Mac Axis dialog stay enabled on a
+ *  protected sheet, with every control inert. The Style strip is refreshed to the group's preset. */
 export const projectSparklineDesign = (host: HTMLElement, instance: SpreadsheetInstance): void => {
   const state = instance.store.getState();
   const group = activeSparklineGroup(state);
   const protectedSheet = isSheetProtected(state, state.selection.active.sheet);
   const settings = group?.settings;
   const reason = instance.i18n.strings.mac.sparkline.protectedLocation;
+  const oneGroup = sparklineGroupIds(state, selectedSparklineCells(state)).length < 2;
   for (const button of host.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
     const id = button.dataset.ribbonCommand ?? '';
     const type = SPARKLINE_TYPE_COMMANDS[id];
@@ -36,11 +45,12 @@ export const projectSparklineDesign = (host: HTMLElement, instance: SpreadsheetI
       button.classList.toggle('fc-tb__rb--active', pressed);
       button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
     }
-    const locked = id !== 'sparklineAxis' && protectedSheet;
+    const locked = !AXIS_COMMANDS.has(id) && protectedSheet;
     const disabled =
       !settings ||
       locked ||
-      (id === 'sparklineShowMarkers' && settings.type !== SparklineType.Line);
+      (id === 'sparklineShowMarkers' && settings.type !== SparklineType.Line) ||
+      (id === SPARKLINE_COMMANDS.group && oneGroup);
     if (disabled) {
       if (!button.disabled || button.dataset[OWN_DISABLED]) {
         button.dataset[OWN_TITLE] ??= button.title;

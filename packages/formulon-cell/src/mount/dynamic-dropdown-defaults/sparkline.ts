@@ -1,13 +1,13 @@
-import { type Color, SparklineAxisType } from '@libraz/formulon';
+import { BlanksAs, type Color, SparklineAxisType } from '@libraz/formulon';
 import { isMacChrome } from '../../commands/chrome-platform.js';
 import type { ObjectActionContext } from '../../commands/object-actions.js';
 import { isSheetProtected } from '../../commands/protection.js';
-import { membersOfGroup } from '../../commands/sparkline.js';
 import {
   activeSparklineGroup,
   clearSelectedSparklineGroupsAction,
   clearSelectedSparklinesAction,
   patchSelectedSparklineGroupsAction,
+  SPARKLINE_COLOR_KEYS,
   type SparklineColorPart,
   setSparklineAxisBoundAction,
   setSparklineColorAction,
@@ -15,14 +15,17 @@ import {
   switchedSparklineSources,
   switchSparklineRowColumnAction,
 } from '../../commands/sparkline-design.js';
-import { unionSparklineSources } from '../../commands/sparkline-layout.js';
 import {
   applySparklineStylePresetAction,
   SPARKLINE_STYLE_PRESETS,
   sparklineStylePresetIndex,
 } from '../../commands/sparkline-presets.js';
 import { sparklineSourceText } from '../../commands/sparkline-ranges.js';
-import { syncColorPaletteTheme, themeColorColumns } from '../../components/color-palette.js';
+import {
+  pickNativeColor,
+  syncColorPaletteTheme,
+  themeColorColumns,
+} from '../../components/color-palette.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
 import { cssOfColorSpec } from '../../engine/theme-color.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -35,8 +38,9 @@ import type {
   DynamicDropdownsCtx,
   SparklineMenuAction,
 } from '../../toolbar/ribbon/dynamic-dropdowns.js';
-import { openMacSparklineDialog } from '../../toolbar/ribbon/mac/actions.js';
+import { openSparklineGroupEditor } from '../../toolbar/ribbon/mac/actions.js';
 import {
+  MORE_COLORS,
   SPARKLINE_STYLE_SLOTS,
   sparklineStyleThumbnail,
 } from '../../toolbar/ribbon/menus/sparkline.js';
@@ -52,9 +56,11 @@ type SparklineDropdownDefaults = Pick<
   'applySparklineAction' | 'updateSparklineMenu'
 >;
 
-/** Bounds of a custom sparkline weight, in points. */
-const MIN_WEIGHT_PT = 0.25;
-const MAX_WEIGHT_PT = 1584;
+/** The spinner step of the custom weight field, in points. */
+const WEIGHT_STEP_PT = 0.25;
+
+/** The empty-cell displays the Hidden & Empty Cells submenu offers. */
+const EMPTY_CELLS_AS: ReadonlySet<number> = new Set([BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Span]);
 
 const MARKER_PARTS: ReadonlySet<string> = new Set([
   'negative',
@@ -81,11 +87,19 @@ export function createSparklineDropdownDefaults(
       ? { okLabel: strings().mac.sparkline.ok, cancelLabel: strings().mac.sparkline.cancel }
       : { okLabel: strings().hyperlinkDialog.ok, cancelLabel: strings().hyperlinkDialog.cancel };
 
+  /** The system colour picker, opened on the active group's colour of `part`. */
+  const moreColors = (part: SparklineColorPart, apply: (css: string) => void): void => {
+    const group = activeSparklineGroup(instance.store.getState());
+    if (!group) return;
+    const current = cssOfColorSpec(instance.workbook, group.settings[SPARKLINE_COLOR_KEYS[part]]);
+    pickNativeColor(current ?? '#000000', apply);
+  };
+
   const promptNumber = (
     title: string,
     label: string,
     initial: number | undefined,
-    bounds: { min?: number; max?: number } = {},
+    bounds: { step?: number } = {},
   ): Promise<number | null> =>
     showNumberPrompt({
       title,
@@ -109,30 +123,6 @@ export function createSparklineDropdownDefaults(
       invalidMessage: label,
       pickerLabel: strings().pivotTableDialog.rangePickerSelect,
     });
-
-  const editGroup = (): void => {
-    const state = instance.store.getState();
-    const group = activeSparklineGroup(state);
-    if (!group) return;
-    const members = membersOfGroup(state, group.id);
-    const first = members[0];
-    const last = members[members.length - 1];
-    if (!first || !last) return;
-    const rows = members.map(({ addr }) => addr.row);
-    const cols = members.map(({ addr }) => addr.col);
-    const location = formatA1Range({
-      r0: Math.min(...rows),
-      c0: Math.min(...cols),
-      r1: Math.max(...rows),
-      c1: Math.max(...cols),
-    });
-    openMacSparklineDialog(instance, {
-      groupId: group.id,
-      sheet: first.addr.sheet,
-      data: unionSparklineSources(members.map(({ spec }) => spec.source)),
-      location,
-    });
-  };
 
   const editSingle = async (): Promise<void> => {
     const state = instance.store.getState();
@@ -179,7 +169,7 @@ export function createSparklineDropdownDefaults(
       mac() ? m.weightTitle : t.weightTitle,
       mac() ? m.weightLabel : t.weightLabel,
       group.settings.lineWidthPt,
-      { min: MIN_WEIGHT_PT, max: MAX_WEIGHT_PT },
+      { step: WEIGHT_STEP_PT },
     );
     if (weight !== null) {
       patchSelectedSparklineGroupsAction(ctxFor(SPARKLINE_COMMANDS.color), {
@@ -223,7 +213,7 @@ export function createSparklineDropdownDefaults(
     const t = strings().ribbon.sparklineDialog;
     const current = end === 'min' ? group.settings.manualMin : group.settings.manualMax;
     const value = await promptNumber(
-      mac() ? m.customValueTitle : t.axisValueTitle,
+      mac() ? m.axisTitle : t.axisValueTitle,
       mac() ? m.customValueLabel : end === 'min' ? t.axisMinLabel : t.axisMaxLabel,
       current ?? undefined,
     );
@@ -258,8 +248,23 @@ export function createSparklineDropdownDefaults(
         const index = SPARKLINE_STYLE_SLOTS.findIndex((slot) => slot.id === value);
         if (index >= 0)
           applySparklineStylePresetAction(ctxFor(SPARKLINE_COMMANDS.styleGallery), index);
+      } else if (kind === 'empty') {
+        const ctx = ctxFor(SPARKLINE_COMMANDS.editData);
+        if (value === 'hidden') {
+          const group = activeSparklineGroup(instance.store.getState());
+          if (group) {
+            patchSelectedSparklineGroupsAction(ctx, {
+              displayHidden: !group.settings.displayHidden,
+            });
+          }
+        } else if (EMPTY_CELLS_AS.has(Number(value))) {
+          patchSelectedSparklineGroupsAction(ctx, { emptyCellsAs: Number(value) as BlanksAs });
+        }
       } else if (kind === 'color') {
-        setSparklineColorAction(ctxFor(SPARKLINE_COMMANDS.color), 'series', value);
+        const ctx = ctxFor(SPARKLINE_COMMANDS.color);
+        if (value === MORE_COLORS) {
+          moreColors('series', (css) => setSparklineColorAction(ctx, 'series', css));
+        } else setSparklineColorAction(ctx, 'series', value);
       } else if (kind === 'weight') {
         if (value === 'custom') return customWeight();
         const weight = Number(value);
@@ -272,14 +277,15 @@ export function createSparklineDropdownDefaults(
         const split = value.indexOf(':');
         const part = value.slice(0, split);
         if (split > 0 && MARKER_PARTS.has(part)) {
-          setSparklineColorAction(
-            ctxFor(SPARKLINE_COMMANDS.markerColor),
-            part as SparklineColorPart,
-            value.slice(split + 1),
-          );
+          const ctx = ctxFor(SPARKLINE_COMMANDS.markerColor);
+          const css = value.slice(split + 1);
+          const apply = (color: string) =>
+            setSparklineColorAction(ctx, part as SparklineColorPart, color);
+          if (css === MORE_COLORS) moreColors(part as SparklineColorPart, apply);
+          else apply(css);
         }
       } else if (kind === 'edit') {
-        if (value === 'group') editGroup();
+        if (value === 'group') openSparklineGroupEditor(instance);
         else if (value === 'single') return editSingle();
         else if (value === 'hidden-empty') return hiddenEmpty();
         else if (value === 'switch')
@@ -304,6 +310,14 @@ export function createSparklineDropdownDefaults(
       if (menu.id === SPARKLINE_MENU_IDS.editData) {
         const sw = menu.querySelector<HTMLButtonElement>('[data-sparkline-edit="switch"]');
         if (sw) setMenuControlDisabled(sw, inert || switchedSparklineSources(state) === null);
+        for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-sparkline-empty]')) {
+          const value = button.dataset.sparklineEmpty;
+          const checked =
+            !!settings &&
+            (value === 'hidden' ? settings.displayHidden : Number(value) === settings.emptyCellsAs);
+          button.setAttribute('aria-checked', String(checked));
+          button.classList.toggle('fc-tb__menu-item--active', checked);
+        }
       }
       if (menu.id === SPARKLINE_MENU_IDS.color || menu.id === SPARKLINE_MENU_IDS.markerColor) {
         syncColorPaletteTheme(menu, themeColorColumns(instance.workbook.getTheme()?.colors));

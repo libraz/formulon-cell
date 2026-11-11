@@ -477,6 +477,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'sortDesc',
   'sortFilterHome',
   'sparklineAxis',
+  'sparklineAxisDialog',
   'sparklineClear',
   'sparklineColor',
   'sparklineEditData',

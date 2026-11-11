@@ -39,6 +39,7 @@ export type ArrangeAction =
 export type SparklineMenuAction =
   | 'edit'
   | 'style'
+  | 'empty'
   | 'color'
   | 'weight'
   | 'markerColor'
@@ -246,6 +247,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'table-refresh',
   'sparkline-edit',
   'sparkline-style',
+  'sparkline-empty',
   'sparkline-color',
   'sparkline-weight',
   'sparkline-marker-color',
@@ -272,6 +274,10 @@ type DynamicDropdownHandler = (
 
 const datasetKeyForAttr = (attr: string): string =>
   attr.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+
+/** Whether a menu entry carries one of the command attributes the dropdown handlers run. */
+const runsCommand = (el: HTMLElement): boolean =>
+  DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS.some((attr) => el.hasAttribute(`data-${attr}`));
 
 const eventElement = (event: Event): Element | null =>
   event.target instanceof Element ? event.target : null;
@@ -317,6 +323,7 @@ const FORMAT_SUBMENU_MENU_IDS: ReadonlySet<string> = new Set([
   'menu-shape-outline',
   SPARKLINE_MENU_IDS.color,
   SPARKLINE_MENU_IDS.markerColor,
+  SPARKLINE_MENU_IDS.editData,
 ]);
 
 export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS: ReadonlySet<string> = new Set([
@@ -796,6 +803,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'table-refresh', handler: (v) => ctx.applyTableRefreshAction?.(v) },
     { attr: 'sparkline-edit', handler: (v) => ctx.applySparklineAction?.('edit', v) },
     { attr: 'sparkline-style', handler: (v) => ctx.applySparklineAction?.('style', v) },
+    { attr: 'sparkline-empty', handler: (v) => ctx.applySparklineAction?.('empty', v) },
     { attr: 'sparkline-color', handler: (v) => ctx.applySparklineAction?.('color', v) },
     { attr: 'sparkline-weight', handler: (v) => ctx.applySparklineAction?.('weight', v) },
     {
@@ -867,7 +875,8 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     }
 
     const formatSubmenu = target?.closest<HTMLElement>('[data-format-submenu]');
-    if (formatSubmenu && FORMAT_SUBMENU_MENU_IDS.has(menu.id)) {
+    // An entry that also names a command runs it on click; hover and the keyboard open its submenu.
+    if (formatSubmenu && FORMAT_SUBMENU_MENU_IDS.has(menu.id) && !runsCommand(formatSubmenu)) {
       event.preventDefault();
       event.stopPropagation();
       if (isDisabledMenuControl(formatSubmenu)) return true;

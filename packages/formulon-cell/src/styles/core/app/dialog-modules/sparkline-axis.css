@@ -1,0 +1,57 @@
+@layer fc.app {
+  /* Axis (Mac): a 352 pt window around a 326 x 256 pt tab view whose panes are 306 x 210. */
+  .fc-macsparkaxis .fc-fmtdlg__panel {
+    width: 352px;
+    max-height: none;
+  }
+  .fc-macsparkaxis .fc-fmtdlg__body {
+    position: relative;
+    margin-top: 16px;
+    padding: 26px 10px 10px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 5px;
+  }
+  .fc-macsparkaxis__tabs {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    display: flex;
+    padding: 1px;
+    border-radius: 6px;
+    background: var(--fc-bg-elev, color-mix(in srgb, CanvasText 8%, Canvas));
+    transform: translate(-50%, -50%);
+  }
+  .fc-macsparkaxis__panel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 210px;
+  }
+  .fc-macsparkaxis__panel[hidden] {
+    display: none;
+  }
+  .fc-macsparkaxis__indent {
+    margin-inline-start: 21px;
+  }
+  .fc-macsparkaxis__rule {
+    width: 100%;
+    margin: 8px 0;
+    border: 0;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 16%, transparent));
+  }
+  .fc-macsparkaxis__box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 11px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 5px;
+  }
+  .fc-macsparkaxis__value {
+    width: 96px;
+    margin-inline-start: 6px;
+  }
+}

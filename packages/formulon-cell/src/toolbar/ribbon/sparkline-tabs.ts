@@ -1,6 +1,7 @@
 import type {
   RibbonCommand,
   RibbonGroupModel,
+  RibbonProfile,
   RibbonTabModel,
   ToolbarText,
 } from '../ribbon-model.js';
@@ -12,6 +13,8 @@ export const SPARKLINE_COMMANDS = {
   color: 'sparklineColor',
   markerColor: 'sparklineMarkerColor',
   axis: 'sparklineAxis',
+  /** The Mac app's Axis button, which opens the Axis dialog instead of a menu. */
+  axisDialog: 'sparklineAxisDialog',
   group: 'sparklineGroup',
   ungroup: 'sparklineUngroup',
   clear: 'sparklineClear',
@@ -30,51 +33,83 @@ export const SPARKLINE_MENU_IDS = {
 /** The Plot Data Right-to-Left axis option stays greyed until the engine models it. */
 export const SPARKLINE_AXIS_DISABLED_ITEMS: readonly string[] = ['rtl'];
 
-/** The Sparkline contextual tab, shown while the active cell hosts a sparkline. */
-export const buildSparklineDesignTab = (tr: ToolbarText): RibbonTabModel => {
+/** Group variants of the Sparkline tab: Show stacks its toggles in columns of three, and the last
+ *  group stacks Group, Ungroup and Clear beside the large Axis button. */
+export const SPARKLINE_STACKED_LAYOUT_GROUP_VARIANTS = ['sparkline-show'] as const;
+export const SPARKLINE_MIXED_LAYOUT_GROUP_VARIANTS = ['sparkline-group'] as const;
+
+/** The Sparkline contextual tab, shown while the active cell hosts a sparkline. The Mac profile's
+ *  Axis button opens the Axis dialog; elsewhere it opens the Axis menu. */
+export const buildSparklineDesignTab = (
+  tr: ToolbarText,
+  profile: RibbonProfile = 'default',
+): RibbonTabModel => {
   const t = tr.sparkline;
-  const command = (id: string, label: string, icon: string): RibbonCommand => ({
+  const large = (id: string, label: string, icon: string): RibbonCommand => ({
+    id,
+    title: label,
+    label,
+    icon,
+    kind: 'large',
+  });
+  const stacked = (id: string, label: string, icon: string, className?: string): RibbonCommand => ({
     id,
     title: label,
     label,
     icon,
     kind: 'wide',
+    layout: 'stacked',
+    ...(className ? { className } : {}),
   });
-  const group = (title: string, commands: RibbonCommand[]): RibbonGroupModel => ({
-    title,
-    commands,
-    variant: 'tiles',
-  });
+  const check = (id: string, label: string, icon: string): RibbonCommand =>
+    stacked(id, label, icon, 'fc-tb__rb--mac-checkbox');
+  const group = (
+    title: string,
+    commands: RibbonCommand[],
+    variant = 'tiles',
+  ): RibbonGroupModel => ({ title, commands, variant });
   return {
     id: 'sparklineDesign',
     label: tr.tabs.sparklineDesign,
     contextual: true,
     groups: [
-      group(t.title, [command(SPARKLINE_COMMANDS.editData, t.editData, 'chartSelectData')]),
+      group(t.title, [large(SPARKLINE_COMMANDS.editData, t.editData, 'chartSelectData')]),
       group(t.type, [
-        command('sparklineTypeLine', t.line, 'sparkline'),
-        command('sparklineTypeColumn', t.column, 'sparklineColumn'),
-        command('sparklineTypeWinLoss', t.winLoss, 'sparklineWinLoss'),
+        large('sparklineTypeLine', t.line, 'sparkline'),
+        large('sparklineTypeColumn', t.column, 'sparklineColumn'),
+        large('sparklineTypeWinLoss', t.winLoss, 'sparklineWinLoss'),
       ]),
-      group(t.show, [
-        command('sparklineShowHigh', t.highPoint, 'sparklineHigh'),
-        command('sparklineShowLow', t.lowPoint, 'sparklineLow'),
-        command('sparklineShowNegative', t.negativePoints, 'sparklineNegative'),
-        command('sparklineShowFirst', t.firstPoint, 'sparklineFirst'),
-        command('sparklineShowLast', t.lastPoint, 'sparklineLast'),
-        command('sparklineShowMarkers', t.markers, 'sparklineMarkers'),
-      ]),
+      group(
+        t.show,
+        [
+          check('sparklineShowHigh', t.highPoint, 'sparklineHigh'),
+          check('sparklineShowLow', t.lowPoint, 'sparklineLow'),
+          check('sparklineShowNegative', t.negativePoints, 'sparklineNegative'),
+          check('sparklineShowFirst', t.firstPoint, 'sparklineFirst'),
+          check('sparklineShowLast', t.lastPoint, 'sparklineLast'),
+          check('sparklineShowMarkers', t.markers, 'sparklineMarkers'),
+        ],
+        SPARKLINE_STACKED_LAYOUT_GROUP_VARIANTS[0],
+      ),
       group(t.style, [
-        command(SPARKLINE_COMMANDS.styleGallery, t.style, 'chartStyles'),
-        command(SPARKLINE_COMMANDS.color, t.color, 'shapeOutline'),
-        command(SPARKLINE_COMMANDS.markerColor, t.markerColor, 'fillColor'),
+        large(SPARKLINE_COMMANDS.styleGallery, t.style, 'chartStyles'),
+        large(SPARKLINE_COMMANDS.color, t.color, 'shapeOutline'),
+        large(SPARKLINE_COMMANDS.markerColor, t.markerColor, 'fillColor'),
       ]),
-      group(t.group, [
-        command(SPARKLINE_COMMANDS.axis, t.axis, 'sparklineAxis'),
-        command(SPARKLINE_COMMANDS.group, t.group, 'outlineGroup'),
-        command(SPARKLINE_COMMANDS.ungroup, t.ungroup, 'outlineUngroup'),
-        command(SPARKLINE_COMMANDS.clear, t.clear, 'clearAll'),
-      ]),
+      group(
+        t.group,
+        [
+          large(
+            profile === 'excel365Mac' ? SPARKLINE_COMMANDS.axisDialog : SPARKLINE_COMMANDS.axis,
+            t.axis,
+            'sparklineAxis',
+          ),
+          stacked(SPARKLINE_COMMANDS.group, t.groupButton, 'outlineGroup'),
+          stacked(SPARKLINE_COMMANDS.ungroup, t.ungroup, 'outlineUngroup'),
+          stacked(SPARKLINE_COMMANDS.clear, t.clear, 'clearAll'),
+        ],
+        SPARKLINE_MIXED_LAYOUT_GROUP_VARIANTS[0],
+      ),
     ],
   };
 };

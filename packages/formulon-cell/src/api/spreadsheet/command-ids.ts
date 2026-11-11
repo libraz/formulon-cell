@@ -351,6 +351,7 @@ export const COMMAND_IDS = [
   'sortDesc',
   'sortFilterHome',
   'sparklineAxis',
+  'sparklineAxisDialog',
   'sparklineClear',
   'sparklineColor',
   'sparklineEditData',

@@ -36,9 +36,7 @@ export type SparklineColorPart =
   | 'first'
   | 'last';
 
-export const SPARKLINE_COLOR_KEYS: Readonly<
-  Record<SparklineColorPart, keyof SparklineGroupSettings>
-> = {
+export const SPARKLINE_COLOR_KEYS = {
   series: 'colorSeries',
   negative: 'colorNegative',
   markers: 'colorMarkers',
@@ -46,7 +44,7 @@ export const SPARKLINE_COLOR_KEYS: Readonly<
   low: 'colorLow',
   first: 'colorFirst',
   last: 'colorLast',
-};
+} as const satisfies Readonly<Record<SparklineColorPart, keyof SparklineGroupSettings>>;
 
 /** Ribbon command id → the sparkline type it sets. */
 export const SPARKLINE_TYPE_COMMANDS: Readonly<Record<string, SparklineType>> = {

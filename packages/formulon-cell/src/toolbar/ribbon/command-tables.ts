@@ -31,6 +31,7 @@ import {
 import { toggleShowPhonetic } from '../../commands/phonetic.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { SpreadsheetStore } from '../../store/store.js';
+import { openSparklineAxisDialog } from './sparkline-axis.js';
 
 type RibbonState = ReturnType<SpreadsheetStore['getState']>;
 export type RibbonFormatMutator = (
@@ -91,6 +92,7 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   pivotFieldListView: (i) => {
     if (!i.openActivePivotFieldList()) i.openWorkbookObjects();
   },
+  sparklineAxisDialog: (i) => void openSparklineAxisDialog(i),
 };
 
 /** Dialog openers whose ribbon button is a primary-action split button. The

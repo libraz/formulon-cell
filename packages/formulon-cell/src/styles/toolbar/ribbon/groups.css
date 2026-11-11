@@ -140,7 +140,8 @@
     max-height: 76px;
   }
 
-  .fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) {
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked),
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--large {
     grid-row: 1 / span 3;
   }
 

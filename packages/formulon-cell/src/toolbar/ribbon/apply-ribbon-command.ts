@@ -91,7 +91,7 @@ import {
   RIBBON_ZOOM_PRESETS,
   type RibbonFormatMutator,
 } from './command-tables.js';
-import { openMacSlicerDialog } from './mac/actions.js';
+import { openMacSlicerDialog, openSparklineGroupEditor } from './mac/actions.js';
 import { dispatchMacRibbonCommand } from './mac/dispatch.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
 
@@ -508,6 +508,10 @@ const applyGenericRibbonCommand = (
       runtime.focusSheet();
       return true;
     }
+    // The face of Edit Data edits the group's location and data; its arrow opens the menu.
+    case 'sparklineEditData':
+      openSparklineGroupEditor(i);
+      return true;
     case 'sparklineGroup':
     case 'sparklineUngroup':
     case 'sparklineClear':

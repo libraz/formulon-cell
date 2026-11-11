@@ -5,7 +5,7 @@
 // main dropdown. The line-color submenu hosts a shared color palette; picks
 // update the playground-owned `selectedBorderColor` via `onPickColor`.
 
-import { createColorPalette } from '../../../components/color-palette.js';
+import { createColorPalette, pickNativeColor } from '../../../components/color-palette.js';
 import { projectDisabledState } from '../../menu-a11y.js';
 import type { ToolbarText } from '../../ribbon-model.js';
 
@@ -113,18 +113,7 @@ const createLineColorSubmenu = (label: string, deps: BordersMenuDeps): HTMLDivEl
     automatic: { label: deps.ribbonText.automatic, color: '#000000' },
     moreColorsLabel: deps.ribbonText.moreColors,
     onPick: (color) => deps.onPickColor(color),
-    onMoreColors: () => {
-      const picker = document.createElement('input');
-      picker.type = 'color';
-      picker.value = deps.getBorderColor();
-      picker.style.cssText = 'position:fixed;left:-9999px;opacity:0';
-      picker.addEventListener('change', () => {
-        deps.onPickColor(picker.value);
-        picker.remove();
-      });
-      document.body.appendChild(picker);
-      picker.click();
-    },
+    onMoreColors: () => pickNativeColor(deps.getBorderColor(), deps.onPickColor),
   });
   submenu.appendChild(palette.el);
   return submenu;

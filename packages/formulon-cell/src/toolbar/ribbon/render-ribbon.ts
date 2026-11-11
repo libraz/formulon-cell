@@ -39,7 +39,11 @@ import { createMacRibbonMenuFactory, type MacRibbonMenuFactory } from './mac/men
 import type { MenuVariant } from './menus/mac-variants.js';
 import { createPivotStyleGallery } from './pivot-style-gallery.js';
 import { createSparklineStyleGallery } from './sparkline-style-gallery.js';
-import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
+import {
+  SPARKLINE_COMMANDS,
+  SPARKLINE_MIXED_LAYOUT_GROUP_VARIANTS,
+  SPARKLINE_STACKED_LAYOUT_GROUP_VARIANTS,
+} from './sparkline-tabs.js';
 import { createPivotReadout, createTableNameInput } from './table-design.js';
 import { createTableStyleGallery } from './table-style-gallery.js';
 
@@ -243,12 +247,14 @@ export const LEGACY_COMMAND_IDS: Record<string, string> = {
 export const SPLIT_BUTTON_COMMANDS = RIBBON_SPLIT_BUTTON_COMMANDS;
 
 const TILE_LAYOUT_GROUP_VARIANTS = new Set(['tiles', ...HOME_TILE_LAYOUT_GROUP_VARIANTS]);
-const STACKED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set(
-  HOME_STACKED_LAYOUT_GROUP_VARIANTS,
-);
+const STACKED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set([
+  ...HOME_STACKED_LAYOUT_GROUP_VARIANTS,
+  ...SPARKLINE_STACKED_LAYOUT_GROUP_VARIANTS,
+]);
 const MIXED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set([
   ...HOME_MIXED_LAYOUT_GROUP_VARIANTS,
   ...DATA_MIXED_LAYOUT_GROUP_VARIANTS,
+  ...SPARKLINE_MIXED_LAYOUT_GROUP_VARIANTS,
 ]);
 
 const createRibbonTabButton = (

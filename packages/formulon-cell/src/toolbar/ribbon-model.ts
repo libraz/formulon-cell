@@ -939,7 +939,7 @@ export function buildRibbonModel(
       ]),
       contextual: true,
     },
-    buildSparklineDesignTab(tr),
+    buildSparklineDesignTab(tr, opts.profile),
   ];
   const homeTab = allTabs.find((candidate) => candidate.id === 'home');
   if (!homeTab) return [];

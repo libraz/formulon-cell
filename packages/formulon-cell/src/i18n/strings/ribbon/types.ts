@@ -388,6 +388,11 @@ export interface RibbonStrings {
       editGroup: string;
       editSingle: string;
       hiddenEmpty: string;
+      /** The Hidden & Empty Cells submenu: three ways to show empty cells, then hidden data. */
+      emptyAsGaps: string;
+      emptyAsZero: string;
+      connectPoints: string;
+      showHiddenData: string;
       switchRowCol: string;
       type: string;
       line: string;
@@ -403,6 +408,8 @@ export interface RibbonStrings {
       style: string;
       markerColor: string;
       weight: string;
+      /** The last Weight entry, which asks for a weight in points. */
+      customWeight: string;
       axis: string;
       horizontalAxis: string;
       generalAxis: string;
@@ -415,6 +422,8 @@ export interface RibbonStrings {
       sameAll: string;
       customValue: string;
       group: string;
+      /** The Group button, apart from the title of the group it sits in. */
+      groupButton: string;
       ungroup: string;
       clear: string;
       clearSelected: string;

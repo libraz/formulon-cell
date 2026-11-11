@@ -331,7 +331,10 @@ describe('toolbar/ribbon shared data', () => {
   });
 
   it('keeps non-rendered activation commands intentional and documented', () => {
-    const renderedCommands = new Set(ribbonSurfaceCommandIds());
+    const renderedCommands = new Set([
+      ...ribbonSurfaceCommandIds(),
+      ...ribbonSurfaceCommandIds({ profile: 'excel365Mac' }),
+    ]);
     const nonRendered = ribbonActivationEntries()
       .map((entry) => entry.command)
       .filter((command) => !renderedCommands.has(command))

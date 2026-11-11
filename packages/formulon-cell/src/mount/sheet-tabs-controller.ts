@@ -13,7 +13,11 @@ import {
   setSheetTabColorAction,
   setSheetVisibilityAction,
 } from '../commands/sheet-actions.js';
-import { createColorPalette, themeColorColumns } from '../components/color-palette.js';
+import {
+  createColorPalette,
+  pickNativeColor,
+  themeColorColumns,
+} from '../components/color-palette.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -533,18 +537,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         theme: themeColorColumns(wb.getTheme?.()?.colors),
         value: tabColor ?? null,
         onPick: (color) => apply(color || null),
-        onMoreColors: () => {
-          const picker = document.createElement('input');
-          picker.type = 'color';
-          picker.value = tabColor ?? '#ffffff';
-          picker.style.cssText = 'position:fixed;left:-9999px;opacity:0';
-          picker.addEventListener('change', () => {
-            picker.remove();
-            apply(picker.value);
-          });
-          document.body.appendChild(picker);
-          picker.click();
-        },
+        onMoreColors: () => pickNativeColor(tabColor ?? '#ffffff', apply),
       });
       sub.appendChild(palette.el);
       sheetMenu.appendChild(sub);

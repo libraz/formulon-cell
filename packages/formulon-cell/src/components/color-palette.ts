@@ -223,6 +223,21 @@ function createColorWheelIcon(): HTMLSpanElement {
  * Keyboard model: a single roving-tabindex grid spans the theme rows and the
  * standard row (both 10 wide), so arrow keys flow seamlessly between the two.
  */
+/** Open the system colour picker on `initial` and call `onPick` with the colour chosen: the
+ *  "More Colors…" row of a palette. */
+export function pickNativeColor(initial: string, onPick: (color: string) => void): void {
+  const picker = document.createElement('input');
+  picker.type = 'color';
+  picker.value = initial;
+  picker.style.cssText = 'position:fixed;left:-9999px;opacity:0';
+  picker.addEventListener('change', () => {
+    picker.remove();
+    onPick(picker.value);
+  });
+  document.body.appendChild(picker);
+  picker.click();
+}
+
 export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHandle {
   const root = document.createElement('div');
   root.className = 'fc-colorpalette';
