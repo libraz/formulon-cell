@@ -193,6 +193,7 @@ export const macZh: MacStrings = {
     delete: '删除…',
     clear: '清除',
     newComment: '新建批注',
+    newNote: '新建便笺',
     editNote: '编辑备注',
     deleteNote: '删除备注',
     formatCells: '设置单元格格式…',

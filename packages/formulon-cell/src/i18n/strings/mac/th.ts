@@ -193,6 +193,7 @@ export const macTh: MacStrings = {
     delete: 'ลบ…',
     clear: 'ล้าง',
     newComment: 'ข้อคิดเห็นใหม่',
+    newNote: 'บันทึกย่อใหม่',
     editNote: 'แก้ไขบันทึกย่อ',
     deleteNote: 'ลบบันทึกย่อ',
     formatCells: 'จัดรูปแบบเซลล์…',

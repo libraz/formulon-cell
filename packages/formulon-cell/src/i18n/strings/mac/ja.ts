@@ -192,6 +192,7 @@ export const macJa: MacStrings = {
     delete: '削除...',
     clear: '数式と値のクリア',
     newComment: '新しいコメント',
+    newNote: '新しいメモ',
     editNote: 'メモの編集',
     deleteNote: 'メモの削除',
     formatCells: 'セルの書式設定...',

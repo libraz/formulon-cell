@@ -830,9 +830,9 @@ function macPasteSpecialSubmenu(s: Strings): MenuEntry {
   };
 }
 
-/** Cell menu in the Mac desktop order and groups. A note cell adds its note rows beside New
- *  Comment. Thesaurus and the macOS service rows are left out: a dictionary service and system
- *  entries, not spreadsheet commands. */
+/** Cell menu in the Mac desktop order and groups. New Note sits beside New Comment, and a note
+ *  cell shows its note rows there instead. Thesaurus and the macOS service rows are left out: a
+ *  dictionary service and system entries, not spreadsheet commands. */
 export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
   const t = s.contextMenu;
   const m = s.mac.contextMenu;
@@ -851,14 +851,14 @@ export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
     sortSubmenu(s),
     { kind: 'sep', id: 'sep3' },
     { kind: 'item', id: 'newComment', label: m.newComment },
-    // A note cell adds its note items to the comment group.
+    // A note cell swaps New Note for its note items.
     ...(hasNote
       ? ([
           { kind: 'item', id: 'insertComment', label: m.editNote },
           { kind: 'item', id: 'deleteComment', label: m.deleteNote },
           { kind: 'item', id: 'showHideNote', label: t.showHideNote },
         ] as const)
-      : []),
+      : ([{ kind: 'item', id: 'insertComment', label: m.newNote }] as const)),
     { kind: 'sep', id: 'sep4' },
     { kind: 'item', id: 'formatCells', label: m.formatCells, hint: '⌘1' },
     { kind: 'item', id: 'pickFromList', label: m.pickFromList },

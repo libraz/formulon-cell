@@ -107,6 +107,7 @@ describe('context menu on the Mac platform profile', () => {
       'フィルター',
       '並べ替え',
       '新しいコメント',
+      '新しいメモ',
       'セルの書式設定...',
       'ドロップダウン リストから選択...',
       'ふりがなの表示',
@@ -116,7 +117,7 @@ describe('context menu on the Mac platform profile', () => {
     ]);
   });
 
-  it('groups the cell menu as the desktop does, with the note items beside New Comment', () => {
+  it('groups the cell menu as the desktop does, with New Note or the note items beside New Comment', () => {
     const groups = (): string[][] => {
       const out: string[][] = [[]];
       for (const node of visibleMenu()?.children ?? []) {
@@ -132,7 +133,7 @@ describe('context menu on the Mac platform profile', () => {
       ['カット', 'コピー', 'ペースト', '形式を選択してペースト'],
       ['挿入...', '削除...', '数式と値のクリア'],
       ['フィルター', '並べ替え'],
-      ['新しいコメント'],
+      ['新しいコメント', '新しいメモ'],
       ['セルの書式設定...', 'ドロップダウン リストから選択...', 'ふりがなの表示', '名前の定義...'],
       ['ハイパーリンク...', 'ハイパーリンクを開く'],
     ]);
@@ -173,6 +174,7 @@ describe('context menu on the Mac platform profile', () => {
       'フィルター',
       '並べ替え',
       '新しいコメント',
+      '新しいメモ',
       'セルの書式設定...',
       'ドロップダウン リストから選択...',
       'ふりがなの表示',
@@ -260,6 +262,7 @@ describe('context menu on the Mac platform profile', () => {
     fireContextMenu(host, 200, 70);
     expect(label('clear')).toBe('Clear Contents');
     expect(label('insertHyperlink')).toBe('Hyperlink…');
+    expect(label('insertComment')).toBe('New Note');
     detach?.();
     disposeOverlayPortal(host);
     attach(zh);

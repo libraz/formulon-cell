@@ -194,6 +194,7 @@ export const macEn: MacStrings = {
     delete: 'Delete…',
     clear: 'Clear Contents',
     newComment: 'New Comment',
+    newNote: 'New Note',
     editNote: 'Edit Note',
     deleteNote: 'Delete Note',
     formatCells: 'Format Cells…',

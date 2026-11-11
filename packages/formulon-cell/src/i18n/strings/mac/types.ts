@@ -262,6 +262,7 @@ export interface MacStrings {
     delete: string;
     clear: string;
     newComment: string;
+    newNote: string;
     editNote: string;
     deleteNote: string;
     formatCells: string;

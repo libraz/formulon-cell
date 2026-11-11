@@ -194,6 +194,7 @@ export const macKo: MacStrings = {
     delete: '삭제…',
     clear: '지우기',
     newComment: '새 댓글',
+    newNote: '새 노트',
     editNote: '노트 편집',
     deleteNote: '노트 삭제',
     formatCells: '셀 서식…',
