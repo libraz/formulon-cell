@@ -15,7 +15,8 @@ const runSpelling = async (sheet: UserJourneyPage, page: Page) => {
 
 /** Spelling checks the whole sheet when one cell is selected and only the selection when a range
  *  is selected, as desktop Excel does. 'teh teh' flags "teh" as not in the dictionary, then the
- *  second "teh" as a repeated word, and the dialog closes silently after the last one. */
+ *  second "teh" as a repeated word, and the dialog closes silently after the last one. Deleting
+ *  a repeated word leaves the spaces around it. */
 export async function runSpellingScopeScenario(page: Page): Promise<void> {
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ fixture: 'empty', locale: 'en' });
@@ -43,10 +44,15 @@ export async function runSpellingScopeScenario(page: Page): Promise<void> {
   await expect(dialog).toContainText('Not in Dictionary:');
   await expect(word).toHaveValue('teh');
   await dialog.getByRole('button', { name: 'Ignore Once', exact: true }).click();
-  await expect(dialog).toContainText('Repeated Word');
+  await expect(dialog).toContainText('Repeated Word:');
   await expect(word).toHaveValue('teh');
   await expect(dialog.locator('#fc-spelling-change-to')).toHaveValue('');
-  await dialog.getByRole('button', { name: 'Ignore Once', exact: true }).click();
+  // A repeated word is deleted rather than changed, and never everywhere at once.
+  await expect(dialog.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Delete All', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: 'Undo Last', exact: true })).toBeEnabled();
+  // Return presses Ignore Once, the default button.
+  await page.keyboard.press('Enter');
   await expect(dialog).toBeHidden();
   // The checked range stays selected.
   expect(
@@ -60,5 +66,15 @@ export async function runSpellingScopeScenario(page: Page): Promise<void> {
     ),
   ).toEqual([[0, 0, 1, 1]]);
   expect(await sheet.readValue('A1')).toEqual({ kind: 'text', value: 'teh teh' });
+
+  // Delete removes only the repeated word; the spaces on both sides stay.
+  await sheet.seed({ A1: 'the the cat' });
+  await sheet.goTo('A1:B2');
+  await runSpelling(sheet, page);
+  await expect(dialog).toContainText('Repeated Word:');
+  await expect(word).toHaveValue('the');
+  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(await sheet.readValue('A1')).toEqual({ kind: 'text', value: 'the  cat' });
   await sheet.expectNoConsoleErrors();
 }
