@@ -183,7 +183,9 @@ export const editDialogsFr: EditDialogsStrings = {
   },
   protection: {
     protectedCellEdit:
-      'La cellule ou le graphique que vous essayez de modifier se trouve sur une feuille protégée. Pour effectuer une modification, ôtez la protection de la feuille. Vous devrez peut-être entrer un mot de passe.',
+      'La cellule ou le graphique que vous essayez de modifier se trouve sur une feuille protégée. Pour apporter une modification à celui-ci, vous devez ôter la protection de la feuille. Vous serez peut-être invité à entrer un mot de passe.',
+    filterRefused:
+      'Désolé... Vous ne pouvez pas utiliser de filtres sur cette feuille protégée. Pour enlever la protection, cliquez sur Ôter la protection de la feuille sous l’onglet Révision.',
     tabProtection: 'Protection',
     locked: 'Verrouillé',
     hiddenFormula: 'Masqué',

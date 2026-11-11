@@ -9,7 +9,7 @@ import {
   recordThreadedChange,
   removeThreadedComment,
 } from '../../../commands/comment.js';
-import { commentWrite } from '../../../commands/comment-actions.js';
+import { threadWrite } from '../../../commands/comment-actions.js';
 import { selectNextFormulaError } from '../../../commands/error-indicators.js';
 import { interactionControllerFor } from '../../../commands/interaction-controller.js';
 import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../commands/page-setup.js';
@@ -506,7 +506,7 @@ export function dispatchMacRibbonCommand(
           origin: 'ribbon',
           commandId: id,
         } as const;
-        return commentWrite(ctx, roots.length > 0 ? [active] : [], undefined, () =>
+        return threadWrite(ctx, roots.length > 0 ? [active] : [], undefined, () =>
           recordThreadedChange(
             instance.history,
             instance.store,

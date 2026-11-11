@@ -70,6 +70,7 @@ import { createPivotMenuFactories } from '../toolbar/ribbon/menus/pivot.js';
 import { createReviewMenuFactories } from '../toolbar/ribbon/menus/review.js';
 import { createShapeFormatMenuFactories } from '../toolbar/ribbon/menus/shape-format.js';
 import { createStylesMenuFactories } from '../toolbar/ribbon/menus/styles.js';
+import { createTableMenuFactories } from '../toolbar/ribbon/menus/table.js';
 import { createTextOrientationMenu } from '../toolbar/ribbon/menus/text-orientation.js';
 import type { RibbonMenus, RibbonRenderHelpers } from '../toolbar/ribbon/render-ribbon.js';
 import { createSelectColorRibbon } from '../toolbar/ribbon/select-color.js';
@@ -183,6 +184,10 @@ export function createDefaultRibbonMenus(
     viewToolbar: dictionaries[lang].viewToolbar,
   });
   const pivotFactories = createPivotMenuFactories({ ribbonMenuText });
+  const tableFactories = createTableMenuFactories(
+    lang,
+    dictionaries[lang].contextMenu.pivotRefresh,
+  );
   const styleFactories = createStylesMenuFactories({
     ribbonLang: lang,
     ribbonMenuText,
@@ -278,6 +283,7 @@ export function createDefaultRibbonMenus(
 
     // PivotTable Design and Analyze tabs
     pivotLayout: pivotFactories.createPivotLayoutMenu,
+    tableRefresh: tableFactories.createTableRefreshMenu,
   };
 }
 

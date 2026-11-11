@@ -2,8 +2,10 @@ import { cellShiftChoices } from '../commands/built-in-command-policy.js';
 import type { History } from '../commands/history.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import {
+  deleteCellsAction,
   deleteColumnsAction,
   deleteRowsAction,
+  insertCellsAction,
   insertColumnsAction,
   insertRowsAction,
   insertTableColumnsAction,
@@ -18,8 +20,10 @@ import {
   showCols,
   showRows,
 } from '../commands/row-col-layout.js';
+import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { openCellShiftDialog, runCellShiftChoice } from './cell-shift-dialog.js';
 import type { ItemId } from './context-menu-spec.js';
@@ -34,6 +38,17 @@ export interface ContextMenuStructureContext {
   /** Forwards to the host's `onAfterCommit`, looked up at call time. */
   readonly afterCommit: () => void;
 }
+
+const wholeLines = (range: Range): boolean => {
+  const r = {
+    sheet: range.sheet,
+    r0: Math.min(range.r0, range.r1),
+    c0: Math.min(range.c0, range.c1),
+    r1: Math.max(range.r0, range.r1),
+    c1: Math.max(range.c0, range.c1),
+  };
+  return isWholeRowRange(r) || isWholeColumnRange(r);
+};
 
 /** Run a cell-shift or row/column structure item against the selection the
  *  menu captured on activation. Returns false for any other item. */
@@ -54,6 +69,11 @@ export function runContextMenuStructureItem(
   const shift = { store, wb, history, origin: 'contextMenu', commandId: id } as const;
   switch (id) {
     case 'insertCells': {
+      // Whole rows or columns are inserted at once, without the dialog.
+      if (wholeLines(state.selection.range)) {
+        if (insertCellsAction(action, state.selection.range, 'down')) ctx.afterCommit();
+        return true;
+      }
       openCellShiftDialog({
         host,
         strings: ctx.strings(),
@@ -72,6 +92,10 @@ export function runContextMenuStructureItem(
       return true;
     }
     case 'deleteCells': {
+      if (wholeLines(state.selection.range)) {
+        if (deleteCellsAction(action, state.selection.range, 'up')) ctx.afterCommit();
+        return true;
+      }
       openCellShiftDialog({
         host,
         strings: ctx.strings(),

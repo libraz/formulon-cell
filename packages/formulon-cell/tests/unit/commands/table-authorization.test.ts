@@ -3,6 +3,7 @@ import {
   builtInCommandIntent,
   canExecuteBuiltIn,
 } from '../../../src/commands/built-in-command-policy.js';
+import { updateTableOverlay } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
 import {
   InteractionController,
@@ -96,7 +97,7 @@ describe('table writes under the interaction policy', () => {
     ['without a policy', undefined],
     ['under an allow-all policy', allowAll],
   ] as const satisfies readonly (readonly [string, InteractionPolicy | undefined])[]) {
-    it(`refuses every table change on a protected sheet but banding, whatever the lock, ${label}`, async () => {
+    it(`refuses every table change on a protected sheet, the style toggles included, ${label}`, async () => {
       const { store, history, controller, table, ctx, toggle } = await setup();
       controller.setPolicy(policy);
       mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 });
@@ -109,7 +110,9 @@ describe('table writes under the interaction policy', () => {
       for (const id of REFUSED_ON_PROTECTED)
         expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(false);
       for (const id of STYLE_TOGGLES)
-        expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(true);
+        expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(false);
+      // Refresh All runs data connections, not a table change: it stays available.
+      expect(canExecuteBuiltIn(store, 'tableRefresh', 'ribbon').allowed).toBe(true);
 
       expect(toggle('tableTotalRow', 'showTotal')).toBe('none');
       expect(table()?.showTotal).toBe(false);
@@ -128,20 +131,14 @@ describe('table writes under the interaction policy', () => {
       ).toBe(false);
       expect(table()?.range).toEqual(TABLE);
 
-      // The style toggles go through on locked cells too.
-      for (let row = 0; row <= 3; row += 1)
-        for (let col = 0; col <= 1; col += 1)
-          mutators.setCellFormat(store, { sheet: 0, row, col }, { locked: true });
-      expect(toggle('tableBandedRows', 'banded')).toBe('toggled');
-      expect(table()?.banded).toBe(false);
-      expect(toggle('tableBandedColumns', 'colStripes')).toBe('toggled');
-      expect(table()?.colStripes).toBe(true);
-      expect(toggle('tableFirstColumn', 'firstCol')).toBe('toggled');
-      expect(table()?.firstCol).toBe(true);
-      expect(toggle('tableLastColumn', 'lastCol')).toBe('toggled');
-      expect(table()?.lastCol).toBe(true);
-      expect(history.undo()).toBe(true);
-      expect(table()?.lastCol).not.toBe(true);
+      // The style toggles are refused from the UI, unlocked cells or not.
+      expect(toggle('tableBandedRows', 'banded')).toBe('none');
+      expect(table()?.banded).toBe(true);
+      expect(toggle('tableFirstColumn', 'firstCol')).toBe('none');
+      expect(table()?.firstCol).not.toBe(true);
+      expect(history.canUndo()).toBe(false);
+      // The data API still changes the banding.
+      expect(updateTableOverlay(store, table()?.id ?? '', { banded: false })?.banded).toBe(false);
     });
 
     it(`edits the total cell's function on a protected sheet only when that cell is unlocked ${label}`, async () => {

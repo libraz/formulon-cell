@@ -78,17 +78,25 @@ describe('note and comment writes under the interaction policy', () => {
     ['without a policy', undefined],
     ['under an allow-all policy', allowAll],
   ] as const satisfies readonly (readonly [string, InteractionPolicy | undefined])[]) {
-    it(`decides notes on a protected sheet by each cell's lock ${label}`, async () => {
+    it(`decides notes on a protected sheet by Edit objects, not the cell's lock ${label}`, async () => {
       const { workbook, store, history, controller, del } = await setup();
       controller.setPolicy(policy);
       setCellLocked(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, false);
       setProtectedSheet(store, 0, true);
+      // Without Edit objects no note changes, the unlocked cell's included; no alert either.
       del('delete-active');
       expect(commentAt(store.getState(), A1)).toBe('first');
-      // Clear Comments clears the unlocked cell's note and keeps the locked one's.
+      expect(setComment(store, B1, 'edited', workbook)).toBe(false);
+      expect(setComment(store, { sheet: 0, row: 5, col: 5 }, 'new', workbook)).toBe(false);
       mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
       executeRibbonClearAction({ store, workbook, history, action: 'comments' });
       expect(commentAt(store.getState(), A1)).toBe('first');
+      expect(commentAt(store.getState(), B1)).toBe('second');
+      // With Edit objects every note changes, the locked cell's included.
+      setProtectedSheet(store, 0, true, { permissions: { objects: true } });
+      expect(setComment(store, A1, 'edited', workbook)).toBe(true);
+      executeRibbonClearAction({ store, workbook, history, action: 'comments' });
+      expect(commentAt(store.getState(), A1)).toBeNull();
       expect(commentAt(store.getState(), B1)).toBeNull();
     });
   }

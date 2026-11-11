@@ -148,6 +148,8 @@ describe('toolbar/ribbon menu primitives', () => {
       updateWatchMenu: vi.fn(),
       applyPivotLayoutAction: vi.fn(),
       updatePivotLayoutMenu: vi.fn(),
+      applyTableRefreshAction: vi.fn(),
+      updateTableRefreshMenu: vi.fn(),
       closeBorderMenu: vi.fn(),
       closeFreezeMenu: vi.fn(),
       closePrintAreaMenu: vi.fn(),

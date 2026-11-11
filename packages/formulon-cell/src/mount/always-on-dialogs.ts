@@ -2,6 +2,7 @@
 // `MountOptions.features`. Dialogs without a `setStrings` hook are rebuilt on
 // locale change so their captured strings stay fresh.
 
+import { filterUseAllowed } from '../commands/filter-actions.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
 import type { InteractionOperation } from '../commands/interaction-policy.js';
@@ -123,6 +124,8 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
     if (!deps.permits('filter')) return;
     const detail = (e as CustomEvent<OpenFilterDetail>).detail;
     if (!detail) return;
+    if (!filterUseAllowed({ store, origin: 'editor', commandId: 'filterDropdown' }, detail.range))
+      return;
     // The dropdown is positioned with `position: fixed`, so it expects
     // viewport-relative coords. The pointer payload's `x/y` are host-relative;
     // use `clientX/clientY` instead. `- 4` matches the chevron offset.
@@ -176,6 +179,8 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
         Math.max(col ?? s.selection.active.col, targetRange.c0),
         targetRange.c1,
       );
+      const entry = { store, origin: 'instanceApi', commandId: 'filterDropdown' } as const;
+      if (!filterUseAllowed(entry, targetRange)) return;
       const hostRect = host.getBoundingClientRect();
       // The chevron hangs off the header cell's trailing edge, which the
       // mirror puts on the left of the cell for a right-to-left sheet.

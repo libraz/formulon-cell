@@ -73,6 +73,8 @@ export interface DynamicDropdownsCtx {
   updateWatchMenu: (menu: HTMLElement) => void;
   /** Optional so hosts built before it keep working; the menu then stays as built. */
   updatePivotLayoutMenu?: (menu: HTMLElement) => void;
+  /** Grey the Table Design Refresh menu's commands that have nothing to run. */
+  updateTableRefreshMenu?: (menu: HTMLElement) => void;
   // Sibling menu controllers that must close when a dynamic dropdown opens.
   closeBorderMenu: (restoreFocus?: boolean) => void;
   closeFreezeMenu: (restoreFocus?: boolean) => void;
@@ -142,6 +144,8 @@ export interface DynamicDropdownsCtx {
   /** PivotTable Design / Analyze menu action. Optional so hosts built before it
    *  keep working; the items then do nothing. */
   applyPivotLayoutAction?: (action: string) => void;
+  /** Run a Table Design Refresh menu command. */
+  applyTableRefreshAction?: (action: string) => void;
   createTableFromSelection: (
     style?: string,
     color?: string,
@@ -224,6 +228,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'script-action',
   'pdf-action',
   'pivot-layout',
+  'table-refresh',
   'table-style',
   'table-style-footer',
   'pivot-table-style',
@@ -342,6 +347,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-review-new-comment': 'updateReviewCommentsMenu',
   'menu-sort': 'updateSortMenu',
   'menu-sort-home': 'updateSortMenu',
+  'menu-table-refresh': 'updateTableRefreshMenu',
   'menu-table-style-home': 'updateTableStylesMenu',
   'menu-text-orientation': 'updateTextOrientationMenu',
   'menu-watch-formulas': 'updateWatchMenu',
@@ -741,6 +747,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'script-action', handler: (v) => ctx.applyScriptAction(v) },
     { attr: 'pdf-action', handler: (v) => ctx.applyPdfAction(v) },
     { attr: 'pivot-layout', handler: (v) => ctx.applyPivotLayoutAction?.(v) },
+    { attr: 'table-refresh', handler: (v) => ctx.applyTableRefreshAction?.(v) },
     {
       attr: 'table-style',
       handler: (v, { button }) => {

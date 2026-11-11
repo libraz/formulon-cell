@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import {

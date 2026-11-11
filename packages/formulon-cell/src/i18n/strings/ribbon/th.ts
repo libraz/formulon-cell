@@ -132,6 +132,7 @@ export const ribbonTh: RibbonStrings = {
     tableProperties: 'คุณสมบัติ',
     tableName: 'ชื่อตาราง',
     tableStyleOptions: 'ตัวเลือกลักษณะตาราง',
+    externalTableData: 'ข้อมูลตารางภายนอก',
     headerRow: 'แถวส่วนหัว',
     totalRow: 'แถวผลรวม',
     bandedRows: 'แถวแบบมีแถบสี',

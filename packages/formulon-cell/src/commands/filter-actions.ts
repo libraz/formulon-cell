@@ -1,7 +1,11 @@
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
+import {
+  type AuthorizedIntentFactory,
+  authorizedWrite,
+  authorizeWrite,
+} from './authorized-write.js';
 import { recordFilterChange } from './filter.js';
 import { History } from './history.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
@@ -49,6 +53,15 @@ export function filterUseWrite<T>(
 ): T {
   return run(ctx, filterIntents(ctx.commandId, [{ kind: 'range', range }]), refused, write);
 }
+
+/** Whether `ctx` may use the filter on `range`, checked before its dropdown opens: on a protected
+ *  sheet without Use AutoFilter the button does nothing. */
+export const filterUseAllowed = (
+  ctx: Pick<FilterActionContext, 'store' | 'origin' | 'commandId'>,
+  range: Range,
+): boolean =>
+  authorizeWrite(ctx.store, filterIntents(ctx.commandId, [{ kind: 'range', range }]), ctx.origin)
+    .allowed;
 
 /**
  * Turn AutoFilter on or off on `sheet`. Decided for the sheet as a whole: no

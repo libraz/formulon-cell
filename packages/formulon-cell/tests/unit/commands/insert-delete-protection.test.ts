@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   builtInProtectionDecision,
   canExecuteBuiltIn,
-  cellShiftChoices,
 } from '../../../src/commands/built-in-command-policy.js';
 import type { InteractionPolicy } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
@@ -59,7 +58,7 @@ describe('row and column insert and delete on a protected sheet', () => {
     expect(document.querySelector('.fc-cellshift')).toBeNull();
   });
 
-  it('with Insert rows only, offers Rows; the Home Cells item stays off, the context menu dialog offers Entire row', async () => {
+  it('with Insert rows only, offers Rows; a cell selection never opens the Insert dialog', async () => {
     const { instance, ctx, value } = await setup();
     setProtectedSheet(instance.store, 0, true, { permissions: { insertRows: true } });
     const menu = menuOf('cellInsert', ['cells', 'rows', 'cols']);
@@ -69,13 +68,12 @@ describe('row and column insert and delete on a protected sheet', () => {
     expect(enabled(menu, 'cellInsert')).toEqual(['rows']);
     ctx.applyCellInsertAction('cells');
     expect(document.querySelector('.fc-cellshift')).toBeNull();
-    // The context menu's Insert… opens the dialog for its Entire row choice.
+    // The context menu's Insert… is greyed too: a protected sheet never opens the dialog.
+    expect(canExecuteBuiltIn(instance.store, 'insertCells', 'contextMenu').allowed).toBe(false);
+    // Over whole rows it inserts them at once by their option.
+    mutators.setRange(instance.store, ROW);
     expect(canExecuteBuiltIn(instance.store, 'insertCells', 'contextMenu').allowed).toBe(true);
-    expect(cellShiftChoices(instance.store, 'insert', 'contextMenu')).toEqual({
-      shift: false,
-      rows: true,
-      cols: false,
-    });
+    mutators.setRange(instance.store, CELL);
     ctx.applyCellInsertAction('cols');
     expect(value(1)).toEqual({ kind: 'number', value: 2 });
 
@@ -124,8 +122,10 @@ describe('row and column insert and delete on a protected sheet', () => {
     mutators.setRange(store, CELL);
     for (const id of ['insertTableRows', 'insertTableColumns'])
       expect(builtInProtectionDecision(store, id).allowed, id).toBe(false);
-    // Insert… / Delete… stay available for their Entire row / Entire column choices.
-    for (const id of ['insertCells', 'deleteCells', 'rowInsertAbove', 'rowDelete', 'colInsertLeft'])
+    // Over part of the rows Insert… / Delete… are greyed; the whole-line commands follow their options.
+    for (const id of ['insertCells', 'deleteCells'])
+      expect(builtInProtectionDecision(store, id).allowed, id).toBe(false);
+    for (const id of ['rowInsertAbove', 'rowDelete', 'colInsertLeft'])
       expect(builtInProtectionDecision(store, id).allowed, id).toBe(true);
     setProtectedSheet(store, 0, true);
     for (const id of ['insertCells', 'deleteCells', 'insertTableRows', 'rowInsertAbove'])

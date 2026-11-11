@@ -133,6 +133,7 @@ export const ribbonEn: RibbonStrings = {
     tableProperties: 'Properties',
     tableName: 'Table Name',
     tableStyleOptions: 'Table Style Options',
+    externalTableData: 'External Table Data',
     headerRow: 'Header Row',
     totalRow: 'Total Row',
     bandedRows: 'Banded Rows',

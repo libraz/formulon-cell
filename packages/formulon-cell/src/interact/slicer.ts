@@ -10,6 +10,7 @@ import {
   resolveSlicerSpec,
   type SlicerActionContext,
   setSlicerSelectionAction,
+  slicerInteractive,
 } from '../commands/slicers.js';
 import { drawingClipPath, sessionPosition } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -168,7 +169,9 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       entry.body.appendChild(empty);
       return;
     }
-    projectDisabledState(entry.clearBtn, spec.selected.length === 0, null);
+    // An inert slicer greys its Clear with the rest of the panel's controls.
+    const interactive = slicerInteractive(slicerContext('editor', 'slicerClear'), spec);
+    projectDisabledState(entry.clearBtn, spec.selected.length === 0 || !interactive, null);
     const distinct = listSlicerValues(store, wb, spec);
     const selected = new Set(spec.selected);
     const focusChip = (idx: number): void => {

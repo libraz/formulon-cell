@@ -192,6 +192,7 @@ export const MENU_ICON_GLYPHS = {
   'validation-clear-rules': 'dataValidationClearRules',
   'validation-settings': 'dataValidation',
   'watch-add': 'watch',
+  'table-refresh': 'refresh',
   'watch-delete': 'watch',
   'watch-delete-all': 'watch',
   'watch-open': 'watch',

@@ -12,7 +12,8 @@ import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
 import type { History } from './history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
-import { isCellWritable, warnProtected } from './protection.js';
+import { noteChangePermitted, warnProtected } from './protection.js';
+import { asThreadIntent } from './thread-intent.js';
 
 export interface CommentEntry {
   addr: Addr;
@@ -44,17 +45,17 @@ const commentIntentFor = (
   effects: [{ kind: 'cells', cells: [addr] }],
 });
 
+/** Threads ignore sheet protection; a policy decides them as any comment change. */
 const canMutateThreadedCell = (
   store: SpreadsheetStore,
   addr: Addr,
   authorization?: ThreadedMutationAuthorization,
 ): boolean => {
-  if (!isCellWritable(store.getState(), addr)) {
-    warnProtected(addr);
-    return false;
-  }
   const controller = interactionControllerFor(store);
-  return !controller || controller.canExecute(commentIntentFor(addr, authorization)).allowed;
+  return (
+    !controller ||
+    controller.canExecute(asThreadIntent(commentIntentFor(addr, authorization))).allowed
+  );
 };
 
 const cloneThread = (entry: ThreadedCommentEntry): ThreadedCommentEntry => ({
@@ -351,8 +352,8 @@ export function recordThreadedChange<T>(
         applyThreadSnapshot(store, wb, sheet, before, { ...authorization, origin: 'undo' }),
       redo: () =>
         applyThreadSnapshot(store, wb, sheet, after, { ...authorization, origin: 'redo' }),
-      intent: { ...intent, origin: 'redo' },
-      inverseIntent: { ...intent, origin: 'undo' },
+      intent: asThreadIntent({ ...intent, origin: 'redo' }),
+      inverseIntent: asThreadIntent({ ...intent, origin: 'undo' }),
     });
   }
   return result;
@@ -422,7 +423,7 @@ export function setComment(
   wb?: WorkbookHandle,
   authorization?: ThreadedMutationAuthorization,
 ): boolean {
-  if (!isCellWritable(store.getState(), addr)) {
+  if (!noteChangePermitted(store.getState(), addr)) {
     warnProtected(addr);
     return false;
   }
@@ -461,7 +462,7 @@ export function clearComment(
   wb?: WorkbookHandle,
   authorization?: ThreadedMutationAuthorization,
 ): void {
-  if (!isCellWritable(store.getState(), addr)) {
+  if (!noteChangePermitted(store.getState(), addr)) {
     warnProtected(addr);
     return;
   }
@@ -627,7 +628,7 @@ export function clearComments(
   const tracked = uniqueAddrs(addrs);
   const state = store.getState();
   const writable = tracked.filter(
-    (addr) => isCellWritable(state, addr) && commentAt(state, addr) !== null,
+    (addr) => noteChangePermitted(state, addr) && commentAt(state, addr) !== null,
   );
   if (writable.length === 0) return;
   applyCommentSnapshot(

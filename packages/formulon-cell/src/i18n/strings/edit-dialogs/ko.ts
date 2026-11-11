@@ -181,7 +181,9 @@ export const editDialogsKo: EditDialogsStrings = {
   },
   protection: {
     protectedCellEdit:
-      '변경하려는 셀 또는 차트가 보호된 시트에 있습니다. 변경하려면 시트 보호를 해제하세요. 암호를 입력해야 할 수도 있습니다.',
+      '변경하려는 셀 또는 차트가 보호된 시트에 있습니다. 변경하려면 시트의 보호를 해제하세요. 암호를 입력해야 할 수도 있습니다.',
+    filterRefused:
+      '이 보호된 시트에서 필터를 사용할 수 없습니다. 보호를 해제하려면 [검토] 탭의 [시트 보호 해제] 단추를 클릭하세요.',
     tabProtection: '보호',
     locked: '잠김',
     hiddenFormula: '숨김',

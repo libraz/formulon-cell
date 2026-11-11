@@ -10,10 +10,9 @@ import {
   setComment,
   threadedCommentsAt,
 } from '../commands/comment.js';
-import { commentWrite } from '../commands/comment-actions.js';
+import { commentWrite, threadWrite } from '../commands/comment-actions.js';
 import { DEFAULT_COMMENT_AUTHOR } from '../commands/comment-author.js';
 import type { History } from '../commands/history.js';
-import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { formatA1Cell } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -296,7 +295,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     const hasNote = commentAt(state, addr) !== null;
     let result: ReturnType<typeof addThreadedComment> | boolean;
     try {
-      result = commentWrite(commentContext(), [addr], false, () =>
+      result = threadWrite(commentContext(), [addr], false, () =>
         recordThreadedChange(
           history,
           store,
@@ -336,21 +335,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     return true;
   };
 
-  /** Unlock a password-guarded range under the note's cell first; the handler then repeats. */
-  const deferForUnlock = (repeat: () => void): boolean => {
-    const { active } = store.getState().selection;
-    const cell = {
-      sheet: active.sheet,
-      r0: active.row,
-      c0: active.col,
-      r1: active.row,
-      c1: active.col,
-    };
-    return deferForAllowedRangeUnlock(store, [cell], repeat);
-  };
-
   const onOk = (): void => {
-    if (deferForUnlock(onOk)) return;
     if (threadedMode) {
       if (!writeThread()) return;
     } else if (!writeComment(textarea.value)) return;
@@ -358,14 +343,13 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   };
 
   const onRemove = (): void => {
-    if (deferForUnlock(onRemove)) return;
     if (threadedMode) {
       const state = store.getState();
       const addr = state.selection.active;
       const wb = getWb() ?? undefined;
       const opening = threadedCommentsAt(store, addr, wb)[0];
       if (opening && wb) {
-        const removed = commentWrite(commentContext(), [addr], false, () =>
+        const removed = threadWrite(commentContext(), [addr], false, () =>
           recordThreadedChange(
             history,
             store,
@@ -403,13 +387,12 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   const onResolve = (): void => {
     if (!threadedMode) return;
-    if (deferForUnlock(onResolve)) return;
     const state = store.getState();
     const addr = state.selection.active;
     const wb = getWb() ?? undefined;
     const opening = threadedCommentsAt(store, addr, wb)[0];
     if (opening && wb) {
-      const resolved = commentWrite(commentContext(), [addr], false, () =>
+      const resolved = threadWrite(commentContext(), [addr], false, () =>
         recordThreadedChange(
           history,
           store,

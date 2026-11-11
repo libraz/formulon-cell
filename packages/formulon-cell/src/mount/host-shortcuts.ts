@@ -303,7 +303,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       e.preventDefault();
       const kind = insertCellsShortcut ? 'insert' : 'delete';
       // Decided as Insert (Delete) Cells: whole rows or columns act at once by their option; any
-      // other selection opens the dialog while one of its choices is allowed.
+      // other selection opens the dialog, which a protected sheet refuses.
       const commandId = kind === 'insert' ? 'insertCells' : 'deleteCells';
       if (!canExecuteBuiltIn(input.store, commandId, 'keyboard').allowed) return;
       const cellShiftEntry = () =>

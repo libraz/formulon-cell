@@ -183,7 +183,9 @@ export const editDialogsDe: EditDialogsStrings = {
   },
   protection: {
     protectedCellEdit:
-      'Die Zelle oder das Diagramm, die bzw. das Sie ändern möchten, befindet sich auf einem geschützten Blatt. Um eine Änderung vorzunehmen, heben Sie den Blattschutz auf. Möglicherweise werden Sie zur Eingabe eines Kennworts aufgefordert.',
+      'Die Zelle oder das Diagramm, die bzw. das Sie ändern möchten, befindet sich auf einem schreibgeschützten Blatt. Um eine Änderung vorzunehmen, heben Sie den Schutz des Blatts auf. Möglicherweise werden Sie aufgefordert, ein Kennwort einzugeben.',
+    filterRefused:
+      'Sie können auf dieses geschützte Blatt keine Filter anwenden. Klicken Sie auf der Registerkarte "Überprüfen" auf die Schaltfläche "Blattschutz aufheben", um den Schutz aufzuheben.',
     tabProtection: 'Schutz',
     locked: 'Gesperrt',
     hiddenFormula: 'Ausgeblendet',

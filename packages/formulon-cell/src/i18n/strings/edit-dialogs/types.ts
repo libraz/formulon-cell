@@ -198,6 +198,8 @@ export interface EditDialogsStrings {
   protection: {
     /** Alert raised by an attempt to change a locked cell of a protected sheet. */
     protectedCellEdit: string;
+    /** Alert when a slicer click would filter a sheet whose protection refuses it. */
+    filterRefused: string;
     /** Format-dialog tab label for the cell-lock section. */
     tabProtection: string;
     /** Checkbox label for the per-cell `locked` flag. */

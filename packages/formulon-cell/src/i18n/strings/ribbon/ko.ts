@@ -133,6 +133,7 @@ export const ribbonKo: RibbonStrings = {
     tableProperties: '속성',
     tableName: '표 이름',
     tableStyleOptions: '표 스타일 옵션',
+    externalTableData: '외부 테이블 데이터',
     headerRow: '머리글 행',
     totalRow: '요약 행',
     bandedRows: '줄무늬 행',

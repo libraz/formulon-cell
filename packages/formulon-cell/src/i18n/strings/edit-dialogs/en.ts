@@ -182,6 +182,8 @@ export const editDialogsEn: EditDialogsStrings = {
   protection: {
     protectedCellEdit:
       "The cell or chart you're trying to change is on a protected sheet. To make a change, unprotect the sheet. You might be requested to enter a password.",
+    filterRefused:
+      "You can't use filters on this protected sheet. To remove protection, click the Unprotect Sheet button on the Review tab.",
     tabProtection: 'Protection',
     locked: 'Locked',
     hiddenFormula: 'Hidden',

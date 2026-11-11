@@ -137,6 +137,8 @@ export interface RibbonStrings {
     tableProperties: string;
     tableName: string;
     tableStyleOptions: string;
+    /** Group of the Table Design Refresh split button. */
+    externalTableData: string;
     headerRow: string;
     totalRow: string;
     bandedRows: string;

@@ -11,7 +11,6 @@ import {
   isCellWritable,
   isSheetProtected,
   isWorkbookStructureProtected,
-  protectedCellMessage,
   protectedSheetPassword,
   protectedSheetPasswordHash,
   protectedSheetPermissions,
@@ -526,14 +525,14 @@ describe('pasteTSV protection gate', () => {
   });
 });
 
-describe('protectedCellMessage', () => {
-  it('uses the desktop wording, with the Mac overlay on a Mac workbook', () => {
-    // Excel (Mac, ja) ends 「…パスワードの入力が必要な場合もあります。」.
-    const mac = { spreadsheetProfileId: () => 'mac-ja_JP' };
-    expect(protectedCellMessage(ja, mac)).toBe(
+describe('protected-sheet alerts', () => {
+  it('uses the desktop wording, one string for every host', () => {
+    expect(ja.protection.protectedCellEdit).toBe(
       '変更しようとしているセルやグラフは保護されているシート上にあります。変更するには、シートの保護を解除してください。パスワードの入力が必要な場合もあります。',
     );
-    expect(protectedCellMessage(ja, null)).toBe(ja.protection.protectedCellEdit);
-    expect(protectedCellMessage(en, null)).toMatch(/^The cell or chart you're trying to change/);
+    expect(ja.mac.protectSheet.protectedCellEdit).toBeUndefined();
+    expect(en.protection.filterRefused).toBe(
+      "You can't use filters on this protected sheet. To remove protection, click the Unprotect Sheet button on the Review tab.",
+    );
   });
 });

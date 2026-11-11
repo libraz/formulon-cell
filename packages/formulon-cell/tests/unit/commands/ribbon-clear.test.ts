@@ -891,9 +891,9 @@ describe('executeRibbonClearAction', () => {
     const hyperlinkHistory = new History();
     const target = { sheet: 0, row: 0, col: 0 };
     const locked = { sheet: 0, row: 0, col: 1 };
-    setProtectedSheet(store, 0, true);
     setCellLocked(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, false);
     setComment(store, target, 'target', workbook);
+    setProtectedSheet(store, 0, true);
     store.setState((state) => ({
       ...state,
       format: {
@@ -910,7 +910,11 @@ describe('executeRibbonClearAction', () => {
     }));
     mutators.setCellFormat(store, target, { hyperlink: 'https://target-before.example' });
 
+    // A note goes by Edit objects, so the comment half clears the target cell alone.
+    setProtectedSheet(store, 0, true, { permissions: { objects: true } });
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     executeRibbonClearAction({ store, workbook, history: commentHistory, action: 'comments' });
+    expect(commentAt(store.getState(), target)).toBeNull();
     mutators.setCellFormat(store, locked, { comment: 'locked-after' });
     expect(commentHistory.undo()).toBe(true);
     expect(commentAt(store.getState(), target)).toBe('target');
@@ -918,6 +922,8 @@ describe('executeRibbonClearAction', () => {
     expect(commentHistory.redo()).toBe(true);
     expect(commentAt(store.getState(), locked)).toBe('locked-after');
 
+    setProtectedSheet(store, 0, true);
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     executeRibbonClearAction({ store, workbook, history: hyperlinkHistory, action: 'hyperlinks' });
     mutators.setCellFormat(store, locked, { hyperlink: 'https://locked-after.example' });
     expect(hyperlinkHistory.undo()).toBe(true);

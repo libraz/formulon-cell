@@ -11,10 +11,8 @@ import {
   inheritsUnlocked,
   syncAllowedEditRangesToEngine,
 } from '../engine/protection-sync.js';
-import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { Strings } from '../i18n/strings.js';
 import {
   cloneRange,
   rangeArea,
@@ -31,6 +29,7 @@ import {
   type State,
   type WorkbookStructureProtectionState,
 } from '../store/store.js';
+import { drawingLocked } from './drawing-lock.js';
 import type { History } from './history.js';
 import type { InteractionOperation } from './interaction-policy.js';
 
@@ -78,14 +77,6 @@ interface ProtectionSnapshot {
 }
 
 export const MAX_MATERIALIZED_LOCK_CELLS = 100_000;
-
-/** The protected-cell alert text for `workbook`'s profile. */
-export const protectedCellMessage = (
-  strings: Strings,
-  workbook: { spreadsheetProfileId?: () => string | null } | null,
-): string =>
-  (isMacWorkbook(workbook) ? strings.mac.protectSheet.protectedCellEdit : undefined) ??
-  strings.protection.protectedCellEdit;
 
 /** Whether `sheet` is currently flagged protected on the workbook. Mirrors
  *  the protection slice as a pure helper so call sites don't reach into the
@@ -167,6 +158,31 @@ const OUTLINE_STRUCTURE_COMMANDS: ReadonlySet<string> = new Set([
   'outlineSummaryRight',
 ]);
 
+/** Commands of the table tab that are not table changes themselves (Insert Slicer, Remove
+ *  Duplicates): over a table, a protected sheet greys them with the rest of the tab. */
+const TABLE_TAB_COMMANDS: ReadonlySet<string> = new Set([
+  'mac.insert.slicer',
+  'mac.data.removeDuplicates',
+]);
+
+const activeCellInTable = (state: State): boolean => {
+  const { sheet, row, col } = state.selection.active;
+  return state.tables.tables.some(
+    ({ range }) =>
+      range.sheet === sheet &&
+      row >= range.r0 &&
+      row <= range.r1 &&
+      col >= range.c0 &&
+      col <= range.c1,
+  );
+};
+
+/** Whether sheet protection lets the note at `addr` be added, edited, deleted or cleared: by Edit
+ *  objects, or when the note's shape is unlocked; the cell's own lock plays no part. Threads are
+ *  never decided by protection. */
+export const noteChangePermitted = (state: State, addr: Addr): boolean =>
+  sheetPermits(state, addr.sheet, 'objects') || !drawingLocked('note');
+
 /** Whether `commandId` is one a protected `sheet` refuses whatever its options. */
 export const refusedOnProtectedSheet = (
   state: State,
@@ -174,7 +190,9 @@ export const refusedOnProtectedSheet = (
   commandId: string | undefined,
 ): boolean =>
   commandId !== undefined &&
-  (REFUSED_ON_PROTECTED_SHEET.has(commandId) || OUTLINE_STRUCTURE_COMMANDS.has(commandId)) &&
+  (REFUSED_ON_PROTECTED_SHEET.has(commandId) ||
+    OUTLINE_STRUCTURE_COMMANDS.has(commandId) ||
+    (TABLE_TAB_COMMANDS.has(commandId) && activeCellInTable(state))) &&
   !sheetPermits(state, sheet);
 
 /** The Protect Sheet option that lets a row or column operation through on a protected sheet,
@@ -203,17 +221,8 @@ export const rowColumnOption = (
   operation: InteractionOperation,
 ): keyof SheetProtectionPermissions | undefined => ROW_COLUMN_OPTION[operation];
 
-/** Table commands a protected sheet still runs, locked cells included: the banding and first/last
- *  column toggles. Every other table change (create, restyle, resize, header/total row, rename)
- *  is refused there whatever its options. */
-const TABLE_COMMANDS_ALLOWED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
-  'tableBandedRows',
-  'tableBandedColumns',
-  'tableFirstColumn',
-  'tableLastColumn',
-]);
-
-/** The table fields those commands change; a protected sheet lets a patch of only these through. */
+/** The table fields the data API may still change on a protected sheet (banding, first/last
+ *  column); the UI refuses every table change there. */
 export const TABLE_FIELDS_ALLOWED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'banded',
   'colStripes',
@@ -221,14 +230,10 @@ export const TABLE_FIELDS_ALLOWED_ON_PROTECTED_SHEET: ReadonlySet<string> = new 
   'lastCol',
 ]);
 
-/** Whether sheet protection lets the table command `commandId` change a table on `sheet`. */
-export const tableChangePermitted = (
-  state: State,
-  sheet: number,
-  commandId: string | undefined,
-): boolean =>
-  sheetPermits(state, sheet) ||
-  (commandId !== undefined && TABLE_COMMANDS_ALLOWED_ON_PROTECTED_SHEET.has(commandId));
+/** Whether sheet protection lets a table command change a table on `sheet`: a protected sheet
+ *  greys the whole table tab whatever its options, Refresh All aside. */
+export const tableChangePermitted = (state: State, sheet: number): boolean =>
+  sheetPermits(state, sheet);
 
 /** Spreadsheet-parity gate for sheet-level operations: rejected (no-op +
  *  warning) on a protected sheet unless `permission` is allowed there. */
@@ -1080,6 +1085,19 @@ export function isBandUnlocked(
   // A row style overrides the column's for every cell of that row.
   for (const rowLock of axes?.rows.values() ?? []) if (rowLock) return false;
   return columnsUnlocked(state, sheet, start, end);
+}
+
+/** Whether a clear of `range` would reach any cell: always off a protected sheet; on one, some
+ *  cell must be writable. A range too large to read cell by cell is taken as reachable. */
+export function hasWritableCell(state: State, range: Range): boolean {
+  if (!isSheetProtected(state, range.sheet)) return true;
+  if (rangeArea(range) > MAX_MATERIALIZED_LOCK_CELLS) return true;
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      if (isCellWritable(state, { sheet: range.sheet, row, col })) return true;
+    }
+  }
+  return false;
 }
 
 /** Soft warn-and-return helper used by writeInput / writeCoerced wrappers.

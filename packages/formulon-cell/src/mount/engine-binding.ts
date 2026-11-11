@@ -3,7 +3,7 @@ import { setDataTableGuardSink } from '../commands/data-table-guard.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { setPivotGuardSink } from '../commands/pivot-guard.js';
-import { protectedCellMessage } from '../commands/protection.js';
+import { setProtectionAlertSink } from '../commands/protection-alert.js';
 import { addrKey } from '../engine/address.js';
 import { hydrateThreadedCommentsFromEngine } from '../engine/annotations-sync.js';
 import { hydrateAutoFilterFromEngine } from '../engine/auto-filter-sync.js';
@@ -263,7 +263,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
           stop: strings.formatDialog.validationErrorStop,
           warning: strings.formatDialog.validationErrorWarning,
           information: strings.formatDialog.validationErrorInfo,
-          protectedCell: protectedCellMessage(strings, wb),
+          protectedCell: strings.protection.protectedCellEdit,
         },
       })
     : null;
@@ -273,6 +273,9 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     paste: strings.pivotTableDialog.cannotChangePaste,
   });
   setDataTableGuardSink(wb, (alert) => validationAlert?.show(alert), strings.dataTableDialog);
+  setProtectionAlertSink(wb, (alert) => validationAlert?.show(alert), {
+    filterRefused: strings.protection.filterRefused,
+  });
 
   const activateSheet = (sheet: number): boolean => {
     if (
@@ -707,6 +710,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       tableTotals.detach();
       setPivotGuardSink(wb, null);
       setDataTableGuardSink(wb, null);
+      setProtectionAlertSink(wb, null);
       quickAnalysis?.detach();
       grid.removeEventListener('dblclick', onDblClick);
       unsubWb();

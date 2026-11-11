@@ -1,10 +1,11 @@
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { Range } from '../engine/types.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { type BuiltInCommandId, isBuiltInCommandId } from './built-in-command-ids.js';
+import { isMacChrome } from './chrome-platform.js';
 import { insertCopiedBandIntents, insertCopiedBlockIntents } from './clipboard/paste-intents.js';
 import { getRecentFunctions } from './function-history.js';
 import { interactionControllerFor } from './interaction-controller.js';
@@ -19,7 +20,9 @@ import type {
 import { valuesOnlyClipboard } from './interaction-policy.js';
 import { outlineDetailAxis } from './outline.js';
 import {
+  hasWritableCell,
   isPartialShift,
+  noteChangePermitted,
   refusedOnProtectedSheet,
   rowColumnOption,
   sheetPermits,
@@ -29,6 +32,7 @@ import {
 } from './protection.js';
 import { FUNCTION_SIGNATURES } from './refs.js';
 import { selectionOverlapsTable } from './table-actions.js';
+import { asThreadIntent } from './thread-intent.js';
 
 /** A built-in command id, or a Mac function-menu leaf naming a spreadsheet function. */
 export type BuiltInCommandRequest = BuiltInCommandId | `mac.function.${string}`;
@@ -120,6 +124,8 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   formatTableHome: 'table',
   pivotTableInsert: 'pivot',
   tableName: 'table',
+  // Refresh All runs data connections, not a table change: enabled on a protected sheet too.
+  tableRefresh: null,
   tableHeaderRow: 'table',
   tableTotalRow: 'table',
   tableBandedRows: 'table',
@@ -626,6 +632,34 @@ const builtInOperation = (
   return outlineDetailAxis(store, selection.range) === 'col' ? 'resizeColumns' : 'resizeRows';
 };
 
+/** Commands that change threaded comments, which sheet protection never decides. */
+const THREAD_COMMANDS: ReadonlySet<string> = new Set([
+  'mac.insert.newComment',
+  'mac.review.newComment',
+  'mac.review.deleteComment',
+]);
+
+/** Commands that start a thread at the active cell, which a cell holding a note cannot take. */
+const THREAD_ADD_COMMANDS: ReadonlySet<string> = new Set([
+  'mac.insert.newComment',
+  'mac.review.newComment',
+]);
+
+const activeHasNote = (state: ReturnType<SpreadsheetStore['getState']>): boolean =>
+  state.format.formats.get(addrKey(state.selection.active))?.comment !== undefined;
+
+/** Whether protection refuses the note command `id`: a note goes by Edit objects. Review > Delete
+ *  also deletes the active cell's threads, so it is refused only over a note. */
+const noteCommandRefused = (
+  state: ReturnType<SpreadsheetStore['getState']>,
+  id: string,
+  operation: InteractionOperation | null,
+): boolean =>
+  operation === 'comment' &&
+  !THREAD_COMMANDS.has(id) &&
+  (id !== 'deleteCommentReview' || activeHasNote(state)) &&
+  !noteChangePermitted(state, state.selection.active);
+
 /** Commands that turn AutoFilter on or off rather than use an existing filter. */
 const FILTER_DEFINITION_COMMANDS: ReadonlySet<BuiltInCommandId> = new Set<BuiltInCommandId>([
   'filter',
@@ -775,7 +809,8 @@ export const builtInCommandIntent = (
       (range): OperationEffect => ({ kind: 'range', range }),
     );
   else effects = [{ kind: 'range', range: selection }];
-  return { operation, origin, commandId: id, effects };
+  const intent: OperationIntent = { operation, origin, commandId: id, effects };
+  return THREAD_COMMANDS.has(id) ? asThreadIntent(intent) : intent;
 };
 
 /** Protection's decision for a built-in command on the active sheet, with or without a policy:
@@ -793,22 +828,16 @@ export const builtInProtectionDecision = (
   const operation = builtInOperation(store, id);
   if (operation !== null && !workbookStructurePermits(state, operation))
     return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
-  // A cell shift is refused on a protected sheet whatever its options; Insert / Delete Cells over
-  // part of the rows is its dialog, available while Entire row or Entire column is.
+  // A cell shift is refused on a protected sheet whatever its options, so Insert / Delete Cells
+  // over part of the rows never opens its dialog there; over whole rows or columns it acts at once.
   const shift =
     operation && CELL_SHIFT_COMMANDS.has(id) && !sheetPermits(state, sheet)
       ? shiftedBand(id, operation, state.selection.range)
       : null;
   const partial = shift !== null && operation !== null && isPartialShift(operation, shift);
-  const dialog = partial && CELL_SHIFT_DIALOG_COMMANDS.has(id);
-  const dialogRefused =
-    dialog &&
-    !sheetPermits(state, sheet, id === 'insertCells' ? 'insertRows' : 'deleteRows') &&
-    !sheetPermits(state, sheet, id === 'insertCells' ? 'insertColumns' : 'deleteColumns');
-  const option =
-    operation && !dialog
-      ? (unlockedCellsOption(operation) ?? rowColumnOption(operation))
-      : undefined;
+  const option = operation
+    ? (unlockedCellsOption(operation) ?? rowColumnOption(operation))
+    : undefined;
   // Turning AutoFilter on or off is refused on a protected sheet; using a filter needs Use AutoFilter.
   const filterRefused =
     operation === 'filter' &&
@@ -819,8 +848,14 @@ export const builtInProtectionDecision = (
     filterRefused ||
     (operation === 'pivot' && !sheetPermits(state, sheet, 'pivotTables')) ||
     (operation === 'object' && !sheetPermits(state, sheet, 'objects')) ||
-    (operation === 'table' && !tableChangePermitted(state, sheet, id)) ||
-    (dialog ? dialogRefused : partial) ||
+    (operation === 'table' && !tableChangePermitted(state, sheet)) ||
+    partial ||
+    noteCommandRefused(state, id, operation) ||
+    // Clear Contents skips locked cells, so it is greyed when every selected cell is locked.
+    (id === 'clear' &&
+      ![state.selection.range, ...(state.selection.extraRanges ?? [])].some((range) =>
+        hasWritableCell(state, normalized(range)),
+      )) ||
     (option !== undefined && !sheetPermits(state, sheet, option));
   return refused
     ? { allowed: false, code: 'protected', reason: 'sheet is protected' }
@@ -832,6 +867,16 @@ const decideBuiltIn = (
   id: string,
   origin: InteractionOrigin,
 ): PermissionDecision => {
+  // A cell holds a note or a thread, never both.
+  if (THREAD_ADD_COMMANDS.has(id) && activeHasNote(store.getState()))
+    return { allowed: false, code: 'invalid', reason: 'the cell holds a note' };
+  // The Mac desktop has no Allow Edit Ranges; stored ranges are still enforced.
+  if (id === 'protectionReview' && isMacChrome(store))
+    return {
+      allowed: false,
+      code: 'invalid',
+      reason: 'Allow Edit Ranges is not on the Mac desktop',
+    };
   const protection = builtInProtectionDecision(store, id);
   if (!protection.allowed) return protection;
   if (

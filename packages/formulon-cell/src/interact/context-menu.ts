@@ -20,7 +20,7 @@ import type {
 import { mergeAt } from '../commands/merge.js';
 import { pivotReportEffects, pivotWrite } from '../commands/pivot-actions.js';
 import { refreshPivotTable } from '../commands/pivot-table.js';
-import { deferForAllowedRangeUnlock } from '../commands/protection.js';
+import { deferForAllowedRangeUnlock, noteChangePermitted } from '../commands/protection.js';
 import { executeNoteVisibilityAction } from '../commands/ribbon-comment.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
@@ -691,6 +691,16 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
               e.kind === 'item' &&
               e.id === 'showHideNote' &&
               commentAt(store.getState(), activeAddr) === null
+            ),
+        )
+        // A protected sheet without Edit objects drops a note's edit and delete rows entirely.
+        .filter(
+          (e) =>
+            !(
+              e.kind === 'item' &&
+              (e.id === 'insertComment' || e.id === 'deleteComment') &&
+              commentAt(store.getState(), activeAddr) !== null &&
+              !noteChangePermitted(store.getState(), activeAddr)
             ),
         )
         .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))

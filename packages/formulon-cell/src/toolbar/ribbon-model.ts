@@ -881,6 +881,15 @@ export function buildRibbonModel(
         group(tr.tableProperties, [
           { id: 'tableName', title: tr.tableName, label: tr.tableName, kind: 'input' },
         ]),
+        group(tr.externalTableData, [
+          cmd(
+            'tableRefresh',
+            strings.contextMenu.pivotRefresh,
+            strings.contextMenu.pivotRefresh,
+            'refresh',
+            'wide',
+          ),
+        ]),
         group(tr.tableStyleOptions, [
           cmd('tableHeaderRow', tr.headerRow, tr.headerRow, 'tableHeaderRow', 'wide'),
           cmd('tableTotalRow', tr.totalRow, tr.totalRow, 'tableTotalRow', 'wide'),

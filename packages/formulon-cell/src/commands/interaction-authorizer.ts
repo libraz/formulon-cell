@@ -29,6 +29,7 @@ import {
   isCellWritable,
   isPartialShift,
   isSheetProtected,
+  noteChangePermitted,
   protectedSheetPermissions,
   refusedOnProtectedSheet,
   rowColumnOption,
@@ -37,6 +38,7 @@ import {
   unlockedCellsOption,
   workbookStructurePermits,
 } from './protection.js';
+import { isThreadIntent } from './thread-intent.js';
 
 const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
   if (
@@ -101,6 +103,8 @@ const sheetProtectionPermits = (
 const protectionPermits = (state: State, operation: InteractionOperation, addr: Addr): boolean => {
   // A table change is decided by its command, whatever the lock of the cells it covers.
   if (operation === 'table') return true;
+  // A note goes by Edit objects (or its shape's lock), not by its cell's lock.
+  if (operation === 'comment') return noteChangePermitted(state, addr);
   const option = protectionOption(operation);
   if (option) return sheetPermits(state, addr.sheet, option);
   const unlockedOption = unlockedCellsOption(operation);
@@ -289,7 +293,7 @@ export class InteractionAuthorizer {
             reason: 'cell is outside editable cells',
           };
         }
-        if (!protectionPermits(state, intent.operation, addr)) {
+        if (!isThreadIntent(intent) && !protectionPermits(state, intent.operation, addr)) {
           return { allowed: false, code: 'protected', addr, reason: 'cell is protected' };
         }
       }
@@ -454,12 +458,13 @@ export class InteractionAuthorizer {
    *  options, and a table change there is decided by its command alone. */
   private structureDecision(intent: OperationIntent): PermissionDecision {
     const state = this.store.getState();
+    if (isThreadIntent(intent)) return { allowed: true };
     if (!workbookStructurePermits(state, intent.operation))
       return { allowed: false, code: 'protected', reason: 'workbook structure is protected' };
     for (const sheet of effectSheets(intent, state.data.sheetIndex)) {
       if (
         refusedOnProtectedSheet(state, sheet, intent.commandId) ||
-        (intent.operation === 'table' && !tableChangePermitted(state, sheet, intent.commandId))
+        (intent.operation === 'table' && !tableChangePermitted(state, sheet))
       )
         return { allowed: false, code: 'protected', reason: 'sheet is protected' };
     }
@@ -499,6 +504,7 @@ export class InteractionAuthorizer {
         if (!isAddress(addr)) return { allowed: false, code: 'outOfBounds', addr };
         if (
           isMutatingInteraction(intent.operation) &&
+          !isThreadIntent(intent) &&
           !protectionPermits(this.store.getState(), intent.operation, addr)
         ) {
           return { allowed: false, code: 'protected', addr };

@@ -2,7 +2,8 @@ import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SlicerSpec, type SpreadsheetStore } from '../store/store.js';
-import { authorizedWrite } from './authorized-write.js';
+import { authorizedWrite, authorizeWrite } from './authorized-write.js';
+import { drawingLocked } from './drawing-lock.js';
 import {
   applyValueFilter,
   distinctValues,
@@ -12,6 +13,7 @@ import {
 import { History } from './history.js';
 import type { OperationIntent } from './interaction-policy.js';
 import { type ObjectActionContext, objectChangeAllowed, objectIntents } from './object-actions.js';
+import { alertFilterRefused } from './protection-alert.js';
 import { recordSlicersChange } from './slice-history.js';
 
 export interface CreateSlicerOptions {
@@ -206,11 +208,23 @@ export interface SlicerActionContext extends ObjectActionContext {
   readonly workbook: WorkbookHandle;
 }
 
+/** Whether slicer `spec` is locked (see {@link drawingLocked}). */
+const slicerLocked = (_spec: SlicerSpec): boolean => drawingLocked('slicer');
+
+const slicerSheet = (ctx: SlicerActionContext, spec: SlicerSpec): number =>
+  spec.sheet ?? ctx.store.getState().data.sheetIndex;
+
+/** Whether slicer `spec` responds to clicks, as a drawing: unlocked, or Edit objects allowed. A
+ *  slicer that does not is inert: its items and Clear do nothing and show no alert. */
+export const slicerInteractive = (ctx: SlicerActionContext, spec: SlicerSpec): boolean =>
+  !slicerLocked(spec) || objectChangeAllowed(ctx, slicerSheet(ctx, spec));
+
 /**
  * Change a slicer and recompute the rows its filter hides, as one authorized step: an object
- * change of the slicer's sheet and, for a change of what it selects (`filters`), a filter use of
- * the table it filters (Use AutoFilter on a protected sheet). The slicer and the filter it drives
- * both undo together.
+ * change of the slicer's sheet (a locked slicer, or deleting one) and, for a change of what it
+ * selects (`filters`), a filter use of the table it filters (Use AutoFilter on a protected sheet).
+ * A usable slicer whose filter the protected sheet refuses says so. The slicer and the filter it
+ * drives both undo together.
  */
 const slicerWrite = (
   ctx: SlicerActionContext,
@@ -218,12 +232,12 @@ const slicerWrite = (
   mutate: () => void,
   filters = true,
 ): boolean => {
-  const sheet = spec.sheet ?? ctx.store.getState().data.sheetIndex;
+  const sheet = slicerSheet(ctx, spec);
   const range = filters ? resolveSlicerSpec(ctx.workbook, spec)?.range : undefined;
-  if (!objectChangeAllowed(ctx, sheet)) return false;
-  const intents = (origin: OperationIntent['origin']): OperationIntent[] => [
-    ...objectIntents(ctx, sheet)(origin),
-    ...(range
+  const asObject = !filters || slicerLocked(spec);
+  if (asObject && !objectChangeAllowed(ctx, sheet)) return false;
+  const filterIntent = (origin: OperationIntent['origin']): OperationIntent[] =>
+    range
       ? [
           {
             operation: 'filter' as const,
@@ -232,7 +246,15 @@ const slicerWrite = (
             effects: [{ kind: 'range' as const, range }],
           },
         ]
-      : []),
+      : [];
+  const filterDecision = authorizeWrite(ctx.store, filterIntent, ctx.origin);
+  if (!filterDecision.allowed) {
+    if (filterDecision.code === 'protected') alertFilterRefused(ctx.workbook);
+    return false;
+  }
+  const intents = (origin: OperationIntent['origin']): OperationIntent[] => [
+    ...(asObject ? objectIntents(ctx, sheet)(origin) : []),
+    ...filterIntent(origin),
   ];
   const history = ctx.history ?? new History();
   return authorizedWrite({

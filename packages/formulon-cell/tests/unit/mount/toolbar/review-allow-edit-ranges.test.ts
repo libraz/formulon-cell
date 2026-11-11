@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { canExecuteBuiltIn } from '../../../../src/commands/built-in-command-policy.js';
 import {
   addAllowedEditRange,
   allowedEditRangesForSheet,
@@ -208,13 +209,12 @@ describe('Allow Edit Ranges manager commit buttons', () => {
     expect(titles()).toHaveLength(1);
   });
 
-  it('keeps the OK-only layout on the Mac chrome, where Esc keeps the changes', async () => {
+  it('offers no manager on the Mac chrome, which has no Allow Edit Ranges', async () => {
     sheet.instance.host.dataset.fcPlatform = 'mac';
-    const { done } = await open();
-    expect(footerLabels()).toEqual(['New...', 'Modify...', 'Delete', 'OK']);
-    await addRange();
-    dialogs()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    await done;
-    expect(titles()).toHaveLength(1);
+    await createReviewDropdownDefaults(sheet.instance).applyProtectAction('allow-edit-ranges');
+    expect(dialogs()).toHaveLength(0);
+    expect(canExecuteBuiltIn(sheet.instance.store, 'protectionReview', 'ribbon').allowed).toBe(
+      false,
+    );
   });
 });

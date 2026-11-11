@@ -132,6 +132,7 @@ export const ribbonZh: RibbonStrings = {
     tableProperties: '属性',
     tableName: '表名称',
     tableStyleOptions: '表格样式选项',
+    externalTableData: '外部表格数据',
     headerRow: '标题行',
     totalRow: '汇总行',
     bandedRows: '镶边行',

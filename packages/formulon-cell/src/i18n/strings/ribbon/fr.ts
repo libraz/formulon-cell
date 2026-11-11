@@ -134,6 +134,7 @@ export const ribbonFr: RibbonStrings = {
     tableProperties: 'Propriétés',
     tableName: 'Nom du tableau',
     tableStyleOptions: 'Options de style de tableau',
+    externalTableData: 'Données de table externe',
     headerRow: "Ligne d'en-tête",
     totalRow: 'Ligne de total',
     bandedRows: 'Lignes à bandes',

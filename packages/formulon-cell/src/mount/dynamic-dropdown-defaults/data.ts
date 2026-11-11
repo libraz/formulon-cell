@@ -1,4 +1,5 @@
 import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
+import { refreshAllConnections } from '../../commands/table-refresh.js';
 import { textToColumns, textToColumnsTargets } from '../../commands/text-to-columns.js';
 import {
   circleInvalidData,
@@ -185,12 +186,30 @@ const updateDataValidationMenu =
     }
   };
 
+/** Table Design Refresh: Refresh All runs the workbook's data connections; the table itself has
+ *  no connection, so the other commands have nothing to run. */
+const applyTableRefreshAction =
+  (instance: SpreadsheetInstance): NonNullable<DynamicDropdownsCtx['applyTableRefreshAction']> =>
+  (action) => {
+    if (action === 'refresh-all') refreshAllConnections(instance.workbook);
+  };
+
+const updateTableRefreshMenu: NonNullable<DynamicDropdownsCtx['updateTableRefreshMenu']> = (
+  menu,
+) => {
+  for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-table-refresh]')) {
+    setMenuControlDisabled(button, button.dataset.tableRefresh !== 'refresh-all');
+  }
+};
+
 type DataDropdownDefaults = Pick<
   DynamicDropdownsCtx,
   | 'splitTextToColumns'
   | 'splitTextToColumnsCustom'
   | 'applyDataValidationAction'
   | 'updateDataValidationMenu'
+  | 'applyTableRefreshAction'
+  | 'updateTableRefreshMenu'
 >;
 
 export function createDataDropdownDefaults(instance: SpreadsheetInstance): DataDropdownDefaults {
@@ -199,5 +218,7 @@ export function createDataDropdownDefaults(instance: SpreadsheetInstance): DataD
     splitTextToColumnsCustom: buildTextToColumnsCustom(instance),
     applyDataValidationAction: buildDataValidationAction(instance),
     updateDataValidationMenu: updateDataValidationMenu(instance),
+    applyTableRefreshAction: applyTableRefreshAction(instance),
+    updateTableRefreshMenu,
   };
 }

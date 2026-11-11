@@ -182,6 +182,8 @@ export const editDialogsZh: EditDialogsStrings = {
   protection: {
     protectedCellEdit:
       '您试图更改的单元格或图表位于受保护的工作表中。若要进行更改，请取消工作表保护。您可能需要输入密码。',
+    filterRefused:
+      '不能在此受保护的工作表上使用筛选器。要取消保护，请单击“审阅”选项卡上的“撤消工作表保护”按钮。',
     tabProtection: '保护',
     locked: '锁定',
     hiddenFormula: '隐藏',

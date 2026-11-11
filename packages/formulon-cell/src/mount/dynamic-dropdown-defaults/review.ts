@@ -1,4 +1,5 @@
 import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
+import { isMacChrome } from '../../commands/chrome-platform.js';
 import { commentAt, listComments } from '../../commands/comment.js';
 import {
   allowedEditRangeHasPassword,
@@ -83,7 +84,7 @@ const unlockAllowedRange = (instance: SpreadsheetInstance, id: string): Promise<
 
 /** The Allow Users to Edit Ranges list for the active sheet, with New, Modify
  *  and Delete. Changing or deleting a password-guarded range asks for its password.
- *  The Windows layout's Cancel puts back the ranges as of opening or the last Apply. */
+ *  Cancel puts back the ranges as of opening or the last Apply. The Mac desktop has no manager. */
 const openAllowEditRangesManager = async (
   instance: SpreadsheetInstance,
   entry: DialogEntry,
@@ -144,7 +145,6 @@ const openAllowEditRangesManager = async (
   };
   const guard = (id: string): Promise<boolean> => unlockAllowedRange(instance, id);
   let restore = protectionCheckpoint(instance.store, instance.workbook);
-  const mac = instance.host.dataset.fcPlatform === 'mac';
   const result = await showAllowEditRangesManagerDialog({
     strings: {
       title: menu.allowEditRangesDialogTitle,
@@ -169,21 +169,17 @@ const openAllowEditRangesManager = async (
         removeAllowedEditRangeAction(ctx, id);
       }
     },
-    ...(mac
-      ? {}
-      : {
-          commit: {
-            strings: {
-              permissions: menu.allowEditRangesPermissionsButton,
-              protectSheet: menu.allowEditRangesProtectSheetButton,
-              cancel: strings.pageSetup.cancel,
-              apply: menu.allowEditRangesApplyButton,
-            },
-            onApply: () => {
-              restore = protectionCheckpoint(instance.store, instance.workbook);
-            },
-          },
-        }),
+    commit: {
+      strings: {
+        permissions: menu.allowEditRangesPermissionsButton,
+        protectSheet: menu.allowEditRangesProtectSheetButton,
+        cancel: strings.pageSetup.cancel,
+        apply: menu.allowEditRangesApplyButton,
+      },
+      onApply: () => {
+        restore = protectionCheckpoint(instance.store, instance.workbook);
+      },
+    },
   });
   if (result === 'discard') restore();
   return result;
@@ -247,6 +243,7 @@ const buildProtectAction =
       return;
     }
     if (action === 'allow-edit-ranges' || action === 'clear-allowed-edit-ranges') {
+      if (!canExecuteBuiltInRequest(instance.store, 'protectionReview', 'ribbon').allowed) return;
       const strings = instance.i18n.strings;
       // Allowed ranges are fixed while the sheet is protected, as on desktop.
       if (isSheetProtected(instance.store.getState(), instance.store.getState().data.sheetIndex)) {
@@ -329,6 +326,9 @@ const updateProtectMenu =
                     ? strings.allowEditRangesClearRequiresAny
                     : undefined;
       setMenuControlDisabled(button, disabled, reason);
+      // The Mac desktop has no Allow Edit Ranges: its items are not offered at all.
+      if (action === 'allow-edit-ranges' || action === 'clear-allowed-edit-ranges')
+        button.hidden = isMacChrome(instance.store);
     }
   };
 

@@ -17,10 +17,9 @@ import {
   setNotesVisible,
   threadedCommentsAt,
 } from './comment.js';
-import { commentWrite } from './comment-actions.js';
+import { commentWrite, threadWrite } from './comment-actions.js';
 import type { History } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
-import { deferForAllowedRangeUnlock } from './protection.js';
 
 export type RibbonCommentAction = 'delete-active' | 'delete-all';
 
@@ -50,15 +49,6 @@ export const executeRibbonCommentAction = (deps: ExecuteRibbonCommentActionDeps)
       : listThreadedComments(store, state.data.sheetIndex, workbook)
     : [];
   if (targets.length === 0 && threaded.length === 0) return;
-  const footprint = [
-    ...targets.map((entry) => entry.addr),
-    ...threaded.map((entry) => ({
-      sheet: state.data.sheetIndex,
-      row: entry.cell.row,
-      col: entry.cell.col,
-    })),
-  ].map((a) => ({ sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col }));
-  if (deferForAllowedRangeUnlock(store, footprint, () => executeRibbonCommentAction(deps))) return;
   // Notes and threads are separate undo steps, each one authorized comment write.
   const ctx = { store, history, ...authorization };
   if (targets.length > 0) {
@@ -79,7 +69,7 @@ export const executeRibbonCommentAction = (deps: ExecuteRibbonCommentActionDeps)
   if (threaded.length > 0 && workbook.capabilities.threadedComments) {
     const sheet = state.data.sheetIndex;
     const cells = threaded.map((entry) => ({ sheet, row: entry.cell.row, col: entry.cell.col }));
-    commentWrite(ctx, cells, undefined, () =>
+    threadWrite(ctx, cells, undefined, () =>
       recordThreadedChange(
         history,
         store,

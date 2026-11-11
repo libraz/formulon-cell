@@ -43,6 +43,7 @@ import {
   type TableOption,
   toggleTableOptionAction,
 } from '../../commands/table-design.js';
+import { refreshAllConnections } from '../../commands/table-refresh.js';
 import {
   setGridlinesVisible,
   setHeadingsVisible,
@@ -409,6 +410,10 @@ const applyGenericRibbonCommand = (
       return true;
     case 'pivotRefresh':
       void hooks?.insert?.refreshPivot?.();
+      return true;
+    // The Table Design Refresh face runs Refresh All: the table has no connection of its own.
+    case 'tableRefresh':
+      refreshAllConnections(i.workbook);
       return true;
     case 'pivotRowHeaders':
     case 'pivotColHeaders':

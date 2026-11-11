@@ -224,7 +224,7 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
     }
   });
 
-  it('does not mutate a protected threaded comment after the dialog opened', async () => {
+  it('mutates threaded comments on a protected sheet, which ignores protection for threads', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
       expect(wb.isStub).toBe(false);
@@ -246,13 +246,16 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
       ).toBe(true);
       hydrateThreadedComments(store, 0, wb.getThreadedComments(0));
       setProtectedSheet(store, 0, true);
-      const addr = { sheet: 0, row: 3, col: 4 };
-      expect(addThreadedComment(store, addr, 'blocked', wb)).toBeNull();
-      expect(editThreadedComment(store, 0, threadId, 'blocked', wb)).toBe(false);
-      expect(resolveThread(store, 0, threadId, true, wb)).toBe(false);
-      expect(removeThreadedComment(store, 0, threadId, wb)).toBe(false);
-      expect(wb.getThreadedComments(0)[0]?.text).toBe('Protected thread');
-      expect(wb.getThreadedComments(0)[0]?.done).toBe(false);
+      expect(addThreadedComment(store, { sheet: 0, row: 5, col: 4 }, 'locked cell', wb)?.text).toBe(
+        'locked cell',
+      );
+      expect(editThreadedComment(store, 0, threadId, 'edited', wb)).toBe(true);
+      expect(resolveThread(store, 0, threadId, true, wb)).toBe(true);
+      const edited = wb.getThreadedComments(0).find((entry) => entry.id === threadId);
+      expect(edited?.text).toBe('edited');
+      expect(edited?.done).toBe(true);
+      expect(removeThreadedComment(store, 0, threadId, wb)).toBe(true);
+      expect(wb.getThreadedComments(0).some((entry) => entry.id === threadId)).toBe(false);
     } finally {
       wb.dispose();
     }

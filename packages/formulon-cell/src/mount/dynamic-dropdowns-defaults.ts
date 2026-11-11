@@ -220,6 +220,8 @@ export function createDefaultDynamicDropdownsCtx(
     applyWhatIfAction: formulaDefaults.applyWhatIfAction,
     applyFindSelectAction: editingDefaults.applyFindSelectAction,
     applyDataValidationAction: dataDefaults.applyDataValidationAction,
+    applyTableRefreshAction: dataDefaults.applyTableRefreshAction,
+    updateTableRefreshMenu: dataDefaults.updateTableRefreshMenu,
     applyConditionalMenuAction: styleDefaults.applyConditionalMenuAction,
     applyUiTheme: pageLayoutDefaults.applyUiTheme,
     applyWorkbookTheme: pageLayoutDefaults.applyWorkbookTheme,

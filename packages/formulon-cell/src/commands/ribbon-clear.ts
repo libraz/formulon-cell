@@ -21,8 +21,14 @@ import {
   clearSelectedContents,
   collectSelectedContentAddresses,
 } from './clear-contents.js';
-import { clearComments, recordCommentChange } from './comment.js';
-import { commentWrite } from './comment-actions.js';
+import {
+  clearComments,
+  listThreadedComments,
+  recordCommentChange,
+  recordThreadedChange,
+  removeThreadedComment,
+} from './comment.js';
+import { type CommentActionContext, commentWrite, threadWrite } from './comment-actions.js';
 import { withSelectionFormatOrigin } from './format.js';
 import type { History, HistoryEntry } from './history.js';
 import type { InteractionController } from './interaction-controller.js';
@@ -40,6 +46,7 @@ import {
   isCellWritable,
   isSheetProtected,
   MAX_MATERIALIZED_LOCK_CELLS,
+  noteChangePermitted,
 } from './protection.js';
 import { recordConditionalRulesChange } from './slice-history.js';
 import { clearSparklinesAction } from './sparkline.js';
@@ -486,6 +493,42 @@ const preflightPlan = (
   );
 };
 
+/** Remove the threads of the planned selection as one step, replies before their opener. */
+const clearSelectedThreads = (
+  ctx: CommentActionContext,
+  workbook: WorkbookHandle,
+  plan: SelectionClearPlan,
+): void => {
+  if (!workbook.capabilities.threadedComments) return;
+  const { sheet } = plan;
+  const threads = listThreadedComments(ctx.store, sheet, workbook).filter((entry) =>
+    plan.ranges.some(
+      (range) =>
+        entry.cell.row >= Math.min(range.r0, range.r1) &&
+        entry.cell.row <= Math.max(range.r0, range.r1) &&
+        entry.cell.col >= Math.min(range.c0, range.c1) &&
+        entry.cell.col <= Math.max(range.c0, range.c1),
+    ),
+  );
+  if (threads.length === 0) return;
+  const cells = threads.map((entry) => ({ sheet, row: entry.cell.row, col: entry.cell.col }));
+  threadWrite(ctx, cells, undefined, () =>
+    recordThreadedChange(
+      ctx.history,
+      ctx.store,
+      workbook,
+      sheet,
+      () => {
+        for (const entry of [...threads].sort(
+          (a, b) => Number(a.parentId === null) - Number(b.parentId === null),
+        ))
+          removeThreadedComment(ctx.store, sheet, entry.id, workbook, ctx);
+      },
+      ctx,
+    ),
+  );
+};
+
 const refreshCells = (store: SpreadsheetStore, workbook: WorkbookHandle, sheet: number): void => {
   mutators.replaceCells(store, workbook.cells(sheet));
 };
@@ -533,8 +576,8 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       : action === 'comments'
         ? {
             ...plan,
-            // A locked cell of a protected sheet keeps its note; only the others are cleared.
-            comments: plan.comments.filter((addr) => isCellWritable(store.getState(), addr)),
+            // A protected sheet keeps its notes unless Edit objects is on.
+            comments: plan.comments.filter((addr) => noteChangePermitted(store.getState(), addr)),
             hyperlinks: [],
             validations: [],
             content: [],
@@ -601,14 +644,15 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       return;
     }
     if (action === 'comments') {
-      // Only the notes a locked cell of a protected sheet does not keep are cleared.
-      const writable = plan.comments.filter((addr) => isCellWritable(store.getState(), addr));
+      // A protected sheet keeps its notes unless Edit objects is on; it never keeps threads.
+      const notes = plan.comments.filter((addr) => noteChangePermitted(store.getState(), addr));
       const ctx = { store, history, origin, commandId };
-      commentWrite(ctx, writable, undefined, () =>
-        recordCommentChange(history, store, workbook, writable, () => {
-          clearComments(store, writable, workbook);
+      commentWrite(ctx, notes, undefined, () =>
+        recordCommentChange(history, store, workbook, notes, () => {
+          clearComments(store, notes, workbook);
         }),
       );
+      clearSelectedThreads(ctx, workbook, plan);
       return;
     }
     if (action === 'hyperlinks') {

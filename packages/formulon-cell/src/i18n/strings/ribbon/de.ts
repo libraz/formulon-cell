@@ -134,6 +134,7 @@ export const ribbonDe: RibbonStrings = {
     tableProperties: 'Eigenschaften',
     tableName: 'Tabellenname',
     tableStyleOptions: 'Optionen für Tabellenformatvorlagen',
+    externalTableData: 'Externe Tabellendaten',
     headerRow: 'Kopfzeile',
     totalRow: 'Ergebniszeile',
     bandedRows: 'Gebänderte Zeilen',

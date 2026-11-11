@@ -485,6 +485,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'tableHeaderRow',
   'tableLastColumn',
   'tableName',
+  'tableRefresh',
   'tableTotalRow',
   'textOrientation',
   'textToColumns',

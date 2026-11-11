@@ -197,12 +197,12 @@ describe('hyperlink outcome', () => {
 });
 
 describe('comments', () => {
-  it('Delete Comment asks first, then deletes; a wrong password keeps it', async () => {
+  it('Delete Comment never asks for a range password: a note goes by Edit objects', async () => {
     const store = createSpreadsheetStore();
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     setComment(store, A1, 'note', wb);
     select(store, area(0, 0, 0, 0));
-    const ui = guard(store, area(0, 0, 0, 0), ['bad', PASSWORD]);
+    const ui = guard(store, area(0, 0, 0, 0), [PASSWORD]);
     const deps = {
       store,
       workbook: wb,
@@ -213,10 +213,12 @@ describe('comments', () => {
     };
     executeRibbonCommentAction(deps);
     await settle();
-    expect(ui.reportIncorrect).toHaveBeenCalledTimes(1);
+    expect(ui.askPassword).not.toHaveBeenCalled();
     expect(commentAt(store.getState(), A1)).toBe('note');
+    setProtectedSheet(store, 0, true, { permissions: { objects: true } });
     executeRibbonCommentAction(deps);
     await settle();
+    expect(ui.askPassword).not.toHaveBeenCalled();
     expect(commentAt(store.getState(), A1)).toBeNull();
   });
 });
