@@ -301,6 +301,16 @@ export const sheetObjectMutators = {
     });
   },
 
+  removeCustomTableStyle(store: SpreadsheetStore, id: string): void {
+    store.setState((s) => ({
+      ...s,
+      tables: {
+        ...s.tables,
+        customTableStyles: (s.tables.customTableStyles ?? []).filter((item) => item.id !== id),
+      },
+    }));
+  },
+
   upsertCustomPivotTableStyle(store: SpreadsheetStore, style: CustomTableStyle): void {
     store.setState((s) => {
       const next = (s.tables.customPivotTableStyles ?? []).filter((item) => item.id !== style.id);

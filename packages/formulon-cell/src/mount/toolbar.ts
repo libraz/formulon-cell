@@ -92,6 +92,8 @@ import {
   type ToolbarText,
   toolbarText,
 } from '../toolbar/ribbon-model.js';
+import { openTableStyleEditor } from './dynamic-dropdown-defaults/styles.js';
+import { attachTableStyleContextMenu } from './table-style-context-menu.js';
 import {
   createDefaultRibbonHelpers,
   createDefaultRibbonHooks,
@@ -618,6 +620,10 @@ export function mountToolbar(
     });
     dropdownsApi = dropdownsDelegation.api;
   }
+  const detachTableStyleContextMenu = attachTableStyleContextMenu(host, getInstance, (mode, id) => {
+    const instance = getInstance();
+    if (instance) void openTableStyleEditor(instance, mode, id);
+  });
   // A host-menu-first face opens its dropdown once the host supplies the hook behind it.
   const openHostMenuFirstDropdown = (command: string, button: HTMLButtonElement): boolean => {
     const hook = RIBBON_HOST_MENU_FIRST_HOOK[command];
@@ -1293,6 +1299,7 @@ export function mountToolbar(
       document.removeEventListener('mousedown', onDocumentMouseDown);
       dropdownsDelegation?.detach();
       dropdownsDelegation = null;
+      detachTableStyleContextMenu();
       borderMenuApi?.detach();
       borderMenuApi = null;
       dropdownsApi = null;

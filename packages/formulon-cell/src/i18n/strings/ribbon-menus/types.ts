@@ -433,6 +433,15 @@ export interface RibbonMenusStrings {
     tableStyleNewPivot: string;
     /** Clear in the table style gallery: removes the active table's style. */
     tableStyleClear: string;
+    /** Context menu of a table style gallery item. */
+    tableStyleApplyMaintain: string;
+    tableStyleApplyClear: string;
+    tableStyleModify: string;
+    tableStyleDuplicate: string;
+    tableStyleDelete: string;
+    tableStyleSetDefault: string;
+    /** Title of the table style dialog opened by Modify. */
+    tableStyleModifyTitle: string;
     /** Format as Table swatch names, keyed by built-in style name. */
     tableStyleSwatches: Readonly<
       Record<`TableStyle${'Light' | 'Medium' | 'Dark'}${number}`, string>

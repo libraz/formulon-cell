@@ -995,6 +995,20 @@ export function clearVisualFormat(state: State, store: SpreadsheetStore): void {
   clearSelectionFormat(state, store, true);
 }
 
+/** Clear Formats over `range` instead of the selection, as Apply and Clear Formatting does
+ *  before a table style. */
+export function clearVisualFormatInRange(
+  state: State,
+  store: SpreadsheetStore,
+  range: Range,
+): boolean {
+  return clearSelectionFormat(
+    { ...state, selection: { ...state.selection, range, extraRanges: [] } },
+    store,
+    true,
+  );
+}
+
 /** Set or clear the font color across the selection. Pass `null` to clear. */
 export function setFontColor(state: State, store: SpreadsheetStore, color: string | null): void {
   applySelectionFormatPatch(state, store, { color: color ?? undefined });

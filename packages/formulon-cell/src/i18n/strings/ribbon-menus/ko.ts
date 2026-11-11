@@ -433,6 +433,13 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     tableStyleNew: '새 표 스타일…',
     tableStyleNewPivot: '새 피벗 테이블 스타일…',
     tableStyleClear: '지우기',
+    tableStyleApplyMaintain: '서식 적용 및 유지',
+    tableStyleApplyClear: '서식 적용 및 지우기',
+    tableStyleModify: '수정...',
+    tableStyleDuplicate: '중복...',
+    tableStyleDelete: '삭제',
+    tableStyleSetDefault: '기본값으로 설정',
+    tableStyleModifyTitle: '표 스타일 수정',
     tableStyleSwatches: {
       TableStyleLight1: '표 스타일 (밝게) 1',
       TableStyleLight2: '표 스타일 (밝게) 2',

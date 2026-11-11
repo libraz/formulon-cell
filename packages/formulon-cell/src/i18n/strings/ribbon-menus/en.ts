@@ -433,6 +433,13 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     tableStyleNew: 'New Table Style…',
     tableStyleNewPivot: 'New PivotTable Style…',
     tableStyleClear: 'Clear',
+    tableStyleApplyMaintain: 'Apply (and Maintain Formatting)',
+    tableStyleApplyClear: 'Apply and Clear Formatting',
+    tableStyleModify: 'Modify...',
+    tableStyleDuplicate: 'Duplicate...',
+    tableStyleDelete: 'Delete',
+    tableStyleSetDefault: 'Set As Default',
+    tableStyleModifyTitle: 'Modify Table Style',
     tableStyleSwatches: {
       TableStyleLight1: 'Table Style (Light) 1',
       TableStyleLight2: 'Table Style (Light) 2',

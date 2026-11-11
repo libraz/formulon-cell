@@ -431,6 +431,13 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     tableStyleNew: 'สไตล์ตารางใหม่…',
     tableStyleNewPivot: 'สไตล์ PivotTable ใหม่…',
     tableStyleClear: 'ล้าง',
+    tableStyleApplyMaintain: 'นำไปใช้ (และคงการจัดรูปแบบเดิม)',
+    tableStyleApplyClear: 'ใช้และล้างการจัดรูปแบบ',
+    tableStyleModify: 'ปรับเปลี่ยน...',
+    tableStyleDuplicate: 'ทําซ้ำ...',
+    tableStyleDelete: 'ลบ',
+    tableStyleSetDefault: 'ตั้งเป็นค่าเริ่มต้น',
+    tableStyleModifyTitle: 'ปรับเปลี่ยนสไตล์ของตาราง',
     tableStyleSwatches: {
       TableStyleLight1: 'สไตล์ตาราง (สว่าง) 1',
       TableStyleLight2: 'สไตล์ตาราง (สว่าง) 2',

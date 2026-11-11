@@ -438,6 +438,13 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     tableStyleNew: 'Nouveau style de tableau…',
     tableStyleNewPivot: 'Nouveau style de tableau croisé dynamique…',
     tableStyleClear: 'Effacer',
+    tableStyleApplyMaintain: 'Appliquer (et conserver la mise en forme)',
+    tableStyleApplyClear: 'Appliquer et supprimer la mise en forme',
+    tableStyleModify: 'Modifier...',
+    tableStyleDuplicate: 'Dupliquer...',
+    tableStyleDelete: 'Supprimer',
+    tableStyleSetDefault: 'Définir par défaut',
+    tableStyleModifyTitle: 'Modifier le style de tableau',
     tableStyleSwatches: {
       TableStyleLight1: 'Style de tableau (Clair) 1',
       TableStyleLight2: 'Style de tableau (Clair) 2',

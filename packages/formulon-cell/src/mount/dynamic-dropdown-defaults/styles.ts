@@ -12,12 +12,14 @@ import {
   type CustomTableStyle,
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
+  customTableStyleById,
   DEFAULT_TABLE_COLOR,
   defaultTableStyleId,
   formatAsTableByStyleId,
   inferTableHasHeaders,
   nextTableName,
   overlayStyleName,
+  parseTableStyleName,
   pivotTableStyleAssignment,
   tableNameError,
   tableOverlayAt,
@@ -25,8 +27,17 @@ import {
 } from '../../commands/format-as-table.js';
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
 import { recordConditionalRulesChange, recordTablesChange } from '../../commands/slice-history.js';
-import { tableSourceForSelection, tableWrite } from '../../commands/table-actions.js';
-import { applyTableStyle, clearTableStyle } from '../../commands/table-style-actions.js';
+import {
+  tableChangeAllowed,
+  tableSourceForSelection,
+  tableWrite,
+} from '../../commands/table-actions.js';
+import {
+  applyTableStyle,
+  clearTableRangeFormatting,
+  clearTableStyle,
+  modifyCustomTableStyle,
+} from '../../commands/table-style-actions.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { Range } from '../../engine/types.js';
@@ -213,6 +224,8 @@ export const showCreateTableDialog = async (
     style?: string;
     color?: string;
     variant?: CustomTableStyle['variant'];
+    /** Clear the direct formatting of the range first, as Apply and Clear Formatting does. */
+    clearFormatting?: boolean;
   } = {},
   entry: DialogEntry = { origin: 'ribbon', commandId: 'formatTableInsert' },
 ): Promise<void> => {
@@ -276,27 +289,73 @@ export const showCreateTableDialog = async (
   }
   const range = parsedRange(result.range);
   if (!range) return;
-  tableWrite(
-    { store: instance.store, history: instance.history, ...entry },
-    range,
-    undefined,
-    () => {
-      recordTablesChange(instance.history, instance.store, () => {
-        formatAsTableByStyleId(
-          instance.store,
-          range,
-          options.style ?? defaultTableStyleId(instance.store.getState(), instance.workbook),
-          options.color,
-          options.variant ?? 'banded',
-          {
-            showHeader: result.hasHeaders,
-            workbook: instance.workbook,
-            ...(result.name ? { name: result.name } : {}),
-          },
-        );
-      });
+  const ctx = { store: instance.store, history: instance.history, ...entry };
+  if (options.clearFormatting && !tableChangeAllowed(ctx, range)) return;
+  const transaction = options.clearFormatting ? instance.history.begin() : null;
+  if (options.clearFormatting) clearTableRangeFormatting(ctx, range);
+  tableWrite(ctx, range, undefined, () => {
+    recordTablesChange(instance.history, instance.store, () => {
+      formatAsTableByStyleId(
+        instance.store,
+        range,
+        options.style ?? defaultTableStyleId(instance.store.getState(), instance.workbook),
+        options.color,
+        options.variant ?? 'banded',
+        {
+          showHeader: result.hasHeaders,
+          workbook: instance.workbook,
+          ...(result.name ? { name: result.name } : {}),
+        },
+      );
+    });
+  });
+  if (transaction) instance.history.end(transaction);
+  instance.host.focus();
+};
+
+/** Modify or Duplicate from a table style gallery item's context menu. Duplicate names the copy
+ *  after its source with a 2; that name is unmeasured. */
+export const openTableStyleEditor = async (
+  instance: SpreadsheetInstance,
+  mode: 'modify' | 'duplicate',
+  styleId: string,
+): Promise<void> => {
+  const strings = instance.i18n.strings;
+  const t = strings.ribbonMenu;
+  const custom = customTableStyleById(instance.store.getState(), styleId);
+  const builtin = custom ? null : parseTableStyleName(styleId);
+  const source =
+    custom ??
+    (builtin
+      ? {
+          label: t.tableStyleSwatches[styleId as keyof typeof t.tableStyleSwatches] ?? styleId,
+          style: builtin.style,
+          color: builtin.color,
+          variant: 'banded' as const,
+        }
+      : null);
+  if (!source || (mode === 'modify' && !custom)) return;
+  const value = await showTableStyleDialog({
+    title: mode === 'modify' ? t.tableStyleModifyTitle : t.tableStyleNew,
+    strings,
+    initial: {
+      name: mode === 'modify' ? source.label : `${source.label} 2`,
+      style: source.style,
+      color: source.color ?? DEFAULT_TABLE_COLOR,
+      variant: source.variant,
     },
-  );
+  });
+  if (value) {
+    const look = { style: value.style, color: value.color, variant: value.variant };
+    if (mode === 'modify') {
+      modifyCustomTableStyle({ store: instance.store, history: instance.history }, styleId, {
+        label: value.name,
+        ...look,
+      });
+    } else {
+      createTableStyleFromActiveTable(instance.store, instance.history, value.name, look);
+    }
+  }
   instance.host.focus();
 };
 

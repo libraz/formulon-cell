@@ -434,6 +434,13 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     tableStyleNew: '新しい表スタイル...',
     tableStyleNewPivot: '新しいピボットテーブル スタイル...',
     tableStyleClear: 'クリア',
+    tableStyleApplyMaintain: '適用 (書式を保持)',
+    tableStyleApplyClear: '適用 (書式をクリア)',
+    tableStyleModify: '変更...',
+    tableStyleDuplicate: '複製...',
+    tableStyleDelete: '削除',
+    tableStyleSetDefault: '既定に設定',
+    tableStyleModifyTitle: 'テーブル スタイルの変更',
     tableStyleSwatches: {
       TableStyleLight1: '白, テーブル スタイル (淡色) 1',
       TableStyleLight2: 'アイスブルー, テーブル スタイル (淡色) 2',

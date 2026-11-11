@@ -431,6 +431,13 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     tableStyleNew: '新建表格样式…',
     tableStyleNewPivot: '新建数据透视表样式…',
     tableStyleClear: '清除',
+    tableStyleApplyMaintain: '应用并保留格式',
+    tableStyleApplyClear: '应用并清除格式',
+    tableStyleModify: '修改...',
+    tableStyleDuplicate: '复制...',
+    tableStyleDelete: '删除',
+    tableStyleSetDefault: '设为默认值',
+    tableStyleModifyTitle: '修改表样式',
     tableStyleSwatches: {
       TableStyleLight1: '表格样式 (浅色) 1',
       TableStyleLight2: '表格样式 (浅色) 2',
