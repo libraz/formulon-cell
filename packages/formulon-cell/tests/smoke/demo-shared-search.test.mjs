@@ -8,6 +8,7 @@ import {
   buildDemoSearchSuggestions,
   commitDemoBookName,
   createDemoStrings,
+  createInitialDemoWorkbook,
   DEFAULT_DEMO_QUICK_ACCESS,
   DEMO_ICONS,
   DEMO_PRINTER_PROFILE_ID,
@@ -19,7 +20,6 @@ import {
   demoQuickAccessEnabled,
   demoQuickAccessMenu,
   demoSelectionLabel,
-  evaluateDemoProbe,
   INITIAL_DEMO_SEARCH_STATE,
   isDemoFeatureOn,
   nextDemoFeatureOverrides,
@@ -32,14 +32,39 @@ import {
   saveDemoWorkbookToDownload,
   toggleDemoQuickAccess,
 } from '../../../../apps/demo-shared/index.ts';
-import {
-  createExcelRibbonSvg,
-  createSpreadsheetStore,
-  mutators,
-  WorkbookHandle,
-} from '../../src/index.ts';
+import { createExcelRibbonSvg, mount } from '../../src/index.ts';
+import { createHostElement, installDomStubs, uninstallDomStubs } from '../test-utils/dom.ts';
 
 const repoRoot = join(import.meta.dirname, '../../../..');
+
+const DEMO_HOST = {
+  printerProfiles: DEMO_PRINTER_PROFILES,
+  printerProfileId: DEMO_PRINTER_PROFILE_ID,
+};
+
+/** Mounts the demo's empty workbook with the demo host providers, runs `body`, then releases both. */
+const withDemoInstance = async (body) => {
+  installDomStubs();
+  const workbook = await createInitialDemoWorkbook('?locale=en&fixture=empty');
+  const { host, cleanup } = createHostElement();
+  const instance = await mount(host, { workbook, host: DEMO_HOST });
+  try {
+    return await body(instance);
+  } finally {
+    instance.dispose();
+    workbook.dispose();
+    cleanup();
+    uninstallDomStubs();
+  }
+};
+
+const text = (instance, ref) => instance.workbook.sheet(0).getValue(...cellOf(ref));
+const cellOf = (ref) => [Number(ref.slice(1)) - 1, ref.charCodeAt(0) - 65];
+const writeText = (instance, values) =>
+  instance.applyChanges(
+    Object.entries(values).map(([ref, input]) => ({ sheet: 0, at: ref, input })),
+    { history: 'record' },
+  );
 
 describe('demo-shared Search/Tell me items', () => {
   it('keeps visible workbook chrome framework-neutral for the Excel baseline', () => {
@@ -296,14 +321,13 @@ describe('demo-shared Search/Tell me items', () => {
   });
 
   it('feeds the shared host-printer stub into the Backstage print preview model', async () => {
-    const store = createSpreadsheetStore();
-    mutators.setPageSetup(store, 0, {
-      margins: { top: 0, right: 0, bottom: 0, left: 0 },
-    });
-    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const ui = createDemoStrings('React').en;
-
-    const model = buildDemoPrintPreviewModel(ui, { store, workbook }, 'Book1');
+    const model = await withDemoInstance(async (instance) => {
+      await instance.workbook
+        .sheet(0)
+        .updatePageMargins({ topIn: 0, rightIn: 0, bottomIn: 0, leftIn: 0 });
+      return buildDemoPrintPreviewModel(ui, instance, 'Book1');
+    });
 
     expect(model.settings).toContainEqual({
       label: 'Printer',
@@ -323,11 +347,10 @@ describe('demo-shared Search/Tell me items', () => {
   });
 
   it('localizes the Backstage print preview model for Japanese Excel chrome', async () => {
-    const store = createSpreadsheetStore();
-    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const ui = createDemoStrings('React').ja;
-
-    const model = buildDemoPrintPreviewModel(ui, { store, workbook }, 'ブック');
+    const model = await withDemoInstance((instance) =>
+      buildDemoPrintPreviewModel(ui, instance, 'ブック'),
+    );
 
     expect(model.title).toBe('印刷');
     expect(model.subtitle).toBe('ブック');
@@ -386,54 +409,43 @@ describe('demo-shared Search/Tell me items', () => {
       return 1;
     };
 
-    const noLosses = {
-      downgradedFormulaCount: 0,
-      deferredFeatureCount: 0,
-      droppedPartCount: 0,
-      droppedRelationshipCount: 0,
-      renumberedPartCount: 0,
-    };
-    const i18n = { strings: {} };
-    await saveDemoWorkbookToDownload({
-      instance: {
-        host: documentRef.body,
-        i18n,
-        workbook: {
-          saveWithDiagnostics: () => ({ bytes: new Uint8Array([1, 2, 3]), diagnostics: noLosses }),
-        },
-      },
-      bookName: 'Book1',
-      setUploadStatus: (status) => statuses.push(status),
-      documentRef,
-      urlApi,
-      setTimeoutFn,
-    });
+    await withDemoInstance(async (instance) => {
+      await saveDemoWorkbookToDownload({
+        instance,
+        bookName: 'Book1',
+        setUploadStatus: (status) => statuses.push(status),
+        documentRef,
+        urlApi,
+        setTimeoutFn,
+      });
 
-    expect(statuses).toEqual(['saving', 'saved']);
-    expect(anchor).toMatchObject({ href: 'blob:demo', download: 'Book1.xlsx' });
-    expect(clicked).toHaveBeenCalledTimes(1);
-    expect(appended).toEqual([anchor]);
-    expect(removed).toEqual([anchor]);
-    expect(urlApi.revokeObjectURL).toHaveBeenCalledWith('blob:demo');
+      expect(statuses).toEqual(['saving', 'saved']);
+      expect(anchor).toMatchObject({ href: 'blob:demo', download: 'Book1.xlsx' });
+      expect(clicked).toHaveBeenCalledTimes(1);
+      expect(appended).toEqual([anchor]);
+      expect(removed).toEqual([anchor]);
+      expect(urlApi.createObjectURL.mock.calls[0][0].size).toBeGreaterThan(0);
+      expect(urlApi.revokeObjectURL).toHaveBeenCalledWith('blob:demo');
 
-    await saveDemoWorkbookToDownload({
-      instance: {
-        host: documentRef.body,
-        i18n,
-        workbook: {
-          saveWithDiagnostics: () => {
-            throw new Error('save failed');
-          },
+      // An instance whose workbook cannot be written reports the failure in the status bar.
+      const broken = new Proxy(instance, {
+        get: (target, key) => {
+          if (key === 'workbook') throw new Error('save failed');
+          return Reflect.get(target, key);
         },
-      },
-      bookName: 'Broken',
-      setUploadStatus: (status) => statuses.push(status),
-      documentRef,
-      urlApi,
-      setTimeoutFn,
+      });
+      await saveDemoWorkbookToDownload({
+        instance: broken,
+        bookName: 'Broken',
+        setUploadStatus: (status) => statuses.push(status),
+        documentRef,
+        urlApi,
+        setTimeoutFn,
+      });
     });
 
     expect(statuses.slice(-2)).toEqual(['saving', 'error']);
+    expect(clicked).toHaveBeenCalledTimes(1);
   });
 
   it('toggles feature overrides relative to the preset default', () => {
@@ -525,62 +537,47 @@ describe('demo-shared Search/Tell me items', () => {
     expect(reduceDemoSearch(open, { type: 'reset' })).toEqual(INITIAL_DEMO_SEARCH_STATE);
   });
 
-  it('evaluates probes and reports evaluation errors as text', () => {
-    const inst = {
-      formula: {
-        evaluate: (name) => {
-          if (name === 'BOOM') throw new Error('boom');
-          return name === 'NUM' ? { kind: 'number', value: 212 } : { kind: 'bool', value: true };
-        },
-      },
-    };
-    expect(evaluateDemoProbe(inst, 'NUM', [])).toEqual({ name: 'NUM', result: '212' });
-    expect(evaluateDemoProbe(inst, 'B', [])).toEqual({
-      name: 'B',
-      result: '{"kind":"bool","value":true}',
+  it('keeps the change log newest-first and capped', async () => {
+    await withDemoInstance((instance) => {
+      writeText(instance, { A1: 'zero' });
+      const event = (row) => ({
+        sheet: 0,
+        at: { row, col: 0 },
+        value: instance.workbook.sheet(0).getValue(row, 0),
+        origin: 'user',
+      });
+      expect(demoChangeLogEntry(instance.workbook, event(0))).toMatchObject({
+        cell: 'A1',
+        preview: '"zero"',
+      });
+      expect(demoChangeLogEntry(instance.workbook, event(1)).preview).toBe('∅');
+      let log = [];
+      for (let row = 0; row < 12; row += 1)
+        log = pushDemoChangeLog(log, demoChangeLogEntry(instance.workbook, event(row)));
+      expect(log).toHaveLength(8);
+      expect(log[0]?.cell).toBe('A12');
     });
-    expect(evaluateDemoProbe(inst, 'BOOM', [])).toEqual({ name: 'BOOM', result: 'boom' });
   });
 
-  it('keeps the change log newest-first and capped', () => {
-    const event = (row) => ({
-      addr: { sheet: 0, row, col: 0 },
-      value: { kind: 'number', value: row },
-      formula: null,
+  it('runs demo scripts as one undo step, skipping protected cells', async () => {
+    await withDemoInstance(async (instance) => {
+      writeText(instance, { A1: 'locked', B1: 'open', C1: 'also' });
+      const sheet = instance.workbook.sheet(0);
+      sheet.updateCellFormat('B1:C1', { protection: { locked: false } });
+      await sheet.protect({});
+      // Reversed drag: the range must be normalized before it is applied.
+      instance.selection.set('C1');
+      instance.selection.extend('A1');
+
+      expect(runDemoScript(instance, 'uppercase')).toBe(2);
+      expect(text(instance, 'A1')).toBe('locked');
+      expect(text(instance, 'B1')).toBe('OPEN');
+      expect(text(instance, 'C1')).toBe('ALSO');
+
+      instance.history.undo();
+      expect(text(instance, 'B1')).toBe('open');
+      expect(text(instance, 'C1')).toBe('also');
     });
-    expect(demoChangeLogEntry(event(0))).toMatchObject({ cell: 'A1', preview: '0' });
-    let log = [];
-    for (let row = 0; row < 12; row += 1)
-      log = pushDemoChangeLog(log, demoChangeLogEntry(event(row)));
-    expect(log).toHaveLength(8);
-    expect(log[0]?.cell).toBe('A12');
-  });
-
-  it('runs demo scripts through the core writer, skipping protected cells', () => {
-    const store = createSpreadsheetStore();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'locked' }, null);
-    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'text', value: 'open' }, null);
-    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { locked: false });
-    mutators.setSheetProtected(store, 0, true);
-    // Reversed drag: the range must be normalized before it is applied.
-    mutators.setRange(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 0 });
-    const writes = [];
-    const history = { begin: vi.fn(), end: vi.fn() };
-    const inst = {
-      store,
-      history,
-      workbook: {
-        withBatchedRecalc: (fn) => fn(),
-        setText: (addr, value) => writes.push([addr.col, value]),
-        setBlank: () => {},
-        cells: () => [],
-      },
-    };
-
-    expect(runDemoScript(inst, 'uppercase')).toBe(1);
-    expect(writes).toEqual([[1, 'OPEN']]);
-    expect(history.begin).toHaveBeenCalledTimes(1);
-    expect(history.end).toHaveBeenCalledTimes(1);
   });
 
   it('lists the Mac Quick Access customize menu in desktop order with the default checks', () => {
@@ -622,23 +619,33 @@ describe('demo-shared Search/Tell me items', () => {
     expect(DEMO_QUICK_ACCESS_COMMANDS).toHaveLength(12);
   });
 
-  it('disables Undo without history and Send Workbook always', () => {
-    const instance = (canUndo) => ({ history: { canUndo: () => canUndo } });
-    expect(demoQuickAccessEnabled('undo', instance(false))).toBe(false);
-    expect(demoQuickAccessEnabled('undo', instance(true))).toBe(true);
+  it('follows undo and repeat history, and disables Send Workbook always', async () => {
+    await withDemoInstance((instance) => {
+      expect(demoQuickAccessEnabled('undo', instance)).toBe(false);
+      expect(demoQuickAccessEnabled('redo', instance)).toBe(false);
+      writeText(instance, { A1: 'typed' });
+      expect(demoQuickAccessEnabled('undo', instance)).toBe(true);
+      expect(demoQuickAccessEnabled('redo', instance)).toBe(instance.history.canRepeat);
+      expect(demoQuickAccessEnabled('sendWorkbook', instance)).toBe(false);
+      expect(demoQuickAccessEnabled('save', instance)).toBe(true);
+    });
     expect(demoQuickAccessEnabled('undo', null)).toBe(false);
-    expect(demoQuickAccessEnabled('sendWorkbook', instance(true))).toBe(false);
-    expect(demoQuickAccessEnabled('redo', instance(false))).toBe(true);
+    expect(demoQuickAccessEnabled('redo', null)).toBe(false);
   });
 
-  it('builds the Mac empty-query search popup sections', () => {
+  it('builds the Mac empty-query search popup sections', async () => {
     const ui = createDemoStrings('React').ja;
-    const openFindReplace = vi.fn();
     const applyCommand = vi.fn(() => true);
-    const sections = buildDemoSearchSuggestions(ui, {
-      instance: { openFindReplace },
-      setRibbonTab: vi.fn(),
-      applyCommand,
+    const { sections, opened } = await withDemoInstance((instance) => {
+      const open = vi.spyOn(instance.dialogs, 'open').mockImplementation(() => {});
+      const built = buildDemoSearchSuggestions(ui, {
+        instance,
+        setRibbonTab: vi.fn(),
+        applyCommand,
+      });
+      built[1].items[0].run();
+      built[1].items[1].run();
+      return { sections: built, opened: open.mock.calls };
     });
     expect(
       sections.map((section) => [
@@ -666,10 +673,10 @@ describe('demo-shared Search/Tell me items', () => {
       [null, [['検索に関するフィードバック', true, false]]],
     ]);
     expect(ui.searchSuggestions.button).toBe('検索 (Cmd + Ctrl + U)');
-    const find = sections[1].items;
-    find[0].run();
-    find[1].run();
-    expect(openFindReplace.mock.calls).toEqual([['find'], ['replace']]);
+    expect(opened).toEqual([
+      ['findReplace', { tab: 'find' }],
+      ['findReplace', { tab: 'replace' }],
+    ]);
     sections[0].items[2].run();
     expect(applyCommand).toHaveBeenCalledWith('insertRows');
     expect(sections[2].items[0].glyph).toBe('feedback');
