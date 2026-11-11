@@ -52,7 +52,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
-- Pick From Drop-down List in the cell context menu, and Alt+Down on a cell without a list validation: the distinct text entries of the column's filled block around the active cell, sorted. A locked active cell on a protected sheet greys it.
+- Pick From Drop-down List in the cell context menu, and Alt+Down on a cell without a list validation: the text entries of the column's filled block around the active cell, the active cell left out, folded case-insensitively with the topmost spelling kept, sorted. A locked active cell on a protected sheet greys it.
 - `WorkbookHandle.sheetIndexByName`, `tableIndexByName`, `renameTable` and `updateTableStyleOptions`. Sheet and table names resolve with the engine's name rules instead of ASCII-only case folding.
 - `ChartPlacement` is exported for `createSessionChart` placements.
 

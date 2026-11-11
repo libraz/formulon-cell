@@ -149,18 +149,23 @@ describe('attachValidationList', () => {
     handle.detach();
   });
 
-  it('Alt+Down on a cell without a list opens Pick From Drop-down List: the column block, sorted', () => {
+  it('Alt+Down on a cell without a list opens Pick From Drop-down List as the desktop builds it', () => {
+    // B1..B7 = header, pear, apple, 10, Apple, pear, banana; B8 blank; B9 = cherry.
     for (const [row, text] of [
-      [0, 'pear'],
-      [1, 'apple'],
-      [2, 'pear'],
-      [4, 'fig'],
-      [6, 'kiwi'],
+      [0, 'header'],
+      [1, 'pear'],
+      [2, 'apple'],
+      [4, 'Apple'],
+      [5, 'pear'],
+      [6, 'banana'],
+      [8, 'cherry'],
     ] as const)
       wb.setText({ sheet: 0, row, col: 1 }, text);
-    wb.setNumber({ sheet: 0, row: 5, col: 1 }, 7);
+    wb.setNumber({ sheet: 0, row: 3, col: 1 }, 10);
     mutators.replaceCells(store, wb.cells(0));
-    mutators.setActive(store, { sheet: 0, row: 3, col: 1 });
+    mutators.setActive(store, { sheet: 0, row: 6, col: 1 });
+    grid.tabIndex = -1;
+    grid.focus();
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     const event = new KeyboardEvent('keydown', {
       key: 'ArrowDown',
@@ -170,13 +175,34 @@ describe('attachValidationList', () => {
     });
     grid.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
-    // Rows 0-2 above and 4-6 below the blank-free block; numbers stay out, duplicates once.
-    expect(items().map((item) => item.textContent)).toEqual(['apple', 'fig', 'kiwi', 'pear']);
+    // The block stops at B8; the active cell, the number and the second "Apple" stay out.
+    expect(items().map((item) => item.textContent)).toEqual(['apple', 'header', 'pear']);
     items()
-      .find((item) => item.textContent === 'fig')
+      .find((item) => item.textContent === 'pear')
       ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    expect(wb.getValue({ sheet: 0, row: 3, col: 1 })).toEqual({ kind: 'text', value: 'fig' });
+    expect(wb.getValue({ sheet: 0, row: 6, col: 1 })).toEqual({ kind: 'text', value: 'pear' });
+    // The sheet keeps the keyboard after a pick.
+    expect(document.activeElement).toBe(grid);
+    handle.detach();
+  });
+
+  it('gives the keyboard to the sheet when the menu that opened the list is gone', () => {
+    const host = document.createElement('div');
+    host.className = 'fc-host';
+    host.tabIndex = -1;
+    document.body.appendChild(host);
+    host.appendChild(grid);
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'alpha');
+    mutators.replaceCells(store, wb.cells(0));
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    const menuButton = document.createElement('button');
+    document.body.appendChild(menuButton);
+    menuButton.focus();
+    const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     expect(handle.openPickList()).toBe(true);
+    menuButton.remove();
+    items()[0]?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(host);
     handle.detach();
   });
 

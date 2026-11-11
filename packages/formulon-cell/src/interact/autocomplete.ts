@@ -729,8 +729,9 @@ export function pickListValues(
   return out;
 }
 
-/** Pick From Drop-down List: the distinct text entries of the column's block of filled cells
- *  above and below `row`, sorted. Formulas and non-text values are left out. */
+/** Pick From Drop-down List: the text entries of the column's block of filled cells around
+ *  `row` (stopping at the first blank, the active cell left out), folded case-insensitively with
+ *  the topmost spelling kept, sorted. Numbers and formulas are left out. */
 export function pickFromListValues(
   cells: Iterable<{ addr: Addr; value: CellValue; formula: string | null }>,
   col: number,
@@ -740,17 +741,21 @@ export function pickFromListValues(
   for (const e of cells) {
     if (e.addr.col === col && e.value.kind !== 'blank') byRow.set(e.addr.row, e);
   }
-  const texts = new Set<string>();
-  const take = (r: number): boolean => {
-    const entry = byRow.get(r);
-    if (!entry) return false;
-    if (entry.formula === null && entry.value.kind === 'text' && entry.value.value.length > 0)
-      texts.add(entry.value.value);
-    return true;
-  };
-  for (let r = row - 1; r >= 0 && take(r); r -= 1);
-  for (let r = row + 1; take(r); r += 1);
-  return [...texts].sort((a, b) => a.localeCompare(b));
+  let top = row;
+  while (top > 0 && byRow.has(top - 1)) top -= 1;
+  let bottom = row;
+  while (byRow.has(bottom + 1)) bottom += 1;
+  const byFold = new Map<string, string>();
+  for (let r = top; r <= bottom; r += 1) {
+    const entry = r === row ? undefined : byRow.get(r);
+    if (!entry || entry.formula !== null || entry.value.kind !== 'text') continue;
+    const text = entry.value.value;
+    const fold = text.toLocaleLowerCase();
+    if (text.length > 0 && !byFold.has(fold)) byFold.set(fold, text);
+  }
+  return [...byFold.values()].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' }),
+  );
 }
 
 /** column-history autocomplete: when editing a plain-text cell, match

@@ -101,9 +101,14 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     popover = null;
     document.removeEventListener('mousedown', onDocMouseDown, true);
     document.removeEventListener('keydown', onDocKey, true);
-    const focusTarget = restoreFocus;
+    const opener = restoreFocus;
     restoreFocus = null;
-    if (shouldRestoreFocus) focusTarget?.focus({ preventScroll: true });
+    if (!shouldRestoreFocus) return;
+    // A menu that opened the list is gone by now; the sheet takes the keyboard back.
+    const focusTarget = opener?.isConnected
+      ? opener
+      : (grid.closest<HTMLElement>('.fc-host') ?? grid);
+    focusTarget.focus({ preventScroll: true });
   };
 
   const onDocMouseDown = (e: MouseEvent): void => {
@@ -143,7 +148,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     }
     if (!isCellWritable(store.getState(), addr)) {
       warnProtected(addr);
-      close();
+      close(true);
       return;
     }
     if (blockDataTableCells(wb, [addr])) {
@@ -154,7 +159,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     const result = commitCellInput({ store, wb, addr, raw: value, origin: 'editor' });
     if (result.status === 'failed') console.warn('formulon-cell: list pick failed', result.error);
     deps.onAfterCommit();
-    close();
+    close(true);
   };
 
   const open = (row: number, col: number, list: string[], currentValue = ''): void => {
