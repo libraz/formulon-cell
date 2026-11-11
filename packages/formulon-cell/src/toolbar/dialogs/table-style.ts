@@ -1,8 +1,8 @@
 import {
-  type CustomTableStyle,
   DEFAULT_TABLE_COLOR,
   TABLE_STYLE_COLORS,
   type TableStyle,
+  type TableVariant,
   tableVariantFromOptions,
   tableVariantOptions,
 } from '../../commands/format-as-table.js';
@@ -20,7 +20,7 @@ export interface TableStyleDialogResult {
   name: string;
   style: TableStyle;
   color: string;
-  variant: CustomTableStyle['variant'];
+  variant: TableVariant;
 }
 
 interface TableStyleDialogStrings {

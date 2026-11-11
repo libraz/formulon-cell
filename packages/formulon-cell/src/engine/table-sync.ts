@@ -1,6 +1,5 @@
 import { TableTotalsRowFunction } from '@libraz/formulon';
 import {
-  type CustomTableStyle,
   DEFAULT_TABLE_COLOR,
   overlayStyleName,
   parseTableStyleName,
@@ -139,11 +138,10 @@ export function sameTotals(
   );
 }
 
-/** Look and flags of an engine table from its style details; a custom style
- *  supplies its family and hue. */
+/** Look and flags of an engine table from its style details; a built-in style
+ *  supplies its family and hue, any other the defaults. */
 function overlayLook(
   details: TableStyleDetails,
-  customs: readonly CustomTableStyle[],
 ): Pick<
   TableOverlay,
   | 'style'
@@ -156,10 +154,7 @@ function overlayLook(
   | 'colStripes'
   | 'styleName'
 > {
-  const custom = customs.find(
-    (c) => c.label.toLocaleLowerCase() === details.styleName.toLowerCase(),
-  );
-  const look = custom ?? parseTableStyleName(details.styleName);
+  const look = parseTableStyleName(details.styleName);
   return {
     style: look?.style ?? 'medium',
     color: look?.color ?? DEFAULT_TABLE_COLOR,
@@ -174,12 +169,8 @@ function overlayLook(
 }
 
 /** Convert the engine's worksheet tables into engine-backed overlays, with
- *  the style, flags and header / totals rows the engine reports. `customs`
- *  are the gallery models of the workbook's custom table styles. */
-export function tableOverlaysFromEngine(
-  wb: TableReader,
-  customs: readonly CustomTableStyle[] = [],
-): TableOverlay[] {
+ *  the style, flags and header / totals rows the engine reports. */
+export function tableOverlaysFromEngine(wb: TableReader): TableOverlay[] {
   const out: TableOverlay[] = [];
   for (const table of wb.getTables()) {
     const range = tableRange(table.sheetIndex, table.ref);
@@ -191,7 +182,7 @@ export function tableOverlaysFromEngine(
       name: table.name,
       range,
       ...(details
-        ? { ...overlayLook(details, customs), totals: totalsFromDetails(details) }
+        ? { ...overlayLook(details), totals: totalsFromDetails(details) }
         : { style: 'medium', showHeader: true, showTotal: false, banded: true }),
       // A table without its AutoFilter shows no header filter buttons.
       ...(wb.capabilities?.typedTableAutoFilter && wb.getTableAutoFilter?.(table.index) === null
@@ -210,12 +201,11 @@ export function hydrateTableOverlaysFromEngine(wb: TableReader, store: Spreadshe
     if (wb.capabilities?.customTableStyles) {
       hydrateTableStylesFromEngine(wb as Parameters<typeof hydrateTableStylesFromEngine>[0], store);
     }
-    const customs = store.getState().tables.customTableStyles ?? [];
     const known = new Map<string, TableOverlay>();
     for (const t of store.getState().tables.tables) {
       if (t.source === 'engine' && t.name) known.set(t.name.toLocaleLowerCase(), t);
     }
-    const overlays = tableOverlaysFromEngine(wb, customs).map((t) => {
+    const overlays = tableOverlaysFromEngine(wb).map((t) => {
       const previous = t.name ? known.get(t.name.toLocaleLowerCase()) : undefined;
       return previous && t.styleName !== undefined && sameEngineLook(previous, t)
         ? { ...t, style: previous.style, color: previous.color, styleName: previous.styleName }

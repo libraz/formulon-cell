@@ -6,6 +6,7 @@ import {
   defaultTableOverlay,
   formatAsTable,
   formatAsTableByStyleId,
+  galleryStyleElements,
   overlayStyleName,
   parseTableStyleName,
   type TableOverlay,
@@ -16,6 +17,10 @@ import {
 import { History } from '../../../src/commands/history.js';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { recordTablesChange } from '../../../src/commands/slice-history.js';
+import {
+  customStyleFromEngine,
+  engineStyleFromCustom,
+} from '../../../src/engine/table-style-sync.js';
 import { hydrateTableOverlaysFromEngine } from '../../../src/engine/table-sync.js';
 import { PivotAggregation, type Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -228,16 +233,18 @@ describe('table styles through the engine', () => {
       selection: { ...s.selection, active: { sheet: 0, row: 1, col: 1 } },
     }));
 
-    createTableStyleFromActiveTable(store, history, 'Quarterly', {
-      style: 'dark',
-      color: '#70ad47',
-      variant: 'bandedFirstCol',
-    });
+    const elements = galleryStyleElements('dark', '#70ad47', 'bandedFirstCol');
+    createTableStyleFromActiveTable(store, history, 'Quarterly', { elements });
     recordTablesChange(history, store, () => {
       updateTableOverlay(
         store,
         overlay?.id ?? '',
-        tableStyleOptionsById(store.getState(), 'custom-table:Quarterly'),
+        tableStyleOptionsById(
+          store.getState(),
+          'custom-table:Quarterly',
+          undefined,
+          'bandedFirstCol',
+        ),
       );
     });
 
@@ -253,14 +260,10 @@ describe('table styles through the engine', () => {
       {
         id: 'custom-table:Quarterly',
         label: 'Quarterly',
-        style: 'dark',
-        color: '#70ad47',
-        variant: 'bandedFirstCol',
+        elements,
       },
     ]);
     expect(onlyTable(back.store)).toMatchObject({
-      style: 'dark',
-      color: '#70ad47',
       styleName: 'Quarterly',
       banded: true,
       firstCol: true,
@@ -271,7 +274,9 @@ describe('table styles through the engine', () => {
     const wb = await seeded();
     const store = bound(wb);
     const history = new History();
-    createTableStyleFromActiveTable(store, history, 'Temp', { style: 'light' });
+    createTableStyleFromActiveTable(store, history, 'Temp', {
+      elements: galleryStyleElements('light', '#4472c4', 'banded'),
+    });
     expect(wb.getCustomTableStyles()).toHaveLength(1);
 
     history.undo();
@@ -301,7 +306,7 @@ describe('table styles through the engine', () => {
       null,
       'Ledger',
       { sheetIndex: 0, pivotIndex: created.pivotIndex },
-      { style: 'medium', color: '#ed7d31', variant: 'banded' },
+      { elements: galleryStyleElements('medium', '#ed7d31', 'banded') },
     );
 
     expect(wb.getPivotStyleInfo(0, created.pivotIndex)).toMatchObject({ name: 'Ledger' });
@@ -310,9 +315,7 @@ describe('table styles through the engine', () => {
       {
         id: 'custom-pivot-table:Ledger',
         label: 'Ledger',
-        style: 'medium',
-        color: '#ed7d31',
-        variant: 'banded',
+        elements: galleryStyleElements('medium', '#ed7d31', 'banded'),
       },
     ]);
     expect(back.store.getState().tables.pivotTableStyles).toEqual([
@@ -382,5 +385,34 @@ describe('table styles through the engine', () => {
     expect(after?.columns.find((c) => c.name === 'Qty')?.totalsRowFunction).toBe(
       TableTotalsRowFunction.Sum,
     );
+  });
+
+  it('round-trips a custom table style and a custom pivot style through the engine', async () => {
+    const wb = await seeded();
+    const side = { style: 'thin' as const, color: '#112233' };
+    const elements = {
+      wholeTable: { borders: { top: side, bottom: side, left: side, right: side } },
+      headerRow: { fill: '#336699', color: '#ffffff', bold: true },
+      firstRowStripe: { fill: '#dde6f0' },
+      firstColumnStripe: { fill: '#eeeeee' },
+      lastColumn: {},
+    };
+    for (const pivot of [false, true]) {
+      const style = {
+        id: pivot ? 'custom-pivot-table:Trip' : 'custom-table:Trip',
+        label: 'Trip',
+        elements: pivot
+          ? { ...elements, firstSubtotalRow: { bold: true }, pageFieldLabels: { fill: '#ffeecc' } }
+          : elements,
+        stripeSizes: { firstRowStripe: 2 },
+      };
+      const input = engineStyleFromCustom(wb, style, { pivot, table: !pivot });
+      if (!input) throw new Error('style not authorable');
+      expect(wb.setCustomTableStyle(input)).toBe(true);
+      const stored = wb.getCustomTableStyles().find((s) => s.name === 'Trip');
+      if (!stored) throw new Error('style missing');
+      expect(customStyleFromEngine(wb, stored, pivot)).toEqual(style);
+      wb.removeCustomTableStyle('Trip');
+    }
   });
 });

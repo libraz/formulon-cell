@@ -78,6 +78,7 @@ versioning is [SemVer](https://semver.org/).
 - The table style gallery has Clear while a table is active: the table keeps its range and options and loses its style, as one undo step.
 - Table Design has a Table Styles group: a strip of the custom and built-in table styles that restyles the active table, with Quick Styles opening the full gallery. On the Mac ribbon, Quick Styles opens the gallery. The PivotTable Design Quick Styles strip and the table strip share one component. Both table galleries list Custom first.
 - A right-click on a table style in either gallery offers Apply (and Maintain Formatting), Apply and Clear Formatting, Modify, Duplicate, Delete and Set As Default. Apply and Clear Formatting clears the cells' direct formatting with the style change as one undo step; Delete moves the tables in that style to the workbook default.
+- Custom table and PivotTable styles keep a format for every table style element and their stripe sizes, so a style from a file shows and saves as it was written. Deleting a custom style moves its tables and PivotTables to their workbook defaults, resetting a deleted default to Table Style Medium 2 or PivotTable Style Light 16, as one undo step.
 
 ### Removed
 

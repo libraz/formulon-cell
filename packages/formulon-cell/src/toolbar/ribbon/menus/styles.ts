@@ -15,9 +15,9 @@ import {
 } from '../../../commands/cell-styles.js';
 import {
   type BuiltinTableStyle,
+  type CustomTableStyle,
   type TableStyle,
   tableStyleGallerySections,
-  tableStyleSwatch,
 } from '../../../commands/format-as-table.js';
 import { builtinTableStyleElements } from '../../../engine/builtin-table-styles.js';
 import {
@@ -45,6 +45,14 @@ import {
   menuTextChip,
 } from './general.js';
 
+/** A custom table or PivotTable style as the Format as Table menu lists it. */
+interface CustomStyleSwatchItem {
+  id: string;
+  label: string;
+  elements: StyleElementFormats;
+  stripeSizes?: CustomTableStyle['stripeSizes'];
+}
+
 export interface StylesMenuDeps {
   ribbonLang: ToolbarLang;
   ribbonMenuText: ToolbarMenuText;
@@ -63,20 +71,8 @@ export interface StylesMenuDeps {
       fontSize?: number;
     };
   }[];
-  customTableStyles?: () => readonly {
-    id: string;
-    label: string;
-    style: TableStyle;
-    color?: string;
-    variant: TableVariantId;
-  }[];
-  customPivotTableStyles?: () => readonly {
-    id: string;
-    label: string;
-    style: TableStyle;
-    color?: string;
-    variant: TableVariantId;
-  }[];
+  customTableStyles?: () => readonly CustomStyleSwatchItem[];
+  customPivotTableStyles?: () => readonly CustomStyleSwatchItem[];
 }
 
 export interface StylesMenuFactories {
@@ -113,40 +109,6 @@ const tableStyleSwatchPart = (className: string, background?: string): HTMLDivEl
   part.className = className;
   if (background) part.style.background = background;
   return part;
-};
-
-const createTableStyleSwatch = (
-  style: TableStyle,
-  color: string,
-  variant: TableVariantId,
-  label: string,
-  actionStyleId: string = style,
-  dataset: 'tableStyle' | 'pivotTableStyle' = 'tableStyle',
-): HTMLButtonElement => {
-  const swatch = tableStyleSwatch(style, color);
-  const { banded, firstCol } = tableVariantOptions(variant);
-  const btn = createMenuButton({
-    className: 'fc-tb__tablestyle-swatch',
-    attr: dataset,
-    value: actionStyleId,
-    title: label,
-    ariaLabel: label,
-  });
-  btn.dataset.tableColor = color;
-  btn.dataset.tableVariant = variant;
-  btn.appendChild(tableStyleSwatchPart('fc-tb__tablestyle-swatch__head', swatch.header));
-  for (let i = 0; i < 3; i += 1) {
-    const rowFill = banded && i % 2 === 0 ? swatch.band : '#ffffff';
-    const row = tableStyleSwatchPart('fc-tb__tablestyle-swatch__row', rowFill);
-    if (firstCol) {
-      row.append(
-        tableStyleSwatchPart('fc-tb__tablestyle-swatch__first-col', swatch.header),
-        tableStyleSwatchPart('fc-tb__tablestyle-swatch__rest'),
-      );
-    }
-    btn.appendChild(row);
-  }
-  return btn;
 };
 
 // A built-in swatch is a 5 x 5 table: a header row over four body rows that
@@ -195,15 +157,16 @@ export const tableStyleSwatchGrid = (elements: StyleElementFormats): HTMLDivElem
   return grid;
 };
 
-const createBuiltinTableStyleSwatch = (
+const createStyleSwatch = (
   name: string,
   elements: StyleElementFormats,
   label: string,
+  dataset: 'tableStyle' | 'pivotTableStyle' = 'tableStyle',
 ): HTMLButtonElement => {
-  // A built-in style is applied by name and leaves the table's options alone.
+  // A style is applied by name and leaves the table's options alone.
   const btn = createMenuButton({
     className: 'fc-tb__tablestyle-swatch fc-tb__tablestyle-swatch--builtin',
-    attr: 'tableStyle',
+    attr: dataset,
     value: name,
     title: label,
     ariaLabel: label,
@@ -328,7 +291,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     };
     const themeColors = deps.getWorkbook?.()?.getTheme?.()?.colors;
     const builtinSwatch = (entry: BuiltinTableStyle): HTMLButtonElement =>
-      createBuiltinTableStyleSwatch(
+      createStyleSwatch(
         entry.name,
         builtinTableStyleElements(entry.name, themeColors) ?? {},
         t.tableStyleSwatches[entry.name as keyof typeof t.tableStyleSwatches] ?? entry.name,
@@ -342,13 +305,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
           children:
             section.kind === 'custom'
               ? section.styles.map((style) =>
-                  createTableStyleSwatch(
-                    style.style,
-                    style.color ?? '#5b9bd5',
-                    style.variant,
-                    style.label,
-                    style.id,
-                  ),
+                  createStyleSwatch(style.id, style.elements, style.label),
                 )
               : section.styles.map(builtinSwatch),
         }),
@@ -363,14 +320,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
           headingClassName: 'fc-tb__tablestyle-heading',
           gridClassName: 'fc-tb__tablestyle-grid',
           children: customPivotTableStyles.map((style) =>
-            createTableStyleSwatch(
-              style.style,
-              style.color ?? '#5b9bd5',
-              style.variant,
-              style.label,
-              style.id,
-              'pivotTableStyle',
-            ),
+            createStyleSwatch(style.id, style.elements, style.label, 'pivotTableStyle'),
           ),
         }),
       );

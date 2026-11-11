@@ -163,4 +163,31 @@ describe('render/grid/table-format', () => {
       expect(tableCellFormat(t, 2, 1, OFFICE_2007)).toBeUndefined();
     });
   });
+
+  describe('custom style elements', () => {
+    const custom = {
+      id: 'custom-table:Mine',
+      label: 'Mine',
+      elements: { headerRow: { fill: '#112233' }, firstRowStripe: { fill: '#aabbcc' } },
+      stripeSizes: { firstRowStripe: 2, secondRowStripe: 2 },
+    };
+    const mine = (over: Partial<TableOverlay> = {}) =>
+      builtin('mine', { range: { sheet: 0, r0: 0, c0: 0, r1: 8, c1: 3 }, ...over });
+
+    it('paints the custom header fill', () => {
+      expect(tableCellFormat(mine(), 0, 1, undefined, [custom])).toEqual({ fill: '#112233' });
+    });
+
+    it('honours the first stripe size: bands of two rows', () => {
+      const fill = (row: number) => tableCellFormat(mine(), row, 1, undefined, [custom])?.fill;
+      expect([1, 2, 3, 4, 5, 6].map(fill)).toEqual([
+        '#aabbcc',
+        '#aabbcc',
+        undefined,
+        undefined,
+        '#aabbcc',
+        '#aabbcc',
+      ]);
+    });
+  });
 });

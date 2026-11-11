@@ -3,6 +3,7 @@ import { customCellStyleId } from '../../../../src/commands/cell-styles.js';
 import {
   customPivotTableStyleId,
   customTableStyleId,
+  galleryStyleElements,
 } from '../../../../src/commands/format-as-table.js';
 import { addrKey } from '../../../../src/engine/address.js';
 import type { MountToolbarOptions } from '../../../../src/mount/toolbar.js';
@@ -642,9 +643,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(sheet.instance.store.getState().tables.customTableStyles).toContainEqual({
       id: customTableStyleId('Review Table'),
       label: 'Review Table',
-      style: 'light',
-      color: '#ed7d31',
-      variant: 'firstCol',
+      elements: galleryStyleElements('light', '#ed7d31', 'firstCol'),
     });
 
     tb.rerender();
@@ -705,9 +704,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(sheet.instance.store.getState().tables.customPivotTableStyles).toContainEqual({
       id: customPivotTableStyleId('Review Pivot'),
       label: 'Review Pivot',
-      style: 'medium',
-      color: '#70ad47',
-      variant: 'bandedFirstCol',
+      elements: galleryStyleElements('medium', '#70ad47', 'bandedFirstCol'),
     });
     expect(sheet.instance.store.getState().tables.pivotTableStyles).toContainEqual({
       sheetIndex: 0,

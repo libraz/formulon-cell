@@ -3,8 +3,10 @@ import {
   createTableStyleFromActiveTable,
   customTableStyleId,
   formatAsTable,
+  galleryStyleElements,
 } from '../../../src/commands/format-as-table.js';
 import { applyTableStyle } from '../../../src/commands/table-style-actions.js';
+import { builtinTableStyleElements } from '../../../src/engine/builtin-table-styles.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
@@ -112,9 +114,7 @@ describe('table style gallery context menu', () => {
 
   it('deletes a custom style, moving its tables to the default style, as one undo step', () => {
     createTableStyleFromActiveTable(sheet.instance.store, sheet.instance.history, 'Review', {
-      style: 'dark',
-      color: '#4472c4',
-      variant: 'banded',
+      elements: galleryStyleElements('dark', '#4472c4', 'banded'),
     });
     const id = customTableStyleId('Review');
     const current = table();
@@ -144,6 +144,36 @@ describe('table style gallery context menu', () => {
     expect(table()?.styleName).toBe('Review');
   });
 
+  it('deletes a custom style, moving its tables to the workbook default table style', () => {
+    sheet.workbook.setTableStyleDefaults({ tableStyle: 'TableStyleLight1' });
+    createTableStyleFromActiveTable(sheet.instance.store, sheet.instance.history, 'Review', {
+      elements: galleryStyleElements('dark', '#4472c4', 'banded'),
+    });
+    const id = customTableStyleId('Review');
+    const current = table();
+    if (!current) throw new Error('no table');
+    applyTableStyle(
+      {
+        store: sheet.instance.store,
+        history: sheet.instance.history,
+        origin: 'ribbon',
+        commandId: 'tableQuickStyles',
+      },
+      current,
+      id,
+    );
+    expect(table()?.styleName).toBe('Review');
+    toolbar.rerender();
+    toolbar.setActiveTab('tableDesign');
+
+    toolbar.rerender();
+    toolbar.setActiveTab('tableDesign');
+
+    rightClick(`[data-table-quick-style="${id}"]`);
+    item('Delete').click();
+    expect(table()?.styleName).toBe('TableStyleLight1');
+  });
+
   it('duplicates a built-in style through the table style dialog', async () => {
     rightClick('[data-table-quick-style="TableStyleMedium3"]');
     item('Duplicate...').click();
@@ -154,7 +184,11 @@ describe('table style gallery context menu', () => {
     expect(name?.value).toMatch(/ 2$/);
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await Promise.resolve();
-    expect(sheet.instance.store.getState().tables.customTableStyles).toHaveLength(1);
+    const created = sheet.instance.store.getState().tables.customTableStyles ?? [];
+    expect(created).toHaveLength(1);
+    expect(created[0]?.elements).toEqual(
+      builtinTableStyleElements('TableStyleMedium3', sheet.workbook.getTheme()?.colors),
+    );
   });
 
   it('creates a table with cleared formatting when no table is active', async () => {

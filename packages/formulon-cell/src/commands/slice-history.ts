@@ -371,7 +371,11 @@ export interface TablesSnapshot {
   pivotTableStyles: PivotTableStyleAssignment[];
 }
 
-const cloneCustomTableStyle = (style: CustomTableStyle): CustomTableStyle => ({ ...style });
+const cloneCustomTableStyle = (style: CustomTableStyle): CustomTableStyle => ({
+  ...style,
+  elements: structuredClone(style.elements),
+  ...(style.stripeSizes ? { stripeSizes: { ...style.stripeSizes } } : {}),
+});
 const clonePivotTableStyle = (style: PivotTableStyleAssignment): PivotTableStyleAssignment => ({
   ...style,
 });

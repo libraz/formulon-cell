@@ -9,18 +9,18 @@ import {
 import { addConditionalRule } from '../../commands/conditional-format.js';
 import {
   applyPivotTableStyleById,
-  type CustomTableStyle,
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
   customTableStyleById,
   DEFAULT_TABLE_COLOR,
   defaultTableStyleId,
   formatAsTableByStyleId,
+  galleryStyleElements,
   inferTableHasHeaders,
   nextTableName,
   overlayStyleName,
-  parseTableStyleName,
   pivotTableStyleAssignment,
+  type TableVariant,
   tableNameError,
   tableOverlayAt,
   tableVariantFromOptions,
@@ -39,6 +39,7 @@ import {
   modifyCustomTableStyle,
 } from '../../commands/table-style-actions.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
+import { builtinTableStyleElements } from '../../engine/builtin-table-styles.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { Range } from '../../engine/types.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
@@ -223,7 +224,7 @@ export const showCreateTableDialog = async (
   options: {
     style?: string;
     color?: string;
-    variant?: CustomTableStyle['variant'];
+    variant?: TableVariant;
     /** Clear the direct formatting of the range first, as Apply and Clear Formatting does. */
     clearFormatting?: boolean;
   } = {},
@@ -323,37 +324,36 @@ export const openTableStyleEditor = async (
   const strings = instance.i18n.strings;
   const t = strings.ribbonMenu;
   const custom = customTableStyleById(instance.store.getState(), styleId);
-  const builtin = custom ? null : parseTableStyleName(styleId);
-  const source =
-    custom ??
-    (builtin
-      ? {
-          label: t.tableStyleSwatches[styleId as keyof typeof t.tableStyleSwatches] ?? styleId,
-          style: builtin.style,
-          color: builtin.color,
-          variant: 'banded' as const,
-        }
-      : null);
+  const themeColors = instance.workbook.getTheme?.()?.colors;
+  const builtinElements = custom ? null : builtinTableStyleElements(styleId, themeColors);
+  const source = custom
+    ? { label: custom.label }
+    : builtinElements
+      ? { label: t.tableStyleSwatches[styleId as keyof typeof t.tableStyleSwatches] ?? styleId }
+      : null;
   if (!source || (mode === 'modify' && !custom)) return;
   const value = await showTableStyleDialog({
     title: mode === 'modify' ? t.tableStyleModifyTitle : t.tableStyleNew,
     strings,
     initial: {
       name: mode === 'modify' ? source.label : `${source.label} 2`,
-      style: source.style,
-      color: source.color ?? DEFAULT_TABLE_COLOR,
-      variant: source.variant,
+      style: 'medium',
+      color: DEFAULT_TABLE_COLOR,
+      variant: 'banded',
     },
   });
   if (value) {
-    const look = { style: value.style, color: value.color, variant: value.variant };
+    // A duplicate copies its source's elements; the dialog's family and hue only author a modify.
+    const copied = custom
+      ? { elements: structuredClone(custom.elements), stripeSizes: custom.stripeSizes }
+      : { elements: structuredClone(builtinElements ?? {}) };
     if (mode === 'modify') {
       modifyCustomTableStyle({ store: instance.store, history: instance.history }, styleId, {
         label: value.name,
-        ...look,
+        elements: galleryStyleElements(value.style, value.color, value.variant),
       });
     } else {
-      createTableStyleFromActiveTable(instance.store, instance.history, value.name, look);
+      createTableStyleFromActiveTable(instance.store, instance.history, value.name, copied);
     }
   }
   instance.host.focus();
@@ -437,11 +437,7 @@ const buildTableStyleFooterAction =
           instance.store as unknown as Parameters<typeof createTableStyleFromActiveTable>[0],
           instance.history as unknown as Parameters<typeof createTableStyleFromActiveTable>[1],
           value.name,
-          {
-            style: value.style,
-            color: value.color,
-            variant: value.variant,
-          },
+          { elements: galleryStyleElements(value.style, value.color, value.variant) },
         );
       }
       instance.host.focus();
@@ -461,11 +457,7 @@ const buildTableStyleFooterAction =
           activePivot
             ? { sheetIndex: activePivot.sheetIndex, pivotIndex: activePivot.pivotIndex }
             : null,
-          {
-            style: value.style,
-            color: value.color,
-            variant: value.variant,
-          },
+          { elements: galleryStyleElements(value.style, value.color, value.variant) },
         );
       }
       instance.host.focus();

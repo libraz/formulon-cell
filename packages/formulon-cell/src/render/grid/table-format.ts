@@ -1,5 +1,6 @@
 import {
   approximateTableStyleElements,
+  type CustomTableStyle,
   isBandedCol,
   isBandedRow,
   isFirstCol,
@@ -31,32 +32,58 @@ const inBody = (table: TableOverlay, row: number, col: number): boolean =>
   !isTotalRow(table, row, col);
 
 /** The format a table paints at (row, col): a built-in style from its own
- *  definition under the workbook theme, a custom one by family and hue. */
+ *  definition under the workbook theme, a custom one from its elements, else
+ *  an approximation by family and hue. */
 export function tableCellFormat(
   table: TableOverlay,
   row: number,
   col: number,
   themeColors?: readonly number[],
+  customs: readonly CustomTableStyle[] = [],
 ): CellFormat | undefined {
   const { r0, r1, c0, c1 } = table.range;
-  const regions: StyleElementRegion[] = [];
-  if (isHeaderRow(table, row, col)) regions.push({ type: 'headerRow', r0, r1: r0, c0, c1 });
-  if (isTotalRow(table, row, col)) regions.push({ type: 'totalRow', r0: r1, r1, c0, c1 });
+  const name = overlayStyleName(table);
+  const builtin = builtinTableStyleElements(name, themeColors);
+  const custom = builtin
+    ? undefined
+    : customs.find((c) => c.label.toLocaleLowerCase() === name.toLocaleLowerCase());
+  const sizes = custom?.stripeSizes;
+  const regions: StyleElementRegion[] = [{ type: 'wholeTable', r0, r1, c0, c1 }];
+  const header = isHeaderRow(table, row, col);
+  const total = isTotalRow(table, row, col);
+  if (header) regions.push({ type: 'headerRow', r0, r1: r0, c0, c1 });
+  if (total) regions.push({ type: 'totalRow', r0: r1, r1, c0, c1 });
+  if (header) {
+    if (col === c0) regions.push({ type: 'firstHeaderCell', r0, r1: r0, c0, c1: c0 });
+    if (col === c1) regions.push({ type: 'lastHeaderCell', r0, r1: r0, c0: c1, c1 });
+  }
+  if (total) {
+    if (col === c0) regions.push({ type: 'firstTotalCell', r0: r1, r1, c0, c1: c0 });
+    if (col === c1) regions.push({ type: 'lastTotalCell', r0: r1, r1, c0: c1, c1 });
+  }
   if (table.banded && inBody(table, row, col)) {
-    const type = isBandedRow(table, row, col) ? 'firstRowStripe' : 'secondRowStripe';
+    const type = isBandedRow(table, row, col, {
+      first: sizes?.firstRowStripe,
+      second: sizes?.secondRowStripe,
+    })
+      ? 'firstRowStripe'
+      : 'secondRowStripe';
     regions.push({ type, r0: row, r1: row, c0, c1 });
   }
   if (table.colStripes && inBody(table, row, col)) {
-    const type = isBandedCol(table, row, col) ? 'firstColumnStripe' : 'secondColumnStripe';
+    const type = isBandedCol(table, row, col, {
+      first: sizes?.firstColumnStripe,
+      second: sizes?.secondColumnStripe,
+    })
+      ? 'firstColumnStripe'
+      : 'secondColumnStripe';
     regions.push({ type, r0, r1, c0: col, c1: col });
   }
   if (isFirstCol(table, row, col)) regions.push({ type: 'firstColumn', r0, r1, c0, c1: c0 });
   if (isLastCol(table, row, col)) regions.push({ type: 'lastColumn', r0, r1, c0: c1, c1 });
-  const name = overlayStyleName(table);
-  if (regions.length === 0 || name === '') return undefined;
+  if (name === '') return undefined;
   const elements =
-    builtinTableStyleElements(name, themeColors) ??
-    approximateTableStyleElements(table.style, table.color);
+    builtin ?? custom?.elements ?? approximateTableStyleElements(table.style, table.color);
   return composeStyleElements(elements, TABLE_ELEMENT_ORDER, regions, row, col);
 }
 
@@ -71,7 +98,9 @@ export function styleElementFormatSource(
   const themeColors = wb?.getTheme?.()?.colors;
   return (row, col) => {
     const table = tableForCell(state.tables.tables, sheet, row, col);
-    const tableFmt = table ? tableCellFormat(table, row, col, themeColors) : undefined;
+    const tableFmt = table
+      ? tableCellFormat(table, row, col, themeColors, state.tables.customTableStyles)
+      : undefined;
     const pivotFmt = pivots.formatAt(row, col);
     return tableFmt && pivotFmt ? { ...tableFmt, ...pivotFmt } : (pivotFmt ?? tableFmt);
   };

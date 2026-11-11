@@ -4,6 +4,7 @@ import {
   createTableStyleFromActiveTable,
   defaultTableOverlay,
   formatAsTable,
+  galleryStyleElements,
 } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
 import { renameActiveTable } from '../../../src/commands/table-design.js';
@@ -64,8 +65,12 @@ describe('table styles and refresh edge cases', () => {
 
   it('rejects a pivot style that reuses a table style name with another look', async () => {
     const { wb, store, history } = await setup();
-    createTableStyleFromActiveTable(store, history, 'Same', { style: 'medium' });
-    createPivotTableStyleFromActivePivot(store, history, 'Same', null, { style: 'dark' });
+    createTableStyleFromActiveTable(store, history, 'Same', {
+      elements: galleryStyleElements('medium', '#4472c4', 'banded'),
+    });
+    createPivotTableStyleFromActivePivot(store, history, 'Same', null, {
+      elements: galleryStyleElements('dark', '#4472c4', 'banded'),
+    });
     expect(store.getState().tables.customPivotTableStyles).toEqual([]);
     expect(store.getState().tables.customTableStyles?.map((s) => s.label)).toEqual(['Same']);
     expect(wb.getCustomTableStyles()[0]).toMatchObject({ name: 'Same', table: true, pivot: false });
@@ -73,8 +78,12 @@ describe('table styles and refresh edge cases', () => {
 
   it('shares one engine style between same-named table and pivot styles that look alike', async () => {
     const { wb, store, history } = await setup();
-    createTableStyleFromActiveTable(store, history, 'Same', { style: 'medium' });
-    createPivotTableStyleFromActivePivot(store, history, 'Same', null, { style: 'medium' });
+    createTableStyleFromActiveTable(store, history, 'Same', {
+      elements: galleryStyleElements('medium', '#4472c4', 'banded'),
+    });
+    createPivotTableStyleFromActivePivot(store, history, 'Same', null, {
+      elements: galleryStyleElements('medium', '#4472c4', 'banded'),
+    });
     expect(wb.getCustomTableStyles()[0]).toMatchObject({ table: true, pivot: true });
   });
 

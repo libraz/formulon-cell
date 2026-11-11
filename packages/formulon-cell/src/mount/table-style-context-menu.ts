@@ -3,7 +3,7 @@ import {
   setDefaultTableStyle,
   tableOverlayAt,
 } from '../commands/format-as-table.js';
-import { applyTableStyle, deleteCustomTableStyle } from '../commands/table-style-actions.js';
+import { applyTableStyle, deleteCustomStyle } from '../commands/table-style-actions.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { menuSeparator, menuTextChip } from '../toolbar/ribbon/menus/general.js';
 import { showCreateTableDialog } from './dynamic-dropdown-defaults/styles.js';
@@ -71,7 +71,11 @@ export function attachTableStyleContextMenu(
         openStyleDialog(action, styleId);
         return;
       case 'delete':
-        deleteCustomTableStyle(ctx, instance.workbook, styleId);
+        deleteCustomStyle(
+          ctx,
+          instance.workbook,
+          customTableStyleById(instance.store.getState(), styleId)?.label ?? '',
+        );
         break;
       case 'setDefault':
         setDefaultTableStyle(state, instance.workbook, styleId);

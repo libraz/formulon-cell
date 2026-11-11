@@ -13,6 +13,7 @@ import {
   engineTableOverlays,
   formatAsTable,
   formatAsTableByStyleId,
+  galleryStyleElements,
   inferTableHasHeaders,
   isBandedRow,
   isHeaderRow,
@@ -344,18 +345,14 @@ describe('formatAsTable command helpers', () => {
 
     expect(
       createTableStyleFromActiveTable(store, history, 'Review Table', {
-        style: 'light',
-        color: '#ed7d31',
-        variant: 'firstCol',
+        elements: galleryStyleElements('light', '#ed7d31', 'firstCol'),
       }),
     ).toBe(true);
     expect(listCustomTableStyles(store.getState())).toEqual([
       {
         id: customTableStyleId('Review Table'),
         label: 'Review Table',
-        style: 'light',
-        color: '#ed7d31',
-        variant: 'firstCol',
+        elements: galleryStyleElements('light', '#ed7d31', 'firstCol'),
       },
     ]);
 
@@ -364,12 +361,7 @@ describe('formatAsTable command helpers', () => {
       range(5, 0, 8, 2),
       customTableStyleId('Review Table'),
     );
-    expect(applied).toMatchObject({
-      style: 'light',
-      color: '#ed7d31',
-      banded: false,
-      firstCol: true,
-    });
+    expect(applied).toMatchObject({ styleName: 'Review Table', banded: true, firstCol: false });
     expect(history.undo()).toBe(true);
     expect(listCustomTableStyles(store.getState())).toEqual([]);
   });
@@ -387,11 +379,7 @@ describe('formatAsTable command helpers', () => {
           sheetIndex: 0,
           pivotIndex: 2,
         },
-        {
-          style: 'dark',
-          color: '#ed7d31',
-          variant: 'bandedFirstCol',
-        },
+        { elements: galleryStyleElements('dark', '#ed7d31', 'bandedFirstCol') },
       ),
     ).toBe(true);
     const styleId = customPivotTableStyleId('Review Pivot');
@@ -399,9 +387,7 @@ describe('formatAsTable command helpers', () => {
       {
         id: styleId,
         label: 'Review Pivot',
-        style: 'dark',
-        color: '#ed7d31',
-        variant: 'bandedFirstCol',
+        elements: galleryStyleElements('dark', '#ed7d31', 'bandedFirstCol'),
       },
     ]);
     expect(store.getState().tables.pivotTableStyles).toEqual([
@@ -492,9 +478,7 @@ describe('default table style', () => {
         {
           id: 'custom-table:Review',
           label: 'Review',
-          style: 'dark' as const,
-          color: '#4472c4',
-          variant: 'banded' as const,
+          elements: { headerRow: { fill: '#203864' } },
         },
       ],
     },

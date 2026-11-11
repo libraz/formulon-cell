@@ -3,12 +3,8 @@ import {
   type CustomTableStyle,
   customPivotTableStyleId,
   customTableStyleId,
-  DEFAULT_TABLE_COLOR,
   type PivotTableStyleAssignment,
-  type TableStyle,
-  tableStyleSwatch,
-  tableVariantFromOptions,
-  tableVariantOptions,
+  type StripeElement,
 } from '../commands/format-as-table.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, TablesSlice } from '../store/types.js';
@@ -16,6 +12,8 @@ import { dxfToApply } from './cf-sync.js';
 import { dxfRecordFromApply } from './cf-writeback.js';
 import {
   ENGINE_ELEMENT_TYPE,
+  elementTypeFromEngine,
+  type StyleElementFormat,
   type StyleElementFormats,
   type TableStyleElementType,
 } from './table-style-elements.js';
@@ -23,16 +21,18 @@ import type { WorkbookHandle } from './workbook-handle.js';
 import type { CustomEngineTableStyle } from './workbook-handle-table-styles.js';
 
 /**
- * Custom table / PivotTable styles between the store's gallery model (family,
- * hue, variant) and the engine's `<tableStyles>` (elements over differential
- * formats). The gallery model is written as a fixed element set - whole-table
- * border in the hue, header fill and text, optional stripe and first-column
- * elements - and read back from the same elements, so a style authored here
- * returns unchanged. A style authored elsewhere is approximated from its
- * header fill and stripe elements.
+ * Custom table / PivotTable styles between the store (a format per element,
+ * plus stripe band sizes) and the engine's `<tableStyles>` (elements over
+ * differential formats). Every element and size is written and read back, so a
+ * style round-trips unchanged.
  */
 
-const FAMILIES: readonly TableStyle[] = ['medium', 'light', 'dark'];
+const STRIPES: ReadonlySet<TableStyleElementType> = new Set<TableStyleElementType>([
+  'firstRowStripe',
+  'secondRowStripe',
+  'firstColumnStripe',
+  'secondColumnStripe',
+]);
 
 /** Pivot style toggles for a PivotTable that had no style element yet. */
 const DEFAULT_PIVOT_STYLE = {
@@ -70,23 +70,7 @@ function dxfIdFor(wb: WorkbookHandle, apply: Partial<CellFormat>): number | null
   return id;
 }
 
-/** The elements a gallery style is written as: whole-table border in the hue,
- *  header fill and text, bold totals, optional stripe and first-column elements. */
-export function customStyleElementFormats(style: CustomTableStyle): StyleElementFormats {
-  const color = style.color ?? DEFAULT_TABLE_COLOR;
-  const swatch = tableStyleSwatch(style.style, color);
-  const { banded, firstCol } = tableVariantOptions(style.variant);
-  const side = { style: 'thin' as const, color };
-  return {
-    wholeTable: { borders: { top: side, bottom: side, left: side, right: side } },
-    headerRow: { fill: swatch.header, color: swatch.headerText, bold: true },
-    totalRow: { bold: true },
-    ...(banded ? { firstRowStripe: { fill: swatch.band } } : {}),
-    ...(firstCol ? { firstColumn: { bold: true } } : {}),
-  };
-}
-
-/** The engine style for a gallery style; null when its differential formats cannot be authored. */
+/** The engine style for a custom style; null when its differential formats cannot be authored. */
 export function engineStyleFromCustom(
   wb: WorkbookHandle,
   style: CustomTableStyle,
@@ -94,62 +78,46 @@ export function engineStyleFromCustom(
 ): TableStyleInput | null {
   if (!wb.capabilities.conditionalFormatDxf) return null;
   const elements: TableStyleElementInput[] = [];
-  for (const [type, apply] of Object.entries(customStyleElementFormats(style))) {
+  for (const [type, apply] of Object.entries(style.elements)) {
+    const engineType = ENGINE_ELEMENT_TYPE[type as TableStyleElementType];
+    const size = STRIPES.has(type as TableStyleElementType)
+      ? (style.stripeSizes?.[type as StripeElement] ?? 1)
+      : undefined;
+    const sized = size === undefined ? {} : { size };
+    if (Object.keys(apply).length === 0) {
+      elements.push({ type: engineType, ...sized });
+      continue;
+    }
     const dxfIndex = dxfIdFor(wb, apply);
     if (dxfIndex === null) return null;
-    elements.push({ type: ENGINE_ELEMENT_TYPE[type as TableStyleElementType], dxfIndex });
+    elements.push({ type: engineType, ...sized, dxfIndex });
   }
   return { name: style.label, ...usage, elements };
 }
 
-const norm = (color: string | undefined): string | undefined => color?.toLowerCase();
-
-const luminance = (hex: string): number => {
-  const h = hex.replace('#', '');
-  const channel = (i: number): number => Number.parseInt(h.slice(i, i + 2), 16) / 255;
-  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
-};
-
-/** The gallery model of an engine style. */
+/** The store model of an engine style: every element it lists, and its stripe band sizes. */
 export function customStyleFromEngine(
   wb: WorkbookHandle,
   style: CustomEngineTableStyle,
   pivot: boolean,
 ): CustomTableStyle {
-  const apply = (type: TableStyleElementType): Partial<CellFormat> | null => {
-    const element = style.elements.find((e) => e.type === ENGINE_ELEMENT_TYPE[type]);
-    return element?.dxfIndex == null ? null : dxfToApply(wb, element.dxfIndex);
-  };
-  const header = apply('headerRow');
-  const stripe = apply('firstRowStripe');
-  const border = apply('wholeTable')?.borders?.top;
-  const borderColor = !border
-    ? undefined
-    : border === true
-      ? '#000000'
-      : (border.color ?? '#000000');
-  const headerFill = norm(header?.fill);
-  const color = norm(borderColor ?? headerFill ?? stripe?.fill) ?? DEFAULT_TABLE_COLOR;
-  const matching = FAMILIES.find((family) => {
-    const swatch = tableStyleSwatch(family, color);
-    return headerFill === norm(swatch.header) && norm(header?.color) === norm(swatch.headerText);
-  });
-  const family: TableStyle =
-    matching ??
-    (headerFill === undefined || luminance(headerFill) > 0.75
-      ? 'light'
-      : luminance(headerFill) < luminance(color) * 0.8
-        ? 'dark'
-        : 'medium');
+  const elements: StyleElementFormats = {};
+  const stripeSizes: Partial<Record<StripeElement, number>> = {};
+  for (const element of style.elements) {
+    const type = elementTypeFromEngine(element.type);
+    if (!type) continue;
+    elements[type] = (
+      element.dxfIndex == null ? {} : dxfToApply(wb, element.dxfIndex)
+    ) as StyleElementFormat;
+    if (STRIPES.has(type) && (element.size ?? 1) > 1) {
+      stripeSizes[type as StripeElement] = element.size;
+    }
+  }
   return {
     id: pivot ? customPivotTableStyleId(style.name) : customTableStyleId(style.name),
     label: style.name,
-    style: family,
-    color,
-    variant: tableVariantFromOptions({
-      banded: style.elements.some((e) => e.type === ENGINE_ELEMENT_TYPE.firstRowStripe),
-      firstCol: style.elements.some((e) => e.type === ENGINE_ELEMENT_TYPE.firstColumn),
-    }),
+    elements,
+    ...(Object.keys(stripeSizes).length > 0 ? { stripeSizes } : {}),
   };
 }
 
@@ -193,12 +161,19 @@ type StyleSlices = Pick<
   'customTableStyles' | 'customPivotTableStyles' | 'pivotTableStyles'
 >;
 
+/** JSON with object keys sorted, so equal styles compare equal whatever their key order. */
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, v) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)))
+      : v,
+  );
+
 const sameStyle = (a: CustomTableStyle, b: CustomTableStyle | undefined): boolean =>
   !!b &&
   a.label === b.label &&
-  a.style === b.style &&
-  a.color === b.color &&
-  a.variant === b.variant;
+  canonical(a.elements) === canonical(b.elements) &&
+  canonical(a.stripeSizes ?? {}) === canonical(b.stripeSizes ?? {});
 
 const pivotKey = (a: PivotTableStyleAssignment): string => `${a.sheetIndex}:${a.pivotIndex}`;
 

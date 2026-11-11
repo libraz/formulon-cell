@@ -6,12 +6,14 @@ import {
   type CustomTableStyle,
   customTableStyleById,
   customTableStyleId,
+  DEFAULT_TABLE_COLOR,
   defaultTableStyleId,
   overlayStyleName,
   type TableOverlay,
   tableStyleOptionsById,
   updateTableOverlay,
 } from './format-as-table.js';
+import { updatePivotStyleInfo } from './pivot-style-info.js';
 import { recordFormatChange, recordTablesChange } from './slice-history.js';
 import { type TableActionContext, tableChangeAllowed, tableWrite } from './table-actions.js';
 
@@ -49,12 +51,19 @@ export function clearTableRangeFormatting(ctx: TableActionContext, range: Range)
   );
 }
 
+/** The overlay look patch of a style pick; a custom style leaves the family and hue at the defaults. */
+function overlayLook(
+  options: ReturnType<typeof tableStyleOptionsById>,
+): Pick<TableOverlay, 'style' | 'color' | 'styleName'> {
+  return {
+    style: options.style ?? 'medium',
+    color: options.color ?? DEFAULT_TABLE_COLOR,
+    styleName: options.styleName,
+  };
+}
+
 function restyle(ctx: TableActionContext, table: TableOverlay, styleId: string): boolean {
-  const {
-    banded: _banded,
-    firstCol: _firstCol,
-    ...look
-  } = tableStyleOptionsById(ctx.store.getState(), styleId);
+  const look = overlayLook(tableStyleOptionsById(ctx.store.getState(), styleId));
   return tableWrite(ctx, table.range, false, () => {
     recordTablesChange(ctx.history, ctx.store, () => {
       updateTableOverlay(ctx.store, table.id, look);
@@ -74,28 +83,81 @@ export function clearTableStyle(ctx: TableActionContext, table: TableOverlay): b
   });
 }
 
-/** Deletes the custom table style `styleId` as one undo step. Tables in it take the workbook
- *  default table style; that fallback is unmeasured. False for a built-in or unknown id. */
-export function deleteCustomTableStyle(
+/** The PivotTable style a PivotTable takes when the workbook names no default. */
+export const FALLBACK_PIVOT_STYLE = 'PivotStyleLight16';
+
+type DeleteStyleWorkbook = Pick<
+  WorkbookHandle,
+  | 'getTableStyleDefaults'
+  | 'setTableStyleDefaults'
+  | 'getPivotTables'
+  | 'getPivotStyleInfo'
+  | 'setPivotStyleInfo'
+  | 'cells'
+>;
+
+/** Deletes the custom style `name`, as one undo step, as the desktop app does. A style may be
+ *  flagged for tables, PivotTables or both. The users of each kind take that kind's workbook
+ *  default. A deleted default resets first, to Table Style Medium 2 / PivotTable Style Light 16.
+ *  False when no custom style has that name. */
+export function deleteCustomStyle(
   ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
-  workbook: Pick<WorkbookHandle, 'getTableStyleDefaults'> | null,
-  styleId: string,
+  workbook: DeleteStyleWorkbook | null,
+  name: string,
 ): boolean {
-  const style = customTableStyleById(ctx.store.getState(), styleId);
-  if (!style) return false;
-  recordTablesChange(ctx.history, ctx.store, () => {
-    mutators.removeCustomTableStyle(ctx.store, styleId);
-    const fallback = defaultTableStyleId(ctx.store.getState(), workbook);
-    const look = tableStyleOptionsById(ctx.store.getState(), fallback);
-    for (const table of ctx.store.getState().tables.tables) {
-      if (overlayStyleName(table) !== style.label) continue;
-      updateTableOverlay(ctx.store, table.id, {
-        style: look.style,
-        color: look.color,
-        styleName: look.styleName,
-      });
+  const state = ctx.store.getState();
+  const named = (style: CustomTableStyle): boolean =>
+    style.label.toLocaleLowerCase() === name.toLocaleLowerCase();
+  const forTables = (state.tables.customTableStyles ?? []).some(named);
+  const forPivots = (state.tables.customPivotTableStyles ?? []).some(named);
+  if (!forTables && !forPivots) return false;
+  const same = (value: string): boolean => value.toLocaleLowerCase() === name.toLocaleLowerCase();
+  const history = ctx.history;
+  const transaction = history?.begin();
+  try {
+    const before = workbook?.getTableStyleDefaults() ?? null;
+    const reset = {
+      ...(forTables && before && same(before.tableStyle) ? { tableStyle: '' } : {}),
+      ...(forPivots && before && same(before.pivotStyle) ? { pivotStyle: '' } : {}),
+    };
+    if (workbook && before && Object.keys(reset).length > 0) {
+      workbook.setTableStyleDefaults(reset);
+      const restore = { tableStyle: before.tableStyle, pivotStyle: before.pivotStyle };
+      if (history && !history.isReplaying()) {
+        history.push({
+          undo: () => workbook.setTableStyleDefaults(restore),
+          redo: () => workbook.setTableStyleDefaults(reset),
+        });
+      }
     }
-  });
+    const pivotUsers =
+      forPivots && workbook
+        ? workbook
+            .getPivotTables()
+            .filter((p) => same(workbook.getPivotStyleInfo(p.sheetIndex, p.pivotIndex)?.name ?? ''))
+        : [];
+    recordTablesChange(history, ctx.store, () => {
+      mutators.removeCustomStylesNamed(ctx.store, name);
+      if (!forTables) return;
+      const fallback = defaultTableStyleId(ctx.store.getState(), workbook);
+      const look = overlayLook(tableStyleOptionsById(ctx.store.getState(), fallback));
+      for (const table of ctx.store.getState().tables.tables) {
+        if (same(overlayStyleName(table))) updateTableOverlay(ctx.store, table.id, look);
+      }
+    });
+    if (workbook) {
+      const pivotDefault = workbook.getTableStyleDefaults()?.pivotStyle || FALLBACK_PIVOT_STYLE;
+      for (const pivot of pivotUsers) {
+        updatePivotStyleInfo(
+          { store: ctx.store, workbook: workbook as WorkbookHandle, history },
+          pivot,
+          { name: pivotDefault },
+        );
+      }
+    }
+  } finally {
+    if (history && transaction) history.end(transaction);
+  }
   return true;
 }
 
@@ -113,14 +175,10 @@ export function modifyCustomTableStyle(
     mutators.removeCustomTableStyle(ctx.store, styleId);
     const id = customTableStyleId(label);
     mutators.upsertCustomTableStyle(ctx.store, { ...next, id, label });
-    const look = tableStyleOptionsById(ctx.store.getState(), id);
+    const look = overlayLook(tableStyleOptionsById(ctx.store.getState(), id));
     for (const table of ctx.store.getState().tables.tables) {
       if (overlayStyleName(table) !== before.label) continue;
-      updateTableOverlay(ctx.store, table.id, {
-        style: look.style,
-        color: look.color,
-        styleName: look.styleName,
-      });
+      updateTableOverlay(ctx.store, table.id, look);
     }
   });
   return true;

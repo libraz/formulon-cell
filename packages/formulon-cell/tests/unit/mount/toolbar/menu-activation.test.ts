@@ -1,5 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { customPivotTableStyleId } from '../../../../src/commands/format-as-table.js';
+import {
+  customPivotTableStyleId,
+  galleryStyleElements,
+} from '../../../../src/commands/format-as-table.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import {
@@ -752,9 +755,7 @@ describe('Spreadsheet.mountToolbar', () => {
     mutators.upsertCustomPivotTableStyle(sheet.instance.store, {
       id: customPivotTableStyleId('Dispatch Coverage Pivot'),
       label: 'Dispatch Coverage Pivot',
-      style: 'medium',
-      color: '#70ad47',
-      variant: 'bandedFirstCol',
+      elements: galleryStyleElements('medium', '#70ad47', 'bandedFirstCol'),
     });
     const renderedKeys = new Set<string>();
     // A contextual tab shows only while its kind of object is selected.

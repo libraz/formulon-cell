@@ -18,7 +18,6 @@ import {
   type StyleElementFormats,
   type StyleElementRegion,
 } from './table-style-elements.js';
-import { customStyleElementFormats } from './table-style-sync.js';
 import { cssColorFromArgb, tintCssColor } from './theme-color.js';
 import type { Range } from './types.js';
 import { PivotAxis } from './types.js';
@@ -366,7 +365,7 @@ function reportStyleElements(
     (tables.customPivotTableStyles ?? []).find(
       (s) => s.label.toLocaleLowerCase() === name.toLocaleLowerCase(),
     );
-  if (custom) return customStyleElementFormats(custom);
+  if (custom) return custom.elements;
   return builtinPivotStyleElements(name, themeColors);
 }
 

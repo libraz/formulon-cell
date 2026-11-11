@@ -35,6 +35,25 @@ export function approximateTableStyleElements(
   };
 }
 
+/** The elements a gallery pick (family, hue, variant) is authored as: whole-table border in
+ *  the hue, header fill and text, bold totals, optional stripe and first-column elements. */
+export function galleryStyleElements(
+  style: TableStyle,
+  color: string,
+  variant: TableVariant,
+): StyleElementFormats {
+  const swatch = tableStyleSwatch(style, color);
+  const { banded, firstCol } = tableVariantOptions(variant);
+  const side = { style: 'thin' as const, color };
+  return {
+    wholeTable: { borders: { top: side, bottom: side, left: side, right: side } },
+    headerRow: { fill: swatch.header, color: swatch.headerText, bold: true },
+    totalRow: { bold: true },
+    ...(banded ? { firstRowStripe: { fill: swatch.band } } : {}),
+    ...(firstCol ? { firstColumn: { bold: true } } : {}),
+  };
+}
+
 /** Built-in table-style hues — one column per swatch in the style gallery,
  *  ordered to mirror the desktop spreadsheet's themed accent columns. */
 export const TABLE_STYLE_COLORS: readonly string[] = [
@@ -78,12 +97,23 @@ export interface TableStyleSwatch {
   band: string;
 }
 
+/** Banded-rows / first-column option pair of a table, as one gallery value. */
+export type TableVariant = 'plain' | 'banded' | 'firstCol' | 'bandedFirstCol';
+
+/** The stripe elements whose band size a custom style can set. */
+export type StripeElement =
+  | 'firstRowStripe'
+  | 'secondRowStripe'
+  | 'firstColumnStripe'
+  | 'secondColumnStripe';
+
+/** A custom table or PivotTable style: a format per element, plus stripe band sizes. */
 export interface CustomTableStyle {
   id: string;
   label: string;
-  style: TableStyle;
-  color?: string;
-  variant: 'plain' | 'banded' | 'firstCol' | 'bandedFirstCol';
+  elements: StyleElementFormats;
+  /** Rows or columns per stripe band; absent or 1 is one row or column. */
+  stripeSizes?: Partial<Record<StripeElement, number>>;
 }
 
 export interface PivotTableStyleAssignment {
@@ -93,9 +123,9 @@ export interface PivotTableStyleAssignment {
 }
 
 export interface CreateCustomTableStyleOptions {
-  style?: TableStyle;
-  color?: string;
-  variant?: CustomTableStyle['variant'];
+  /** The style's elements; derived from the active table's look when omitted. */
+  elements?: StyleElementFormats;
+  stripeSizes?: CustomTableStyle['stripeSizes'];
 }
 
 /** Derive the header / banded-row fills for a `(style, color)` pair. */
@@ -440,14 +470,14 @@ export function pivotTableStyleAssignment(
 export function tableVariantFromOptions(input: {
   banded?: boolean;
   firstCol?: boolean;
-}): CustomTableStyle['variant'] {
+}): TableVariant {
   if (input.banded && input.firstCol) return 'bandedFirstCol';
   if (input.firstCol) return 'firstCol';
   if (input.banded === false) return 'plain';
   return 'banded';
 }
 
-export function tableVariantOptions(variant: CustomTableStyle['variant']): {
+export function tableVariantOptions(variant: TableVariant): {
   banded: boolean;
   firstCol: boolean;
 } {
@@ -560,17 +590,11 @@ export function tableStyleOptionsById(
   state: { tables: { customTableStyles?: readonly CustomTableStyle[] } },
   styleId: string,
   color?: string,
-  variant: CustomTableStyle['variant'] = 'banded',
-): Pick<TableOverlay, 'style' | 'color' | 'banded' | 'firstCol' | 'styleName'> {
+  variant: TableVariant = 'banded',
+): Pick<TableOverlay, 'banded' | 'firstCol' | 'styleName'> &
+  Partial<Pick<TableOverlay, 'style' | 'color'>> {
   const custom = customTableStyleById(state, styleId);
-  if (custom) {
-    return {
-      style: custom.style,
-      color: custom.color,
-      styleName: custom.label,
-      ...tableVariantOptions(custom.variant),
-    };
-  }
+  if (custom) return { styleName: custom.label, ...tableVariantOptions(variant) };
   // A built-in name keeps the name; the grid approximates it by family and hue.
   const builtin = parseTableStyleName(styleId);
   if (builtin) {
@@ -623,7 +647,7 @@ export function formatAsTableByStyleId(
   range: Range,
   styleId: string,
   color?: string,
-  variant: CustomTableStyle['variant'] = 'banded',
+  variant: TableVariant = 'banded',
   options: Pick<
     FormatAsTableOptions,
     'showHeader' | 'showTotal' | 'firstCol' | 'lastCol' | 'workbook' | 'totalsLabel' | 'name'
@@ -633,6 +657,24 @@ export function formatAsTableByStyleId(
     ...tableStyleOptionsById(store.getState(), styleId, color, variant),
     ...options,
   });
+}
+
+/** Elements and stripe sizes for a new custom style: the caller's, else the active table's look. */
+function newStyleBody(
+  options: CreateCustomTableStyleOptions,
+  source: TableOverlay | null | undefined,
+): Pick<CustomTableStyle, 'elements' | 'stripeSizes'> {
+  const elements =
+    options.elements ??
+    galleryStyleElements(
+      source?.style ?? 'medium',
+      source?.color ?? DEFAULT_TABLE_COLOR,
+      tableVariantFromOptions({
+        banded: source?.banded ?? true,
+        firstCol: source?.firstCol ?? false,
+      }),
+    );
+  return { elements, ...(options.stripeSizes ? { stripeSizes: options.stripeSizes } : {}) };
 }
 
 export function createTableStyleFromActiveTable(
@@ -650,14 +692,7 @@ export function createTableStyleFromActiveTable(
     mutators.upsertCustomTableStyle(store, {
       id: customTableStyleId(label),
       label,
-      style: options.style ?? source?.style ?? 'medium',
-      color: options.color ?? source?.color ?? DEFAULT_TABLE_COLOR,
-      variant:
-        options.variant ??
-        tableVariantFromOptions({
-          banded: source?.banded ?? true,
-          firstCol: source?.firstCol ?? false,
-        }),
+      ...newStyleBody(options, source),
     });
   });
   return true;
@@ -683,14 +718,7 @@ export function createPivotTableStyleFromActivePivot(
     const style = {
       id: customPivotTableStyleId(label),
       label,
-      style: options.style ?? activeTable?.style ?? 'medium',
-      color: options.color ?? activeTable?.color ?? DEFAULT_TABLE_COLOR,
-      variant:
-        options.variant ??
-        tableVariantFromOptions({
-          banded: activeTable?.banded ?? true,
-          firstCol: activeTable?.firstCol ?? false,
-        }),
+      ...newStyleBody(options, activeTable),
     };
     mutators.upsertCustomPivotTableStyle(store, style);
     if (pivot) {
@@ -880,9 +908,26 @@ export function isLastCol(t: TableOverlay, row: number, col: number): boolean {
   return true;
 }
 
+/** Rows or columns in the first and second stripe band; each defaults to 1. */
+export interface StripeBands {
+  first?: number;
+  second?: number;
+}
+
+/** True when offset `n` falls in a first stripe band. */
+const inFirstBand = (n: number, { first = 1, second = 1 }: StripeBands): boolean => {
+  const a = Math.max(1, first);
+  return n % (a + Math.max(1, second)) < a;
+};
+
 /** True when the row should paint with the alternate zebra fill. Header
  *  and total rows are excluded. */
-export function isBandedRow(t: TableOverlay, row: number, col: number): boolean {
+export function isBandedRow(
+  t: TableOverlay,
+  row: number,
+  col: number,
+  bands: StripeBands = {},
+): boolean {
   if (!t.banded) return false;
   if (col < t.range.c0 || col > t.range.c1) return false;
   if (isHeaderRow(t, row, col)) return false;
@@ -890,17 +935,22 @@ export function isBandedRow(t: TableOverlay, row: number, col: number): boolean 
   if (row < t.range.r0 || row > t.range.r1) return false;
   // The first data row takes the first stripe, as the built-in styles define it.
   const dataStart = t.showHeader ? t.range.r0 + 1 : t.range.r0;
-  return ((row - dataStart) & 1) === 0;
+  return inFirstBand(row - dataStart, bands);
 }
 
 /** True when the column should paint with the alternate stripe fill. Header
  *  and total rows are excluded. */
-export function isBandedCol(t: TableOverlay, row: number, col: number): boolean {
+export function isBandedCol(
+  t: TableOverlay,
+  row: number,
+  col: number,
+  bands: StripeBands = {},
+): boolean {
   if (!t.colStripes) return false;
   if (col < t.range.c0 || col > t.range.c1) return false;
   if (row < t.range.r0 || row > t.range.r1) return false;
   if (isHeaderRow(t, row, col) || isTotalRow(t, row, col)) return false;
-  return ((col - t.range.c0) & 1) === 0;
+  return inFirstBand(col - t.range.c0, bands);
 }
 
 /** The totals-row cell at (row, col) as its engine table and zero-based column; null elsewhere. */

@@ -1,5 +1,4 @@
 import {
-  approximateTableStyleElements,
   listCustomTableStyles,
   overlayStyleName,
   tableOverlayAt,
@@ -49,8 +48,7 @@ export const createTableStyleGallery = (opts: TableStyleGalleryOptions): HTMLDiv
             ? section.styles.map((style) => ({
                 id: style.id,
                 label: style.label,
-                thumbnail: () =>
-                  tableStyleSwatchGrid(approximateTableStyleElements(style.style, style.color)),
+                thumbnail: () => tableStyleSwatchGrid(style.elements),
               }))
             : section.styles.map((entry) => ({
                 id: entry.name,

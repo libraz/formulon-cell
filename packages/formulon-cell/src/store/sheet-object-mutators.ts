@@ -311,6 +311,31 @@ export const sheetObjectMutators = {
     }));
   },
 
+  /** Removes the custom table and PivotTable styles named `label`, and the PivotTable
+   *  assignments of the PivotTable one. */
+  removeCustomStylesNamed(store: SpreadsheetStore, label: string): void {
+    const named = (style: CustomTableStyle): boolean =>
+      style.label.toLocaleLowerCase() === label.toLocaleLowerCase();
+    store.setState((s) => {
+      const pivotIds = new Set(
+        (s.tables.customPivotTableStyles ?? []).filter(named).map((st) => st.id),
+      );
+      return {
+        ...s,
+        tables: {
+          ...s.tables,
+          customTableStyles: (s.tables.customTableStyles ?? []).filter((st) => !named(st)),
+          customPivotTableStyles: (s.tables.customPivotTableStyles ?? []).filter(
+            (st) => !named(st),
+          ),
+          pivotTableStyles: (s.tables.pivotTableStyles ?? []).filter(
+            (a) => !pivotIds.has(a.styleId),
+          ),
+        },
+      };
+    });
+  },
+
   upsertCustomPivotTableStyle(store: SpreadsheetStore, style: CustomTableStyle): void {
     store.setState((s) => {
       const next = (s.tables.customPivotTableStyles ?? []).filter((item) => item.id !== style.id);
