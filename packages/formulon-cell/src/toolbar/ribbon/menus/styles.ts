@@ -14,9 +14,9 @@ import {
   resolveCellStyleFormat,
 } from '../../../commands/cell-styles.js';
 import {
-  BUILTIN_TABLE_STYLES,
   type BuiltinTableStyle,
   type TableStyle,
+  tableStyleGallerySections,
   tableStyleSwatch,
 } from '../../../commands/format-as-table.js';
 import { builtinTableStyleElements } from '../../../engine/builtin-table-styles.js';
@@ -333,35 +333,24 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
         builtinTableStyleElements(entry.name, themeColors) ?? {},
         t.tableStyleSwatches[entry.name as keyof typeof t.tableStyleSwatches] ?? entry.name,
       );
-    for (const family of ['light', 'medium', 'dark'] as const) {
+    for (const section of tableStyleGallerySections(deps.customTableStyles?.() ?? [])) {
       scrollBody.append(
         ...menuLabeledGrid({
-          label: familyLabels[family],
+          label: section.kind === 'custom' ? t.tableStyleCustom : familyLabels[section.kind],
           headingClassName: 'fc-tb__tablestyle-heading',
           gridClassName: 'fc-tb__tablestyle-grid',
-          children: BUILTIN_TABLE_STYLES.filter((entry) => entry.family === family).map(
-            builtinSwatch,
-          ),
-        }),
-      );
-    }
-    const customTableStyles = deps.customTableStyles?.() ?? [];
-    if (customTableStyles.length > 0) {
-      const label = t.tableStyleCustom;
-      scrollBody.append(
-        ...menuLabeledGrid({
-          label,
-          headingClassName: 'fc-tb__tablestyle-heading',
-          gridClassName: 'fc-tb__tablestyle-grid',
-          children: customTableStyles.map((style) =>
-            createTableStyleSwatch(
-              style.style,
-              style.color ?? '#5b9bd5',
-              style.variant,
-              style.label,
-              style.id,
-            ),
-          ),
+          children:
+            section.kind === 'custom'
+              ? section.styles.map((style) =>
+                  createTableStyleSwatch(
+                    style.style,
+                    style.color ?? '#5b9bd5',
+                    style.variant,
+                    style.label,
+                    style.id,
+                  ),
+                )
+              : section.styles.map(builtinSwatch),
         }),
       );
     }

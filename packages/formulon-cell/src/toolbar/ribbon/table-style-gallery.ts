@@ -1,9 +1,9 @@
 import {
   approximateTableStyleElements,
-  BUILTIN_TABLE_STYLES,
   listCustomTableStyles,
   overlayStyleName,
   tableOverlayAt,
+  tableStyleGallerySections,
 } from '../../commands/format-as-table.js';
 import { applyTableStyle } from '../../commands/table-style-actions.js';
 import { builtinTableStyleElements } from '../../engine/builtin-table-styles.js';
@@ -43,22 +43,22 @@ export const createTableStyleGallery = (opts: TableStyleGalleryOptions): HTMLDiv
       if (!inst) return [];
       const names = dictionaries[lang].ribbonMenu.tableStyleSwatches;
       const theme = inst.workbook.getTheme()?.colors;
-      const custom = listCustomTableStyles(inst.store.getState()).map(
-        (style): QuickStyleEntry => ({
-          id: style.id,
-          label: style.label,
-          thumbnail: () =>
-            tableStyleSwatchGrid(approximateTableStyleElements(style.style, style.color)),
-        }),
+      return tableStyleGallerySections(listCustomTableStyles(inst.store.getState())).flatMap(
+        (section): QuickStyleEntry[] =>
+          section.kind === 'custom'
+            ? section.styles.map((style) => ({
+                id: style.id,
+                label: style.label,
+                thumbnail: () =>
+                  tableStyleSwatchGrid(approximateTableStyleElements(style.style, style.color)),
+              }))
+            : section.styles.map((entry) => ({
+                id: entry.name,
+                label: names[entry.name as keyof typeof names] ?? entry.name,
+                thumbnail: () =>
+                  tableStyleSwatchGrid(builtinTableStyleElements(entry.name, theme) ?? {}),
+              })),
       );
-      const builtin = BUILTIN_TABLE_STYLES.map(
-        (entry): QuickStyleEntry => ({
-          id: entry.name,
-          label: names[entry.name as keyof typeof names] ?? entry.name,
-          thumbnail: () => tableStyleSwatchGrid(builtinTableStyleElements(entry.name, theme) ?? {}),
-        }),
-      );
-      return [...custom, ...builtin];
     },
     current: () => {
       const inst = getInst();

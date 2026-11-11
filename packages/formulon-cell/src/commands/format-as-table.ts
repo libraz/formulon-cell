@@ -260,6 +260,24 @@ export const BUILTIN_TABLE_STYLES: readonly BuiltinTableStyle[] = (
   })),
 );
 
+/** A section of the table style gallery. */
+export type TableStyleGallerySection<C = CustomTableStyle> =
+  | { readonly kind: 'custom'; readonly styles: readonly C[] }
+  | { readonly kind: TableStyle; readonly styles: readonly BuiltinTableStyle[] };
+
+/** The table style gallery's sections in order, shared by the menu and the in-ribbon strip:
+ *  Custom first, when there is one, then Light, Medium and Dark. The Custom position is
+ *  unmeasured on the Mac app. */
+export function tableStyleGallerySections<C>(customs: readonly C[]): TableStyleGallerySection<C>[] {
+  return [
+    ...(customs.length > 0 ? [{ kind: 'custom' as const, styles: customs }] : []),
+    ...(['light', 'medium', 'dark'] as const).map((kind) => ({
+      kind,
+      styles: BUILTIN_TABLE_STYLES.filter((entry) => entry.family === kind),
+    })),
+  ];
+}
+
 /** Built-in engine style name for a gallery family and hue: the first block
  *  of each family, one style per palette column. */
 export const tableStyleName = (style: TableStyle, color: string = DEFAULT_TABLE_COLOR): string =>

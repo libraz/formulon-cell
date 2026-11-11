@@ -28,6 +28,7 @@ import {
   tableForCell,
   tableOverlayAt,
   tableOverlayById,
+  tableStyleGallerySections,
   updateTableOverlay,
   upsertTable,
 } from '../../../src/commands/format-as-table.js';
@@ -522,5 +523,23 @@ describe('default table style', () => {
     ]);
     expect(setDefaultTableStyle(state, { setTableStyleDefaults }, 'nope')).toBe(false);
     expect(setDefaultTableStyle(state, null, 'TableStyleLight4')).toBe(false);
+  });
+});
+
+describe('table style gallery order', () => {
+  it('puts Custom first when there is one, then Light, Medium and Dark', () => {
+    const custom = {
+      id: 'custom-table:A',
+      label: 'A',
+      style: 'dark' as const,
+      variant: 'banded' as const,
+    };
+    expect(tableStyleGallerySections([custom]).map((s) => [s.kind, s.styles.length])).toEqual([
+      ['custom', 1],
+      ['light', 21],
+      ['medium', 28],
+      ['dark', 11],
+    ]);
+    expect(tableStyleGallerySections([]).map((s) => s.kind)).toEqual(['light', 'medium', 'dark']);
   });
 });

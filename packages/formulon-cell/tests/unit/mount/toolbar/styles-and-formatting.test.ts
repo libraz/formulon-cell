@@ -655,7 +655,8 @@ describe('Spreadsheet.mountToolbar', () => {
     const customTableStyleButton = host.querySelector<HTMLButtonElement>(
       `[data-table-style="${customTableStyleId('Review Table')}"]`,
     );
-    expect(customTableStyleButton?.title).toBe('Review Table');
+    // Custom comes first, so the opened menu focuses this swatch and its ScreenTip holds the title.
+    expect(customTableStyleButton?.getAttribute('aria-label')).toBe('Review Table');
 
     vi.spyOn(sheet.workbook, 'getPivotTables').mockReturnValue([
       {
