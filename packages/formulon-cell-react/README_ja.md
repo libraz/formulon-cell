@@ -20,7 +20,7 @@
 ## インストール
 
 ```sh
-npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zustand
+npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom
 ```
 
 バンドラの設定は [プロジェクトの README](https://github.com/libraz/formulon-cell/blob/main/README_ja.md#バンドラの設定) を参照してください。

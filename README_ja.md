@@ -31,12 +31,12 @@
 ## インストール
 
 ```sh
-npm install @libraz/formulon-cell zustand
-npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zustand  # React 18+
-npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand                # Vue 3
+npm install @libraz/formulon-cell
+npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom  # React 18+
+npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue                # Vue 3
 ```
 
-`zustand` はピア依存です。UI が購読しているストアを、ホスト側からも同じインスタンスで読めるようにしています。標準のエンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `Workbook.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。インメモリのスタブエンジンは `engine: 'stub'` を渡したときだけ使われます。Node.js で使う場合は 22 以降が必要です。
+標準のエンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `Workbook.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。インメモリのスタブエンジンは `engine: 'stub'` を渡したときだけ使われます。Node.js で使う場合は 22 以降が必要です。
 
 ### バンドラの設定
 

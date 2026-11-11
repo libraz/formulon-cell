@@ -20,7 +20,7 @@ The grid, ribbon, menus, commands, and dialogs all live in core; this package on
 ## Install
 
 ```sh
-npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand
+npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue
 ```
 
 Bundler settings are in the [project README](https://github.com/libraz/formulon-cell#bundler-integration).

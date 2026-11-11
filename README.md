@@ -31,12 +31,12 @@
 ## Installation
 
 ```sh
-npm install @libraz/formulon-cell zustand
-npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zustand  # React 18+
-npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand                # Vue 3
+npm install @libraz/formulon-cell
+npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom  # React 18+
+npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue                # Vue 3
 ```
 
-`zustand` is a peer dependency so the host can read the same store the chrome subscribes to. The default engine is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `Workbook.createDefault()` rejects if the engine fails to initialize; there is no silent fallback, and the in-memory stub engine runs only when you pass `engine: 'stub'`. Node.js integrations require Node 22 or later.
+The default engine is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `Workbook.createDefault()` rejects if the engine fails to initialize; there is no silent fallback, and the in-memory stub engine runs only when you pass `engine: 'stub'`. Node.js integrations require Node 22 or later.
 
 ### Bundler integration
 

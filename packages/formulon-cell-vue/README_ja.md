@@ -20,7 +20,7 @@
 ## インストール
 
 ```sh
-npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand
+npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue
 ```
 
 バンドラの設定は [プロジェクトの README](https://github.com/libraz/formulon-cell/blob/main/README_ja.md#バンドラの設定) を参照してください。

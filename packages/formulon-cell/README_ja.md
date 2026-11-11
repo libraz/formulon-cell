@@ -20,10 +20,10 @@
 ## インストール
 
 ```sh
-npm install @libraz/formulon-cell zustand
+npm install @libraz/formulon-cell
 ```
 
-`zustand` はピア依存です。標準の WASM エンジンは単一スレッド版で、COOP/COEP ヘッダは要りません。エンジンの初期化に失敗すると `Workbook.createDefault()` は reject します。インメモリのスタブは `engine: 'stub'` を渡したときだけ使われます。バンドラの設定は [プロジェクトの README](https://github.com/libraz/formulon-cell/blob/main/README_ja.md#バンドラの設定) を参照してください。
+標準の WASM エンジンは単一スレッド版で、COOP/COEP ヘッダは要りません。エンジンの初期化に失敗すると `Workbook.createDefault()` は reject します。インメモリのスタブは `engine: 'stub'` を渡したときだけ使われます。バンドラの設定は [プロジェクトの README](https://github.com/libraz/formulon-cell/blob/main/README_ja.md#バンドラの設定) を参照してください。
 
 ## クイックスタート
 
@@ -73,7 +73,7 @@ form.update({ policy: viewerPolicy() }); // 送信後は選択とコピーだけ
 
 | プロファイル | 内容 |
 |--------|------|
-| `embedded`  | グリッドだけ。全機能、リボン、印刷をオフ |
+| `embedded`  | グリッドだけを表示し、ほかの機能、リボン、印刷はすべてオフ |
 | `minimal`   | 数式バー、ステータスバー、基本キーマップ |
 | `standard`  | + クイック分析、コンテキストメニュー、検索と置換、クリップボード、書式のコピー/貼り付け |
 | `full`      | + セルの書式設定、形式を選択して貼り付け、条件付き書式、名前の定義、ハイパーリンク、ピボットテーブルの作成、データの入力規則、オートコンプリート、コメントのホバー表示 |
@@ -82,7 +82,7 @@ form.update({ policy: viewerPolicy() }); // 送信後は選択とコピーだけ
 
 | import パス | 内容 |
 |---|---|
-| `@libraz/formulon-cell` | `mount`、`Workbook`、ポリシー、拡張ファクトリ |
+| `@libraz/formulon-cell` | `mount`、`Workbook`、ポリシー、公開型 |
 | `@libraz/formulon-cell/toolbar` | `ribbon()` とリボンのモデル |
 | `@libraz/formulon-cell/charts` | グラフのレイアウト用ヘルパー |
 | `@libraz/formulon-cell/extensions` | 拡張ファクトリ一式 |

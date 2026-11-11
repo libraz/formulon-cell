@@ -20,10 +20,10 @@ This is the vanilla TypeScript / DOM core. [`@libraz/formulon-cell-react`](https
 ## Install
 
 ```sh
-npm install @libraz/formulon-cell zustand
+npm install @libraz/formulon-cell
 ```
 
-`zustand` is a peer dependency. The default WASM engine is single-threaded and needs no COOP/COEP headers. `Workbook.createDefault()` rejects if the engine fails to initialize; the in-memory stub is used only when you pass `engine: 'stub'`. Bundler settings are in the [project README](https://github.com/libraz/formulon-cell#bundler-integration).
+The default WASM engine is single-threaded and needs no COOP/COEP headers. `Workbook.createDefault()` rejects if the engine fails to initialize; the in-memory stub is used only when you pass `engine: 'stub'`. Bundler settings are in the [project README](https://github.com/libraz/formulon-cell#bundler-integration).
 
 ## Quick start
 
@@ -73,7 +73,7 @@ A policy allows or denies 27 operations one by one, takes editable cells as A1 r
 
 | profile | what's in it |
 |---------|--------------|
-| `embedded`  | grid only: every feature, the ribbon and printing off |
+| `embedded`  | the grid alone, with every feature, the ribbon and printing turned off |
 | `minimal`   | formula bar, status bar, basic keymap |
 | `standard`  | + Quick Analysis, context menu, find/replace, clipboard, format painter |
 | `full`      | + format dialog, paste special, conditional formatting, named ranges, hyperlink dialog, PivotTable creation, validation, autocomplete, hover comments |
@@ -82,7 +82,7 @@ A policy allows or denies 27 operations one by one, takes editable cells as A1 r
 
 | import path | contents |
 |---|---|
-| `@libraz/formulon-cell` | `mount`, `Workbook`, policies, extension factories |
+| `@libraz/formulon-cell` | `mount`, `Workbook`, policies and the public types |
 | `@libraz/formulon-cell/toolbar` | `ribbon()` and the ribbon model |
 | `@libraz/formulon-cell/charts` | chart layout helpers |
 | `@libraz/formulon-cell/extensions` | all extension factories |
