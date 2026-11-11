@@ -29,17 +29,17 @@ npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand
 
 ```vue
 <script setup lang="ts">
-import { Spreadsheet, presets, type SpreadsheetInstance } from '@libraz/formulon-cell-vue';
+import { Spreadsheet, type SpreadsheetInstance } from '@libraz/formulon-cell-vue';
 import '@libraz/formulon-cell/styles.css';
 
 const ready = (instance: SpreadsheetInstance) => {
-  console.log('mounted', instance.workbook.version);
+  console.log('mounted', instance.workbook.engine);
 };
 </script>
 
 <template>
   <Spreadsheet
-    :features="presets.full()"
+    :ui="{ profile: 'full' }"
     locale="ja"
     style="width: 100%; height: 100vh"
     @ready="ready"
@@ -51,7 +51,7 @@ const ready = (instance: SpreadsheetInstance) => {
 
 ```ts
 const sheetRef = ref<SpreadsheetExposed | null>(null);
-const instance = computed(() => sheetRef.value?.instance.value ?? null);
+const instance = computed(() => sheetRef.value?.spreadsheet ?? null);
 const selection = useSelection(instance);
 const { locale, strings } = useI18n(instance);
 ```
@@ -59,34 +59,34 @@ const { locale, strings } = useI18n(instance);
 | コンポーザブル | 説明 |
 |------------|------|
 | `useSelection(instance)` | 現在の選択範囲 |
-| `useSpreadsheet(instance, selector, fallback)` | ストアの状態から任意の値を取り出す |
+| `useSpreadsheet(instance, selector)` | インスタンスから導いた値。変更のたびに再計算される |
 | `useI18n(instance)` | 現在のロケールと文言。実行時の切り替えに追従する |
-| `useSpreadsheetEvent(instance, event, handler)` | `cellChange`、`selectionChange`、`recalc` などを購読する |
+| `useSpreadsheetEvent(instance, event, handler)` | `change`、`cell`、`recalc` などを購読する |
 
 ## リボンツールバー
 
-`SpreadsheetToolbar` は SFC のサブパスとして配布しているので、アプリ側の Vue ビルドでそのままコンパイルされます。中身はコアの `Spreadsheet.mountToolbar` のアダプタで、`dropdownActions` を渡すとリボンを複製せずに個別のドロップダウン処理だけを差し替えられます。
+`SpreadsheetToolbar` はコアの `mountToolbar` を Vue から使うためのアダプタです。`hooks` を渡すと、リボンを複製せずにリボンコマンドのホスト側の処理を差し込めます。
 
 ```vue
 <script setup lang="ts">
-import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
-import '@libraz/formulon-cell-vue/toolbar.css';
+import { SpreadsheetToolbar } from '@libraz/formulon-cell-vue';
+import '@libraz/formulon-cell/styles/toolbar.css';
 </script>
 
 <template>
-  <SpreadsheetToolbar :instance="instance" :active-tab="tab" locale="ja" @tab-change="tab = $event" />
+  <SpreadsheetToolbar :spreadsheet="instance" v-model:active-tab="tab" />
 </template>
 ```
 
 ## 埋め込み
 
-`ui`、`policy`、`viewport`、`context-menu`、`overlays`、`toolbar` の各 props は、再マウントせずに実行時に反映されます。`fixedFormPolicy` と `viewerPolicy` はこのパッケージからも import できます。ポリシーはどの入力経路にも効き、成功したバッチ更新は `change-batch` イベントで受け取れます。
+`ui`、`policy`、`viewport`、`context-menu`、`overlays`、`toolbar` の各 props は、再マウントせずに実行時に反映されます。`fixedFormPolicy` と `viewerPolicy` は `@libraz/formulon-cell` から import できます。ポリシーはどの入力経路にも効き、変更のバッチは `status` 付きの `change` イベントで受け取れます。
 
 ```vue
 <Spreadsheet
   :ui="{ profile: 'embedded' }"
   :policy="fixedFormPolicy(['B2:C10'])"
-  @change-batch="save"
+  @change="save"
 />
 ```
 

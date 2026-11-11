@@ -28,16 +28,16 @@ npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zu
 ## クイックスタート
 
 ```tsx
-import { Spreadsheet, presets } from '@libraz/formulon-cell-react';
+import { Spreadsheet } from '@libraz/formulon-cell-react';
 import '@libraz/formulon-cell/styles.css';
 
 export function MySheet() {
   return (
     <Spreadsheet
       style={{ width: '100%', height: '100vh' }}
-      features={presets.full()}
+      ui={{ profile: 'full' }}
       locale="ja"
-      onReady={(instance) => console.log('mounted', instance.workbook.version)}
+      onReady={(instance) => console.log('mounted', instance.workbook.engine)}
     />
   );
 }
@@ -47,7 +47,7 @@ export function MySheet() {
 
 ```tsx
 const ref = useRef<SpreadsheetRef>(null);
-ref.current?.instance?.undo();
+ref.current?.spreadsheet?.history.undo();
 ```
 
 ## フック
@@ -55,36 +55,36 @@ ref.current?.instance?.undo();
 | フック | 説明 |
 |------|------|
 | `useSelection(instance)` | 現在の選択範囲 |
-| `useSpreadsheet(instance, selector, fallback)` | ストアの状態から任意の値を取り出す |
+| `useSpreadsheet(instance, selector)` | インスタンスから導いた値。変更のたびに再計算される |
 | `useI18n(instance)` | 現在のロケールと文言。実行時の切り替えに追従する |
-| `useSpreadsheetEvent(instance, event, handler)` | `cellChange`、`selectionChange`、`recalc` などを購読する |
+| `useSpreadsheetEvent(instance, event, handler)` | `change`、`cell`、`recalc` などを購読する |
 
 ## リボンツールバー
 
-`SpreadsheetToolbar` はコアの `Spreadsheet.mountToolbar` を React から使うためのアダプタです。`dropdownActions` を渡すと、リボンを複製せずに個別のドロップダウン処理だけを差し替えられます。
+`SpreadsheetToolbar` はコアの `mountToolbar` を React から使うためのアダプタです。`hooks` を渡すと、リボンを複製せずにリボンコマンドのホスト側の処理を差し込めます。
 
 ```tsx
-import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';
-import '@libraz/formulon-cell-react/toolbar.css';
+import { SpreadsheetToolbar } from '@libraz/formulon-cell-react';
+import type { RibbonTab } from '@libraz/formulon-cell/toolbar';
+import '@libraz/formulon-cell/styles/toolbar.css';
 
 <SpreadsheetToolbar
-  instance={instance}
+  spreadsheet={instance}
   activeTab={tab}
   onTabChange={setTab}
-  locale="ja"
-  dropdownActions={{ applyProtectAction: openProtectDialog }}
+  hooks={{ protection: { runSheet: openProtectDialog } }}
 />;
 ```
 
 ## 埋め込み
 
-`ui`、`policy`、`viewport`、`contextMenu`、`overlays`、`toolbar` の各 props は、再マウントせずに実行時に反映されます。`fixedFormPolicy` と `viewerPolicy` はこのパッケージからも import できます。ポリシーはどの入力経路にも効き、成功したバッチ更新は `onChangeBatch` で受け取れます。
+`ui`、`policy`、`viewport`、`contextMenu`、`overlays`、`toolbar` の各 props は、再マウントせずに実行時に反映されます。`fixedFormPolicy` と `viewerPolicy` は `@libraz/formulon-cell` から import できます。ポリシーはどの入力経路にも効き、変更のバッチは `status` 付きで `onChange` に届きます。
 
 ```tsx
 <Spreadsheet
   ui={{ profile: 'embedded' }}
   policy={fixedFormPolicy(['B2:C10'])}
-  onChangeBatch={(batch) => save(batch)}
+  onChange={(change) => save(change)}
 />
 ```
 

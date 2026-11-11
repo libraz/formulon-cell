@@ -28,16 +28,16 @@ Bundler settings are in the [project README](https://github.com/libraz/formulon-
 ## Quick start
 
 ```tsx
-import { Spreadsheet, presets } from '@libraz/formulon-cell-react';
+import { Spreadsheet } from '@libraz/formulon-cell-react';
 import '@libraz/formulon-cell/styles.css';
 
 export function MySheet() {
   return (
     <Spreadsheet
       style={{ width: '100%', height: '100vh' }}
-      features={presets.full()}
+      ui={{ profile: 'full' }}
       locale="en"
-      onReady={(instance) => console.log('mounted', instance.workbook.version)}
+      onReady={(instance) => console.log('mounted', instance.workbook.engine)}
     />
   );
 }
@@ -47,7 +47,7 @@ export function MySheet() {
 
 ```tsx
 const ref = useRef<SpreadsheetRef>(null);
-ref.current?.instance?.undo();
+ref.current?.spreadsheet?.history.undo();
 ```
 
 ## Hooks
@@ -55,36 +55,36 @@ ref.current?.instance?.undo();
 | hook | description |
 |------|-------------|
 | `useSelection(instance)` | the active selection |
-| `useSpreadsheet(instance, selector, fallback)` | any slice of the store state |
+| `useSpreadsheet(instance, selector)` | a value derived from the instance, re-run after every change |
 | `useI18n(instance)` | current locale and strings, updated on runtime swaps |
-| `useSpreadsheetEvent(instance, event, handler)` | subscribe to `cellChange`, `selectionChange`, `recalc`, … |
+| `useSpreadsheetEvent(instance, event, handler)` | subscribe to `change`, `cell`, `recalc`, … |
 
 ## Ribbon toolbar
 
-`SpreadsheetToolbar` adapts core `Spreadsheet.mountToolbar`. Use `dropdownActions` to replace individual dropdown handlers without forking the ribbon.
+`SpreadsheetToolbar` adapts core `mountToolbar`. Use `hooks` to supply host actions for ribbon commands without forking the ribbon.
 
 ```tsx
-import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';
-import '@libraz/formulon-cell-react/toolbar.css';
+import { SpreadsheetToolbar } from '@libraz/formulon-cell-react';
+import type { RibbonTab } from '@libraz/formulon-cell/toolbar';
+import '@libraz/formulon-cell/styles/toolbar.css';
 
 <SpreadsheetToolbar
-  instance={instance}
+  spreadsheet={instance}
   activeTab={tab}
   onTabChange={setTab}
-  locale="en"
-  dropdownActions={{ applyProtectAction: openProtectDialog }}
+  hooks={{ protection: { runSheet: openProtectDialog } }}
 />;
 ```
 
 ## Embedding
 
-`ui`, `policy`, `viewport`, `contextMenu`, `overlays`, and `toolbar` props apply at runtime without re-mounting. `fixedFormPolicy` and `viewerPolicy` are re-exported, a policy applies to every input path, and successful batch updates arrive through `onChangeBatch`.
+`ui`, `policy`, `viewport`, `contextMenu`, `overlays`, and `toolbar` props apply at runtime without re-mounting. `fixedFormPolicy` and `viewerPolicy` come from `@libraz/formulon-cell`, a policy applies to every input path, and each batch of changes arrives through `onChange` with its `status`.
 
 ```tsx
 <Spreadsheet
   ui={{ profile: 'embedded' }}
   policy={fixedFormPolicy(['B2:C10'])}
-  onChangeBatch={(batch) => save(batch)}
+  onChange={(change) => save(change)}
 />
 ```
 

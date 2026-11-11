@@ -29,17 +29,17 @@ Bundler settings are in the [project README](https://github.com/libraz/formulon-
 
 ```vue
 <script setup lang="ts">
-import { Spreadsheet, presets, type SpreadsheetInstance } from '@libraz/formulon-cell-vue';
+import { Spreadsheet, type SpreadsheetInstance } from '@libraz/formulon-cell-vue';
 import '@libraz/formulon-cell/styles.css';
 
 const ready = (instance: SpreadsheetInstance) => {
-  console.log('mounted', instance.workbook.version);
+  console.log('mounted', instance.workbook.engine);
 };
 </script>
 
 <template>
   <Spreadsheet
-    :features="presets.full()"
+    :ui="{ profile: 'full' }"
     locale="en"
     style="width: 100%; height: 100vh"
     @ready="ready"
@@ -51,7 +51,7 @@ const ready = (instance: SpreadsheetInstance) => {
 
 ```ts
 const sheetRef = ref<SpreadsheetExposed | null>(null);
-const instance = computed(() => sheetRef.value?.instance.value ?? null);
+const instance = computed(() => sheetRef.value?.spreadsheet ?? null);
 const selection = useSelection(instance);
 const { locale, strings } = useI18n(instance);
 ```
@@ -59,34 +59,34 @@ const { locale, strings } = useI18n(instance);
 | composable | description |
 |------------|-------------|
 | `useSelection(instance)` | the active selection |
-| `useSpreadsheet(instance, selector, fallback)` | any slice of the store state |
+| `useSpreadsheet(instance, selector)` | a value derived from the instance, re-run after every change |
 | `useI18n(instance)` | current locale and strings, updated on runtime swaps |
-| `useSpreadsheetEvent(instance, event, handler)` | subscribe to `cellChange`, `selectionChange`, `recalc`, … |
+| `useSpreadsheetEvent(instance, event, handler)` | subscribe to `change`, `cell`, `recalc`, … |
 
 ## Ribbon toolbar
 
-`SpreadsheetToolbar` ships as an SFC subpath so it compiles with your own Vue pipeline. It adapts core `Spreadsheet.mountToolbar`; pass `dropdownActions` to replace individual dropdown handlers without forking the ribbon.
+`SpreadsheetToolbar` adapts core `mountToolbar`. Pass `hooks` to supply host actions for ribbon commands without forking the ribbon.
 
 ```vue
 <script setup lang="ts">
-import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
-import '@libraz/formulon-cell-vue/toolbar.css';
+import { SpreadsheetToolbar } from '@libraz/formulon-cell-vue';
+import '@libraz/formulon-cell/styles/toolbar.css';
 </script>
 
 <template>
-  <SpreadsheetToolbar :instance="instance" :active-tab="tab" locale="en" @tab-change="tab = $event" />
+  <SpreadsheetToolbar :spreadsheet="instance" v-model:active-tab="tab" />
 </template>
 ```
 
 ## Embedding
 
-`ui`, `policy`, `viewport`, `context-menu`, `overlays`, and `toolbar` props apply at runtime without re-mounting. `fixedFormPolicy` and `viewerPolicy` are re-exported, a policy applies to every input path, and successful batch updates are emitted as `change-batch`.
+`ui`, `policy`, `viewport`, `context-menu`, `overlays`, and `toolbar` props apply at runtime without re-mounting. `fixedFormPolicy` and `viewerPolicy` come from `@libraz/formulon-cell`, a policy applies to every input path, and each batch of changes is emitted as `change` with its `status`.
 
 ```vue
 <Spreadsheet
   :ui="{ profile: 'embedded' }"
   :policy="fixedFormPolicy(['B2:C10'])"
-  @change-batch="save"
+  @change="save"
 />
 ```
 
