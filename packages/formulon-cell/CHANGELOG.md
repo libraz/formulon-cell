@@ -103,6 +103,7 @@ versioning is [SemVer](https://semver.org/).
 - Return in the Spelling dialog presses Ignore Once after a button was clicked in browsers that leave no focus on a clicked button.
 - Sparklines: an oversized source is refused instead of stalling the grid, column sparklines on a flat date axis stay in the cell, the win/loss axis sits on the bars' baseline, a source on a sheet named like a cell reference is quoted, grouping an existing group or ungrouping a single sparkline records nothing, and Edit Group Location & Data keeps the group on its sheet.
 - Insert Slicer adds every chosen field as one undo step or none, targets only the active table, and is unavailable for a session-only table or a PivotTable.
+- A slicer item click a protected sheet refuses leaves keyboard focus on the alert it opens, so Return dismisses the alert.
 
 ### Removed
 

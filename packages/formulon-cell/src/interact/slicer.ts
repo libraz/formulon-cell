@@ -215,9 +215,14 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
         //  "all" so the next click can re-narrow without going through
         //  every chip.
         const next = current.size === distinct.length ? [] : Array.from(current).sort();
-        setSlicerSelectionAction(slicerContext('editor', 'slicerFilter'), spec.id, next);
+        const applied = setSlicerSelectionAction(
+          slicerContext('editor', 'slicerFilter'),
+          spec.id,
+          next,
+        );
         renderAll();
-        restoreChipFocus(value);
+        // A refused click may have opened an alert, which keeps the focus.
+        if (applied) restoreChipFocus(value);
       });
       chip.addEventListener('keydown', (e) => {
         const chips = Array.from(

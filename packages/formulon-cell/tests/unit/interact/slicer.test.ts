@@ -4,10 +4,15 @@ import { fileURLToPath } from 'node:url';
 import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
+import { setProtectionAlertSink } from '../../../src/commands/protection-alert.js';
 import { recordSlicersChange } from '../../../src/commands/slice-history.js';
 import type { CellValue } from '../../../src/engine/types.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { addrKey } from '../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { ja } from '../../../src/i18n/strings.js';
 import { attachSlicer } from '../../../src/interact/slicer.js';
 import {
@@ -392,6 +397,31 @@ describe('attachSlicer', () => {
     expect(host.querySelectorAll('.fc-slicer__chip').length).toBe(2);
     handle.detach();
     refreshSpy.mockRestore();
+  });
+
+  it('leaves focus on the protection alert a refused chip click opens', async () => {
+    const handle = attachSlicer({ host, store, getWb: () => wb });
+    handle.addSlicer({ tableName: 'Sales', column: 'Region' });
+    const ok = document.createElement('button');
+    document.body.appendChild(ok);
+    setProtectionAlertSink(wb, () => ok.focus(), { filterRefused: 'refused' });
+    // The controller guards a real workbook; the slicer keeps reading the stand-in.
+    const guarded = await WorkbookHandle.createDefault({ preferStub: true });
+    const controller = new InteractionController({
+      store,
+      getWb: () => guarded,
+      history: new History(),
+    });
+    registerInteractionController(store, controller);
+    setProtectedSheet(store, 0, true, { permissions: { objects: true } });
+    host.querySelector<HTMLButtonElement>('.fc-slicer__chip[data-fc-value="East"]')?.click();
+    expect(document.activeElement).toBe(ok);
+    await new Promise<void>((done) => requestAnimationFrame(() => done()));
+    expect(document.activeElement).toBe(ok);
+    setProtectionAlertSink(wb, null);
+    controller.dispose();
+    guarded.dispose();
+    handle.detach();
   });
 
   it('keeps slicer chips on the shared interaction chip button helper', () => {
