@@ -45,7 +45,8 @@ versioning is [SemVer](https://semver.org/).
 - **Breaking:** The `moveCells` interaction operation is removed. Cut, drag-move and Insert Copied Cells are decided as the paste and insert they perform.
 - On a protected sheet, Format Cells, the phonetic commands and every formatting command need the Format cells option whatever the selection, as writes already did; Define Name, Create from Selection and Data Validation are unavailable, while the Name Manager and New Comment stay available.
 - The Home Clear control is decided by the selected cells, and its Clear Hyperlinks item needs the Insert hyperlinks option on a protected sheet; without it the item is greyed as unavailable, not as having nothing to clear.
-- Review > Spelling checks the whole sheet when one cell is selected and only the selection when a range is.
+- Review > Spelling checks the whole sheet when one cell is selected and only the selection when a range is, reporting by rows from the active cell and wrapping to the top.
+- Formula autocomplete treats a defined name whose value is a LAMBDA as a function: it carries the function glyph, inserts with an opening parenthesis and shows its parameters in the argument tooltip. On the Mac, other names sit in a Named Ranges group above the Functions group, each under its header.
 - The Mac cell context menu follows the desktop order and groups, with New Comment and the note rows beside it.
 - The Windows cell context menu offers New Comment, which starts a thread, before New Note.
 - On the Mac, the Review Notes menu shows Edit Note in place of New Note when the active cell has a note, and drops it while that note is locked on a protected sheet.

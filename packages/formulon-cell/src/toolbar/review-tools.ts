@@ -67,24 +67,26 @@ export function applyTextScript(value: string, command: Exclude<ScriptCommand, '
   }
 }
 
+/** The cells and notes a review reads, by rows. With `startAt`, the order starts at that cell
+ *  and wraps from the end to the top, as the spelling check walks a sheet. */
 export function reviewCellsFromState(
   state: State,
   sheet = state.data.sheetIndex,
   range?: ReviewRange,
+  startAt?: { row: number; col: number },
 ): ReviewCell[] {
-  const cells: ReviewCell[] = [];
+  const entries: { row: number; col: number; cell: ReviewCell }[] = [];
+  const inScope = (addr: { sheet: number; row: number; col: number }): boolean =>
+    addr.sheet === sheet &&
+    (!range ||
+      (addr.sheet === range.sheet &&
+        addr.row >= range.r0 &&
+        addr.row <= range.r1 &&
+        addr.col >= range.c0 &&
+        addr.col <= range.c1));
   for (const [key, cell] of state.data.cells) {
     const addr = parseAddrKey(key);
-    if (!addr || addr.sheet !== sheet) continue;
-    if (
-      range &&
-      (addr.sheet !== range.sheet ||
-        addr.row < range.r0 ||
-        addr.row > range.r1 ||
-        addr.col < range.c0 ||
-        addr.col > range.c1)
-    )
-      continue;
+    if (!addr || !inScope(addr)) continue;
     const label = formatA1Cell(addr.row, addr.col);
     const value: ReviewCellValue =
       cell.value.kind === 'text'
@@ -96,25 +98,31 @@ export function reviewCellsFromState(
             : cell.value.kind === 'bool'
               ? { kind: 'bool' }
               : { kind: 'blank' };
-    cells.push({ label, value, formula: cell.formula, source: 'cell' });
+    entries.push({ ...addr, cell: { label, value, formula: cell.formula, source: 'cell' } });
   }
   for (const [key, fmt] of state.format.formats) {
     if (typeof fmt.comment !== 'string' || fmt.comment.trim().length === 0) continue;
     const addr = parseAddrKey(key);
-    if (!addr || addr.sheet !== sheet) continue;
-    if (
-      range &&
-      (addr.sheet !== range.sheet ||
-        addr.row < range.r0 ||
-        addr.row > range.r1 ||
-        addr.col < range.c0 ||
-        addr.col > range.c1)
-    )
-      continue;
+    if (!addr || !inScope(addr)) continue;
     const label = `${formatA1Cell(addr.row, addr.col)} comment`;
-    cells.push({ label, value: { kind: 'text', value: fmt.comment }, source: 'comment' });
+    entries.push({
+      ...addr,
+      cell: { label, value: { kind: 'text', value: fmt.comment }, source: 'comment' },
+    });
   }
-  return cells.sort((a, b) => a.label.localeCompare(b.label, 'en', { numeric: true }));
+  const before = (a: { row: number; col: number }, b: { row: number; col: number }): boolean =>
+    a.row < b.row || (a.row === b.row && a.col < b.col);
+  const wrapped = (entry: { row: number; col: number }): number =>
+    startAt && before(entry, startAt) ? 1 : 0;
+  return entries
+    .sort(
+      (a, b) =>
+        wrapped(a) - wrapped(b) ||
+        a.row - b.row ||
+        a.col - b.col ||
+        (a.cell.source === 'comment' ? 1 : 0) - (b.cell.source === 'comment' ? 1 : 0),
+    )
+    .map((entry) => entry.cell);
 }
 
 const reportText = (lang: RibbonReportLang): ReviewReportText => dictionaries[lang].reviewReports;

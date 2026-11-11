@@ -364,13 +364,15 @@ export function createDefaultRibbonHooks(
     buildItems: (
       cells: ReturnType<typeof reviewCellsFromState>,
     ) => { severity: 'info' | 'warning'; label: string; detail: string }[],
-    scope: 'selection' | 'sheet-from-cell' = 'selection',
+    scope: 'selection' | 'spelling' = 'selection',
   ): void => {
     const state = instance.store.getState();
-    const { range, extraRanges } = state.selection;
-    // Spelling from one selected cell checks the whole sheet; a selected range limits it.
+    const { active, range, extraRanges } = state.selection;
+    // Spelling from one selected cell checks the whole sheet; a selected range limits it. Either
+    // way it starts at the active cell and wraps from the end to the top.
+    const spelling = scope === 'spelling';
     const wholeSheet =
-      scope === 'sheet-from-cell' &&
+      spelling &&
       range.r0 === range.r1 &&
       range.c0 === range.c1 &&
       (extraRanges?.length ?? 0) === 0;
@@ -378,6 +380,7 @@ export function createDefaultRibbonHooks(
       state,
       state.data.sheetIndex,
       wholeSheet ? undefined : range,
+      spelling ? active : undefined,
     );
     void showSharedReport(title, buildItems(cells));
   };
@@ -482,7 +485,7 @@ export function createDefaultRibbonHooks(
         showReviewReport(
           instance.i18n.strings.ribbon.spelling,
           (cells) => analyzeSpellingCells(cells, reportLang),
-          'sheet-from-cell',
+          'spelling',
         );
       },
       translate: () => {

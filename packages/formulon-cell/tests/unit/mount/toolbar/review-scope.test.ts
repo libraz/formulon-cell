@@ -9,14 +9,23 @@ const reportedCells = (): string[] =>
     (label) => label.textContent?.split(' · ')[1] ?? '',
   );
 
-// Pinned to the documented desktop scope; the desktop UI has not been measured for it yet.
-describe('Review > Spelling scope', () => {
+describe('Review > Spelling scope and order', () => {
   let sheet: MountedStubSheet;
+
+  const select = (active: [number, number], range: [number, number, number, number]): void => {
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: active[0], col: active[1] });
+    const [r0, c0, r1, c1] = range;
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0, c0, r1, c1 });
+  };
+  const spell = (): void => {
+    createDefaultRibbonHooks(sheet.instance).review?.spelling?.();
+  };
 
   beforeEach(async () => {
     sheet = await mountStubSheet({ locale: 'en' });
     seedText(sheet, 0, 0, 'teh');
-    seedText(sheet, 4, 2, 'teh');
+    seedText(sheet, 1, 1, 'hello');
+    seedText(sheet, 4, 2, 'recieve');
   });
 
   afterEach(() => {
@@ -24,16 +33,15 @@ describe('Review > Spelling scope', () => {
     document.body.replaceChildren();
   });
 
-  it('checks the whole sheet from one selected cell', () => {
-    mutators.setActive(sheet.instance.store, { sheet: 0, row: 9, col: 9 });
-    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 9, c0: 9, r1: 9, c1: 9 });
-    createDefaultRibbonHooks(sheet.instance).review?.spelling?.();
-    expect(reportedCells()).toEqual(['A1', 'C5']);
+  it('from one selected cell checks the whole sheet, starting there and wrapping to the top', () => {
+    select([1, 1], [1, 1, 1, 1]);
+    spell();
+    expect(reportedCells()).toEqual(['C5', 'A1']);
   });
 
   it('checks only a selected range', () => {
-    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
-    createDefaultRibbonHooks(sheet.instance).review?.spelling?.();
+    select([0, 0], [0, 0, 2, 0]);
+    spell();
     expect(reportedCells()).toEqual(['A1']);
   });
 });
