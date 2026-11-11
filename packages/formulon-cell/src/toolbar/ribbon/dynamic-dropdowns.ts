@@ -69,6 +69,7 @@ export interface DynamicDropdownsCtx {
   updateReviewCommentsMenu: (menu: HTMLElement) => void;
   updateSortMenu: (menu: HTMLElement) => void;
   updateTableStylesMenu: (menu: HTMLElement) => void;
+  updatePivotStylesMenu: (menu: HTMLElement) => void;
   updateTextOrientationMenu: (menu: HTMLElement) => void;
   updateWatchMenu: (menu: HTMLElement) => void;
   /** Optional so hosts built before it keep working; the menu then stays as built. */
@@ -348,6 +349,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-sort': 'updateSortMenu',
   'menu-sort-home': 'updateSortMenu',
   'menu-table-refresh': 'updateTableRefreshMenu',
+  'menu-pivot-quick-styles': 'updatePivotStylesMenu',
   'menu-table-quick-styles': 'updateTableStylesMenu',
   'menu-table-style-home': 'updateTableStylesMenu',
   'menu-text-orientation': 'updateTextOrientationMenu',

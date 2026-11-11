@@ -427,7 +427,6 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     tableStyleMedium: '中等',
     tableStyleDark: '深色',
     tableStyleCustom: '自定义',
-    pivotTableStyleCustom: '自定义数据透视表',
     tableStyleNew: '新建表格样式…',
     tableStyleNewPivot: '新建数据透视表样式…',
     tableStyleClear: '清除',

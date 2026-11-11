@@ -530,7 +530,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   pivotSortAsc: 'pivot',
   pivotSortDesc: 'pivot',
   pivotSortMore: 'pivot',
-  pivotStyleGallery: 'pivot',
+  pivotQuickStyles: 'pivot',
   pivotSubtotal: 'pivot',
   pivotSummarizeAverage: 'pivot',
   pivotSummarizeCount: 'pivot',

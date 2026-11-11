@@ -80,6 +80,7 @@ versioning is [SemVer](https://semver.org/).
 - A right-click on a table style in either gallery offers Apply (and Maintain Formatting), Apply and Clear Formatting, Modify, Duplicate, Delete and Set As Default. Apply and Clear Formatting clears the cells' direct formatting with the style change as one undo step; Delete moves the tables in that style to the workbook default.
 - Custom table and PivotTable styles keep a format for every table style element and their stripe sizes, so a style from a file shows and saves as it was written. Deleting a custom style moves its tables and PivotTables to their workbook defaults, resetting a deleted default to Table Style Medium 2 or PivotTable Style Light 16, as one undo step.
 - New Table Style, New PivotTable Style, Modify and Duplicate open the desktop style dialog: a name, the table or PivotTable style elements with Format (the differential Format Cells) and Clear for each, the stripe size, a preview, and Set as default. The Mac host uses the Mac titles and labels, without the PivotTable default checkbox.
+- PivotTable Design > Quick Styles lists custom PivotTable styles first and opens the full PivotTable style gallery, with New PivotTable Style and, while a PivotTable is active, Clear. Its styles have the same context menu as table styles, and `pivotQuickStyles` joins the command ids. Custom PivotTable styles no longer appear in Format as Table. Modifying a custom style renames it for every kind it is flagged for, and its tables and PivotTables follow.
 
 ### Removed
 

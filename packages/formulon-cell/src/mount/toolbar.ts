@@ -620,10 +620,14 @@ export function mountToolbar(
     });
     dropdownsApi = dropdownsDelegation.api;
   }
-  const detachTableStyleContextMenu = attachTableStyleContextMenu(host, getInstance, (mode, id) => {
-    const instance = getInstance();
-    if (instance) void openTableStyleEditor(instance, mode, id);
-  });
+  const detachTableStyleContextMenu = attachTableStyleContextMenu(
+    host,
+    getInstance,
+    (kind, mode, id) => {
+      const instance = getInstance();
+      if (instance) void openTableStyleEditor(instance, kind, mode, id);
+    },
+  );
   // A host-menu-first face opens its dropdown once the host supplies the hook behind it.
   const openHostMenuFirstDropdown = (command: string, button: HTMLButtonElement): boolean => {
     const hook = RIBBON_HOST_MENU_FIRST_HOOK[command];

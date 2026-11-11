@@ -428,7 +428,6 @@ export interface RibbonMenusStrings {
     tableStyleMedium: string;
     tableStyleDark: string;
     tableStyleCustom: string;
-    pivotTableStyleCustom: string;
     tableStyleNew: string;
     tableStyleNewPivot: string;
     /** Clear in the table style gallery: removes the active table's style. */

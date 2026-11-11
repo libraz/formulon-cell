@@ -16,6 +16,7 @@ import {
 import {
   type BuiltinTableStyle,
   type CustomTableStyle,
+  pivotStyleGallerySections,
   type TableStyle,
   tableStyleGallerySections,
 } from '../../../commands/format-as-table.js';
@@ -31,6 +32,11 @@ import { dictionaries } from '../../../i18n/strings.js';
 import type { CellBorderSide, CellFormat } from '../../../store/types.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarLang, ToolbarText } from '../../ribbon-model.js';
+import {
+  builtinPivotThumbnailElements,
+  pivotStyleLabel,
+  pivotStyleThumbnail,
+} from '../pivot-style-gallery.js';
 
 import {
   createMenu,
@@ -77,13 +83,13 @@ export interface StylesMenuDeps {
 
 export interface StylesMenuFactories {
   createTableStyleMenu: (id: string) => HTMLDivElement;
+  createPivotStyleMenu: (id: string) => HTMLDivElement;
   createCellStylesMenu: () => HTMLDivElement;
   createCurrencyMenu: () => HTMLDivElement;
 }
 
 type StylesMenuText = ToolbarMenuText & {
   tableStyleCustom: string;
-  pivotTableStyleCustom: string;
   cellStyleCustom: string;
 };
 
@@ -182,7 +188,7 @@ const tableStyleFooterButton = (label: string, action: string): HTMLButtonElemen
     action,
     action === 'new-pivot-style'
       ? 'pivot-style-new'
-      : action === 'clear-table-style'
+      : action === 'clear-table-style' || action === 'clear-pivot-style'
         ? 'clear'
         : 'table-style-new',
   );
@@ -311,26 +317,66 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
         }),
       );
     }
-    const customPivotTableStyles = deps.customPivotTableStyles?.() ?? [];
-    if (customPivotTableStyles.length > 0) {
-      const label = t.pivotTableStyleCustom;
-      scrollBody.append(
-        ...menuLabeledGrid({
-          label,
-          headingClassName: 'fc-tb__tablestyle-heading',
-          gridClassName: 'fc-tb__tablestyle-grid',
-          children: customPivotTableStyles.map((style) =>
-            createStyleSwatch(style.id, style.elements, style.label, 'pivotTableStyle'),
-          ),
-        }),
-      );
-    }
     menu.appendChild(scrollBody);
     menu.appendChild(menuSeparator());
     menu.appendChild(tableStyleFooterButton(t.tableStyleNew, 'new-table-style'));
     menu.appendChild(tableStyleFooterButton(t.tableStyleNewPivot, 'new-pivot-style'));
     // Clear shows only while a table is active; updateTableStylesMenu toggles it.
     const clear = tableStyleFooterButton(t.tableStyleClear, 'clear-table-style');
+    clear.hidden = true;
+    menu.appendChild(clear);
+    return menu;
+  };
+
+  /** PivotTable Design > Quick Styles: the full PivotTable style gallery in the shared section
+   *  order, New PivotTable Style, and Clear while a PivotTable is active. */
+  const createPivotStyleMenu = (id: string): HTMLDivElement => {
+    const menu = createMenu(menuIdForCommand(id));
+    menu.classList.add('fc-tb__tablestyle-menu', 'fc-tb__pivotstyle-menu');
+    const scrollBody = menuScrollBody('fc-tb__tablestyle-scroll', ribbonText.quickStyles);
+    const familyLabels: Record<TableStyle, string> = {
+      light: t.tableStyleLight,
+      medium: t.tableStyleMedium,
+      dark: t.tableStyleDark,
+    };
+    const themeColors = deps.getWorkbook?.()?.getTheme?.()?.colors;
+    const swatch = (value: string, label: string, thumb: HTMLElement): HTMLButtonElement => {
+      const btn = createMenuButton({
+        className: 'fc-tb__tablestyle-swatch fc-tb__pivotstyle-swatch',
+        attr: 'pivotTableStyle',
+        value,
+        title: label,
+        ariaLabel: label,
+      });
+      btn.appendChild(thumb);
+      return btn;
+    };
+    for (const section of pivotStyleGallerySections(deps.customPivotTableStyles?.() ?? [])) {
+      scrollBody.append(
+        ...menuLabeledGrid({
+          label: section.kind === 'custom' ? t.tableStyleCustom : familyLabels[section.kind],
+          headingClassName: 'fc-tb__tablestyle-heading',
+          gridClassName: 'fc-tb__tablestyle-grid',
+          children:
+            section.kind === 'custom'
+              ? section.styles.map((style) =>
+                  swatch(style.id, style.label, pivotStyleThumbnail(style.elements)),
+                )
+              : section.names.map((name) =>
+                  swatch(
+                    name,
+                    pivotStyleLabel(name, ribbonLang),
+                    pivotStyleThumbnail(builtinPivotThumbnailElements(name, themeColors)),
+                  ),
+                ),
+        }),
+      );
+    }
+    menu.appendChild(scrollBody);
+    menu.appendChild(menuSeparator());
+    menu.appendChild(tableStyleFooterButton(t.tableStyleNewPivot, 'new-pivot-style'));
+    // Clear shows only while a PivotTable is active; updatePivotStylesMenu toggles it.
+    const clear = tableStyleFooterButton(t.tableStyleClear, 'clear-pivot-style');
     clear.hidden = true;
     menu.appendChild(clear);
     return menu;
@@ -385,5 +431,5 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     return menu;
   };
 
-  return { createTableStyleMenu, createCellStylesMenu, createCurrencyMenu };
+  return { createTableStyleMenu, createPivotStyleMenu, createCellStylesMenu, createCurrencyMenu };
 };

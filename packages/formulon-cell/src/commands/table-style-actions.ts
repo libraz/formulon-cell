@@ -3,12 +3,15 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators } from '../store/store.js';
 import { clearVisualFormatInRange, withSelectionFormatOrigin } from './format.js';
 import {
+  applyPivotTableStyleById,
   type CustomTableStyle,
-  customTableStyleById,
+  customPivotTableStyleById,
+  customPivotTableStyleId,
   customTableStyleId,
   DEFAULT_TABLE_COLOR,
   defaultTableStyleId,
   overlayStyleName,
+  pivotTableStyleAssignment,
   type TableOverlay,
   tableStyleOptionsById,
   updateTableOverlay,
@@ -161,25 +164,80 @@ export function deleteCustomStyle(
   return true;
 }
 
-/** Replaces the custom table style `styleId` with `next`, as Modify does, as one undo step.
- *  Tables in it follow, under its new name. False for a built-in or unknown id. */
-export function modifyCustomTableStyle(
+/** Replaces the custom style `name` with `next`, as Modify does, as one undo step. Every kind
+ *  the style is flagged for takes the change; its tables and PivotTables follow under the new
+ *  name. False when no custom style has that name. */
+export function modifyCustomStyle(
   ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
-  styleId: string,
+  name: string,
   next: Omit<CustomTableStyle, 'id'>,
 ): boolean {
-  const before = customTableStyleById(ctx.store.getState(), styleId);
+  const state = ctx.store.getState();
+  const named = (style: CustomTableStyle): boolean =>
+    style.label.toLocaleLowerCase() === name.toLocaleLowerCase();
+  const table = (state.tables.customTableStyles ?? []).find(named);
+  const pivot = (state.tables.customPivotTableStyles ?? []).find(named);
   const label = next.label.trim();
-  if (!before || !label) return false;
+  if ((!table && !pivot) || !label) return false;
   recordTablesChange(ctx.history, ctx.store, () => {
-    mutators.removeCustomTableStyle(ctx.store, styleId);
-    const id = customTableStyleId(label);
-    mutators.upsertCustomTableStyle(ctx.store, { ...next, id, label });
-    const look = overlayLook(tableStyleOptionsById(ctx.store.getState(), id));
-    for (const table of ctx.store.getState().tables.tables) {
-      if (overlayStyleName(table) !== before.label) continue;
-      updateTableOverlay(ctx.store, table.id, look);
+    const assigned = (ctx.store.getState().tables.pivotTableStyles ?? []).filter(
+      (a) => a.styleId === pivot?.id,
+    );
+    mutators.removeCustomStylesNamed(ctx.store, name);
+    if (table) {
+      const id = customTableStyleId(label);
+      mutators.upsertCustomTableStyle(ctx.store, { ...next, id, label });
+      const look = overlayLook(tableStyleOptionsById(ctx.store.getState(), id));
+      for (const overlay of ctx.store.getState().tables.tables) {
+        if (overlayStyleName(overlay).toLocaleLowerCase() === name.toLocaleLowerCase()) {
+          updateTableOverlay(ctx.store, overlay.id, look);
+        }
+      }
+    }
+    if (pivot) {
+      const id = customPivotTableStyleId(label);
+      mutators.upsertCustomPivotTableStyle(ctx.store, { ...next, id, label });
+      for (const a of assigned) mutators.upsertPivotTableStyle(ctx.store, { ...a, styleId: id });
     }
   });
   return true;
+}
+
+/** Gives the PivotTable `pivot` the style `styleId` as one undo step: a custom style's id, a
+ *  built-in name, or '' for None. */
+export function applyPivotStyle(
+  ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
+  workbook: WorkbookHandle,
+  pivot: { sheetIndex: number; pivotIndex: number },
+  styleId: string,
+): boolean {
+  const state = ctx.store.getState();
+  const at = { sheetIndex: pivot.sheetIndex, pivotIndex: pivot.pivotIndex };
+  if (customPivotTableStyleById(state, styleId)) {
+    return applyPivotTableStyleById(ctx.store, ctx.history, at, styleId);
+  }
+  const history = ctx.history;
+  const transaction = history?.begin();
+  try {
+    // A built-in style replaces a custom assignment, which would otherwise win on the next sync.
+    if (pivotTableStyleAssignment(state, at.sheetIndex, at.pivotIndex)) {
+      recordTablesChange(history, ctx.store, () => mutators.removePivotTableStyle(ctx.store, at));
+    }
+    return updatePivotStyleInfo({ store: ctx.store, workbook, history }, at, { name: styleId });
+  } finally {
+    if (history && transaction) history.end(transaction);
+  }
+}
+
+/** Makes the style `name` (a built-in name or a custom style's label) its kind's workbook default,
+ *  as Set As Default does. False when the engine keeps no defaults. */
+export function setStyleDefault(
+  workbook: Pick<WorkbookHandle, 'setTableStyleDefaults'> | null,
+  kind: 'table' | 'pivot',
+  name: string,
+): boolean {
+  if (!workbook || name === '') return false;
+  return workbook.setTableStyleDefaults(
+    kind === 'table' ? { tableStyle: name } : { pivotStyle: name },
+  );
 }

@@ -309,6 +309,7 @@ export const COMMAND_IDS = [
   'pivotInsertTimeline',
   'pivotMove',
   'pivotOptions',
+  'pivotQuickStyles',
   'pivotRefresh',
   'pivotReportLayout',
   'pivotRowHeaders',

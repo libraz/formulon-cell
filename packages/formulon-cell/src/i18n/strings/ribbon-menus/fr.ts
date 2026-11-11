@@ -434,7 +434,6 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     tableStyleMedium: 'Moyen',
     tableStyleDark: 'Foncé',
     tableStyleCustom: 'Personnalisé',
-    pivotTableStyleCustom: 'Tableau croisé dynamique personnalisé',
     tableStyleNew: 'Nouveau style de tableau…',
     tableStyleNewPivot: 'Nouveau style de tableau croisé dynamique…',
     tableStyleClear: 'Effacer',

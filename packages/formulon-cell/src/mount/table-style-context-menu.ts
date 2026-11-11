@@ -1,27 +1,42 @@
 import {
+  customPivotTableStyleById,
   customTableStyleById,
-  setDefaultTableStyle,
   tableOverlayAt,
 } from '../commands/format-as-table.js';
-import { applyTableStyle, deleteCustomStyle } from '../commands/table-style-actions.js';
+import {
+  applyPivotStyle,
+  applyTableStyle,
+  clearTableRangeFormatting,
+  deleteCustomStyle,
+  setStyleDefault,
+} from '../commands/table-style-actions.js';
+import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import type { TableStyleKind } from '../toolbar/dialogs/table-style.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { menuSeparator, menuTextChip } from '../toolbar/ribbon/menus/general.js';
 import { showCreateTableDialog } from './dynamic-dropdown-defaults/styles.js';
 import type { SpreadsheetInstance } from './types.js';
 
-const ITEM_SELECTOR = '[data-table-style], [data-table-quick-style]';
+const ITEM_SELECTOR =
+  '[data-table-style], [data-table-quick-style], [data-pivot-table-style], [data-pivot-style]';
 
 type Action = 'applyMaintain' | 'applyClear' | 'modify' | 'duplicate' | 'delete' | 'setDefault';
 
 /**
- * The context menu of a table style gallery item, in the Format as Table menu, the Quick Styles
- * menu and the Table Design strip: apply keeping or clearing the cells' formatting, Set As
- * Default, and Delete for a custom style. Modify and Duplicate open the table style dialog.
+ * The context menu of a table or PivotTable style gallery item, in the galleries' menus and
+ * strips: apply keeping or clearing the cells' formatting, Set As Default, and Delete for a
+ * custom style. Modify and Duplicate open the style dialog.
  */
+/** The custom style `styleId` names among `kind`'s custom styles, or null. */
+const customStyleOf = (instance: SpreadsheetInstance, kind: TableStyleKind, styleId: string) =>
+  kind === 'table'
+    ? customTableStyleById(instance.store.getState(), styleId)
+    : customPivotTableStyleById(instance.store.getState(), styleId);
+
 export function attachTableStyleContextMenu(
   host: HTMLElement,
   getInstance: () => SpreadsheetInstance | null,
-  openStyleDialog: (mode: 'modify' | 'duplicate', styleId: string) => void,
+  openStyleDialog: (kind: TableStyleKind, mode: 'modify' | 'duplicate', styleId: string) => void,
 ): () => void {
   let open: { menu: HTMLDivElement; restore: HTMLElement } | null = null;
 
@@ -52,33 +67,57 @@ export function attachTableStyleContextMenu(
     }
   };
 
-  const run = (instance: SpreadsheetInstance, action: Action, styleId: string, from: string) => {
+  const run = (
+    instance: SpreadsheetInstance,
+    kind: TableStyleKind,
+    action: Action,
+    styleId: string,
+    from: string,
+  ): void => {
     const state = instance.store.getState();
     const { sheet, row, col } = state.selection.active;
-    const table = tableOverlayAt(state, sheet, row, col);
     const entry = { origin: 'ribbon', commandId: from } as const;
     const ctx = { store: instance.store, history: instance.history, ...entry };
+    const custom = customStyleOf(instance, kind, styleId);
     switch (action) {
       case 'applyMaintain':
       case 'applyClear': {
         const clearFormatting = action === 'applyClear';
+        if (kind === 'pivot') {
+          const pivot = findPivotTableAtCell(instance.workbook, state.selection.active);
+          if (!pivot) break;
+          const history = instance.history;
+          const transaction = history.begin();
+          try {
+            if (clearFormatting) {
+              clearTableRangeFormatting(ctx, {
+                sheet: pivot.sheetIndex,
+                r0: pivot.top,
+                c0: pivot.left,
+                r1: pivot.top + pivot.rows - 1,
+                c1: pivot.left + pivot.cols - 1,
+              });
+            }
+            applyPivotStyle(ctx, instance.workbook, pivot, styleId);
+          } finally {
+            history.end(transaction);
+          }
+          break;
+        }
+        const table = tableOverlayAt(state, sheet, row, col);
         if (table) applyTableStyle(ctx, table, styleId, { clearFormatting });
         else void showCreateTableDialog(instance, { style: styleId, clearFormatting }, entry);
         break;
       }
       case 'modify':
       case 'duplicate':
-        openStyleDialog(action, styleId);
+        openStyleDialog(kind, action, styleId);
         return;
       case 'delete':
-        deleteCustomStyle(
-          ctx,
-          instance.workbook,
-          customTableStyleById(instance.store.getState(), styleId)?.label ?? '',
-        );
+        if (custom) deleteCustomStyle(ctx, instance.workbook, custom.label);
         break;
       case 'setDefault':
-        setDefaultTableStyle(state, instance.workbook, styleId);
+        setStyleDefault(instance.workbook, kind, custom?.label ?? styleId);
         break;
     }
     instance.host.focus();
@@ -89,17 +128,30 @@ export function attachTableStyleContextMenu(
     const item = target?.closest<HTMLElement>(ITEM_SELECTOR);
     const instance = getInstance();
     if (!item || !instance || !host.contains(item)) return;
-    const styleId = item.dataset.tableStyle ?? item.dataset.tableQuickStyle ?? '';
-    if (!styleId) return;
+    const kind: TableStyleKind =
+      item.dataset.pivotTableStyle !== undefined || item.dataset.pivotStyle !== undefined
+        ? 'pivot'
+        : 'table';
+    const styleId =
+      item.dataset.tableStyle ??
+      item.dataset.tableQuickStyle ??
+      item.dataset.pivotTableStyle ??
+      item.dataset.pivotStyle ??
+      '';
+    // None is a gallery entry without a style to edit.
+    const none = styleId === '';
+    if (kind === 'table' && none) return;
     event.preventDefault();
     event.stopPropagation();
     close(false);
     const from =
-      item.dataset.tableQuickStyle !== undefined || item.closest('#menu-table-quick-styles')
-        ? 'tableQuickStyles'
-        : 'formatTableHome';
+      kind === 'pivot'
+        ? 'pivotQuickStyles'
+        : item.dataset.tableQuickStyle !== undefined || item.closest('#menu-table-quick-styles')
+          ? 'tableQuickStyles'
+          : 'formatTableHome';
     const t = instance.i18n.strings.ribbonMenu;
-    const custom = customTableStyleById(instance.store.getState(), styleId) !== null;
+    const custom = customStyleOf(instance, kind, styleId) !== null;
     const menu = document.createElement('div');
     menu.className = 'fc-tb__menu fc-tb__tablestyle-ctx';
     menu.setAttribute('role', 'menu');
@@ -117,7 +169,7 @@ export function attachTableStyleContextMenu(
       projectDisabledState(node, disabled, null);
       node.addEventListener('click', () => {
         close(false);
-        run(instance, action, styleId, from);
+        run(instance, kind, action, styleId, from);
       });
       return node;
     };
@@ -127,13 +179,13 @@ export function attachTableStyleContextMenu(
       button('applyClear', t.tableStyleApplyClear),
       menuSeparator(),
       button('modify', t.tableStyleModify, !custom),
-      button('duplicate', t.tableStyleDuplicate),
+      button('duplicate', t.tableStyleDuplicate, none),
       button('delete', t.tableStyleDelete, !custom),
       menuSeparator(),
       button(
         'setDefault',
         t.tableStyleSetDefault,
-        instance.workbook.capabilities.customTableStyles !== true,
+        none || instance.workbook.capabilities.customTableStyles !== true,
       ),
     );
     host.appendChild(menu);

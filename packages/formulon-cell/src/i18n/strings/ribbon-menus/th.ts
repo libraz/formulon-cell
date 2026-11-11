@@ -427,7 +427,6 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     tableStyleMedium: 'ปานกลาง',
     tableStyleDark: 'เข้ม',
     tableStyleCustom: 'กำหนดเอง',
-    pivotTableStyleCustom: 'PivotTable แบบกำหนดเอง',
     tableStyleNew: 'สไตล์ตารางใหม่…',
     tableStyleNewPivot: 'สไตล์ PivotTable ใหม่…',
     tableStyleClear: 'ล้าง',

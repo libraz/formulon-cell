@@ -132,7 +132,7 @@ export const projectPivotDesign = (host: HTMLElement, instance: SpreadsheetInsta
     button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
   }
   host
-    .querySelector('[data-ribbon-command="pivotStyleGallery"]')
+    .querySelector('[data-ribbon-gallery="pivotQuickStyles"]')
     ?.dispatchEvent(new Event('fc-ribbon-control-refresh'));
 };
 

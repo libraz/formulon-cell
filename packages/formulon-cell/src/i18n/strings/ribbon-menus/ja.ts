@@ -430,7 +430,6 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     tableStyleMedium: '中間',
     tableStyleDark: '濃色',
     tableStyleCustom: 'ユーザー設定',
-    pivotTableStyleCustom: 'ピボットテーブル ユーザー設定',
     tableStyleNew: '新しい表スタイル...',
     tableStyleNewPivot: '新しいピボットテーブル スタイル...',
     tableStyleClear: 'クリア',

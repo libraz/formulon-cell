@@ -8,18 +8,15 @@ import {
 } from '../../commands/cell-styles.js';
 import { addConditionalRule } from '../../commands/conditional-format.js';
 import {
-  applyPivotTableStyleById,
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
+  customPivotTableStyleById,
   customTableStyleById,
-  customTableStyleId,
   defaultTableStyleId,
   formatAsTableByStyleId,
   inferTableHasHeaders,
   nextTableName,
   overlayStyleName,
-  pivotTableStyleAssignment,
-  setDefaultTableStyle,
   type TableVariant,
   tableNameError,
   tableOverlayAt,
@@ -32,14 +29,17 @@ import {
   tableWrite,
 } from '../../commands/table-actions.js';
 import {
+  applyPivotStyle,
   applyTableStyle,
   clearTableRangeFormatting,
   clearTableStyle,
-  modifyCustomTableStyle,
+  modifyCustomStyle,
+  setStyleDefault,
 } from '../../commands/table-style-actions.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
 import { builtinTableStyleElements } from '../../engine/builtin-table-styles.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
+import { builtinPivotStyleElements } from '../../engine/pivot-style.js';
 import type { Range } from '../../engine/types.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import { type DialogEntry, openFormatDialogFrom } from '../../interact/dialog-entry.js';
@@ -64,6 +64,7 @@ import {
 } from '../../toolbar/dialogs/table-style.js';
 import { applyConditionalMenuAction } from '../../toolbar/ribbon/conditional-menu-action.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
+import { pivotStyleLabel } from '../../toolbar/ribbon/pivot-style-gallery.js';
 import { formatSheetAbsoluteRange, parseA1Range } from '../../wrappers/toolbar-a1.js';
 import { showInstanceReport } from './menu-feedback.js';
 import { normalizedSelectionRange } from './selection.js';
@@ -206,20 +207,39 @@ const updateTableStylesMenu =
       '[data-table-style-footer="clear-table-style"]',
     );
     if (clear) clear.hidden = !activeTable;
+  };
 
-    const activePivot = findPivotTableAtCell(
-      instance.workbook as unknown as Parameters<typeof findPivotTableAtCell>[0],
-      active,
-    );
-    const activePivotStyle = activePivot
-      ? pivotTableStyleAssignment(state, activePivot.sheetIndex, activePivot.pivotIndex)?.styleId
-      : null;
+/** The active PivotTable's current gallery entry: a custom style's id, a built-in name or ''. */
+const activePivotStyleId = (
+  instance: SpreadsheetInstance,
+): { pivot: { sheetIndex: number; pivotIndex: number } | null; id: string | null } => {
+  const state = instance.store.getState();
+  const pivot = findPivotTableAtCell(
+    instance.workbook as unknown as Parameters<typeof findPivotTableAtCell>[0],
+    state.selection.active,
+  );
+  if (!pivot) return { pivot: null, id: null };
+  const name = instance.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)?.name ?? '';
+  const custom = (state.tables.customPivotTableStyles ?? []).find(
+    (style) => style.label.toLocaleLowerCase() === name.toLocaleLowerCase(),
+  );
+  return { pivot, id: custom?.id ?? name };
+};
+
+const updatePivotStylesMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updatePivotStylesMenu'] =>
+  (menu) => {
+    const { pivot, id } = activePivotStyleId(instance);
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-pivot-table-style]')) {
-      const activeStyle = button.dataset.pivotTableStyle === activePivotStyle;
+      const active = id !== null && button.dataset.pivotTableStyle === id;
       button.setAttribute('role', 'menuitemradio');
-      button.setAttribute('aria-checked', String(activeStyle));
-      button.classList.toggle('fc-tb__menu-item--active', activeStyle);
+      button.setAttribute('aria-checked', String(active));
+      button.classList.toggle('fc-tb__menu-item--active', active);
     }
+    const clear = menu.querySelector<HTMLButtonElement>(
+      '[data-table-style-footer="clear-pivot-style"]',
+    );
+    if (clear) clear.hidden = !pivot;
   };
 
 /** The table-creation dialog over the selection (a single cell proposes its current region),
@@ -383,13 +403,7 @@ const saveNewStyle = (
   const look = { elements: value.elements, stripeSizes: value.stripeSizes };
   if (kind === 'table') {
     createTableStyleFromActiveTable(instance.store, instance.history, value.name, look);
-    if (value.setAsDefault) {
-      setDefaultTableStyle(
-        instance.store.getState(),
-        instance.workbook,
-        customTableStyleId(value.name),
-      );
-    }
+    if (value.setAsDefault) setStyleDefault(instance.workbook, 'table', value.name.trim());
     return;
   }
   const state = instance.store.getState();
@@ -430,49 +444,58 @@ export const openNewTableStyle = async (
   instance.host.focus();
 };
 
-/** Modify or Duplicate from a table style gallery item's context menu. Duplicate names the copy
- *  after its source with a 2; that name is unmeasured. */
+/** Modify or Duplicate from a style gallery item's context menu, for a table or PivotTable
+ *  style. Duplicate names the copy after its source with a 2; that name is unmeasured. */
 export const openTableStyleEditor = async (
   instance: SpreadsheetInstance,
+  kind: TableStyleKind,
   mode: 'modify' | 'duplicate',
   styleId: string,
 ): Promise<void> => {
   const t = instance.i18n.strings.ribbonMenu;
-  const custom = customTableStyleById(instance.store.getState(), styleId);
+  const lang = dictionaryLocaleFor(instance.i18n.locale);
+  const state = instance.store.getState();
+  const custom =
+    kind === 'table'
+      ? customTableStyleById(state, styleId)
+      : customPivotTableStyleById(state, styleId);
   const themeColors = instance.workbook.getTheme?.()?.colors;
-  const builtinElements = custom ? null : builtinTableStyleElements(styleId, themeColors);
+  const builtinElements = custom
+    ? null
+    : kind === 'table'
+      ? builtinTableStyleElements(styleId, themeColors)
+      : styleId
+        ? builtinPivotStyleElements(styleId, themeColors)
+        : null;
   const label = custom
     ? custom.label
-    : builtinElements
-      ? (t.tableStyleSwatches[styleId as keyof typeof t.tableStyleSwatches] ?? styleId)
-      : null;
+    : !builtinElements
+      ? null
+      : kind === 'table'
+        ? (t.tableStyleSwatches[styleId as keyof typeof t.tableStyleSwatches] ?? styleId)
+        : pivotStyleLabel(styleId, lang);
   if (label === null || (mode === 'modify' && !custom)) return;
   const defaults = instance.workbook.getTableStyleDefaults();
+  const currentDefault = kind === 'table' ? defaults?.tableStyle : defaults?.pivotStyle;
   const value = await runTableStyleDialog(instance, {
-    kind: 'table',
+    kind,
     mode: mode === 'modify' ? 'modify' : 'new',
     initial: {
       name: mode === 'modify' ? label : `${label} 2`,
       elements: structuredClone(custom?.elements ?? builtinElements ?? {}),
       stripeSizes: { ...custom?.stripeSizes },
-      setAsDefault: mode === 'modify' && defaults?.tableStyle === label,
+      setAsDefault: mode === 'modify' && currentDefault === label,
     },
   });
   if (value && mode === 'modify') {
-    modifyCustomTableStyle({ store: instance.store, history: instance.history }, styleId, {
+    modifyCustomStyle({ store: instance.store, history: instance.history }, label, {
       label: value.name,
       elements: value.elements,
       stripeSizes: value.stripeSizes,
     });
-    if (value.setAsDefault) {
-      setDefaultTableStyle(
-        instance.store.getState(),
-        instance.workbook,
-        customTableStyleId(value.name),
-      );
-    }
+    if (value.setAsDefault) setStyleDefault(instance.workbook, kind, value.name.trim());
   } else if (value) {
-    saveNewStyle(instance, 'table', value);
+    saveNewStyle(instance, kind, value);
   }
   instance.host.focus();
 };
@@ -531,6 +554,19 @@ const buildTableStyleFooterAction =
       instance.host.focus();
       return;
     }
+    if (action === 'clear-pivot-style') {
+      const { pivot } = activePivotStyleId(instance);
+      if (pivot) {
+        applyPivotStyle(
+          { store: instance.store, history: instance.history },
+          instance.workbook,
+          pivot,
+          '',
+        );
+      }
+      instance.host.focus();
+      return;
+    }
     if (action === 'new-table-style' || action === 'new-pivot-style') {
       await openNewTableStyle(instance, action === 'new-table-style' ? 'table' : 'pivot');
       return;
@@ -550,15 +586,12 @@ const buildTableStyleFooterAction =
 const buildPivotTableStyleAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyPivotTableStyleFromRibbon'] =>
   (styleId) => {
-    const pivot = findPivotTableAtCell(
-      instance.workbook as unknown as Parameters<typeof findPivotTableAtCell>[0],
-      instance.store.getState().selection.active,
-    );
+    const { pivot } = activePivotStyleId(instance);
     if (pivot) {
-      applyPivotTableStyleById(
-        instance.store as unknown as Parameters<typeof applyPivotTableStyleById>[0],
-        instance.history as unknown as Parameters<typeof applyPivotTableStyleById>[1],
-        { sheetIndex: pivot.sheetIndex, pivotIndex: pivot.pivotIndex },
+      applyPivotStyle(
+        { store: instance.store, history: instance.history },
+        instance.workbook,
+        pivot,
         styleId,
       );
     }
@@ -644,6 +677,7 @@ type StylesDropdownDefaults = Pick<
   | 'createTableFromSelection'
   | 'openTableStyleFooterAction'
   | 'updateTableStylesMenu'
+  | 'updatePivotStylesMenu'
   | 'applyPivotTableStyleFromRibbon'
   | 'applyCellStyleFromRibbon'
   | 'updateCellStylesMenu'
@@ -658,6 +692,7 @@ export function createStylesDropdownDefaults(
     createTableFromSelection: buildTableStyleAction(instance),
     openTableStyleFooterAction: buildTableStyleFooterAction(instance),
     updateTableStylesMenu: updateTableStylesMenu(instance),
+    updatePivotStylesMenu: updatePivotStylesMenu(instance),
     applyPivotTableStyleFromRibbon: buildPivotTableStyleAction(instance),
     applyCellStyleFromRibbon: buildCellStyleAction(instance),
     updateCellStylesMenu: updateCellStylesMenu(instance),

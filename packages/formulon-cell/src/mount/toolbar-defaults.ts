@@ -278,6 +278,7 @@ export function createDefaultRibbonMenus(
 
     // Styles
     tableStyle: styleFactories.createTableStyleMenu,
+    pivotStyle: styleFactories.createPivotStyleMenu,
     cellStyles: styleFactories.createCellStylesMenu,
     currency: styleFactories.createCurrencyMenu,
 

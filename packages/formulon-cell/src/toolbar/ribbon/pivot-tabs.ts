@@ -126,7 +126,7 @@ export const buildPivotContextualTabs = (
           command('pivotRowStripes', 'rowStripes'),
           command('pivotColStripes', 'colStripes'),
         ]),
-        group([command('pivotStyleGallery', 'quickStyles', { kind: 'input' })]),
+        group([command('pivotQuickStyles', 'quickStyles')]),
       ],
     },
   ];

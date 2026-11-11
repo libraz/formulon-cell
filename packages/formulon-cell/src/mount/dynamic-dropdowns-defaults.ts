@@ -267,6 +267,7 @@ export function createDefaultDynamicDropdownsCtx(
     createTableFromSelection: styleDefaults.createTableFromSelection,
     openTableStyleFooterAction: styleDefaults.openTableStyleFooterAction,
     updateTableStylesMenu: styleDefaults.updateTableStylesMenu,
+    updatePivotStylesMenu: styleDefaults.updatePivotStylesMenu,
     applyPivotTableStyleFromRibbon: styleDefaults.applyPivotTableStyleFromRibbon,
     applyCellStyleFromRibbon: styleDefaults.applyCellStyleFromRibbon,
     updateCellStylesMenu: styleDefaults.updateCellStylesMenu,

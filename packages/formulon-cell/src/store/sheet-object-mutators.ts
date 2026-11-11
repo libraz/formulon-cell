@@ -358,6 +358,21 @@ export const sheetObjectMutators = {
     });
   },
 
+  removePivotTableStyle(
+    store: SpreadsheetStore,
+    pivot: { sheetIndex: number; pivotIndex: number },
+  ): void {
+    store.setState((s) => ({
+      ...s,
+      tables: {
+        ...s.tables,
+        pivotTableStyles: (s.tables.pivotTableStyles ?? []).filter(
+          (item) => item.sheetIndex !== pivot.sheetIndex || item.pivotIndex !== pivot.pivotIndex,
+        ),
+      },
+    }));
+  },
+
   upsertSheetView(store: SpreadsheetStore, view: SheetView): void {
     store.setState((s) => {
       const next = s.sheetViews.views.filter((v) => v.id !== view.id);

@@ -144,6 +144,7 @@ describe('toolbar/ribbon menu primitives', () => {
       updateReviewCommentsMenu: vi.fn(),
       updateSortMenu: vi.fn(),
       updateTableStylesMenu: vi.fn(),
+      updatePivotStylesMenu: vi.fn(),
       updateTextOrientationMenu: vi.fn(),
       updateWatchMenu: vi.fn(),
       applyPivotLayoutAction: vi.fn(),

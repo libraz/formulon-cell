@@ -68,6 +68,7 @@ export const RIBBON_MENU_FACTORY_KEYS = [
   'shapesInsert',
   'screenshotInsert',
   'chartInsert',
+  'pivotStyle',
   'tableStyle',
   'cellStyles',
   'currency',
@@ -141,6 +142,7 @@ export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> 
   script: 'menu-script',
   formatTableHome: 'menu-table-style-home',
   tableQuickStyles: 'menu-table-quick-styles',
+  pivotQuickStyles: 'menu-pivot-quick-styles',
   cellStyles: 'menu-cell-styles-home',
   currency: 'menu-currency-home',
   textToColumns: 'menu-text-to-columns',
@@ -207,6 +209,7 @@ export const RIBBON_MENU_FACTORY_FOR_COMMAND: Readonly<Record<string, RibbonMenu
   chartInsert: 'chartInsert',
   formatTableHome: 'tableStyle',
   tableQuickStyles: 'tableStyle',
+  pivotQuickStyles: 'pivotStyle',
   cellStyles: 'cellStyles',
   currency: 'currency',
   pageTheme: 'pageTheme',
@@ -269,6 +272,7 @@ export const RIBBON_AUDITED_GALLERY_COMMANDS = [
   'screenshotInsert',
   'formatTableHome',
   'tableQuickStyles',
+  'pivotQuickStyles',
   'cellStyles',
 ] as const;
 

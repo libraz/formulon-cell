@@ -125,6 +125,7 @@ export interface RibbonMenus {
   screenshotInsert?: RibbonMenuFactory;
   chartInsert?: RibbonMenuFactory;
   tableStyle?: RibbonMenuFactory;
+  pivotStyle?: RibbonMenuFactory;
   cellStyles?: RibbonMenuFactory;
   currency?: RibbonMenuFactory;
   pageTheme?: RibbonMenuFactory;
@@ -543,12 +544,6 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
           }
           if (c.kind === 'input') {
             const inputCtx = { getInst: ctx.getInst, text: ctx.ribbonText };
-            if (c.id === 'pivotStyleGallery') {
-              tools.appendChild(
-                createPivotStyleGallery({ lang: ctx.ribbonLang, getInst: ctx.getInst }),
-              );
-              continue;
-            }
             tools.appendChild(
               c.id.startsWith('pivot')
                 ? createPivotReadout(c, inputCtx)
@@ -571,6 +566,19 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
             // The Mac Home tab embeds the cell-styles gallery; the button becomes its more arrow.
             tools.appendChild(
               createMacCellStylesGallery({
+                lang: ctx.ribbonLang,
+                getInst: ctx.getInst,
+                arrow: b,
+                menu: submenu?.() ?? null,
+              }),
+            );
+            continue;
+          }
+          if (c.id === 'pivotQuickStyles') {
+            // The PivotTable Design tab embeds the PivotTable style gallery; the button is its
+            // more arrow.
+            tools.appendChild(
+              createPivotStyleGallery({
                 lang: ctx.ribbonLang,
                 getInst: ctx.getInst,
                 arrow: b,

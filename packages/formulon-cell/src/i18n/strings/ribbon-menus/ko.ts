@@ -429,7 +429,6 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     tableStyleMedium: '중간',
     tableStyleDark: '어둡게',
     tableStyleCustom: '사용자 지정',
-    pivotTableStyleCustom: '사용자 지정 피벗 테이블',
     tableStyleNew: '새 표 스타일…',
     tableStyleNewPivot: '새 피벗 테이블 스타일…',
     tableStyleClear: '지우기',

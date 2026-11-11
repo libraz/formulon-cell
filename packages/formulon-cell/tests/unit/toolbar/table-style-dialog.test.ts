@@ -103,4 +103,22 @@ describe('New Table Style dialog', () => {
     ok();
     await expect(pending).resolves.toMatchObject({ setAsDefault: false });
   });
+
+  it('keeps the elements it does not list through Modify and OK', async () => {
+    // A PivotTable style from a file may carry the table-only header and total cell elements.
+    const elements = {
+      headerRow: { bold: true },
+      lastHeaderCell: { fill: '#112233' },
+      firstTotalCell: { fill: '#445566' },
+      lastTotalCell: { fill: '#778899' },
+    };
+    const pending = open({
+      kind: 'pivot',
+      mode: 'modify',
+      initial: { name: 'Brand', elements, stripeSizes: { firstRowStripe: 3 } },
+    });
+    expect(options().map((o) => o.dataset.element)).not.toContain('lastTotalCell');
+    ok();
+    await expect(pending).resolves.toMatchObject({ elements, stripeSizes: { firstRowStripe: 3 } });
+  });
 });

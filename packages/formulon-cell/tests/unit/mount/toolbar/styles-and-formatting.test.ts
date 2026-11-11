@@ -687,10 +687,8 @@ describe('Spreadsheet.mountToolbar', () => {
     const customPivotStyleButton = host.querySelector<HTMLButtonElement>(
       `[data-pivot-table-style="${customPivotTableStyleId('Review Pivot')}"]`,
     );
-    expect(customPivotStyleButton?.title).toBe('Review Pivot');
-    expect(customPivotStyleButton?.getAttribute('role')).toBe('menuitemradio');
-    expect(customPivotStyleButton?.getAttribute('aria-checked')).toBe('true');
-    expect(customPivotStyleButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
+    // Custom PivotTable styles live in the PivotTable Styles gallery, not in Format as Table.
+    expect(customPivotStyleButton).toBeNull();
 
     const stylesButton = host.querySelector<HTMLButtonElement>(
       '[data-ribbon-command="cellStyles"]',

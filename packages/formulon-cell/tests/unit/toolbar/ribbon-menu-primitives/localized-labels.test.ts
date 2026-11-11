@@ -69,7 +69,6 @@ describe('toolbar/ribbon menu primitives', () => {
     const stylesSource = readFileSync(join(menusDir, 'styles.ts'), 'utf8');
 
     expect(stylesSource).toContain('t.tableStyleCustom');
-    expect(stylesSource).toContain('t.pivotTableStyleCustom');
     expect(stylesSource).toContain('t.cellStyleCustom');
     expect(stylesSource).not.toContain("ribbonLang === 'ja' ? 'ユーザー設定'");
     expect(stylesSource).not.toContain('Custom PivotTable');

@@ -439,7 +439,6 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     tableStyleMedium: 'Mittel',
     tableStyleDark: 'Dunkel',
     tableStyleCustom: 'Benutzerdefiniert',
-    pivotTableStyleCustom: 'Benutzerdefinierte PivotTable',
     tableStyleNew: 'Neue Tabellenformatvorlage …',
     tableStyleNewPivot: 'Neue PivotTable-Formatvorlage …',
     tableStyleClear: 'Löschen',

@@ -23,7 +23,6 @@ import {
   listTableOverlays,
   removeTable,
   sessionTableOverlays,
-  setDefaultTableStyle,
   type TableOverlay,
   tableColumns,
   tableForCell,
@@ -35,6 +34,7 @@ import {
 } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
+import { setStyleDefault } from '../../../src/commands/table-style-actions.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const range = (r0: number, c0: number, r1: number, c1: number) =>
@@ -495,18 +495,15 @@ describe('default table style', () => {
     expect(defaultTableStyleId(state, null)).toBe('TableStyleMedium2');
   });
 
-  it('sets a built-in or custom style as the workbook default by its name', () => {
+  it("sets a built-in or custom style as its kind's workbook default by its name", () => {
     const setTableStyleDefaults = vi.fn(() => true);
-    expect(setDefaultTableStyle(state, { setTableStyleDefaults }, 'TableStyleLight4')).toBe(true);
-    expect(setDefaultTableStyle(state, { setTableStyleDefaults }, 'custom-table:Review')).toBe(
-      true,
-    );
+    expect(setStyleDefault({ setTableStyleDefaults }, 'table', 'TableStyleLight4')).toBe(true);
+    expect(setStyleDefault({ setTableStyleDefaults }, 'pivot', 'Review')).toBe(true);
     expect(setTableStyleDefaults.mock.calls).toEqual([
       [{ tableStyle: 'TableStyleLight4' }],
-      [{ tableStyle: 'Review' }],
+      [{ pivotStyle: 'Review' }],
     ]);
-    expect(setDefaultTableStyle(state, { setTableStyleDefaults }, 'nope')).toBe(false);
-    expect(setDefaultTableStyle(state, null, 'TableStyleLight4')).toBe(false);
+    expect(setStyleDefault(null, 'table', 'TableStyleLight4')).toBe(false);
   });
 });
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { customPivotTableStyleId } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
 import { createPivotTableAtPlacement } from '../../../src/commands/pivot-table.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -40,7 +41,12 @@ describe('PivotTable style gallery', () => {
 
   it('pages through None and the 84 built-in styles, six to a page', async () => {
     const { wb, inst } = await setup();
-    const gallery = createPivotStyleGallery({ lang: 'ja', getInst: () => inst });
+    const gallery = createPivotStyleGallery({
+      lang: 'ja',
+      getInst: () => inst,
+      arrow: document.createElement('button'),
+      menu: null,
+    });
     document.body.appendChild(gallery);
     const labels = (): string[] =>
       Array.from(
@@ -65,7 +71,12 @@ describe('PivotTable style gallery', () => {
 
   it('marks the current style and applies a clicked one as a single undo step', async () => {
     const { wb, inst, history } = await setup();
-    const gallery = createPivotStyleGallery({ lang: 'ja', getInst: () => inst });
+    const gallery = createPivotStyleGallery({
+      lang: 'ja',
+      getInst: () => inst,
+      arrow: document.createElement('button'),
+      menu: null,
+    });
     document.body.appendChild(gallery);
     const before = wb.getPivotTables()[0];
     if (!before) throw new Error('no pivot');
@@ -90,7 +101,12 @@ describe('PivotTable style gallery', () => {
 
   it('draws each swatch with the style header band', async () => {
     const { wb, inst } = await setup();
-    const gallery = createPivotStyleGallery({ lang: 'ja', getInst: () => inst });
+    const gallery = createPivotStyleGallery({
+      lang: 'ja',
+      getInst: () => inst,
+      arrow: document.createElement('button'),
+      menu: null,
+    });
     for (let i = 0; i < 20; i += 1) {
       gallery.querySelector<HTMLButtonElement>('.fc-tb__pivotstyle-prev')?.click();
     }
@@ -98,6 +114,37 @@ describe('PivotTable style gallery', () => {
       .querySelectorAll('.fc-tb__pivotstyle-chip')[1]
       ?.querySelector<HTMLElement>('.fc-tb__pivotstyle-cell--header');
     expect(header?.style.background).not.toBe('');
+    wb.dispose();
+  });
+
+  it('lists custom PivotTable styles first and applies one', async () => {
+    const { wb, inst, store } = await setup();
+    mutators.upsertCustomPivotTableStyle(store, {
+      id: customPivotTableStyleId('Brand'),
+      label: 'Brand',
+      elements: { headerRow: { fill: '#336699' } },
+    });
+    const gallery = createPivotStyleGallery({
+      lang: 'ja',
+      getInst: () => inst,
+      arrow: document.createElement('button'),
+      menu: null,
+    });
+    for (let i = 0; i < 20; i += 1) {
+      gallery.querySelector<HTMLButtonElement>('.fc-tb__pivotstyle-prev')?.click();
+    }
+    const chips = Array.from(
+      gallery.querySelectorAll<HTMLButtonElement>('.fc-tb__pivotstyle-chip'),
+    );
+    expect(chips.map((c) => c.getAttribute('aria-label')).slice(0, 2)).toEqual(['Brand', 'なし']);
+    chips[0]?.click();
+    expect(store.getState().tables.pivotTableStyles).toEqual([
+      { sheetIndex: 0, pivotIndex: 0, styleId: customPivotTableStyleId('Brand') },
+    ]);
+    // A built-in pick replaces the custom assignment.
+    gallery.querySelectorAll<HTMLButtonElement>('.fc-tb__pivotstyle-chip')[2]?.click();
+    expect(store.getState().tables.pivotTableStyles).toEqual([]);
+    expect(wb.getPivotStyleInfo(0, 0)?.name).toBe('PivotStyleLight1');
     wb.dispose();
   });
 });

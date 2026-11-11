@@ -1,17 +1,20 @@
-import { updatePivotStyleInfo } from '../../commands/pivot-style-info.js';
+import {
+  listCustomPivotTableStyles,
+  pivotStyleGallerySections,
+} from '../../commands/format-as-table.js';
+import { applyPivotStyle } from '../../commands/table-style-actions.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import { builtinPivotStyleElements } from '../../engine/pivot-style.js';
-import type { StyleElementFormat } from '../../engine/table-style-elements.js';
+import type { StyleElementFormat, StyleElementFormats } from '../../engine/table-style-elements.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { ToolbarLang } from '../ribbon-model.js';
-import { createQuickStyleStrip } from './quick-style-strip.js';
+import { createQuickStyleStrip, type QuickStyleEntry } from './quick-style-strip.js';
 
 const FAMILIES = [
   { id: 'Light', ja: '淡色', en: 'Light' },
   { id: 'Medium', ja: '中間', en: 'Medium' },
   { id: 'Dark', ja: '濃色', en: 'Dark' },
 ] as const;
-const PER_FAMILY = 28;
 const PAGE_SIZE = 6;
 
 /** Colour names Excel (ja) prefixes to each built-in style's accessible name, by family. */
@@ -52,28 +55,17 @@ const JA_COLOUR_NAMES: Readonly<Record<(typeof FAMILIES)[number]['id'], readonly
   ],
 };
 
-interface GalleryStyle {
-  /** The style element's name; empty for no style. */
-  name: string;
-  label: string;
-}
-
-const galleryStyles = (lang: ToolbarLang): GalleryStyle[] => {
-  const none = lang === 'ja' ? 'なし' : 'None';
-  const family = (f: (typeof FAMILIES)[number]): string => (lang === 'ja' ? f.ja : f.en);
+/** The accessible name of a built-in PivotTable style, or None for ''. */
+export const pivotStyleLabel = (name: string, lang: ToolbarLang): string => {
+  if (name === '') return lang === 'ja' ? 'なし' : 'None';
+  const match = /^PivotStyle(Light|Medium|Dark)(\d+)$/.exec(name);
+  const f = FAMILIES.find((family) => family.id === match?.[1]);
+  if (!match || !f) return name;
+  const index = Number(match[2]);
+  const family = lang === 'ja' ? f.ja : f.en;
   const word = lang === 'ja' ? 'ピボット スタイル' : 'PivotTable Style';
-  return [
-    { name: '', label: none },
-    ...FAMILIES.flatMap((f) =>
-      Array.from({ length: PER_FAMILY }, (_, i) => {
-        const colour = lang === 'ja' ? JA_COLOUR_NAMES[f.id][i] : undefined;
-        return {
-          name: `PivotStyle${f.id}${i + 1}`,
-          label: `${colour ? `${colour}, ` : ''}${word} (${family(f)}) ${i + 1}`,
-        };
-      }),
-    ),
-  ];
+  const colour = lang === 'ja' ? JA_COLOUR_NAMES[f.id][index - 1] : undefined;
+  return `${colour ? `${colour}, ` : ''}${word} (${family}) ${index}`;
 };
 
 const edgeColor = (edge: unknown): string =>
@@ -92,11 +84,10 @@ const paint = (cell: HTMLElement, format: StyleElementFormat | undefined): void 
   }
 };
 
-/** A small report drawn in `name`: header band, plain rows, total band. */
-const thumbnail = (name: string, themeColors: readonly number[] | undefined): HTMLDivElement => {
+/** A small report drawn in `elements`: header band, plain rows, total band. */
+export const pivotStyleThumbnail = (elements: StyleElementFormats | null): HTMLDivElement => {
   const thumb = document.createElement('div');
   thumb.className = 'fc-tb__pivotstyle-thumb';
-  const elements = name ? builtinPivotStyleElements(name, themeColors) : null;
   const rows = 5;
   for (let r = 0; r < rows; r += 1) {
     const kind = r === 0 ? 'header' : r === rows - 1 ? 'total' : 'body';
@@ -113,15 +104,24 @@ const thumbnail = (name: string, themeColors: readonly number[] | undefined): HT
   return thumb;
 };
 
+/** The elements of a built-in PivotTable style, or null for None. */
+export const builtinPivotThumbnailElements = (
+  name: string,
+  themeColors: readonly number[] | undefined,
+): StyleElementFormats | null => (name ? builtinPivotStyleElements(name, themeColors) : null);
+
 export interface PivotStyleGalleryOptions {
   lang: ToolbarLang;
   getInst: () => SpreadsheetInstance | null;
+  /** The ribbon's Quick Styles button; it opens the full gallery. */
+  arrow: HTMLButtonElement;
+  menu: HTMLElement | null;
 }
 
-/** The Design tab's Quick Styles: None and the built-in styles, a page at a time, with arrows. */
+/** The PivotTable Design Quick Styles: custom styles, None and the built-in styles, a page at a
+ *  time, with the Quick Styles button as the more arrow. */
 export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDivElement => {
   const { lang, getInst } = opts;
-  const styles = galleryStyles(lang);
   const activePivot = (): { sheetIndex: number; pivotIndex: number } | null => {
     const inst = getInst();
     return inst
@@ -134,32 +134,44 @@ export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDiv
     chipKey: 'pivotStyle',
     pageSize: PAGE_SIZE,
     entries: () => {
-      const theme = getInst()?.workbook.getTheme()?.colors;
-      return styles.map((style) => ({
-        id: style.name,
-        label: style.label,
-        thumbnail: () => thumbnail(style.name, theme),
-      }));
+      const inst = getInst();
+      if (!inst) return [];
+      const theme = inst.workbook.getTheme()?.colors;
+      return pivotStyleGallerySections(listCustomPivotTableStyles(inst.store.getState())).flatMap(
+        (section): QuickStyleEntry[] =>
+          section.kind === 'custom'
+            ? section.styles.map((style) => ({
+                id: style.id,
+                label: style.label,
+                thumbnail: () => pivotStyleThumbnail(style.elements),
+              }))
+            : section.names.map((name) => ({
+                id: name,
+                label: pivotStyleLabel(name, lang),
+                thumbnail: () => pivotStyleThumbnail(builtinPivotThumbnailElements(name, theme)),
+              })),
+      );
     },
     // No report, or one without a style element, shows None as current.
     current: () => {
       const inst = getInst();
       const pivot = activePivot();
       if (!inst || !pivot) return '';
-      return inst.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)?.name ?? '';
+      const name = inst.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)?.name ?? '';
+      const custom = listCustomPivotTableStyles(inst.store.getState()).find(
+        (style) => style.label.toLocaleLowerCase() === name.toLocaleLowerCase(),
+      );
+      return custom?.id ?? name;
     },
-    apply: (name) => {
+    apply: (id) => {
       const target = getInst();
       const pivot = activePivot();
       if (!target || !pivot) return;
-      updatePivotStyleInfo(
-        { store: target.store, workbook: target.workbook, history: target.history },
-        pivot,
-        { name },
-      );
+      applyPivotStyle({ store: target.store, history: target.history }, target.workbook, pivot, id);
       target.host.focus();
     },
+    more: { arrow: opts.arrow, menu: opts.menu },
   });
-  wrap.dataset.ribbonCommand = 'pivotStyleGallery';
+  wrap.dataset.ribbonGallery = 'pivotQuickStyles';
   return wrap;
 };

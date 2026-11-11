@@ -308,6 +308,29 @@ export function tableStyleGallerySections<C>(customs: readonly C[]): TableStyleG
   ];
 }
 
+/** A section of the PivotTable style gallery; an empty name is None. */
+export type PivotStyleGallerySection<C = CustomTableStyle> =
+  | { readonly kind: 'custom'; readonly styles: readonly C[] }
+  | { readonly kind: TableStyle; readonly names: readonly string[] };
+
+const PIVOT_FAMILY_NAMES = { light: 'Light', medium: 'Medium', dark: 'Dark' } as const;
+
+/** The PivotTable style gallery's sections in order, shared by its strip and menu: Custom first,
+ *  as in the table gallery, then None and Light 1-28, Medium 1-28 and Dark 1-28. The layout is
+ *  unmeasured on the Mac app. */
+export function pivotStyleGallerySections<C>(customs: readonly C[]): PivotStyleGallerySection<C>[] {
+  return [
+    ...(customs.length > 0 ? [{ kind: 'custom' as const, styles: customs }] : []),
+    ...(['light', 'medium', 'dark'] as const).map((kind) => ({
+      kind,
+      names: [
+        ...(kind === 'light' ? [''] : []),
+        ...Array.from({ length: 28 }, (_, i) => `PivotStyle${PIVOT_FAMILY_NAMES[kind]}${i + 1}`),
+      ],
+    })),
+  ];
+}
+
 /** Built-in engine style name for a gallery family and hue: the first block
  *  of each family, one style per palette column. */
 export const tableStyleName = (style: TableStyle, color: string = DEFAULT_TABLE_COLOR): string =>
@@ -627,19 +650,6 @@ export function defaultTableStyleId(
   return (
     listCustomTableStyles(state).find((style) => style.label === name)?.id ?? FALLBACK_TABLE_STYLE
   );
-}
-
-/** Makes `styleId` the workbook's default table style, as Set As Default does. False when the
- *  engine keeps no defaults or the id names no table style. */
-export function setDefaultTableStyle(
-  state: { tables: { customTableStyles?: readonly CustomTableStyle[] } },
-  workbook: Pick<WorkbookHandle, 'setTableStyleDefaults'> | null | undefined,
-  styleId: string,
-): boolean {
-  const name =
-    customTableStyleById(state, styleId)?.label ?? (parseTableStyleName(styleId) ? styleId : null);
-  if (!workbook || name === null) return false;
-  return workbook.setTableStyleDefaults({ tableStyle: name });
 }
 
 export function formatAsTableByStyleId(
