@@ -69,6 +69,12 @@ export const viewMutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: on } }));
   },
 
+  setShowAllNotes(store: SpreadsheetStore, on: boolean): void {
+    store.setState((s) =>
+      s.ui.showAllNotes === on ? s : { ...s, ui: { ...s.ui, showAllNotes: on } },
+    );
+  },
+
   setShowOutlineSymbols(store: SpreadsheetStore, on: boolean): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showOutlineSymbols: on } }));
   },

@@ -392,12 +392,6 @@ export function noteVisibleAt(state: State, addr: Addr): boolean {
   );
 }
 
-/** True when `sheet` has notes and every one of them is shown. */
-export function allNotesVisible(state: State, sheet = state.data.sheetIndex): boolean {
-  const notes = listComments(state, sheet);
-  return notes.length > 0 && notes.every((note) => note.visible === true);
-}
-
 /** List non-empty comments on `sheet` in row-major order. */
 export function listComments(state: State, sheet = state.data.sheetIndex): CommentEntry[] {
   const out: CommentEntry[] = [];

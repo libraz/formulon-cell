@@ -4,7 +4,7 @@
 // from the store and keep note and threaded-comment undo entries independent.
 
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { SpreadsheetStore } from '../store/store.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 import {
   clearComment,
   commentAt,
@@ -88,8 +88,9 @@ export const executeRibbonCommentAction = (deps: ExecuteRibbonCommentActionDeps)
   }
 };
 
-/** `toggle-active` is Show/Hide Note on the active cell; `toggle-all` is Show
- *  All Notes, which shows every note unless all of them are already shown. */
+/** `toggle-active` is Show/Hide Note on the active cell, which the workbook keeps;
+ *  `toggle-all` is Show All Notes, a view preference that draws every note and leaves
+ *  each note's own shown state alone. */
 export type NoteVisibilityAction = 'toggle-active' | 'toggle-all';
 
 export interface ExecuteNoteVisibilityActionDeps {
@@ -101,17 +102,11 @@ export interface ExecuteNoteVisibilityActionDeps {
 export const executeNoteVisibilityAction = (deps: ExecuteNoteVisibilityActionDeps): boolean => {
   const { store, workbook, action } = deps;
   const state = store.getState();
+  if (action === 'toggle-all') {
+    mutators.setShowAllNotes(store, !state.ui.showAllNotes);
+    return true;
+  }
   const active = state.selection.active;
-  const addrs =
-    action === 'toggle-active'
-      ? commentAt(state, active) === null
-        ? []
-        : [active]
-      : listComments(state).map((entry) => entry.addr);
-  if (addrs.length === 0) return false;
-  const visible =
-    action === 'toggle-active'
-      ? !noteVisibleAt(state, active)
-      : !addrs.every((addr) => noteVisibleAt(state, addr));
-  return setNotesVisible(store, addrs, visible, workbook);
+  if (commentAt(state, active) === null) return false;
+  return setNotesVisible(store, [active], !noteVisibleAt(state, active), workbook);
 };

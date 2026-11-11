@@ -48,11 +48,13 @@ versioning is [SemVer](https://semver.org/).
 - The Mac cell context menu follows the desktop order and groups, with New Comment and the note rows beside it.
 - The Windows cell context menu offers New Comment, which starts a thread, before New Note.
 - On the Mac, the Review Notes menu shows Edit Note in place of New Note when the active cell has a note, and drops it while that note is locked on a protected sheet.
+- Show All Notes is a view preference of the spreadsheet: it draws every note while each note keeps its own Show/Hide state, and the workbook and its saved file stay unchanged. Show/Hide Note on one cell is still saved with the workbook.
 - A pick from a validation list is an authorized, undoable cell entry.
 - **Breaking:** `Strings.mac.contextMenu.newNote` is now `newComment`.
 
 ### Added
 
+- `SpreadsheetOptions.showAllNotes` sets Show All Notes at mount and through `update`; `instance.options.showAllNotes` reads it back. `UpdateEvent.source` is `'api'` for `update` and `'user'` when the user toggles Show All Notes from the UI.
 - Pick From Drop-down List in the cell context menu, and Alt+Down on a cell without a list validation: the text entries of the column's filled block around the active cell, the active cell left out, folded case-insensitively with the topmost spelling kept, sorted. A locked active cell on a protected sheet greys it.
 - `WorkbookHandle.sheetIndexByName`, `tableIndexByName`, `renameTable` and `updateTableStyleOptions`. Sheet and table names resolve with the engine's name rules instead of ASCII-only case folding.
 - `ChartPlacement` is exported for `createSessionChart` placements.

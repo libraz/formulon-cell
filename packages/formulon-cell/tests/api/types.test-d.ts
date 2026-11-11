@@ -16,6 +16,8 @@ import type {
   SheetPrintDocument,
   SpreadsheetFailure,
   SpreadsheetInstance,
+  SpreadsheetOptions,
+  UpdateEvent,
   Workbook,
 } from '@libraz/formulon-cell';
 import type { saveWithPrompts } from '@libraz/formulon-cell/toolbar';
@@ -36,6 +38,12 @@ describe('types', () => {
     expectTypeOf(instance.selection.on('change', () => {})).toEqualTypeOf<Disposer>();
     expectTypeOf(instance.history.on('change', () => {})).toEqualTypeOf<Disposer>();
     expectTypeOf(instance.i18n.on('change', () => {})).toEqualTypeOf<Disposer>();
+  });
+
+  it('options read back as a readonly snapshot and updates name their source', () => {
+    expectTypeOf(instance.options).toEqualTypeOf<Readonly<SpreadsheetOptions>>();
+    expectTypeOf(instance.options.showAllNotes).toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<UpdateEvent['source']>().toEqualTypeOf<'api' | 'user'>();
   });
 
   it('absence is null, never undefined', () => {

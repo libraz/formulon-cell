@@ -80,6 +80,10 @@ export interface SpreadsheetOptions {
   readonly host?: HostProviders;
   readonly uploadStatus?: StatusBarUploadStatus;
   readonly macroRecording?: boolean | null;
+  /** Review > Show All Notes: draws every note, whatever each note's own Show/Hide state. A view
+   *  preference of this spreadsheet; the workbook and its saved file do not change. The user's
+   *  toggle updates it and emits `update` with `source: 'user'`. Defaults to `false`. */
+  readonly showAllNotes?: boolean;
   /** Cancels the mount; an aborted signal rejects with its reason. */
   readonly signal?: AbortSignal;
 }
@@ -126,9 +130,12 @@ export interface RecalcEvent {
   readonly cells: readonly ChangedCell[];
 }
 
-/** `update` changed these option keys. */
+/** These option keys changed. */
 export interface UpdateEvent {
   readonly keys: readonly (keyof SpreadsheetPatch)[];
+  /** `'api'` for a call to `update`; `'user'` when the user changed a view preference such as
+   *  Show All Notes from the UI. */
+  readonly source: 'api' | 'user';
 }
 
 /** A failure after `mount` resolved that no call could throw: an extension's setup, a host

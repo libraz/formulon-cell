@@ -4,12 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { deleteCells, insertCells } from '../../../src/commands/cell-shift.js';
 import { pasteSpecial } from '../../../src/commands/clipboard/paste-special.js';
 import { captureSnapshot } from '../../../src/commands/clipboard/snapshot.js';
-import {
-  allNotesVisible,
-  clearComment,
-  noteVisibleAt,
-  setComment,
-} from '../../../src/commands/comment.js';
+import { clearComment, noteVisibleAt, setComment } from '../../../src/commands/comment.js';
 import { History } from '../../../src/commands/history.js';
 import { executeNoteVisibilityAction } from '../../../src/commands/ribbon-comment.js';
 import { sortRange } from '../../../src/commands/sort.js';
@@ -86,16 +81,21 @@ describe('note visibility (native engine)', () => {
     expect(store.getState().format.formats.get(addrKey(a(0, 0)))?.commentVisible).toBe(undefined);
   });
 
-  it('Show All Notes shows every note, then hides them all', () => {
+  it('Show All Notes leaves each note and the workbook as they were', () => {
     setComment(store, a(0, 0), 'one', wb);
     setComment(store, a(3, 2), 'two', wb);
+    mutators.setActive(store, a(3, 2));
+    executeNoteVisibilityAction({ store, workbook: wb, action: 'toggle-active' });
+    const saved = wb.save();
     executeNoteVisibilityAction({ store, workbook: wb, action: 'toggle-all' });
-    expect(allNotesVisible(store.getState())).toBe(true);
-    expect(wb.getCommentVisible(0, 3, 2)).toBe(true);
-    executeNoteVisibilityAction({ store, workbook: wb, action: 'toggle-all' });
-    expect(allNotesVisible(store.getState())).toBe(false);
+    expect(store.getState().ui.showAllNotes).toBe(true);
+    expect(noteVisibleAt(store.getState(), a(0, 0))).toBe(false);
     expect(wb.getCommentVisible(0, 0, 0)).toBe(false);
-    expect(wb.getCommentVisible(0, 3, 2)).toBe(false);
+    expect(wb.save()).toEqual(saved);
+    executeNoteVisibilityAction({ store, workbook: wb, action: 'toggle-all' });
+    expect(store.getState().ui.showAllNotes).toBe(false);
+    expect(noteVisibleAt(store.getState(), a(3, 2))).toBe(true);
+    expect(wb.getCommentVisible(0, 3, 2)).toBe(true);
   });
 
   it('keeps a shown note shown when sort moves it', () => {

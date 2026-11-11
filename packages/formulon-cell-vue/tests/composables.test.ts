@@ -189,7 +189,7 @@ describe('useSpreadsheetEvent', () => {
     source.value = a;
     await nextTick();
     a.update({ theme: 'paper' });
-    expect(handler).toHaveBeenCalledWith({ keys: ['theme'] });
+    expect(handler).toHaveBeenCalledWith({ keys: ['theme'], source: 'api' });
     source.value = b;
     await nextTick();
     handler.mockClear();

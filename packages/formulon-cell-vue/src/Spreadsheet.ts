@@ -87,6 +87,7 @@ const component = defineComponent({
     host: option<'host'>(Object as PropType<Options['host']>),
     uploadStatus: option<'uploadStatus'>(String as PropType<Options['uploadStatus']>),
     macroRecording: option<'macroRecording'>(Boolean as PropType<Options['macroRecording']>),
+    showAllNotes: option<'showAllNotes'>(Boolean as PropType<Options['showAllNotes']>),
     signal: option<'signal'>(null),
     errorFallback: {
       type: Function as PropType<(error: unknown) => VNodeChild>,

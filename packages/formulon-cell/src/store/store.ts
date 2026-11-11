@@ -60,6 +60,7 @@ export const createSpreadsheetStore = () =>
       rightToLeft: false,
       showFormulas: false,
       showOutlineSymbols: true,
+      showAllNotes: false,
       endMode: false,
       workbookView: 'normal',
       zoomBeforePreview: null,

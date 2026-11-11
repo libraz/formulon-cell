@@ -52,7 +52,7 @@ describe('Mac note navigation bounds', () => {
       expect(opened).toEqual(['0:1']);
       expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 1 });
       applyRibbonCommand('mac.review.showNotes', deps);
-      expect(noteVisibleAt(store.getState(), { sheet: 0, row: 0, col: 1 })).toBe(true);
+      expect(store.getState().ui.showAllNotes).toBe(true);
     } finally {
       navigation.dispose();
       workbook.dispose();
@@ -103,7 +103,7 @@ describe('Mac note navigation bounds', () => {
     }
   });
 
-  it('Show All Notes shows every note, and Show/Hide Note toggles the active one', async () => {
+  it('Show All Notes is a view preference, and Show/Hide Note toggles the active one', async () => {
     const store = createSpreadsheetStore();
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const host = document.createElement('div');
@@ -122,13 +122,14 @@ describe('Mac note navigation bounds', () => {
     try {
       const note = { sheet: 0, row: 2, col: 1 };
       applyRibbonCommand('mac.review.showNotes', deps);
-      expect(noteVisibleAt(store.getState(), note)).toBe(true);
+      expect(store.getState().ui.showAllNotes).toBe(true);
+      expect(noteVisibleAt(store.getState(), note)).toBe(false);
       store.setState((s) => ({
         ...s,
         selection: { ...s.selection, active: note, anchor: note },
       }));
       applyRibbonCommand('mac.review.showHideNote', deps);
-      expect(noteVisibleAt(store.getState(), note)).toBe(false);
+      expect(noteVisibleAt(store.getState(), note)).toBe(true);
     } finally {
       workbook.dispose();
     }

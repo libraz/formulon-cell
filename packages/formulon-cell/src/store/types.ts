@@ -210,6 +210,9 @@ export interface UiSlice {
   showFormulas: boolean;
   /** When false, the outline gutters (brackets and +/- toggles) are hidden. */
   showOutlineSymbols: boolean;
+  /** Review > Show All Notes: every note is drawn whatever its own shown state. A view
+   *  preference of this spreadsheet, never written to the workbook. */
+  showAllNotes: boolean;
   /** Excel End mode: the next arrow key jumps to the edge of the current data region. */
   endMode: boolean;
   /** Workbook view mode surfaced by View > Workbook Views. Page Layout folds

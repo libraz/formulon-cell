@@ -112,7 +112,7 @@ describe('React <Spreadsheet>', () => {
 
     expect(mounted.refValue.spreadsheet).toBe(original);
     expect(onUpdate).toHaveBeenCalledTimes(1);
-    expect(onUpdate.mock.calls[0]?.[0]).toEqual({ keys: ['theme'] });
+    expect(onUpdate.mock.calls[0]?.[0]).toEqual({ keys: ['theme'], source: 'api' });
     expect(mounted.host.querySelector<HTMLElement>('[data-fc-theme]')?.dataset.fcTheme).toBe('ink');
   });
 

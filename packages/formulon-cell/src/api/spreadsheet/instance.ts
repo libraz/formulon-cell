@@ -397,7 +397,8 @@ export class SpreadsheetInstance {
   }
 
   /** Applies a patch to the options: keys present are replaced, `null` resets one to its default,
-   *  and keys left out keep their values. Emits `update` with the keys it changed. */
+   *  and keys left out keep their values. Emits `update` with the keys it changed and
+   *  `source: 'api'`. */
   update(patch: SpreadsheetPatch): void {
     const state = stateOf(this);
     const keys = (Object.keys(patch) as (keyof SpreadsheetPatch)[]).filter(
@@ -405,7 +406,7 @@ export class SpreadsheetInstance {
     );
     if (keys.length === 0) return;
     for (const key of keys) applyPatchKey(state, key, patch[key] ?? null);
-    const event: UpdateEvent = { keys };
+    const event: UpdateEvent = { keys, source: 'api' };
     state.events.emit('update', event);
   }
 
@@ -591,6 +592,11 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
       break;
     case 'macroRecording':
       legacy.setMacroRecording((value as boolean | null) ?? null);
+      break;
+    case 'showAllNotes':
+      // The options lead, so the store subscriber does not read this as the user's toggle.
+      state.options = next as SpreadsheetOptions;
+      mutators.setShowAllNotes(legacy.store, (value as boolean | null) ?? false);
       break;
   }
   state.options = next as SpreadsheetOptions;
@@ -981,6 +987,14 @@ export async function mount(
   for (const hint of options.formulaHints ?? []) formulaHints.add(hint);
   const instance = new SpreadsheetInstance(CONSTRUCT, state);
 
+  if (options.showAllNotes) mutators.setShowAllNotes(legacy.store, true);
+  const offShowAllNotes = legacy.store.subscribe(() => {
+    const shown = state.legacy.store.getState().ui.showAllNotes;
+    if (shown === (state.options.showAllNotes ?? false)) return;
+    state.options = { ...state.options, showAllNotes: shown };
+    events.emit('update', { keys: ['showAllNotes'], source: 'user' });
+  });
+
   let lastSelection = selectionOf(legacy);
   const offSelection = legacy.store.subscribe(() => {
     const next = selectionOf(state.legacy);
@@ -1015,6 +1029,7 @@ export async function mount(
   life.onDispose(() => state.legacy.dispose());
   life.onDispose(() => {
     offSelection();
+    offShowAllNotes();
     offCell();
     offBatch();
     offRecalc();

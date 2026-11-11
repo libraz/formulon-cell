@@ -56,15 +56,21 @@ export interface VisibleNote {
 
 // The store replaces the formats map on every change, so its identity keys
 // the shown-note index and an unchanged sheet is never rescanned.
-const noteIndex = new WeakMap<ReadonlyMap<string, CellFormat>, readonly VisibleNote[]>();
+const shownNoteIndex = new WeakMap<ReadonlyMap<string, CellFormat>, readonly VisibleNote[]>();
+const everyNoteIndex = new WeakMap<ReadonlyMap<string, CellFormat>, readonly VisibleNote[]>();
 
-/** Every shown note in `formats`, cached per map. */
-export function visibleNotes(formats: ReadonlyMap<string, CellFormat>): readonly VisibleNote[] {
-  const cached = noteIndex.get(formats);
+/** Every note drawn from `formats`: the shown ones, or all of them under Show All Notes. Cached
+ *  per map. */
+export function visibleNotes(
+  formats: ReadonlyMap<string, CellFormat>,
+  showAll = false,
+): readonly VisibleNote[] {
+  const index = showAll ? everyNoteIndex : shownNoteIndex;
+  const cached = index.get(formats);
   if (cached) return cached;
   const notes: VisibleNote[] = [];
   for (const [key, format] of formats) {
-    if (format.commentVisible !== true || !format.comment) continue;
+    if (!format.comment || (!showAll && format.commentVisible !== true)) continue;
     const addr = parseAddrKey(key);
     if (!addr) continue;
     notes.push({
@@ -73,7 +79,7 @@ export function visibleNotes(formats: ReadonlyMap<string, CellFormat>): readonly
       ...(format.commentAuthor ? { author: format.commentAuthor } : {}),
     });
   }
-  noteIndex.set(formats, notes);
+  index.set(formats, notes);
   return notes;
 }
 
@@ -116,7 +122,7 @@ export function paintVisibleNotes(
   const scale = renderScale(layout, viewport);
   const rtl = layout.rtl === true;
   const macPt = wholePointAdvances(layout) ? fontPointsToCssPx(1) * scale : null;
-  const notes = visibleNotes(state.format.formats);
+  const notes = visibleNotes(state.format.formats, state.ui.showAllNotes);
   if (notes.length === 0) return;
   const bodyEnd = bodyEndOf(rows);
   for (const note of notes) {

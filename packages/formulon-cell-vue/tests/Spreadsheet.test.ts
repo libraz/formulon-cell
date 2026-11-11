@@ -101,7 +101,7 @@ describe('<Spreadsheet>', () => {
     expect(onChange).toHaveBeenCalled();
     view.props.theme = 'ink';
     await flush();
-    expect(onUpdate).toHaveBeenCalledWith({ keys: ['theme'] });
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['theme'], source: 'api' });
   });
 
   it('emits selectionChange when the selection moves', async () => {
@@ -135,7 +135,7 @@ describe('<Spreadsheet>', () => {
     view.props.theme = 'ink';
     await flush();
     expect(onUpdate).toHaveBeenCalledTimes(1);
-    expect(onUpdate).toHaveBeenCalledWith({ keys: ['theme'] });
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['theme'], source: 'api' });
     expect(view.instance()).toBe(first);
   });
 
@@ -159,7 +159,7 @@ describe('<Spreadsheet>', () => {
     expect(onUpdate).not.toHaveBeenCalled();
     view.props.ui = { profile: 'full' };
     await flush();
-    expect(onUpdate).toHaveBeenCalledWith({ keys: ['ui'] });
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['ui'], source: 'api' });
   });
 
   it('applies props changed while the mount is pending once it settles', async () => {
@@ -185,7 +185,7 @@ describe('<Spreadsheet>', () => {
     view.props.theme = 'ink';
     await flush();
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onUpdate).toHaveBeenCalledWith({ keys: ['theme'] });
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['theme'], source: 'api' });
     expect(view.instance()?.disposed).toBe(false);
   });
 

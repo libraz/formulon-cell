@@ -3,7 +3,7 @@ import {
   BUILT_IN_COMMAND_OPERATION,
   canExecuteBuiltIn,
 } from '../../../src/commands/built-in-command-policy.js';
-import { allNotesVisible, noteVisibleAt, setComment } from '../../../src/commands/comment.js';
+import { noteVisibleAt, setComment } from '../../../src/commands/comment.js';
 import { History } from '../../../src/commands/history.js';
 import {
   InteractionController,
@@ -13,6 +13,7 @@ import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
 import { executeNoteVisibilityAction } from '../../../src/commands/ribbon-comment.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from '../../../src/engine/format-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { visibleNotes } from '../../../src/render/grid/notes.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -64,23 +65,28 @@ describe('Show/Hide Note is a view operation', () => {
     mutators.setSheetProtected(store, 0, true);
     executeNoteVisibilityAction({ store, workbook: wb, action: 'toggle-all' });
     expect(openDialog()).toBeNull();
-    expect(noteVisibleAt(store.getState(), a(0, 0))).toBe(true);
+    expect(store.getState().ui.showAllNotes).toBe(true);
   });
 
-  it('Show All Notes shows, then hides again, including a blank-cell note from the file', async () => {
+  it('Show All Notes draws every note, a blank-cell note from the file included, and writes none', async () => {
     expect(wb.setCommentEntry(0, 5, 5, 'Alice', 'loaded on a blank cell')).toBe(true);
     const loaded = await WorkbookHandle.loadBytes(wb.save());
     try {
       hydrateCommentsAndHyperlinksFromEngine(loaded, store, 0);
       setComment(store, a(1, 1), 'typed', loaded);
+      const formats = store.getState().format.formats;
       executeNoteVisibilityAction({ store, workbook: loaded, action: 'toggle-all' });
-      expect(allNotesVisible(store.getState())).toBe(true);
-      expect(loaded.getCommentVisible(0, 5, 5)).toBe(true);
+      expect(store.getState().ui.showAllNotes).toBe(true);
+      expect(store.getState().format.formats).toBe(formats);
+      expect(visibleNotes(formats, true).map((n) => n.addr)).toEqual(
+        expect.arrayContaining([a(5, 5), a(1, 1)]),
+      );
+      expect(visibleNotes(formats)).toEqual([]);
+      expect(loaded.getCommentVisible(0, 5, 5)).toBe(false);
       executeNoteVisibilityAction({ store, workbook: loaded, action: 'toggle-all' });
-      expect(allNotesVisible(store.getState())).toBe(false);
+      expect(store.getState().ui.showAllNotes).toBe(false);
       expect(noteVisibleAt(store.getState(), a(5, 5))).toBe(false);
       expect(noteVisibleAt(store.getState(), a(1, 1))).toBe(false);
-      expect(loaded.getCommentVisible(0, 5, 5)).toBe(false);
     } finally {
       loaded.dispose();
     }

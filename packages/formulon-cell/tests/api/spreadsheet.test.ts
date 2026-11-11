@@ -20,6 +20,8 @@ import {
 } from '@libraz/formulon-cell';
 import { ribbon } from '@libraz/formulon-cell/toolbar';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { workbookHandleOf } from '../../src/api/workbook.js';
+import { setComment } from '../../src/commands/comment.js';
 import { spreadsheetInternals } from '../../src/mount/internals.js';
 import { expectFailure, makeHost } from './helpers.js';
 
@@ -204,10 +206,38 @@ describe('spreadsheet: update', () => {
     sheet.update({ locale: 'ja' });
     expect(sheet.options.theme).toBe('ink');
     expect(sheet.options.locale).toBe('ja');
-    expect(updates).toHaveBeenCalledWith(expect.objectContaining({ keys: ['locale'] }));
+    expect(updates).toHaveBeenCalledWith({ keys: ['locale'], source: 'api' });
     sheet.update({ policy: viewerPolicy() });
     sheet.update({ policy: null });
     expect(sheet.commands.can('insertRows')).toBe(true);
+  });
+
+  it('Show All Notes from the UI reports a user update, writes no note and leaves the file as it was', async () => {
+    const sheet = await mountSheet();
+    const { store } = spreadsheetInternals(sheet);
+    setComment(store, { sheet: 0, row: 1, col: 1 }, 'note', workbookHandleOf(sheet.workbook));
+    const formats = store.getState().format.formats;
+    const saved = sheet.workbook.save();
+    const updates = vi.fn();
+    sheet.on('update', updates);
+
+    sheet.commands.execute('showAllNotesReview');
+    expect(updates).toHaveBeenCalledTimes(1);
+    expect(updates).toHaveBeenCalledWith({ keys: ['showAllNotes'], source: 'user' });
+    expect(sheet.options.showAllNotes).toBe(true);
+    expect(store.getState().format.formats).toBe(formats);
+    expect(sheet.workbook.save()).toEqual(saved);
+
+    sheet.update({ showAllNotes: false });
+    expect(updates).toHaveBeenLastCalledWith({ keys: ['showAllNotes'], source: 'api' });
+    expect(updates).toHaveBeenCalledTimes(2);
+    expect(store.getState().ui.showAllNotes).toBe(false);
+  });
+
+  it('showAllNotes set at mount draws every note from the start', async () => {
+    const sheet = await mountSheet({ showAllNotes: true });
+    expect(sheet.options.showAllNotes).toBe(true);
+    expect(spreadsheetInternals(sheet).store.getState().ui.showAllNotes).toBe(true);
   });
 
   it('update({ host }) replaces the function providers and null removes them', async () => {

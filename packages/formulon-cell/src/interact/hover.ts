@@ -115,7 +115,7 @@ export function attachHover(deps: HoverDeps): HoverHandle {
       last = null;
     }
     // A shown note is already on the canvas; hovering it adds no popup.
-    const note = fmt?.commentVisible ? undefined : fmt?.comment;
+    const note = fmt?.commentVisible || store.getState().ui.showAllNotes ? undefined : fmt?.comment;
     const tooltip = note || fmt?.hyperlinkTooltip;
     if (tooltip) {
       if (tooltip !== shownText) {

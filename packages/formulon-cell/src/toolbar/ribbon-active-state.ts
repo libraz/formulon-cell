@@ -1,6 +1,6 @@
 import type { BorderPreset as CommandBorderPreset } from '../commands/border-presets.js';
 import { activeCellStyleId } from '../commands/cell-styles.js';
-import { allNotesVisible, commentAt, noteVisibleAt } from '../commands/comment.js';
+import { commentAt, noteVisibleAt } from '../commands/comment.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import { tableForCell } from '../commands/format-as-table.js';
 import { mergeAt } from '../commands/merge.js';
@@ -434,7 +434,7 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     formatPainterArmed: !!inst.formatPainter?.isActive(),
     hasComment: commentAt(s, a) != null,
     noteVisible: noteVisibleAt(s, a),
-    allNotesVisible: allNotesVisible(s),
+    allNotesVisible: s.ui.showAllNotes,
     fontFamily: f?.fontFamily ?? displayFamily,
     // CellFormat stores CSS pixels for paint; Excel's ribbon exposes points.
     fontSize: fontCssPxToDisplayPoints(f?.fontSize ?? displaySize),

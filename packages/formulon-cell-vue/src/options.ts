@@ -18,6 +18,7 @@ export const OPTION_KEYS = [
   'host',
   'uploadStatus',
   'macroRecording',
+  'showAllNotes',
   'signal',
 ] as const satisfies readonly (keyof SpreadsheetOptions)[];
 

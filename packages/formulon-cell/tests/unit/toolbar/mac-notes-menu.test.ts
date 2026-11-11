@@ -78,6 +78,9 @@ describe('Mac Review > Notes menu', () => {
     expect(buttons.get('mac.review.showNotes')?.getAttribute('aria-pressed')).toBe('false');
     mutators.setCellFormat(instance.store, { sheet: 0, row: 4, col: 4 }, { commentVisible: true });
     projectMacRibbonState(host, instance);
+    expect(buttons.get('mac.review.showNotes')?.getAttribute('aria-pressed')).toBe('false');
+    mutators.setShowAllNotes(instance.store, true);
+    projectMacRibbonState(host, instance);
     expect(buttons.get('mac.review.showNotes')?.getAttribute('aria-pressed')).toBe('true');
   });
 

@@ -69,7 +69,7 @@ describe('<Spreadsheet> embedding props', () => {
     expect(host.querySelector('[data-ribbon-tab]')).not.toBeNull();
     props.toolbar = null;
     await flush();
-    expect(onUpdate).toHaveBeenCalledWith({ keys: ['toolbar'] });
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['toolbar'], source: 'api' });
     expect(host.querySelector('[data-ribbon-tab]')).toBeNull();
   });
 
@@ -81,7 +81,7 @@ describe('<Spreadsheet> embedding props', () => {
     onUpdate.mockClear();
     props.policy = undefined;
     await flush();
-    expect(onUpdate).toHaveBeenCalledWith({ keys: ['policy'] });
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['policy'], source: 'api' });
   });
 
   it('reports a rejected workbook replacement and keeps the instance on its workbook', async () => {
@@ -108,7 +108,7 @@ describe('<Spreadsheet> embedding props', () => {
     await flush();
     expect(onError).toHaveBeenCalledTimes(1);
     expect(instance.i18n.locale).toBe('ja');
-    expect(onUpdate).toHaveBeenCalledWith({ keys: ['locale'] });
+    expect(onUpdate).toHaveBeenCalledWith({ keys: ['locale'], source: 'api' });
   });
 
   it('keeps the strings overlay when the locale changes through the prop', async () => {
