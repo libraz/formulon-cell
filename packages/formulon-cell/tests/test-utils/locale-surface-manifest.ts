@@ -286,7 +286,7 @@ export const LOCALE_SURFACE_TOOLBAR_ROUTES: readonly LocaleSurfaceToolbarRoute[]
     menuId: 'menu-table-style-home',
     actionAttr: 'tableStyleFooter',
     action: 'new-table-style',
-    titlePath: 'ribbonMenu.tableStyleNew',
+    titlePath: 'ribbonMenu.tableStyleNewTitle',
     factoryId: 'toolbar.tableStyle',
     cancelable: true,
   },

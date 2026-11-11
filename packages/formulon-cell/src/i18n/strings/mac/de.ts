@@ -271,6 +271,18 @@ export const macDe: MacStrings = {
     errorCaption: 'Diese Fehlermeldung anzeigen, wenn ungültige Daten eingegeben wurden:',
   },
   createTable: { nameLabel: 'Wie lautet der Name Ihrer Tabelle?' },
+  tableStyleDialog: {
+    newTitle: 'Neues Tabellenformat',
+    modifyTitle: 'Tabellenformat ändern',
+    newPivotTitle: 'Schnellformatvorlage für neue PivotTable',
+    modifyPivotTitle: 'Schnellformatvorlage für PivotTable ändern',
+    setDefault: 'Als Standard-Tabellenformatvorlage für diese Arbeitsmappe festlegen',
+    name: 'Name:',
+    format: 'Format',
+    clear: 'Löschen',
+    preview: 'Vorschau',
+    stripeSize: 'Streifenbreite',
+  },
   goToDialog: macGoToDialogFrom(editDialogsDe.goToDialog, {
     selectCaption: 'Auswählen',
     optionsGroup: 'Optionen',

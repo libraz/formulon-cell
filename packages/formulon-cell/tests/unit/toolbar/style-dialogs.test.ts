@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { ja } from '../../../src/i18n/strings.js';
 import { showCellStyleDialog } from '../../../src/toolbar/dialogs/cell-style.js';
-import { showTableStyleDialog } from '../../../src/toolbar/dialogs/table-style.js';
 
 const sourcePath = (relative: string): string =>
   join(process.cwd(), 'src/toolbar/dialogs', relative);
@@ -24,42 +23,6 @@ const nextFrame = (): Promise<void> =>
 describe('style dialogs i18n', () => {
   afterEach(() => {
     document.body.replaceChildren();
-  });
-
-  it('renders Create Table Style labels from the provided dictionary', async () => {
-    const pending = showTableStyleDialog({
-      title: ja.ribbonMenu.tableStyleNew,
-      strings: ja,
-    });
-
-    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
-    expect(dialog?.textContent).toContain('新しい表スタイル');
-    expect(dialog?.textContent).toContain('スタイル名');
-    expect(dialog?.textContent).toContain('スタイルの種類');
-    expect(dialog?.textContent).toContain('アクセント色');
-    expect(dialog?.textContent).toContain('縞模様の行');
-    expect(dialog?.textContent).toContain('最初の列を強調');
-    expect(dialog?.textContent).not.toContain('Style name');
-    expect(dialog?.textContent).not.toContain('First column emphasis');
-
-    await closeDialog();
-    await expect(pending).resolves.toBeNull();
-  });
-
-  it('focuses and selects the table style name field on open', async () => {
-    const pending = showTableStyleDialog({
-      title: ja.ribbonMenu.tableStyleNew,
-      strings: ja,
-    });
-    await nextFrame();
-
-    const name = document.body.querySelector<HTMLInputElement>('input[data-dialog-field="name"]');
-    expect(document.activeElement).toBe(name);
-    expect(name?.selectionStart).toBe(0);
-    expect(name?.selectionEnd).toBe(name?.value.length);
-
-    await closeDialog();
-    await expect(pending).resolves.toBeNull();
   });
 
   it('renders Create Cell Style labels from the provided dictionary', async () => {

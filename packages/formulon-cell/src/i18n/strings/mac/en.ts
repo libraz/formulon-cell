@@ -268,6 +268,18 @@ export const macEn: MacStrings = {
     errorCaption: 'When user enters invalid data, show this error alert:',
   },
   createTable: { nameLabel: 'What is the name of your table?' },
+  tableStyleDialog: {
+    newTitle: 'New Table Style',
+    modifyTitle: 'Modify Table Style',
+    newPivotTitle: 'New PivotTable Quick Style',
+    modifyPivotTitle: 'Modify PivotTable Quick Style',
+    setDefault: 'Set as default table style for this workbook',
+    name: 'Name:',
+    format: 'Format',
+    clear: 'Clear',
+    preview: 'Preview',
+    stripeSize: 'Stripe size',
+  },
   goToDialog: macGoToDialogFrom(editDialogsEn.goToDialog, {
     selectCaption: 'Select',
     optionsGroup: 'Options',

@@ -3,7 +3,6 @@ import { customCellStyleId } from '../../../../src/commands/cell-styles.js';
 import {
   customPivotTableStyleId,
   customTableStyleId,
-  galleryStyleElements,
 } from '../../../../src/commands/format-as-table.js';
 import { addrKey } from '../../../../src/engine/address.js';
 import type { MountToolbarOptions } from '../../../../src/mount/toolbar.js';
@@ -610,41 +609,21 @@ describe('Spreadsheet.mountToolbar', () => {
     await Promise.resolve();
     const tableStyleDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(tableStyleDialog?.textContent).toContain('New Table Style');
+    expect(tableStyleDialog?.textContent).toContain('Table Element:');
     const tableStyleName = tableStyleDialog?.querySelector<HTMLInputElement>('input');
     expect(tableStyleName).toBeTruthy();
     if (!tableStyleName) throw new Error('Expected new table style name input.');
     tableStyleName.value = 'Review Table';
-    const tableStyleType = tableStyleDialog?.querySelector<HTMLSelectElement>(
-      '[data-dialog-field="style"]',
-    );
-    const tableStyleColor = tableStyleDialog?.querySelector<HTMLSelectElement>(
-      '[data-dialog-field="color"]',
-    );
-    const tableStyleBanded = tableStyleDialog?.querySelector<HTMLInputElement>(
-      '[data-dialog-field="bandedRows"]',
-    );
-    const tableStyleFirstCol = tableStyleDialog?.querySelector<HTMLInputElement>(
-      '[data-dialog-field="firstColumn"]',
-    );
-    expect(tableStyleType?.value).toBe('dark');
-    expect(tableStyleColor?.value).toBe('#4472c4');
-    expect(tableStyleBanded?.checked).toBe(true);
-    expect(tableStyleFirstCol?.checked).toBe(true);
-    if (!tableStyleType || !tableStyleColor || !tableStyleBanded || !tableStyleFirstCol) {
-      throw new Error('Expected table style editor controls.');
-    }
-    tableStyleType.value = 'light';
-    tableStyleColor.value = '#ed7d31';
-    tableStyleBanded.checked = false;
-    tableStyleFirstCol.checked = true;
     tableStyleDialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(sheet.instance.store.getState().tables.customTableStyles).toContainEqual({
-      id: customTableStyleId('Review Table'),
-      label: 'Review Table',
-      elements: galleryStyleElements('light', '#ed7d31', 'firstCol'),
-    });
+    expect(sheet.instance.store.getState().tables.customTableStyles).toEqual([
+      expect.objectContaining({
+        id: customTableStyleId('Review Table'),
+        label: 'Review Table',
+        elements: {},
+      }),
+    ]);
 
     tb.rerender();
     const refreshedTableButton = host.querySelector<HTMLButtonElement>(
@@ -685,27 +664,16 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(pivotStyleName).toBeTruthy();
     if (!pivotStyleName) throw new Error('Expected new PivotTable style name input.');
     pivotStyleName.value = 'Review Pivot';
-    const pivotStyleType = pivotStyleDialog?.querySelector<HTMLSelectElement>(
-      '[data-dialog-field="style"]',
-    );
-    const pivotStyleColor = pivotStyleDialog?.querySelector<HTMLSelectElement>(
-      '[data-dialog-field="color"]',
-    );
-    expect(pivotStyleType?.value).toBe('dark');
-    expect(pivotStyleColor?.value).toBe('#4472c4');
-    if (!pivotStyleType || !pivotStyleColor) {
-      throw new Error('Expected PivotTable style editor controls.');
-    }
-    pivotStyleType.value = 'medium';
-    pivotStyleColor.value = '#70ad47';
     pivotStyleDialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(sheet.instance.store.getState().tables.customPivotTableStyles).toContainEqual({
-      id: customPivotTableStyleId('Review Pivot'),
-      label: 'Review Pivot',
-      elements: galleryStyleElements('medium', '#70ad47', 'bandedFirstCol'),
-    });
+    expect(sheet.instance.store.getState().tables.customPivotTableStyles).toEqual([
+      expect.objectContaining({
+        id: customPivotTableStyleId('Review Pivot'),
+        label: 'Review Pivot',
+        elements: {},
+      }),
+    ]);
     expect(sheet.instance.store.getState().tables.pivotTableStyles).toContainEqual({
       sheetIndex: 0,
       pivotIndex: 2,

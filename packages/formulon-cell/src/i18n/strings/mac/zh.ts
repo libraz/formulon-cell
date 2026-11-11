@@ -267,6 +267,18 @@ export const macZh: MacStrings = {
     errorCaption: '输入无效数据时显示下列出错警告:',
   },
   createTable: { nameLabel: '表名称是什么?' },
+  tableStyleDialog: {
+    newTitle: '新建表样式',
+    modifyTitle: '修改表样式',
+    newPivotTitle: '新建数据透视表快速样式',
+    modifyPivotTitle: '修改数据透视表快速样式',
+    setDefault: '设置为此工作簿的默认表样式',
+    name: '名称:',
+    format: '格式',
+    clear: '清除',
+    preview: '预览',
+    stripeSize: '条纹尺寸',
+  },
   goToDialog: macGoToDialogFrom(editDialogsZh.goToDialog, {
     selectCaption: '选择',
     optionsGroup: '选项',

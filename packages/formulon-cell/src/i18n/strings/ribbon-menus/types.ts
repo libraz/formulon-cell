@@ -442,15 +442,60 @@ export interface RibbonMenusStrings {
     tableStyleSetDefault: string;
     /** Title of the table style dialog opened by Modify. */
     tableStyleModifyTitle: string;
+    /** Labels of the New / Modify Table Style dialog. */
+    tableStyleElement: string;
+    tableStyleFormat: string;
+    tableStyleClearElement: string;
+    tableStyleElementFormatting: string;
+    tableStylePreview: string;
+    tableStyleStripeSize: string;
+    tableStyleSetDefaultTable: string;
+    tableStyleSetDefaultPivot: string;
+    tableStyleNewTitle: string;
+    tableStyleNewPivotTitle: string;
+    tableStyleModifyPivotTitle: string;
+    /** Name a new table / PivotTable style starts with; `{n}` is the first free number. */
+    tableStyleDefaultName: string;
+    pivotStyleDefaultName: string;
+    /** The table and PivotTable style elements the dialog lists. */
+    tableStyleElements: Record<
+      | 'wholeTable'
+      | 'headerRow'
+      | 'totalRow'
+      | 'grandTotalRow'
+      | 'firstColumn'
+      | 'lastColumn'
+      | 'grandTotalColumn'
+      | 'firstRowStripe'
+      | 'secondRowStripe'
+      | 'firstColumnStripe'
+      | 'secondColumnStripe'
+      | 'firstHeaderCell'
+      | 'lastHeaderCell'
+      | 'firstTotalCell'
+      | 'lastTotalCell'
+      | 'firstSubtotalColumn'
+      | 'secondSubtotalColumn'
+      | 'thirdSubtotalColumn'
+      | 'firstSubtotalRow'
+      | 'secondSubtotalRow'
+      | 'thirdSubtotalRow'
+      | 'blankRow'
+      | 'firstColumnSubheading'
+      | 'secondColumnSubheading'
+      | 'thirdColumnSubheading'
+      | 'firstRowSubheading'
+      | 'secondRowSubheading'
+      | 'thirdRowSubheading'
+      | 'pageFieldLabels'
+      | 'pageFieldValues',
+      string
+    >;
     /** Format as Table swatch names, keyed by built-in style name. */
     tableStyleSwatches: Readonly<
       Record<`TableStyle${'Light' | 'Medium' | 'Dark'}${number}`, string>
     >;
     tableStyleName: string;
-    tableStyleType: string;
-    tableStyleColor: string;
-    tableStyleBandedRows: string;
-    tableStyleFirstColumn: string;
     cellStyleNew: string;
     cellStyleCustom: string;
     cellStyleName: string;

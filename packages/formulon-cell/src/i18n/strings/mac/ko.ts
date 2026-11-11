@@ -268,6 +268,18 @@ export const macKo: MacStrings = {
     errorCaption: '유효하지 않은 데이터를 입력하면 표시할 오류 메시지:',
   },
   createTable: { nameLabel: '표 이름은 무엇입니까?' },
+  tableStyleDialog: {
+    newTitle: '표 스타일 새로 만들기',
+    modifyTitle: '테이블 스타일 수정',
+    newPivotTitle: '새 피벗 테이블 빠른 스타일',
+    modifyPivotTitle: '피벗 테이블 빠른 스타일 수정',
+    setDefault: '이 통합 문서의 기본 표 스타일로 설정',
+    name: '이름:',
+    format: '서식',
+    clear: '지우기',
+    preview: '미리 보기',
+    stripeSize: '줄무늬 크기',
+  },
   goToDialog: macGoToDialogFrom(editDialogsKo.goToDialog, {
     selectCaption: '선택',
     optionsGroup: '옵션',

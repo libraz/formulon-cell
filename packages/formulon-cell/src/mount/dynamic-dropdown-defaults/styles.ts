@@ -12,18 +12,17 @@ import {
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
   customTableStyleById,
-  DEFAULT_TABLE_COLOR,
+  customTableStyleId,
   defaultTableStyleId,
   formatAsTableByStyleId,
-  galleryStyleElements,
   inferTableHasHeaders,
   nextTableName,
   overlayStyleName,
   pivotTableStyleAssignment,
+  setDefaultTableStyle,
   type TableVariant,
   tableNameError,
   tableOverlayAt,
-  tableVariantFromOptions,
 } from '../../commands/format-as-table.js';
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
 import { recordConditionalRulesChange, recordTablesChange } from '../../commands/slice-history.js';
@@ -44,9 +43,11 @@ import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { Range } from '../../engine/types.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import { type DialogEntry, openFormatDialogFrom } from '../../interact/dialog-entry.js';
+import { attachFormatDialog, type FormatDialogHandle } from '../../interact/format-dialog.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { type ConditionalRule, mutators } from '../../store/store.js';
+import type { CellFormat } from '../../store/types.js';
 import { describeCellStyleFormat, showCellStyleDialog } from '../../toolbar/dialogs/cell-style.js';
 import { showChoiceDialog } from '../../toolbar/dialogs/choice.js';
 import {
@@ -55,7 +56,12 @@ import {
 } from '../../toolbar/dialogs/conditional-format.js';
 import { showFormatAsTableDialog } from '../../toolbar/dialogs/format-as-table.js';
 import { showMessage } from '../../toolbar/dialogs/prompt.js';
-import { showTableStyleDialog } from '../../toolbar/dialogs/table-style.js';
+import {
+  showTableStyleDialog,
+  type TableStyleDialogOptions,
+  type TableStyleDialogValue,
+  type TableStyleKind,
+} from '../../toolbar/dialogs/table-style.js';
 import { applyConditionalMenuAction } from '../../toolbar/ribbon/conditional-menu-action.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { formatSheetAbsoluteRange, parseA1Range } from '../../wrappers/toolbar-a1.js';
@@ -314,6 +320,116 @@ export const showCreateTableDialog = async (
   instance.host.focus();
 };
 
+/** The first `template` name, numbered from 1, that no custom style of `kind` uses. */
+const freeStyleName = (instance: SpreadsheetInstance, template: string): string => {
+  const state = instance.store.getState();
+  const taken = new Set(
+    [...(state.tables.customTableStyles ?? []), ...(state.tables.customPivotTableStyles ?? [])].map(
+      (style) => style.label.toLocaleLowerCase(),
+    ),
+  );
+  for (let n = 1; ; n += 1) {
+    const name = template.replace('{n}', String(n));
+    if (!taken.has(name.toLocaleLowerCase())) return name;
+  }
+};
+
+/** Runs the table style dialog with the instance's differential Format Cells behind Format. */
+const runTableStyleDialog = async (
+  instance: SpreadsheetInstance,
+  opts: Pick<TableStyleDialogOptions, 'kind' | 'mode' | 'initial'>,
+): Promise<TableStyleDialogValue | null> => {
+  const strings = instance.i18n.strings;
+  const format: { dialog: FormatDialogHandle | null } = { dialog: null };
+  const summary = strings.mac.styleDialog.summary;
+  try {
+    return await showTableStyleDialog({
+      ...opts,
+      mac: instance.host.dataset.fcPlatform === 'mac',
+      strings,
+      editFormat: (initial, apply) => {
+        format.dialog ??= attachFormatDialog({
+          host: instance.host,
+          store: instance.store,
+          strings,
+          getWb: () => instance.workbook,
+          getLocale: () => instance.i18n.locale,
+        });
+        format.dialog.open('font', { mode: 'dxf', initialFormat: initial, onApplyDxf: apply });
+      },
+      // The element line names what the element sets: its font, border and fill.
+      describe: (format) => {
+        const parts = describeCellStyleFormat(format as CellFormat, summary);
+        const font =
+          format.bold || format.italic || format.underline || format.strike || format.color;
+        return [
+          ...(font ? [parts.font] : []),
+          ...(format.borders ? [parts.border] : []),
+          ...(format.fill ? [parts.fill] : []),
+        ].join('; ');
+      },
+    });
+  } finally {
+    format.dialog?.detach();
+  }
+};
+
+/** Writes a dialog result as a new custom style of `kind`, and its default when asked. */
+const saveNewStyle = (
+  instance: SpreadsheetInstance,
+  kind: TableStyleKind,
+  value: TableStyleDialogValue,
+): void => {
+  const look = { elements: value.elements, stripeSizes: value.stripeSizes };
+  if (kind === 'table') {
+    createTableStyleFromActiveTable(instance.store, instance.history, value.name, look);
+    if (value.setAsDefault) {
+      setDefaultTableStyle(
+        instance.store.getState(),
+        instance.workbook,
+        customTableStyleId(value.name),
+      );
+    }
+    return;
+  }
+  const state = instance.store.getState();
+  const pivot = findPivotTableAtCell(
+    instance.workbook as unknown as Parameters<typeof findPivotTableAtCell>[0],
+    state.selection.active,
+  );
+  createPivotTableStyleFromActivePivot(
+    instance.store,
+    instance.history,
+    value.name,
+    pivot ? { sheetIndex: pivot.sheetIndex, pivotIndex: pivot.pivotIndex } : null,
+    look,
+  );
+  if (value.setAsDefault)
+    instance.workbook.setTableStyleDefaults({ pivotStyle: value.name.trim() });
+};
+
+/** New Table Style / New PivotTable Style from a gallery footer. */
+export const openNewTableStyle = async (
+  instance: SpreadsheetInstance,
+  kind: TableStyleKind,
+): Promise<void> => {
+  const t = instance.i18n.strings.ribbonMenu;
+  const value = await runTableStyleDialog(instance, {
+    kind,
+    mode: 'new',
+    initial: {
+      name: freeStyleName(
+        instance,
+        kind === 'table' ? t.tableStyleDefaultName : t.pivotStyleDefaultName,
+      ),
+      elements: {},
+      stripeSizes: {},
+    },
+  });
+  if (value) saveNewStyle(instance, kind, value);
+  instance.host.focus();
+};
+
 /** Modify or Duplicate from a table style gallery item's context menu. Duplicate names the copy
  *  after its source with a 2; that name is unmeasured. */
 export const openTableStyleEditor = async (
@@ -321,40 +437,42 @@ export const openTableStyleEditor = async (
   mode: 'modify' | 'duplicate',
   styleId: string,
 ): Promise<void> => {
-  const strings = instance.i18n.strings;
-  const t = strings.ribbonMenu;
+  const t = instance.i18n.strings.ribbonMenu;
   const custom = customTableStyleById(instance.store.getState(), styleId);
   const themeColors = instance.workbook.getTheme?.()?.colors;
   const builtinElements = custom ? null : builtinTableStyleElements(styleId, themeColors);
-  const source = custom
-    ? { label: custom.label }
+  const label = custom
+    ? custom.label
     : builtinElements
-      ? { label: t.tableStyleSwatches[styleId as keyof typeof t.tableStyleSwatches] ?? styleId }
+      ? (t.tableStyleSwatches[styleId as keyof typeof t.tableStyleSwatches] ?? styleId)
       : null;
-  if (!source || (mode === 'modify' && !custom)) return;
-  const value = await showTableStyleDialog({
-    title: mode === 'modify' ? t.tableStyleModifyTitle : t.tableStyleNew,
-    strings,
+  if (label === null || (mode === 'modify' && !custom)) return;
+  const defaults = instance.workbook.getTableStyleDefaults();
+  const value = await runTableStyleDialog(instance, {
+    kind: 'table',
+    mode: mode === 'modify' ? 'modify' : 'new',
     initial: {
-      name: mode === 'modify' ? source.label : `${source.label} 2`,
-      style: 'medium',
-      color: DEFAULT_TABLE_COLOR,
-      variant: 'banded',
+      name: mode === 'modify' ? label : `${label} 2`,
+      elements: structuredClone(custom?.elements ?? builtinElements ?? {}),
+      stripeSizes: { ...custom?.stripeSizes },
+      setAsDefault: mode === 'modify' && defaults?.tableStyle === label,
     },
   });
-  if (value) {
-    // A duplicate copies its source's elements; the dialog's family and hue only author a modify.
-    const copied = custom
-      ? { elements: structuredClone(custom.elements), stripeSizes: custom.stripeSizes }
-      : { elements: structuredClone(builtinElements ?? {}) };
-    if (mode === 'modify') {
-      modifyCustomTableStyle({ store: instance.store, history: instance.history }, styleId, {
-        label: value.name,
-        elements: galleryStyleElements(value.style, value.color, value.variant),
-      });
-    } else {
-      createTableStyleFromActiveTable(instance.store, instance.history, value.name, copied);
+  if (value && mode === 'modify') {
+    modifyCustomTableStyle({ store: instance.store, history: instance.history }, styleId, {
+      label: value.name,
+      elements: value.elements,
+      stripeSizes: value.stripeSizes,
+    });
+    if (value.setAsDefault) {
+      setDefaultTableStyle(
+        instance.store.getState(),
+        instance.workbook,
+        customTableStyleId(value.name),
+      );
     }
+  } else if (value) {
+    saveNewStyle(instance, 'table', value);
   }
   instance.host.focus();
 };
@@ -395,10 +513,6 @@ const buildTableStyleFooterAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['openTableStyleFooterAction'] =>
   async (action) => {
     const strings = instance.i18n.strings;
-    const activePivot = findPivotTableAtCell(
-      instance.workbook as unknown as Parameters<typeof findPivotTableAtCell>[0],
-      instance.store.getState().selection.active,
-    );
     const state = instance.store.getState();
     const active = state.selection.active;
     const activeTable = tableOverlayAt(state, active.sheet, active.row, active.col);
@@ -417,50 +531,8 @@ const buildTableStyleFooterAction =
       instance.host.focus();
       return;
     }
-    const initial = {
-      name: strings.ribbonMenu.tableStyleMedium,
-      style: activeTable?.style ?? 'medium',
-      color: activeTable?.color ?? DEFAULT_TABLE_COLOR,
-      variant: tableVariantFromOptions({
-        banded: activeTable?.banded ?? true,
-        firstCol: activeTable?.firstCol ?? false,
-      }),
-    } as const;
-    if (action === 'new-table-style') {
-      const value = await showTableStyleDialog({
-        title: strings.ribbonMenu.tableStyleNew,
-        strings,
-        initial,
-      });
-      if (value) {
-        createTableStyleFromActiveTable(
-          instance.store as unknown as Parameters<typeof createTableStyleFromActiveTable>[0],
-          instance.history as unknown as Parameters<typeof createTableStyleFromActiveTable>[1],
-          value.name,
-          { elements: galleryStyleElements(value.style, value.color, value.variant) },
-        );
-      }
-      instance.host.focus();
-      return;
-    }
-    if (action === 'new-pivot-style') {
-      const value = await showTableStyleDialog({
-        title: strings.ribbonMenu.tableStyleNewPivot,
-        strings,
-        initial,
-      });
-      if (value) {
-        createPivotTableStyleFromActivePivot(
-          instance.store as unknown as Parameters<typeof createPivotTableStyleFromActivePivot>[0],
-          instance.history as unknown as Parameters<typeof createPivotTableStyleFromActivePivot>[1],
-          value.name,
-          activePivot
-            ? { sheetIndex: activePivot.sheetIndex, pivotIndex: activePivot.pivotIndex }
-            : null,
-          { elements: galleryStyleElements(value.style, value.color, value.variant) },
-        );
-      }
-      instance.host.focus();
+    if (action === 'new-table-style' || action === 'new-pivot-style') {
+      await openNewTableStyle(instance, action === 'new-table-style' ? 'table' : 'pivot');
       return;
     }
     const label =

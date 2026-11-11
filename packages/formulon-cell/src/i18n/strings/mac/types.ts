@@ -80,6 +80,19 @@ export interface MacStrings {
   dataValidation: MacDataValidationStrings;
   /** Labels only the Mac Create Table dialog shows. */
   createTable: MacCreateTableStrings;
+  /** Labels of the Mac New / Modify Table Style and PivotTable Quick Style dialog. */
+  tableStyleDialog: {
+    newTitle: string;
+    modifyTitle: string;
+    newPivotTitle: string;
+    modifyPivotTitle: string;
+    setDefault: string;
+    name: string;
+    format: string;
+    clear: string;
+    preview: string;
+    stripeSize: string;
+  };
   /** Labels of the Mac Zoom dialog. */
   zoomDialog: MacZoomDialogStrings;
   /** Texts of the Mac compact alert panels. */

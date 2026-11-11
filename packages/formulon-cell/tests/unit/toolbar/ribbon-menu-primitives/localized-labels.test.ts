@@ -85,10 +85,9 @@ describe('toolbar/ribbon menu primitives', () => {
       'utf8',
     );
 
-    expect(tableStyleDialogSource).toContain('tableStyleName: string');
     expect(tableStyleDialogSource).toContain('t.tableStyleName');
-    expect(tableStyleDialogSource).toContain('t.tableStyleMedium');
-    expect(tableStyleDialogSource).toContain('t.tableStyleBandedRows');
+    expect(tableStyleDialogSource).toContain('t.tableStyleElements[label]');
+    expect(tableStyleDialogSource).toContain('m.setDefault');
     expect(cellStyleDialogSource).toContain('cellStyleName: string');
     expect(cellStyleDialogSource).toContain('t.cellStyleName');
     expect(cellStyleDialogSource).toContain('t.cellStyleNormal');

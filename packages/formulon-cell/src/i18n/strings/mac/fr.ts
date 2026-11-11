@@ -269,6 +269,18 @@ export const macFr: MacStrings = {
     errorCaption: 'Quand des données non valides sont tapées, afficher ce message d’alerte :',
   },
   createTable: { nameLabel: 'Quel est le nom de votre tableau ?' },
+  tableStyleDialog: {
+    newTitle: 'Nouveau style de tableau',
+    modifyTitle: 'Modifier le style de tableau',
+    newPivotTitle: 'Nouveau style rapide de tableau croisé dynamique',
+    modifyPivotTitle: 'Modifier le style rapide du tableau croisé dynamique',
+    setDefault: 'Définir en tant que style de tableau par défaut pour ce classeur',
+    name: 'Nom :',
+    format: 'Format',
+    clear: 'Effacer',
+    preview: 'Aperçu',
+    stripeSize: 'Taille de rayure',
+  },
   goToDialog: macGoToDialogFrom(editDialogsFr.goToDialog, {
     selectCaption: 'Sélectionner',
     optionsGroup: 'Options',

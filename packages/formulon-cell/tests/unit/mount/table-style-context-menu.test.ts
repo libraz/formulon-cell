@@ -183,7 +183,7 @@ describe('table style gallery context menu', () => {
     const name = dialog?.querySelector<HTMLInputElement>('input');
     expect(name?.value).toMatch(/ 2$/);
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const created = sheet.instance.store.getState().tables.customTableStyles ?? [];
     expect(created).toHaveLength(1);
     expect(created[0]?.elements).toEqual(

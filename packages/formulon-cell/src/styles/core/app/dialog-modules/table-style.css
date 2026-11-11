@@ -1,0 +1,72 @@
+@layer fc.chrome {
+  /* New / Modify Table Style: the element list and its buttons beside the preview. */
+  .fc-tablestyle-dlg {
+    min-width: 440px;
+  }
+
+  .fc-tablestyle-dlg__columns {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+  }
+
+  .fc-tablestyle-dlg__elements {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .fc-tablestyle-dlg__label {
+    font-size: 12px;
+  }
+
+  .fc-tablestyle-dlg__list {
+    height: 132px;
+    overflow-y: auto;
+    border: 1px solid var(--fc-rule);
+    background: var(--fc-bg);
+  }
+
+  .fc-tablestyle-dlg__option {
+    padding: 1px 6px;
+    cursor: default;
+    white-space: nowrap;
+  }
+
+  .fc-tablestyle-dlg__option--formatted {
+    font-weight: 700;
+  }
+
+  .fc-tablestyle-dlg__option[aria-selected="true"] {
+    background: var(--fc-accent-soft, #dbe7f7);
+  }
+
+  .fc-tablestyle-dlg__buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .fc-tablestyle-dlg__preview {
+    display: flex;
+    flex: 0 0 150px;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 12px;
+    border-left: 1px solid var(--fc-rule);
+  }
+
+  .fc-tablestyle-dlg__preview-box {
+    width: 120px;
+    height: 90px;
+  }
+
+  .fc-tablestyle-dlg__describe {
+    min-height: 1.4em;
+    margin-top: 6px;
+    color: var(--fc-fg-mute);
+    font-size: 12px;
+  }
+}

@@ -267,6 +267,18 @@ export const macTh: MacStrings = {
     errorCaption: 'เมื่อผู้ใช้ป้อนข้อมูลที่ไม่ถูกต้อง ให้แสดงการแจ้งเตือนข้อผิดพลาดนี้:',
   },
   createTable: { nameLabel: 'ตารางของคุณชื่ออะไร' },
+  tableStyleDialog: {
+    newTitle: 'สไตล์ตารางใหม่',
+    modifyTitle: 'ปรับเปลี่ยนสไตล์ตาราง',
+    newPivotTitle: 'สไตล์ด่วนของ PivotTable ใหม่',
+    modifyPivotTitle: 'ปรับเปลี่ยนสไตล์ด่วนของ PivotTable',
+    setDefault: 'ตั้งค่าเป็นสไตล์ตารางเริ่มต้นสำหรับเวิร์กบุ๊กนี้',
+    name: 'ชื่อ:',
+    format: 'รูปแบบ',
+    clear: 'ล้าง',
+    preview: 'แสดงตัวอย่าง',
+    stripeSize: 'ขนาดของลายทาง',
+  },
   goToDialog: macGoToDialogFrom(editDialogsTh.goToDialog, {
     selectCaption: 'เลือก',
     optionsGroup: 'ตัวเลือก',
