@@ -1,7 +1,11 @@
 // Generated from the ribbon model (buildRibbonModel over every tab of both profiles, commands that
-// take no value). tests/unit/api/command-ids.test.ts fails when the ribbon and this list drift.
+// take no value) plus CELL_COMMAND_IDS. tests/unit/api/command-ids.test.ts fails when they drift.
 
-/** Every command `SpreadsheetInstance.commands` runs: the ribbon's command ids, unchanged. */
+/** Commands of the cell context menu that no ribbon button runs. */
+export const CELL_COMMAND_IDS = ['openHyperlink'] as const;
+
+/** Every command `SpreadsheetInstance.commands` runs: the ribbon's command ids, unchanged, and the
+ *  cell commands without a ribbon button. */
 export const COMMAND_IDS = [
   'accessibility',
   'addIn',
@@ -264,6 +268,7 @@ export const COMMAND_IDS = [
   'objectBringForward',
   'objectSelectionPane',
   'objectSendBackward',
+  'openHyperlink',
   'outlineGroup',
   'outlineHideDetail',
   'outlineShowDetail',
@@ -390,7 +395,7 @@ export const COMMAND_IDS = [
   'zoomSelection',
 ] as const;
 
-/** A ribbon command id; the command acts on the current selection. */
+/** A command id; the command acts on the current selection. */
 export type CommandId = (typeof COMMAND_IDS)[number];
 
 const COMMAND_ID_SET: ReadonlySet<string> = new Set(COMMAND_IDS);

@@ -20,6 +20,7 @@ import {
 } from '@libraz/formulon-cell';
 import { ribbon } from '@libraz/formulon-cell/toolbar';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { legacyInstanceOf } from '../../src/api/spreadsheet/instance.js';
 import { workbookHandleOf } from '../../src/api/workbook.js';
 import { setComment } from '../../src/commands/comment.js';
 import { spreadsheetInternals } from '../../src/mount/internals.js';
@@ -245,6 +246,28 @@ describe('spreadsheet: update', () => {
     sheet.commands.execute('showAllNotesReview');
     expect(sheet.options.showAllNotes).toBe(true);
     expect(sheet.history.canUndo).toBe(false);
+  });
+
+  it('reports a theme or language the user picks as a user update, and update() as the api', async () => {
+    const sheet = await mountSheet({ theme: 'paper' });
+    const updates = vi.fn();
+    sheet.on('update', updates);
+    // The Page Layout theme picker and the language menu run these.
+    legacyInstanceOf(sheet).setTheme('ink');
+    expect(updates).toHaveBeenLastCalledWith({ keys: ['theme'], source: 'user' });
+    expect(sheet.options.theme).toBe('ink');
+    expect(legacyInstanceOf(sheet).setLocale('ja')).toBe(true);
+    expect(updates).toHaveBeenLastCalledWith({ keys: ['locale'], source: 'user' });
+    expect(sheet.options.locale).toBe('ja');
+
+    updates.mockClear();
+    sheet.update({ theme: 'contrast' });
+    sheet.update({ theme: null });
+    expect(updates.mock.calls).toEqual([
+      [{ keys: ['theme'], source: 'api' }],
+      [{ keys: ['theme'], source: 'api' }],
+    ]);
+    expect(sheet.options.theme).toBeUndefined();
   });
 
   it('showAllNotes set at mount draws every note from the start', async () => {

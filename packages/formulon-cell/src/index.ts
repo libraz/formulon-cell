@@ -19,6 +19,7 @@ export {
   type Audit,
   type CellFormatter,
   type CellRegistry,
+  type CommandIntent,
   type Commands,
   type Extensions,
   type FormulaHints,

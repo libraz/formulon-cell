@@ -133,8 +133,8 @@ export interface RecalcEvent {
 /** These option keys changed. */
 export interface UpdateEvent {
   readonly keys: readonly (keyof SpreadsheetPatch)[];
-  /** `'api'` for a call to `update`; `'user'` when the user changed a view preference such as
-   *  Show All Notes from the UI. */
+  /** `'api'` for a call to `update`; `'user'` when the user changed an option from the UI: the
+   *  theme, the language or Show All Notes. */
   readonly source: 'api' | 'user';
 }
 

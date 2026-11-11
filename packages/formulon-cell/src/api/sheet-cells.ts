@@ -272,7 +272,8 @@ declare module './workbook.js' {
      * Reads CSV text into the sheet from `options.at`, the way typing each field would: a leading
      * `=` makes a formula, numbers, dates and logical values are recognised in `options.locale`,
      * and a cell formatted as text keeps the field as text. Host code is not gated by sheet
-     * protection: every field is written. One undo step and one `change` event.
+     * protection: every field is written. One undo step and one `change` event. The import the
+     * user's policy and protection decide is `SpreadsheetInstance.importCsv`.
      *
      * @throws FormulonError `limit-exceeded` above 100,000 cells.
      */
@@ -280,6 +281,12 @@ declare module './workbook.js' {
     /**
      * Writes the values of `options.range` (the used range by default) as CSV text with `\r\n` line
      * ends; an empty sheet gives `''`.
+     *
+     * @example Export what the user has selected
+     * ```ts
+     * const { sheet, range } = instance.selection.get();
+     * const csv = instance.workbook.sheet(sheet).exportCsv({ range });
+     * ```
      *
      * @throws FormulonError `limit-exceeded` above 100,000 cells.
      */

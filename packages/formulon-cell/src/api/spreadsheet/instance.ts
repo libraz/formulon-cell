@@ -11,13 +11,16 @@ import {
   BUILT_IN_COMMAND_OPERATION,
   canExecuteBuiltInRequest,
 } from '../../commands/built-in-command-policy.js';
+import { parseCSV } from '../../commands/clipboard/csv.js';
 import type { PasteSpecialOptions } from '../../commands/clipboard/paste-special.js';
 import type { History as LegacyHistory } from '../../commands/history.js';
 import { createHistoryView } from '../../commands/history-view.js';
+import { importCSV, MAX_CSV_CELLS } from '../../commands/import-export.js';
 import type {
   HostCellChangeInput,
   InteractionOperation,
 } from '../../commands/interaction-policy.js';
+import { refusedBatch } from '../../commands/interaction-policy.js';
 import { sheetPermits } from '../../commands/protection.js';
 import { clearTraceArrows, traceDependents, tracePrecedents } from '../../commands/traces.js';
 import { resolveCellInput, resolveRangeInput } from '../../engine/range-input.js';
@@ -46,6 +49,7 @@ import type { ChangeBatchResult } from '../change-batch.js';
 import { failureOfDecision, spreadsheetFailure } from '../errors.js';
 import { type Disposer, Emitter } from '../events.js';
 import { Lifecycle } from '../lifecycle.js';
+import type { ImportCsvOptions } from '../sheet-cells.js';
 import {
   type ChangeOrigin,
   type SheetRef,
@@ -53,7 +57,13 @@ import {
   withChangeOrigin,
   workbookHandleOf,
 } from '../workbook.js';
-import { type CommandId, isCommandId } from './command-ids.js';
+import { type CELL_COMMAND_IDS, type CommandId, isCommandId } from './command-ids.js';
+
+type CellCommandId = (typeof CELL_COMMAND_IDS)[number];
+
+/** The options the user can change from the UI. */
+type UserOptionKey = 'showAllNotes' | 'theme' | 'locale';
+
 import { createDialogs, type Dialogs } from './dialogs.js';
 import type {
   ApplyChangesOptions,
@@ -105,11 +115,31 @@ export interface Viewport {
 }
 
 /** The ribbon commands, acting on the current selection. */
+/** A question {@link Commands.can} answers besides a command id: whether the user may select,
+ *  may copy, or may make an edit of `operation` to the cells `at` names. `sheet` and `at` take
+ *  what `applyChanges` and the `Sheet` facade take: an A1 cell or range (sheet-qualified or on
+ *  `sheet`, the active sheet when omitted), a `CellAddress` or a `CellRect`. */
+export type CommandIntent =
+  | { readonly kind: 'select' }
+  | { readonly kind: 'copy' }
+  | {
+      readonly kind: 'edit';
+      readonly operation: InteractionOperation;
+      readonly sheet?: SheetRef;
+      readonly at: string | CellAddress | CellRect;
+    };
+
 export interface Commands {
   /** Runs a command. Throws `policy-denied` or `protected` when it may not run. */
   execute(id: CommandId): void;
-  /** Whether `execute(id)` would run now. */
+  /**
+   * Whether `execute(id)` would run now, or whether the policy and sheet protection allow an
+   * intent: an `edit` is decided as `applyChanges` decides a batch over the same cells. The answer
+   * follows the policy, the protection and the selection, so check again after an `update`, a
+   * `change` and a selection `change`.
+   */
   can(id: CommandId): boolean;
+  can(intent: CommandIntent): boolean;
 }
 
 /** Formula auditing arrows. */
@@ -193,6 +223,8 @@ interface InstanceState {
   /** Workbook swaps, run one at a time in request order. */
   swaps: Promise<void>;
   origin: ChangeOrigin | null;
+  /** True while `update` applies a patch: the view changes it causes are the API's, not the user's. */
+  applyingPatch: boolean;
   readonly life: Lifecycle;
   readonly events: Emitter<SpreadsheetInstanceEvents>;
   readonly selection: Selection;
@@ -405,9 +437,46 @@ export class SpreadsheetInstance {
       (key) => patch[key] !== undefined,
     );
     if (keys.length === 0) return;
-    for (const key of keys) applyPatchKey(state, key, patch[key] ?? null);
+    state.applyingPatch = true;
+    try {
+      for (const key of keys) applyPatchKey(state, key, patch[key] ?? null);
+    } finally {
+      state.applyingPatch = false;
+    }
     const event: UpdateEvent = { keys, source: 'api' };
     state.events.emit('update', event);
+  }
+
+  /**
+   * Imports CSV text from `options.at` as the user's import does: decided by the interaction
+   * policy and sheet protection, all or nothing, and one undo step. A refusal, or more fields
+   * than the CSV limit, is reported in `rejections`; nothing throws for it. `Sheet.importCsv` is
+   * the ungated import for host code.
+   */
+  importCsv(text: string, options: ImportCsvOptions): ChangeBatchResult {
+    const state = stateOf(this);
+    if (typeof text !== 'string') throw new TypeError('importCsv: text must be a string');
+    if (options?.at === undefined) throw new TypeError('importCsv: options.at is required');
+    const legacy = state.legacy;
+    const handle = workbookHandleOf(state.workbook);
+    const active = legacy.store.getState().data.sheetIndex;
+    const at =
+      typeof options.at === 'string'
+        ? resolveCellInput(options.at, handle, active, 'importCsv.at')
+        : { sheet: active, row: options.at.row, col: options.at.col };
+    const parse = options.delimiter ? { delimiter: options.delimiter } : {};
+    const rows = parseCSV(text, parse);
+    const width = rows.reduce((widest, row) => Math.max(widest, row.length), 0);
+    if (rows.length * width > MAX_CSV_CELLS) {
+      return refusedBatch({
+        code: 'effectTooLarge',
+        reason: `importCsv: ${rows.length * width} cells exceed the limit of ${MAX_CSV_CELLS}`,
+      });
+    }
+    return importCSV(legacy.store, handle, text, at, legacy.history, {
+      ...parse,
+      ...(options.locale !== undefined ? { locale: options.locale } : {}),
+    });
   }
 
   /** Writes cell changes as one batch, decided by the interaction policy and sheet protection in
@@ -594,8 +663,6 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
       legacy.setMacroRecording((value as boolean | null) ?? null);
       break;
     case 'showAllNotes':
-      // The options lead, so the store subscriber does not read this as the user's toggle.
-      state.options = next as SpreadsheetOptions;
       mutators.setShowAllNotes(legacy.store, (value as boolean | null) ?? false);
       break;
   }
@@ -692,18 +759,55 @@ const createSelection = (
   };
 };
 
-const createCommands = (legacy: () => LegacyInstance): Commands => ({
+const intentRange = (target: LegacyInstance, workbook: Workbook, intent: EditIntent): Range => {
+  const sheet =
+    intent.sheet === undefined
+      ? target.store.getState().data.sheetIndex
+      : workbook.sheet(intent.sheet).index;
+  const { at } = intent;
+  if (typeof at === 'string') return resolveRangeInput(at, workbookHandleOf(workbook), sheet, 'at');
+  if ('firstRow' in at)
+    return { sheet, r0: at.firstRow, c0: at.firstCol, r1: at.lastRow, c1: at.lastCol };
+  return { sheet, r0: at.row, c0: at.col, r1: at.row, c1: at.col };
+};
+
+type EditIntent = Extract<CommandIntent, { kind: 'edit' }>;
+
+const intentAllowed = (target: LegacyInstance, workbook: Workbook, intent: CommandIntent) => {
+  const controller = target.commands;
+  if (intent.kind === 'select') return controller.canSelect().allowed;
+  if (intent.kind === 'copy') return controller.canCopy().allowed;
+  const range = intentRange(target, workbook, intent);
+  const base = { operation: intent.operation, origin: 'instanceApi' } as const;
+  return (
+    controller.canExecute({ ...base, effects: [{ kind: 'workbook' }] }).allowed &&
+    controller.canExecute({ ...base, effects: [{ kind: 'range', range }] }).allowed
+  );
+};
+
+/** How each cell command runs; ribbon commands run through the ribbon. */
+const CELL_COMMANDS: Record<CellCommandId, (target: LegacyInstance) => void> = {
+  openHyperlink: (target) => {
+    target.followActiveHyperlink();
+  },
+};
+
+const isCellCommandId = (id: CommandId): id is CellCommandId => id in CELL_COMMANDS;
+
+const createCommands = (legacy: () => LegacyInstance, workbook: () => Workbook): Commands => ({
   execute(id) {
     if (!isCommandId(id)) throw notFound(`unknown command ${String(id)}`);
     const target = legacy();
     const refusal = commandRefusal(target, id);
     if (refusal)
       throw spreadsheetFailure(refusal, `command ${id} may not run`, { context: { command: id } });
-    if (target.toolbar) target.toolbar.applyCommand(id);
+    if (isCellCommandId(id)) CELL_COMMANDS[id](target);
+    else if (target.toolbar) target.toolbar.applyCommand(id);
     else runRibbonCommand(target, id);
   },
-  can(id) {
-    return isCommandId(id) && commandRefusal(legacy(), id) === null;
+  can(request: CommandId | CommandIntent) {
+    if (typeof request === 'object') return intentAllowed(legacy(), workbook(), request);
+    return isCommandId(request) && commandRefusal(legacy(), request) === null;
   },
 });
 
@@ -958,11 +1062,12 @@ export async function mount(
     requestedWorkbook: workbook,
     swaps: Promise.resolve(),
     origin: null,
+    applyingPatch: false,
     life,
     events,
     selection: createSelection(current, selectionEvents),
     history: createHistory(legacy.history),
-    commands: createCommands(currentLegacy),
+    commands: createCommands(currentLegacy, () => current().workbook),
     dialogs: createDialogs(currentLegacy),
     audit: createAudit(currentLegacy, addrOf),
     viewport: {
@@ -988,12 +1093,26 @@ export async function mount(
   const instance = new SpreadsheetInstance(CONSTRUCT, state);
 
   if (options.showAllNotes) mutators.setShowAllNotes(legacy.store, true);
-  const offShowAllNotes = legacy.store.subscribe(() => {
-    const shown = state.legacy.store.getState().ui.showAllNotes;
-    if (shown === (state.options.showAllNotes ?? false)) return;
-    state.options = { ...state.options, showAllNotes: shown };
-    events.emit('update', { keys: ['showAllNotes'], source: 'user' });
-  });
+  // A view preference the user changes from the UI updates the options and reports `update`
+  // with `source: 'user'`; a change `update` makes is already reported as the API's.
+  const userOption = <K extends UserOptionKey>(key: K, initial: SpreadsheetOptions[K]) => {
+    let last = initial;
+    return (value: SpreadsheetOptions[K]): void => {
+      if (value === last) return;
+      last = value;
+      if (state.applyingPatch) return;
+      state.options = { ...state.options, [key]: value };
+      events.emit('update', { keys: [key], source: 'user' });
+    };
+  };
+  const reportShowAllNotes = userOption('showAllNotes', legacy.store.getState().ui.showAllNotes);
+  const offShowAllNotes = legacy.store.subscribe(() =>
+    reportShowAllNotes(state.legacy.store.getState().ui.showAllNotes),
+  );
+  const reportTheme = userOption('theme', legacy.store.getState().ui.theme);
+  const offTheme = legacy.on('themeChange', (e) => reportTheme(e.theme));
+  const reportLocale = userOption('locale', legacy.i18n.locale);
+  const offLocale = legacy.on('localeChange', (e) => reportLocale(e.locale));
 
   let lastSelection = selectionOf(legacy);
   const offSelection = legacy.store.subscribe(() => {
@@ -1030,6 +1149,8 @@ export async function mount(
   life.onDispose(() => {
     offSelection();
     offShowAllNotes();
+    offTheme();
+    offLocale();
     offCell();
     offBatch();
     offRecalc();

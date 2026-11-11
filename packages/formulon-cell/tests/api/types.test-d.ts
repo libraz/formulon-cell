@@ -4,6 +4,7 @@ import type {
   BatchRejection,
   ChangeBatchResult,
   CommandId,
+  CommandIntent,
   DialogId,
   Disposer,
   InteractionOperation,
@@ -38,6 +39,15 @@ describe('types', () => {
     expectTypeOf(instance.selection.on('change', () => {})).toEqualTypeOf<Disposer>();
     expectTypeOf(instance.history.on('change', () => {})).toEqualTypeOf<Disposer>();
     expectTypeOf(instance.i18n.on('change', () => {})).toEqualTypeOf<Disposer>();
+  });
+
+  it('commands.can takes a command id or an intent', () => {
+    expectTypeOf(instance.commands.can('bold')).toEqualTypeOf<boolean>();
+    expectTypeOf(instance.commands.can({ kind: 'copy' })).toEqualTypeOf<boolean>();
+    expectTypeOf(
+      instance.commands.can({ kind: 'edit', operation: 'format', sheet: 'Sheet1', at: 'A1:B2' }),
+    ).toEqualTypeOf<boolean>();
+    expectTypeOf<CommandIntent>().toMatchTypeOf<Parameters<typeof instance.commands.can>[0]>();
   });
 
   it('options read back as a readonly snapshot and updates name their source', () => {
