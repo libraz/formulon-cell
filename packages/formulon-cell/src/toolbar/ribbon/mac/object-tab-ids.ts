@@ -1,6 +1,5 @@
 /** Commands of the Mac table and chart tabs that the host has no feature behind; they stay greyed out. */
 export const MAC_OBJECT_TAB_DISABLED_COMMAND_IDS: readonly string[] = [
-  'tableSummarizePivot',
   'tableConvertRange',
   'chartQuickLayout',
   'chartQuickStyles',

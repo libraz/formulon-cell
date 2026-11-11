@@ -1,6 +1,7 @@
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { InteractionOrigin } from '../commands/interaction-policy.js';
 import { type ChangeBatchResult, refusedBatch } from '../commands/interaction-policy.js';
+import type { Range } from '../engine/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { TabId } from './format-dialog-model.js';
 import type { PageSetupDialogTab } from './page-setup-dialog.js';
@@ -89,6 +90,7 @@ export interface DialogOpeners {
   readonly pivotTableDialog: (
     placement: 'new' | 'existing' | undefined,
     entry: DialogEntry,
+    source?: Range,
   ) => void;
   readonly commentDialog: (mode: 'note' | 'thread' | undefined, entry: DialogEntry) => void;
   readonly pasteSpecialDialog: (entry: DialogEntry) => void;
@@ -146,8 +148,9 @@ export function openPivotTableDialogFrom(
   store: SpreadsheetStore,
   placement: 'new' | 'existing' | undefined,
   entry: DialogEntry,
+  source?: Range,
 ): void {
-  openers.get(store)?.pivotTableDialog(placement, entry);
+  openers.get(store)?.pivotTableDialog(placement, entry, source);
 }
 
 /** Open the note or threaded-comment dialog on behalf of an internal UI entry point. */

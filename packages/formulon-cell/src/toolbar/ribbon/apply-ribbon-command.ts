@@ -39,6 +39,7 @@ import {
 } from '../../commands/session-illustration.js';
 import { toggleSplitPanes } from '../../commands/split-panes.js';
 import {
+  activeTableOverlay,
   TABLE_OPTION_COMMANDS,
   type TableOption,
   toggleTableOptionAction,
@@ -58,6 +59,7 @@ import {
 import { fontPointsToCssPx } from '../../engine/font-units.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { FeatureFlags } from '../../extensions/index.js';
+import { openPivotTableDialogFrom } from '../../interact/dialog-entry.js';
 import { openMacPivotMoveDialog } from '../../interact/mac-pivot-move-dialog.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { outlineSummaryFor } from '../../store/outline-summary.js';
@@ -80,6 +82,7 @@ import {
   RIBBON_ZOOM_PRESETS,
   type RibbonFormatMutator,
 } from './command-tables.js';
+import { createMacRibbonActions } from './mac/actions.js';
 import { dispatchMacRibbonCommand } from './mac/dispatch.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
 
@@ -394,6 +397,22 @@ const applyGenericRibbonCommand = (
     }
     case 'formatTableHome':
       void hooks?.insert?.createTable?.();
+      return true;
+    case 'tableSummarizePivot': {
+      // Create PivotTable proposes the active table as its source.
+      const table = activeTableOverlay(i.store.getState());
+      openPivotTableDialogFrom(
+        i.store,
+        undefined,
+        { origin: 'ribbon', commandId: 'tableSummarizePivot' },
+        table?.range,
+      );
+      return true;
+    }
+    case 'tableInsertSlicer':
+    case 'pivotInsertSlicer':
+      // One Insert Slicer dialog serves the table, the PivotTable and the Mac Insert tab.
+      void createMacRibbonActions(i)['mac.insert.slicer']?.();
       return true;
     case 'pivotFieldList':
       i.openActivePivotFieldList();

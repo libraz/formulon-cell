@@ -59,6 +59,9 @@ export const TABLE_ICONS = {
   tableFirstColumn: option([{ axis: 'col', index: 0, fill: PALETTE.accent }]),
   tableLastColumn: option([{ axis: 'col', index: 3, fill: PALETTE.accent }]),
 
+  // Convert to Range: the table's grid without its header band, plain cells again.
+  tableConvertRange: sheet({ ...FULL, cols: 3, rows: 4, rules: PALETTE.grid }),
+
   // A pivot pulls a summary out of the source grid.
   pivotTable: [
     ...sheet({ x: 2.4, y: 2.4, w: 11.4, h: 11.4, cols: 2, rows: 2, frame: PALETTE.grid }),

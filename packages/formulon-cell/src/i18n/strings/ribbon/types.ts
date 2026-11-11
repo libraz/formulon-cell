@@ -141,6 +141,13 @@ export interface RibbonStrings {
     tableStyles: string;
     /** The table style gallery button; on a wide ribbon it heads the in-ribbon strip. */
     quickStyles: string;
+    /** Table Design Tools group and its commands. */
+    tableTools: string;
+    summarizePivot: string;
+    convertRange: string;
+    insertSlicer: string;
+    /** The confirmation Convert to Range asks before it runs. */
+    convertRangeConfirm: string;
     /** Group of the Table Design Refresh split button. */
     externalTableData: string;
     headerRow: string;

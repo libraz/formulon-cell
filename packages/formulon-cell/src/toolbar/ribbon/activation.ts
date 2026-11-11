@@ -423,6 +423,7 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'sheetViewDelete',
   'sheetViewSave',
   'pivotFieldList',
+  'pivotInsertSlicer',
   'pivotOptions',
   'pivotMove',
   'pivotFieldSettings',
@@ -440,7 +441,9 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'tableFilterButton',
   'tableFirstColumn',
   'tableHeaderRow',
+  'tableInsertSlicer',
   'tableLastColumn',
+  'tableSummarizePivot',
   'tableTotalRow',
   'top',
   'translateReview',
@@ -527,6 +530,8 @@ export const RIBBON_TOGGLE_COMMANDS: ReadonlySet<string> = new Set([
 
 export const RIBBON_DISABLED_COMMANDS: ReadonlySet<string> = new Set([
   'helpSearch',
+  // Greyed until the engine's convert-to-range verb lands.
+  'tableConvertRange',
   ...PIVOT_DISABLED_COMMAND_IDS,
 ]);
 

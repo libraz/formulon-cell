@@ -377,11 +377,11 @@ describe('toolbar/ribbon shared data', () => {
     );
     expect(
       standardEntries.filter((entry) => entry.kind === 'disabled').map((entry) => entry.command),
-    ).toEqual(['helpSearch', ...PIVOT_DISABLED_COMMAND_IDS].sort());
-    // Every surface carries the contextual tabs, so the PivotTable stubs show up in both.
+    ).toEqual(['helpSearch', 'tableConvertRange', ...PIVOT_DISABLED_COMMAND_IDS].sort());
+    // Every surface carries the contextual tabs, so their disabled commands show up in both.
     expect(
       optionalEntries.filter((entry) => entry.kind === 'disabled').map((entry) => entry.command),
-    ).toEqual([...PIVOT_DISABLED_COMMAND_IDS].sort());
+    ).toEqual(['tableConvertRange', ...PIVOT_DISABLED_COMMAND_IDS].sort());
   });
 
   it('keeps effective activation categories mutually exclusive', () => {

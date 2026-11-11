@@ -259,4 +259,28 @@ describe('Table Design tab of the ribbon', () => {
     ).toBe(false);
     tb.dispose();
   });
+
+  it('runs the Tools group: Summarize with PivotTable proposes the table, Insert Slicer opens', () => {
+    makeTable();
+    mutators.setActive(store(), { sheet: 0, row: 1, col: 1 });
+    mutators.setRange(store(), { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 1 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
+    tb.setActiveTab('tableDesign');
+    command('tableSummarizePivot').click();
+    const pivot = document.querySelector<HTMLElement>('.fc-pivotdlg');
+    expect(pivot).toBeTruthy();
+    // The whole table is the source, not the two selected cells.
+    expect(pivot?.querySelector<HTMLInputElement>('input.fc-namedlg__input')?.value).toBe(
+      'Sheet1!$A$1:$C$4',
+    );
+    pivot
+      ?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
+      ?.click();
+
+    command('tableInsertSlicer').click();
+    expect(document.body.querySelector('.fc-macslicerdlg__fields')).toBeTruthy();
+    // Convert to Range waits for the engine's convert verb.
+    expect(command('tableConvertRange').disabled).toBe(true);
+    tb.dispose();
+  });
 });

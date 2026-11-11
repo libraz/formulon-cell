@@ -1,8 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   customPivotTableStyleId,
+  formatAsTable,
   galleryStyleElements,
 } from '../../../../src/commands/format-as-table.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import {
@@ -514,11 +516,31 @@ describe('Spreadsheet.mountToolbar', () => {
       helpers: stubHelpers(),
     });
 
+    // A table sheet shows the Table Design tab and its greyed commands.
+    const tableWorkbook = await WorkbookHandle.createDefault();
+    tableWorkbook.setText({ sheet: 0, row: 0, col: 0 }, 'Head');
+    tableWorkbook.setText({ sheet: 0, row: 1, col: 0 }, 'a');
+    const tableSheet = await mountStubSheet({ locale: 'en', workbook: tableWorkbook });
+    mutators.replaceCells(tableSheet.instance.store, tableWorkbook.cells(0));
+    formatAsTable(
+      tableSheet.instance.store,
+      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+      { workbook: tableWorkbook },
+    );
+    mutators.setActive(tableSheet.instance.store, { sheet: 0, row: 1, col: 0 });
+    const tableHost = document.createElement('div');
+    document.body.appendChild(tableHost);
+    const tableTb = Spreadsheet.mountToolbar(tableHost, tableSheet.instance, {
+      ribbonTabs: RIBBON_TABS,
+      helpers: stubHelpers(),
+    });
+
     for (const command of RIBBON_DISABLED_COMMANDS) {
       const selector = `[data-ribbon-command="${command}"]`;
       const button =
         host.querySelector<HTMLButtonElement>(selector) ??
-        pivotHost.querySelector<HTMLButtonElement>(selector);
+        pivotHost.querySelector<HTMLButtonElement>(selector) ??
+        tableHost.querySelector<HTMLButtonElement>(selector);
       expect(button, `${command} button`).toBeTruthy();
       expect(button?.disabled, `${command} disabled`).toBe(true);
       expect(button?.getAttribute('aria-disabled'), `${command} aria-disabled`).toBe('true');
@@ -533,6 +555,9 @@ describe('Spreadsheet.mountToolbar', () => {
       expect(button?.dataset.ribbonMenuId, `${command} menu`).toBeUndefined();
     }
 
+    tableTb.dispose();
+    tableHost.remove();
+    tableSheet.dispose();
     pivotTb.dispose();
     pivotHost.remove();
     tb.dispose();

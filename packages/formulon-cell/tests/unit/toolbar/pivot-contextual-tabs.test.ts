@@ -47,7 +47,8 @@ describe('PivotTable contextual tabs', () => {
     const byId = new Map(commands('pivotAnalyze').map((c) => [c.id, c]));
     expect(byId.get('pivotFieldList')?.disabled).toBeFalsy();
     expect(byId.get('pivotMove')?.disabled).toBeFalsy();
-    for (const id of ['pivotInsertSlicer', 'pivotInsertTimeline', 'pivotChart']) {
+    expect(byId.get('pivotInsertSlicer')?.disabled).toBeFalsy();
+    for (const id of ['pivotInsertTimeline', 'pivotChart']) {
       expect(byId.get(id)?.disabled, id).toBe(true);
     }
   });

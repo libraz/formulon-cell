@@ -127,6 +127,9 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   formatTableInsert: 'table',
   formatTableHome: 'table',
   tableQuickStyles: 'table',
+  tableSummarizePivot: 'pivot',
+  tableInsertSlicer: 'object',
+  pivotInsertSlicer: 'object',
   pivotTableInsert: 'pivot',
   tableName: 'table',
   // Refresh All runs data connections, not a table change: enabled on a protected sheet too.

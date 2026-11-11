@@ -114,7 +114,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
   const openHyperlinkDialog: DialogOpeners['hyperlinkDialog'] = (entry) => {
     featureState.hyperlinkDialog?.open(entry);
   };
-  const openPivotTableDialog: DialogOpeners['pivotTableDialog'] = (placement, entry) => {
+  const openPivotTableDialog: DialogOpeners['pivotTableDialog'] = (placement, entry, source) => {
     if (!permits('pivot')) return;
     const opts = placement ? { placement } : undefined;
     const userPivot = getUserHandle('pivotTableDialog') as
@@ -124,7 +124,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       userPivot.open(opts);
       return;
     }
-    featureState.pivotTableDialog?.open({ ...opts, entry });
+    featureState.pivotTableDialog?.open({ ...opts, entry, ...(source ? { source } : {}) });
   };
   registerDialogOpeners(store, {
     pivotTableDialog: openPivotTableDialog,

@@ -46,6 +46,9 @@ export interface PivotTableDialogOpenOptions {
   placement?: 'new' | 'existing';
   /** Who opened the dialog; the instance API when absent. */
   entry?: DialogEntry;
+  /** The source to propose, as Summarize with PivotTable proposes its table; the selection's
+   *  table or region when absent. */
+  source?: SheetRange;
 }
 
 export interface PivotTableDialogHandle {
@@ -581,7 +584,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       if (mac) destInput.value = '';
       tableRangeInput.checked = true;
       pickFormat.begin();
-      sourceInput.value = selectedRangeLabel();
+      sourceInput.value = opts.source ? sourceRangeLabel(opts.source) : selectedRangeLabel();
       // New worksheet is the dialog's default placement; only an explicit
       // "existing sheet" entry point starts on the other radio.
       const placement = opts.placement ?? 'new';

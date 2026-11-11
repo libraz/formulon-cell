@@ -361,6 +361,7 @@ export const COMMAND_IDS = [
   'tableFilterButton',
   'tableFirstColumn',
   'tableHeaderRow',
+  'tableInsertSlicer',
   'tableLastColumn',
   'tableQuickStyles',
   'tableRefresh',

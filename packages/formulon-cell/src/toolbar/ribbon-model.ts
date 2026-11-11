@@ -881,6 +881,22 @@ export function buildRibbonModel(
         group(tr.tableProperties, [
           { id: 'tableName', title: tr.tableName, label: tr.tableName, kind: 'input' },
         ]),
+        group(tr.tableTools, [
+          cmd('tableSummarizePivot', tr.summarizePivot, tr.summarizePivot, 'pivotTable', 'wide'),
+          cmd('removeDupes', tr.removeDuplicates, tr.removeDuplicates, 'removeDuplicates', 'wide'),
+          // Greyed until the engine's convert-to-range verb lands.
+          {
+            ...cmd(
+              'tableConvertRange',
+              tr.convertRange,
+              tr.convertRange,
+              'tableConvertRange',
+              'wide',
+            ),
+            disabled: true,
+          },
+          cmd('tableInsertSlicer', tr.insertSlicer, tr.insertSlicer, 'slicer', 'wide'),
+        ]),
         group(tr.externalTableData, [
           cmd(
             'tableRefresh',
