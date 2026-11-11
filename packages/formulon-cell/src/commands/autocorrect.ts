@@ -111,6 +111,9 @@ const replacementAt = (text: string, start: number, entry: AutoCorrectEntry): st
   return carryCase(entry.to, typed);
 };
 
+/** Han and kana, written without spaces between words. */
+const CJK = /^[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]+$/u;
+
 const startsWord = (text: string, at: number): boolean =>
   at === 0 || START.test(text.charAt(at - 1));
 const endsWord = (text: string, at: number): boolean =>
@@ -120,7 +123,8 @@ const longestFirst = (entries: readonly AutoCorrectEntry[]): AutoCorrectEntry[] 
   entries.filter((entry) => entry.from !== '').sort((a, b) => b.from.length - a.from.length);
 
 /** `text` with every entry replaced where it stands as a word: at the start or after white
- *  space, and before the end, white space or punctuation. */
+ *  space, and before the end, white space or punctuation. A Han or kana entry needs no word
+ *  boundary, as those scripts have no spaces between words. */
 export function autoCorrectText(text: string, entries: readonly AutoCorrectEntry[]): string {
   const ordered = longestFirst(entries);
   if (ordered.length === 0) return text;
@@ -128,17 +132,17 @@ export function autoCorrectText(text: string, entries: readonly AutoCorrectEntry
   let at = 0;
   while (at < text.length) {
     let replaced = false;
-    if (startsWord(text, at)) {
-      for (const entry of ordered) {
-        const end = at + entry.from.length;
-        if (!endsWord(text, end)) continue;
-        const to = replacementAt(text, at, entry);
-        if (to === null) continue;
-        out += to;
-        at = end;
-        replaced = true;
-        break;
-      }
+    const wordStart = startsWord(text, at);
+    for (const entry of ordered) {
+      const end = at + entry.from.length;
+      const free = CJK.test(entry.from);
+      if (!free && (!wordStart || !endsWord(text, end))) continue;
+      const to = replacementAt(text, at, entry);
+      if (to === null) continue;
+      out += to;
+      at = end;
+      replaced = true;
+      break;
     }
     if (!replaced) {
       out += text.charAt(at);
