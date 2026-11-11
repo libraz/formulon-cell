@@ -5,6 +5,7 @@
 // in main.ts that would otherwise need rewriting.
 
 import { findNext } from '../../commands/find.js';
+import { openCommentDialogFrom } from '../../interact/dialog-entry.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators } from '../../store/store.js';
@@ -12,6 +13,9 @@ import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
 import type { RibbonReportItem } from '../review-tools.js';
 import type { RibbonTab } from '../ribbon-model.js';
 import { createMenu, menuIconButton, menuSeparator } from './menus/general.js';
+
+/** The title bar's Comments button opens the note dialog as Review > New Comment. */
+const TITLE_COMMENTS_ENTRY = { origin: 'ribbon', commandId: 'newCommentReview' } as const;
 
 export interface BackstageTitleShellText {
   save: string;
@@ -203,7 +207,8 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
   });
 
   titleActionButton('comments')?.addEventListener('click', () => {
-    getInst()?.openCommentDialog();
+    const inst = getInst();
+    if (inst) openCommentDialogFrom(inst.store, undefined, TITLE_COMMENTS_ENTRY);
   });
 
   titleActionButton('share')?.addEventListener('click', () => {
@@ -328,8 +333,10 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     if (action === 'save') triggerSave();
     else if (action === 'save-as') void triggerSaveAs();
     else if (action === 'autosave') toggleAutosave();
-    else if (action === 'comments') getInst()?.openCommentDialog();
-    else if (action === 'share') {
+    else if (action === 'comments') {
+      const inst = getInst();
+      if (inst) openCommentDialogFrom(inst.store, undefined, TITLE_COMMENTS_ENTRY);
+    } else if (action === 'share') {
       showRibbonReport(shellText.share, [
         { severity: 'info', label: shellText.share, detail: shellText.shareReady },
       ]);

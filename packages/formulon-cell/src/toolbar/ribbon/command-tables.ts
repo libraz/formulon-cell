@@ -1,4 +1,5 @@
 import {
+  openCommentDialogFrom,
   openDataValidationDialogFrom,
   openFormatDialogFrom,
   openHyperlinkDialogFrom,
@@ -60,8 +61,10 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   gotoSpecialHome: (i) => i.openGoToSpecial(),
   hyperlinkInsert: (i) =>
     openHyperlinkDialogFrom(i.store, { origin: 'ribbon', commandId: 'hyperlinkInsert' }),
-  commentInsert: (i) => i.openCommentDialog({ mode: 'note' }),
-  newCommentReview: (i) => i.openCommentDialog({ mode: 'note' }),
+  commentInsert: (i) =>
+    openCommentDialogFrom(i.store, 'note', { origin: 'ribbon', commandId: 'commentInsert' }),
+  newCommentReview: (i) =>
+    openCommentDialogFrom(i.store, 'note', { origin: 'ribbon', commandId: 'newCommentReview' }),
   dataValidation: (i) =>
     openDataValidationDialogFrom(i.store, { origin: 'ribbon', commandId: 'dataValidation' }),
   namedRanges: (i) =>

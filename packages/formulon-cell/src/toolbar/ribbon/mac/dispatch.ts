@@ -9,6 +9,7 @@ import {
   recordThreadedChange,
   removeThreadedComment,
 } from '../../../commands/comment.js';
+import { commentWrite } from '../../../commands/comment-actions.js';
 import { selectNextFormulaError } from '../../../commands/error-indicators.js';
 import { interactionControllerFor } from '../../../commands/interaction-controller.js';
 import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../commands/page-setup.js';
@@ -17,6 +18,7 @@ import { FUNCTION_SIGNATURES } from '../../../commands/refs.js';
 import { executeNoteVisibilityAction } from '../../../commands/ribbon-comment.js';
 import { formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import {
+  openCommentDialogFrom,
   openDataValidationDialogFrom,
   openDefineNameDialogFrom,
   openPageSetupDialogFrom,
@@ -489,28 +491,33 @@ export function dispatchMacRibbonCommand(
         return ctx.applyFreezeAction('col');
       case 'mac.insert.newComment':
       case 'mac.review.newComment':
-        return instance.openCommentDialog({ mode: 'thread' });
+        return openCommentDialogFrom(instance.store, 'thread', { origin: 'ribbon', commandId: id });
       case 'mac.review.newNote':
-        return instance.openCommentDialog({ mode: 'note' });
+        return openCommentDialogFrom(instance.store, 'note', { origin: 'ribbon', commandId: id });
       case 'mac.review.deleteComment': {
         const active = state.selection.active;
         const roots = listThreadedComments(instance.store, sheet, instance.workbook).filter(
           (entry) =>
             !entry.parentId && entry.cell.row === active.row && entry.cell.col === active.col,
         );
-        return recordThreadedChange(
-          instance.history,
-          instance.store,
-          instance.workbook,
-          sheet,
-          () => {
-            for (const root of roots)
-              removeThreadedComment(instance.store, sheet, root.id, instance.workbook, {
-                origin: 'ribbon',
-                commandId: id,
-              });
-          },
-          { origin: 'ribbon', commandId: id },
+        const ctx = {
+          store: instance.store,
+          history: instance.history,
+          origin: 'ribbon',
+          commandId: id,
+        } as const;
+        return commentWrite(ctx, roots.length > 0 ? [active] : [], undefined, () =>
+          recordThreadedChange(
+            instance.history,
+            instance.store,
+            instance.workbook,
+            sheet,
+            () => {
+              for (const root of roots)
+                removeThreadedComment(instance.store, sheet, root.id, instance.workbook, ctx);
+            },
+            ctx,
+          ),
         );
       }
       case 'mac.review.previousComment':

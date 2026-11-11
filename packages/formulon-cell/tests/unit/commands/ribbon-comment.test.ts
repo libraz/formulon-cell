@@ -23,7 +23,14 @@ describe('executeRibbonCommentAction', () => {
     try {
       expect(wb.isStub).toBe(false);
       setComment(store, addr, 'native note', wb);
-      executeRibbonCommentAction({ store, workbook: wb, history, action: 'delete-active' });
+      executeRibbonCommentAction({
+        store,
+        workbook: wb,
+        history,
+        action: 'delete-active',
+        origin: 'ribbon',
+        commandId: 'deleteCommentReview',
+      });
       expect(wb.getComment(0, 0, 0)).toBeNull();
       expect(history.undo()).toBe(true);
       expect(commentAt(store.getState(), addr)).toBe('native note');
@@ -60,6 +67,8 @@ describe('executeRibbonCommentAction', () => {
       workbook: wb,
       history,
       action: 'delete-active',
+      origin: 'ribbon',
+      commandId: 'deleteCommentReview',
     });
 
     expect(commentAt(store.getState(), active)).toBeNull();
@@ -81,6 +90,8 @@ describe('executeRibbonCommentAction', () => {
       workbook: wb,
       history,
       action: 'delete-active',
+      origin: 'ribbon',
+      commandId: 'deleteCommentReview',
     });
 
     expect(wb.setCommentEntry).not.toHaveBeenCalled();
@@ -104,6 +115,8 @@ describe('executeRibbonCommentAction', () => {
       workbook: wb,
       history,
       action: 'delete-all',
+      origin: 'ribbon',
+      commandId: 'deleteCommentReview',
     });
 
     expect(commentAt(store.getState(), first)).toBeNull();

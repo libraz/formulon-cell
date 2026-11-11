@@ -4,7 +4,8 @@ import {
 } from '../commands/clear-contents.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
-import { clearComment, commentAt } from '../commands/comment.js';
+import { clearComment, commentAt, recordCommentChange } from '../commands/comment.js';
+import { commentWrite } from '../commands/comment-actions.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
 import { tableForCell } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
@@ -1349,7 +1350,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'deleteComment': {
         const addr = state.selection.active;
-        wrapFmt('deleteComment', () => clearComment(store, addr, wb));
+        const ctx = { store, history, origin: 'contextMenu', commandId: 'deleteComment' } as const;
+        commentWrite(ctx, [addr], undefined, () =>
+          recordCommentChange(history, store, wb, [addr], () => clearComment(store, addr, wb), ctx),
+        );
         return;
       }
       case 'showHideNote': {

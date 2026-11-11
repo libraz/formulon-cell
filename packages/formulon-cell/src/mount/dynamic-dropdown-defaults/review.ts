@@ -24,7 +24,7 @@ import {
   areasFromSqref,
   sqrefFromAreas,
 } from '../../engine/protection-sync.js';
-import type { DialogEntry } from '../../interact/dialog-entry.js';
+import { type DialogEntry, openCommentDialogFrom } from '../../interact/dialog-entry.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import {
@@ -337,7 +337,10 @@ const buildReviewCommentAction =
   (action) => {
     if (action === 'thread') {
       if (instance.workbook.capabilities.threadedComments)
-        instance.openCommentDialog({ mode: 'thread' });
+        openCommentDialogFrom(instance.store, 'thread', {
+          origin: 'ribbon',
+          commandId: 'newCommentReview',
+        });
       return;
     }
     if (action !== 'delete-active' && action !== 'delete-all') return;
@@ -346,6 +349,8 @@ const buildReviewCommentAction =
       workbook: instance.workbook,
       history: instance.history,
       action,
+      origin: 'ribbon',
+      commandId: 'deleteCommentReview',
     });
     instance.host.focus();
   };

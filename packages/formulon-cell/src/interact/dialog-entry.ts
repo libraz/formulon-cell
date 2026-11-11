@@ -52,6 +52,12 @@ export const INSTANCE_API_PIVOT_TABLE_ENTRY: DialogEntry = {
   commandId: 'pivotTableInsert',
 };
 
+/** The entry of a note or comment dialog open through the public instance method. */
+export const INSTANCE_API_COMMENT_ENTRY: DialogEntry = {
+  origin: 'instanceApi',
+  commandId: 'newCommentReview',
+};
+
 /** The mount's dialog openers that take the entry of an internal UI caller. */
 export interface DialogOpeners {
   readonly formatDialog: (tab: TabId | undefined, entry: DialogEntry) => void;
@@ -64,6 +70,7 @@ export interface DialogOpeners {
     placement: 'new' | 'existing' | undefined,
     entry: DialogEntry,
   ) => void;
+  readonly commentDialog: (mode: 'note' | 'thread' | undefined, entry: DialogEntry) => void;
 }
 
 const openers = new WeakMap<SpreadsheetStore, DialogOpeners>();
@@ -118,4 +125,13 @@ export function openPivotTableDialogFrom(
   entry: DialogEntry,
 ): void {
   openers.get(store)?.pivotTableDialog(placement, entry);
+}
+
+/** Open the note or threaded-comment dialog on behalf of an internal UI entry point. */
+export function openCommentDialogFrom(
+  store: SpreadsheetStore,
+  mode: 'note' | 'thread' | undefined,
+  entry: DialogEntry,
+): void {
+  openers.get(store)?.commentDialog(mode, entry);
 }

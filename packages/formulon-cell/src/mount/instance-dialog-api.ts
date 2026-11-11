@@ -6,6 +6,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ExtensionHandle } from '../extensions/index.js';
 import {
   type DialogOpeners,
+  INSTANCE_API_COMMENT_ENTRY,
   INSTANCE_API_DEFINE_NAME_ENTRY,
   INSTANCE_API_FORMAT_ENTRY,
   INSTANCE_API_HYPERLINK_ENTRY,
@@ -129,6 +130,8 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
     dataValidationDialog: openDataValidationDialog,
     namedRangeDialog: openNamedRangeDialog,
     defineNameDialog: openDefineNameDialog,
+    commentDialog: (mode, entry) =>
+      featureState.commentDialog?.open({ ...(mode ? { mode } : {}), entry }),
   });
   return {
     openConditionalDialog(options) {
@@ -163,7 +166,7 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       return target !== null && getBinding().followHyperlink(target);
     },
     openCommentDialog(options) {
-      featureState.commentDialog?.open(options);
+      featureState.commentDialog?.open({ ...options, entry: INSTANCE_API_COMMENT_ENTRY });
     },
     openFindReplace(tab?: 'find' | 'replace') {
       getBinding().findReplace?.open(tab);

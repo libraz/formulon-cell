@@ -208,6 +208,8 @@ describe('comments', () => {
       workbook: wb,
       history: new History(),
       action: 'delete-active' as const,
+      origin: 'ribbon' as const,
+      commandId: 'deleteCommentReview',
     };
     executeRibbonCommentAction(deps);
     await settle();

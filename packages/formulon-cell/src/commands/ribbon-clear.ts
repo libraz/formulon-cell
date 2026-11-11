@@ -22,6 +22,7 @@ import {
   collectSelectedContentAddresses,
 } from './clear-contents.js';
 import { clearComments, recordCommentChange } from './comment.js';
+import { commentWrite } from './comment-actions.js';
 import { withSelectionFormatOrigin } from './format.js';
 import type { History, HistoryEntry } from './history.js';
 import type { InteractionController } from './interaction-controller.js';
@@ -514,6 +515,8 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       : action === 'comments'
         ? {
             ...plan,
+            // A locked cell of a protected sheet keeps its note; only the others are cleared.
+            comments: plan.comments.filter((addr) => isCellWritable(store.getState(), addr)),
             hyperlinks: [],
             validations: [],
             content: [],
@@ -584,9 +587,14 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       return;
     }
     if (action === 'comments') {
-      recordCommentChange(history, store, workbook, plan.comments, () => {
-        clearComments(store, plan.comments, workbook);
-      });
+      // Only the notes a locked cell of a protected sheet does not keep are cleared.
+      const writable = plan.comments.filter((addr) => isCellWritable(store.getState(), addr));
+      const ctx = { store, history, origin: 'ribbon', commandId: 'clear-comments' } as const;
+      commentWrite(ctx, writable, undefined, () =>
+        recordCommentChange(history, store, workbook, writable, () => {
+          clearComments(store, writable, workbook);
+        }),
+      );
       return;
     }
     if (action === 'hyperlinks') {

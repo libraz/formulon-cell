@@ -17,7 +17,9 @@ import {
   setNotesVisible,
   threadedCommentsAt,
 } from './comment.js';
+import { commentWrite } from './comment-actions.js';
 import type { History } from './history.js';
+import type { InteractionOrigin } from './interaction-policy.js';
 import { deferForAllowedRangeUnlock } from './protection.js';
 
 export type RibbonCommentAction = 'delete-active' | 'delete-all';
@@ -27,10 +29,14 @@ export interface ExecuteRibbonCommentActionDeps {
   workbook: WorkbookHandle;
   history: History;
   action: RibbonCommentAction;
+  /** The entry point deleting the comments. */
+  origin: InteractionOrigin;
+  commandId: string;
 }
 
 export const executeRibbonCommentAction = (deps: ExecuteRibbonCommentActionDeps): void => {
-  const { store, workbook, history, action } = deps;
+  const { store, workbook, history, action, origin, commandId } = deps;
+  const authorization = { origin, commandId };
   const state = store.getState();
   const targets =
     action === 'delete-active'
@@ -53,42 +59,41 @@ export const executeRibbonCommentAction = (deps: ExecuteRibbonCommentActionDeps)
     })),
   ].map((a) => ({ sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col }));
   if (deferForAllowedRangeUnlock(store, footprint, () => executeRibbonCommentAction(deps))) return;
+  // Notes and threads are separate undo steps, each one authorized comment write.
+  const ctx = { store, history, ...authorization };
   if (targets.length > 0) {
-    recordCommentChange(
-      history,
-      store,
-      workbook,
-      targets.map((entry) => entry.addr),
-      () => {
-        for (const entry of targets)
-          clearComment(store, entry.addr, workbook, {
-            origin: 'ribbon',
-            commandId: 'deleteComment',
-          });
-      },
-      { origin: 'ribbon', commandId: 'deleteComment' },
+    const cells = targets.map((entry) => entry.addr);
+    commentWrite(ctx, cells, undefined, () =>
+      recordCommentChange(
+        history,
+        store,
+        workbook,
+        cells,
+        () => {
+          for (const entry of targets) clearComment(store, entry.addr, workbook, authorization);
+        },
+        authorization,
+      ),
     );
   }
   if (threaded.length > 0 && workbook.capabilities.threadedComments) {
-    recordThreadedChange(
-      history,
-      store,
-      workbook,
-      state.data.sheetIndex,
-      () => {
-        for (const entry of [...threaded].sort(
-          (a, b) => Number(a.parentId === null) - Number(b.parentId === null),
-        )) {
-          removeThreadedComment(store, state.data.sheetIndex, entry.id, workbook, {
-            origin: 'ribbon',
-            commandId: 'deleteComment',
-          });
-        }
-      },
-      {
-        origin: 'ribbon',
-        commandId: 'deleteComment',
-      },
+    const sheet = state.data.sheetIndex;
+    const cells = threaded.map((entry) => ({ sheet, row: entry.cell.row, col: entry.cell.col }));
+    commentWrite(ctx, cells, undefined, () =>
+      recordThreadedChange(
+        history,
+        store,
+        workbook,
+        sheet,
+        () => {
+          for (const entry of [...threaded].sort(
+            (a, b) => Number(a.parentId === null) - Number(b.parentId === null),
+          )) {
+            removeThreadedComment(store, sheet, entry.id, workbook, authorization);
+          }
+        },
+        authorization,
+      ),
     );
   }
 };

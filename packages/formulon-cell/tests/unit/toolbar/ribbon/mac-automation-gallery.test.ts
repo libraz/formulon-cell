@@ -343,6 +343,7 @@ describe('Mac automation gallery', () => {
       defineNameDialog: unused,
       pageSetupDialog: unused,
       hyperlinkDialog: unused,
+      commentDialog: unused,
       pivotTableDialog: () => {
         throw new Error('pivot exploded');
       },

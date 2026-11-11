@@ -49,6 +49,7 @@ import type {
   ContextMenuInteractionController,
   ContextMenuOptions,
 } from '../interact/context-menu-options.js';
+import type { DialogEntry } from '../interact/dialog-entry.js';
 import { InlineEditor } from '../interact/editor.js';
 import { attachFindReplace } from '../interact/find-replace.js';
 import type { FormatDialogHandle } from '../interact/format-dialog.js';
@@ -148,7 +149,7 @@ interface AttachEngineBindingInput {
   emitter: SpreadsheetEmitter;
   flags: FeatureFlags;
   formulaRegistry: FormulaRegistry;
-  getCommentDialog: () => { open(): void } | null;
+  getCommentDialog: () => { open(options?: { entry?: DialogEntry }): void } | null;
   getFormatDialog: () => FormatDialogHandle | null;
   getFormatPainter: () => { isActive(): boolean } | null;
   getFormulaBarEditor?: () => RangeInsertTarget | null;
@@ -403,7 +404,8 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
           tag.select();
         },
         onSwitchSheet: (delta) => getSheetTabs()?.switchRelative(delta),
-        onEditComment: () => getCommentDialog()?.open(),
+        onEditComment: () =>
+          getCommentDialog()?.open({ entry: { origin: 'keyboard', commandId: 'insertComment' } }),
         onClipboardShortcut: clipboardH ? (kind) => clipboardH.runShortcut(kind) : undefined,
         onPasteSpecial: pasteSpecialDialog ? () => pasteSpecialDialog.open() : undefined,
       })
@@ -430,7 +432,10 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         onOpenHyperlink: (url) => {
           followHyperlink({ store, wb, ...hyperlinkFollow }, url);
         },
-        onEditComment: () => getCommentDialog()?.open(),
+        onEditComment: () =>
+          getCommentDialog()?.open({
+            entry: { origin: 'contextMenu', commandId: 'insertComment' },
+          }),
         onDefineName: () =>
           getNamedRangeDialog()?.open({ origin: 'contextMenu', commandId: 'defineName' }),
         getLocale,

@@ -10,6 +10,7 @@ import {
   setComment,
   threadedCommentsAt,
 } from '../commands/comment.js';
+import { commentWrite } from '../commands/comment-actions.js';
 import { DEFAULT_COMMENT_AUTHOR } from '../commands/comment-author.js';
 import type { History } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
@@ -20,6 +21,7 @@ import { cellRect, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { type DialogEntry, INSTANCE_API_COMMENT_ENTRY } from './dialog-entry.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -39,7 +41,7 @@ export interface CommentDialogDeps {
 }
 
 export interface CommentDialogHandle {
-  open(options?: { mode?: 'note' | 'thread' }): void;
+  open(options?: { mode?: 'note' | 'thread'; entry?: DialogEntry }): void;
   close(): void;
   detach(): void;
 }
@@ -179,7 +181,9 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       t.threadConflict ?? 'This cell has a threaded comment. Remove it before adding a note.',
     writeFailed: t.writeFailed ?? 'The comment could not be saved.',
   };
-  const mutationAuthorization = { origin: 'instanceApi' as const, commandId: 'commentDialog' };
+  // The entry point that opened the dialog; its commits run as it.
+  let mutationAuthorization: DialogEntry = INSTANCE_API_COMMENT_ENTRY;
+  const commentContext = () => ({ store, history: history ?? null, ...mutationAuthorization });
   replyBtn.textContent = labels.reply;
   resolveBtn.textContent = labels.resolve;
 
@@ -252,22 +256,24 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       error.hidden = false;
       return false;
     }
-    let saved = true;
-    recordCommentChange(
-      history,
-      store,
-      wb,
-      [addr],
-      () => {
-        saved = setComment(
-          store,
-          addr,
-          next != null && next !== '' ? next : '',
-          wb,
-          mutationAuthorization,
-        );
-      },
-      mutationAuthorization,
+    let saved = false;
+    commentWrite(commentContext(), [addr], undefined, () =>
+      recordCommentChange(
+        history,
+        store,
+        wb,
+        [addr],
+        () => {
+          saved = setComment(
+            store,
+            addr,
+            next != null && next !== '' ? next : '',
+            wb,
+            mutationAuthorization,
+          );
+        },
+        mutationAuthorization,
+      ),
     );
     if (!saved) {
       error.textContent = labels.writeFailed;
@@ -290,29 +296,31 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     const hasNote = commentAt(state, addr) !== null;
     let result: ReturnType<typeof addThreadedComment> | boolean;
     try {
-      result = recordThreadedChange(
-        history,
-        store,
-        wb,
-        addr.sheet,
-        () => {
-          if (editingThreadId) {
-            return editThreadedComment(
-              store,
-              addr.sheet,
-              editingThreadId,
-              textarea.value,
-              wb,
-              [],
-              mutationAuthorization,
-            );
-          }
-          return addThreadedComment(store, addr, textarea.value, wb, {
-            replyToThread: replyingTo ?? undefined,
-            authorization: mutationAuthorization,
-          });
-        },
-        mutationAuthorization,
+      result = commentWrite(commentContext(), [addr], false, () =>
+        recordThreadedChange(
+          history,
+          store,
+          wb,
+          addr.sheet,
+          () => {
+            if (editingThreadId) {
+              return editThreadedComment(
+                store,
+                addr.sheet,
+                editingThreadId,
+                textarea.value,
+                wb,
+                [],
+                mutationAuthorization,
+              );
+            }
+            return addThreadedComment(store, addr, textarea.value, wb, {
+              replyToThread: replyingTo ?? undefined,
+              authorization: mutationAuthorization,
+            });
+          },
+          mutationAuthorization,
+        ),
       );
     } catch {
       result = false;
@@ -357,13 +365,15 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       const wb = getWb() ?? undefined;
       const opening = threadedCommentsAt(store, addr, wb)[0];
       if (opening && wb) {
-        const removed = recordThreadedChange(
-          history,
-          store,
-          wb,
-          addr.sheet,
-          () => removeThreadedComment(store, addr.sheet, opening.id, wb, mutationAuthorization),
-          mutationAuthorization,
+        const removed = commentWrite(commentContext(), [addr], false, () =>
+          recordThreadedChange(
+            history,
+            store,
+            wb,
+            addr.sheet,
+            () => removeThreadedComment(store, addr.sheet, opening.id, wb, mutationAuthorization),
+            mutationAuthorization,
+          ),
         );
         if (!removed) {
           error.textContent = labels.writeFailed;
@@ -399,14 +409,16 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     const wb = getWb() ?? undefined;
     const opening = threadedCommentsAt(store, addr, wb)[0];
     if (opening && wb) {
-      const resolved = recordThreadedChange(
-        history,
-        store,
-        wb,
-        addr.sheet,
-        () =>
-          resolveThread(store, addr.sheet, opening.id, !opening.done, wb, mutationAuthorization),
-        mutationAuthorization,
+      const resolved = commentWrite(commentContext(), [addr], false, () =>
+        recordThreadedChange(
+          history,
+          store,
+          wb,
+          addr.sheet,
+          () =>
+            resolveThread(store, addr.sheet, opening.id, !opening.done, wb, mutationAuthorization),
+          mutationAuthorization,
+        ),
       );
       if (!resolved) {
         error.textContent = labels.writeFailed;
@@ -534,7 +546,8 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   };
 
   const api: CommentDialogHandle = {
-    open(options: { mode?: 'note' | 'thread' } = {}): void {
+    open(options: { mode?: 'note' | 'thread'; entry?: DialogEntry } = {}): void {
+      mutationAuthorization = options.entry ?? INSTANCE_API_COMMENT_ENTRY;
       const state = store.getState();
       const addr = state.selection.active;
       const wb = getWb() ?? undefined;
