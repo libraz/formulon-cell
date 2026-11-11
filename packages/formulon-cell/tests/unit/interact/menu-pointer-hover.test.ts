@@ -93,3 +93,28 @@ describe('menu hover focus follows pointer movement', () => {
     menu.detach();
   });
 });
+
+describe('delegated menu hover follows pointer movement', () => {
+  it('ignores an element that appears under a resting pointer', async () => {
+    const { delegatePointerArrive } = await import('../../../src/toolbar/menu-a11y.js');
+    const root = document.createElement('div');
+    const first = document.createElement('button');
+    const second = document.createElement('button');
+    root.append(first, second);
+    document.body.appendChild(root);
+    const seen: EventTarget[] = [];
+    const detach = delegatePointerArrive(root, (event) => {
+      if (event.target) seen.push(event.target);
+    });
+    second.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(seen).toEqual([]);
+    second.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+    second.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+    first.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+    expect(seen).toEqual([second, first]);
+    detach();
+    second.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+    expect(seen).toEqual([second, first]);
+    root.remove();
+  });
+});

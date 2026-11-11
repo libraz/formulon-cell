@@ -92,13 +92,13 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(highlight?.textContent).toContain('Highlight Cells Rules');
     expect(topBottom?.textContent).toContain('Top/Bottom Rules');
 
-    const hoverHighlight = new MouseEvent('mouseover', { bubbles: true });
+    const hoverHighlight = new MouseEvent('mousemove', { bubbles: true });
     Object.defineProperty(hoverHighlight, 'target', { value: highlight });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownHover(hoverHighlight)).toBe(true);
     expect(menu?.querySelector<HTMLElement>('[data-cf-panel="highlight"]')?.hidden).toBe(false);
     expect(highlight?.getAttribute('aria-expanded')).toBe('true');
 
-    const hoverTopBottom = new MouseEvent('mouseover', { bubbles: true });
+    const hoverTopBottom = new MouseEvent('mousemove', { bubbles: true });
     Object.defineProperty(hoverTopBottom, 'target', { value: topBottom });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownHover(hoverTopBottom)).toBe(true);
     expect(menu?.querySelector<HTMLElement>('[data-cf-panel="highlight"]')?.hidden).toBe(true);
@@ -400,7 +400,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(clickEvent)).toBe(true);
     expect(panel?.hidden).toBe(true);
 
-    const hoverEvent = new MouseEvent('mouseover', { bubbles: true });
+    const hoverEvent = new MouseEvent('mousemove', { bubbles: true });
     Object.defineProperty(hoverEvent, 'target', { value: trigger });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownHover(hoverEvent)).toBe(true);
     expect(panel?.hidden).toBe(true);

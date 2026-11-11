@@ -413,7 +413,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tabColorTrigger?.getAttribute('aria-controls')).toBe('menu-format-cells-tabColor');
     expect(visibilityPanel?.hidden).toBe(true);
     expect(tabColorPanel?.hidden).toBe(true);
-    visibilityTrigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    visibilityTrigger?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
     expect(visibilityPanel?.hidden).toBe(false);
     expect(visibilityTrigger?.getAttribute('aria-expanded')).toBe('true');
     expect(
@@ -431,7 +431,7 @@ describe('Spreadsheet.mountToolbar', () => {
         .querySelector<HTMLButtonElement>('#menu-format-cells [data-cell-format="tab-color-red"]')
         ?.getAttribute('aria-checked'),
     ).toBe('false');
-    tabColorTrigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    tabColorTrigger?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
     expect(tabColorPanel?.hidden).toBe(false);
     expect(visibilityPanel?.hidden).toBe(true);
     const lockCellButton = host.querySelector<HTMLButtonElement>(

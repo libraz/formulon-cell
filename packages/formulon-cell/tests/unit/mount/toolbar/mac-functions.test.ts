@@ -57,7 +57,7 @@ describe('Spreadsheet.mountToolbar', () => {
     opener.click();
     expect(menu.hidden).toBe(false);
 
-    const hover = new MouseEvent('mouseover', { bubbles: true });
+    const hover = new MouseEvent('mousemove', { bubbles: true });
     Object.defineProperty(hover, 'target', { value: engineering });
     const beforeHoverFocus = document.activeElement;
     expect(tb.dropdownsApi?.dynamicRibbonDropdownHover(hover)).toBe(true);

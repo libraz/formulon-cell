@@ -80,6 +80,23 @@ export function onPointerArrive(item: HTMLElement, handler: () => void): void {
   });
 }
 
+/** The delegated form of `onPointerArrive`: runs `handler` when the pointer moves onto another
+ *  element under `root`, never for an element that appeared under a resting pointer. Returns the
+ *  detacher. */
+export function delegatePointerArrive(
+  root: Document | HTMLElement,
+  handler: (event: MouseEvent) => void,
+): () => void {
+  let last: EventTarget | null = null;
+  const onMove = (event: Event): void => {
+    if (event.target === last) return;
+    last = event.target;
+    handler(event as MouseEvent);
+  };
+  root.addEventListener('mousemove', onMove);
+  return () => root.removeEventListener('mousemove', onMove);
+}
+
 export function prepareMenu(menu: HTMLElement, label?: string): void {
   menu.setAttribute('role', 'menu');
   if (label) menu.setAttribute('aria-label', label);

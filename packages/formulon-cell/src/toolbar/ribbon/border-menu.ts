@@ -9,7 +9,12 @@ import { setBorderPreset } from '../../commands/format.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../../components/color-palette.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import type { CellBorderStyle } from '../../store/store.js';
-import { focusMenuItem, handleMenuKeydown, onPointerArrive } from '../menu-a11y.js';
+import {
+  delegatePointerArrive,
+  focusMenuItem,
+  handleMenuKeydown,
+  onPointerArrive,
+} from '../menu-a11y.js';
 import { RIBBON_BORDERS_MENU_ID } from './activation.js';
 
 export interface BorderMenuCtx {
@@ -333,7 +338,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
     }
     if (target?.closest('[data-border-preset], [data-border-draw]')) closeBorderSubmenus();
   };
-  document.addEventListener('mouseover', onDocumentMouseOver);
+  const detachPointerArrive = delegatePointerArrive(document, onDocumentMouseOver);
 
   const detach = (): void => {
     borderBtn?.removeEventListener('click', onBorderButtonClick);
@@ -342,7 +347,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
     document.removeEventListener('keydown', onDocumentEscapeKey);
     document.removeEventListener('keydown', onDocumentSubmenuKeydown);
     document.removeEventListener('click', onDocumentClick);
-    document.removeEventListener('mouseover', onDocumentMouseOver);
+    detachPointerArrive();
   };
 
   return {

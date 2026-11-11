@@ -460,7 +460,7 @@ describe('Spreadsheet.mountToolbar', () => {
       helpers: stubHelpers(),
     });
     const attachedTypes = added.mock.calls.map(([type]) => type);
-    const dynamicTypes = ['click', 'mousedown', 'focusin', 'mouseover', 'keydown'];
+    const dynamicTypes = ['click', 'mousedown', 'focusin', 'mousemove', 'keydown'];
     for (const type of dynamicTypes) expect(attachedTypes).toContain(type);
 
     tb.dispose();

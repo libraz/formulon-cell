@@ -3,6 +3,7 @@
 // dispatcher; `detach` removes every one of them on toolbar dispose.
 
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { delegatePointerArrive } from '../toolbar/menu-a11y.js';
 import type { RibbonHooks } from '../toolbar/ribbon/apply-ribbon-command.js';
 import {
   createDynamicDropdowns,
@@ -149,7 +150,7 @@ export function attachDynamicDropdownDelegation(
   document.addEventListener('click', onClick);
   document.addEventListener('mousedown', onPointerDown, true);
   document.addEventListener('focusin', onFocusIn);
-  document.addEventListener('mouseover', onHover);
+  const detachHover = delegatePointerArrive(document, onHover);
   document.addEventListener('keydown', onKeyDown);
 
   return {
@@ -158,7 +159,7 @@ export function attachDynamicDropdownDelegation(
       document.removeEventListener('click', onClick);
       document.removeEventListener('mousedown', onPointerDown, true);
       document.removeEventListener('focusin', onFocusIn);
-      document.removeEventListener('mouseover', onHover);
+      detachHover();
       document.removeEventListener('keydown', onKeyDown);
     },
   };
