@@ -697,11 +697,11 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await allowEditRanges.getByRole('button', { name: 'キャンセル', exact: true }).click();
   await expect(allowEditRanges).toBeHidden();
   await page.locator('[data-ribbon-command="accessibility"]').click();
-  const accessibility = page.getByRole('dialog', { name: 'アクセシビリティ チェック' });
+  const accessibility = page.getByRole('dialog', { name: 'アクセシビリティ', exact: true });
   await expect(accessibility).toBeVisible();
-  await snapshotPage(page, 'excel-chrome-review-accessibility-dialog-1440');
-  await accessibility.getByRole('button', { name: 'OK', exact: true }).click();
-  await expect(accessibility).toBeHidden();
+  await snapshotPage(page, 'excel-chrome-review-accessibility-pane-1440');
+  await accessibility.getByRole('button', { name: '閉じる', exact: true }).click();
+  await expect(accessibility).toHaveCount(0);
   await page.locator('[data-ribbon-command="translateReview"]').click();
   const translate = page.getByRole('dialog', { name: '翻訳' });
   await expect(translate).toBeVisible();
@@ -721,10 +721,10 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
     inst.history.clear();
   });
   await page.locator('[data-ribbon-command="spellingReview"]').click();
-  const spelling = page.getByRole('dialog', { name: 'スペル チェック' });
+  const spelling = page.getByRole('dialog', { name: /^スペル チェック/ });
   await expect(spelling).toBeVisible();
   await snapshotPage(page, 'excel-chrome-review-spelling-dialog-1440');
-  await spelling.getByRole('button', { name: 'OK' }).click();
+  await spelling.getByRole('button', { name: 'キャンセル', exact: true }).click();
   await expect(spelling).toBeHidden();
   await switchRibbonTab(page, 'help');
   await snapshotDemo(page, 'excel-chrome-help-full-1440');

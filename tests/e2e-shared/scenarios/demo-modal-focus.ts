@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 async function expectActive(locator: Locator, message: string): Promise<void> {
@@ -35,11 +36,19 @@ export async function runDemoModalFocusScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
   await sp.mount();
 
+  // Spelling opens only on a flagged word.
+  await page.evaluate(() => {
+    const inst = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+    if (!inst) throw new Error('window.__fcInst is required');
+    inst.workbook.batch(() => inst.workbook.sheet(0).setText(0, 0, 'teh'));
+    inst.history.clear();
+    inst.selection.set('A1');
+  });
   await page.locator('[data-ribbon-tab="review"]').click();
   const spelling = page.locator('[data-ribbon-command="spellingReview"]').first();
   await expect(spelling).toBeEnabled();
   await spelling.click();
-  await expectModalFocusContract(page, page.getByRole('dialog', { name: 'Spelling', exact: true }));
+  await expectModalFocusContract(page, page.getByRole('dialog', { name: /^Spelling/ }));
 
   await page.locator('[data-ribbon-tab="automate"]').click();
   const script = page.getByRole('button', { name: /^Script$/i }).first();
