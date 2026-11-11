@@ -13,6 +13,7 @@ import {
   type DemoQuickAccessDeps,
   type DemoQuickAccessId,
   type DemoUiStrings,
+  demoHistorySnapshot,
   demoQuickAccessEnabled,
   demoQuickAccessMenu,
   runDemoQuickAccess,
@@ -35,10 +36,10 @@ export const DemoQuickAccess = ({ ui, instance, deps }: DemoQuickAccessProps): R
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const chevronRef = useRef<HTMLButtonElement | null>(null);
-  // Re-render when the history changes so Undo enables and disables with it.
+  // Re-render when the history changes so Undo and Redo enable and disable with it.
   useSyncExternalStore(
     instance ? (notify) => instance.history.on('change', notify) : noHistory,
-    () => instance?.history.canUndo ?? false,
+    () => demoHistorySnapshot(instance),
   );
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);

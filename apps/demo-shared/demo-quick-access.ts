@@ -96,6 +96,12 @@ export const demoQuickAccessEnabled = (
   return true;
 };
 
+/** The history flags the title bar's Undo and Redo buttons read, as one value for a change check. */
+export const demoHistorySnapshot = (instance: SpreadsheetInstance | null): string =>
+  instance
+    ? `${instance.history.canUndo}/${instance.history.canRedo}/${instance.history.canRepeat}`
+    : '';
+
 /** Run a toolbar button. AutoSave is a local switch the caller owns. */
 export const runDemoQuickAccess = (id: DemoQuickAccessId, deps: DemoQuickAccessDeps): void => {
   switch (id) {

@@ -57,6 +57,28 @@ const searchInput = ref<HTMLInputElement | null>(null);
 const quickAccess = ref<HTMLElement | null>(null);
 defineExpose({ quickAccess });
 
+// Bumped on every history change so Undo and Redo enable and disable with it.
+const historyRevision = ref(0);
+let unsubscribeHistory: (() => void) | undefined;
+watch(
+  () => props.instance,
+  (instance) => {
+    unsubscribeHistory?.();
+    unsubscribeHistory = instance?.history.on('change', () => {
+      historyRevision.value += 1;
+    });
+  },
+  { immediate: true },
+);
+const canUndo = computed(() => {
+  void historyRevision.value;
+  return props.instance?.history.canUndo ?? false;
+});
+const canRedo = computed(() => {
+  void historyRevision.value;
+  return props.instance?.history.canRedo ?? false;
+});
+
 let disposeSearchShortcut: (() => void) | undefined;
 
 const filteredCommands = computed(() => {
@@ -156,6 +178,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   disposeSearchShortcut?.();
   disposeSearchShortcut = undefined;
+  unsubscribeHistory?.();
+  unsubscribeHistory = undefined;
 });
 </script>
 
@@ -186,10 +210,10 @@ onBeforeUnmount(() => {
           <button type="button" class="demo__title-icon" :aria-label="ui.save" :title="ui.save" @click="emit('save')">
             <DemoIcon name="save" />
           </button>
-          <button type="button" class="demo__title-icon" :aria-label="ui.undo" :title="ui.undo" @click="instance?.history.undo()">
+          <button type="button" class="demo__title-icon" :aria-label="ui.undo" :title="ui.undo" :disabled="!canUndo" @click="instance?.history.undo()">
             <DemoIcon name="undo" />
           </button>
-          <button type="button" class="demo__title-icon" :aria-label="ui.redo" :title="ui.redo" @click="instance?.history.redo()">
+          <button type="button" class="demo__title-icon" :aria-label="ui.redo" :title="ui.redo" :disabled="!canRedo" @click="instance?.history.redo()">
             <DemoIcon name="redo" />
           </button>
         </template>

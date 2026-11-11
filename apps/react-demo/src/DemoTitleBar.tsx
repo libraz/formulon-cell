@@ -8,6 +8,7 @@ import {
   useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import {
   buildDemoSearchSuggestions,
@@ -15,6 +16,7 @@ import {
   type DemoSearchItem,
   type DemoSearchUsagePrior,
   type DemoUiStrings,
+  demoHistorySnapshot,
   demoSearchOptionId,
   INITIAL_DEMO_SEARCH_STATE,
   installDemoSearchShortcut,
@@ -50,6 +52,8 @@ interface DemoTitleBarProps {
   onTabChange: (tab: RibbonTab) => void;
 }
 
+const noHistory = (): (() => void) => () => {};
+
 export const DemoTitleBar = ({
   ui,
   platform,
@@ -74,6 +78,11 @@ export const DemoTitleBar = ({
   );
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const mac = platform === 'mac';
+  // Re-render when the history changes so Undo and Redo enable and disable with it.
+  useSyncExternalStore(
+    instance ? (notify) => instance.history.on('change', notify) : noHistory,
+    () => demoHistorySnapshot(instance),
+  );
   // The Mac title bar shows a magnifier button until the search is opened.
   const [searchActive, setSearchActive] = useState(false);
   const openSearch = useCallback(() => setSearchActive(true), []);
@@ -194,6 +203,7 @@ export const DemoTitleBar = ({
                 className="demo__title-icon"
                 aria-label={ui.undo}
                 title={ui.undo}
+                disabled={!instance?.history.canUndo}
                 onClick={() => instance?.history.undo()}
               >
                 <DemoIcon name="undo" />
@@ -203,6 +213,7 @@ export const DemoTitleBar = ({
                 className="demo__title-icon"
                 aria-label={ui.redo}
                 title={ui.redo}
+                disabled={!instance?.history.canRedo}
                 onClick={() => instance?.history.redo()}
               >
                 <DemoIcon name="redo" />
