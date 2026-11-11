@@ -101,6 +101,10 @@ const fullSheetRange = (sheet: number): Range => ({
   c1: MAX_COL,
 });
 
+/** `value` clamped into `lo..hi`, or `lo` when absent. */
+const clampInto = (value: number | undefined, lo: number, hi: number): number =>
+  Math.max(lo, Math.min(hi, value ?? lo));
+
 const boundedAxisRange = (
   store: SpreadsheetStore,
   axis: 'row' | 'col',
@@ -370,39 +374,41 @@ export const selectionMutators = {
     });
   },
 
-  /** Set entire row/col selection without an active-cell address change.
-   *  Used when the user clicks a row/col header. */
-  selectRow(store: SpreadsheetStore, row: number): void {
+  /** Select whole row `row`. `activeCol` places the active cell (clamped into the range); it
+   *  defaults to the range's first column. */
+  selectRow(store: SpreadsheetStore, row: number, activeCol?: number): void {
     const range = boundedAxisRange(store, 'row', row, row);
     if (!range) return;
+    const col = clampInto(activeCol, range.c0, range.c1);
     store.setState((s) => ({
       ...s,
       selection: {
-        active: { sheet: range.sheet, row: range.r0, col: range.c0 },
-        anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        active: { sheet: range.sheet, row: range.r0, col },
+        anchor: { sheet: range.sheet, row: range.r0, col },
         range,
         extraRanges: [],
       },
     }));
   },
 
-  selectRows(store: SpreadsheetStore, anchorRow: number, endRow: number): void {
+  selectRows(store: SpreadsheetStore, anchorRow: number, endRow: number, activeCol?: number): void {
     const r0 = Math.min(anchorRow, endRow);
     const r1 = Math.max(anchorRow, endRow);
     const range = boundedAxisRange(store, 'row', r0, r1);
     if (!range) return;
+    const col = clampInto(activeCol, range.c0, range.c1);
     store.setState((s) => ({
       ...s,
       selection: {
         active: {
           sheet: range.sheet,
           row: Math.max(range.r0, Math.min(range.r1, anchorRow)),
-          col: range.c0,
+          col,
         },
         anchor: {
           sheet: range.sheet,
           row: Math.max(range.r0, Math.min(range.r1, anchorRow)),
-          col: range.c0,
+          col,
         },
         range,
         extraRanges: [],
@@ -410,36 +416,40 @@ export const selectionMutators = {
     }));
   },
 
-  selectCol(store: SpreadsheetStore, col: number): void {
+  /** Select whole column `col`. `activeRow` places the active cell (clamped into the range); it
+   *  defaults to the range's first row. */
+  selectCol(store: SpreadsheetStore, col: number, activeRow?: number): void {
     const range = boundedAxisRange(store, 'col', col, col);
     if (!range) return;
+    const row = clampInto(activeRow, range.r0, range.r1);
     store.setState((s) => ({
       ...s,
       selection: {
-        active: { sheet: range.sheet, row: range.r0, col: range.c0 },
-        anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        active: { sheet: range.sheet, row, col: range.c0 },
+        anchor: { sheet: range.sheet, row, col: range.c0 },
         range,
         extraRanges: [],
       },
     }));
   },
 
-  selectCols(store: SpreadsheetStore, anchorCol: number, endCol: number): void {
+  selectCols(store: SpreadsheetStore, anchorCol: number, endCol: number, activeRow?: number): void {
     const c0 = Math.min(anchorCol, endCol);
     const c1 = Math.max(anchorCol, endCol);
     const range = boundedAxisRange(store, 'col', c0, c1);
     if (!range) return;
+    const row = clampInto(activeRow, range.r0, range.r1);
     store.setState((s) => ({
       ...s,
       selection: {
         active: {
           sheet: range.sheet,
-          row: range.r0,
+          row,
           col: Math.max(range.c0, Math.min(range.c1, anchorCol)),
         },
         anchor: {
           sheet: range.sheet,
-          row: range.r0,
+          row,
           col: Math.max(range.c0, Math.min(range.c1, anchorCol)),
         },
         range,

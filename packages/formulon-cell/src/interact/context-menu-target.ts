@@ -2,6 +2,7 @@ import type { Addr } from '../engine/types.js';
 import { hitZone, layoutForView } from '../render/geometry.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { firstVisibleCol, firstVisibleRow } from '../store/visible-axis.js';
 import type { MenuKind } from './context-menu-spec.js';
 
 export type MenuTarget = {
@@ -37,7 +38,7 @@ export const resolveContextMenuTarget = (
     const inSel = selectedRanges.some(
       (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && isWholeRowRange(sel),
     );
-    if (!inSel && canChangeSelection()) mutators.selectRow(store, zone.row);
+    if (!inSel && canChangeSelection()) mutators.selectRow(store, zone.row, firstVisibleCol(s));
     return {
       kind: 'row',
       cell: { ...store.getState().selection.active },
@@ -47,7 +48,7 @@ export const resolveContextMenuTarget = (
     const inSel = selectedRanges.some(
       (sel) => zone.col >= sel.c0 && zone.col <= sel.c1 && isWholeColumnRange(sel),
     );
-    if (!inSel && canChangeSelection()) mutators.selectCol(store, zone.col);
+    if (!inSel && canChangeSelection()) mutators.selectCol(store, zone.col, firstVisibleRow(s));
     return {
       kind: 'col',
       cell: { ...store.getState().selection.active },

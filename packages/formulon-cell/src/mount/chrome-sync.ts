@@ -26,7 +26,6 @@ import { formatNumber } from '../format/number-format.js';
 import type { Strings } from '../i18n/strings.js';
 import { scrollActiveIntoView } from '../interact/navigation-policy.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
-import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import type { NumFmt } from '../store/types/cell-format.js';
@@ -208,15 +207,14 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   grid.setAttribute('aria-colcount', String(MAX_COL + 1));
   grid.setAttribute('aria-multiselectable', 'true');
 
-  /** The defined name when the selection is exactly a named range, else the
-   *  active cell's address (a whole row or column keeps its band reference). */
-  const nameBoxText = (ref: string): string => {
+  /** The defined name when the selection is exactly a named range, else the active cell's
+   *  address, whole rows, columns and multi-area selections included. */
+  const nameBoxText = (): string => {
     const s = store.getState();
-    if (s.selection.extraRanges?.length) return ref;
-    const range = s.selection.range;
-    const named = nameForRange(getWb(), s.data.sheetIndex, range);
+    const named = s.selection.extraRanges?.length
+      ? null
+      : nameForRange(getWb(), s.data.sheetIndex, s.selection.range);
     if (named) return named;
-    if (isWholeColumnRange(range) || isWholeRowRange(range)) return ref;
     const a = s.selection.active;
     return formatSelectionRef(
       { r0: a.row, c0: a.col, r1: a.row, c1: a.col },
@@ -535,7 +533,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const ref = selectionRef(s);
     const object = s.ui.selectedObject;
     if (document.activeElement !== tag) {
-      tag.value = object ? object.name : (dragSizeText(s) ?? nameBoxText(ref));
+      tag.value = object ? object.name : (dragSizeText(s) ?? nameBoxText());
     }
     if (!getFormulaEditing()) {
       fxInput.value = object ? '' : formulaBarText(s, wb, active, display);
@@ -652,7 +650,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   /** Tell the user the entry is unusable, then put the box back as it was. */
   const rejectNameBoxValue = (): void => {
     onAlert?.({ severity: 'stop', message: getStrings().a11y.nameBoxInvalidReference });
-    tag.value = nameBoxText(selectionRef(store.getState()));
+    tag.value = nameBoxText();
     tag.focus();
     tag.select();
   };

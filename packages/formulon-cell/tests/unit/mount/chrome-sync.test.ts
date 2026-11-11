@@ -300,6 +300,17 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
     expect(tag.value).toBe('A1');
   });
 
+  it('a whole row, a whole column or a multi-area selection shows the active cell, never a band', () => {
+    const store = sheet.instance.store;
+    mutators.selectRow(store, 2, 4);
+    expect(tag.value).toBe('E3');
+    mutators.selectCols(store, 1, 3, 9);
+    expect(tag.value).toBe('B10');
+    mutators.selectRow(store, 1);
+    mutators.addExtraRange(store, { sheet: 0, r0: 3, c0: 0, r1: 3, c1: 16_383 });
+    expect(tag.value).toBe('A4');
+  });
+
   it('shows a merged logical cell by its anchor while retaining the complete selection', () => {
     const store = sheet.instance.store;
     const range = { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 3 };
