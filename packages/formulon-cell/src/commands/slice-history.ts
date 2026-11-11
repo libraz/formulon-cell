@@ -7,6 +7,7 @@ import {
 import { syncLayoutToEngine } from '../engine/layout-sync.js';
 import type { Range, SheetAxisFormatOverride, SheetFontOverride } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { cloneSparklineSlice } from '../store/sparkline-slice.js';
 import { splitPosition } from '../store/split-panes.js';
 import type {
   CellFormat,
@@ -18,7 +19,7 @@ import type {
   RangeValidation,
   SessionIllustration,
   SlicerSpec,
-  Sparkline,
+  SparklineSlice,
   SpreadsheetStore,
   State,
 } from '../store/store.js';
@@ -1024,16 +1025,16 @@ export function recordMergesChangeWithEngine(
   });
 }
 
-export function captureSparklineSnapshot(state: State): Map<string, Sparkline> {
-  return new Map(state.sparkline.sparklines);
+export function captureSparklineSnapshot(state: State): SparklineSlice {
+  return cloneSparklineSlice(state.sparkline);
 }
 
-export function applySparklineSnapshot(
-  store: SpreadsheetStore,
-  snap: Map<string, Sparkline>,
-): void {
-  store.setState((s) => ({ ...s, sparkline: { sparklines: new Map(snap) } }));
+export function applySparklineSnapshot(store: SpreadsheetStore, snap: SparklineSlice): void {
+  store.setState((s) => ({ ...s, sparkline: cloneSparklineSlice(snap) }));
 }
+
+const sameSparklineSnapshot = (a: SparklineSlice, b: SparklineSlice): boolean =>
+  sameMapSnapshot(a.sparklines, b.sparklines) && sameMapSnapshot(a.groups, b.groups);
 
 export function recordSparklineChange(
   history: History | null,
@@ -1043,7 +1044,7 @@ export function recordSparklineChange(
   recordSliceChange(history, store, mutate, {
     capture: captureSparklineSnapshot,
     apply: applySparklineSnapshot,
-    same: sameMapSnapshot,
+    same: sameSparklineSnapshot,
   });
 }
 

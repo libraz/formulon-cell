@@ -1,5 +1,6 @@
+import { SparklineType } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { sparklineAt } from '../../../src/commands/sparkline.js';
+import { groupOfCell, sparklineAt } from '../../../src/commands/sparkline.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { ja } from '../../../src/i18n/strings/ja.js';
@@ -57,10 +58,11 @@ describe('attachMacSparklineDialog', () => {
     type.dispatchEvent(new Event('change', { bubbles: true }));
     ok.click();
 
-    expect(sparklineAt(store.getState(), { sheet: 0, row: 0, col: 3 })).toEqual({
-      kind: 'column',
-      source: 'A1:C1',
-      showNegative: true,
+    const dest = { sheet: 0, row: 0, col: 3 };
+    expect(sparklineAt(store.getState(), dest)?.source).toBe('A1:C1');
+    expect(groupOfCell(store.getState(), dest)?.settings).toMatchObject({
+      type: SparklineType.Column,
+      negative: true,
     });
     handle.detach();
   });

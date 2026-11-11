@@ -1,5 +1,9 @@
 import type { History } from '../commands/history.js';
-import { setSparklinesAction } from '../commands/sparkline.js';
+import {
+  defaultSparklineGroupSettings,
+  setSparklinesAction,
+  sparklineTypeOf,
+} from '../commands/sparkline.js';
 import { formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
@@ -242,16 +246,8 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
         origin: 'ribbon',
         commandId: 'mac.insert.sparkline',
       },
-      [
-        {
-          addr: lastDestination,
-          spec: {
-            kind: lastKind,
-            source: sourceForSpec(lastSource, lastDestination),
-            showNegative: lastKind !== 'line',
-          },
-        },
-      ],
+      [{ addr: lastDestination, source: sourceForSpec(lastSource, lastDestination) }],
+      defaultSparklineGroupSettings(sparklineTypeOf(lastKind)),
     );
     if (!ok) {
       setError(strings.mac.sparkline.protectedLocation);

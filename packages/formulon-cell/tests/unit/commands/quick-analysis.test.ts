@@ -1,3 +1,4 @@
+import { SparklineType } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import type { SelectionStats } from '../../../src/commands/aggregate.js';
 import { History } from '../../../src/commands/history.js';
@@ -10,12 +11,19 @@ import {
   isQuickAnalysisActionEnabled,
   quickAnalysisActionById,
 } from '../../../src/commands/quick-analysis.js';
+import {
+  defaultSparklineGroupSettings,
+  groupOfCell,
+  setSparkline,
+} from '../../../src/commands/sparkline.js';
 import type { Range } from '../../../src/engine/types.js';
 import {
   WorkbookHandle,
   type WorkbookHandle as WorkbookHandleType,
 } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+
+const LINE = defaultSparklineGroupSettings(SparklineType.Line);
 
 const mkStats = (overrides: Partial<SelectionStats> = {}): SelectionStats => ({
   cells: 1,
@@ -320,10 +328,11 @@ describe('executeQuickAnalysisAction', () => {
     });
 
     expect(result).toEqual({ ok: true, kind: 'sparkline', count: 1 });
-    expect(store.getState().sparkline.sparklines.get('0:2:4')).toEqual({
-      kind: 'column',
-      source: 'A3:D3',
-      showNegative: true,
+    const state = store.getState();
+    expect(state.sparkline.sparklines.get('0:2:4')?.source).toBe('A3:D3');
+    expect(groupOfCell(state, { sheet: 0, row: 2, col: 4 })?.settings).toMatchObject({
+      type: SparklineType.Column,
+      negative: true,
     });
   });
 
@@ -521,7 +530,7 @@ describe('executeQuickAnalysisAction', () => {
       color: '#5b9bd5',
       showValue: true,
     });
-    mutators.setSparkline(store, { sheet: 0, row: 1, col: 1 }, { kind: 'line', source: 'A1:C1' });
+    setSparkline(store, { sheet: 0, row: 1, col: 1 }, 'A1:C1', LINE);
     mutators.upsertTableOverlay(store, {
       id: 'tbl',
       source: 'session',

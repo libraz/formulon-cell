@@ -4,6 +4,10 @@
  * a tinted theme colour comes out as the spreadsheet paints it.
  */
 
+import type { Color } from '@libraz/formulon';
+import { ColorKind } from '@libraz/formulon';
+import type { WorkbookHandle } from './workbook-handle.js';
+
 const CSS_HEX_COLOR = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 /** `#rrggbb` from an engine ARGB colour; the alpha byte is carried by transparency. */
@@ -84,4 +88,15 @@ const tintedArgb = (argb: number, tint: number): number => {
 export const tintCssColor = (color: string, tint: number): string | null => {
   const argb = argbFromCssColor(color);
   return argb === null ? null : cssColorFromArgb(tintedArgb(argb, tint));
+};
+
+/** CSS colour of an engine colour spec through the workbook theme; undefined when the spec is
+ *  absent or cannot be resolved. Without a workbook only an RGB spec resolves. */
+export const cssOfColorSpec = (
+  wb: Pick<WorkbookHandle, 'resolveColorArgb'> | null,
+  spec: Color | null,
+): string | undefined => {
+  if (spec === null || spec.kind === ColorKind.None) return undefined;
+  const argb = wb?.resolveColorArgb(spec) ?? (spec.kind === ColorKind.Rgb ? spec.argb : null);
+  return argb === null ? undefined : cssColorFromArgb(argb);
 };

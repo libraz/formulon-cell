@@ -51,6 +51,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineDrawingObject } from '../engine/workbook-handle-annotations.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
 import { rangesIntersect } from '../store/selection-geometry.js';
+import { withSparklineMembers } from '../store/sparkline-slice.js';
 import {
   type ConditionalRule,
   type LayoutSlice,
@@ -376,7 +377,7 @@ function shiftAnchoredRanges(
           split,
           delta,
         );
-        return { ...s, sparkline: { sparklines } };
+        return { ...s, sparkline: withSparklineMembers(s.sparkline, sparklines) };
       });
     });
   }

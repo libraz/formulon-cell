@@ -1,7 +1,19 @@
+import type { Color } from '@libraz/formulon';
+import { BlanksAs, ColorKind, SparklineAxisType, SparklineType } from '@libraz/formulon';
 import { addrKey, parseAddrKey, quoteSheetName } from '../engine/address.js';
+import { argbFromCssColor } from '../engine/theme-color.js';
 import type { Addr, Range } from '../engine/types.js';
+import { DEFAULT_NEGATIVE_COLOR, DEFAULT_SPARKLINE_COLOR } from '../render/painters/controls.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
-import { mutators, type Sparkline, type SpreadsheetStore } from '../store/store.js';
+import { cloneSparklineSettings, withSparklineMembers } from '../store/sparkline-slice.js';
+import {
+  mutators,
+  type Sparkline,
+  type SparklineGroupSettings,
+  type SparklineKind,
+  type SparklineSlice,
+  type SpreadsheetStore,
+} from '../store/store.js';
 import { authorizedWrite } from './authorized-write.js';
 import { adjustInterval } from './axis-shift.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
@@ -13,6 +25,72 @@ import { recordSparklineChange } from './slice-history.js';
 export interface SparklineEntry {
   addr: Addr;
   spec: Sparkline;
+}
+
+/** A sparkline to create: its host cell and data range. */
+export interface SparklineInsert {
+  addr: Addr;
+  source: string;
+}
+
+type SparklineState = { sparkline: SparklineSlice };
+
+const TYPE_OF_KIND: Record<SparklineKind, SparklineType> = {
+  line: SparklineType.Line,
+  column: SparklineType.Column,
+  'win-loss': SparklineType.Stacked,
+};
+
+const KIND_OF_TYPE: Record<SparklineType, SparklineKind> = {
+  [SparklineType.Line]: 'line',
+  [SparklineType.Column]: 'column',
+  [SparklineType.Stacked]: 'win-loss',
+};
+
+export const sparklineTypeOf = (kind: SparklineKind): SparklineType => TYPE_OF_KIND[kind];
+
+export const sparklineKindOf = (type: SparklineType): SparklineKind => KIND_OF_TYPE[type] ?? 'line';
+
+/** An opaque RGB engine colour of `css` (`#rgb` / `#rrggbb`). */
+export const rgbColorSpec = (css: string): Color => ({
+  kind: ColorKind.Rgb,
+  argb: argbFromCssColor(css) ?? 0xff000000,
+  theme: 0,
+  tint: 0,
+  indexed: 0,
+});
+
+/** Settings of a new group of `type`: the series and negative colours of the overlay,
+ *  negatives shown for column and win/loss. */
+export function defaultSparklineGroupSettings(type: SparklineType): SparklineGroupSettings {
+  const mark = rgbColorSpec(DEFAULT_NEGATIVE_COLOR);
+  return {
+    type,
+    colorSeries: rgbColorSpec(DEFAULT_SPARKLINE_COLOR),
+    colorNegative: mark,
+    colorAxis: rgbColorSpec('#000000'),
+    colorMarkers: mark,
+    colorFirst: mark,
+    colorLast: mark,
+    colorHigh: mark,
+    colorLow: mark,
+    markers: false,
+    high: false,
+    low: false,
+    first: false,
+    last: false,
+    negative: type !== SparklineType.Line,
+    displayXAxis: false,
+    displayHidden: false,
+    minAxisType: SparklineAxisType.Individual,
+    maxAxisType: SparklineAxisType.Individual,
+    manualMin: null,
+    manualMax: null,
+    dateAxis: false,
+    dateAxisRange: null,
+    lineWidthPt: 0.75,
+    emptyCellsAs: BlanksAs.Gap,
+  };
 }
 
 export function listSparklines(state: {
@@ -36,6 +114,23 @@ export function sparklineAt(
   return spec ? { ...spec } : null;
 }
 
+/** The group of the sparkline at `addr`, with a copy of its settings; null when there is none. */
+export function groupOfCell(
+  state: SparklineState,
+  addr: Addr,
+): { id: string; settings: SparklineGroupSettings } | null {
+  const member = state.sparkline.sparklines.get(addrKey(addr));
+  const settings = member && state.sparkline.groups.get(member.group);
+  return member && settings
+    ? { id: member.group, settings: cloneSparklineSettings(settings) }
+    : null;
+}
+
+/** The members of group `groupId` in row-major order. */
+export function membersOfGroup(state: SparklineState, groupId: string): readonly SparklineEntry[] {
+  return listSparklines(state).filter(({ spec }) => spec.group === groupId);
+}
+
 let groupSeq = 0;
 
 /** A group id no other sparkline of this session shares. */
@@ -44,12 +139,89 @@ export const newSparklineGroupId = (): string => {
   return `sparkline-group-${groupSeq}`;
 };
 
-/** Attach several sparklines as one group from the entry point `ctx` names: one engine group and
- *  one undo step, an object change of the sheet and the location cells. Any sheet protection
- *  refuses it, Edit objects included. */
+/** Patch the settings of group `groupId`; false when the group does not exist. Store-level:
+ *  callers wrap it in `recordSparklineChange`. */
+export function updateSparklineGroup(
+  store: SpreadsheetStore,
+  groupId: string,
+  patch: Partial<SparklineGroupSettings>,
+): boolean {
+  const current = store.getState().sparkline.groups.get(groupId);
+  if (!current) return false;
+  mutators.setSparklineGroup(store, groupId, { ...current, ...structuredClone(patch) });
+  return true;
+}
+
+/** Merge the groups of the sparklines at `addrs` (those on `active`'s sheet) into one new
+ *  group that takes the settings of `active`'s group, or of the first cell's. Returns the new
+ *  group id, or null when no cell hosts a sparkline. */
+export function groupSparklines(
+  store: SpreadsheetStore,
+  addrs: readonly Addr[],
+  active: Addr | undefined = addrs[0],
+): string | null {
+  const state = store.getState();
+  const sheet = (active ?? addrs[0])?.sheet;
+  if (sheet === undefined) return null;
+  const touched = new Set<string>();
+  for (const addr of addrs) {
+    const member = addr.sheet === sheet ? state.sparkline.sparklines.get(addrKey(addr)) : undefined;
+    if (member) touched.add(member.group);
+  }
+  if (touched.size === 0) return null;
+  const activeGroup = active ? state.sparkline.sparklines.get(addrKey(active))?.group : undefined;
+  const settings = state.sparkline.groups.get(
+    activeGroup && touched.has(activeGroup) ? activeGroup : ([...touched][0] as string),
+  );
+  if (!settings) return null;
+  const id = newSparklineGroupId();
+  store.setState((s) => {
+    const sparklines = new Map(
+      [...s.sparkline.sparklines].map(([key, member]) => [
+        key,
+        touched.has(member.group) ? { ...member, group: id } : member,
+      ]),
+    );
+    const groups = new Map(s.sparkline.groups);
+    groups.set(id, cloneSparklineSettings(settings));
+    return { ...s, sparkline: withSparklineMembers({ sparklines, groups }, sparklines) };
+  });
+  return id;
+}
+
+/** Give each member of the groups of the sparklines at `addrs` its own group with a copy of
+ *  the group's settings. Returns how many sparklines were regrouped. */
+export function ungroupSparklines(store: SpreadsheetStore, addrs: readonly Addr[]): number {
+  const state = store.getState();
+  const touched = new Set<string>();
+  for (const addr of addrs) {
+    const member = state.sparkline.sparklines.get(addrKey(addr));
+    if (member) touched.add(member.group);
+  }
+  let count = 0;
+  store.setState((s) => {
+    const sparklines = new Map(s.sparkline.sparklines);
+    const groups = new Map(s.sparkline.groups);
+    for (const [key, member] of s.sparkline.sparklines) {
+      const settings = touched.has(member.group) ? s.sparkline.groups.get(member.group) : undefined;
+      if (!settings) continue;
+      const id = newSparklineGroupId();
+      sparklines.set(key, { ...member, group: id });
+      groups.set(id, cloneSparklineSettings(settings));
+      count += 1;
+    }
+    return { ...s, sparkline: withSparklineMembers({ sparklines, groups }, sparklines) };
+  });
+  return count;
+}
+
+/** Attach several sparklines as one new group with `settings` from the entry point `ctx`
+ *  names: one engine group and one undo step, an object change of the sheet and the location
+ *  cells. Any sheet protection refuses it, Edit objects included. */
 export function setSparklinesAction(
   ctx: ObjectActionContext,
-  entries: readonly SparklineEntry[],
+  entries: readonly SparklineInsert[],
+  settings: SparklineGroupSettings,
 ): boolean {
   const cells = entries.map(({ addr }) => addr);
   const first = cells[0];
@@ -58,7 +230,7 @@ export function setSparklinesAction(
     ctx,
     first.sheet,
     false,
-    () => writeSparklines(ctx.store, entries, ctx.history),
+    () => writeSparklines(ctx.store, entries, settings, ctx.history),
     [{ kind: 'cells', cells }],
   );
 }
@@ -67,28 +239,30 @@ export function setSparklinesAction(
  *  undo step. Nothing is written on a protected sheet. */
 export function setSparklines(
   store: SpreadsheetStore,
-  entries: readonly SparklineEntry[],
+  entries: readonly SparklineInsert[],
+  settings: SparklineGroupSettings,
   history: History | null = null,
 ): boolean {
   return setSparklinesAction(
     { store, history, origin: 'instanceApi', commandId: 'mac.insert.sparkline' },
     entries,
+    settings,
   );
 }
 
 const writeSparklines = (
   store: SpreadsheetStore,
-  entries: readonly SparklineEntry[],
+  entries: readonly SparklineInsert[],
+  settings: SparklineGroupSettings,
   history: History | null,
 ): boolean => {
   // Inserting or regrouping sparklines is refused under any protection, silently.
   if (entries.some(({ addr }) => isSheetProtected(store.getState(), addr.sheet))) return false;
-  // A lone sparkline is its own group; several created together share one.
-  const group = entries.length > 1 ? newSparklineGroupId() : undefined;
+  const group = newSparklineGroupId();
   recordSparklineChange(history, store, () => {
-    for (const { addr, spec } of entries) {
-      mutators.setSparkline(store, addr, group === undefined ? spec : { ...spec, group });
-    }
+    // Every cell leaves its previous group first, so a replaced member never lingers in it.
+    for (const { addr, source } of entries) mutators.setSparkline(store, addr, { source, group });
+    mutators.setSparklineGroup(store, group, settings);
   });
   return true;
 };
@@ -96,10 +270,11 @@ const writeSparklines = (
 export function setSparkline(
   store: SpreadsheetStore,
   addr: Addr,
-  spec: Sparkline,
+  source: string,
+  settings: SparklineGroupSettings,
   history: History | null = null,
 ): boolean {
-  return setSparklines(store, [{ addr, spec }], history);
+  return setSparklines(store, [{ addr, source }], settings, history);
 }
 
 export function clearSparkline(
@@ -131,7 +306,7 @@ export function clearSparklinesInRange(
  * Remove the sparklines of the cells in `range` from the entry point `ctx` names, as Clear All
  * does: a clear of those cells, so each cell's lock decides it (Edit objects does not) and a
  * locked cell keeps its sparkline. Only the cleared cells lose theirs; the rest of a group stays
- * one group. Returns how many were removed.
+ * one group, and a group left with no member is dropped. Returns how many were removed.
  */
 export function clearSparklinesAction(ctx: ObjectActionContext, range: Range): number {
   const { store, history } = ctx;

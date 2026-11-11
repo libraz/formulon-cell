@@ -20,7 +20,12 @@ import {
   recordFormatChange,
   recordTablesChange,
 } from './slice-history.js';
-import { clearSparklinesAction, setSparklinesAction } from './sparkline.js';
+import {
+  clearSparklinesAction,
+  defaultSparklineGroupSettings,
+  setSparklinesAction,
+  sparklineTypeOf,
+} from './sparkline.js';
 import { tableWrite } from './table-actions.js';
 
 /**
@@ -477,18 +482,15 @@ function addSparkline(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteRes
   const col = range.c1 + 1;
   if (col > MAX_COL) return { ok: false, reason: 'out-of-bounds' };
   const addr = { sheet: range.sheet, row: range.r0, col };
-  const spec = {
-    kind,
-    source: formatA1Range(range, { collapse: false }),
-    showNegative: kind !== 'line',
-  };
+  const insert = { addr, source: formatA1Range(range, { collapse: false }) };
   const ctx = {
     store,
     history: input.history ?? null,
     origin: 'editor',
     commandId: 'mac.insert.sparkline',
   } as const;
-  if (!setSparklinesAction(ctx, [{ addr, spec }])) return { ok: false, reason: 'protected' };
+  if (!setSparklinesAction(ctx, [insert], defaultSparklineGroupSettings(sparklineTypeOf(kind))))
+    return { ok: false, reason: 'protected' };
   return { ok: true, kind: 'sparkline', count: 1 };
 }
 

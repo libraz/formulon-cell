@@ -1,27 +1,10 @@
-import type { Color, ColorInput, SheetRect } from '@libraz/formulon';
-import { ColorKind, SparklineType } from '@libraz/formulon';
+import type { SheetRect } from '@libraz/formulon';
 import { newSparklineGroupId, splitSourceQualifier } from '../commands/sparkline.js';
-import { DEFAULT_NEGATIVE_COLOR, DEFAULT_SPARKLINE_COLOR } from '../render/painters/controls.js';
-import type { Sparkline, SparklineKind, SpreadsheetStore, State } from '../store/store.js';
+import { sameSparklineSettings, withSparklineMembers } from '../store/sparkline-slice.js';
+import type { Sparkline, SparklineGroupSettings, SpreadsheetStore, State } from '../store/store.js';
 import { addrKey, formatA1Cell, formatA1Range, parseAddrKey, quoteSheetName } from './address.js';
-import { argbFromCssColor, cssColorFromArgb } from './theme-color.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-import type {
-  EngineSparklineGroupPatch,
-  EngineSparklineInput,
-} from './workbook-handle-drawing-objects.js';
-
-const TYPE_OF_KIND: Record<SparklineKind, SparklineType> = {
-  line: SparklineType.Line,
-  column: SparklineType.Column,
-  'win-loss': SparklineType.Stacked,
-};
-
-const KIND_OF_TYPE: Record<SparklineType, SparklineKind> = {
-  [SparklineType.Line]: 'line',
-  [SparklineType.Column]: 'column',
-  [SparklineType.Stacked]: 'win-loss',
-};
+import type { EngineSparklineInput } from './workbook-handle-drawing-objects.js';
 
 /** Sheet-qualified source the engine stores. */
 const engineFormula = (source: string, hostSheet: string): string =>
@@ -41,28 +24,6 @@ const storeSource = (wb: WorkbookHandle, source: SheetRect, hostSheet: number): 
     : `${quoteSheetName(wb.sheetName(source.sheet))}!${range}`;
 };
 
-const colorSpecOf = (css: string): ColorInput =>
-  cssColorFromArgb(argbFromCssColor(css) ?? 0xff000000);
-
-/** CSS colour of an engine colour; undefined when it is absent. */
-const cssOfSpec = (wb: WorkbookHandle, spec: Color | null): string | undefined => {
-  if (spec === null || spec.kind === ColorKind.None) return undefined;
-  const argb = wb.resolveColorArgb(spec) ?? (spec.kind === ColorKind.Rgb ? spec.argb : null);
-  return argb === null ? undefined : cssColorFromArgb(argb);
-};
-
-/** `css` as an engine colour, keeping `base` while it still shows as `css`; with
- *  no `css`, `base` or else `fallback`. */
-const colorFor = (
-  wb: WorkbookHandle,
-  css: string | undefined,
-  base: Color | null | undefined,
-  fallback: string,
-): ColorInput => {
-  if (css === undefined) return base ?? colorSpecOf(fallback);
-  return base && cssOfSpec(wb, base) === css ? base : colorSpecOf(css);
-};
-
 /** Hydrate the sparkline groups of `sheet` (every sheet when omitted) into the
  *  store, replacing what the store held for them. */
 export function hydrateSparklinesFromEngine(
@@ -74,23 +35,18 @@ export function hydrateSparklinesFromEngine(
   const sheets = sheet === undefined ? [...Array(wb.sheetCount).keys()] : [sheet];
   const hydrate = (): void => {
     const loaded = new Map<string, Sparkline>();
+    const loadedGroups = new Map<string, SparklineGroupSettings>();
     for (const index of sheets) {
       for (const group of wb.listSparklineGroups(index)) {
-        const { sparklines, ...settings } = group;
+        const { sparklines, id: _engineId, ...settings } = group;
         const id = newSparklineGroupId();
-        const color = cssOfSpec(wb, group.colorSeries);
-        const negativeColor = cssOfSpec(wb, group.colorNegative);
+        loadedGroups.set(id, settings);
         for (const member of sparklines) {
           if (!member.source) continue;
           const { row, col } = member.location;
           loaded.set(addrKey({ sheet: index, row, col }), {
-            kind: KIND_OF_TYPE[group.type] ?? 'line',
             source: storeSource(wb, member.source, index),
-            ...(color ? { color } : {}),
-            showNegative: group.negative,
-            ...(negativeColor ? { negativeColor } : {}),
             group: id,
-            nativeGroup: settings,
           });
         }
       }
@@ -103,7 +59,8 @@ export function hydrateSparklinesFromEngine(
         }),
       );
       for (const [key, spec] of loaded) sparklines.set(key, spec);
-      return { ...state, sparkline: { sparklines } };
+      const groups = new Map([...state.sparkline.groups, ...loadedGroups]);
+      return { ...state, sparkline: withSparklineMembers({ sparklines, groups }, sparklines) };
     });
   };
   if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
@@ -114,23 +71,31 @@ interface Member {
   sheet: number;
   row: number;
   col: number;
-  spec: Sparkline;
+  source: string;
 }
 
-/** Sparklines of one sheet by group: the sparklines created together, or a
- *  cell on its own. */
-const groupsOf = (map: ReadonlyMap<string, Sparkline>): Map<string, Member[]> => {
-  const groups = new Map<string, Member[]>();
-  for (const [key, spec] of map) {
+interface Group {
+  id: string;
+  sheet: number;
+  members: Member[];
+  settings: SparklineGroupSettings;
+}
+
+/** The slice's groups with their members in row-major order; a member whose group has no
+ *  settings is left out. */
+const groupsOf = (slice: State['sparkline']): Map<string, Group> => {
+  const groups = new Map<string, Group>();
+  for (const [key, spec] of slice.sparklines) {
     const at = parseAddrKey(key);
-    if (!at) continue;
-    const id = `${at.sheet}|${spec.group ?? `cell:${key}`}`;
-    const members = groups.get(id);
-    if (members) members.push({ ...at, spec });
-    else groups.set(id, [{ ...at, spec }]);
+    const settings = slice.groups.get(spec.group);
+    if (!at || !settings) continue;
+    const member = { ...at, source: spec.source };
+    const group = groups.get(spec.group);
+    if (group) group.members.push(member);
+    else groups.set(spec.group, { id: spec.group, sheet: at.sheet, members: [member], settings });
   }
-  for (const members of groups.values()) {
-    members.sort((a, b) => a.row - b.row || a.col - b.col);
+  for (const group of groups.values()) {
+    group.members.sort((a, b) => a.row - b.row || a.col - b.col);
   }
   return groups;
 };
@@ -142,22 +107,12 @@ const sameMembers = (a: readonly Member[], b: readonly Member[]): boolean =>
   a.length === b.length &&
   a.every(
     (member, i) =>
-      member.row === b[i]?.row &&
-      member.col === b[i]?.col &&
-      member.spec.source === b[i]?.spec.source,
+      member.row === b[i]?.row && member.col === b[i]?.col && member.source === b[i]?.source,
   );
 
-const styleOf = (members: readonly Member[]): Sparkline => members[0]?.spec as Sparkline;
-
-const sameStyle = (a: Sparkline, b: Sparkline): boolean =>
-  a.kind === b.kind &&
-  a.color === b.color &&
-  !!a.showNegative === !!b.showNegative &&
-  a.negativeColor === b.negativeColor;
-
-/** Overlay sparklines mirrored into the engine's sparkline groups. A group is
- *  the sparklines that share a `group` id; the engine position of a group is
- *  found again by its cells for every write, as a removal shifts it. */
+/** Overlay sparklines mirrored into the engine's sparkline groups. A group is a store group
+ *  id with its settings; the engine group of one is found again by its cells for every
+ *  write, as a removal shifts positions. */
 export class SparklineMirror {
   constructor(private readonly handle: WorkbookHandle) {}
 
@@ -171,69 +126,66 @@ export class SparklineMirror {
   sync(store: SpreadsheetStore): void {
     const slice = store.getState().sparkline;
     if (slice === this.last) return;
-    const previous = this.last?.sparklines ?? new Map<string, Sparkline>();
+    const previous = this.last;
     this.last = slice;
     const wb = this.handle;
     if (!wb.capabilities.sparklines) return;
-    const before = groupsOf(previous);
-    const after = groupsOf(slice.sparklines);
+    const before = previous ? groupsOf(previous) : new Map<string, Group>();
+    const after = groupsOf(slice);
     const rejected: string[] = [];
     const refused = new Set<number>();
-    // Style a group's members take on, by cell.
-    const restyled = new Map<string, Partial<Sparkline>>();
-    const unify = (members: readonly Member[], style: Sparkline): void => {
-      for (const member of members) {
-        if (sameStyle(member.spec, style)) continue;
-        restyled.set(addrKey(member), {
-          kind: style.kind,
-          color: style.color,
-          showNegative: style.showNegative,
-          negativeColor: style.negativeColor,
-        });
-      }
-    };
-    for (const [id, members] of before) {
-      if (after.has(id)) continue;
-      const index = this.indexOf(members);
-      if (index >= 0) wb.removeSparklineGroup(members[0]?.sheet as number, index);
+    // Engine ids are read up front: a write shifts positions, an id stays.
+    const engineIds = new Map<string, string>();
+    for (const [id, group] of before) {
+      const engineId = this.engineIdOf(group);
+      if (engineId !== undefined) engineIds.set(id, engineId);
     }
-    const additions: Member[][] = [];
-    for (const [id, members] of after) {
+    for (const [id, group] of before) {
+      const engineId = engineIds.get(id);
+      if (engineId === undefined || after.has(id)) continue;
+      const index = this.indexOfId(group.sheet, engineId);
+      if (index >= 0) wb.removeSparklineGroup(group.sheet, index);
+    }
+    const additions: Group[] = [];
+    const updates: { group: Group; old: Group; engineId: string }[] = [];
+    for (const [id, group] of after) {
       const old = before.get(id);
-      const index = old ? this.indexOf(old) : -1;
-      if (!old || index < 0) {
-        additions.push(members);
+      const engineId = engineIds.get(id);
+      if (!old || engineId === undefined) additions.push(group);
+      else updates.push({ group, old, engineId });
+    }
+    // Shrinking groups first, so a cell never sits in two engine groups at once.
+    updates.sort(
+      (a, b) =>
+        a.group.members.length -
+        a.old.members.length -
+        (b.group.members.length - b.old.members.length),
+    );
+    for (const { group, old, engineId } of updates) {
+      const index = this.indexOfId(group.sheet, engineId);
+      if (index < 0) continue;
+      if (!sameMembers(old.members, group.members) && !this.setMembers(group, index)) {
+        refused.add(group.sheet);
         continue;
       }
-      const sheet = members[0]?.sheet as number;
-      if (!sameMembers(old, members) && !this.setMembers(sheet, index, members)) {
-        refused.add(sheet);
-        continue;
+      if (!sameSparklineSettings(old.settings, group.settings)) {
+        if (!wb.updateSparklineGroup(group.sheet, index, group.settings)) {
+          refused.add(group.sheet);
+        }
       }
-      // A style is the group's: the member that changed sets it for the rest.
-      const was = styleOf(old);
-      const changed = members.find((member) => {
-        const prior = previous.get(addrKey(member));
-        return prior !== undefined && !sameStyle(prior, member.spec);
-      });
-      const now = changed?.spec ?? was;
-      if (!sameStyle(was, now)) this.restyle(sheet, index, was, now);
-      unify(members, now);
     }
-    for (const members of additions) {
-      if (this.add(members)) unify(members, styleOf(members));
-      else rejected.push(...members.map((m) => addrKey(m)));
+    for (const group of additions) {
+      if (!this.add(group)) rejected.push(...group.members.map((m) => addrKey(m)));
     }
-    if (rejected.length > 0 || restyled.size > 0) {
-      // Drop what the engine refused and show every member in its group's style.
+    if (rejected.length > 0) {
+      // Drop what the engine refused.
       store.setState((state) => {
         const sparklines = new Map(state.sparkline.sparklines);
         for (const key of rejected) sparklines.delete(key);
-        for (const [key, patch] of restyled) {
-          const spec = sparklines.get(key);
-          if (spec) sparklines.set(key, { ...spec, ...patch });
-        }
-        const next = { ...state, sparkline: { sparklines } };
+        const next = {
+          ...state,
+          sparkline: withSparklineMembers(state.sparkline, sparklines),
+        };
         this.last = next.sparkline;
         return next;
       });
@@ -242,66 +194,38 @@ export class SparklineMirror {
     for (const sheet of refused) hydrateSparklinesFromEngine(wb, store, sheet);
   }
 
-  /** Engine index of the group holding any of `members` on their sheet; -1 if none. */
-  private indexOf(members: readonly Member[]): number {
-    const sheet = members[0]?.sheet;
-    if (sheet === undefined) return -1;
-    const cells = new Set(members.map(locationOf));
+  /** Id of the engine group holding any of `group`'s cells; undefined if none. */
+  private engineIdOf(group: Group): string | undefined {
+    const cells = new Set(group.members.map(locationOf));
     return this.handle
-      .listSparklineGroups(sheet)
-      .findIndex((group) =>
-        group.sparklines.some((sparkline) =>
+      .listSparklineGroups(group.sheet)
+      .find((candidate) =>
+        candidate.sparklines.some((sparkline) =>
           cells.has(formatA1Cell(sparkline.location.row, sparkline.location.col)),
         ),
-      );
+      )?.id;
   }
 
-  private engineMembers(members: readonly Member[]): EngineSparklineInput[] {
-    const hostSheet = this.handle.sheetName(members[0]?.sheet as number);
-    return members.map((member) => ({
-      source: engineFormula(member.spec.source, hostSheet),
+  private indexOfId(sheet: number, engineId: string): number {
+    return this.handle.listSparklineGroups(sheet).findIndex((group) => group.id === engineId);
+  }
+
+  private engineMembers(group: Group): EngineSparklineInput[] {
+    const hostSheet = this.handle.sheetName(group.sheet);
+    return group.members.map((member) => ({
+      source: engineFormula(member.source, hostSheet),
       location: locationOf(member),
     }));
   }
 
-  private setMembers(sheet: number, index: number, members: readonly Member[]): boolean {
-    return this.handle.setSparklineGroupSparklines(sheet, index, this.engineMembers(members));
+  private setMembers(group: Group, index: number): boolean {
+    return this.handle.setSparklineGroupSparklines(group.sheet, index, this.engineMembers(group));
   }
 
-  /** Apply the style change from `from` to `to` on group `index`; the group's other settings stay. */
-  private restyle(sheet: number, index: number, from: Sparkline, to: Sparkline): void {
-    this.handle.updateSparklineGroup(sheet, index, this.styleChange(from, to));
-  }
-
-  /** The group fields that `to` changes from `from`. */
-  private styleChange(from: Sparkline, to: Sparkline): EngineSparklineGroupPatch {
-    const change: {
-      -readonly [K in keyof EngineSparklineGroupPatch]: EngineSparklineGroupPatch[K];
-    } = {};
-    if (from.kind !== to.kind) change.type = TYPE_OF_KIND[to.kind];
-    if (from.color !== to.color) {
-      change.colorSeries = colorSpecOf(to.color ?? DEFAULT_SPARKLINE_COLOR);
-    }
-    if (!!from.showNegative !== !!to.showNegative) change.negative = !!to.showNegative;
-    if (from.negativeColor !== to.negativeColor) {
-      change.colorNegative = colorSpecOf(to.negativeColor ?? DEFAULT_NEGATIVE_COLOR);
-    }
-    return change;
-  }
-
-  private add(members: readonly Member[]): boolean {
-    const wb = this.handle;
-    const style = styleOf(members);
-    // The id is the read-back group's own; a new group gets one of its own.
-    const { id: _id, ...base }: Partial<NonNullable<Sparkline['nativeGroup']>> =
-      style.nativeGroup ?? {};
-    return wb.addSparklineGroup(members[0]?.sheet as number, {
-      ...base,
-      type: TYPE_OF_KIND[style.kind],
-      colorSeries: colorFor(wb, style.color, base.colorSeries, DEFAULT_SPARKLINE_COLOR),
-      colorNegative: colorFor(wb, style.negativeColor, base.colorNegative, DEFAULT_NEGATIVE_COLOR),
-      negative: !!style.showNegative,
-      sparklines: this.engineMembers(members),
+  private add(group: Group): boolean {
+    return this.handle.addSparklineGroup(group.sheet, {
+      ...group.settings,
+      sparklines: this.engineMembers(group),
     });
   }
 }

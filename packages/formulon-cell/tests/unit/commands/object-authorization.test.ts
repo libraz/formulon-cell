@@ -1,3 +1,4 @@
+import { SparklineType } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
 import { canExecuteBuiltIn } from '../../../src/commands/built-in-command-policy.js';
 import { History } from '../../../src/commands/history.js';
@@ -13,7 +14,11 @@ import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { createSessionChart } from '../../../src/commands/session-chart.js';
 import { createSessionShape } from '../../../src/commands/session-illustration.js';
 import { setSlicerSelectionAction } from '../../../src/commands/slicers.js';
-import { setSparklinesAction, sparklineAt } from '../../../src/commands/sparkline.js';
+import {
+  defaultSparklineGroupSettings,
+  setSparklinesAction,
+  sparklineAt,
+} from '../../../src/commands/sparkline.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -118,9 +123,13 @@ describe('drawing-object writes under the interaction policy', () => {
     });
     const addr = { sheet: 0, row: 1, col: 3 };
     const ctx = { store, history, origin: 'ribbon', commandId: 'mac.insert.sparkline' } as const;
-    expect(setSparklinesAction(ctx, [{ addr, spec: { kind: 'line', source: 'B2:B4' } }])).toBe(
-      true,
-    );
+    expect(
+      setSparklinesAction(
+        ctx,
+        [{ addr, source: 'B2:B4' }],
+        defaultSparklineGroupSettings(SparklineType.Line),
+      ),
+    ).toBe(true);
     expect(sparklineAt(store.getState(), addr)).not.toBeNull();
     expect(seen.find((intent) => intent.origin === 'ribbon')?.effects).toEqual([
       { kind: 'sheet', sheet: 0 },

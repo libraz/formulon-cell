@@ -396,32 +396,28 @@ export interface ConditionalSlice {
   rules: ConditionalRule[];
 }
 
-/** Inline mini-chart attached to a single cell. The renderer paints `kind`
- *  inside the cell rect using the resolved numeric series at `source`. */
+/** UI-level sparkline type; maps onto the engine `SparklineType`. */
 export type SparklineKind = 'line' | 'column' | 'win-loss';
 
+/** One sparkline: the host cell's data range and the group that styles it. */
 export interface Sparkline {
-  kind: SparklineKind;
   /** A1-style range, e.g. `B2:B12` or `Sheet2!B2:B12`. */
   source: string;
-  /** Stroke for line, fill for column. CSS color. Default: `#0078d4`. */
-  color?: string;
-  /** When true, paint negatives in `negativeColor` (column / win-loss). */
-  showNegative?: boolean;
-  negativeColor?: string;
-  /** Sparklines created by one action share a group, which is one engine group. */
-  group?: string;
-  /** Engine group settings the overlay does not model (markers, axes, date
-   *  axis, line weight, ...), carried so an update does not reset them. */
-  nativeGroup?: SparklineGroupSettings;
+  /** Id of the group in `SparklineSlice.groups`. */
+  group: string;
 }
 
-/** An engine sparkline group without its members. */
-export type SparklineGroupSettings = Omit<import('@libraz/formulon').SparklineGroup, 'sparklines'>;
+/** An engine sparkline group's settings: everything but its members and id. */
+export type SparklineGroupSettings = Omit<
+  import('@libraz/formulon').SparklineGroup,
+  'sparklines' | 'id'
+>;
 
 export interface SparklineSlice {
   /** Per-host-cell sparkline keyed by `addrKey`. */
   sparklines: Map<string, Sparkline>;
+  /** Settings of each group, keyed by group id. */
+  groups: Map<string, SparklineGroupSettings>;
 }
 
 /** @deprecated Use `ChartKind` from `@libraz/formulon-cell/charts` instead. */

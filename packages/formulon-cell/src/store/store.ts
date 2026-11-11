@@ -93,7 +93,7 @@ export const createSpreadsheetStore = () =>
     format: { formats: new Map(), customCellStyles: [] },
     merges: { byAnchor: new Map(), byCell: new Map() },
     conditional: { rules: [] },
-    sparkline: { sparklines: new Map() },
+    sparkline: { sparklines: new Map(), groups: new Map() },
     charts: { charts: [] },
     illustrations: { illustrations: [] },
     threadedComments: { bySheet: new Map(), persons: [] },

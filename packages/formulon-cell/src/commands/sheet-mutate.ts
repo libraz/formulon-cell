@@ -8,6 +8,7 @@ import {
   remapStoreSheetStateForStructureEvent,
 } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { withSparklineMembers } from '../store/sparkline-slice.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import type { OutlineSummary } from '../store/types.js';
 import type { History } from './history.js';
@@ -251,7 +252,9 @@ export function renameSheet(
             beforeName,
             name,
           );
-          return sparklines ? { ...s, sparkline: { sparklines } } : s;
+          return sparklines
+            ? { ...s, sparkline: withSparklineMembers(s.sparkline, sparklines) }
+            : s;
         });
       });
     }

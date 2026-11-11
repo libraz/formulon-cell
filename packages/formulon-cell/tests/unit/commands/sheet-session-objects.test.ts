@@ -1,7 +1,8 @@
+import { SparklineType } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { moveSheet, removeSheet, renameSheet } from '../../../src/commands/sheet-mutate.js';
-import { setSparkline } from '../../../src/commands/sparkline.js';
+import { defaultSparklineGroupSettings, setSparkline } from '../../../src/commands/sparkline.js';
 import { deleteRows, insertCols, insertRows } from '../../../src/commands/structure.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -10,6 +11,9 @@ import {
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 import { newWb } from './structure/fixtures.js';
+
+const LINE = defaultSparklineGroupSettings(SparklineType.Line);
+const COLUMN = defaultSparklineGroupSettings(SparklineType.Column);
 
 interface TableDef {
   name: string;
@@ -98,8 +102,8 @@ describe('session objects across sheet moves and removals', () => {
   it('moves sparkline hosts, watches, traces and ignored-error marks with their sheet', () => {
     const store = createSpreadsheetStore();
     const { wb } = makeWb();
-    setSparkline(store, { sheet: 0, row: 1, col: 1 }, { kind: 'line', source: 'A1:A5' });
-    setSparkline(store, { sheet: 1, row: 2, col: 2 }, { kind: 'line', source: 'B1:B5' });
+    setSparkline(store, { sheet: 0, row: 1, col: 1 }, 'A1:A5', LINE);
+    setSparkline(store, { sheet: 1, row: 2, col: 2 }, 'B1:B5', LINE);
     mutators.addWatch(store, { sheet: 0, row: 0, col: 0 });
     store.setState((s) => ({
       ...s,
@@ -161,9 +165,9 @@ describe('sparklines across renames and row/column edits', () => {
     const store = createSpreadsheetStore();
     const history = new History();
     const { wb } = makeWb();
-    setSparkline(store, { sheet: 0, row: 0, col: 0 }, { kind: 'line', source: 'Beta!B2:B9' });
-    setSparkline(store, { sheet: 0, row: 1, col: 0 }, { kind: 'line', source: 'B2:B9' });
-    setSparkline(store, { sheet: 0, row: 2, col: 0 }, { kind: 'line', source: "'Beta'!C2:C9" });
+    setSparkline(store, { sheet: 0, row: 0, col: 0 }, 'Beta!B2:B9', LINE);
+    setSparkline(store, { sheet: 0, row: 1, col: 0 }, 'B2:B9', LINE);
+    setSparkline(store, { sheet: 0, row: 2, col: 0 }, "'Beta'!C2:C9", LINE);
 
     expect(renameSheet(wb, 1, 'Q3 Sales', store, history)).toBe(true);
     const sources = () =>
@@ -179,8 +183,8 @@ describe('sparklines across renames and row/column edits', () => {
   it('moves hosts and re-points sources for a row insert and delete', async () => {
     const store = createSpreadsheetStore();
     const wb = await newWb();
-    setSparkline(store, { sheet: 0, row: 4, col: 5 }, { kind: 'column', source: 'A2:C2' });
-    setSparkline(store, { sheet: 0, row: 8, col: 5 }, { kind: 'line', source: 'A6:A9' });
+    setSparkline(store, { sheet: 0, row: 4, col: 5 }, 'A2:C2', COLUMN);
+    setSparkline(store, { sheet: 0, row: 8, col: 5 }, 'A6:A9', LINE);
 
     expect(insertRows(store, wb, null, 3, 2)).toBe(true);
     let s = store.getState().sparkline.sparklines;
@@ -197,8 +201,8 @@ describe('sparklines across renames and row/column edits', () => {
     const store = createSpreadsheetStore();
     const wb = await newWb();
     const history = new History();
-    setSparkline(store, { sheet: 0, row: 0, col: 4 }, { kind: 'line', source: 'B2:D2' });
-    setSparkline(store, { sheet: 0, row: 1, col: 2 }, { kind: 'line', source: 'Sheet1!B2:B9' });
+    setSparkline(store, { sheet: 0, row: 0, col: 4 }, 'B2:D2', LINE);
+    setSparkline(store, { sheet: 0, row: 1, col: 2 }, 'Sheet1!B2:B9', LINE);
 
     expect(insertCols(store, wb, history, 2, 1)).toBe(true);
     const s = store.getState().sparkline.sparklines;

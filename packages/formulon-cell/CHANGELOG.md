@@ -82,6 +82,7 @@ versioning is [SemVer](https://semver.org/).
 - New Table Style, New PivotTable Style, Modify and Duplicate open the desktop style dialog: a name, the table or PivotTable style elements with Format (the differential Format Cells) and Clear for each, the stripe size, a preview, and Set as default. The Mac host uses the Mac titles and labels, without the PivotTable default checkbox.
 - PivotTable Design > Quick Styles lists custom PivotTable styles first and opens the full PivotTable style gallery, with New PivotTable Style and, while a PivotTable is active, Clear. Its styles have the same context menu as table styles, and `pivotQuickStyles` joins the command ids. Custom PivotTable styles no longer appear in Format as Table. Modifying a custom style renames it for every kind it is flagged for, and its tables and PivotTables follow.
 - Table Design has a Tools group: Summarize with PivotTable opens Create PivotTable with the table as its source, Remove Duplicates, Convert to Range, and Insert Slicer. Insert Slicer also works on PivotTable Analyze, and the Mac table tab's Summarize with PivotTable is no longer greyed out. Convert to Range stays greyed out until the engine can convert a table. `tableInsertSlicer` joins the command ids.
+- Sparklines draw every group setting from the file: markers, high, low, first, last and negative point colours, the axis, individual, shared or custom vertical bounds, line weight, empty cells as gaps, zero or connected, hidden data, and the date axis.
 
 ### Removed
 

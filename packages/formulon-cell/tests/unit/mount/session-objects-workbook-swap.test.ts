@@ -1,7 +1,11 @@
+import { SparklineType } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
+import { defaultSparklineGroupSettings, setSparkline } from '../../../src/commands/sparkline.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { mutators } from '../../../src/store/store.js';
 import { mountStubSheet } from '../../test-utils/mount.js';
+
+const LINE = defaultSparklineGroupSettings(SparklineType.Line);
 
 describe('session objects across workbook replacement', () => {
   it('drops sparklines, slicers, watches, traces and error marks of the old workbook', async () => {
@@ -10,7 +14,7 @@ describe('session objects across workbook replacement', () => {
     const sheet = await mountStubSheet({ workbook: original });
     try {
       const { store } = sheet.instance;
-      mutators.setSparkline(store, { sheet: 0, row: 0, col: 3 }, { kind: 'line', source: 'A1:C1' });
+      setSparkline(store, { sheet: 0, row: 0, col: 3 }, 'A1:C1', LINE);
       mutators.addSlicer(store, { id: 's', tableName: 'T', column: 'X', selected: ['a'] });
       mutators.addWatch(store, { sheet: 0, row: 1, col: 1 });
       store.setState((s) => ({

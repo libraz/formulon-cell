@@ -72,7 +72,7 @@ import {
   TABLE_HEADER_TEXT_RESERVE,
 } from '../painters.js';
 import { rowBaselineFonts } from '../row-baseline.js';
-import { paintCellSparkline } from '../sparkline.js';
+import { createSparklineGroupExtents, paintCellSparkline } from '../sparkline.js';
 import {
   cellTextWidth,
   paintedFontSize,
@@ -203,6 +203,7 @@ export function paintCells(
     evaluateConditional(state, wb, cellCtx.locale, visibleBounds, cellCtx.conditionalCache),
   );
   const sparklines = sparkline.sparklines;
+  const sparklineExtents = createSparklineGroupExtents(state, wb);
   const ignored = errorIndicators.ignoredErrors;
   const validationCircles = errorIndicators.validationCircles;
   // Lock-icon overlay only fires when the active sheet is currently
@@ -790,7 +791,7 @@ export function paintCells(
           cellCtx.dpr ?? 1,
         );
       }
-      if (spark) paintCellSparkline(ctx, bounds, spark, state, cellCtx.wb);
+      if (spark) paintCellSparkline(ctx, bounds, spark, state, cellCtx.wb, sparklineExtents, ptPx);
       if (fmt?.comment || hasThreadedComment) paintCommentMarker(ctx, bounds, rtl);
       if (hasValidationCircle) paintValidationCircle(ctx, bounds, VALIDATION_TRIANGLE_COLOR);
       // Lock-icon overlay — only when the sheet is protected AND the cell

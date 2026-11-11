@@ -1,3 +1,4 @@
+import { SparklineType } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { autoSum } from '../../src/commands/auto-sum.js';
@@ -10,12 +11,16 @@ import {
 import {
   clearSparkline,
   clearSparklinesInRange,
+  defaultSparklineGroupSettings,
   listSparklines,
   setSparkline,
   sparklineAt,
 } from '../../src/commands/sparkline.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
+
+const LINE = defaultSparklineGroupSettings(SparklineType.Line);
+const COLUMN = defaultSparklineGroupSettings(SparklineType.Column);
 
 /**
  * Integration: a handful of commands that have solid unit coverage but no
@@ -180,15 +185,15 @@ describe('integration: sparkline lifecycle against the mounted store', () => {
 
   it('setSparkline persists in store.sparkline and is readable by addr', () => {
     const { instance } = sheet;
-    setSparkline(instance.store, { sheet: 0, row: 5, col: 2 }, { kind: 'line', source: 'A1:E1' });
+    setSparkline(instance.store, { sheet: 0, row: 5, col: 2 }, 'A1:E1', LINE);
     const at = sparklineAt(instance.store.getState(), { sheet: 0, row: 5, col: 2 });
-    expect(at).toEqual({ kind: 'line', source: 'A1:E1' });
+    expect(at?.source).toBe('A1:E1');
   });
 
   it('listSparklines returns entries sorted by sheet/row/col', () => {
     const { instance } = sheet;
-    setSparkline(instance.store, { sheet: 0, row: 1, col: 1 }, { kind: 'column', source: 'A1:C1' });
-    setSparkline(instance.store, { sheet: 0, row: 0, col: 5 }, { kind: 'line', source: 'A1:C1' });
+    setSparkline(instance.store, { sheet: 0, row: 1, col: 1 }, 'A1:C1', COLUMN);
+    setSparkline(instance.store, { sheet: 0, row: 0, col: 5 }, 'A1:C1', LINE);
     const all = listSparklines(instance.store.getState());
     expect(all.map((e) => `${e.addr.row}:${e.addr.col}`)).toEqual(['0:5', '1:1']);
   });
@@ -196,7 +201,7 @@ describe('integration: sparkline lifecycle against the mounted store', () => {
   it('clearSparkline removes a single entry; clearSparklinesInRange clears overlap', () => {
     const { instance } = sheet;
     for (let c = 0; c < 3; c += 1) {
-      setSparkline(instance.store, { sheet: 0, row: 0, col: c }, { kind: 'line', source: 'A2:E2' });
+      setSparkline(instance.store, { sheet: 0, row: 0, col: c }, 'A2:E2', LINE);
     }
     clearSparkline(instance.store, { sheet: 0, row: 0, col: 1 });
     expect(listSparklines(instance.store.getState()).map((e) => e.addr.col)).toEqual([0, 2]);

@@ -1209,7 +1209,7 @@ export const Spreadsheet = {
           // Overlays name the previous workbook's tables.
           tables: { ...state.tables, tables: [] },
           // Session objects point into the previous workbook's cells and tables.
-          sparkline: { sparklines: new Map() },
+          sparkline: { sparklines: new Map(), groups: new Map() },
           slicers: { slicers: [] },
           watch: { watches: [] },
           traces: { items: [] },

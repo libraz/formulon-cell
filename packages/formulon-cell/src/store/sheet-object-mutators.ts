@@ -9,6 +9,7 @@ import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { frozenColEnd, frozenRowEnd } from './freeze-band.js';
 import { rangesIntersect } from './selection-geometry.js';
+import { cloneSparklineSettings, withSparklineMembers } from './sparkline-slice.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
   ConditionalRule,
@@ -16,6 +17,7 @@ import type {
   SessionIllustration,
   SlicerSpec,
   Sparkline,
+  SparklineGroupSettings,
   TablesSlice,
 } from './types.js';
 
@@ -69,7 +71,8 @@ export const sheetObjectMutators = {
     });
   },
 
-  /** Attach a sparkline spec to `addr`. Pass `null` to remove. */
+  /** Attach a sparkline member to `addr`. Pass `null` to remove. A group left with no
+   *  member is dropped. */
   setSparkline(store: SpreadsheetStore, addr: Addr, spec: Sparkline | null): void {
     store.setState((s) => {
       const key = addrKey(addr);
@@ -77,7 +80,27 @@ export const sheetObjectMutators = {
       const sparklines = new Map(s.sparkline.sparklines);
       if (spec === null) sparklines.delete(key);
       else sparklines.set(key, { ...spec });
-      return { ...s, sparkline: { sparklines } };
+      return { ...s, sparkline: withSparklineMembers(s.sparkline, sparklines) };
+    });
+  },
+
+  /** Set the settings of group `id`; `null` removes the group and its members. */
+  setSparklineGroup(
+    store: SpreadsheetStore,
+    id: string,
+    settings: SparklineGroupSettings | null,
+  ): void {
+    store.setState((s) => {
+      if (settings === null) {
+        if (!s.sparkline.groups.has(id)) return s;
+        const sparklines = new Map(
+          [...s.sparkline.sparklines].filter(([, member]) => member.group !== id),
+        );
+        return { ...s, sparkline: withSparklineMembers(s.sparkline, sparklines) };
+      }
+      const groups = new Map(s.sparkline.groups);
+      groups.set(id, cloneSparklineSettings(settings));
+      return { ...s, sparkline: { ...s.sparkline, groups } };
     });
   },
 
@@ -87,7 +110,7 @@ export const sheetObjectMutators = {
       if (!s.sparkline.sparklines.has(key)) return s;
       const sparklines = new Map(s.sparkline.sparklines);
       sparklines.delete(key);
-      return { ...s, sparkline: { sparklines } };
+      return { ...s, sparkline: withSparklineMembers(s.sparkline, sparklines) };
     });
   },
 
@@ -98,7 +121,7 @@ export const sheetObjectMutators = {
         if (keyInRange(key, range)) sparklines.delete(key);
       }
       if (sparklines.size === s.sparkline.sparklines.size) return s;
-      return { ...s, sparkline: { sparklines } };
+      return { ...s, sparkline: withSparklineMembers(s.sparkline, sparklines) };
     });
   },
 

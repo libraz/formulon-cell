@@ -1,3 +1,4 @@
+import { SparklineType } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
 import { canExecuteBuiltIn } from '../../../src/commands/built-in-command-policy.js';
 import { History } from '../../../src/commands/history.js';
@@ -8,7 +9,11 @@ import {
 import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import { executeRibbonClearAction } from '../../../src/commands/ribbon-clear.js';
 import { removeSlicerAction } from '../../../src/commands/slicers.js';
-import { setSparklines, sparklineAt } from '../../../src/commands/sparkline.js';
+import {
+  defaultSparklineGroupSettings,
+  setSparklines,
+  sparklineAt,
+} from '../../../src/commands/sparkline.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -37,7 +42,8 @@ describe('object protection rules', () => {
     expect(
       setSparklines(
         store,
-        [0, 1, 2].map((row) => ({ addr: G(row), spec: { kind: 'line', source: 'A1:A4' } })),
+        [0, 1, 2].map((row) => ({ addr: G(row), source: 'A1:A4' })),
+        defaultSparklineGroupSettings(SparklineType.Line),
         history,
       ),
     ).toBe(true);

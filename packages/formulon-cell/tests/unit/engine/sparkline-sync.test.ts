@@ -1,12 +1,18 @@
-import { SparklineType } from '@libraz/formulon';
+import { BlanksAs, SparklineAxisType, SparklineType } from '@libraz/formulon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
   clearSparkline,
+  defaultSparklineGroupSettings,
+  groupOfCell,
+  groupSparklines,
   listSparklines,
+  rgbColorSpec,
   setSparkline,
   setSparklines,
   sparklineAt,
+  ungroupSparklines,
+  updateSparklineGroup,
 } from '../../../src/commands/sparkline.js';
 import { deleteRows, insertCols, insertRows } from '../../../src/commands/structure.js';
 import { formatA1Cell, formatA1Range } from '../../../src/engine/address.js';
@@ -14,7 +20,8 @@ import { hydrateSparklinesFromEngine } from '../../../src/engine/sparkline-sync.
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
-  type Sparkline,
+  mutators,
+  type SparklineGroupSettings,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
@@ -61,12 +68,21 @@ const groups = (wb: WorkbookHandle) =>
       location: formatA1Cell(member.location.row, member.location.col),
     })),
   }));
-const line: Sparkline = { kind: 'line', source: 'B2:B5', color: '#cc3300' };
+const lineSettings = {
+  ...defaultSparklineGroupSettings(SparklineType.Line),
+  colorSeries: rgbColorSpec('#cc3300'),
+};
+const SOURCE = 'B2:B5';
+const rgbOf = (color: { argb: number } | null | undefined): number => (color?.argb ?? 0) & 0xffffff;
 
 describe('sparklines saved with the workbook', () => {
   it('writes a sparkline as a group and hydrates it from the saved file', async () => {
     const { wb, store } = await session();
-    setSparkline(store, at(1, 4), { ...line, showNegative: true, negativeColor: '#112233' });
+    setSparkline(store, at(1, 4), SOURCE, {
+      ...lineSettings,
+      negative: true,
+      colorNegative: rgbColorSpec('#112233'),
+    });
 
     expect(groups(wb)).toHaveLength(1);
     expect(groups(wb)[0]).toMatchObject({
@@ -74,40 +90,44 @@ describe('sparklines saved with the workbook', () => {
       negative: true,
       sparklines: [{ formula: 'Sheet1!B2:B5', location: 'E2' }],
     });
-    expect((groups(wb)[0]?.colorSeries?.argb ?? 0) & 0xffffff).toBe(0xcc3300);
+    expect(rgbOf(groups(wb)[0]?.colorSeries)).toBe(0xcc3300);
 
     const reopened = await saved(wb);
-    expect(sparklineAt(reopened.store.getState(), at(1, 4))).toMatchObject({
-      kind: 'line',
-      source: 'B2:B5',
-      color: '#cc3300',
-      showNegative: true,
-      negativeColor: '#112233',
-    });
+    const state = reopened.store.getState();
+    expect(sparklineAt(state, at(1, 4))).toMatchObject({ source: SOURCE });
+    const settings = groupOfCell(state, at(1, 4))?.settings;
+    expect(settings).toMatchObject({ type: SparklineType.Line, negative: true });
+    expect(rgbOf(settings?.colorSeries)).toBe(0xcc3300);
+    expect(rgbOf(settings?.colorNegative)).toBe(0x112233);
   });
 
   it('maps column and win-loss to engine group types', async () => {
     const { wb, store } = await session();
-    setSparkline(store, at(1, 4), { kind: 'column', source: 'B2:B5', showNegative: true });
-    setSparkline(store, at(2, 4), { kind: 'win-loss', source: 'C2:C5', showNegative: true });
+    setSparkline(store, at(1, 4), SOURCE, defaultSparklineGroupSettings(SparklineType.Column));
+    setSparkline(store, at(2, 4), 'C2:C5', defaultSparklineGroupSettings(SparklineType.Stacked));
 
     expect(groups(wb).map((group) => group.type)).toEqual([
       SparklineType.Column,
       SparklineType.Stacked,
     ]);
     const reopened = await saved(wb);
-    expect(listSparklines(reopened.store.getState()).map((entry) => entry.spec.kind)).toEqual([
-      'column',
-      'win-loss',
-    ]);
+    expect(
+      listSparklines(reopened.store.getState()).map(
+        (entry) => groupOfCell(reopened.store.getState(), entry.addr)?.settings.type,
+      ),
+    ).toEqual([SparklineType.Column, SparklineType.Stacked]);
   });
 
   it('keeps sparklines created together in one group', async () => {
     const { wb, store } = await session();
-    setSparklines(store, [
-      { addr: at(1, 4), spec: line },
-      { addr: at(2, 4), spec: { ...line, source: 'C2:C5' } },
-    ]);
+    setSparklines(
+      store,
+      [
+        { addr: at(1, 4), source: SOURCE },
+        { addr: at(2, 4), source: 'C2:C5' },
+      ],
+      lineSettings,
+    );
 
     expect(groups(wb)).toHaveLength(1);
     expect(groups(wb)[0]?.sparklines.map((s) => s.location)).toEqual(['E2', 'E3']);
@@ -120,9 +140,75 @@ describe('sparklines saved with the workbook', () => {
     expect(groups(wb)[0]?.sparklines.map((s) => s.location)).toEqual(['E3']);
     clearSparkline(store, at(2, 4));
     expect(groups(wb)).toEqual([]);
+    expect(store.getState().sparkline.groups.size).toBe(0);
   });
 
-  it('edits the colour and kind of a group and nothing else', async () => {
+  it('round-trips every group setting through the engine', async () => {
+    const { wb, store } = await session();
+    const settings: SparklineGroupSettings = {
+      type: SparklineType.Column,
+      colorSeries: rgbColorSpec('#102030'),
+      colorNegative: rgbColorSpec('#112233'),
+      colorAxis: rgbColorSpec('#223344'),
+      colorMarkers: rgbColorSpec('#334455'),
+      colorFirst: rgbColorSpec('#445566'),
+      colorLast: rgbColorSpec('#556677'),
+      colorHigh: rgbColorSpec('#667788'),
+      colorLow: rgbColorSpec('#778899'),
+      markers: true,
+      high: true,
+      low: true,
+      first: true,
+      last: true,
+      negative: true,
+      displayXAxis: true,
+      displayHidden: true,
+      minAxisType: SparklineAxisType.Custom,
+      maxAxisType: SparklineAxisType.Group,
+      manualMin: -4.5,
+      manualMax: 12,
+      dateAxis: false,
+      dateAxisRange: null,
+      lineWidthPt: 2.25,
+      emptyCellsAs: BlanksAs.Span,
+    };
+    setSparkline(store, at(1, 4), SOURCE, settings);
+
+    const reopened = await saved(wb);
+    const read = groupOfCell(reopened.store.getState(), at(1, 4))?.settings;
+    expect(read).toBeDefined();
+    const colors = (g: SparklineGroupSettings | undefined) =>
+      [
+        g?.colorSeries,
+        g?.colorNegative,
+        g?.colorAxis,
+        g?.colorMarkers,
+        g?.colorFirst,
+        g?.colorLast,
+        g?.colorHigh,
+        g?.colorLow,
+      ].map(rgbOf);
+    expect(colors(read)).toEqual(colors(settings));
+    expect(read).toMatchObject({
+      type: SparklineType.Column,
+      markers: true,
+      high: true,
+      low: true,
+      first: true,
+      last: true,
+      negative: true,
+      displayXAxis: true,
+      displayHidden: true,
+      minAxisType: SparklineAxisType.Custom,
+      maxAxisType: SparklineAxisType.Group,
+      manualMin: -4.5,
+      manualMax: 12,
+      lineWidthPt: 2.25,
+      emptyCellsAs: BlanksAs.Span,
+    });
+  });
+
+  it('edits the colour of a group and nothing else', async () => {
     const { wb, store } = await session((handle) => {
       handle.addSparklineGroup(0, {
         type: SparklineType.Line,
@@ -133,14 +219,14 @@ describe('sparklines saved with the workbook', () => {
         sparklines: [{ source: 'Sheet1!B2:B5', location: 'E2' }],
       });
     });
-    const spec = sparklineAt(store.getState(), at(1, 4)) as Sparkline;
-    expect(spec.nativeGroup).toMatchObject({ markers: true, high: true, lineWidthPt: 2.25 });
+    const group = groupOfCell(store.getState(), at(1, 4));
+    expect(group?.settings).toMatchObject({ markers: true, high: true, lineWidthPt: 2.25 });
 
-    setSparkline(store, at(1, 4), { ...spec, color: '#00aa00' }, undefined);
+    updateSparklineGroup(store, group?.id as string, { colorSeries: rgbColorSpec('#00aa00') });
 
-    const [group] = groups(wb);
-    expect((group?.colorSeries?.argb ?? 0) & 0xffffff).toBe(0x00aa00);
-    expect(group).toMatchObject({
+    const [engine] = groups(wb);
+    expect(rgbOf(engine?.colorSeries)).toBe(0x00aa00);
+    expect(engine).toMatchObject({
       markers: true,
       high: true,
       lineWidthPt: 2.25,
@@ -174,7 +260,7 @@ describe('sparklines saved with the workbook', () => {
 
   it('undoes and redoes a new sparkline in the file', async () => {
     const { wb, store, history } = await session();
-    setSparkline(store, at(1, 4), line, history);
+    setSparkline(store, at(1, 4), SOURCE, lineSettings, history);
     expect(groups(wb)).toHaveLength(1);
 
     history.undo();
@@ -189,7 +275,7 @@ describe('sparklines saved with the workbook', () => {
 
   it('shifts a sparkline once when rows or columns are inserted, and back on undo', async () => {
     const { wb, store, history } = await session();
-    setSparkline(store, at(1, 4), line);
+    setSparkline(store, at(1, 4), SOURCE, lineSettings);
 
     expect(insertRows(store, wb, history, 0, 2)).toBe(true);
     expect(groups(wb)[0]?.sparklines).toEqual([{ formula: 'Sheet1!B4:B7', location: 'E4' }]);
@@ -209,7 +295,7 @@ describe('sparklines saved with the workbook', () => {
 
   it('restores a sparkline whose cell a row delete removed', async () => {
     const { wb, store, history } = await session();
-    setSparkline(store, at(1, 4), line, history);
+    setSparkline(store, at(1, 4), SOURCE, lineSettings, history);
 
     expect(deleteRows(store, wb, history, 1, 1)).toBe(true);
     expect(groups(wb)).toEqual([]);
@@ -224,7 +310,7 @@ describe('sparklines saved with the workbook', () => {
   it('keeps a sparkline on its sheet when an earlier sheet is removed', async () => {
     const { wb, store } = await session();
     const second = wb.addSheet();
-    setSparkline(store, { sheet: second, row: 1, col: 4 }, { kind: 'line', source: 'B2:B5' });
+    setSparkline(store, { sheet: second, row: 1, col: 4 }, SOURCE, lineSettings);
     expect(wb.listSparklineGroups(second)).toHaveLength(1);
 
     expect(wb.removeSheet(0)).toBe(true);
@@ -233,28 +319,45 @@ describe('sparklines saved with the workbook', () => {
     expect(listSparklines(store.getState()).map((entry) => entry.addr.sheet)).toEqual([0]);
   });
 
-  it('applies a style change of one member to the whole group', async () => {
+  it('applies a settings change to the whole group', async () => {
     const { wb, store } = await session();
-    setSparklines(store, [
-      { addr: at(1, 4), spec: line },
-      { addr: at(2, 4), spec: { ...line, source: 'C2:C5' } },
-    ]);
-    const second = sparklineAt(store.getState(), at(2, 4)) as Sparkline;
+    setSparklines(
+      store,
+      [
+        { addr: at(1, 4), source: SOURCE },
+        { addr: at(2, 4), source: 'C2:C5' },
+      ],
+      lineSettings,
+    );
+    const group = groupOfCell(store.getState(), at(2, 4));
 
-    setSparkline(store, at(2, 4), { ...second, color: '#00aa00', group: second.group });
+    updateSparklineGroup(store, group?.id as string, { colorSeries: rgbColorSpec('#00aa00') });
 
-    expect((groups(wb)[0]?.colorSeries?.argb ?? 0) & 0xffffff).toBe(0x00aa00);
-    expect(sparklineAt(store.getState(), at(1, 4))?.color).toBe('#00aa00');
-    expect(sparklineAt(store.getState(), at(2, 4))?.color).toBe('#00aa00');
+    expect(rgbOf(groups(wb)[0]?.colorSeries)).toBe(0x00aa00);
+    expect(groups(wb)).toHaveLength(1);
+    expect(groupOfCell(store.getState(), at(1, 4))?.id).toBe(group?.id);
+  });
+
+  it('writes grouping and ungrouping as engine groups', async () => {
+    const { wb, store } = await session();
+    setSparkline(store, at(1, 4), SOURCE, lineSettings);
+    setSparkline(store, at(2, 4), 'C2:C5', lineSettings);
+    expect(groups(wb)).toHaveLength(2);
+
+    groupSparklines(store, [at(1, 4), at(2, 4)]);
+    expect(groups(wb)).toHaveLength(1);
+    expect(groups(wb)[0]?.sparklines.map((s) => s.location)).toEqual(['E2', 'E3']);
+
+    ungroupSparklines(store, [at(1, 4)]);
+    expect(groups(wb)).toHaveLength(2);
   });
 
   it('re-reads the group from the engine when it refuses a member change', async () => {
     const { wb, store } = await session();
+    setSparkline(store, at(1, 4), SOURCE, lineSettings);
+    const group = groupOfCell(store.getState(), at(1, 4));
     const members = vi.spyOn(wb, 'setSparklineGroupSparklines').mockReturnValue(false);
-    setSparklines(store, [
-      { addr: at(1, 4), spec: line },
-      { addr: at(2, 4), spec: line },
-    ]);
+    mutators.setSparkline(store, at(2, 4), { source: 'C2:C5', group: group?.id as string });
     members.mockRestore();
 
     expect(listSparklines(store.getState()).map((entry) => entry.addr.row)).toEqual([1]);

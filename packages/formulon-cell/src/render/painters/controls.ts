@@ -1,3 +1,4 @@
+import { BlanksAs, SparklineAxisType, SparklineType } from '@libraz/formulon';
 import { isColGroupCollapsed, isRowGroupCollapsed } from '../../commands/outline.js';
 import {
   MAC_OUTLINE_LANE,
@@ -6,7 +7,7 @@ import {
   outlineSummaryFor,
 } from '../../store/outline-summary.js';
 import { isRowHidden } from '../../store/row-visibility.js';
-import type { Sparkline } from '../../store/store.js';
+import type { SparklineGroupSettings } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
   type AxisLayout,
@@ -521,24 +522,121 @@ export function paintOutlineGutters(
 export const DEFAULT_SPARKLINE_COLOR = '#0078d4';
 export const DEFAULT_NEGATIVE_COLOR = '#d24545';
 
-/** Inline mini-chart drawn inside a single cell rect. `values` is the resolved
- *  numeric series for `spec.source`; non-numeric source cells are filtered by
- *  the caller before invoking. No-op when the series is empty. */
+/** One plotted point: its position on the x axis (an index, or a date value) and its value;
+ *  `null` is an empty cell. */
+export interface SparklinePoint {
+  x: number;
+  value: number | null;
+}
+
+/** Group colours as CSS; an absent colour falls back to the series colour. */
+export interface SparklineColors {
+  series: string;
+  negative?: string;
+  axis?: string;
+  markers?: string;
+  first?: string;
+  last?: string;
+  high?: string;
+  low?: string;
+}
+
+export interface SparklinePaintInput {
+  settings: SparklineGroupSettings;
+  colors: SparklineColors;
+  /** The series in source order, hidden cells already left out. */
+  points: readonly SparklinePoint[];
+  /** Min and max over every member of the group, for a group-scaled axis. */
+  groupExtent?: { min: number; max: number } | null;
+  /** Screen px of one typographic point, for the line width. */
+  pxPerPt?: number;
+}
+
+/** Values of `points` as the axis sees them: an empty cell counts as zero when so configured. */
+export const sparklineValues = (
+  points: readonly SparklinePoint[],
+  emptyCellsAs: BlanksAs,
+): number[] => {
+  const out: number[] = [];
+  for (const point of points) {
+    if (point.value !== null) out.push(point.value);
+    else if (emptyCellsAs === BlanksAs.Zero) out.push(0);
+  }
+  return out;
+};
+
+const extentOf = (values: readonly number[]): { min: number; max: number } | null => {
+  if (values.length === 0) return null;
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (const v of values) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  return { min, max };
+};
+
+/** Min and max of `values`; null when there are none. */
+export const sparklineExtent = extentOf;
+
+/** Inline mini-chart drawn inside a single cell rect, from its group's settings. A series
+ *  with no point paints nothing. */
 export function paintSparkline(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
-  spec: Sparkline,
-  values: readonly number[],
+  input: SparklinePaintInput,
 ): void {
-  if (values.length === 0) return;
+  const { settings, colors, groupExtent } = input;
+  if (input.points.length === 0) return;
   const inset = 2;
   const x = rect.x + inset;
   const y = rect.y + inset;
   const w = Math.max(0, rect.w - inset * 2);
   const h = Math.max(0, rect.h - inset * 2);
   if (w <= 0 || h <= 0) return;
-  const color = spec.color ?? DEFAULT_SPARKLINE_COLOR;
-  const negColor = spec.negativeColor ?? DEFAULT_NEGATIVE_COLOR;
+  const zero = settings.emptyCellsAs === BlanksAs.Zero;
+  const span = settings.emptyCellsAs === BlanksAs.Span && settings.type === SparklineType.Line;
+  // Points keep their slot; a zero fill gives empty cells a value, a line span drops them.
+  const points = input.points
+    .map((p) => (zero && p.value === null ? { ...p, value: 0 } : p))
+    .filter((p) => !(span && p.value === null));
+  const values = points.flatMap((p) => (p.value === null ? [] : [p.value]));
+  const own = extentOf(values);
+  if (!own) return;
+  const min =
+    settings.minAxisType === SparklineAxisType.Custom && settings.manualMin !== null
+      ? settings.manualMin
+      : settings.minAxisType === SparklineAxisType.Group && groupExtent
+        ? groupExtent.min
+        : own.min;
+  const max =
+    settings.maxAxisType === SparklineAxisType.Custom && settings.manualMax !== null
+      ? settings.manualMax
+      : settings.maxAxisType === SparklineAxisType.Group && groupExtent
+        ? groupExtent.max
+        : own.max;
+  const range = max - min || 1;
+  const yOf = (v: number): number => y + h - ((Math.min(Math.max(v, min), max) - min) / range) * h;
+  const count = input.points.length;
+  const xs = input.points.map((p) => p.x);
+  const xMin = Math.min(...xs);
+  const xSpan = Math.max(...xs) - xMin;
+  const slot = w / count;
+
+  // Colour of one point: high, low, first, last, then negative override the series colour.
+  const first = points.find((p) => p.value !== null);
+  const last = [...points].reverse().find((p) => p.value !== null);
+  const hi = points.find((p) => p.value === own.max);
+  const lo = points.find((p) => p.value === own.min);
+  const special = (p: SparklinePoint): string | undefined => {
+    if (settings.high && p === hi && colors.high) return colors.high;
+    if (settings.low && p === lo && colors.low) return colors.low;
+    if (settings.first && p === first && colors.first) return colors.first;
+    if (settings.last && p === last && colors.last) return colors.last;
+    if (settings.negative && (p.value ?? 0) < 0 && colors.negative) return colors.negative;
+    return undefined;
+  };
+  const colorOf = (p: SparklinePoint): string => special(p) ?? colors.series;
 
   ctx.save();
   ctx.beginPath();
@@ -546,68 +644,65 @@ export function paintSparkline(
   ctx.clip();
   ctx.globalAlpha = 1;
 
-  if (spec.kind === 'line') {
-    let min = Number.POSITIVE_INFINITY;
-    let max = Number.NEGATIVE_INFINITY;
-    for (const v of values) {
-      if (v < min) min = v;
-      if (v > max) max = v;
-    }
-    const span = max - min || 1;
-    const stepX = values.length > 1 ? w / (values.length - 1) : 0;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+  if (settings.displayXAxis && min <= 0 && max >= 0) {
+    const ay = Math.round(yOf(0)) + 0.5;
+    ctx.strokeStyle = colors.axis ?? '#000000';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, ay);
+    ctx.lineTo(x + w, ay);
+    ctx.stroke();
+  }
+
+  if (settings.type === SparklineType.Line) {
+    const xOf = (p: SparklinePoint): number =>
+      xSpan > 0 ? x + ((p.x - xMin) / xSpan) * w : x + w / 2;
+    ctx.strokeStyle = colors.series;
+    ctx.lineWidth = Math.max(0.5, settings.lineWidthPt * (input.pxPerPt ?? 4 / 3));
     ctx.lineJoin = 'round';
     ctx.beginPath();
-    for (let i = 0; i < values.length; i += 1) {
-      const v = values[i] ?? 0;
-      const px = x + (values.length > 1 ? i * stepX : w / 2);
-      const py = y + h - ((v - min) / span) * h;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+    let pen = false;
+    for (const p of points) {
+      if (p.value === null) {
+        pen = false;
+        continue;
+      }
+      if (pen) ctx.lineTo(xOf(p), yOf(p.value));
+      else ctx.moveTo(xOf(p), yOf(p.value));
+      pen = true;
     }
     ctx.stroke();
-  } else if (spec.kind === 'column') {
-    let min = Number.POSITIVE_INFINITY;
-    let max = Number.NEGATIVE_INFINITY;
-    for (const v of values) {
-      if (v < min) min = v;
-      if (v > max) max = v;
-    }
-    // Anchor the baseline at zero when the range straddles it; otherwise rest
-    // bars on the value extreme closest to zero so all bars stay positive-side.
-    const baseline = min < 0 && max > 0 ? 0 : min >= 0 ? min : max;
-    const span = Math.max(Math.abs(max - baseline), Math.abs(min - baseline)) || 1;
-    const slot = w / values.length;
-    const gap = Math.min(1, slot * 0.2);
-    const barW = Math.max(1, slot - gap);
-    const baseY = y + h - ((baseline - min) / Math.max(max - min, 1e-9)) * h;
-    for (let i = 0; i < values.length; i += 1) {
-      const v = values[i] ?? 0;
-      const isNeg = v < 0;
-      const fill = spec.showNegative && isNeg ? negColor : color;
-      const px = x + i * slot;
-      const barH = (Math.abs(v - baseline) / span) * h;
-      const py = isNeg ? baseY : baseY - barH;
-      ctx.fillStyle = fill;
-      ctx.fillRect(px, py, barW, Math.max(1, barH));
+    const dot = Math.max(2.5, ctx.lineWidth * 2);
+    for (const p of points) {
+      if (p.value === null) continue;
+      const marked = special(p);
+      if (marked === undefined && !settings.markers) continue;
+      ctx.fillStyle = marked ?? colors.markers ?? colors.series;
+      ctx.fillRect(xOf(p) - dot / 2, yOf(p.value) - dot / 2, dot, dot);
     }
   } else {
-    // win-loss
-    const half = h / 2;
-    const slot = w / values.length;
     const gap = Math.min(1, slot * 0.2);
     const barW = Math.max(1, slot - gap);
-    const midY = y + half;
-    for (let i = 0; i < values.length; i += 1) {
-      const v = values[i] ?? 0;
-      if (v === 0) continue;
-      const isNeg = v < 0;
-      const fill = spec.showNegative && isNeg ? negColor : color;
-      ctx.fillStyle = fill;
-      const px = x + i * slot;
-      if (isNeg) ctx.fillRect(px, midY, barW, Math.max(1, half - 1));
-      else ctx.fillRect(px, midY - Math.max(1, half - 1), barW, Math.max(1, half - 1));
+    const xOf = (p: SparklinePoint): number =>
+      settings.dateAxis && xSpan > 0 ? x + ((p.x - xMin) / xSpan) * (w - slot) : x + p.x * slot;
+    if (settings.type === SparklineType.Column) {
+      // Bars rest on zero when the axis spans it, else on the axis limit nearest zero.
+      const base = Math.min(Math.max(0, min), max);
+      const baseY = yOf(base);
+      for (const p of points) {
+        if (p.value === null) continue;
+        const vy = yOf(p.value);
+        ctx.fillStyle = colorOf(p);
+        ctx.fillRect(xOf(p), Math.min(vy, baseY), barW, Math.max(1, Math.abs(vy - baseY)));
+      }
+    } else {
+      const half = h / 2;
+      const bar = Math.max(1, half - 1);
+      for (const p of points) {
+        if (p.value === null || p.value === 0) continue;
+        ctx.fillStyle = colorOf(p);
+        ctx.fillRect(xOf(p), p.value < 0 ? y + half : y + half - bar, barW, bar);
+      }
     }
   }
 

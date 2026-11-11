@@ -1,3 +1,4 @@
+import { SparklineType } from '@libraz/formulon';
 // @vitest-environment node
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -5,6 +6,7 @@ import { copy } from '../../../src/commands/clipboard/copy.js';
 import { insertCopiedBand } from '../../../src/commands/clipboard/insert-copied-cells.js';
 import { captureSnapshotFromCopyResult } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
+import { defaultSparklineGroupSettings } from '../../../src/commands/sparkline.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';
 import type { Addr, Range } from '../../../src/engine/types.js';
@@ -373,9 +375,8 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
           ...state,
           sparkline: {
             ...state.sparkline,
-            sparklines: new Map([
-              [addrKey(address(axis, 1, 2)), { kind: 'line' as const, source: 'A1:B1' }],
-            ]),
+            sparklines: new Map([[addrKey(address(axis, 1, 2)), { source: 'A1:B1', group: 'g' }]]),
+            groups: new Map([['g', defaultSparklineGroupSettings(SparklineType.Line)]]),
           },
         }));
       }

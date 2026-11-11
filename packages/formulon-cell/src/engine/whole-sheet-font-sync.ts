@@ -1,3 +1,4 @@
+import { withSparklineMembers } from '../store/sparkline-slice.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import type { SheetViewMemo } from '../store/types.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
@@ -196,7 +197,11 @@ const remapSessionObjects = (state: State, mapIndex: SheetIndexMapper): State =>
   }
 
   const sparklines = remapAddressMap(state.sparkline.sparklines, mapIndex);
-  if (sparklines.changed) next = { ...next, sparkline: { sparklines: sparklines.map } };
+  if (sparklines.changed)
+    next = {
+      ...next,
+      sparkline: withSparklineMembers(state.sparkline, sparklines.map),
+    };
 
   const mapAddr = (addr: Addr): Addr | null => {
     const sheet = mapIndex(addr.sheet);
