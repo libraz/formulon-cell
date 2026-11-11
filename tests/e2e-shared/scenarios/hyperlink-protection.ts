@@ -26,18 +26,19 @@ const linkWithCtrlK = async (sheet: UserJourneyPage, ref: string, url: string) =
 const linkAt = async (sheet: UserJourneyPage, ref: string) =>
   (await sheet.readFormat(ref))?.hyperlink ?? null;
 
-const removeWithClearMenu = async (sheet: UserJourneyPage, page: Page, ref: string) => {
+/** Opens Home > Clear at `ref` and returns its Remove Hyperlinks row. */
+const openRemoveHyperlinks = async (sheet: UserJourneyPage, page: Page, ref: string) => {
   await sheet.goTo(ref);
   await selectRibbonTab(page, 'home');
   await sheet.clickRibbon('clearFormat');
   const menu = page.locator('#menu-clear');
   await expect(menu).toBeVisible();
-  await menu.getByRole('menuitem', { name: 'Remove Hyperlinks' }).click();
+  return menu.getByRole('menuitem', { name: 'Remove Hyperlinks' });
 };
 
-/** On a protected sheet, the Insert hyperlinks option lets a link reach an unlocked cell only; a
- *  locked cell keeps refusing it. Without the option the Link command and Ctrl+K are unavailable,
- *  yet removing a link still works on unlocked cells and is refused on locked ones. */
+/** On a protected sheet, the Insert hyperlinks option lets a link reach or leave an unlocked cell
+ *  only; a locked cell keeps refusing both. Without the option the Link command, Ctrl+K and Remove
+ *  Hyperlinks are unavailable even on an unlocked cell. */
 export async function runProtectedSheetHyperlinkScenario(page: Page): Promise<void> {
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ locale: 'en' });
@@ -65,9 +66,17 @@ export async function runProtectedSheetHyperlinkScenario(page: Page): Promise<vo
   await sheet.shortcut('k');
   await expect(page.locator('.fc-hldlg')).toBeHidden();
 
-  await removeWithClearMenu(sheet, page, 'B2');
+  let remove = await openRemoveHyperlinks(sheet, page, 'B2');
+  await expect(remove).toBeDisabled();
+  await page.keyboard.press('Escape');
+
+  await protectWithUnlockedB2(page, true);
+  remove = await openRemoveHyperlinks(sheet, page, 'B2');
+  await remove.click();
   await expect.poll(() => linkAt(sheet, 'B2')).toBeNull();
-  await removeWithClearMenu(sheet, page, 'B3');
-  await expect.poll(() => linkAt(sheet, 'B3')).toBe('https://example.com/original');
+  // Over a locked cell the whole Clear menu is greyed, so its link stays.
+  await sheet.goTo('B3');
+  await expect(page.locator('[data-ribbon-command="clearFormat"]').first()).toBeDisabled();
+  expect(await linkAt(sheet, 'B3')).toBe('https://example.com/original');
   await sheet.expectNoConsoleErrors();
 }
