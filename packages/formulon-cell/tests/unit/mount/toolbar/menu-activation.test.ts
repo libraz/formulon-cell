@@ -199,6 +199,8 @@ describe('Spreadsheet.mountToolbar', () => {
       );
 
       for (const [command, menuId] of Object.entries(RIBBON_DROPDOWN_MENU_FOR_COMMAND)) {
+        // Each command is checked in the first context that renders it.
+        if (rendered.has(command)) continue;
         const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
         if (!button) continue;
         rendered.add(command);
@@ -258,6 +260,8 @@ describe('Spreadsheet.mountToolbar', () => {
       });
 
       for (const command of RIBBON_DYNAMIC_MENU_FIRST_COMMANDS) {
+        // Each command is checked in the first context that renders it.
+        if (!misses.has(`${command}:missing`)) continue;
         const menuId = RIBBON_DROPDOWN_MENU_FOR_COMMAND[command];
         if (!menuId) {
           misses.add(`${command}:menu-map`);

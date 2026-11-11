@@ -470,17 +470,31 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     return document.getElementById(spec.menuId) as HTMLDivElement | null;
   };
 
+  // Only `openDynamicRibbonDropdown` shows these menus, so the ones it opened are tracked here
+  // rather than found by scanning the document. A re-rendered menu drops out when read; one hidden
+  // by other code stays until a close resets its button.
+  const openMenus = new Set<HTMLDivElement>();
+  const trackedMenus = (): HTMLDivElement[] => {
+    for (const menu of openMenus) {
+      if (!menu.isConnected) openMenus.delete(menu);
+    }
+    return [...openMenus];
+  };
+  const liveOpenMenus = (): HTMLDivElement[] => trackedMenus().filter((menu) => !menu.hidden);
+
   const closeDynamicRibbonDropdown = (
     spec: RibbonDropdownSpec,
     restoreFocus = false,
-    targetMenu?: HTMLDivElement,
+    menuToClose?: HTMLDivElement,
   ): void => {
+    const targetMenu = menuToClose ?? trackedMenus().find((menu) => menu.id === spec.menuId);
     const preceding = targetMenu?.previousElementSibling;
     const button = preceding?.matches('button[data-ribbon-command]')
       ? (preceding as HTMLButtonElement)
       : dynamicDropdownButtonForSpec(spec);
     const menu = targetMenu ?? dynamicMenuForButton(spec, button);
     if (!menu) return;
+    openMenus.delete(menu);
     menu.hidden = true;
     if (menu.id === 'menu-conditional') closeDynamicConditionalSubmenus(menu);
     if (FORMAT_SUBMENU_MENU_IDS.has(menu.id)) closeDynamicFormatSubmenus(menu);
@@ -490,16 +504,15 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   };
 
   const closeAllDynamicRibbonDropdowns = (exceptMenuId?: string): void => {
-    for (const menu of document.querySelectorAll<HTMLDivElement>('.fc-tb__menu')) {
-      if (!ALL_DROPDOWN_IDS.has(menu.id) || menu.id === exceptMenuId) continue;
+    for (const menu of trackedMenus()) {
+      if (menu.id === exceptMenuId) continue;
       const spec = dynamicDropdownSpecForMenu(menu);
       if (spec) closeDynamicRibbonDropdown(spec, false, menu);
     }
   };
 
   const firstOpenDynamicDropdownSpec = (): RibbonDropdownSpec | null => {
-    for (const menu of document.querySelectorAll<HTMLDivElement>('.fc-tb__menu')) {
-      if (menu.hidden || !ALL_DROPDOWN_IDS.has(menu.id)) continue;
+    for (const menu of liveOpenMenus()) {
       const spec = dynamicDropdownSpecForMenu(menu);
       if (spec) return spec;
     }
@@ -543,6 +556,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     ctx.closePrintAreaMenu();
     ctx.closeSymbolMenu();
     menu.hidden = false;
+    openMenus.add(menu);
     positionDynamicRibbonDropdown(menu, button);
     button.setAttribute('aria-haspopup', 'menu');
     button.setAttribute('aria-expanded', 'true');
