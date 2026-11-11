@@ -68,29 +68,35 @@ const option = <K extends keyof Options>(type: PropType<Options[K]> | null) => (
   default: undefined,
 });
 
+/** One prop per `SpreadsheetOptions` key; the `satisfies` fails to compile on a missing or extra
+ *  key, so a new option cannot reach the component unwired. */
+const optionProps = {
+  workbook: option<'workbook'>(Object as PropType<Options['workbook']>),
+  seed: option<'seed'>(Function as PropType<Options['seed']>),
+  ui: option<'ui'>(Object as PropType<Options['ui']>),
+  policy: option<'policy'>(Object as PropType<Options['policy']>),
+  viewport: option<'viewport'>(Object as PropType<Options['viewport']>),
+  contextMenu: option<'contextMenu'>(Object as PropType<Options['contextMenu']>),
+  overlays: option<'overlays'>(Object as PropType<Options['overlays']>),
+  toolbar: option<'toolbar'>(Object as PropType<Options['toolbar']>),
+  theme: option<'theme'>(String as PropType<Options['theme']>),
+  locale: option<'locale'>(String as PropType<Options['locale']>),
+  strings: option<'strings'>(Object as PropType<Options['strings']>),
+  extensions: option<'extensions'>(Array as PropType<Options['extensions']>),
+  formulaHints: option<'formulaHints'>(Array as PropType<Options['formulaHints']>),
+  spelling: option<'spelling'>(Object as PropType<Options['spelling']>),
+  autoCorrect: option<'autoCorrect'>(Object as PropType<Options['autoCorrect']>),
+  host: option<'host'>(Object as PropType<Options['host']>),
+  uploadStatus: option<'uploadStatus'>(String as PropType<Options['uploadStatus']>),
+  macroRecording: option<'macroRecording'>(Boolean as PropType<Options['macroRecording']>),
+  showAllNotes: option<'showAllNotes'>(Boolean as PropType<Options['showAllNotes']>),
+  signal: option<'signal'>(null),
+} satisfies { [K in keyof Options]-?: ReturnType<typeof option<K>> };
+
 const component = defineComponent({
   name: 'Spreadsheet',
   props: {
-    workbook: option<'workbook'>(Object as PropType<Options['workbook']>),
-    seed: option<'seed'>(Function as PropType<Options['seed']>),
-    ui: option<'ui'>(Object as PropType<Options['ui']>),
-    policy: option<'policy'>(Object as PropType<Options['policy']>),
-    viewport: option<'viewport'>(Object as PropType<Options['viewport']>),
-    contextMenu: option<'contextMenu'>(Object as PropType<Options['contextMenu']>),
-    overlays: option<'overlays'>(Object as PropType<Options['overlays']>),
-    toolbar: option<'toolbar'>(Object as PropType<Options['toolbar']>),
-    theme: option<'theme'>(String as PropType<Options['theme']>),
-    locale: option<'locale'>(String as PropType<Options['locale']>),
-    strings: option<'strings'>(Object as PropType<Options['strings']>),
-    extensions: option<'extensions'>(Array as PropType<Options['extensions']>),
-    formulaHints: option<'formulaHints'>(Array as PropType<Options['formulaHints']>),
-    spelling: option<'spelling'>(Object as PropType<Options['spelling']>),
-    autoCorrect: option<'autoCorrect'>(Object as PropType<Options['autoCorrect']>),
-    host: option<'host'>(Object as PropType<Options['host']>),
-    uploadStatus: option<'uploadStatus'>(String as PropType<Options['uploadStatus']>),
-    macroRecording: option<'macroRecording'>(Boolean as PropType<Options['macroRecording']>),
-    showAllNotes: option<'showAllNotes'>(Boolean as PropType<Options['showAllNotes']>),
-    signal: option<'signal'>(null),
+    ...optionProps,
     errorFallback: {
       type: Function as PropType<(error: unknown) => VNodeChild>,
       default: undefined,
