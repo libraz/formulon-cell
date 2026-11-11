@@ -31,8 +31,8 @@ const item = (menu: Locator, kind: Kind, choice: 'cells' | 'rows' | 'cols') =>
   menu.locator(`[data-cell-${kind}="${choice}"]`);
 
 /** Asserts the cell context menu greys Insert…/Delete…, then closes the menu. */
-const expectCellMenuItemGreyed = async (sheet: UserJourneyPage, page: Page, kind: Kind) => {
-  await sheet.focusHost();
+const expectCellMenuItemGreyed = async (page: Page, kind: Kind) => {
+  await expect(page.locator('.fc-host').first()).toBeFocused();
   await page.keyboard.press('Shift+F10');
   const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
   await expect(menu).toBeVisible();
@@ -91,7 +91,7 @@ export async function runProtectedSheetRowColumnScenario(page: Page): Promise<vo
   await expect(page.locator('[data-ribbon-command="outlineGroup"]').first()).toBeDisabled();
 
   await sheet.goTo('A3');
-  await expectCellMenuItemGreyed(sheet, page, 'insert');
+  await expectCellMenuItemGreyed(page, 'insert');
   await expectShortcutNoOp(sheet, page, 'Shift+Equal', 'A3', 'two');
 
   await selectRow(page, 3);
@@ -115,7 +115,7 @@ export async function runProtectedSheetRowColumnScenario(page: Page): Promise<vo
   await expectText(sheet, 'A3', 'two');
 
   await sheet.goTo('A2');
-  await expectCellMenuItemGreyed(sheet, page, 'delete');
+  await expectCellMenuItemGreyed(page, 'delete');
   await expectShortcutNoOp(sheet, page, 'Minus', 'A3', 'two');
 
   await selectRow(page, 2);
