@@ -1,4 +1,5 @@
 import {
+  currentPivotStyleId,
   listCustomPivotTableStyles,
   pivotStyleGallerySections,
 } from '../../commands/format-as-table.js';
@@ -158,10 +159,7 @@ export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDiv
       const pivot = activePivot();
       if (!inst || !pivot) return '';
       const name = inst.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)?.name ?? '';
-      const custom = listCustomPivotTableStyles(inst.store.getState()).find(
-        (style) => style.label.toLocaleLowerCase() === name.toLocaleLowerCase(),
-      );
-      return custom?.id ?? name;
+      return currentPivotStyleId(inst.store.getState(), name);
     },
     apply: (id) => {
       const target = getInst();

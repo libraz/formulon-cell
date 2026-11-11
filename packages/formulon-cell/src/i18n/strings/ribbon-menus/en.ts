@@ -451,6 +451,7 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     tableStyleNewPivotTitle: 'New PivotTable Style',
     tableStyleModifyPivotTitle: 'Modify PivotTable Style',
     tableStyleDefaultName: 'Table Style {n}',
+    tableStyleNameExists: 'This style name already exists.',
     pivotStyleDefaultName: 'PivotStyle {n}',
     tableStyleElements: {
       wholeTable: 'Whole Table',

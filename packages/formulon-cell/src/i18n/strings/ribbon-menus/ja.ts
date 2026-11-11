@@ -452,6 +452,7 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     tableStyleNewPivotTitle: '新しいピボットテーブル スタイル',
     tableStyleModifyPivotTitle: 'ピボットテーブル スタイルの変更',
     tableStyleDefaultName: 'テーブル スタイル {n}',
+    tableStyleNameExists: 'このスタイル名は既に存在します。',
     pivotStyleDefaultName: 'ピボット スタイル {n}',
     tableStyleElements: {
       wholeTable: 'テーブル全体',

@@ -305,6 +305,8 @@ export interface DialogNameField {
   input: HTMLInputElement;
   focus: () => void;
   valueOrError: (errorRow: HTMLElement, message: string) => string | null;
+  /** Shows `message` against the name, as a rejected name does. */
+  showError: (errorRow: HTMLElement, message: string) => void;
 }
 
 export const appendDialogNameField = (
@@ -325,5 +327,6 @@ export const appendDialogNameField = (
       }
       return value;
     },
+    showError: (errorRow, message) => showInputError(errorRow, input, message),
   };
 };

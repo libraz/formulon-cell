@@ -455,6 +455,7 @@ export interface RibbonMenusStrings {
     tableStyleModifyPivotTitle: string;
     /** Name a new table / PivotTable style starts with; `{n}` is the first free number. */
     tableStyleDefaultName: string;
+    tableStyleNameExists: string;
     pivotStyleDefaultName: string;
     /** The table and PivotTable style elements the dialog lists. */
     tableStyleElements: Record<

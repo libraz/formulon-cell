@@ -449,6 +449,7 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     tableStyleNewPivotTitle: 'สไตล์ PivotTable ใหม่',
     tableStyleModifyPivotTitle: 'ปรับเปลี่ยนสไตล์ของ PivotTable',
     tableStyleDefaultName: 'สไตล์ตาราง {n}',
+    tableStyleNameExists: 'ชื่อสไตล์นี้มีอยู่แล้ว',
     pivotStyleDefaultName: 'สไตล์ PivotTable {n}',
     tableStyleElements: {
       wholeTable: 'ทั้งตาราง',

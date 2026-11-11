@@ -366,21 +366,14 @@ describe('formatAsTable command helpers', () => {
     expect(listCustomTableStyles(store.getState())).toEqual([]);
   });
 
-  it('creates and assigns session custom PivotTable styles', () => {
+  it('creates session custom PivotTable styles and assigns them on request', () => {
     const store = createSpreadsheetStore();
     const history = new History();
 
     expect(
-      createPivotTableStyleFromActivePivot(
-        store,
-        history,
-        'Review Pivot',
-        {
-          sheetIndex: 0,
-          pivotIndex: 2,
-        },
-        { elements: galleryStyleElements('dark', '#ed7d31', 'bandedFirstCol') },
-      ),
+      createPivotTableStyleFromActivePivot(store, history, 'Review Pivot', {
+        elements: galleryStyleElements('dark', '#ed7d31', 'bandedFirstCol'),
+      }),
     ).toBe(true);
     const styleId = customPivotTableStyleId('Review Pivot');
     expect(listCustomPivotTableStyles(store.getState())).toEqual([
@@ -390,10 +383,11 @@ describe('formatAsTable command helpers', () => {
         elements: galleryStyleElements('dark', '#ed7d31', 'bandedFirstCol'),
       },
     ]);
-    expect(store.getState().tables.pivotTableStyles).toEqual([
-      { sheetIndex: 0, pivotIndex: 2, styleId },
-    ]);
+    expect(store.getState().tables.pivotTableStyles ?? []).toEqual([]);
 
+    expect(
+      applyPivotTableStyleById(store, history, { sheetIndex: 0, pivotIndex: 2 }, styleId),
+    ).toBe(true);
     expect(
       applyPivotTableStyleById(store, history, { sheetIndex: 0, pivotIndex: 3 }, styleId),
     ).toBe(true);
@@ -406,6 +400,8 @@ describe('formatAsTable command helpers', () => {
     expect(store.getState().tables.pivotTableStyles).toEqual([
       { sheetIndex: 0, pivotIndex: 2, styleId },
     ]);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().tables.pivotTableStyles ?? []).toEqual([]);
     expect(history.undo()).toBe(true);
     expect(listCustomPivotTableStyles(store.getState())).toEqual([]);
   });

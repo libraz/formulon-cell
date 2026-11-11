@@ -1,4 +1,5 @@
 import {
+  currentTableStyleId,
   listCustomTableStyles,
   overlayStyleName,
   tableOverlayAt,
@@ -62,9 +63,7 @@ export const createTableStyleGallery = (opts: TableStyleGalleryOptions): HTMLDiv
       const inst = getInst();
       const table = inst ? activeTable(inst) : null;
       if (!inst || !table) return null;
-      const name = overlayStyleName(table);
-      const custom = listCustomTableStyles(inst.store.getState()).find((s) => s.label === name);
-      return custom?.id ?? name;
+      return currentTableStyleId(inst.store.getState(), overlayStyleName(table));
     },
     apply: (id) => {
       const inst = getInst();

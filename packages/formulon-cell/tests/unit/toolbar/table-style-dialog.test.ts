@@ -89,7 +89,7 @@ describe('New Table Style dialog', () => {
     await expect(pending).resolves.toEqual({
       name: 'テーブル スタイル 1',
       elements: { headerRow: { fill: '#336699', bold: true } },
-      stripeSizes: { firstRowStripe: 2 },
+      stripeSizes: {},
       setAsDefault: true,
     });
   });
@@ -108,6 +108,7 @@ describe('New Table Style dialog', () => {
     // A PivotTable style from a file may carry the table-only header and total cell elements.
     const elements = {
       headerRow: { bold: true },
+      firstRowStripe: { fill: '#aabbcc' },
       lastHeaderCell: { fill: '#112233' },
       firstTotalCell: { fill: '#445566' },
       lastTotalCell: { fill: '#778899' },

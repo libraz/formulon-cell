@@ -463,6 +463,7 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     tableStyleNewPivotTitle: 'Neues PivotTable-Format',
     tableStyleModifyPivotTitle: 'PivotTable-Format ändern',
     tableStyleDefaultName: 'Tabellenformat {n}',
+    tableStyleNameExists: 'Dieser Formatname ist bereits vorhanden.',
     pivotStyleDefaultName: 'PivotTable-Format {n}',
     tableStyleElements: {
       wholeTable: 'Ganze Tabelle',

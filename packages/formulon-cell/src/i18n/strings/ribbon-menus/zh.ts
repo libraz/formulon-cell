@@ -449,6 +449,7 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     tableStyleNewPivotTitle: '新建数据透视表样式',
     tableStyleModifyPivotTitle: '修改数据透视表样式',
     tableStyleDefaultName: '表样式 {n}',
+    tableStyleNameExists: '此样式名已存在。',
     pivotStyleDefaultName: '数据透视表样式 {n}',
     tableStyleElements: {
       wholeTable: '整个表',

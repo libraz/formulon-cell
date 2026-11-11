@@ -117,7 +117,7 @@ export function attachTableStyleContextMenu(
         if (custom) deleteCustomStyle(ctx, instance.workbook, custom.label);
         break;
       case 'setDefault':
-        setStyleDefault(instance.workbook, kind, custom?.label ?? styleId);
+        setStyleDefault(instance.workbook, kind, custom?.label ?? styleId, instance.history);
         break;
     }
     instance.host.focus();

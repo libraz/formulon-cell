@@ -5,17 +5,23 @@ import { clearVisualFormatInRange, withSelectionFormatOrigin } from './format.js
 import {
   applyPivotTableStyleById,
   type CustomTableStyle,
+  createPivotTableStyleFromActivePivot,
+  createTableStyleFromActiveTable,
   customPivotTableStyleById,
   customPivotTableStyleId,
+  customStyleNameError,
   customTableStyleId,
   DEFAULT_TABLE_COLOR,
   defaultTableStyleId,
   overlayStyleName,
   pivotTableStyleAssignment,
+  repointTableStyle,
+  sameStyleName,
   type TableOverlay,
   tableStyleOptionsById,
   updateTableOverlay,
 } from './format-as-table.js';
+import type { History } from './history.js';
 import { updatePivotStyleInfo } from './pivot-style-info.js';
 import { recordFormatChange, recordTablesChange } from './slice-history.js';
 import { type TableActionContext, tableChangeAllowed, tableWrite } from './table-actions.js';
@@ -33,11 +39,17 @@ export function applyTableStyle(
   if (!tableChangeAllowed(ctx, table.range)) return false;
   const history = ctx.history;
   const transaction = history?.begin();
+  let applied = false;
   try {
     clearTableRangeFormatting(ctx, table.range);
-    return restyle(ctx, table, styleId);
+    applied = restyle(ctx, table, styleId);
+    return applied;
   } finally {
-    if (history && transaction) history.end(transaction);
+    if (history && transaction) {
+      // A refused restyle leaves the cells' formatting as it was.
+      if (applied) history.end(transaction);
+      else history.abort(transaction);
+    }
   }
 }
 
@@ -56,7 +68,7 @@ export function clearTableRangeFormatting(ctx: TableActionContext, range: Range)
 
 /** The overlay look patch of a style pick; a custom style leaves the family and hue at the defaults. */
 function overlayLook(
-  options: ReturnType<typeof tableStyleOptionsById>,
+  options: NonNullable<ReturnType<typeof tableStyleOptionsById>>,
 ): Pick<TableOverlay, 'style' | 'color' | 'styleName'> {
   return {
     style: options.style ?? 'medium',
@@ -65,13 +77,24 @@ function overlayLook(
   };
 }
 
+/** The overlay look of the style `styleId`; null for an id that names no style. */
+function styleLook(
+  state: Parameters<typeof tableStyleOptionsById>[0],
+  styleId: string,
+): Pick<TableOverlay, 'style' | 'color' | 'styleName'> | null {
+  const options = tableStyleOptionsById(state, styleId);
+  return options ? overlayLook(options) : null;
+}
+
 function restyle(ctx: TableActionContext, table: TableOverlay, styleId: string): boolean {
-  const look = overlayLook(tableStyleOptionsById(ctx.store.getState(), styleId));
+  const look = styleLook(ctx.store.getState(), styleId);
+  if (!look) return false;
   return tableWrite(ctx, table.range, false, () => {
+    let applied = false;
     recordTablesChange(ctx.history, ctx.store, () => {
-      updateTableOverlay(ctx.store, table.id, look);
+      applied = updateTableOverlay(ctx.store, table.id, look) !== null;
     });
-    return true;
+    return applied;
   });
 }
 
@@ -79,25 +102,59 @@ function restyle(ctx: TableActionContext, table: TableOverlay, styleId: string):
  *  one undo step. False when the change is refused. */
 export function clearTableStyle(ctx: TableActionContext, table: TableOverlay): boolean {
   return tableWrite(ctx, table.range, false, () => {
+    let cleared = false;
     recordTablesChange(ctx.history, ctx.store, () => {
-      updateTableOverlay(ctx.store, table.id, { styleName: '' });
+      cleared = updateTableOverlay(ctx.store, table.id, { styleName: '' }) !== null;
     });
-    return true;
+    return cleared;
   });
 }
 
 /** The PivotTable style a PivotTable takes when the workbook names no default. */
 export const FALLBACK_PIVOT_STYLE = 'PivotStyleLight16';
 
-type DeleteStyleWorkbook = Pick<
+type StyleDefaultsWorkbook = Pick<
   WorkbookHandle,
-  | 'getTableStyleDefaults'
-  | 'setTableStyleDefaults'
-  | 'getPivotTables'
-  | 'getPivotStyleInfo'
-  | 'setPivotStyleInfo'
-  | 'cells'
+  'getTableStyleDefaults' | 'setTableStyleDefaults'
 >;
+
+type DeleteStyleWorkbook = StyleDefaultsWorkbook &
+  Pick<WorkbookHandle, 'getPivotTables' | 'getPivotStyleInfo' | 'setPivotStyleInfo' | 'cells'>;
+
+/** Writes the workbook's style defaults that differ from what it holds and records the change on
+ *  `history` (the open transaction, if any) so it undoes with the style change. An empty name
+ *  clears a default. False when the engine keeps no defaults. */
+function recordStyleDefaults(
+  history: History | null,
+  workbook: StyleDefaultsWorkbook,
+  change: { tableStyle?: string; pivotStyle?: string },
+): boolean {
+  const before = workbook.getTableStyleDefaults();
+  if (!before) return false;
+  const next: { tableStyle?: string; pivotStyle?: string } = {};
+  const restore: { tableStyle?: string; pivotStyle?: string } = {};
+  for (const key of ['tableStyle', 'pivotStyle'] as const) {
+    const value = change[key];
+    if (value === undefined || value === before[key]) continue;
+    next[key] = value;
+    restore[key] = before[key];
+  }
+  if (Object.keys(next).length === 0) return true;
+  if (!workbook.setTableStyleDefaults(next)) return false;
+  if (history && !history.isReplaying()) {
+    history.push({
+      undo: () => workbook.setTableStyleDefaults(restore),
+      redo: () => workbook.setTableStyleDefaults(next),
+    });
+  }
+  return true;
+}
+
+/** Runs `fn` as one undo step when there is a history. */
+const inTransaction = (history: History | null, fn: () => void): void => {
+  if (history) history.transact(fn);
+  else fn();
+};
 
 /** Deletes the custom style `name`, as one undo step, as the desktop app does. A style may be
  *  flagged for tables, PivotTables or both. The users of each kind take that kind's workbook
@@ -109,43 +166,40 @@ export function deleteCustomStyle(
   name: string,
 ): boolean {
   const state = ctx.store.getState();
-  const named = (style: CustomTableStyle): boolean =>
-    style.label.toLocaleLowerCase() === name.toLocaleLowerCase();
+  const named = (style: CustomTableStyle): boolean => sameStyleName(style.label, name);
   const forTables = (state.tables.customTableStyles ?? []).some(named);
   const forPivots = (state.tables.customPivotTableStyles ?? []).some(named);
   if (!forTables && !forPivots) return false;
-  const same = (value: string): boolean => value.toLocaleLowerCase() === name.toLocaleLowerCase();
   const history = ctx.history;
   const transaction = history?.begin();
   try {
     const before = workbook?.getTableStyleDefaults() ?? null;
-    const reset = {
-      ...(forTables && before && same(before.tableStyle) ? { tableStyle: '' } : {}),
-      ...(forPivots && before && same(before.pivotStyle) ? { pivotStyle: '' } : {}),
-    };
-    if (workbook && before && Object.keys(reset).length > 0) {
-      workbook.setTableStyleDefaults(reset);
-      const restore = { tableStyle: before.tableStyle, pivotStyle: before.pivotStyle };
-      if (history && !history.isReplaying()) {
-        history.push({
-          undo: () => workbook.setTableStyleDefaults(restore),
-          redo: () => workbook.setTableStyleDefaults(reset),
-        });
-      }
+    if (workbook && before) {
+      recordStyleDefaults(history, workbook, {
+        ...(forTables && sameStyleName(before.tableStyle, name) ? { tableStyle: '' } : {}),
+        ...(forPivots && sameStyleName(before.pivotStyle, name) ? { pivotStyle: '' } : {}),
+      });
     }
     const pivotUsers =
       forPivots && workbook
         ? workbook
             .getPivotTables()
-            .filter((p) => same(workbook.getPivotStyleInfo(p.sheetIndex, p.pivotIndex)?.name ?? ''))
+            .filter((p) =>
+              sameStyleName(
+                workbook.getPivotStyleInfo(p.sheetIndex, p.pivotIndex)?.name ?? '',
+                name,
+              ),
+            )
         : [];
     recordTablesChange(history, ctx.store, () => {
       mutators.removeCustomStylesNamed(ctx.store, name);
       if (!forTables) return;
       const fallback = defaultTableStyleId(ctx.store.getState(), workbook);
-      const look = overlayLook(tableStyleOptionsById(ctx.store.getState(), fallback));
+      const look = styleLook(ctx.store.getState(), fallback);
+      if (!look) return;
       for (const table of ctx.store.getState().tables.tables) {
-        if (same(overlayStyleName(table))) updateTableOverlay(ctx.store, table.id, look);
+        if (sameStyleName(overlayStyleName(table), name))
+          repointTableStyle(ctx.store, table.id, look);
       }
     });
     if (workbook) {
@@ -164,41 +218,95 @@ export function deleteCustomStyle(
   return true;
 }
 
+/** How a Modify dialog's Set As Default checkbox applies to `kind`'s workbook default. */
+export interface ModifyStyleDefault {
+  workbook: StyleDefaultsWorkbook | null;
+  kind: 'table' | 'pivot';
+  setAsDefault: boolean;
+}
+
 /** Replaces the custom style `name` with `next`, as Modify does, as one undo step. Every kind
  *  the style is flagged for takes the change; its tables and PivotTables follow under the new
- *  name. False when no custom style has that name. */
+ *  name, and so does a workbook default that named it. `defaults` applies the dialog's Set As
+ *  Default checkbox: ticked makes the style `kind`'s default, unticked clears that default when
+ *  it named the style. False when no custom style has that name, or the new name is taken. */
 export function modifyCustomStyle(
   ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
   name: string,
   next: Omit<CustomTableStyle, 'id'>,
+  defaults?: ModifyStyleDefault,
 ): boolean {
   const state = ctx.store.getState();
-  const named = (style: CustomTableStyle): boolean =>
-    style.label.toLocaleLowerCase() === name.toLocaleLowerCase();
+  const named = (style: CustomTableStyle): boolean => sameStyleName(style.label, name);
   const table = (state.tables.customTableStyles ?? []).find(named);
   const pivot = (state.tables.customPivotTableStyles ?? []).find(named);
   const label = next.label.trim();
   if ((!table && !pivot) || !label) return false;
-  recordTablesChange(ctx.history, ctx.store, () => {
-    const assigned = (ctx.store.getState().tables.pivotTableStyles ?? []).filter(
-      (a) => a.styleId === pivot?.id,
-    );
-    mutators.removeCustomStylesNamed(ctx.store, name);
-    if (table) {
-      const id = customTableStyleId(label);
-      mutators.upsertCustomTableStyle(ctx.store, { ...next, id, label });
-      const look = overlayLook(tableStyleOptionsById(ctx.store.getState(), id));
-      for (const overlay of ctx.store.getState().tables.tables) {
-        if (overlayStyleName(overlay).toLocaleLowerCase() === name.toLocaleLowerCase()) {
-          updateTableOverlay(ctx.store, overlay.id, look);
+  if (customStyleNameError(state, label, { exceptLabel: name })) return false;
+  inTransaction(ctx.history, () => {
+    // The engine resets a default whose style it removes: a default naming the old name moves
+    // first, and a ticked one is set again once the style is back.
+    const workbook = defaults?.workbook;
+    const before = workbook?.getTableStyleDefaults();
+    const key = defaults?.kind === 'pivot' ? 'pivotStyle' : 'tableStyle';
+    if (defaults && workbook && before) {
+      recordStyleDefaults(ctx.history, workbook, {
+        ...(table && sameStyleName(before.tableStyle, name) ? { tableStyle: label } : {}),
+        ...(pivot && sameStyleName(before.pivotStyle, name) ? { pivotStyle: label } : {}),
+        ...(defaults.setAsDefault
+          ? { [key]: label }
+          : sameStyleName(before[key], name)
+            ? { [key]: '' }
+            : {}),
+      });
+    }
+    recordTablesChange(ctx.history, ctx.store, () => {
+      const assigned = (ctx.store.getState().tables.pivotTableStyles ?? []).filter(
+        (a) => a.styleId === pivot?.id,
+      );
+      mutators.removeCustomStylesNamed(ctx.store, name);
+      if (table) {
+        const id = customTableStyleId(label);
+        mutators.upsertCustomTableStyle(ctx.store, { ...next, id, label });
+        const look = styleLook(ctx.store.getState(), id);
+        for (const overlay of ctx.store.getState().tables.tables) {
+          if (look && sameStyleName(overlayStyleName(overlay), name)) {
+            repointTableStyle(ctx.store, overlay.id, look);
+          }
         }
       }
-    }
-    if (pivot) {
-      const id = customPivotTableStyleId(label);
-      mutators.upsertCustomPivotTableStyle(ctx.store, { ...next, id, label });
-      for (const a of assigned) mutators.upsertPivotTableStyle(ctx.store, { ...a, styleId: id });
-    }
+      if (pivot) {
+        const id = customPivotTableStyleId(label);
+        mutators.upsertCustomPivotTableStyle(ctx.store, { ...next, id, label });
+        for (const a of assigned) mutators.upsertPivotTableStyle(ctx.store, { ...a, styleId: id });
+      }
+    });
+    if (defaults?.setAsDefault && workbook)
+      recordStyleDefaults(ctx.history, workbook, { [key]: label });
+  });
+  return true;
+}
+
+/** Adds a custom style of `kind` from a dialog result, and makes it the workbook default of its
+ *  kind when asked, as one undo step. False when the name is empty or taken. */
+export function createCustomStyle(
+  ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
+  workbook: StyleDefaultsWorkbook | null,
+  kind: 'table' | 'pivot',
+  value: {
+    name: string;
+    elements: CustomTableStyle['elements'];
+    stripeSizes: CustomTableStyle['stripeSizes'];
+    setAsDefault: boolean;
+  },
+): boolean {
+  const label = value.name.trim();
+  if (!label || customStyleNameError(ctx.store.getState(), label)) return false;
+  const look = { elements: value.elements, stripeSizes: value.stripeSizes };
+  inTransaction(ctx.history, () => {
+    if (kind === 'table') createTableStyleFromActiveTable(ctx.store, ctx.history, label, look);
+    else createPivotTableStyleFromActivePivot(ctx.store, ctx.history, label, look);
+    if (value.setAsDefault) setStyleDefault(workbook, kind, label, ctx.history);
   });
   return true;
 }
@@ -219,25 +327,31 @@ export function applyPivotStyle(
   const history = ctx.history;
   const transaction = history?.begin();
   try {
+    const applied = updatePivotStyleInfo({ store: ctx.store, workbook, history }, at, {
+      name: styleId,
+    });
     // A built-in style replaces a custom assignment, which would otherwise win on the next sync.
-    if (pivotTableStyleAssignment(state, at.sheetIndex, at.pivotIndex)) {
+    if (applied && pivotTableStyleAssignment(state, at.sheetIndex, at.pivotIndex)) {
       recordTablesChange(history, ctx.store, () => mutators.removePivotTableStyle(ctx.store, at));
     }
-    return updatePivotStyleInfo({ store: ctx.store, workbook, history }, at, { name: styleId });
+    return applied;
   } finally {
     if (history && transaction) history.end(transaction);
   }
 }
 
 /** Makes the style `name` (a built-in name or a custom style's label) its kind's workbook default,
- *  as Set As Default does. False when the engine keeps no defaults. */
+ *  as Set As Default does; with `history` and a workbook that reads its defaults, the change is
+ *  recorded on it. False when the engine keeps no defaults. */
 export function setStyleDefault(
-  workbook: Pick<WorkbookHandle, 'setTableStyleDefaults'> | null,
+  workbook: (Pick<WorkbookHandle, 'setTableStyleDefaults'> & Partial<StyleDefaultsWorkbook>) | null,
   kind: 'table' | 'pivot',
   name: string,
+  history: History | null = null,
 ): boolean {
   if (!workbook || name === '') return false;
-  return workbook.setTableStyleDefaults(
-    kind === 'table' ? { tableStyle: name } : { pivotStyle: name },
-  );
+  const change = kind === 'table' ? { tableStyle: name } : { pivotStyle: name };
+  return history && workbook.getTableStyleDefaults
+    ? recordStyleDefaults(history, workbook as StyleDefaultsWorkbook, change)
+    : workbook.setTableStyleDefaults(change);
 }

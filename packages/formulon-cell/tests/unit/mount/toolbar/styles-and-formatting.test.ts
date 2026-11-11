@@ -674,11 +674,8 @@ describe('Spreadsheet.mountToolbar', () => {
         elements: {},
       }),
     ]);
-    expect(sheet.instance.store.getState().tables.pivotTableStyles).toContainEqual({
-      sheetIndex: 0,
-      pivotIndex: 2,
-      styleId: customPivotTableStyleId('Review Pivot'),
-    });
+    // New PivotTable Style adds the style without assigning it to the active PivotTable.
+    expect(sheet.instance.store.getState().tables.pivotTableStyles ?? []).toEqual([]);
     tb.rerender();
     const pivotGalleryButton = host.querySelector<HTMLButtonElement>(
       '[data-ribbon-command="formatTableHome"]',

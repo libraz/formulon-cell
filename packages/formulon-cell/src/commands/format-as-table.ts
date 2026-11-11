@@ -452,6 +452,62 @@ export function customPivotTableStyleId(name: string): string {
   return `${CUSTOM_PIVOT_TABLE_STYLE_PREFIX}${name.trim()}`;
 }
 
+/** Whether two style names are the same: the desktop app compares them case-insensitively. */
+export const sameStyleName = (a: string, b: string): boolean =>
+  a.toLocaleLowerCase() === b.toLocaleLowerCase();
+
+/** The gallery id a table or PivotTable style name is shown as: the id of the custom style that
+ *  label names (any case), else the name itself, which is a built-in name or '' for none. */
+export const galleryStyleIdOf = (customs: readonly CustomTableStyle[], name: string): string =>
+  customs.find((style) => sameStyleName(style.label, name))?.id ?? name;
+
+/** The table style gallery id the style name `name` is current as. */
+export const currentTableStyleId = (
+  state: { tables: { customTableStyles?: readonly CustomTableStyle[] } },
+  name: string,
+): string => galleryStyleIdOf(state.tables.customTableStyles ?? [], name);
+
+/** The PivotTable style gallery id the style name `name` is current as. */
+export const currentPivotStyleId = (
+  state: { tables: { customPivotTableStyles?: readonly CustomTableStyle[] } },
+  name: string,
+): string => galleryStyleIdOf(state.tables.customPivotTableStyles ?? [], name);
+
+/** Every built-in table and PivotTable style name. */
+const builtinStyleNames = (): string[] => [
+  ...BUILTIN_TABLE_STYLES.map((entry) => entry.name),
+  ...pivotStyleGallerySections([]).flatMap((section) =>
+    section.kind === 'custom' ? [] : section.names.filter((name) => name !== ''),
+  ),
+];
+
+/** Why `name` cannot name a custom style: another custom style of either kind, or a built-in
+ *  table or PivotTable style, already has it. `exceptLabel` is the style being modified. */
+export function customStyleNameError(
+  state: {
+    tables: {
+      customTableStyles?: readonly CustomTableStyle[];
+      customPivotTableStyles?: readonly CustomTableStyle[];
+    };
+  },
+  name: string,
+  options: { exceptLabel?: string } = {},
+): 'exists' | null {
+  const label = name.trim();
+  const { exceptLabel } = options;
+  const clash = [
+    ...(state.tables.customTableStyles ?? []),
+    ...(state.tables.customPivotTableStyles ?? []),
+  ].some(
+    (style) =>
+      sameStyleName(style.label, label) &&
+      !(exceptLabel !== undefined && sameStyleName(style.label, exceptLabel)),
+  );
+  return clash || builtinStyleNames().some((builtin) => sameStyleName(builtin, label))
+    ? 'exists'
+    : null;
+}
+
 export function listCustomTableStyles(state: {
   tables: { customTableStyles?: readonly CustomTableStyle[] };
 }): readonly CustomTableStyle[] {
@@ -608,14 +664,17 @@ export function formatAsTable(
   return storedOverlay(store, overlay);
 }
 
-/** Overlay options for a built-in style id or a custom table style id. */
+/** Overlay options for a built-in style id, a custom table style id or a family id; null for an
+ *  id that names none of them. */
 export function tableStyleOptionsById(
   state: { tables: { customTableStyles?: readonly CustomTableStyle[] } },
   styleId: string,
   color?: string,
   variant: TableVariant = 'banded',
-): Pick<TableOverlay, 'banded' | 'firstCol' | 'styleName'> &
-  Partial<Pick<TableOverlay, 'style' | 'color'>> {
+):
+  | (Pick<TableOverlay, 'banded' | 'firstCol' | 'styleName'> &
+      Partial<Pick<TableOverlay, 'style' | 'color'>>)
+  | null {
   const custom = customTableStyleById(state, styleId);
   if (custom) return { styleName: custom.label, ...tableVariantOptions(variant) };
   // A built-in name keeps the name; the grid approximates it by family and hue.
@@ -628,12 +687,8 @@ export function tableStyleOptionsById(
       ...tableVariantOptions(variant),
     };
   }
-  return {
-    style: styleId as TableStyle,
-    color,
-    styleName: undefined,
-    ...tableVariantOptions(variant),
-  };
+  if (styleId !== 'light' && styleId !== 'medium' && styleId !== 'dark') return null;
+  return { style: styleId, color, styleName: undefined, ...tableVariantOptions(variant) };
 }
 
 /** The built-in style a new table takes when the workbook names no default table style. */
@@ -648,7 +703,8 @@ export function defaultTableStyleId(
   if (name === '') return FALLBACK_TABLE_STYLE;
   if (parseTableStyleName(name)) return name;
   return (
-    listCustomTableStyles(state).find((style) => style.label === name)?.id ?? FALLBACK_TABLE_STYLE
+    listCustomTableStyles(state).find((style) => sameStyleName(style.label, name))?.id ??
+    FALLBACK_TABLE_STYLE
   );
 }
 
@@ -663,10 +719,8 @@ export function formatAsTableByStyleId(
     'showHeader' | 'showTotal' | 'firstCol' | 'lastCol' | 'workbook' | 'totalsLabel' | 'name'
   > = {},
 ): TableOverlay | null {
-  return formatAsTable(store, range, {
-    ...tableStyleOptionsById(store.getState(), styleId, color, variant),
-    ...options,
-  });
+  const look = tableStyleOptionsById(store.getState(), styleId, color, variant);
+  return look ? formatAsTable(store, range, { ...look, ...options }) : null;
 }
 
 /** Elements and stripe sizes for a new custom style: the caller's, else the active table's look. */
@@ -708,11 +762,11 @@ export function createTableStyleFromActiveTable(
   return true;
 }
 
+/** Adds a custom PivotTable style; like the table path it assigns the style to no PivotTable. */
 export function createPivotTableStyleFromActivePivot(
   store: SpreadsheetStore,
   history: History | null,
   name: string,
-  pivot?: { sheetIndex: number; pivotIndex: number } | null,
   options: CreateCustomTableStyleOptions = {},
 ): boolean {
   const label = name.trim();
@@ -725,19 +779,11 @@ export function createPivotTableStyleFromActivePivot(
       state.selection.active.row,
       state.selection.active.col,
     );
-    const style = {
+    mutators.upsertCustomPivotTableStyle(store, {
       id: customPivotTableStyleId(label),
       label,
       ...newStyleBody(options, activeTable),
-    };
-    mutators.upsertCustomPivotTableStyle(store, style);
-    if (pivot) {
-      mutators.upsertPivotTableStyle(store, {
-        sheetIndex: pivot.sheetIndex,
-        pivotIndex: pivot.pivotIndex,
-        styleId: style.id,
-      });
-    }
+    });
   });
   return true;
 }
@@ -843,14 +889,37 @@ export function updateTableOverlay(
   id: string,
   patch: TableOverlayPatch,
 ): TableOverlay | null {
+  return patchTableOverlay(store, id, patch, false);
+}
+
+/** Re-points a table to the look of another style after a workbook-level style change (delete or
+ *  modify). Only the derived look changes, and a protected sheet takes it too; every other table
+ *  option stays gated. Desktop behaviour on a protected sheet is unmeasured. */
+export function repointTableStyle(
+  store: SpreadsheetStore,
+  id: string,
+  look: Pick<TableOverlay, 'style' | 'color' | 'styleName'>,
+): TableOverlay | null {
+  const { style, color, styleName } = look;
+  return patchTableOverlay(store, id, { style, color, styleName }, true);
+}
+
+function patchTableOverlay(
+  store: SpreadsheetStore,
+  id: string,
+  patch: TableOverlayPatch,
+  styleDriven: boolean,
+): TableOverlay | null {
   const current = tableOverlayById(store.getState(), id);
   if (!current) return null;
   // A protected sheet still lets the style toggles change, and a total cell it leaves unlocked.
-  const permitted = Object.keys(patch).every(
-    (key) =>
-      TABLE_FIELDS_ALLOWED_ON_PROTECTED_SHEET.has(key) ||
-      (key === 'totals' && totalCellsWritable(store, current, patch.totals)),
-  );
+  const permitted =
+    styleDriven ||
+    Object.keys(patch).every(
+      (key) =>
+        TABLE_FIELDS_ALLOWED_ON_PROTECTED_SHEET.has(key) ||
+        (key === 'totals' && totalCellsWritable(store, current, patch.totals)),
+    );
   if (!permitted && blockedByProtection(store, current.range.sheet, 'updateTableOverlay'))
     return null;
   if (patch.range && overlapsOtherTable(store, id, patch.range)) return null;

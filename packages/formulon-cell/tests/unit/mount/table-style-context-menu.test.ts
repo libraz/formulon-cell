@@ -112,6 +112,14 @@ describe('table style gallery context menu', () => {
     expect(sheet.workbook.getTableStyleDefaults()?.tableStyle).toBe('TableStyleMedium5');
   });
 
+  it('undoes Set As Default in one step', () => {
+    const before = sheet.workbook.getTableStyleDefaults()?.tableStyle;
+    rightClick('[data-table-quick-style="TableStyleMedium5"]');
+    item('Set As Default').click();
+    expect(sheet.instance.history.undo()).toBe(true);
+    expect(sheet.workbook.getTableStyleDefaults()?.tableStyle).toBe(before);
+  });
+
   it('deletes a custom style, moving its tables to the default style, as one undo step', () => {
     createTableStyleFromActiveTable(sheet.instance.store, sheet.instance.history, 'Review', {
       elements: galleryStyleElements('dark', '#4472c4', 'banded'),

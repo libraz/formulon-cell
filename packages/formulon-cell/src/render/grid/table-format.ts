@@ -8,6 +8,7 @@ import {
   isLastCol,
   isTotalRow,
   overlayStyleName,
+  sameStyleName,
   type TableOverlay,
   tableForCell,
 } from '../../commands/format-as-table.js';
@@ -31,6 +32,25 @@ const inBody = (table: TableOverlay, row: number, col: number): boolean =>
   !isHeaderRow(table, row, col) &&
   !isTotalRow(table, row, col);
 
+/** First and last body row: below the header and above the total row. */
+const bodyTop = (table: TableOverlay): number => table.range.r0 + (table.showHeader ? 1 : 0);
+const bodyBottom = (table: TableOverlay): number => table.range.r1 - (table.showTotal ? 1 : 0);
+
+/** The offsets, from the body's first row or column, of the stripe band holding offset `n`:
+ *  `own` is that band's size, `other` the alternate band's. */
+const stripeBand = (
+  n: number,
+  isFirst: boolean,
+  own = 1,
+  other = 1,
+): { start: number; end: number } => {
+  const size = Math.max(1, own);
+  const period = size + Math.max(1, other);
+  const cycle = Math.floor(n / period) * period;
+  const start = cycle + (isFirst ? 0 : Math.max(1, other));
+  return { start, end: start + size - 1 };
+};
+
 /** The format a table paints at (row, col): a built-in style from its own
  *  definition under the workbook theme, a custom one from its elements, else
  *  an approximation by family and hue. */
@@ -44,9 +64,7 @@ export function tableCellFormat(
   const { r0, r1, c0, c1 } = table.range;
   const name = overlayStyleName(table);
   const builtin = builtinTableStyleElements(name, themeColors);
-  const custom = builtin
-    ? undefined
-    : customs.find((c) => c.label.toLocaleLowerCase() === name.toLocaleLowerCase());
+  const custom = builtin ? undefined : customs.find((c) => sameStyleName(c.label, name));
   const sizes = custom?.stripeSizes;
   const regions: StyleElementRegion[] = [{ type: 'wholeTable', r0, r1, c0, c1 }];
   const header = isHeaderRow(table, row, col);
@@ -62,22 +80,42 @@ export function tableCellFormat(
     if (col === c1) regions.push({ type: 'lastTotalCell', r0: r1, r1, c0: c1, c1 });
   }
   if (table.banded && inBody(table, row, col)) {
-    const type = isBandedRow(table, row, col, {
+    const first = isBandedRow(table, row, col, {
       first: sizes?.firstRowStripe,
       second: sizes?.secondRowStripe,
-    })
-      ? 'firstRowStripe'
-      : 'secondRowStripe';
-    regions.push({ type, r0: row, r1: row, c0, c1 });
+    });
+    const band = stripeBand(
+      row - bodyTop(table),
+      first,
+      first ? sizes?.firstRowStripe : sizes?.secondRowStripe,
+      first ? sizes?.secondRowStripe : sizes?.firstRowStripe,
+    );
+    regions.push({
+      type: first ? 'firstRowStripe' : 'secondRowStripe',
+      r0: bodyTop(table) + band.start,
+      r1: Math.min(bodyTop(table) + band.end, bodyBottom(table)),
+      c0,
+      c1,
+    });
   }
   if (table.colStripes && inBody(table, row, col)) {
-    const type = isBandedCol(table, row, col, {
+    const first = isBandedCol(table, row, col, {
       first: sizes?.firstColumnStripe,
       second: sizes?.secondColumnStripe,
-    })
-      ? 'firstColumnStripe'
-      : 'secondColumnStripe';
-    regions.push({ type, r0, r1, c0: col, c1: col });
+    });
+    const band = stripeBand(
+      col - c0,
+      first,
+      first ? sizes?.firstColumnStripe : sizes?.secondColumnStripe,
+      first ? sizes?.secondColumnStripe : sizes?.firstColumnStripe,
+    );
+    regions.push({
+      type: first ? 'firstColumnStripe' : 'secondColumnStripe',
+      r0: bodyTop(table),
+      r1: bodyBottom(table),
+      c0: c0 + band.start,
+      c1: Math.min(c0 + band.end, c1),
+    });
   }
   if (isFirstCol(table, row, col)) regions.push({ type: 'firstColumn', r0, r1, c0, c1: c0 });
   if (isLastCol(table, row, col)) regions.push({ type: 'lastColumn', r0, r1, c0: c1, c1 });

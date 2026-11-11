@@ -451,6 +451,7 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     tableStyleNewPivotTitle: '새 피벗 테이블 스타일',
     tableStyleModifyPivotTitle: '피벗 테이블 스타일 수정',
     tableStyleDefaultName: '표 스타일 {n}',
+    tableStyleNameExists: '이 스타일 이름은 이미 있습니다.',
     pivotStyleDefaultName: '피벗 스타일 {n}',
     tableStyleElements: {
       wholeTable: '전체 표',

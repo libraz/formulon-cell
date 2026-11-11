@@ -457,6 +457,7 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     tableStyleNewPivotTitle: 'Nouveau style de tableau croisé dynamique',
     tableStyleModifyPivotTitle: 'Modifier le style de tableau croisé dynamique',
     tableStyleDefaultName: 'Style de tableau {n}',
+    tableStyleNameExists: 'Ce nom de style existe déjà.',
     pivotStyleDefaultName: 'Style de tableau croisé dynamique {n}',
     tableStyleElements: {
       wholeTable: 'Tableau entier',

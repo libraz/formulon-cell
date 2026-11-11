@@ -92,6 +92,8 @@ export interface TableStyleDialogOptions {
   mac: boolean;
   strings: Strings;
   initial: Omit<TableStyleDialogValue, 'setAsDefault'> & { setAsDefault?: boolean };
+  /** The error message for a name the style cannot take, or null when it is free. */
+  validateName?: (name: string) => string | null;
   /** Opens the differential Format Cells for one element; `apply` receives the new format. */
   editFormat: (initial: Partial<CellFormat>, apply: (format: Partial<CellFormat>) => void) => void;
   /** Describes an element's format for the Element Formatting line. */
@@ -283,11 +285,21 @@ export const showTableStyleDialog = (
     const onOk = (): TableStyleDialogValue | null => {
       const label = name.valueOrError(errorRow, strings.namedRangeDialog.errorEmptyName);
       if (label === null) return null;
+      const taken = opts.validateName?.(label);
+      if (taken) {
+        name.showError(errorRow, taken);
+        return null;
+      }
+      // The engine drops a stripe size whose element is absent.
+      const sizes = Object.fromEntries(
+        Object.entries(stripeSizes).filter(([element]) => elements[element as StripeElement]),
+      );
       const value: TableStyleDialogValue = {
         name: label,
         elements,
-        stripeSizes,
-        setAsDefault: setDefault?.checked === true,
+        stripeSizes: sizes,
+        // Without the checkbox the style keeps the default it had.
+        setAsDefault: setDefault ? setDefault.checked : opts.initial.setAsDefault === true,
       };
       lifecycle.finish(value);
       return value;

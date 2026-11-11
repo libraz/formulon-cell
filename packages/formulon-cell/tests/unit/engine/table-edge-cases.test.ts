@@ -68,7 +68,7 @@ describe('table styles and refresh edge cases', () => {
     createTableStyleFromActiveTable(store, history, 'Same', {
       elements: galleryStyleElements('medium', '#4472c4', 'banded'),
     });
-    createPivotTableStyleFromActivePivot(store, history, 'Same', null, {
+    createPivotTableStyleFromActivePivot(store, history, 'Same', {
       elements: galleryStyleElements('dark', '#4472c4', 'banded'),
     });
     expect(store.getState().tables.customPivotTableStyles).toEqual([]);
@@ -81,7 +81,7 @@ describe('table styles and refresh edge cases', () => {
     createTableStyleFromActiveTable(store, history, 'Same', {
       elements: galleryStyleElements('medium', '#4472c4', 'banded'),
     });
-    createPivotTableStyleFromActivePivot(store, history, 'Same', null, {
+    createPivotTableStyleFromActivePivot(store, history, 'Same', {
       elements: galleryStyleElements('medium', '#4472c4', 'banded'),
     });
     expect(wb.getCustomTableStyles()[0]).toMatchObject({ table: true, pivot: true });

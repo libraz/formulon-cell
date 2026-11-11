@@ -8,15 +8,17 @@ import {
 } from '../../commands/cell-styles.js';
 import { addConditionalRule } from '../../commands/conditional-format.js';
 import {
-  createPivotTableStyleFromActivePivot,
-  createTableStyleFromActiveTable,
+  currentPivotStyleId,
+  currentTableStyleId,
   customPivotTableStyleById,
+  customStyleNameError,
   customTableStyleById,
   defaultTableStyleId,
   formatAsTableByStyleId,
   inferTableHasHeaders,
   nextTableName,
   overlayStyleName,
+  sameStyleName,
   type TableVariant,
   tableNameError,
   tableOverlayAt,
@@ -24,6 +26,7 @@ import {
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
 import { recordConditionalRulesChange, recordTablesChange } from '../../commands/slice-history.js';
 import {
+  overlapsTable,
   tableChangeAllowed,
   tableSourceForSelection,
   tableWrite,
@@ -33,8 +36,8 @@ import {
   applyTableStyle,
   clearTableRangeFormatting,
   clearTableStyle,
+  createCustomStyle,
   modifyCustomStyle,
-  setStyleDefault,
 } from '../../commands/table-style-actions.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
 import { builtinTableStyleElements } from '../../engine/builtin-table-styles.js';
@@ -196,9 +199,11 @@ const updateTableStylesMenu =
     const state = instance.store.getState();
     const active = state.selection.active;
     const activeTable = tableOverlayAt(state, active.sheet, active.row, active.col);
-    const activeStyleName = activeTable ? overlayStyleName(activeTable) : null;
+    const activeStyleId = activeTable
+      ? currentTableStyleId(state, overlayStyleName(activeTable))
+      : null;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-table-style]')) {
-      const activeStyle = activeStyleName !== null && button.dataset.tableStyle === activeStyleName;
+      const activeStyle = activeStyleId !== null && button.dataset.tableStyle === activeStyleId;
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-checked', String(activeStyle));
       button.classList.toggle('fc-tb__menu-item--active', activeStyle);
@@ -220,10 +225,7 @@ const activePivotStyleId = (
   );
   if (!pivot) return { pivot: null, id: null };
   const name = instance.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)?.name ?? '';
-  const custom = (state.tables.customPivotTableStyles ?? []).find(
-    (style) => style.label.toLocaleLowerCase() === name.toLocaleLowerCase(),
-  );
-  return { pivot, id: custom?.id ?? name };
+  return { pivot, id: currentPivotStyleId(state, name) };
 };
 
 const updatePivotStylesMenu =
@@ -318,46 +320,59 @@ export const showCreateTableDialog = async (
   if (!range) return;
   const ctx = { store: instance.store, history: instance.history, ...entry };
   if (options.clearFormatting && !tableChangeAllowed(ctx, range)) return;
+  // A range over another table creates nothing, so it clears nothing either.
+  if (overlapsTable(instance.store.getState(), range)) {
+    instance.host.focus();
+    return;
+  }
   const transaction = options.clearFormatting ? instance.history.begin() : null;
-  if (options.clearFormatting) clearTableRangeFormatting(ctx, range);
-  tableWrite(ctx, range, undefined, () => {
-    recordTablesChange(instance.history, instance.store, () => {
-      formatAsTableByStyleId(
-        instance.store,
-        range,
-        options.style ?? defaultTableStyleId(instance.store.getState(), instance.workbook),
-        options.color,
-        options.variant ?? 'banded',
-        {
-          showHeader: result.hasHeaders,
-          workbook: instance.workbook,
-          ...(result.name ? { name: result.name } : {}),
-        },
-      );
+  let created = false;
+  try {
+    if (options.clearFormatting) clearTableRangeFormatting(ctx, range);
+    created = tableWrite(ctx, range, false, () => {
+      let table: unknown = null;
+      recordTablesChange(instance.history, instance.store, () => {
+        table = formatAsTableByStyleId(
+          instance.store,
+          range,
+          options.style ?? defaultTableStyleId(instance.store.getState(), instance.workbook),
+          options.color,
+          options.variant ?? 'banded',
+          {
+            showHeader: result.hasHeaders,
+            workbook: instance.workbook,
+            ...(result.name ? { name: result.name } : {}),
+          },
+        );
+      });
+      return table !== null;
     });
-  });
-  if (transaction) instance.history.end(transaction);
+  } finally {
+    if (transaction) {
+      // The engine can still refuse the table; its formatting then stays as it was.
+      if (created) instance.history.end(transaction);
+      else instance.history.abort(transaction);
+    }
+  }
   instance.host.focus();
 };
 
-/** The first `template` name, numbered from 1, that no custom style of `kind` uses. */
-const freeStyleName = (instance: SpreadsheetInstance, template: string): string => {
+/** The first `template` name, numbered from 1, that no custom table or PivotTable style, and no
+ *  built-in style, uses. */
+const freeStyleName = (instance: SpreadsheetInstance, template: string, first = 1): string => {
   const state = instance.store.getState();
-  const taken = new Set(
-    [...(state.tables.customTableStyles ?? []), ...(state.tables.customPivotTableStyles ?? [])].map(
-      (style) => style.label.toLocaleLowerCase(),
-    ),
-  );
-  for (let n = 1; ; n += 1) {
+  for (let n = first; ; n += 1) {
     const name = template.replace('{n}', String(n));
-    if (!taken.has(name.toLocaleLowerCase())) return name;
+    if (!customStyleNameError(state, name)) return name;
   }
 };
 
-/** Runs the table style dialog with the instance's differential Format Cells behind Format. */
+/** Runs the table style dialog with the instance's differential Format Cells behind Format.
+ *  `exceptLabel` is the style being modified, which may keep its own name. */
 const runTableStyleDialog = async (
   instance: SpreadsheetInstance,
   opts: Pick<TableStyleDialogOptions, 'kind' | 'mode' | 'initial'>,
+  exceptLabel?: string,
 ): Promise<TableStyleDialogValue | null> => {
   const strings = instance.i18n.strings;
   const format: { dialog: FormatDialogHandle | null } = { dialog: null };
@@ -367,6 +382,10 @@ const runTableStyleDialog = async (
       ...opts,
       mac: instance.host.dataset.fcPlatform === 'mac',
       strings,
+      validateName: (name) =>
+        customStyleNameError(instance.store.getState(), name, { exceptLabel })
+          ? strings.ribbonMenu.tableStyleNameExists
+          : null,
       editFormat: (initial, apply) => {
         format.dialog ??= attachFormatDialog({
           host: instance.host,
@@ -400,26 +419,12 @@ const saveNewStyle = (
   kind: TableStyleKind,
   value: TableStyleDialogValue,
 ): void => {
-  const look = { elements: value.elements, stripeSizes: value.stripeSizes };
-  if (kind === 'table') {
-    createTableStyleFromActiveTable(instance.store, instance.history, value.name, look);
-    if (value.setAsDefault) setStyleDefault(instance.workbook, 'table', value.name.trim());
-    return;
-  }
-  const state = instance.store.getState();
-  const pivot = findPivotTableAtCell(
-    instance.workbook as unknown as Parameters<typeof findPivotTableAtCell>[0],
-    state.selection.active,
+  createCustomStyle(
+    { store: instance.store, history: instance.history },
+    instance.workbook,
+    kind,
+    value,
   );
-  createPivotTableStyleFromActivePivot(
-    instance.store,
-    instance.history,
-    value.name,
-    pivot ? { sheetIndex: pivot.sheetIndex, pivotIndex: pivot.pivotIndex } : null,
-    look,
-  );
-  if (value.setAsDefault)
-    instance.workbook.setTableStyleDefaults({ pivotStyle: value.name.trim() });
 };
 
 /** New Table Style / New PivotTable Style from a gallery footer. */
@@ -445,7 +450,8 @@ export const openNewTableStyle = async (
 };
 
 /** Modify or Duplicate from a style gallery item's context menu, for a table or PivotTable
- *  style. Duplicate names the copy after its source with a 2; that name is unmeasured. */
+ *  style. Duplicate names the copy after its source with the first free number from 2; that
+ *  name is unmeasured. */
 export const openTableStyleEditor = async (
   instance: SpreadsheetInstance,
   kind: TableStyleKind,
@@ -477,23 +483,28 @@ export const openTableStyleEditor = async (
   if (label === null || (mode === 'modify' && !custom)) return;
   const defaults = instance.workbook.getTableStyleDefaults();
   const currentDefault = kind === 'table' ? defaults?.tableStyle : defaults?.pivotStyle;
-  const value = await runTableStyleDialog(instance, {
-    kind,
-    mode: mode === 'modify' ? 'modify' : 'new',
-    initial: {
-      name: mode === 'modify' ? label : `${label} 2`,
-      elements: structuredClone(custom?.elements ?? builtinElements ?? {}),
-      stripeSizes: { ...custom?.stripeSizes },
-      setAsDefault: mode === 'modify' && currentDefault === label,
+  const value = await runTableStyleDialog(
+    instance,
+    {
+      kind,
+      mode: mode === 'modify' ? 'modify' : 'new',
+      initial: {
+        name: mode === 'modify' ? label : freeStyleName(instance, `${label} {n}`, 2),
+        elements: structuredClone(custom?.elements ?? builtinElements ?? {}),
+        stripeSizes: { ...custom?.stripeSizes },
+        setAsDefault:
+          mode === 'modify' && currentDefault !== undefined && sameStyleName(currentDefault, label),
+      },
     },
-  });
+    mode === 'modify' ? label : undefined,
+  );
   if (value && mode === 'modify') {
-    modifyCustomStyle({ store: instance.store, history: instance.history }, label, {
-      label: value.name,
-      elements: value.elements,
-      stripeSizes: value.stripeSizes,
-    });
-    if (value.setAsDefault) setStyleDefault(instance.workbook, kind, value.name.trim());
+    modifyCustomStyle(
+      { store: instance.store, history: instance.history },
+      label,
+      { label: value.name, elements: value.elements, stripeSizes: value.stripeSizes },
+      { workbook: instance.workbook, kind, setAsDefault: value.setAsDefault },
+    );
   } else if (value) {
     saveNewStyle(instance, kind, value);
   }

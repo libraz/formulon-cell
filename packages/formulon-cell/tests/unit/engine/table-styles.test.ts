@@ -1,6 +1,7 @@
 import { TableTotalsRowFunction } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  applyPivotTableStyleById,
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
   defaultTableOverlay,
@@ -244,7 +245,7 @@ describe('table styles through the engine', () => {
           'custom-table:Quarterly',
           undefined,
           'bandedFirstCol',
-        ),
+        ) ?? {},
       );
     });
 
@@ -301,12 +302,14 @@ describe('table styles through the engine', () => {
     expect(created).toMatchObject({ ok: true });
     if (!created.ok) return;
 
-    createPivotTableStyleFromActivePivot(
+    createPivotTableStyleFromActivePivot(store, null, 'Ledger', {
+      elements: galleryStyleElements('medium', '#ed7d31', 'banded'),
+    });
+    applyPivotTableStyleById(
       store,
       null,
-      'Ledger',
       { sheetIndex: 0, pivotIndex: created.pivotIndex },
-      { elements: galleryStyleElements('medium', '#ed7d31', 'banded') },
+      'custom-pivot-table:Ledger',
     );
 
     expect(wb.getPivotStyleInfo(0, created.pivotIndex)).toMatchObject({ name: 'Ledger' });
