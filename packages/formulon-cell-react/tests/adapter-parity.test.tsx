@@ -45,6 +45,30 @@ const exportedTypeKeys = (file: string, name: string): string[] => {
 const vueOptionKeys = (option: 'props' | 'emits'): string[] => {
   const sf = program.getSourceFile(vueSpreadsheet);
   const keys: string[] = [];
+  const unwrap = (expr: ts.Expression): ts.Expression =>
+    ts.isSatisfiesExpression(expr) || ts.isAsExpression(expr) ? unwrap(expr.expression) : expr;
+  // A spread `...name` contributes the keys of the module-level `const name = { ... }`.
+  const spreadSource = (name: string): ts.ObjectLiteralExpression | undefined => {
+    for (const stmt of sf?.statements ?? []) {
+      if (!ts.isVariableStatement(stmt)) continue;
+      for (const decl of stmt.declarationList.declarations) {
+        if (!ts.isIdentifier(decl.name) || decl.name.text !== name || !decl.initializer) continue;
+        const init = unwrap(decl.initializer);
+        if (ts.isObjectLiteralExpression(init)) return init;
+      }
+    }
+    return undefined;
+  };
+  const collect = (obj: ts.ObjectLiteralExpression): void => {
+    for (const p of obj.properties) {
+      if (ts.isSpreadAssignment(p) && ts.isIdentifier(p.expression)) {
+        const source = spreadSource(p.expression.text);
+        if (source) collect(source);
+      } else if (p.name && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))) {
+        keys.push(p.name.text);
+      }
+    }
+  };
   const visit = (node: ts.Node): void => {
     if (
       ts.isPropertyAssignment(node) &&
@@ -52,10 +76,7 @@ const vueOptionKeys = (option: 'props' | 'emits'): string[] => {
       node.name.text === option &&
       ts.isObjectLiteralExpression(node.initializer)
     ) {
-      for (const p of node.initializer.properties) {
-        if (p.name && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)))
-          keys.push(p.name.text);
-      }
+      collect(node.initializer);
       return;
     }
     ts.forEachChild(node, visit);
