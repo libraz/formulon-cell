@@ -76,9 +76,10 @@ const readMenuOrder = (menu: Locator) =>
 const OPTION_GATED = ['formatCells', 'showPhonetic', 'defineName', 'insertHyperlink'] as const;
 
 /** On a protected sheet under default options, Format Cells, Show Phonetic, Define Name and
- *  Hyperlink are greyed whatever the selection, while New Comment stays enabled. Clear Contents is
- *  greyed when the selection holds a locked cell, and Pick From Drop-down List when the active cell
- *  is locked; on unlocked cells both work, a pick being an undoable entry. */
+ *  Hyperlink are greyed whatever the selection, while New Comment stays enabled. New Note greys
+ *  too: notes follow Edit objects rather than the cell's lock, as Edit Note and Delete Note do.
+ *  Clear Contents is greyed when the selection holds a locked cell, and Pick From Drop-down List
+ *  when the active cell is locked; on unlocked cells both work, a pick being an undoable entry. */
 export async function runProtectedSheetMenuScenario(page: Page): Promise<void> {
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ locale: 'ja', platform: 'mac' });
@@ -87,13 +88,13 @@ export async function runProtectedSheetMenuScenario(page: Page): Promise<void> {
 
   await protectWithUnlocked(page, 'B3');
   let menu = await openCellMenu(sheet, page, 'B2:B4');
-  await expectItems(menu, [...OPTION_GATED, 'clear', 'pickFromList'], false);
+  await expectItems(menu, [...OPTION_GATED, 'insertComment', 'clear', 'pickFromList'], false);
   await expectItems(menu, ['newComment'], true);
   await closeMenu(page, menu);
 
   await protectWithUnlocked(page, 'B2:B5');
   menu = await openCellMenu(sheet, page, 'B2:B4');
-  await expectItems(menu, OPTION_GATED, false);
+  await expectItems(menu, [...OPTION_GATED, 'insertComment'], false);
   await expectItems(menu, ['clear', 'newComment', 'pickFromList'], true);
   expect(await readMenuOrder(menu)).toEqual(MAC_CELL_MENU);
   await closeMenu(page, menu);
