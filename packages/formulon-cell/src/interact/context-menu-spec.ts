@@ -449,6 +449,8 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
     filterSubmenu(s),
     sortSubmenu(s),
     { kind: 'sep', id: 'sep3' },
+    // New Comment before New Note, as the desktop Windows menu documents it; not measured here.
+    { kind: 'item', id: 'newComment', label: t.newComment },
     { kind: 'item', id: 'insertComment', label: t.insertComment, hint: '⇧F2' },
     { kind: 'item', id: 'deleteComment', label: t.deleteComment },
     { kind: 'item', id: 'showHideNote', label: t.showHideNote },

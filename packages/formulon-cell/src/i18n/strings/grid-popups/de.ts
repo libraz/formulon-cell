@@ -42,6 +42,7 @@ export const gridPopupsDe: GridPopupsStrings = {
     colUnhide: 'Spalten einblenden',
     colGroup: 'Spalten gruppieren',
     colUngroup: 'Gruppierung der Spalten aufheben',
+    newComment: 'Neuer Kommentar',
     insertComment: 'Kommentar bearbeiten…',
     deleteComment: 'Kommentar löschen',
     showHideNote: 'Notiz ein-/ausblenden',

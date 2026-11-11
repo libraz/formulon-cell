@@ -44,6 +44,7 @@ export interface GridPopupsStrings {
     rowUngroup: string;
     colGroup: string;
     colUngroup: string;
+    newComment: string;
     insertComment: string;
     deleteComment: string;
     showHideNote: string;

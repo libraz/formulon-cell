@@ -42,6 +42,7 @@ export const gridPopupsZh: GridPopupsStrings = {
     colUnhide: '取消隐藏列',
     colGroup: '组合列',
     colUngroup: '取消组合列',
+    newComment: '新建批注',
     insertComment: '编辑批注…',
     deleteComment: '删除批注',
     showHideNote: '显示/隐藏备注',

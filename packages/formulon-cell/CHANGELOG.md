@@ -46,6 +46,7 @@ versioning is [SemVer](https://semver.org/).
 - On a protected sheet, Format Cells, the phonetic commands and every formatting command need the Format cells option whatever the selection, as writes already did; Define Name, Create from Selection and Data Validation are unavailable, while the Name Manager and New Comment stay available.
 - The Home Clear control is decided by the selected cells, and its Clear Hyperlinks item needs the Insert hyperlinks option on a protected sheet.
 - The Mac cell context menu follows the desktop order and groups, with New Comment and the note rows beside it.
+- The Windows cell context menu offers New Comment, which starts a thread, before New Note.
 - A pick from a validation list is an authorized, undoable cell entry.
 - **Breaking:** `Strings.mac.contextMenu.newNote` is now `newComment`.
 

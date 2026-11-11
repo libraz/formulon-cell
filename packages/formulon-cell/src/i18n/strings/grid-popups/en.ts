@@ -42,6 +42,7 @@ export const gridPopupsEn: GridPopupsStrings = {
     colUnhide: 'Unhide columns',
     colGroup: 'Group columns',
     colUngroup: 'Ungroup columns',
+    newComment: 'New Comment',
     insertComment: 'Edit comment…',
     deleteComment: 'Delete comment',
     showHideNote: 'Show/Hide Note',

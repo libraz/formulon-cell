@@ -131,6 +131,8 @@ describe('attachContextMenu', () => {
       'clear',
       'filterMenu',
       'sortMenu',
+      // Windows-unmeasured placement.
+      'newComment',
       'insertComment',
       'deleteComment',
       'showHideNote',

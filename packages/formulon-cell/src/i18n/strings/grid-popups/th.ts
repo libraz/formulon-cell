@@ -42,6 +42,7 @@ export const gridPopupsTh: GridPopupsStrings = {
     colUnhide: 'ยกเลิกการซ่อนคอลัมน์',
     colGroup: 'จัดกลุ่มคอลัมน์',
     colUngroup: 'ยกเลิกการจัดกลุ่มคอลัมน์',
+    newComment: 'ข้อคิดเห็นใหม่',
     insertComment: 'แก้ไขข้อคิดเห็น…',
     deleteComment: 'ลบข้อคิดเห็น',
     showHideNote: 'แสดง/ซ่อนบันทึกย่อ',

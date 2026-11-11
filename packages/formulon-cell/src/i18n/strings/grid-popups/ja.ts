@@ -42,6 +42,7 @@ export const gridPopupsJa: GridPopupsStrings = {
     colUnhide: '列の再表示',
     colGroup: '列をグループ化',
     colUngroup: '列のグループ解除',
+    newComment: '新しいコメント',
     insertComment: 'コメントを編集…',
     deleteComment: 'コメントを削除',
     showHideNote: 'メモの表示/非表示',

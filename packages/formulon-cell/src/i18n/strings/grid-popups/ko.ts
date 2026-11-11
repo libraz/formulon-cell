@@ -42,6 +42,7 @@ export const gridPopupsKo: GridPopupsStrings = {
     colUnhide: '열 숨기기 취소',
     colGroup: '열 그룹화',
     colUngroup: '열 그룹 해제',
+    newComment: '새 댓글',
     insertComment: '노트 편집…',
     deleteComment: '노트 삭제',
     showHideNote: '메모 표시/숨기기',
