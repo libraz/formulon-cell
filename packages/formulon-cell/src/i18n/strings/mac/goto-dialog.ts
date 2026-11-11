@@ -40,7 +40,33 @@ export const macGoToDialogJa: MacGoToDialogStrings = {
   noOptions: 'この選択項目にはオプションはありません。',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: kindComments, reference, selectCaption, optionsGroup, noOptions. */
+/** Mac app wording from the Excel bundle; not answered by it: kindComments, kindBlanks, reference, selectCaption, optionsGroup. */
+export const macGoToDialogDe: Partial<MacGoToDialogStrings> = {
+  noOptions: 'Für diese Auswahl sind keine Optionen vorhanden.',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: kindComments, kindBlanks, reference, selectCaption, optionsGroup. */
+export const macGoToDialogFr: Partial<MacGoToDialogStrings> = {
+  noOptions: 'Il n’y a aucune option pour cette sélection.',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: kindComments, kindBlanks, reference, selectCaption, optionsGroup. */
+export const macGoToDialogKo: Partial<MacGoToDialogStrings> = {
+  noOptions: '이 선택 사항에 대한 옵션이 없습니다.',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: kindComments, reference, selectCaption, optionsGroup. */
 export const macGoToDialogTh: Partial<MacGoToDialogStrings> = {
   kindBlanks: 'ว่าง',
+  noOptions: 'ไม่มีตัวเลือกสำหรับการเลือกนี้',
+};
+
+/** Mac app wording from the Excel bundle; not answered by it: kindComments, kindBlanks, reference, selectCaption, optionsGroup. */
+export const macGoToDialogZh: Partial<MacGoToDialogStrings> = {
+  noOptions: '没有适合此选择的选项。',
+};
+
+/** Mac app wording from the Excel bundle. */
+export const macGoToDialogEn: Partial<MacGoToDialogStrings> = {
+  noOptions: 'There are no options for this selection.',
 };

@@ -97,3 +97,9 @@ export const macNamedRangeDialogZh: Partial<MacNamedRangeDialogStrings> = {
   defineNamePrompt: '输入数据区域的名称:',
   defineRangePrompt: '选择单元格区域:',
 };
+
+/** Mac app wording from the Excel bundle. */
+export const macNamedRangeDialogEn: Partial<MacNamedRangeDialogStrings> = {
+  formulaHeader: 'Refers To',
+  defineNames: 'Names:',
+};

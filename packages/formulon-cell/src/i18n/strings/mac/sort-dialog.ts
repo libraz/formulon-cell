@@ -64,55 +64,83 @@ export const macSortDialogJa: MacSortDialogStrings = {
   caseSensitive: '大文字と小文字を区別する',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: sortDialogHeader, levelsHeading, columnHeading, sortOnValues, copyLevel, options, and 5 more. */
+/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation, and 1 more. */
 export const macSortDialogDe: Partial<MacSortDialogStrings> = {
+  sortDialogHeader: 'Meine Liste hat Kopfzeilen',
   sortDialogAscending: 'A bis Z',
   sortDialogDescending: 'Z bis A',
+  levelsHeading: 'Ebenen für die Sortierung hinzufügen:',
   sortOnHeading: 'Sortieren nach',
   colorHeading: 'Farbe/Symbol',
   sortTopToBottom: 'Zeilen sortieren',
   sortLeftToRight: 'Spalten sortieren',
+  usePhonetic: 'Silbentabelle',
+  noPhonetic: 'Zeichenfolge',
   caseSensitive: 'Groß-/Kleinschreibung beachten',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: sortDialogHeader, levelsHeading, columnHeading, sortOnValues, copyLevel, options, and 6 more. */
+/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation, and 2 more. */
 export const macSortDialogFr: Partial<MacSortDialogStrings> = {
+  sortDialogHeader: 'Ma liste contient des en-têtes',
   sortDialogAscending: 'De A à Z',
   sortDialogDescending: 'De Z à A',
+  levelsHeading: 'Ajouter des niveaux pour trier par :',
   sortOnHeading: 'Trier sur',
   colorHeading: 'Couleur/Icône',
   sortTopToBottom: 'Du haut vers le bas',
   sortLeftToRight: 'De la gauche vers la droite',
+  usePhonetic: 'Trier par syllabe',
+  noPhonetic: 'Trier par caractère',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: sortDialogHeader, levelsHeading, columnHeading, sortOnValues, copyLevel, options, and 5 more. */
+/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation, and 1 more. */
 export const macSortDialogKo: Partial<MacSortDialogStrings> = {
+  sortDialogHeader: '목록에 머리글 포함',
   sortDialogAscending: '텍스트 오름차순',
   sortDialogDescending: '텍스트 내림차순',
+  levelsHeading: '정렬 기준에 수준 추가:',
   sortOnHeading: '정렬 기준',
   colorHeading: '색상/아이콘',
   sortTopToBottom: '위쪽에서 아래쪽',
   sortLeftToRight: '왼쪽에서 오른쪽',
+  usePhonetic: '한글 사전순',
+  noPhonetic: '획순',
   caseSensitive: '대/소문자 구분',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: sortDialogHeader, levelsHeading, columnHeading, sortOnValues, copyLevel, options, and 5 more. */
+/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation, and 1 more. */
 export const macSortDialogTh: Partial<MacSortDialogStrings> = {
+  sortDialogHeader: 'รายการของฉันมีส่วนหัว',
   sortDialogAscending: 'ก ถึง ฮ',
   sortDialogDescending: 'ฮ ถึง ก',
+  levelsHeading: 'เพิ่มระดับเพื่อเรียงลำดับตาม:',
   sortOnHeading: 'เรียงลำดับ',
   colorHeading: 'สี/ไอคอน',
   sortTopToBottom: 'เรียงลำดับจากบนลงล่าง',
   sortLeftToRight: 'เรียงลำดับจากซ้ายไปขวา',
+  usePhonetic: 'การเรียงลำดับตามพยางค์',
+  noPhonetic: 'การเรียงลำดับตามขีด',
   caseSensitive: 'ตรงตามตัวพิมพ์ใหญ่-เล็ก',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: sortDialogHeader, sortDialogAscending, sortDialogDescending, levelsHeading, columnHeading, sortOnValues, and 6 more. */
+/** Mac app wording from the Excel bundle; not answered by it: sortDialogAscending, sortDialogDescending, columnHeading, sortOnValues, options, rowHeading, and 2 more. */
 export const macSortDialogZh: Partial<MacSortDialogStrings> = {
+  sortDialogHeader: '列表包含标题',
+  levelsHeading: '添加按以下方式排序的级别:',
   sortOnHeading: '排序依据',
   colorHeading: '颜色/图标',
   copyLevel: '复制',
   sortTopToBottom: '按列排序',
   sortLeftToRight: '按行排序',
+  usePhonetic: '字母顺序',
+  noPhonetic: '笔划顺序',
   caseSensitive: '区分大小写',
+};
+
+/** Mac app wording from the Excel bundle. */
+export const macSortDialogEn: Partial<MacSortDialogStrings> = {
+  sortDialogHeader: 'My list has headers',
+  levelsHeading: 'Add levels to sort by:',
+  usePhonetic: 'Syllabary Ordering',
+  noPhonetic: 'Stroke Ordering',
 };

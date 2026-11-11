@@ -126,3 +126,8 @@ export const macHyperlinkDialogZh: Partial<MacHyperlinkDialogStrings> = {
   cellReference: '输入单元格引用:',
   recentEmails: '最近使用过的电子邮件地址:',
 };
+
+/** Mac app wording from the Excel bundle. */
+export const macHyperlinkDialogEn: Partial<MacHyperlinkDialogStrings> = {
+  displayText: 'Text to Display:',
+};

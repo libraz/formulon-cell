@@ -37,37 +37,47 @@ export const macCfRulesDialogJa: MacCfRulesDialogStrings = {
   appliesToLabel: '適用対象:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, headerRule. */
+/** Mac app wording from the Excel bundle; not answered by it: title. */
 export const macCfRulesDialogDe: Partial<MacCfRulesDialogStrings> = {
+  headerRule: 'Regel (angewendet in der angezeigten Reihenfolge)',
   duplicate: 'Regel duplizieren',
   orderLabel: 'Reihenfolge der Regeln ändern:',
   appliesToLabel: 'Gilt für:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, headerRule. */
+/** Mac app wording from the Excel bundle; not answered by it: title. */
 export const macCfRulesDialogFr: Partial<MacCfRulesDialogStrings> = {
+  headerRule: "Règle (appliquée dans l'ordre indiqué)",
   duplicate: 'Dupliquer la règle',
   orderLabel: 'Modifier l’ordre de règle :',
   appliesToLabel: 'S’applique à :',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, headerRule. */
+/** Mac app wording from the Excel bundle; not answered by it: title. */
 export const macCfRulesDialogKo: Partial<MacCfRulesDialogStrings> = {
+  headerRule: '규칙(표시 순서대로 적용)',
   duplicate: '중복 규칙',
   orderLabel: '규칙 순서 변경:',
   appliesToLabel: '적용 대상:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, headerRule. */
+/** Mac app wording from the Excel bundle; not answered by it: title. */
 export const macCfRulesDialogTh: Partial<MacCfRulesDialogStrings> = {
+  headerRule: 'กฎ (ใช้ตามลำดับที่แสดง)',
   duplicate: 'ทำซ้ำกฎ',
   orderLabel: 'เปลี่ยนลำดับของกฎ:',
   appliesToLabel: 'นำไปใช้กับ:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, headerRule. */
+/** Mac app wording from the Excel bundle; not answered by it: title. */
 export const macCfRulesDialogZh: Partial<MacCfRulesDialogStrings> = {
+  headerRule: '规则(按所示顺序应用)',
   duplicate: '复制规则',
   orderLabel: '更改规则次序:',
   appliesToLabel: '适用于:',
+};
+
+/** Mac app wording from the Excel bundle. */
+export const macCfRulesDialogEn: Partial<MacCfRulesDialogStrings> = {
+  headerRule: 'Rule (applied in order shown)',
 };

@@ -90,7 +90,7 @@ export const macFilterPanelFrom = (
   ...overrides,
 });
 
-/** Mac wording for this locale; not measured. */
+/** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasEn: MacFilterPanelExtras = {
   sortSection: 'Sort',
   filterSection: 'Filter',
@@ -252,7 +252,13 @@ const extrasTh: MacFilterPanelExtras = {
 };
 
 export const macFilterPanelEn = (t: FilterDropdownStrings): MacFilterPanelStrings =>
-  macFilterPanelFrom(t, extrasEn);
+  macFilterPanelFrom(t, extrasEn, {
+    chooseOne: 'Choose One',
+    notContains: 'Does Not Contain',
+    selectAll: '(Select All)',
+    apply: 'Apply Filter',
+    clear: 'Clear Filter',
+  });
 
 export const macFilterPanelJa = (t: FilterDropdownStrings): MacFilterPanelStrings =>
   macFilterPanelFrom(t, extrasJa, {
@@ -275,6 +281,8 @@ export const macFilterPanelJa = (t: FilterDropdownStrings): MacFilterPanelString
 export const macFilterPanelDe = (t: FilterDropdownStrings): MacFilterPanelStrings =>
   macFilterPanelFrom(t, extrasDe, {
     chooseOne: 'Eine Option auswählen',
+    apply: 'Filter anwenden',
+    clear: 'Filter entfernen',
     blanks: '(Leere)',
     close: 'Schließen',
     sortAsc: 'Aufsteigend',
@@ -293,6 +301,8 @@ export const macFilterPanelFr = (t: FilterDropdownStrings): MacFilterPanelString
   macFilterPanelFrom(t, extrasFr, {
     chooseOne: 'Choisir',
     selectAll: '(Sélectionner tout)',
+    apply: 'Appliquer le filtre',
+    clear: 'Effacer le filtre',
     blanks: '(Vides)',
     sortAsc: 'Croissant',
     sortDesc: 'Décroissant',
@@ -311,6 +321,8 @@ export const macFilterPanelZh = (t: FilterDropdownStrings): MacFilterPanelString
     contains: '包含',
     notContains: '不包含',
     selectAll: '(全选)',
+    apply: '应用筛选器',
+    clear: '清除筛选器',
     blanks: '(空白)',
     close: '关闭',
     sortAsc: '升序',
@@ -329,6 +341,8 @@ export const macFilterPanelKo = (t: FilterDropdownStrings): MacFilterPanelString
   macFilterPanelFrom(t, extrasKo, {
     chooseOne: '항목 선택',
     contains: '포함',
+    apply: '필터 적용',
+    clear: '필터 해제',
     blanks: '(필드 값 없음)',
     close: '닫기',
     sortAsc: '오름차순',
@@ -347,6 +361,8 @@ export const macFilterPanelTh = (t: FilterDropdownStrings): MacFilterPanelString
     contains: 'มี',
     notContains: 'ไม่มี',
     selectAll: '(เลือกทั้งหมด)',
+    apply: 'ใช้ตัวกรอง',
+    clear: 'ล้างตัวกรอง',
     blanks: '(ว่าง)',
     byColor: 'ตามสี:',
     cellColor: 'สีของเซลล์',

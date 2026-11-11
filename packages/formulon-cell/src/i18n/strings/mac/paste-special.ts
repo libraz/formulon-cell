@@ -31,37 +31,48 @@ export const macPasteSpecialJa: MacPasteSpecialStrings = {
   pasteLink: 'ペースト リンク',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteAllMergingCF, pasteLink. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
 export const macPasteSpecialDe: Partial<MacPasteSpecialStrings> = {
   pasteValues: 'Werte',
   pasteAllUsingSourceTheme: 'Alles mit Quelldesign',
+  pasteAllMergingCF: 'Alle, bedingte Formate zusammenführen',
   skipBlanks: 'Leerzellen überspringen',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteAllMergingCF, pasteLink. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
 export const macPasteSpecialFr: Partial<MacPasteSpecialStrings> = {
   pasteValues: 'Valeurs',
   pasteAllUsingSourceTheme: 'Tout, avec le thème source',
+  pasteAllMergingCF: 'Tout, fusionner la mise en forme conditionnelle',
   skipBlanks: 'Blancs non compris',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteAllMergingCF, pasteLink. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
 export const macPasteSpecialKo: Partial<MacPasteSpecialStrings> = {
   pasteValues: '값',
   pasteAllUsingSourceTheme: '원본 테마 사용',
+  pasteAllMergingCF: '모두, 조건부 서식 병합',
   skipBlanks: '내용 있는 셀만 붙여넣기',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteAllMergingCF, pasteLink. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
 export const macPasteSpecialTh: Partial<MacPasteSpecialStrings> = {
   pasteValues: 'ค่า',
   pasteAllUsingSourceTheme: 'ทั้งหมดที่ใช้ชุดรูปแบบต้นฉบับ',
+  pasteAllMergingCF: 'ทั้งหมด, ผสานการจัดรูปแบบตามเงื่อนไข',
   skipBlanks: 'ข้ามเซลล์ที่ว่าง',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteAllMergingCF, pasteLink. */
+/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
 export const macPasteSpecialZh: Partial<MacPasteSpecialStrings> = {
   pasteValues: '值',
   pasteAllUsingSourceTheme: '全部使用源主题',
+  pasteAllMergingCF: '全部，合并条件格式',
   skipBlanks: '跳过空单元',
+};
+
+/** Mac app wording from the Excel bundle. */
+export const macPasteSpecialEn: Partial<MacPasteSpecialStrings> = {
+  skipBlanks: 'Skip Blanks',
+  pasteAllMergingCF: 'All, merge conditional formats',
 };

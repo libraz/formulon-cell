@@ -8,7 +8,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
-- The Mac host's dialogs and panes in German, French, Korean, Thai and Chinese use the Mac app's own wording where the desktop strings give it; the rest keeps the shared wording.
+- The Mac host's dialogs and panes use the Mac app's own wording in English, German, French, Korean, Thai and Chinese wherever the desktop strings settle it for the same control; the rest keeps the shared wording. The default profile's English is unchanged.
 - A new table from Format as Table, Insert > Table or Ctrl+T takes the workbook's default table style, and Table Style Medium 2 when none is set. The ribbon hook `insert.createTable` takes no argument.
 - **Breaking:** Requires `@libraz/formulon` 0.19.0. `WorkbookHandle` follows the engine's 0.19 model:
   - Engine failures surface as `FormulonError`. Optional list reads (merges, hyperlinks, conditional formats, tables, external links, passthrough parts) still fall back to an empty list.

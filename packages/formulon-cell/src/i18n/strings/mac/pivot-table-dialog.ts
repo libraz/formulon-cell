@@ -42,36 +42,53 @@ export const macPivotTableDialogJa: MacPivotTableDialogStrings = {
   moveLocation: '場所:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, moveLocation. */
+/** Mac app wording from the Excel bundle; not answered by it: moveLocation. */
 export const macPivotTableDialogDe: Partial<MacPivotTableDialogStrings> = {
   source: 'Tabelle/Bereich:',
+  destinationSection: 'Wählen Sie die Position der PivotTable aus.',
+  destination: 'Tabelle/Bereich:',
   chooseConnection: 'Verbindung auswählen...',
   moveTitle: 'PivotTable verschieben',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, chooseConnection, moveLocation. */
+/** Mac app wording from the Excel bundle; not answered by it: chooseConnection, moveLocation. */
 export const macPivotTableDialogFr: Partial<MacPivotTableDialogStrings> = {
   source: 'Tableau/Plage :',
+  destinationSection: 'Choisissez l’emplacement du tableau croisé dynamique :',
+  destination: 'Tableau/Plage :',
   moveTitle: 'Déplacer le tableau croisé dynamique',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, moveLocation. */
+/** Mac app wording from the Excel bundle; not answered by it: moveLocation. */
 export const macPivotTableDialogKo: Partial<MacPivotTableDialogStrings> = {
   source: '표/범위:',
+  destinationSection: '피벗 테이블을 배치할 위치를 선택합니다.',
+  destination: '표/범위:',
   chooseConnection: '연결 선택...',
   moveTitle: '피벗 테이블 이동',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, moveLocation. */
+/** Mac app wording from the Excel bundle; not answered by it: moveLocation. */
 export const macPivotTableDialogTh: Partial<MacPivotTableDialogStrings> = {
   source: 'ตาราง/ช่วง:',
+  destinationSection: 'เลือกตำแหน่งที่จะเก็บ PivotTable',
+  destination: 'ตาราง/ช่วง:',
   chooseConnection: 'เลือกการเชื่อมต่อ...',
   moveTitle: 'ย้าย PivotTable',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: destinationSection, destination, moveLocation. */
+/** Mac app wording from the Excel bundle; not answered by it: moveLocation. */
 export const macPivotTableDialogZh: Partial<MacPivotTableDialogStrings> = {
   source: '表/区域:',
+  destinationSection: '选择要放置数据透视表的位置。',
+  destination: '表/区域:',
   chooseConnection: '选择连接...',
   moveTitle: '移动数据透视表',
+};
+
+/** Mac app wording from the Excel bundle. */
+export const macPivotTableDialogEn: Partial<MacPivotTableDialogStrings> = {
+  source: 'Table/Range:',
+  destinationSection: 'Choose where to place the PivotTable.',
+  destination: 'Table/Range:',
 };

@@ -27,7 +27,7 @@ import { macPivotFieldSettingsTh } from './pivot-field-settings.js';
 import { macPivotOptionsTh } from './pivot-options.js';
 import { macPivotTableDialogFrom, macPivotTableDialogTh } from './pivot-table-dialog.js';
 import { macProtectSheetFrom, macProtectSheetTh } from './protect-sheet.js';
-import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
+import { macRemoveDuplicatesFrom, macRemoveDuplicatesTh } from './remove-duplicates.js';
 import { macSheetTabMenuTh } from './sheet-tab-menu.js';
 import { macSortDialogFrom, macSortDialogTh } from './sort-dialog.js';
 import { macStyleDialogTh } from './style-dialog.js';
@@ -212,88 +212,124 @@ export const macTh: MacStrings = {
     cellStyles: 'สไตล์เซลล์',
     autoSum: 'ผลรวมอัตโนมัติ',
   },
-  formatDialog: { ...macFormatDialogFrom(cellFormatTh.formatDialog), ...macFormatDialogTh },
+  formatDialog: {
+    ...{ ...macFormatDialogFrom(cellFormatTh.formatDialog), ...macFormatDialogTh },
+    ...macFormatDialogTh,
+  },
   iterativeDialog: {
-    ...macIterativeDialogFrom(formulaDialogsTh.iterativeDialog, {
-      calcAutoNoTable: ribbonMenusTh.ribbonMenu.calcAutoNoTable,
-    }),
+    ...{
+      ...macIterativeDialogFrom(formulaDialogsTh.iterativeDialog, {
+        calcAutoNoTable: ribbonMenusTh.ribbonMenu.calcAutoNoTable,
+      }),
+      ...macIterativeDialogTh,
+    },
     ...macIterativeDialogTh,
   },
   namedRangeDialog: {
-    ...macNamedRangeDialogFrom(formulaDialogsTh.namedRangeDialog, {
-      defineTitle: 'กำหนดชื่อ',
-      defineNames: 'ชื่อ:',
-      defineNamePrompt: 'ใส่ชื่อสำหรับช่วงข้อมูล:',
-      defineRangePrompt: 'เลือกช่วงของเซลล์:',
-    }),
+    ...{
+      ...macNamedRangeDialogFrom(formulaDialogsTh.namedRangeDialog, {
+        defineTitle: 'กำหนดชื่อ',
+        defineNames: 'ชื่อ:',
+        defineNamePrompt: 'ใส่ชื่อสำหรับช่วงข้อมูล:',
+        defineRangePrompt: 'เลือกช่วงของเซลล์:',
+      }),
+      ...macNamedRangeDialogTh,
+    },
     ...macNamedRangeDialogTh,
   },
-  pasteSpecial: { ...macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog), ...macPasteSpecialTh },
+  pasteSpecial: {
+    ...{ ...macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog), ...macPasteSpecialTh },
+    ...macPasteSpecialTh,
+  },
   zoomDialog: {
-    ...macZoomDialogFrom(ribbonTh.ribbon, cellFormatTh.formatDialog),
+    ...{
+      ...macZoomDialogFrom(ribbonTh.ribbon, cellFormatTh.formatDialog),
+      ...macZoomDialogTh,
+    },
     ...macZoomDialogTh,
   },
   alerts: mergeMacAlerts(
-    macAlertsFrom(
-      ribbonTh.ribbon,
-      {
-        message: 'แผ่นงานนี้จะถูกลบอย่างถาวร คุณต้องการดำเนินการต่อหรือไม่',
-        confirm: 'ลบ',
-        cancel: 'ยกเลิก',
-      },
-      editDialogsTh.moveCells,
+    mergeMacAlerts(
+      macAlertsFrom(
+        ribbonTh.ribbon,
+        {
+          message: 'แผ่นงานนี้จะถูกลบอย่างถาวร คุณต้องการดำเนินการต่อหรือไม่',
+          confirm: 'ลบ',
+          cancel: 'ยกเลิก',
+        },
+        editDialogsTh.moveCells,
+      ),
+      macAlertsTh,
     ),
     macAlertsTh,
   ),
   protectSheet: {
-    ...macProtectSheetFrom(editDialogsTh.protection, {
-      heading: 'ป้องกันเวิร์กชีตและเนื้อหาของเซลล์ที่ถูกล็อก',
-      note: 'ตามค่าเริ่มต้น เซลล์ทั้งหมดถูกล็อก แต่สามารถปลดล็อกได้',
-    }),
+    ...{
+      ...macProtectSheetFrom(editDialogsTh.protection, {
+        heading: 'ป้องกันเวิร์กชีตและเนื้อหาของเซลล์ที่ถูกล็อก',
+        note: 'ตามค่าเริ่มต้น เซลล์ทั้งหมดถูกล็อก แต่สามารถปลดล็อกได้',
+      }),
+      ...macProtectSheetTh,
+    },
     ...macProtectSheetTh,
   },
   advancedFilter: {
-    ...macAdvancedFilterFrom(ribbonMenusTh.ribbonMenu, {
-      filterInPlace: 'กรองรายการในตำแหน่งเดิม',
-      copyToLocation: 'คัดลอกไปยังตำแหน่งอื่น',
-    }),
+    ...{
+      ...macAdvancedFilterFrom(ribbonMenusTh.ribbonMenu, {
+        filterInPlace: 'กรองรายการในตำแหน่งเดิม',
+        copyToLocation: 'คัดลอกไปยังตำแหน่งอื่น',
+      }),
+      ...macAdvancedFilterTh,
+    },
     ...macAdvancedFilterTh,
   },
-  chrome: { ...macChromeFrom(workbookChromeTh, formulaDialogsTh), ...macChromeTh },
+  chrome: {
+    ...{ ...macChromeFrom(workbookChromeTh, formulaDialogsTh), ...macChromeTh },
+    ...macChromeTh,
+  },
   textToColumnsWizard: macTextToColumnsWizardTh,
   styleDialog: macStyleDialogTh,
   externalLinksPane: macExternalLinksPaneTh,
   watchWindow: macWatchWindowTh,
   accessibilityPane: macAccessibilityPaneTh,
   cfRulesDialog: {
-    ...macCfRulesDialogFrom(cellFormatTh.cfRulesDialog, {
-      orderLabel: 'เปลี่ยนลำดับกฎ:',
-      appliesToLabel: 'นำไปใช้กับ:',
-    }),
+    ...{
+      ...macCfRulesDialogFrom(cellFormatTh.cfRulesDialog, {
+        orderLabel: 'เปลี่ยนลำดับกฎ:',
+        appliesToLabel: 'นำไปใช้กับ:',
+      }),
+      ...macCfRulesDialogTh,
+    },
     ...macCfRulesDialogTh,
   },
   hyperlinkDialog: {
-    ...macHyperlinkDialogFrom(editDialogsTh.hyperlinkDialog, {
-      displayText: 'ข้อความที่จะแสดง:',
-      selectionInDocument: '<<ส่วนที่เลือกในเอกสาร>>',
-      screenTip: 'คำแนะนำบนหน้าจอ...',
-      screenTipTitle: 'ตั้งค่าคำแนะนำบนหน้าจอของไฮเปอร์ลิงก์',
-      screenTipLabel: 'ข้อความคำแนะนำบนหน้าจอ:',
-      tabWeb: 'เว็บเพจหรือไฟล์',
-      tabDocument: 'เอกสารนี้',
-      tabEmail: 'ที่อยู่อีเมล',
-      webIntro: 'ลิงก์ไปยังไฟล์หรือเว็บเพจที่มีอยู่',
-      browse: 'เลือก...',
-      browseUnavailable: 'ไม่สามารถเลือกไฟล์ในเบราว์เซอร์ได้ โปรดพิมพ์ที่อยู่',
-      cellReference: 'พิมพ์การอ้างอิงเซลล์:',
-      documentPlace: 'หรือเลือกตำแหน่งในเอกสารนี้:',
-      emailAddress: 'ที่อยู่อีเมล:',
-      subject: 'เรื่อง:',
-      recentEmails: 'ที่อยู่อีเมลที่ใช้ล่าสุด:',
-    }),
+    ...{
+      ...macHyperlinkDialogFrom(editDialogsTh.hyperlinkDialog, {
+        displayText: 'ข้อความที่จะแสดง:',
+        selectionInDocument: '<<ส่วนที่เลือกในเอกสาร>>',
+        screenTip: 'คำแนะนำบนหน้าจอ...',
+        screenTipTitle: 'ตั้งค่าคำแนะนำบนหน้าจอของไฮเปอร์ลิงก์',
+        screenTipLabel: 'ข้อความคำแนะนำบนหน้าจอ:',
+        tabWeb: 'เว็บเพจหรือไฟล์',
+        tabDocument: 'เอกสารนี้',
+        tabEmail: 'ที่อยู่อีเมล',
+        webIntro: 'ลิงก์ไปยังไฟล์หรือเว็บเพจที่มีอยู่',
+        browse: 'เลือก...',
+        browseUnavailable: 'ไม่สามารถเลือกไฟล์ในเบราว์เซอร์ได้ โปรดพิมพ์ที่อยู่',
+        cellReference: 'พิมพ์การอ้างอิงเซลล์:',
+        documentPlace: 'หรือเลือกตำแหน่งในเอกสารนี้:',
+        emailAddress: 'ที่อยู่อีเมล:',
+        subject: 'เรื่อง:',
+        recentEmails: 'ที่อยู่อีเมลที่ใช้ล่าสุด:',
+      }),
+      ...macHyperlinkDialogTh,
+    },
     ...macHyperlinkDialogTh,
   },
-  pageSetup: { ...macPageSetupFrom(pageLayoutTh.pageSetup), ...macPageSetupTh },
+  pageSetup: {
+    ...{ ...macPageSetupFrom(pageLayoutTh.pageSetup), ...macPageSetupTh },
+    ...macPageSetupTh,
+  },
   dataValidation: {
     inputCaption: 'เมื่อเลือกเซลล์ ให้แสดงข้อความป้อนข้อมูลนี้:',
     errorCaption: 'เมื่อผู้ใช้ป้อนข้อมูลที่ไม่ถูกต้อง ให้แสดงการแจ้งเตือนข้อผิดพลาดนี้:',
@@ -312,49 +348,64 @@ export const macTh: MacStrings = {
     stripeSize: 'ขนาดของลายทาง',
   },
   goToDialog: {
-    ...macGoToDialogFrom(editDialogsTh.goToDialog, {
-      selectCaption: 'เลือก',
-      optionsGroup: 'ตัวเลือก',
-      noOptions: 'รายการที่เลือกนี้ไม่มีตัวเลือก',
-    }),
+    ...{
+      ...macGoToDialogFrom(editDialogsTh.goToDialog, {
+        selectCaption: 'เลือก',
+        optionsGroup: 'ตัวเลือก',
+        noOptions: 'รายการที่เลือกนี้ไม่มีตัวเลือก',
+      }),
+      ...macGoToDialogTh,
+    },
     ...macGoToDialogTh,
   },
   pivotFieldSettings: macPivotFieldSettingsTh,
   pivotOptions: macPivotOptionsTh,
   pivotTableDialog: {
-    ...macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
-      chooseConnection: 'เลือกการเชื่อมต่อ...',
-      moveTitle: 'ย้าย PivotTable',
-      moveLocation: 'ตำแหน่ง:',
-    }),
+    ...{
+      ...macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
+        chooseConnection: 'เลือกการเชื่อมต่อ...',
+        moveTitle: 'ย้าย PivotTable',
+        moveLocation: 'ตำแหน่ง:',
+      }),
+      ...macPivotTableDialogTh,
+    },
     ...macPivotTableDialogTh,
   },
-  removeDuplicates: macRemoveDuplicatesFrom(ribbonMenusTh.ribbonMenu),
+  removeDuplicates: {
+    ...macRemoveDuplicatesFrom(ribbonMenusTh.ribbonMenu),
+    ...macRemoveDuplicatesTh,
+  },
   sortDialog: {
-    ...macSortDialogFrom(ribbonMenusTh.ribbonMenu, {
-      levelsHeading: 'เพิ่มระดับการเรียงลำดับ:',
-      columnHeading: 'คอลัมน์',
-      sortOnHeading: 'เรียงลำดับตาม',
-      sortOnValues: editDialogsTh.findReplace.values,
-      colorHeading: 'สี/ไอคอน',
-      copyLevel: gridPopupsTh.contextMenu.copy,
-      options: 'ตัวเลือก...',
-      rowHeading: 'Row',
-      orientation: 'Orientation',
-      sortTopToBottom: 'Sort top to bottom',
-      sortLeftToRight: 'Sort left to right',
-      method: 'Method',
-      usePhonetic: 'Use phonetic',
-      noPhonetic: "Don't use phonetic",
-      caseSensitive: 'Case sensitive',
-    }),
+    ...{
+      ...macSortDialogFrom(ribbonMenusTh.ribbonMenu, {
+        levelsHeading: 'เพิ่มระดับการเรียงลำดับ:',
+        columnHeading: 'คอลัมน์',
+        sortOnHeading: 'เรียงลำดับตาม',
+        sortOnValues: editDialogsTh.findReplace.values,
+        colorHeading: 'สี/ไอคอน',
+        copyLevel: gridPopupsTh.contextMenu.copy,
+        options: 'ตัวเลือก...',
+        rowHeading: 'Row',
+        orientation: 'Orientation',
+        sortTopToBottom: 'Sort top to bottom',
+        sortLeftToRight: 'Sort left to right',
+        method: 'Method',
+        usePhonetic: 'Use phonetic',
+        noPhonetic: "Don't use phonetic",
+        caseSensitive: 'Case sensitive',
+      }),
+      ...macSortDialogTh,
+    },
     ...macSortDialogTh,
   },
   errorMenu: macErrorMenuTh,
   filterPanel: macFilterPanelTh(gridPopupsTh.filterDropdown),
   sheetTabMenu: macSheetTabMenuTh,
   findReplace: {
-    ...macFindReplaceFrom(editDialogsTh.findReplace, 'แยกอักขระครึ่งความกว้างและเต็มความกว้าง'),
+    ...{
+      ...macFindReplaceFrom(editDialogsTh.findReplace, 'แยกอักขระครึ่งความกว้างและเต็มความกว้าง'),
+      ...macFindReplaceTh,
+    },
     ...macFindReplaceTh,
   },
 };

@@ -17,7 +17,7 @@ import { macExternalLinksPaneFr } from './external-links-pane.js';
 import { macFilterPanelFr } from './filter-panel.js';
 import { macFindReplaceFr, macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFr, macFormatDialogFrom } from './format-dialog.js';
-import { macGoToDialogFrom } from './goto-dialog.js';
+import { macGoToDialogFr, macGoToDialogFrom } from './goto-dialog.js';
 import { macHyperlinkDialogFr, macHyperlinkDialogFrom } from './hyperlink-dialog.js';
 import { macIterativeDialogFr, macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFr, macNamedRangeDialogFrom } from './named-range-dialog.js';
@@ -27,7 +27,7 @@ import { macPivotFieldSettingsFr } from './pivot-field-settings.js';
 import { macPivotOptionsFr } from './pivot-options.js';
 import { macPivotTableDialogFr, macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFr, macProtectSheetFrom } from './protect-sheet.js';
-import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
+import { macRemoveDuplicatesFr, macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSheetTabMenuFr } from './sheet-tab-menu.js';
 import { macSortDialogFr, macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogFr } from './style-dialog.js';
@@ -214,88 +214,124 @@ export const macFr: MacStrings = {
     cellStyles: 'Styles de cellule',
     autoSum: 'Somme automatique',
   },
-  formatDialog: { ...macFormatDialogFrom(cellFormatFr.formatDialog), ...macFormatDialogFr },
+  formatDialog: {
+    ...{ ...macFormatDialogFrom(cellFormatFr.formatDialog), ...macFormatDialogFr },
+    ...macFormatDialogFr,
+  },
   iterativeDialog: {
-    ...macIterativeDialogFrom(formulaDialogsFr.iterativeDialog, {
-      calcAutoNoTable: ribbonMenusFr.ribbonMenu.calcAutoNoTable,
-    }),
+    ...{
+      ...macIterativeDialogFrom(formulaDialogsFr.iterativeDialog, {
+        calcAutoNoTable: ribbonMenusFr.ribbonMenu.calcAutoNoTable,
+      }),
+      ...macIterativeDialogFr,
+    },
     ...macIterativeDialogFr,
   },
   namedRangeDialog: {
-    ...macNamedRangeDialogFrom(formulaDialogsFr.namedRangeDialog, {
-      defineTitle: 'Définir un nom',
-      defineNames: 'Noms :',
-      defineNamePrompt: 'Entrez un nom pour la plage de données :',
-      defineRangePrompt: 'Sélectionnez la plage de cellules :',
-    }),
+    ...{
+      ...macNamedRangeDialogFrom(formulaDialogsFr.namedRangeDialog, {
+        defineTitle: 'Définir un nom',
+        defineNames: 'Noms :',
+        defineNamePrompt: 'Entrez un nom pour la plage de données :',
+        defineRangePrompt: 'Sélectionnez la plage de cellules :',
+      }),
+      ...macNamedRangeDialogFr,
+    },
     ...macNamedRangeDialogFr,
   },
-  pasteSpecial: { ...macPasteSpecialFrom(editDialogsFr.pasteSpecialDialog), ...macPasteSpecialFr },
+  pasteSpecial: {
+    ...{ ...macPasteSpecialFrom(editDialogsFr.pasteSpecialDialog), ...macPasteSpecialFr },
+    ...macPasteSpecialFr,
+  },
   zoomDialog: {
-    ...macZoomDialogFrom(ribbonFr.ribbon, cellFormatFr.formatDialog),
+    ...{
+      ...macZoomDialogFrom(ribbonFr.ribbon, cellFormatFr.formatDialog),
+      ...macZoomDialogFr,
+    },
     ...macZoomDialogFr,
   },
   alerts: mergeMacAlerts(
-    macAlertsFrom(
-      ribbonFr.ribbon,
-      {
-        message: 'Cette feuille sera définitivement supprimée. Voulez-vous continuer ?',
-        confirm: 'Supprimer',
-        cancel: 'Annuler',
-      },
-      editDialogsFr.moveCells,
+    mergeMacAlerts(
+      macAlertsFrom(
+        ribbonFr.ribbon,
+        {
+          message: 'Cette feuille sera définitivement supprimée. Voulez-vous continuer ?',
+          confirm: 'Supprimer',
+          cancel: 'Annuler',
+        },
+        editDialogsFr.moveCells,
+      ),
+      macAlertsFr,
     ),
     macAlertsFr,
   ),
   protectSheet: {
-    ...macProtectSheetFrom(editDialogsFr.protection, {
-      heading: 'Protéger la feuille et le contenu des cellules verrouillées',
-      note: 'Par défaut, toutes les cellules sont verrouillées, mais vous pouvez les déverrouiller.',
-    }),
+    ...{
+      ...macProtectSheetFrom(editDialogsFr.protection, {
+        heading: 'Protéger la feuille et le contenu des cellules verrouillées',
+        note: 'Par défaut, toutes les cellules sont verrouillées, mais vous pouvez les déverrouiller.',
+      }),
+      ...macProtectSheetFr,
+    },
     ...macProtectSheetFr,
   },
   advancedFilter: {
-    ...macAdvancedFilterFrom(ribbonMenusFr.ribbonMenu, {
-      filterInPlace: 'Filtrer la liste, sur place',
-      copyToLocation: 'Copier vers un autre emplacement',
-    }),
+    ...{
+      ...macAdvancedFilterFrom(ribbonMenusFr.ribbonMenu, {
+        filterInPlace: 'Filtrer la liste, sur place',
+        copyToLocation: 'Copier vers un autre emplacement',
+      }),
+      ...macAdvancedFilterFr,
+    },
     ...macAdvancedFilterFr,
   },
-  chrome: { ...macChromeFrom(workbookChromeFr, formulaDialogsFr), ...macChromeFr },
+  chrome: {
+    ...{ ...macChromeFrom(workbookChromeFr, formulaDialogsFr), ...macChromeFr },
+    ...macChromeFr,
+  },
   textToColumnsWizard: macTextToColumnsWizardFr,
   styleDialog: macStyleDialogFr,
   externalLinksPane: macExternalLinksPaneFr,
   watchWindow: macWatchWindowFr,
   accessibilityPane: macAccessibilityPaneFr,
   cfRulesDialog: {
-    ...macCfRulesDialogFrom(cellFormatFr.cfRulesDialog, {
-      orderLabel: 'Modifier l’ordre des règles :',
-      appliesToLabel: 'S’applique à :',
-    }),
+    ...{
+      ...macCfRulesDialogFrom(cellFormatFr.cfRulesDialog, {
+        orderLabel: 'Modifier l’ordre des règles :',
+        appliesToLabel: 'S’applique à :',
+      }),
+      ...macCfRulesDialogFr,
+    },
     ...macCfRulesDialogFr,
   },
   hyperlinkDialog: {
-    ...macHyperlinkDialogFrom(editDialogsFr.hyperlinkDialog, {
-      displayText: 'Texte à afficher :',
-      selectionInDocument: '<<Sélection dans le document>>',
-      screenTip: 'Info-bulle...',
-      screenTipTitle: 'Info-bulle du lien hypertexte',
-      screenTipLabel: 'Texte de l’info-bulle :',
-      tabWeb: 'Page web ou fichier',
-      tabDocument: 'Ce document',
-      tabEmail: 'Adresse e-mail',
-      webIntro: 'Lier à un fichier ou une page web existant.',
-      browse: 'Sélectionner...',
-      browseUnavailable: 'Impossible de choisir un fichier dans un navigateur. Tapez l’adresse.',
-      cellReference: 'Tapez la référence de la cellule :',
-      documentPlace: 'Ou sélectionnez un emplacement dans ce document :',
-      emailAddress: 'Adresse e-mail :',
-      subject: 'Objet :',
-      recentEmails: 'Adresses e-mail récemment utilisées :',
-    }),
+    ...{
+      ...macHyperlinkDialogFrom(editDialogsFr.hyperlinkDialog, {
+        displayText: 'Texte à afficher :',
+        selectionInDocument: '<<Sélection dans le document>>',
+        screenTip: 'Info-bulle...',
+        screenTipTitle: 'Info-bulle du lien hypertexte',
+        screenTipLabel: 'Texte de l’info-bulle :',
+        tabWeb: 'Page web ou fichier',
+        tabDocument: 'Ce document',
+        tabEmail: 'Adresse e-mail',
+        webIntro: 'Lier à un fichier ou une page web existant.',
+        browse: 'Sélectionner...',
+        browseUnavailable: 'Impossible de choisir un fichier dans un navigateur. Tapez l’adresse.',
+        cellReference: 'Tapez la référence de la cellule :',
+        documentPlace: 'Ou sélectionnez un emplacement dans ce document :',
+        emailAddress: 'Adresse e-mail :',
+        subject: 'Objet :',
+        recentEmails: 'Adresses e-mail récemment utilisées :',
+      }),
+      ...macHyperlinkDialogFr,
+    },
     ...macHyperlinkDialogFr,
   },
-  pageSetup: { ...macPageSetupFrom(pageLayoutFr.pageSetup), ...macPageSetupFr },
+  pageSetup: {
+    ...{ ...macPageSetupFrom(pageLayoutFr.pageSetup), ...macPageSetupFr },
+    ...macPageSetupFr,
+  },
   dataValidation: {
     inputCaption: 'Quand la cellule est sélectionnée, afficher ce message de saisie :',
     errorCaption: 'Quand des données non valides sont tapées, afficher ce message d’alerte :',
@@ -313,47 +349,62 @@ export const macFr: MacStrings = {
     preview: 'Aperçu',
     stripeSize: 'Taille de rayure',
   },
-  goToDialog: macGoToDialogFrom(editDialogsFr.goToDialog, {
-    selectCaption: 'Sélectionner',
-    optionsGroup: 'Options',
-    noOptions: 'Cette sélection n’a pas d’options.',
-  }),
+  goToDialog: {
+    ...macGoToDialogFrom(editDialogsFr.goToDialog, {
+      selectCaption: 'Sélectionner',
+      optionsGroup: 'Options',
+      noOptions: 'Cette sélection n’a pas d’options.',
+    }),
+    ...macGoToDialogFr,
+  },
   pivotFieldSettings: macPivotFieldSettingsFr,
   pivotOptions: macPivotOptionsFr,
   pivotTableDialog: {
-    ...macPivotTableDialogFrom(dataObjectsFr.pivotTableDialog, {
-      chooseConnection: 'Choisir la connexion...',
-      moveTitle: 'Déplacer le tableau croisé dynamique',
-      moveLocation: 'Emplacement :',
-    }),
+    ...{
+      ...macPivotTableDialogFrom(dataObjectsFr.pivotTableDialog, {
+        chooseConnection: 'Choisir la connexion...',
+        moveTitle: 'Déplacer le tableau croisé dynamique',
+        moveLocation: 'Emplacement :',
+      }),
+      ...macPivotTableDialogFr,
+    },
     ...macPivotTableDialogFr,
   },
-  removeDuplicates: macRemoveDuplicatesFrom(ribbonMenusFr.ribbonMenu),
+  removeDuplicates: {
+    ...macRemoveDuplicatesFrom(ribbonMenusFr.ribbonMenu),
+    ...macRemoveDuplicatesFr,
+  },
   sortDialog: {
-    ...macSortDialogFrom(ribbonMenusFr.ribbonMenu, {
-      levelsHeading: 'Ajouter un niveau de tri :',
-      columnHeading: 'Colonne',
-      sortOnHeading: 'Trier sur',
-      sortOnValues: editDialogsFr.findReplace.values,
-      colorHeading: 'Couleur/Icône',
-      copyLevel: gridPopupsFr.contextMenu.copy,
-      options: 'Options...',
-      rowHeading: 'Ligne',
-      orientation: 'Orientation',
-      sortTopToBottom: 'Trier de haut en bas',
-      sortLeftToRight: 'Trier de gauche à droite',
-      method: 'Méthode',
-      usePhonetic: 'Utiliser le phonétique',
-      noPhonetic: 'Ne pas utiliser le phonétique',
-      caseSensitive: 'Respecter la casse',
-    }),
+    ...{
+      ...macSortDialogFrom(ribbonMenusFr.ribbonMenu, {
+        levelsHeading: 'Ajouter un niveau de tri :',
+        columnHeading: 'Colonne',
+        sortOnHeading: 'Trier sur',
+        sortOnValues: editDialogsFr.findReplace.values,
+        colorHeading: 'Couleur/Icône',
+        copyLevel: gridPopupsFr.contextMenu.copy,
+        options: 'Options...',
+        rowHeading: 'Ligne',
+        orientation: 'Orientation',
+        sortTopToBottom: 'Trier de haut en bas',
+        sortLeftToRight: 'Trier de gauche à droite',
+        method: 'Méthode',
+        usePhonetic: 'Utiliser le phonétique',
+        noPhonetic: 'Ne pas utiliser le phonétique',
+        caseSensitive: 'Respecter la casse',
+      }),
+      ...macSortDialogFr,
+    },
     ...macSortDialogFr,
   },
   errorMenu: macErrorMenuFr,
   filterPanel: macFilterPanelFr(gridPopupsFr.filterDropdown),
   sheetTabMenu: macSheetTabMenuFr,
   findReplace: {
-    ...macFindReplaceFrom(editDialogsFr.findReplace, 'Distinguer demi-chasse et pleine chasse'),
+    ...{
+      ...macFindReplaceFrom(editDialogsFr.findReplace, 'Distinguer demi-chasse et pleine chasse'),
+      ...macFindReplaceFr,
+    },
     ...macFindReplaceFr,
   },
 };
