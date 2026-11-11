@@ -1,0 +1,106 @@
+{
+  "濃い青緑": {
+    "en": "Dark Teal",
+    "de": "Dunkelblaugrün",
+    "fr": "Bleu-vert foncé",
+    "ko": "진한 청록",
+    "th": "เขียวหัวเป็ดเข้ม",
+    "zh": "深青"
+  },
+  "オレンジ": {
+    "en": "Orange",
+    "de": "Orange",
+    "fr": "Orange",
+    "ko": "주황",
+    "th": "ส้ม",
+    "zh": "橙色"
+  },
+  "濃い緑": {
+    "en": "Dark Green",
+    "de": "Dunkelgrün",
+    "fr": "Vert foncé",
+    "ko": "진한 녹색",
+    "th": "เขียวเข้ม",
+    "zh": "深绿色"
+  },
+  "水色": {
+    "en": "Turquoise",
+    "de": "Türkis",
+    "fr": "Turquoise",
+    "ko": "옥색",
+    "th": "ฟ้าเทอร์คอยส์",
+    "zh": "青绿"
+  },
+  "プラム": {
+    "en": "Plum",
+    "de": "Pflaume",
+    "fr": "Prune",
+    "ko": "진한 보라",
+    "th": "ม่วงพลัม",
+    "zh": "梅红"
+  },
+  "緑": {
+    "en": "Green",
+    "de": "Grün",
+    "fr": "Vert",
+    "ko": "녹색",
+    "th": "เขียว",
+    "zh": "绿色"
+  },
+  "茶": {
+    "en": "Brown",
+    "de": "Braun",
+    "fr": "Marron",
+    "ko": "밤색",
+    "th": "น้ำตาล",
+    "zh": "褐色"
+  },
+  "濃い灰色": {
+    "en": "Dark Gray",
+    "de": "Dunkelgrau",
+    "fr": "Gris foncé",
+    "ko": "진한 회색",
+    "th": "เทาเข้ม",
+    "zh": "深灰色"
+  },
+  "薄い灰色": {
+    "en": "Light Gray",
+    "de": "Hellgrau",
+    "fr": "Gris clair",
+    "ko": "밝은 회색",
+    "th": "เทาอ่อน",
+    "zh": "浅灰色"
+  },
+  "赤": {
+    "en": "Red",
+    "de": "Rot",
+    "fr": "Rouge",
+    "ko": "빨강",
+    "th": "แดง",
+    "zh": "红色"
+  },
+  "濃い青": {
+    "en": "Dark Blue",
+    "de": "Dunkelblau",
+    "fr": "Bleu foncé",
+    "ko": "진한 파랑",
+    "th": "น้ำเงินเข้ม",
+    "zh": "深蓝"
+  },
+  "黒": {
+    "en": "Black",
+    "de": "Schwarz",
+    "fr": "Noir",
+    "ko": "검정",
+    "th": "ดำ",
+    "zh": "黑色"
+  },
+  "ローズ": {
+    "en": "Rose",
+    "de": "Hellrosa",
+    "fr": "Rose saumon",
+    "ko": "다홍",
+    "th": "ชมพูกุหลาบ",
+    "zh": "玫瑰红"
+  }
+}
