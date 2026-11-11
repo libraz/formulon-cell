@@ -615,8 +615,10 @@ export function paintSparkline(
       : settings.maxAxisType === SparklineAxisType.Group && groupExtent
         ? groupExtent.max
         : own.max;
-  const range = max - min || 1;
-  const yOf = (v: number): number => y + h - ((Math.min(Math.max(v, min), max) - min) / range) * h;
+  // Flat data sits on the top edge, and its columns fill the plot area.
+  const flat = max === min;
+  const yOf = (v: number): number =>
+    flat ? y : y + h - ((Math.min(Math.max(v, min), max) - min) / (max - min)) * h;
   const count = input.points.length;
   let xMin = Number.POSITIVE_INFINITY;
   let xMax = Number.NEGATIVE_INFINITY;
@@ -661,6 +663,9 @@ export function paintSparkline(
   }
 
   if (settings.type === SparklineType.Line) {
+    // A line needs two values; a date axis joins its points in date order.
+    const drawn =
+      values.length < 2 ? [] : settings.dateAxis ? [...points].sort((a, b) => a.x - b.x) : points;
     const xOf = (p: SparklinePoint): number =>
       xSpan > 0 ? x + ((p.x - xMin) / xSpan) * w : x + w / 2;
     ctx.strokeStyle = colors.series;
@@ -668,7 +673,7 @@ export function paintSparkline(
     ctx.lineJoin = 'round';
     ctx.beginPath();
     let pen = false;
-    for (const p of points) {
+    for (const p of drawn) {
       if (p.value === null) {
         pen = false;
         continue;
@@ -679,7 +684,7 @@ export function paintSparkline(
     }
     ctx.stroke();
     const dot = Math.max(2.5, ctx.lineWidth * 2);
-    for (const p of points) {
+    for (const p of drawn) {
       if (p.value === null) continue;
       const marked = special(p);
       if (marked === undefined && !settings.markers) continue;
@@ -699,7 +704,7 @@ export function paintSparkline(
     if (settings.type === SparklineType.Column) {
       // Bars rest on zero when the axis spans it, else on the axis limit nearest zero.
       const base = Math.min(Math.max(0, min), max);
-      const baseY = yOf(base);
+      const baseY = flat ? y + h : yOf(base);
       for (const [i, p] of points.entries()) {
         if (p.value === null) continue;
         const vy = yOf(p.value);

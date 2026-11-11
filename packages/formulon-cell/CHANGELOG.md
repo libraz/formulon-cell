@@ -105,6 +105,7 @@ versioning is [SemVer](https://semver.org/).
 - Sparklines: an oversized source is refused instead of stalling the grid, column sparklines on a flat date axis stay in the cell, the win/loss axis sits on the bars' baseline, a source on a sheet named like a cell reference is quoted, grouping an existing group or ungrouping a single sparkline records nothing, and Edit Group Location & Data keeps the group on its sheet.
 - Insert Slicer adds every chosen field as one undo step or none, targets only the active table, and is unavailable for a session-only table or a PivotTable.
 - A slicer item click a protected sheet refuses leaves keyboard focus on the alert it opens, so Return dismisses the alert.
+- Sparklines over all-equal values draw the line along the top and the columns at full height; a line over a single value draws nothing; a line on a date axis joins its points in date order.
 
 ### Removed
 
