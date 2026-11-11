@@ -50,6 +50,7 @@ versioning is [SemVer](https://semver.org/).
 - On the Mac, the Review Notes menu shows Edit Note in place of New Note when the active cell has a note, and drops it while that note is locked on a protected sheet.
 - Show All Notes is a view preference of the spreadsheet: it draws every note while each note keeps its own Show/Hide state, and the workbook and its saved file stay unchanged. Show/Hide Note on one cell is still saved with the workbook.
 - A pick from a validation list is an authorized, undoable cell entry.
+- Under a host interaction policy, a drag starts when the policy allows its operation: the selection border moves cells and the right-button fill drag opens its menu when the policy limits no cell and allows pasting, formulas and formats (and fill); the page-layout rulers, header and footer bands and page breaks follow the page setup operation; a table's resize grip follows its own table check. The cells and the sheet's protection are still decided on drop.
 - **Breaking:** `Strings.mac.contextMenu.newNote` is now `newComment`.
 
 ### Added

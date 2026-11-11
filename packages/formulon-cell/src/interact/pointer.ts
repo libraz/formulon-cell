@@ -16,6 +16,7 @@ import { tableOverlayById } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
 import { hyperlinkAt, isInDocumentHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { fullFidelityCellWrites, policyPermits } from '../commands/interaction-policy.js';
 import { expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
 import { moveSelectionTo, moveTargetFits, moveTargetRange } from '../commands/move-cells.js';
 import {
@@ -624,6 +625,16 @@ export function attachPointer(
     };
   };
 
+  // A drag starts only when the policy allows its operation; the cells and the sheet's
+  // protection are decided when it drops.
+  const hostPolicy = () => interactionControllerFor(store)?.policy;
+  /** A border drag moves whole cells, formats and formulas included. */
+  const moveDragAllowed = (): boolean => fullFidelityCellWrites(hostPolicy());
+  /** A right-button fill drag ends in a menu whose fills carry formats and formulas. */
+  const fillMenuDragAllowed = (): boolean =>
+    fullFidelityCellWrites(hostPolicy()) && policyPermits(hostPolicy(), 'fill');
+  const pageDragAllowed = (): boolean => policyPermits(hostPolicy(), 'pageSetup');
+
   /** A secondary press moves the selection before the context menu opens:
    *  a cell outside every selected range becomes the selection, the corner
    *  selects the sheet. Headers are resolved by the menu itself. */
@@ -633,7 +644,7 @@ export function attachPointer(
     if (controller?.policy?.selection === false) return;
     if (s.ui.editor.kind !== 'idle') return;
     const { x, y } = localXY(e);
-    if (isFillHandleHit(hits, x, y) && controller?.policy === undefined) {
+    if (isFillHandleHit(hits, x, y) && fillMenuDragAllowed()) {
       // A right-button fill drag ends in a menu of fill kinds, so the context
       // menu the same press would raise is swallowed.
       host.focus();
@@ -649,7 +660,7 @@ export function attachPointer(
       return;
     }
     // A right-button drag by the selection frame ends in a menu of drop actions.
-    if (controller?.policy === undefined && isSelectionBorderHit(s, x, y)) {
+    if (moveDragAllowed() && isSelectionBorderHit(s, x, y)) {
       const grabbed = hitTest(geometryLayout(s), s.viewport, x, y);
       if (grabbed) {
         host.focus();
@@ -768,7 +779,7 @@ export function attachPointer(
     // same affordance the desktop app puts on its rulers.
     const ruler = rulerHandleAt(s, hits, x, y);
     if (ruler) {
-      if (restricted) {
+      if (!pageDragAllowed()) {
         e.preventDefault();
         return;
       }
@@ -785,7 +796,7 @@ export function attachPointer(
     // no cell occupies, so a click there can only mean "edit that slot".
     const band = pageBandAt(s, hits, x, y);
     if (band) {
-      if (restricted) {
+      if (!pageDragAllowed()) {
         e.preventDefault();
         return;
       }
@@ -801,7 +812,7 @@ export function attachPointer(
     // the only thing in that view a drag from this position could mean.
     const breakHandle = pageBreakHandleAt(s, hits, x, y);
     if (breakHandle) {
-      if (restricted) {
+      if (!pageDragAllowed()) {
         e.preventDefault();
         return;
       }
@@ -846,7 +857,7 @@ export function attachPointer(
 
     // A table's corner grip resizes the table; the target range previews in the
     // same band the fill drag uses.
-    if (!restricted && !inFormula) {
+    if (!inFormula) {
       const table = resizableTableGripAt(store, x, y);
       if (table) {
         e.preventDefault();
@@ -861,7 +872,7 @@ export function attachPointer(
 
     // The selection frame moves the block. The cell under the pointer is the
     // grab point, so a grab on the bottom edge counts from the row below it.
-    if (!restricted && !inFormula && isSelectionBorderHit(s, x, y)) {
+    if (moveDragAllowed() && !inFormula && isSelectionBorderHit(s, x, y)) {
       const grabbed = hitTest(geometryLayout(s), s.viewport, x, y);
       const { r0, c0, r1, c1 } = s.selection.range;
       // An item of a report is reordered, never moved as a cell.

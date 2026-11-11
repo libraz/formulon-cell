@@ -395,16 +395,21 @@ export const policyPermits = (
 ): boolean =>
   operation === null || policy === undefined || operationDecision(policy, operation).allowed;
 
-/** Whether the clipboard carries values alone under `policy`: the full-fidelity clipboard writes
- *  without asking the policy, so it runs only when the policy limits no cell and allows pasting
- *  formulas and formats. A values-only clipboard has no move, so it cannot cut. */
-export const valuesOnlyClipboard = (policy: InteractionPolicy | undefined): boolean => {
-  if (policy === undefined) return false;
-  if (policy.editable !== undefined) return true;
-  return !(['paste', 'formulaEdit', 'format'] as const).every((operation) =>
+/** Whether `policy` lets a write carry formulas and formats wherever it lands: it limits no cell
+ *  and allows pasting, formulas and formats. Writes that move whole cells (the clipboard, a drag
+ *  move, a fill drag's menu) ask the policy only for the operation, so they need this. */
+export const fullFidelityCellWrites = (policy: InteractionPolicy | undefined): boolean => {
+  if (policy === undefined) return true;
+  if (policy.editable !== undefined) return false;
+  return (['paste', 'formulaEdit', 'format'] as const).every((operation) =>
     policyPermits(policy, operation),
   );
 };
+
+/** Whether the clipboard carries values alone under `policy` (see {@link fullFidelityCellWrites}).
+ *  A values-only clipboard has no move, so it cannot cut. */
+export const valuesOnlyClipboard = (policy: InteractionPolicy | undefined): boolean =>
+  !fullFidelityCellWrites(policy);
 
 /** Viewer profile: users can select and copy, while every mutation remains
  * denied. Print/export are deliberately left for an explicit host choice. */
