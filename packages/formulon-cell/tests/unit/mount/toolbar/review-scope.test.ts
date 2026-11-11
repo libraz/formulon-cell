@@ -9,6 +9,7 @@ const reportedCells = (): string[] =>
     (label) => label.textContent?.split(' · ')[1] ?? '',
   );
 
+// Pinned to the documented desktop scope; the desktop UI has not been measured for it yet.
 describe('Review > Spelling scope', () => {
   let sheet: MountedStubSheet;
 
