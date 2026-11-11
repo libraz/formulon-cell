@@ -1,14 +1,9 @@
-import { MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
-import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
-import type { SpreadsheetStore, State } from '../../store/store.js';
+import type { SpreadsheetStore } from '../../store/store.js';
 import { type AuthorizedIntentFactory, authorizedWrite } from '../authorized-write.js';
 import { History } from '../history.js';
-import { cellShiftBand, columnShiftBand, rowShiftBand } from '../interaction-effects.js';
-import type { InteractionOrigin, OperationEffect } from '../interaction-policy.js';
-import { isCellWritable, isSheetProtected } from '../protection.js';
-import { makeBand } from './copied-band.js';
+import type { InteractionOrigin } from '../interaction-policy.js';
 import {
   copiedBlock,
   type InsertCopiedBandTarget,
@@ -19,6 +14,11 @@ import {
   targetAddress,
 } from './insert-copied-cells.js';
 import { resolvePasteDestination } from './paste-destination.js';
+import {
+  insertCopiedBandIntents,
+  insertCopiedBlockIntents,
+  pasteIntents,
+} from './paste-intents.js';
 import { type PasteSpecialOptions, pasteSpecial } from './paste-special.js';
 import type { ClipboardSnapshot } from './snapshot.js';
 
@@ -30,59 +30,14 @@ export interface PasteActionContext {
   readonly commandId: string;
 }
 
-/** Cells a protected sheet's paste may still enumerate one by one. */
-const MAX_ENUMERATED_PASTE_CELLS = 100_000;
-
-/**
- * The cells of `range` a paste writes. A snapshot paste is atomic and writes all of them; a text
- * paste (`skipsLocked`) skips the locked cells of a protected sheet, so only its writable cells
- * are declared. Null when it writes none.
- */
-export const pastedCells = (
-  state: State,
-  range: Range,
-  skipsLocked: boolean,
-): OperationEffect | null => {
-  if (!skipsLocked || !isSheetProtected(state, range.sheet)) return { kind: 'range', range };
-  const area = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-  if (area > MAX_ENUMERATED_PASTE_CELLS) return { kind: 'range', range };
-  const cells = [];
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    for (let col = range.c0; col <= range.c1; col += 1) {
-      const addr = { sheet: range.sheet, row, col };
-      if (isCellWritable(state, addr)) cells.push(addr);
-    }
-  }
-  return cells.length > 0 ? { kind: 'cells', cells } : null;
-};
-
-/**
- * Run a paste as one authorized `paste` step whose undo and redo replay under the same check:
- * the destination cells it writes and, for a cut, the source cells it clears. `extra` adds the
- * intents of what the paste does beyond cells (column widths, an insertion). `write` records its
- * own undo entries; `refused` is returned when the paste is not allowed.
- */
-export function pasteWrite<T>(
+/** Run `write` as one authorized step of `intents`, whose undo and redo replay under the same
+ *  check; `refused` when there is nothing to authorize or the step is refused. */
+function runPaste<T>(
   ctx: PasteActionContext,
-  ranges: {
-    readonly destination: Range | null;
-    readonly cutSource?: Range | null;
-    readonly skipsLocked?: boolean;
-  },
+  intents: AuthorizedIntentFactory,
   refused: T,
   write: () => T,
-  extra: AuthorizedIntentFactory = () => [],
 ): T {
-  const state = ctx.store.getState();
-  const effects = [ranges.destination, ranges.cutSource ?? null]
-    .map((range) => (range ? pastedCells(state, range, ranges.skipsLocked === true) : null))
-    .filter((effect): effect is OperationEffect => effect !== null);
-  const intents: AuthorizedIntentFactory = (origin) => [
-    ...(effects.length > 0
-      ? [{ operation: 'paste' as const, origin, commandId: ctx.commandId, effects }]
-      : []),
-    ...extra(origin),
-  ];
   if (intents(ctx.origin).length === 0) return refused;
   const result = authorizedWrite({
     store: ctx.store,
@@ -92,6 +47,31 @@ export function pasteWrite<T>(
     write,
   });
   return result.ok ? result.value : refused;
+}
+
+/**
+ * Run a paste as one authorized step (see {@link pasteIntents}): the whole destination and, for a
+ * cut, the source it clears, plus the tables it grows. `extra` adds the intents of what the paste
+ * does beyond cells (column widths). `write` records its own undo entries; `refused` is returned
+ * when the paste is not allowed.
+ */
+export function pasteWrite<T>(
+  ctx: PasteActionContext,
+  ranges: { readonly destination: Range | null; readonly cutSource?: Range | null },
+  refused: T,
+  write: () => T,
+  extra: AuthorizedIntentFactory = () => [],
+): T {
+  const state = ctx.store.getState();
+  return runPaste(
+    ctx,
+    (origin) => [
+      ...pasteIntents(state, origin, ctx.commandId, ranges.destination, ranges.cutSource ?? null),
+      ...extra(origin),
+    ],
+    refused,
+    write,
+  );
 }
 
 /** Paste Special of `snap` from the entry point `ctx` names, as one authorized step. Column
@@ -129,10 +109,8 @@ export function pasteSpecialAction(
   );
 }
 
-/**
- * Insert Copied (Cut) Cells of a copied whole-row or whole-column band at `target`: the inserted
- * lines are a row (column) insert, a cut also deletes its source lines, and the band is pasted.
- */
+/** Insert Copied (Cut) Cells of a copied whole-row or whole-column band at `target`, as one
+ *  authorized step of {@link insertCopiedBandIntents}. */
 export function insertCopiedBandAction(
   ctx: PasteActionContext,
   wb: WorkbookHandle,
@@ -140,48 +118,23 @@ export function insertCopiedBandAction(
   target?: InsertCopiedBandTarget,
 ): InsertCopiedCellsResult | null {
   if (!snapshot) return null;
-  const logical = snapshot.logicalRange ?? snapshot.range;
-  const rows = isWholeRowRange(logical);
-  const at = targetAddress(ctx.store.getState(), target);
-  if (!at || rows === isWholeColumnRange(logical)) return null;
-  const count = rows ? logical.r1 - logical.r0 + 1 : logical.c1 - logical.c0 + 1;
-  const insertionAt = rows ? at.row : at.col;
+  const state = ctx.store.getState();
+  const at = targetAddress(state, target);
+  if (!at) return null;
+  const source = snapshot.logicalRange ?? snapshot.range;
   const cut = snapshot.mode === 'cut';
-  const lines = (sheet: number, first: number): OperationEffect => ({
-    kind: 'range',
-    range: rows ? rowShiftBand(sheet, first) : columnShiftBand(sheet, first),
-  });
-  return pasteWrite(
+  if (insertCopiedBandIntents(state, ctx.origin, ctx.commandId, source, cut, at) === null)
+    return null;
+  return runPaste(
     ctx,
-    { destination: makeBand(at.sheet, rows, insertionAt, count), cutSource: cut ? logical : null },
+    (origin) => insertCopiedBandIntents(state, origin, ctx.commandId, source, cut, at) ?? [],
     null,
     () => insertCopiedBand(ctx.store, wb, ctx.history, snapshot, target),
-    (origin) => [
-      {
-        operation: rows ? 'insertRows' : 'insertColumns',
-        origin,
-        commandId: ctx.commandId,
-        effects: [lines(at.sheet, insertionAt)],
-      },
-      ...(cut
-        ? [
-            {
-              operation: rows ? ('deleteRows' as const) : ('deleteColumns' as const),
-              origin,
-              commandId: ctx.commandId,
-              effects: [lines(logical.sheet, rows ? logical.r0 : logical.c0)],
-            },
-          ]
-        : []),
-    ],
   );
 }
 
-/**
- * Insert Copied (Cut) Cells of a block at the active cell, shifting cells down or right: the
- * shifted cells are a cell insert, a cut also closes its source up or left, and the block is
- * pasted.
- */
+/** Insert Copied (Cut) Cells of a block at the active cell, shifting cells `direction`, as one
+ *  authorized step of {@link insertCopiedBlockIntents}. */
 export function insertCopiedCellsAction(
   ctx: PasteActionContext,
   wb: WorkbookHandle,
@@ -191,38 +144,15 @@ export function insertCopiedCellsAction(
 ): InsertCopiedCellsResult | null {
   const block = copiedBlock(text, snapshot);
   if (!block) return null;
-  const { active } = ctx.store.getState().selection;
-  const destination: Range = {
-    sheet: active.sheet,
-    r0: active.row,
-    c0: active.col,
-    r1: Math.min(MAX_ROW, active.row + block.height - 1),
-    c1: Math.min(MAX_COL, active.col + block.width - 1),
-  };
-  const down = direction === 'down';
+  const state = ctx.store.getState();
+  const size = { rows: block.height, cols: block.width };
   const cutSource = snapshot?.mode === 'cut' ? snapshot.range : null;
-  return pasteWrite(
+  const at = state.selection.active;
+  return runPaste(
     ctx,
-    { destination, cutSource },
+    (origin) =>
+      insertCopiedBlockIntents(state, origin, ctx.commandId, size, cutSource, at, direction),
     null,
     () => insertCopiedCellsFromTSV(ctx.store, wb, ctx.history, text, direction, snapshot),
-    (origin) => [
-      {
-        operation: down ? 'insertRows' : 'insertColumns',
-        origin,
-        commandId: ctx.commandId,
-        effects: [{ kind: 'range', range: cellShiftBand(destination, down) }],
-      },
-      ...(cutSource
-        ? [
-            {
-              operation: down ? ('deleteRows' as const) : ('deleteColumns' as const),
-              origin,
-              commandId: ctx.commandId,
-              effects: [{ kind: 'range' as const, range: cellShiftBand(cutSource, down) }],
-            },
-          ]
-        : []),
-    ],
   );
 }

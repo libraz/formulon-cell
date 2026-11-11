@@ -1,7 +1,7 @@
 import { addrKey } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
-import { mutators, type SpreadsheetStore } from '../../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { defaultObjectNames, type TableOverlay, updateTableOverlay } from '../format-as-table.js';
 import type { History } from '../history.js';
 import { recordTablesChange } from '../slice-history.js';
@@ -20,6 +20,16 @@ const grownRange = (table: TableOverlay, written: Range): Range | null => {
   return null;
 };
 
+/** The tables a paste over `written` grows, each with the range it grows to. */
+export const tablesGrownByPaste = (
+  state: State,
+  written: Range,
+): { readonly id: string; readonly range: Range }[] =>
+  state.tables.tables.flatMap((table) => {
+    const range = grownRange(table, written);
+    return range ? [{ id: table.id, range }] : [];
+  });
+
 /**
  * Grow every table a paste lands against. A paste that starts in the row
  * directly below a table, within its columns, adds the rows it covers; one
@@ -32,10 +42,7 @@ export function extendTablesForPaste(
   history: History | null,
   written: Range,
 ): void {
-  const growth = store.getState().tables.tables.flatMap((table) => {
-    const range = grownRange(table, written);
-    return range ? [{ id: table.id, range }] : [];
-  });
+  const growth = tablesGrownByPaste(store.getState(), written);
   if (growth.length === 0) return;
   recordTablesChange(history, store, () => {
     for (const { id, range } of growth) updateTableOverlay(store, id, { range });

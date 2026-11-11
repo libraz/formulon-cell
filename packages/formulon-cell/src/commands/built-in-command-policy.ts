@@ -5,6 +5,7 @@ import type { Range } from '../engine/types.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { type BuiltInCommandId, isBuiltInCommandId } from './built-in-command-ids.js';
+import { insertCopiedBandIntents, insertCopiedBlockIntents } from './clipboard/paste-intents.js';
 import { getRecentFunctions } from './function-history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import { columnShiftBand, rowShiftBand } from './interaction-effects.js';
@@ -15,6 +16,7 @@ import type {
   OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
+import { valuesOnlyClipboard } from './interaction-policy.js';
 import { outlineDetailAxis } from './outline.js';
 import {
   isPartialShift,
@@ -43,13 +45,15 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   pasteValues: 'paste',
   pasteValuesNumFmt: 'paste',
   pasteTranspose: 'paste',
-  pasteFormatsOnly: 'format',
-  pasteFormulas: 'formulaEdit',
-  pasteFormulasNumFmt: 'formulaEdit',
-  cut: 'moveCells',
+  pasteFormatsOnly: 'paste',
+  pasteFormulas: 'paste',
+  pasteFormulasNumFmt: 'paste',
+  cut: 'paste',
   clear: 'clear',
   insertCells: 'insertRows',
-  insertCopiedCells: 'moveCells',
+  // Decided on the intents its write declares (see insertCopiedDecision); 'paste' alone without
+  // a copy of this workbook to size the insertion.
+  insertCopiedCells: 'paste',
   deleteCells: 'deleteRows',
   insertRows: 'insertRows',
   deleteRows: 'deleteRows',
@@ -456,7 +460,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   paperSizePreset: 'pageSetup',
   pasteColumnWidths: 'resizeColumns',
   pasteKeepSource: 'paste',
-  pasteLink: 'formulaEdit',
+  pasteLink: 'paste',
   pasteNoBorders: 'paste',
   pdf: 'export',
   pivotActiveField: 'pivot',
@@ -847,6 +851,16 @@ const decideBuiltIn = (
   // Ids arrive from DOM datasets and public command APIs; validate at the boundary.
   if (!isBuiltInCommandRequest(id)) return invalidCommand(id);
   if (id === 'copy') return controller.canCopy();
+  if (id === 'cut' && valuesOnlyClipboard(controller.policy))
+    return {
+      allowed: false,
+      code: 'operationDenied',
+      reason: 'a values-only clipboard cannot cut',
+    };
+  if (id === 'insertCopiedCells') {
+    const decision = insertCopiedDecision(store, origin);
+    if (decision) return decision;
+  }
   if (isBuiltInCommandId(id) && SELECTING_NAVIGATION_COMMANDS.has(id))
     return controller.canSelect();
   const intent = builtInCommandIntent(store, id, origin);
@@ -878,6 +892,44 @@ export function canExecuteBuiltInRequest(
 ): PermissionDecision {
   return decideBuiltIn(store, id, origin);
 }
+
+/**
+ * Insert Copied Cells decided on the intents its write declares for the copy on this workbook's
+ * clipboard: a whole-row (column) copy inserts lines at the selection; any other block is allowed
+ * while either shift direction of its dialog is. Null without such a copy.
+ */
+const insertCopiedDecision = (
+  store: SpreadsheetStore,
+  origin: InteractionOrigin,
+): PermissionDecision | null => {
+  const controller = interactionControllerFor(store);
+  const state = store.getState();
+  const copied = state.ui.copyRange;
+  if (!controller || !copied) return null;
+  const source = normalized(copied);
+  const selection = normalized(state.selection.range);
+  const at = { sheet: selection.sheet, row: selection.r0, col: selection.c0 };
+  const cut = state.ui.copyMode === 'cut';
+  const commandId = 'insertCopiedCells';
+  const decide = (intents: readonly OperationIntent[]): PermissionDecision => {
+    for (const intent of intents) {
+      const decision = controller.canExecute(intent);
+      if (!decision.allowed) return decision;
+    }
+    return { allowed: true };
+  };
+  const band = insertCopiedBandIntents(state, origin, commandId, source, cut, at);
+  if (band) return decide(band);
+  const size = { rows: source.r1 - source.r0 + 1, cols: source.c1 - source.c0 + 1 };
+  const down = decide(
+    insertCopiedBlockIntents(state, origin, commandId, size, cut ? source : null, at, 'down'),
+  );
+  if (down.allowed) return down;
+  const right = decide(
+    insertCopiedBlockIntents(state, origin, commandId, size, cut ? source : null, at, 'right'),
+  );
+  return right.allowed ? right : down;
+};
 
 const wholeLineSelection = (store: SpreadsheetStore): boolean => {
   const s = normalized(store.getState().selection.range);

@@ -148,6 +148,8 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'cellStyles',
   'mac.data.dataTable',
   'mac.insert.sparkline',
+  // Refused by the insertion itself whatever the sheet's options.
+  'insertCopiedCells',
 ]);
 
 /** Outline structure commands: Group, Ungroup and the outline settings (summary position). Any

@@ -30,7 +30,11 @@ import {
   InteractionController as FullInteractionController,
   interactionControllerFor,
 } from './interaction-controller.js';
-import type { InteractionOperation, OperationEffect } from './interaction-policy.js';
+import type {
+  InteractionOperation,
+  InteractionOrigin,
+  OperationEffect,
+} from './interaction-policy.js';
 import {
   isAllowedEditRangeOpen,
   isCellWritable,
@@ -55,6 +59,8 @@ export interface ExecuteRibbonClearActionDeps {
   action: RibbonClearAction;
   /** Optional mounted controller. Contents uses it to share policy/history. */
   commands?: Pick<InteractionController, 'execute' | 'policy'>;
+  /** The entry point the clear runs as; the Home ribbon's Clear menu item when omitted. */
+  entry?: { readonly origin: InteractionOrigin; readonly commandId: string };
 }
 
 const visualFormatKeys: readonly (keyof CellFormat)[] = [
@@ -405,12 +411,13 @@ const effectsForRanges = (ranges: readonly Range[]): readonly OperationEffect[] 
 
 const preflight = (
   controller: FullInteractionController | undefined,
+  origin: InteractionOrigin,
   operation: InteractionOperation,
   commandId: string,
   effects: readonly OperationEffect[],
 ): boolean => {
   if (!controller || effects.length === 0 || !controller.policy) return true;
-  return controller.canExecute({ operation, origin: 'ribbon', commandId, effects }).allowed;
+  return controller.canExecute({ operation, origin, commandId, effects }).allowed;
 };
 
 const resolveTransactionController = (
@@ -445,25 +452,34 @@ const preflightPlan = (
   deps: ExecuteRibbonClearActionDeps,
   plan: SelectionClearPlan,
   controller: FullInteractionController | undefined,
+  origin: InteractionOrigin,
   commandId: string,
 ): boolean => {
   if (!controller?.policy) return true;
-  if (!preflight(controller, 'clear', commandId, effectsForCells(plan.content))) {
+  if (!preflight(controller, origin, 'clear', commandId, effectsForCells(plan.content))) {
     return false;
   }
-  if (!preflight(controller, 'comment', commandId, effectsForCells(plan.comments))) return false;
+  if (!preflight(controller, origin, 'comment', commandId, effectsForCells(plan.comments)))
+    return false;
   if (
-    !preflight(controller, hyperlinkOperation(true), commandId, effectsForCells(plan.hyperlinks))
+    !preflight(
+      controller,
+      origin,
+      hyperlinkOperation(true),
+      commandId,
+      effectsForCells(plan.hyperlinks),
+    )
   ) {
     return false;
   }
-  if (!preflight(controller, 'validation', commandId, effectsForCells(plan.validations)))
+  if (!preflight(controller, origin, 'validation', commandId, effectsForCells(plan.validations)))
     return false;
-  if (!preflight(controller, 'format', commandId, effectsForCells(plan.formatEntries))) {
+  if (!preflight(controller, origin, 'format', commandId, effectsForCells(plan.formatEntries))) {
     return false;
   }
   return preflight(
     controller,
+    origin,
     'format',
     commandId,
     effectsForRanges(rangesForRuleIndexes(deps.store.getState(), plan.conditionalRuleIndexes)),
@@ -476,6 +492,7 @@ const refreshCells = (store: SpreadsheetStore, workbook: WorkbookHandle, sheet: 
 
 export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): void => {
   const { store, workbook, history, action } = deps;
+  const origin = deps.entry?.origin ?? 'ribbon';
 
   // Contents keeps its public command adapter behavior. Clear All runs its
   // content child through the resolved controller inside one History step.
@@ -486,7 +503,8 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       workbook,
       history,
       commands: deps.commands as ClearContentsCommands | undefined,
-      origin: 'ribbon',
+      origin,
+      ...(deps.entry ? { commandId: deps.entry.commandId } : {}),
     });
     if (result.status !== 'rejected') refreshCells(store, workbook, range.sheet);
     return;
@@ -546,22 +564,18 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
                 conditionalRuleIndexes: plan.conditionalRuleIndexes,
               }
             : plan;
-  if (
-    !preflightPlan(
-      deps,
-      policyPlan,
-      controller,
-      action === 'all'
-        ? 'clear-all'
-        : action === 'formats'
-          ? 'clear-formats'
-          : action === 'comments'
-            ? 'clear-comments'
-            : action === 'hyperlinks'
-              ? 'clear-hyperlinks'
-              : 'clear-conditional',
-    )
-  ) {
+  const commandId =
+    deps.entry?.commandId ??
+    (action === 'all'
+      ? 'clear-all'
+      : action === 'formats'
+        ? 'clear-formats'
+        : action === 'comments'
+          ? 'clear-comments'
+          : action === 'hyperlinks'
+            ? 'clear-hyperlinks'
+            : 'clear-conditional');
+  if (!preflightPlan(deps, policyPlan, controller, origin, commandId)) {
     if (resolved.ephemeral) controller?.dispose();
     return;
   }
@@ -578,9 +592,9 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
         () =>
           withSelectionFormatOrigin(
             store,
-            'ribbon',
+            origin,
             () => clearPlannedFormats(store, plan, true),
-            'clear-formats',
+            commandId,
           ),
         { repeat: () => executeRibbonClearAction(deps) },
       );
@@ -589,7 +603,7 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
     if (action === 'comments') {
       // Only the notes a locked cell of a protected sheet does not keep are cleared.
       const writable = plan.comments.filter((addr) => isCellWritable(store.getState(), addr));
-      const ctx = { store, history, origin: 'ribbon', commandId: 'clear-comments' } as const;
+      const ctx = { store, history, origin, commandId };
       commentWrite(ctx, writable, undefined, () =>
         recordCommentChange(history, store, workbook, writable, () => {
           clearComments(store, writable, workbook);
@@ -599,7 +613,7 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
     }
     if (action === 'hyperlinks') {
       hyperlinkWrite(
-        { store, history, workbook, origin: 'ribbon', commandId: 'clear-hyperlinks' },
+        { store, history, workbook, origin, commandId },
         plan.hyperlinks,
         undefined,
         () =>
@@ -624,8 +638,8 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
         workbook,
         history,
         commands: controller,
-        origin: 'ribbon',
-        commandId: 'clear-all',
+        origin,
+        commandId,
       });
       if (result.status === 'rejected') {
         history.abort(token);
@@ -638,7 +652,7 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       const { selection } = store.getState();
       for (const range of [selection.range, ...(selection.extraRanges ?? [])]) {
         clearSparklinesAction(
-          { store, history, origin: 'ribbon', commandId: 'clear-all' },
+          { store, history, origin, commandId },
           {
             sheet: range.sheet,
             r0: Math.min(range.r0, range.r1),
@@ -660,9 +674,9 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
         recordClearFormatEntries(history, store, workbook, plan.sheet, formatTargets, () =>
           withSelectionFormatOrigin(
             store,
-            'ribbon',
+            origin,
             () => clearPlannedFormats(store, plan, false),
-            'clear-all',
+            commandId,
           ),
         );
       }

@@ -1,3 +1,4 @@
+import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { type CopyResult, copy, planCopyRanges } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { createDrawingClipboard } from '../commands/clipboard/drawing.js';
@@ -26,7 +27,7 @@ import { encodeTSV, parseTSV } from '../commands/clipboard/tsv.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { policyPermits } from '../commands/interaction-policy.js';
+import { policyPermits, valuesOnlyClipboard } from '../commands/interaction-policy.js';
 import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
@@ -77,17 +78,9 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   const drawings = createDrawingClipboard({ store, wb, history });
 
   const policy = () => interactionControllerFor(store)?.policy;
-  /** The full-fidelity clipboard writes without asking the policy, so it runs only when the
-   *  policy limits no cell and allows pasting formulas and formats. Otherwise copies carry
-   *  values alone and pastes go through the controller, cell by cell. */
-  const valuesOnly = (): boolean => {
-    const current = policy();
-    if (current === undefined) return false;
-    if (current.editable !== undefined) return true;
-    return !(['paste', 'formulaEdit', 'format'] as const).every((operation) =>
-      policyPermits(current, operation),
-    );
-  };
+  /** Copies carry values alone and pastes go through the controller, cell by cell, while the
+   *  policy limits the clipboard (see {@link valuesOnlyClipboard}). */
+  const valuesOnly = (): boolean => valuesOnlyClipboard(policy());
 
   /** Copy or cut the selected chart or picture instead of the cells under it.
    *  Returns the system clipboard text, or null when nothing was taken. */
@@ -152,7 +145,11 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     );
   };
 
-  const restrictedPaste = (state: State, text: string): { writtenRange: Range } | null => {
+  const restrictedPaste = (
+    entry: DialogEntry,
+    state: State,
+    text: string,
+  ): { writtenRange: Range } | null => {
     const controller = interactionControllerFor(store);
     if (!controller || controller.policy === undefined) return null;
     const internal =
@@ -233,19 +230,26 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       }
     }
     if (changes.length === 0) return null;
-    const result = controller.execute({
-      type: 'cellBatch',
-      operation: 'paste',
-      origin: 'clipboard',
-      changes,
-      // Keep the matrix coordinates stable when a fixed form opts into
-      // positional partial application. The controller's policy supplies the
-      // default when this is omitted; an explicit value here would silently
-      // turn `skipIneligible` back into an atomic rejection.
-      denied: controller.policy.batchDenied,
-    });
-    if (result.status === 'rejected' || result.status === 'noop') return null;
-    return { writtenRange: destination };
+    const write = (): { writtenRange: Range } | null => {
+      const result = controller.execute({
+        type: 'cellBatch',
+        operation: 'paste',
+        origin: entry.origin,
+        commandId: entry.commandId,
+        changes,
+        // Keep the matrix coordinates stable when a fixed form opts into
+        // positional partial application. The controller's policy supplies the
+        // default when this is omitted; an explicit value here would silently
+        // turn `skipIneligible` back into an atomic rejection.
+        denied: controller.policy?.batchDenied,
+      });
+      if (result.status === 'rejected' || result.status === 'noop') return null;
+      return { writtenRange: destination };
+    };
+    // A policy that skips ineligible cells writes part of the destination: the batch decides
+    // and records each written cell itself.
+    if (controller.policy.batchDenied === 'skipIneligible') return write();
+    return pasteWrite({ store, history: history ?? null, ...entry }, { destination }, null, write);
   };
 
   const hasLiveInternalPayload = (state: State): boolean => {
@@ -477,7 +481,6 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       {
         destination: pasteDestinationRange(state, text),
         cutSource: internal?.mode === 'cut' ? internal.range : null,
-        skipsLocked: internal === null,
       },
       none,
       () => pasteFromClipboard(store.getState(), text, html),
@@ -530,9 +533,8 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       if (text !== null) e.clipboardData?.setData('text/plain', text);
       return;
     }
-    if (valuesOnly() || !policyPermits(policy(), 'moveCells')) {
-      // Cut is a move operation. The values-only route has no atomic move
-      // executor yet, so fail closed before touching data or the marquee.
+    if (!canExecuteBuiltIn(store, 'cut', 'clipboard').allowed) {
+      // Fail closed before touching data or the marquee.
       e.preventDefault();
       return;
     }
@@ -571,7 +573,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (!hasPastePayload(text)) return;
     if (valuesOnly()) {
       e.preventDefault();
-      const r = restrictedPaste(s, text);
+      const r = restrictedPaste(NATIVE_PASTE_ENTRY, s, text);
       if (r) {
         consumeCutMarquee();
         mutators.setRange(store, r.writtenRange);
@@ -675,7 +677,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       return;
     }
     if (kind === 'cut') {
-      if (valuesOnly() || !policyPermits(policy(), 'moveCells')) return;
+      if (!canExecuteBuiltIn(store, 'cut', entry.origin).allowed) return;
       const r = cut(s, wb);
       if (!r) return;
       drawings.clear();
@@ -718,7 +720,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (pasteDrawing(text)) return;
     if (!hasPastePayload(text)) return;
     if (valuesOnly()) {
-      const r = restrictedPaste(pasteState, text);
+      const r = restrictedPaste(entry, pasteState, text);
       if (!r) return;
       consumeCutMarquee();
       mutators.setRange(store, r.writtenRange);

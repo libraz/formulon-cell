@@ -11,7 +11,7 @@ import {
 import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
-import { isCellWritable } from '../protection.js';
+import { isCellWritable, isSheetProtected } from '../protection.js';
 import { recordFormatChange } from '../slice-history.js';
 import { applyPatchesAtomic } from './apply-patches-atomic.js';
 import { extendTablesForPaste } from './table-extension.js';
@@ -25,8 +25,8 @@ export interface PasteResult {
  * Paste a TSV payload at the current active cell. Each value is run through
  * `coerceInput` so leading-`=` strings become formulas, numerics become
  * numbers, etc. — matching the spreadsheet behaviour when you paste values from a
- * different program. Cells gated by sheet protection (locked + sheet
- * protected) are silently skipped, mirroring the spreadsheet's paste behaviour.
+ * different program. A destination that touches a locked cell of a protected
+ * sheet refuses the paste as a whole, as the spreadsheet does.
  * With `history`, the cells are written in one atomic engine call and recorded
  * as a single undo step; without it, each cell goes through the scalar path.
  *
@@ -56,6 +56,7 @@ export function pasteTSV(
     r1: origin.row + rows.length - 1,
     c1: origin.col + pastedCols - 1,
   };
+  if (!rangeWritable(state, pasteArea)) return null;
   if (blockPivotEdit(wb, pasteArea, 'paste') || blockDataTableEdit(wb, pasteArea)) return null;
   const inputLocale = inputLocaleForWorkbook(wb);
   let maxCols = 0;
@@ -65,7 +66,6 @@ export function pasteTSV(
     if (cells.length > maxCols) maxCols = cells.length;
     for (let c = 0; c < cells.length; c += 1) {
       const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
-      if (!isCellWritable(state, addr)) continue;
       writes.push({
         addr,
         input: coerceInputForCell(state, addr, cells[c] ?? '', inputLocale, wb),
@@ -99,6 +99,17 @@ export function pasteTSV(
   extendTablesForPaste(store, history, writtenRange);
   if (transaction !== undefined) history?.end(transaction);
   return { writtenRange };
+}
+
+/** Whether every cell of `range` is writable under sheet protection. */
+function rangeWritable(state: State, range: Range): boolean {
+  if (!isSheetProtected(state, range.sheet)) return true;
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      if (!isCellWritable(state, { sheet: range.sheet, row, col })) return false;
+    }
+  }
+  return true;
 }
 
 /** Give each General destination the number format its pasted text implies;

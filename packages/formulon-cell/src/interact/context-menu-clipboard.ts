@@ -273,7 +273,6 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
             {
               destination,
               cutSource: snap?.mode === 'cut' ? snap.range : null,
-              skipsLocked: !snap,
             },
             null,
             (): ReturnType<typeof pasteTSV> | ReturnType<typeof pasteSpecial> =>

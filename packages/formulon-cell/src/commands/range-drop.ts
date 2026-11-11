@@ -128,6 +128,7 @@ export async function applyRangeDrop(
           workbook: wb,
           history: history ?? new History(),
           action: 'all',
+          entry: { origin: ctx.origin, commandId: ctx.commandId },
         });
       }
       return inserted;

@@ -495,7 +495,7 @@ describe('structure mutators on protected sheet', () => {
 });
 
 describe('pasteTSV protection gate', () => {
-  it('skips locked destinations silently while writing through unlocked ones', async () => {
+  it('refuses the whole paste when its destination touches a locked cell', async () => {
     const store = createSpreadsheetStore();
     const wb = await newWb();
     // Activate paste at A1; row spans A1..C1.
@@ -509,14 +509,20 @@ describe('pasteTSV protection gate', () => {
     mutators.setSheetProtected(store, 0, true);
     const result = pasteTSV(store.getState(), store, wb, 'foo\tbar\tbaz');
     wb.recalc();
-    // A1 (locked) — engine cell should remain blank.
-    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
-    // B1 (unlocked) — paste landed.
+    // A1 and C1 are locked, so not even the unlocked B1 is written.
+    for (let col = 0; col < 3; col += 1)
+      expect(wb.getValue({ sheet: 0, row: 0, col }).kind).toBe('blank');
+    expect(result).toBeNull();
+
+    // A destination of unlocked cells alone takes the paste.
+    expect(pasteTSV(store.getState(), store, wb, 'only')).toBeNull();
+    store.setState((s) => ({
+      ...s,
+      selection: { ...s.selection, active: { sheet: 0, row: 0, col: 1 } },
+    }));
+    expect(pasteTSV(store.getState(), store, wb, 'bar')?.writtenRange).toBeDefined();
     const b1 = wb.getValue({ sheet: 0, row: 0, col: 1 });
     expect(b1.kind === 'text' && b1.value).toBe('bar');
-    // C1 (locked) — blank.
-    expect(wb.getValue({ sheet: 0, row: 0, col: 2 }).kind).toBe('blank');
-    expect(result?.writtenRange).toBeDefined();
   });
 });
 

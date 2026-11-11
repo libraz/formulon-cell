@@ -93,7 +93,7 @@ function runInsertCopiedBand(ctx: ContextMenuInsertCopiedContext, kind: 'row' | 
     // The inserted lines are a row (column) insert; the copy is pasted into them.
     const inserted = pasteWrite(
       action,
-      { destination: band, skipsLocked: !snap },
+      { destination: band },
       false,
       () => {
         try {

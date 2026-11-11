@@ -75,15 +75,20 @@ describe('selection-format built-in command policy', () => {
         'borders',
         'formatCells',
         'editPhonetic',
-        'pasteFormatsOnly',
       ] as const) {
         expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toEqual({ allowed: true });
       }
 
       controller.setPolicy({ ...policy, operations: { ...policy.operations, format: false } });
-      for (const id of ['borders', 'formatCells', 'editPhonetic', 'pasteFormatsOnly'] as const) {
+      for (const id of ['borders', 'formatCells', 'editPhonetic'] as const) {
         expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toMatchObject({ allowed: false });
       }
+      // Paste Formats is a paste: the paste operation decides it, as its write declares.
+      expect(canExecuteBuiltIn(store, 'pasteFormatsOnly', 'ribbon')).toEqual({ allowed: true });
+      controller.setPolicy({ ...policy, operations: { ...policy.operations, paste: false } });
+      expect(canExecuteBuiltIn(store, 'pasteFormatsOnly', 'ribbon')).toMatchObject({
+        allowed: false,
+      });
     } finally {
       unregister();
       controller.dispose();

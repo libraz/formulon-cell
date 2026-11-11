@@ -140,7 +140,7 @@ describe('TSV paste value batching', () => {
     }
   });
 
-  it('skips protected cells but preserves the input rectangle in its result', async () => {
+  it('refuses a paste over a protected cell as a whole', async () => {
     const wb = await WorkbookHandle.createDefault();
     const store = createSpreadsheetStore();
     const history = new History();
@@ -151,14 +151,10 @@ describe('TSV paste value batching', () => {
 
       const result = pasteTSV(store.getState(), store, wb, 'allowed\tlocked', history);
 
-      expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
-      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
-        kind: 'text',
-        value: 'allowed',
-      });
-      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
-      expect(history.undo()).toBe(true);
+      expect(result).toBeNull();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+      expect(history.canUndo()).toBe(false);
     } finally {
       wb.dispose();
     }
