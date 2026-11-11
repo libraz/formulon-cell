@@ -234,6 +234,19 @@ describe('spreadsheet: update', () => {
     expect(store.getState().ui.showAllNotes).toBe(false);
   });
 
+  it('Show/Hide Note and Show All Notes add no undo step', async () => {
+    const sheet = await mountSheet();
+    const { store } = spreadsheetInternals(sheet);
+    setComment(store, { sheet: 0, row: 1, col: 1 }, 'note', workbookHandleOf(sheet.workbook));
+    sheet.selection.set('B2');
+    sheet.history.clear();
+    sheet.commands.execute('showHideNoteReview');
+    expect(store.getState().format.formats.get('0:1:1')?.commentVisible).toBe(true);
+    sheet.commands.execute('showAllNotesReview');
+    expect(sheet.options.showAllNotes).toBe(true);
+    expect(sheet.history.canUndo).toBe(false);
+  });
+
   it('showAllNotes set at mount draws every note from the start', async () => {
     const sheet = await mountSheet({ showAllNotes: true });
     expect(sheet.options.showAllNotes).toBe(true);
