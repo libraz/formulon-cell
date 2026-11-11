@@ -14,6 +14,7 @@ import type { SpreadsheetInstance } from '../mount/types.js';
 import { mutators } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogButton, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 
 /** A cell's constant text or its note: what the check reads. */
 interface SpellingTarget {
@@ -421,11 +422,12 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
     instance.spellingService().addWord?.(issue.word.word, locale);
     skip(issue.word.word.toLowerCase());
   });
-  // Return anywhere but on a button presses the default button.
-  shell.on(body, 'keydown', (event) => {
-    const key = event as KeyboardEvent;
-    if (key.key !== 'Enter' || key.target instanceof HTMLButtonElement) return;
-    key.preventDefault();
+  // Return presses the default button; the overlay hears it even where a clicked button keeps no
+  // focus (WebKit).
+  shell.on(shell.overlay, 'keydown', (rawEvent) => {
+    const event = rawEvent as KeyboardEvent;
+    if (!isSubmitEnter(event)) return;
+    event.preventDefault();
     ignoreOnce.click();
   });
   shell.on(change, 'click', () => applyChange(false));

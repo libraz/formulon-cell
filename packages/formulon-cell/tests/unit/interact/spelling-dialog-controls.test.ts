@@ -76,6 +76,17 @@ describe('Spelling dialog controls on the Mac desktop', () => {
     expect(labels()[0]).toBe('辞書にない単語: recieve');
   });
 
+  it('presses Ignore Once on Return when focus rests on the dialog itself', async () => {
+    await open([
+      [0, 0, 'teh'],
+      [1, 0, 'recieve'],
+    ]);
+    const panel = dialog()?.querySelector<HTMLElement>('.fc-spelling__panel');
+    panel?.focus();
+    panel?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(labels()[0]).toBe('辞書にない単語: recieve');
+  });
+
   it('enables Undo Last after an Ignore and steps back to the word', async () => {
     await open([
       [0, 0, 'teh'],
