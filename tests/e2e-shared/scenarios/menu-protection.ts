@@ -52,6 +52,7 @@ const MAC_CELL_MENU = [
   'sort',
   '|',
   'newComment',
+  'insertComment',
   '|',
   'formatCells',
   'pickFromList',
