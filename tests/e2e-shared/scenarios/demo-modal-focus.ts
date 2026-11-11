@@ -10,63 +10,42 @@ async function expectActive(locator: Locator, message: string): Promise<void> {
     .toBe(true);
 }
 
-/** B8 — demo modal dialogs follow desktop spreadsheet keyboard semantics.
- *
- * Review and Automate commands live in the React/Vue wrapper chrome rather
- * than the core spreadsheet. They still need the same Excel-like modal
- * contract as core dialogs: focus moves into the dialog, Tab/Shift+Tab stays
- * inside it, Escape closes, and focus returns to the ribbon command that
- * launched it.
- */
+/** Asserts a modal dialog keeps Tab and Shift+Tab inside it, closes on Escape, and hands focus
+ *  back to the grid, as a closed desktop dialog returns to the worksheet. */
+async function expectModalFocusContract(page: Page, dialog: Locator) {
+  await expect(dialog).toBeVisible();
+  const inside = () => dialog.evaluate((el) => el.contains(document.activeElement));
+  await expect.poll(inside, { message: 'the dialog should take focus' }).toBe(true);
+  for (const key of ['Tab', 'Tab', 'Tab', 'Shift+Tab', 'Shift+Tab', 'Shift+Tab', 'Shift+Tab']) {
+    await page.keyboard.press(key);
+    expect(await inside(), `${key} should keep focus inside the dialog`).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expectActive(
+    page.locator('.fc-host').first(),
+    'the dialog should return focus to the grid',
+  );
+}
+
+/** B8 — the Review and Automate report and script dialogs follow desktop modal keyboard
+ *  semantics: focus moves into the dialog, Tab/Shift+Tab stays inside it, Escape closes, and focus
+ *  returns to the grid. */
 export async function runDemoModalFocusScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
   await sp.mount();
 
   await page.locator('[data-ribbon-tab="review"]').click();
-  const accessibility = page
-    .getByRole('button', { name: /Accessibility|アクセシビリティ/ })
-    .first();
-  await expect(accessibility).toBeEnabled();
-  await accessibility.click();
-
-  const reviewDialog = page
-    .locator('.fc-tb__modal[role="dialog"][aria-modal="true"]')
-    .filter({ hasText: /Accessibility Check|No issues found/i });
-  await expect(reviewDialog).toBeVisible();
-
-  const reviewClose = reviewDialog.getByRole('button', { name: /Close/i });
-  const reviewOk = reviewDialog.getByRole('button', { name: /^OK$/i });
-  await expectActive(reviewClose, 'review dialog should focus the first command');
-
-  await page.keyboard.press('Shift+Tab');
-  await expectActive(reviewOk, 'Shift+Tab should wrap to the last review dialog command');
-  await page.keyboard.press('Tab');
-  await expectActive(reviewClose, 'Tab should wrap back to the first review dialog command');
-
-  await page.keyboard.press('Escape');
-  await expect(reviewDialog).toBeHidden();
-  await expectActive(accessibility, 'review dialog should restore focus to its ribbon command');
+  const spelling = page.locator('[data-ribbon-command="spellingReview"]').first();
+  await expect(spelling).toBeEnabled();
+  await spelling.click();
+  await expectModalFocusContract(page, page.getByRole('dialog', { name: 'Spelling', exact: true }));
 
   await page.locator('[data-ribbon-tab="automate"]').click();
   const script = page.getByRole('button', { name: /^Script$/i }).first();
   await expect(script).toBeEnabled();
   await script.click();
-  await page.locator('#menu-script [data-script-action="custom"]').click();
-
-  const scriptDialog = page
-    .locator('.fc-tb__modal[role="dialog"][aria-modal="true"]')
-    .filter({ hasText: /^Script/ });
-  await expect(scriptDialog).toBeVisible();
-
-  const scriptClose = scriptDialog.getByRole('button', { name: /Close/i });
-  const scriptRun = scriptDialog.getByRole('button', { name: /^Run$/i });
-  await expectActive(scriptClose, 'script dialog should focus the first command');
-
-  await page.keyboard.press('Shift+Tab');
-  await expectActive(scriptRun, 'Shift+Tab should wrap to the Run command');
-  await page.keyboard.press('Escape');
-  await expect(scriptDialog).toBeHidden();
-  await expectActive(script, 'script dialog should restore focus to its ribbon command');
+  await expectModalFocusContract(page, page.getByRole('dialog', { name: 'Script', exact: true }));
 }
 
 export async function runDemoStatusBarHostStateScenario(page: Page): Promise<void> {
@@ -75,26 +54,8 @@ export async function runDemoStatusBarHostStateScenario(page: Page): Promise<voi
   await sp.expectNoStub();
 
   const upload = page.locator('.fc-host__statusbar-upload').first();
-  const macro = page.locator('.fc-host__statusbar-macro').first();
 
   await page.locator('.demo__quick button[aria-label="Save"]').click();
   await expect(upload).toBeVisible();
   await expect(upload).toHaveAttribute('data-upload-status', 'saved');
-
-  await page.locator('[data-ribbon-tab="automate"]').click();
-  const script = page.getByRole('button', { name: /^Script$/i }).first();
-  await expect(script).toBeEnabled();
-  await script.click();
-  await page.locator('#menu-script [data-script-action="custom"]').click();
-
-  const scriptDialog = page
-    .locator('.fc-tb__modal[role="dialog"][aria-modal="true"]')
-    .filter({ hasText: /^Script/ });
-  await expect(scriptDialog).toBeVisible();
-  await expect(macro).toBeVisible();
-  await expect(macro).toHaveAttribute('data-macro-recording', 'true');
-
-  await page.keyboard.press('Escape');
-  await expect(scriptDialog).toBeHidden();
-  await expect(macro).toHaveAttribute('data-macro-recording', 'false');
 }

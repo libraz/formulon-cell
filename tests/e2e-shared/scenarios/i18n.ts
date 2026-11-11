@@ -821,13 +821,13 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     'menu-protect-review',
   );
 
+  // Check Accessibility opens the docked Accessibility pane, as in desktop Excel.
   await page.locator('[data-ribbon-command="accessibility"]').first().click();
-  const accessibilityDialog = page.getByRole('dialog', { name: 'アクセシビリティ チェック' });
-  await expect(accessibilityDialog).toBeVisible();
-  await expect(accessibilityDialog).toContainText(/問題は見つかりませんでした。|リボン コマンド/);
-  await expect(accessibilityDialog).not.toContainText('Accessibility Check');
-  await accessibilityDialog.getByRole('button', { name: 'OK', exact: true }).click();
-  await expect(accessibilityDialog).toHaveCount(0);
+  const accessibilityPane = page.getByRole('dialog', { name: 'アクセシビリティ', exact: true });
+  await expect(accessibilityPane).toBeVisible();
+  await expect(accessibilityPane).not.toContainText('Accessibility');
+  await accessibilityPane.getByRole('button', { name: '閉じる', exact: true }).click();
+  await expect(accessibilityPane).toHaveCount(0);
 
   await page.locator('[data-ribbon-command="translateReview"]').first().click();
   const translateDialog = page.getByRole('dialog', { name: '翻訳' });
@@ -850,6 +850,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     if (!inst) throw new Error('window.__fcInst is required');
     inst.workbook.batch(() => inst.workbook.sheet(0).setText(0, 0, 'teh teh'));
     inst.history.clear();
+    inst.selection.set('A1');
   });
   const spellingCommand = page.getByRole('button', { name: /スペル/ }).first();
   await expect(spellingCommand).toBeVisible();
@@ -859,7 +860,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await expect(dialog).toContainText('同じ語が繰り返されています');
   await expect(dialog).toContainText('スペルミスの可能性');
   await expect(dialog).not.toContainText('Spelling Review');
-  await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+  await dialog.getByRole('button', { name: '閉じる', exact: true }).click();
   await expect(dialog).toHaveCount(0);
 
   await page.locator('[data-ribbon-tab="help"]').click();
