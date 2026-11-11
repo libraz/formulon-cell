@@ -3,6 +3,7 @@ import { newAllowedEditRangeId } from '../store/sheet-settings-mutators.js';
 import {
   type AllowedEditRange,
   mutators,
+  type SheetAxisLocks,
   type SheetProtectionPasswordHash,
   type SheetProtectionPermissions,
   type SpreadsheetStore,
@@ -33,22 +34,35 @@ export function hydrateAxisLocksFromEngine(
   store: SpreadsheetStore,
   sheet: number,
 ): void {
+  mutators.setSheetAxisLocks(store, sheet, axisLocksFromEngine(wb, sheet));
+}
+
+/** The Locked flag of `sheet`'s row and column styles, or null when the engine has none to read. */
+export function axisLocksFromEngine(wb: WorkbookHandle, sheet: number): SheetAxisLocks | null {
   const snapshot = wb.getSheetFontAxisSnapshot?.(sheet) ?? null;
-  if (!snapshot) {
-    mutators.setSheetAxisLocks(store, sheet, null);
-    return;
-  }
+  if (!snapshot) return null;
   // An XF with no protection element is locked.
   const locked = (xf: number): boolean => wb.getCellXf(xf)?.locked !== false;
-  mutators.setSheetAxisLocks(store, sheet, {
+  return {
     rows: new Map(snapshot.rows.map(({ row, styleXf }) => [row, locked(styleXf)])),
     cols: snapshot.columns.map(({ first, last, styleXf }) => ({
       first,
       last,
       locked: locked(styleXf),
     })),
-  });
+  };
 }
+
+/** Whether `axes` leave the cell at `row`, `col` unlocked when it has no format of its own. */
+export const inheritsUnlocked = (
+  axes: SheetAxisLocks | null,
+  row: number,
+  col: number,
+): boolean => {
+  const rowLock = axes?.rows.get(row);
+  if (rowLock !== undefined) return !rowLock;
+  return axes?.cols.find((span) => col >= span.first && col <= span.last)?.locked === false;
+};
 
 /** Read one sheet's `<sheetProtection>` and protected ranges into the store. */
 export function hydrateSheetProtectionFromEngine(

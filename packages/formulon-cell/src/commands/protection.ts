@@ -8,6 +8,7 @@ import {
   allowedEditRangeAreas,
   flushProtectionToEngine,
   flushWorkbookProtectionToEngine,
+  inheritsUnlocked,
   syncAllowedEditRangesToEngine,
 } from '../engine/protection-sync.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
@@ -995,12 +996,8 @@ export function isCellLocked(state: State, addr: Addr): boolean {
 
 /** The lock a cell with no Locked flag of its own inherits: its row style's, else its column
  *  style's, else locked. */
-const axisLocked = (state: State, sheet: number, row: number, col: number): boolean => {
-  const axes = state.protection.axisLocks?.get(sheet);
-  const rowLock = axes?.rows.get(row);
-  if (rowLock !== undefined) return rowLock;
-  return axes?.cols.find((span) => col >= span.first && col <= span.last)?.locked ?? true;
-};
+const axisLocked = (state: State, sheet: number, row: number, col: number): boolean =>
+  !inheritsUnlocked(state.protection.axisLocks?.get(sheet) ?? null, row, col);
 
 /** Whether column styles leave every column of `first..last` unlocked. */
 const columnsUnlocked = (state: State, sheet: number, first: number, last: number): boolean => {

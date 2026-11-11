@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { isCellWritable, setProtectedSheet } from '../../../src/commands/protection.js';
 import { deleteCols, deleteRows } from '../../../src/commands/structure.js';
+import { hydrateCellFormatsFromEngine } from '../../../src/engine/cell-format-sync.js';
 import { hydrateAxisLocksFromEngine } from '../../../src/engine/protection-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -70,5 +71,20 @@ describe('locks inherited from row and column styles', () => {
     setProtectedSheet(store, 0, true);
     expect(isCellWritable(store.getState(), { sheet: 0, row: 2, col: 9 })).toBe(true);
     expect(isCellWritable(store.getState(), { sheet: 0, row: 3, col: 9 })).toBe(false);
+  });
+  it('refuses a cell whose own format is locked inside a row its row style unlocks', async () => {
+    const { wb, store, unlocked, sync } = await setup();
+    const base = wb.getCellXf(0);
+    if (!base) throw new Error('missing default XF');
+    // The cell's own XF carries no protection element, so it is locked.
+    const own = wb.addXfRecord({ ...base, locked: null, wrapText: true });
+    expect(wb.setRowStyleRange(0, 1, 1, unlocked)).toBe(true);
+    expect(wb.setCellXfIndex(0, 1, 3, own)).toBe(true);
+    sync();
+    hydrateCellFormatsFromEngine(wb, store, 0);
+    setProtectedSheet(store, 0, true, { permissions: { deleteRows: true } });
+    expect(isCellWritable(store.getState(), { sheet: 0, row: 1, col: 3 })).toBe(false);
+    expect(isCellWritable(store.getState(), { sheet: 0, row: 1, col: 4 })).toBe(true);
+    expect(deleteRows(store, wb, null, 1)).toBe(false);
   });
 });

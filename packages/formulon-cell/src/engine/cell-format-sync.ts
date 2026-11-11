@@ -1,5 +1,5 @@
 import { sameStructuredValue } from '../commands/prepared-change.js';
-import type { CellFormat, SpreadsheetStore } from '../store/store.js';
+import type { CellFormat, SheetAxisLocks, SpreadsheetStore } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
 import { syncAxisFormatOverrides } from './axis-format-sync.js';
 import { cellFormatFromXf } from './cell-format-projection.js';
@@ -22,6 +22,7 @@ import {
   writePhoneticProperties,
   writeShowPhonetic,
 } from './phonetic-sync.js';
+import { axisLocksFromEngine, inheritsUnlocked } from './protection-sync.js';
 import { formattedKeySet, seedSyncedFormatKeys } from './synced-format-keys.js';
 import type { Addr, CellValue } from './types.js';
 import { syncValidationsToEngine } from './validation-sync.js';
@@ -325,6 +326,11 @@ export function hydrateCellFormatsFromEngine(
     }));
   }
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
+  let axes: SheetAxisLocks | null | undefined;
+  const axisLocks = (): SheetAxisLocks | null => {
+    if (axes === undefined) axes = axisLocksFromEngine(wb, sheet);
+    return axes;
+  };
   // Styled blanks are absent from the physical cells; visit each address once.
   const xfByKey = new Map<string, { addr: Addr; value: CellValue; xfIndex: number }>();
   for (const { addr, xfIndex } of wb.cellXfIndices(sheet)) {
@@ -351,6 +357,14 @@ export function hydrateCellFormatsFromEngine(
     const xf = wb.getCellXf(xfIndex);
     if (!xf) continue;
     const patch = cellFormatFromXf(wb, xf, workbookDefaultFont, styleKeys);
+    // A cell's own XF with no protection element is locked whatever its row or column style says;
+    // where that style is unlocked, the entry says so explicitly instead of inheriting it.
+    if (
+      xf.locked === null &&
+      xf.hidden === null &&
+      inheritsUnlocked(axisLocks(), c.addr.row, c.addr.col)
+    )
+      patch.locked = true;
     if (phonetic) {
       patch.phonetic = phonetic;
       withPhoneticProperties(wb, c.addr, patch);
