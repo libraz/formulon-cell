@@ -201,6 +201,14 @@ export interface MacStrings {
     chooseType: string;
     unavailable: string;
     protectedLocation: string;
+    weightTitle: string;
+    weightLabel: string;
+    dateTitle: string;
+    dateRangeLabel: string;
+    customValueTitle: string;
+    customValueLabel: string;
+    emptyCellsLabel: string;
+    showHiddenLabel: string;
   };
   slicer: {
     ok: string;

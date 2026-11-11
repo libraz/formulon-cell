@@ -43,6 +43,7 @@ import { createPivotDropdownDefaults } from './dynamic-dropdown-defaults/pivot.j
 import { createReviewDropdownDefaults } from './dynamic-dropdown-defaults/review.js';
 import { normalizedSelectionRange } from './dynamic-dropdown-defaults/selection.js';
 import { createShapeFormatDropdownDefaults } from './dynamic-dropdown-defaults/shape-format.js';
+import { createSparklineDropdownDefaults } from './dynamic-dropdown-defaults/sparkline.js';
 import { createStylesDropdownDefaults } from './dynamic-dropdown-defaults/styles.js';
 import { createViewDropdownDefaults } from './dynamic-dropdown-defaults/view.js';
 
@@ -166,6 +167,7 @@ export function createDefaultDynamicDropdownsCtx(
   const viewDefaults = createViewDropdownDefaults(instance);
   const chartDesignDefaults = createChartDesignDropdownDefaults(instance);
   const shapeFormatDefaults = createShapeFormatDropdownDefaults(instance);
+  const sparklineDefaults = createSparklineDropdownDefaults(instance);
   const pivotDefaults = createPivotDropdownDefaults(instance);
 
   const base: DynamicDropdownsCtx = {
@@ -250,6 +252,8 @@ export function createDefaultDynamicDropdownsCtx(
     applyShapeOutlineWeightAction: shapeFormatDefaults.applyShapeOutlineWeightAction,
     applyShapeOutlineDashAction: shapeFormatDefaults.applyShapeOutlineDashAction,
     updateShapeOutlineMenu: shapeFormatDefaults.updateShapeOutlineMenu,
+    applySparklineAction: sparklineDefaults.applySparklineAction,
+    updateSparklineMenu: sparklineDefaults.updateSparklineMenu,
     applySortMenuAction: editingDefaults.applySortMenuAction,
     applyReviewCommentAction: reviewDefaults.applyReviewCommentAction,
     applyProtectAction: reviewDefaults.applyProtectAction,

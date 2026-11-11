@@ -4,6 +4,7 @@ import { fontFamilyCatalog, fontFamilyLocaleForStrings } from './ribbon/font-fam
 import { buildMacRibbonModel } from './ribbon/mac/model.js';
 import { buildMacObjectTabs } from './ribbon/mac/object-tabs.js';
 import { buildPivotContextualTabs } from './ribbon/pivot-tabs.js';
+import { buildSparklineDesignTab } from './ribbon/sparkline-tabs.js';
 
 export type RibbonTab =
   | 'file'
@@ -24,7 +25,8 @@ export type RibbonTab =
   | 'pictureFormat'
   | 'tableDesign'
   | 'pivotAnalyze'
-  | 'pivotDesign';
+  | 'pivotDesign'
+  | 'sparklineDesign';
 
 export type ToolbarLang = Locale;
 
@@ -117,14 +119,23 @@ export const PICTURE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['pictureFor
 export const TABLE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['tableDesign'];
 /** The tabs the active cell adds while it is inside a PivotTable report. */
 export const PIVOT_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['pivotAnalyze', 'pivotDesign'];
+/** The tab the active cell adds while it hosts a sparkline. */
+export const SPARKLINE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['sparklineDesign'];
+/** The tabs of a sparkline cell inside a table. */
+export const TABLE_SPARKLINE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = [
+  ...TABLE_CONTEXTUAL_RIBBON_TABS,
+  ...SPARKLINE_CONTEXTUAL_RIBBON_TABS,
+];
 /** Every contextual tab. Only one object is selected at a time, so the
- *  ribbon shows at most one of these sets. */
+ *  ribbon shows at most one of these sets, and a sparkline cell inside a table shows both of
+ *  its tabs. */
 export const CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = [
   ...CHART_CONTEXTUAL_RIBBON_TABS,
   ...SHAPE_CONTEXTUAL_RIBBON_TABS,
   ...PICTURE_CONTEXTUAL_RIBBON_TABS,
   ...TABLE_CONTEXTUAL_RIBBON_TABS,
   ...PIVOT_CONTEXTUAL_RIBBON_TABS,
+  ...SPARKLINE_CONTEXTUAL_RIBBON_TABS,
 ];
 
 export const RIBBON_TAB_LABELS: Readonly<Record<RibbonTab, Record<ToolbarLang, string>>> =
@@ -927,6 +938,7 @@ export function buildRibbonModel(
       ]),
       contextual: true,
     },
+    buildSparklineDesignTab(tr),
   ];
   const homeTab = allTabs.find((candidate) => candidate.id === 'home');
   if (!homeTab) return [];

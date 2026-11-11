@@ -15,6 +15,7 @@ import { PIVOT_ICONS } from './pivot.js';
 import { REVIEW_ICONS } from './review.js';
 import { SHELL_ICONS } from './shell.js';
 import { SORT_FILTER_ICONS } from './sort-filter.js';
+import { SPARKLINE_ICONS } from './sparkline.js';
 import { STRUCTURE_ICONS } from './structure.js';
 import { TABLE_ICONS } from './table.js';
 import { VIEW_ICONS } from './view.js';
@@ -30,6 +31,7 @@ export const RIBBON_GLYPHS = {
   ...FIND_ICONS,
   ...STRUCTURE_ICONS,
   ...TABLE_ICONS,
+  ...SPARKLINE_ICONS,
   ...FORMULA_ICONS,
   ...CHART_ICONS,
   ...MEDIA_ICONS,

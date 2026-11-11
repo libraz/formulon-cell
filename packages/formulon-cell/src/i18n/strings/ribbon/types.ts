@@ -379,6 +379,77 @@ export interface RibbonStrings {
       tableDesign: string;
       pivotAnalyze: string;
       pivotDesign: string;
+      sparklineDesign: string;
+    };
+    /** Labels of the Sparkline contextual tab. */
+    sparkline: {
+      title: string;
+      editData: string;
+      editGroup: string;
+      editSingle: string;
+      hiddenEmpty: string;
+      switchRowCol: string;
+      type: string;
+      line: string;
+      column: string;
+      winLoss: string;
+      show: string;
+      highPoint: string;
+      lowPoint: string;
+      negativePoints: string;
+      firstPoint: string;
+      lastPoint: string;
+      markers: string;
+      style: string;
+      markerColor: string;
+      weight: string;
+      axis: string;
+      horizontalAxis: string;
+      generalAxis: string;
+      dateAxis: string;
+      showAxis: string;
+      plotRtl: string;
+      verticalMin: string;
+      verticalMax: string;
+      autoEach: string;
+      sameAll: string;
+      customValue: string;
+      group: string;
+      ungroup: string;
+      clear: string;
+      clearSelected: string;
+      clearGroups: string;
+      color: string;
+      /** Preset names; `{n}` is the accent or set number. */
+      styleNames: {
+        accentDarker50: string;
+        accentDarker25: string;
+        accent: string;
+        accentLighter40: string;
+        dark: string;
+        colorful: string;
+      };
+    };
+    /** Labels of the Sparkline dialogs. */
+    sparklineDialog: {
+      editGroupTitle: string;
+      locationRange: string;
+      dataRange: string;
+      editSingleTitle: string;
+      editSingleLabel: string;
+      weightTitle: string;
+      weightLabel: string;
+      dateRangeTitle: string;
+      dateRangeLabel: string;
+      axisValueTitle: string;
+      axisMinLabel: string;
+      axisMaxLabel: string;
+      hiddenTitle: string;
+      emptyCellsLabel: string;
+      gaps: string;
+      zero: string;
+      connect: string;
+      showHidden: string;
     };
     /** Composed-label templates. `{name}` / `{percent}` are interpolated at use. */
     functionArgumentsTitle: string;

@@ -23,6 +23,7 @@ import type {
   WorkbookViewMode,
 } from '../store/types.js';
 import { projectDisabledState } from './menu-a11y.js';
+import { projectSparklineDesign } from './ribbon/sparkline-design.js';
 import { projectPivotDesign, projectTableDesign } from './ribbon/table-design.js';
 
 /**
@@ -524,6 +525,7 @@ export const projectRibbonActiveState = (
   }
   projectTableDesign(host, instance);
   projectPivotDesign(host, instance);
+  projectSparklineDesign(host, instance);
   const buttons = indexRibbonButtons(host);
   // Authoring a split the engine cannot save is refused up front.
   const splitSaved = instance.workbook?.capabilities?.sheetSplit === true;

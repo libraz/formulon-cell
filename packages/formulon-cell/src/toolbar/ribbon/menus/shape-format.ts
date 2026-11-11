@@ -31,14 +31,14 @@ const PX_PER_PT = 96 / 72;
 
 /** A weight in points the way the menu writes it: 2.25 is 2¼. */
 const FRACTIONS: Record<string, string> = { '0.25': '¼', '0.5': '½', '0.75': '¾' };
-const pointsLabel = (weight: number): string => {
+export const pointsLabel = (weight: number): string => {
   const whole = Math.trunc(weight);
   const fraction = FRACTIONS[String(weight - whole)] ?? '';
   return fraction ? `${whole || ''}${fraction}` : String(weight);
 };
 
 /** A horizontal line sample `weight` points thick in `dash`. */
-const lineSample = (weight: number, dash: SessionShapeLineDash): SVGSVGElement => {
+export const lineSample = (weight: number, dash: SessionShapeLineDash): SVGSVGElement => {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'fc-tb__shape-line-sample');
   svg.setAttribute('viewBox', `0 0 ${SAMPLE_W} ${SAMPLE_H}`);

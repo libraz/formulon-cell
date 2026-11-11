@@ -129,6 +129,32 @@
     color: var(--fc-tb-fg);
   }
 
+  /* Sparkline colour menus: Weight and the marker colours open beside the menu. */
+  #menu-sparkline-color .fc-tb__menu-item--submenu .fc-tb__menu-item__caret,
+  #menu-sparkline-marker-color .fc-tb__menu-item--submenu .fc-tb__menu-item__caret {
+    margin-left: auto;
+  }
+
+  /* Sparkline Style: six presets per row. */
+  .fc-tb__sparkline-styles {
+    display: grid;
+    grid-template-columns: repeat(6, 28px);
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .fc-tb__sparkline-style {
+    width: 28px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--fc-tb-line);
+    background: var(--fc-tb-ribbon-bg);
+  }
+
+  .fc-tb__sparkline-style:disabled {
+    opacity: 0.45;
+  }
+
   /* Change Colors: the six colours of a palette before its name. */
   .fc-tb__chart-palette {
     display: inline-flex;

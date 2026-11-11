@@ -13,6 +13,7 @@ import {
   macRibbonMenuIdForCommand,
 } from './mac/model.js';
 import { PIVOT_DISABLED_COMMAND_IDS } from './pivot-command-ids.js';
+import { SPARKLINE_MENU_IDS } from './sparkline-tabs.js';
 
 export type RibbonActivationKind =
   | 'primaryAction'
@@ -87,6 +88,12 @@ export const RIBBON_MENU_FACTORY_KEYS = [
   'shapeOutline',
   'pivotLayout',
   'tableRefresh',
+  'sparklineEditData',
+  'sparklineStyle',
+  'sparklineColor',
+  'sparklineMarkerColor',
+  'sparklineAxis',
+  'sparklineClear',
 ] as const;
 
 export type RibbonMenuFactoryKey = (typeof RIBBON_MENU_FACTORY_KEYS)[number];
@@ -161,6 +168,12 @@ export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> 
   pivotSelect: 'menu-pivot-select',
   pivotFieldsItemsSets: 'menu-pivot-fields-items-sets',
   tableRefresh: 'menu-table-refresh',
+  sparklineEditData: SPARKLINE_MENU_IDS.editData,
+  sparklineStyleGallery: SPARKLINE_MENU_IDS.style,
+  sparklineColor: SPARKLINE_MENU_IDS.color,
+  sparklineMarkerColor: SPARKLINE_MENU_IDS.markerColor,
+  sparklineAxis: SPARKLINE_MENU_IDS.axis,
+  sparklineClear: SPARKLINE_MENU_IDS.clear,
 };
 
 export const RIBBON_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
@@ -233,11 +246,18 @@ export const RIBBON_MENU_FACTORY_FOR_COMMAND: Readonly<Record<string, RibbonMenu
   pivotSelect: 'pivotLayout',
   pivotFieldsItemsSets: 'pivotLayout',
   tableRefresh: 'tableRefresh',
+  sparklineEditData: 'sparklineEditData',
+  sparklineStyleGallery: 'sparklineStyle',
+  sparklineColor: 'sparklineColor',
+  sparklineMarkerColor: 'sparklineMarkerColor',
+  sparklineAxis: 'sparklineAxis',
+  sparklineClear: 'sparklineClear',
 };
 
 export const RIBBON_AUDITED_PRIMARY_ACTION_SPLIT_COMMANDS = [
   'paste',
   'tableRefresh',
+  'sparklineClear',
   'pivotTableInsert',
   'autosum',
   'autosumFormula',
@@ -273,6 +293,7 @@ export const RIBBON_AUDITED_GALLERY_COMMANDS = [
   'formatTableHome',
   'tableQuickStyles',
   'pivotQuickStyles',
+  'sparklineStyleGallery',
   'cellStyles',
 ] as const;
 
@@ -289,6 +310,10 @@ export const RIBBON_AUDITED_DROPDOWN_COMMANDS = [
   'chartColors',
   'shapeFill',
   'shapeOutline',
+  'sparklineEditData',
+  'sparklineColor',
+  'sparklineMarkerColor',
+  'sparklineAxis',
   'borders',
   'calcOptions',
   'whatIf',
@@ -435,6 +460,8 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'sortAsc',
   'sortData',
   'sortDesc',
+  'sparklineGroup',
+  'sparklineUngroup',
   'spellingReview',
   'tableBandedColumns',
   'tableBandedRows',
@@ -526,6 +553,15 @@ export const RIBBON_TOGGLE_COMMANDS: ReadonlySet<string> = new Set([
   'viewRightToLeft',
   'showHideNoteReview',
   'showAllNotesReview',
+  'sparklineTypeLine',
+  'sparklineTypeColumn',
+  'sparklineTypeWinLoss',
+  'sparklineShowHigh',
+  'sparklineShowLow',
+  'sparklineShowNegative',
+  'sparklineShowFirst',
+  'sparklineShowLast',
+  'sparklineShowMarkers',
 ]);
 
 export const RIBBON_DISABLED_COMMANDS: ReadonlySet<string> = new Set([

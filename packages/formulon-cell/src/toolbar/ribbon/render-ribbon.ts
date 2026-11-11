@@ -143,6 +143,12 @@ export interface RibbonMenus {
   shapeOutline?: RibbonMenuFactory;
   pivotLayout?: RibbonMenuFactory;
   tableRefresh?: RibbonMenuFactory;
+  sparklineEditData?: RibbonMenuFactory;
+  sparklineStyle?: RibbonMenuFactory;
+  sparklineColor?: RibbonMenuFactory;
+  sparklineMarkerColor?: RibbonMenuFactory;
+  sparklineAxis?: RibbonMenuFactory;
+  sparklineClear?: RibbonMenuFactory;
 }
 
 /** Renderer helpers from select-color.ts / control-dispatch.ts. These create

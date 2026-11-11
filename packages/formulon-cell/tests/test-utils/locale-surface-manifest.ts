@@ -690,6 +690,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'block',
   ),
   shell('toolbar.sort', 'toolbar/dialogs/sort.ts', 'showSortDialog', 'ribbonMenu', 'block'),
+  shell(
+    'toolbar.sparkline',
+    'toolbar/dialogs/sparkline.ts',
+    'showSparklineRangeDialog',
+    'ribbon',
+    'block',
+  ),
   shell('toolbar.symbol', 'toolbar/dialogs/symbol.ts', 'showSymbolDialog', 'ribbonMenu', 'block'),
   shell(
     'toolbar.tableStyle',

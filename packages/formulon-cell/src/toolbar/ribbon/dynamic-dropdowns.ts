@@ -21,6 +21,7 @@ import {
 } from './mac/model.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
 import type { TableVariantId } from './menus/styles.js';
+import { SPARKLINE_MENU_IDS } from './sparkline-tabs.js';
 
 export type RibbonDropdownSpec = {
   menuId: string;
@@ -34,6 +35,8 @@ export type ArrangeAction =
   | 'bring-front'
   | 'send-back'
   | 'selection-pane';
+/** The Sparkline tab menu entry families, by the `data-sparkline-*` attribute that names them. */
+export type SparklineMenuAction = 'edit' | 'color' | 'weight' | 'markerColor' | 'axis' | 'clear';
 export type UiTheme = 'paper' | 'ink' | 'contrast';
 
 export interface DynamicDropdownsCtx {
@@ -76,6 +79,8 @@ export interface DynamicDropdownsCtx {
   updatePivotLayoutMenu?: (menu: HTMLElement) => void;
   /** Grey the Table Design Refresh menu's commands that have nothing to run. */
   updateTableRefreshMenu?: (menu: HTMLElement) => void;
+  /** Refresh a Sparkline tab menu (checked entries, disabled entries) before it opens. */
+  updateSparklineMenu?: (menu: HTMLElement) => void;
   // Sibling menu controllers that must close when a dynamic dropdown opens.
   closeBorderMenu: (restoreFocus?: boolean) => void;
   closeFreezeMenu: (restoreFocus?: boolean) => void;
@@ -147,6 +152,8 @@ export interface DynamicDropdownsCtx {
   applyPivotLayoutAction?: (action: string) => void;
   /** Run a Table Design Refresh menu command. */
   applyTableRefreshAction?: (action: string) => void;
+  /** Run an entry of a Sparkline tab menu. */
+  applySparklineAction?: (kind: SparklineMenuAction, value: string) => void | Promise<void>;
   createTableFromSelection: (
     style?: string,
     color?: string,
@@ -230,6 +237,12 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'pdf-action',
   'pivot-layout',
   'table-refresh',
+  'sparkline-edit',
+  'sparkline-color',
+  'sparkline-weight',
+  'sparkline-marker-color',
+  'sparkline-axis',
+  'sparkline-clear',
   'table-style',
   'table-style-footer',
   'pivot-table-style',
@@ -294,6 +307,8 @@ const applyVerticalViewportLimit = (
 const FORMAT_SUBMENU_MENU_IDS: ReadonlySet<string> = new Set([
   'menu-format-cells',
   'menu-shape-outline',
+  SPARKLINE_MENU_IDS.color,
+  SPARKLINE_MENU_IDS.markerColor,
 ]);
 
 export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS: ReadonlySet<string> = new Set([
@@ -349,6 +364,12 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-sort': 'updateSortMenu',
   'menu-sort-home': 'updateSortMenu',
   'menu-table-refresh': 'updateTableRefreshMenu',
+  [SPARKLINE_MENU_IDS.editData]: 'updateSparklineMenu',
+  [SPARKLINE_MENU_IDS.style]: 'updateSparklineMenu',
+  [SPARKLINE_MENU_IDS.color]: 'updateSparklineMenu',
+  [SPARKLINE_MENU_IDS.markerColor]: 'updateSparklineMenu',
+  [SPARKLINE_MENU_IDS.axis]: 'updateSparklineMenu',
+  [SPARKLINE_MENU_IDS.clear]: 'updateSparklineMenu',
   'menu-pivot-quick-styles': 'updatePivotStylesMenu',
   'menu-table-quick-styles': 'updateTableStylesMenu',
   'menu-table-style-home': 'updateTableStylesMenu',
@@ -765,6 +786,15 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'pdf-action', handler: (v) => ctx.applyPdfAction(v) },
     { attr: 'pivot-layout', handler: (v) => ctx.applyPivotLayoutAction?.(v) },
     { attr: 'table-refresh', handler: (v) => ctx.applyTableRefreshAction?.(v) },
+    { attr: 'sparkline-edit', handler: (v) => ctx.applySparklineAction?.('edit', v) },
+    { attr: 'sparkline-color', handler: (v) => ctx.applySparklineAction?.('color', v) },
+    { attr: 'sparkline-weight', handler: (v) => ctx.applySparklineAction?.('weight', v) },
+    {
+      attr: 'sparkline-marker-color',
+      handler: (v) => ctx.applySparklineAction?.('markerColor', v),
+    },
+    { attr: 'sparkline-axis', handler: (v) => ctx.applySparklineAction?.('axis', v) },
+    { attr: 'sparkline-clear', handler: (v) => ctx.applySparklineAction?.('clear', v) },
     {
       attr: 'table-style',
       handler: (v, { button }) => {

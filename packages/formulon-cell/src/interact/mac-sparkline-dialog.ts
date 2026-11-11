@@ -1,11 +1,18 @@
 import type { History } from '../commands/history.js';
 import {
   defaultSparklineGroupSettings,
+  type SparklineInsert,
   setSparklinesAction,
   sparklineTypeOf,
 } from '../commands/sparkline.js';
+import { replaceSparklineGroupAction } from '../commands/sparkline-design.js';
+import { splitDataForLocation } from '../commands/sparkline-layout.js';
+import {
+  type ResolvedSparklineRange,
+  resolveSparklineRange,
+  sparklineSourceText,
+} from '../commands/sparkline-ranges.js';
 import { formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
-import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -33,47 +40,26 @@ export interface MacSparklineDialogDeps {
   /** Optional policy gate supplied by a host action provider. */
   canCommit?: (source: Range, destination: Addr) => boolean;
   onCommitted?: (source: Range, destination: Addr, kind: SparklineKind) => void;
+  /** Called after the dialog closes, whether it was confirmed or dismissed. */
+  onClosed?: () => void;
+}
+
+/** An existing group the dialog edits: the data and location range texts it opens with. The
+ *  group keeps its settings and gets one sparkline per location cell. */
+export interface MacSparklineEditTarget {
+  groupId: string;
+  data: string;
+  location: string;
 }
 
 export interface MacSparklineDialogHandle {
-  open(): void;
+  /** Open the Insert Sparkline chooser, or Edit Sparklines for `edit`. */
+  open(edit?: MacSparklineEditTarget): void;
   close(): void;
   refresh(): void;
   setStrings(next: Strings): void;
   detach(): void;
 }
-
-interface ResolvedRange extends Range {
-  explicitSheet: boolean;
-}
-
-const formatSheetRange = (sheetName: string, range: Range): string => {
-  const body = formatA1Range(range);
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(sheetName)) return `${sheetName}!${body}`;
-  return `'${sheetName.replace(/'/g, "''")}'!${body}`;
-};
-
-const sheetIndex = (wb: WorkbookHandle, name: string): number => wb.sheetIndexByName(name) ?? -1;
-
-const resolveRange = (
-  raw: string,
-  fallbackSheet: number,
-  wb: WorkbookHandle | null,
-): ResolvedRange | null => {
-  const parsed = parseRangeRef(raw);
-  if (!parsed) return null;
-  const sheet =
-    parsed.sheetName === null ? fallbackSheet : wb ? sheetIndex(wb, parsed.sheetName) : -1;
-  if (sheet < 0) return null;
-  return {
-    sheet,
-    r0: parsed.r0,
-    c0: parsed.c0,
-    r1: parsed.r1,
-    c1: parsed.c1,
-    explicitSheet: parsed.sheetName !== null,
-  };
-};
 
 const kindLabels = (strings: Strings): Readonly<Record<SparklineKind, string>> => ({
   line: strings.quickAnalysis.actions.sparkLine,
@@ -154,9 +140,11 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     okLabel: strings.mac.sparkline.ok,
   });
 
-  let lastSource: ResolvedRange | null = null;
+  let lastSource: ResolvedSparklineRange | null = null;
   let lastDestination: Addr | null = null;
   let lastKind: SparklineKind = 'line';
+  let lastEntries: SparklineInsert[] = [];
+  let editing: MacSparklineEditTarget | null = null;
 
   const currentSheet = (): number => store.getState().data.sheetIndex;
   const setError = (message: string | null): void => {
@@ -170,15 +158,19 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
 
   const validate = (): boolean => {
     const wb = deps.getWb?.() ?? null;
-    const source = resolveRange(sourceInput.value, currentSheet(), wb);
+    const source = resolveSparklineRange(sourceInput.value, currentSheet(), wb);
     if (!source) {
       lastSource = null;
       lastDestination = null;
       setError(strings.mac.sparkline.invalidSource);
       return false;
     }
-    const destination = resolveRange(destinationInput.value, currentSheet(), wb);
-    if (!destination || destination.r0 !== destination.r1 || destination.c0 !== destination.c1) {
+    const destination = resolveSparklineRange(destinationInput.value, currentSheet(), wb);
+    const oneCell =
+      destination !== null &&
+      destination.r0 === destination.r1 &&
+      destination.c0 === destination.c1;
+    if (!destination || (!editing && !oneCell)) {
       lastSource = null;
       lastDestination = null;
       setError(strings.mac.sparkline.locationOneCell);
@@ -217,6 +209,28 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       setError(strings.mac.sparkline.unavailable);
       return false;
     }
+    if (editing) {
+      const parts = splitDataForLocation(source, destination);
+      if (!parts) {
+        lastSource = null;
+        lastDestination = null;
+        setError(strings.mac.sparkline.invalidSource);
+        return false;
+      }
+      const width = destination.c1 - destination.c0 + 1;
+      lastEntries = parts.map((part, i) => ({
+        addr: {
+          sheet: destination.sheet,
+          row: destination.r0 + Math.floor(i / width),
+          col: destination.c0 + (i % width),
+        },
+        source: sparklineSourceText(
+          { ...part, explicitSheet: source.explicitSheet },
+          destination.sheet,
+          wb,
+        ),
+      }));
+    }
     lastSource = source;
     lastDestination = destinationAddr;
     lastKind = kind;
@@ -224,14 +238,8 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     return true;
   };
 
-  const sourceForSpec = (source: ResolvedRange, destination: Addr): string => {
-    if (source.explicitSheet || source.sheet !== destination.sheet) {
-      const wb = deps.getWb?.() ?? null;
-      const name = wb?.sheetName(source.sheet) ?? `Sheet${source.sheet + 1}`;
-      return formatSheetRange(name, source);
-    }
-    return formatA1Range(source);
-  };
+  const sourceForSpec = (source: ResolvedSparklineRange, destination: Addr): string =>
+    sparklineSourceText(source, destination.sheet, deps.getWb?.() ?? null);
 
   const onChange = (): void => {
     validate();
@@ -239,6 +247,24 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   const onCancel = (): void => api.close();
   const onOk = (): void => {
     if (!validate() || !lastSource || !lastDestination) return;
+    if (editing) {
+      const done = replaceSparklineGroupAction(
+        {
+          store,
+          history: deps.history ?? null,
+          origin: 'ribbon',
+          commandId: 'sparklineEditData',
+        },
+        editing.groupId,
+        lastEntries,
+      );
+      if (!done) {
+        setError(strings.mac.sparkline.protectedLocation);
+        return;
+      }
+      api.close();
+      return;
+    }
     const ok = setSparklinesAction(
       {
         store,
@@ -274,8 +300,10 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   const refreshLabels = (): void => {
     const labels = kindLabels(strings);
     const t = strings.mac.sparkline;
-    header.textContent = t.title;
-    shell.setAriaLabel(t.title);
+    const title = editing ? strings.ribbon.sparklineDialog.editGroupTitle : t.title;
+    header.textContent = title;
+    shell.setAriaLabel(title);
+    kindRow.row.hidden = editing !== null;
     sourceRow.text.textContent = t.dataRange;
     destinationRow.text.textContent = t.location;
     kindRow.text.textContent = t.type;
@@ -298,25 +326,27 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   };
 
   const api: MacSparklineDialogHandle = {
-    open(): void {
+    open(edit?: MacSparklineEditTarget): void {
       const range = store.getState().selection.range;
+      editing = edit ?? null;
       pickFormat.begin();
-      sourceInput.value = formatA1Range(range);
+      sourceInput.value = edit ? edit.data : formatA1Range(range);
       // The desktop dialog opens with the location empty; OK stays disabled
       // without flagging an error the user has not made yet.
-      destinationInput.value = '';
+      destinationInput.value = edit ? edit.location : '';
       kindSelect.value = 'line';
       lastSource = null;
       lastDestination = null;
       refreshLabels();
       validate();
-      error.hidden = true;
+      if (!edit) error.hidden = true;
       shell.open();
       deferInitialFocus(shell.overlay, () => sourceInput.focus());
     },
     close(): void {
       shell.close();
       host.focus();
+      deps.onClosed?.();
     },
     refresh(): void {
       refreshLabels();

@@ -2,6 +2,7 @@ import { selectedSessionChart } from '../commands/chart-design.js';
 import { subscribeRecentFunctions } from '../commands/function-history.js';
 import { selectedSessionIllustration } from '../commands/session-illustration.js';
 import { activeTableOverlay } from '../commands/table-design.js';
+import { addrKey } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
 import { attachRibbonScreenTips } from '../interact/ribbon-screen-tip.js';
@@ -87,7 +88,9 @@ import {
   PIVOT_CONTEXTUAL_RIBBON_TABS,
   type RibbonTab,
   SHAPE_CONTEXTUAL_RIBBON_TABS,
+  SPARKLINE_CONTEXTUAL_RIBBON_TABS,
   TABLE_CONTEXTUAL_RIBBON_TABS,
+  TABLE_SPARKLINE_CONTEXTUAL_RIBBON_TABS,
   type ToolbarLang,
   type ToolbarText,
   toolbarText,
@@ -440,7 +443,14 @@ export function mountToolbar(
       if (workbook && findPivotTableAtCell(workbook, state.selection.active)) {
         return PIVOT_CONTEXTUAL_RIBBON_TABS;
       }
-      return activeTableOverlay(state) ? TABLE_CONTEXTUAL_RIBBON_TABS : NO_CONTEXTUAL_TABS;
+      const inTable = activeTableOverlay(state) !== null;
+      const hostsSparkline = state.sparkline.sparklines.has(addrKey(state.selection.active));
+      if (inTable) {
+        return hostsSparkline
+          ? TABLE_SPARKLINE_CONTEXTUAL_RIBBON_TABS
+          : TABLE_CONTEXTUAL_RIBBON_TABS;
+      }
+      return hostsSparkline ? SPARKLINE_CONTEXTUAL_RIBBON_TABS : NO_CONTEXTUAL_TABS;
     }
     return item.kind === 'image' ? PICTURE_CONTEXTUAL_RIBBON_TABS : SHAPE_CONTEXTUAL_RIBBON_TABS;
   };
@@ -459,6 +469,7 @@ export function mountToolbar(
           state.tables.tables,
           state.ui.selectedObject,
           state.selection.active,
+          state.sparkline.sparklines,
           state.data,
         ]
       : [current];

@@ -37,6 +37,15 @@ import {
   arrangeSessionIllustration,
   selectedSessionIllustration,
 } from '../../commands/session-illustration.js';
+import {
+  clearSelectedSparklinesAction,
+  groupSelectedSparklinesAction,
+  patchSelectedSparklineGroupsAction,
+  SPARKLINE_SHOW_COMMANDS,
+  SPARKLINE_TYPE_COMMANDS,
+  toggleSparklineFlagAction,
+  ungroupSelectedSparklinesAction,
+} from '../../commands/sparkline-design.js';
 import { toggleSplitPanes } from '../../commands/split-panes.js';
 import {
   activeTableOverlay,
@@ -490,6 +499,31 @@ const applyGenericRibbonCommand = (
           okLabel: i.i18n.strings.pageSetup.ok,
         });
       }
+      runtime.refreshCells();
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
+      return true;
+    }
+    case 'sparklineGroup':
+    case 'sparklineUngroup':
+    case 'sparklineClear':
+    case 'sparklineTypeLine':
+    case 'sparklineTypeColumn':
+    case 'sparklineTypeWinLoss':
+    case 'sparklineShowHigh':
+    case 'sparklineShowLow':
+    case 'sparklineShowNegative':
+    case 'sparklineShowFirst':
+    case 'sparklineShowLast':
+    case 'sparklineShowMarkers': {
+      const ctx = { store: i.store, history: i.history, origin: 'ribbon', commandId: id } as const;
+      const type = SPARKLINE_TYPE_COMMANDS[id];
+      const flag = SPARKLINE_SHOW_COMMANDS[id];
+      if (type !== undefined) patchSelectedSparklineGroupsAction(ctx, { type });
+      else if (flag) toggleSparklineFlagAction(ctx, flag);
+      else if (id === 'sparklineGroup') groupSelectedSparklinesAction(ctx);
+      else if (id === 'sparklineUngroup') ungroupSelectedSparklinesAction(ctx);
+      else clearSelectedSparklinesAction(ctx);
       runtime.refreshCells();
       runtime.projectFormatToolbar();
       runtime.focusSheet();

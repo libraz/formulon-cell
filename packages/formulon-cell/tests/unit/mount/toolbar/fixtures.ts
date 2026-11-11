@@ -1,7 +1,11 @@
-import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind, SparklineType } from '@libraz/formulon';
 import { vi } from 'vitest';
 import { defaultTableOverlay } from '../../../../src/commands/format-as-table.js';
 import { createPivotTableAtPlacement } from '../../../../src/commands/pivot-table.js';
+import {
+  defaultSparklineGroupSettings,
+  setSparklines,
+} from '../../../../src/commands/sparkline.js';
 import { addrKey } from '../../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../../../../src/store/store.js';
@@ -82,8 +86,19 @@ export const selectStoreTable = (store: SpreadsheetStore): void => {
   });
 };
 
+/** Put a sparkline in the active cell, so the ribbon shows the Sparkline tab while no object is selected. */
+export const selectStoreSparkline = (store: SpreadsheetStore): void => {
+  const { active } = store.getState().selection;
+  setSparklines(
+    store,
+    [{ addr: active, source: 'A1:A4' }],
+    defaultSparklineGroupSettings(SparklineType.Line),
+  );
+};
+
 /** One selection per set of contextual tabs; together they show every tab the ribbon has. */
 export const CONTEXTUAL_SELECTIONS: readonly ((store: SpreadsheetStore) => void)[] = [
+  selectStoreSparkline,
   selectStoreTable,
   selectStoreChart,
   selectStoreShape,
@@ -195,6 +210,8 @@ export const dynamicDropdownNoopOverrides = (): Partial<DynamicDropdownsCtx> => 
   updateChartAddElementMenu: vi.fn(),
   applyChartColorsAction: vi.fn(),
   updateChartColorsMenu: vi.fn(),
+  applySparklineAction: vi.fn(),
+  updateSparklineMenu: vi.fn(),
   applyShapeFillAction: vi.fn(),
   updateShapeFillMenu: vi.fn(),
   applyShapeOutlineAction: vi.fn(),

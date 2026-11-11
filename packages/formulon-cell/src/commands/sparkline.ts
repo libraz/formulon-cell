@@ -309,11 +309,25 @@ export function clearSparklinesInRange(
  * one group, and a group left with no member is dropped. Returns how many were removed.
  */
 export function clearSparklinesAction(ctx: ObjectActionContext, range: Range): number {
+  return clearSparklineCellsAction(
+    ctx,
+    listSparklines(ctx.store.getState())
+      .filter(({ addr }) => rangeContainsAddr(range, addr))
+      .map(({ addr }) => addr),
+  );
+}
+
+/** Remove the sparklines of `cells` as {@link clearSparklinesAction} does: one undo step, each
+ *  cell's lock deciding it. Returns how many were removed. */
+export function clearSparklineCellsAction(
+  ctx: ObjectActionContext,
+  cells: readonly Addr[],
+): number {
   const { store, history } = ctx;
   const state = store.getState();
-  const writable = listSparklines(state)
-    .filter(({ addr }) => rangeContainsAddr(range, addr) && isCellWritable(state, addr))
-    .map(({ addr }) => addr);
+  const writable = cells.filter(
+    (addr) => state.sparkline.sparklines.has(addrKey(addr)) && isCellWritable(state, addr),
+  );
   if (writable.length === 0) return 0;
   const result = authorizedWrite({
     store,

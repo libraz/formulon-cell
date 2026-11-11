@@ -69,6 +69,7 @@ import { createPasteMenu } from '../toolbar/ribbon/menus/paste.js';
 import { createPivotMenuFactories } from '../toolbar/ribbon/menus/pivot.js';
 import { createReviewMenuFactories } from '../toolbar/ribbon/menus/review.js';
 import { createShapeFormatMenuFactories } from '../toolbar/ribbon/menus/shape-format.js';
+import { createSparklineMenuFactories } from '../toolbar/ribbon/menus/sparkline.js';
 import { createStylesMenuFactories } from '../toolbar/ribbon/menus/styles.js';
 import { createTableMenuFactories } from '../toolbar/ribbon/menus/table.js';
 import { createTextOrientationMenu } from '../toolbar/ribbon/menus/text-orientation.js';
@@ -173,6 +174,7 @@ export function createDefaultRibbonMenus(
   const pageLayoutFactories = createPageLayoutMenuFactories(ribbonMenuText);
   const chartDesignFactories = createChartDesignMenuFactories(ribbonMenuText);
   const shapeFormatFactories = createShapeFormatMenuFactories(ribbonText, ribbonMenuText);
+  const sparklineFactories = createSparklineMenuFactories(ribbonText, ribbonMenuText);
   const formulaFactories = createFormulasMenuFactories(ribbonMenuText, lang);
   const reviewFactories = createReviewMenuFactories(ribbonMenuText);
   const homeFactories = createHomeMenuFactories({
@@ -285,6 +287,14 @@ export function createDefaultRibbonMenus(
     // PivotTable Design and Analyze tabs
     pivotLayout: pivotFactories.createPivotLayoutMenu,
     tableRefresh: tableFactories.createTableRefreshMenu,
+
+    // Sparkline tab
+    sparklineEditData: sparklineFactories.createSparklineEditDataMenu,
+    sparklineStyle: sparklineFactories.createSparklineStyleMenu,
+    sparklineColor: sparklineFactories.createSparklineColorMenu,
+    sparklineMarkerColor: sparklineFactories.createSparklineMarkerColorMenu,
+    sparklineAxis: sparklineFactories.createSparklineAxisMenu,
+    sparklineClear: sparklineFactories.createSparklineClearMenu,
   };
 }
 
