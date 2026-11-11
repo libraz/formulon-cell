@@ -36,22 +36,27 @@ describe('table stripe bands', () => {
   });
 
   it('clips a band that runs past the body to the last body row', () => {
-    const style = custom({ firstRowStripe: 3 }, { bottom: edge });
+    const style = custom({ firstRowStripe: 4 }, { bottom: edge });
     const t = table({ showTotal: true });
-    // Bands are rows 1-3 and 5-7; the last band ends at body row 7, above the total row.
+    // Bands are rows 1-4 and 6-9; the last band is cut at body row 7, above the total row.
     expect(tableCellFormat(t, 7, 1, undefined, [style])?.borders).toEqual({ bottom: edge });
     expect(tableCellFormat(t, 6, 1, undefined, [style])?.borders).toBeUndefined();
   });
 
   it('draws a multi-column band border on the band edge and clips column bands to the body', () => {
-    const style = custom({ firstColumnStripe: 2 }, { left: edge, right: edge, top: edge });
-    const t = table({ colStripes: true, banded: false });
+    const style = custom(
+      { firstColumnStripe: 2 },
+      { left: edge, right: edge, top: edge, bottom: edge },
+    );
+    const t = table({ colStripes: true, banded: false, showTotal: true });
     const at = (row: number, col: number) =>
       tableCellFormat(t, row, col, undefined, [style])?.borders;
     expect(at(3, 0)).toEqual({ left: edge });
     expect(at(3, 1)).toEqual({ right: edge });
     // The top edge lands on the first body row, not on the header row.
     expect(at(1, 0)).toEqual({ left: edge, top: edge });
+    // The bottom edge lands on the last body row, above the total row.
+    expect(at(7, 0)).toEqual({ left: edge, bottom: edge });
     expect(at(0, 0)).toBeUndefined();
   });
 });

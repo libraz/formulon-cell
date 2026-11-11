@@ -33,4 +33,28 @@ describe('Create Table dialog that creates nothing', () => {
     );
     expect(history.canUndo()).toBe(false);
   });
+
+  it('keeps the formatting of a range whose table the engine refuses to create', async () => {
+    const { store, history } = sheet.instance;
+    mutators.setCellFormat(store, { sheet: 0, row: 1, col: 0 }, { fill: '#ff0000' });
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 });
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+    const pending = showCreateTableDialog(sheet.instance, {
+      clearFormatting: true,
+      style: 'custom-table:Missing',
+    });
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const input = dialog?.querySelector<HTMLInputElement>('input');
+    if (!input) throw new Error('dialog did not open');
+    input.value = 'A1:B4';
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await pending;
+
+    expect(store.getState().tables.tables).toHaveLength(0);
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 0 }))?.fill).toBe(
+      '#ff0000',
+    );
+    expect(history.canUndo()).toBe(false);
+  });
 });
