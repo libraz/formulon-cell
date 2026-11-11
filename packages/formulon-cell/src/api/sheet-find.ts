@@ -6,7 +6,8 @@ import {
 } from '@libraz/formulon';
 import { coerceInput, inputLocaleForWorkbook, workbookDate1904 } from '../commands/coerce-input.js';
 import { applySubstitution, type FindOptions, matcherFor } from '../commands/find.js';
-import { appliedBatch } from '../commands/interaction-policy.js';
+import { appliedBatch, refusedBatch } from '../commands/interaction-policy.js';
+import { isFormulonError } from '../engine/result.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import type { ChangeBatchResult } from './change-batch.js';
 import type { MemberSpec, SheetContext } from './facade-context.js';
@@ -166,23 +167,38 @@ function replaceAll(ctx: SheetContext, options: ReplaceCellsOptions): ChangeBatc
     mac: isMacWorkbook(ctx.handle),
   };
   const written: CellAddress[] = [];
-  const { changed } = ctx.handle.trackChangedCells(() =>
-    ctx.run(() => {
-      for (const at of targets) {
-        const current = cellText(sheet, at, lookIn) ?? '';
-        const next = applySubstitution(current, find, options.replacement);
-        if (next === current) continue;
-        // Formulas are canonical both ways; a constant is read as typed in the workbook locale.
-        if (lookIn === 'formulas' && next.startsWith('=')) {
-          ctx.cellWrite([at.row, at.col], () => sheet.setFormula(at.row, at.col, next));
-        } else {
-          const input = coerceInput(next, coerceOptions);
-          ctx.cellWrite([at.row, at.col], () => writeCoerced(ctx, at, input, locale));
+  let writing: CellAddress | null = null;
+  let tracked: ReturnType<typeof ctx.handle.trackChangedCells>;
+  try {
+    tracked = ctx.handle.trackChangedCells(() =>
+      ctx.run(() => {
+        for (const at of targets) {
+          writing = at;
+          const current = cellText(sheet, at, lookIn) ?? '';
+          const next = applySubstitution(current, find, options.replacement);
+          if (next === current) continue;
+          // Formulas are canonical both ways; a constant is read as typed in the workbook locale.
+          if (lookIn === 'formulas' && next.startsWith('=')) {
+            ctx.cellWrite([at.row, at.col], () => sheet.setFormula(at.row, at.col, next));
+          } else {
+            const input = coerceInput(next, coerceOptions);
+            ctx.cellWrite([at.row, at.col], () => writeCoerced(ctx, at, input, locale));
+          }
+          written.push(at);
         }
-        written.push(at);
-      }
-    }),
-  );
+      }),
+    );
+  } catch (error) {
+    // The batch restored every cell it wrote; report the cell the engine refused.
+    if (!isFormulonError(error) || writing === null) throw error;
+    const at: CellAddress = writing;
+    return refusedBatch({
+      addr: { sheet: sheet.index, row: at.row, col: at.col },
+      code: 'invalid',
+      reason: error.message,
+    });
+  }
+  const { changed } = tracked;
   if (written.length === 0) return appliedBatch(changed, null);
   const rows = written.map((at) => at.row);
   const cols = written.map((at) => at.col);
@@ -210,8 +226,9 @@ declare module './workbook.js' {
     findAll(options: FindCellsOptions): CellAddress[];
     /**
      * Replaces what the query finds in each cell, as Replace All does, without asking sheet
-     * protection: host code is not gated. A replacement that breaks a formula throws the engine's
-     * error and writes nothing. One undo step and one `change` event.
+     * protection: host code is not gated. A replacement that breaks a formula writes nothing and
+     * is reported as `refused`, naming that cell with code `invalid`. One undo step and one
+     * `change` event.
      */
     replaceAll(options: ReplaceCellsOptions): ChangeBatchResult;
   }

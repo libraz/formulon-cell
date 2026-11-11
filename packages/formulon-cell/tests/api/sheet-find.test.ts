@@ -1,5 +1,4 @@
-import { FormulonError } from '@libraz/formulon';
-import { Workbook } from '@libraz/formulon-cell';
+import { type ReplaceCellsOptions, Workbook } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const open: Workbook[] = [];
@@ -48,6 +47,12 @@ describe('sheet find', () => {
 });
 
 describe('sheet replace', () => {
+  it('throws for a missing replacement', async () => {
+    const wb = await createWorkbook();
+    const options = { query: 'a' } as unknown as ReplaceCellsOptions;
+    expect(() => wb.sheet(0).replaceAll(options)).toThrow(TypeError);
+  });
+
   it('replaces in constants and leaves formula cells alone in values mode, as one change', async () => {
     const wb = await createWorkbook();
     const sheet = wb.sheet(0);
@@ -66,7 +71,7 @@ describe('sheet replace', () => {
     expect(changes).toBe(1);
   });
 
-  it('replaces formula text in formulas mode, and a broken formula throws and writes nothing', async () => {
+  it('replaces formula text in formulas mode, and refuses a broken formula writing nothing', async () => {
     const wb = await createWorkbook();
     const sheet = wb.sheet(0);
     sheet.setNumber('A1', 3);
@@ -74,9 +79,12 @@ describe('sheet replace', () => {
     sheet.setFormula('B2', '=SUM(A1)+1');
     sheet.replaceAll({ query: 'SUM', replacement: 'MAX', lookIn: 'formulas' });
     expect(sheet.getFormula('B1')).toBe('=MAX(A1)');
-    expect(() => sheet.replaceAll({ query: 'A1)', replacement: '', lookIn: 'formulas' })).toThrow(
-      FormulonError,
-    );
+    const refused = sheet.replaceAll({ query: 'A1)', replacement: '', lookIn: 'formulas' });
+    expect(refused.status).toBe('refused');
+    expect(refused.applied).toEqual([]);
+    expect(refused.rejections).toEqual([
+      expect.objectContaining({ sheet: 0, at: { row: 0, col: 1 }, code: 'invalid' }),
+    ]);
     expect(sheet.getFormula('B1')).toBe('=MAX(A1)');
     expect(sheet.getFormula('B2')).toBe('=MAX(A1)+1');
   });
