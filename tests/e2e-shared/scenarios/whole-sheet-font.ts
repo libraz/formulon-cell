@@ -146,8 +146,7 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
   await last.scrollIntoViewIfNeeded();
   await expect(last).toBeInViewport();
   await dialog
-    .locator(
-      '.fc-fmtdlg__footer .fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary):not([data-fc-validation-clear-all])',
-    )
+    .locator('.fc-fmtdlg__footer')
+    .getByRole('button', { name: 'キャンセル', exact: true })
     .click();
 }
