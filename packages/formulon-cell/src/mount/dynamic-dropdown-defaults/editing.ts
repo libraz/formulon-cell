@@ -269,12 +269,16 @@ const updateClearMenu =
         setMenuControlDisabled(button, true, instance.i18n.strings.backstage.commandUnavailable);
         continue;
       }
+      const hyperlinkItem = action === 'hyperlinks' || action === 'remove-hyperlinks';
+      if (hyperlinkItem && hyperlinksRefused) {
+        setMenuControlDisabled(button, true, instance.i18n.strings.backstage.commandUnavailable);
+        continue;
+      }
       const disabled =
         (action === 'contents' && !hasContentsSelection) ||
         (action === 'formats' && !hasFormats) ||
         (action === 'comments' && !hasComments) ||
-        ((action === 'hyperlinks' || action === 'remove-hyperlinks') &&
-          (!hasHyperlinks || hyperlinksRefused)) ||
+        (hyperlinkItem && !hasHyperlinks) ||
         (action === 'conditional' && !hasConditional);
       setMenuControlDisabled(button, disabled, disabledReason);
     }

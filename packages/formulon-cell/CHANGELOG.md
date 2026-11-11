@@ -44,7 +44,8 @@ versioning is [SemVer](https://semver.org/).
 - **Breaking:** `InteractionPolicy.batchDenied` and `BatchDeniedMode` are removed; a cell batch is refused as a whole by its first refused cell.
 - **Breaking:** The `moveCells` interaction operation is removed. Cut, drag-move and Insert Copied Cells are decided as the paste and insert they perform.
 - On a protected sheet, Format Cells, the phonetic commands and every formatting command need the Format cells option whatever the selection, as writes already did; Define Name, Create from Selection and Data Validation are unavailable, while the Name Manager and New Comment stay available.
-- The Home Clear control is decided by the selected cells, and its Clear Hyperlinks item needs the Insert hyperlinks option on a protected sheet.
+- The Home Clear control is decided by the selected cells, and its Clear Hyperlinks item needs the Insert hyperlinks option on a protected sheet; without it the item is greyed as unavailable, not as having nothing to clear.
+- Review > Spelling checks the whole sheet when one cell is selected and only the selection when a range is.
 - The Mac cell context menu follows the desktop order and groups, with New Comment and the note rows beside it.
 - The Windows cell context menu offers New Comment, which starts a thread, before New Note.
 - On the Mac, the Review Notes menu shows Edit Note in place of New Note when the active cell has a note, and drops it while that note is locked on a protected sheet.

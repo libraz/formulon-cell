@@ -3,6 +3,7 @@ import {
   builtInProtectionDecision,
   canExecuteBuiltIn,
 } from '../../../src/commands/built-in-command-policy.js';
+import { setHyperlink } from '../../../src/commands/hyperlinks.js';
 import type { InteractionPolicy } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { insertCellsAction, insertRowsAction } from '../../../src/commands/row-col-actions.js';
@@ -62,6 +63,29 @@ describe('row and column insert and delete on a protected sheet', () => {
     ctx.updateClearMenu(menu);
     expect(canExecuteBuiltIn(instance.store, 'clearFormat', 'ribbon').allowed).toBe(false);
     expect([...menu.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+  });
+
+  it('greys Remove Hyperlinks at an unlocked linked cell as unavailable unless Insert hyperlinks is allowed', async () => {
+    const { instance, ctx } = await setup();
+    const at = { sheet: 0, row: 1, col: 1 };
+    setHyperlink(instance.store, at, 'https://example.test', sheet?.workbook);
+    mutators.setCellFormat(instance.store, at, { locked: false });
+    mutators.setRange(instance.store, CELL);
+    const menu = document.createElement('div');
+    const item = document.createElement('button');
+    item.dataset.clear = 'remove-hyperlinks';
+    menu.appendChild(item);
+
+    setProtectedSheet(instance.store, 0, true);
+    ctx.updateClearMenu(menu);
+    expect(item.disabled).toBe(true);
+    expect(item.dataset.menuDisabledReason).toBe(
+      instance.i18n.strings.backstage.commandUnavailable,
+    );
+
+    setProtectedSheet(instance.store, 0, true, { permissions: { insertHyperlinks: true } });
+    ctx.updateClearMenu(menu);
+    expect(item.disabled).toBe(false);
   });
 
   it('opens no cell dialog and offers nothing without an insert option', async () => {
