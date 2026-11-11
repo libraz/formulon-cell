@@ -60,8 +60,11 @@ describe('AutoCorrect', () => {
   });
 
   // The capitalisation rules are not measured against the desktop yet.
-  it('lowers the second of two initial capitals', () => {
-    expect(correctTwoInitialCapitals('THe CApitals TWO Ok IDs')).toBe('The Capitals TWO Ok Ids');
+  it('lowers the second of two initial capitals, except plural acronyms and exceptions', () => {
+    expect(correctTwoInitialCapitals('THe CApitals TWO Ok')).toBe('The Capitals TWO Ok');
+    // A plural acronym keeps its capitals by rule, unmeasured; listed exceptions stay too.
+    expect(correctTwoInitialCapitals('IDs PCs')).toBe('IDs PCs');
+    expect(correctTwoInitialCapitals('MHz CDrom', ['cdrom'])).toBe('Mhz CDrom');
   });
 
   it('capitalises English day names in lower case, whatever the language', () => {
@@ -70,6 +73,10 @@ describe('AutoCorrect', () => {
 
   it('capitalises a sentence after a sentence end and leaves the cell start as typed', () => {
     expect(capitalizeSentences('done. next! why? ok.no')).toBe('done. Next! Why? Ok.no');
+    expect(capitalizeSentences('approx. ten. Approx. two', ['approx.'])).toBe(
+      'approx. ten. Approx. two',
+    );
+    expect(capitalizeSentences('approx! ten', ['approx'])).toBe('approx! Ten');
   });
 
   it('applies each switch on its own', () => {
@@ -85,6 +92,23 @@ describe('AutoCorrect', () => {
     expect(store.correct('THe end. monday')).toBe('THe end. monday');
   });
 
+  it('takes the host exceptions per language and hands edited ones back', () => {
+    const onChange = vi.fn();
+    const store = new AutoCorrectStore(
+      () => ({
+        exceptions: (locale) =>
+          locale === 'en' ? { firstLetter: ['approx'], initialCaps: ['CDrom'] } : undefined,
+        onChange,
+      }),
+      () => 'en',
+    );
+    expect(store.correct('approx. ten CDrom')).toBe('approx. ten CDrom');
+    const exceptions = { firstLetter: [], initialCaps: [] };
+    store.update({ exceptions });
+    expect(store.correct('approx. ten CDrom')).toBe('approx. Ten Cdrom');
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ exceptions }), 'en');
+  });
+
   it('keeps edits for the session and hands the whole state to the host', () => {
     const onChange = vi.fn();
     let options: AutoCorrectOptions = { onChange };
@@ -95,6 +119,7 @@ describe('AutoCorrect', () => {
     );
     expect(store.state()).toEqual({
       entries: symbols,
+      exceptions: { firstLetter: [], initialCaps: [] },
       replaceAsYouType: true,
       replaceHyperlinks: true,
       correctTwoInitialCapitals: true,
@@ -106,6 +131,7 @@ describe('AutoCorrect', () => {
     expect(onChange).toHaveBeenLastCalledWith(
       {
         entries: [...symbols, { from: 'teh', to: 'the' }],
+        exceptions: { firstLetter: [], initialCaps: [] },
         replaceAsYouType: true,
         replaceHyperlinks: true,
         correctTwoInitialCapitals: true,
@@ -127,6 +153,7 @@ describe('AutoCorrect', () => {
     options = { entries: () => [{ from: 'ｘ', to: 'y' }], replaceHyperlinks: false };
     expect(store.state()).toEqual({
       entries: [{ from: 'ｘ', to: 'y' }],
+      exceptions: { firstLetter: [], initialCaps: [] },
       replaceAsYouType: false,
       replaceHyperlinks: false,
       correctTwoInitialCapitals: true,

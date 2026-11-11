@@ -6,6 +6,7 @@
       "mustExport": {
         "ApplyChangesOptions": "type",
         "AutoCorrectEntry": "type",
+        "AutoCorrectExceptions": "type",
         "AutoCorrectOptions": "type",
         "AutoCorrectState": "type",
         "Audit": "type",

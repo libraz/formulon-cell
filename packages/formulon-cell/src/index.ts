@@ -70,6 +70,7 @@ export type { CellFormatterEntry, CellRenderInput } from './cells.js';
 export type { CategoryChartPoint, ChartCategory } from './charts/types.js';
 export type {
   AutoCorrectEntry,
+  AutoCorrectExceptions,
   AutoCorrectOptions,
   AutoCorrectState,
 } from './commands/autocorrect.js';

@@ -311,6 +311,7 @@ describe('spreadsheet: update', () => {
     const sheet = await mountSheet({
       autoCorrect: {
         entries: () => [{ from: 'teh', to: 'the' }],
+        exceptions: () => ({ firstLetter: ['approx'], initialCaps: [] }),
         replaceHyperlinks: false,
         capitalizeSentences: false,
         onChange,
@@ -319,6 +320,7 @@ describe('spreadsheet: update', () => {
     const autoCorrect = legacyInstanceOf(sheet).autoCorrect;
     expect(autoCorrect.state()).toEqual({
       entries: [{ from: 'teh', to: 'the' }],
+      exceptions: { firstLetter: ['approx'], initialCaps: [] },
       replaceAsYouType: true,
       replaceHyperlinks: false,
       correctTwoInitialCapitals: true,
@@ -333,6 +335,7 @@ describe('spreadsheet: update', () => {
           { from: 'teh', to: 'the' },
           { from: 'adn', to: 'and' },
         ],
+        exceptions: { firstLetter: ['approx'], initialCaps: [] },
         replaceAsYouType: true,
         replaceHyperlinks: false,
         correctTwoInitialCapitals: true,

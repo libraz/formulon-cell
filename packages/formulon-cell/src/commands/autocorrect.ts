@@ -6,9 +6,19 @@ export interface AutoCorrectEntry {
   readonly to: string;
 }
 
+/** Words the capitalisation rules leave alone. Matching ignores case. */
+export interface AutoCorrectExceptions {
+  /** Abbreviations after whose period a sentence does not start, such as `approx`; a trailing
+   *  period is optional. */
+  readonly firstLetter: readonly string[];
+  /** Words kept with two initial capitals, such as `IDs`. */
+  readonly initialCaps: readonly string[];
+}
+
 /** What the AutoCorrect options hold for one language. */
 export interface AutoCorrectState {
   readonly entries: readonly AutoCorrectEntry[];
+  readonly exceptions: AutoCorrectExceptions;
   /** Replace text as you type. */
   readonly replaceAsYouType: boolean;
   /** Replace internet and network paths with hyperlinks. */
@@ -21,7 +31,7 @@ export interface AutoCorrectState {
   readonly capitalizeDays: boolean;
 }
 
-type AutoCorrectSwitch = Exclude<keyof AutoCorrectState, 'entries'>;
+type AutoCorrectSwitch = Exclude<keyof AutoCorrectState, 'entries' | 'exceptions'>;
 const SWITCHES: readonly AutoCorrectSwitch[] = [
   'replaceAsYouType',
   'replaceHyperlinks',
@@ -35,6 +45,8 @@ const SWITCHES: readonly AutoCorrectSwitch[] = [
 export interface AutoCorrectOptions {
   /** The list for `locale`, in place of the built-in one; `undefined` keeps the built-in one. */
   readonly entries?: (locale: string) => readonly AutoCorrectEntry[] | undefined;
+  /** The exceptions for `locale`; `undefined` keeps none beyond the rules' own. */
+  readonly exceptions?: (locale: string) => AutoCorrectExceptions | undefined;
   /** Replace text as you type; on by default. */
   readonly replaceAsYouType?: boolean;
   /** Replace internet and network paths with hyperlinks; on by default. */
@@ -166,14 +178,29 @@ const isLower = (text: string): boolean =>
 const isUpper = (text: string): boolean =>
   text === text.toUpperCase() && text !== text.toLowerCase();
 
+const NO_EXCEPTIONS: AutoCorrectExceptions = { firstLetter: [], initialCaps: [] };
+const lowerSet = (words: readonly string[], strip = ''): Set<string> =>
+  new Set(
+    words.map((word) => (strip && word.endsWith(strip) ? word.slice(0, -1) : word).toLowerCase()),
+  );
+
 /** `text` with the second capital of a word like `THe` lowered: two capitals followed only by
- *  lower-case letters. */
-export const correctTwoInitialCapitals = (text: string): string =>
-  text.replace(WORD, (word) =>
-    word.length > 2 && isUpper(word.slice(0, 2)) && isLower(word.slice(2))
+ *  lower-case letters. A plural acronym such as `PCs` and the `exceptions` stay as typed. */
+export const correctTwoInitialCapitals = (
+  text: string,
+  exceptions: readonly string[] = [],
+): string => {
+  const keep = lowerSet(exceptions);
+  return text.replace(WORD, (word) =>
+    word.length > 2 &&
+    isUpper(word.slice(0, 2)) &&
+    isLower(word.slice(2)) &&
+    word.slice(2) !== 's' &&
+    !keep.has(word.toLowerCase())
       ? word.charAt(0) + word.charAt(1).toLowerCase() + word.slice(2)
       : word,
   );
+};
 
 /** `text` with English day names typed in lower case given a capital, in every language, as the
  *  desktop labels say. */
@@ -183,12 +210,20 @@ export const capitalizeDays = (text: string): string =>
   );
 
 /** `text` with the first letter after a sentence end and white space given a capital. The start
- *  of the cell is left as typed. */
-export const capitalizeSentences = (text: string): string =>
-  text.replace(
-    /([.!?]\s+)(\p{Ll})/gu,
-    (_, end: string, letter: string) => end + letter.toUpperCase(),
+ *  of the cell, and the word after the period of one of the `abbreviations`, are left as typed. */
+export const capitalizeSentences = (
+  text: string,
+  abbreviations: readonly string[] = [],
+): string => {
+  const keep = lowerSet(abbreviations, '.');
+  return text.replace(
+    /(\p{L}*)([.!?]\s+)(\p{Ll})/gu,
+    (match, word: string, end: string, letter: string) =>
+      end.startsWith('.') && keep.has(word.toLowerCase())
+        ? match
+        : word + end + letter.toUpperCase(),
   );
+};
 
 /** The AutoCorrect state of one spreadsheet. User edits last for the instance's lifetime and are
  *  handed to the host through `onChange`. */
@@ -196,6 +231,7 @@ export class AutoCorrectStore {
   readonly #options: () => AutoCorrectOptions | undefined;
   readonly #locale: () => string;
   readonly #edited = new Map<string, readonly AutoCorrectEntry[]>();
+  readonly #editedExceptions = new Map<string, AutoCorrectExceptions>();
   readonly #switches: Partial<Record<AutoCorrectSwitch, boolean>> = {};
 
   constructor(options: () => AutoCorrectOptions | undefined, locale: () => string) {
@@ -210,6 +246,8 @@ export class AutoCorrectStore {
     return {
       entries:
         this.#edited.get(locale) ?? options?.entries?.(locale) ?? builtInAutoCorrectEntries(locale),
+      exceptions:
+        this.#editedExceptions.get(locale) ?? options?.exceptions?.(locale) ?? NO_EXCEPTIONS,
       replaceAsYouType: on('replaceAsYouType'),
       replaceHyperlinks: on('replaceHyperlinks'),
       correctTwoInitialCapitals: on('correctTwoInitialCapitals'),
@@ -222,6 +260,7 @@ export class AutoCorrectStore {
   update(patch: Partial<AutoCorrectState>): void {
     const locale = this.#locale();
     if (patch.entries) this.#edited.set(locale, [...patch.entries]);
+    if (patch.exceptions) this.#editedExceptions.set(locale, patch.exceptions);
     for (const key of SWITCHES) {
       const value = patch[key];
       if (value !== undefined) this.#switches[key] = value;
@@ -244,9 +283,13 @@ export class AutoCorrectStore {
   correct(text: string): string {
     const state = this.state();
     let out = state.replaceAsYouType ? autoCorrectText(text, state.entries) : text;
-    if (state.correctTwoInitialCapitals) out = correctTwoInitialCapitals(out);
+    if (state.correctTwoInitialCapitals) {
+      out = correctTwoInitialCapitals(out, state.exceptions.initialCaps);
+    }
     if (state.capitalizeDays) out = capitalizeDays(out);
-    if (state.capitalizeSentences) out = capitalizeSentences(out);
+    if (state.capitalizeSentences) {
+      out = capitalizeSentences(out, state.exceptions.firstLetter);
+    }
     return out;
   }
 }
