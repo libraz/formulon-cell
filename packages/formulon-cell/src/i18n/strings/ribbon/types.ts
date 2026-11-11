@@ -420,6 +420,10 @@ export interface RibbonStrings {
       clearSelected: string;
       clearGroups: string;
       color: string;
+      /** Accessible name of the Style strip's chevron, which opens the full gallery. */
+      moreStyles: string;
+      /** The colour word prefixed to each Style preset's accessible name, in gallery order. */
+      styleColorNames: readonly string[];
       /** Preset names; `{n}` is the accent or set number. */
       styleNames: {
         accentDarker50: string;

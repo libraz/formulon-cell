@@ -7,6 +7,7 @@ import {
 } from '../../commands/sparkline-design.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectDisabledState } from '../menu-a11y.js';
+import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
 
 /** Marks a button this projection disabled, so a disabled state set elsewhere is left alone. */
 const OWN_DISABLED = 'sparklineDisabled';
@@ -15,7 +16,8 @@ const OWN_TITLE = 'sparklineTitle';
 
 /** Sync the Sparkline tab under `host` with the group of the active cell: the pressed Type and
  *  Show toggles, Markers (line sparklines only), and the greying a protected sheet asks for. The
- *  Axis menu stays enabled on a protected sheet, with every entry inert. */
+ *  Axis menu stays enabled on a protected sheet, with every entry inert. The Style strip is
+ *  refreshed to the group's preset. */
 export const projectSparklineDesign = (host: HTMLElement, instance: SpreadsheetInstance): void => {
   const state = instance.store.getState();
   const group = activeSparklineGroup(state);
@@ -53,4 +55,7 @@ export const projectSparklineDesign = (host: HTMLElement, instance: SpreadsheetI
       delete button.dataset[OWN_TITLE];
     }
   }
+  host
+    .querySelector(`[data-ribbon-gallery="${SPARKLINE_COMMANDS.styleGallery}"]`)
+    ?.dispatchEvent(new Event('fc-ribbon-control-refresh'));
 };

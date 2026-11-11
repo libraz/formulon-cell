@@ -36,7 +36,14 @@ export type ArrangeAction =
   | 'send-back'
   | 'selection-pane';
 /** The Sparkline tab menu entry families, by the `data-sparkline-*` attribute that names them. */
-export type SparklineMenuAction = 'edit' | 'color' | 'weight' | 'markerColor' | 'axis' | 'clear';
+export type SparklineMenuAction =
+  | 'edit'
+  | 'style'
+  | 'color'
+  | 'weight'
+  | 'markerColor'
+  | 'axis'
+  | 'clear';
 export type UiTheme = 'paper' | 'ink' | 'contrast';
 
 export interface DynamicDropdownsCtx {
@@ -238,6 +245,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'pivot-layout',
   'table-refresh',
   'sparkline-edit',
+  'sparkline-style',
   'sparkline-color',
   'sparkline-weight',
   'sparkline-marker-color',
@@ -787,6 +795,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'pivot-layout', handler: (v) => ctx.applyPivotLayoutAction?.(v) },
     { attr: 'table-refresh', handler: (v) => ctx.applyTableRefreshAction?.(v) },
     { attr: 'sparkline-edit', handler: (v) => ctx.applySparklineAction?.('edit', v) },
+    { attr: 'sparkline-style', handler: (v) => ctx.applySparklineAction?.('style', v) },
     { attr: 'sparkline-color', handler: (v) => ctx.applySparklineAction?.('color', v) },
     { attr: 'sparkline-weight', handler: (v) => ctx.applySparklineAction?.('weight', v) },
     {

@@ -1,6 +1,8 @@
 // Sparkline tab menus: Edit Data, the Style gallery, the two colour menus, Axis and Clear.
 
+import type { Color } from '@libraz/formulon';
 import { SHAPE_LINE_WEIGHTS } from '../../../commands/shape-format.js';
+import type { SparklineStylePreset } from '../../../commands/sparkline-presets.js';
 import { createColorPalette } from '../../../components/color-palette.js';
 import { projectDisabledState } from '../../menu-a11y.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
@@ -67,9 +69,54 @@ export const SPARKLINE_STYLE_SLOTS: readonly SparklineStyleSlot[] = [
   ),
 ];
 
-/** The colours of each Style slot are measured data and have not been taken yet, so every slot
- *  stays disabled and this table stays empty. */
-export const SPARKLINE_STYLE_PRESETS: Readonly<Record<string, never>> = {};
+/** The accessible name of the Style preset at gallery `index`: its colour word before its name. */
+export const sparklineStyleLabel = (t: ToolbarText['sparkline'], index: number): string => {
+  const slot = SPARKLINE_STYLE_SLOTS[index];
+  if (!slot) return '';
+  const name = t.styleNames[slot.name].replace('{n}', String(slot.n));
+  return `${t.styleColorNames[index]}, ${name}`;
+};
+
+/** A small line sparkline in a preset's colours, with its high, low, first and last points. */
+export const sparklineStyleThumbnail = (
+  preset: SparklineStylePreset,
+  css: (color: Color) => string,
+): SVGSVGElement => {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'fc-tb__sparkline-style__thumb');
+  svg.setAttribute('viewBox', '0 0 28 16');
+  svg.setAttribute('aria-hidden', 'true');
+  const points: readonly [number, number][] = [
+    [3, 10],
+    [8, 4],
+    [13, 8],
+    [18, 13],
+    [25, 6],
+  ];
+  const line = document.createElementNS(ns, 'polyline');
+  line.setAttribute('points', points.map(([x, y]) => `${x},${y}`).join(' '));
+  line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', css(preset.series));
+  line.setAttribute('stroke-width', '1.5');
+  svg.appendChild(line);
+  const marks: readonly [[number, number] | undefined, Color][] = [
+    [points[0], preset.first],
+    [points[1], preset.high],
+    [points[3], preset.low],
+    [points[4], preset.last],
+  ];
+  for (const [point, color] of marks) {
+    if (!point) continue;
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', String(point[0]));
+    dot.setAttribute('cy', String(point[1]));
+    dot.setAttribute('r', '1.8');
+    dot.setAttribute('fill', css(color));
+    svg.appendChild(dot);
+  }
+  return svg;
+};
 
 export interface SparklineMenuFactories {
   createSparklineEditDataMenu: () => HTMLDivElement;
@@ -147,8 +194,8 @@ export const createSparklineMenuFactories = (
   const createSparklineStyleMenu = (): HTMLDivElement => {
     const menu = createMenu(SPARKLINE_MENU_IDS.style);
     const grid = colorSwatchGrid('fc-tb__sparkline-styles');
-    for (const slot of SPARKLINE_STYLE_SLOTS) {
-      const name = t.styleNames[slot.name].replace('{n}', String(slot.n));
+    SPARKLINE_STYLE_SLOTS.forEach((slot, index) => {
+      const name = sparklineStyleLabel(t, index);
       const swatch = createMenuButton({
         className: 'fc-tb__sparkline-style',
         attr: 'sparklineStyle',
@@ -156,10 +203,10 @@ export const createSparklineMenuFactories = (
         title: name,
         ariaLabel: name,
       });
-      // The preset colours are not measured yet, so every slot waits, as other unbuilt commands do.
-      projectDisabledState(swatch, true, ribbonText.disabled, { titlePrefix: name });
+      swatch.setAttribute('role', 'menuitemradio');
+      swatch.setAttribute('aria-checked', 'false');
       grid.appendChild(swatch);
-    }
+    });
     menu.appendChild(grid);
     return menu;
   };

@@ -1,4 +1,4 @@
-import { SparklineAxisType } from '@libraz/formulon';
+import { type Color, SparklineAxisType } from '@libraz/formulon';
 import { isMacChrome } from '../../commands/chrome-platform.js';
 import type { ObjectActionContext } from '../../commands/object-actions.js';
 import { isSheetProtected } from '../../commands/protection.js';
@@ -16,9 +16,15 @@ import {
   switchSparklineRowColumnAction,
 } from '../../commands/sparkline-design.js';
 import { unionSparklineSources } from '../../commands/sparkline-layout.js';
+import {
+  applySparklineStylePresetAction,
+  SPARKLINE_STYLE_PRESETS,
+  sparklineStylePresetIndex,
+} from '../../commands/sparkline-presets.js';
 import { sparklineSourceText } from '../../commands/sparkline-ranges.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../../components/color-palette.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
+import { cssOfColorSpec } from '../../engine/theme-color.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { showNumberPrompt } from '../../toolbar/dialogs/prompt.js';
 import {
@@ -30,6 +36,10 @@ import type {
   SparklineMenuAction,
 } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { openMacSparklineDialog } from '../../toolbar/ribbon/mac/actions.js';
+import {
+  SPARKLINE_STYLE_SLOTS,
+  sparklineStyleThumbnail,
+} from '../../toolbar/ribbon/menus/sparkline.js';
 import {
   SPARKLINE_AXIS_DISABLED_ITEMS,
   SPARKLINE_COMMANDS,
@@ -244,7 +254,11 @@ export function createSparklineDropdownDefaults(
 
   return {
     applySparklineAction(kind: SparklineMenuAction, value: string) {
-      if (kind === 'color') {
+      if (kind === 'style') {
+        const index = SPARKLINE_STYLE_SLOTS.findIndex((slot) => slot.id === value);
+        if (index >= 0)
+          applySparklineStylePresetAction(ctxFor(SPARKLINE_COMMANDS.styleGallery), index);
+      } else if (kind === 'color') {
         setSparklineColorAction(ctxFor(SPARKLINE_COMMANDS.color), 'series', value);
       } else if (kind === 'weight') {
         if (value === 'custom') return customWeight();
@@ -322,10 +336,19 @@ export function createSparklineDropdownDefaults(
           if (SPARKLINE_AXIS_DISABLED_ITEMS.includes(value)) setMenuControlDisabled(button, true);
         }
       }
-      // The Style presets are unmeasured, so every slot stays disabled whatever the selection.
       if (menu.id === SPARKLINE_MENU_IDS.style) {
-        const waiting = instance.i18n.strings.ribbon.disabled;
-        for (const button of buttons) setMenuControlDisabled(button, true, waiting);
+        const current = sparklineStylePresetIndex(settings);
+        const css = (color: Color): string => cssOfColorSpec(instance.workbook, color) ?? '';
+        SPARKLINE_STYLE_SLOTS.forEach((slot, index) => {
+          const swatch = menu.querySelector<HTMLButtonElement>(
+            `[data-sparkline-style="${slot.id}"]`,
+          );
+          const preset = SPARKLINE_STYLE_PRESETS[index];
+          if (!swatch || !preset) return;
+          swatch.replaceChildren(sparklineStyleThumbnail(preset, css));
+          swatch.setAttribute('aria-checked', String(index === current));
+          swatch.classList.toggle('fc-tb__menu-item--active', index === current);
+        });
       }
     },
   };

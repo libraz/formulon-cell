@@ -38,6 +38,8 @@ import { createMacCellStylesGallery } from './mac/home-styles-gallery.js';
 import { createMacRibbonMenuFactory, type MacRibbonMenuFactory } from './mac/menus.js';
 import type { MenuVariant } from './menus/mac-variants.js';
 import { createPivotStyleGallery } from './pivot-style-gallery.js';
+import { createSparklineStyleGallery } from './sparkline-style-gallery.js';
+import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
 import { createPivotReadout, createTableNameInput } from './table-design.js';
 import { createTableStyleGallery } from './table-style-gallery.js';
 
@@ -586,6 +588,20 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
             tools.appendChild(
               createPivotStyleGallery({
                 lang: ctx.ribbonLang,
+                getInst: ctx.getInst,
+                arrow: b,
+                menu: submenu?.() ?? null,
+                pageArrows: profile !== 'excel365Mac',
+              }),
+            );
+            continue;
+          }
+          if (c.id === SPARKLINE_COMMANDS.styleGallery) {
+            // The Sparkline tab embeds the Style gallery; the button becomes its more arrow.
+            tools.appendChild(
+              createSparklineStyleGallery({
+                lang: ctx.ribbonLang,
+                text: ctx.ribbonText.sparkline,
                 getInst: ctx.getInst,
                 arrow: b,
                 menu: submenu?.() ?? null,

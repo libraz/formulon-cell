@@ -61,10 +61,20 @@ describe('Sparkline tab buttons greyed by a protected sheet', () => {
     expect(command('sparklineShowHigh').title).toBe(own);
   });
 
-  it('keeps the name of the disabled Style swatches and the Plot Right to Left entry', () => {
-    const swatch = host.querySelector<HTMLButtonElement>('[data-sparkline-style]');
-    expect(swatch?.disabled).toBe(true);
-    expect(swatch?.title.startsWith(swatch?.getAttribute('aria-label') ?? '-')).toBe(true);
+  it('greys the Style strip with the reason and gives it back once unprotected', () => {
+    const reason = sheet.instance.i18n.strings.mac.sparkline.protectedLocation;
+    const chip = () => host.querySelector<HTMLButtonElement>('[data-sparkline-quick-style]');
+    expect(chip()?.disabled).toBe(false);
+    setProtectedSheet(sheet.instance.store, 0, true);
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 5 });
+    expect(chip()?.disabled).toBe(true);
+    expect(chip()?.title).toBe(`${chip()?.getAttribute('aria-label')}\n${reason}`);
+    setProtectedSheet(sheet.instance.store, 0, false);
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 5 });
+    expect(chip()?.disabled).toBe(false);
+  });
+
+  it('keeps the name of the disabled Plot Right to Left entry', () => {
     command('sparklineAxis').click();
     const rtl = host.querySelector<HTMLButtonElement>('[data-sparkline-axis="rtl"]');
     expect(rtl?.disabled).toBe(true);

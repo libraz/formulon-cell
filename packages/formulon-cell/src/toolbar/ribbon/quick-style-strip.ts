@@ -10,7 +10,7 @@ export interface QuickStyleEntry {
   /** What `apply` receives and `current` reports; empty for no style. */
   readonly id: string;
   readonly label: string;
-  readonly thumbnail: () => HTMLElement;
+  readonly thumbnail: () => Element;
 }
 
 export interface QuickStyleStripOptions {
@@ -27,6 +27,8 @@ export interface QuickStyleStripOptions {
   /** The id of the style in use; null when nothing is selected that takes a style. */
   readonly current: () => string | null;
   readonly apply: (id: string) => void;
+  /** Non-null while the chips refuse a click, with the reason to show, if any. */
+  readonly blocked?: () => { readonly reason: string | null } | null;
   /** The ribbon's gallery button and its full menu, placed after the strip as its more arrow. */
   readonly more?: { readonly arrow: HTMLButtonElement; readonly menu: HTMLElement | null };
 }
@@ -70,6 +72,7 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
   const render = (): void => {
     const entries = opts.entries();
     const current = opts.current();
+    const blocked = opts.blocked?.() ?? null;
     if (current !== shownCurrent) {
       shownCurrent = current;
       const at = entries.findIndex((entry) => entry.id === current);
@@ -87,6 +90,7 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
         chip.setAttribute('aria-label', entry.label);
         chip.title = entry.label;
         chip.appendChild(entry.thumbnail());
+        if (blocked) projectDisabledState(chip, true, blocked.reason, { titlePrefix: entry.label });
         chip.addEventListener('click', () => {
           opts.apply(entry.id);
           render();

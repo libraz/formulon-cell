@@ -8,6 +8,7 @@ import {
   rgbColorSpec,
   setSparklines,
 } from '../../../../src/commands/sparkline.js';
+import { SPARKLINE_STYLE_PRESETS } from '../../../../src/commands/sparkline-presets.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
@@ -333,17 +334,26 @@ describe('Sparkline tab of the ribbon', () => {
     },
   );
 
-  it('lists the 36 style slots, all disabled', () => {
+  it('applies a Style preset from the gallery as one undo step and checks it', () => {
     mountOnSparklines();
     const swatches = host.querySelectorAll<HTMLButtonElement>('[data-sparkline-style]');
     expect(swatches).toHaveLength(36);
-    expect(Array.from(swatches).every((swatch) => swatch.disabled)).toBe(true);
-    expect(swatches[0]?.getAttribute('aria-label')).toBe('Sparkline Style Accent 1, Darker 50%');
-    expect(swatches[35]?.getAttribute('aria-label')).toBe('Sparkline Style Colorful #6');
-    // A slot waits for its measured colours and says so, like other unbuilt commands.
-    expect(swatches[0]?.getAttribute('aria-description')).toBe('Coming soon');
+    expect(Array.from(swatches).every((swatch) => !swatch.disabled)).toBe(true);
+    expect(swatches[0]?.getAttribute('aria-label')).toBe(
+      'Dark Teal, Sparkline Style Accent 1, Darker 50%',
+    );
+    expect(swatches[35]?.getAttribute('aria-label')).toBe('Plum, Sparkline Style Colorful #6');
+    pick('[data-sparkline-style="colorful-1"]');
+    expect(settings(2)?.colorSeries).toEqual(SPARKLINE_STYLE_PRESETS[30]?.series);
+    expect(settings(2)?.colorMarkers).toEqual(SPARKLINE_STYLE_PRESETS[30]?.markers);
     command('sparklineStyleGallery').click();
-    expect(Array.from(swatches).every((swatch) => swatch.disabled)).toBe(true);
-    expect(swatches[0]?.getAttribute('aria-description')).toBe('Coming soon');
+    const checked = host.querySelectorAll('[data-sparkline-style][aria-checked="true"]');
+    expect(Array.from(checked).map((el) => (el as HTMLElement).dataset.sparklineStyle)).toEqual([
+      'colorful-1',
+    ]);
+    sheet.instance.history.undo();
+    expect(settings()?.colorSeries).toEqual(
+      defaultSparklineGroupSettings(SparklineType.Line).colorSeries,
+    );
   });
 });
