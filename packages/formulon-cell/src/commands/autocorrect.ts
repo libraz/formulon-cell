@@ -1,5 +1,5 @@
 import type { SpreadsheetStore } from '../store/store.js';
-import { isAddress } from './spelling.js';
+import { carryCase, isAddress } from './spelling.js';
 
 /** One AutoCorrect replacement: typing `from` enters `to`. */
 export interface AutoCorrectEntry {
@@ -100,16 +100,6 @@ export const builtInAutoCorrectEntries = (locale: string): readonly AutoCorrectE
 
 const START = /\s/u;
 const END = /[\s\p{P}\p{S}]/u;
-
-/** Gives `word` the capitalisation of `like`: all caps, a leading capital, or as is. */
-const carryCase = (word: string, like: string): string => {
-  if (like.length > 1 && like === like.toUpperCase() && like !== like.toLowerCase()) {
-    return word.toUpperCase();
-  }
-  const first = like.charAt(0);
-  if (first !== first.toLowerCase()) return word.charAt(0).toUpperCase() + word.slice(1);
-  return word;
-};
 
 /** The replacement when `entry` is typed at `start`, or null. A `from` without capitals matches
  *  any case and passes the typed capitalisation on; one with capitals matches exactly. */

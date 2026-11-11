@@ -20,9 +20,12 @@ const COMMON_TYPOS: Readonly<Record<string, string>> = {
   wierd: 'weird',
 };
 
-/** Gives `word` the capitalisation of `like`: all caps, a leading capital, or as is. */
-const matchCase = (word: string, like: string): string => {
-  if (like.length > 1 && like === like.toUpperCase()) return word.toUpperCase();
+/** Gives `word` the capitalisation of `like`: all caps (two or more cased letters, no lower
+ *  case), a leading capital, or as is. Spelling suggestions and AutoCorrect share it. */
+export const carryCase = (word: string, like: string): string => {
+  if (like.length > 1 && like === like.toUpperCase() && like !== like.toLowerCase()) {
+    return word.toUpperCase();
+  }
   const first = like.charAt(0);
   if (first !== first.toLowerCase()) return word.charAt(0).toUpperCase() + word.slice(1);
   return word;
@@ -41,7 +44,7 @@ export const defaultSpellingService: SpellingService = {
   check: (word, locale) => !coveredLocale(locale) || typoFix(word) === undefined,
   suggest: (word, locale) => {
     const fix = coveredLocale(locale) ? typoFix(word) : undefined;
-    return fix === undefined ? [] : [matchCase(fix, word)];
+    return fix === undefined ? [] : [carryCase(fix, word)];
   },
 };
 
