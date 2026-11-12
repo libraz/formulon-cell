@@ -267,11 +267,11 @@
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg .fc-sortdlg__add-level {
     left: 19px;
-    width: 26px;
+    width: 23px;
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg .fc-sortdlg__delete-level {
     left: 42px;
-    width: 26px;
+    width: 23px;
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg .fc-sortdlg__copy-level {
     left: 65px;
