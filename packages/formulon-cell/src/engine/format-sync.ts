@@ -112,26 +112,34 @@ export function hydrateCommentsAndHyperlinksFromEngine(
     }
   }
 
-  // The engine holds the sheet's links: a link it no longer has leaves the store too.
-  const staleLinks = wb.capabilities.hyperlinks
-    ? [...store.getState().format.formats].filter(([key, fmt]) => {
-        if (fmt.hyperlink === undefined) return false;
-        return parseAddrKey(key)?.sheet === sheet;
-      })
-    : [];
-  if (updates.length === 0 && staleLinks.length === 0) return;
+  // The engine holds the sheet's links and notes: one it no longer has leaves the store too. Notes
+  // are only dropped when the engine can list them all.
+  const linksRead = wb.capabilities.hyperlinks;
+  const notesRead = wb.capabilities.comments && wb.capabilities.commentsEnumerable;
+  const stale = [...store.getState().format.formats].filter(
+    ([key, fmt]) =>
+      ((linksRead && fmt.hyperlink !== undefined) ||
+        (notesRead && (fmt.comment !== undefined || fmt.commentVisible !== undefined))) &&
+      parseAddrKey(key)?.sheet === sheet,
+  );
+  if (updates.length === 0 && stale.length === 0) return;
 
   store.setState((s) => {
     const formats = new Map(s.format.formats);
-    for (const [key, fmt] of staleLinks) {
-      const {
-        hyperlink: _hyperlink,
-        hyperlinkLocation: _location,
-        hyperlinkSpan: _span,
-        hyperlinkDisplay: _display,
-        hyperlinkTooltip: _tooltip,
-        ...rest
-      } = fmt;
+    for (const [key, fmt] of stale) {
+      const rest: CellFormat = { ...fmt };
+      if (linksRead) {
+        delete rest.hyperlink;
+        delete rest.hyperlinkLocation;
+        delete rest.hyperlinkSpan;
+        delete rest.hyperlinkDisplay;
+        delete rest.hyperlinkTooltip;
+      }
+      if (notesRead) {
+        delete rest.comment;
+        delete rest.commentAuthor;
+        delete rest.commentVisible;
+      }
       formats.set(key, rest);
     }
     for (const u of updates) {

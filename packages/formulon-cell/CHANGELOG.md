@@ -98,6 +98,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- A link or note removed through the workbook API (`sheet.removeHyperlink`, `sheet.clearHyperlinks`, `sheet.setComment(at, null)`) leaves the grid too; a note hidden that way stops showing.
 - Refusal reasons the ribbon, context menu and validation alerts show are in the UI language; the API's `reason` stays English with its `code`, and a host's own reason shows as given. A disabled control keeps its own title.
 - Spelling: a refused Change All applies nothing, AutoCorrect from the dialog records an entry only once the change is written, Undo Last keeps its record when the undo fails, repeated numbers pass, and words such as `constructor` are no longer flagged.
 - AutoCorrect: the capitalisation rules leave web addresses, e-mail addresses and paths alone; a Ctrl+Enter fill from the formula bar is corrected; lists keyed by language (`ja`) apply to a full locale (`ja-JP`); a web address typed in the formula bar becomes a hyperlink as in the cell.
