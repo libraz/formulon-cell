@@ -243,7 +243,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
   let cellRefreshes = 0;
   const refreshCells = (): void => {
     cellRefreshes += 1;
-    mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+    mutators.refreshActiveSheetCells(store, wb);
   };
 
   // A recalc changes cells besides the written one (dependents, spill ranges).

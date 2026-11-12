@@ -117,10 +117,7 @@ const buildConditionalMenuAction =
       invalidText: conditionalMenuStrings.invalidText,
     };
     const refreshWorkbookCells = (): void => {
-      mutators.replaceCells(
-        instance.store,
-        instance.workbook.cells(instance.store.getState().data.sheetIndex),
-      );
+      mutators.refreshActiveSheetCells(instance.store, instance.workbook);
     };
     const pickFormat = createRangePickFormatter({
       store: instance.store,

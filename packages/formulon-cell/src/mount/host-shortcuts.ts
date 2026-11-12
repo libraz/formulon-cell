@@ -180,7 +180,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
           return;
         }
         currentWb.setNumber(target, value);
-        mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
+        mutators.refreshActiveSheetCells(input.store, currentWb);
       });
     };
     const applyDirectNumberFormat = (action: NumberFormatAction): void => {
@@ -281,7 +281,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     if (matchesRibbonShortcut(e, 'recalcNow') || matchesRibbonShortcut(e, 'recalcSheet')) {
       e.preventDefault();
       currentWb.recalc();
-      mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
+      mutators.refreshActiveSheetCells(input.store, currentWb);
       input.invalidate();
       return;
     }
@@ -341,10 +341,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
             range,
           );
           if (inserted.status === 'applied') {
-            mutators.replaceCells(
-              input.store,
-              currentWb.cells(input.store.getState().data.sheetIndex),
-            );
+            mutators.refreshActiveSheetCells(input.store, currentWb);
             input.invalidate();
             return;
           }
@@ -365,7 +362,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
           if (kind === 'insert') insertColumnsAction(ctx, range.c0, count);
           else deleteColumnsAction(ctx, range.c0, count);
         }
-        mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
+        mutators.refreshActiveSheetCells(input.store, currentWb);
         input.invalidate();
         return;
       }
@@ -378,10 +375,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
           const range = input.store.getState().selection.range;
           const target = { ...cellShiftEntry(), wb: currentWb };
           if (!runCellShiftChoice(target, kind, range, choice)) return;
-          mutators.replaceCells(
-            input.store,
-            currentWb.cells(input.store.getState().data.sheetIndex),
-          );
+          mutators.refreshActiveSheetCells(input.store, currentWb);
           input.invalidate();
         },
       });
@@ -540,10 +534,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
             action: 'down',
           });
           if (changed.status === 'applied') {
-            mutators.replaceCells(
-              input.store,
-              currentWb.cells(input.store.getState().data.sheetIndex),
-            );
+            mutators.refreshActiveSheetCells(input.store, currentWb);
             input.invalidate();
           }
         });
@@ -562,10 +553,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
             action: 'right',
           });
           if (changed.status === 'applied') {
-            mutators.replaceCells(
-              input.store,
-              currentWb.cells(input.store.getState().data.sheetIndex),
-            );
+            mutators.refreshActiveSheetCells(input.store, currentWb);
             input.invalidate();
           }
         });

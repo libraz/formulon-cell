@@ -334,10 +334,7 @@ export function runRibbonCommand(instance: SpreadsheetInstance, id: string): boo
   const strings = instance.i18n.strings;
   const lang = toolbarLangForLocale(instance.i18n.locale);
   const refreshCells = (): void =>
-    mutators.replaceCells(
-      instance.store,
-      instance.workbook.cells(instance.store.getState().data.sheetIndex),
-    );
+    mutators.refreshActiveSheetCells(instance.store, instance.workbook);
   const applyRibbonFormat = defaultApplyRibbonFormat(() => instance);
   return applyRibbonCommand(id, {
     inst: instance,

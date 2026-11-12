@@ -71,7 +71,7 @@ import { isMacHost } from './ui-options.js';
 
 const refreshCells = (ctx: BuiltInExtensionContext): void => {
   const wb = ctx.workbook;
-  mutators.replaceCells(ctx.store, wb.cells(ctx.store.getState().data.sheetIndex));
+  mutators.refreshActiveSheetCells(ctx.store, wb);
 };
 
 /** Format-painter handle. Built-in id `'formatPainter'`. Pair with

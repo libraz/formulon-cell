@@ -361,7 +361,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     status.textContent = '';
     applySettings(wb);
     if (deps.store) {
-      mutators.replaceCells(deps.store, wb.cells(deps.store.getState().data.sheetIndex));
+      mutators.refreshActiveSheetCells(deps.store, wb);
     }
     opened = { ...draft };
   };
@@ -386,7 +386,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     applySettings(wb);
     // Mode, date-system and precision changes can recalculate formulas.
     if (deps.store) {
-      mutators.replaceCells(deps.store, wb.cells(deps.store.getState().data.sheetIndex));
+      mutators.refreshActiveSheetCells(deps.store, wb);
     }
     api.close();
   };

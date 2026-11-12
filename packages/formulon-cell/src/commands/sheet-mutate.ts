@@ -90,7 +90,7 @@ const remapWorkbookSheetLayout = (
  *  written to. */
 const recalcAndRefresh = (store: SpreadsheetStore | null | undefined, wb: WorkbookHandle): void => {
   wb.recalcAuto();
-  if (store) mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+  if (store) mutators.refreshActiveSheetCells(store, wb);
 };
 
 /** Per mounted store, how a newly active sheet is loaded from the engine. */

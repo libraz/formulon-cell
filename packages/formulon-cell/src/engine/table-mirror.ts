@@ -614,9 +614,7 @@ export class TableMirror {
   private refreshCells(store: SpreadsheetStore): void {
     const wb = this.handle;
     wb.recalcAuto();
-    wb.withEngineSyncMuted(() =>
-      mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex)),
-    );
+    wb.withEngineSyncMuted(() => mutators.refreshActiveSheetCells(store, wb));
   }
 }
 

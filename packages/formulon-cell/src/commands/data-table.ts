@@ -54,7 +54,7 @@ export function dataTableDefinition(
 }
 
 const refreshCells = (store: SpreadsheetStore, workbook: WorkbookHandle): void => {
-  mutators.replaceCells(store, workbook.cells(store.getState().data.sheetIndex));
+  mutators.refreshActiveSheetCells(store, workbook);
 };
 
 /** What-If Analysis → Data Table, as one authorized undo step. A protected sheet refuses it

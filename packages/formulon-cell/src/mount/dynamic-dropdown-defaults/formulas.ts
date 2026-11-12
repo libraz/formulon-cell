@@ -321,10 +321,7 @@ const buildDefinedNameAction =
           selected,
           instance.store,
         );
-        mutators.replaceCells(
-          instance.store,
-          instance.workbook.cells(instance.store.getState().data.sheetIndex),
-        );
+        mutators.refreshActiveSheetCells(instance.store, instance.workbook);
         instance.host.focus();
       });
     }

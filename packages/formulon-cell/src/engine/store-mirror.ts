@@ -339,7 +339,7 @@ export class StoreMirror {
   /** Re-read the bound store's active sheet after a recalc no UI command ran. */
   refreshCells(): void {
     const store = this.boundStore;
-    if (store) mutators.replaceCells(store, this.handle.cells(store.getState().data.sheetIndex));
+    if (store) mutators.refreshActiveSheetCells(store, this.handle);
   }
 
   withMuted<T>(fn: () => T): T {

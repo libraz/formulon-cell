@@ -526,11 +526,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             return { active, range };
           },
           subscribeToRangeChanges: (listener) => input.store.subscribe(listener),
-          onAfterMutate: () =>
-            mutators.replaceCells(
-              input.store,
-              input.wb().cells(input.store.getState().data.sheetIndex),
-            ),
+          onAfterMutate: () => mutators.refreshActiveSheetCells(input.store, input.wb()),
         });
         input.featureRegistry.set(
           'namedRanges',
@@ -564,10 +560,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           strings,
           history: input.history,
           onAfterCreate: () => {
-            mutators.replaceCells(
-              input.store,
-              input.wb().cells(input.store.getState().data.sheetIndex),
-            );
+            mutators.refreshActiveSheetCells(input.store, input.wb());
             autofitPivotTableColumns(input.store, input.wb(), { theme: resolveTheme(input.host) });
           },
           invalidate: () => input.renderer.invalidate(),
@@ -642,10 +635,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           },
           onRecalc: () => {
             input.wb().recalc();
-            mutators.replaceCells(
-              input.store,
-              input.wb().cells(input.store.getState().data.sheetIndex),
-            );
+            mutators.refreshActiveSheetCells(input.store, input.wb());
             input.renderer.invalidate();
           },
           onZoomChange: (zoom) => {

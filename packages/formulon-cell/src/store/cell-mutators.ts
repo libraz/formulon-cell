@@ -35,6 +35,16 @@ export const cellMutators = {
     store.setState((s) => ({ ...s, data: { ...s.data, cells } }));
   },
 
+  /** Re-read the active sheet's cells from `source`, such as the workbook after a write. */
+  refreshActiveSheetCells(
+    store: SpreadsheetStore,
+    source: {
+      cells(sheet: number): Iterable<{ addr: Addr; value: CellValue; formula: string | null }>;
+    },
+  ): void {
+    cellMutators.replaceCells(store, source.cells(store.getState().data.sheetIndex));
+  },
+
   /** Switch the active sheet index. Cells must be re-hydrated separately
    *  via `replaceCells` after calling this. The sheet being left keeps its
    *  selection and scroll; a sheet visited for the first time starts at A1. */

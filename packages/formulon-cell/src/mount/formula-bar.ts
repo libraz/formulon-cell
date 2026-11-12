@@ -732,7 +732,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         showCommitFailure(written.outcome.message, written.outcome.title);
         return;
       }
-      mutators.replaceCells(store, wb().cells(store.getState().data.sheetIndex));
+      mutators.refreshActiveSheetCells(store, wb());
       finishEditing();
       host.focus();
       return;
@@ -764,7 +764,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
 
     const currentWb = wb();
-    mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
+    mutators.refreshActiveSheetCells(store, currentWb);
     finishEditing();
     host.focus();
   };
@@ -811,7 +811,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     ) {
       return true;
     }
-    mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
+    mutators.refreshActiveSheetCells(store, currentWb);
     return true;
   };
 

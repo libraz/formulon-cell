@@ -103,10 +103,7 @@ const buildCellInsertAction =
             range,
           );
           if (inserted.status === 'applied') {
-            mutators.replaceCells(
-              instance.store,
-              instance.workbook.cells(instance.store.getState().data.sheetIndex),
-            );
+            mutators.refreshActiveSheetCells(instance.store, instance.workbook);
             instance.host.focus();
             return;
           }
@@ -115,10 +112,7 @@ const buildCellInsertAction =
       }
       if (!hasActiveCopy(instance) && (isWholeRowRange(range) || isWholeColumnRange(range))) {
         handleInsertCellsAction(instance, isWholeRowRange(range) ? 'rows' : 'cols');
-        mutators.replaceCells(
-          instance.store,
-          instance.workbook.cells(instance.store.getState().data.sheetIndex),
-        );
+        mutators.refreshActiveSheetCells(instance.store, instance.workbook);
         instance.host.focus();
         return;
       }
@@ -130,10 +124,7 @@ const buildCellInsertAction =
         onSubmit: (choice) => {
           if (!runCellShiftChoice(cellShiftTarget(instance, 'insert'), 'insert', range, choice))
             return;
-          mutators.replaceCells(
-            instance.store,
-            instance.workbook.cells(instance.store.getState().data.sheetIndex),
-          );
+          mutators.refreshActiveSheetCells(instance.store, instance.workbook);
           instance.host.focus();
         },
       });
@@ -171,10 +162,7 @@ const buildCellDeleteAction =
       const range = normalizedSelectionRange(instance);
       if (isWholeRowRange(range) || isWholeColumnRange(range)) {
         handleDeleteCellsAction(instance, isWholeRowRange(range) ? 'rows' : 'cols');
-        mutators.replaceCells(
-          instance.store,
-          instance.workbook.cells(instance.store.getState().data.sheetIndex),
-        );
+        mutators.refreshActiveSheetCells(instance.store, instance.workbook);
         instance.host.focus();
         return;
       }
@@ -186,10 +174,7 @@ const buildCellDeleteAction =
         onSubmit: (choice) => {
           if (!runCellShiftChoice(cellShiftTarget(instance, 'delete'), 'delete', range, choice))
             return;
-          mutators.replaceCells(
-            instance.store,
-            instance.workbook.cells(instance.store.getState().data.sheetIndex),
-          );
+          mutators.refreshActiveSheetCells(instance.store, instance.workbook);
           instance.host.focus();
         },
       });
@@ -257,10 +242,7 @@ const buildCellFormatAction =
       refreshWorkbookCells:
         opts.refreshCells ??
         (() => {
-          mutators.replaceCells(
-            instance.store,
-            instance.workbook.cells(instance.store.getState().data.sheetIndex),
-          );
+          mutators.refreshActiveSheetCells(instance.store, instance.workbook);
         }),
       sheetTabColorByAction,
       projectFormatToolbar: opts.projectFormatToolbar ?? noop,

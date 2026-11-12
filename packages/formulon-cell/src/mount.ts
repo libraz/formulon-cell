@@ -1107,7 +1107,7 @@ export const Spreadsheet = {
       },
       recalc() {
         wb.recalc();
-        mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+        mutators.refreshActiveSheetCells(store, wb);
         renderer.invalidate();
       },
       toggleSheetProtection() {
@@ -1155,12 +1155,12 @@ export const Spreadsheet = {
         // Batch the replay: a multi-cell entry restores cell by cell, and each
         // write would otherwise recalc on its own.
         const ok = wb.withBatchedRecalc(() => history.undo());
-        if (ok) mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+        if (ok) mutators.refreshActiveSheetCells(store, wb);
         return ok;
       },
       redo() {
         const ok = wb.withBatchedRecalc(() => history.redo());
-        if (ok) mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+        if (ok) mutators.refreshActiveSheetCells(store, wb);
         return ok;
       },
       async setWorkbook(next) {
