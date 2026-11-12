@@ -122,7 +122,20 @@ export function focusMenuItem(
   const numericIndex = index === 'first' ? 0 : index === 'last' ? items.length - 1 : index;
   const next = Math.max(0, Math.min(numericIndex, items.length - 1));
   for (const [idx, item] of items.entries()) item.tabIndex = idx === next ? 0 : -1;
-  items[next]?.focus({ preventScroll: true });
+  const item = items[next];
+  if (!item) return;
+  item.focus({ preventScroll: true });
+  revealInMenu(menu, item);
+}
+
+/** Scrolls only the menu's own overflow box so `item` is in view; the page stays put. */
+function revealInMenu(menu: HTMLElement, item: HTMLElement): void {
+  if (menu.scrollHeight <= menu.clientHeight) return;
+  const top = menu.getBoundingClientRect().top + menu.clientTop;
+  const bottom = top + menu.clientHeight;
+  const rect = item.getBoundingClientRect();
+  if (rect.top < top) menu.scrollTop -= top - rect.top;
+  else if (rect.bottom > bottom) menu.scrollTop += rect.bottom - bottom;
 }
 
 export function handleMenuKeydown(
