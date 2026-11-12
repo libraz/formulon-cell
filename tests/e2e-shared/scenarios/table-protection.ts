@@ -176,9 +176,11 @@ const openStyleMenu = async (page: Page, label: string) => {
   };
 };
 
-/** A custom table style cannot be modified or deleted while a table using it sits on a protected
- *  sheet, even from another, unprotected sheet: its strip menu greys Modify... and Delete with the
- *  protection reason, Duplicate stays available, and the style and its tables stay as they are. */
+/** While any sheet of the workbook is protected, a custom table style can be neither modified nor
+ *  deleted: from an unprotected sheet its strip menu keeps Modify... and Delete enabled, but they
+ *  do nothing, with no dialog and no alert, and the style and its tables stay as they are.
+ *  Duplicate stays available. With the protected sheet's table active, the whole strip is greyed
+ *  with the reason and opens no menu. */
 export async function runProtectedSheetCustomStyleScenario(
   page: Page,
   platform: 'default' | 'mac',
@@ -233,23 +235,39 @@ export async function runProtectedSheetCustomStyleScenario(
     instance.workbook.sheet(0).protect();
     instance.history.clear();
   });
-  open = await openStyleMenu(page, 'Review');
-  for (const action of ['modify', 'delete']) {
-    await expect(open.item(action), action).toBeDisabled();
-    await expect(open.item(action), action).toHaveAttribute(
-      'title',
-      expect.stringContaining(SHEET_PROTECTED_JA),
-    );
+  for (const action of ['delete', 'modify']) {
+    open = await openStyleMenu(page, 'Review');
+    for (const each of ['modify', 'delete', 'duplicate'])
+      await expect(open.item(each), each).toBeEnabled();
+    expect((await open.item(action).getAttribute('title')) ?? '').not.toContain(SHEET_PROTECTED_JA);
+    await open.item(action).click();
+    await page.waitForTimeout(300);
+    await expect(page.getByRole('dialog'), action).toHaveCount(0);
+    await expect(page.locator('.fc-tablestyle-dlg'), action).toHaveCount(0);
+    if (await open.menu.isVisible()) await page.keyboard.press('Escape');
+    await expect(open.menu).toBeHidden();
   }
-  await expect(open.item('duplicate')).toBeEnabled();
-  await open.item('delete').click({ force: true });
-  await page.keyboard.press('Escape');
-  await expect(open.menu).toBeHidden();
 
   expect(await readTableStyles(page)).toEqual(styled);
   await expect(await styleChip(page, 'Review')).toBeVisible();
   expect(
     await page.evaluate(() => (window as unknown as InstanceWindow).__fcInst.history.canUndo),
   ).toBe(false);
+
+  // With the protected sheet's table active, every strip chip is greyed with the reason and a
+  // right-click opens no menu.
+  await sheet.chooseSheet('Sheet1');
+  await sheet.goTo('A2');
+  const chip = await styleChip(page, 'Review');
+  const chips = page.locator('[data-table-quick-style]');
+  expect(await chips.count()).toBeGreaterThan(0);
+  for (const each of await chips.all()) {
+    await expect(each).toBeDisabled();
+    await expect(each).toHaveAttribute('title', expect.stringContaining(SHEET_PROTECTED_JA));
+  }
+  await chip.click({ button: 'right', force: true });
+  await page.waitForTimeout(300);
+  await expect(page.locator('.fc-tb__tablestyle-ctx')).toHaveCount(0);
+  expect(await readTableStyles(page)).toEqual(styled);
   await sheet.expectNoConsoleErrors();
 }
