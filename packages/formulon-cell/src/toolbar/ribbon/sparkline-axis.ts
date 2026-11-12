@@ -39,6 +39,7 @@ export const openSparklineAxisDialog = async (instance: SpreadsheetInstance): Pr
       sameAll: m.axisSameAll,
       customValue: m.customValueLabel,
       invalidRange: m.invalidSource,
+      dateRangeNotLine: m.dateAxisNotLine,
       pickerLabel: instance.i18n.strings.pivotTableDialog.rangePickerSelect,
       ok: m.ok,
       cancel: m.cancel,

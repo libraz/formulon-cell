@@ -153,6 +153,10 @@ export const macZh: MacStrings = {
     axisTitle: '坐标轴',
     customValueLabel: '自定义值:',
     hiddenEmptyMenu: '隐藏的单元格和空单元格',
+    locationNotLine:
+      '位置引用无效，因为单元格没有全部在同一列或行中。请选择全部在单列或单行中的单元格。',
+    dateAxisNotLine:
+      '日期坐标轴引用无效，因为单元格没有全部在同一列或行中。请选择全部在单列或单行中的单元格。',
   },
   slicer: {
     ok: '确定',
@@ -268,6 +272,11 @@ export const macZh: MacStrings = {
           cancel: '取消',
         },
         editDialogsZh.moveCells,
+        {
+          headline: '无法找到您搜索的数据。',
+          message: '如果您确定该数据存在于当前工作表中，请检查您键入的内容并重试。',
+          confirm: '确定',
+        },
       ),
       macAlertsZh,
     ),

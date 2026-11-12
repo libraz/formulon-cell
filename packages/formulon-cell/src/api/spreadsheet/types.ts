@@ -84,8 +84,9 @@ export interface SpreadsheetOptions {
   /** The spell checker Review > Spelling asks; by default a short list of common English typos,
    *  which passes every word of other languages. */
   readonly spelling?: SpellingService;
-  /** AutoCorrect: the replacement list per language, the starting switches and a callback with
-   *  what the user changes. By default the desktop's symbol replacements, such as `(c)` → `©`. */
+  /** AutoCorrect: the replacement lists per language and the switches. By default the desktop's
+   *  symbol replacements, such as `(c)` → `©`. The user's edits update it and emit `update` with
+   *  `source: 'user'`. */
   readonly autoCorrect?: AutoCorrectOptions;
   readonly host?: HostProviders;
   readonly uploadStatus?: StatusBarUploadStatus;
@@ -144,7 +145,7 @@ export interface RecalcEvent {
 export interface UpdateEvent {
   readonly keys: readonly (keyof SpreadsheetPatch)[];
   /** `'api'` for a call to `update`; `'user'` when the user changed an option from the UI: the
-   *  theme, the language or Show All Notes. */
+   *  theme, the language, Show All Notes or AutoCorrect. */
   readonly source: 'api' | 'user';
 }
 

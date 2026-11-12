@@ -191,6 +191,24 @@ describe('Sparkline Axis dialog on the Mac', () => {
     expect(settings()?.maxAxisType).toBe(SparklineAxisType.Individual);
   });
 
+  it('refuses a date range over rows and columns with an alert, keeping the dialog open', async () => {
+    // strman_0008 key 45; when the desktop raises it is unmeasured.
+    await mount('mac');
+    const dlg = await open();
+    choose(radio(dlg, '日付軸'));
+    const dateField = dlg.querySelector<HTMLInputElement>(
+      'input[aria-label="スパークラインのデータ範囲を選んでください:"]',
+    ) as HTMLInputElement;
+    dateField.value = 'A9:C10';
+    ok(dlg)?.click();
+    const alert = document.querySelector('.fc-tb__dlg--alert');
+    expect(alert?.querySelector('.fc-tb__dlg__message')?.textContent).toBe(
+      '日付軸の参照が有効ではありません。すべてのセルが同じ行または列に含まれていません。すべてのセルが 1 つの行または列に含まれるように選択してください。',
+    );
+    expect(document.querySelector('.fc-macsparkaxis')).toBe(dlg);
+    expect(settings()?.dateAxis).toBe(false);
+  });
+
   it('leaves Axis enabled but inert on a protected sheet, with the rest of the tab greyed', async () => {
     await mount('mac');
     setProtectedSheet(sheet.instance.store, 0, true);

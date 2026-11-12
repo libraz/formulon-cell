@@ -156,6 +156,10 @@ export const macDe: MacStrings = {
     axisTitle: 'Achsen',
     customValueLabel: 'Benutzerdefinierter Wert:',
     hiddenEmptyMenu: 'Ausgeblendete und leere Zellen',
+    locationNotLine:
+      'Der Speicherortbezug ist ungültig, weil sich die Zellen nicht alle in der gleichen Spalte oder Zeile befinden. Wählen Sie Zellen aus, die sich alle in einer einzelnen Spalte oder Zeile befinden.',
+    dateAxisNotLine:
+      'Der Datumsachsenbezug ist ungültig, weil sich die Zellen nicht alle in der gleichen Spalte oder Zeile befinden. Wählen Sie Zellen aus, die sich in einer einzelnen Spalte oder Zeile befinden.',
   },
   slicer: {
     ok: 'OK',
@@ -271,6 +275,12 @@ export const macDe: MacStrings = {
           cancel: 'Abbrechen',
         },
         editDialogsDe.moveCells,
+        {
+          headline: 'Es können keine übereinstimmenden Daten gefunden werden.',
+          message:
+            'Überprüfen Sie die Eingabe und versuchen Sie es erneut, wenn Sie sicher sind, dass bestimmte Daten in dem aktuellen Blatt vorhanden sind.',
+          confirm: 'OK',
+        },
       ),
       macAlertsDe,
     ),

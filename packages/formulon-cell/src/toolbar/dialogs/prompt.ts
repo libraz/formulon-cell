@@ -6,6 +6,7 @@ import {
   appendErrorRow,
   appendInputRow,
   createDialogShell,
+  type DialogShell,
   focusAndSelectInput,
   installDialogLifecycle,
   mountDialog,
@@ -40,20 +41,46 @@ export interface NumberPromptOptions {
   panelClasses?: readonly string[];
 }
 
-export interface ConfirmOptions {
+/** The message of a confirm or message dialog. */
+interface AlertText {
+  /** The accessible name; shown as the title bar unless `alert` is set. */
   title: string;
   message: string;
+  /** A bold line above the message. */
+  headline?: string;
+  /** The Mac desktop's compact alert: no title bar and the buttons filling the row. Its app icon
+   *  is left out, being the vendor's. */
+  alert?: boolean;
+}
+
+export interface ConfirmOptions extends AlertText {
   okLabel: string;
   cancelLabel: string;
   destructive?: boolean;
 }
 
-export interface MessageOptions {
+export interface MessageOptions extends AlertText {
   host?: HTMLElement;
-  title: string;
-  message: string;
   okLabel: string;
 }
+
+const appendAlertText = (shell: DialogShell, opts: AlertText): void => {
+  if (opts.alert) {
+    shell.overlay.classList.add('fc-tb__dlg--alert');
+    shell.header.hidden = true;
+  }
+  const doc = shell.body.ownerDocument;
+  if (opts.headline) {
+    const headline = doc.createElement('p');
+    headline.className = 'fc-tb__dlg__headline';
+    headline.textContent = opts.headline;
+    shell.body.appendChild(headline);
+  }
+  const msg = doc.createElement('p');
+  msg.className = 'fc-tb__dlg__message';
+  msg.textContent = opts.message;
+  shell.body.appendChild(msg);
+};
 
 /** Excel 365-styled modal prompt. Returns the entered value, or `null`
  *  when the user cancels. Replaces native `window.prompt`. */
@@ -153,10 +180,7 @@ export const showConfirm = (opts: ConfirmOptions): Promise<boolean> =>
       role: 'alertdialog',
       bodyVariant: 'app',
     });
-    const msg = document.createElement('p');
-    msg.className = 'fc-tb__dlg__message';
-    msg.textContent = opts.message;
-    shell.body.appendChild(msg);
+    appendAlertText(shell, opts);
 
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
       cancelLabel: opts.cancelLabel,
@@ -185,10 +209,7 @@ export const showMessage = (opts: MessageOptions): Promise<void> =>
       role: 'alertdialog',
       bodyVariant: 'app',
     });
-    const msg = document.createElement('p');
-    msg.className = 'fc-tb__dlg__message';
-    msg.textContent = opts.message;
-    shell.body.appendChild(msg);
+    appendAlertText(shell, opts);
 
     const okBtn = appendDialogButton(shell.footer, {
       label: opts.okLabel,

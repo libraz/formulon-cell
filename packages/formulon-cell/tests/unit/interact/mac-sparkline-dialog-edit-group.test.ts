@@ -51,6 +51,28 @@ describe('Edit Sparklines dialog', () => {
     handle.detach();
   });
 
+  it('refuses a location over rows and columns with an alert, keeping the dialog open', () => {
+    // Excel for Mac: OK on a 2 x 2 location raises strman_0008 key 44 and leaves the dialog up.
+    const handle = attachMacSparklineDialog({
+      host,
+      store: createSpreadsheetStore(),
+      getWb: () => workbook,
+      canCommit: () => true,
+    });
+    handle.open({ groupId: 'g', sheet: 0, data: 'A1:B4', location: 'E1:F2' });
+    const ok = document.querySelector<HTMLButtonElement>(
+      '.fc-macsparkdlg .fc-fmtdlg__btn--primary',
+    );
+    expect(ok?.disabled).toBe(false);
+    ok?.click();
+    const alert = document.querySelector('.fc-tb__dlg--alert');
+    expect(alert?.querySelector('.fc-tb__dlg__message')?.textContent).toBe(
+      'Location reference is not valid because the cells are not all in the same column or row. Select cells that are all in a single column or row.',
+    );
+    expect(document.querySelector<HTMLElement>('.fc-macsparkdlg')?.hidden).toBe(false);
+    handle.detach();
+  });
+
   it('applies canCommit to an edit', () => {
     const handle = attachMacSparklineDialog({
       host,

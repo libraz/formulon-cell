@@ -21,5 +21,6 @@ export async function confirmSheetDelete(
     message: t.message,
     okLabel: t.confirm,
     cancelLabel: t.cancel,
+    alert: true,
   });
 }

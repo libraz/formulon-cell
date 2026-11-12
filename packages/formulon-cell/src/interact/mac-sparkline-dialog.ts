@@ -18,6 +18,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SparklineKind, SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
+import { showMessage } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogActions,
@@ -158,7 +159,10 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     });
   };
 
+  // A location OK may take but refuses with an alert, as the desktop does.
+  let refusal: string | null = null;
   const validate = (): boolean => {
+    refusal = null;
     const wb = deps.getWb?.() ?? null;
     const source = resolveSparklineRange(sourceInput.value, currentSheet(), wb);
     if (!source) {
@@ -215,6 +219,13 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       return false;
     }
     if (editing) {
+      if (destination.r0 !== destination.r1 && destination.c0 !== destination.c1) {
+        lastSource = null;
+        lastDestination = null;
+        refusal = strings.mac.sparkline.locationNotLine;
+        setError(null);
+        return false;
+      }
       const parts = splitDataForLocation(source, destination);
       if (!parts) {
         lastSource = null;
@@ -251,7 +262,18 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   };
   const onCancel = (): void => api.close();
   const onOk = (): void => {
-    if (!validate() || !lastSource || !lastDestination) return;
+    if (!validate() || !lastSource || !lastDestination) {
+      if (refusal !== null) {
+        void showMessage({
+          host,
+          title: header.textContent ?? '',
+          message: refusal,
+          okLabel: strings.mac.sparkline.ok,
+          alert: true,
+        });
+      }
+      return;
+    }
     if (editing) {
       const done = replaceSparklineGroupAction(
         {

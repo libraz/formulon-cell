@@ -154,6 +154,10 @@ export const macKo: MacStrings = {
     axisTitle: '축',
     customValueLabel: '사용자 지정 값:',
     hiddenEmptyMenu: '숨겨진 셀/빈 셀',
+    locationNotLine:
+      '셀이 모두 같은 열 또는 행에 있지 않으므로 위치 참조가 잘못되었습니다. 모두 단일 열 또는 행에 있는 셀을 선택하십시오.',
+    dateAxisNotLine:
+      '셀이 모두 같은 열 또는 행에 있지 않으므로 날짜 축 참조가 잘못되었습니다. 모두 단일 열 또는 행에 있는 셀을 선택하십시오.',
   },
   slicer: {
     ok: '확인',
@@ -269,6 +273,11 @@ export const macKo: MacStrings = {
           cancel: '취소',
         },
         editDialogsKo.moveCells,
+        {
+          headline: '검색하려는 데이터를 찾을 수 없습니다.',
+          message: '데이터가 현재 시트에 분명히 있는 경우 입력한 내용을 확인한 후 다시 시도하세요.',
+          confirm: '확인',
+        },
       ),
       macAlertsKo,
     ),

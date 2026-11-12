@@ -15,5 +15,6 @@ export function confirmMoveOverwrite(
     message: mac?.message ?? t.overwriteMessage,
     okLabel: mac?.confirm ?? t.ok,
     cancelLabel: mac?.cancel ?? t.cancel,
+    alert: mac !== null,
   });
 }

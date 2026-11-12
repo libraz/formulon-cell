@@ -10,6 +10,7 @@ import { attachRangePickerButton } from '../../interact/range-picker-control.js'
 import type { SpreadsheetStore } from '../../store/store.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import { appendCheckboxRow } from './form-controls.js';
+import { showMessage } from './prompt.js';
 import {
   appendDialogActions,
   appendErrorRow,
@@ -189,6 +190,8 @@ export interface SparklineAxisDialogText {
   sameAll: string;
   customValue: string;
   invalidRange: string;
+  /** The alert refusing a date range that spans rows and columns. */
+  dateRangeNotLine: string;
   pickerLabel: string;
   ok: string;
   cancel: string;
@@ -389,6 +392,16 @@ export const showSparklineAxisDialog = (
         if (!dateRange) {
           activate('horizontal');
           showInputError(errorRow, dateInput, t.invalidRange);
+          return;
+        }
+        if (dateRange.r0 !== dateRange.r1 && dateRange.c0 !== dateRange.c1) {
+          void showMessage({
+            host: opts.host,
+            title: t.title,
+            message: t.dateRangeNotLine,
+            okLabel: t.ok,
+            alert: true,
+          });
           return;
         }
       }

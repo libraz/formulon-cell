@@ -9,6 +9,14 @@ export interface MacConfirmAlertStrings {
   cancel: string;
 }
 
+/** A one-button notice of the Mac desktop's compact alert panel. */
+export interface MacNoticeAlertStrings {
+  /** The bold line above the message. */
+  headline: string;
+  message: string;
+  confirm: string;
+}
+
 /** Texts of the Mac desktop's compact alert panels. */
 export interface MacAlertStrings {
   /** Before a merge that discards every value but the top-left one. */
@@ -17,6 +25,8 @@ export interface MacAlertStrings {
   deleteSheet: MacConfirmAlertStrings;
   /** Before a drag-move overwrites data. */
   overwriteOnMove: MacConfirmAlertStrings;
+  /** Find Next with nothing found. */
+  findNotFound: MacNoticeAlertStrings;
 }
 
 /** Each locale starts from its shared alert texts and overrides the fields the Excel bundle answers. */
@@ -24,6 +34,7 @@ export const macAlertsFrom = (
   ribbon: RibbonStrings['ribbon'],
   deleteSheet: MacConfirmAlertStrings,
   moveCells: EditDialogsStrings['moveCells'],
+  findNotFound: MacNoticeAlertStrings,
 ): MacAlertStrings => ({
   mergeLoseData: {
     message: ribbon.mergeLoseDataMessage,
@@ -36,6 +47,7 @@ export const macAlertsFrom = (
     confirm: moveCells.ok,
     cancel: moveCells.cancel,
   },
+  findNotFound,
 });
 
 /** Per-alert overrides of the shared texts. */
@@ -49,6 +61,7 @@ export const mergeMacAlerts = (
   mergeLoseData: { ...base.mergeLoseData, ...bundle.mergeLoseData },
   deleteSheet: { ...base.deleteSheet, ...bundle.deleteSheet },
   overwriteOnMove: { ...base.overwriteOnMove, ...bundle.overwriteOnMove },
+  findNotFound: { ...base.findNotFound, ...bundle.findNotFound },
 });
 
 /** English Mac app wording from the Excel bundle. The bundle's delete-sheet sentence names the
@@ -75,6 +88,12 @@ export const macAlertsJa: MacAlertStrings = {
     message: '既にデータがありますが、置き換えますか?',
     confirm: 'OK',
     cancel: 'キャンセル',
+  },
+  findNotFound: {
+    headline: '検索しているデータが見つかりません。',
+    message:
+      '現在のシートにデータが存在する場合は、入力内容を確認して、もう一度やり直してください。',
+    confirm: 'OK',
   },
 };
 
@@ -107,7 +126,7 @@ export const macAlertsKo: MacAlertsBundle = {
   },
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.confirm, deleteSheet.message, deleteSheet.confirm, overwriteOnMove.confirm. */
+/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.confirm, deleteSheet.message, deleteSheet.confirm, overwriteOnMove.confirm, findNotFound.confirm. */
 export const macAlertsTh: MacAlertsBundle = {
   overwriteOnMove: {
     message: 'มีข้อมูลอยู่ที่นี่แล้ว คุณต้องการแทนที่ข้อมูลนั้นหรือไม่',

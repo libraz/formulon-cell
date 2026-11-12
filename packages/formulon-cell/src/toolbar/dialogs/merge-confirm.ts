@@ -27,5 +27,6 @@ export async function confirmMergeLoseData(
     message: mac?.message ?? t.mergeLoseDataMessage,
     okLabel: mac?.confirm ?? t.mergeLoseDataConfirm,
     cancelLabel: mac?.cancel ?? t.mergeLoseDataCancel,
+    alert: mac !== null,
   });
 }

@@ -221,6 +221,10 @@ export interface MacStrings {
     customValueLabel: string;
     /** Edit Data > Hidden & Empty Cells: a submenu trigger, so no ellipsis. */
     hiddenEmptyMenu: string;
+    /** Edit Sparklines refusing a location that spans rows and columns. */
+    locationNotLine: string;
+    /** The Axis dialog refusing a date range that spans rows and columns. */
+    dateAxisNotLine: string;
   };
   slicer: {
     ok: string;

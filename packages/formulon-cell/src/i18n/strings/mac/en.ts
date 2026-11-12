@@ -154,6 +154,10 @@ export const macEn: MacStrings = {
     axisTitle: 'Axes',
     customValueLabel: 'Custom value:',
     hiddenEmptyMenu: 'Hidden & Empty Cells',
+    locationNotLine:
+      'Location reference is not valid because the cells are not all in the same column or row. Select cells that are all in a single column or row.',
+    dateAxisNotLine:
+      'Date axis reference is not valid because the cells are not all in the same column or row. Select cells that are all in a single column or row.',
   },
   slicer: {
     ok: 'OK',
@@ -253,6 +257,12 @@ export const macEn: MacStrings = {
         cancel: 'Cancel',
       },
       editDialogsEn.moveCells,
+      {
+        headline: "Cannot find the data you're searching for.",
+        message:
+          'If you are certain the data exists in the current sheet, check what you typed and try again.',
+        confirm: 'OK',
+      },
     ),
     macAlertsEn,
   ),

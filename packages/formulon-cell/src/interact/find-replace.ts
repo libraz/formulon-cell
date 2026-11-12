@@ -20,6 +20,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { sameAddr } from '../store/direct-format.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
+import { showMessage } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createDialogButton, deferInitialFocus } from './dialog-shell.js';
 import { isNavigationAddrAllowed, navigationPolicyFor } from './navigation-policy.js';
@@ -434,6 +435,17 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     }
     currentMatch = m;
     updateSummary(matches);
+    if (!m && isMac()) {
+      const t = strings.mac.alerts.findNotFound;
+      void showMessage({
+        host,
+        title: t.headline,
+        headline: t.headline,
+        message: t.message,
+        okLabel: t.confirm,
+        alert: true,
+      });
+    }
   };
 
   const doReplace = (): void => {

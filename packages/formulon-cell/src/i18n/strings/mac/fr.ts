@@ -155,6 +155,10 @@ export const macFr: MacStrings = {
     axisTitle: 'Axes',
     customValueLabel: 'Valeur personnalisée :',
     hiddenEmptyMenu: 'Cellules masquées et cellules vides',
+    locationNotLine:
+      'La référence d’emplacement n’est pas valide car les cellules ne se trouvent pas toutes dans la même colonne ou ligne. Sélectionnez des cellules qui se trouvent toutes dans une même colonne ou ligne.',
+    dateAxisNotLine:
+      'La référence de l’axe des dates n’est pas valide car les cellules ne se trouvent pas toutes dans la même colonne ou ligne. Sélectionnez des cellules qui se trouvent toutes dans une même colonne ou ligne.',
   },
   slicer: {
     ok: 'OK',
@@ -270,6 +274,12 @@ export const macFr: MacStrings = {
           cancel: 'Annuler',
         },
         editDialogsFr.moveCells,
+        {
+          headline: 'Impossible de trouver les données que vous recherchez.',
+          message:
+            'Si vous êtes sûr qu’elles sont présentes dans la feuille actuelle, contrôlez ce que vous avez tapé et réessayez.',
+          confirm: 'OK',
+        },
       ),
       macAlertsFr,
     ),

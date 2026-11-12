@@ -152,6 +152,10 @@ export const macJa: MacStrings = {
     axisTitle: '軸',
     customValueLabel: 'ユーザー設定値:',
     hiddenEmptyMenu: '非表示および空白のセル',
+    locationNotLine:
+      '場所の参照が有効ではありません。すべてのセルが同じ行または列に含まれていません。すべてのセルが 1 つの行または列に含まれるように選択してください。',
+    dateAxisNotLine:
+      '日付軸の参照が有効ではありません。すべてのセルが同じ行または列に含まれていません。すべてのセルが 1 つの行または列に含まれるように選択してください。',
   },
   slicer: {
     ok: 'OK',
