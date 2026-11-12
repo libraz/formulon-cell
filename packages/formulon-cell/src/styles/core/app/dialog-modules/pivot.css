@@ -257,6 +257,12 @@
   .fc-pivotdlg--filter .fc-pivotdlg__settings-condition-values {
     grid-column: 1 / -1;
   }
+  .fc-pivotdlg--filter .fc-pivotdlg__settings-grid > .fc-pivotdlg__settings-field {
+    grid-column: 1 / -1;
+  }
+  .fc-pivotdlg--filter .fc-pivotdlg__settings-field[hidden] {
+    display: none;
+  }
   .fc-pivotdlg__settings-check {
     display: flex;
     align-items: center;

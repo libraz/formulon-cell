@@ -11,6 +11,7 @@ import {
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import {
@@ -21,9 +22,9 @@ import {
   pivotFilterConditionToSpec,
   pivotFilterInputFor,
   pivotFilterSpecToCondition,
-  showPivotFilterDialog,
 } from './pivot-field-settings.js';
 import { commitPivotChange } from './pivot-field-settings-dialog-apply.js';
+import { showPivotFilterDialog } from './pivot-filter-dialog.js';
 import {
   createWorkbookObjectsActionButton,
   pivotEditCheck,
@@ -203,7 +204,13 @@ const aggregationOptionsOf = (t: Strings['workbookObjects']) => [
 /** Builds the settings controls of one field. `onFilterDialogClosed` runs after
  *  the filter dialog returns a condition. */
 export function createPivotFieldEditor(
-  ctx: { host: HTMLElement; strings: Strings; wb: WorkbookHandle },
+  ctx: {
+    host: HTMLElement;
+    strings: Strings;
+    wb: WorkbookHandle;
+    /** Data field captions a value or Top 10 filter can score. */
+    dataFields?: readonly string[];
+  },
   model: PivotEditorField,
   initialCondition: PivotFilterConditionState | undefined,
   onFilterDialogClosed: () => void,
@@ -236,6 +243,8 @@ export function createPivotFieldEditor(
   };
   const filterConditionControls = createPivotFilterConditionControls({
     strings: strings.pivotTableDialog,
+    datePeriods: strings.datePeriods,
+    dataFields: ctx.dataFields,
     condition: filterCondition,
     selectClassName: 'fc-objects__input',
     valueClassName: 'fc-objects__input',
@@ -259,6 +268,8 @@ export function createPivotFieldEditor(
       condition: filterCondition,
       okLabel: strings.pageSetup.ok,
       cancelLabel: strings.pageSetup.cancel,
+      dataFields: ctx.dataFields,
+      mac: isMacHost(host),
     }).then((condition) => {
       if (!condition) return;
       syncFilterCondition(condition);
@@ -494,11 +505,15 @@ export function renderPivotEditForm(
     { value: AXIS_NONE, label: t.pivotAreaNone },
   ];
   const filterConditions = pivotEditorFilterConditions(editorModel, pivotFilterInputFor(ctx.wb));
+  const dataFields = definition?.dataFields.map((spec) => spec.name ?? '') ?? [];
   const editors: { editor: PivotFieldEditor; axisSelect: HTMLSelectElement }[] = [];
   for (const model of editorModel.fields) {
     const { index } = model;
-    const editor = createPivotFieldEditor(ctx, model, filterConditions.get(index), () =>
-      ctx.rerender(),
+    const editor = createPivotFieldEditor(
+      { ...ctx, dataFields },
+      model,
+      filterConditions.get(index),
+      () => ctx.rerender(),
     );
     const select = createDialogSelect(
       axisOptions,

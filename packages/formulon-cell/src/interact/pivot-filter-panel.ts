@@ -22,9 +22,9 @@ import {
   pivotFilterConditionToSpec,
   pivotFilterInputFor,
   pivotFilterSpecToCondition,
-  showPivotFilterDialog,
 } from './pivot-field-settings.js';
 import { commitPivotChange, type PivotCommitContext } from './pivot-field-settings-dialog-apply.js';
+import { showPivotFilterDialog } from './pivot-filter-dialog.js';
 
 /**
  * The filter panel a report's drop-down button opens: sort buttons, label and
@@ -43,42 +43,44 @@ export interface PivotFilterPanelContext extends PivotCommitContext {
 type PanelStrings = Strings['workbookObjects']['pivotFilterPanel'];
 type ConditionKey = keyof PanelStrings['conditions'];
 
-/** The desktop's label and value filter lists; null marks a separator. Entries
- *  the engine can express name their condition kind. */
-const LABEL_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind | null] | null)[] = [
+/** The desktop's label and value filter lists; null marks a separator. Every
+ *  entry opens the dialog for its condition kind. */
+const LABEL_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind] | null)[] = [
   null,
-  ['equals', null],
-  ['notEquals', null],
+  ['equals', PivotFilterKind.LabelEqual],
+  ['notEquals', PivotFilterKind.LabelNotEqual],
   null,
   ['beginsWith', PivotFilterKind.LabelBeginsWith],
-  ['notBeginsWith', null],
-  ['endsWith', null],
-  ['notEndsWith', null],
+  ['notBeginsWith', PivotFilterKind.LabelNotBeginsWith],
+  ['endsWith', PivotFilterKind.LabelEndsWith],
+  ['notEndsWith', PivotFilterKind.LabelNotEndsWith],
   null,
   ['contains', PivotFilterKind.LabelContains],
-  ['notContains', null],
+  ['notContains', PivotFilterKind.LabelNotContains],
   null,
-  ['greater', null],
-  ['greaterOrEqual', null],
-  ['less', null],
-  ['lessOrEqual', null],
+  ['greater', PivotFilterKind.LabelGreaterThan],
+  ['greaterOrEqual', PivotFilterKind.LabelGreaterThanOrEqual],
+  ['less', PivotFilterKind.LabelLessThan],
+  ['lessOrEqual', PivotFilterKind.LabelLessThanOrEqual],
   null,
-  ['between', null],
+  ['between', PivotFilterKind.LabelBetween],
+  ['notBetween', PivotFilterKind.LabelNotBetween],
 ];
-const VALUE_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind | null] | null)[] = [
+const VALUE_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind] | null)[] = [
   null,
-  ['equals', null],
-  ['notEquals', null],
+  ['equals', PivotFilterKind.ValueEqual],
+  ['notEquals', PivotFilterKind.ValueNotEqual],
   null,
   ['greater', PivotFilterKind.ValueGreaterThan],
-  ['greaterOrEqual', null],
-  ['less', null],
-  ['lessOrEqual', null],
+  ['greaterOrEqual', PivotFilterKind.ValueGreaterThanOrEqual],
+  ['less', PivotFilterKind.ValueLessThan],
+  ['lessOrEqual', PivotFilterKind.ValueLessThanOrEqual],
   null,
   ['between', PivotFilterKind.ValueBetween],
+  ['notBetween', PivotFilterKind.ValueNotBetween],
   null,
   ['top10', PivotFilterKind.ValueTopCount],
-  ['bottom10', null],
+  ['bottom10', PivotFilterKind.ValueBottomCount],
 ];
 
 const open = new WeakMap<HTMLElement, () => void>();
@@ -208,9 +210,8 @@ export function openPivotFieldFilter(
         option.value = '';
         option.textContent = t.chooseOne;
       } else {
-        option.value = entry[1] === null ? `unsupported:${entry[0]}` : String(entry[1]);
+        option.value = String(entry[1]);
         option.textContent = t.conditions[entry[0]];
-        projectDisabledState(option, entry[1] === null, null);
       }
       s.appendChild(option);
     }
@@ -228,6 +229,8 @@ export function openPivotFieldFilter(
         condition: { kind, value: current?.kind === kind ? current.value : '' },
         okLabel: strings.pageSetup.ok,
         cancelLabel: strings.pageSetup.cancel,
+        dataFields: model.dataFields,
+        mac: true,
       }).then((condition) => {
         if (!condition || !model) return;
         const spec = pivotFilterConditionToSpec(

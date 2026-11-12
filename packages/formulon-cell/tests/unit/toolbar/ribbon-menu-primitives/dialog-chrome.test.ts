@@ -28,6 +28,7 @@ describe('toolbar/ribbon menu primitives', () => {
       'src/interact/filter-dropdown.ts',
       'src/interact/view-toolbar.ts',
       'src/interact/pivot-field-settings.ts',
+      'src/interact/pivot-filter-dialog.ts',
       'src/interact/pivot-table-dialog.ts',
       'src/interact/pivot-table-field-areas.ts',
       'src/interact/workbook-objects-pivot-editor.ts',

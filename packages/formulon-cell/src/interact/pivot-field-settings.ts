@@ -16,20 +16,23 @@ import {
   type PivotShowValuesAs as PivotShowValuesAsValue,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { excelSerialToIsoDate } from '../format/date-serial.js';
+import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
 import type { Strings } from '../i18n/strings.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { createDialogButton } from './dialog-shell.js';
+import { showPivotFilterDialog } from './pivot-filter-dialog.js';
 import {
-  appendDialogActions,
-  appendDialogFrame,
-  createDialogButton,
-  createDialogShell,
-  deferInitialFocus,
-} from './dialog-shell.js';
-import {
+  PIVOT_FILTER_COMPARISONS,
+  PIVOT_FILTER_PERIODS,
   type PivotFilterCategory,
+  type PivotTop10Basis,
+  type PivotTop10Direction,
   pivotFilterCategory,
   pivotFilterOperand,
+  pivotTop10Kind,
+  pivotTop10Parts,
 } from './pivot-filter-kinds.js';
 
 export type PivotAreaKind = 'filters' | 'columns' | 'rows' | 'values';
@@ -117,6 +120,8 @@ export const createPivotAreaSettingsButton = (
 export interface PivotFilterConditionState {
   kind: PivotFilterKind | null;
   value: string;
+  /** The data field a value or Top 10 filter scores; absent for the first. */
+  dataField?: number;
 }
 
 /** How typed operands read: the workbook's input locale and date system. */
@@ -152,6 +157,8 @@ export interface PivotFieldSettingsPanelOptions {
   panelEl: HTMLDivElement;
   active: PivotFieldSettingsActive | null;
   strings: Strings['pivotTableDialog'];
+  /** Relative date period names for the Date Filters list. */
+  datePeriods: Record<DatePeriodKey, string>;
   okLabel?: string;
   cancelLabel?: string;
   fields: readonly PivotSourceField[];
@@ -230,36 +237,36 @@ export const splitFilterConditionRange = (value: string): [string, string] => {
   return [parts[0]?.trim() ?? '', parts[1]?.trim() ?? ''];
 };
 
-/** The kinds each Field Settings filter menu offers, in menu order. */
-const CONDITION_OPTIONS: Record<
-  PivotFilterCategory,
-  readonly [PivotFilterKind, keyof Strings['pivotTableDialog']][]
-> = {
-  label: [
-    [PivotFilterKind.LabelContains, 'filterConditionLabelContains'],
-    [PivotFilterKind.LabelBeginsWith, 'filterConditionLabelBeginsWith'],
-  ],
-  date: [[PivotFilterKind.DateBetween, 'filterConditionDateBetween']],
-  value: [
-    [PivotFilterKind.ValueGreaterThan, 'filterConditionValueGreaterThan'],
-    [PivotFilterKind.ValueBetween, 'filterConditionValueBetween'],
-    [PivotFilterKind.ValueTopCount, 'filterConditionValueTop10'],
-  ],
-};
-
+/** Fills `select` with a category's filter list: a none entry, the desktop's comparisons in
+ *  order, then Top 10 (value) or a separator and the relative periods (date). */
 export const appendFilterConditionOptions = (
   select: HTMLSelectElement,
   category: PivotFilterCategory,
   strings: Strings['pivotTableDialog'],
+  datePeriods: Record<DatePeriodKey, string>,
 ): void => {
+  const dialogs = strings.filterDialogs;
   select.replaceChildren();
   appendDialogSelectOptions(select, [
     { value: '', label: strings.filterConditionNone },
-    ...CONDITION_OPTIONS[category].map(([kind, key]) => ({
+    ...PIVOT_FILTER_COMPARISONS[category].map(([kind, key]) => ({
       value: String(kind),
-      label: strings[key],
+      label: dialogs.operators[key],
     })),
   ]);
+  if (category === 'value') {
+    appendDialogSelectOptions(select, [
+      { value: String(PivotFilterKind.ValueTopCount), label: dialogs.menu.top10 },
+    ]);
+  } else if (category === 'date') {
+    appendDialogSelectOptions(select, [
+      { value: '-', label: '──────────', disabled: true },
+      ...PIVOT_FILTER_PERIODS.map(([kind, key]) => ({
+        value: String(kind),
+        label: datePeriods[key],
+      })),
+    ]);
+  }
 };
 
 const splitFilterDateRange = (value: string): [string, string] => {
@@ -286,9 +293,13 @@ export const pivotFilterConditionToSpec = (
 ): PivotFilterSpec | null => {
   if (!condition || condition.kind === null) return null;
   const { kind } = condition;
+  const scored =
+    condition.dataField !== undefined && condition.dataField > 0
+      ? { dataFieldIndex: condition.dataField }
+      : {};
   const text = condition.value.trim();
   const operand = pivotFilterOperand(kind);
-  if (operand === 'none') return { axis, fieldName, kind };
+  if (operand === 'none') return { axis, fieldName, kind, ...scored };
   if (operand === 'count') {
     const count = Number(text);
     return {
@@ -296,6 +307,7 @@ export const pivotFilterConditionToSpec = (
       fieldName,
       kind,
       value: Number.isFinite(count) && count > 0 ? Math.floor(count) : 10,
+      ...scored,
     };
   }
   if (operand === 'textRange' || operand === 'numberRange' || operand === 'dateRange') {
@@ -305,10 +317,10 @@ export const pivotFilterConditionToSpec = (
     const value = readOperand(lowText, single, input);
     const valueHigh = readOperand(highText, single, input);
     if (value === null || valueHigh === null) return null;
-    return { axis, fieldName, kind, value, valueHigh };
+    return { axis, fieldName, kind, value, valueHigh, ...scored };
   }
   const value = readOperand(text, operand, input);
-  return value === null ? null : { axis, fieldName, kind, value };
+  return value === null ? null : { axis, fieldName, kind, value, ...scored };
 };
 
 /** One engine operand as the text a dialog shows. */
@@ -332,15 +344,27 @@ export const pivotFilterSpecToCondition = (
   const date = operand === 'date' || operand === 'dateRange';
   const date1904 = input.date1904 === true;
   const low = operandText(spec.value, date, date1904);
+  const scored =
+    spec.dataFieldIndex !== undefined && spec.dataFieldIndex > 0
+      ? { dataField: spec.dataFieldIndex }
+      : {};
   if (operand === 'textRange' || operand === 'numberRange' || operand === 'dateRange') {
-    return { kind: spec.kind, value: `${low}..${operandText(spec.valueHigh, date, date1904)}` };
+    return {
+      kind: spec.kind,
+      value: `${low}..${operandText(spec.valueHigh, date, date1904)}`,
+      ...scored,
+    };
   }
-  return { kind: spec.kind, value: low };
+  return { kind: spec.kind, value: low, ...scored };
 };
 
 export interface PivotFilterConditionControlsOptions {
   strings: Strings['pivotTableDialog'];
+  /** Relative date period names for the Date Filters list. */
+  datePeriods: Record<DatePeriodKey, string>;
   condition?: PivotFilterConditionState;
+  /** Data field captions a value or Top 10 filter can score; the index is the data field index. */
+  dataFields?: readonly string[];
   selectClassName: string;
   valueClassName: string;
   valuesContainerClassName: string;
@@ -351,25 +375,24 @@ export interface PivotFilterConditionControlsOptions {
   onUserChange?(): void;
 }
 
-export interface PivotFilterDialogOptions {
-  host: HTMLElement;
-  strings: Strings['pivotTableDialog'];
-  fieldName: string;
-  condition?: PivotFilterConditionState;
-  okLabel: string;
-  cancelLabel: string;
-}
-
 const applyDataset = (element: HTMLElement, dataset?: Record<string, string>): void => {
   for (const [key, value] of Object.entries(dataset ?? {})) element.dataset[key] = value;
 };
 
+const TOP10_OPTION_VALUE = String(PivotFilterKind.ValueTopCount);
+
 export const createPivotFilterConditionControls = (
   options: PivotFilterConditionControlsOptions,
 ): HTMLElement[] => {
-  const { strings: t } = options;
+  const { strings: t, datePeriods } = options;
+  const dialogs = t.filterDialogs;
+  const dataFields = options.dataFields ?? [];
   const condition = options.condition ?? { kind: null, value: '' };
   let currentValue = condition.value;
+  let dataField = condition.dataField ?? 0;
+  const initialTop10 = condition.kind === null ? null : pivotTop10Parts(condition.kind);
+  let top10Direction: PivotTop10Direction = initialTop10?.direction ?? 'top';
+  let top10Basis: PivotTop10Basis = initialTop10?.basis ?? 'items';
   const conditionCategory = createDialogSelect(
     [
       { value: 'label', label: t.filterConditionCategoryLabel },
@@ -383,22 +406,105 @@ export const createPivotFilterConditionControls = (
 
   const conditionSelect = createDialogSelect([], '', { className: options.selectClassName });
   applyDataset(conditionSelect, options.conditionDataset);
-  appendFilterConditionOptions(conditionSelect, conditionCategory.value as PivotFilterCategory, t);
-  const initialKind = condition.kind === null ? '' : String(condition.kind);
+  const fillConditionOptions = (): void =>
+    appendFilterConditionOptions(
+      conditionSelect,
+      conditionCategory.value as PivotFilterCategory,
+      t,
+      datePeriods,
+    );
+  fillConditionOptions();
+  const initialKind =
+    condition.kind === null ? '' : initialTop10 ? TOP10_OPTION_VALUE : String(condition.kind);
   conditionSelect.value = initialKind;
   if (conditionSelect.value !== initialKind) conditionSelect.value = '';
+  const isTop10 = (): boolean => conditionSelect.value === TOP10_OPTION_VALUE;
   const selectedKind = (): PivotFilterKind | null =>
-    conditionSelect.value === '' ? null : (Number(conditionSelect.value) as PivotFilterKind);
+    conditionSelect.value === ''
+      ? null
+      : isTop10()
+        ? pivotTop10Kind(top10Direction, top10Basis)
+        : (Number(conditionSelect.value) as PivotFilterKind);
   const conditionValueControls = document.createElement('div');
   conditionValueControls.className = options.valuesContainerClassName;
   const syncCondition = (value: string): void => {
     currentValue = value;
-    options.onChange({ kind: selectedKind(), value });
+    const kind = selectedKind();
+    const scored = kind !== null && conditionCategory.value === 'value' && dataField > 0;
+    options.onChange({ kind, value, ...(scored ? { dataField } : {}) });
+  };
+  const renderDataFieldRow = (): void => {
+    if (conditionCategory.value !== 'value' || dataFields.length === 0) return;
+    const select = createDialogSelect(
+      dataFields.map((name, index) => ({ value: String(index), label: name })),
+      String(dataField),
+      { className: options.selectClassName },
+    );
+    select.dataset.pivotFilterDataField = 'true';
+    select.addEventListener('change', () => {
+      options.onUserChange?.();
+      dataField = Number(select.value);
+      syncCondition(currentValue);
+    });
+    conditionValueControls.append(options.fieldRow(dialogs.top10.by, select));
+  };
+  const renderTop10Controls = (): void => {
+    const direction = createDialogSelect(
+      [
+        { value: 'top', label: dialogs.top10.top },
+        { value: 'bottom', label: dialogs.top10.bottom },
+      ],
+      top10Direction,
+      { className: options.selectClassName },
+    );
+    direction.dataset.pivotFilterTop10Direction = 'true';
+    const count = document.createElement('input');
+    count.type = 'number';
+    count.min = '1';
+    count.step = '1';
+    count.className = options.valueClassName;
+    count.value = currentValue || '10';
+    count.placeholder = t.filterConditionTopCountPlaceholder;
+    count.dataset.pivotFilterTop10Count = 'true';
+    const basis = createDialogSelect(
+      [
+        { value: 'items', label: dialogs.top10.items },
+        { value: 'percent', label: dialogs.top10.percent },
+        { value: 'sum', label: dialogs.top10.sum },
+      ],
+      top10Basis,
+      { className: options.selectClassName },
+    );
+    basis.dataset.pivotFilterTop10Basis = 'true';
+    direction.addEventListener('change', () => {
+      options.onUserChange?.();
+      top10Direction = direction.value as PivotTop10Direction;
+      syncCondition(count.value);
+    });
+    basis.addEventListener('change', () => {
+      options.onUserChange?.();
+      top10Basis = basis.value as PivotTop10Basis;
+      syncCondition(count.value);
+    });
+    count.addEventListener('input', () => {
+      options.onUserChange?.();
+      syncCondition(count.value);
+    });
+    const group = document.createElement('div');
+    group.append(direction, count, basis);
+    conditionValueControls.append(options.fieldRow(dialogs.top10.show, group));
+    renderDataFieldRow();
+    syncCondition(count.value);
   };
   const renderConditionValueControls = (): void => {
     conditionValueControls.replaceChildren();
+    if (isTop10()) {
+      renderTop10Controls();
+      return;
+    }
     const kind = selectedKind();
     const operand = kind === null ? 'none' : pivotFilterOperand(kind);
+    if (kind !== null) renderDataFieldRow();
     if (operand === 'none') {
       syncCondition('');
       return;
@@ -457,11 +563,7 @@ export const createPivotFilterConditionControls = (
   };
   conditionCategory.addEventListener('change', () => {
     options.onUserChange?.();
-    appendFilterConditionOptions(
-      conditionSelect,
-      conditionCategory.value as PivotFilterCategory,
-      t,
-    );
+    fillConditionOptions();
     conditionSelect.value = '';
     renderConditionValueControls();
   });
@@ -476,68 +578,6 @@ export const createPivotFilterConditionControls = (
     conditionValueControls,
   ];
 };
-
-export const showPivotFilterDialog = (
-  options: PivotFilterDialogOptions,
-): Promise<PivotFilterConditionState | null> =>
-  new Promise<PivotFilterConditionState | null>((resolve) => {
-    const title = options.strings.filterDialogTitle.replace('{field}', options.fieldName);
-    let draft: PivotFilterConditionState = options.condition ?? { kind: null, value: '' };
-    let done = false;
-    const finish = (result: PivotFilterConditionState | null): void => {
-      if (done) return;
-      done = true;
-      shell.dispose();
-      resolve(result);
-    };
-    const shell = createDialogShell({
-      host: options.host,
-      className: 'fc-pivotdlg',
-      ariaLabel: title,
-      onDismiss: () => finish(null),
-    });
-    shell.overlay.classList.add('fc-fmtdlg');
-    shell.overlay.classList.add('fc-pivotdlg--filter');
-    const { body, footer } = appendDialogFrame(shell, {
-      title,
-      panelClasses: ['fc-fmtdlg__panel', 'fc-pivotdlg__panel'],
-      bodyClass: 'fc-fmtdlg__body fc-pivotdlg__body',
-    });
-    const grid = document.createElement('div');
-    grid.className = 'fc-pivotdlg__settings-grid';
-    grid.append(
-      ...createPivotFilterConditionControls({
-        strings: options.strings,
-        condition: draft,
-        selectClassName: 'fc-fmtdlg__select',
-        valueClassName: 'fc-namedlg__input',
-        valuesContainerClassName: 'fc-pivotdlg__settings-condition-values',
-        categoryDataset: { pivotFilterCategory: 'true' },
-        conditionDataset: { pivotFilterCondition: 'true' },
-        fieldRow: settingsFieldRow,
-        onChange: (condition) => {
-          draft = condition;
-        },
-      }),
-    );
-    body.appendChild(grid);
-    const { cancelBtn: cancel, okBtn: ok } = appendDialogActions(footer, {
-      cancelLabel: options.cancelLabel,
-      okLabel: options.okLabel,
-    });
-    shell.on(cancel, 'click', () => finish(null));
-    shell.on(ok, 'click', () => finish(draft));
-    shell.open();
-    deferInitialFocus(shell.overlay, () => {
-      const category = grid.querySelector<HTMLSelectElement>(
-        'select[data-pivot-filter-category="true"]',
-      );
-      const categoryButton =
-        category?.closest('.fc-select')?.querySelector<HTMLButtonElement>('.fc-select__button') ??
-        category;
-      categoryButton?.focus({ preventScroll: true });
-    });
-  });
 
 export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOptions): void => {
   const { panelEl, active, strings: t, fields, controls } = options;
@@ -748,6 +788,8 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
     settingsControls.append(
       ...createPivotFilterConditionControls({
         strings: t,
+        datePeriods: options.datePeriods,
+        dataFields: options.selectedValueFields,
         condition: options.selectedFilterCondition(active.fieldName),
         selectClassName: 'fc-fmtdlg__select',
         valueClassName: 'fc-namedlg__input',
@@ -768,6 +810,8 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
           condition: options.selectedFilterCondition(active.fieldName),
           okLabel: options.okLabel as string,
           cancelLabel: options.cancelLabel as string,
+          dataFields: options.selectedValueFields,
+          mac: isMacHost(options.host as HTMLElement),
         }).then((condition) => {
           if (!condition) return;
           options.setFilterCondition(active.fieldName, condition);

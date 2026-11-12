@@ -343,6 +343,7 @@ const renderFieldSettingsPanel = (
     panelEl,
     active: areas.active,
     strings: ctx.strings.pivotTableDialog,
+    datePeriods: ctx.strings.datePeriods,
     okLabel: ctx.strings.pageSetup.ok,
     cancelLabel: ctx.strings.pageSetup.cancel,
     fields,

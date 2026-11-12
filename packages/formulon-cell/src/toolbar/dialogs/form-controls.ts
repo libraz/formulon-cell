@@ -1,6 +1,10 @@
+import { projectDisabledState } from '../menu-a11y.js';
+
 export interface DialogSelectOption {
   value: string;
   label: string;
+  /** A row that cannot be picked, such as a separator. */
+  disabled?: boolean;
 }
 
 export interface DialogDatalistOption {
@@ -23,6 +27,7 @@ export const appendDialogSelectOptions = (
     const opt = document.createElement('option');
     opt.value = option.value;
     opt.textContent = option.label;
+    if (option.disabled) projectDisabledState(opt, true, null);
     select.appendChild(opt);
   }
 };

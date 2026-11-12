@@ -10,9 +10,13 @@ import {
   createPivotFilterConditionControls,
   pivotFilterConditionToSpec,
   pivotFilterSpecToCondition,
-  showPivotFilterDialog,
   splitFilterConditionRange,
 } from '../../../src/interact/pivot-field-settings.js';
+import { showPivotFilterDialog } from '../../../src/interact/pivot-filter-dialog.js';
+import {
+  PIVOT_FILTER_COMPARISONS,
+  PIVOT_FILTER_PERIODS,
+} from '../../../src/interact/pivot-filter-kinds.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -176,6 +180,7 @@ describe('pivot-field-settings shared filter condition model', () => {
     ]) {
       const controls = createPivotFilterConditionControls({
         strings: en.pivotTableDialog,
+        datePeriods: en.datePeriods,
         condition: { kind, value: kind === PivotFilterKind.ValueTopCount ? '5' : '10..20' },
         selectClassName: 'select',
         valueClassName: 'input',
@@ -204,6 +209,7 @@ describe('pivot-field-settings shared filter condition model', () => {
     for (const kind of [PivotFilterKind.DateBetween]) {
       const controls = createPivotFilterConditionControls({
         strings: en.pivotTableDialog,
+        datePeriods: en.datePeriods,
         condition: {
           kind,
           value: '2026-05-01..2026-05-31',
@@ -237,6 +243,7 @@ describe('pivot-field-settings shared filter condition model', () => {
     const changes: string[] = [];
     const controls = createPivotFilterConditionControls({
       strings: en.pivotTableDialog,
+      datePeriods: en.datePeriods,
       condition: { kind: PivotFilterKind.LabelContains, value: 'East' },
       selectClassName: 'select',
       valueClassName: 'input',
@@ -282,8 +289,7 @@ describe('pivot-field-settings shared filter condition model', () => {
         .map((option) => option.value),
     ).toEqual([
       '',
-      String(PivotFilterKind.ValueGreaterThan),
-      String(PivotFilterKind.ValueBetween),
+      ...PIVOT_FILTER_COMPARISONS.value.map(([kind]) => String(kind)),
       String(PivotFilterKind.ValueTopCount),
     ]);
     expect(
@@ -297,6 +303,7 @@ describe('pivot-field-settings shared filter condition model', () => {
   it('enables engine-backed Excel PivotTable filter operators', () => {
     const controls = createPivotFilterConditionControls({
       strings: en.pivotTableDialog,
+      datePeriods: en.datePeriods,
       condition: { kind: PivotFilterKind.LabelContains, value: 'East' },
       selectClassName: 'select',
       valueClassName: 'input',
@@ -324,7 +331,7 @@ describe('pivot-field-settings shared filter condition model', () => {
       Array.from(condition.options)
         .filter((option) => !option.disabled)
         .map((option) => option.value),
-    ).toEqual(['', String(PivotFilterKind.LabelContains), String(PivotFilterKind.LabelBeginsWith)]);
+    ).toEqual(['', ...PIVOT_FILTER_COMPARISONS.label.map(([kind]) => String(kind))]);
     expect(Array.from(condition.options).filter((option) => option.disabled)).toEqual([]);
 
     category.value = 'date';
@@ -333,11 +340,15 @@ describe('pivot-field-settings shared filter condition model', () => {
       Array.from(condition.options)
         .filter((option) => !option.disabled)
         .map((option) => option.value),
-    ).toEqual(['', String(PivotFilterKind.DateBetween)]);
-    expect(Array.from(condition.options).filter((option) => option.disabled)).toEqual([]);
+    ).toEqual([
+      '',
+      ...PIVOT_FILTER_COMPARISONS.date.map(([kind]) => String(kind)),
+      ...PIVOT_FILTER_PERIODS.map(([kind]) => String(kind)),
+    ]);
+    expect(Array.from(condition.options).filter((option) => option.disabled)).toHaveLength(1);
   });
 
-  it('opens the shared PivotTable filter dialog and returns the selected condition', async () => {
+  it('opens the value filter dialog on the condition kind and returns the edited condition', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const result = showPivotFilterDialog({
@@ -347,32 +358,29 @@ describe('pivot-field-settings shared filter condition model', () => {
       condition: { kind: PivotFilterKind.ValueGreaterThan, value: '100' },
       okLabel: 'OK',
       cancelLabel: 'Cancel',
+      mac: false,
     });
     const dialog = document.body.querySelector<HTMLElement>('.fc-pivotdlg');
-    expect(dialog?.textContent).toContain('PivotTable Filter: Sales');
+    expect(dialog?.textContent).toContain('Value Filter (Sales)');
     expect(dialog?.classList.contains('fc-pivotdlg--filter')).toBe(true);
-    const category = dialog?.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-category="true"]',
+    const operator = dialog?.querySelector<HTMLSelectElement>(
+      'select[data-pivot-filter-operator="true"]',
     );
-    const condition = dialog?.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-condition="true"]',
-    );
-    if (!category || !condition || !dialog) throw new Error('missing dialog controls');
+    if (!operator || !dialog) throw new Error('missing dialog controls');
     await new Promise((resolve) => requestAnimationFrame(resolve));
     expect(document.activeElement).toBe(
-      category.closest('.fc-select')?.querySelector<HTMLButtonElement>('.fc-select__button'),
+      operator.closest('.fc-select')?.querySelector<HTMLButtonElement>('.fc-select__button'),
     );
-    expect(category.value).toBe('value');
-    expect(condition.value).toBe(String(PivotFilterKind.ValueGreaterThan));
-    condition.value = String(PivotFilterKind.ValueBetween);
-    condition.dispatchEvent(new Event('change', { bubbles: true }));
-    const inputs = Array.from(dialog.querySelectorAll<HTMLInputElement>('input[type="number"]'));
-    expect(inputs).toHaveLength(2);
-    if (!inputs[0] || !inputs[1]) throw new Error('missing range inputs');
-    inputs[0].value = '10';
-    inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-    inputs[1].value = '20';
-    inputs[1].dispatchEvent(new Event('input', { bubbles: true }));
+    expect(operator.value).toBe(String(PivotFilterKind.ValueGreaterThan));
+    operator.value = String(PivotFilterKind.ValueBetween);
+    operator.dispatchEvent(new Event('change', { bubbles: true }));
+    const low = dialog.querySelector<HTMLInputElement>('input[data-pivot-filter-value="true"]');
+    const high = dialog.querySelector<HTMLInputElement>(
+      'input[data-pivot-filter-value-high="true"]',
+    );
+    if (!low || !high) throw new Error('missing range inputs');
+    low.value = '10';
+    high.value = '20';
     dialog.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await expect(result).resolves.toEqual({ kind: PivotFilterKind.ValueBetween, value: '10..20' });
     expect(document.body.querySelector('.fc-pivotdlg')).toBeNull();

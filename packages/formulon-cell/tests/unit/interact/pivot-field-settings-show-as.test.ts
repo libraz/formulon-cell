@@ -55,6 +55,7 @@ const setup = () => {
       panelEl,
       active: { kind: 'values', fieldName: 'Sales' },
       strings: en.pivotTableDialog,
+      datePeriods: en.datePeriods,
       fields: FIELDS,
       controls: {
         ...selects,

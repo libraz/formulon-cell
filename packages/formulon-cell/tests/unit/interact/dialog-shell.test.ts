@@ -844,7 +844,7 @@ describe('interact/dialog-shell', () => {
       'src/interact/iterative-dialog.ts',
       'src/interact/hyperlink-dialog.ts',
       'src/interact/fx-dialog.ts',
-      'src/interact/pivot-field-settings.ts',
+      'src/interact/pivot-filter-dialog.ts',
     ]) {
       const source = readFileSync(join(process.cwd(), file), 'utf8');
       expect(source).toContain('appendDialogFrame(');

@@ -69,6 +69,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- PivotTable filters offer every desktop condition: the label and value lists in the filter panel include Not Between and Bottom 10, Field Settings lists every comparison and the relative date periods, and the Label, Value, Date and Top 10 Filter dialogs follow the desktop with Top or Bottom by items, percent or sum and the data field to score.
 - `@libraz/formulon-cell/adapter` also exports what the React and Vue packages share for binding props and deriving values: `SPREADSHEET_OPTION_KEYS`, `optionsFromProps`, `patchFromOptions`, `ribbonHooksKey`, `forwardRibbonHooks`, `isLiveSpreadsheet`, `subscribeToSpreadsheet`, `subscribeToSelection`, `subscribeToLocale` and the `SpreadsheetSubscriber` type.
 - `Workbook.getCalcMode` / `setCalcMode`, `getIterative` / `updateIterative`, `getProfileId` and `listFunctionNames`. Leaving Manual recalculates what the edits made under it left dirty, and a mounted ribbon shows the new mode; `on('change')` reports the `'calc'` part.
 - `Sheet.copy({ insertBefore, newName })` copies a sheet with its cells, formats and objects; `SheetCopyOptions` is exported.

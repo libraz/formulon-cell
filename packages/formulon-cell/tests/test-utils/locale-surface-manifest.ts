@@ -25,6 +25,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'sessionCharts',
   'sessionIllustrations',
   'slicer',
+  'datePeriods',
   'fillSeriesDialog',
   'hyperlinkDialog',
   'commentDialog',
@@ -555,8 +556,8 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'block',
   ),
   shell(
-    'interact.pivotFieldSettings',
-    'interact/pivot-field-settings.ts',
+    'interact.pivotFilterDialog',
+    'interact/pivot-filter-dialog.ts',
     'showPivotFilterDialog',
     'pivotTableDialog',
     'block',

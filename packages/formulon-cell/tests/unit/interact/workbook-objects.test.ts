@@ -974,14 +974,14 @@ describe('attachWorkbookObjectsPanel', () => {
     const dialog = document.body.querySelector<HTMLElement>(
       '.fc-pivotdlg[role="dialog"]:not([hidden])',
     );
-    expect(dialog?.textContent).toContain('PivotTable Filter: Region');
-    const condition = dialog?.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-condition="true"]',
+    expect(dialog?.textContent).toContain('Label Filter (Region)');
+    const operator = dialog?.querySelector<HTMLSelectElement>(
+      'select[data-pivot-filter-operator="true"]',
     );
-    expect(condition?.value).toBe('');
+    expect(operator?.value).toBe(String(PivotFilterKind.LabelEqual));
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
     await Promise.resolve();
-    expect(document.body.textContent).not.toContain('PivotTable Filter: Region');
+    expect(document.body.textContent).not.toContain('Label Filter (Region)');
     handle.detach();
   });
 

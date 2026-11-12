@@ -105,7 +105,12 @@ export function renderPivotFieldListPane(
   let write: (layout: PivotPaneLayout) => void = () => {};
   const editors = editorModel.fields
     .map((model) =>
-      createPivotFieldEditor(ctx, model, filterConditions.get(model.index), () => write(layout)),
+      createPivotFieldEditor(
+        { ...ctx, dataFields: definition?.dataFields.map((spec) => spec.name ?? '') ?? [] },
+        model,
+        filterConditions.get(model.index),
+        () => write(layout),
+      ),
     )
     .sort((a, b) => a.model.index - b.model.index);
   const editorOf = new Map<string, PivotFieldEditor>(

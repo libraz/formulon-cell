@@ -1,4 +1,62 @@
+/** A relative date period, in the order the desktop's Date Filters list them. */
+export type DatePeriodKey =
+  | 'tomorrow'
+  | 'today'
+  | 'yesterday'
+  | 'nextWeek'
+  | 'thisWeek'
+  | 'lastWeek'
+  | 'nextMonth'
+  | 'thisMonth'
+  | 'lastMonth'
+  | 'nextQuarter'
+  | 'thisQuarter'
+  | 'lastQuarter'
+  | 'nextYear'
+  | 'thisYear'
+  | 'lastYear'
+  | 'yearToDate'
+  | 'quarter1'
+  | 'quarter2'
+  | 'quarter3'
+  | 'quarter4'
+  | 'january'
+  | 'february'
+  | 'march'
+  | 'april'
+  | 'may'
+  | 'june'
+  | 'july'
+  | 'august'
+  | 'september'
+  | 'october'
+  | 'november'
+  | 'december';
+
+/** A filter dialog's comparison, as its operator pop-up names it. */
+export type FilterOperatorKey =
+  | 'equal'
+  | 'notEqual'
+  | 'greaterThan'
+  | 'greaterThanOrEqual'
+  | 'lessThan'
+  | 'lessThanOrEqual'
+  | 'beginsWith'
+  | 'notBeginsWith'
+  | 'endsWith'
+  | 'notEndsWith'
+  | 'contains'
+  | 'notContains'
+  | 'between'
+  | 'notBetween'
+  | 'before'
+  | 'after'
+  | 'beforeOrEqual'
+  | 'afterOrEqual';
+
 export interface DataObjectsStrings {
+  /** Relative date periods, shared by every Date Filters list. */
+  datePeriods: Record<DatePeriodKey, string>;
   pivotTableDialog: {
     title: string;
     sourceSection: string;
@@ -39,28 +97,47 @@ export interface DataObjectsStrings {
     filterConditionCategoryDate: string;
     filterCondition: string;
     filterConditionNone: string;
-    filterConditionLabelEquals: string;
-    filterConditionLabelDoesNotEqual: string;
-    filterConditionLabelContains: string;
-    filterConditionLabelBeginsWith: string;
-    filterConditionLabelEndsWith: string;
-    filterConditionLabelDoesNotContain: string;
-    filterConditionLabelDate: string;
-    filterConditionDateBefore: string;
-    filterConditionDateAfter: string;
-    filterConditionDateBetween: string;
-    filterConditionValueGreaterThan: string;
-    filterConditionValueLessThan: string;
-    filterConditionValueEquals: string;
-    filterConditionValueBetween: string;
-    filterConditionValueNotBetween: string;
-    filterConditionValueTop10: string;
     filterConditionValue: string;
     filterConditionTextPlaceholder: string;
     filterConditionNumberPlaceholder: string;
     filterConditionTopCountPlaceholder: string;
     filterConditionLowValue: string;
     filterConditionHighValue: string;
+    /** The desktop's Label, Value, Date and Top 10 filter dialogs. */
+    filterDialogs: {
+      operators: Record<FilterOperatorKey, string>;
+      label: {
+        macTitle: string;
+        title: string;
+        prompt: string;
+        and: string;
+        wildcardOne: string;
+        wildcardMany: string;
+      };
+      value: { macTitle: string; title: string; prompt: string; and: string };
+      date: { macTitle: string; title: string; prompt: string; and: string };
+      top10: {
+        macTitle: string;
+        title: string;
+        show: string;
+        top: string;
+        bottom: string;
+        items: string;
+        percent: string;
+        sum: string;
+        by: string;
+      };
+      menu: {
+        top10: string;
+        notBetween: string;
+        before: string;
+        after: string;
+        allDatesInPeriod: string;
+        labelFilters: string;
+        valueFilters: string;
+        dateFilters: string;
+      };
+    };
     filterItems: string;
     rowField: string;
     columnField: string;
@@ -175,6 +252,7 @@ export interface DataObjectsStrings {
         | 'less'
         | 'lessOrEqual'
         | 'between'
+        | 'notBetween'
         | 'top10'
         | 'bottom10',
         string

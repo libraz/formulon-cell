@@ -629,17 +629,17 @@ describe('attachPivotTableDialog', () => {
 
     const dialog = Array.from(
       document.body.querySelectorAll<HTMLElement>('.fc-pivotdlg[role="dialog"]:not([hidden])'),
-    ).find((el) => el.textContent?.includes('PivotTable Filter: Channel'));
-    expect(dialog?.textContent).toContain('PivotTable Filter: Channel');
-    const condition = dialog?.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-condition="true"]',
+    ).find((el) => el.textContent?.includes('Label Filter (Channel)'));
+    expect(dialog?.textContent).toContain('Label Filter (Channel)');
+    const operator = dialog?.querySelector<HTMLSelectElement>(
+      'select[data-pivot-filter-operator="true"]',
     );
-    expect(condition?.value).toBe('');
+    expect(operator?.value).toBe(String(PivotFilterKind.LabelEqual));
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
     await Promise.resolve();
     expect(
       Array.from(document.body.querySelectorAll<HTMLElement>('.fc-pivotdlg[role="dialog"]')).some(
-        (el) => el.textContent?.includes('PivotTable Filter: Channel'),
+        (el) => el.textContent?.includes('Label Filter (Channel)'),
       ),
     ).toBe(false);
     handle.detach();

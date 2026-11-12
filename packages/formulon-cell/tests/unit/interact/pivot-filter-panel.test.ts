@@ -131,14 +131,17 @@ describe('PivotTable filter panel', () => {
     expect(clearButton()?.disabled).toBe(true);
   });
 
-  it('offers only the conditions the engine can apply', async () => {
+  it('offers every label condition, all enabled', async () => {
     const { ctx } = await setup();
     openPivotFieldFilter(ctx, { sheet: 0, row: 2, col: 0 });
     const byLabel = panel()?.querySelector<HTMLSelectElement>(
       'select[data-pivot-filter-by="label"]',
     );
     const enabled = [...(byLabel?.options ?? [])].filter((o) => !o.disabled).map((o) => o.text);
-    expect(enabled).toEqual(['1 つ選択してください', 'で始まる', 'を含む']);
+    expect(enabled).toHaveLength(1 + 14);
+    expect(
+      [...(byLabel?.options ?? [])].filter((o) => o.disabled).every((o) => /^─+$/.test(o.text)),
+    ).toBe(true);
   });
 
   it('is not offered on a value cell', async () => {
