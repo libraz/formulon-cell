@@ -205,7 +205,10 @@ describe('grid formula painting follows the active language profile', () => {
   });
 
   it('falls back safely for a partial workbook object', () => {
-    const partialWb = { capabilities: {} } as WorkbookHandleType;
+    const partialWb = {
+      capabilities: {},
+      recalcTodaySerial: () => Number.NaN,
+    } as unknown as WorkbookHandleType;
     const formula = '=SUM(A1,$B$2)';
     expect(paintOne({ formula, wb: partialWb, r1c1: true }).texts).toContain(
       formatA1FormulaAsR1C1(formula, { row: 2, col: 2 }),

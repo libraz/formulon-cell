@@ -62,6 +62,7 @@ const makeEngine = (
       return opts.profile;
     }),
     setProfileId: vi.fn(),
+    getPinnedNow: () => null,
   };
   const module = {
     Workbook: { createDefault },

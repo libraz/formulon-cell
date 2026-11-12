@@ -144,6 +144,7 @@ const makeHandle = (overrides: FakeOverrides = {}): WorkbookHandle => {
     sheetCount: 1,
     sheet: () => sheet,
     getDate1904: () => false,
+    getPinnedNow: () => null,
     listPivotCaches: () => [cache(7), cache(9)],
     pivotCache: (cacheId: number) => cache(cacheId),
     addPivotCache: (requestedId: number | null) => cache(requestedId ?? 8),

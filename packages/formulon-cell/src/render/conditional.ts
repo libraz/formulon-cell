@@ -70,6 +70,8 @@ interface ConditionalCacheKey {
   wb: WorkbookHandle | null;
   locale: string;
   profile: ReturnType<WorkbookHandle['spreadsheetProfileId']>;
+  /** The day time-period rules judge by (see `recalcDayNumber`). */
+  today: number;
   bounds: ConditionalVisibleBounds | null;
 }
 
@@ -92,6 +94,7 @@ function sameCacheKey(a: ConditionalCacheKey, b: ConditionalCacheKey): boolean {
     a.wb === b.wb &&
     a.locale === b.locale &&
     a.profile === b.profile &&
+    a.today === b.today &&
     a.bounds?.r0 === b.bounds?.r0 &&
     a.bounds?.c0 === b.bounds?.c0 &&
     a.bounds?.r1 === b.bounds?.r1 &&
@@ -331,6 +334,7 @@ export function evaluateConditional(
     wb,
     locale,
     profile: profileForCache(wb),
+    today: recalcDayNumber(wb, state.ui.date1904 === true),
     bounds: visibleBounds
       ? {
           ...visibleBounds,
@@ -344,7 +348,7 @@ export function evaluateConditional(
       : null,
   };
   if (cache?.key && cache.overlay && sameCacheKey(cache.key, key)) return cache.overlay;
-  const out = overlayFor(state, wb, visibleBounds);
+  const out = overlayFor(state, wb, visibleBounds, key.today);
   if (cache) {
     cache.key = key;
     cache.overlay = out;
@@ -356,6 +360,7 @@ function overlayFor(
   state: State,
   wb: WorkbookHandle | null,
   visibleBounds: ConditionalVisibleBounds | null,
+  today: number,
 ): Map<string, ConditionalCellOverlay> {
   const out = new Map<string, ConditionalCellOverlay>();
   const rules = state.conditional.rules;
@@ -383,7 +388,7 @@ function overlayFor(
     } else if (rule.kind === 'text-contains') {
       paintTextContains(state, rule, ruleOverlay, visibleBounds);
     } else if (rule.kind === 'date-occurring') {
-      paintDateOccurring(state, rule, ruleOverlay, visibleBounds);
+      paintDateOccurring(state, rule, ruleOverlay, visibleBounds, today);
     } else if (rule.kind === 'formula') {
       paintFormula(state, rule, ruleOverlay, wb, visibleBounds);
     } else if (rule.kind === 'duplicates' || rule.kind === 'unique') {
@@ -900,11 +905,21 @@ function monthKey(day: number): number {
   return d.getUTCFullYear() * 12 + d.getUTCMonth();
 }
 
+/** The day number (days since the Unix epoch) time-period rules judge by: the workbook's day of
+ *  its last recalculation, else the local date. */
+function recalcDayNumber(wb: WorkbookHandle | null, date1904: boolean): number {
+  const serial = wb ? wb.recalcTodaySerial() : Number.NaN;
+  const date = Number.isFinite(serial) ? excelSerialToDate(serial, date1904) : null;
+  if (date) return normalizeDate(date);
+  const now = new Date();
+  return Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / DAY_MS);
+}
+
 function datePeriodMatches(
   day: number,
   period: Extract<ConditionalRule, { kind: 'date-occurring' }>['period'],
+  today: number,
 ): boolean {
-  const today = normalizeDate(new Date());
   switch (period) {
     case 'yesterday':
       return day === today - 1;
@@ -936,6 +951,7 @@ function paintDateOccurring(
   rule: Extract<ConditionalRule, { kind: 'date-occurring' }>,
   out: Map<string, ConditionalCellOverlay>,
   visibleBounds: ConditionalVisibleBounds | null,
+  today: number,
 ): void {
   const sheet = state.data.sheetIndex;
   for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
@@ -943,7 +959,7 @@ function paintDateOccurring(
     const cell = state.data.cells.get(key);
     if (!cell) continue;
     const day = cellDateDay(cell.value, state.ui.date1904 === true);
-    if (day === null || !datePeriodMatches(day, rule.period)) continue;
+    if (day === null || !datePeriodMatches(day, rule.period, today)) continue;
     const overlay = out.get(key) ?? {};
     mergeApply(overlay, rule.apply);
     out.set(key, overlay);

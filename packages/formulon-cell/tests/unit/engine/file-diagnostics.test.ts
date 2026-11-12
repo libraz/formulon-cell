@@ -16,7 +16,11 @@ import { buildFileLossReport } from '../../../src/interact/spreadsheet-compatibi
 const makeHandle = (raw: Record<string, unknown>): WorkbookHandle => {
   const Ctor = WorkbookHandle as unknown as new (module: Formulon, wb: Workbook) => WorkbookHandle;
   const module = { getVersion: () => 'test' } as unknown as Formulon;
-  return new Ctor(module, { getCalcMode: () => 0, ...raw } as unknown as Workbook);
+  return new Ctor(module, {
+    getCalcMode: () => 0,
+    getPinnedNow: () => null,
+    ...raw,
+  } as unknown as Workbook);
 };
 
 describe('file loss entries', () => {

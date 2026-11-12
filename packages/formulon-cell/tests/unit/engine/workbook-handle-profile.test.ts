@@ -17,6 +17,7 @@ const makeHandle = async (
   const raw = supportsProfile
     ? {
         getProfileId: () => 'win-365-ja_JP',
+        getPinnedNow: () => null,
         setProfileId: (profileId: string) => {
           setCalls.push(profileId);
         },
@@ -51,6 +52,7 @@ describe('WorkbookHandle spreadsheet profile', () => {
     const raw = {
       getProfileId: () => 'win-365-de_DE',
       setProfileId: () => {},
+      getPinnedNow: () => null,
     };
     const module = {
       getVersion: () => 'test',
@@ -118,6 +120,7 @@ describe('WorkbookHandle spreadsheet profile', () => {
     const raw = {
       getProfileId: () => 'win-365-de_DE',
       setProfileId: () => {},
+      getPinnedNow: () => null,
     };
     const module = {
       getVersion: () => 'test',

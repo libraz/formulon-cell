@@ -217,6 +217,7 @@ describe('integration: native conditional-format formula evaluation', () => {
           conditionalFormulaEvaluation: true,
           spreadsheetProfile: false,
         },
+        recalcTodaySerial: () => Number.NaN,
         evaluateConditionalFormula: () => ({
           status: { ok: false },
           value: { kind: 1, number: 1, boolean: 0, text: '', errorCode: 0 },

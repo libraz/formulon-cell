@@ -1,5 +1,6 @@
 import { type ErrorCode, type FontScheme, WorkbookFormat } from '@libraz/formulon';
 import type { History } from '../commands/history.js';
+import { excelSerialFromParts } from '../format/date-serial.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
 import { CALC_MODE_AUTO_NO_TABLE, CALC_MODE_MANUAL } from './calc-mode.js';
@@ -309,6 +310,26 @@ export class WorkbookHandle {
     this.module = module;
     this.wb = wb;
     this.capabilities = detectCapabilities(module);
+    this.recalcDay = this.currentDay();
+  }
+
+  /** The day the workbook's calculation judges by: the pinned clock when one is set, else the
+   *  local date. Read at each recalculation, so it moves when the values would. */
+  private recalcDay: { readonly year: number; readonly month: number; readonly day: number };
+
+  private currentDay(): { year: number; month: number; day: number } {
+    const pinned = this.isStub ? null : orFallback(null, () => this.wb.getPinnedNow());
+    if (pinned) return { year: pinned.year, month: pinned.month, day: pinned.day };
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+  }
+
+  /** The serial of the day of the last recalculation (see `recalcDay`), the `today` of
+   *  time-period conditional formats. NaN when the date has no serial. */
+  recalcTodaySerial(): number {
+    const date1904 = this.isStub ? false : orFallback(false, () => this.wb.getDate1904());
+    const { year, month, day } = this.recalcDay;
+    return excelSerialFromParts(year, month, day, { date1904 }) ?? Number.NaN;
   }
 
   /** Create a new workbook with the defaults `platform`'s desktop spreadsheet
@@ -1368,6 +1389,7 @@ export class WorkbookHandle {
 
   /** Announce a completed recalc pass and reset the dirty accumulator. */
   private emitRecalc(): void {
+    this.recalcDay = this.currentDay();
     const dirty = this.dirtySinceRecalc;
     this.dirtySinceRecalc = new Set();
     this.emit({ kind: 'recalc', dirty });

@@ -156,6 +156,7 @@ const makeRaw = (
     },
     getCalcMode: () => (options.manual ? 1 : 0),
     getProfileId: () => 'win-365-en_US',
+    getPinnedNow: () => null,
     setCalcMode: () => {},
     cells: () => {
       throw new Error('pivot overlay enumeration is not allowed');

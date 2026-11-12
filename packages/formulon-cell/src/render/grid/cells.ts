@@ -253,6 +253,7 @@ export function paintCells(
       visibleBounds.c0,
       visibleBounds.r1,
       visibleBounds.c1,
+      wb.recalcTodaySerial(),
     );
     for (const [k, v] of engineCf) {
       const merged = { ...(conditional.get(k) ?? {}), ...v };

@@ -22,7 +22,11 @@ const makeHandle = (
     ('getVersion' in module
       ? module
       : { getVersion: () => 'test', ...module }) as unknown as Formulon,
-    raw as unknown as Workbook,
+    // Every engine has a clock; a fake that leaves it out reads as unpinned.
+    new Proxy(raw, {
+      get: (target, key) =>
+        key === 'getPinnedNow' && !(key in target) ? () => null : Reflect.get(target, key),
+    }) as unknown as Workbook,
   );
 
 /** An object whose every method fails with a `FormulonError` naming it. */
