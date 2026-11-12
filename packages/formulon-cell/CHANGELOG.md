@@ -70,6 +70,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- The column filter checklist groups a column's dates by year, month and day, with a checkbox for each year and month, and the kept dates are saved as date-group items that read back into the same checklist.
 - The Mac column filter takes a second comparison joined by And or Or, saved as a two-condition custom filter and read back from the file; Below Average round-trips as Above Average does.
 - The Mac column filter offers date conditions on a column of dates: Equals, Before, After, their or-equal forms and Between take a date typed in the workbook's locale and are saved as comparisons, and the relative periods from Tomorrow to Year to Date, the quarters and the months are saved as dynamic filters, kept through a save.
 - PivotTable filters offer every desktop condition: the label and value lists in the filter panel include Not Between and Bottom 10; for a field holding dates the label list becomes Date Filters, with the date comparisons and the relative periods, and the context menu reads Date Filters; and the Label, Value, Date and Top 10 Filter dialogs follow the desktop with Top or Bottom by items, percent or sum and the data field to score.

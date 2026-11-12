@@ -56,6 +56,43 @@
     font: inherit;
     color: var(--fc-fg, currentColor);
   }
+  /* The date tree: years, then months, then days, each level indented under its parent. */
+  .fc-filter-dropdown__row[data-fc-level="1"] {
+    padding-left: 16px;
+  }
+  .fc-filter-dropdown__row[data-fc-level="2"] {
+    padding-left: 40px;
+  }
+  .fc-filter-dropdown__row--group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .fc-filter-dropdown__row--group > label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .fc-filter-dropdown__disclosure {
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+  }
+  .fc-filter-dropdown__disclosure::before {
+    content: "";
+    display: block;
+    margin: auto;
+    border-block: 4px solid transparent;
+    border-inline-start: 5px solid currentColor;
+    width: 0;
+    height: 0;
+  }
+  .fc-filter-dropdown__disclosure[aria-expanded="true"]::before {
+    transform: rotate(90deg);
+  }
   .fc-filter-dropdown__list {
     max-height: 220px;
     overflow-y: auto;

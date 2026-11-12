@@ -18,6 +18,12 @@ import {
   datePeriodXmlType,
 } from '../commands/date-periods.js';
 import { distinctValues, isFilterComparisonOp, normalizeColorKey } from '../commands/filter.js';
+import {
+  columnDateSerials,
+  dateGroupItemsXml,
+  dateGroupsForVisible,
+  serialInDateGroups,
+} from '../commands/filter-date-groups.js';
 import type { HiddenIndices } from '../store/row-visibility.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type {
@@ -296,6 +302,26 @@ function decodeAffixPattern(
   return text === null ? null : { op, text };
 }
 
+/** A checklist column's kept items, with the column's dated numbers, which the file stores as
+ *  date-group items rather than as values. */
+function checklistVisible(
+  state: State,
+  range: Range,
+  entry: ValueFilterCriteria,
+  locale: string,
+  wb?: WorkbookHandle,
+): { visible: string[]; dates: Map<string, number>; filterBlank: boolean } {
+  const hidden = new Set(entry.hiddenValues.map((value) => filterMatchKey(value, locale)));
+  const visible = distinctValues(state, range, entry.byCol, locale, wb).filter(
+    (value) => !hidden.has(filterMatchKey(value, locale)),
+  );
+  return {
+    visible,
+    dates: columnDateSerials(state, range, entry.byCol),
+    filterBlank: !hidden.has(''),
+  };
+}
+
 function customColumnFromCriteria(
   colId: number,
   condition: NonNullable<ValueFilterCriteria['condition']>,
@@ -502,13 +528,19 @@ export function typedAutoFilterFromState(
       columns.set(colId, customColumnFromCriteria(colId, entry.condition));
       continue;
     }
-    const hidden = new Set(entry.hiddenValues.map((value) => filterMatchKey(value, locale)));
+    const { visible, dates, filterBlank } = checklistVisible(state, range, entry, locale, wb);
     columns.set(colId, {
       ...emptyAutoFilterColumn(colId),
       kind: FILTER_KIND_VALUES,
-      filterBlank: !hidden.has(''),
-      values: distinctValues(state, range, entry.byCol, locale, wb).filter(
-        (value) => value !== '' && !hidden.has(filterMatchKey(value, locale)),
+      filterBlank,
+      values: visible.filter((value) => value !== '' && !dates.has(value)),
+      dateGroups: dateGroupsForVisible(
+        visible.flatMap((value) => {
+          const serial = dates.get(value);
+          return serial === undefined ? [] : [serial];
+        }),
+        dates.values(),
+        state.ui.date1904 === true,
       ),
     });
   }
@@ -624,11 +656,17 @@ function localCriteriaFromTypedFilter(
       unsupportedColumns.add(column.columnOffset);
       continue;
     }
-    if (column.kind === FILTER_KIND_VALUES && column.dateGroups.length === 0) {
+    if (column.kind === FILTER_KIND_VALUES) {
       const visible = new Set(column.values.map((value) => filterMatchKey(value, locale)));
-      const hiddenValues = distinctValues(state, range, byCol, locale, wb).filter((value) =>
-        value === '' ? !column.filterBlank : !visible.has(filterMatchKey(value, locale)),
-      );
+      const dates =
+        column.dateGroups.length > 0 ? columnDateSerials(state, range, byCol) : new Map();
+      const date1904 = state.ui.date1904 === true;
+      const hiddenValues = distinctValues(state, range, byCol, locale, wb).filter((value) => {
+        if (value === '') return !column.filterBlank;
+        const serial = dates.get(value);
+        if (serial !== undefined) return !serialInDateGroups(serial, column.dateGroups, date1904);
+        return !visible.has(filterMatchKey(value, locale));
+      });
       criteria.push({ range, byCol, hiddenValues });
       continue;
     }
@@ -808,10 +846,22 @@ export function autoFilterXmlFromState(
       (value) => !hidden.has(filterMatchKey(value, locale)),
     );
     const includeBlank = visible.includes('');
-    const filters = visible
-      .filter((value) => value !== '')
-      .map((value) => `<filter val="${escapeXml(value)}"/>`)
-      .join('');
+    const dates = columnDateSerials(state, range, entry.byCol);
+    const filters =
+      visible
+        .filter((value) => value !== '' && !dates.has(value))
+        .map((value) => `<filter val="${escapeXml(value)}"/>`)
+        .join('') +
+      dateGroupItemsXml(
+        dateGroupsForVisible(
+          visible.flatMap((value) => {
+            const serial = dates.get(value);
+            return serial === undefined ? [] : [serial];
+          }),
+          dates.values(),
+          state.ui.date1904 === true,
+        ),
+      );
     const blankAttr = includeBlank ? ' blank="1"' : '';
     return [
       `<filterColumn colId="${colId}"><filters${blankAttr}>${filters}</filters></filterColumn>`,

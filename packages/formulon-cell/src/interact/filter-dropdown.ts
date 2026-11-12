@@ -16,10 +16,12 @@ import {
   type ConditionFilterOptions,
   type DistinctFilterFailureReason,
   distinctFilterItemsResult,
+  type FilterValueItem,
   isFilterComparisonOp,
   resetFilterCriteria,
 } from '../commands/filter.js';
 import { filterUseWrite } from '../commands/filter-actions.js';
+import { columnDateSerials } from '../commands/filter-date-groups.js';
 import type { History } from '../commands/history.js';
 import { parseDateTimeInput } from '../commands/input-grammar.js';
 import { sortRangeWithHistory } from '../commands/sort.js';
@@ -27,7 +29,7 @@ import { addrKey } from '../engine/address.js';
 import { createProfileTextSemantics, localeForWorkbook } from '../engine/profile-text-semantics.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { excelSerialToIsoDate } from '../format/date-serial.js';
+import { excelSerialToDateParts, excelSerialToIsoDate } from '../format/date-serial.js';
 import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { sameRange } from '../store/selection-geometry.js';
@@ -564,6 +566,14 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       }
     };
 
+    // A column's dated numbers group by year and month, as on the desktop.
+    const dateSerials = columnDateSerials(state, range, col);
+    const date1904 = state.ui.date1904 === true;
+    const expanded = new Set<string>();
+    const monthFormat = new Intl.DateTimeFormat(activeLocale, { month: 'long', timeZone: 'UTC' });
+    const monthName = (month: number): string =>
+      monthFormat.format(new Date(Date.UTC(2000, month - 1, 1)));
+
     const renderRows = (filter: string): void => {
       list.innerHTML = '';
       const f = filter.toLocaleLowerCase(activeLocale);
@@ -608,11 +618,20 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       allRow.append(allCb, allLabel);
       list.appendChild(allRow);
 
-      for (const item of distinct) {
-        const display = item.key === '' ? (mac ? m.blanks : t.blanks) : item.label;
-        if (f && !display.toLocaleLowerCase(activeLocale).includes(f)) continue;
+      // In the date tree a change re-renders the rows, so the parents' states follow; the focus
+      // returns to the checkbox that changed.
+      const rerender = (focusValue: string): void => {
+        renderRows(search.value);
+        frame(() =>
+          rowCheckboxes()
+            .find((box) => box.value === focusValue)
+            ?.focus({ preventScroll: true }),
+        );
+      };
+      const itemRow = (item: FilterValueItem, display: string, level: number, tree: boolean) => {
         const row = ownerDocument.createElement('label');
         row.className = 'fc-filter-dropdown__row';
+        if (level > 0) row.dataset.fcLevel = String(level);
         const cb = ownerDocument.createElement('input');
         cb.type = 'checkbox';
         cb.value = item.key;
@@ -621,15 +640,91 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         cb.addEventListener('change', () => {
           if (cb.checked) hiddenDelete(item.key);
           else hiddenAdd(item.key);
+          autoApplyIfOn();
+          if (tree) {
+            rerender(item.key);
+            return;
+          }
           // Refresh select-all indeterminate state without rebuilding rows.
           allCb.checked = distinct.every((vv) => !hiddenHas(vv.key));
           allCb.indeterminate = !allCb.checked && distinct.some((vv) => !hiddenHas(vv.key));
-          autoApplyIfOn();
         });
         const text = ownerDocument.createElement('span');
         text.textContent = display;
         row.append(cb, text);
         list.appendChild(row);
+      };
+      // A year or month of the date tree: a disclosure toggle and a checkbox for all its dates.
+      const groupRow = (path: string, label: string, items: FilterValueItem[], level: number) => {
+        const row = ownerDocument.createElement('div');
+        row.className = 'fc-filter-dropdown__row fc-filter-dropdown__row--group';
+        row.dataset.fcLevel = String(level);
+        const isOpen = expanded.has(path);
+        const toggle = createInteractionButton({
+          className: 'fc-filter-dropdown__disclosure',
+          ariaLabel: label,
+        });
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        toggle.dataset.fcDatePath = path;
+        toggle.addEventListener('click', () => {
+          if (expanded.has(path)) expanded.delete(path);
+          else expanded.add(path);
+          renderRows(search.value);
+        });
+        const cb = ownerDocument.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = `group:${path}`;
+        const shown = items.filter((item) => !hiddenHas(item.key)).length;
+        cb.checked = shown === items.length;
+        cb.indeterminate = shown > 0 && shown < items.length;
+        cb.addEventListener('keydown', handleRowKey);
+        cb.addEventListener('change', () => {
+          for (const item of items) {
+            if (cb.checked) hiddenDelete(item.key);
+            else hiddenAdd(item.key);
+          }
+          autoApplyIfOn();
+          rerender(cb.value);
+        });
+        const text = ownerDocument.createElement('span');
+        text.textContent = label;
+        const box = ownerDocument.createElement('label');
+        box.append(cb, text);
+        row.append(toggle, box);
+        list.appendChild(row);
+        return isOpen;
+      };
+
+      const dated = f ? [] : distinct.filter((item) => dateSerials.has(item.key));
+      if (dated.length > 0) {
+        const years = new Map<number, Map<number, { item: FilterValueItem; day: number }[]>>();
+        for (const item of dated) {
+          const parts = excelSerialToDateParts(dateSerials.get(item.key) as number, date1904);
+          if (!parts) continue;
+          const months = years.get(parts.year) ?? new Map();
+          years.set(parts.year, months);
+          const days = months.get(parts.month) ?? [];
+          months.set(parts.month, days);
+          days.push({ item, day: parts.day });
+        }
+        for (const [year, months] of [...years].sort(([a], [b]) => a - b)) {
+          const yearItems = [...months.values()].flat().map(({ item }) => item);
+          if (!groupRow(String(year), String(year), yearItems, 0)) continue;
+          for (const [month, days] of [...months].sort(([a], [b]) => a - b)) {
+            const path = `${year}-${month}`;
+            const items = days.map(({ item }) => item);
+            if (!groupRow(path, monthName(month), items, 1)) continue;
+            for (const { item, day } of [...days].sort((a, b) => a.day - b.day)) {
+              itemRow(item, String(day), 2, true);
+            }
+          }
+        }
+      }
+      for (const item of distinct) {
+        if (dated.includes(item)) continue;
+        const display = item.key === '' ? (mac ? m.blanks : t.blanks) : item.label;
+        if (f && !display.toLocaleLowerCase(activeLocale).includes(f)) continue;
+        itemRow(item, display, 0, dated.length > 0);
       }
     };
     renderRows('');

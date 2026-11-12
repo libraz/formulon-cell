@@ -906,38 +906,6 @@ describe('AutoFilter engine sync', () => {
         iconIndex: 0,
       });
 
-      const importedDateGroups = {
-        ...valuesColumn,
-        columnOffset: 1,
-        kind: 1,
-        values: [],
-        dateGroups: [{ year: 2024, month: 0, day: 0, hour: 0, minute: 0, second: 0, grouping: 0 }],
-      } as AutoFilterColumn;
-      expect(
-        wb.setAutoFilter(0, {
-          range: { firstRow: 0, firstCol: 0, lastRow: 3, lastCol: 1 },
-          columns: [valuesColumn, importedDateGroups],
-          sort: null,
-        }),
-      ).toBe(true);
-      expect(wb.applyAutoFilter(0)).toBe(true);
-      hydrateAutoFilterFromEngine(wb, store, 0);
-      store.setState((state) => ({
-        ...state,
-        ui: {
-          ...state.ui,
-          filterCriteria: [{ range: filterRange, byCol: 0, hiddenValues: [] }],
-        },
-      }));
-      expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
-      expect(
-        wb.getAutoFilter(0)?.columns.find((column) => column.columnOffset === 1),
-      ).toMatchObject({
-        columnOffset: 1,
-        kind: 1,
-        dateGroups: [{ year: 2024, grouping: 0 }],
-      });
-
       const importedButtonFlags = {
         ...valuesColumn,
         columnOffset: 1,
