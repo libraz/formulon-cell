@@ -31,7 +31,12 @@ import { showMoveCopySheetDialog } from '../toolbar/dialogs/move-copy-sheet.js';
 import { showMessage } from '../toolbar/dialogs/prompt.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
 import { showUnhideSheetDialog } from '../toolbar/dialogs/unhide-sheet.js';
-import { onPointerArrive, projectDisabledState } from '../toolbar/menu-a11y.js';
+import {
+  focusMenuItem,
+  handleMenuKeydown,
+  onPointerArrive,
+  projectDisabledState,
+} from '../toolbar/menu-a11y.js';
 import { hiddenSheetIndexes, visibleSheetIndexes } from './sheet-indexes.js';
 import {
   createSheetMenuButton,
@@ -652,7 +657,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       });
     }
     positionSheetMenu(sheetMenu, x, y);
-    sheetMenu.querySelector<HTMLButtonElement>('.fc-sheetmenu__item:not([disabled])')?.focus();
+    focusMenuItem(sheetMenu, 'first', '[role^="menuitem"]');
   };
 
   const refreshNav = (): void => {
@@ -781,36 +786,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       }
       return;
     }
-    const items = Array.from(sheetMenu.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'));
-    const enabled = items.filter((item) => !item.disabled);
-    const active =
-      document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
-    const activeIndex = active ? enabled.indexOf(active) : -1;
-    const focusAt = (idx: number): void => {
-      if (enabled.length === 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      enabled[(idx + enabled.length) % enabled.length]?.focus();
-    };
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      closeMenu(true);
-    } else if (e.key === 'ArrowDown') {
-      focusAt(activeIndex < 0 ? 0 : activeIndex + 1);
-    } else if (e.key === 'ArrowUp') {
-      focusAt(activeIndex < 0 ? enabled.length - 1 : activeIndex - 1);
-    } else if (e.key === 'Home') {
-      focusAt(0);
-    } else if (e.key === 'End') {
-      focusAt(enabled.length - 1);
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      if (active && sheetMenu.contains(active) && !active.disabled) {
-        e.preventDefault();
-        e.stopPropagation();
-        active.click();
-      }
-    }
+    handleMenuKeydown(e, sheetMenu, { close: closeMenu, items: '[role^="menuitem"]' });
   };
 
   firstSheet.addEventListener('click', firstSheetRepeater.onClick);

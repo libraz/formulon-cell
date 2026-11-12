@@ -99,6 +99,7 @@ const mount = (state: FakeWbState, opts?: { initialIndex?: number }): Harness =>
   const sheetTabs = document.createElement('div');
   const sheetMenu = document.createElement('div');
   sheetMenu.hidden = true;
+  sheetMenu.setAttribute('role', 'menu');
   host.append(firstSheet, lastSheet, addSheetBtn, sheetTabs, sheetMenu);
 
   const store = createSpreadsheetStore();

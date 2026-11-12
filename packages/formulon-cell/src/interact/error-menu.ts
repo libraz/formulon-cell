@@ -5,7 +5,7 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
@@ -51,7 +51,6 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
 
   let visible = false;
   let detachOutside: (() => void) | null = null;
-  let activeIndex = -1;
   let restoreFocusEl: HTMLElement | null = null;
 
   const close = (restoreFocus = false): void => {
@@ -59,7 +58,6 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     visible = false;
     root.style.display = 'none';
     root.replaceChildren();
-    activeIndex = -1;
     const focusTarget = restoreFocusEl;
     restoreFocusEl = null;
     detachOutside?.();
@@ -71,42 +69,9 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     }
   };
 
-  const menuItems = (): HTMLButtonElement[] =>
-    Array.from(root.querySelectorAll<HTMLButtonElement>('.fc-errmenu__item')).filter(
-      (btn) => !btn.disabled,
-    );
-
-  const focusMenuItem = (idx: number): void => {
-    const items = menuItems();
-    if (items.length === 0) return;
-    activeIndex = (idx + items.length) % items.length;
-    items[activeIndex]?.focus({ preventScroll: true });
-  };
-
   const onDocKey = (e: KeyboardEvent): void => {
     if (!visible) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      close(true);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      focusMenuItem(activeIndex + 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      focusMenuItem(activeIndex - 1);
-    } else if (e.key === 'Home') {
-      e.preventDefault();
-      focusMenuItem(0);
-    } else if (e.key === 'End') {
-      e.preventDefault();
-      focusMenuItem(menuItems().length - 1);
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      const target = document.activeElement;
-      if (target instanceof HTMLButtonElement && root.contains(target)) {
-        e.preventDefault();
-        target.click();
-      }
-    }
+    handleMenuKeydown(e, root, { close, items: '.fc-errmenu__item' });
   };
 
   const onScroll = (): void => close(false);
@@ -288,7 +253,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
       );
       document.addEventListener('keydown', onDocKey, true);
       window.addEventListener('scroll', onScroll, true);
-      focusMenuItem(0);
+      focusMenuItem(root, 'first', '.fc-errmenu__item');
     },
     close,
     detach(): void {

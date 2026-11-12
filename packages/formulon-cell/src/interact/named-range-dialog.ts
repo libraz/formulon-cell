@@ -18,7 +18,7 @@ import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
 import {
   type DialogEntry,
@@ -633,30 +633,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   function onFilterDocKey(e: KeyboardEvent): void {
     if (!filterMenu) return;
-    const items = Array.from(filterMenu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
-    const active =
-      document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
-    const idx = active ? items.indexOf(active) : -1;
-    const focusAt = (next: number): void => {
-      e.preventDefault();
-      e.stopPropagation();
-      const wrapped = (next + items.length) % items.length;
-      items[wrapped]?.focus();
-    };
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      closeFilterMenu();
-      filterBtn.focus();
-    } else if (e.key === 'ArrowDown') {
-      focusAt(idx < 0 ? 0 : idx + 1);
-    } else if (e.key === 'ArrowUp') {
-      focusAt(idx < 0 ? items.length - 1 : idx - 1);
-    } else if (e.key === 'Home') {
-      focusAt(0);
-    } else if (e.key === 'End') {
-      focusAt(items.length - 1);
-    }
+    handleMenuKeydown(e, filterMenu, {
+      close: closeFilterMenu,
+      restoreFocusTo: filterBtn,
+      items: '[role="menuitem"]',
+    });
   }
 
   const openFilterMenu = (): void => {

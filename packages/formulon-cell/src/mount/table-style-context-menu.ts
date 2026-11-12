@@ -7,7 +7,7 @@ import {
   type TableStyleKind,
 } from '../commands/table-style-actions.js';
 import { onOutsidePress } from '../interact/outside-press.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { menuSeparator, menuTextChip } from '../toolbar/ribbon/menus/general.js';
 import type { SpreadsheetInstance } from './types.js';
 
@@ -47,17 +47,7 @@ export function attachTableStyleContextMenu(
   };
   const onKey = (event: KeyboardEvent): void => {
     if (!open) return;
-    const items = [...open.menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
-    const at = items.indexOf(document.activeElement as HTMLButtonElement);
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      close(true);
-    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      const step = event.key === 'ArrowDown' ? 1 : -1;
-      items[(at + step + items.length) % items.length]?.focus();
-    }
+    handleMenuKeydown(event, open.menu, { close });
   };
 
   const run = (
@@ -172,7 +162,7 @@ export function attachTableStyleContextMenu(
       { event: 'pointerdown' },
     );
     document.addEventListener('keydown', onKey, true);
-    menu.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+    focusMenuItem(menu, 'first');
   };
 
   host.addEventListener('contextmenu', onContextMenu, true);

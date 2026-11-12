@@ -116,13 +116,13 @@ export function focusMenuItem(
   const items = menuItems(menu, selector);
   if (items.length === 0) {
     menu.tabIndex = -1;
-    menu.focus();
+    menu.focus({ preventScroll: true });
     return;
   }
   const numericIndex = index === 'first' ? 0 : index === 'last' ? items.length - 1 : index;
   const next = Math.max(0, Math.min(numericIndex, items.length - 1));
   for (const [idx, item] of items.entries()) item.tabIndex = idx === next ? 0 : -1;
-  items[next]?.focus();
+  items[next]?.focus({ preventScroll: true });
 }
 
 export function handleMenuKeydown(
@@ -157,8 +157,9 @@ export function handleMenuKeydown(
   } else if (event.key === 'End') {
     move(items.length - 1);
   } else if (event.key === 'Enter' || event.key === ' ') {
+    // As in a native menu, Return with no highlighted item does nothing.
     event.preventDefault();
     event.stopPropagation();
-    (idx >= 0 ? items[idx] : items[0])?.click();
+    if (idx >= 0) items[idx]?.click();
   }
 }

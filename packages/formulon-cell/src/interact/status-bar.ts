@@ -38,7 +38,7 @@ import {
   type WorkbookViewMode,
 } from '../store/store.js';
 import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
@@ -735,20 +735,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   overlayPortalFor(statusbar).appendChild(popover);
 
   let popoverVisible = false;
-  let popoverActiveIndex = -1;
   let restoreFocusEl: HTMLElement | null = null;
-
-  const chooserItems = (): HTMLButtonElement[] =>
-    Array.from(popover.querySelectorAll<HTMLButtonElement>('.fc-statusbar__chooser-item')).filter(
-      (btn) => !btn.disabled,
-    );
-
-  const focusChooserItem = (idx: number): void => {
-    const items = chooserItems();
-    if (items.length === 0) return;
-    popoverActiveIndex = (idx + items.length) % items.length;
-    items[popoverActiveIndex]?.focus();
-  };
 
   const buildChooser = (): void => {
     popover.replaceChildren();
@@ -831,13 +818,12 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     popover.style.top = '-9999px';
     popoverVisible = true;
     placeChooser(clientX, clientY);
-    focusChooserItem(0);
+    focusMenuItem(popover, 'first', '.fc-statusbar__chooser-item');
   };
 
   const hideChooser = (restoreFocus = false): void => {
     if (!popoverVisible) return;
     popoverVisible = false;
-    popoverActiveIndex = -1;
     popover.style.display = 'none';
     const focusTarget = restoreFocusEl;
     restoreFocusEl = null;
@@ -893,34 +879,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       hideChooser(false);
       return;
     }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      hideChooser(true);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      e.stopPropagation();
-      focusChooserItem(popoverActiveIndex + 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      e.stopPropagation();
-      focusChooserItem(popoverActiveIndex - 1);
-    } else if (e.key === 'Home') {
-      e.preventDefault();
-      e.stopPropagation();
-      focusChooserItem(0);
-    } else if (e.key === 'End') {
-      e.preventDefault();
-      e.stopPropagation();
-      focusChooserItem(chooserItems().length - 1);
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      const target = document.activeElement;
-      if (target instanceof HTMLButtonElement && popover.contains(target)) {
-        e.preventDefault();
-        e.stopPropagation();
-        target.click();
-      }
-    }
+    handleMenuKeydown(e, popover, { close: hideChooser, items: '.fc-statusbar__chooser-item' });
   };
 
   statusbar.addEventListener('contextmenu', onContextMenu);

@@ -116,6 +116,7 @@ versioning is [SemVer](https://semver.org/).
 - The Mac Sort dialog's Add Level and Delete Level buttons no longer overlap each other or Copy Level.
 - A source or destination on a sheet named like a cell reference or a number (`A1`, `R1C1`, `2024`) is quoted in the Mac Subtotal, Consolidate and Move PivotTable dialogs, as in a formula.
 - Context menus and their submenus, the filter and PivotTable field dropdowns, the Paste Options and Auto Fill Options buttons, the sheet tab menus, the formula helper and the other popovers sit on whole pixels, as the ribbon menus and tips already did, so their text no longer blurs.
+- Menus follow native menu keys throughout: Return or Space with no item highlighted does nothing rather than choosing the first item; moving through a menu never scrolls the page; Home and End work in the sheet tab, table style, status bar and error indicator menus; and the keys a menu takes no longer reach the grid. The Name Manager filter menu chooses its highlighted item on Return.
 - Sparklines over all-equal values draw the line along the top and the columns at full height; a line over a single value draws nothing; a line on a date axis joins its points in date order.
 
 ### Removed
