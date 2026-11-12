@@ -1032,6 +1032,15 @@ export function mountToolbar(
   const onDoubleClick = (e: MouseEvent): void => {
     const target = e.target;
     if (!(target instanceof Element)) return;
+    const painter = target.closest<HTMLButtonElement>('[data-ribbon-command="formatPainter"]');
+    if (painter) {
+      if (painter.disabled || isAriaDisabled(painter)) return;
+      // A double-click keeps the painter on for repeated pastes until it is clicked again.
+      e.preventDefault();
+      getInstance()?.formatPainter?.activate(true);
+      projectFormatToolbar();
+      return;
+    }
     const tabBtn = target.closest<HTMLButtonElement>('[data-ribbon-tab]');
     if (!tabBtn) return;
     if (tabBtn.dataset.ribbonTab === 'file') return;
