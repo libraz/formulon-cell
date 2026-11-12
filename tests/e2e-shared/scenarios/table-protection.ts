@@ -130,3 +130,126 @@ export async function runProtectedSheetTableScenario(
   expect(await readTables(page)).toHaveLength(1);
   await sheet.expectNoConsoleErrors();
 }
+
+const SHEET_PROTECTED_JA =
+  '変更しようとしているセルやグラフは保護されているシート上にあります。変更するには、シートの保護を解除してください。パスワードの入力が必要な場合もあります。';
+
+/** Each sheet's table and the style it uses, sheet by sheet. */
+const readTableStyles = (page: Page) =>
+  page.evaluate(() => {
+    const workbook = (window as unknown as InstanceWindow).__fcInst.workbook;
+    return [0, 1].map((index) =>
+      workbook
+        .sheet(index)
+        .listTables()
+        .map((table) => [table.name, table.getStyleOptions()?.styleName ?? null]),
+    );
+  });
+
+/** The active table's Table Design strip chip for the style labelled `label`. */
+const styleChip = async (page: Page, label: string) => {
+  await selectRibbonTab(page, 'tableDesign');
+  const chip = page.locator(`[data-table-quick-style][aria-label="${label}"]`).first();
+  await revealRibbonCommand(chip);
+  return chip;
+};
+
+/** Opens the active table's Quick Styles gallery. */
+const openQuickStyles = async (page: Page) => {
+  await selectRibbonTab(page, 'tableDesign');
+  const quickStyles = page.locator('[data-ribbon-command="tableQuickStyles"]').first();
+  await revealRibbonCommand(quickStyles);
+  await quickStyles.click();
+  const gallery = page.locator('#menu-table-quick-styles');
+  await expect(gallery).toBeVisible();
+  return gallery;
+};
+
+/** Right-clicks the style's chip and returns its context menu. */
+const openStyleMenu = async (page: Page, label: string) => {
+  await (await styleChip(page, label)).click({ button: 'right' });
+  const menu = page.locator('.fc-tb__tablestyle-ctx');
+  await expect(menu).toBeVisible();
+  return {
+    menu,
+    item: (action: string) => menu.locator(`[data-table-style-context="${action}"]`),
+  };
+};
+
+/** A custom table style cannot be modified or deleted while a table using it sits on a protected
+ *  sheet, even from another, unprotected sheet: its strip menu greys Modify... and Delete with the
+ *  protection reason, Duplicate stays available, and the style and its tables stay as they are. */
+export async function runProtectedSheetCustomStyleScenario(
+  page: Page,
+  platform: 'default' | 'mac',
+): Promise<void> {
+  const sheet = new UserJourneyPage(page);
+  await sheet.mount({ locale: 'ja', platform });
+  await sheet.expectNoStub();
+  await sheet.seed({ A1: 'Item', B1: 'Qty', A2: 'Pen', B2: 3, A3: 'Ink', B3: 5 });
+  await page.evaluate(() => {
+    const instance = (window as unknown as InstanceWindow).__fcInst;
+    const workbook = instance.workbook;
+    workbook.sheet(0).addTable({ range: 'A1:B3', name: 'Sales' });
+    const second = workbook.addSheet('Notes');
+    workbook.batch(() => {
+      second.setText(0, 0, 'Code');
+      second.setText(0, 1, 'Count');
+      second.setText(1, 0, 'X1');
+      second.setNumber(1, 1, 7);
+    });
+    second.addTable({ range: 'A1:B2', name: 'Codes' });
+    instance.history.clear();
+  });
+
+  // A custom style made through New Table Style, then applied to both tables from the gallery.
+  await sheet.goTo('A2');
+  await (await openQuickStyles(page))
+    .locator('[data-table-style-footer="new-table-style"]')
+    .click();
+  const dialog = page.locator('.fc-tablestyle-dlg');
+  await expect(dialog).toBeVisible();
+  await dialog.locator('[data-dialog-field="name"]').fill('Review');
+  await dialog.locator('.fc-fmtdlg__btn--primary').click();
+  await expect(dialog).toBeHidden();
+  const applyReview = async () =>
+    (await openQuickStyles(page)).locator('[data-table-style][aria-label="Review"]').click();
+  await applyReview();
+  await sheet.chooseSheet('Notes');
+  await sheet.goTo('A2');
+  await applyReview();
+  const styled = [[['Sales', 'Review']], [['Codes', 'Review']]];
+  await expect.poll(() => readTableStyles(page)).toEqual(styled);
+
+  // Control: with no sheet protected, Modify... and Delete are available.
+  let open = await openStyleMenu(page, 'Review');
+  await expect(open.item('modify')).toBeEnabled();
+  await expect(open.item('delete')).toBeEnabled();
+  await page.keyboard.press('Escape');
+  await expect(open.menu).toBeHidden();
+
+  await page.evaluate(() => {
+    const instance = (window as unknown as InstanceWindow).__fcInst;
+    instance.workbook.sheet(0).protect();
+    instance.history.clear();
+  });
+  open = await openStyleMenu(page, 'Review');
+  for (const action of ['modify', 'delete']) {
+    await expect(open.item(action), action).toBeDisabled();
+    await expect(open.item(action), action).toHaveAttribute(
+      'title',
+      expect.stringContaining(SHEET_PROTECTED_JA),
+    );
+  }
+  await expect(open.item('duplicate')).toBeEnabled();
+  await open.item('delete').click({ force: true });
+  await page.keyboard.press('Escape');
+  await expect(open.menu).toBeHidden();
+
+  expect(await readTableStyles(page)).toEqual(styled);
+  await expect(await styleChip(page, 'Review')).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as unknown as InstanceWindow).__fcInst.history.canUndo),
+  ).toBe(false);
+  await sheet.expectNoConsoleErrors();
+}
