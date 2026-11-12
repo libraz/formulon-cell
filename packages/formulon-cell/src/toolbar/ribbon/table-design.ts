@@ -10,6 +10,7 @@ import type { SpreadsheetInstance } from '../../mount/types.js';
 import { showMessage } from '../dialogs/prompt.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import type { RibbonCommand, ToolbarText } from '../ribbon-model.js';
+import { projectPressedState } from './button.js';
 
 export interface TableNameInputCtx {
   getInst: () => SpreadsheetInstance | null;
@@ -116,8 +117,7 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
       option === 'filterButton'
         ? !!table && table.filterButton !== false
         : table?.[option] === true;
-    button.classList.toggle('fc-tb__rb--active', pressed);
-    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    projectPressedState(button, pressed);
     // Leave other disabled reasons (policy, protection) alone when the table is engine-backed.
     if (sessionOnly) {
       projectDisabledState(button, true, reason);
@@ -142,8 +142,7 @@ export const projectPivotDesign = (host: HTMLElement, instance: SpreadsheetInsta
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
     if (!button) continue;
     const pressed = info ? info[key] : DEFAULT_PIVOT_TOGGLES[key];
-    button.classList.toggle('fc-tb__rb--active', pressed);
-    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    projectPressedState(button, pressed);
   }
   host
     .querySelector('[data-ribbon-gallery="pivotQuickStyles"]')

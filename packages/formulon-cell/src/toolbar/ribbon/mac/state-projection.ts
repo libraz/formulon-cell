@@ -14,6 +14,7 @@ import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { rangeValidationsIntersect } from '../../../store/range-validations.js';
 import { projectDisabledState } from '../../menu-a11y.js';
 import { indexRibbonButtons, projectActiveState } from '../../ribbon-active-state.js';
+import { projectPressedState } from '../button.js';
 import { EMBEDDED_UNSUPPORTED, macRibbonLabelForCommand } from './labels.js';
 import { MAC_CONTEXT_LABELS } from './labels-data.js';
 import { toolbarLangForLocale } from './locale.js';
@@ -303,8 +304,7 @@ export const projectMacRibbonState = (
   };
   for (const [command, pressed] of Object.entries({ ...drawingStates, ...toggleStates })) {
     for (const button of buttons.get(command) ?? []) {
-      button.classList.toggle('fc-tb__rb--active', pressed);
-      button.setAttribute('aria-pressed', String(pressed));
+      projectPressedState(button, pressed);
     }
   }
 
@@ -323,8 +323,7 @@ export const projectMacRibbonState = (
       pressed = active.workbookView === view;
     }
     for (const button of buttons.get(command) ?? []) {
-      button.classList.toggle('fc-tb__rb--active', pressed);
-      button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+      projectPressedState(button, pressed);
     }
   }
 

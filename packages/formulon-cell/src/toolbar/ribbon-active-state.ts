@@ -21,6 +21,7 @@ import type {
   WorkbookViewMode,
 } from '../store/types.js';
 import { projectDisabledState } from './menu-a11y.js';
+import { projectPressedState } from './ribbon/button.js';
 import { projectSparklineDesign } from './ribbon/sparkline-design.js';
 import { projectPivotDesign, projectTableDesign } from './ribbon/table-design.js';
 
@@ -521,8 +522,7 @@ export const projectRibbonActiveState = (
     else if (command === 'viewPageLayout') pressed = active.workbookView === 'pageLayout';
     else if (command === 'viewPageBreakPreview')
       pressed = active.workbookView === 'pageBreakPreview';
-    button.classList.toggle('fc-tb__rb--active', pressed);
-    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    projectPressedState(button, pressed);
   }
 
   const sheetBackground = host.querySelector<HTMLButtonElement>(

@@ -40,3 +40,9 @@ export const createRibbonButton = (opts: RibbonButtonOptions): HTMLButtonElement
   }
   return button;
 };
+
+/** Shows a ribbon toggle as pressed or released, both visually and to assistive technology. */
+export const projectPressedState = (button: HTMLElement, pressed: boolean): void => {
+  button.classList.toggle('fc-tb__rb--active', pressed);
+  button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+};

@@ -9,6 +9,7 @@ import {
 } from '../../commands/sparkline-design.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectDisabledState } from '../menu-a11y.js';
+import { projectPressedState } from './button.js';
 import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
 
 /** The Axis menu and the Mac Axis dialog stay enabled on a protected sheet, their controls inert. */
@@ -42,8 +43,7 @@ export const projectSparklineDesign = (host: HTMLElement, instance: SpreadsheetI
     if (type !== undefined || flag !== undefined) {
       const pressed =
         type !== undefined ? settings?.type === type : !!flag && settings?.[flag] === true;
-      button.classList.toggle('fc-tb__rb--active', pressed);
-      button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+      projectPressedState(button, pressed);
     }
     const locked = !AXIS_COMMANDS.has(id) && protectedSheet;
     const disabled =
