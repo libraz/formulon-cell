@@ -1,5 +1,6 @@
 import { test } from '@playwright/test';
 import { runMacAutoFilterDateScenario } from '../../../tests/e2e-shared/scenarios/autofilter-date-conditions.js';
+import { runMacAutoFilterOrPairScenario } from '../../../tests/e2e-shared/scenarios/autofilter-two-conditions.js';
 import {
   runFilterShortcutScenario,
   runProtectedSheetFilterAndBackgroundScenario,
@@ -25,3 +26,7 @@ for (const locale of ['en', 'de', 'ja'] as const) {
     await runMacAutoFilterDateScenario(page, locale);
   });
 }
+
+test('Mac column filter joins a second comparison with Or', async ({ page }) => {
+  await runMacAutoFilterOrPairScenario(page);
+});
