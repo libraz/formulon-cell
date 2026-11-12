@@ -1,4 +1,5 @@
 import { test } from '@playwright/test';
+import { runMacAutoFilterByColorScenario } from '../../../tests/e2e-shared/scenarios/autofilter-by-color.js';
 import { runMacAutoFilterDateScenario } from '../../../tests/e2e-shared/scenarios/autofilter-date-conditions.js';
 import { runAutoFilterDateTreeScenario } from '../../../tests/e2e-shared/scenarios/autofilter-date-tree.js';
 import { runMacAutoFilterOrPairScenario } from '../../../tests/e2e-shared/scenarios/autofilter-two-conditions.js';
@@ -39,3 +40,7 @@ for (const platform of ['default', 'mac'] as const) {
     await runAutoFilterDateTreeScenario(page, platform);
   });
 }
+
+test('Mac column filter By color keeps only the rows with the picked fill', async ({ page }) => {
+  await runMacAutoFilterByColorScenario(page);
+});
