@@ -6,11 +6,9 @@ import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 type InstanceWindow = Window & { __fcInst: SpreadsheetInstance };
 
-// The panel's two By color pop-ups sit on either side of the rule between Sort and Filter.
-const sortSide = (dropdown: Locator) =>
-  dropdown.locator('.fc-filter-dropdown__color-filter:not(.fc-filter-dropdown__rule ~ *)');
-const filterSide = (dropdown: Locator) =>
-  dropdown.locator('.fc-filter-dropdown__rule ~ .fc-filter-dropdown__color-filter');
+// The panel has a By color pop-up on its sort side and on its filter side.
+const sortSide = (dropdown: Locator) => dropdown.locator('[data-fc-color-side="sort"]');
+const filterSide = (dropdown: Locator) => dropdown.locator('[data-fc-color-side="filter"]');
 const yellowSwatch = (side: Locator) =>
   side.locator('.fc-filter-dropdown__swatch[data-fc-color*="ffff00"]');
 
