@@ -1,3 +1,4 @@
+import { cellShiftChoices } from '../commands/built-in-command-policy.js';
 import type { DeleteCellsDirection, InsertCellsDirection } from '../commands/cell-shift.js';
 import type { History } from '../commands/history.js';
 import { columnShiftBand, rowShiftBand } from '../commands/interaction-effects.js';
@@ -198,6 +199,27 @@ export function runCellShiftChoice(
     return choice === 'down' || choice === 'right' ? insertCellsAction(ctx, norm, choice) : false;
   }
   return choice === 'up' || choice === 'left' ? deleteCellsAction(ctx, norm, choice) : false;
+}
+
+/** Opens the Insert / Delete Cells dialog over `range` with the choices `target` may run,
+ *  applies the chosen one, and calls `onApplied` when the sheet changed. */
+export function runCellShiftFlow(
+  host: HTMLElement,
+  strings: Strings,
+  kind: 'insert' | 'delete',
+  target: CellShiftTarget,
+  range: Range,
+  onApplied: () => void,
+): void {
+  openCellShiftDialog({
+    host,
+    strings,
+    kind,
+    allowed: cellShiftChoices(target.store, kind, target.origin),
+    onSubmit: (choice) => {
+      if (runCellShiftChoice(target, kind, range, choice)) onApplied();
+    },
+  });
 }
 
 /** Dispose a host's current dialog without returning focus to a removed opener. */

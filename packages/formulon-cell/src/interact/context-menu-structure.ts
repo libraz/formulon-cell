@@ -1,4 +1,3 @@
-import { cellShiftChoices } from '../commands/built-in-command-policy.js';
 import type { History } from '../commands/history.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import {
@@ -29,7 +28,7 @@ import {
   normalizeRange,
 } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
-import { openCellShiftDialog, runCellShiftChoice } from './cell-shift-dialog.js';
+import { runCellShiftFlow } from './cell-shift-dialog.js';
 import type { ItemId } from './context-menu-spec.js';
 
 export interface ContextMenuStructureContext {
@@ -72,15 +71,9 @@ export function runContextMenuStructureItem(
         if (insertCellsAction(action, state.selection.range, 'down')) ctx.afterCommit();
         return true;
       }
-      openCellShiftDialog({
-        host,
-        strings: ctx.strings(),
-        kind: 'insert',
-        allowed: cellShiftChoices(store, 'insert', 'contextMenu'),
-        onSubmit: (choice) => {
-          if (runCellShiftChoice(shift, 'insert', state.selection.range, choice)) ctx.afterCommit();
-        },
-      });
+      runCellShiftFlow(host, ctx.strings(), 'insert', shift, state.selection.range, () =>
+        ctx.afterCommit(),
+      );
       return true;
     }
     case 'insertTableRows':
@@ -94,15 +87,9 @@ export function runContextMenuStructureItem(
         if (deleteCellsAction(action, state.selection.range, 'up')) ctx.afterCommit();
         return true;
       }
-      openCellShiftDialog({
-        host,
-        strings: ctx.strings(),
-        kind: 'delete',
-        allowed: cellShiftChoices(store, 'delete', 'contextMenu'),
-        onSubmit: (choice) => {
-          if (runCellShiftChoice(shift, 'delete', state.selection.range, choice)) ctx.afterCommit();
-        },
-      });
+      runCellShiftFlow(host, ctx.strings(), 'delete', shift, state.selection.range, () =>
+        ctx.afterCommit(),
+      );
       return true;
     }
     case 'rowInsertAbove': {

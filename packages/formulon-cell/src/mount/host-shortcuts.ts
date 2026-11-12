@@ -1,4 +1,4 @@
-import { canExecuteBuiltIn, cellShiftChoices } from '../commands/built-in-command-policy.js';
+import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { insertCopiedBandAction } from '../commands/clipboard/paste-actions.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { executeRibbonFillAction, fillOutputRange } from '../commands/fill.js';
@@ -40,7 +40,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { excelSerialFromParts } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
-import { openCellShiftDialog, runCellShiftChoice } from '../interact/cell-shift-dialog.js';
+import { runCellShiftFlow } from '../interact/cell-shift-dialog.js';
 import type { DialogEntry } from '../interact/dialog-entry.js';
 import type { FormatDialogHandle } from '../interact/format-dialog.js';
 import type { HyperlinkDialogHandle } from '../interact/hyperlink-dialog.js';
@@ -366,19 +366,17 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         input.invalidate();
         return;
       }
-      openCellShiftDialog({
-        host: input.host,
-        strings: input.strings(),
+      runCellShiftFlow(
+        input.host,
+        input.strings(),
         kind,
-        allowed: cellShiftChoices(input.store, kind, 'keyboard'),
-        onSubmit: (choice) => {
-          const range = input.store.getState().selection.range;
-          const target = { ...cellShiftEntry(), wb: currentWb };
-          if (!runCellShiftChoice(target, kind, range, choice)) return;
+        { ...cellShiftEntry(), wb: currentWb },
+        selected,
+        () => {
           mutators.refreshActiveSheetCells(input.store, currentWb);
           input.invalidate();
         },
-      });
+      );
       return;
     }
     const numberFormatAction = directNumberFormatAction(e);

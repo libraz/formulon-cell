@@ -8,7 +8,7 @@ import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { addrKey } from '../../engine/address.js';
 import { isMacHost } from '../../extensions/ui-options.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
-import { openCellShiftDialog, runCellShiftChoice } from '../../interact/cell-shift-dialog.js';
+import { runCellShiftFlow } from '../../interact/cell-shift-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { sheetTabColorActionForColor, sheetTabColorByAction } from '../../sheet-tab-colors.js';
 import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
@@ -116,18 +116,17 @@ const buildCellInsertAction =
         instance.host.focus();
         return;
       }
-      openCellShiftDialog({
-        host: instance.host,
-        strings: instance.i18n.strings,
-        kind: 'insert',
-        allowed: cellShiftChoices(instance.store, 'insert', 'ribbon'),
-        onSubmit: (choice) => {
-          if (!runCellShiftChoice(cellShiftTarget(instance, 'insert'), 'insert', range, choice))
-            return;
+      runCellShiftFlow(
+        instance.host,
+        instance.i18n.strings,
+        'insert',
+        cellShiftTarget(instance, 'insert'),
+        range,
+        () => {
           mutators.refreshActiveSheetCells(instance.store, instance.workbook);
           instance.host.focus();
         },
-      });
+      );
       return;
     }
     const mapped: Record<string, Parameters<typeof handleInsertCellsAction>[1]> = {
@@ -166,18 +165,17 @@ const buildCellDeleteAction =
         instance.host.focus();
         return;
       }
-      openCellShiftDialog({
-        host: instance.host,
-        strings: instance.i18n.strings,
-        kind: 'delete',
-        allowed: cellShiftChoices(instance.store, 'delete', 'ribbon'),
-        onSubmit: (choice) => {
-          if (!runCellShiftChoice(cellShiftTarget(instance, 'delete'), 'delete', range, choice))
-            return;
+      runCellShiftFlow(
+        instance.host,
+        instance.i18n.strings,
+        'delete',
+        cellShiftTarget(instance, 'delete'),
+        range,
+        () => {
           mutators.refreshActiveSheetCells(instance.store, instance.workbook);
           instance.host.focus();
         },
-      });
+      );
       return;
     }
     const mapped: Record<string, Parameters<typeof handleDeleteCellsAction>[1]> = {
