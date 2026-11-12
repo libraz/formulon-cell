@@ -255,10 +255,10 @@ export async function runSelectionFormat(
     await page.locator('#menu-format-cells [data-cell-format="dialog"]').click();
     const dialog = page
       .locator('.fc-fmtdlg:not([hidden])')
-      .filter({ has: page.locator('button[data-fc-tab="font"]') })
+      .filter({ has: page.locator('[role="tab"][data-fc-tab="font"]') })
       .first();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button[data-fc-tab="font"]').click();
+    await dialog.locator('[role="tab"][data-fc-tab="font"]').click();
     await dialog.locator('.fc-fmtdlg__font-size-row input').fill('16');
     await dialog.locator('.fc-fmtdlg__btn--primary').click();
     await expect(dialog).toBeHidden();

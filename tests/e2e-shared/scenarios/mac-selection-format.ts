@@ -276,7 +276,7 @@ export async function runMacSelectionFormatDialogWithHole(page: Page): Promise<v
   await historyKey(page, 'Meta+1');
   const dialog = page.getByRole('dialog', { name: 'Format Cells', exact: true });
   await expect(dialog).toBeVisible();
-  await dialog.locator('button[data-fc-tab="font"]').click();
+  await dialog.locator('[role="tab"][data-fc-tab="font"]').click();
   await expect
     .poll(() =>
       dialog
@@ -285,7 +285,7 @@ export async function runMacSelectionFormatDialogWithHole(page: Page): Promise<v
     )
     .toBe(true);
   await expect(dialog.locator('[data-fc-font-style][aria-selected="true"]')).toHaveCount(0);
-  await dialog.locator('button[data-fc-tab="align"]').click();
+  await dialog.locator('[role="tab"][data-fc-tab="align"]').click();
   await expect(dialog.locator('input[data-fc-check="mergeCells"]')).toBeDisabled();
   await dialog.locator('select[data-fc-select="align"]').selectOption('center');
   await dialog.locator('.fc-fmtdlg__btn--primary').click();
