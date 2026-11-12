@@ -81,8 +81,9 @@
       var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
   }
 
+  /* A tab keeps its label's width; a row of long labels scrolls rather than overlapping. */
   .fc-quick__tab {
-    min-width: 0;
+    flex: 0 0 auto;
     min-height: 25px;
     padding: 4px 8px 5px;
     border: 0;

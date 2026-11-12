@@ -110,6 +110,7 @@ versioning is [SemVer](https://semver.org/).
 - Insert Slicer adds every chosen field as one undo step or none, targets only the active table, and is unavailable for a session-only table or a PivotTable.
 - A slicer item click a protected sheet refuses leaves keyboard focus on the alert it opens, so Return dismisses the alert.
 - More of the Mac host's dialogs use the desktop wording in German, French, Korean, Thai and Chinese: the filter panel, Format Cells, PivotTable field settings and options, Find, Go To Special, Sort, Text to Columns, Hyperlink, Page Setup, the Accessibility pane and the sheet tab menu. Insert Slicer and the Spelling buttons follow the desktop wording in German and French, and the table style menu shows its access keys in Korean and Chinese as in Japanese.
+- Quick Analysis tabs with long labels, as in French, no longer run into each other: each tab keeps its label's width and the tab row scrolls.
 - Sparklines over all-equal values draw the line along the top and the columns at full height; a line over a single value draws nothing; a line on a date axis joins its points in date order.
 
 ### Removed
