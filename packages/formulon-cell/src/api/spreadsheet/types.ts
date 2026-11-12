@@ -88,6 +88,11 @@ export interface SpreadsheetOptions {
    *  symbol replacements, such as `(c)` → `©`. The user's edits update it and emit `update` with
    *  `source: 'user'`. */
   readonly autoCorrect?: AutoCorrectOptions;
+  /** The user's custom lists, each a list of entries in order, which custom-list sorting and
+   *  AutoFill follow after the locale's built-in day and month lists. Lists the user adds or deletes
+   *  in the Custom Lists dialog update it and emit `update` with `source: 'user'`; the built-in
+   *  lists are never part of it. */
+  readonly customLists?: readonly (readonly string[])[];
   readonly host?: HostProviders;
   readonly uploadStatus?: StatusBarUploadStatus;
   readonly macroRecording?: boolean | null;

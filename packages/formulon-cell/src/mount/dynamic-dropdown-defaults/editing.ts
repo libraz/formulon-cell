@@ -1,5 +1,8 @@
+import { customListsFor } from '../../commands/autofill-series.js';
 import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import { inputLocaleForWorkbook } from '../../commands/coerce-input.js';
 import { conditionalRulesForRange } from '../../commands/conditional-format.js';
+import { customListsSourceFor } from '../../commands/custom-lists.js';
 import {
   executeRibbonFillAction,
   fillDirectionRange,
@@ -52,6 +55,7 @@ import type { SpreadsheetInstance } from '../../mount.js';
 import { selectionContainsAddr } from '../../store/selection-geometry.js';
 import { mutators } from '../../store/store.js';
 import { showAdvancedFilterDialog } from '../../toolbar/dialogs/advanced-filter.js';
+import { showCustomListsDialog } from '../../toolbar/dialogs/custom-lists.js';
 import { showMessage } from '../../toolbar/dialogs/prompt.js';
 import {
   removeDuplicatesResultMessage,
@@ -418,6 +422,30 @@ const buildSortMenuAction =
         },
         colorChoices: (column) =>
           columnColorChoices(instance.store.getState(), range, Number(column)),
+        customList: {
+          label: strings.sortCustomList,
+          open: (initial) => {
+            const lists = customListsSourceFor(instance.store);
+            return showCustomListsDialog({
+              host: instance.host,
+              labels: {
+                title: strings.customListsTitle,
+                newList: strings.customListsNew,
+                lists: strings.customListsLabel,
+                entries: strings.customListsEntries,
+                add: strings.customListsAdd,
+                delete: strings.customListsDelete,
+                hint: strings.customListsHint,
+                ok: strings.sortDialogApply,
+                cancel: strings.sortDialogCancel,
+              },
+              builtIns: customListsFor(inputLocaleForWorkbook(instance.workbook)),
+              userLists: lists?.get() ?? [],
+              onChange: (next) => lists?.set(next),
+              ...(initial ? { initial } : {}),
+            });
+          },
+        },
         columns,
         rows: mac
           ? Array.from({ length: range.r1 - range.r0 + 1 }, (_, i) => ({
@@ -450,6 +478,7 @@ const buildSortMenuAction =
               ...(level.sortOn ? { sortOn: level.sortOn } : {}),
               ...(level.color ? { color: level.color } : {}),
               ...(level.icon ? { icon: level.icon } : {}),
+              ...(level.customList ? { customList: level.customList } : {}),
             })),
             hasHeader: result.hasHeader,
             orientation: result.orientation,

@@ -71,7 +71,7 @@ import { type CELL_COMMAND_IDS, type CommandId, isCommandId } from './command-id
 type CellCommandId = (typeof CELL_COMMAND_IDS)[number];
 
 /** The options the user can change from the UI. */
-type UserOptionKey = 'showAllNotes' | 'theme' | 'locale' | 'autoCorrect';
+type UserOptionKey = 'showAllNotes' | 'theme' | 'locale' | 'autoCorrect' | 'customLists';
 
 import { createDialogs, type Dialogs } from './dialogs.js';
 import type {
@@ -251,6 +251,7 @@ interface InstanceState {
   readonly spelling: { current: SpellingService | undefined };
   /** The host's AutoCorrect options, read when AutoCorrect runs. */
   readonly autoCorrect: { current: AutoCorrectOptions | undefined };
+  readonly customLists: { current: readonly (readonly string[])[] | undefined };
   /** The workbook the latest `update({ workbook })` asked for; differs from `workbook` while the
    *  mount is still switching to it. */
   requestedWorkbook: Workbook;
@@ -713,6 +714,9 @@ const applyPatchKey = (state: InstanceState, key: keyof SpreadsheetPatch, value:
     case 'autoCorrect':
       state.autoCorrect.current = (value as AutoCorrectOptions | null) ?? undefined;
       break;
+    case 'customLists':
+      state.customLists.current = (value as readonly (readonly string[])[] | null) ?? undefined;
+      break;
     case 'host':
       applyHostProviders(state, (value as SpreadsheetOptions['host'] | null) ?? {});
       break;
@@ -1052,6 +1056,8 @@ const legacyOptionsOf = (
   spelling: { readonly current: SpellingService | undefined },
   autoCorrect: { current: AutoCorrectOptions | undefined },
   reportAutoCorrect: { readonly current: (next: AutoCorrectOptions) => void },
+  customLists: { current: readonly (readonly string[])[] | undefined },
+  reportCustomLists: { readonly current: (next: readonly (readonly string[])[]) => void },
   notifyRibbon: () => void,
 ): MountOptions => {
   const host = options.host ?? {};
@@ -1083,6 +1089,11 @@ const legacyOptionsOf = (
     setAutoCorrectOptions: (next) => {
       autoCorrect.current = next;
       reportAutoCorrect.current(next);
+    },
+    getCustomLists: () => customLists.current,
+    setCustomLists: (next) => {
+      customLists.current = next;
+      reportCustomLists.current(next);
     },
     ...(options.uploadStatus !== undefined ? { uploadStatus: options.uploadStatus } : {}),
     ...(options.macroRecording !== undefined ? { macroRecording: options.macroRecording } : {}),
@@ -1127,6 +1138,10 @@ export async function mount(
   const autoCorrect = { current: options.autoCorrect };
   // Bound once the instance can report a user edit as `update`.
   const reportAutoCorrect: { current: (next: AutoCorrectOptions) => void } = { current: () => {} };
+  const customLists = { current: options.customLists };
+  const reportCustomLists: { current: (next: readonly (readonly string[])[]) => void } = {
+    current: () => {},
+  };
   const ribbonEvents = new Emitter<RibbonEvents>();
   const notifyRibbon = (): void => {
     const ribbonHandle = legacy?.toolbar;
@@ -1143,6 +1158,8 @@ export async function mount(
         spelling,
         autoCorrect,
         reportAutoCorrect,
+        customLists,
+        reportCustomLists,
         notifyRibbon,
       ),
     );
@@ -1186,6 +1203,7 @@ export async function mount(
     host: hostProviders,
     spelling,
     autoCorrect,
+    customLists,
     requestedWorkbook: workbook,
     swaps: Promise.resolve(),
     origin: null,
@@ -1244,6 +1262,7 @@ export async function mount(
   const offTheme = legacy.on('themeChange', (e) => reportTheme(e.theme));
   const reportLocale = userOption('locale', legacy.i18n.locale);
   reportAutoCorrect.current = userOption('autoCorrect', options.autoCorrect);
+  reportCustomLists.current = userOption('customLists', options.customLists);
   const offLocale = legacy.on('localeChange', (e) => reportLocale(e.locale));
 
   let lastSelection = selectionOf(legacy);

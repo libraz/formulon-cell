@@ -677,6 +677,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'block',
   ),
   shell(
+    'toolbar.customLists',
+    'toolbar/dialogs/custom-lists.ts',
+    'showCustomListsDialog',
+    'ribbonMenu',
+    'block',
+  ),
+  shell(
     'toolbar.removeDuplicates',
     'toolbar/dialogs/remove-duplicates.ts',
     'showRemoveDuplicatesDialog',

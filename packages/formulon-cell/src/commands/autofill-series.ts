@@ -387,10 +387,14 @@ const numberAtom = (
 };
 
 /** Classify a text cell as a step of a list or numbered series, or null when
- *  AutoFill copies it. */
-export function textSeriesAtom(text: string, locale: string | undefined): TextSeriesAtom | null {
+ *  AutoFill copies it. The user's custom lists come after the built-in ones. */
+export function textSeriesAtom(
+  text: string,
+  locale: string | undefined,
+  userLists: readonly (readonly string[])[] = [],
+): TextSeriesAtom | null {
   const profile = profileFor(locale);
-  const lists = customListsFor(locale);
+  const lists = [...customListsFor(locale), ...userLists];
   const key = matchKey(text, profile);
   const dotless = profile.trailingDot && key.endsWith('.') ? key.slice(0, -1) : null;
   // The last list containing the text wins, so a localized list overrides the English one.

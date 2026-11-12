@@ -140,6 +140,7 @@ export const SPREADSHEET_OPTION_KEYS = [
   'formulaHints',
   'spelling',
   'autoCorrect',
+  'customLists',
   'host',
   'uploadStatus',
   'macroRecording',

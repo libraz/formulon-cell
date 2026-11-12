@@ -99,6 +99,10 @@ export interface MountOptions {
   getAutoCorrectOptions?: () => AutoCorrectOptions | undefined;
   /** Receives the configuration a user edit in AutoCorrect Options makes. */
   setAutoCorrectOptions?: (next: AutoCorrectOptions) => void;
+  /** The user's custom lists, without the built-in ones. */
+  getCustomLists?: () => readonly (readonly string[])[] | undefined;
+  /** Receives the user's lists after the Custom Lists dialog adds or deletes one. */
+  setCustomLists?: (next: readonly (readonly string[])[]) => void;
   /** Optional host-driven status bar Upload Status indicator. */
   uploadStatus?: StatusBarUploadStatus;
   /** Optional host-driven status bar Macro Recording indicator. */

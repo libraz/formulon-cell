@@ -6,6 +6,7 @@ import {
   registerAutoCorrect,
 } from './commands/autocorrect.js';
 import { registerChromePlatform } from './commands/chrome-platform.js';
+import { registerCustomLists } from './commands/custom-lists.js';
 import { History } from './commands/history.js';
 import {
   InteractionController,
@@ -210,6 +211,10 @@ export const Spreadsheet = {
     const getSpellingService = opts.getSpellingService;
     const getAutoCorrectOptions = opts.getAutoCorrectOptions;
     const setAutoCorrectOptions = opts.setAutoCorrectOptions;
+    const getCustomLists = opts.getCustomLists;
+    const setCustomLists = opts.setCustomLists;
+    // Without a host to keep them, the lists the user adds last for this mount.
+    let ownCustomLists: readonly (readonly string[])[] = [];
     // Without a host to keep it, a user edit lasts for this mount.
     let ownAutoCorrect: AutoCorrectOptions | undefined;
     let uploadStatus = opts.uploadStatus ?? null;
@@ -331,6 +336,13 @@ export const Spreadsheet = {
       },
     );
     registerAutoCorrect(store, autoCorrect);
+    registerCustomLists(store, {
+      get: () => (getCustomLists ? (getCustomLists() ?? []) : ownCustomLists),
+      set: (next) => {
+        if (setCustomLists) setCustomLists(next);
+        else ownCustomLists = next;
+      },
+    });
     const viewportSheet = viewportRangeSheet(opts.viewport, wb);
     if (viewportSheet !== undefined) mutators.setSheetIndex(store, viewportSheet);
     mutators.setTheme(store, initialTheme);

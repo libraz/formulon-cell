@@ -85,6 +85,7 @@ const optionProps = {
   formulaHints: option<'formulaHints'>(Array as PropType<Options['formulaHints']>),
   spelling: option<'spelling'>(Object as PropType<Options['spelling']>),
   autoCorrect: option<'autoCorrect'>(Object as PropType<Options['autoCorrect']>),
+  customLists: option<'customLists'>(Array as PropType<Options['customLists']>),
   host: option<'host'>(Object as PropType<Options['host']>),
   uploadStatus: option<'uploadStatus'>(String as PropType<Options['uploadStatus']>),
   macroRecording: option<'macroRecording'>(Boolean as PropType<Options['macroRecording']>),

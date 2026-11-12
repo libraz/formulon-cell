@@ -70,6 +70,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- `customLists` on the mount options: the user's custom lists, which custom-list sorting and AutoFill follow after the locale's built-in day and month lists. The Sort dialog's Order offers Custom List…, opening Custom Lists, where NEW LIST takes typed entries, Add and Delete change the user's lists (the built-in lists stay read-only) and each change emits `update` with `source: 'user'`; the chosen list is written to the file with the sort level.
 - The Sort dialog sorts on cell colour, font colour or conditional formatting icon as well as values: Sort On offers the kinds the column shows, a colour or icon level picks from the column's own fills, font colours or icons, and its order is On Top or On Bottom.
 - Remove Duplicates reports what it did in the desktop wording: how many duplicate values it removed and how many unique values remain, or that none were found; on the Mac it is the compact title-less alert. A run it refuses, such as on merged cells or a locked range, never claims that no duplicates were found.
 - The Mac column panel sorts by color too: its sort side's By color pop-up puts the rows with the picked fill, font colour or conditional formatting icon first, and colour and icon sort levels are saved and read back with the filter.

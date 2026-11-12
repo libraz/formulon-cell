@@ -328,4 +328,32 @@
     left: 608px;
     width: 73px;
   }
+
+  /* Custom Lists: the lists on the left, their entries on the right, Add and Delete below. */
+  .fc-customlists .fc-tb__dlg__body,
+  .fc-customlists {
+    min-width: 460px;
+  }
+  .fc-customlists__lists,
+  .fc-customlists__entries {
+    box-sizing: border-box;
+    width: 100%;
+    font: inherit;
+  }
+  .fc-customlists__entries {
+    resize: vertical;
+  }
+  .fc-customlists__label {
+    display: block;
+    margin: 6px 0 2px;
+  }
+  .fc-customlists__buttons {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .fc-customlists__hint {
+    margin: 6px 0 0;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 62%, transparent));
+  }
 }

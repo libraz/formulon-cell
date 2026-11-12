@@ -46,6 +46,9 @@ export interface SortDialogOptions {
   /** The fills, font colours and conditional formatting icons a column's data shows, keyed by
    *  the column's value; a colour or icon level picks from them. */
   colorChoices?: (column: string) => ColumnColorChoices;
+  /** Order › Custom List…: its label and the Custom Lists dialog it opens, which resolves with
+   *  the chosen list or `null`. Without it the order offers no custom list. */
+  customList?: { label: string; open(initial: readonly string[] | null): Promise<string[] | null> };
   initialColumn: string;
   initialDirection: 'asc' | 'desc';
   initialHasHeader: boolean;
@@ -68,9 +71,11 @@ export interface SortDialogSortOnLabels {
 export interface SortDialogLevel {
   column: string;
   direction: 'asc' | 'desc';
-  sortOn?: 'cellColor' | 'fontColor' | 'cellIcon';
+  sortOn?: 'cellColor' | 'fontColor' | 'cellIcon' | 'customList';
   color?: string;
   icon?: ConditionalIconRef;
+  /** The list order of a custom-list level. */
+  customList?: string[];
 }
 
 export interface SortDialogResult {
@@ -139,13 +144,19 @@ const appendSortLevelRow = (
     ...(initial.icon ? { icon: initial.icon } : {}),
   };
 
-  const kind = (): SortDialogLevel['sortOn'] | undefined =>
-    sortOn.value === 'values' ? undefined : (sortOn.value as SortDialogLevel['sortOn']);
+  // A value level ordered by a custom list keeps the list here; the order then reads `list`.
+  let customList: string[] | null =
+    initial.sortOn === 'customList' && initial.customList ? [...initial.customList] : null;
+  const kind = (): 'cellColor' | 'fontColor' | 'cellIcon' | undefined =>
+    sortOn.value === 'values'
+      ? undefined
+      : (sortOn.value as 'cellColor' | 'fontColor' | 'cellIcon');
   const choices = (): ColumnColorChoices =>
     opts.colorChoices?.(column.value) ?? { fills: [], fonts: [], icons: [] };
 
   const renderSortOn = (): void => {
-    const current = kind() ?? initial.sortOn ?? 'values';
+    const current =
+      kind() ?? (initial.sortOn === 'customList' ? undefined : initial.sortOn) ?? 'values';
     const c = choices();
     sortOn.replaceChildren();
     appendDialogSelectOptions(sortOn, [
@@ -157,7 +168,7 @@ const appendSortLevelRow = (
     const option = [...sortOn.options].find((o) => o.value === current);
     sortOn.value = option && !option.disabled ? current : 'values';
   };
-  const renderOrder = (value: 'asc' | 'desc'): void => {
+  const renderOrder = (value: 'asc' | 'desc' | 'list'): void => {
     direction.replaceChildren();
     appendDialogSelectOptions(
       direction,
@@ -169,10 +180,26 @@ const appendSortLevelRow = (
         : [
             { value: 'asc', label: opts.ascendingLabel },
             { value: 'desc', label: opts.descendingLabel },
+            ...(customList ? [{ value: 'list', label: customList.join(', ') }] : []),
+            ...(opts.customList ? [{ value: 'custom', label: opts.customList.label }] : []),
           ],
     );
-    direction.value = value;
+    direction.value = value === 'list' && !customList ? 'asc' : value;
   };
+  // Order › Custom List… opens the Custom Lists dialog; Cancel puts the order back.
+  let lastOrder = direction.value;
+  direction.addEventListener('change', () => {
+    if (direction.value !== 'custom' || !opts.customList) {
+      lastOrder = direction.value;
+      return;
+    }
+    const previous = lastOrder;
+    void opts.customList.open(customList).then((list) => {
+      if (list && list.length > 0) customList = list;
+      renderOrder(list && list.length > 0 ? 'list' : (previous as 'asc' | 'desc' | 'list'));
+      lastOrder = direction.value;
+    });
+  });
   const renderSwatches = (): void => {
     swatches.replaceChildren();
     const k = kind();
@@ -215,7 +242,8 @@ const appendSortLevelRow = (
   };
 
   renderSortOn();
-  renderOrder(initial.direction);
+  renderOrder(customList ? 'list' : initial.direction);
+  lastOrder = direction.value;
   renderSwatches();
   sortOn.addEventListener('change', () => {
     picked = {};
@@ -243,6 +271,9 @@ const appendSortLevelRow = (
   const value = (): SortDialogLevel => {
     const k = kind();
     const dir = direction.value === 'desc' ? 'desc' : 'asc';
+    if (!k && direction.value === 'list' && customList) {
+      return { column: column.value, direction: 'asc', sortOn: 'customList', customList };
+    }
     if (k === 'cellIcon' && picked.icon) {
       return { column: column.value, direction: dir, sortOn: k, icon: picked.icon };
     }

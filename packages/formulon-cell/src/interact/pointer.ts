@@ -2,6 +2,7 @@ import type { AutofitOptions } from '../commands/autofit-measurement.js';
 import { clearSelectedContents } from '../commands/clear-contents.js';
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { isPopulated } from '../commands/current-region.js';
+import { userCustomLists } from '../commands/custom-lists.js';
 import {
   executeFillHandle,
   fillDestFor,
@@ -1380,7 +1381,13 @@ export function attachPointer(
         }
         mutators.setFillPreview(store, dest);
         host.style.cursor = 'crosshair';
-        const last = fillLastValue(s, drag.src, dest, inputLocaleForWorkbook(wb));
+        const last = fillLastValue(
+          s,
+          drag.src,
+          dest,
+          inputLocaleForWorkbook(wb),
+          userCustomLists(store),
+        );
         if (last === null || !e) {
           fillTooltip.hide();
         } else {

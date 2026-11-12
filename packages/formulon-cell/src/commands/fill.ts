@@ -13,6 +13,7 @@ import {
 } from './autofill-series.js';
 import { createAutofitMeasureContext } from './autofit-measurement.js';
 import { inputLocaleForWorkbook } from './coerce-input.js';
+import { userCustomLists } from './custom-lists.js';
 import { blockDataTableEdit } from './data-table-guard.js';
 import { restrictedFillChanges } from './fill-plan.js';
 import { rowHiddenByFilter, rowsVisibleToFilter } from './filter-visible.js';
@@ -130,6 +131,8 @@ type DateFillUnit = 'days' | 'weekdays' | 'months' | 'years';
 
 interface ProjectionContext {
   locale: string | undefined;
+  /** The user's custom lists, which text series follow after the built-in ones. */
+  userLists?: readonly (readonly string[])[];
   /** Workbook date system the source serials are read in. */
   date1904: boolean;
   dateUnit?: DateFillUnit;
@@ -431,11 +434,11 @@ type SlotKind =
   | { type: 'text'; atom: TextSeriesAtom }
   | { type: 'single' };
 
-const slotKind = (cell: SourceCell, locale: string | undefined): SlotKind => {
+const slotKind = (cell: SourceCell, ctx: ProjectionContext): SlotKind => {
   if (cell.formula !== null) return { type: 'single' };
   if (cell.numeric !== null) return cell.dateKind ? { type: 'date' } : { type: 'number' };
   if (cell.text !== null) {
-    const atom = textSeriesAtom(cell.text, locale);
+    const atom = textSeriesAtom(cell.text, ctx.locale, ctx.userLists);
     if (atom) return { type: 'text', atom };
   }
   return { type: 'single' };
@@ -473,7 +476,7 @@ function buildProjection(line: SourceCell[], ctx: ProjectionContext): SeriesProj
       },
     };
   }
-  const kinds = line.map((cell) => slotKind(cell, ctx.locale));
+  const kinds = line.map((cell) => slotKind(cell, ctx));
   kinds.forEach((kind, i) => {
     const prev = kinds[i - 1];
     if (kind.type !== 'text' || prev?.type !== 'text') return;
@@ -688,6 +691,7 @@ function applyFillRange(
   const source = readSource(state, src);
   const series = {
     locale: inputLocaleForWorkbook(wb),
+    userLists: userCustomLists(opts?.store),
     date1904: state.ui.date1904 === true,
     dateUnit: opts?.dateUnit,
     series: opts?.series,
@@ -791,6 +795,7 @@ export function fillLastValue(
   src: Range,
   dest: Range,
   locale: string | undefined,
+  userLists: readonly (readonly string[])[] = [],
 ): string | null {
   if (dest.r0 === src.r0 && dest.r1 === src.r1 && dest.c0 === src.c0 && dest.c1 === src.c1) {
     return null;
@@ -813,6 +818,7 @@ export function fillLastValue(
           : src.c0 - dest.c0;
   const ctx: ProjectionContext = {
     locale,
+    userLists,
     date1904: state.ui.date1904 === true,
     sign: forward ? 1 : -1,
   };

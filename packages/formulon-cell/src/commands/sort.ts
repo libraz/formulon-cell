@@ -14,9 +14,9 @@ import {
 } from '../store/store.js';
 import type { ConditionalIconRef } from '../store/types/conditional-rule.js';
 import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
-import { customListsFor } from './autofill-series.js';
 import { recordCommentChange } from './comment.js';
 import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
+import { allCustomLists } from './custom-lists.js';
 import { blockDataTableEdit } from './data-table-guard.js';
 import { filterRangeForSort, inferAutoFilterRange, setFilterSort } from './filter.js';
 import { filterRangeAt } from './filter-ranges.js';
@@ -256,13 +256,14 @@ const nativeSortPermutation = (
   sortKeys: readonly SortKey[],
   horizontal: boolean,
   matchCase: boolean,
+  lists: readonly (readonly string[])[],
 ): number[] | null => {
   const last = horizontal ? range.c1 : range.r1;
   const count = last - start + 1;
   if (count <= 0) return [];
   if (count > MAX_NATIVE_SORT_ROWS) return null;
 
-  const builtInLists = customListsFor(localeForWorkbook(wb));
+  const builtInLists = lists;
   const byKey = sortKeys.map((key) => {
     const direction = key.direction === 'desc' ? -1 : 1;
     const sortOn = key.sortOn ?? 'value';
@@ -746,12 +747,21 @@ export function sortRange(
   const nativeBundle =
     !skipsLines && wb.isStub === false && wb.capabilities.arrayFormulaEvaluation === true;
   const nativeOrder = nativeBundle
-    ? nativeSortPermutation(state, wb, range, start, sortKeys, horizontal, matchCase)
+    ? nativeSortPermutation(
+        state,
+        wb,
+        range,
+        start,
+        sortKeys,
+        horizontal,
+        matchCase,
+        allCustomLists(store, localeForWorkbook(wb)),
+      )
     : null;
   if (nativeBundle && nativeOrder === null) return false;
 
   state = hydrateSortComments(store, wb, dataRange, horizontal ? range.r0 : start);
-  const builtInLists = customListsFor(localeForWorkbook(wb));
+  const builtInLists = allCustomLists(store, localeForWorkbook(wb));
   const addrAt = (line: number, pos: number): Addr =>
     horizontal
       ? { sheet: range.sheet, row: pos, col: line }

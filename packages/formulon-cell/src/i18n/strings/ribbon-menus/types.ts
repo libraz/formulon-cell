@@ -85,6 +85,15 @@ export interface RibbonMenusStrings {
     sortOnCellIcon: string;
     sortOnTop: string;
     sortOnBottom: string;
+    /** The Order entry that opens Custom Lists, and that dialog's wording. */
+    sortCustomList: string;
+    customListsTitle: string;
+    customListsNew: string;
+    customListsLabel: string;
+    customListsEntries: string;
+    customListsAdd: string;
+    customListsDelete: string;
+    customListsHint: string;
     sortDialogAscending: string;
     sortDialogDescending: string;
     sortDialogHeader: string;
