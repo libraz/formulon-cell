@@ -25,6 +25,8 @@ export const viewportSize = (ownerDocument?: Document): { width: number; height:
   };
 };
 
+/** `value` within `[min, max]`; `min` wins when `max < min`, so a panel wider than the viewport
+ *  stays at its leading edge. */
 export const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), Math.max(min, max));
 

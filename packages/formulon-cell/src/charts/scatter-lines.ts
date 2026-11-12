@@ -1,3 +1,4 @@
+import { clamp } from './numeric.js';
 import type { ChartPlotBounds } from './types.js';
 
 /** A finite data point, or a source-order break/blank. */
@@ -66,9 +67,6 @@ const boundsFor = (bounds: ChartPlotBounds): NormalizedBounds | null => {
   if (!Number.isFinite(right) || !Number.isFinite(bottom)) return null;
   return { left: bounds.x, right, top: bounds.y, bottom };
 };
-
-const clampTo = (value: number, minimum: number, maximum: number): number =>
-  Math.min(maximum, Math.max(minimum, value));
 
 interface NormalizedAxis {
   readonly minimum: number;
@@ -171,10 +169,10 @@ const projectNormalizedSegment = (
     bounds.y + (projection?.reverseY === true ? y2Fraction : 1 - y2Fraction) * bounds.height;
   if (![x1, x2, y1, y2].every(Number.isFinite)) return null;
   return {
-    x1: clampTo(x1, bounds.x, right),
-    y1: clampTo(y1, bounds.y, bottom),
-    x2: clampTo(x2, bounds.x, right),
-    y2: clampTo(y2, bounds.y, bottom),
+    x1: clamp(x1, bounds.x, right),
+    y1: clamp(y1, bounds.y, bottom),
+    x2: clamp(x2, bounds.x, right),
+    y2: clamp(y2, bounds.y, bottom),
     startIndex: segment.startIndex,
     endIndex: segment.endIndex,
   };
@@ -304,10 +302,10 @@ export const clipScatterSegment = (
 
   // The result is clamped as a final defense against one-ulp interpolation
   // drift.
-  const finalX1 = clampTo(x1Screen, rectangle.left, rectangle.right);
-  const finalY1 = clampTo(y1Screen, rectangle.top, rectangle.bottom);
-  const finalX2 = clampTo(x2Screen, rectangle.left, rectangle.right);
-  const finalY2 = clampTo(y2Screen, rectangle.top, rectangle.bottom);
+  const finalX1 = clamp(x1Screen, rectangle.left, rectangle.right);
+  const finalY1 = clamp(y1Screen, rectangle.top, rectangle.bottom);
+  const finalX2 = clamp(x2Screen, rectangle.left, rectangle.right);
+  const finalY2 = clamp(y2Screen, rectangle.top, rectangle.bottom);
   if (
     !Number.isFinite(finalX1) ||
     !Number.isFinite(finalY1) ||
