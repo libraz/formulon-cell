@@ -3,6 +3,7 @@ import { test } from '@playwright/test';
 import {
   runSparklineFlatRenderScenario,
   runSparklineHiddenEmptyScenario,
+  runSparklineRightToLeftScenario,
   runSparklineStyleStripScenario,
 } from '../../../tests/e2e-shared/scenarios/sparkline-desktop.js';
 
@@ -11,6 +12,11 @@ for (const platform of ['default', 'mac'] as const) {
     page,
   }) => {
     await runSparklineHiddenEmptyScenario(page, platform);
+  });
+  test(`Plot Data Right-to-Left mirrors the plot as one undo step (${platform} chrome)`, async ({
+    page,
+  }) => {
+    await runSparklineRightToLeftScenario(page, platform);
   });
 }
 
