@@ -1,5 +1,5 @@
 import type { SpreadsheetInstance } from '@libraz/formulon-cell';
-import { sameProp } from '@libraz/formulon-cell/adapter';
+import { forwardRibbonHooks, ribbonHooksKey, sameProp } from '@libraz/formulon-cell/adapter';
 import {
   mountToolbar,
   type RibbonHooks,
@@ -17,7 +17,6 @@ import {
   ref,
   watch,
 } from 'vue';
-import { forwardRibbonHooks, ribbonHooksShape } from './ribbon-hooks.js';
 
 /** Props of {@link SpreadsheetToolbar}. */
 export interface SpreadsheetToolbarProps {
@@ -106,7 +105,7 @@ const component = defineComponent({
 
     // The ribbon remounts when the spreadsheet, the tab surface or the set of hooks changes.
     watch(
-      () => [props.spreadsheet, props.ribbonTabs, ribbonHooksShape(props.hooks)] as const,
+      () => [props.spreadsheet, props.ribbonTabs, ribbonHooksKey(props.hooks)] as const,
       ([spreadsheet, tabs, shape], [previous, previousTabs, previousShape]) => {
         if (spreadsheet === previous && sameProp(tabs, previousTabs) && shape === previousShape) {
           return;

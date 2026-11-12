@@ -69,6 +69,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- `@libraz/formulon-cell/adapter` also exports what the React and Vue packages share for binding props and deriving values: `SPREADSHEET_OPTION_KEYS`, `optionsFromProps`, `patchFromOptions`, `ribbonHooksKey`, `forwardRibbonHooks`, `isLiveSpreadsheet`, `subscribeToSpreadsheet`, `subscribeToSelection`, `subscribeToLocale` and the `SpreadsheetSubscriber` type.
 - `Workbook.getCalcMode` / `setCalcMode`, `getIterative` / `updateIterative`, `getProfileId` and `listFunctionNames`. Leaving Manual recalculates what the edits made under it left dirty, and a mounted ribbon shows the new mode; `on('change')` reports the `'calc'` part.
 - `Sheet.copy({ insertBefore, newName })` copies a sheet with its cells, formats and objects; `SheetCopyOptions` is exported.
 - `Workbook.listPeople` / `getPerson` / `addPerson` / `removePerson` manage the people threaded comments name, and `Workbook.listExternalLinks` lists the external books the workbook references.

@@ -1,5 +1,5 @@
 import type { SpreadsheetInstance } from '@libraz/formulon-cell';
-import { sameProp } from '@libraz/formulon-cell/adapter';
+import { forwardRibbonHooks, ribbonHooksKey, sameProp } from '@libraz/formulon-cell/adapter';
 import {
   mountToolbar,
   type RibbonHooks,
@@ -7,7 +7,6 @@ import {
   type Toolbar,
 } from '@libraz/formulon-cell/toolbar';
 import { type ReactElement, useEffect, useRef } from 'react';
-import { forwardRibbonHooks, ribbonHooksShape } from './ribbon-hooks.js';
 
 /** Props of {@link SpreadsheetToolbar}. */
 export interface SpreadsheetToolbarProps {
@@ -45,7 +44,7 @@ export const SpreadsheetToolbar = (props: SpreadsheetToolbarProps): ReactElement
   const propsRef = useRef(props);
   propsRef.current = props;
   const ribbonTabs = useSameProp(props.ribbonTabs);
-  const hooksShape = ribbonHooksShape(props.hooks);
+  const hooksShape = ribbonHooksKey(props.hooks);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: hooksShape stands for the hooks present; the hooks themselves are read at call time
   useEffect(() => {

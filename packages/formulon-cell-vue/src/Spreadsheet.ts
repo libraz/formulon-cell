@@ -11,7 +11,7 @@ import {
   type UpdateEvent,
   type WorkbookEvent,
 } from '@libraz/formulon-cell';
-import { reconcileProps } from '@libraz/formulon-cell/adapter';
+import { optionsFromProps, patchFromOptions, reconcileProps } from '@libraz/formulon-cell/adapter';
 import {
   type ComponentOptionsMixin,
   type CSSProperties,
@@ -26,7 +26,6 @@ import {
   type VNodeChild,
   watch,
 } from 'vue';
-import { optionsOf, patchOf } from './options.js';
 
 type LocaleChangeEvent = Parameters<Parameters<I18n['on']>[1]>[0];
 type Options = SpreadsheetOptions;
@@ -130,7 +129,7 @@ const component = defineComponent({
     const report = (error: unknown): void => {
       if (!disposed) emit('error', error);
     };
-    const currentOptions = (): SpreadsheetOptions => optionsOf(props as SpreadsheetOptions);
+    const currentOptions = (): SpreadsheetOptions => optionsFromProps(props as SpreadsheetOptions);
 
     onMounted(() => {
       const host = hostEl.value;
@@ -154,8 +153,8 @@ const component = defineComponent({
           );
           instance.value = inst;
           // Props that changed while the mount was pending.
-          const latest = patchOf(currentOptions());
-          reconcileProps(inst, patchOf(options), latest, report);
+          const latest = patchFromOptions(currentOptions());
+          reconcileProps(inst, patchFromOptions(options), latest, report);
           applied = latest;
           emit('ready', inst);
         },
@@ -168,7 +167,7 @@ const component = defineComponent({
     });
 
     watch(
-      () => patchOf(currentOptions()),
+      () => patchFromOptions(currentOptions()),
       (next) => {
         const inst = instance.value;
         if (!inst) return;

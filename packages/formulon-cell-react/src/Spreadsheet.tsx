@@ -11,10 +11,9 @@ import {
   type UpdateEvent,
   type WorkbookEvent,
 } from '@libraz/formulon-cell';
-import { reconcileProps } from '@libraz/formulon-cell/adapter';
+import { optionsFromProps, patchFromOptions, reconcileProps } from '@libraz/formulon-cell/adapter';
 import type { CSSProperties, ForwardedRef, ReactNode } from 'react';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { optionsOf, patchOf } from './options.js';
 
 type LocaleChangeEvent = Parameters<Parameters<I18n['on']>[1]>[0];
 
@@ -81,7 +80,7 @@ const SpreadsheetComponent = (
     const report = (error: unknown): void => {
       if (!disposed) propsRef.current.onError?.(error);
     };
-    const options = optionsOf(propsRef.current);
+    const options = optionsFromProps(propsRef.current);
     const offs: (() => void)[] = [];
     mount(host, options).then(
       (inst) => {
@@ -102,8 +101,8 @@ const SpreadsheetComponent = (
         );
         instanceRef.current = inst;
         // Props that changed while the mount was pending.
-        const latest = patchOf(optionsOf(p()));
-        reconcileProps(inst, patchOf(options), latest, report);
+        const latest = patchFromOptions(optionsFromProps(p()));
+        reconcileProps(inst, patchFromOptions(options), latest, report);
         appliedRef.current = latest;
         setLive(inst);
         p().onReady?.(inst);
@@ -127,7 +126,7 @@ const SpreadsheetComponent = (
   useEffect(() => {
     const inst = instanceRef.current;
     if (!inst) return;
-    const next = patchOf(optionsOf(props));
+    const next = patchFromOptions(optionsFromProps(props));
     const previous = appliedRef.current;
     appliedRef.current = next;
     reconcileProps(inst, previous, next, (error) => propsRef.current.onError?.(error));

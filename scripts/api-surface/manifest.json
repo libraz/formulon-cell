@@ -938,9 +938,19 @@
     },
     "@libraz/formulon-cell/adapter": {
       "mustExport": {
+        "SPREADSHEET_OPTION_KEYS": "value",
+        "SpreadsheetSubscriber": "type",
+        "forwardRibbonHooks": "value",
+        "isLiveSpreadsheet": "value",
+        "optionsFromProps": "value",
+        "patchFromOptions": "value",
         "propsPatch": "value",
         "reconcileProps": "value",
-        "sameProp": "value"
+        "ribbonHooksKey": "value",
+        "sameProp": "value",
+        "subscribeToLocale": "value",
+        "subscribeToSelection": "value",
+        "subscribeToSpreadsheet": "value"
       },
       "mustNotExport": []
     },
