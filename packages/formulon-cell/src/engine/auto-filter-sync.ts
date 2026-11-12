@@ -29,6 +29,7 @@ import type { HiddenIndices } from '../store/row-visibility.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type {
   FilterComparisonOp,
+  FilterHiddenButtons,
   FilterSortKey,
   FilterSortSpec,
   SpreadsheetStore,
@@ -70,6 +71,7 @@ const conditionOperator: Record<
   lessThanOrEqual: 'lessThanOrEqual',
 };
 
+const FILTER_KIND_NONE = FilterKind.None;
 const FILTER_KIND_VALUES = FilterKind.Values;
 const FILTER_KIND_CUSTOM = FilterKind.Custom;
 const FILTER_KIND_TOP10 = FilterKind.Top10;
@@ -602,6 +604,14 @@ export function typedAutoFilterFromState(
       ),
     });
   }
+  for (const col of hiddenButtonCols(state, range)) {
+    const colId = col - range.c0;
+    columns.set(colId, {
+      ...(columns.get(colId) ?? emptyAutoFilterColumn(colId)),
+      hiddenButton: true,
+      showButton: false,
+    });
+  }
 
   return {
     range: {
@@ -614,6 +624,13 @@ export function typedAutoFilterFromState(
     sort: sortForRange(state, range, imported, wb),
   };
 }
+
+/** The sheet columns of `range` whose dropdown button is hidden. */
+const hiddenButtonCols = (state: State, range: Range): number[] =>
+  (state.ui.filterHiddenButtons ?? [])
+    .filter((spec) => sameRange(spec.range, range))
+    .flatMap((spec) => spec.cols)
+    .filter((col) => col >= range.c0 && col <= range.c1);
 
 function sortForRange(
   state: State,
@@ -697,18 +714,22 @@ function localCriteriaFromTypedFilter(
   filter: AutoFilter,
   locale = 'en-US',
   wb?: WorkbookHandle,
-): { range: Range; criteria: ValueFilterCriteria[]; unsupportedColumns: Set<number> } {
+): {
+  range: Range;
+  criteria: ValueFilterCriteria[];
+  unsupportedColumns: Set<number>;
+  hiddenButtons: number[];
+} {
   const range = rangeFromAutoFilter(filter, sheet);
   const criteria: ValueFilterCriteria[] = [];
   const unsupportedColumns = new Set<number>();
+  // A column whose button the file hides keeps its filter; only the button goes.
+  const hiddenButtons = filter.columns
+    .filter((column) => column.hiddenButton || !column.showButton)
+    .map((column) => range.c0 + column.columnOffset);
   for (const column of filter.columns) {
     const byCol = range.c0 + column.columnOffset;
-    // The dropdown affordance flags have no cell-layer representation. Keep
-    // their native column intact until that column is explicitly edited.
-    if (column.hiddenButton || !column.showButton) {
-      unsupportedColumns.add(column.columnOffset);
-      continue;
-    }
+    if (column.kind === FILTER_KIND_NONE) continue;
     if (column.kind === FILTER_KIND_VALUES) {
       const visible = new Set(column.values.map((value) => filterMatchKey(value, locale)));
       const dates =
@@ -842,7 +863,7 @@ function localCriteriaFromTypedFilter(
     }
     unsupportedColumns.add(column.columnOffset);
   }
-  return { range, criteria, unsupportedColumns };
+  return { range, criteria, unsupportedColumns, hiddenButtons };
 }
 
 /** One comparison as a `<customFilter>`. */
@@ -863,7 +884,7 @@ export function autoFilterXmlFromState(
   const criteria = state.ui.filterCriteria
     .filter((entry) => sameRange(entry.range, range))
     .sort((a, b) => a.byCol - b.byCol);
-  if (criteria.length === 0)
+  if (criteria.length === 0 && hiddenButtonCols(state, range).length === 0)
     return `<autoFilter ref="${formatA1Range(range, { collapse: false })}"/>`;
 
   const columns = criteria.flatMap((entry) => {
@@ -928,7 +949,33 @@ export function autoFilterXmlFromState(
       `<filterColumn colId="${colId}"><filters${blankAttr}>${filters}</filters></filterColumn>`,
     ];
   });
-  return `<autoFilter ref="${formatA1Range(range, { collapse: false })}">${columns.join('')}</autoFilter>`;
+  return `<autoFilter ref="${formatA1Range(range, { collapse: false })}">${withHiddenButtons(
+    columns,
+    hiddenButtonCols(state, range).map((col) => col - range.c0),
+  ).join('')}</autoFilter>`;
+}
+
+/** `<filterColumn>` elements with `hiddenButton="1"` on each of `hidden`, adding an empty
+ *  element for a hidden column without a criterion, in column order. */
+function withHiddenButtons(columns: readonly string[], hidden: readonly number[]): string[] {
+  const byId = new Map<number, string>();
+  for (const column of columns) {
+    const id = Number(/^<filterColumn colId="(\d+)"/.exec(column)?.[1]);
+    byId.set(id, column);
+  }
+  for (const id of hidden) {
+    const column = byId.get(id);
+    byId.set(
+      id,
+      column
+        ? column.replace(
+            `<filterColumn colId="${id}"`,
+            `<filterColumn colId="${id}" hiddenButton="1"`,
+          )
+        : `<filterColumn colId="${id}" hiddenButton="1"/>`,
+    );
+  }
+  return [...byId].sort(([a], [b]) => a - b).map(([, column]) => column);
 }
 
 /** Parses only the range, which is enough to restore header affordances while
@@ -1153,7 +1200,12 @@ function decodeTypedFilter(
   sheet: number,
   target: FilterTarget,
   typed: AutoFilter,
-): { range: Range; criteria: ValueFilterCriteria[]; sort: FilterSortSpec | null } {
+): {
+  range: Range;
+  criteria: ValueFilterCriteria[];
+  sort: FilterSortSpec | null;
+  hiddenButtons: FilterHiddenButtons | null;
+} {
   const decoded = localCriteriaFromTypedFilter(
     store.getState(),
     sheet,
@@ -1169,6 +1221,10 @@ function decodeTypedFilter(
     range: decoded.range,
     criteria: decoded.criteria,
     sort: sortSpecFromTyped(typed, decoded.range, wb),
+    hiddenButtons:
+      decoded.hiddenButtons.length > 0
+        ? { range: decoded.range, cols: decoded.hiddenButtons }
+        : null,
   };
 }
 
@@ -1182,6 +1238,7 @@ export function hydrateAutoFilterFromEngine(
   const ranges: Range[] = [];
   const criteria: ValueFilterCriteria[] = [];
   const sorts: FilterSortSpec[] = [];
+  const hiddenButtons: FilterHiddenButtons[] = [];
   let worksheetTyped = false;
   if (wb.capabilities.typedAutoFilter) {
     const load = (target: FilterTarget): boolean => {
@@ -1194,6 +1251,7 @@ export function hydrateAutoFilterFromEngine(
       ranges.push(decoded.range);
       criteria.push(...decoded.criteria);
       if (decoded.sort) sorts.push(decoded.sort);
+      if (decoded.hiddenButtons) hiddenButtons.push(decoded.hiddenButtons);
       return true;
     };
     worksheetTyped = load(sheetFilterTarget(wb, sheet));
@@ -1220,7 +1278,13 @@ export function hydrateAutoFilterFromEngine(
   wb.withEngineSyncMuted(() => {
     store.setState((state) => ({
       ...state,
-      ui: { ...state.ui, filterRanges: ranges, filterCriteria: criteria, filterSorts: sorts },
+      ui: {
+        ...state.ui,
+        filterRanges: ranges,
+        filterCriteria: criteria,
+        filterSorts: sorts,
+        filterHiddenButtons: hiddenButtons,
+      },
     }));
   });
 }

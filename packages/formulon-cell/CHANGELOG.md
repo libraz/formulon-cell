@@ -106,6 +106,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- A filter column whose dropdown button the file hides shows no button, keeps its filter applied and editable, and keeps the hidden button through a save.
 - Switching a column filter between conditions that hide the same rows, such as two date periods, is its own undo step.
 - PivotTable filters of every kind the file holds stay through an edit of the report, and a PivotTable date filter reads its typed dates in the workbook's locale, as cell entry does.
 - Double-clicking Format Painter keeps it on for repeated pastes until the button is clicked again.

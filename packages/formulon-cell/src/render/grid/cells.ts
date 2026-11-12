@@ -1,5 +1,6 @@
 import { inputLocaleForWorkbook } from '../../commands/coerce-input.js';
 import { errorCheckFlagged } from '../../commands/error-indicators.js';
+import { filterButtonHidden } from '../../commands/filter-ranges.js';
 import { activeFilterRanges } from '../../commands/filter-state.js';
 import {
   isHeaderRow,
@@ -523,7 +524,9 @@ export function paintCells(
       const isActive = r === active.row && c === active.col;
       const hasValidationCircle = validationCircles.has(key);
       const hasThreadedComment = threadedRootKeys.has(key);
-      const filterHeader = filterRanges.some((fr) => fr.r0 === r && c >= fr.c0 && c <= fr.c1);
+      const filterHeader =
+        filterRanges.some((fr) => fr.r0 === r && c >= fr.c0 && c <= fr.c1) &&
+        !filterButtonHidden(state, data.sheetIndex, r, c);
       // Render-worthy when there's data, a merge anchor, a static fill, or a
       // sparkline/table host — all reasons to paint into an otherwise blank cell.
       if (

@@ -562,7 +562,11 @@ export function hitZone(
   screenX: number,
   y: number,
   filterRanges: readonly Range[] = [],
-  opts?: { resizeHandles?: boolean },
+  opts?: {
+    resizeHandles?: boolean;
+    /** True for a filter header whose dropdown button the file hides. */
+    filterButtonHidden?: (row: number, col: number) => boolean;
+  },
 ): HitZone | null {
   // Everything below reasons in laid-out space, where column A is always
   // leftmost. `colAtX` and `hitTest` do the same, so the pointer only has to
@@ -624,7 +628,7 @@ export function hitZone(
   const filterRange = filterRanges.find(
     (r) => r.r0 === cell.row && cell.col >= r.c0 && cell.col <= r.c1,
   );
-  if (filterRange) {
+  if (filterRange && !opts?.filterButtonHidden?.(cell.row, cell.col)) {
     const btn = filterButtonRect(cellRect(layout, viewport, cell.row, cell.col), layout.rtl);
     if (screenX >= btn.x && screenX < btn.x + btn.w && y >= btn.y && y < btn.y + btn.h) {
       return { kind: 'col-filter-btn', col: cell.col, range: filterRange };

@@ -11,7 +11,7 @@ import {
   fillShrinkFor,
 } from '../commands/fill.js';
 import { autoFillDownExtent } from '../commands/fill-plan.js';
-import { headerFilterRanges } from '../commands/filter-ranges.js';
+import { headerFilterRanges, hiddenFilterButtonTest } from '../commands/filter-ranges.js';
 import { tableOverlayById } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
 import { hyperlinkAt, isInDocumentHyperlinkTarget } from '../commands/hyperlinks.js';
@@ -435,7 +435,9 @@ export function attachPointer(
       drag = { kind: 'none' };
       return;
     }
-    const zone = hitZone(layoutForView(s), s.viewport, x, y, headerFilterRanges(s));
+    const zone = hitZone(layoutForView(s), s.viewport, x, y, headerFilterRanges(s), {
+      filterButtonHidden: hiddenFilterButtonTest(s),
+    });
     if (!zone) return;
 
     if (marquee.axis === 'cell') {
@@ -924,7 +926,9 @@ export function attachPointer(
     }
 
     const layout = layoutForView(s);
-    const zone = hitZone(layout, s.viewport, x, y, headerFilterRanges(s));
+    const zone = hitZone(layout, s.viewport, x, y, headerFilterRanges(s), {
+      filterButtonHidden: hiddenFilterButtonTest(s),
+    });
     if (!zone) return;
 
     // Range-insert: keep focus on the editor (preventDefault avoids the

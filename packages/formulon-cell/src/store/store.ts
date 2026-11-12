@@ -85,6 +85,7 @@ export const createSpreadsheetStore = () =>
       filterRanges: [],
       filterCriteria: [],
       filterSorts: [],
+      filterHiddenButtons: [],
       watchPanelOpen: false,
       workbookObjectsOpen: false,
       formulaBarVisible: true,

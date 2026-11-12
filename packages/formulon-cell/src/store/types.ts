@@ -257,6 +257,9 @@ export interface UiSlice {
   /** Sort order last applied inside each filter range; the filter buttons show
    *  its direction arrow and the file keeps it as the filter's `sortState`. */
   filterSorts?: FilterSortSpec[];
+  /** Columns of each filter range whose dropdown button the file hides; their filter still
+   *  applies. */
+  filterHiddenButtons?: FilterHiddenButtons[];
   /** Visibility flag for the Watch Window panel. Session-only state — the
    *  panel itself reads `watch.watches` for content. */
   watchPanelOpen: boolean;
@@ -297,6 +300,12 @@ export interface ValueFilterCriteria {
   /** Color filter. When present, rows survive only when the target cell's fill
    *  or font color matches `color`. */
   color?: FilterColorSpec;
+}
+
+export interface FilterHiddenButtons {
+  range: Range;
+  /** Sheet columns whose header shows no filter button. */
+  cols: number[];
 }
 
 export interface FilterSortSpec {

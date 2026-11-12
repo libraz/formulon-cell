@@ -34,6 +34,7 @@ import {
 import { cellTextHorizontalMetrics, wrapText } from '../render/text-wrap.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { DEFAULT_CELL_FONT_THEME, resolveTheme } from '../theme/resolve.js';
+import { filterButtonHidden } from './filter-ranges.js';
 import { formatNumber } from './format.js';
 import { showsHeaderFilterButton, tableForCell } from './format-as-table.js';
 
@@ -330,11 +331,12 @@ function headerButtonWidth(
       ? fontPointsToCssPx(MAC_PIVOT_BUTTON_SIZE) + 1
       : FILTER_DROPDOWN_RESERVED_WIDTH;
   }
-  const filter = state.ui.filterRanges.some(
-    (fr) => fr.sheet === sheet && fr.r0 === row && col >= fr.c0 && col <= fr.c1,
-  )
-    ? FILTER_DROPDOWN_RESERVED_WIDTH
-    : 0;
+  const filter =
+    state.ui.filterRanges.some(
+      (fr) => fr.sheet === sheet && fr.r0 === row && col >= fr.c0 && col <= fr.c1,
+    ) && !filterButtonHidden(state, sheet, row, col)
+      ? FILTER_DROPDOWN_RESERVED_WIDTH
+      : 0;
   const table = tableForCell(state.tables.tables, sheet, row, col);
   const chevron =
     table && showsHeaderFilterButton(table, row, col) ? TABLE_HEADER_RESERVED_WIDTH : 0;

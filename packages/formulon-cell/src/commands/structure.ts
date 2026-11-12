@@ -58,6 +58,7 @@ import {
   inheritFormatsByRow,
   normalizeAxisEdit,
   shiftFilterCriteria,
+  shiftFilterHiddenButtons,
   shiftFilterSorts,
   shiftFormatsByCol,
   shiftFormatsByRow,
@@ -413,6 +414,13 @@ function shiftAnchoredRanges(
           filterRanges,
           filterCriteria: shiftFilterCriteria(s.ui.filterCriteria, sheet, axis, split, delta),
           filterSorts: shiftFilterSorts(s.ui.filterSorts, sheet, axis, split, delta),
+          filterHiddenButtons: shiftFilterHiddenButtons(
+            s.ui.filterHiddenButtons,
+            sheet,
+            axis,
+            split,
+            delta,
+          ),
         },
       };
     });

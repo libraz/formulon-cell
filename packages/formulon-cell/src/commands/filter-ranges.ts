@@ -74,3 +74,25 @@ export function withFilterRange(state: FilterRangeState, range: Range): Range[] 
 export function withoutFilterRange(ranges: readonly Range[], range: Range): Range[] {
   return ranges.filter((existing) => !sameRange(existing, range));
 }
+
+/** Whether the header cell at (`row`, `col`) of a filter range shows no dropdown button. */
+export function filterButtonHidden(
+  state: Pick<State, 'ui'>,
+  sheet: number,
+  row: number,
+  col: number,
+) {
+  return (state.ui.filterHiddenButtons ?? []).some(
+    ({ range, cols }) =>
+      range.sheet === sheet &&
+      range.r0 === row &&
+      cols.includes(col) &&
+      state.ui.filterRanges.some((filter) => sameRange(filter, range)),
+  );
+}
+
+/** `filterButtonHidden` on the active sheet, as a hit test takes it. */
+export const hiddenFilterButtonTest =
+  (state: Pick<State, 'ui' | 'data'>) =>
+  (row: number, col: number): boolean =>
+    filterButtonHidden(state, state.data.sheetIndex, row, col);

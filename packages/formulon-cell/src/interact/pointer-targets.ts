@@ -1,4 +1,4 @@
-import { headerFilterRanges } from '../commands/filter-ranges.js';
+import { headerFilterRanges, hiddenFilterButtonTest } from '../commands/filter-ranges.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { hitZone, layoutForView, type Rect, rangeRects } from '../render/geometry.js';
 import {
@@ -177,7 +177,9 @@ export function updateCursor(
     return;
   }
   const s = store.getState();
-  const zone = hitZone(layoutForView(s), s.viewport, x, y, headerFilterRanges(s));
+  const zone = hitZone(layoutForView(s), s.viewport, x, y, headerFilterRanges(s), {
+    filterButtonHidden: hiddenFilterButtonTest(s),
+  });
   if (!zone) {
     host.style.cursor = '';
     return;

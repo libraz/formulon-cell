@@ -2,6 +2,7 @@ import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type {
   CellFormat,
+  FilterHiddenButtons,
   FilterSortSpec,
   RangeValidation,
   ValueFilterCriteria,
@@ -336,6 +337,31 @@ export function shiftFilterSorts(
       return mapped ? [{ ...key, byCol: mapped[0] }] : [];
     });
     if (keys.length > 0) out.push({ range, keys });
+  }
+  return out;
+}
+
+export function shiftFilterHiddenButtons(
+  hidden: readonly FilterHiddenButtons[] | undefined,
+  sheet: number,
+  axis: 'row' | 'col',
+  split: number,
+  delta: number,
+): FilterHiddenButtons[] {
+  const out: FilterHiddenButtons[] = [];
+  for (const spec of hidden ?? []) {
+    if (spec.range.sheet !== sheet) {
+      out.push(spec);
+      continue;
+    }
+    const range = shiftRangeAxis(spec.range, axis, split, delta);
+    if (!range) continue;
+    const cols = spec.cols.flatMap((col) => {
+      if (axis === 'row') return [col];
+      const mapped = adjustInterval(col, col, split, delta);
+      return mapped ? [mapped[0]] : [];
+    });
+    if (cols.length > 0) out.push({ range, cols });
   }
   return out;
 }
