@@ -51,7 +51,10 @@ export async function runPivotTableFilterDialogScenario(page: Page): Promise<voi
   const filterDialog = page.getByRole('dialog', { name: 'PivotTable Filter: Channel' });
   await expect(filterDialog).toBeVisible();
   await expect(filterDialog.locator('[data-pivot-filter-category="true"]')).toHaveValue('label');
-  await expect(filterDialog.locator('[data-pivot-filter-condition="true"]')).toHaveValue('none');
+  // A new filter starts on the None condition.
+  await expect(
+    filterDialog.locator('[data-pivot-filter-condition="true"] option:checked'),
+  ).toHaveText('None');
   await filterDialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(filterDialog).toBeHidden();
 
