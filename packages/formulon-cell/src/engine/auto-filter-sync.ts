@@ -495,6 +495,9 @@ function sortStateFromSpec(spec: FilterSortSpec, wb?: WorkbookHandle): AutoFilte
           },
         ];
       }
+      if (key.sortOn === 'customList' && key.customList?.length) {
+        return [{ ...base, sortBy: SORT_BY_VALUE, customList: key.customList.join(',') }];
+      }
       if (key.sortOn === 'cellIcon' && key.icon) {
         const icon = customIconToEngine(key.icon);
         return icon
@@ -506,8 +509,7 @@ function sortStateFromSpec(spec: FilterSortSpec, wb?: WorkbookHandle): AutoFilte
   };
 }
 
-/** Value, colour and icon sort levels of a typed `<sortState>`; custom-list levels have no
- *  cell-layer representation and are left out. */
+/** The value, custom-list, colour and icon sort levels of a typed `<sortState>`. */
 function sortSpecFromTyped(
   typed: AutoFilter,
   range: Range,
@@ -517,9 +519,13 @@ function sortSpecFromTyped(
   if (!sort || sort.columnSort) return null;
   const keys = sort.conditions.flatMap((condition): FilterSortKey[] => {
     const byCol = condition.range.firstCol;
-    if (condition.customList !== null || byCol < range.c0 || byCol > range.c1) return [];
+    if (byCol < range.c0 || byCol > range.c1) return [];
     const base = { byCol, direction: condition.descending ? ('desc' as const) : ('asc' as const) };
-    if (condition.sortBy === SORT_BY_VALUE) return [base];
+    if (condition.sortBy === SORT_BY_VALUE) {
+      return condition.customList
+        ? [{ ...base, sortOn: 'customList', customList: condition.customList.split(',') }]
+        : [base];
+    }
     if (condition.sortBy === SortBy.Icon) {
       const icon =
         condition.iconIndex === null
@@ -621,7 +627,7 @@ export function typedAutoFilterFromState(
       lastCol: range.c1,
     },
     columns: Array.from(columns.values()).sort((a, b) => a.columnOffset - b.columnOffset),
-    sort: sortForRange(state, range, imported, wb),
+    sort: sortForRange(state, range, wb),
   };
 }
 
@@ -635,15 +641,10 @@ const hiddenButtonCols = (state: State, range: Range): number[] =>
 function sortForRange(
   state: State,
   range: Range,
-  imported: ImportedTypedFilter | undefined,
   wb?: WorkbookHandle,
 ): AutoFilterSortStateInput | null {
   const spec = state.ui.filterSorts?.find((entry) => sameRange(entry.range, range));
-  if (spec) return sortStateFromSpec(spec, wb);
-  // Custom-list levels the cell layer cannot show stay engine-owned until a sort replaces them.
-  const carried =
-    imported && sameAutoFilterRange(imported.filter, range) ? imported.filter.sort : null;
-  return carried?.conditions.some((condition) => condition.customList !== null) ? carried : null;
+  return spec ? sortStateFromSpec(spec, wb) : null;
 }
 
 function wildcardCondition(

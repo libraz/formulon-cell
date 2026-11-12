@@ -32,7 +32,7 @@ const seeded = async () => {
   return { wb, store };
 };
 
-describe('AutoFilter sort levels by colour and icon', () => {
+describe('AutoFilter sort levels by custom list, colour and icon', () => {
   const cases: { key: FilterSortKey; native: object }[] = [
     {
       key: { byCol: 0, direction: 'asc', sortOn: 'cellColor', color: '#ff0000' },
@@ -41,6 +41,15 @@ describe('AutoFilter sort levels by colour and icon', () => {
     {
       key: { byCol: 0, direction: 'desc', sortOn: 'fontColor', color: '#0000ff' },
       native: { sortBy: SortBy.FontColor, descending: true },
+    },
+    {
+      key: {
+        byCol: 0,
+        direction: 'desc',
+        sortOn: 'customList',
+        customList: ['Low', 'Mid', 'High'],
+      },
+      native: { sortBy: SortBy.Value, descending: true, customList: 'Low,Mid,High' },
     },
     {
       key: { byCol: 0, direction: 'asc', sortOn: 'cellIcon', icon: { set: 'arrows3', slot: 1 } },
@@ -56,7 +65,9 @@ describe('AutoFilter sort levels by colour and icon', () => {
         expect(syncAutoFilterToEngine(wb, store.getState(), 0, store), key.sortOn).toBe(true);
         const condition = wb.getAutoFilter(0)?.sort?.conditions[0];
         expect(condition, key.sortOn).toMatchObject(native);
-        if (key.sortOn !== 'cellIcon') expect(condition?.dxfIndex).not.toBeNull();
+        if (key.sortOn === 'cellColor' || key.sortOn === 'fontColor') {
+          expect(condition?.dxfIndex).not.toBeNull();
+        }
         const reopened = await WorkbookHandle.loadBytes(wb.save());
         try {
           const reloaded = createSpreadsheetStore();

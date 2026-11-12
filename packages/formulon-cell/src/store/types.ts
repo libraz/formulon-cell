@@ -314,16 +314,18 @@ export interface FilterSortSpec {
   keys: FilterSortKey[];
 }
 
-/** One sort level of a filtered range: by value, or with one fill, font colour or conditional
- *  formatting icon first (last when descending). */
+/** One sort level of a filtered range: by value, in a custom list's order, or with one fill, font
+ *  colour or conditional formatting icon first (last when descending). */
 export interface FilterSortKey {
   byCol: number;
   direction: 'asc' | 'desc';
-  sortOn?: 'cellColor' | 'fontColor' | 'cellIcon';
+  sortOn?: 'cellColor' | 'fontColor' | 'cellIcon' | 'customList';
   /** The colour of a colour level, lower-cased. */
   color?: string;
   /** The icon of an icon level. */
   icon?: ConditionalIconRef;
+  /** The list order of a custom-list level. */
+  customList?: string[];
 }
 
 /** A filter by colour: rows whose cell fill or font colour is `color`, or whose conditional

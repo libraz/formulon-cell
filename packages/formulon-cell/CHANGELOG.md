@@ -107,6 +107,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- A sort by a custom list inside a filtered range is remembered with the filter and written to the file's sort state with its list, and a custom-list sort level read from a file comes back into the filter's sort.
 - A filter column whose dropdown button the file hides shows no button, keeps its filter applied and editable, and keeps the hidden button through a save.
 - Switching a column filter between conditions that hide the same rows, such as two date periods, is its own undo step.
 - PivotTable filters of every kind the file holds stay through an edit of the report, and a PivotTable date filter reads its typed dates in the workbook's locale, as cell entry does.

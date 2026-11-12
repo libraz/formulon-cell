@@ -870,6 +870,11 @@ export function sortRange(
       if (sortOn === 'cellIcon' && key.icon) {
         return [{ byCol: key.byCol, direction: key.direction, sortOn, icon: { ...key.icon } }];
       }
+      if (sortOn === 'customList' && key.customList?.length) {
+        return [
+          { byCol: key.byCol, direction: key.direction, sortOn, customList: [...key.customList] },
+        ];
+      }
       return [];
     });
     setFilterSort(store, history, filterRange, keys, wb);
