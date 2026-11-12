@@ -93,23 +93,6 @@ type StylesMenuText = ToolbarMenuText & {
   cellStyleCustom: string;
 };
 
-export type TableVariantId = 'plain' | 'banded' | 'firstCol' | 'bandedFirstCol';
-
-export const tableVariantOptions = (
-  variant: TableVariantId,
-): { banded: boolean; firstCol: boolean } => {
-  switch (variant) {
-    case 'plain':
-      return { banded: false, firstCol: false };
-    case 'banded':
-      return { banded: true, firstCol: false };
-    case 'firstCol':
-      return { banded: false, firstCol: true };
-    case 'bandedFirstCol':
-      return { banded: true, firstCol: true };
-  }
-};
-
 const tableStyleSwatchPart = (className: string, background?: string): HTMLDivElement => {
   const part = document.createElement('div');
   part.className = className;

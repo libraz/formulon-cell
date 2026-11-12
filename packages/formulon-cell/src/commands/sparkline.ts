@@ -41,15 +41,7 @@ const TYPE_OF_KIND: Record<SparklineKind, SparklineType> = {
   'win-loss': SparklineType.Stacked,
 };
 
-const KIND_OF_TYPE: Record<SparklineType, SparklineKind> = {
-  [SparklineType.Line]: 'line',
-  [SparklineType.Column]: 'column',
-  [SparklineType.Stacked]: 'win-loss',
-};
-
 export const sparklineTypeOf = (kind: SparklineKind): SparklineType => TYPE_OF_KIND[kind];
-
-export const sparklineKindOf = (type: SparklineType): SparklineKind => KIND_OF_TYPE[type] ?? 'line';
 
 /** An opaque RGB engine colour of `css` (`#rgb` / `#rrggbb`). */
 export const rgbColorSpec = (css: string): Color => ({

@@ -117,9 +117,6 @@ export function clearTableStyle(ctx: TableActionContext, table: TableOverlay): b
   });
 }
 
-/** The PivotTable style a PivotTable takes when the workbook names no default. */
-export const FALLBACK_PIVOT_STYLE = 'PivotStyleLight16';
-
 type StyleDefaultsWorkbook = Pick<
   WorkbookHandle,
   'getTableStyleDefaults' | 'setTableStyleDefaults'

@@ -11,7 +11,7 @@ import {
 import { isSubmitEnter } from '../../interact/mac-dialog-keys.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
 
-export const restoreDialogFocus = (overlay: HTMLElement, opener: HTMLElement | null): void => {
+const restoreDialogFocus = (overlay: HTMLElement, opener: HTMLElement | null): void => {
   if (!opener) return;
   const ownerDocument = overlay.ownerDocument;
   if (

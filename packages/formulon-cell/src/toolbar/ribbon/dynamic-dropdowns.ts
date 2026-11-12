@@ -6,6 +6,7 @@ import type { DialogEntry } from '../../interact/dialog-entry.js';
 // the click dispatch table.
 
 import type { RibbonFillAction } from '../../commands/fill.js';
+import type { TableVariant } from '../../commands/format-as-table.js';
 import type { WorkbookThemePresetId } from '../../engine/workbook-theme-presets.js';
 import { clamp, viewportSize } from '../../interact/overlay-position.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -20,7 +21,6 @@ import {
   macRibbonMenuIdForCommand,
 } from './mac/model.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
-import type { TableVariantId } from './menus/styles.js';
 import { SPARKLINE_MENU_IDS } from './sparkline-tabs.js';
 
 export type RibbonDropdownSpec = {
@@ -165,7 +165,7 @@ export interface DynamicDropdownsCtx {
   createTableFromSelection: (
     style?: string,
     color?: string,
-    variant?: TableVariantId,
+    variant?: TableVariant,
   ) => void | Promise<void>;
   openTableStyleFooterAction: (action: string) => void | Promise<void>;
   applyPivotTableStyleFromRibbon: (styleId: string) => void | Promise<void>;
@@ -815,7 +815,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     {
       attr: 'table-style',
       handler: (v, { button }) => {
-        const variant = (button.dataset.tableVariant as TableVariantId | undefined) ?? 'banded';
+        const variant = (button.dataset.tableVariant as TableVariant | undefined) ?? 'banded';
         return ctx.createTableFromSelection(v, button.dataset.tableColor, variant);
       },
     },

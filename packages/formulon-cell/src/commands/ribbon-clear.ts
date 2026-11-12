@@ -1,5 +1,6 @@
-import { authorizedBatch, type RefusedDecision } from './authorized-write.js';
+import { authorizedBatch } from './authorized-write.js';
 import { hyperlinkIntents, hyperlinkOperation } from './hyperlink-actions.js';
+import type { RefusedDecision } from './permission-reasons.js';
 // Shared "Clear" ribbon split-button action — invoked by every host wrapper.
 // The command owns selection planning, policy preflight, sparse metadata
 // mutation, and the history boundary so all ribbon hosts have the same

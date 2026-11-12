@@ -8,12 +8,11 @@ import {
   type PermissionDecision,
   refusedByDecision,
 } from './interaction-policy.js';
+import type { RefusedDecision } from './permission-reasons.js';
 
 /** The intents of one logical write for an origin: the action's own origin
  *  for the apply check, `'undo'` and `'redo'` for history replay. */
 export type AuthorizedIntentFactory = (origin: InteractionOrigin) => readonly OperationIntent[];
-
-export type RefusedDecision = Extract<PermissionDecision, { allowed: false }>;
 
 export type AuthorizedWriteResult<T> =
   | { readonly ok: true; readonly value: T }
