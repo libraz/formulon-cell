@@ -139,7 +139,7 @@ export const ribbonFr: RibbonStrings = {
     tableTools: 'Outils',
     summarizePivot: 'Synthétiser avec un tableau croisé dynamique',
     convertRange: 'Convertir en plage',
-    insertSlicer: 'Insérer des segments',
+    insertSlicer: 'Insérer un segment',
     convertRangeConfirm: 'Voulez-vous convertir le tableau en plage normale ?',
     externalTableData: 'Données de table externe',
     headerRow: "Ligne d'en-tête",

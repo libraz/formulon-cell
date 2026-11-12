@@ -197,7 +197,7 @@ export const macPivotOptionsJa: MacPivotOptionsStrings = {
   unavailable: 'このバージョンでは使用できません。',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, tabLayout, tabData, tabAltText, display.group, display.noDataGroup, and 24 more. */
+/** Mac app wording from the Excel bundle; not answered by it: display.group, display.noDataGroup, display.noDataRows, display.noDataColumns, display.repeatRowLabels, display.printTitles, and 9 more. */
 export const macPivotOptionsDe: MacPivotOptionsStrings = {
   title: 'PivotTable-Optionen',
   name: 'PivotTable-Name:',
@@ -263,7 +263,7 @@ export const macPivotOptionsDe: MacPivotOptionsStrings = {
   unavailable: 'In dieser Version nicht verfügbar.',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, name, tabLayout, tabData, tabAltText, display.group, and 25 more. */
+/** Mac app wording from the Excel bundle; not answered by it: display.group, display.noDataGroup, display.noDataRows, display.noDataColumns, display.repeatRowLabels, display.printTitles, and 8 more. */
 export const macPivotOptionsFr: MacPivotOptionsStrings = {
   title: 'Options du tableau croisé dynamique',
   name: 'Nom du tableau croisé dynamique :',
@@ -283,7 +283,7 @@ export const macPivotOptionsFr: MacPivotOptionsStrings = {
     noDataGroup: 'Éléments sans données :',
     noDataRows: 'Afficher sur les lignes',
     noDataColumns: 'Afficher sur les colonnes',
-    printGroup: 'Impression :',
+    printGroup: 'Imprimer :',
     repeatRowLabels: 'Répéter les étiquettes de lignes sur chaque page imprimée',
     printTitles: 'Définir les titres à imprimer',
     itemLabels: 'Étiquettes des éléments lorsque la zone des valeurs ne contient aucun champ',
@@ -300,7 +300,7 @@ export const macPivotOptionsFr: MacPivotOptionsStrings = {
     downThenOver: 'Vers le bas, puis à droite',
     overThenDown: 'À droite, puis vers le bas',
     fieldsPerColumn: 'Champs par colonne :',
-    sortGroup: 'Tri :',
+    sortGroup: 'Trier :',
     customLists: 'Utiliser des listes personnalisées lors du tri',
     sortAscending: 'Trier de A à Z',
     sortDataSource: 'Trier par ordre de source de données',
@@ -329,14 +329,14 @@ export const macPivotOptionsFr: MacPivotOptionsStrings = {
   unavailable: 'Non disponible dans cette version.',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, tabLayout, tabData, tabAltText, display.group, display.noDataGroup, and 21 more. */
+/** Mac app wording from the Excel bundle; not answered by it: display.group, display.noDataGroup, display.noDataRows, display.noDataColumns, display.repeatRowLabels, display.printTitles, and 8 more. */
 export const macPivotOptionsZh: MacPivotOptionsStrings = {
   title: '数据透视表选项',
   name: '数据透视表名称:',
   tabDisplay: '显示',
   tabLayout: '布局',
   tabData: '数据',
-  tabAltText: '可选文字',
+  tabAltText: '替换文字',
   display: {
     group: '显示:',
     expandButtons: '展开/折叠按钮',
@@ -387,7 +387,7 @@ export const macPivotOptionsZh: MacPivotOptionsStrings = {
   },
   altText: {
     title: '标题',
-    description: '说明',
+    description: '描述',
     help: '标题和描述为表格、图示、图像和其他对象中包含的信息提供替代性的文字表示。此信息对于有视觉或认知障碍而无法看清楚或理解对象的人十分有用。\n\n系统可为残障人士朗读标题，让其判断是否希望听到内容的描述。',
   },
   ok: '确定',
@@ -395,7 +395,7 @@ export const macPivotOptionsZh: MacPivotOptionsStrings = {
   unavailable: '此版本中不可用。',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, tabLayout, tabData, tabAltText, display.group, display.noDataGroup, and 22 more. */
+/** Mac app wording from the Excel bundle; not answered by it: display.group, display.noDataGroup, display.noDataRows, display.noDataColumns, display.repeatRowLabels, display.printTitles, and 9 more. */
 export const macPivotOptionsKo: MacPivotOptionsStrings = {
   title: '피벗 테이블 옵션',
   name: '피벗 테이블 이름:',
@@ -421,7 +421,7 @@ export const macPivotOptionsKo: MacPivotOptionsStrings = {
     itemLabels: '값 영역에 필드가 없을 때 항목 레이블',
   },
   layout: {
-    group: '레이아웃:',
+    group: '모양:',
     multipleFilters: '필드 하나에 여러 필터 허용',
     autofitColumns: '업데이트 시 열 자동 맞춤',
     preserveFormatting: '업데이트 시 셀 서식 유지',
@@ -433,7 +433,7 @@ export const macPivotOptionsKo: MacPivotOptionsStrings = {
     overThenDown: '열 우선',
     fieldsPerColumn: '열당 필드 수:',
     sortGroup: '정렬:',
-    customLists: '정렬할 때 사용자 지정 목록 사용',
+    customLists: '정렬에 사용자 지정 목록 사용',
     sortAscending: '텍스트 오름차순 정렬',
     sortDataSource: '데이터 원본 순서로 정렬',
   },
@@ -461,7 +461,7 @@ export const macPivotOptionsKo: MacPivotOptionsStrings = {
   unavailable: '이 버전에서는 사용할 수 없습니다.',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, tabLayout, tabData, tabAltText, display.group, display.noDataGroup, and 23 more. */
+/** Mac app wording from the Excel bundle; not answered by it: display.group, display.noDataGroup, display.noDataRows, display.noDataColumns, display.repeatRowLabels, display.printTitles, and 9 more. */
 export const macPivotOptionsTh: MacPivotOptionsStrings = {
   title: 'ตัวเลือก PivotTable',
   name: 'ชื่อ PivotTable:',
@@ -493,12 +493,12 @@ export const macPivotOptionsTh: MacPivotOptionsStrings = {
     preserveFormatting: 'รักษาการจัดรูปแบบเซลล์เมื่ออัปเดต',
     mergeLabels: 'ผสานและจัดกึ่งกลางเซลล์ที่มีป้ายชื่อ',
     compactIndent: 'เยื้องป้ายชื่อแถวในรูปแบบกะทัดรัด:',
-    reportFilterGroup: 'ตัวกรองรายงาน:',
+    reportFilterGroup: 'ตัวกรองรายการ:',
     fieldOrder: 'เขตข้อมูลที่แสดงอยู่:',
     downThenOver: 'ลงแล้วซ้ายไปขวา',
     overThenDown: 'ซ้ายไปขวาแล้วลง',
     fieldsPerColumn: 'เขตข้อมูลต่อคอลัมน์:',
-    sortGroup: 'การเรียงลำดับ:',
+    sortGroup: 'เรียงลำดับ:',
     customLists: 'ใช้รายการแบบกำหนดเองเมื่อเรียงลำดับ',
     sortAscending: 'เรียงลำดับจาก ก ถึง ฮ',
     sortDataSource: 'เรียงตามลำดับแหล่งข้อมูล',

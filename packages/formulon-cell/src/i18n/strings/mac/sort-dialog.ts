@@ -64,7 +64,7 @@ export const macSortDialogJa: MacSortDialogStrings = {
   caseSensitive: '大文字と小文字を区別する',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation, and 1 more. */
+/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation. */
 export const macSortDialogDe: Partial<MacSortDialogStrings> = {
   sortDialogHeader: 'Meine Liste hat Kopfzeilen',
   sortDialogAscending: 'A bis Z',
@@ -79,7 +79,7 @@ export const macSortDialogDe: Partial<MacSortDialogStrings> = {
   caseSensitive: 'Groß-/Kleinschreibung beachten',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation. */
 export const macSortDialogFr: Partial<MacSortDialogStrings> = {
   sortDialogHeader: 'Ma liste contient des en-têtes',
   sortDialogAscending: 'De A à Z',
@@ -91,9 +91,10 @@ export const macSortDialogFr: Partial<MacSortDialogStrings> = {
   sortLeftToRight: 'De la gauche vers la droite',
   usePhonetic: 'Trier par syllabe',
   noPhonetic: 'Trier par caractère',
+  method: 'Méthode ',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation, and 1 more. */
+/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation. */
 export const macSortDialogKo: Partial<MacSortDialogStrings> = {
   sortDialogHeader: '목록에 머리글 포함',
   sortDialogAscending: '텍스트 오름차순',
@@ -108,7 +109,7 @@ export const macSortDialogKo: Partial<MacSortDialogStrings> = {
   caseSensitive: '대/소문자 구분',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation, and 1 more. */
+/** Mac app wording from the Excel bundle; not answered by it: columnHeading, sortOnValues, copyLevel, options, rowHeading, orientation. */
 export const macSortDialogTh: Partial<MacSortDialogStrings> = {
   sortDialogHeader: 'รายการของฉันมีส่วนหัว',
   sortDialogAscending: 'ก ถึง ฮ',
@@ -121,9 +122,10 @@ export const macSortDialogTh: Partial<MacSortDialogStrings> = {
   usePhonetic: 'การเรียงลำดับตามพยางค์',
   noPhonetic: 'การเรียงลำดับตามขีด',
   caseSensitive: 'ตรงตามตัวพิมพ์ใหญ่-เล็ก',
+  method: 'วิธี',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: sortDialogAscending, sortDialogDescending, columnHeading, sortOnValues, options, rowHeading, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: sortDialogAscending, sortDialogDescending, columnHeading, sortOnValues, options, rowHeading, and 1 more. */
 export const macSortDialogZh: Partial<MacSortDialogStrings> = {
   sortDialogHeader: '列表包含标题',
   levelsHeading: '添加按以下方式排序的级别:',

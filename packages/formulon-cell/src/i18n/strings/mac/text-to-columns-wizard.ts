@@ -69,7 +69,7 @@ export const macTextToColumnsWizardJa: TextToColumnsWizardStrings = {
   finish: '完了',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 6 more. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 3 more. */
 export const macTextToColumnsWizardDe: TextToColumnsWizardStrings = {
   title: 'Textkonvertierungs-Assistent - Schritt {step} von 3',
   step1Intro:
@@ -88,7 +88,7 @@ export const macTextToColumnsWizardDe: TextToColumnsWizardStrings = {
     'Zum Verschieben einer Trennlinie ziehen Sie sie.',
   ],
   delimiters: 'Trennzeichen',
-  other: 'Andere:',
+  other: 'Anderes:',
   qualifier: 'Textqualifizierer:',
   qualifierNone: 'kein',
   step3Prompt: 'Markieren Sie jede Spalte, und legen Sie das Datenformat fest.',
@@ -104,7 +104,7 @@ export const macTextToColumnsWizardDe: TextToColumnsWizardStrings = {
   finish: 'Fertig stellen',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 8 more. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 2 more. */
 export const macTextToColumnsWizardFr: TextToColumnsWizardStrings = {
   title: 'Assistant Conversion - Étape {step} sur 3',
   step1Intro: 'L’Assistant a déterminé que vos données sont délimitées.',
@@ -127,7 +127,7 @@ export const macTextToColumnsWizardFr: TextToColumnsWizardStrings = {
   qualifierNone: 'aucun',
   step3Prompt: 'Sélectionnez chaque colonne et définissez le format des données.',
   columnFormat: 'Format des données en colonne',
-  general: 'Standard',
+  general: 'Général',
   text: 'Texte',
   date: 'Date :',
   skip: 'Colonne non distribuée',
@@ -135,10 +135,10 @@ export const macTextToColumnsWizardFr: TextToColumnsWizardStrings = {
   details: 'Avancé...',
   back: '< Précédent',
   next: 'Suivant >',
-  finish: 'Terminer',
+  finish: 'Fin',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 5 more. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 1 more. */
 export const macTextToColumnsWizardZh: TextToColumnsWizardStrings = {
   title: '文本分列向导 - 第 {step} 步，共 3 步',
   step1Intro: '文本分列向导判定您的数据具有分隔符。',
@@ -171,7 +171,7 @@ export const macTextToColumnsWizardZh: TextToColumnsWizardStrings = {
   finish: '完成',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 5 more. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 2 more. */
 export const macTextToColumnsWizardKo: TextToColumnsWizardStrings = {
   title: '텍스트 마법사 - {step}/3단계',
   step1Intro: '텍스트 마법사에서 데이터가 구분 기호로 분리되어 있는 것으로 판단했습니다.',
@@ -204,7 +204,7 @@ export const macTextToColumnsWizardKo: TextToColumnsWizardStrings = {
   finish: '마침',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 6 more. */
+/** Mac app wording from the Excel bundle; not answered by it: title, step1Intro, step1Prompt, step2Prompt, fixedPrompt, fixedSteps, and 2 more. */
 export const macTextToColumnsWizardTh: TextToColumnsWizardStrings = {
   title: 'ตัวช่วยสร้างการแปลงข้อความเป็นคอลัมน์ - ขั้นตอนที่ {step} จาก 3',
   step1Intro: 'ตัวช่วยสร้างข้อความพบว่าข้อมูลของคุณมีตัวคั่น',

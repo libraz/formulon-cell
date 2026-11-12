@@ -149,7 +149,7 @@ export const editDialogsFr: EditDialogsStrings = {
     ignoreOnce: 'Ignorer une fois',
     ignoreAll: 'Ignorer tout',
     add: 'Ajouter',
-    change: 'Modifier',
+    change: 'Remplacer',
     changeAll: 'Remplacer tout',
     delete: 'Supprimer',
     deleteAll: 'Supprimer tout',

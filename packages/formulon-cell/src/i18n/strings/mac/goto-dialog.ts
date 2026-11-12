@@ -50,9 +50,10 @@ export const macGoToDialogFr: Partial<MacGoToDialogStrings> = {
   noOptions: 'Il n’y a aucune option pour cette sélection.',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: kindComments, kindBlanks, reference, selectCaption, optionsGroup. */
+/** Mac app wording from the Excel bundle; not answered by it: kindComments, reference, selectCaption, optionsGroup. */
 export const macGoToDialogKo: Partial<MacGoToDialogStrings> = {
   noOptions: '이 선택 사항에 대한 옵션이 없습니다.',
+  kindBlanks: '필드 값 없음',
 };
 
 /** Mac app wording from the Excel bundle; not answered by it: kindComments, reference, selectCaption, optionsGroup. */

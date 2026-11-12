@@ -135,7 +135,7 @@ export const macAccessibilityPaneJa: MacAccessibilityPaneStrings = {
   statusIssues: 'アクセシビリティ: 検討が必要です',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: close, help, cleanTitle, cleanText, issuesTitle, issuesText, and 21 more. */
+/** Mac app wording from the Excel bundle; not answered by it: close, help, cleanTitle, cleanText, issuesTitle, issuesText, and 16 more. */
 export const macAccessibilityPaneDe: MacAccessibilityPaneStrings = {
   title: 'Barrierefreiheit-Assistent',
   close: 'Barrierefreiheits-Assistent schließen',
@@ -181,7 +181,7 @@ export const macAccessibilityPaneDe: MacAccessibilityPaneStrings = {
   statusIssues: 'Barrierefreiheit: Untersuchen',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: close, back, cleanTitle, cleanText, issuesTitle, issuesText, and 22 more. */
+/** Mac app wording from the Excel bundle; not answered by it: close, back, cleanTitle, cleanText, issuesTitle, issuesText, and 16 more. */
 export const macAccessibilityPaneFr: MacAccessibilityPaneStrings = {
   title: 'Assistant d’accessibilité',
   close: 'Fermer Assistant Accessibilité',
@@ -198,9 +198,9 @@ export const macAccessibilityPaneFr: MacAccessibilityPaneStrings = {
   noIssues: 'Aucun problème',
   sections: {
     colorContrast: 'Couleur et contraste',
-    media: 'Médias et illustrations',
+    media: 'Média et illustrations',
     tables: 'Tableaux',
-    structure: 'Structure du document',
+    structure: 'Document Structure',
     access: 'Accès au document',
   },
   rules: {
@@ -212,7 +212,7 @@ export const macAccessibilityPaneFr: MacAccessibilityPaneStrings = {
     defaultSheetName: 'Noms de feuille par défaut',
     restrictedAccess: 'Accès restreint',
   },
-  contrastTitle: 'Contraste de texte difficile à lire',
+  contrastTitle: 'Contraste de texte dur à lire',
   contrastText:
     'La couleur actuelle du texte est difficile à voir. Choisissez une couleur à fort contraste pour que le texte soit bien visible.',
   contrastSwatch: 'Couleur de police {color}',
@@ -227,7 +227,7 @@ export const macAccessibilityPaneFr: MacAccessibilityPaneStrings = {
   statusIssues: 'Accessibilité : examen requis',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: close, back, cleanTitle, cleanText, issuesTitle, issuesText, and 23 more. */
+/** Mac app wording from the Excel bundle; not answered by it: close, back, cleanTitle, cleanText, issuesTitle, issuesText, and 16 more. */
 export const macAccessibilityPaneZh: MacAccessibilityPaneStrings = {
   title: '辅助功能助手',
   close: '关闭辅助功能助手',
@@ -255,9 +255,9 @@ export const macAccessibilityPaneZh: MacAccessibilityPaneStrings = {
     tableHeader: '缺少表格标题',
     mergedCells: '合并的单元格',
     defaultSheetName: '默认工作表名称',
-    restrictedAccess: '受限访问',
+    restrictedAccess: '限制访问',
   },
-  contrastTitle: '文本对比度难以阅读',
+  contrastTitle: '难以阅读文本对比度',
   contrastText: '当前文本颜色难以看清。请考虑使用高对比度颜色，使文本清晰可见。',
   contrastSwatch: '字体颜色 {color}',
   moreFontColors: '其他字体颜色',
@@ -270,7 +270,7 @@ export const macAccessibilityPaneZh: MacAccessibilityPaneStrings = {
   statusIssues: '辅助功能: 需要调查',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: close, cleanTitle, cleanText, issuesTitle, issuesText, counter, and 21 more. */
+/** Mac app wording from the Excel bundle; not answered by it: close, cleanTitle, cleanText, issuesTitle, issuesText, counter, and 15 more. */
 export const macAccessibilityPaneKo: MacAccessibilityPaneStrings = {
   title: '접근성 도우미',
   close: '접근성 도우미 닫기',
@@ -313,7 +313,7 @@ export const macAccessibilityPaneKo: MacAccessibilityPaneStrings = {
   statusIssues: '접근성: 조사 필요',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: close, help, cleanTitle, cleanText, issuesTitle, issuesText, and 21 more. */
+/** Mac app wording from the Excel bundle; not answered by it: close, help, cleanTitle, cleanText, issuesTitle, issuesText, and 16 more. */
 export const macAccessibilityPaneTh: MacAccessibilityPaneStrings = {
   title: 'ตัวช่วยสำหรับการเข้าถึง',
   close: 'ปิดผู้ช่วยการช่วยสำหรับการเข้าถึง',
@@ -328,7 +328,7 @@ export const macAccessibilityPaneTh: MacAccessibilityPaneStrings = {
   issueCount: '{count} ปัญหา',
   noIssues: 'ไม่มีปัญหา',
   sections: {
-    colorContrast: 'สีและคอนทราสต์',
+    colorContrast: 'สีและความคมชัด',
     media: 'สื่อและภาพประกอบ',
     tables: 'ตาราง',
     structure: 'โครงสร้างเอกสาร',
@@ -341,7 +341,7 @@ export const macAccessibilityPaneTh: MacAccessibilityPaneStrings = {
     tableHeader: 'ส่วนหัวของตารางขาดหายไป',
     mergedCells: 'เซลล์ที่ผสาน',
     defaultSheetName: 'ชื่อแผ่นงานเริ่มต้น',
-    restrictedAccess: 'การเข้าถึงแบบจำกัด',
+    restrictedAccess: 'การเข้าถึงที่จำกัด',
   },
   contrastTitle: 'ความคมชัดของข้อความที่อ่านยาก',
   contrastText: 'สีข้อความปัจจุบันมองเห็นได้ยาก ลองใช้สีที่มีคอนทราสต์สูงเพื่อให้ข้อความชัดเจน',

@@ -31,7 +31,7 @@ export const macPasteSpecialJa: MacPasteSpecialStrings = {
   pasteLink: 'ペースト リンク',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
+/** Mac app wording from the Excel bundle. */
 export const macPasteSpecialDe: Partial<MacPasteSpecialStrings> = {
   pasteValues: 'Werte',
   pasteAllUsingSourceTheme: 'Alles mit Quelldesign',
@@ -39,7 +39,7 @@ export const macPasteSpecialDe: Partial<MacPasteSpecialStrings> = {
   skipBlanks: 'Leerzellen überspringen',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
+/** Mac app wording from the Excel bundle. */
 export const macPasteSpecialFr: Partial<MacPasteSpecialStrings> = {
   pasteValues: 'Valeurs',
   pasteAllUsingSourceTheme: 'Tout, avec le thème source',
@@ -47,7 +47,7 @@ export const macPasteSpecialFr: Partial<MacPasteSpecialStrings> = {
   skipBlanks: 'Blancs non compris',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
+/** Mac app wording from the Excel bundle. */
 export const macPasteSpecialKo: Partial<MacPasteSpecialStrings> = {
   pasteValues: '값',
   pasteAllUsingSourceTheme: '원본 테마 사용',
@@ -55,7 +55,7 @@ export const macPasteSpecialKo: Partial<MacPasteSpecialStrings> = {
   skipBlanks: '내용 있는 셀만 붙여넣기',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
+/** Mac app wording from the Excel bundle. */
 export const macPasteSpecialTh: Partial<MacPasteSpecialStrings> = {
   pasteValues: 'ค่า',
   pasteAllUsingSourceTheme: 'ทั้งหมดที่ใช้ชุดรูปแบบต้นฉบับ',
@@ -63,7 +63,7 @@ export const macPasteSpecialTh: Partial<MacPasteSpecialStrings> = {
   skipBlanks: 'ข้ามเซลล์ที่ว่าง',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: title, sectionPaste, pasteLink. */
+/** Mac app wording from the Excel bundle. */
 export const macPasteSpecialZh: Partial<MacPasteSpecialStrings> = {
   pasteValues: '值',
   pasteAllUsingSourceTheme: '全部使用源主题',

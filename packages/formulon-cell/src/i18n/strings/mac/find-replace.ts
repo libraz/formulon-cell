@@ -25,34 +25,35 @@ export const macFindReplaceFrom = (
   matchWidth,
 });
 
-/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, search, matchEntire, cellsFound. */
+/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, matchEntire, cellsFound. */
 export const macFindReplaceDe: Partial<MacFindReplaceStrings> = {
   lookIn: 'Suchen in:',
   matchCase: 'Groß-/Kleinschreibung beachten',
   matchWidth: 'Byte beachten',
+  search: 'Suchen:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, search, lookIn, matchEntire, cellsFound. */
+/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, matchEntire, cellsFound. */
 export const macFindReplaceFr: Partial<MacFindReplaceStrings> = {
   matchCase: 'Respecter la casse',
   matchWidth: 'Respecter le nombre d’octets',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, search, matchEntire, cellsFound. */
+/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, matchEntire, cellsFound. */
 export const macFindReplaceKo: Partial<MacFindReplaceStrings> = {
   lookIn: '찾는 위치:',
   matchCase: '대/소문자 구분',
   matchWidth: '전자/반자 구분',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, search, matchEntire, cellsFound. */
+/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, matchEntire, cellsFound. */
 export const macFindReplaceTh: Partial<MacFindReplaceStrings> = {
   lookIn: 'มองหาใน:',
   matchCase: 'ตรงตามตัวพิมพ์ใหญ่-เล็ก',
   matchWidth: 'ตรงตามไบต์',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, search, matchEntire, cellsFound. */
+/** Mac app wording from the Excel bundle; not answered by it: optionsMore, optionsLess, matchEntire, cellsFound. */
 export const macFindReplaceZh: Partial<MacFindReplaceStrings> = {
   lookIn: '查找范围:',
   matchCase: '区分大小写',

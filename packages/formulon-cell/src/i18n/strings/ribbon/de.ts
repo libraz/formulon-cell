@@ -139,7 +139,7 @@ export const ribbonDe: RibbonStrings = {
     tableTools: 'Extras',
     summarizePivot: 'In einer PivotTable zusammenfassen',
     convertRange: 'In Bereich konvertieren',
-    insertSlicer: 'Datenschnitt auswählen',
+    insertSlicer: 'Datenschnitt einfügen',
     convertRangeConfirm: 'Möchten Sie die Tabelle in einen normalen Bereich konvertieren?',
     externalTableData: 'Externe Tabellendaten',
     headerRow: 'Kopfzeile',

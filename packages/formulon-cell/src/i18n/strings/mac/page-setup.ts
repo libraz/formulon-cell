@@ -76,7 +76,7 @@ export const macPageSetupJa: MacPageSetupStrings = {
   firstPageNumber: '先頭ページ番号:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 11 more. */
+/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 9 more. */
 export const macPageSetupDe: Partial<MacPageSetupStrings> = {
   centerOnPage: 'Auf der Seite zentrieren:',
   headerNone: '(keine)',
@@ -93,7 +93,7 @@ export const macPageSetupDe: Partial<MacPageSetupStrings> = {
   firstPageNumber: 'Erste Seitenzahl:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 11 more. */
+/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 9 more. */
 export const macPageSetupFr: Partial<MacPageSetupStrings> = {
   centerOnPage: 'Centrer sur la page :',
   headerNone: '(aucun)',
@@ -110,7 +110,7 @@ export const macPageSetupFr: Partial<MacPageSetupStrings> = {
   firstPageNumber: 'Commencer la numérotation à :',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 11 more. */
+/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 9 more. */
 export const macPageSetupKo: Partial<MacPageSetupStrings> = {
   centerOnPage: '페이지 가운데 맞춤:',
   headerNone: '(없음)',
@@ -125,9 +125,11 @@ export const macPageSetupKo: Partial<MacPageSetupStrings> = {
   pagesWideBy: '페이지 너비',
   tall: '페이지 높이',
   firstPageNumber: '시작 페이지 번호:',
+  customHeader: '머리글 편집...',
+  customFooter: '바닥글 편집...',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 11 more. */
+/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 9 more. */
 export const macPageSetupTh: Partial<MacPageSetupStrings> = {
   centerOnPage: 'กึ่งกลางหน้ากระดาษ:',
   headerNone: '(ไม่มี)',
@@ -144,7 +146,7 @@ export const macPageSetupTh: Partial<MacPageSetupStrings> = {
   firstPageNumber: 'หมายเลขหน้าแรก:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 11 more. */
+/** Mac app wording from the Excel bundle; not answered by it: marginTop, marginRight, marginBottom, marginLeft, marginHeader, marginFooter, and 9 more. */
 export const macPageSetupZh: Partial<MacPageSetupStrings> = {
   centerOnPage: '居中:',
   headerNone: '(无)',

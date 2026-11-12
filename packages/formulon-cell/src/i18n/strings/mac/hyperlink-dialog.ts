@@ -62,7 +62,7 @@ export const macHyperlinkDialogJa: MacHyperlinkDialogStrings = {
   recentEmails: '最近使用した電子メール アドレス:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, tabEmail, browse, browseUnavailable, documentPlace, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, browseUnavailable, documentPlace. */
 export const macHyperlinkDialogDe: Partial<MacHyperlinkDialogStrings> = {
   displayText: 'Anzuzeigender Text:',
   screenTip: 'QuickInfo...',
@@ -75,7 +75,7 @@ export const macHyperlinkDialogDe: Partial<MacHyperlinkDialogStrings> = {
   recentEmails: 'Zuletzt verwendete E-Mail-Adressen:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, tabEmail, browse, browseUnavailable, documentPlace, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, browseUnavailable, documentPlace. */
 export const macHyperlinkDialogFr: Partial<MacHyperlinkDialogStrings> = {
   displayText: 'Texte à afficher :',
   screenTip: 'Info-bulle...',
@@ -86,9 +86,11 @@ export const macHyperlinkDialogFr: Partial<MacHyperlinkDialogStrings> = {
   webIntro: 'Définir un lien vers une page web ou un fichier existant.',
   cellReference: 'Entrer la référence de la cellule :',
   recentEmails: 'Adresses de courrier récemment utilisées :',
+  tabEmail: 'Adresse de courrier',
+  emailAddress: 'Adresse de courrier :',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, tabEmail, browse, browseUnavailable, documentPlace, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, browseUnavailable, documentPlace. */
 export const macHyperlinkDialogKo: Partial<MacHyperlinkDialogStrings> = {
   displayText: '표시할 텍스트:',
   screenTip: '화면 설명...',
@@ -101,7 +103,7 @@ export const macHyperlinkDialogKo: Partial<MacHyperlinkDialogStrings> = {
   recentEmails: '최근 사용한 전자 메일 주소:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, tabEmail, browse, browseUnavailable, documentPlace, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, browseUnavailable, documentPlace. */
 export const macHyperlinkDialogTh: Partial<MacHyperlinkDialogStrings> = {
   displayText: 'ข้อความที่จะแสดง:',
   screenTip: 'คำแนะนำบนหน้าจอ...',
@@ -112,9 +114,10 @@ export const macHyperlinkDialogTh: Partial<MacHyperlinkDialogStrings> = {
   webIntro: 'ลิงก์ไปยังไฟล์หรือเว็บเพจที่มีอยู่',
   cellReference: 'พิมพ์การอ้างอิงเซลล์:',
   recentEmails: 'อีเมลแอดเดรสที่ใช้ล่าสุด:',
+  emailAddress: 'อีเมลแอดเดรส:',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, tabEmail, browse, browseUnavailable, documentPlace, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: url, selectionInDocument, browseUnavailable, documentPlace. */
 export const macHyperlinkDialogZh: Partial<MacHyperlinkDialogStrings> = {
   displayText: '要显示的文本:',
   screenTip: '屏幕提示...',

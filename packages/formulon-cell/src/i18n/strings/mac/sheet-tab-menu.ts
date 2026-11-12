@@ -40,10 +40,10 @@ export const macSheetTabMenuJa: MacSheetTabMenuStrings = {
   unavailable: 'この機能は未実装です。',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: insertSheet, tabColor, unhideSheet, unhideTitle, unhideList, unavailable. */
+/** Mac app wording from the Excel bundle; not answered by it: insertSheet, unhideList, unavailable. */
 export const macSheetTabMenuDe: MacSheetTabMenuStrings = {
   insertSheet: 'Blatt einfügen',
-  tabColor: 'Registerkartenfarbe',
+  tabColor: 'Registerfarbe',
   hideSheet: 'Ausblenden',
   unhideSheet: 'Einblenden...',
   unhideTitle: 'Einblenden',
@@ -53,10 +53,10 @@ export const macSheetTabMenuDe: MacSheetTabMenuStrings = {
   unavailable: 'Diese Funktion ist noch nicht implementiert.',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: insertSheet, tabColor, unhideSheet, unhideTitle, unhideList, unavailable. */
+/** Mac app wording from the Excel bundle; not answered by it: insertSheet, unhideList, unavailable. */
 export const macSheetTabMenuFr: MacSheetTabMenuStrings = {
   insertSheet: 'Insérer une feuille',
-  tabColor: 'Couleur de l’onglet',
+  tabColor: 'Couleur d’onglet',
   hideSheet: 'Masquer',
   unhideSheet: 'Afficher...',
   unhideTitle: 'Afficher',
@@ -66,10 +66,10 @@ export const macSheetTabMenuFr: MacSheetTabMenuStrings = {
   unavailable: 'Cette fonctionnalité n’est pas encore implémentée.',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: insertSheet, tabColor, unhideSheet, unhideTitle, unhideList, unavailable. */
+/** Mac app wording from the Excel bundle; not answered by it: insertSheet, unhideList, unavailable. */
 export const macSheetTabMenuZh: MacSheetTabMenuStrings = {
   insertSheet: '插入工作表',
-  tabColor: '选项卡颜色',
+  tabColor: '工作表标签颜色',
   hideSheet: '隐藏',
   unhideSheet: '取消隐藏...',
   unhideTitle: '取消隐藏',
@@ -79,10 +79,10 @@ export const macSheetTabMenuZh: MacSheetTabMenuStrings = {
   unavailable: '此功能尚未实现。',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: insertSheet, tabColor, unhideSheet, unhideTitle, unhideList, unavailable. */
+/** Mac app wording from the Excel bundle; not answered by it: insertSheet, unhideList, unavailable. */
 export const macSheetTabMenuKo: MacSheetTabMenuStrings = {
   insertSheet: '시트 삽입',
-  tabColor: '탭 색',
+  tabColor: '시트 탭 색',
   hideSheet: '숨기기',
   unhideSheet: '숨기기 취소...',
   unhideTitle: '숨기기 취소',
@@ -92,7 +92,7 @@ export const macSheetTabMenuKo: MacSheetTabMenuStrings = {
   unavailable: '이 기능은 아직 구현되지 않았습니다.',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: insertSheet, tabColor, unhideSheet, unhideTitle, unhideList, viewCode, and 1 more. */
+/** Mac app wording from the Excel bundle; not answered by it: insertSheet, unhideTitle, unhideList, viewCode, unavailable. */
 export const macSheetTabMenuTh: MacSheetTabMenuStrings = {
   insertSheet: 'แทรกแผ่นงาน',
   tabColor: 'สีแท็บ',

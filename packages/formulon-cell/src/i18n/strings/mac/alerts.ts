@@ -70,14 +70,14 @@ export const macAlertsJa: MacAlertStrings = {
   },
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.confirm, mergeLoseData.cancel, deleteSheet.message, deleteSheet.confirm, deleteSheet.cancel, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.cancel, deleteSheet.message, deleteSheet.confirm, deleteSheet.cancel, overwriteOnMove.cancel. */
 export const macAlertsDe: MacAlertsBundle = {
   overwriteOnMove: {
     message: 'Hier gibt es schon Daten. Möchten Sie diese ersetzen?',
   },
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.confirm, mergeLoseData.cancel, deleteSheet.message, deleteSheet.confirm, deleteSheet.cancel, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, deleteSheet.message, deleteSheet.confirm. */
 export const macAlertsFr: MacAlertsBundle = {
   overwriteOnMove: {
     message: 'Cette cellule contient déjà des données. Voulez-vous les remplacer ?',
@@ -99,7 +99,7 @@ export const macAlertsKo: MacAlertsBundle = {
   },
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.confirm, mergeLoseData.cancel, deleteSheet.message, deleteSheet.confirm, deleteSheet.cancel, and 2 more. */
+/** Mac app wording from the Excel bundle; not answered by it: mergeLoseData.message, mergeLoseData.confirm, deleteSheet.message, deleteSheet.confirm, overwriteOnMove.confirm. */
 export const macAlertsTh: MacAlertsBundle = {
   overwriteOnMove: {
     message: 'มีข้อมูลอยู่ที่นี่แล้ว คุณต้องการแทนที่ข้อมูลนั้นหรือไม่',

@@ -86,7 +86,7 @@ export const macStyleDialogJa: MacStyleDialogStrings = {
   },
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.number, properties.alignment, properties.font, and 13 more. */
+/** Mac app wording from the Excel bundle; not answered by it: caption, formatColumn, properties.number, properties.alignment, properties.font, properties.fill, and 12 more. */
 export const macStyleDialogDe: MacStyleDialogStrings = {
   title: 'Zellenformatvorlage ändern',
   nameLabel: 'Name der Formatvorlage:',
@@ -125,7 +125,7 @@ export const macStyleDialogDe: MacStyleDialogStrings = {
   },
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.number, properties.alignment, properties.font, and 13 more. */
+/** Mac app wording from the Excel bundle; not answered by it: caption, formatColumn, properties.number, properties.alignment, properties.font, properties.fill, and 12 more. */
 export const macStyleDialogFr: MacStyleDialogStrings = {
   title: 'Modifier le style de cellule',
   nameLabel: 'Nom du style :',
@@ -164,7 +164,7 @@ export const macStyleDialogFr: MacStyleDialogStrings = {
   },
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.number, properties.alignment, properties.font, and 10 more. */
+/** Mac app wording from the Excel bundle; not answered by it: caption, formatColumn, properties.number, properties.alignment, properties.font, properties.protection, and 9 more. */
 export const macStyleDialogZh: MacStyleDialogStrings = {
   title: '修改单元格样式',
   nameLabel: '样式名称:',
@@ -203,7 +203,7 @@ export const macStyleDialogZh: MacStyleDialogStrings = {
   },
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.alignment, properties.font, properties.protection, and 6 more. */
+/** Mac app wording from the Excel bundle; not answered by it: caption, formatColumn, properties.alignment, properties.font, properties.protection, formatButton, and 5 more. */
 export const macStyleDialogKo: MacStyleDialogStrings = {
   title: '셀 스타일 수정',
   nameLabel: '스타일 이름:',
@@ -242,7 +242,7 @@ export const macStyleDialogKo: MacStyleDialogStrings = {
   },
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: previewLabel, caption, formatColumn, properties.alignment, properties.font, properties.protection, and 7 more. */
+/** Mac app wording from the Excel bundle; not answered by it: caption, formatColumn, properties.alignment, properties.font, properties.protection, formatButton, and 6 more. */
 export const macStyleDialogTh: MacStyleDialogStrings = {
   title: 'ปรับเปลี่ยนสไตล์เซลล์',
   nameLabel: 'ชื่อสไตล์:',

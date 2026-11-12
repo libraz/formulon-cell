@@ -58,7 +58,7 @@ const MAC_FORMAT_DIALOG_KEYS = [
 export const macFormatDialogFrom = (dialog: FormatDialogStrings): Partial<FormatDialogStrings> =>
   Object.fromEntries(MAC_FORMAT_DIALOG_KEYS.map((key) => [key, dialog[key]]));
 
-/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 15 more. */
+/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 13 more. */
 export const macFormatDialogDe: Partial<FormatDialogStrings> = {
   descGeneral: 'Standardzellen haben kein bestimmtes Zahlenformat.',
   descFixed:
@@ -95,9 +95,10 @@ export const macFormatDialogDe: Partial<FormatDialogStrings> = {
   borderStyleDouble: 'Doppelt',
   fillPatternColor: 'Musterfarbe:',
   fillPatternStyle: 'Musterformat:',
+  borderStyleThick: 'Dick',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 18 more. */
+/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 13 more. */
 export const macFormatDialogFr: Partial<FormatDialogStrings> = {
   descGeneral: 'Les formules de format Standard n’ont pas de format de nombre spécifique.',
   descFixed:
@@ -132,9 +133,13 @@ export const macFormatDialogFr: Partial<FormatDialogStrings> = {
   borderStyleDouble: 'Double',
   fillPatternColor: 'Couleur de motif :',
   fillPatternStyle: 'Style de motif :',
+  borderStyleDotted: 'En pointillé',
+  borderStyleDashed: 'En tirets',
+  borderStyleThin: 'Fine',
+  borderStyleThick: 'Épaisse',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 18 more. */
+/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 12 more. */
 export const macFormatDialogKo: Partial<FormatDialogStrings> = {
   descGeneral: '일반 셀 서식에서는 특정 번호 서식을 지정하지 않습니다.',
   descFixed:
@@ -165,9 +170,14 @@ export const macFormatDialogKo: Partial<FormatDialogStrings> = {
   borderStyleMediumDashed: '중간 굵기 파선',
   fillPatternColor: '패턴 색:',
   fillPatternStyle: '무늬 스타일:',
+  calendarType: '일정 유형:',
+  borderStyleThin: '아주 가늘게',
+  borderStyleMedium: '보통',
+  borderStyleThick: '굵은선',
+  borderStyleDouble: '이중 실선',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 14 more. */
+/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 12 more. */
 export const macFormatDialogTh: Partial<FormatDialogStrings> = {
   descGeneral: 'เซลล์ที่มีรูปแบบทั่วไปไม่มีการระบุรูปแบบตัวเลขเฉพาะ',
   descFixed:
@@ -203,9 +213,11 @@ export const macFormatDialogTh: Partial<FormatDialogStrings> = {
   borderStyleThick: 'หนา',
   fillPatternColor: 'สีลวดลาย:',
   fillPatternStyle: 'สไตล์ลวดลาย:',
+  decimals: 'ตำแหน่งจุดทศนิยม:',
+  borderStyleDouble: 'เส้นคู่',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 19 more. */
+/** Mac app wording from the Excel bundle; not answered by it: categoryLabel, fontFamily, fontStyle, fontSize, fontUnderline, color, and 12 more. */
 export const macFormatDialogZh: Partial<FormatDialogStrings> = {
   descGeneral: '常规单元格格式不包含任何特定的数字格式。',
   descFixed: '数值格式用于一般数字的表示。货币和会计格式则提供货币值计算的专用格式。',
@@ -233,6 +245,11 @@ export const macFormatDialogZh: Partial<FormatDialogStrings> = {
   borderStyleMediumDashed: '中划线',
   fillPatternColor: '图案颜色:',
   fillPatternStyle: '图案样式:',
+  symbol: '符号:',
+  borderStyleDashed: '短划线',
+  borderStyleThin: '细线',
+  borderStyleMedium: '中等',
+  borderStyleThick: '粗线',
 };
 
 /** Mac app wording from the Excel bundle. */
