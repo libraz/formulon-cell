@@ -48,13 +48,12 @@ export async function runPivotTableFilterDialogScenario(page: Page): Promise<voi
   );
   await pivotDialog.getByRole('button', { name: 'Filter...' }).click();
 
-  const filterDialog = page.getByRole('dialog', { name: 'PivotTable Filter: Channel' });
+  // With no condition set, Filter... opens the desktop Label Filter on equals.
+  const filterDialog = page.getByRole('dialog', { name: 'Label Filter (Channel)' });
   await expect(filterDialog).toBeVisible();
-  await expect(filterDialog.locator('[data-pivot-filter-category="true"]')).toHaveValue('label');
-  // A new filter starts on the None condition.
   await expect(
-    filterDialog.locator('[data-pivot-filter-condition="true"] option:checked'),
-  ).toHaveText('None');
+    filterDialog.locator('[data-pivot-filter-operator="true"] option:checked'),
+  ).toHaveText('equals');
   await filterDialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(filterDialog).toBeHidden();
 
