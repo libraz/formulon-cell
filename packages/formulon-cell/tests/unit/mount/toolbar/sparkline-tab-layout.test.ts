@@ -213,6 +213,8 @@ describe('Sparkline tab layout', () => {
     expect(checked(String(BlanksAs.Gap))).toBe('true');
     pick(String(BlanksAs.Zero));
     expect(settings()?.emptyCellsAs).toBe(BlanksAs.Zero);
+    // The pick hands focus back to the grid, so Cmd+Z undoes it rather than the name box.
+    expect(document.activeElement).toBe(sheet.instance.host);
     openEditData();
     expect(checked(String(BlanksAs.Zero))).toBe('true');
     expect(checked(String(BlanksAs.Gap))).toBe('false');

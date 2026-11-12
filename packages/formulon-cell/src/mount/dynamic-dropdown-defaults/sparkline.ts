@@ -219,7 +219,7 @@ export function createSparklineDropdownDefaults(
     }
   };
 
-  const axis = (value: string): void | Promise<void> => {
+  const axis = (value: string): Promise<void> | undefined => {
     const ctx = ctxFor(SPARKLINE_COMMANDS.axis);
     if (value === 'general') {
       patchSelectedSparklineGroupsAction(ctx, { dateAxis: false });
@@ -260,8 +260,9 @@ export function createSparklineDropdownDefaults(
       } else if (kind === 'color') {
         const ctx = ctxFor(SPARKLINE_COMMANDS.color);
         if (value === MORE_COLORS) {
-          moreColors('series', (css) => setSparklineColorAction(ctx, 'series', css));
-        } else setSparklineColorAction(ctx, 'series', value);
+          return moreColors('series', (css) => setSparklineColorAction(ctx, 'series', css));
+        }
+        setSparklineColorAction(ctx, 'series', value);
       } else if (kind === 'weight') {
         if (value === 'custom') return customWeight();
         const weight = Number(value);
@@ -278,22 +279,24 @@ export function createSparklineDropdownDefaults(
           const css = value.slice(split + 1);
           const apply = (color: string) =>
             setSparklineColorAction(ctx, part as SparklineColorPart, color);
-          if (css === MORE_COLORS) moreColors(part as SparklineColorPart, apply);
-          else apply(css);
+          if (css === MORE_COLORS) return moreColors(part as SparklineColorPart, apply);
+          apply(css);
         }
       } else if (kind === 'edit') {
-        if (value === 'group') openSparklineGroupEditor(instance);
-        else if (value === 'single') return editSingle();
-        else if (value === 'hidden-empty') return hiddenEmpty();
-        else if (value === 'switch')
-          switchSparklineRowColumnAction(ctxFor(SPARKLINE_COMMANDS.editData));
+        if (value === 'group') return openSparklineGroupEditor(instance);
+        if (value === 'single') return editSingle();
+        if (value === 'hidden-empty') return hiddenEmpty();
+        if (value === 'switch') switchSparklineRowColumnAction(ctxFor(SPARKLINE_COMMANDS.editData));
       } else if (kind === 'axis') {
-        return axis(value);
+        const dialog = axis(value);
+        if (dialog) return dialog;
       } else if (value === 'groups') {
         clearSelectedSparklineGroupsAction(ctxFor(SPARKLINE_COMMANDS.clear));
       } else {
         clearSelectedSparklinesAction(ctxFor(SPARKLINE_COMMANDS.clear));
       }
+      // A pick that opens no dialog hands focus back to the grid, as the style strip does.
+      instance.host.focus();
     },
 
     updateSparklineMenu(menu) {
