@@ -62,9 +62,14 @@ describe('custom style names', () => {
     createTableStyleFromActiveTable(store, null, 'A', { elements });
     createPivotTableStyleFromActivePivot(store, null, 'B', { elements });
     const next = { label: 'b', elements: {} };
-    expect(modifyCustomStyle(ctxFor(store, null), 'A', next)).toBe(false);
+    expect(modifyCustomStyle(ctxFor(store, null), 'A', next)).toEqual({
+      ok: false,
+      reason: 'invalidName',
+    });
     expect(store.getState().tables.customTableStyles?.map((s) => s.label)).toEqual(['A']);
-    expect(modifyCustomStyle(ctxFor(store, null), 'A', { label: 'a', elements: {} })).toBe(true);
+    expect(modifyCustomStyle(ctxFor(store, null), 'A', { label: 'a', elements: {} })).toEqual({
+      ok: true,
+    });
     expect(store.getState().tables.customTableStyles?.map((s) => s.label)).toEqual(['a']);
   });
 

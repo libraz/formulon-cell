@@ -1,8 +1,7 @@
 import { customPivotTableStyleById, customTableStyleById } from '../commands/format-as-table.js';
-import { permissionReasonText } from '../commands/permission-reasons.js';
+import { anySheetProtected } from '../commands/protection.js';
 import {
   activeStyleTarget,
-  customStyleUsedOnProtectedSheet,
   deleteCustomStyle,
   setStyleDefault,
   type TableStyleKind,
@@ -81,6 +80,10 @@ export function attachTableStyleContextMenu(
         break;
       }
       case 'modify':
+        // While any sheet is protected Modify stays enabled and does nothing, as on the desktop.
+        if (anySheetProtected(instance.store.getState())) break;
+        openStyleDialog(kind, action, styleId);
+        return;
       case 'duplicate':
         openStyleDialog(kind, action, styleId);
         return;
@@ -117,17 +120,6 @@ export function attachTableStyleContextMenu(
     const t = instance.i18n.strings.ribbonMenu;
     const customStyle = customStyleOf(instance, kind, styleId);
     const custom = customStyle !== null;
-    // A style a protected sheet's table or PivotTable uses can be neither modified nor deleted.
-    const locked =
-      customStyle !== null &&
-      customStyleUsedOnProtectedSheet(
-        instance.store.getState(),
-        instance.workbook,
-        customStyle.label,
-      );
-    const lockedReason = locked
-      ? permissionReasonText(instance.i18n.strings, 'sheetProtected')
-      : null;
     const menu = document.createElement('div');
     menu.className = 'fc-tb__menu fc-tb__tablestyle-ctx';
     menu.setAttribute('role', 'menu');
@@ -159,9 +151,9 @@ export function attachTableStyleContextMenu(
       button('applyClear', t.tableStyleApplyClear),
       button('applyMaintain', t.tableStyleApplyMaintain),
       menuSeparator(),
-      button('modify', t.tableStyleModify, !custom || locked, lockedReason),
+      button('modify', t.tableStyleModify, !custom),
       button('duplicate', t.tableStyleDuplicate, none),
-      button('delete', t.tableStyleDelete, !custom || locked, lockedReason),
+      button('delete', t.tableStyleDelete, !custom),
       menuSeparator(),
       button(
         'setDefault',

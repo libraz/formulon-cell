@@ -11,7 +11,6 @@ import {
   applyTableStyle,
   clearTableStyle,
   createCustomStyle,
-  customStyleUsedOnProtectedSheet,
   deleteCustomStyle,
   modifyCustomStyle,
 } from '../../../src/commands/table-style-actions.js';
@@ -154,11 +153,14 @@ describe('table style commands', () => {
       applyTableStyle(entry(), table(), customTableStyleId('Brand'));
       setProtectedSheet(store(), 0, true);
     };
+    const REFUSED = { ok: false, reason: 'workbookHasProtectedSheet' };
 
+    // Excel for Mac: with any sheet of the workbook protected, Delete and Modify of a custom
+    // style change nothing, whether or not the style is used and wherever its users are.
     it('refuses to delete or modify a style a protected sheet table uses', () => {
       useBrand();
-      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Brand')).toBe(false);
-      expect(modifyCustomStyle(ctx(), 'Brand', { label: 'Brand 2', elements })).toBe(false);
+      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Brand')).toEqual(REFUSED);
+      expect(modifyCustomStyle(ctx(), 'Brand', { label: 'Brand 2', elements })).toEqual(REFUSED);
       expect(table().styleName).toBe('Brand');
       expect(
         store()
@@ -166,19 +168,22 @@ describe('table style commands', () => {
           .tables.customTableStyles?.map((s) => s.label),
       ).toEqual(['Brand']);
       setProtectedSheet(store(), 0, false);
-      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Brand')).toBe(true);
+      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Brand')).toEqual({ ok: true });
     });
 
-    it('refuses to delete or modify a style a protected sheet PivotTable uses', () => {
+    it('refuses to delete or modify an unused style while another sheet is protected', () => {
+      createCustomStyle(ctx(), null, 'table', value('Other', false));
       createPivotTableStyleFromActivePivot(store(), history(), 'Pivot Brand', { elements });
-      mutators.upsertPivotTableStyle(store(), {
-        sheetIndex: 0,
-        pivotIndex: 0,
-        styleId: 'custom-pivot-table:Pivot Brand',
-      });
-      setProtectedSheet(store(), 0, true);
-      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Pivot Brand')).toBe(false);
-      expect(modifyCustomStyle(ctx(), 'Pivot Brand', { label: 'P2', elements })).toBe(false);
+      setProtectedSheet(store(), 1, true);
+      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Other')).toEqual(REFUSED);
+      expect(modifyCustomStyle(ctx(), 'Other', { label: 'O2', elements })).toEqual(REFUSED);
+      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Pivot Brand')).toEqual(REFUSED);
+      expect(modifyCustomStyle(ctx(), 'Pivot Brand', { label: 'P2', elements })).toEqual(REFUSED);
+      expect(
+        store()
+          .getState()
+          .tables.customTableStyles?.map((s) => s.label),
+      ).toEqual(['Other']);
       expect(
         store()
           .getState()
@@ -186,23 +191,9 @@ describe('table style commands', () => {
       ).toEqual(['Pivot Brand']);
     });
 
-    it('counts a PivotTable whose workbook style names the style', () => {
-      const workbook = {
-        getPivotTables: () => [{ sheetIndex: 0, pivotIndex: 0 }],
-        getPivotStyleInfo: () => ({ name: 'Pivot Brand' }),
-      } as unknown as Parameters<typeof customStyleUsedOnProtectedSheet>[1];
-      const used = () =>
-        customStyleUsedOnProtectedSheet(store().getState(), workbook, 'pivot brand');
-      expect(used()).toBe(false);
-      setProtectedSheet(store(), 0, true);
-      expect(used()).toBe(true);
-    });
-
-    it('leaves a table on a protected sheet alone when a style it does not use is deleted', () => {
+    it('still duplicates a style while a sheet is protected', () => {
       useBrand();
-      createCustomStyle(ctx(), null, 'table', value('Other', false));
-      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Other')).toBe(true);
-      expect(table().styleName).toBe('Brand');
+      expect(createCustomStyle(ctx(), null, 'table', value('Brand 2', false))).toBe(true);
     });
 
     it('still refuses every other table change on a protected sheet', () => {

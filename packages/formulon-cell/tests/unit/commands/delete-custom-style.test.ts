@@ -70,7 +70,7 @@ describe('deleteCustomStyle', () => {
   it('moves tables to the unchanged default table style', () => {
     useStyle('Brand', { table: true });
     expect(table()?.styleName).toBe('Brand');
-    expect(deleteCustomStyle(ctx(), sheet.workbook, 'Brand')).toBe(true);
+    expect(deleteCustomStyle(ctx(), sheet.workbook, 'Brand')).toEqual({ ok: true });
     expect(table()?.styleName).toBe('TableStyleMedium2');
     expect(sheet.instance.store.getState().tables.customTableStyles).toEqual([]);
   });
@@ -142,6 +142,9 @@ describe('deleteCustomStyle', () => {
   });
 
   it('refuses a name no custom style has', () => {
-    expect(deleteCustomStyle(ctx(), sheet.workbook, 'TableStyleMedium2')).toBe(false);
+    expect(deleteCustomStyle(ctx(), sheet.workbook, 'TableStyleMedium2')).toEqual({
+      ok: false,
+      reason: 'notFound',
+    });
   });
 });

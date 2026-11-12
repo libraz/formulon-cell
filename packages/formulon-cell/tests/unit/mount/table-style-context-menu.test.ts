@@ -217,6 +217,39 @@ describe('table style gallery context menu', () => {
     expect(table()?.styleName).toBe('TableStyleLight1');
   });
 
+  it('keeps Modify and Delete enabled but inert while another sheet is protected', async () => {
+    // Excel for Mac: with any sheet protected, 変更… and 削除 stay enabled and do nothing.
+    createTableStyleFromActiveTable(sheet.instance.store, sheet.instance.history, 'Review', {
+      elements: galleryStyleElements('dark', '#4472c4', 'banded'),
+    });
+    const id = customTableStyleId('Review');
+    const current = table();
+    if (!current) throw new Error('no table');
+    // The strip opens on the page of the table's style, so the custom chip shows once applied.
+    applyTableStyle(
+      {
+        store: sheet.instance.store,
+        history: sheet.instance.history,
+        origin: 'ribbon',
+        commandId: 'tableQuickStyles',
+      },
+      current,
+      id,
+    );
+    setProtectedSheet(sheet.instance.store, 1, true);
+    toolbar.rerender();
+    toolbar.setActiveTab('tableDesign');
+    rightClick(`[data-table-quick-style="${id}"]`);
+    expect(item('Modify...').disabled).toBe(false);
+    expect(item('Delete').disabled).toBe(false);
+    item('Delete').click();
+    expect(sheet.instance.store.getState().tables.customTableStyles).toHaveLength(1);
+    rightClick(`[data-table-quick-style="${id}"]`);
+    item('Modify...').click();
+    await Promise.resolve();
+    expect(document.body.querySelector('.fc-tb__dlg')).toBeNull();
+  });
+
   it('duplicates a built-in style through the table style dialog', async () => {
     rightClick('[data-table-quick-style="TableStyleMedium3"]');
     item('Duplicate...').click();

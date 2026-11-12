@@ -26,7 +26,7 @@ import {
 } from './format-as-table.js';
 import type { History } from './history.js';
 import { updatePivotStyleInfo } from './pivot-style-info.js';
-import { isSheetProtected } from './protection.js';
+import { anySheetProtected } from './protection.js';
 import { recordFormatChange, recordTablesChange } from './slice-history.js';
 import { type TableActionContext, tableChangeAllowed, tableWrite } from './table-actions.js';
 
@@ -128,34 +128,13 @@ type StyleDefaultsWorkbook = Pick<
 type DeleteStyleWorkbook = StyleDefaultsWorkbook &
   Pick<WorkbookHandle, 'getPivotTables' | 'getPivotStyleInfo' | 'setPivotStyleInfo' | 'cells'>;
 
-/** What a workbook tells about the PivotTables that use a style. */
-type PivotStyleUsers = Pick<WorkbookHandle, 'getPivotTables' | 'getPivotStyleInfo'>;
+/** Why Delete or Modify left a custom style as it was. */
+export type CustomStyleRefusal = 'notFound' | 'invalidName' | 'workbookHasProtectedSheet';
 
-/** Whether a table or PivotTable using the custom style `name` sits on a protected sheet, which
- *  keeps the style from being deleted or modified. */
-export function customStyleUsedOnProtectedSheet(
-  state: ReturnType<TableActionContext['store']['getState']>,
-  workbook: PivotStyleUsers | null,
-  name: string,
-): boolean {
-  const pivotStyle = (state.tables.customPivotTableStyles ?? []).find((style) =>
-    sameStyleName(style.label, name),
-  );
-  return (
-    state.tables.tables.some(
-      (table) =>
-        sameStyleName(overlayStyleName(table), name) && isSheetProtected(state, table.range.sheet),
-    ) ||
-    (state.tables.pivotTableStyles ?? []).some(
-      (a) => a.styleId === pivotStyle?.id && isSheetProtected(state, a.sheetIndex),
-    ) ||
-    (workbook?.getPivotTables() ?? []).some(
-      (p) =>
-        isSheetProtected(state, p.sheetIndex) &&
-        sameStyleName(workbook?.getPivotStyleInfo(p.sheetIndex, p.pivotIndex)?.name ?? '', name),
-    )
-  );
-}
+/** What Delete or Modify of a custom style did. */
+export type CustomStyleChange = { ok: true } | { ok: false; reason: CustomStyleRefusal };
+
+const refused = (reason: CustomStyleRefusal): CustomStyleChange => ({ ok: false, reason });
 
 /** Writes the workbook's style defaults that differ from what it holds and records the change on
  *  `history` (the open transaction, if any) so it undoes with the style change. An empty name
@@ -195,18 +174,19 @@ const inTransaction = (history: History | null, fn: () => void): void => {
 /** Deletes the custom style `name`, as one undo step, as the desktop app does. A style may be
  *  flagged for tables, PivotTables or both. The users of each kind take that kind's workbook
  *  default. A deleted default resets first, to Table Style Medium 2 / PivotTable Style Light 16.
- *  False when no custom style has that name. */
+ *  Refused when no custom style has that name, or while any sheet of the workbook is protected,
+ *  whoever uses the style. */
 export function deleteCustomStyle(
   ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
   workbook: DeleteStyleWorkbook | null,
   name: string,
-): boolean {
+): CustomStyleChange {
   const state = ctx.store.getState();
   const named = (style: CustomTableStyle): boolean => sameStyleName(style.label, name);
   const forTables = (state.tables.customTableStyles ?? []).some(named);
   const forPivots = (state.tables.customPivotTableStyles ?? []).some(named);
-  if (!forTables && !forPivots) return false;
-  if (customStyleUsedOnProtectedSheet(state, workbook, name)) return false;
+  if (!forTables && !forPivots) return refused('notFound');
+  if (anySheetProtected(state)) return refused('workbookHasProtectedSheet');
   const history = ctx.history;
   const transaction = history?.begin();
   try {
@@ -252,12 +232,12 @@ export function deleteCustomStyle(
   } finally {
     if (history && transaction) history.end(transaction);
   }
-  return true;
+  return { ok: true };
 }
 
 /** How a Modify dialog's Set As Default checkbox applies to `kind`'s workbook default. */
 export interface ModifyStyleDefault {
-  workbook: (StyleDefaultsWorkbook & PivotStyleUsers) | null;
+  workbook: StyleDefaultsWorkbook | null;
   kind: TableStyleKind;
   setAsDefault: boolean;
 }
@@ -266,21 +246,23 @@ export interface ModifyStyleDefault {
  *  the style is flagged for takes the change; its tables and PivotTables follow under the new
  *  name, and so does a workbook default that named it. `defaults` applies the dialog's Set As
  *  Default checkbox: ticked makes the style `kind`'s default, unticked clears that default when
- *  it named the style. False when no custom style has that name, or the new name is taken. */
+ *  it named the style. Refused when no custom style has that name, the new name is taken, or any
+ *  sheet of the workbook is protected. */
 export function modifyCustomStyle(
   ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
   name: string,
   next: Omit<CustomTableStyle, 'id'>,
   defaults?: ModifyStyleDefault,
-): boolean {
+): CustomStyleChange {
   const state = ctx.store.getState();
   const named = (style: CustomTableStyle): boolean => sameStyleName(style.label, name);
   const table = (state.tables.customTableStyles ?? []).find(named);
   const pivot = (state.tables.customPivotTableStyles ?? []).find(named);
   const label = next.label.trim();
-  if ((!table && !pivot) || !label) return false;
-  if (customStyleUsedOnProtectedSheet(state, defaults?.workbook ?? null, name)) return false;
-  if (customStyleNameError(state, label, { exceptLabel: name })) return false;
+  if (!table && !pivot) return refused('notFound');
+  if (anySheetProtected(state)) return refused('workbookHasProtectedSheet');
+  if (!label || customStyleNameError(state, label, { exceptLabel: name }))
+    return refused('invalidName');
   inTransaction(ctx.history, () => {
     // The engine resets a default whose style it removes: a default naming the old name moves
     // first, and a ticked one is set again once the style is back.
@@ -322,7 +304,7 @@ export function modifyCustomStyle(
     if (defaults?.setAsDefault && workbook)
       recordStyleDefaults(ctx.history, workbook, { [key]: label });
   });
-  return true;
+  return { ok: true };
 }
 
 /** Adds a custom style of `kind` from a dialog result, and makes it the workbook default of its

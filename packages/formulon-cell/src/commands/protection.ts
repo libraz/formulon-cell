@@ -85,6 +85,10 @@ export function isSheetProtected(state: State, sheet: number): boolean {
   return state.protection.protectedSheets.has(sheet);
 }
 
+/** Whether any sheet of the workbook is protected. */
+export const anySheetProtected = (state: State): boolean =>
+  state.protection.protectedSheets.size > 0;
+
 /** Whether `sheet` lets an operation through: always when it is not
  *  protected, and on a protected sheet only when the Protect Sheet option
  *  `permission` is on (Excel: formatting, width/height and row insertion
