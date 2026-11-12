@@ -3,11 +3,11 @@ import { rangesIntersect } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import {
   type AuthorizedIntentFactory,
-  authorizedWrite,
+  authorizedWriteOr,
   authorizeWrite,
 } from './authorized-write.js';
 import { currentRegion } from './current-region.js';
-import { History } from './history.js';
+import type { History } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
 
 /** Where a table change runs and which entry point asked for it. */
@@ -39,14 +39,7 @@ export function tableWrite<T>(
   refused: T,
   write: () => T,
 ): T {
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents: tableIntents(ctx, range),
-    origin: ctx.origin,
-    write,
-  });
-  return result.ok ? result.value : refused;
+  return authorizedWriteOr(ctx, tableIntents(ctx, range), refused, write);
 }
 
 /** Whether `range` (in either corner order) overlaps an existing table: a new table, or a Data

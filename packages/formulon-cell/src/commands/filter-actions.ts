@@ -3,11 +3,11 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import {
   type AuthorizedIntentFactory,
-  authorizedWrite,
+  authorizedWriteOr,
   authorizeWrite,
 } from './authorized-write.js';
 import { recordFilterChange } from './filter.js';
-import { History } from './history.js';
+import type { History } from './history.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
 
 /** Where a filter change runs and which entry point asked for it. */
@@ -24,16 +24,10 @@ const run = <T>(
   intents: AuthorizedIntentFactory,
   refused: T,
   write: () => T,
-): T => {
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents,
-    origin: ctx.origin,
-    write: () => recordFilterChange(ctx.history, ctx.store, write, ctx.workbook),
-  });
-  return result.ok ? result.value : refused;
-};
+): T =>
+  authorizedWriteOr(ctx, intents, refused, () =>
+    recordFilterChange(ctx.history, ctx.store, write, ctx.workbook),
+  );
 
 const filterIntents =
   (commandId: string, effects: readonly OperationEffect[]): AuthorizedIntentFactory =>

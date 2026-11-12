@@ -1,7 +1,7 @@
 import type { Addr } from '../engine/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
-import { History } from './history.js';
+import { type AuthorizedIntentFactory, authorizedWriteOr } from './authorized-write.js';
+import type { History } from './history.js';
 import type { InteractionOrigin, OperationIntent } from './interaction-policy.js';
 import { asThreadIntent } from './thread-intent.js';
 
@@ -50,14 +50,7 @@ function commentStep<T>(
   thread: boolean,
 ): T {
   if (cells.length === 0) return refused;
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents: commentIntents(ctx, cells, thread),
-    origin: ctx.origin,
-    write,
-  });
-  return result.ok ? result.value : refused;
+  return authorizedWriteOr(ctx, commentIntents(ctx, cells, thread), refused, write);
 }
 
 /** The intents of a note (or, with `thread`, a threaded-comment) change of `cells`. */

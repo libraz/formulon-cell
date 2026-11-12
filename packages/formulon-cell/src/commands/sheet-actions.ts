@@ -1,9 +1,9 @@
 import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
+import { type AuthorizedIntentFactory, authorizedWriteOr } from './authorized-write.js';
 import type { BuiltInCommandId } from './built-in-command-ids.js';
-import { History } from './history.js';
+import type { History } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
 import {
   addSheet,
@@ -48,14 +48,7 @@ const run = <T>(
   refused: T,
   write: () => T,
 ): T => {
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents: sheetIntents(commandId),
-    origin: ctx.origin,
-    write,
-  });
-  return result.ok ? result.value : refused;
+  return authorizedWriteOr(ctx, sheetIntents(commandId), refused, write);
 };
 
 /** Insert a sheet, after the active one when `afterActive`; its index, or -1 when refused. */

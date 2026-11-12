@@ -3,8 +3,8 @@ import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { DataTableDefinition, DataTableInfo } from '../engine/workbook-handle-data-tables.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { authorizedWrite } from './authorized-write.js';
-import { History } from './history.js';
+import { authorizedWriteOr } from './authorized-write.js';
+import type { History } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
 import { overlapsTable } from './table-actions.js';
 
@@ -66,10 +66,9 @@ export function createDataTable(
   const def = dataTableDefinition(request);
   if (typeof def === 'string') return def;
   if (overlapsTable(ctx.store.getState(), request.selection)) return 'rejected';
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents: (origin) => [
+  return authorizedWriteOr(
+    ctx,
+    (origin) => [
       {
         operation: 'valueEdit',
         origin,
@@ -77,10 +76,9 @@ export function createDataTable(
         effects: [{ kind: 'range', range: def.range }],
       },
     ],
-    origin: ctx.origin,
-    write: () => writeDataTable(ctx, def),
-  });
-  return result.ok ? result.value : 'rejected';
+    'rejected',
+    () => writeDataTable(ctx, def),
+  );
 }
 
 const writeDataTable = (

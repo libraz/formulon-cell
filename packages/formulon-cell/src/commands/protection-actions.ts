@@ -1,8 +1,8 @@
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SheetProtectionPermissions, SpreadsheetStore } from '../store/store.js';
-import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
-import { History } from './history.js';
+import { type AuthorizedIntentFactory, authorizedWriteOr } from './authorized-write.js';
+import type { History } from './history.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
 import {
   type AllowedEditRangeOptions,
@@ -36,14 +36,7 @@ const run = <T>(
   refused: T,
   write: () => T,
 ): T => {
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents: protectionIntents(ctx.commandId, effect),
-    origin: ctx.origin,
-    write,
-  });
-  return result.ok ? result.value : refused;
+  return authorizedWriteOr(ctx, protectionIntents(ctx.commandId, effect), refused, write);
 };
 
 const sheetOf = (ctx: ProtectionActionContext, id: string): number | null =>

@@ -1,8 +1,8 @@
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
-import { History } from './history.js';
+import { type AuthorizedIntentFactory, authorizedWriteOr } from './authorized-write.js';
+import type { History } from './history.js';
 import { clearHyperlink, type SetHyperlinkOptions, setHyperlink } from './hyperlinks.js';
 import type { InteractionOperation, InteractionOrigin } from './interaction-policy.js';
 import { recordFormatChange } from './slice-history.js';
@@ -35,14 +35,7 @@ export function hyperlinkWrite<T>(
   removes = false,
 ): T {
   if (cells.length === 0) return refused;
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents: hyperlinkIntents(ctx, cells, removes),
-    origin: ctx.origin,
-    write,
-  });
-  return result.ok ? result.value : refused;
+  return authorizedWriteOr(ctx, hyperlinkIntents(ctx, cells, removes), refused, write);
 }
 
 /** The intents of a hyperlink change of `cells`; `removes` marks a removal. */

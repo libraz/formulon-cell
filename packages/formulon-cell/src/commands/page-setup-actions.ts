@@ -1,6 +1,6 @@
 import type { SpreadsheetStore } from '../store/store.js';
-import { authorizedWrite } from './authorized-write.js';
-import { History } from './history.js';
+import { authorizedWriteOr } from './authorized-write.js';
+import type { History } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
 
 /** Where a page-setup change runs and which entry point asked for it. */
@@ -23,10 +23,9 @@ export function pageSetupWrite<T>(
   refused: T,
   write: () => T,
 ): T {
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents: (origin) => [
+  return authorizedWriteOr(
+    ctx,
+    (origin) => [
       {
         operation: 'pageSetup',
         origin,
@@ -34,8 +33,7 @@ export function pageSetupWrite<T>(
         effects: [{ kind: 'sheet', sheet }],
       },
     ],
-    origin: ctx.origin,
+    refused,
     write,
-  });
-  return result.ok ? result.value : refused;
+  );
 }

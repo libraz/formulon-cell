@@ -1,8 +1,8 @@
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { authorizedWrite } from './authorized-write.js';
-import { History } from './history.js';
+import { authorizedWriteOr } from './authorized-write.js';
+import type { History } from './history.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
 
 /** Who runs a pivot change: the store whose controller decides it, and the entry point. */
@@ -37,10 +37,9 @@ export function pivotWrite<T>(
   write: () => T,
   options: { readonly addsSheet?: boolean } = {},
 ): T {
-  const result = authorizedWrite({
-    store: auth.store,
-    history: history ?? new History(),
-    intents: (origin) => [
+  return authorizedWriteOr(
+    { store: auth.store, history, origin: auth.origin },
+    (origin) => [
       { operation: 'pivot', origin, commandId: auth.commandId, effects },
       ...(options.addsSheet
         ? [
@@ -53,10 +52,9 @@ export function pivotWrite<T>(
           ]
         : []),
     ],
-    origin: auth.origin,
+    refused,
     write,
-  });
-  return result.ok ? result.value : refused;
+  );
 }
 
 /** The effects of a change to the report `pivotIndex` on `sheet`: its range, or the sheet. */

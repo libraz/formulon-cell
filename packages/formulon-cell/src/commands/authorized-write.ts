@@ -1,5 +1,5 @@
 import type { SpreadsheetStore } from '../store/store.js';
-import type { History } from './history.js';
+import { History } from './history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import {
   type ChangeBatchResult,
@@ -74,6 +74,32 @@ export function authorizedWrite<T>(request: AuthorizedWriteRequest<T>): Authoriz
   }
   history.end(token);
   return { ok: true, value };
+}
+
+/** Where an action's write runs and which entry point asked for it. */
+export interface ActionWriteContext {
+  readonly store: SpreadsheetStore;
+  /** Without one, the write runs on a history nobody keeps. */
+  readonly history?: History | null;
+  readonly origin: InteractionOrigin;
+}
+
+/** {@link authorizedWrite} for an action: the write's value, or `refused` when any of its
+ *  apply, undo or redo intents is denied. */
+export function authorizedWriteOr<T>(
+  ctx: ActionWriteContext,
+  intents: AuthorizedIntentFactory,
+  refused: T,
+  write: () => T,
+): T {
+  const result = authorizedWrite({
+    store: ctx.store,
+    history: ctx.history ?? new History(),
+    intents,
+    origin: ctx.origin,
+    write,
+  });
+  return result.ok ? result.value : refused;
 }
 
 /** {@link authorizedWrite} of a batch command: the write's own result, or the refusal as a batch

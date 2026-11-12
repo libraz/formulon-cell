@@ -1,10 +1,10 @@
 import type { SpreadsheetStore } from '../store/store.js';
 import {
   type AuthorizedIntentFactory,
-  authorizedWrite,
+  authorizedWriteOr,
   authorizeWrite,
 } from './authorized-write.js';
-import { History } from './history.js';
+import type { History } from './history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
 import { sheetPermits } from './protection.js';
@@ -60,12 +60,5 @@ export function objectWrite<T>(
   cells: readonly OperationEffect[] = [],
 ): T {
   if (!objectChangeAllowed(ctx, sheet, cells)) return refused;
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents: objectIntents(ctx, sheet, cells),
-    origin: ctx.origin,
-    write,
-  });
-  return result.ok ? result.value : refused;
+  return authorizedWriteOr(ctx, objectIntents(ctx, sheet, cells), refused, write);
 }

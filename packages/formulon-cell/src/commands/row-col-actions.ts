@@ -1,7 +1,7 @@
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { authorizedWrite, authorizeWrite } from './authorized-write.js';
+import { authorizedWriteOr, authorizeWrite } from './authorized-write.js';
 import {
   type DeleteCellsDirection,
   deleteCells,
@@ -12,7 +12,7 @@ import {
   wholeLineEdit,
 } from './cell-shift.js';
 import { tableForCell } from './format-as-table.js';
-import { History } from './history.js';
+import type { History } from './history.js';
 import { cellShiftBand, columnShiftBand, rowShiftBand } from './interaction-effects.js';
 import type {
   InteractionOperation,
@@ -41,14 +41,12 @@ export function rowColWrite<T>(
   refused: T,
   write: () => T,
 ): T {
-  const result = authorizedWrite({
-    store: ctx.store,
-    history: ctx.history ?? new History(),
-    intents: (origin) => [{ operation, origin, commandId: ctx.commandId, effects }],
-    origin: ctx.origin,
+  return authorizedWriteOr(
+    ctx,
+    (origin) => [{ operation, origin, commandId: ctx.commandId, effects }],
+    refused,
     write,
-  });
-  return result.ok ? result.value : refused;
+  );
 }
 
 /**
