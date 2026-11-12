@@ -8,6 +8,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- Create from Selection opens the Create Names dialog, as on the desktop: one entry in place of the four Create from Top Row, Bottom Row, Left Column and Right Column entries, with checkboxes for the top row, left column, bottom row and right column in any combination. Names from one edge leave out the other checked edges, the names are created as one undo step, and the top row and left column start checked when they hold text.
 - Notes on the default profile follow the desktop: the cell menu offers New Note on a cell without a note and Edit Note, Delete Note and Show/Hide Note on one with a note, and the Review tab's New Note reads Edit Note while the active cell has a note.
 - No UI string names the desktop product any more: the Name Manager's delete confirmation is titled Name Manager, and the screen-clipping notice no longer calls the system picker by the product's name.
 - A command that refuses because its range is too large reads "Selection is too large.", the desktop's own wording, and one the engine cannot carry out reads "Can’t complete this action." in every locale; Go To Special, Name Manager, Create PivotTable and Move PivotTable share these messages.

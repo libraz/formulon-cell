@@ -313,10 +313,7 @@ export const FORMULA_ICONS = {
       PALETTE.accent,
     ),
   ],
-  namesCreateTop: nameFromEdge('row', 0),
-  namesCreateBottom: nameFromEdge('row', 2),
-  namesCreateLeft: nameFromEdge('col', 0),
-  namesCreateRight: nameFromEdge('col', 2),
+  namesCreateFromSelection: nameFromEdge('row', 0),
 } satisfies Record<string, IconDefinition>;
 
 /** Grid with the edge band that supplies the names highlighted. */

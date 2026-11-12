@@ -524,7 +524,8 @@ describe('Spreadsheet.mountToolbar', () => {
       menuId: 'menu-defined-names',
     });
     const namesMenu = host.querySelector<HTMLElement>('#menu-defined-names');
-    expect(namesMenu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(7);
+    // Define Name, Name Manager, Create from Selection and Use in Formula.
+    expect(namesMenu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(4);
     expect(
       namesMenu?.querySelector<HTMLButtonElement>('[data-defined-name-action="use-formula"]')
         ?.disabled,

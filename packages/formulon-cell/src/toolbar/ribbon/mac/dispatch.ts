@@ -154,10 +154,6 @@ const operations = [
   'mac.formulas.defineName',
   'mac.formulas.useInFormula',
   'mac.formulas.createFromSelection',
-  'mac.formulas.createNames.topRow',
-  'mac.formulas.createNames.bottomRow',
-  'mac.formulas.createNames.leftColumn',
-  'mac.formulas.createNames.rightColumn',
   'mac.formulas.errorCheck',
   'mac.formulas.removeArrows',
   'mac.formulas.calc.auto',
@@ -415,14 +411,6 @@ export function dispatchMacRibbonCommand(
     } as const;
     const sortAction = sort[id as keyof typeof sort];
     if (sortAction) return ctx.applySortMenuAction(sortAction);
-    const names = {
-      'mac.formulas.createNames.topRow': 'create-top-row',
-      'mac.formulas.createNames.bottomRow': 'create-bottom-row',
-      'mac.formulas.createNames.leftColumn': 'create-left-column',
-      'mac.formulas.createNames.rightColumn': 'create-right-column',
-    } as const;
-    const nameAction = names[id as keyof typeof names];
-    if (nameAction) return ctx.applyDefinedNameAction(nameAction);
     switch (id) {
       case 'mac.insert.recommendedPivotTable':
         return ctx.applyPivotTableAction('recommended');
@@ -449,7 +437,7 @@ export function dispatchMacRibbonCommand(
       case 'mac.formulas.useInFormula':
         return ctx.applyDefinedNameAction('use-formula');
       case 'mac.formulas.createFromSelection':
-        return ctx.applyDefinedNameAction('create-top-row');
+        return ctx.applyDefinedNameAction('create-from-selection');
       case 'mac.formulas.removeArrows':
         return ctx.applyFormulaAuditAction('clear-all');
       case 'mac.formulas.errorCheck':

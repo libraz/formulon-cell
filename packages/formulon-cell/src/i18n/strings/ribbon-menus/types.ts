@@ -265,11 +265,14 @@ export interface RibbonMenusStrings {
     defineName: string;
     useInFormula: string;
     noDefinedNames: string;
-    createFromSelectionTop: string;
-    createFromSelectionBottom: string;
-    createFromSelectionLeft: string;
-    createFromSelectionRight: string;
-    definedNamesCreateFailed: string;
+    /** Formulas › Create from Selection and the Create Names dialog it opens. */
+    createFromSelection: string;
+    createNamesTitle: string;
+    createNamesIn: string;
+    createNamesTop: string;
+    createNamesLeft: string;
+    createNamesBottom: string;
+    createNamesRight: string;
     nameManager: string;
     calcAutomatic: string;
     calcAutoNoTable: string;

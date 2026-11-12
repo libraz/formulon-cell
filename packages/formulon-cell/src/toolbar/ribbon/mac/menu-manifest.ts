@@ -58,7 +58,6 @@ export const MAC_RIBBON_MENU_COMMANDS = [
   'mac.formulas.math',
   'mac.formulas.more',
   'mac.formulas.calcOptions',
-  'mac.formulas.createFromSelection',
   'mac.formulas.removeArrows',
   'mac.formulas.errorCheck',
   'mac.data.dataTypes',
@@ -385,12 +384,6 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
       labelJa: '反復計算を有効にする',
     },
   ]),
-  'mac.formulas.createFromSelection': menu([
-    { id: 'mac.formulas.createNames.topRow', label: 'Top row' },
-    { id: 'mac.formulas.createNames.bottomRow', label: 'Bottom row' },
-    { id: 'mac.formulas.createNames.leftColumn', label: 'Left column' },
-    { id: 'mac.formulas.createNames.rightColumn', label: 'Right column' },
-  ]),
   // The host has no linked data types, so the gallery lists Excel's entries greyed out.
   'mac.data.dataTypes': [
     galleryItem('mac.data.dataTypes.stocks', 'Stocks (English)', '株式 (English)'),
@@ -505,7 +498,6 @@ export const macRibbonMenuIdForCommand = (commandId: string): string | null => {
     'mac.formulas.math': 'menu-mac-formulas-math',
     'mac.formulas.more': MAC_FORMULAS_MORE_MENU_ID,
     'mac.formulas.calcOptions': 'menu-mac-formulas-calc-options',
-    'mac.formulas.createFromSelection': 'menu-mac-formulas-create-names',
     'mac.formulas.removeArrows': 'menu-mac-formulas-remove-arrows',
     'mac.formulas.errorCheck': 'menu-mac-formulas-error-check',
     'mac.data.dataTypes': 'menu-mac-data-types',

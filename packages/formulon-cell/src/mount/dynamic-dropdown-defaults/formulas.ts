@@ -19,12 +19,14 @@ import {
   watchRange,
 } from '../../commands/watch.js';
 import { addrKey } from '../../engine/address.js';
+import type { Range } from '../../engine/types.js';
 import { openDataTableDialogFrom } from '../../interact/data-table-dialog.js';
 import { openDefineNameDialogFrom, openNamedRangeDialogFrom } from '../../interact/dialog-entry.js';
 import { openMacGoalSeekDialog } from '../../interact/mac-goal-seek-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators } from '../../store/store.js';
 import { showCommandRefusal } from '../../toolbar/dialogs/command-refusal.js';
+import { showCreateNamesDialog } from '../../toolbar/dialogs/create-names.js';
 import { showDefinedNamePickerDialog } from '../../toolbar/dialogs/defined-name-picker.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { handleAutoSum } from '../../wrappers/toolbar-actions.js';
@@ -250,6 +252,91 @@ const updateClearArrowsMenu =
     }
   };
 
+const CREATE_NAMES_SOURCES = [
+  ['top', 'top-row'],
+  ['left', 'left-column'],
+  ['bottom', 'bottom-row'],
+  ['right', 'right-column'],
+] as const;
+
+/** Whether any cell of `range` holds text, which the Create Names dialog reads as labels. */
+const holdsText = (instance: SpreadsheetInstance, range: Range): boolean => {
+  const cells = instance.store.getState().data.cells;
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      if (cells.get(addrKey({ sheet: range.sheet, row, col }))?.value.kind === 'text') return true;
+    }
+  }
+  return false;
+};
+
+/** Create from Selection: the Create Names dialog, then names from each checked edge as one step.
+ *  An edge's names leave out the other checked edges, so with Top row and Left column checked the
+ *  column names start after the left column and the row names after the top row. */
+async function createNamesFromSelection(instance: SpreadsheetInstance): Promise<void> {
+  const strings = instance.i18n.strings;
+  const t = strings.ribbonMenu;
+  const range = instance.store.getState().selection.range;
+  // Top row and Left column start checked when that edge holds text; the desktop's own
+  // pre-fill rule is provisional until measured.
+  const edges = await showCreateNamesDialog({
+    host: instance.host,
+    labels: {
+      title: t.createNamesTitle,
+      createIn: t.createNamesIn,
+      top: t.createNamesTop,
+      left: t.createNamesLeft,
+      bottom: t.createNamesBottom,
+      right: t.createNamesRight,
+      ok: strings.pageSetup.ok,
+      cancel: strings.pageSetup.cancel,
+    },
+    initial: {
+      top: holdsText(instance, { ...range, r1: range.r0 }),
+      left: holdsText(instance, { ...range, c1: range.c0 }),
+      bottom: false,
+      right: false,
+    },
+  });
+  if (!edges) return;
+  const narrowed = (source: (typeof CREATE_NAMES_SOURCES)[number][1]): Range => {
+    const rows = source === 'top-row' || source === 'bottom-row';
+    return {
+      ...range,
+      r0: !rows && edges.top ? range.r0 + 1 : range.r0,
+      r1: !rows && edges.bottom ? range.r1 - 1 : range.r1,
+      c0: rows && edges.left ? range.c0 + 1 : range.c0,
+      c1: rows && edges.right ? range.c1 - 1 : range.c1,
+    };
+  };
+  const written = namedRangeWrite(
+    {
+      store: instance.store,
+      workbook: instance.workbook,
+      history: instance.history,
+      origin: 'ribbon',
+      commandId: 'namedRanges',
+    },
+    () => {
+      for (const [edge, source] of CREATE_NAMES_SOURCES) {
+        if (!edges[edge]) continue;
+        const state = instance.store.getState();
+        const result = createDefinedNamesFromSelection(
+          { ...state, selection: { ...state.selection, range: narrowed(source) } },
+          instance.workbook,
+          source,
+        );
+        if (!result.ok) return result;
+      }
+      return null;
+    },
+  );
+  const reason = written.ok && written.value ? written.value.reason : null;
+  if (reason === 'too-large' || reason === 'engine-failed') {
+    await showCommandRefusal({ host: instance.host, strings, title: t.createNamesTitle, reason });
+  }
+}
+
 const buildDefinedNameAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyDefinedNameAction'] =>
   async (action) => {
@@ -261,43 +348,8 @@ const buildDefinedNameAction =
       openNamedRangeDialogFrom(instance.store, { origin: 'ribbon', commandId: 'namedRanges' });
       return;
     }
-    const source =
-      action === 'create-top-row'
-        ? 'top-row'
-        : action === 'create-bottom-row'
-          ? 'bottom-row'
-          : action === 'create-left-column'
-            ? 'left-column'
-            : action === 'create-right-column'
-              ? 'right-column'
-              : null;
-    if (source) {
-      const written = namedRangeWrite(
-        {
-          store: instance.store,
-          workbook: instance.workbook,
-          history: instance.history,
-          origin: 'ribbon',
-          commandId: 'namedRanges',
-        },
-        () => createDefinedNamesFromSelection(instance.store.getState(), instance.workbook, source),
-      );
-      const reason = written.ok && !written.value.ok ? written.value.reason : null;
-      if (reason === 'too-large' || reason === 'engine-failed') {
-        const menu = instance.i18n.strings.ribbonMenu;
-        const title = {
-          'top-row': menu.createFromSelectionTop,
-          'bottom-row': menu.createFromSelectionBottom,
-          'left-column': menu.createFromSelectionLeft,
-          'right-column': menu.createFromSelectionRight,
-        }[source];
-        await showCommandRefusal({
-          host: instance.host,
-          strings: instance.i18n.strings,
-          title,
-          reason,
-        });
-      }
+    if (action === 'create-from-selection') {
+      await createNamesFromSelection(instance);
       instance.host.focus();
       return;
     }

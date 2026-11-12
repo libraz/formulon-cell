@@ -48,8 +48,17 @@ describe('Create from Selection refusal', () => {
     sheet = await mountStubSheet({ locale: 'en', workbook: await WorkbookHandle.createDefault() });
     const { instance } = sheet;
     mutators.setRange(instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 16_383 });
-    // The action waits for the alert's OK, so it is left running while the alert is checked.
-    void createFormulasDropdownDefaults(instance).applyDefinedNameAction('create-top-row');
+    // The action waits for the dialog and then the alert, so it is left running.
+    void createFormulasDropdownDefaults(instance).applyDefinedNameAction('create-from-selection');
+    await settle();
+    const top = document.querySelector<HTMLInputElement>('.fc-createnames [data-fc-edge="top"]');
+    if (!top) throw new Error('missing Create Names');
+    top.checked = true;
+    top.dispatchEvent(new Event('change'));
+    top
+      .closest('[role="dialog"]')
+      ?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.click();
     await settle();
     expect(alertText()).toBe(en.commandRefusal.tooLarge);
   });

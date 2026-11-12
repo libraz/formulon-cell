@@ -25,7 +25,7 @@ const NAME_IDS = [
   'namedRanges',
   'mac.formulas.defineName',
   'mac.formulas.namesManager',
-  'mac.formulas.createNames.topRow',
+  'mac.formulas.createFromSelection',
 ] as const;
 
 const allowAll: InteractionPolicy = { defaultOperation: 'allow' };

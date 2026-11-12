@@ -678,6 +678,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'block',
   ),
   shell(
+    'toolbar.createNames',
+    'toolbar/dialogs/create-names.ts',
+    'showCreateNamesDialog',
+    'ribbonMenu',
+    'block',
+  ),
+  shell(
     'toolbar.customLists',
     'toolbar/dialogs/custom-lists.ts',
     'showCustomListsDialog',

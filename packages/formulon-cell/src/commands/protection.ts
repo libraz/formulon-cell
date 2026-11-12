@@ -149,10 +149,6 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'defineName',
   'mac.formulas.defineName',
   'mac.formulas.createFromSelection',
-  'mac.formulas.createNames.topRow',
-  'mac.formulas.createNames.bottomRow',
-  'mac.formulas.createNames.leftColumn',
-  'mac.formulas.createNames.rightColumn',
   // The Data Validation dialog.
   'dataValidation',
   'mac.data.validation.settings',
