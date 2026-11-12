@@ -12,7 +12,7 @@ import type { Locale } from '../../i18n/strings.js';
 // can branch without needing dedicated wrapper props.
 
 import type { FeatureFlags } from '../../extensions/index.js';
-import { clampPanelToViewport, panelSize, viewportSize } from '../../interact/overlay-position.js';
+import { panelSize, placePanel, viewportSize } from '../../interact/overlay-position.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import type { RibbonDisplayText, ToolbarMenuText } from '../menu-text.js';
@@ -432,9 +432,7 @@ export const positionRibbonDisplayMenu = (toggle: HTMLElement, menu: HTMLElement
   const size = panelSize(menu, contentSize.width, contentSize.height);
   const desiredX = toggleRect.right - size.width;
   const desiredY = opensBelow ? toggleRect.bottom + gap : toggleRect.top - size.height - gap;
-  const position = clampPanelToViewport(menu, desiredX, desiredY, { pad });
-  menu.style.left = `${Math.round(position.x)}px`;
-  menu.style.top = `${Math.round(position.y)}px`;
+  placePanel(menu, desiredX, desiredY, { pad });
 };
 
 export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {

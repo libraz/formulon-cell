@@ -4,7 +4,7 @@ import { isMacHost } from '../extensions/ui-options.js';
 import { cellRect, hitTest, layoutForView, pointPx } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 
 /** Measured desktop note card size, in points. */
 const NOTE_CARD_W_PT = 105;
@@ -146,13 +146,11 @@ export function attachHover(deps: HoverDeps): HoverHandle {
         px = gridBox.left + cell.x + cell.w;
         py = gridBox.top + above.y;
       }
-      const position = clampPanelToViewport(tip, px, py, {
+      placePanel(tip, px, py, {
         pad: 8,
         fallbackWidth: 280,
         fallbackHeight: 32,
       });
-      tip.style.left = `${Math.round(position.x)}px`;
-      tip.style.top = `${Math.round(position.y)}px`;
     } else {
       hideTip();
     }

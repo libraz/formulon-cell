@@ -12,7 +12,7 @@
  */
 
 import { onOutsidePress } from '../../interact/outside-press.js';
-import { clampPanelToViewport, viewportSize } from '../../interact/overlay-position.js';
+import { placePanel, viewportSize } from '../../interact/overlay-position.js';
 import { createRibbonButton } from './button.js';
 
 export const RIBBON_GROUP_NARROW_CLASS = 'fc-tb__ribbon-group--narrow';
@@ -124,9 +124,7 @@ const openGroupPopup = (group: HTMLElement, button: HTMLElement): void => {
     const desiredY = rect.bottom + GROUP_POPUP_GAP;
     tools.style.maxWidth = `${Math.max(0, viewport.width - GROUP_POPUP_PAD * 2)}px`;
     tools.style.maxHeight = `${Math.max(0, viewport.height - GROUP_POPUP_PAD - desiredY)}px`;
-    const position = clampPanelToViewport(tools, rect.left, desiredY, { pad: GROUP_POPUP_PAD });
-    tools.style.left = `${Math.round(position.x)}px`;
-    tools.style.top = `${Math.round(position.y)}px`;
+    placePanel(tools, rect.left, desiredY, { pad: GROUP_POPUP_PAD });
   }
   const doc = group.ownerDocument;
   // Bubble phase: the chosen command runs first, then the popup goes.

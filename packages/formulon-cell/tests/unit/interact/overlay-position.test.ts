@@ -3,6 +3,7 @@ import {
   clamp,
   clampPanelToViewport,
   panelSize,
+  placePanel,
   viewportSize,
 } from '../../../src/interact/overlay-position.js';
 
@@ -64,6 +65,20 @@ describe('interact/overlay-position', () => {
         fallbackHeight: 160,
       }),
     ).toEqual({ x: 24, y: 16 });
+  });
+
+  it('places a panel clamped into the viewport on whole pixels', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 180 });
+    const panel = document.createElement('div');
+
+    expect(placePanel(panel, 10.6, 20.4, { fallbackWidth: 100, fallbackHeight: 40 })).toEqual({
+      x: 11,
+      y: 20,
+    });
+    expect([panel.style.left, panel.style.top]).toEqual(['11px', '20px']);
+    placePanel(panel, 400.5, 300.5, { fallbackWidth: 100.5, fallbackHeight: 40 });
+    expect([panel.style.left, panel.style.top]).toEqual(['215px', '136px']);
   });
 
   it('converts client coordinates into a translated and scaled fixed containing block', () => {

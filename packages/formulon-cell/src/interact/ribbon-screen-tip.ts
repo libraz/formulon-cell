@@ -1,5 +1,5 @@
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
+import { panelSize, placePanel, viewportSize } from './overlay-position.js';
 
 /** The two shortcut conventions used by the ribbon. `default` covers the
  * Windows/Linux surface as well as an explicitly unspecified platform. */
@@ -254,9 +254,7 @@ export function attachRibbonScreenTips(options: RibbonScreenTipsOptions): Ribbon
       belowY + size.height + SCREEN_TIP_PAD <= viewport.height || aboveY < SCREEN_TIP_PAD
         ? belowY
         : aboveY;
-    const clamped = clampPanelToViewport(tip, desiredX, desiredY, { pad: SCREEN_TIP_PAD });
-    tip.style.left = `${Math.round(clamped.x)}px`;
-    tip.style.top = `${Math.round(clamped.y)}px`;
+    placePanel(tip, desiredX, desiredY, { pad: SCREEN_TIP_PAD });
   };
 
   const show = (target: HTMLElement): void => {

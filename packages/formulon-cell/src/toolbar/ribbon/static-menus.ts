@@ -1,7 +1,7 @@
 // Open/close handling for ribbon menus that are plain sibling DOM (the
 // fallback when no dynamic-dropdown delegation is attached).
 
-import { clampPanelToViewport, panelSize, viewportSize } from '../../interact/overlay-position.js';
+import { panelSize, placePanel, viewportSize } from '../../interact/overlay-position.js';
 
 const STATIC_MENU_GAP = 3;
 const STATIC_MENU_PAD = 4;
@@ -26,7 +26,7 @@ const clearStaticMenuPosition = (menu: HTMLElement): void => {
 /** Places a static sibling in the viewport coordinate space. The ribbon panel
  * is a horizontal scroll owner, so an absolutely positioned sibling would be
  * clipped by the panel's overflow. A fixed menu retains the trigger's visual
- * position while `clampPanelToViewport` also handles transformed hosts. */
+ * position while `placePanel` also handles transformed hosts. */
 const positionStaticRibbonMenu = (button: HTMLElement, menu: HTMLElement): void => {
   clearStaticMenuPosition(menu);
   menu.style.position = 'fixed';
@@ -63,13 +63,11 @@ const positionStaticRibbonMenu = (button: HTMLElement, menu: HTMLElement): void 
   const desiredY = opensBelow
     ? buttonRect.bottom + STATIC_MENU_GAP
     : buttonRect.top - size.height - STATIC_MENU_GAP;
-  const position = clampPanelToViewport(menu, desiredX, desiredY, {
+  placePanel(menu, desiredX, desiredY, {
     pad: STATIC_MENU_PAD,
     fallbackWidth: STATIC_MENU_FALLBACK_WIDTH,
     fallbackHeight: STATIC_MENU_FALLBACK_HEIGHT,
   });
-  menu.style.left = `${Math.round(position.x)}px`;
-  menu.style.top = `${Math.round(position.y)}px`;
 };
 
 /** Hides every open static menu except `except`, collapses the function

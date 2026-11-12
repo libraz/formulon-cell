@@ -152,3 +152,18 @@ export const clampPanelToViewport = (
     ),
   };
 };
+
+/** Moves `panel` to `(x, y)` clamped into the viewport, on whole pixels so its text stays
+ *  crisp, and returns the position written to its `left`/`top`. */
+export const placePanel = (
+  panel: HTMLElement,
+  x: number,
+  y: number,
+  options: ViewportPanelPositionOptions = {},
+): ViewportPanelPosition => {
+  const position = clampPanelToViewport(panel, x, y, options);
+  const placed = { x: Math.round(position.x), y: Math.round(position.y) };
+  panel.style.left = `${placed.x}px`;
+  panel.style.top = `${placed.y}px`;
+  return placed;
+};
