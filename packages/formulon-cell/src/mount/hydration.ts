@@ -41,8 +41,7 @@ export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: Spreadsh
     hydrateAutoFilterFromEngine(wb, store, sheet);
     hydratePageSetupFromEngine(wb, store, sheet);
   };
-  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
-  else hydrate();
+  wb.withEngineSyncMuted(hydrate);
 }
 
 /** Validate viewport options against `wb`, including its merges on the target sheet. */

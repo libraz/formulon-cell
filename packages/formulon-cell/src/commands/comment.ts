@@ -505,7 +505,7 @@ const capturePhysicalCommentSnapshot = (
   wb: WorkbookHandle | undefined,
   addrs: readonly Addr[],
 ): PhysicalCommentSnapshot => {
-  if (!wb?.capabilities.comments || typeof wb.getComment !== 'function') return [];
+  if (!wb?.capabilities.comments) return [];
   return addrs.map((addr) => ({
     addr: cloneAddr(addr),
     comment: wb.getComment(addr.sheet, addr.row, addr.col),

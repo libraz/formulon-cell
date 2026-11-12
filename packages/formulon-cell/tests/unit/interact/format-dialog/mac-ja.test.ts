@@ -466,6 +466,8 @@ describe('format dialog Number category padding by workbook locale', () => {
       getTheme: () => null,
       getValue: () => ({ kind: 'blank' }),
       spreadsheetProfileId: () => profile,
+      withEngineSyncMuted: <T>(fn: () => T): T => fn(),
+      subscribe: () => () => {},
     } as unknown as never;
     const handle = attachFormatDialog({ host, store, strings: ja, getWb: () => wb });
     handle.open('number');

@@ -11,6 +11,7 @@ const blank = (): CellValue => ({ kind: 'blank' });
 const wbWithLambda = (text: string | null): WorkbookHandle =>
   ({
     getLambdaText: (_a: Addr) => text,
+    getFormulaForDisplay: (formula: string) => formula,
   }) as unknown as WorkbookHandle;
 
 describe('formatCellForEdit', () => {
@@ -146,6 +147,7 @@ describe('formulaForEdit', () => {
       capabilities: { formulaR1C1: true },
       sheetCount: 1,
       cellFormulaR1C1: vi.fn(() => '=SUM(R[-2]C[-2],R2C2)'),
+      localizeFormulaR1C1Text: () => null,
       getFormulaForDisplay,
     } as unknown as WorkbookHandle;
     const addr = { sheet: 0, row: 2, col: 2 };
@@ -160,6 +162,7 @@ describe('editSeedForAddr', () => {
     const { editSeedForAddr } = await import('../../../src/engine/edit-seed.js');
     const wb = {
       cellFormula: () => '=1+2',
+      getFormulaForDisplay: (formula: string) => formula,
       capabilities: {},
       sheetCount: 1,
     } as unknown as WorkbookHandle;

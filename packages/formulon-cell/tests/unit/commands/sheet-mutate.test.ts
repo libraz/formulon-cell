@@ -72,6 +72,7 @@ const makeFake = (
     recalcAuto: (): void => {
       fake.recalcs += 1;
     },
+    getTables: () => [],
     cells: (sheet: number) => fake.sheetCells.get(sheet) ?? [],
     sheetName: (idx: number): string => fake.names[idx] ?? `Sheet${idx + 1}`,
     sheetIndexByName: (name: string): number | null => {

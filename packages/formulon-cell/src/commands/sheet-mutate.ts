@@ -125,12 +125,11 @@ const activateSheet = (
 
 /** Table overlays name their sheet; re-read them after the sheets were reordered. */
 const refreshTableOverlays = (store: SpreadsheetStore, wb: WorkbookHandle): void => {
-  if (typeof wb.getTables === 'function') hydrateTableOverlaysFromEngine(wb, store);
+  hydrateTableOverlaysFromEngine(wb, store);
 };
 
 /** Slicers name a table, which goes away with its sheet. */
 const pruneOrphanSlicers = (store: SpreadsheetStore, wb: WorkbookHandle): void => {
-  if (typeof wb.getTables !== 'function') return;
   for (const spec of store.getState().slicers.slicers) {
     if (!findSlicerTable(wb, spec.tableName)) mutators.removeSlicer(store, spec.id);
   }
@@ -361,8 +360,7 @@ const hydrateCopiedSheet = (store: SpreadsheetStore, wb: WorkbookHandle, copy: n
     hydrateSheetProtectionFromEngine(wb, store, copy);
     hydrateSheetPrForSheet(wb, store, copy);
   };
-  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
-  else hydrate();
+  wb.withEngineSyncMuted(hydrate);
 };
 
 /** Copy the sheet at `source` so the copy lands before the sheet at `before`

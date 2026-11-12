@@ -109,8 +109,7 @@ export function hydrateSlicersFromEngine(wb: WorkbookHandle, store: SpreadsheetS
       },
     }));
   };
-  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
-  else hydrate();
+  wb.withEngineSyncMuted(hydrate);
 }
 
 /** Capture slicer `objectId` so a row or column delete that drops it can be

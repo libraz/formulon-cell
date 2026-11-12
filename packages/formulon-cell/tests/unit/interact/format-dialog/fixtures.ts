@@ -48,6 +48,8 @@ export const mergeWorkbook = (): WorkbookHandle =>
     getValue: () => ({ kind: 'blank' }),
     getTheme: () => null,
     withBatchedRecalc: <T>(fn: () => T): T => fn(),
+    withEngineSyncMuted: <T>(fn: () => T): T => fn(),
+    subscribe: () => () => {},
   }) as unknown as WorkbookHandle;
 
 export const seedText = (

@@ -241,7 +241,7 @@ export function syncCellFormatsToEngine(
     if (strict) previous.add(key);
     // Per-run first: `setCellPhonetic` spans the whole cell, so on a partially
     // annotated cell it would flatten every span into one reading.
-    if (wb.capabilities.phoneticRuns && typeof wb.setCellPhoneticRuns === 'function') {
+    if (wb.capabilities.phoneticRuns) {
       const setPhoneticSucceeded = wb.setCellPhoneticRuns(
         sheet,
         row,
@@ -251,7 +251,7 @@ export function syncCellFormatsToEngine(
       if (strict && !setPhoneticSucceeded) {
         throw strictSyncError('setCellPhoneticRuns', key);
       }
-    } else if (wb.capabilities.phonetic && typeof wb.setCellPhonetic === 'function') {
+    } else if (wb.capabilities.phonetic) {
       const setPhoneticSucceeded = wb.setCellPhonetic(
         sheet,
         row,

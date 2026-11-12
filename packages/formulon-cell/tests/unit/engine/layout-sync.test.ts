@@ -165,6 +165,7 @@ const makeFake = (opts: {
     getRowLayouts: () => opts.rows ?? [],
     getSheetDefaultLayoutPx: () => opts.defaults ?? null,
     getSheetView: (sheet: number) => opts.views?.[sheet] ?? opts.view ?? null,
+    sheetRowsHiddenByDefault: () => false,
     setColumnWidth: (sheet: number, first: number, last: number, width: number) => {
       colCalls.push({ sheet, first, last, width });
       return opts.colRowSize;

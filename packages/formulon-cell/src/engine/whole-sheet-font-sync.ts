@@ -288,7 +288,6 @@ export const remapStoreSheetStateForStructureEvent = (
 const ensureStructureEventBinding = (wb: WorkbookHandle): StructureEventBinding | null => {
   const current = structureEventBindings.get(wb);
   if (current) return current;
-  if (typeof wb.subscribe !== 'function') return null;
   const stores = new Set<SpreadsheetStore>();
   const beforeStoreRemap = new Map<SpreadsheetStore, (mapIndex: SheetIndexMapper) => void>();
   const binding: StructureEventBinding = {
@@ -307,8 +306,7 @@ const ensureStructureEventBinding = (wb: WorkbookHandle): StructureEventBinding 
         remapStoreSheetStateForStructureEvent(store, mapIndex);
       }
     };
-    if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(remap);
-    else remap();
+    wb.withEngineSyncMuted(remap);
   });
   structureEventBindings.set(wb, binding);
   return binding;

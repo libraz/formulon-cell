@@ -65,7 +65,7 @@ const valueDisplay = (value: Parameters<typeof formatCell>[0], opts: FindOptions
   formatCell(value, localeForSearch(opts));
 
 const workbookDisplay = (wb: WorkbookHandle | undefined, addr: Addr, fallback: string): string => {
-  if (!wb || typeof wb.getDisplayText !== 'function') return fallback;
+  if (!wb) return fallback;
   try {
     return wb.getDisplayText(addr.sheet, addr.row, addr.col) ?? fallback;
   } catch {
@@ -74,7 +74,7 @@ const workbookDisplay = (wb: WorkbookHandle | undefined, addr: Addr, fallback: s
 };
 
 const formulaDisplay = (formula: string, opts: FindOptions): string => {
-  if (!opts.workbook || typeof opts.workbook.getFormulaForDisplay !== 'function') return formula;
+  if (!opts.workbook) return formula;
   try {
     return opts.workbook.getFormulaForDisplay(formula);
   } catch {
@@ -207,14 +207,12 @@ const notesForSearch = (state: State, opts: FindOptions): CellEntry[] => {
   if (opts.workbook?.capabilities?.comments) {
     for (const sheet of selected) {
       try {
-        const native =
-          opts.workbook.capabilities.commentsEnumerable &&
-          typeof opts.workbook.getComments === 'function'
-            ? opts.workbook.getComments(sheet)
-            : [...opts.workbook.cells(sheet)].flatMap((entry) => {
-                const comment = opts.workbook?.getComment(sheet, entry.addr.row, entry.addr.col);
-                return comment ? [{ ...entry.addr, ...comment }] : [];
-              });
+        const native = opts.workbook.capabilities.commentsEnumerable
+          ? opts.workbook.getComments(sheet)
+          : [...opts.workbook.cells(sheet)].flatMap((entry) => {
+              const comment = opts.workbook?.getComment(sheet, entry.addr.row, entry.addr.col);
+              return comment ? [{ ...entry.addr, ...comment }] : [];
+            });
         for (const comment of native) {
           const addr = { sheet, row: comment.row, col: comment.col };
           const key = addrKey(addr);
@@ -237,7 +235,7 @@ const cellDisplayForSearch = (
   if (!cell) return '';
   if (opts.lookIn === 'formulas') {
     let formula = cell.formula;
-    if (opts.workbook && typeof opts.workbook.cellFormula === 'function') {
+    if (opts.workbook) {
       try {
         formula = opts.workbook.cellFormula(addr) ?? formula;
       } catch {

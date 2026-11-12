@@ -70,6 +70,15 @@ const makeEngine = (): {
     getCellXf(idx: number): CellXf | null {
       return xfs.get(idx) ?? null;
     },
+    getResolvedFontRecord(this: { getFontRecord(index: number): unknown }, index: number) {
+      return this.getFontRecord(index);
+    },
+    getResolvedFillRecord(this: { getFillRecord(index: number): unknown }, index: number) {
+      return this.getFillRecord(index);
+    },
+    getResolvedBorderRecord(this: { getBorderRecord(index: number): unknown }, index: number) {
+      return this.getBorderRecord(index);
+    },
     getFontRecord(idx: number): FontRecord | null {
       return fonts.get(idx) ?? null;
     },

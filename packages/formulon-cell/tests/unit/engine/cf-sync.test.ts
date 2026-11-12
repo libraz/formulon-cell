@@ -98,6 +98,8 @@ const fakeWb = (
         matches: cell.matches.map((m) => ({ ...baseMatch, ...m })),
       })),
     getDxf: (index: number) => dxfs[index] ?? null,
+    getSheetView: () => null,
+    getConditionalFormats: () => [],
   } as unknown as WorkbookHandle;
 };
 

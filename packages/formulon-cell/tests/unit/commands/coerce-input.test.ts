@@ -66,7 +66,7 @@ describe('coerceInput', () => {
     expect(parseLocalizedNumericInput('1e999', 'en-US')).toBeNull();
   });
 
-  it('maps public workbook profiles to input locales and falls back for older engines', () => {
+  it('maps public workbook profiles to input locales and falls back when no profile is reported', () => {
     const withProfile = (profile: string | null): WorkbookHandle =>
       ({ spreadsheetProfileId: () => profile }) as unknown as WorkbookHandle;
     expect(inputLocaleForWorkbook(withProfile('windows-de_DE'))).toBe('de-DE');
@@ -154,6 +154,9 @@ const stubHandle = () => {
     setBool: vi.fn(),
     setError: vi.fn(),
     setText: vi.fn(),
+    spreadsheetProfileId: () => null,
+    calcSettings: () => null,
+    canonicalizeLocalizedFormula: (formula: string) => formula,
   } as unknown as WorkbookHandle & {
     setBlank: ReturnType<typeof vi.fn>;
     setFormula: ReturnType<typeof vi.fn>;

@@ -246,6 +246,7 @@ describe('comment commands', () => {
     const calls: { row: number; col: number; text: string }[] = [];
     const wb = {
       capabilities: { comments: true },
+      getComment: () => null,
       setCommentEntry: (
         _sheet: number,
         row: number,

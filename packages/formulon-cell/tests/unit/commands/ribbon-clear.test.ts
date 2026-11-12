@@ -26,6 +26,7 @@ const makeWorkbook = (
 } => {
   const cells = new Map(entries.map((entry) => [key(entry.addr), entry]));
   const wb = {
+    subscribe: () => () => {},
     capabilities: { comments: true },
     setBlank: vi.fn((addr: Addr) => {
       cells.delete(key(addr));

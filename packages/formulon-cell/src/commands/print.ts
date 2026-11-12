@@ -769,10 +769,10 @@ export function buildPrintDocument(
     // value directly in that case; otherwise the workbook renderer accounts
     // for inherited styles, date systems, and display overflow.
     const ownFormatCode = format?.numFmt ? numFmtToFormatCode(format.numFmt, wb) : null;
-    if (ownFormatCode && typeof wb.formatValueForDisplay === 'function') {
+    if (ownFormatCode) {
       return wb.formatValueForDisplay(snap.value, ownFormatCode);
     }
-    if (format?.hyperlinkDisplay || typeof wb.getDisplayText !== 'function') return null;
+    if (format?.hyperlinkDisplay) return null;
     const displayed = wb.getDisplayText(sheet, row, col);
     if (displayed === '') return null;
     return displayed;

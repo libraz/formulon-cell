@@ -191,7 +191,7 @@ export function canonicalizeFormulaForEngine(
   if (!wb.capabilities.functionLocale) return formula;
 
   let canonicalNames: ReadonlySet<string> | null = null;
-  if (wb.capabilities.functionMetadata && typeof wb.functionNames === 'function') {
+  if (wb.capabilities.functionMetadata) {
     try {
       const names = wb.functionNames();
       if (names) canonicalNames = new Set(names.map((name) => name.toUpperCase()));

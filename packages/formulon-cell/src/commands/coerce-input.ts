@@ -1,9 +1,5 @@
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { formatCodeToNumFmt } from '../engine/format-writeback.js';
-import {
-  canonicalizeFormula,
-  localeOrdinalForSpreadsheetProfile,
-} from '../engine/function-locale.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import type { Addr, CellValue, SpreadsheetProfileId } from '../engine/types.js';
@@ -115,14 +111,13 @@ function publicProfileForInputLocale(
   wb: WorkbookHandle,
   locale: string | undefined,
 ): SpreadsheetProfileId | null | undefined {
-  const current = typeof wb.spreadsheetProfileId === 'function' ? wb.spreadsheetProfileId() : null;
+  const current = wb.spreadsheetProfileId();
   if (locale === undefined) return current ?? undefined;
   return spreadsheetProfileForLocale(locale, current?.startsWith('mac-') ? 'mac' : 'default');
 }
 
 /** Convert user-facing localized function names to formulon's canonical
- * storage grammar. The optional adapter method is used when available; the
- * fallback keeps compatibility with the first profile API. */
+ * storage grammar. */
 export function canonicalizeLocalizedFormulaForInput(
   wb: WorkbookHandle,
   formula: string,
@@ -130,24 +125,13 @@ export function canonicalizeLocalizedFormulaForInput(
 ): string {
   const profile = publicProfileForInputLocale(wb, locale);
   if (profile === null) return formula;
-  if (typeof wb.canonicalizeLocalizedFormula === 'function') {
-    return wb.canonicalizeLocalizedFormula(formula, profile);
-  }
-  if (!profile || !wb.capabilities?.functionLocale) return formula;
-  const ordinal = localeOrdinalForSpreadsheetProfile(profile);
-  return canonicalizeFormula(wb, formula, ordinal);
+  return wb.canonicalizeLocalizedFormula(formula, profile);
 }
 
 /** Callback used by external clipboard payloads. Internal snapshots continue
  * to read formulas directly from the store and therefore remain canonical. */
 export function localizeFormulaForClipboard(wb: WorkbookHandle): (formula: string) => string {
-  if (typeof wb.localizeFormulaText === 'function') {
-    return (formula) => wb.localizeFormulaText(formula);
-  }
-  if (typeof wb.getFormulaForDisplay === 'function') {
-    return (formula) => wb.getFormulaForDisplay(formula);
-  }
-  return (formula) => formula;
+  return (formula) => wb.localizeFormulaText(formula);
 }
 
 /** Resolve the live workbook profile into the locale used by input coercion.
@@ -168,7 +152,7 @@ export function inputLocaleForWorkbook(wb: WorkbookHandle): string | undefined {
 
 /** The workbook's date system, for callers that hold no store. */
 export function workbookDate1904(wb: WorkbookHandle): boolean {
-  return (typeof wb.calcSettings === 'function' && wb.calcSettings()?.date1904) || false;
+  return wb.calcSettings()?.date1904 || false;
 }
 
 /**

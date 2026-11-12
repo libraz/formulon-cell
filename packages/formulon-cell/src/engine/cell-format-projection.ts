@@ -11,7 +11,7 @@ import {
   textRotationToCellRotation,
   type WorkbookDefaultFont,
 } from './format-writeback.js';
-import type { Addr, CellXf, FontRecord } from './types.js';
+import type { Addr, CellXf } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 export function cellFormatFromXf(
@@ -34,29 +34,13 @@ export function cellFormatFromXfWithStatus(
   const styleKey =
     xf.styleXfIndex === undefined ? undefined : styleKeysByXfId?.get(xf.styleXfIndex);
   if (styleKey !== undefined) patch.cellStyle = styleKey;
-  const resolved = wb as WorkbookHandle & {
-    getResolvedFontRecord?: (fontIndex: number) => FontRecord | null;
-    getResolvedFillRecord?: (fillIndex: number) => ReturnType<WorkbookHandle['getFillRecord']>;
-    getResolvedBorderRecord?: (
-      borderIndex: number,
-    ) => ReturnType<WorkbookHandle['getBorderRecord']>;
-  };
-  const font =
-    typeof resolved.getResolvedFontRecord === 'function'
-      ? resolved.getResolvedFontRecord(xf.fontIndex)
-      : wb.getFontRecord(xf.fontIndex);
+  const font = wb.getResolvedFontRecord(xf.fontIndex);
   if (font) Object.assign(patch, fontRecordToFormat(font, workbookDefaultFont));
   else complete = false;
-  const fill =
-    typeof resolved.getResolvedFillRecord === 'function'
-      ? resolved.getResolvedFillRecord(xf.fillIndex)
-      : wb.getFillRecord(xf.fillIndex);
+  const fill = wb.getResolvedFillRecord(xf.fillIndex);
   if (fill) Object.assign(patch, fillRecordToFormat(fill, { cell: true }));
   else complete = false;
-  const border =
-    typeof resolved.getResolvedBorderRecord === 'function'
-      ? resolved.getResolvedBorderRecord(xf.borderIndex)
-      : wb.getBorderRecord(xf.borderIndex);
+  const border = wb.getResolvedBorderRecord(xf.borderIndex);
   if (border) Object.assign(patch, borderRecordToFormat(border));
   else complete = false;
   if (xf.numFmtId !== BUILTIN_NUM_FMT_GENERAL) {

@@ -47,6 +47,7 @@ const makeFakeWb = (state: FakeWbState): WorkbookHandle => {
     },
     recalcAuto(): void {},
     cells: () => [],
+    getTables: () => [],
     renameSheet(idx: number, name: string): boolean {
       if (state.failRename) return false;
       state.sheets[idx] = name;

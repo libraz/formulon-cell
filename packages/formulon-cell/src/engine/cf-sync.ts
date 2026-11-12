@@ -240,23 +240,20 @@ function dataBarHasMixedPopulation(
   const ranges = entry.ranges.map(validEngineRange);
   if (ranges.some((range) => range === null)) return undefined;
   const validRanges = ranges as EngineRange[];
-  if (typeof wb.physicalCells === 'function') {
-    let hasNegative = false;
-    let hasPositive = false;
-    for (const cell of wb.physicalCells(sheet)) {
-      if (
-        cell.value.kind !== 'number' ||
-        !Number.isFinite(cell.value.value) ||
-        !validRanges.some((range) => rangeContainsCell(range, cell.addr.row, cell.addr.col))
-      )
-        continue;
-      hasNegative ||= cell.value.value < 0;
-      hasPositive ||= cell.value.value > 0;
-      if (hasNegative && hasPositive) return true;
-    }
-    return false;
+  let hasNegative = false;
+  let hasPositive = false;
+  for (const cell of wb.physicalCells(sheet)) {
+    if (
+      cell.value.kind !== 'number' ||
+      !Number.isFinite(cell.value.value) ||
+      !validRanges.some((range) => rangeContainsCell(range, cell.addr.row, cell.addr.col))
+    )
+      continue;
+    hasNegative ||= cell.value.value < 0;
+    hasPositive ||= cell.value.value > 0;
+    if (hasNegative && hasPositive) return true;
   }
-  return undefined;
+  return false;
 }
 
 export function dxfToApply(
@@ -516,10 +513,8 @@ export function evaluateCfFromEngine(
 ): Map<string, ConditionalCellOverlay> {
   const out = new Map<string, ConditionalCellOverlay>();
   if (!wb.capabilities.conditionalFormat) return out;
-  const sheetRtl =
-    typeof wb.getSheetView === 'function' && wb.getSheetView(sheet)?.rightToLeft === true;
-  const metadataEntries =
-    typeof wb.getConditionalFormats === 'function' ? wb.getConditionalFormats(sheet) : [];
+  const sheetRtl = wb.getSheetView(sheet)?.rightToLeft === true;
+  const metadataEntries = wb.getConditionalFormats(sheet);
   const negativePopulationCache = new Map<ConditionalFormatEntry, boolean | undefined>();
   const cells = wb.evaluateCfRange(sheet, firstRow, firstCol, lastRow, lastCol, todaySerial);
   for (const cell of cells) {

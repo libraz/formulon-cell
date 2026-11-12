@@ -330,9 +330,7 @@ export function definedNameValueText(wb: WorkbookHandle, entry: DefinedNameEntry
     }
     return truncateValueText(`{${rows.join(';')}}`);
   }
-  if (!wb.capabilities.formulaTextEvaluation || typeof wb.evaluateFormulaText !== 'function') {
-    return '';
-  }
+  if (!wb.capabilities.formulaTextEvaluation) return '';
   try {
     const result = wb.evaluateFormulaText({ sheet: ownSheet, row: 0, col: 0 }, `=${body}`);
     if (!result) return '';

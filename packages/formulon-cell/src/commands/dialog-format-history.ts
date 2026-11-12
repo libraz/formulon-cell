@@ -256,24 +256,15 @@ const captureNativeXfs = (
 
 const restoreNativeXfs = (workbook: WorkbookHandle, snapshot: NativeXfSnapshot): void => {
   if (!workbook.capabilities?.cellFormatting) return;
-  const clearCellXfIndex = (
-    workbook as WorkbookHandle & {
-      clearCellXfIndex?: (sheet: number, row: number, col: number) => boolean;
-    }
-  ).clearCellXfIndex;
   for (const [key, entry] of snapshot) {
     const addr = parseAddrKey(key);
     if (!addr) continue;
     // A non-cell source is inherited. Use the native clear operation when the
-    // loaded adapter exposes it; older bundles retain the effective-XF
-    // fallback so replay remains compatible with their API surface.
+    // engine supports it; otherwise fall back to the effective XF.
     const inherited = entry.source !== null && entry.source !== 0;
     const xfIndex = inherited ? entry.effectiveXfIndex : entry.directXfIndex;
     if (inherited && workbook.capabilities.cellFormattingClear === true) {
-      if (
-        typeof clearCellXfIndex !== 'function' ||
-        !clearCellXfIndex.call(workbook, addr.sheet, addr.row, addr.col)
-      )
+      if (!workbook.clearCellXfIndex(addr.sheet, addr.row, addr.col))
         throw new Error(`dialog native XF clear restore failed at ${key}`);
       // Non-empty cells may remain cell-owned in the native resolver even
       // after a successful clear. Confirm the requested inherited source and
@@ -299,9 +290,7 @@ const restoreNativeXfs = (workbook: WorkbookHandle, snapshot: NativeXfSnapshot):
 };
 
 const withEngineSyncMuted = <T>(workbook: WorkbookHandle | null, fn: () => T): T =>
-  workbook && typeof workbook.withEngineSyncMuted === 'function'
-    ? workbook.withEngineSyncMuted(fn)
-    : fn();
+  workbook ? workbook.withEngineSyncMuted(fn) : fn();
 
 const restoreAfterFailure = (
   store: SpreadsheetStore,

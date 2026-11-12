@@ -25,6 +25,7 @@ const fakeWb = () =>
     setSheetViewMode: vi.fn(),
     setSheetShowGridLines: vi.fn(),
     setSheetShowRowColHeaders: vi.fn(),
+    setSheetShowFormulas: vi.fn(),
     setSheetShowZeros: vi.fn(),
   }) as unknown as WorkbookHandle & {
     setSheetFreeze: ReturnType<typeof vi.fn>;
@@ -33,6 +34,7 @@ const fakeWb = () =>
     setSheetShowGridLines: ReturnType<typeof vi.fn>;
     setSheetShowRowColHeaders: ReturnType<typeof vi.fn>;
     setSheetShowZeros: ReturnType<typeof vi.fn>;
+    setSheetShowFormulas: ReturnType<typeof vi.fn>;
   };
 
 describe('attachViewToolbar', () => {

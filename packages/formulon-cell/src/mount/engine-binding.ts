@@ -682,8 +682,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     const hydrate = (): void => {
       for (const fn of FACADE_HYDRATORS[change.kind]) fn(wb, store, sheet, change.range);
     };
-    if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
-    else hydrate();
+    wb.withEngineSyncMuted(hydrate);
     if (change.kind === 'names' || change.kind === 'protection') {
       hydrateWorkbookMetadataFromEngine(wb, store);
     }

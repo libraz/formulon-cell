@@ -29,7 +29,7 @@ const DEFAULT_AXIS_DEFAULTS: AxisDefaults = {
 };
 
 const engineAxisDefaults = (wb: WorkbookHandle, sheet: number): AxisDefaults | null =>
-  typeof wb.getSheetDefaultLayoutPx === 'function' ? wb.getSheetDefaultLayoutPx(sheet) : null;
+  wb.getSheetDefaultLayoutPx(sheet);
 
 const platformAxisDefaults = (wb: WorkbookHandle): AxisDefaults =>
   wb.geometryPlatform === 'mac' ? MAC_AXIS_DEFAULTS : DEFAULT_AXIS_DEFAULTS;
@@ -75,8 +75,7 @@ export function hydrateLayoutFromEngine(
   const engineDefaults = engineAxisDefaults(wb, sheet);
   const defaults = engineDefaults ?? platformAxisDefaults(wb);
   const view = wb.getSheetView(sheet);
-  const defaultRowsHidden =
-    typeof wb.sheetRowsHiddenByDefault === 'function' && wb.sheetRowsHiddenByDefault(sheet);
+  const defaultRowsHidden = wb.sheetRowsHiddenByDefault(sheet);
   const hasAxisLayouts =
     wb.capabilities.colRowSize || wb.capabilities.hiddenRowsCols || wb.capabilities.outlines;
   // hiddenSheets is workbook-scoped — walk every sheet so the set is correct
@@ -280,11 +279,7 @@ export function syncLayoutToEngine(
       const b = before.colWidths.get(col);
       const a = after.colWidths.get(col);
       if (b === a) continue;
-      if (
-        a === undefined &&
-        wb.capabilities.columnWidthClear === true &&
-        typeof wb.clearColumnWidth === 'function'
-      ) {
+      if (a === undefined && wb.capabilities.columnWidthClear === true) {
         wb.clearColumnWidth(sheet, col, col);
       } else {
         wb.setColumnWidth(sheet, col, col, a ?? layout.defaultColWidth);
@@ -298,11 +293,7 @@ export function syncLayoutToEngine(
       const b = before.rowHeights.get(row);
       const a = after.rowHeights.get(row);
       if (b === a) continue;
-      if (
-        a === undefined &&
-        wb.capabilities.rowHeightClear === true &&
-        typeof wb.clearRowHeight === 'function'
-      ) {
+      if (a === undefined && wb.capabilities.rowHeightClear === true) {
         wb.clearRowHeight(sheet, row);
       } else {
         wb.setRowHeight(sheet, row, a ?? layout.defaultRowHeight);
@@ -397,8 +388,7 @@ export function syncLayoutToEngine(
       // state. On an engine that has only the flag, hiding is the closest
       // reachable state, and the refused demotion leaves the sheet as it was.
       const needsThreeState = a === SheetVisibility.VeryHidden || b === SheetVisibility.VeryHidden;
-      const canStateVisibility = typeof wb.setSheetVisibility === 'function';
-      if (needsThreeState && canStateVisibility && wb.setSheetVisibility(i, a)) continue;
+      if (needsThreeState && wb.setSheetVisibility(i, a)) continue;
       wb.setSheetTabHidden(i, a !== SheetVisibility.Visible);
     }
   }

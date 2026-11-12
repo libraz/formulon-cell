@@ -213,7 +213,8 @@ export function hydrateTableOverlaysFromEngine(wb: TableReader, store: Spreadshe
     });
     mutators.replaceEngineTableOverlays(store, overlays);
   };
-  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
+  // A reader without the mute (a partial view of the handle) hydrates directly.
+  if (wb.withEngineSyncMuted) wb.withEngineSyncMuted(hydrate);
   else hydrate();
 }
 

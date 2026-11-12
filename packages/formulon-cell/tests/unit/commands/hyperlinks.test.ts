@@ -37,6 +37,7 @@ describe('hyperlink commands', () => {
     const clearHyperlinks = vi.fn(() => true);
     const addHyperlink = vi.fn(() => true);
     const wb = {
+      subscribe: () => () => {},
       capabilities: { hyperlinks: true },
       clearHyperlinks,
       addHyperlink,
@@ -69,6 +70,7 @@ describe('hyperlink commands', () => {
     const clearHyperlinks = vi.fn(() => true);
     const addHyperlink = vi.fn(() => true);
     const wb = {
+      subscribe: () => () => {},
       capabilities: { hyperlinks: true },
       clearHyperlinks,
       addHyperlink,
@@ -85,6 +87,7 @@ describe('hyperlink commands', () => {
     const clearHyperlinks = vi.fn(() => true);
     const addHyperlink = vi.fn(() => true);
     const wb = {
+      subscribe: () => () => {},
       capabilities: { hyperlinks: true },
       clearHyperlinks,
       addHyperlink,
@@ -114,6 +117,7 @@ describe('hyperlink commands', () => {
     const clearHyperlinks = vi.fn(() => true);
     const addHyperlink = vi.fn(() => true);
     const wb = {
+      subscribe: () => () => {},
       capabilities: { hyperlinks: true },
       clearHyperlinks,
       addHyperlink,
@@ -137,6 +141,7 @@ describe('hyperlink commands', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const clearHyperlinks = vi.fn(() => true);
     const wb = {
+      subscribe: () => () => {},
       capabilities: { hyperlinks: true },
       clearHyperlinks,
       addHyperlink: vi.fn(() => true),

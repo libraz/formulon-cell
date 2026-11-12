@@ -129,9 +129,7 @@ const writePivotCacheWorksheetSource = (
   cacheId: number,
   source: Range,
 ): boolean => {
-  if (!wb.capabilities.pivotCacheSource || typeof wb.setPivotCacheWorksheetSource !== 'function') {
-    return true;
-  }
+  if (!wb.capabilities.pivotCacheSource) return true;
   return wb.setPivotCacheWorksheetSource(cacheId, {
     range: {
       sheet: source.sheet,

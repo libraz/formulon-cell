@@ -106,9 +106,11 @@ describe('whole-sheet font planning', () => {
         notifySheetMove = listener;
         return () => undefined;
       },
+      withEngineSyncMuted: <T>(fn: () => T): T => fn(),
       getSheetFontAxisSnapshot: () => baseline,
       getCellXf: () => ({ fontIndex: 0 }),
       getFontRecord: () => ({ name: 'Aptos', size: 11 }),
+      getResolvedFontRecord: () => ({ name: 'Aptos', size: 11 }),
       addFontRecord: () => 9,
       addXfRecord: () => 10,
       clearColumnStyle: () => {

@@ -63,8 +63,7 @@ export function hydrateSparklinesFromEngine(
       return { ...state, sparkline: withSparklineMembers({ sparklines, groups }, sparklines) };
     });
   };
-  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
-  else hydrate();
+  wb.withEngineSyncMuted(hydrate);
 }
 
 interface Member {

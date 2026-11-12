@@ -157,6 +157,15 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
       if (!caps.cellFormatting) return null;
       return xfTable.get(xfIndex) ?? null;
     },
+    getResolvedFontRecord(index: number) {
+      return this.getFontRecord(index);
+    },
+    getResolvedFillRecord(index: number) {
+      return this.getFillRecord(index);
+    },
+    getResolvedBorderRecord(index: number) {
+      return this.getBorderRecord(index);
+    },
     getFontRecord(idx: number) {
       if (!caps.cellFormatting) return null;
       return fonts.get(idx) ?? null;
@@ -239,6 +248,7 @@ const makeFlushFake = (opts: {
     addHyperlink: 0,
   };
   const wb = {
+    subscribe: () => () => {},
     capabilities: {
       cellFormatting: opts.cellFormatting,
       dataValidation: opts.dataValidation,

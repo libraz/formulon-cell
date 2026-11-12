@@ -12,6 +12,7 @@ const commentWorkbook = (): WorkbookHandle & {
   ({
     capabilities: { comments: true },
     setCommentEntry: vi.fn(),
+    getComment: () => null,
   }) as unknown as WorkbookHandle & { setCommentEntry: ReturnType<typeof vi.fn> };
 
 describe('executeRibbonCommentAction', () => {

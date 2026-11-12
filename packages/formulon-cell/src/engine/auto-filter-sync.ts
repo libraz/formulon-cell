@@ -94,8 +94,7 @@ const sheetFilterTarget = (wb: WorkbookHandle, sheet: number): FilterTarget => (
   remove: () => wb.removeAutoFilter(sheet),
   apply: () => wb.applyAutoFilter(sheet),
   clear: () => wb.clearAutoFilter(sheet),
-  evaluate: () =>
-    typeof wb.evaluateAutoFilter === 'function' ? wb.evaluateAutoFilter(sheet) : null,
+  evaluate: () => wb.evaluateAutoFilter(sheet),
 });
 
 const tableFilterTarget = (wb: WorkbookHandle, table: number): FilterTarget => ({
@@ -779,7 +778,6 @@ export function syncNativeAutoFilterVisibility(
   filter: FilterTarget = sheetFilterTarget(wb, sheet),
 ): boolean {
   if (!wb.capabilities.typedAutoFilter) return false;
-  if (typeof wb.evaluateAutoFilter !== 'function') return false;
   const evaluated = filter.evaluate();
   if (!evaluated) return false;
   const nextHidden = new Set(store.getState().layout.hiddenRows);
@@ -852,7 +850,7 @@ const emptyTypedFilter = (range: Range): AutoFilterInput => ({
 function engineHoldsFilter(wb: WorkbookHandle, sheet: number, slot: FilterSlot): boolean {
   if (slot.target.get()) return true;
   if (slot.table || !wb.capabilities.autoFilter) return false;
-  return typeof wb.getSheetAutoFilterXml === 'function' && wb.getSheetAutoFilterXml(sheet) !== null;
+  return wb.getSheetAutoFilterXml(sheet) !== null;
 }
 
 /** Drop an engine filter the store no longer has. Clearing it exposes its
@@ -1040,11 +1038,7 @@ export function hydrateAutoFilterFromEngine(
   // keeps the worksheet filter's range visible, with its criteria left
   // engine-owned until a UI mutation replaces them.
   let xml: string | null = null;
-  if (
-    !worksheetTyped &&
-    wb.capabilities.autoFilter &&
-    typeof wb.getSheetAutoFilterXml === 'function'
-  ) {
+  if (!worksheetTyped && wb.capabilities.autoFilter) {
     xml = wb.getSheetAutoFilterXml(sheet);
     const range = xml === null ? null : autoFilterRangeFromXml(xml, sheet);
     if (range) ranges.push(range);

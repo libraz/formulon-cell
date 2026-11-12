@@ -30,6 +30,8 @@ const seedCells = (
 const makeCfWb = (cellLookup: CellMap): WorkbookHandle => {
   return {
     capabilities: { conditionalFormat: true } as never,
+    getSheetView: () => null,
+    getConditionalFormats: () => [],
     evaluateCfRange(
       _sheet: number,
       firstRow: number,
@@ -185,6 +187,8 @@ describe('engine/spill × conditional-format intersection', () => {
     ]);
     const wb: WorkbookHandle = {
       capabilities: { conditionalFormat: true } as never,
+      getSheetView: () => null,
+      getConditionalFormats: () => [],
       evaluateCfRange(): ReturnType<WorkbookHandle['evaluateCfRange']> {
         return [
           {

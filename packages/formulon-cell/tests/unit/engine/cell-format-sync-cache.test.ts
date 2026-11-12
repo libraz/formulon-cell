@@ -210,6 +210,15 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
       counts.getEffectiveStyle += 1;
       return options.effectiveStyles?.get([sheet, row, col].join(':')) ?? null;
     },
+    getResolvedFontRecord(index: number) {
+      return this.getFontRecord(index);
+    },
+    getResolvedFillRecord(index: number) {
+      return this.getFillRecord(index);
+    },
+    getResolvedBorderRecord(index: number) {
+      return this.getBorderRecord(index);
+    },
     getFontRecord(index: number): FontRecord | null {
       return fonts.get(index) ?? null;
     },

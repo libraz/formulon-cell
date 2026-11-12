@@ -151,7 +151,7 @@ export function resolveNamedStyleXfs(
     ]),
   );
   const resolved = new Map<string, NamedStyleXfResolution>();
-  if (!wb.capabilities.cellStyles || typeof wb.getNamedCellStyles !== 'function') return resolved;
+  if (!wb.capabilities.cellStyles) return resolved;
   const add = (key: string, xfId: number, groups: readonly CellStyleFormatGroup[]): void => {
     const raw = wb.getCellStyleXf(xfId);
     if (!raw) return;
@@ -219,13 +219,13 @@ const namedStyleCatalog = (
   readonly byBuiltin: ReadonlyMap<number, NamedStyleCatalogEntry>;
   readonly byName: ReadonlyMap<string, NamedStyleCatalogEntry>;
 } => {
-  const entries: NamedStyleCatalogEntry[] =
-    typeof wb.cellStyleCount === 'function' && typeof wb.getCellStyle === 'function'
-      ? Array.from({ length: wb.cellStyleCount() }, (_, index) => {
-          const style = wb.getCellStyle(index);
-          return style ? [{ ...style, index }] : [];
-        }).flat()
-      : wb.getNamedCellStyles().map((style) => ({ ...style, hidden: false }));
+  const entries: NamedStyleCatalogEntry[] = Array.from(
+    { length: wb.cellStyleCount() },
+    (_, index) => {
+      const style = wb.getCellStyle(index);
+      return style ? [{ ...style, index }] : [];
+    },
+  ).flat();
   const byBuiltin = new Map<number, NamedStyleCatalogEntry>();
   const byName = new Map<string, NamedStyleCatalogEntry>();
   for (const entry of entries) {

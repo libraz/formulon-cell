@@ -84,5 +84,14 @@ export const namedStyleWorkbook = (): WorkbookHandle =>
       diagonalUp: false,
       diagonalDown: false,
     }),
+    getResolvedFontRecord(this: { getFontRecord(index: number): unknown }, fontIndex: number) {
+      return this.getFontRecord(fontIndex);
+    },
+    getResolvedFillRecord(this: { getFillRecord(index: number): unknown }, fillIndex: number) {
+      return this.getFillRecord(fillIndex);
+    },
+    getResolvedBorderRecord(this: { getBorderRecord(): unknown }) {
+      return this.getBorderRecord();
+    },
     getNumFmtCode: () => null,
   }) as unknown as WorkbookHandle;

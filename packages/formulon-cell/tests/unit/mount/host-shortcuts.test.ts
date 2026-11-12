@@ -65,6 +65,9 @@ function makeSetup(
     ({
       capabilities: {},
       recalc,
+      withEngineSyncMuted: <T>(fn: () => T): T => fn(),
+      subscribe: () => () => {},
+      setSheetShowFormulas: () => true,
       cells,
       setNumber,
       trackChangedCells: <T>(fn: () => T) => ({ value: fn(), changed: [] }),

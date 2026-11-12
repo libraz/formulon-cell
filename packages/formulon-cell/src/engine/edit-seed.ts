@@ -2,7 +2,6 @@ import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import type { State } from '../store/store.js';
 import { addrKey } from './address.js';
-import { localeOrdinalForSpreadsheetProfile, localizeFormula } from './function-locale.js';
 import type { Addr, CellValue } from './types.js';
 import { formatBoolean, formatEditableNumber } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -26,15 +25,10 @@ export function formulaForEdit(
 ): string | null {
   if (!formula) return null;
   if (!r1c1) {
-    return typeof wb.getFormulaForDisplay === 'function'
-      ? wb.getFormulaForDisplay(formula)
-      : formula;
+    return wb.getFormulaForDisplay(formula);
   }
   // The engine spells the references in the profile's R1C1 letters along with its separators.
-  const localized =
-    typeof wb.localizeFormulaR1C1Text === 'function'
-      ? wb.localizeFormulaR1C1Text(formula, addr)
-      : null;
+  const localized = wb.localizeFormulaR1C1Text(formula, addr);
   if (localized !== null) return localized;
   let native: string | null = null;
   if (wb.capabilities.formulaR1C1 && addr.sheet >= 0 && addr.sheet < wb.sheetCount) {
@@ -49,11 +43,7 @@ export function formulaForEdit(
   // Native R1C1 output already resolved the exact relative references. Apply
   // full profile conversion only after that resolution so separators and
   // localized literals are displayed consistently with A1 editing.
-  if (typeof wb.getFormulaForDisplay === 'function') {
-    return wb.getFormulaForDisplay(resolved);
-  }
-  const profile = typeof wb.spreadsheetProfileId === 'function' ? wb.spreadsheetProfileId() : null;
-  return localizeFormula(wb, resolved, localeOrdinalForSpreadsheetProfile(profile));
+  return wb.getFormulaForDisplay(resolved);
 }
 
 /**
@@ -88,10 +78,7 @@ export function formatCellForEdit(
   if (wb && addr) {
     const lambda = wb.getLambdaText(addr);
     if (lambda) {
-      const localized =
-        typeof wb.getFormulaForDisplay === 'function'
-          ? wb.getFormulaForDisplay(`=${lambda}`)
-          : `=${lambda}`;
+      const localized = wb.getFormulaForDisplay(`=${lambda}`);
       return hideFormula ? '' : displayFormula(localized);
     }
   }

@@ -21,6 +21,7 @@ const mount = (names: string[]) => {
     },
     sheetName: (i: number) => sheets[i] ?? '',
     spreadsheetProfileId: () => 'mac-ja_JP',
+    getTables: () => [],
     capabilities: { sheetMutate: true, sheetTabHidden: true } as EngineCapabilities,
     addSheet(name?: string) {
       sheets.push(name ?? `Sheet${sheets.length + 1}`);

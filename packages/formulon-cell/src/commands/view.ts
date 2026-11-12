@@ -15,7 +15,7 @@ export function setGridlinesVisible(
   wb: WorkbookHandle | null = null,
 ): void {
   mutators.setShowGridLines(store, visible);
-  if (wb && typeof wb.setSheetShowGridLines === 'function') {
+  if (wb) {
     wb.setSheetShowGridLines(store.getState().data.sheetIndex, visible);
   }
 }
@@ -27,7 +27,7 @@ export function setHeadingsVisible(
   wb: WorkbookHandle | null = null,
 ): void {
   mutators.setShowHeaders(store, visible);
-  if (wb && typeof wb.setSheetShowRowColHeaders === 'function') {
+  if (wb) {
     wb.setSheetShowRowColHeaders(store.getState().data.sheetIndex, visible);
   }
 }
@@ -39,7 +39,7 @@ export function setZerosVisible(
   wb: WorkbookHandle | null = null,
 ): void {
   mutators.setShowZeros(store, visible);
-  if (wb && typeof wb.setSheetShowZeros === 'function') {
+  if (wb) {
     wb.setSheetShowZeros(store.getState().data.sheetIndex, visible);
   }
 }
@@ -51,7 +51,7 @@ export function setSheetRightToLeft(
   wb: WorkbookHandle | null = null,
 ): void {
   mutators.setRightToLeft(store, rightToLeft);
-  if (wb && typeof wb.setSheetRightToLeft === 'function') {
+  if (wb) {
     wb.setSheetRightToLeft(store.getState().data.sheetIndex, rightToLeft);
   }
 }
@@ -63,7 +63,7 @@ export function setShowFormulas(
   wb: WorkbookHandle | null = null,
 ): void {
   mutators.setShowFormulas(store, visible);
-  if (wb && typeof wb.setSheetShowFormulas === 'function') {
+  if (wb) {
     wb.setSheetShowFormulas(store.getState().data.sheetIndex, visible);
   }
 }
@@ -75,7 +75,7 @@ export function setOutlineSymbolsVisible(
   wb: WorkbookHandle | null = null,
 ): void {
   mutators.setShowOutlineSymbols(store, visible);
-  if (wb && typeof wb.setSheetShowOutlineSymbols === 'function') {
+  if (wb) {
     wb.setSheetShowOutlineSymbols(store.getState().data.sheetIndex, visible);
   }
 }

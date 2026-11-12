@@ -158,11 +158,11 @@ export function readPhoneticRuns(
   addr: Addr,
   value: CellValue,
 ): readonly PhoneticRun[] | null {
-  if (wb.capabilities.phoneticRuns && typeof wb.getCellPhoneticRuns === 'function') {
+  if (wb.capabilities.phoneticRuns) {
     const runs = wb.getCellPhoneticRuns(addr.sheet, addr.row, addr.col);
     return runs !== null && runs.length > 0 ? runs : null;
   }
-  if (wb.capabilities.phonetic && typeof wb.getCellPhonetic === 'function') {
+  if (wb.capabilities.phonetic) {
     const text = wb.getCellPhonetic(addr.sheet, addr.row, addr.col);
     if (!text) return null;
     return [{ start: 0, end: value.kind === 'text' ? value.value.length : 0, text }];

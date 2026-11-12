@@ -78,8 +78,7 @@ const imageFromNative = (
 
 /** Run `fn` without mirroring its store writes back into the engine. */
 const muted = (wb: WorkbookHandle, fn: () => void): void => {
-  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(fn);
-  else fn();
+  wb.withEngineSyncMuted(fn);
 };
 
 /** Drop the native projections of `sheet` (every sheet when omitted). Overlays

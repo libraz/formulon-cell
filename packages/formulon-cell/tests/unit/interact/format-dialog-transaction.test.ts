@@ -26,6 +26,8 @@ const workbook = (addMerge: () => void): WorkbookHandle =>
     setText: () => undefined,
     getValue: () => ({ kind: 'blank' }),
     withBatchedRecalc: <T>(fn: () => T): T => fn(),
+    withEngineSyncMuted: <T>(fn: () => T): T => fn(),
+    subscribe: () => () => {},
   }) as unknown as WorkbookHandle;
 
 const run = (store: SpreadsheetStore, history: History | null, wb: WorkbookHandle) => {
