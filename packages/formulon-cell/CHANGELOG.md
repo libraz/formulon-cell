@@ -114,6 +114,7 @@ versioning is [SemVer](https://semver.org/).
 - Return in the Iterative Calculation, Page Setup, PivotTable, Insert Function, conditional formatting, Format Cells and Sparkline dialogs follows the other dialogs: it no longer presses OK while confirming IME text, from a focused button, or inside a list, where it keeps its own meaning.
 - Time-period conditional formats (Today, Last 7 Days, This Month and the rest) judge by the day of the last recalculation, or the engine's pinned clock, as on the desktop: the formatting moves with the values on recalc rather than at midnight. Time-period rules the engine evaluates, as from a loaded file, match again; before, they matched no cell.
 - The Mac Sort dialog's Add Level and Delete Level buttons no longer overlap each other or Copy Level.
+- A source or destination on a sheet named like a cell reference or a number (`A1`, `R1C1`, `2024`) is quoted in the Mac Subtotal, Consolidate and Move PivotTable dialogs, as in a formula.
 - Sparklines over all-equal values draw the line along the top and the columns at full height; a line over a single value draws nothing; a line on a date axis joins its points in date order.
 
 ### Removed

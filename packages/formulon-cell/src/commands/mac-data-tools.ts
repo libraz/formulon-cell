@@ -1,4 +1,4 @@
-import { colLetter, formatA1Cell, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { colLetter, formatA1Cell, MAX_COL, MAX_ROW, quoteSheetName } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { type CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js';
@@ -944,7 +944,7 @@ export function formatMacCellAddress(addr: Addr): string {
 
 export function formatMacRangeAddress(wb: WorkbookHandle, range: Range): string {
   const sheet = wb.sheetName(range.sheet);
-  const prefix = /[^A-Za-z0-9_]/.test(sheet) ? `'${sheet.replaceAll("'", "''")}'!` : `${sheet}!`;
+  const prefix = `${quoteSheetName(sheet)}!`;
   const first = formatMacCellAddress({ sheet: range.sheet, row: range.r0, col: range.c0 });
   const last = formatMacCellAddress({ sheet: range.sheet, row: range.r1, col: range.c1 });
   return `${prefix}${first === last ? first : `${first}:${last}`}`;
