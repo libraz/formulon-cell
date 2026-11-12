@@ -151,8 +151,7 @@ export const macJa: MacStrings = {
     axisRtlUnsupported: 'このオプションはまだサポートされていません。',
     axisTitle: '軸',
     customValueLabel: 'ユーザー設定値:',
-    emptyCellsLabel: '空白セルの表示方法:',
-    showHiddenLabel: '非表示の行と列のデータを表示する',
+    hiddenEmptyMenu: '非表示および空白のセル',
   },
   slicer: {
     ok: 'OK',

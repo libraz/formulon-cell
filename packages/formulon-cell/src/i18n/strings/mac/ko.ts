@@ -153,8 +153,7 @@ export const macKo: MacStrings = {
     axisRtlUnsupported: '이 옵션은 아직 지원되지 않습니다.',
     axisTitle: '축',
     customValueLabel: '사용자 지정 값:',
-    emptyCellsLabel: '빈 셀 표시 형식:',
-    showHiddenLabel: '숨겨진 행 및 열에 데이터 표시',
+    hiddenEmptyMenu: '숨겨진 셀/빈 셀',
   },
   slicer: {
     ok: '확인',

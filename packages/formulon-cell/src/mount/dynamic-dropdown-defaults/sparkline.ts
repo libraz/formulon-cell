@@ -23,17 +23,20 @@ import {
 import { sparklineSourceText } from '../../commands/sparkline-ranges.js';
 import {
   pickNativeColor,
+  syncColorPaletteSelection,
   syncColorPaletteTheme,
   themeColorColumns,
 } from '../../components/color-palette.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
 import { cssOfColorSpec } from '../../engine/theme-color.js';
 import type { SpreadsheetInstance } from '../../mount.js';
+import { sparklineColors } from '../../render/sparkline.js';
 import { showNumberPrompt } from '../../toolbar/dialogs/prompt.js';
 import {
   showSparklineHiddenEmptyDialog,
   showSparklineRangeDialog,
 } from '../../toolbar/dialogs/sparkline.js';
+import { setPenColorBar } from '../../toolbar/ribbon/border-icons.js';
 import type {
   DynamicDropdownsCtx,
   SparklineMenuAction,
@@ -41,6 +44,7 @@ import type {
 import { openSparklineGroupEditor } from '../../toolbar/ribbon/mac/actions.js';
 import {
   MORE_COLORS,
+  SPARKLINE_MARKER_PARTS,
   SPARKLINE_STYLE_SLOTS,
   sparklineStyleThumbnail,
 } from '../../toolbar/ribbon/menus/sparkline.js';
@@ -62,14 +66,7 @@ const WEIGHT_STEP_PT = 0.25;
 /** The empty-cell displays the Hidden & Empty Cells submenu offers. */
 const EMPTY_CELLS_AS: ReadonlySet<number> = new Set([BlanksAs.Gap, BlanksAs.Zero, BlanksAs.Span]);
 
-const MARKER_PARTS: ReadonlySet<string> = new Set([
-  'negative',
-  'markers',
-  'high',
-  'low',
-  'first',
-  'last',
-]);
+const MARKER_PARTS: ReadonlySet<string> = new Set(SPARKLINE_MARKER_PARTS);
 
 export function createSparklineDropdownDefaults(
   instance: SpreadsheetInstance,
@@ -146,11 +143,11 @@ export function createSparklineDropdownDefaults(
     const result = await showSparklineHiddenEmptyDialog({
       host: instance.host,
       title: t.hiddenTitle,
-      emptyCellsLabel: mac() ? strings().mac.sparkline.emptyCellsLabel : t.emptyCellsLabel,
+      emptyCellsLabel: t.emptyCellsLabel,
       gaps: t.gaps,
       zero: t.zero,
       connect: t.connect,
-      showHidden: mac() ? strings().mac.sparkline.showHiddenLabel : t.showHidden,
+      showHidden: t.showHidden,
       ...okCancel(),
       initial: {
         emptyCellsAs: group.settings.emptyCellsAs,
@@ -321,6 +318,20 @@ export function createSparklineDropdownDefaults(
       }
       if (menu.id === SPARKLINE_MENU_IDS.color || menu.id === SPARKLINE_MENU_IDS.markerColor) {
         syncColorPaletteTheme(menu, themeColorColumns(instance.workbook.getTheme()?.colors));
+      }
+      // Each palette frames the colour in use; a point with none takes the series colour.
+      if (settings && menu.id === SPARKLINE_MENU_IDS.color) {
+        syncColorPaletteSelection(menu, sparklineColors(settings, instance.workbook).series);
+      }
+      if (settings && menu.id === SPARKLINE_MENU_IDS.markerColor) {
+        const colors = sparklineColors(settings, instance.workbook);
+        for (const part of SPARKLINE_MARKER_PARTS) {
+          const color = colors[part] ?? colors.series;
+          const trigger = menu.querySelector(`[data-format-submenu="${part}"]`);
+          if (trigger) setPenColorBar(trigger, color);
+          const panel = menu.querySelector(`#${SPARKLINE_MENU_IDS.markerColor}-${part}`);
+          if (panel) syncColorPaletteSelection(panel, color);
+        }
       }
       if (menu.id === SPARKLINE_MENU_IDS.color) {
         for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-sparkline-weight]')) {

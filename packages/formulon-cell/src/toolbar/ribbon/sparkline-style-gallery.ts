@@ -20,6 +20,10 @@ import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
 // One gallery row: the desktop strip shows seven presets beside its chevron.
 const PAGE_SIZE = 7;
 
+// The desktop strip leaves these presets (Accent 4-6 lighter 40% and Dark #1-#4) to the full
+// gallery behind the chevron.
+const FULL_GALLERY_ONLY: ReadonlySet<number> = new Set([21, 22, 23, 24, 25, 26, 27]);
+
 export interface SparklineStyleGalleryOptions {
   lang: ToolbarLang;
   text: ToolbarText['sparkline'];
@@ -31,8 +35,8 @@ export interface SparklineStyleGalleryOptions {
   pageArrows: boolean;
 }
 
-/** Sparkline > Style: the 36 presets a row at a time, with the Style button as the more arrow.
- *  A pick gives the selected groups the preset's colours. */
+/** Sparkline > Style: the strip's 29 presets a row at a time, with the Style button as the more
+ *  arrow onto all 36. A pick gives the selected groups the preset's colours. */
 export const createSparklineStyleGallery = (opts: SparklineStyleGalleryOptions): HTMLDivElement => {
   const { getInst, text: t } = opts;
   const wrap = createQuickStyleStrip({
@@ -47,7 +51,7 @@ export const createSparklineStyleGallery = (opts: SparklineStyleGalleryOptions):
       const css = (color: Color): string => cssOfColorSpec(inst.workbook, color) ?? '';
       return SPARKLINE_STYLE_SLOTS.flatMap((slot, index) => {
         const preset = SPARKLINE_STYLE_PRESETS[index];
-        return preset
+        return preset && !FULL_GALLERY_ONLY.has(index)
           ? [
               {
                 id: slot.id,

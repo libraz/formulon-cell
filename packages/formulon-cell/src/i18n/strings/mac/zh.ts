@@ -152,8 +152,7 @@ export const macZh: MacStrings = {
     axisRtlUnsupported: '此选项尚不受支持。',
     axisTitle: '坐标轴',
     customValueLabel: '自定义值:',
-    emptyCellsLabel: '空单元格显示为:',
-    showHiddenLabel: '显示隐藏行列中的数据',
+    hiddenEmptyMenu: '隐藏的单元格和空单元格',
   },
   slicer: {
     ok: '确定',

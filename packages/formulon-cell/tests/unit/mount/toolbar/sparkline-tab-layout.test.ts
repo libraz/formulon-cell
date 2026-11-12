@@ -127,7 +127,7 @@ describe('Sparkline tab layout', () => {
     expect(dlg.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.disabled).toBe(false);
   });
 
-  it('lists the Edit Data menu with the Hidden & Empty Cells submenu as the desktop app does', async () => {
+  it('lists the Edit Data menu with the Hidden & Empty Cells submenu on the Mac', async () => {
     await mount('ja', 'mac');
     command('sparklineEditData')
       .querySelector('.fc-tb__rb-split-chevron')
@@ -143,7 +143,7 @@ describe('Sparkline tab layout', () => {
       'グループの位置とデータの編集...',
       '単一スパークラインのデータの編集...',
       '|',
-      '非表示および空白のセル...',
+      '非表示および空白のセル',
       '行/列の切り替え',
     ]);
     const panel = menu.querySelector<HTMLElement>('.fc-tb__submenu');
@@ -161,8 +161,39 @@ describe('Sparkline tab layout', () => {
     ]);
   });
 
-  it('sets the empty-cell display and hidden data from the submenu, one undo step each', async () => {
+  it('opens the Hidden & Empty Cells submenu on a click of its Mac entry, with no dialog', async () => {
+    await mount('ja', 'mac');
+    command('sparklineEditData')
+      .querySelector('.fc-tb__rb-split-chevron')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(host.querySelector('[data-sparkline-edit="hidden-empty"]')).toBeNull();
+    const trigger = host.querySelector<HTMLElement>('[data-format-submenu="hidden-empty"]');
+    if (!trigger) throw new Error('no Hidden & Empty Cells entry');
+    const click = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(click, 'target', { value: trigger });
+    tb.dropdownsApi?.dynamicRibbonDropdownClick(click);
+    await Promise.resolve();
+    expect(host.querySelector<HTMLElement>('#menu-sparkline-edit-data-hidden-empty')?.hidden).toBe(
+      false,
+    );
+    expect(document.querySelector('.fc-tb__dlg')).toBeNull();
+  });
+
+  it('opens the Hidden and Empty Cell Settings dialog from a plain Edit Data entry elsewhere', async () => {
     await mount('en');
+    command('sparklineEditData')
+      .querySelector('.fc-tb__rb-split-chevron')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const menu = host.querySelector<HTMLElement>('#menu-sparkline-edit-data');
+    expect(menu?.querySelector('.fc-tb__submenu')).toBeNull();
+    expect(menu?.querySelector('[data-sparkline-empty]')).toBeNull();
+    const entry = menu?.querySelector<HTMLElement>('[data-sparkline-edit="hidden-empty"]');
+    expect(entry?.textContent).toBe('Hidden & Empty Cells...');
+    expect(entry?.hasAttribute('aria-haspopup')).toBe(false);
+  });
+
+  it('sets the empty-cell display and hidden data from the Mac submenu, one undo step each', async () => {
+    await mount('en', 'mac');
     const settings = () => groupOfCell(sheet.instance.store.getState(), at(0))?.settings;
     const pick = (value: string): void => {
       const target = host.querySelector<HTMLElement>(`[data-sparkline-empty="${value}"]`);

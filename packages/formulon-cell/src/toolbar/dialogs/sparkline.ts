@@ -225,8 +225,6 @@ export interface SparklineAxisDialogOptions {
   getWb: () => WorkbookHandle | null;
   text: SparklineAxisDialogText;
   initial: SparklineAxisDialogInitial;
-  /** Every control greyed and OK disabled; only Cancel closes the dialog. */
-  readOnly: boolean;
 }
 
 const AXIS_BOUND_TYPES = [
@@ -352,17 +350,11 @@ export const showSparklineAxisDialog = (
     cancelBtn.dataset.dialogAction = 'cancel';
 
     const sync = (): void => {
-      const off = opts.readOnly;
       const grey = (el: HTMLInputElement | HTMLButtonElement, disabled: boolean): void =>
         projectDisabledState(el, disabled, null);
-      for (const input of [general.input, date.input, showAxis]) grey(input, off);
-      grey(dateInput, off || !date.input.checked);
-      for (const end of [min, max]) {
-        for (const choice of end.choices) grey(choice.input, off);
-        grey(end.value, off || !end.choices[2]?.input.checked);
-      }
+      grey(dateInput, !date.input.checked);
+      for (const end of [min, max]) grey(end.value, !end.choices[2]?.input.checked);
       grey(picker, dateInput.disabled);
-      grey(okBtn, off);
     };
     projectDisabledState(rtl, true, t.rtlUnsupported, { titlePrefix: t.plotRtl });
     shell.body.addEventListener('change', sync);
@@ -387,7 +379,6 @@ export const showSparklineAxisDialog = (
       return { type, value };
     };
     const onOk = (): void => {
-      if (opts.readOnly) return;
       let dateRange: ResolvedSparklineRange | null = null;
       if (date.input.checked) {
         dateRange = resolveSparklineRange(
@@ -415,5 +406,5 @@ export const showSparklineAxisDialog = (
     };
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
-    mountDialog(shell, () => (opts.readOnly ? cancelBtn.focus() : general.input.focus()));
+    mountDialog(shell, () => general.input.focus());
   });

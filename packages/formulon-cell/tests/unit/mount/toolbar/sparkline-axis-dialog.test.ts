@@ -81,8 +81,6 @@ describe('Sparkline Axis dialog on the Mac', () => {
     input.dispatchEvent(new Event('change', { bubbles: true }));
   };
   const ok = (dlg: HTMLElement) => dlg.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
-  const cancel = (dlg: HTMLElement) =>
-    dlg.querySelector<HTMLButtonElement>('[data-dialog-action="cancel"]');
 
   it('replaces the Axis menu with a dialog button on the Mac profile only', async () => {
     await mount('mac');
@@ -193,20 +191,41 @@ describe('Sparkline Axis dialog on the Mac', () => {
     expect(settings()?.maxAxisType).toBe(SparklineAxisType.Individual);
   });
 
-  it('opens with every control greyed on a protected sheet and closes with Cancel', async () => {
+  it('leaves Axis enabled but inert on a protected sheet, with the rest of the tab greyed', async () => {
     await mount('mac');
     setProtectedSheet(sheet.instance.store, 0, true);
     mutators.setActive(sheet.instance.store, at(0));
+    const greyed = [
+      'sparklineEditData',
+      'sparklineTypeLine',
+      'sparklineTypeColumn',
+      'sparklineTypeWinLoss',
+      'sparklineShowHigh',
+      'sparklineShowLow',
+      'sparklineShowNegative',
+      'sparklineShowFirst',
+      'sparklineShowLast',
+      'sparklineShowMarkers',
+      'sparklineColor',
+      'sparklineMarkerColor',
+      'sparklineGroup',
+      'sparklineUngroup',
+      'sparklineClear',
+    ];
+    for (const id of greyed) {
+      const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${id}"]`);
+      expect(button?.disabled, id).toBe(true);
+    }
+    const chips = host.querySelectorAll<HTMLButtonElement>('[data-sparkline-quick-style]');
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) expect(chip.disabled).toBe(true);
     expect(axisButton().disabled).toBe(false);
+    expect(axisButton().getAttribute('aria-disabled')).not.toBe('true');
     const before = settings();
-    const dlg = await open();
-    const inputs = Array.from(dlg.querySelectorAll<HTMLInputElement>('input'));
-    expect(inputs.length).toBeGreaterThan(0);
-    expect(inputs.every((input) => input.disabled)).toBe(true);
-    expect(ok(dlg)?.disabled).toBe(true);
-    expect(cancel(dlg)?.disabled).toBe(false);
-    cancel(dlg)?.click();
-    await vi.waitFor(() => expect(document.querySelector('.fc-macsparkaxis')).toBeNull());
+    axisButton().click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.querySelector('.fc-macsparkaxis')).toBeNull();
+    expect(document.querySelector('.fc-tb__dlg, [role="alertdialog"]')).toBeNull();
     expect(settings()).toEqual(before);
   });
 });

@@ -68,6 +68,26 @@ describe('Sparkline Style strip', () => {
     expect(chevron?.getAttribute('aria-label')).toBe('他のアイテムを表示');
   });
 
+  it('lists every preset in the strip but the seven the desktop leaves to the full gallery', async () => {
+    await mount('en');
+    const next = host.querySelector<HTMLButtonElement>('.fc-tb__sparkline-quick-next');
+    const seen: (string | undefined)[] = [...ids()];
+    for (let turn = 0; turn < 10 && next && !next.disabled; turn++) {
+      next.click();
+      seen.push(...ids());
+    }
+    const family = (name: string, from: number, to: number) =>
+      Array.from({ length: to - from + 1 }, (_, i) => `${name}-${from + i}`);
+    expect(seen).toEqual([
+      ...family('accentDarker50', 1, 6),
+      ...family('accentDarker25', 1, 6),
+      ...family('accent', 1, 6),
+      ...family('accentLighter40', 1, 3),
+      ...family('dark', 5, 6),
+      ...family('colorful', 1, 6),
+    ]);
+  });
+
   it('names every preset as the desktop gallery does in ja', async () => {
     await mount('ja', 'mac');
     const labels = Array.from(

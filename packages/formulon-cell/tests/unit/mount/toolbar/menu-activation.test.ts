@@ -791,11 +791,15 @@ describe('Spreadsheet.mountToolbar', () => {
       }),
       () => pivotSheet.instance,
     ];
-    for (const context of contexts) {
+    // Some menus build a profile's own rows, so both profiles count.
+    for (const [context, platform] of contexts.flatMap((context) =>
+      (['default', 'mac'] as const).map((platform) => [context, platform] as const),
+    )) {
       const tb = Spreadsheet.mountToolbar(host, context(), {
         ribbonTabs: RIBBON_TABS,
         dynamicDropdowns: true,
         helpers: stubHelpers(),
+        ...(platform === 'mac' ? { platform } : {}),
       });
       for (const menuId of tb.dropdownsApi?.DYNAMIC_RIBBON_DROPDOWN_IDS ?? []) {
         const menu = host.querySelector<HTMLElement>(`#${menuId}`);

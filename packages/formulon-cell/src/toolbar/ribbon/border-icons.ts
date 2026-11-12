@@ -134,17 +134,29 @@ export const createBorderEraserPreview = (): SVGSVGElement => {
   return svg;
 };
 
-export const createBorderLineColorPreview = (): SVGSVGElement => {
-  const svg = createBorderToolIcon('fc-tb__border-preview--line-color');
+/** A pencil over a bar in the colour it applies: the icon of an entry that picks a line or point
+ *  colour. `setPenColorBar` repaints the bar. */
+export const createPenColorIcon = (className: string, color = '#ed7d31'): SVGSVGElement => {
+  const svg = createBorderToolIcon(className);
   appendPath(svg, 'M3 12h10', { stroke: '#1f1f1f', strokeWidth: '1.5', strokeLinecap: 'square' });
   appendPath(svg, 'M4 8.5 9.8 2.7l2.1 2.1L6.1 10.6 3.5 11.2 4 8.5Z', {
     fill: '#ffffff',
     stroke: '#2f75b5',
     strokeWidth: '1',
   });
-  appendPath(svg, 'M2 14h12', { stroke: '#ed7d31', strokeWidth: '2', strokeLinecap: 'square' });
+  appendPath(svg, 'M2 14h12', { stroke: color, strokeWidth: '2', strokeLinecap: 'square' });
+  svg.lastElementChild?.classList.add(PEN_COLOR_BAR);
   return svg;
 };
+
+const PEN_COLOR_BAR = 'fc-tb__pen-color-bar';
+
+export const setPenColorBar = (icon: ParentNode, color: string): void => {
+  icon.querySelector(`.${PEN_COLOR_BAR}`)?.setAttribute('stroke', color);
+};
+
+export const createBorderLineColorPreview = (): SVGSVGElement =>
+  createPenColorIcon('fc-tb__border-preview--line-color');
 
 export const createBorderLineStylePreview = (): SVGSVGElement => {
   const svg = createBorderToolIcon('fc-tb__border-preview--line-style');

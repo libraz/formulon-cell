@@ -11,11 +11,11 @@ import { showSparklineAxisDialog } from '../dialogs/sparkline.js';
 import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
 
 /** Open the Axis dialog on the group of the active cell and apply what it returns as one undo
- *  step. On a protected sheet it opens with every control greyed. */
+ *  step. On a protected sheet the button stays enabled and does nothing, as on the desktop. */
 export const openSparklineAxisDialog = async (instance: SpreadsheetInstance): Promise<void> => {
   const state = instance.store.getState();
   const group = activeSparklineGroup(state);
-  if (!group) return;
+  if (!group || isSheetProtected(state, state.selection.active.sheet)) return;
   const settings = group.settings;
   const m = instance.i18n.strings.mac.sparkline;
   const range = settings.dateAxisRange?.rect;
@@ -23,7 +23,6 @@ export const openSparklineAxisDialog = async (instance: SpreadsheetInstance): Pr
     host: instance.host,
     store: instance.store,
     getWb: () => instance.workbook,
-    readOnly: isSheetProtected(state, state.selection.active.sheet),
     text: {
       title: m.axisTitle,
       horizontal: m.axisHorizontal,

@@ -157,8 +157,9 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   objectSelectionPane: null,
   shapeFill: 'object',
   // The Sparkline tab: settings and membership of sparkline groups are drawing-object changes;
-  // Clear decides as clearing, by each cell's lock. The Axis menu and the Mac Axis dialog edit
-  // nothing themselves: a protected sheet leaves them open with every control inert.
+  // Clear decides as clearing, by each cell's lock. The Axis menu and the Mac Axis button edit
+  // nothing themselves and stay enabled: on a protected sheet the menu's controls are inert and
+  // the button does nothing.
   sparklineAxis: null,
   sparklineAxisDialog: null,
   sparklineClear: 'clear',

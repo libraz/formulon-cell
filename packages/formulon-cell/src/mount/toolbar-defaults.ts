@@ -174,7 +174,11 @@ export function createDefaultRibbonMenus(
   const pageLayoutFactories = createPageLayoutMenuFactories(ribbonMenuText);
   const chartDesignFactories = createChartDesignMenuFactories(ribbonMenuText);
   const shapeFormatFactories = createShapeFormatMenuFactories(ribbonText, ribbonMenuText);
-  const sparklineFactories = createSparklineMenuFactories(ribbonText, ribbonMenuText);
+  const sparklineFactories = createSparklineMenuFactories(
+    ribbonText,
+    ribbonMenuText,
+    dictionaries[lang].mac.sparkline,
+  );
   const formulaFactories = createFormulasMenuFactories(ribbonMenuText, lang);
   const reviewFactories = createReviewMenuFactories(ribbonMenuText);
   const homeFactories = createHomeMenuFactories({

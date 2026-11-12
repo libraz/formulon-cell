@@ -153,8 +153,7 @@ export const macEn: MacStrings = {
     axisRtlUnsupported: 'This option is not supported yet.',
     axisTitle: 'Axes',
     customValueLabel: 'Custom value:',
-    emptyCellsLabel: 'Show empty cells as:',
-    showHiddenLabel: 'Show data in hidden rows and columns',
+    hiddenEmptyMenu: 'Hidden & Empty Cells',
   },
   slicer: {
     ok: 'OK',

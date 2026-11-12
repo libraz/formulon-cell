@@ -154,8 +154,7 @@ export const macFr: MacStrings = {
     axisRtlUnsupported: 'Cette option n’est pas encore prise en charge.',
     axisTitle: 'Axes',
     customValueLabel: 'Valeur personnalisée :',
-    emptyCellsLabel: 'Afficher toute cellule vide en tant que :',
-    showHiddenLabel: 'Afficher les données des lignes et colonnes masquées',
+    hiddenEmptyMenu: 'Cellules masquées et cellules vides',
   },
   slicer: {
     ok: 'OK',

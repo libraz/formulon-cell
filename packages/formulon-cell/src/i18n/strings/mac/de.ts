@@ -155,8 +155,7 @@ export const macDe: MacStrings = {
     axisRtlUnsupported: 'Diese Option wird noch nicht unterstützt.',
     axisTitle: 'Achsen',
     customValueLabel: 'Benutzerdefinierter Wert:',
-    emptyCellsLabel: 'Leere Zellen anzeigen als:',
-    showHiddenLabel: 'Daten in ausgeblendeten Zeilen und Spalten anzeigen',
+    hiddenEmptyMenu: 'Ausgeblendete und leere Zellen',
   },
   slicer: {
     ok: 'OK',

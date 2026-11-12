@@ -4,9 +4,11 @@ import { BlanksAs, type Color } from '@libraz/formulon';
 import { SHAPE_LINE_WEIGHTS } from '../../../commands/shape-format.js';
 import type { SparklineStylePreset } from '../../../commands/sparkline-presets.js';
 import { createColorPalette } from '../../../components/color-palette.js';
+import type { MacStrings } from '../../../i18n/strings/mac/types.js';
 import { projectDisabledState } from '../../menu-a11y.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarText } from '../../ribbon-model.js';
+import { createPenColorIcon } from '../border-icons.js';
 import { SPARKLINE_MENU_IDS } from '../sparkline-tabs.js';
 import {
   colorSwatchGrid,
@@ -19,6 +21,7 @@ import {
   menuSeparator,
   menuSubmenuTrigger,
 } from './general.js';
+import type { MenuVariant } from './mac-variants.js';
 import { lineSample, pointsLabel } from './shape-format.js';
 
 /** The points a sparkline colours apart from its series, in menu order. */
@@ -122,7 +125,7 @@ export const sparklineStyleThumbnail = (
 export const MORE_COLORS = 'more';
 
 export interface SparklineMenuFactories {
-  createSparklineEditDataMenu: () => HTMLDivElement;
+  createSparklineEditDataMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
   createSparklineStyleMenu: () => HTMLDivElement;
   createSparklineColorMenu: () => HTMLDivElement;
   createSparklineMarkerColorMenu: () => HTMLDivElement;
@@ -133,6 +136,7 @@ export interface SparklineMenuFactories {
 export const createSparklineMenuFactories = (
   ribbonText: ToolbarText,
   ribbonMenuText: ToolbarMenuText,
+  macText: MacStrings['sparkline'],
 ): SparklineMenuFactories => {
   const t = ribbonText.sparkline;
   const item = (label: string, attr: string, value: string): HTMLButtonElement =>
@@ -188,25 +192,29 @@ export const createSparklineMenuFactories = (
     return [trigger, panel];
   };
 
-  const createSparklineEditDataMenu = (): HTMLDivElement => {
+  // Hidden & Empty Cells: on the Mac a submenu of the settings, which a click opens as hover does;
+  // elsewhere an entry that opens the Hidden and Empty Cell Settings dialog.
+  const createSparklineEditDataMenu = (
+    _commandId?: string,
+    variant?: MenuVariant,
+  ): HTMLDivElement => {
     const menu = createMenu(SPARKLINE_MENU_IDS.editData);
     const empty = (label: string, value: string) =>
       checkable(item(label, 'sparklineEmpty', value), 'menuitemradio');
-    const [hidden, panel] = submenu(SPARKLINE_MENU_IDS.editData, 'hidden-empty', t.hiddenEmpty, [
-      empty(t.emptyAsGaps, String(BlanksAs.Gap)),
-      empty(t.emptyAsZero, String(BlanksAs.Zero)),
-      empty(t.connectPoints, String(BlanksAs.Span)),
-      menuSeparator(),
-      checkable(item(t.showHiddenData, 'sparklineEmpty', 'hidden'), 'menuitemcheckbox'),
-    ]);
-    // Hovering the entry opens its submenu; clicking it opens the Hidden and Empty Cell Settings dialog.
-    hidden.dataset.sparklineEdit = 'hidden-empty';
+    const hidden: Node[] = variant?.mac
+      ? submenu(SPARKLINE_MENU_IDS.editData, 'hidden-empty', macText.hiddenEmptyMenu, [
+          empty(t.emptyAsGaps, String(BlanksAs.Gap)),
+          empty(t.emptyAsZero, String(BlanksAs.Zero)),
+          empty(t.connectPoints, String(BlanksAs.Span)),
+          menuSeparator(),
+          checkable(item(t.showHiddenData, 'sparklineEmpty', 'hidden'), 'menuitemcheckbox'),
+        ])
+      : [item(t.hiddenEmpty, 'sparklineEdit', 'hidden-empty')];
     menu.append(
       item(t.editGroup, 'sparklineEdit', 'group'),
       item(t.editSingle, 'sparklineEdit', 'single'),
       menuSeparator(),
-      hidden,
-      panel,
+      ...hidden,
       item(t.switchRowCol, 'sparklineEdit', 'switch'),
     );
     return menu;
@@ -257,6 +265,7 @@ export const createSparklineMenuFactories = (
     return menu;
   };
 
+  // Each point is a submenu whose icon shows the point's colour; Markers closes the first block.
   const createSparklineMarkerColorMenu = (): HTMLDivElement => {
     const menu = createMenu(SPARKLINE_MENU_IDS.markerColor);
     const labels: Record<SparklineMarkerPart, string> = {
@@ -268,11 +277,15 @@ export const createSparklineMenuFactories = (
       last: t.lastPoint,
     };
     for (const part of SPARKLINE_MARKER_PARTS) {
-      menu.append(
-        ...submenu(SPARKLINE_MENU_IDS.markerColor, part, labels[part], [
-          palette(labels[part], 'sparklineMarkerColor', `${part}:`),
-        ]),
+      const [trigger, panel] = submenu(
+        SPARKLINE_MENU_IDS.markerColor,
+        part,
+        labels[part],
+        [palette(labels[part], 'sparklineMarkerColor', `${part}:`)],
+        createPenColorIcon('fc-tb__sparkline-marker-icon'),
       );
+      menu.append(trigger, panel);
+      if (part === 'markers') menu.append(menuSeparator());
     }
     return menu;
   };

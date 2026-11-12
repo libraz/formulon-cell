@@ -119,9 +119,18 @@
   }
 
   /* Sparkline Style strip: seven presets beside the chevron; the chip size is unmeasured. */
+  /* Sparkline Style strip: 80 x 56 chips stepping 78, so neighbours overlap by 2. */
+  .fc-tb__sparkline-quick-strip {
+    gap: 0;
+  }
+
+  .fc-tb__sparkline-quick-chip + .fc-tb__sparkline-quick-chip {
+    margin-left: -2px;
+  }
+
   .fc-tb__sparkline-quick-chip {
-    flex: 0 0 40px;
-    width: 40px;
+    flex: 0 0 80px;
+    width: 80px;
     height: 56px;
     padding: 2px;
     border: 1px solid var(--fc-rule);

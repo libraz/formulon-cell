@@ -219,8 +219,8 @@ export interface MacStrings {
     axisRtlUnsupported: string;
     axisTitle: string;
     customValueLabel: string;
-    emptyCellsLabel: string;
-    showHiddenLabel: string;
+    /** Edit Data > Hidden & Empty Cells: a submenu trigger, so no ellipsis. */
+    hiddenEmptyMenu: string;
   };
   slicer: {
     ok: string;

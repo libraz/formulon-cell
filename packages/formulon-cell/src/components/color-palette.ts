@@ -209,6 +209,33 @@ export function syncColorPaletteTheme(
   }
 }
 
+/**
+ * Mark `color` as the selected swatch of every palette under `root`, and make the selected
+ * swatch (or the first) the palette's tab stop. Null selects nothing.
+ */
+export function syncColorPaletteSelection(root: ParentNode, color: string | null): void {
+  const selected = color ? normalizeHex(color) : null;
+  const palettes =
+    root instanceof HTMLElement && root.matches('.fc-colorpalette')
+      ? [root]
+      : Array.from(root.querySelectorAll<HTMLElement>('.fc-colorpalette'));
+  for (const palette of palettes) {
+    const swatches = Array.from(
+      palette.querySelectorAll<HTMLButtonElement>('.fc-colorpalette__swatch'),
+    );
+    const stop = Math.max(
+      swatches.findIndex((swatch) => swatch.dataset.color === selected),
+      0,
+    );
+    swatches.forEach((swatch, i) => {
+      const isSelected = swatch.dataset.color === selected;
+      swatch.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      swatch.classList.toggle('fc-colorpalette__swatch--selected', isSelected);
+      swatch.tabIndex = i === stop ? 0 : -1;
+    });
+  }
+}
+
 /** A multi-hue ring — the "More Colors" affordance. */
 function createColorWheelIcon(): HTMLSpanElement {
   const wheel = document.createElement('span');
@@ -246,28 +273,13 @@ export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHa
 
   /** Every swatch button, row-major, used for roving-tabindex navigation. */
   const swatches: HTMLButtonElement[] = [];
-  let selected = options.value ? normalizeHex(options.value) : null;
 
-  const syncSelection = (): void => {
-    for (const swatch of swatches) {
-      const isSelected = swatch.dataset.color === selected;
-      swatch.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
-      swatch.classList.toggle('fc-colorpalette__swatch--selected', isSelected);
-    }
-  };
-
-  /** Index of the swatch that owns tabindex=0 (the roving focus target). */
-  const rovingIndex = (): number => {
-    const idx = swatches.findIndex((s) => s.dataset.color === selected);
-    return Math.max(idx, 0);
-  };
-
-  const syncRoving = (): void => {
-    const active = rovingIndex();
-    swatches.forEach((swatch, i) => {
-      swatch.tabIndex = i === active ? 0 : -1;
-    });
-  };
+  /** Index of the selected swatch, or the first. */
+  const selectedIndex = (): number =>
+    Math.max(
+      swatches.findIndex((s) => s.getAttribute('aria-pressed') === 'true'),
+      0,
+    );
 
   const focusSwatch = (index: number): void => {
     const clamped = Math.max(0, Math.min(swatches.length - 1, index));
@@ -324,9 +336,7 @@ export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHa
     // The colour is read at the click: a theme change rewrites the swatch.
     swatch.addEventListener('click', () => {
       const color = swatch.dataset.color ?? normalized;
-      selected = color;
-      syncSelection();
-      syncRoving();
+      syncColorPaletteSelection(root, color);
       options.onPick(color);
     });
     swatch.addEventListener('keydown', (event) => onSwatchKeydown(event, index));
@@ -416,18 +426,15 @@ export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHa
     root.appendChild(more);
   }
 
-  syncSelection();
-  syncRoving();
+  syncColorPaletteSelection(root, options.value ?? null);
 
   return {
     el: root,
     setValue(color: string | null): void {
-      selected = color ? normalizeHex(color) : null;
-      syncSelection();
-      syncRoving();
+      syncColorPaletteSelection(root, color);
     },
     focus(): void {
-      swatches[rovingIndex()]?.focus();
+      swatches[selectedIndex()]?.focus();
     },
   };
 }

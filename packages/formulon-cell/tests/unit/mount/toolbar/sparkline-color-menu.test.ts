@@ -7,6 +7,7 @@ import {
   setSparklines,
 } from '../../../../src/commands/sparkline.js';
 import { Spreadsheet } from '../../../../src/mount.js';
+import { sparklineColors } from '../../../../src/render/sparkline.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
 import { stubHelpers } from './fixtures.js';
@@ -98,6 +99,72 @@ describe('Sparkline Color menu', () => {
     pick('[data-sparkline-marker-color="high:more"]');
     chooseNative('#abcdef');
     expect(settings()?.colorHigh).toEqual(rgbColorSpec('#abcdef'));
+  });
+
+  it('lists the six points as colour submenus, Markers closing the first block', async () => {
+    await mount();
+    const menu = open('sparklineMarkerColor');
+    const rows = Array.from(menu.children)
+      .filter((el) => !el.classList.contains('fc-tb__submenu'))
+      .map((el) =>
+        el.getAttribute('role') === 'separator' ? '|' : (el.textContent ?? '').replace('›', ''),
+      );
+    expect(rows).toEqual([
+      '負のポイント',
+      'マーカー',
+      '|',
+      '頂点 (山)',
+      '頂点 (谷)',
+      '始点',
+      '終点',
+    ]);
+    for (const part of ['negative', 'markers', 'high', 'low', 'first', 'last']) {
+      const panel = menu.querySelector<HTMLElement>(`#menu-sparkline-marker-color-${part}`);
+      expect(
+        panel?.querySelector('.fc-colorpalette__contrast input')?.hasAttribute('disabled'),
+      ).toBe(true);
+      expect(panel?.querySelector('.fc-colorpalette__action--automatic')).toBeNull();
+      expect(panel?.querySelector('.fc-colorpalette__action--no-fill')).toBeNull();
+      expect(
+        panel?.querySelectorAll('.fc-colorpalette__grid--theme .fc-colorpalette__swatch'),
+      ).toHaveLength(60);
+      expect(
+        panel?.querySelectorAll('.fc-colorpalette__grid--standard .fc-colorpalette__swatch'),
+      ).toHaveLength(10);
+      expect(panel?.querySelector('.fc-colorpalette__action--more')).not.toBeNull();
+    }
+  });
+
+  it('shows each point colour on its entry and frames it in the palette', async () => {
+    await mount();
+    open('sparklineColor');
+    pick('[data-sparkline-color="#ff0000"]');
+    let menu = open('sparklineColor');
+    expect(
+      menu
+        .querySelector('.fc-colorpalette__swatch[aria-pressed="true"]')
+        ?.getAttribute('data-color'),
+    ).toBe('#ff0000');
+    open('sparklineMarkerColor');
+    pick('[data-sparkline-marker-color="high:#00b050"]');
+    menu = open('sparklineMarkerColor');
+    const bar = (part: string) =>
+      menu
+        .querySelector(`[data-format-submenu="${part}"] .fc-tb__pen-color-bar`)
+        ?.getAttribute('stroke');
+    const framed = (part: string) =>
+      menu
+        .querySelector(
+          `#menu-sparkline-marker-color-${part} .fc-colorpalette__swatch[aria-pressed="true"]`,
+        )
+        ?.getAttribute('data-color');
+    expect(bar('high')).toBe('#00b050');
+    expect(framed('high')).toBe('#00b050');
+    const low = sparklineColors(
+      settings() ?? defaultSparklineGroupSettings(SparklineType.Line),
+      null,
+    ).low;
+    expect(bar('low')).toBe(low ?? '#ff0000');
   });
 
   it.each([0.2, 1585])('accepts a custom weight of %s pt', async (weight) => {

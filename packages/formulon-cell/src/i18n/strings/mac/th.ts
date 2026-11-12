@@ -152,8 +152,7 @@ export const macTh: MacStrings = {
     axisRtlUnsupported: 'ยังไม่รองรับตัวเลือกนี้',
     axisTitle: 'แกน',
     customValueLabel: 'ค่าแบบกำหนดเอง:',
-    emptyCellsLabel: 'แสดงเซลล์ว่างเป็น:',
-    showHiddenLabel: 'แสดงข้อมูลในแถวและคอลัมน์ที่ซ่อนอยู่',
+    hiddenEmptyMenu: 'ซ่อนเซลล์และล้างเซลล์',
   },
   slicer: {
     ok: 'ตกลง',
