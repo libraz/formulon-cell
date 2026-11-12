@@ -36,7 +36,6 @@ export const formulaDialogsZh: FormulaDialogsStrings = {
     errorInvalidName: '输入的名称无效。',
     errorDuplicateName: '输入的名称已存在。请输入唯一的名称。',
     errorEmptyFormula: '请输入引用',
-    errorEngineFailed: '保存失败',
     ok: '确定',
     cancel: '取消',
     commitButton: '提交',

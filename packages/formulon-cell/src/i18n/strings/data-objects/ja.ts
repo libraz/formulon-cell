@@ -175,7 +175,6 @@ export const dataObjectsJa: DataObjectsStrings = {
     unsupported: 'このエンジンではピボットテーブルの作成に対応していません。',
     invalidRange: '見出し行を含む 2 列以上、2 行以上の範囲を選択してください。',
     invalidDestination: '配置場所をセル番地で入力してください。',
-    engineFailed: 'ピボットテーブルの作成に失敗しました。',
     cancel: 'キャンセル',
     ok: 'OK',
   },

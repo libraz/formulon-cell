@@ -205,7 +205,6 @@ export const editDialogsEn: EditDialogsStrings = {
     ruleAll: 'All',
     ruleSame: 'Same',
     noResults: 'No cells were found.',
-    selectionTooLarge: 'The selection is too large.',
     cancel: 'Cancel',
     ok: 'OK',
   },

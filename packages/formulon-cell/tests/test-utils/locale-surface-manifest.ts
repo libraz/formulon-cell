@@ -108,6 +108,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'viewToolbar',
   'sheetTabs',
   'a11y',
+  'commandRefusal',
   'mountError',
   'workbookSave',
 ] as const;

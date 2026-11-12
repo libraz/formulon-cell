@@ -36,7 +36,6 @@ export const formulaDialogsKo: FormulaDialogsStrings = {
     errorInvalidName: '입력한 이름이 올바르지 않습니다.',
     errorDuplicateName: '입력한 이름이 이미 있습니다. 고유한 이름을 입력하세요.',
     errorEmptyFormula: '참조를 입력하세요',
-    errorEngineFailed: '저장하지 못했습니다',
     ok: '확인',
     cancel: '취소',
     commitButton: '적용',

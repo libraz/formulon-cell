@@ -119,6 +119,10 @@ export const workbookChromeDe: WorkbookChromeStrings = {
     spreadsheet: 'Tabellenkalkulation',
     grid: 'Arbeitsblattraster',
   },
+  commandRefusal: {
+    tooLarge: 'Markierung ist zu groß.',
+    engineFailed: 'Diese Aktion kann nicht abgeschlossen werden.',
+  },
   mountError: {
     title: 'Tabellenkalkulations-Engine nicht verfügbar',
     engineHelp:

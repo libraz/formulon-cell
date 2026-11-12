@@ -174,7 +174,6 @@ export const dataObjectsZh: DataObjectsStrings = {
     unsupported: '此引擎不支持创建数据透视表。',
     invalidRange: '请至少选择 2 行和 2 列，其中包括标题行。',
     invalidDestination: '请输入位置的单元格引用。',
-    engineFailed: '创建数据透视表失败。',
     cancel: '取消',
     ok: '确定',
   },

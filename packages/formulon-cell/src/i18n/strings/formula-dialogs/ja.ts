@@ -36,7 +36,6 @@ export const formulaDialogsJa: FormulaDialogsStrings = {
     errorInvalidName: '入力した名前は無効です。',
     errorDuplicateName: '入力した名前は既に存在します。一意の名前を入力してください。',
     errorEmptyFormula: '参照を入力してください',
-    errorEngineFailed: '保存に失敗しました',
     ok: 'OK',
     cancel: 'キャンセル',
     commitButton: '確定',

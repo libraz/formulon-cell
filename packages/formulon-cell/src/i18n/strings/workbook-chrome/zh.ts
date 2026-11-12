@@ -116,6 +116,10 @@ export const workbookChromeZh: WorkbookChromeStrings = {
     spreadsheet: '电子表格',
     grid: '工作表网格',
   },
+  commandRefusal: {
+    tooLarge: '选定区域太大。',
+    engineFailed: '无法完成此操作。',
+  },
   mountError: {
     title: '电子表格引擎不可用',
     engineHelp:

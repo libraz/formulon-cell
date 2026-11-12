@@ -174,7 +174,6 @@ export const dataObjectsEn: DataObjectsStrings = {
     unsupported: 'This engine does not support PivotTable creation.',
     invalidRange: 'Select at least 2 rows and 2 columns including a header row.',
     invalidDestination: 'Enter a cell reference for the location.',
-    engineFailed: 'Failed to create PivotTable.',
     cancel: 'Cancel',
     ok: 'OK',
   },

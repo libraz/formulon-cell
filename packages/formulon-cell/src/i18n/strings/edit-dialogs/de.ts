@@ -207,7 +207,6 @@ export const editDialogsDe: EditDialogsStrings = {
     ruleAll: 'Alle',
     ruleSame: 'Gleiche',
     noResults: 'Es wurden keine Zellen gefunden.',
-    selectionTooLarge: 'Die Auswahl ist zu groß.',
     cancel: 'Abbrechen',
     ok: 'OK',
   },

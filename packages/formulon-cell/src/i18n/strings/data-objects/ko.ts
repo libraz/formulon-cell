@@ -174,7 +174,6 @@ export const dataObjectsKo: DataObjectsStrings = {
     unsupported: '이 엔진은 피벗 테이블 만들기를 지원하지 않습니다.',
     invalidRange: '머리글 행을 포함하여 행 2개 이상과 열 2개 이상을 선택하세요.',
     invalidDestination: '위치에 사용할 셀 참조를 입력하세요.',
-    engineFailed: '피벗 테이블을 만들지 못했습니다.',
     cancel: '취소',
     ok: '확인',
   },

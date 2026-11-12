@@ -204,7 +204,6 @@ export const editDialogsZh: EditDialogsStrings = {
     ruleAll: '全部',
     ruleSame: '相同',
     noResults: '未找到单元格。',
-    selectionTooLarge: '所选内容太大。',
     cancel: '取消',
     ok: '确定',
   },

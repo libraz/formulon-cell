@@ -180,7 +180,6 @@ export const dataObjectsDe: DataObjectsStrings = {
     invalidRange:
       'Wählen Sie mindestens 2 Zeilen und 2 Spalten einschließlich einer Kopfzeile aus.',
     invalidDestination: 'Geben Sie einen Zellbezug für den Speicherort ein.',
-    engineFailed: 'PivotTable konnte nicht erstellt werden.',
     cancel: 'Abbrechen',
     ok: 'OK',
   },

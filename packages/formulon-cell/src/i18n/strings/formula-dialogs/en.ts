@@ -36,7 +36,6 @@ export const formulaDialogsEn: FormulaDialogsStrings = {
     errorInvalidName: 'The name that you entered is not valid.',
     errorDuplicateName: 'The name that you entered already exists. Enter a unique name.',
     errorEmptyFormula: 'Enter a reference',
-    errorEngineFailed: 'Failed to save',
     ok: 'OK',
     cancel: 'Cancel',
     commitButton: 'Commit',

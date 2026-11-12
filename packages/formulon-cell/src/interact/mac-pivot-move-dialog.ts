@@ -143,7 +143,7 @@ function attachPivotMoveDialog(instance: SpreadsheetInstance): PivotMoveDialogHa
     );
     if (!moved) {
       status.dataset.state = 'error';
-      status.textContent = t.engineFailed;
+      status.textContent = instance.i18n.strings.commandRefusal.engineFailed;
       return;
     }
     close();

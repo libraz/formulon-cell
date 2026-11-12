@@ -489,7 +489,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
         )
       : createConfiguredPivot(range, placement);
     if (!result.ok) {
-      showError(strings.pivotTableDialog.engineFailed);
+      showError(strings.commandRefusal.engineFailed);
       return;
     }
     const { destination } = result;

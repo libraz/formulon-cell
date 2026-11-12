@@ -116,6 +116,10 @@ export const workbookChromeTh: WorkbookChromeStrings = {
     spreadsheet: 'สเปรดชีต',
     grid: 'เส้นตารางเวิร์กชีต',
   },
+  commandRefusal: {
+    tooLarge: 'ส่วนที่เลือกใหญ่เกินไป',
+    engineFailed: 'ไม่สามารถดำเนินการนี้ให้เสร็จสมบูรณ์',
+  },
   mountError: {
     title: 'กลไกสเปรดชีตไม่พร้อมใช้งาน',
     engineHelp:

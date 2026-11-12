@@ -55,6 +55,7 @@ import type { SpreadsheetInstance } from '../../mount.js';
 import { selectionContainsAddr } from '../../store/selection-geometry.js';
 import { mutators } from '../../store/store.js';
 import { showAdvancedFilterDialog } from '../../toolbar/dialogs/advanced-filter.js';
+import { showCommandRefusal } from '../../toolbar/dialogs/command-refusal.js';
 import { showCustomListsDialog } from '../../toolbar/dialogs/custom-lists.js';
 import { showMessage } from '../../toolbar/dialogs/prompt.js';
 import {
@@ -306,7 +307,7 @@ const buildFindSelectAction =
         findSelect: strings.ribbon.findSelect,
         findNoMatches: strings.ribbonMenu.findNoMatches,
         commentNone: strings.ribbonMenu.commentNone,
-        selectionTooLarge: strings.goToDialog.selectionTooLarge,
+        selectionTooLarge: strings.commandRefusal.tooLarge,
       },
     });
     if (result.kind === 'open-find') {
@@ -534,6 +535,15 @@ const buildSortMenuAction =
           instance.history.end();
         }
         mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
+        if (!outcome.ok && (outcome.reason === 'too-large' || outcome.reason === 'engine-failed')) {
+          void showCommandRefusal({
+            host: instance.host,
+            strings: instance.i18n.strings,
+            title: strings.removeDuplicatesDialogTitle,
+            reason: outcome.reason,
+          }).then(() => instance.host.focus());
+          return;
+        }
         const message = removeDuplicatesResultMessage(outcome, strings);
         if (!message) {
           instance.host.focus();

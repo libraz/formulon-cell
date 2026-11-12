@@ -174,7 +174,6 @@ export const dataObjectsTh: DataObjectsStrings = {
     unsupported: 'กลไกนี้ไม่สนับสนุนการสร้าง PivotTable',
     invalidRange: 'เลือกอย่างน้อย 2 แถวและ 2 คอลัมน์ รวมทั้งแถวส่วนหัว',
     invalidDestination: 'ป้อนการอ้างอิงเซลล์สำหรับตำแหน่ง',
-    engineFailed: 'สร้าง PivotTable ไม่สำเร็จ',
     cancel: 'ยกเลิก',
     ok: 'ตกลง',
   },

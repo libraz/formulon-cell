@@ -12,6 +12,7 @@ import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { rangeDefinedNames, resolveAreaText, splitAreas } from '../mount/ref-utils.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { showCommandRefusal } from '../toolbar/dialogs/command-refusal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogActions,
@@ -450,7 +451,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
         : [];
     api.close();
     if (result.status === 'too-large') {
-      alertDialog.show({ severity: 'stop', title: t.title, message: t.selectionTooLarge });
+      void showCommandRefusal({ host, strings, title: t.title, reason: 'too-large' });
       return;
     }
     if (ranges.length === 0) {

@@ -207,7 +207,6 @@ export const editDialogsJa: EditDialogsStrings = {
     ruleAll: 'すべて',
     ruleSame: '同じ入力規則',
     noResults: '該当するセルが見つかりません。',
-    selectionTooLarge: '選択範囲が大きすぎます。',
     cancel: 'キャンセル',
     ok: 'OK',
   },

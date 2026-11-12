@@ -225,7 +225,6 @@ export interface EditDialogsStrings {
     /** Alert text when the search finds nothing. */
     noResults: string;
     /** Alert text when the result exceeds the selection cap. */
-    selectionTooLarge: string;
     cancel: string;
     ok: string;
   };

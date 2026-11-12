@@ -205,7 +205,6 @@ export const editDialogsKo: EditDialogsStrings = {
     ruleAll: '모두',
     ruleSame: '동일',
     noResults: '셀을 찾을 수 없습니다.',
-    selectionTooLarge: '선택 영역이 너무 큽니다.',
     cancel: '취소',
     ok: '확인',
   },

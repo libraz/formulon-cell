@@ -47,7 +47,6 @@ export interface FormulaDialogsStrings {
     /** Inline error: empty formula/ref. */
     errorEmptyFormula: string;
     /** Inline error: engine refused the write. */
-    errorEngineFailed: string;
     ok: string;
     cancel: string;
     commitButton: string;

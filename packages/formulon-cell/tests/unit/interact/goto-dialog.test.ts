@@ -245,7 +245,9 @@ describe('attachGoToDialog', () => {
     const blanks = kindRadios().find((r) => r.value === 'blanks');
     if (blanks) blanks.checked = true;
     okBtn()?.click();
-    expect(alertText()).toBe(ja.goToDialog.selectionTooLarge);
+    expect(document.querySelector('[role="alertdialog"] .fc-tb__dlg__message')?.textContent).toBe(
+      ja.commandRefusal.tooLarge,
+    );
     handle.detach();
   });
 

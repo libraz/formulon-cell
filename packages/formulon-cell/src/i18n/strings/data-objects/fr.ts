@@ -178,7 +178,6 @@ export const dataObjectsFr: DataObjectsStrings = {
     unsupported: 'Ce moteur ne prend pas en charge la création de tableaux croisés dynamiques.',
     invalidRange: 'Sélectionnez au moins 2 lignes et 2 colonnes, y compris une ligne d’en-tête.',
     invalidDestination: 'Entrez une référence de cellule pour l’emplacement.',
-    engineFailed: 'Échec de la création du tableau croisé dynamique.',
     cancel: 'Annuler',
     ok: 'OK',
   },

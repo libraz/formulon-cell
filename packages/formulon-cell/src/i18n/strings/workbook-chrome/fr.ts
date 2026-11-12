@@ -119,6 +119,10 @@ export const workbookChromeFr: WorkbookChromeStrings = {
     spreadsheet: 'Feuille de calcul',
     grid: 'Grille de la feuille de calcul',
   },
+  commandRefusal: {
+    tooLarge: 'La sélection est trop grande.',
+    engineFailed: 'Impossible de terminer cette action.',
+  },
   mountError: {
     title: 'Moteur de feuille de calcul indisponible',
     engineHelp:

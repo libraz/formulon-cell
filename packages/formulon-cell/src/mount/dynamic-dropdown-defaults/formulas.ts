@@ -24,6 +24,7 @@ import { openDefineNameDialogFrom, openNamedRangeDialogFrom } from '../../intera
 import { openMacGoalSeekDialog } from '../../interact/mac-goal-seek-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators } from '../../store/store.js';
+import { showCommandRefusal } from '../../toolbar/dialogs/command-refusal.js';
 import { showDefinedNamePickerDialog } from '../../toolbar/dialogs/defined-name-picker.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { handleAutoSum } from '../../wrappers/toolbar-actions.js';
@@ -271,7 +272,7 @@ const buildDefinedNameAction =
               ? 'right-column'
               : null;
     if (source) {
-      namedRangeWrite(
+      const written = namedRangeWrite(
         {
           store: instance.store,
           workbook: instance.workbook,
@@ -281,6 +282,22 @@ const buildDefinedNameAction =
         },
         () => createDefinedNamesFromSelection(instance.store.getState(), instance.workbook, source),
       );
+      const reason = written.ok && !written.value.ok ? written.value.reason : null;
+      if (reason === 'too-large' || reason === 'engine-failed') {
+        const menu = instance.i18n.strings.ribbonMenu;
+        const title = {
+          'top-row': menu.createFromSelectionTop,
+          'bottom-row': menu.createFromSelectionBottom,
+          'left-column': menu.createFromSelectionLeft,
+          'right-column': menu.createFromSelectionRight,
+        }[source];
+        await showCommandRefusal({
+          host: instance.host,
+          strings: instance.i18n.strings,
+          title,
+          reason,
+        });
+      }
       instance.host.focus();
       return;
     }

@@ -36,7 +36,6 @@ export const formulaDialogsTh: FormulaDialogsStrings = {
     errorInvalidName: 'ชื่อที่คุณป้อนไม่ถูกต้อง',
     errorDuplicateName: 'ชื่อที่คุณป้อนมีอยู่แล้ว ป้อนชื่อที่ไม่ซ้ำกัน',
     errorEmptyFormula: 'ป้อนการอ้างอิง',
-    errorEngineFailed: 'บันทึกไม่สำเร็จ',
     ok: 'ตกลง',
     cancel: 'ยกเลิก',
     commitButton: 'ยืนยัน',

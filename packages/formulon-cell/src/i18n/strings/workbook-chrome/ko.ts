@@ -117,6 +117,10 @@ export const workbookChromeKo: WorkbookChromeStrings = {
     spreadsheet: '스프레드시트',
     grid: '워크시트 눈금',
   },
+  commandRefusal: {
+    tooLarge: '선택 범위가 너무 큽니다.',
+    engineFailed: '이 작업을 완료할 수 없습니다.',
+  },
   mountError: {
     title: '스프레드시트 엔진을 사용할 수 없음',
     engineHelp:

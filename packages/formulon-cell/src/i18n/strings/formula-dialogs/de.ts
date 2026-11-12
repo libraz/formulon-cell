@@ -38,7 +38,6 @@ export const formulaDialogsDe: FormulaDialogsStrings = {
     errorDuplicateName:
       'Der eingegebene Name ist bereits vorhanden. Geben Sie einen eindeutigen Namen ein.',
     errorEmptyFormula: 'Geben Sie einen Bezug ein',
-    errorEngineFailed: 'Speichern fehlgeschlagen',
     ok: 'OK',
     cancel: 'Abbrechen',
     commitButton: 'Übernehmen',

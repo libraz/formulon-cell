@@ -87,11 +87,12 @@ const hasFormulaError = (formula: string): boolean =>
 function errorMessageFor(
   reason: 'empty-name' | 'invalid-name' | 'empty-formula' | 'unsupported' | 'engine-failed',
   t: Strings['namedRangeDialog'],
+  refusal: Strings['commandRefusal'],
 ): string {
   if (reason === 'invalid-name') return t.errorInvalidName;
   if (reason === 'empty-name') return t.errorEmptyName;
   if (reason === 'empty-formula') return t.errorEmptyFormula;
-  return t.errorEngineFailed;
+  return refusal.engineFailed;
 }
 
 /**
@@ -870,7 +871,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     if (!written.ok) return false;
     const result = written.value;
     if (!result.ok) {
-      showDefineError(errorMessageFor(result.reason, t));
+      showDefineError(errorMessageFor(result.reason, t, strings.commandRefusal));
       return false;
     }
     clearDialogError(defineError);
@@ -892,7 +893,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     const written = writeNames(() => deleteDefinedName(wb, entry.name, entry.localSheetId));
     if (!written.ok) return;
     if (!written.value.ok) {
-      showDefineError(t.errorEngineFailed);
+      showDefineError(strings.commandRefusal.engineFailed);
       return;
     }
     clearDialogError(defineError);
@@ -928,7 +929,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     const entry = pendingDeleteName;
     const written = writeNames(() => deleteDefinedName(wb, entry.name, entry.localSheetId));
     if (!written.ok || !written.value.ok) {
-      showMainError(t.errorEngineFailed);
+      showMainError(strings.commandRefusal.engineFailed);
       closeDeleteConfirm();
       return;
     }
@@ -953,7 +954,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     if (!written.ok) return;
     const result = written.value;
     if (!result.ok) {
-      showMainError(errorMessageFor(result.reason, t));
+      showMainError(errorMessageFor(result.reason, t, strings.commandRefusal));
       return;
     }
     clearMainError();
@@ -1019,7 +1020,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     if (!written.ok) return;
     const result = written.value;
     if (!result.ok) {
-      showError(errorMessageFor(result.reason, t));
+      showError(errorMessageFor(result.reason, t, strings.commandRefusal));
       return;
     }
     clearError();

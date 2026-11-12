@@ -204,7 +204,6 @@ export const editDialogsTh: EditDialogsStrings = {
     ruleAll: 'ทั้งหมด',
     ruleSame: 'เหมือนกัน',
     noResults: 'ไม่พบเซลล์',
-    selectionTooLarge: 'การเลือกใหญ่เกินไป',
     cancel: 'ยกเลิก',
     ok: 'ตกลง',
   },

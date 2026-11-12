@@ -8,6 +8,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- A command that refuses because its range is too large reads "Selection is too large.", the desktop's own wording, and one the engine cannot carry out reads "Can’t complete this action." in every locale; Go To Special, Name Manager, Create PivotTable and Move PivotTable share these messages.
 - Spelling follows the desktop app: Ignore Once is the default button, so Return leaves the word as it is; Ignore UPPERCASE starts off; Undo Last steps back over any action, an Ignore included; Suggest is greyed while Always suggest is on; a repeated word offers Delete and Delete All, with Add available and AutoCorrect deleting the word as Delete does, and Delete removes only the word, keeping the spaces around it. A Japanese UI checks English. On the Mac the word appears in its label and an Add words to list follows the suggestions.
 - F7 opens Spelling.
 - A report filter field takes item selection only, as on the desktop; label, value and date conditions apply to row and column fields. `createPivotTableFromRange`'s `pivotFilters` now apply to the row or column field and refuse a spec naming any other field.
@@ -109,6 +110,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- Remove Duplicates and Create from Selection no longer refuse silently: a range too large to handle, or an action the engine cannot carry out, raises an alert, the title-less one on the Mac and one titled with the command elsewhere. Go To Special raises its too-large alert the same way.
 - A sort by a custom list inside a filtered range is remembered with the filter and written to the file's sort state with its list, and a custom-list sort level read from a file comes back into the filter's sort.
 - A filter column whose dropdown button the file hides shows no button, keeps its filter applied and editable, and keeps the hidden button through a save.
 - Switching a column filter between conditions that hide the same rows, such as two date periods, is its own undo step.

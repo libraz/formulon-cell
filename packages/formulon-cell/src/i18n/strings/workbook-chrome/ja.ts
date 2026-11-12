@@ -116,6 +116,10 @@ export const workbookChromeJa: WorkbookChromeStrings = {
     spreadsheet: 'スプレッドシート',
     grid: 'ワークシート グリッド',
   },
+  commandRefusal: {
+    tooLarge: '選択範囲が大きすぎます。',
+    engineFailed: 'この操作を完了できません。',
+  },
   mountError: {
     title: 'スプレッドシート エンジンを利用できません',
     engineHelp:

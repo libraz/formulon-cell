@@ -120,6 +120,13 @@ export interface WorkbookChromeStrings {
     spreadsheet: string;
     grid: string;
   };
+  /** Why a command refused to run, shown in its alert or inline error. `tooLarge` is the desktop's
+   *  own wording; `engineFailed` is the desktop's generic can't-complete clause with the product
+   *  name dropped. */
+  commandRefusal: {
+    tooLarge: string;
+    engineFailed: string;
+  };
   mountError: {
     title: string;
     engineHelp: string;
