@@ -404,7 +404,7 @@ export const dataObjectsKo: DataObjectsStrings = {
         '스톡 및 온라인 그림 카탈로그에는 호스트에서 제공하는 미디어 선택기 또는 서비스 통합이 필요합니다.',
       screenshotCurrentView: '현재 시트 보기에는 탑재된 그리드 캔버스의 PNG 내보내기가 필요합니다.',
       screenClipping:
-        '화면 캡처에는 호스트에서 제공하는 captureScreenClip 후크가 필요하며 브라우저는 Excel 스타일의 OS 영역 캡처 선택기를 직접 열 수 없습니다.',
+        '화면 캡처에는 호스트에서 제공하는 captureScreenClip 후크가 필요하며 브라우저는 OS 영역 캡처 선택기를 직접 열 수 없습니다.',
       chartAuthoring:
         '세로 막대형, 가로 막대형, 꺾은선형, 영역형, 원형, 도넛형, 분산형 차트를 만들고 편집할 수 있으며 통합 문서와 함께 저장됩니다. 그 밖의 차트 종류는 자리 표시자로 표시되며 이동, 크기 조정, 삭제만 할 수 있습니다.',
       externalLinks: '엔진에서 외부 링크 레코드를 제공하면 목록화할 수 있습니다.',

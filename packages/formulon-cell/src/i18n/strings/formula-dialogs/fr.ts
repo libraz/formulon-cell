@@ -40,7 +40,6 @@ export const formulaDialogsFr: FormulaDialogsStrings = {
     cancel: 'Annuler',
     commitButton: 'Valider',
     cancelButton: 'Annuler',
-    confirmDeleteTitle: 'Microsoft Excel',
     confirmDeleteMessage: 'Voulez-vous vraiment supprimer le nom {name} ?',
     close: 'Fermer',
   },

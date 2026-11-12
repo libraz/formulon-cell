@@ -70,6 +70,7 @@ This is what a change looks like by the time it is merged. The maintainer checks
 - Use the in-memory stub engine (`preferStub: true`) only in tests and explicit demos, never as a fallback when the WebAssembly engine fails to load.
 - Build ribbon icons from `src/toolbar/icon-kit`, and run `yarn icons:review` to look at the contact sheets before and after an icon change.
 - Add a new UI string to every locale table under `src/i18n/strings/`. English text in a language you do not know is fine; the maintainer translates it.
+- When a string takes the desktop app's own wording and that wording names the product, drop the product name and repair the grammar as little as possible; no UI string names the product.
 - Add unit tests under `packages/formulon-cell/tests` for the code you changed. A change visible in both demos gets a scenario under `tests/e2e-shared/scenarios`.
 - Where a change fixes a defect, include a test that fails without the fix.
 - Write comments in English and give exported symbols a TSDoc comment.

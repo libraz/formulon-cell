@@ -408,7 +408,7 @@ export const dataObjectsEn: DataObjectsStrings = {
       screenshotCurrentView:
         'Current Sheet View requires the mounted grid canvas to provide a PNG export.',
       screenClipping:
-        'Screen clipping requires a host-provided captureScreenClip hook; browsers cannot open an Excel-style OS region capture picker directly.',
+        'Screen clipping requires a host-provided captureScreenClip hook; browsers cannot open an OS region capture picker directly.',
       chartAuthoring:
         'Column, bar, line, area, pie, doughnut, and scatter charts can be created and edited, and are saved with the workbook. Other chart types are shown as placeholders that can be moved, resized, and deleted.',
       externalLinks: 'External link records can be inventoried when the engine exposes them.',

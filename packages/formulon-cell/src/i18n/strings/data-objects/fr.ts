@@ -416,7 +416,7 @@ export const dataObjectsFr: DataObjectsStrings = {
       screenshotCurrentView:
         'L’affichage actuel de la feuille nécessite que le canevas de grille monté fournisse une exportation PNG.',
       screenClipping:
-        'La capture d’écran nécessite un hook captureScreenClip fourni par l’hôte ; les navigateurs ne peuvent pas ouvrir directement un sélecteur de région du système d’exploitation de type Excel.',
+        'La capture d’écran nécessite un hook captureScreenClip fourni par l’hôte ; les navigateurs ne peuvent pas ouvrir directement un sélecteur de région du système d’exploitation.',
       chartAuthoring:
         'Les graphiques en histogramme, en barres, en courbes, en aires, en secteurs, en anneau et en nuage de points peuvent être créés et modifiés, et sont enregistrés avec le classeur. Les autres types de graphiques s’affichent sous forme d’espace réservé, que l’on peut seulement déplacer, redimensionner et supprimer.',
       externalLinks:

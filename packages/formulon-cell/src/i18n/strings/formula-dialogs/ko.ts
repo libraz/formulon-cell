@@ -40,7 +40,6 @@ export const formulaDialogsKo: FormulaDialogsStrings = {
     cancel: '취소',
     commitButton: '적용',
     cancelButton: '취소',
-    confirmDeleteTitle: 'Microsoft Excel',
     confirmDeleteMessage: '이름 {name}을(를) 삭제하시겠습니까?',
     close: '닫기',
   },

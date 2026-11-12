@@ -387,7 +387,7 @@ export const dataObjectsZh: DataObjectsStrings = {
       mediaPickers: '库存图片和联机图片目录需要宿主提供媒体选取器或服务集成。',
       screenshotCurrentView: '当前工作表视图需要已挂载的网格画布提供 PNG 导出。',
       screenClipping:
-        '屏幕剪辑需要宿主提供 captureScreenClip hook；浏览器无法直接打开 Excel 风格的操作系统区域捕获选取器。',
+        '屏幕剪辑需要宿主提供 captureScreenClip hook；浏览器无法直接打开 操作系统区域捕获选取器。',
       chartAuthoring:
         '可以创建和编辑柱形图、条形图、折线图、面积图、饼图、圆环图和散点图，并随工作簿一起保存。其他类型的图表显示为占位框，只能移动、调整大小和删除。',
       externalLinks: '引擎公开外部链接记录时，可以对其编目。',

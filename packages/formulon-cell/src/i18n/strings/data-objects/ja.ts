@@ -406,7 +406,7 @@ export const dataObjectsJa: DataObjectsStrings = {
       screenshotCurrentView:
         '現在のシート表示には、マウント済みグリッド canvas から PNG を書き出せる必要があります。',
       screenClipping:
-        '画面の領域には、ホストが提供する captureScreenClip hook が必要です。ブラウザーだけでは Excel 型の OS 領域選択キャプチャを直接開けません。',
+        '画面の領域には、ホストが提供する captureScreenClip hook が必要です。ブラウザーだけでは OS 領域選択キャプチャを直接開けません。',
       chartAuthoring:
         '縦棒、横棒、折れ線、面、円、ドーナツ、散布図のグラフを作成・編集でき、ブックと一緒に保存されます。そのほかの種類のグラフは代替表示になり、移動、サイズ変更、削除だけができます。',
       externalLinks: 'エンジンが公開している場合、外部リンク レコードを一覧できます。',

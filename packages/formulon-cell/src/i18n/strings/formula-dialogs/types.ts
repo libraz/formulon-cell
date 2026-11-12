@@ -51,7 +51,6 @@ export interface FormulaDialogsStrings {
     cancel: string;
     commitButton: string;
     cancelButton: string;
-    confirmDeleteTitle: string;
     confirmDeleteMessage: string;
     close: string;
   };

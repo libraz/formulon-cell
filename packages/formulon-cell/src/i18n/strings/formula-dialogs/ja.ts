@@ -40,7 +40,6 @@ export const formulaDialogsJa: FormulaDialogsStrings = {
     cancel: 'キャンセル',
     commitButton: '確定',
     cancelButton: 'キャンセル',
-    confirmDeleteTitle: 'Microsoft Excel',
     confirmDeleteMessage: '名前 {name} を削除してもよろしいですか?',
     close: '閉じる',
   },

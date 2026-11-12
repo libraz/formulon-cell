@@ -417,7 +417,7 @@ export const dataObjectsDe: DataObjectsStrings = {
       screenshotCurrentView:
         'Die aktuelle Blattansicht erfordert, dass das eingebundene Raster-Canvas einen PNG-Export bereitstellt.',
       screenClipping:
-        'Bildschirmausschnitte erfordern einen vom Host bereitgestellten captureScreenClip-Hook; Browser können keine Betriebssystemauswahl für regionsbasierte Aufnahmen im Excel-Stil direkt öffnen.',
+        'Bildschirmausschnitte erfordern einen vom Host bereitgestellten captureScreenClip-Hook; Browser können keine Betriebssystemauswahl für regionsbasierte Aufnahmen direkt öffnen.',
       chartAuthoring:
         'Säulen-, Balken-, Linien-, Flächen-, Kreis-, Ring- und Punktdiagramme können erstellt und bearbeitet werden und werden mit der Arbeitsmappe gespeichert. Andere Diagrammtypen werden als Platzhalter angezeigt, die nur verschoben, in der Größe geändert und gelöscht werden können.',
       externalLinks:

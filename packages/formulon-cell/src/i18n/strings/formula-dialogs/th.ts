@@ -40,7 +40,6 @@ export const formulaDialogsTh: FormulaDialogsStrings = {
     cancel: 'ยกเลิก',
     commitButton: 'ยืนยัน',
     cancelButton: 'ยกเลิก',
-    confirmDeleteTitle: 'Microsoft Excel',
     confirmDeleteMessage: 'คุณแน่ใจหรือไม่ว่าต้องการลบชื่อ {name}',
     close: 'ปิด',
   },

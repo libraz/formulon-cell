@@ -40,7 +40,6 @@ export const formulaDialogsZh: FormulaDialogsStrings = {
     cancel: '取消',
     commitButton: '提交',
     cancelButton: '取消',
-    confirmDeleteTitle: 'Microsoft Excel',
     confirmDeleteMessage: '是否确实要删除名称 {name}？',
     close: '关闭',
   },

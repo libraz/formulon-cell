@@ -352,14 +352,14 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const deleteShell = createDialogShell({
     host,
     className: 'fc-namedlg-confirm',
-    ariaLabel: t.confirmDeleteTitle,
+    ariaLabel: t.title,
     onDismiss: () => closeDeleteConfirm(),
   });
   deleteShell.overlay.classList.add('fc-fmtdlg');
   deleteShell.panel.classList.add('fc-fmtdlg__panel', 'fc-namedlg-confirm__panel');
   const deleteTitle = document.createElement('div');
   deleteTitle.className = 'fc-fmtdlg__header';
-  deleteTitle.textContent = t.confirmDeleteTitle;
+  deleteTitle.textContent = t.title;
   const deleteBody = document.createElement('div');
   deleteBody.className = 'fc-namedlg-confirm__body';
   const deleteMessage = document.createElement('p');
