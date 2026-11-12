@@ -19,6 +19,7 @@ import { renderScale } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { pickFromListValues } from './autocomplete.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
 export interface ValidationListDeps {
@@ -98,12 +99,14 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
   const { grid, store, wb } = deps;
   let popover: HTMLDivElement | null = null;
   let restoreFocus: HTMLElement | null = null;
+  let detachOutside: (() => void) | null = null;
 
   const close = (shouldRestoreFocus = false): void => {
     if (!popover) return;
     popover.remove();
     popover = null;
-    document.removeEventListener('mousedown', onDocMouseDown, true);
+    detachOutside?.();
+    detachOutside = null;
     document.removeEventListener('keydown', onDocKey, true);
     const opener = restoreFocus;
     restoreFocus = null;
@@ -115,11 +118,6 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     focusTarget.focus({ preventScroll: true });
   };
 
-  const onDocMouseDown = (e: MouseEvent): void => {
-    if (!popover) return;
-    if (popover.contains(e.target as Node)) return;
-    close();
-  };
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -246,7 +244,15 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     overlayPortalFor(grid).appendChild(div);
     popover = div;
     focusItem(selectedIndex);
-    document.addEventListener('mousedown', onDocMouseDown, true);
+    detachOutside = onOutsidePress(
+      document,
+      () => [popover],
+      () => {
+        if (!popover) return;
+        close();
+      },
+      { event: 'mousedown' },
+    );
     document.addEventListener('keydown', onDocKey, true);
   };
 

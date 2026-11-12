@@ -25,6 +25,7 @@ import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import { formatNumber } from '../format/number-format.js';
 import type { Strings } from '../i18n/strings.js';
 import { scrollActiveIntoView } from '../interact/navigation-policy.js';
+import { onOutsidePress } from '../interact/outside-press.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
@@ -549,10 +550,12 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   const updateChrome = (): void => refreshChrome(true);
 
   let nameMenu: HTMLDivElement | null = null;
+  let detachNameMenuPointer: (() => void) | null = null;
   const closeNameMenu = (): void => {
     nameMenu?.remove();
     nameMenu = null;
-    document.removeEventListener('pointerdown', onNameMenuDocPointer, true);
+    detachNameMenuPointer?.();
+    detachNameMenuPointer = null;
     document.removeEventListener('keydown', onNameMenuDocKey, true);
   };
 
@@ -655,13 +658,6 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     tag.select();
   };
 
-  function onNameMenuDocPointer(e: PointerEvent): void {
-    if (!nameMenu) return;
-    const target = e.target;
-    if (target instanceof Node && (nameMenu.contains(target) || tag.contains(target))) return;
-    closeNameMenu();
-  }
-
   function onNameMenuDocKey(e: KeyboardEvent): void {
     if (!nameMenu) return;
     const items = Array.from(nameMenu.querySelectorAll<HTMLButtonElement>('[role="option"]'));
@@ -750,7 +746,15 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     menu.style.top = `${r.bottom + 2}px`;
     menu.style.minWidth = `${Math.max(116, r.width)}px`;
     nameMenu = menu;
-    document.addEventListener('pointerdown', onNameMenuDocPointer, true);
+    detachNameMenuPointer = onOutsidePress(
+      document,
+      () => [nameMenu, tag],
+      () => {
+        if (!nameMenu) return;
+        closeNameMenu();
+      },
+      { event: 'pointerdown', capture: true },
+    );
     document.addEventListener('keydown', onNameMenuDocKey, true);
     menu.querySelector<HTMLButtonElement>('[role="option"]')?.focus();
   };

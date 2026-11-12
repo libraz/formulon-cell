@@ -4,6 +4,7 @@ import { cellRect, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { createInteractionButton } from './chip-button.js';
 import { deferInitialFocus } from './dialog-shell.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
@@ -46,12 +47,9 @@ export function showPivotSpillCallout(
 
   const close = (): void => {
     callout.remove();
-    doc.removeEventListener('mousedown', onDocMouseDown, true);
+    detachOutside();
     doc.removeEventListener('keydown', onDocKey, true);
     if (open.get(host) === close) open.delete(host);
-  };
-  const onDocMouseDown = (e: MouseEvent): void => {
-    if (!callout.contains(e.target as Node)) close();
   };
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') close();
@@ -75,7 +73,12 @@ export function showPivotSpillCallout(
   callout.style.left = `${position.x}px`;
   callout.style.top = `${position.y}px`;
   deferInitialFocus(callout, () => ok.focus({ preventScroll: true }));
-  doc.addEventListener('mousedown', onDocMouseDown, true);
+  const detachOutside = onOutsidePress(
+    doc,
+    () => [callout],
+    () => close(),
+    { event: 'mousedown' },
+  );
   doc.addEventListener('keydown', onDocKey, true);
   open.set(host, close);
 }

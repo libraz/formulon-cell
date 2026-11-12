@@ -1,5 +1,6 @@
 import { focusMenuItem, handleMenuKeydown, prepareMenu } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
 export interface PopupMenuItem {
@@ -25,7 +26,7 @@ export const openPopupMenu = (opts: PopupMenuOptions): (() => void) => {
   const close = (): void => {
     if (closed) return;
     closed = true;
-    document.removeEventListener('pointerdown', onDocPointer, true);
+    detachOutside();
     menu.remove();
     anchor.setAttribute('aria-expanded', 'false');
   };
@@ -42,11 +43,6 @@ export const openPopupMenu = (opts: PopupMenuOptions): (() => void) => {
     menu.append(item);
   }
   prepareMenu(menu, opts.label);
-  const onDocPointer = (e: PointerEvent): void => {
-    const target = e.target;
-    if (target instanceof Node && (menu.contains(target) || anchor.contains(target))) return;
-    close();
-  };
   menu.addEventListener('keydown', (e) => {
     handleMenuKeydown(e, menu, { close, restoreFocusTo: anchor });
   });
@@ -55,7 +51,14 @@ export const openPopupMenu = (opts: PopupMenuOptions): (() => void) => {
   menu.style.left = `${Math.max(4, r.left)}px`;
   menu.style.top = `${r.bottom + 2}px`;
   anchor.setAttribute('aria-expanded', 'true');
-  document.addEventListener('pointerdown', onDocPointer, true);
+  const detachOutside = onOutsidePress(
+    document,
+    () => [menu, anchor],
+    () => close(),
+    {
+      event: 'pointerdown',
+    },
+  );
   focusMenuItem(menu, 'first');
   return close;
 };

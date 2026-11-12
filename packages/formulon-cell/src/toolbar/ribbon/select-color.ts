@@ -6,6 +6,7 @@ import type { Locale } from '../../i18n/strings.js';
 
 import { createColorPalette, themeColorColumns } from '../../components/color-palette.js';
 import { addrKey } from '../../engine/address.js';
+import { onOutsidePress } from '../../interact/outside-press.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { type NumberFormatAction, numberFormatSample } from '../number-format.js';
 import type { RibbonCommand } from '../ribbon-model.js';
@@ -457,12 +458,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       );
       focusListOption(list, selectedIndex);
       setTimeout(() => {
-        const onDocDown = (ev: MouseEvent): void => {
-          if (ev.target instanceof Node && wrap.contains(ev.target)) return;
-          close();
-        };
-        document.addEventListener('mousedown', onDocDown, true);
-        detachDocDown = () => document.removeEventListener('mousedown', onDocDown, true);
+        detachDocDown = onOutsidePress(document, () => [wrap], close, {
+          event: 'mousedown',
+          capture: true,
+        });
       }, 0);
     };
 
@@ -584,12 +583,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       wrap.appendChild(flyout);
       palette.focus();
       setTimeout(() => {
-        const onDocDown = (ev: MouseEvent): void => {
-          if (ev.target instanceof Node && wrap.contains(ev.target)) return;
-          close();
-        };
-        document.addEventListener('mousedown', onDocDown, true);
-        detachDocDown = () => document.removeEventListener('mousedown', onDocDown, true);
+        detachDocDown = onOutsidePress(document, () => [wrap], close, {
+          event: 'mousedown',
+          capture: true,
+        });
       }, 0);
     };
 

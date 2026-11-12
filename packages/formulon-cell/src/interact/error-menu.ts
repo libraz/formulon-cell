@@ -7,6 +7,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
@@ -49,6 +50,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
   overlayPortalFor(host).appendChild(root);
 
   let visible = false;
+  let detachOutside: (() => void) | null = null;
   let activeIndex = -1;
   let restoreFocusEl: HTMLElement | null = null;
 
@@ -60,7 +62,8 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     activeIndex = -1;
     const focusTarget = restoreFocusEl;
     restoreFocusEl = null;
-    document.removeEventListener('mousedown', onDocMouseDown, true);
+    detachOutside?.();
+    detachOutside = null;
     document.removeEventListener('keydown', onDocKey, true);
     window.removeEventListener('scroll', onScroll, true);
     if (restoreFocus) {
@@ -78,12 +81,6 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     if (items.length === 0) return;
     activeIndex = (idx + items.length) % items.length;
     items[activeIndex]?.focus({ preventScroll: true });
-  };
-
-  const onDocMouseDown = (e: MouseEvent): void => {
-    if (!visible) return;
-    if (e.target instanceof Node && root.contains(e.target)) return;
-    close(false);
   };
 
   const onDocKey = (e: KeyboardEvent): void => {
@@ -281,7 +278,16 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
       const { x, y } = clampPanelToViewport(root, screenX, screenY);
       root.style.left = `${x}px`;
       root.style.top = `${y}px`;
-      document.addEventListener('mousedown', onDocMouseDown, true);
+      detachOutside?.();
+      detachOutside = onOutsidePress(
+        document,
+        () => [root],
+        () => {
+          if (!visible) return;
+          close(false);
+        },
+        { event: 'mousedown' },
+      );
       document.addEventListener('keydown', onDocKey, true);
       window.addEventListener('scroll', onScroll, true);
       focusMenuItem(0);

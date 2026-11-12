@@ -7,6 +7,7 @@ import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
 
 import { setBorderPreset } from '../../commands/format.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../../components/color-palette.js';
+import { onOutsidePress } from '../../interact/outside-press.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import type { CellBorderStyle } from '../../store/store.js';
 import {
@@ -147,15 +148,16 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   };
   borderBtn?.addEventListener('click', onBorderButtonClick);
 
-  const onDocumentMouseDown = (e: MouseEvent): void => {
-    const menu = getBorderMenu();
-    const btn = getBorderBtn();
-    if (!menu || menu.hidden) return;
-    if (menu.contains(e.target as Node)) return;
-    if (btn?.contains(e.target as Node)) return;
-    closeBorderMenu();
-  };
-  document.addEventListener('mousedown', onDocumentMouseDown);
+  const detachDocumentMouseDown = onOutsidePress(
+    document,
+    () => [getBorderMenu(), getBorderBtn()],
+    () => {
+      const menu = getBorderMenu();
+      if (!menu || menu.hidden) return;
+      closeBorderMenu();
+    },
+    { event: 'mousedown', capture: false },
+  );
 
   const onDocumentEscapeKey = (e: KeyboardEvent): void => {
     const menu = getBorderMenu();
@@ -343,7 +345,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   const detach = (): void => {
     borderBtn?.removeEventListener('click', onBorderButtonClick);
     borderMenu?.removeEventListener('keydown', onBorderMenuKeydown);
-    document.removeEventListener('mousedown', onDocumentMouseDown);
+    detachDocumentMouseDown();
     document.removeEventListener('keydown', onDocumentEscapeKey);
     document.removeEventListener('keydown', onDocumentSubmenuKeydown);
     document.removeEventListener('click', onDocumentClick);

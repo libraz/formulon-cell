@@ -1,5 +1,6 @@
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
+import { onOutsidePress } from './outside-press.js';
 
 const ENHANCED = 'fcCustomSelectEnhanced';
 const HANDLES = new WeakMap<HTMLSelectElement, CustomSelectHandle>();
@@ -112,16 +113,26 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
   // Outside-dismiss listeners exist only while the list is open.
   const ownerWindow = select.ownerDocument.defaultView;
   let listening = false;
+  let detachOutside: (() => void) | null = null;
   const setOutsideListeners = (on: boolean): void => {
     if (listening === on) return;
     listening = on;
     if (on) {
-      document.addEventListener('pointerdown', onDocumentPointer);
+      detachOutside = onOutsidePress(
+        document,
+        () => [wrap],
+        () => {
+          pointerDownInside = false;
+          close();
+        },
+        { event: 'pointerdown', capture: false },
+      );
       document.addEventListener('pointerup', onDocumentPointerEnd);
       document.addEventListener('pointercancel', onDocumentPointerEnd);
       ownerWindow?.addEventListener('blur', onWindowBlur);
     } else {
-      document.removeEventListener('pointerdown', onDocumentPointer);
+      detachOutside?.();
+      detachOutside = null;
       document.removeEventListener('pointerup', onDocumentPointerEnd);
       document.removeEventListener('pointercancel', onDocumentPointerEnd);
       ownerWindow?.removeEventListener('blur', onWindowBlur);
@@ -269,13 +280,6 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
   const onWindowBlur = (): void => {
     pointerDownInside = false;
     if (!wrap.contains(document.activeElement)) close();
-  };
-
-  const onDocumentPointer = (e: Event): void => {
-    if (!wrap.contains(e.target as Node)) {
-      pointerDownInside = false;
-      close();
-    }
   };
 
   const observer = new MutationObserver(() => {

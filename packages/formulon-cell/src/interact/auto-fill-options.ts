@@ -22,6 +22,7 @@ import {
   createFloatingOptionsMenuItem,
 } from './floating-options-menu.js';
 import { createObjectMenu, type ObjectMenuEntry } from './object-menu.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
@@ -456,12 +457,6 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
     reapply(mode);
   };
 
-  const onDocPointerDown = (e: MouseEvent): void => {
-    const target = e.target as Node | null;
-    if (target && (button.contains(target) || menu.contains(target))) return;
-    hide();
-  };
-
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') hide();
   };
@@ -472,7 +467,14 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   host.addEventListener('fc:movemenu', onMoveMenuRequest);
   button.addEventListener('click', onButtonClick);
   menu.addEventListener('click', onMenuClick);
-  document.addEventListener('mousedown', onDocPointerDown, true);
+  const detachOutside = onOutsidePress(
+    document,
+    () => [button, menu],
+    () => hide(),
+    {
+      event: 'mousedown',
+    },
+  );
   document.addEventListener('keydown', onDocKey, true);
   window.addEventListener('scroll', hide, true);
 
@@ -485,7 +487,7 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
       dragMenu.detach();
       button.removeEventListener('click', onButtonClick);
       menu.removeEventListener('click', onMenuClick);
-      document.removeEventListener('mousedown', onDocPointerDown, true);
+      detachOutside();
       document.removeEventListener('keydown', onDocKey, true);
       window.removeEventListener('scroll', hide, true);
       button.remove();

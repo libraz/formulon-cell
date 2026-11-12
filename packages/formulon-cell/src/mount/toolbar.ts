@@ -7,6 +7,7 @@ import { selectedSessionIllustration } from '../commands/session-illustration.js
 import { activeTableOverlay } from '../commands/table-design.js';
 import { addrKey } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import { onOutsidePress } from '../interact/outside-press.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
 import { attachRibbonScreenTips } from '../interact/ribbon-screen-tip.js';
 import { projectMacFunctionMenus } from '../toolbar/ribbon/mac/menus.js';
@@ -1176,19 +1177,22 @@ export function mountToolbar(
   // Clicking outside the ribbon while the display menu is open dismisses it
   // — Excel-style behaviour. Uses mousedown so the close happens before the
   // outside element's own click handler fires.
-  const onDocumentMouseDown = (e: MouseEvent): void => {
-    const shouldCloseStaticMenus = hasOpenStaticMenu();
-    const shouldRenderDisplayState = displayMenuOpen || (isCollapsedMode() && ribbonPeek);
-    if (!shouldRenderDisplayState && !shouldCloseStaticMenus) return;
-    const target = e.target;
-    if (!(target instanceof Element)) return;
-    if (host.contains(target)) return;
-    if (shouldCloseStaticMenus) closeStaticRibbonMenus(host);
-    if (displayMenuOpen) displayMenuOpen = false;
-    if (isCollapsedMode()) ribbonPeek = false;
-    if (shouldRenderDisplayState) renderToolbar();
-  };
-  document.addEventListener('mousedown', onDocumentMouseDown);
+  const detachDocumentMouseDown = onOutsidePress(
+    document,
+    () => [host],
+    (e) => {
+      const shouldCloseStaticMenus = hasOpenStaticMenu();
+      const shouldRenderDisplayState = displayMenuOpen || (isCollapsedMode() && ribbonPeek);
+      if (!shouldRenderDisplayState && !shouldCloseStaticMenus) return;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (shouldCloseStaticMenus) closeStaticRibbonMenus(host);
+      if (displayMenuOpen) displayMenuOpen = false;
+      if (isCollapsedMode()) ribbonPeek = false;
+      if (shouldRenderDisplayState) renderToolbar();
+    },
+    { event: 'mousedown', capture: false },
+  );
 
   // Re-project active-state on any store mutation. When the toolbar is
   // mounted with a deferred getter we may not have an instance yet — track
@@ -1335,7 +1339,7 @@ export function mountToolbar(
       host.removeEventListener('keydown', onKey);
       host.removeEventListener('keydown', onDisplayKey);
       document.removeEventListener('keydown', onGlobalKey);
-      document.removeEventListener('mousedown', onDocumentMouseDown);
+      detachDocumentMouseDown();
       dropdownsDelegation?.detach();
       dropdownsDelegation = null;
       detachTableStyleContextMenu();

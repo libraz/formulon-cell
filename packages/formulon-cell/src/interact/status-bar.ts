@@ -36,6 +36,7 @@ import {
 import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport, panelSize } from './overlay-position.js';
 
@@ -874,12 +875,6 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     showChooser(e.clientX, e.clientY);
   };
 
-  const onDocPointerDown = (e: MouseEvent): void => {
-    if (!popoverVisible) return;
-    if (e.target instanceof Node && popover.contains(e.target)) return;
-    hideChooser(false);
-  };
-
   const onDocFocusIn = (e: FocusEvent): void => {
     if (!popoverVisible) return;
     if (e.target instanceof Node && popover.contains(e.target)) return;
@@ -929,7 +924,15 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   statusbar.addEventListener('contextmenu', onContextMenu);
   statusbar.addEventListener('keydown', onStatusbarKeyDown);
   center.addEventListener('click', onCenterClick);
-  document.addEventListener('mousedown', onDocPointerDown, true);
+  const detachOutside = onOutsidePress(
+    document,
+    () => [popover],
+    () => {
+      if (!popoverVisible) return;
+      hideChooser(false);
+    },
+    { event: 'mousedown' },
+  );
   document.addEventListener('focusin', onDocFocusIn, true);
   document.addEventListener('keydown', onDocKey, true);
   document.addEventListener('keydown', refreshKeyboardLocks, true);
@@ -952,7 +955,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       statusbar.removeEventListener('contextmenu', onContextMenu);
       statusbar.removeEventListener('keydown', onStatusbarKeyDown);
       center.removeEventListener('click', onCenterClick);
-      document.removeEventListener('mousedown', onDocPointerDown, true);
+      detachOutside();
       document.removeEventListener('focusin', onDocFocusIn, true);
       document.removeEventListener('keydown', onDocKey, true);
       document.removeEventListener('keydown', refreshKeyboardLocks, true);

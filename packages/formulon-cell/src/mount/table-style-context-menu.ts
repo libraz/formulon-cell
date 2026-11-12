@@ -6,6 +6,7 @@ import {
   setStyleDefault,
   type TableStyleKind,
 } from '../commands/table-style-actions.js';
+import { onOutsidePress } from '../interact/outside-press.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { menuSeparator, menuTextChip } from '../toolbar/ribbon/menus/general.js';
 import type { SpreadsheetInstance } from './types.js';
@@ -32,18 +33,17 @@ export function attachTableStyleContextMenu(
   openStyleDialog: (kind: TableStyleKind, mode: 'modify' | 'duplicate', styleId: string) => void,
 ): () => void {
   let open: { menu: HTMLDivElement; restore: HTMLElement } | null = null;
+  let detachOutside: (() => void) | null = null;
 
   const close = (restoreFocus: boolean): void => {
     if (!open) return;
     const { menu, restore } = open;
     open = null;
     menu.remove();
-    document.removeEventListener('pointerdown', onOutside, true);
+    detachOutside?.();
+    detachOutside = null;
     document.removeEventListener('keydown', onKey, true);
     if (restoreFocus && restore.isConnected) restore.focus({ preventScroll: true });
-  };
-  const onOutside = (event: PointerEvent): void => {
-    if (open && event.target instanceof Node && !open.menu.contains(event.target)) close(false);
   };
   const onKey = (event: KeyboardEvent): void => {
     if (!open) return;
@@ -163,7 +163,14 @@ export function attachTableStyleContextMenu(
     );
     host.appendChild(menu);
     open = { menu, restore: item };
-    document.addEventListener('pointerdown', onOutside, true);
+    detachOutside = onOutsidePress(
+      document,
+      () => [open?.menu],
+      () => {
+        if (open) close(false);
+      },
+      { event: 'pointerdown' },
+    );
     document.addEventListener('keydown', onKey, true);
     menu.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
   };

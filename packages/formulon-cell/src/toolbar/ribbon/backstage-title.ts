@@ -6,6 +6,7 @@
 
 import { findNext } from '../../commands/find.js';
 import { openCommentDialogFrom } from '../../interact/dialog-entry.js';
+import { onOutsidePress } from '../../interact/outside-press.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators } from '../../store/store.js';
@@ -350,13 +351,15 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     });
   });
 
-  ownerDocument.addEventListener('pointerdown', (event) => {
-    if (titleMoreMenu.hidden) return;
-    const target = event.target as Element | null;
-    if (titleMoreMenu.contains(target)) return;
-    if (titleMoreButton?.contains(target)) return;
-    closeTitleMoreMenu();
-  });
+  onOutsidePress(
+    ownerDocument,
+    () => [titleMoreMenu, titleMoreButton],
+    () => {
+      if (titleMoreMenu.hidden) return;
+      closeTitleMoreMenu();
+    },
+    { event: 'pointerdown', capture: false },
+  );
 
   return {
     selectRibbonTab,

@@ -7,6 +7,7 @@ import {
 } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { placeMacMenu } from './context-menu-placement.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
@@ -43,6 +44,7 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
   root.tabIndex = -1;
   let restoreFocusTo: HTMLElement | null = null;
   let onClose: (() => void) | null = null;
+  let detachOutside: (() => void) | null = null;
 
   const clearActiveItem = (): void => {
     for (const item of root.querySelectorAll('.fc-ctxmenu__item--active')) {
@@ -66,9 +68,6 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
 
   root.addEventListener('focusin', (event) => syncActiveItem(event.target));
 
-  const onDocumentPointerDown = (event: PointerEvent): void => {
-    if (!(event.target instanceof Node && root.contains(event.target))) close();
-  };
   const onDocumentFocusIn = (event: FocusEvent): void => {
     if (!(event.target instanceof Node && root.contains(event.target))) close();
   };
@@ -76,7 +75,8 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
 
   const close = (restoreFocus = false): void => {
     if (!root.isConnected) return;
-    document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+    detachOutside?.();
+    detachOutside = null;
     document.removeEventListener('focusin', onDocumentFocusIn, true);
     window.removeEventListener('blur', onWindowBlur);
     clearActiveItem();
@@ -150,7 +150,14 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
       }
       if (!root.isConnected) {
         overlayPortalFor(host).appendChild(root);
-        document.addEventListener('pointerdown', onDocumentPointerDown, true);
+        detachOutside = onOutsidePress(
+          document,
+          () => [root],
+          () => close(),
+          {
+            event: 'pointerdown',
+          },
+        );
         document.addEventListener('focusin', onDocumentFocusIn, true);
         window.addEventListener('blur', onWindowBlur);
       }

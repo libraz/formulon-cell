@@ -11,6 +11,7 @@
  * first, into one named button that opens the group as a popup.
  */
 
+import { onOutsidePress } from '../../interact/outside-press.js';
 import { clampPanelToViewport, viewportSize } from '../../interact/overlay-position.js';
 import { createRibbonButton } from './button.js';
 
@@ -128,20 +129,23 @@ const openGroupPopup = (group: HTMLElement, button: HTMLElement): void => {
     tools.style.top = `${Math.round(position.y)}px`;
   }
   const doc = group.ownerDocument;
-  const dismiss = (event: Event): void => {
-    if (event.target instanceof Node && group.contains(event.target)) return;
-    if (event.target instanceof Element && event.target.closest(OPENED_LIST)) return;
-    closeGroupPopup(group);
-  };
   // Bubble phase: the chosen command runs first, then the popup goes.
   const choose = (event: Event): void => {
     if (event.target instanceof Element && choseLeaf(event.target)) closeGroupPopup(group);
   };
   popupListeners.get(group)?.();
-  doc.addEventListener('pointerdown', dismiss, true);
+  const detachDismiss = onOutsidePress(
+    doc,
+    () => [group],
+    (event) => {
+      if (event.target instanceof Element && event.target.closest(OPENED_LIST)) return;
+      closeGroupPopup(group);
+    },
+    { event: 'pointerdown', capture: true },
+  );
   doc.addEventListener('click', choose);
   popupListeners.set(group, () => {
-    doc.removeEventListener('pointerdown', dismiss, true);
+    detachDismiss();
     doc.removeEventListener('click', choose);
   });
 };

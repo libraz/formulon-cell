@@ -37,6 +37,7 @@ import {
   focusAndSelectInput,
   showDialogError,
 } from './dialog-shell.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
@@ -403,6 +404,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   let sortKey: NameSortKey = 'name';
   let sortDir: 'asc' | 'desc' = 'asc';
   let filterMenu: HTMLDivElement | null = null;
+  let detachFilterOutside: (() => void) | null = null;
   let editorMode: 'new' | 'edit' = 'new';
   let pendingDeleteName: DefinedNameEntry | null = null;
   let editingEntry: DefinedNameEntry | null = null;
@@ -624,20 +626,10 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const closeFilterMenu = (): void => {
     filterMenu?.remove();
     filterMenu = null;
-    document.removeEventListener('pointerdown', onFilterDocPointer, true);
+    detachFilterOutside?.();
+    detachFilterOutside = null;
     document.removeEventListener('keydown', onFilterDocKey, true);
   };
-
-  function onFilterDocPointer(e: PointerEvent): void {
-    const target = e.target;
-    if (
-      target instanceof Node &&
-      (filterMenu?.contains(target) === true || filterBtn.contains(target))
-    ) {
-      return;
-    }
-    closeFilterMenu();
-  }
 
   function onFilterDocKey(e: KeyboardEvent): void {
     if (!filterMenu) return;
@@ -693,7 +685,12 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     menu.style.left = `${Math.max(4, r.left)}px`;
     menu.style.top = `${r.bottom + 2}px`;
     filterMenu = menu;
-    document.addEventListener('pointerdown', onFilterDocPointer, true);
+    detachFilterOutside = onOutsidePress(
+      document,
+      () => [filterMenu, filterBtn],
+      () => closeFilterMenu(),
+      { event: 'pointerdown' },
+    );
     document.addEventListener('keydown', onFilterDocKey, true);
     menu.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
   };

@@ -27,6 +27,7 @@ import {
   appendDialogIconButton,
   deferInitialFocus,
 } from './dialog-shell.js';
+import { onOutsidePress } from './outside-press.js';
 
 export interface CommentDialogDeps {
   host: HTMLElement;
@@ -421,12 +422,6 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   // Click-outside guard — committed cancel when the user clicks anywhere
   // that isn't the note. Captured at document level so we beat host-bound
   // pointer handlers (selection, autofill, etc.).
-  const onDocPointerDown = (e: MouseEvent): void => {
-    if (wrap.hidden) return;
-    if (e.target instanceof Node && wrap.contains(e.target)) return;
-    onCancel();
-  };
-
   const onKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -513,6 +508,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   wrap.addEventListener('keydown', onKey);
 
   let attached = false;
+  let detachOutside: (() => void) | null = null;
   let placeFrame = 0;
   const cancelPlaceFrame = (): void => {
     if (placeFrame) window.cancelAnimationFrame(placeFrame);
@@ -577,7 +573,15 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       wrap.hidden = false;
       place();
       if (!attached) {
-        document.addEventListener('mousedown', onDocPointerDown, true);
+        detachOutside = onOutsidePress(
+          document,
+          () => [wrap],
+          () => {
+            if (wrap.hidden) return;
+            onCancel();
+          },
+          { event: 'mousedown' },
+        );
         window.addEventListener('scroll', onScrollOrResize, true);
         window.addEventListener('resize', onScrollOrResize);
         attached = true;
@@ -590,7 +594,8 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     close(): void {
       wrap.hidden = true;
       if (attached) {
-        document.removeEventListener('mousedown', onDocPointerDown, true);
+        detachOutside?.();
+        detachOutside = null;
         window.removeEventListener('scroll', onScrollOrResize, true);
         window.removeEventListener('resize', onScrollOrResize);
         attached = false;
@@ -606,7 +611,8 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       cancelBtn.removeEventListener('click', onCancel);
       wrap.removeEventListener('keydown', onKey);
       if (attached) {
-        document.removeEventListener('mousedown', onDocPointerDown, true);
+        detachOutside?.();
+        detachOutside = null;
         window.removeEventListener('scroll', onScrollOrResize, true);
         window.removeEventListener('resize', onScrollOrResize);
         attached = false;

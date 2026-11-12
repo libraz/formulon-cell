@@ -15,6 +15,7 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { enhanceCustomSelect } from './custom-select.js';
 import { deferInitialFocus } from './dialog-shell.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 import {
@@ -350,15 +351,9 @@ export function openPivotFieldFilter(
   const close = (): void => {
     for (const handle of selectHandles.values()) handle.dispose();
     panel.remove();
-    doc.removeEventListener('mousedown', onDocMouseDown, true);
+    detachOutside();
     doc.removeEventListener('keydown', onDocKey, true);
     if (open.get(ctx.host) === close) open.delete(ctx.host);
-  };
-  const onDocMouseDown = (e: MouseEvent): void => {
-    if (panel.contains(e.target as Node)) return;
-    // The filter dialog the panel opened sits over it; leave the panel be.
-    if ((e.target as Element | null)?.closest?.('.fc-pivotdlg--filter')) return;
-    close();
   };
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape' && panel.contains(e.target as Node)) {
@@ -379,7 +374,16 @@ export function openPivotFieldFilter(
   panel.style.left = `${position.x}px`;
   panel.style.top = `${position.y}px`;
   deferInitialFocus(panel, () => search.focus({ preventScroll: true }));
-  doc.addEventListener('mousedown', onDocMouseDown, true);
+  const detachOutside = onOutsidePress(
+    doc,
+    () => [panel],
+    (e) => {
+      // The filter dialog the panel opened sits over it; leave the panel be.
+      if ((e.target as Element | null)?.closest?.('.fc-pivotdlg--filter')) return;
+      close();
+    },
+    { event: 'mousedown' },
+  );
   doc.addEventListener('keydown', onDocKey, true);
   open.set(ctx.host, close);
   return true;

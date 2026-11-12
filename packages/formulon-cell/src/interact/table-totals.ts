@@ -5,6 +5,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { gridHitState } from '../render/grid.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
 export interface TableTotalsDeps {
@@ -61,19 +62,18 @@ export function attachTableTotals(deps: TableTotalsDeps): TableTotalsHandle {
   const { grid, store, strings } = deps;
   let popover: HTMLDivElement | null = null;
   let restoreFocus: HTMLElement | null = null;
+  let detachOutside: (() => void) | null = null;
 
   const close = (shouldRestoreFocus = false): void => {
     if (!popover) return;
     popover.remove();
     popover = null;
-    document.removeEventListener('mousedown', onDocMouseDown, true);
+    detachOutside?.();
+    detachOutside = null;
     document.removeEventListener('keydown', onDocKey, true);
     const target = restoreFocus;
     restoreFocus = null;
     if (shouldRestoreFocus) target?.focus({ preventScroll: true });
-  };
-  const onDocMouseDown = (e: MouseEvent): void => {
-    if (popover && !popover.contains(e.target as Node)) close();
   };
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return;
@@ -170,7 +170,14 @@ export function attachTableTotals(deps: TableTotalsDeps): TableTotalsHandle {
     overlayPortalFor(grid).appendChild(div);
     popover = div;
     focusItem(selected);
-    document.addEventListener('mousedown', onDocMouseDown, true);
+    detachOutside = onOutsidePress(
+      document,
+      () => [popover],
+      () => {
+        if (popover) close();
+      },
+      { event: 'mousedown' },
+    );
     document.addEventListener('keydown', onDocKey, true);
     return true;
   };

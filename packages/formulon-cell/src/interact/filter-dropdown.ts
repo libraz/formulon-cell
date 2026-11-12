@@ -24,6 +24,7 @@ import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { deferInitialFocus } from './dialog-shell.js';
+import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
@@ -91,6 +92,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
   let activeCol = 0;
   let activeHidden = new Set<string>();
   let restoreFocus: HTMLElement | null = null;
+  let detachOutside: (() => void) | null = null;
 
   const close = (): void => {
     if (!root) return;
@@ -98,19 +100,13 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     root = null;
     activeRange = null;
     activeHidden = new Set();
-    ownerDocument.removeEventListener('mousedown', onDocMouseDown, true);
+    detachOutside?.();
+    detachOutside = null;
     ownerDocument.removeEventListener('keydown', onDocKey, true);
     restoreFocus?.focus({ preventScroll: true });
     restoreFocus = null;
   };
 
-  const onDocMouseDown = (e: MouseEvent): void => {
-    if (!root) return;
-    if (root.contains(e.target as Node)) return;
-    // The desktop panel is a floating window that only its close button dismisses.
-    if (mac) return;
-    close();
-  };
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -639,7 +635,17 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
     deferInitialFocus(r, () => search.focus());
 
-    ownerDocument.addEventListener('mousedown', onDocMouseDown, true);
+    detachOutside = onOutsidePress(
+      ownerDocument,
+      () => [root],
+      () => {
+        if (!root) return;
+        // The desktop panel is a floating window that only its close button dismisses.
+        if (mac) return;
+        close();
+      },
+      { event: 'mousedown' },
+    );
     ownerDocument.addEventListener('keydown', onDocKey, true);
   };
 

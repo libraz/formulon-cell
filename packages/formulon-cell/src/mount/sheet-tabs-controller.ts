@@ -22,6 +22,7 @@ import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
+import { onOutsidePress } from '../interact/outside-press.js';
 import { clampPanelToViewport } from '../interact/overlay-position.js';
 import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-colors.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -753,12 +754,6 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     update();
   };
   const onAddSheetClick = (): void => addAndSwitchSheet();
-  const onSheetMenuPointerDown = (e: PointerEvent): void => {
-    if (sheetMenu.hidden) return;
-    const target = e.target;
-    if (target instanceof Node && sheetMenu.contains(target)) return;
-    closeMenu();
-  };
   const onSheetMenuFocusIn = (e: FocusEvent): void => {
     if (sheetMenu.hidden) return;
     const target = e.target;
@@ -834,7 +829,15 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       refreshAfterSheetChange();
     },
   });
-  document.addEventListener('pointerdown', onSheetMenuPointerDown);
+  const detachSheetMenuPointerDown = onOutsidePress(
+    document,
+    () => [sheetMenu],
+    () => {
+      if (sheetMenu.hidden) return;
+      closeMenu();
+    },
+    { event: 'pointerdown', capture: false },
+  );
   document.addEventListener('focusin', onSheetMenuFocusIn, true);
   document.addEventListener('keydown', onSheetMenuKeyDown, true);
 
@@ -849,7 +852,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       addSheetBtn.removeEventListener('click', onAddSheetClick);
       sheetTabs.removeEventListener('scroll', refreshNav);
       tabDrag.detach();
-      document.removeEventListener('pointerdown', onSheetMenuPointerDown);
+      detachSheetMenuPointerDown();
       document.removeEventListener('focusin', onSheetMenuFocusIn, true);
       document.removeEventListener('keydown', onSheetMenuKeyDown, true);
       sheetMenu.remove();
