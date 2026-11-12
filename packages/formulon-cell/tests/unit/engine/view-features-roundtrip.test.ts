@@ -282,13 +282,26 @@ describe('rows hidden by default', () => {
     const wb = await WorkbookHandle.createDefault();
     wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
     wb.setNumber({ sheet: 0, row: 2, col: 1 }, 2);
-    wb.setRowHidden(0, 4, false);
+    // Under zeroHeight a row without its own entry is hidden, values or not, so the shown rows
+    // are unhidden explicitly.
+    for (const row of [0, 2, 4]) wb.setRowHidden(0, row, false);
     wb.patchSheetFormatDefaults(0, { zeroHeight: true });
     return wb;
   };
 
   it('shows only the rows that say otherwise, and keeps the setting through a save', async () => {
-    const { wb, store } = await hydrated((await zeroHeightBook()).save());
+    const live = await zeroHeightBook();
+    const before = createSpreadsheetStore();
+    hydrateLayoutFromEngine(live, before, 0);
+    expect([0, 1, 2, 3, 4, 5].map((r) => shown(before, r))).toEqual([
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+    ]);
+    const { wb, store } = await hydrated(live.save());
     expect(store.getState().layout.defaultRowsHidden).toBe(true);
     expect([0, 1, 2, 3, 4, 5, 100].map((r) => shown(store, r))).toEqual([
       true,
