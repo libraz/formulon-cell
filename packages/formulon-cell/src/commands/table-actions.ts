@@ -1,5 +1,10 @@
 import type { Range } from '../engine/types.js';
-import { rangesIntersect } from '../store/selection-geometry.js';
+import {
+  isSingleCell,
+  normalizeRange,
+  rangesIntersect,
+  selectionRangeList,
+} from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import {
   type AuthorizedIntentFactory,
@@ -45,33 +50,19 @@ export function tableWrite<T>(
 /** Whether `range` (in either corner order) overlaps an existing table: a new table, or a Data
  *  Table, cannot go there. */
 export const overlapsTable = (state: State, range: Range): boolean => {
-  const normal = {
-    sheet: range.sheet,
-    r0: Math.min(range.r0, range.r1),
-    c0: Math.min(range.c0, range.c1),
-    r1: Math.max(range.r0, range.r1),
-    c1: Math.max(range.c0, range.c1),
-  };
+  const normal = normalizeRange(range);
   return state.tables.tables.some((t) => rangesIntersect(t.range, normal));
 };
 
 /** Whether the selection overlaps an existing table, which refuses creating a table there. */
 export const selectionOverlapsTable = (state: State): boolean =>
-  [state.selection.range, ...(state.selection.extraRanges ?? [])].some((range) =>
-    overlapsTable(state, range),
-  );
+  selectionRangeList(state.selection).some((range) => overlapsTable(state, range));
 
 /** The range a new table proposes: the selection, or for a single cell its current region (the
  *  cell alone when it is empty), as Create Table detects it. */
 export const tableSourceForSelection = (state: State): Range => {
   const r = state.selection.range;
-  const range: Range = {
-    sheet: r.sheet,
-    r0: Math.min(r.r0, r.r1),
-    c0: Math.min(r.c0, r.c1),
-    r1: Math.max(r.r0, r.r1),
-    c1: Math.max(r.c0, r.c1),
-  };
-  if (range.r0 !== range.r1 || range.c0 !== range.c1) return range;
+  const range: Range = normalizeRange(r);
+  if (!isSingleCell(range)) return range;
   return currentRegion(state, state.selection.active) ?? range;
 };

@@ -6,6 +6,7 @@ import type { Addr } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogButton } from './dialog-shell.js';
@@ -381,7 +382,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   const onAdd = (): void => {
     const selection = store.getState().selection;
     recordWatchesChange(deps.history ?? null, store, () => {
-      mutators.addWatchRanges(store, [selection.range, ...(selection.extraRanges ?? [])]);
+      mutators.addWatchRanges(store, selectionRangeList(selection));
     });
   };
   const onRemoveSelected = (): void => {

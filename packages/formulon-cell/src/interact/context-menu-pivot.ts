@@ -9,6 +9,7 @@ import { PIVOT_CELL_KIND } from '../engine/pivot-cell-kind.js';
 import { type Addr, PivotAxis, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
+import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import {
   type ItemId,
@@ -112,7 +113,7 @@ function selectedItemsOf(ctx: PivotMenuContext, ref: PivotMenuCellRef): Set<stri
   const out = new Set<string>();
   const selection = ctx.store.getState().selection;
   const { row: r, col: c, sheet } = ref.addr;
-  const selected = [selection.range, ...(selection.extraRanges ?? [])];
+  const selected = selectionRangeList(selection);
   // A right-click outside the selection acts on the clicked cell alone.
   const ranges = selected.some((x) => r >= x.r0 && r <= x.r1 && c >= x.c0 && c <= x.c1)
     ? selected

@@ -46,7 +46,11 @@ import type { FormatDialogHandle } from '../interact/format-dialog.js';
 import type { HyperlinkDialogHandle } from '../interact/hyperlink-dialog.js';
 import { toggleAutoFilterFromSelection } from '../interact/ribbon-filter-data.js';
 import { directCellFormat } from '../store/direct-format.js';
-import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  normalizeRange,
+} from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { type NumberFormatAction, numberFormatForAction } from '../toolbar/number-format.js';
@@ -322,13 +326,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         }) as const;
       const state = input.store.getState();
       const selected = state.selection.range;
-      const range = {
-        sheet: selected.sheet,
-        r0: Math.min(selected.r0, selected.r1),
-        r1: Math.max(selected.r0, selected.r1),
-        c0: Math.min(selected.c0, selected.c1),
-        c1: Math.max(selected.c0, selected.c1),
-      };
+      const range = normalizeRange(selected);
       if (kind === 'insert' && hasActiveCopy(state)) {
         const snapshot = input.getClipboardSnapshot?.();
         const sourceRange = snapshot?.logicalRange ?? snapshot?.range;

@@ -1,6 +1,10 @@
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { rangesIntersect, selectionCoversRange } from '../store/selection-geometry.js';
+import {
+  rangesIntersect,
+  selectionCoversRange,
+  selectionRangeList,
+} from '../store/selection-geometry.js';
 import type { SelectionSlice } from '../store/types.js';
 
 /** Stop-level alert shown when an edit would touch a PivotTable cell. */
@@ -98,7 +102,7 @@ export function planPivotSelection(
   wb: WorkbookHandle,
   selection: Pick<SelectionSlice, 'range' | 'extraRanges'>,
 ): PivotSelectionPlan {
-  const ranges = [selection.range, ...(selection.extraRanges ?? [])];
+  const ranges = selectionRangeList(selection);
   const plan: PivotSelectionPlan = { whole: [], partial: false };
   for (const bounds of wb.pivotBounds(selection.range.sheet)) {
     if (!ranges.some((range) => rangesIntersect(range, bounds.range))) {

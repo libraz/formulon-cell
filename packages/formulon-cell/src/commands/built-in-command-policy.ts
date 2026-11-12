@@ -2,7 +2,12 @@ import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { Range } from '../engine/types.js';
-import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  normalizeRange,
+  selectionRangeList,
+} from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { type BuiltInCommandId, isBuiltInCommandId } from './built-in-command-ids.js';
 import { isMacChrome } from './chrome-platform.js';
@@ -755,13 +760,7 @@ const CELL_SHIFT_COMMANDS: ReadonlySet<string> = new Set([
  *  Entire column. */
 const CELL_SHIFT_DIALOG_COMMANDS: ReadonlySet<string> = new Set(['insertCells', 'deleteCells']);
 
-const normalized = (range: Range): Range => ({
-  sheet: range.sheet,
-  r0: Math.min(range.r0, range.r1),
-  c0: Math.min(range.c0, range.c1),
-  r1: Math.max(range.r0, range.r1),
-  c1: Math.max(range.c0, range.c1),
-});
+const normalized = (range: Range): Range => normalizeRange(range);
 
 /** The band an insert or delete of `id` moves: whole rows (columns) from the selection to the sheet
  *  end, or for a cell shift only the selection's columns (rows). */
@@ -891,7 +890,7 @@ export const builtInProtectionDecision = (
     // Clearing is all or nothing, so a locked selected cell greys Clear Contents and the whole
     // Home Clear control.
     (CLEAR_CONTROL_COMMANDS.has(id) &&
-      ![state.selection.range, ...(state.selection.extraRanges ?? [])].every((range) =>
+      !selectionRangeList(state.selection).every((range) =>
         rangeCellsWritable(state, normalized(range)),
       )) ||
     (option !== undefined && !sheetPermits(state, sheet, option));

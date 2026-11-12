@@ -16,6 +16,7 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
+import { selectionRangeList } from '../store/selection-geometry.js';
 import { selectionExtendEnd } from '../store/selection-mutators.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { clamp, jumpToDataEdge, lastUsedCell } from './data-edge-navigation.js';
@@ -476,19 +477,15 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       // A registered controller always owns the mounted write; standalone
       // consumers receive the helper's ephemeral atomic controller.
       e.preventDefault();
-      runAfterAllowedRangeUnlock(
-        store,
-        [s.selection.range, ...(s.selection.extraRanges ?? [])],
-        () => {
-          const result = clearSelectedContents({
-            store,
-            workbook: deps.wb,
-            history: deps.history,
-            origin: 'keyboard',
-          });
-          if (result.status !== 'refused') deps.onClearActive();
-        },
-      );
+      runAfterAllowedRangeUnlock(store, selectionRangeList(s.selection), () => {
+        const result = clearSelectedContents({
+          store,
+          workbook: deps.wb,
+          history: deps.history,
+          origin: 'keyboard',
+        });
+        if (result.status !== 'refused') deps.onClearActive();
+      });
       return;
     } else if (k === 'Escape') {
       // No editor active, so Escape cancels the copy marquee — the only way

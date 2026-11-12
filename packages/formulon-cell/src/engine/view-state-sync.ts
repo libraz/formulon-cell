@@ -1,3 +1,4 @@
+import { selectionRangeList } from '../store/selection-geometry.js';
 import { splitPosition } from '../store/split-panes.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { SelectionSlice, SheetViewMemo } from '../store/types.js';
@@ -135,7 +136,7 @@ const writeSheetView = (
   wb.setSheetSelection(sheet, {
     activeRow: selection.active.row,
     activeCol: selection.active.col,
-    ranges: [selection.range, ...(selection.extraRanges ?? [])],
+    ranges: selectionRangeList(selection),
   });
   const view = wb.getSheetView(sheet);
   const bandRows = (view?.freezeRows ?? 0) > 0 || (view?.splitY ?? 0) > 0;

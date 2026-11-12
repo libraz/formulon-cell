@@ -1,3 +1,4 @@
+import { isSingleCell } from '../store/selection-geometry.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
 import type { Addr, CellValue, Range } from './types.js';
 
@@ -150,7 +151,7 @@ export function findSpillRanges(
     if (!addr || addr.sheet !== sheet) continue;
     const { row, col } = addr;
     const r = detectSpillRange(cells, sheet, row, col);
-    if (r.r0 === r.r1 && r.c0 === r.c1) continue;
+    if (isSingleCell(r)) continue;
     out.push(r);
   }
   return out;

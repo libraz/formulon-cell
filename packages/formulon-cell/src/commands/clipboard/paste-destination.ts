@@ -1,7 +1,11 @@
 /** Where an internal paste lands: tile repetition, whole-row/-column band destinations, and the bounded cells a band paste materializes. */
 import { MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
-import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  normalizeRange,
+} from '../../store/selection-geometry.js';
 import type { State } from '../../store/store.js';
 import type { ClipboardSnapshot } from './snapshot.js';
 
@@ -28,13 +32,7 @@ export const bandAxisFor = (range: Range): BandAxis | null => {
 
 const normalizedSelection = (state: State): Range => {
   const selected = state.selection.range;
-  return {
-    sheet: selected.sheet,
-    r0: Math.min(selected.r0, selected.r1),
-    c0: Math.min(selected.c0, selected.c1),
-    r1: Math.max(selected.r0, selected.r1),
-    c1: Math.max(selected.c0, selected.c1),
-  };
+  return normalizeRange(selected);
 };
 
 /** Expand a whole-row/-column source to the logical destination band. Excel

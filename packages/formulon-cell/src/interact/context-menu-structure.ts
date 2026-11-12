@@ -23,7 +23,11 @@ import {
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  normalizeRange,
+} from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { openCellShiftDialog, runCellShiftChoice } from './cell-shift-dialog.js';
 import type { ItemId } from './context-menu-spec.js';
@@ -40,13 +44,7 @@ export interface ContextMenuStructureContext {
 }
 
 const wholeLines = (range: Range): boolean => {
-  const r = {
-    sheet: range.sheet,
-    r0: Math.min(range.r0, range.r1),
-    c0: Math.min(range.c0, range.c1),
-    r1: Math.max(range.r0, range.r1),
-    c1: Math.max(range.c0, range.c1),
-  };
+  const r = normalizeRange(range);
   return isWholeRowRange(r) || isWholeColumnRange(r);
 };
 

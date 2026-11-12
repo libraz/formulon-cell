@@ -2,7 +2,12 @@ import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../engine/address.js
 import type { Range } from '../../engine/types.js';
 import { formatBoolean, formatEditableNumber, formatError } from '../../engine/value.js';
 import { isDataTableFormula } from '../../engine/workbook-handle-data-tables.js';
-import { isWholeColumnRange, isWholeRowRange, sameRange } from '../../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  sameRange,
+  selectionRangeList,
+} from '../../store/selection-geometry.js';
 import type { State } from '../../store/store.js';
 import { rowsVisibleToFilter } from '../filter-visible.js';
 import { encodeTSV } from './tsv.js';
@@ -96,7 +101,7 @@ export function planCopyRanges(state: State): CopyRangePlan | null {
 function normalizedCopyRanges(
   state: State,
 ): { sourceRanges: Range[]; payloadRanges: Range[] } | null {
-  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])];
+  const ranges = selectionRangeList(state.selection);
   const sheet = state.data.sheetIndex;
   if (ranges.some((r) => r.sheet !== sheet)) return null;
   const sourceRanges = ranges

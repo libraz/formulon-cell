@@ -3,6 +3,7 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
 import { mergeFormatPatch } from './format-merge.js';
 import { addMergeToMaps, removeIntersectingMerges } from './merge-maps.js';
+import { isSingleCell } from './selection-geometry.js';
 import type { SpreadsheetStore } from './store.js';
 import type { CellFormat, CustomCellStyle } from './types.js';
 
@@ -157,7 +158,7 @@ export const cellMutators = {
    *  every other cell in the range is mapped back to that anchor. If the
    *  range is 1×1 it's a no-op. */
   mergeRange(store: SpreadsheetStore, range: Range): void {
-    if (range.r0 === range.r1 && range.c0 === range.c1) return;
+    if (isSingleCell(range)) return;
     store.setState((s) => {
       const byAnchor = new Map(s.merges.byAnchor);
       const byCell = new Map(s.merges.byCell);

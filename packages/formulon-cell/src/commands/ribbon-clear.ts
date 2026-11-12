@@ -13,9 +13,11 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { subtractFromRangeValidations } from '../store/range-validations.js';
 import {
+  normalizeRange,
   rangesIntersect,
   selectionContainsAddr,
   selectionCoversRange,
+  selectionRangeList,
 } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
@@ -707,17 +709,8 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): Ch
       // Clear All removes the sparklines of the cleared, unlocked cells (read before the formats reset
       // their lock); the rest of a group stays.
       const { selection } = store.getState();
-      for (const range of [selection.range, ...(selection.extraRanges ?? [])]) {
-        clearSparklinesAction(
-          { store, history, origin, commandId },
-          {
-            sheet: range.sheet,
-            r0: Math.min(range.r0, range.r1),
-            c0: Math.min(range.c0, range.c1),
-            r1: Math.max(range.r0, range.r1),
-            c1: Math.max(range.c0, range.c1),
-          },
-        );
+      for (const range of selectionRangeList(selection)) {
+        clearSparklinesAction({ store, history, origin, commandId }, normalizeRange(range));
       }
 
       if (plan.comments.length > 0) {

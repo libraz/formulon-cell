@@ -45,6 +45,7 @@ import type {
   ScreenClipResult,
 } from '../../mount/types.js';
 import { Spreadsheet } from '../../mount.js';
+import { selectionRangeList } from '../../store/selection-geometry.js';
 import { mutators } from '../../store/store.js';
 import type { TraceArrow } from '../../store/types.js';
 import {
@@ -367,7 +368,7 @@ const commandRefusal = (legacy: LegacyInstance, id: string): CommandRefusal => {
 
 const selectionOf = (legacy: LegacyInstance): SelectionState => {
   const { selection, data } = legacy.store.getState();
-  const ranges = [selection.range, ...(selection.extraRanges ?? [])].map(toRect);
+  const ranges = selectionRangeList(selection).map(toRect);
   return {
     sheet: data.sheetIndex,
     active: { row: selection.active.row, col: selection.active.col },

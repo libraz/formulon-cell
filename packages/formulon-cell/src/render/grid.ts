@@ -12,7 +12,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { headerLabelScale } from '../store/header-strip.js';
 import { validationAt } from '../store/range-validations.js';
-import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
+import { isSingleCell, isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { CellFormat, State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
@@ -841,15 +841,14 @@ export class GridRenderer {
     // An empty report's placeholder covers its own cursor; an outline drawn
     // around it would stick out of the box's edge.
     const underPlaceholder =
-      r.r0 === r.r1 &&
-      r.c0 === r.c1 &&
+      isSingleCell(r) &&
       pivotStyleLayer(this.getWb(), state).placeholders.some(
         ({ range }) =>
           range.r0 <= a.row && a.row <= range.r1 && range.c0 <= a.col && a.col <= range.c1,
       );
     // A multi-cell range carries the one outline; the active cell inside it is
     // only left unshaded, as in Excel. A merge selected alone is its own range.
-    const multiCell = r.r0 !== r.r1 || r.c0 !== r.c1;
+    const multiCell = !isSingleCell(r);
     const rangeOutline = multiCell ? rangeRects(layout, viewport, r) : activeRects;
     const outlineRects = sameRectList(activeRects, rangeOutline) ? activeRects : rangeOutline;
     // Disjoint ranges: every range gets a thin rule and the active cell a thin
@@ -952,7 +951,7 @@ export class GridRenderer {
       }
     }
 
-    const handleRange = activeMerge && r.r0 === r.r1 && r.c0 === r.c1 ? activeVisualRange : r;
+    const handleRange = activeMerge && isSingleCell(r) ? activeVisualRange : r;
     const handleRects = rangeRects(layout, viewport, handleRange);
     let handleBounds = trailingRect(handleRects, layout.rtl);
     let handleRing = false;

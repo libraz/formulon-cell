@@ -73,6 +73,7 @@ import {
   type WorkbookObjectsPanelHandle,
 } from '../interact/workbook-objects.js';
 import type { GridRenderer } from '../render/grid.js';
+import { isSingleCell } from '../store/selection-geometry.js';
 import type { PageMargins, PageSetup, SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { resolveTheme } from '../theme/resolve.js';
@@ -442,7 +443,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         const getInitialArguments = (functionName: string): readonly string[] | null => {
           if (!shouldSeedFunctionWithSelection(functionName)) return null;
           const range = input.store.getState().selection.range;
-          if (range.r0 === range.r1 && range.c0 === range.c1) return null;
+          if (isSingleCell(range)) return null;
           return [formatA1Range(range)];
         };
         if (input.isMacPlatform()) {

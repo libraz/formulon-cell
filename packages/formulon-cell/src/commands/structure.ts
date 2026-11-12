@@ -44,7 +44,7 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineDrawingObject } from '../engine/workbook-handle-annotations.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
-import { rangesIntersect } from '../store/selection-geometry.js';
+import { isSingleCell, rangesIntersect } from '../store/selection-geometry.js';
 import { withSparklineMembers } from '../store/sparkline-slice.js';
 import {
   type ConditionalRule,
@@ -304,7 +304,7 @@ function shiftAnchoredRanges(
       for (const merge of s.merges.byAnchor.values()) {
         const shifted = merge.sheet === sheet ? shiftRangeAxis(merge, axis, split, delta) : merge;
         if (!shifted) continue;
-        if (shifted.r0 === shifted.r1 && shifted.c0 === shifted.c1) continue;
+        if (isSingleCell(shifted)) continue;
         addMergeToMaps(byAnchor, byCell, shifted);
       }
       return { ...s, merges: { byAnchor, byCell } };

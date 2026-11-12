@@ -1,5 +1,6 @@
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
+import { selectionRangeList } from '../store/selection-geometry.js';
 import type { State, StatusAggKey } from '../store/store.js';
 
 export const STATUS_AGGREGATE_KEYS: readonly StatusAggKey[] = [
@@ -63,9 +64,7 @@ export function aggregateSelectionFromEntries(
   entries: Iterable<[string, { value: CellValue; formula: string | null }]>,
 ): SelectionStats {
   const sheet = state.data.sheetIndex;
-  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])].filter(
-    (range) => range.sheet === sheet,
-  );
+  const ranges = selectionRangeList(state.selection).filter((range) => range.sheet === sheet);
 
   const cells = countUniqueRangeCells(ranges);
   if (cells <= 0) return EMPTY;

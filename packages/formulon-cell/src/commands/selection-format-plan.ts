@@ -7,6 +7,7 @@ import {
   rangeContainsAddr,
   rangesIntersect,
   selectionCoversRange,
+  selectionRangeList,
   subtractRange,
 } from '../store/selection-geometry.js';
 import type { CellFormat, State } from '../store/store.js';
@@ -30,7 +31,7 @@ const validSelectionRange = (range: Range, sheet: number): boolean =>
   range.c1 <= MAX_COL;
 
 export const selectionRanges = (state: State): Range[] | null => {
-  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])];
+  const ranges = selectionRangeList(state.selection);
   const primary = ranges[0];
   if (!primary || !validSelectionRange(primary, primary.sheet)) return null;
   if (!ranges.every((range) => validSelectionRange(range, primary.sheet))) return null;

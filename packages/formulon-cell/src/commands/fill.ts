@@ -2,7 +2,7 @@ import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialFromDate, excelSerialToDate } from '../format/date-serial.js';
-import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
+import { normalizeRange, rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
   retargetTextSeries,
@@ -935,13 +935,7 @@ function justifyInto(deps: JustifySelectionDeps): boolean {
   const { store, workbook, history } = deps;
   const state = store.getState();
   const selected = state.selection.range;
-  const range: Range = {
-    sheet: selected.sheet,
-    r0: Math.min(selected.r0, selected.r1),
-    c0: Math.min(selected.c0, selected.c1),
-    r1: Math.max(selected.r0, selected.r1),
-    c1: Math.max(selected.c0, selected.c1),
-  };
+  const range: Range = normalizeRange(selected);
   let width = 0;
   for (let col = range.c0; col <= range.c1; col += 1) {
     width += state.layout.colWidths.get(col) ?? state.layout.defaultColWidth;
@@ -1088,13 +1082,7 @@ const executeRibbonFlashFill = (
 
 const DATE_SERIES_ACTIONS = new Set(['days', 'weekdays', 'months', 'years']);
 
-const normalizedRange = (selected: Range): Range => ({
-  sheet: selected.sheet,
-  r0: Math.min(selected.r0, selected.r1),
-  c0: Math.min(selected.c0, selected.c1),
-  r1: Math.max(selected.r0, selected.r1),
-  c1: Math.max(selected.c0, selected.c1),
-});
+const normalizedRange = (selected: Range): Range => normalizeRange(selected);
 
 /** A fill as a batch result: `range` is the rectangle `fill` wrote (null when it wrote nothing),
  *  `applied` the cells whose content changed. */
@@ -1114,13 +1102,7 @@ export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): Chan
 const ribbonFillInto = (deps: ExecuteRibbonFillActionDeps): Range | null => {
   const { store, workbook, history, action } = deps;
   const selected = store.getState().selection.range;
-  let range: Range = {
-    sheet: selected.sheet,
-    r0: Math.min(selected.r0, selected.r1),
-    c0: Math.min(selected.c0, selected.c1),
-    r1: Math.max(selected.r0, selected.r1),
-    c1: Math.max(selected.c0, selected.c1),
-  };
+  let range: Range = normalizeRange(selected);
   if (action === 'flash')
     return executeRibbonFlashFill(store, workbook, history, range) ? range : null;
   if (action === 'justify') return justifyInto({ store, workbook, history }) ? range : null;

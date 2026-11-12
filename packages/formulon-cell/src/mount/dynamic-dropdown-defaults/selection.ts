@@ -1,15 +1,10 @@
 import type { Range } from '../../engine/types.js';
 import type { SpreadsheetInstance } from '../../mount.js';
+import { normalizeRange } from '../../store/selection-geometry.js';
 
 export const normalizedSelectionRange = (instance: SpreadsheetInstance): Range => {
   const r = instance.store.getState().selection.range;
-  return {
-    sheet: r.sheet,
-    r0: Math.min(r.r0, r.r1),
-    c0: Math.min(r.c0, r.c1),
-    r1: Math.max(r.r0, r.r1),
-    c1: Math.max(r.c0, r.c1),
-  };
+  return normalizeRange(r);
 };
 
 export const hasActiveCopy = (instance: SpreadsheetInstance): boolean => {

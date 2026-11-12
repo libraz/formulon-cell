@@ -32,6 +32,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { bodyBandOrigin, layoutForView, rangeRects } from '../render/geometry.js';
+import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
 import { onPointerArrive, projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -1294,11 +1295,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'clear': {
         const selected = store.getState().selection;
-        if (
-          deferForAllowedRangeUnlock(store, [selected.range, ...(selected.extraRanges ?? [])], () =>
-            run(id),
-          )
-        ) {
+        if (deferForAllowedRangeUnlock(store, selectionRangeList(selected), () => run(id))) {
           return;
         }
         if (hasExplicitPolicy()) {

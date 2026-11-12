@@ -9,7 +9,12 @@ import {
   frozenRowStart,
 } from '../store/freeze-band.js';
 import { isRowHidden } from '../store/row-visibility.js';
-import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  normalizeRange,
+  selectionRangeList,
+} from '../store/selection-geometry.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
   type AutofitOptions,
@@ -379,10 +384,7 @@ function normalizeAutofitRanges(ranges: readonly Range[], sheet: number): Range[
     if (range.sheet !== sheet) return null;
     const coordinates = [range.r0, range.r1, range.c0, range.c1];
     if (!coordinates.every(Number.isInteger)) return null;
-    const r0 = Math.min(range.r0, range.r1);
-    const r1 = Math.max(range.r0, range.r1);
-    const c0 = Math.min(range.c0, range.c1);
-    const c1 = Math.max(range.c0, range.c1);
+    const { r0, c0, r1, c1 } = normalizeRange(range);
     if (r0 < 0 || r1 > MAX_ROW || c0 < 0 || c1 > MAX_COL) return null;
     const key = `${sheet}:${r0}:${c0}:${r1}:${c1}`;
     if (seen.has(key)) continue;
@@ -595,7 +597,7 @@ export type TrackSpan = readonly [number, number];
  * selected whole column (row) takes part; otherwise only `track` does.
  */
 export function headerGestureSpans(state: State, axis: HeaderAxis, track: number): TrackSpan[] {
-  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])];
+  const ranges = selectionRangeList(state.selection);
   const spans: TrackSpan[] = [];
   let total = 0;
   for (const range of ranges) {

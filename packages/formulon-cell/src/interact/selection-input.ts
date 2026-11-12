@@ -16,7 +16,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { directCellFormat, sameAddr } from '../store/direct-format.js';
 import { validationAt } from '../store/range-validations.js';
-import { rangeArea, subtractRange } from '../store/selection-geometry.js';
+import { rangeArea, selectionRangeList, subtractRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 
 export interface SelectionInputChange {
@@ -60,7 +60,7 @@ export function buildSelectionInputBatch(
   raw: string,
   anchor: Addr,
 ): SelectionInputBatch | null {
-  const inputRanges = [state.selection.range, ...(state.selection.extraRanges ?? [])];
+  const inputRanges = selectionRangeList(state.selection);
   const uniqueRanges: Range[] = [];
   let totalCells = 0;
 
@@ -143,7 +143,7 @@ export function writeSelectionInput(
   raw: string,
   anchor: Addr,
 ): SelectionInputWriteResult {
-  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])];
+  const ranges = selectionRangeList(state.selection);
   const totalCells = ranges.reduce((sum, r) => sum + rangeArea(r), 0);
   if (totalCells > MAX_SELECTION_INPUT_CELLS) return { status: 'limitExceeded' };
   const sheet = state.data.sheetIndex;

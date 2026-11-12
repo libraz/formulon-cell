@@ -13,6 +13,7 @@ import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
+import { normalizeRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogActions, createDialogShell } from './dialog-shell.js';
@@ -174,10 +175,7 @@ export function runCellShiftChoice(
 ): boolean {
   const { store, wb, history } = target;
   const ctx: RowColActionContext = { ...target, workbook: wb };
-  const r0 = Math.min(range.r0, range.r1);
-  const r1 = Math.max(range.r0, range.r1);
-  const c0 = Math.min(range.c0, range.c1);
-  const c1 = Math.max(range.c0, range.c1);
+  const { r0, c0, r1, c1 } = normalizeRange(range);
   const norm: Range = { sheet: range.sheet, r0, c0, r1, c1 };
   const sheet = store.getState().data.sheetIndex;
   if (choice === 'rows') {

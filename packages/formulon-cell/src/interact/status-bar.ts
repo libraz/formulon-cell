@@ -23,7 +23,11 @@ import {
   ZOOM_SLIDER_STEP,
   zoomToSliderPosition,
 } from '../store/render-scale.js';
-import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  selectionRangeList,
+} from '../store/selection-geometry.js';
 import {
   mutators,
   type NumFmt,
@@ -126,7 +130,7 @@ interface SelectionAggregateIndex {
 }
 
 const aggregateRangeKeys = (state: ReturnType<SpreadsheetStore['getState']>): AggregateRangeKey[] =>
-  [state.selection.range, ...(state.selection.extraRanges ?? [])].map((range) => [
+  selectionRangeList(state.selection).map((range) => [
     range.sheet,
     range.r0,
     range.c0,

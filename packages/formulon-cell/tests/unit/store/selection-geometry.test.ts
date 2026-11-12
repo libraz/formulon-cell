@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { Range } from '../../../src/engine/types.js';
 import {
   applySelectionRectangle,
+  isSingleCell,
+  normalizeRange,
   rangeArea,
   rangeContainsAddr,
   rangeContainsRange,
@@ -10,6 +12,7 @@ import {
   sameRange,
   selectionContainsAddr,
   selectionCoversRange,
+  selectionRangeList,
   subtractRange,
 } from '../../../src/store/selection-geometry.js';
 import type { SelectionSlice } from '../../../src/store/types.js';
@@ -30,6 +33,26 @@ const selection = (primary: Range, extras: Range[] = []): SelectionSlice => ({
 });
 
 describe('store/selection-geometry', () => {
+  it('orders the corners of a range dragged up or left', () => {
+    expect(normalizeRange({ sheet: 2, r0: 5, c0: 7, r1: 1, c1: 3 })).toEqual(range(1, 3, 5, 7, 2));
+    expect(normalizeRange(range(1, 3, 5, 7))).toEqual(range(1, 3, 5, 7));
+  });
+
+  it('lists the primary range before the added ones', () => {
+    expect(selectionRangeList(selection(range(1, 1), [range(3, 3), range(5, 5)]))).toEqual([
+      range(1, 1),
+      range(3, 3),
+      range(5, 5),
+    ]);
+    expect(selectionRangeList({ range: range(2, 2) })).toEqual([range(2, 2)]);
+  });
+
+  it('tells a single cell from a wider range', () => {
+    expect(isSingleCell(range(4, 4))).toBe(true);
+    expect(isSingleCell(range(4, 4, 4, 5))).toBe(false);
+    expect(isSingleCell(range(4, 4, 5, 4))).toBe(false);
+  });
+
   it('subtracts a center rectangle into four disjoint pieces', () => {
     expect(subtractRange(range(0, 0, 4, 4), range(2, 2))).toEqual([
       range(0, 0, 1, 4),

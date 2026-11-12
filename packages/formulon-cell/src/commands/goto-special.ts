@@ -5,7 +5,11 @@ import { ERROR_LITERALS } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeValidationCells, validationAt } from '../store/range-validations.js';
 import { visibleRowSegments } from '../store/row-visibility.js';
-import { rangeContainsAddr } from '../store/selection-geometry.js';
+import {
+  isSingleCell,
+  rangeContainsAddr,
+  selectionRangeList,
+} from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import type { SelectionSlice } from '../store/types.js';
 import { listComments } from './comment.js';
@@ -458,9 +462,7 @@ export function findMatchingRanges(
 ): GoToSpecialResult {
   const state = store.getState();
   const sheet = state.data.sheetIndex;
-  const selected = [state.selection.range, ...(state.selection.extraRanges ?? [])].filter(
-    (r) => r.sheet === sheet,
-  );
+  const selected = selectionRangeList(state.selection).filter((r) => r.sheet === sheet);
   const only = selected.length === 1 ? (selected[0] as Range) : null;
   let entries: CellEntry[] | undefined;
   const ctx: SearchContext = {
@@ -472,7 +474,7 @@ export function findMatchingRanges(
       return entries;
     },
     selected,
-    single: only !== null && only.r0 === only.r1 && only.c0 === only.c1,
+    single: only !== null && isSingleCell(only),
     options,
   };
   const active = state.selection.active;

@@ -5,6 +5,7 @@ import { activeFilterRanges } from '../../commands/filter-state.js';
 import { colLetter } from '../../engine/address.js';
 import { headerDigitPitch } from '../../store/header-strip.js';
 import { renderScale } from '../../store/render-scale.js';
+import { selectionRangeList } from '../../store/selection-geometry.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
   type AxisLayout,
@@ -121,7 +122,7 @@ export function paintHeaders(
   const firstCol = cols.visible[0] ?? 0;
   // A selected chart or picture takes the highlight off the headers, as in Excel.
   const objectSelected = state.ui.selectedObject !== null;
-  const selectedRanges = objectSelected ? [] : [selection.range, ...(selection.extraRanges ?? [])];
+  const selectedRanges = objectSelected ? [] : selectionRangeList(selection);
   const colSelected = (col: number): boolean =>
     selectedRanges.some((r) => col >= r.c0 && col <= r.c1);
   const rowSelected = (row: number): boolean =>

@@ -1,5 +1,6 @@
 import { colLetter, formatA1Cell, formatA1Range, quoteSheetName } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
+import { normalizeRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 /** Sheet-prefix policy for one pick. `auto` follows the per-dialog latch. */
@@ -47,13 +48,7 @@ export const createRangePickFormatter = (deps: RangePickFormatterDeps): RangePic
   };
   const selectionRange = (opts?: RangePickFormatOptions): Range => {
     const r = opts?.range ?? store.getState().selection.range;
-    return {
-      sheet: r.sheet,
-      r0: Math.min(r.r0, r.r1),
-      c0: Math.min(r.c0, r.c1),
-      r1: Math.max(r.r0, r.r1),
-      c1: Math.max(r.c0, r.c1),
-    };
+    return normalizeRange(r);
   };
   const qualify = (sheet: number, body: string, opts?: RangePickFormatOptions): string => {
     const mode = opts?.prefix ?? 'auto';

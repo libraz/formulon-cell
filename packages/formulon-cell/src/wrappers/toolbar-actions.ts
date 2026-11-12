@@ -35,6 +35,7 @@ import {
   openPasteSpecialFrom,
 } from '../interact/dialog-entry.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
+import { isSingleCell } from '../store/selection-geometry.js';
 import { mutators } from '../store/store.js';
 import { confirmSheetDelete } from '../toolbar/dialogs/sheet-delete-confirm.js';
 import type { MergeAction } from '../toolbar/merge-action.js';
@@ -160,7 +161,7 @@ export const handleAutoSum = (
   }
   const run = (): boolean => {
     const r = instance.store.getState().selection.range;
-    const single = r.r0 === r.r1 && r.c0 === r.c1;
+    const single = isSingleCell(r);
     instance.history.begin();
     let result: ReturnType<typeof autoSum> = null;
     try {

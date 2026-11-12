@@ -2,7 +2,11 @@ import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type DataTableInfo, formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
-import { selectionCoversRange } from '../store/selection-geometry.js';
+import {
+  isSingleCell,
+  selectionCoversRange,
+  selectionRangeList,
+} from '../store/selection-geometry.js';
 import type { SelectionSlice } from '../store/types.js';
 
 /** Stop-level alert shown when an edit would touch part of a data table. */
@@ -56,7 +60,7 @@ export function tableFunctionAlert(wb: WorkbookHandle): DataTableGuardAlert {
 /** Whether a data table's result block holds any cell of `range`. */
 export function dataTableOccupies(wb: WorkbookHandle, range: Range): boolean {
   if (!wb.capabilities?.dataTables) return false;
-  if (range.r0 === range.r1 && range.c0 === range.c1) {
+  if (isSingleCell(range)) {
     return wb.dataTableAt({ sheet: range.sheet, row: range.r0, col: range.c0 }) !== null;
   }
   return wb.dataTablesInRange(range).length > 0;
@@ -96,7 +100,7 @@ export function planDataTableSelection(
   const plan: DataTableSelectionPlan = { whole: [], partial: false };
   if (!wb.capabilities?.dataTables) return plan;
   const seen = new Set<string>();
-  for (const range of [selection.range, ...(selection.extraRanges ?? [])]) {
+  for (const range of selectionRangeList(selection)) {
     for (const table of wb.dataTablesInRange(range)) {
       const key = `${table.range.sheet}:${table.range.r0}:${table.range.c0}`;
       if (seen.has(key)) continue;

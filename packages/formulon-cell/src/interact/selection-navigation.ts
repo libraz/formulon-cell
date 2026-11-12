@@ -3,6 +3,7 @@ import { mergeAt } from '../commands/merge.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { sameAddr } from '../store/direct-format.js';
+import { isSingleCell } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
   clampNavigationAddr,
@@ -195,7 +196,7 @@ export function nextWithinSelection(
 ): Addr | null {
   const range = state.selection.range;
   if (!contains(range, state.selection.active)) return null;
-  if (range.r0 === range.r1 && range.c0 === range.c1) return null;
+  if (isSingleCell(range)) return null;
 
   const activeMerge = mergeAt(state, state.selection.active);
   const start = activeMerge

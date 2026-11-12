@@ -82,6 +82,7 @@ import {
   type SelectionGestureMode,
   selectionContainsAddr,
   selectionCoversRange,
+  selectionRangeList,
 } from '../store/selection-geometry.js';
 import {
   mutators,
@@ -686,7 +687,7 @@ export function attachPointer(
       return;
     }
     if (zone.kind !== 'cell') return;
-    const inside = [s.selection.range, ...(s.selection.extraRanges ?? [])].some(
+    const inside = selectionRangeList(s.selection).some(
       (r) => zone.row >= r.r0 && zone.row <= r.r1 && zone.col >= r.c0 && zone.col <= r.c1,
     );
     if (inside) return;

@@ -27,6 +27,7 @@ import type { Strings } from '../i18n/strings.js';
 import { scrollActiveIntoView } from '../interact/navigation-policy.js';
 import { onOutsidePress } from '../interact/outside-press.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
+import { isSingleCell } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import type { NumFmt } from '../store/types/cell-format.js';
@@ -231,7 +232,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     if (!dragFrom) return null;
     const f = dragFrom;
     if (f.r0 === r.r0 && f.c0 === r.c0 && f.r1 === r.r1 && f.c1 === r.c1) return null;
-    if (r.r0 === r.r1 && r.c0 === r.c1) return null;
+    if (isSingleCell(r)) return null;
     return `${r.r1 - r.r0 + 1}R x ${r.c1 - r.c0 + 1}C`;
   };
   const onGridPointerDown = (e: PointerEvent): void => {
@@ -598,7 +599,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     if (!areas || !first) return false;
     const sheetIdx = first.sheet;
     if (!showSheet(sheetIdx)) return false;
-    if (areas.length === 1 && first.r0 === first.r1 && first.c0 === first.c1) {
+    if (areas.length === 1 && isSingleCell(first)) {
       mutators.setActive(store, { sheet: sheetIdx, row: first.r0, col: first.c0 });
     } else {
       const start = { sheet: sheetIdx, row: first.r0, col: first.c0 };
@@ -641,7 +642,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     if (areas?.length !== 1 || !range) return false;
     const sheetIdx = store.getState().data.sheetIndex;
     if (range.sheet !== sheetIdx) return false;
-    const collapsed = range.r0 === range.r1 && range.c0 === range.c1;
+    const collapsed = isSingleCell(range);
     if (collapsed) {
       mutators.addExtraCell(store, { sheet: sheetIdx, row: range.r0, col: range.c0 });
     } else {

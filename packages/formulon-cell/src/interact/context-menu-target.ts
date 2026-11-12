@@ -1,6 +1,10 @@
 import type { Addr } from '../engine/types.js';
 import { hitZone, layoutForView } from '../render/geometry.js';
-import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  selectionRangeList,
+} from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { firstVisibleCol, firstVisibleRow } from '../store/visible-axis.js';
 import type { MenuKind } from './context-menu-spec.js';
@@ -33,7 +37,7 @@ export const resolveContextMenuTarget = (
     if (canChangeSelection()) mutators.selectAll(store);
     return { kind: 'cell', cell: { ...store.getState().selection.active }, corner: true };
   }
-  const selectedRanges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
+  const selectedRanges = selectionRangeList(s.selection);
   if (zone.kind === 'row-header' || zone.kind === 'row-resize') {
     const inSel = selectedRanges.some(
       (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && isWholeRowRange(sel),

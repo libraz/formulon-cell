@@ -27,7 +27,12 @@ import { isMacHost } from '../extensions/ui-options.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, dictionaryLocaleFor, type Strings } from '../i18n/strings.js';
 import { rangeValidationAt } from '../store/range-validations.js';
-import { rangeContainsAddr, sameRange } from '../store/selection-geometry.js';
+import {
+  isSingleCell,
+  rangeContainsAddr,
+  sameRange,
+  selectionRangeList,
+} from '../store/selection-geometry.js';
 import type { CellFormat, NumFmt, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
@@ -415,7 +420,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
     syncControlsFromDraft();
     const range = state.selection.range;
-    const multiCell = range.r0 !== range.r1 || range.c0 !== range.c1;
+    const multiCell = !isSingleCell(range);
     const mergeRange = expandRangeWithMerges(state, range);
     const hasExtraRanges = (state.selection.extraRanges?.length ?? 0) > 0;
     const mergeDisabled =
@@ -617,7 +622,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
     const mergeRange = expandRangeWithMerges(state, range);
     // Merging a lone cell is a no-op, as in the spreadsheet app.
-    const loneCell = mergeRange.r0 === mergeRange.r1 && mergeRange.c0 === mergeRange.c1;
+    const loneCell = isSingleCell(mergeRange);
     const mergeAction =
       loneCell && alignTab.mergeAction() === 'merge' ? null : alignTab.mergeAction();
 
@@ -688,7 +693,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       }
       const repeat = (): void => {
         const current = store.getState();
-        const currentRanges = [current.selection.range, ...(current.selection.extraRanges ?? [])];
+        const currentRanges = selectionRangeList(current.selection);
         if (!isWholeSheetSelection(currentRanges)) return;
         let applied = false;
         recordFormatChange(

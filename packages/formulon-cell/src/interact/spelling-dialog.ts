@@ -11,6 +11,7 @@ import {
 import { parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
+import { isSingleCell } from '../store/selection-geometry.js';
 import { mutators } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogButton, appendDialogFrame, createDialogShell } from './dialog-shell.js';
@@ -62,8 +63,7 @@ export function spellingTargets(instance: SpreadsheetInstance): SpellingTarget[]
   const state = instance.store.getState();
   const { active, range, extraRanges } = state.selection;
   const sheet = state.data.sheetIndex;
-  const wholeSheet =
-    range.r0 === range.r1 && range.c0 === range.c1 && (extraRanges?.length ?? 0) === 0;
+  const wholeSheet = isSingleCell(range) && (extraRanges?.length ?? 0) === 0;
   const inScope = (addr: Addr): boolean =>
     addr.sheet === sheet &&
     (wholeSheet ||

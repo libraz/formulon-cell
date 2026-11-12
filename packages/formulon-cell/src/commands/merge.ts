@@ -3,7 +3,12 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { sameAddr } from '../store/direct-format.js';
-import { rangeArea, rangeContainsAddr, rangesIntersect } from '../store/selection-geometry.js';
+import {
+  isSingleCell,
+  rangeArea,
+  rangeContainsAddr,
+  rangesIntersect,
+} from '../store/selection-geometry.js';
 import {
   type CellBorderSide,
   type CellBorders,
@@ -412,7 +417,7 @@ export function applyMerge(
   const stateBefore = store.getState();
   if (!canMaterializeMergeRange(range)) return false;
   const effective = expandRangeWithMerges(stateBefore, range);
-  if (effective.r0 === effective.r1 && effective.c0 === effective.c1) return false;
+  if (isSingleCell(effective)) return false;
   if (!canMaterializeMergeRange(effective)) return false;
   if (mergeBlockedByTable(stateBefore, effective)) return false;
   if (blockDataTableEdit(wb, effective)) return false;

@@ -10,6 +10,7 @@ import { rangeForRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell, fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isSingleCell } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { blockDataTableCells } from './data-table-guard.js';
 import { adjustFormulaForCutPasteMove } from './formula-refs.js';
@@ -314,7 +315,7 @@ export function definedNameValueText(wb: WorkbookHandle, entry: DefinedNameEntry
   const range = rangeForRef(wb, body, ownSheet);
   if (range) {
     const { sheet } = range;
-    if (range.r0 === range.r1 && range.c0 === range.c1) {
+    if (isSingleCell(range)) {
       return formatCell(wb.getValue({ sheet, row: range.r0, col: range.c0 }));
     }
     const rows: string[] = [];

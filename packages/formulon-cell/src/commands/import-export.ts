@@ -7,7 +7,7 @@ import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { formatBoolean, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { rangeArea } from '../store/selection-geometry.js';
+import { isSingleCell, rangeArea } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { authorizedWrite } from './authorized-write.js';
 import {
@@ -178,7 +178,7 @@ export function exportCSV(state: State, opts: ExportOptions = {}): string {
 
 function selectionOrUsed(state: State): Range | null {
   const sel = state.selection.range;
-  const isSingle = sel.r0 === sel.r1 && sel.c0 === sel.c1;
+  const isSingle = isSingleCell(sel);
   if (!isSingle) return sel;
   return usedRange(state);
 }

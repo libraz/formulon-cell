@@ -3,7 +3,7 @@ import { createProfileTextSemantics, localeForWorkbook } from '../engine/profile
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
+import { isSingleCell, rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
 import { customListsFor } from './autofill-series.js';
@@ -999,7 +999,7 @@ export const sortActiveColumnAuto = (deps: SortActiveColumnAutoOptions): boolean
   const { store, workbook, history, direction, origin, commandId } = deps;
   const state = store.getState();
   const sel = state.selection.range;
-  const single = sel.r0 === sel.r1 && sel.c0 === sel.c1;
+  const single = isSingleCell(sel);
   // A cell inside an AutoFilter sorts that whole filter, blank rows included,
   // with the filter's first row as the header.
   const filter = single ? filterRangeAt(state, state.selection.active) : null;

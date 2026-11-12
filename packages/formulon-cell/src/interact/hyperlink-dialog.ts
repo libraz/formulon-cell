@@ -6,6 +6,7 @@ import { quoteSheetName } from '../engine/address.js';
 import { addrKey, type WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { isSingleCell } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { showPrompt } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -342,7 +343,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
     const { range, active } = state.selection;
     const fmt = state.format.formats.get(addrKey(active));
     tooltip = fmt?.hyperlinkTooltip;
-    const single = range.r0 === range.r1 && range.c0 === range.c1;
+    const single = isSingleCell(range);
     const value = state.data.cells.get(addrKey(active))?.value;
     const cellText =
       value?.kind === 'text' ? value.value : value?.kind === 'number' ? String(value.value) : '';

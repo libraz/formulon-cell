@@ -14,6 +14,24 @@ export const cloneRange = (range: Range): Range => ({
   c1: range.c1,
 });
 
+/** `range` with its corners ordered, so `r0 <= r1` and `c0 <= c1`. */
+export const normalizeRange = (range: Range): Range => ({
+  sheet: range.sheet,
+  r0: Math.min(range.r0, range.r1),
+  c0: Math.min(range.c0, range.c1),
+  r1: Math.max(range.r0, range.r1),
+  c1: Math.max(range.c0, range.c1),
+});
+
+/** True when `range` covers one cell. */
+export const isSingleCell = (range: Pick<Range, 'r0' | 'c0' | 'r1' | 'c1'>): boolean =>
+  range.r0 === range.r1 && range.c0 === range.c1;
+
+/** The primary range of a selection followed by its added ranges. */
+export const selectionRangeList = (
+  selection: Pick<SelectionSlice, 'range' | 'extraRanges'>,
+): Range[] => [selection.range, ...(selection.extraRanges ?? [])];
+
 /** True when `range` spans every column, i.e. it selects whole rows. */
 export const isWholeRowRange = (range: Pick<Range, 'c0' | 'c1'>): boolean =>
   range.c0 === 0 && range.c1 >= MAX_COL;
@@ -95,7 +113,7 @@ export const selectionCoversRange = (
   target: Range,
 ): boolean => {
   let uncovered = [cloneRange(target)];
-  for (const selected of [selection.range, ...(selection.extraRanges ?? [])]) {
+  for (const selected of selectionRangeList(selection)) {
     uncovered = uncovered.flatMap((piece) => subtractRange(piece, selected));
     if (uncovered.length === 0) return true;
   }
@@ -124,7 +142,7 @@ export const applySelectionRectangle = (
   mode: SelectionGestureMode,
   anchor: Addr,
 ): SelectionSlice | null => {
-  const ranges = [base.range, ...(base.extraRanges ?? [])];
+  const ranges = selectionRangeList(base);
 
   if (mode === 'add') {
     const extras = [...(base.extraRanges ?? []), base.range].flatMap((range) =>

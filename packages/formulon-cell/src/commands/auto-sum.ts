@@ -1,7 +1,7 @@
 import { addrKey, formatA1Range } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { rangeArea } from '../store/selection-geometry.js';
+import { isSingleCell, rangeArea } from '../store/selection-geometry.js';
 import type { State } from '../store/store.js';
 import { blockDataTableEdit } from './data-table-guard.js';
 import { mergeAt } from './merge.js';
@@ -14,7 +14,7 @@ export function autoSumTargets(state: State): Range[] {
   const sheet = state.data.sheetIndex;
   const a = state.selection.active;
   const cell = (row: number, col: number): Range => ({ sheet, r0: row, c0: col, r1: row, c1: col });
-  if (r.r0 === r.r1 && r.c0 === r.c1) {
+  if (isSingleCell(r)) {
     if (isEmpty(state, sheet, a.row, a.col)) return [cell(a.row, a.col)];
     if (!isNum(state, sheet, a.row, a.col)) return [];
     let bottom = a.row;
@@ -116,7 +116,7 @@ export function autoSumSuggestion(
   const r = state.selection.range;
   const sheet = state.data.sheetIndex;
   const a = state.selection.active;
-  const single = r.r0 === r.r1 && r.c0 === r.c1;
+  const single = isSingleCell(r);
   if (
     single &&
     isNum(state, sheet, a.row, a.col) &&
@@ -204,7 +204,7 @@ export function autoSum(
 ): { addr: Addr; formula: string } | null {
   const r = state.selection.range;
   const sheet = state.data.sheetIndex;
-  const isSingle = r.r0 === r.r1 && r.c0 === r.c1;
+  const isSingle = isSingleCell(r);
   const a = state.selection.active;
   const fn = functionName;
 

@@ -1,7 +1,7 @@
 import { SparklineAxisType, SparklineType } from '@libraz/formulon';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
-import { rangeContainsAddr } from '../store/selection-geometry.js';
+import { rangeContainsAddr, selectionRangeList } from '../store/selection-geometry.js';
 import {
   mutators,
   type SparklineGroupSettings,
@@ -68,7 +68,7 @@ type SparklineState = Pick<State, 'selection'> & { sparkline: SparklineSlice };
 /** The sparkline cells inside the selection ranges, row-major. The active cell stands in when
  *  it hosts a sparkline the ranges somehow miss. */
 export function selectedSparklineCells(state: SparklineState): Addr[] {
-  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])];
+  const ranges = selectionRangeList(state.selection);
   const out: Addr[] = [];
   for (const key of state.sparkline.sparklines.keys()) {
     const addr = parseAddrKey(key);
