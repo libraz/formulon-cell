@@ -1,13 +1,13 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
-import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
+import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
-/** P01 — the shared PivotTable filter dialog is reachable from the
- * Create PivotTable Field Settings flow. This intentionally goes through the
- * demo-exposed core instance instead of wrapper-specific APIs so React/Vue run
- * the same scenario. */
+/** P01 — a text row field's Filter > Label Filters... opens the panel, and a label condition there
+ * opens the desktop Label Filter dialog. This goes through the demo-exposed core instance instead
+ * of wrapper-specific APIs so React/Vue run the same scenario. */
 export async function runPivotTableFilterDialogScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
   const consoleErrors = sp.collectConsoleErrors();
@@ -15,41 +15,42 @@ export async function runPivotTableFilterDialogScenario(page: Page): Promise<voi
   await sp.expectNoStub();
 
   await page.evaluate(() => {
-    const inst = (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst;
+    const w = window as unknown as { __fcInst?: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const inst = w.__fcInst;
     if (!inst) throw new Error('window.__fcInst is required');
+    const sheet = inst.workbook.sheet(0);
     inst.workbook.batch(() => {
-      const sheet = inst.workbook.sheet(0);
-      ['Region', 'Sales', 'Qty', 'Channel', 'Segment'].forEach((value, col) => {
+      ['Channel', 'Sales'].forEach((value, col) => {
         sheet.setText(0, col, value);
       });
-      sheet.setText(1, 0, 'East');
+      sheet.setText(1, 0, 'Online');
       sheet.setNumber(1, 1, 10);
-      sheet.setNumber(1, 2, 2);
-      sheet.setText(1, 3, 'Online');
-      sheet.setText(1, 4, 'Consumer');
-      sheet.setText(2, 0, 'West');
+      sheet.setText(2, 0, 'Retail');
       sheet.setNumber(2, 1, 20);
-      sheet.setNumber(2, 2, 4);
-      sheet.setText(2, 3, 'Retail');
-      sheet.setText(2, 4, 'Business');
     });
+    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(inst.workbook);
+    const made = w.__fcProbes['commands/pivot-table'].createPivotTableFromRange(handle, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
+      destination: { sheet: 0, row: 0, col: 3 },
+      name: 'ChannelReport',
+      rowField: 'Channel',
+      valueField: 'Sales',
+      aggregation: 0,
+    });
+    if (!made.ok) throw new Error(`pivot creation failed: ${made.reason}`);
     inst.history.clear();
-    inst.selection.set('A1:E3');
-    inst.dialogs.open('pivotTable');
   });
 
-  const pivotDialog = page.getByRole('dialog', { name: 'Create PivotTable' });
-  await expect(pivotDialog).toBeVisible();
-  await pivotDialog.locator('[data-pivot-field-list-field="Segment"]').check();
-  await pivotDialog.locator('[data-pivot-field-list-field="Channel"]').check();
-  await pivotDialog.getByRole('button', { name: 'Field Settings: Channel' }).click();
-  await expect(pivotDialog.locator('.fc-pivotdlg__area-settings-panel')).toContainText(
-    'Field Settings: Channel',
-  );
-  await pivotDialog.getByRole('button', { name: 'Filter...' }).click();
+  const label = await gridCellCenter(page, 1, 3);
+  await page.mouse.click(label.x, label.y, { button: 'right' });
+  await page.locator('.fc-ctxmenu [data-fc-action="filter"]').first().hover();
+  await page.locator('.fc-ctxmenu__sub [data-fc-action="pivotFilterLabel"]').click();
+  const panel = page.locator('.fc-pivot-filter-panel');
+  await expect(panel).toBeVisible();
+  // 12 is PivotFilterKind.LabelEqual.
+  await panel.locator('select[data-pivot-filter-by="label"]').selectOption('12');
 
-  // With no condition set, Filter... opens the desktop Label Filter on equals.
-  const filterDialog = page.getByRole('dialog', { name: 'Label Filter (Channel)' });
+  const filterDialog = page.getByRole('dialog', { name: 'Label Filter', exact: true });
   await expect(filterDialog).toBeVisible();
   await expect(
     filterDialog.locator('[data-pivot-filter-operator="true"] option:checked'),
