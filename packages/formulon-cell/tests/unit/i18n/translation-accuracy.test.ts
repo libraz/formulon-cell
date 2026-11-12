@@ -26,9 +26,10 @@ describe('seven-language translation dictionary contract', () => {
     expect(ko.findReplace.comments).toBe('메모');
     expect(ko.findReplace.notes).toBe('노트');
     expect(ko.ribbon.newComment).toBe('새 노트');
-    expect(ko.ribbon.editNote).toBe('노트 편집');
+    // Edit Note keeps the desktop's own wording, which still says 메모 (strman_0066 fa).
+    expect(ko.ribbon.editNote).toBe('메모 편집');
     expect(ko.contextMenu.newNote).toBe('새 노트');
-    expect(ko.contextMenu.editNote).toBe('노트 편집');
+    expect(ko.contextMenu.editNote).toBe('메모 편집');
     expect(ko.contextMenu.deleteNote).toBe('노트 삭제');
     expect(ko.formatDialog.comment).toBe('노트');
   });

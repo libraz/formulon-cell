@@ -44,7 +44,7 @@ export const gridPopupsKo: GridPopupsStrings = {
     colUngroup: '열 그룹 해제',
     newComment: '새 댓글',
     newNote: '새 노트',
-    editNote: '노트 편집',
+    editNote: '메모 편집',
     deleteNote: '노트 삭제',
     showHideNote: '메모 표시/숨기기',
     insertHyperlink: '하이퍼링크 삽입…',
