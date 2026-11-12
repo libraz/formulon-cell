@@ -191,13 +191,27 @@ describe('Mac differential format layout', () => {
       .filter((left) => left !== undefined)
       .at(-1);
 
-  // The footer is absolutely positioned: Clear needs its own place, off Cancel's.
-  it('places Clear apart from Cancel', () => {
+  // Excel for Mac: Clear sits at the tab panel's bottom-right corner, the footer holding only
+  // Cancel and OK.
+  it('places Clear in the tab panel, above the footer and off Cancel', () => {
     const cancel = leftOf('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)');
     const clear = leftOf('.fc-fmtdlg__btn.fc-fmtdlg__btn--clear');
     expect(cancel).toBeDefined();
-    expect(clear).toBeDefined();
-    expect(clear).not.toBe(cancel);
+    expect(clear).toBe('501px');
+    const clearRule = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(([, selector]) =>
+      selector?.replace(/\s+/g, ' ').trim().endsWith('.fc-fmtdlg__btn.fc-fmtdlg__btn--clear'),
+    );
+    // The tab panel ends at 553 (top 38, height 515); the footer row starts at 558.
+    const top = Number.parseFloat(clearRule?.[2]?.match(/top:\s*([\d.]+)px/)?.[1] ?? 'NaN');
+    expect(top + 26).toBeLessThanOrEqual(553);
+  });
+
+  it('marks the overlay of a Mac differential format, so the Number hint leaves room for Clear', () => {
+    openDxf('mac', {}, 'conditional');
+    expect(document.querySelector('.fc-fmtdlg--mac-dxf')).not.toBeNull();
+    expect(css).toMatch(
+      /\.fc-fmtdlg--mac\.fc-fmtdlg--mac-dxf[\s\S]*?\.fc-fmtdlg__hintbar[^{]*\{\s*width: 464px;/,
+    );
   });
 
   it('puts the Automatic caption in the color popup, off the Color label', () => {

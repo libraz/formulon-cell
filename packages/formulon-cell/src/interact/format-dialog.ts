@@ -564,6 +564,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const numberMode = mode === 'numberFormat';
     overlay.classList.toggle('fc-fmtdlg--data-validation', dataValidationMode);
     overlay.classList.toggle('fc-fmtdlg--number-format', numberMode);
+    overlay.classList.toggle('fc-fmtdlg--mac-dxf', macDxf !== null);
     // `role="dialog"` sits on the overlay, so the accessible name has to be set
     // there — labelling the panel leaves the dialog announcing the format title
     // while the header reads Data Validation.

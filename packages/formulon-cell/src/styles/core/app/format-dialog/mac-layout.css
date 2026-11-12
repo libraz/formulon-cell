@@ -2410,10 +2410,19 @@
     box-sizing: border-box;
   }
 
-  /* A differential format's Clear sits at the footer's left end, apart from Cancel and OK; its
-     exact frame is unmeasured. */
+  /* A differential format's Clear sits in the tab panel's bottom-right corner, on the panel's
+     inner margin; the footer keeps only Cancel and OK. */
   .fc-fmtdlg--mac .fc-fmtdlg__panel .fc-fmtdlg__footer .fc-fmtdlg__btn.fc-fmtdlg__btn--clear {
-    left: 29px;
+    left: 501px;
+    top: 511px;
+    z-index: 3;
+  }
+
+  /* The Number tab's bottom hint stops short of Clear. */
+  .fc-fmtdlg--mac.fc-fmtdlg--mac-dxf
+    .fc-fmtdlg__panel
+    .fc-fmtdlg__hintbar:not([data-fc-cat="general"]):not([data-fc-cat="text"]) {
+    width: 464px;
   }
 
   /* An unset font color reads Automatic in the color popup: the caption covers the well, left
