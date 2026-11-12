@@ -175,7 +175,7 @@ const inTransaction = (history: History | null, fn: () => void): void => {
 /** Deletes the custom style `name`, as one undo step, as the desktop app does. A style may be
  *  flagged for tables, PivotTables or both. The users of each kind take that kind's workbook
  *  default. A deleted default resets first, to Table Style Medium 2 / PivotTable Style Light 16.
- *  Refused when no custom style has that name, or while any sheet of the workbook is protected,
+ *  Refused when no custom style has that name, then while any sheet of the workbook is protected,
  *  whoever uses the style. */
 export function deleteCustomStyle(
   ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
@@ -242,8 +242,8 @@ export interface ModifyStyleDefault {
  *  the style is flagged for takes the change; its tables and PivotTables follow under the new
  *  name, and so does a workbook default that named it. `defaults` applies the dialog's Set As
  *  Default checkbox: ticked makes the style `kind`'s default, unticked clears that default when
- *  it named the style. Refused when no custom style has that name, the new name is taken, or any
- *  sheet of the workbook is protected. */
+ *  it named the style. Refused when no custom style has that name or the new name is unusable,
+ *  then when any sheet of the workbook is protected. */
 export function modifyCustomStyle(
   ctx: Omit<TableActionContext, 'origin' | 'commandId'>,
   name: string,
@@ -256,9 +256,9 @@ export function modifyCustomStyle(
   const pivot = (state.tables.customPivotTableStyles ?? []).find(named);
   const label = next.label.trim();
   if (!table && !pivot) return refused('notFound');
-  if (anySheetProtected(state)) return refused('workbookHasProtectedSheet');
   if (!label || customStyleNameError(state, label, { exceptLabel: name }))
     return refused('invalidName');
+  if (anySheetProtected(state)) return refused('workbookHasProtectedSheet');
   inTransaction(ctx.history, () => {
     // The engine resets a default whose style it removes: a default naming the old name moves
     // first, and a ticked one is set again once the style is back.

@@ -191,6 +191,27 @@ describe('table style commands', () => {
       ).toEqual(['Pivot Brand']);
     });
 
+    // Delete and Modify check their arguments first, as the engine does: an unknown style or an
+    // unusable new name is reported before the protection refusal.
+    it('reports a bad argument before the protection refusal, for Delete and Modify alike', () => {
+      useBrand();
+      createCustomStyle(ctx(), null, 'table', value('Taken', false));
+      expect(deleteCustomStyle(ctx(), sheet.workbook, 'Missing')).toEqual({
+        ok: false,
+        reason: 'notFound',
+      });
+      expect(modifyCustomStyle(ctx(), 'Missing', { label: 'M2', elements })).toEqual({
+        ok: false,
+        reason: 'notFound',
+      });
+      for (const label of ['Taken', '  ']) {
+        expect(modifyCustomStyle(ctx(), 'Brand', { label, elements })).toEqual({
+          ok: false,
+          reason: 'invalidName',
+        });
+      }
+    });
+
     it('still duplicates a style while a sheet is protected', () => {
       useBrand();
       expect(createCustomStyle(ctx(), null, 'table', value('Brand 2', false))).toBe(true);
