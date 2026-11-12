@@ -37,7 +37,7 @@ const expectItems = async (menu: Locator, ids: readonly string[], enabled: boole
   }
 };
 
-/** The Mac cell menu with nothing copied, in desktop order; `|` is a separator. */
+/** The Mac cell menu on a protected sheet with nothing copied, in desktop order; `|` is a separator. */
 const MAC_CELL_MENU = [
   'cut',
   'copy',
@@ -52,7 +52,6 @@ const MAC_CELL_MENU = [
   'sort',
   '|',
   'newComment',
-  'insertComment',
   '|',
   'formatCells',
   'pickFromList',
@@ -76,8 +75,8 @@ const readMenuOrder = (menu: Locator) =>
 const OPTION_GATED = ['formatCells', 'showPhonetic', 'defineName', 'insertHyperlink'] as const;
 
 /** On a protected sheet under default options, Format Cells, Show Phonetic, Define Name and
- *  Hyperlink are greyed whatever the selection, while New Comment stays enabled. New Note greys
- *  too: notes follow Edit objects rather than the cell's lock, as Edit Note and Delete Note do.
+ *  Hyperlink are greyed whatever the selection, while New Comment stays enabled and New Note is
+ *  absent from the menu.
  *  Clear Contents is greyed when the selection holds a locked cell, and Pick From Drop-down List
  *  when the active cell is locked; on unlocked cells both work, a pick being an undoable entry. */
 export async function runProtectedSheetMenuScenario(page: Page): Promise<void> {
@@ -88,13 +87,14 @@ export async function runProtectedSheetMenuScenario(page: Page): Promise<void> {
 
   await protectWithUnlocked(page, 'B3');
   let menu = await openCellMenu(sheet, page, 'B2:B4');
-  await expectItems(menu, [...OPTION_GATED, 'insertComment', 'clear', 'pickFromList'], false);
+  await expectItems(menu, [...OPTION_GATED, 'clear', 'pickFromList'], false);
   await expectItems(menu, ['newComment'], true);
+  await expect(menu.locator('[data-fc-action="insertComment"]')).toHaveCount(0);
   await closeMenu(page, menu);
 
   await protectWithUnlocked(page, 'B2:B5');
   menu = await openCellMenu(sheet, page, 'B2:B4');
-  await expectItems(menu, [...OPTION_GATED, 'insertComment'], false);
+  await expectItems(menu, OPTION_GATED, false);
   await expectItems(menu, ['clear', 'newComment', 'pickFromList'], true);
   expect(await readMenuOrder(menu)).toEqual(MAC_CELL_MENU);
   await closeMenu(page, menu);
