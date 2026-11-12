@@ -40,35 +40,20 @@ const expectAxisMenuUnavailable = async (page: Page) => {
   await expect(menu).toBeHidden();
 };
 
-/** Axis on the Mac chrome: a dialog whose inputs and OK are all unavailable; Cancel closes it. */
-const expectAxisDialogUnavailable = async (page: Page) => {
+/** Axis on the Mac chrome: the button stays enabled but does nothing, opening no dialog. */
+const expectAxisInert = async (page: Page) => {
   const axis = sparklineCommand(page, 'sparklineAxisDialog');
   await revealRibbonCommand(axis);
   await expect(axis).toBeEnabled();
   await axis.click();
-  const dialog = page.getByRole('dialog', { name: '軸', exact: true });
-  await expect(dialog).toBeVisible();
-  for (const name of ['横', '縦']) {
-    await dialog.getByRole('tab', { name, exact: true }).click();
-    await expect(dialog.getByRole('tabpanel')).toBeVisible();
-  }
-  const inputs = dialog.locator('input');
-  expect(await inputs.count()).toBeGreaterThan(0);
-  expect(
-    await inputs.evaluateAll(
-      (els) => els.filter((el) => !(el as HTMLInputElement).disabled).length,
-    ),
-  ).toBe(0);
-  await expect(dialog.locator('.fc-fmtdlg__btn--primary')).toBeDisabled();
-  const cancel = dialog.locator('[data-dialog-action="cancel"]');
-  await expect(cancel).toBeEnabled();
-  await cancel.click();
-  await expect(dialog).toBeHidden();
+  await page.waitForTimeout(300);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.fc-macsparkaxis')).toHaveCount(0);
 };
 
 /** The Sparkline tab on a sparkline cell of a protected sheet: every control is unavailable except
- *  Axis, which opens a menu (Windows) or dialog (Mac) of unavailable controls, so the group cannot
- *  change. */
+ *  Axis, which opens a menu of unavailable entries (Windows) or does nothing (Mac), so the group
+ *  cannot change. */
 const expectTabUnavailable = async (page: Page, platform: Platform) => {
   await selectRibbonTab(page, 'sparklineDesign');
   const commands = page.locator('[data-ribbon-panel="sparklineDesign"] [data-ribbon-command]');
@@ -88,7 +73,7 @@ const expectTabUnavailable = async (page: Page, platform: Platform) => {
   const axisId = platform === 'mac' ? 'sparklineAxisDialog' : 'sparklineAxis';
   expect(sparklineIds.filter(([id, off]) => id !== axisId && !off)).toEqual([]);
 
-  if (platform === 'mac') await expectAxisDialogUnavailable(page);
+  if (platform === 'mac') await expectAxisInert(page);
   else await expectAxisMenuUnavailable(page);
 };
 
