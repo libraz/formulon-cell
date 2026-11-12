@@ -139,6 +139,9 @@ describe('deleteCustomStyle', () => {
     expect(table()?.styleName).toBe('Brand');
     expect(pivotStyle()).toBe('Brand');
     expect(defaults()).toMatchObject({ tableStyle: 'Brand', pivotStyle: 'Brand' });
+    sheet.instance.history.redo();
+    expect(table()?.styleName).toBe('TableStyleMedium2');
+    expect(pivotStyle()).toBe('PivotStyleLight16');
   });
 
   it('refuses a name no custom style has', () => {

@@ -238,7 +238,7 @@ const AXIS_BOUND_TYPES = [
 ] as const;
 
 /** The Axis dialog of the Mac app: the horizontal axis on one tab and the two vertical bounds on
- *  the other, applied together on OK. Plot Data Right-to-Left stays greyed. */
+ *  the other, applied together on OK. */
 export const showSparklineAxisDialog = (
   opts: SparklineAxisDialogOptions,
 ): Promise<SparklineAxisDialogResult | null> =>

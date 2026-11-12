@@ -1,4 +1,5 @@
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators } from '../store/store.js';
@@ -15,7 +16,6 @@ import {
   customStyleNameError,
   customTableStyleId,
   DEFAULT_TABLE_COLOR,
-  defaultTableStyleId,
   overlayStyleName,
   pivotTableStyleAssignment,
   sameStyleName,
@@ -126,7 +126,8 @@ type StyleDefaultsWorkbook = Pick<
 >;
 
 type DeleteStyleWorkbook = StyleDefaultsWorkbook &
-  Pick<WorkbookHandle, 'getPivotTables' | 'getPivotStyleInfo' | 'setPivotStyleInfo' | 'cells'>;
+  Pick<WorkbookHandle, 'getPivotTables' | 'getPivotStyleInfo' | 'setPivotStyleInfo' | 'cells'> &
+  Parameters<typeof hydrateTableOverlaysFromEngine>[0];
 
 /** Why Delete or Modify left a custom style as it was. */
 export type CustomStyleRefusal = 'notFound' | 'invalidName' | 'workbookHasProtectedSheet';
@@ -190,47 +191,40 @@ export function deleteCustomStyle(
   const history = ctx.history;
   const transaction = history?.begin();
   try {
-    const before = workbook?.getTableStyleDefaults() ?? null;
-    if (workbook && before) {
-      recordStyleDefaults(history, workbook, {
-        ...(forTables && sameStyleName(before.tableStyle, name) ? { tableStyle: '' } : {}),
-        ...(forPivots && sameStyleName(before.pivotStyle, name) ? { pivotStyle: '' } : {}),
-      });
-    }
-    const pivotUsers =
+    // The engine moves the style's users to the defaults, and resets a default naming it, when the
+    // style goes. Undo restores the style first, then what was captured here.
+    const defaults = workbook?.getTableStyleDefaults() ?? null;
+    const pivots =
       forPivots && workbook
-        ? workbook
-            .getPivotTables()
-            .filter((p) =>
-              sameStyleName(
-                workbook.getPivotStyleInfo(p.sheetIndex, p.pivotIndex)?.name ?? '',
-                name,
-              ),
-            )
+        ? workbook.getPivotTables().flatMap((p) => {
+            const info = workbook.getPivotStyleInfo(p.sheetIndex, p.pivotIndex);
+            return info && sameStyleName(info.name ?? '', name) ? [{ ...p, info }] : [];
+          })
         : [];
-    // Re-point the PivotTables while the style still exists, so undo can point them back: the
-    // engine re-points any it still finds when the style goes.
-    if (workbook) {
-      const pivotDefault = workbook.getTableStyleDefaults()?.pivotStyle || FALLBACK_PIVOT_STYLE;
-      for (const pivot of pivotUsers) {
-        updatePivotStyleInfo(
-          { store: ctx.store, workbook: workbook as WorkbookHandle, history },
-          pivot,
-          { name: pivotDefault },
-        );
+    const repaint = (): void => {
+      if (!workbook) return;
+      for (const sheet of new Set(pivots.map((p) => p.sheetIndex))) {
+        mutators.replaceCells(ctx.store, workbook.cells(sheet));
       }
+    };
+    const replaying = !history || history.isReplaying();
+    if (!replaying && workbook && (defaults || pivots.length > 0)) {
+      history.push({
+        undo: () => {
+          if (defaults) workbook.setTableStyleDefaults(defaults);
+          for (const p of pivots) workbook.setPivotStyleInfo(p.sheetIndex, p.pivotIndex, p.info);
+          repaint();
+        },
+        redo: () => undefined,
+      });
     }
     recordTablesChange(history, ctx.store, () => {
       mutators.removeCustomStylesNamed(ctx.store, name);
-      if (!forTables) return;
-      const fallback = defaultTableStyleId(ctx.store.getState(), workbook);
-      const look = styleLook(ctx.store.getState(), fallback);
-      if (!look) return;
-      for (const table of ctx.store.getState().tables.tables) {
-        if (sameStyleName(overlayStyleName(table), name))
-          updateTableOverlay(ctx.store, table.id, look);
-      }
+      // The overlays follow the tables the engine moved.
+      if (workbook && forTables) hydrateTableOverlaysFromEngine(workbook, ctx.store);
     });
+    repaint();
+    if (!replaying && pivots.length > 0) history.push({ undo: () => undefined, redo: repaint });
   } finally {
     if (history && transaction) history.end(transaction);
   }
