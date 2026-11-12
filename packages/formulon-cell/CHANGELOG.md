@@ -111,7 +111,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
-- Remove Duplicates and Create from Selection no longer refuse silently: a range too large to handle, or an action the engine cannot carry out, raises an alert, the title-less one on the Mac and one titled with the command elsewhere. Go To Special raises its too-large alert the same way.
+- Remove Duplicates and Create from Selection no longer refuse silently: a range too large to handle, or an action the engine cannot carry out, raises an alert, the title-less one on the Mac and one titled with the command elsewhere. Go To Special and the Find & Select searches (Formulas, Constants and the rest) raise their too-large alert the same way.
 - A sort by a custom list inside a filtered range is remembered with the filter and written to the file's sort state with its list, and a custom-list sort level read from a file comes back into the filter's sort.
 - A filter column whose dropdown button the file hides shows no button, keeps its filter applied and editable, and keeps the hidden button through a save.
 - Switching a column filter between conditions that hide the same rows, such as two date periods, is its own undo step.

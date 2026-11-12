@@ -621,6 +621,8 @@ export type RibbonFindActionResult =
   | { kind: 'open-objects' }
   | { kind: 'selected' }
   | { kind: 'report'; report: RibbonFindActionReport }
+  /** The search found more cells than a selection can hold. */
+  | { kind: 'refused'; reason: 'too-large' }
   | { kind: 'noop' };
 
 export interface ExecuteRibbonFindActionDeps {
@@ -631,7 +633,6 @@ export interface ExecuteRibbonFindActionDeps {
     findSelect: string;
     findNoMatches: string;
     commentNone: string;
-    selectionTooLarge: string;
   };
 }
 
@@ -665,13 +666,10 @@ export const executeRibbonFindAction = (
   const kind = RIBBON_SPECIAL_KINDS[action];
   if (!kind) return { kind: 'noop' };
   const found = findMatchingRanges(workbook, store, kind);
+  // Too many matches is a refusal, raised as Go To Special raises it.
+  if (found.status === 'too-large') return { kind: 'refused', reason: 'too-large' };
   if (found.status !== 'found') {
-    const label =
-      found.status === 'too-large'
-        ? strings.selectionTooLarge
-        : kind === 'comments'
-          ? strings.commentNone
-          : strings.findNoMatches;
+    const label = kind === 'comments' ? strings.commentNone : strings.findNoMatches;
     return {
       kind: 'report',
       report: { title: strings.findSelect, items: [{ severity: 'info', label, detail: '' }] },

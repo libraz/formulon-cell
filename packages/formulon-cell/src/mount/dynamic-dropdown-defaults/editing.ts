@@ -307,9 +307,18 @@ const buildFindSelectAction =
         findSelect: strings.ribbon.findSelect,
         findNoMatches: strings.ribbonMenu.findNoMatches,
         commentNone: strings.ribbonMenu.commentNone,
-        selectionTooLarge: strings.commandRefusal.tooLarge,
       },
     });
+    if (result.kind === 'refused') {
+      await showCommandRefusal({
+        host: instance.host,
+        strings,
+        title: strings.ribbon.findSelect,
+        reason: result.reason,
+      });
+      instance.host.focus();
+      return;
+    }
     if (result.kind === 'open-find') {
       instance.openFindReplace(result.mode);
       return;
