@@ -77,6 +77,14 @@ export interface RibbonMenusStrings {
     sortDialogTitle: string;
     sortDialogColumn: string;
     sortDialogOrder: string;
+    /** The Sort dialog's Sort On column and its choices, and the order of a colour or icon level. */
+    sortDialogSortOn: string;
+    sortOnCellValues: string;
+    sortOnCellColor: string;
+    sortOnFontColor: string;
+    sortOnCellIcon: string;
+    sortOnTop: string;
+    sortOnBottom: string;
     sortDialogAscending: string;
     sortDialogDescending: string;
     sortDialogHeader: string;

@@ -20,6 +20,15 @@ const labels = {
   levelUnavailableLabel: 'At least one sort level is required.',
   ascendingLabel: 'A to Z',
   descendingLabel: 'Z to A',
+  sortOn: {
+    heading: 'Sort On',
+    values: 'Cell Values',
+    cellColor: 'Cell Color',
+    fontColor: 'Font Color',
+    cellIcon: 'Conditional Formatting Icon',
+    onTop: 'On Top',
+    onBottom: 'On Bottom',
+  },
   okLabel: 'OK',
   cancelLabel: 'Cancel',
 };
@@ -59,7 +68,7 @@ describe('showSortDialog', () => {
 
     const rows = Array.from(dialog?.querySelectorAll<HTMLElement>('.fc-sortdlg__level') ?? []);
     const secondColumn = rows[1]?.querySelector<HTMLSelectElement>('select[aria-label="Then by"]');
-    const secondDirection = rows[1]?.querySelectorAll<HTMLSelectElement>('select')[1];
+    const secondDirection = rows[1]?.querySelector<HTMLSelectElement>('.fc-sortdlg__direction');
     if (secondColumn) secondColumn.value = '1';
     if (secondDirection) secondDirection.value = 'desc';
 
@@ -145,6 +154,15 @@ describe('showSortDialog', () => {
       copyLevelLabel: 'レベルのコピー',
       ascendingLabel: macSortDialogJa.sortDialogAscending ?? '',
       descendingLabel: macSortDialogJa.sortDialogDescending ?? '',
+      sortOn: {
+        heading: 'Sort On',
+        values: 'Cell Values',
+        cellColor: 'Cell Color',
+        fontColor: 'Font Color',
+        cellIcon: 'Conditional Formatting Icon',
+        onTop: 'On Top',
+        onBottom: 'On Bottom',
+      },
       okLabel: 'OK',
       cancelLabel: 'キャンセル',
       mac: macSortDialogJa,
@@ -184,13 +202,19 @@ describe('showSortDialog', () => {
       const column = row?.querySelector<HTMLSelectElement>('.fc-sortdlg__column');
       expect(Array.from(column?.options ?? [], (o) => o.text)).toEqual(['名前', '部門', '売上']);
       const sortOn = row?.querySelector<HTMLSelectElement>('.fc-sortdlg__sort-on');
-      expect(Array.from(sortOn?.options ?? [], (o) => o.text)).toEqual(['値']);
+      // Values, then the colour and icon kinds, greyed while the column shows none.
+      expect(Array.from(sortOn?.options ?? [], (o) => [o.text, o.disabled])).toEqual([
+        ['値', false],
+        ['Cell Color', true],
+        ['Font Color', true],
+        ['Conditional Formatting Icon', true],
+      ]);
       const direction = row?.querySelector<HTMLSelectElement>('.fc-sortdlg__direction');
       expect(Array.from(direction?.options ?? [], (o) => o.text)).toEqual([
         '昇順 (A ～ Z)',
         '降順 (Z ～ A)',
       ]);
-      expect(row?.querySelector<HTMLSelectElement>('.fc-sortdlg__color')?.disabled).toBe(true);
+      expect(row?.querySelector<HTMLElement>('.fc-sortdlg__color')?.hidden).toBe(true);
 
       const add = dialog?.querySelector<HTMLButtonElement>('.fc-sortdlg__add-level');
       const del = dialog?.querySelector<HTMLButtonElement>('.fc-sortdlg__delete-level');
@@ -229,7 +253,8 @@ describe('showSortDialog', () => {
       void showSortDialog({ ...macOptions(macHost()), host: undefined });
       const dialog = document.querySelector<HTMLElement>('.fc-tb__dlg');
       expect(dialog?.querySelector('.fc-sortdlg__heading')).toBeNull();
-      expect(dialog?.querySelector('.fc-sortdlg__sort-on')).toBeNull();
+      // The shared layout has Sort On too, as the Windows desktop does.
+      expect(dialog?.querySelector('.fc-sortdlg__sort-on')).not.toBeNull();
       expect(dialog?.querySelector('.fc-sortdlg__options')).toBeNull();
       expect(dialog?.querySelector('.fc-sortdlg__add-level')?.textContent).toBe('レベルの追加');
       expect(

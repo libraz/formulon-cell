@@ -17,6 +17,7 @@ import {
   type FilterActionContext,
   filterUseWrite,
 } from '../../commands/filter-actions.js';
+import { columnColorChoices } from '../../commands/filter-colors.js';
 import { activeFilterRange } from '../../commands/filter-ranges.js';
 import { executeRibbonFindAction } from '../../commands/goto-special.js';
 import {
@@ -406,6 +407,17 @@ const buildSortMenuAction =
         levelUnavailableLabel: strings.sortLevelUnavailable,
         ascendingLabel: strings.sortDialogAscending,
         descendingLabel: strings.sortDialogDescending,
+        sortOn: {
+          heading: strings.sortDialogSortOn,
+          values: strings.sortOnCellValues,
+          cellColor: strings.sortOnCellColor,
+          fontColor: strings.sortOnFontColor,
+          cellIcon: strings.sortOnCellIcon,
+          onTop: strings.sortOnTop,
+          onBottom: strings.sortOnBottom,
+        },
+        colorChoices: (column) =>
+          columnColorChoices(instance.store.getState(), range, Number(column)),
         columns,
         rows: mac
           ? Array.from({ length: range.r1 - range.r0 + 1 }, (_, i) => ({
@@ -435,6 +447,9 @@ const buildSortMenuAction =
             keys: result.levels.map((level) => ({
               byCol: Number(level.column),
               direction: level.direction,
+              ...(level.sortOn ? { sortOn: level.sortOn } : {}),
+              ...(level.color ? { color: level.color } : {}),
+              ...(level.icon ? { icon: level.icon } : {}),
             })),
             hasHeader: result.hasHeader,
             orientation: result.orientation,

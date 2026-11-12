@@ -9,7 +9,9 @@
   .fc-sortdlg__grid-head,
   .fc-sortdlg__level {
     display: grid;
-    grid-template-columns: minmax(96px, 0.8fr) minmax(150px, 1.2fr) minmax(110px, 0.8fr);
+    grid-template-columns:
+      minmax(96px, 0.8fr) minmax(150px, 1.2fr) minmax(130px, 1fr)
+      minmax(150px, 1.2fr);
     gap: 8px;
     align-items: center;
   }
@@ -253,6 +255,37 @@
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg .fc-sortdlg__level .fc-sortdlg__color {
     width: 103px;
+  }
+
+  /* A colour or icon level's swatches: the column's fills, font colours or icons. */
+  .fc-sortdlg__order {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .fc-sortdlg__color {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px;
+  }
+  .fc-sortdlg__color[hidden] {
+    display: none;
+  }
+  .fc-sortdlg__swatch {
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    padding: 1px;
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: 2px;
+    background: var(--fc-swatch, transparent);
+  }
+  .fc-sortdlg__swatch[aria-pressed="true"] {
+    box-shadow: 0 0 0 2px var(--fc-accent, dodgerblue);
+  }
+  .fc-sortdlg__swatch > canvas {
+    display: block;
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-sortdlg .fc-fmtdlg__btn {
     position: absolute;

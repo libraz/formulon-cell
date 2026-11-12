@@ -484,3 +484,24 @@ export function drawConditionalIconArt(
       return;
   }
 }
+
+/** One icon as a small canvas element, drawn as the grid paints it, for a swatch or a menu row. */
+export function conditionalIconCanvas(
+  doc: Document,
+  kind: ConditionalIconSet,
+  slot: number,
+  size = 14,
+): HTMLCanvasElement {
+  const canvas = doc.createElement('canvas');
+  const ratio = doc.defaultView?.devicePixelRatio ?? 1;
+  canvas.width = Math.round(size * ratio);
+  canvas.height = Math.round(size * ratio);
+  canvas.style.width = `${size}px`;
+  canvas.style.height = `${size}px`;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.scale((size * ratio) / 12, (size * ratio) / 12);
+    drawConditionalIconArt(ctx, kind, slot);
+  }
+  return canvas;
+}

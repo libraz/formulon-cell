@@ -34,10 +34,9 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialToDateParts, excelSerialToIsoDate } from '../format/date-serial.js';
 import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { drawConditionalIconArt } from '../render/painters/cf-icons.js';
+import { conditionalIconCanvas } from '../render/painters/cf-icons.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
-import type { ConditionalIconSet } from '../store/types/conditional-rule.js';
 import type { FilterColorSpec } from '../store/types.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
@@ -269,21 +268,6 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       .data.cells.get(addrKey({ sheet: range.sheet, row: range.r0, col }))?.value;
     if (value?.kind === 'text') return value.value;
     return value?.kind === 'number' ? String(value.value) : '';
-  };
-
-  /** A conditional formatting icon drawn at 14 px, as the grid paints it. */
-  const iconCanvas = (set: ConditionalIconSet, slot: number): HTMLCanvasElement => {
-    const canvas = ownerDocument.createElement('canvas');
-    const ratio = ownerDocument.defaultView?.devicePixelRatio ?? 1;
-    canvas.width = Math.round(14 * ratio);
-    canvas.height = Math.round(14 * ratio);
-    canvas.className = 'fc-filter-dropdown__swatch-icon';
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.scale((14 * ratio) / 12, (14 * ratio) / 12);
-      drawConditionalIconArt(ctx, set, slot);
-    }
-    return canvas;
   };
 
   const open = (range: Range, col: number, anchor: { x: number; y: number; h: number }): void => {
@@ -922,7 +906,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
                 icon,
               });
               button.dataset.fcIcon = `${icon.set}:${icon.slot}`;
-              button.appendChild(iconCanvas(icon.set, icon.slot));
+              const canvas = conditionalIconCanvas(ownerDocument, icon.set, icon.slot);
+              canvas.className = 'fc-filter-dropdown__swatch-icon';
+              button.appendChild(canvas);
               swatches.appendChild(button);
             }
             return;

@@ -1,4 +1,7 @@
+import type { ColumnColorChoices } from '../../commands/filter-colors.js';
 import type { MacSortDialogLabels } from '../../i18n/strings/mac/sort-dialog.js';
+import { conditionalIconCanvas } from '../../render/painters/cf-icons.js';
+import type { ConditionalIconRef } from '../../store/types/conditional-rule.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import { appendDialogSelectOptions, createDialogSelect } from './form-controls.js';
 import {
@@ -38,6 +41,11 @@ export interface SortDialogOptions {
   /** Key choices once the sort runs left to right (Mac options sheet); values
    *  are absolute row indexes. Without them the column list stays. */
   rows?: readonly SortDialogColumn[];
+  /** Sort On choices and the order of a colour or icon level. */
+  sortOn: SortDialogSortOnLabels;
+  /** The fills, font colours and conditional formatting icons a column's data shows, keyed by
+   *  the column's value; a colour or icon level picks from them. */
+  colorChoices?: (column: string) => ColumnColorChoices;
   initialColumn: string;
   initialDirection: 'asc' | 'desc';
   initialHasHeader: boolean;
@@ -45,10 +53,30 @@ export interface SortDialogOptions {
   cancelLabel: string;
 }
 
+export interface SortDialogSortOnLabels {
+  heading: string;
+  values: string;
+  cellColor: string;
+  fontColor: string;
+  cellIcon: string;
+  onTop: string;
+  onBottom: string;
+}
+
+/** One level of the dialog: a value level, or a colour or icon to put on top (`asc`) or at the
+ *  bottom. */
+export interface SortDialogLevel {
+  column: string;
+  direction: 'asc' | 'desc';
+  sortOn?: 'cellColor' | 'fontColor' | 'cellIcon';
+  color?: string;
+  icon?: ConditionalIconRef;
+}
+
 export interface SortDialogResult {
   column: string;
   direction: 'asc' | 'desc';
-  levels: Array<{ column: string; direction: 'asc' | 'desc' }>;
+  levels: SortDialogLevel[];
   hasHeader: boolean;
   orientation: 'topToBottom' | 'leftToRight';
   matchCase: boolean;
@@ -61,25 +89,14 @@ const buildColumnSelect = (
   return createDialogSelect(columns, initial);
 };
 
-const buildDirectionSelect = (
-  asc: string,
-  desc: string,
-  initial: 'asc' | 'desc',
-): HTMLSelectElement => {
-  return createDialogSelect(
-    [
-      { value: 'asc', label: asc },
-      { value: 'desc', label: desc },
-    ],
-    initial,
-  );
-};
-
 interface SortLevelControls {
   row: HTMLDivElement;
   label: HTMLSpanElement;
   column: HTMLSelectElement;
   direction: HTMLSelectElement;
+  sortOn: HTMLSelectElement;
+  /** The level as the dialog's result reports it. */
+  value(): SortDialogLevel;
 }
 
 const appendSortLevelRow = (
@@ -88,44 +105,153 @@ const appendSortLevelRow = (
   mac: MacSortDialogLabels | undefined,
   keys: readonly SortDialogColumn[],
   rowLabel: string,
-  columnValue: string,
-  directionValue: 'asc' | 'desc',
+  initial: SortDialogLevel,
 ): SortLevelControls => {
-  const row = document.createElement('div');
+  const doc = body.ownerDocument;
+  const row = doc.createElement('div');
   row.className = 'fc-sortdlg__level';
   row.setAttribute('role', 'row');
 
-  const label = document.createElement('span');
+  const label = doc.createElement('span');
   label.className = 'fc-sortdlg__level-label';
   label.textContent = rowLabel;
   label.setAttribute('role', 'rowheader');
 
-  const column = buildColumnSelect(keys, columnValue);
+  const column = buildColumnSelect(keys, initial.column);
   column.classList.add('fc-sortdlg__column');
   column.setAttribute('aria-label', rowLabel);
   column.setAttribute('role', 'cell');
 
-  const direction = buildDirectionSelect(opts.ascendingLabel, opts.descendingLabel, directionValue);
+  const t = opts.sortOn;
+  const sortOn = createDialogSelect([], '', { ariaLabel: t.heading, role: 'cell' });
+  sortOn.classList.add('fc-sortdlg__sort-on');
+  const direction = createDialogSelect([], '', { ariaLabel: opts.orderLabel, role: 'cell' });
   direction.classList.add('fc-sortdlg__direction');
-  direction.setAttribute('aria-label', opts.orderLabel);
-  direction.setAttribute('role', 'cell');
+  // A colour or icon level's choices: the swatches of what the column shows. The Mac layout
+  // gives them its Color column; the shared layout sets them beside the order. Provisional until
+  // measured.
+  const swatches = doc.createElement('div');
+  swatches.className = 'fc-sortdlg__color';
+  swatches.setAttribute('role', 'cell');
+  swatches.setAttribute('aria-label', mac?.colorHeading ?? t.heading);
+  let picked: { color?: string; icon?: ConditionalIconRef } = {
+    ...(initial.color ? { color: initial.color } : {}),
+    ...(initial.icon ? { icon: initial.icon } : {}),
+  };
+
+  const kind = (): SortDialogLevel['sortOn'] | undefined =>
+    sortOn.value === 'values' ? undefined : (sortOn.value as SortDialogLevel['sortOn']);
+  const choices = (): ColumnColorChoices =>
+    opts.colorChoices?.(column.value) ?? { fills: [], fonts: [], icons: [] };
+
+  const renderSortOn = (): void => {
+    const current = kind() ?? initial.sortOn ?? 'values';
+    const c = choices();
+    sortOn.replaceChildren();
+    appendDialogSelectOptions(sortOn, [
+      { value: 'values', label: mac?.sortOnValues ?? t.values },
+      { value: 'cellColor', label: t.cellColor, disabled: c.fills.length === 0 },
+      { value: 'fontColor', label: t.fontColor, disabled: c.fonts.length === 0 },
+      { value: 'cellIcon', label: t.cellIcon, disabled: c.icons.length === 0 },
+    ]);
+    const option = [...sortOn.options].find((o) => o.value === current);
+    sortOn.value = option && !option.disabled ? current : 'values';
+  };
+  const renderOrder = (value: 'asc' | 'desc'): void => {
+    direction.replaceChildren();
+    appendDialogSelectOptions(
+      direction,
+      kind()
+        ? [
+            { value: 'asc', label: t.onTop },
+            { value: 'desc', label: t.onBottom },
+          ]
+        : [
+            { value: 'asc', label: opts.ascendingLabel },
+            { value: 'desc', label: opts.descendingLabel },
+          ],
+    );
+    direction.value = value;
+  };
+  const renderSwatches = (): void => {
+    swatches.replaceChildren();
+    const k = kind();
+    swatches.hidden = !k;
+    if (!k) return;
+    const c = choices();
+    const buttons: HTMLButtonElement[] = [];
+    const add = (labelText: string, choice: { color?: string; icon?: ConditionalIconRef }) => {
+      const button = appendDialogButton(swatches, { label: '' });
+      button.className = 'fc-sortdlg__swatch';
+      button.setAttribute('aria-label', labelText);
+      const on =
+        choice.color !== undefined
+          ? picked.color === choice.color
+          : picked.icon?.set === choice.icon?.set && picked.icon?.slot === choice.icon?.slot;
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+      button.addEventListener('click', () => {
+        picked = choice;
+        for (const other of buttons) other.setAttribute('aria-pressed', 'false');
+        button.setAttribute('aria-pressed', 'true');
+      });
+      buttons.push(button);
+      return button;
+    };
+    if (k === 'cellIcon') {
+      for (const icon of c.icons) {
+        const button = add(`${icon.set} ${icon.slot + 1}`, { icon });
+        button.dataset.fcIcon = `${icon.set}:${icon.slot}`;
+        button.appendChild(conditionalIconCanvas(doc, icon.set, icon.slot));
+      }
+    } else {
+      for (const color of k === 'cellColor' ? c.fills : c.fonts) {
+        const button = add(color, { color });
+        button.dataset.fcColor = color;
+        button.style.setProperty('--fc-swatch', color);
+      }
+    }
+    // A level starts on the column's first colour or icon, as the desktop does.
+    if (!buttons.some((b) => b.getAttribute('aria-pressed') === 'true')) buttons[0]?.click();
+  };
+
+  renderSortOn();
+  renderOrder(initial.direction);
+  renderSwatches();
+  sortOn.addEventListener('change', () => {
+    picked = {};
+    renderOrder(direction.value === 'desc' ? 'desc' : 'asc');
+    renderSwatches();
+  });
+  column.addEventListener('change', () => {
+    picked = {};
+    renderSortOn();
+    renderOrder(direction.value === 'desc' ? 'desc' : 'asc');
+    renderSwatches();
+  });
 
   if (mac) {
-    // Values are the only sort-on key; colour and icon sorts are not offered.
-    const sortOn = createDialogSelect([{ value: 'values', label: mac.sortOnValues }], 'values', {
-      ariaLabel: mac.sortOnHeading,
-      role: 'cell',
-    });
-    sortOn.classList.add('fc-sortdlg__sort-on');
-    const color = createDialogSelect([], '', { ariaLabel: mac.colorHeading, role: 'cell' });
-    color.classList.add('fc-sortdlg__color');
-    projectDisabledState(color, true, null);
-    row.append(label, column, sortOn, direction, color);
+    row.append(label, column, sortOn, direction, swatches);
   } else {
-    row.append(label, column, direction);
+    const order = doc.createElement('div');
+    order.className = 'fc-sortdlg__order';
+    order.setAttribute('role', 'cell');
+    order.append(swatches, direction);
+    direction.removeAttribute('role');
+    row.append(label, column, sortOn, order);
   }
   body.appendChild(row);
-  return { row, label, column, direction };
+  const value = (): SortDialogLevel => {
+    const k = kind();
+    const dir = direction.value === 'desc' ? 'desc' : 'asc';
+    if (k === 'cellIcon' && picked.icon) {
+      return { column: column.value, direction: dir, sortOn: k, icon: picked.icon };
+    }
+    if ((k === 'cellColor' || k === 'fontColor') && picked.color) {
+      return { column: column.value, direction: dir, sortOn: k, color: picked.color };
+    }
+    return { column: column.value, direction: dir };
+  };
+  return { row, label, column, direction, sortOn, value };
 };
 
 interface SortOptionsChoice {
@@ -257,7 +383,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     headerRow.setAttribute('role', 'row');
     const headings = mac
       ? ['', mac.columnHeading, mac.sortOnHeading, opts.orderLabel, mac.colorHeading]
-      : ['', opts.columnLabel, opts.orderLabel];
+      : ['', opts.columnLabel, opts.sortOn.heading, opts.orderLabel];
     const headCells: HTMLSpanElement[] = [];
     for (const label of headings) {
       const cell = document.createElement('span');
@@ -329,8 +455,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     };
 
     const addLevel = (
-      columnValue = opts.initialColumn,
-      directionValue: 'asc' | 'desc' = opts.initialDirection,
+      initial: SortDialogLevel = { column: opts.initialColumn, direction: opts.initialDirection },
       focus = true,
     ): void => {
       const level = appendSortLevelRow(
@@ -339,8 +464,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
         mac,
         keyItems(),
         levels.length === 0 ? opts.columnLabel : opts.thenByLabel,
-        columnValue,
-        directionValue,
+        initial,
       );
       level.row.addEventListener('click', () => selectLevel(levels.indexOf(level)));
       level.row.addEventListener('focusin', () => selectLevel(levels.indexOf(level)));
@@ -351,13 +475,14 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
       if (focus) level.column.focus({ preventScroll: true });
     };
 
-    addLevel(opts.initialColumn, opts.initialDirection, false);
+    addLevel(undefined, false);
 
     addLevelBtn.addEventListener('click', () => {
-      const source = levels[selectedLevelIndex];
+      const source = levels[selectedLevelIndex]?.value();
       addLevel(
-        source?.column.value ?? opts.initialColumn,
-        source?.direction.value === 'desc' ? 'desc' : 'asc',
+        source
+          ? { column: source.column, direction: source.direction }
+          : { column: opts.initialColumn, direction: opts.initialDirection },
       );
     });
     deleteLevelBtn.addEventListener('click', () => {
@@ -371,7 +496,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     copyLevelBtn.addEventListener('click', () => {
       const source = levels[selectedLevelIndex];
       if (!source) return;
-      addLevel(source.column.value, source.direction.value === 'desc' ? 'desc' : 'asc');
+      addLevel(source.value());
     });
 
     shell.body.appendChild(dataHeaderRow);
@@ -408,10 +533,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     const buildResult = (): SortDialogResult => ({
       column: levels[0]?.column.value ?? opts.initialColumn,
       direction: levels[0]?.direction.value === 'desc' ? 'desc' : 'asc',
-      levels: levels.map((level) => ({
-        column: level.column.value,
-        direction: level.direction.value === 'desc' ? 'desc' : 'asc',
-      })),
+      levels: levels.map((level) => level.value()),
       hasHeader: hasHeader.checked,
       orientation,
       matchCase,

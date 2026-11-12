@@ -70,6 +70,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- The Sort dialog sorts on cell colour, font colour or conditional formatting icon as well as values: Sort On offers the kinds the column shows, a colour or icon level picks from the column's own fills, font colours or icons, and its order is On Top or On Bottom.
 - Remove Duplicates reports what it did in the desktop wording: how many duplicate values it removed and how many unique values remain, or that none were found; on the Mac it is the compact title-less alert. A run it refuses, such as on merged cells or a locked range, never claims that no duplicates were found.
 - The Mac column panel sorts by color too: its sort side's By color pop-up puts the rows with the picked fill, font colour or conditional formatting icon first, and colour and icon sort levels are saved and read back with the filter.
 - The Mac column filter's By color pop-up lists the cell fills, font colours and conditional formatting icons the column shows and filters by the one picked; icon filters are saved and read back like colour filters.
