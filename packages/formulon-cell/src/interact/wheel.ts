@@ -20,18 +20,6 @@ export interface WheelDeps {
   getWb?: () => WorkbookHandle | null;
 }
 
-/**
- * Wheel-to-scroll bridge.
- *
- * - **Ctrl/Cmd + wheel** → zoom (delegates to `mutators.setZoom`).
- * - **Shift + wheel**    → horizontal scroll (deltaY redirected to deltaX).
- * - **Plain wheel**      → vertical (deltaY) and horizontal (deltaX) scroll.
- *   Over a split's top or left pane, that pane scrolls on its own axis.
- *
- * Trackpads emit small pixel-precise deltas (1–5 px), which would round to
- * zero rows on every event. We accumulate residuals across events so a slow
- * scroll still advances by one row once enough pixels have accumulated.
- */
 /** Whether the pointer is over the top and/or left pane of a split. */
 function splitPaneAt(
   grid: HTMLElement,
@@ -83,6 +71,18 @@ const MAC_COLS_PER_LINE = 0.15;
 const DOM_DELTA_LINE = 1;
 const DOM_DELTA_PAGE = 2;
 
+/**
+ * Wheel-to-scroll bridge.
+ *
+ * - **Ctrl/Cmd + wheel** → zoom (delegates to `mutators.setZoom`).
+ * - **Shift + wheel**    → horizontal scroll (deltaY redirected to deltaX).
+ * - **Plain wheel**      → vertical (deltaY) and horizontal (deltaX) scroll.
+ *   Over a split's top or left pane, that pane scrolls on its own axis.
+ *
+ * Trackpads emit small pixel-precise deltas (1–5 px), which would round to
+ * zero rows on every event. We accumulate residuals across events so a slow
+ * scroll still advances by one row once enough pixels have accumulated.
+ */
 export function attachWheel(deps: WheelDeps): () => void {
   const { grid, store, getWb } = deps;
 

@@ -1,4 +1,5 @@
 import { headerFilterRanges } from '../commands/filter-ranges.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { hitZone, layoutForView, type Rect, rangeRects } from '../render/geometry.js';
 import {
   PAGE_BREAK_GRAB,
@@ -10,7 +11,7 @@ import {
 import { type GridHitState, gridHitState } from '../render/grid.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
-import { isMacHost, MAC_GRID_CURSORS, resizeCursor } from './grid-cursors.js';
+import { MAC_GRID_CURSORS, resizeCursor } from './grid-cursors.js';
 import { resizableTableGripAt } from './table-resize.js';
 
 /** Pixels the fill-handle hit zone extends past the painted handle. */

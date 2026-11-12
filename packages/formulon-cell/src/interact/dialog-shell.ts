@@ -194,30 +194,16 @@ const keyWasHandled = (event: KeyboardEvent): boolean =>
   event.defaultPrevented || handledDialogKeyEvents.has(event);
 
 /**
- * Shared lifecycle and listener-bookkeeping primitive for the spreadsheet's
- * 16+ modal dialogs. Each dialog used to hand-roll its own overlay creation,
- * `role`/`aria-modal` wiring, Escape + backdrop dismissal, and a bespoke
- * `removeEventListener` ladder in `detach()`. Drift in those ladders was the
- * single largest source of pre-existing listener leaks (e.g. `fx-dialog`
- * tracked 9 add / 7 remove). This helper centralizes the pattern:
+ * Shared lifecycle and listener bookkeeping for the spreadsheet's modal dialogs:
  *
- *  1. Mounts a `<div role=dialog aria-modal>` with the requested class into the
- *     host's themed overlay portal, marked `hidden` so callers control reveal
- *     timing.
- *  2. Inherits theme tokens through the portal's cascade, so themed
- *     colors/shadows render outside the `.fc-host` `contain: strict` boundary.
- *  3. Keeps Tab / Shift+Tab focus inside the visible dialog, matching desktop
- *     modal behavior.
- *  4. Hooks Escape (document keydown, gated on `!hidden`) to `onDismiss`;
- *     a backdrop click is swallowed and never dismisses.
- *  5. Provides `on()` to register listeners with auto-cleanup. Every `on()`
- *     call is matched by a `removeEventListener` in `dispose()`, so callers
- *     never have to maintain their own bag.
- *
- * Existing dialogs migrate by replacing `overlay.addEventListener(...)` with
- * `shell.on(overlay, ...)` and `detach()` with `shell.dispose()`. The two
- * built-in dismissal listeners (Escape + backdrop) are tracked alongside
- * caller-registered listeners so dispose teardown is a single sweep.
+ *  1. Mounts a hidden `<div role=dialog aria-modal>` with the requested class into the host's
+ *     themed overlay portal, so callers control reveal timing and theme tokens still apply
+ *     outside the `.fc-host` `contain: strict` boundary.
+ *  2. Keeps Tab / Shift+Tab focus inside the visible dialog, as desktop modals do.
+ *  3. Hooks Escape (document keydown, while shown) to `onDismiss`; a backdrop click is swallowed
+ *     and never dismisses.
+ *  4. `on()` registers listeners that `dispose()` removes in one sweep, together with the
+ *     built-in Escape and backdrop listeners.
  */
 export function createDialogShell(deps: DialogShellDeps): DialogShell {
   const { host, className, onDismiss } = deps;

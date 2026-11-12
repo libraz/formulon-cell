@@ -440,8 +440,8 @@ export function attachSessionCharts(deps: {
     return wanted;
   };
 
-  /** Whether `target` is part of a chart, its settings or the ribbon, which keep the chart selected. */
   const menu = createObjectMenu(host);
+  /** Whether `target` is part of a chart, its settings or the ribbon, which keep the chart selected. */
   const insideCharts = (target: EventTarget | null): boolean =>
     target instanceof Node &&
     (root.contains(target) ||

@@ -62,9 +62,7 @@ export interface CfRulesDialogHandle {
 }
 
 function createCfRulesDialogButton(className: string, label: string): HTMLButtonElement {
-  const button = createDialogButton({ label, baseClass: 'fc-cfrulesdlg__btn' });
-  button.className = `fc-fmtdlg__btn ${className}`;
-  return button;
+  return createDialogButton({ label, baseClass: `fc-fmtdlg__btn ${className}` });
 }
 
 /** Maps the engine's CF rule type ordinal to a localized display label.

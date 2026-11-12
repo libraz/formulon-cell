@@ -182,7 +182,9 @@ describe('attachCfRulesDialog', () => {
   it('keeps command and row action buttons on the shared dialog primitive', () => {
     const source = readFileSync(join(root, 'src/interact/cf-rules-dialog.ts'), 'utf8');
     expect(source).toContain('function createCfRulesDialogButton(');
-    expect(source).toContain("createDialogButton({ label, baseClass: 'fc-cfrulesdlg__btn' })");
+    expect(source).toMatch(
+      /createDialogButton\(\{ label, baseClass: `fc-fmtdlg__btn \$\{className\}` \}\)/,
+    );
     expect(source).not.toContain("document.createElement('button')");
   });
 

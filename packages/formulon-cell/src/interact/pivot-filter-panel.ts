@@ -373,7 +373,6 @@ export function openPivotFieldFilter(
   const at = anchor ?? { x: rect.left + 40, y: rect.top + 40 };
   // The desktop hangs the panel 6 pt below the button's bottom-left corner.
   const position = clampPanelToViewport(panel, at.x, at.y + 6, {
-    pad: 4,
     fallbackWidth: 257,
     fallbackHeight: 434,
   });

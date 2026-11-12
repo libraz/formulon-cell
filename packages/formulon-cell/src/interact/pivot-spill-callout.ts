@@ -70,7 +70,7 @@ export function showPivotSpillCallout(
     callout,
     hostRect.left + cell.x + cell.w / 2 - 192,
     above >= 4 ? above : hostRect.top + cell.y + cell.h + 8,
-    { pad: 4, fallbackWidth: 384, fallbackHeight: 241 },
+    { fallbackWidth: 384, fallbackHeight: 241 },
   );
   callout.style.left = `${position.x}px`;
   callout.style.top = `${position.y}px`;

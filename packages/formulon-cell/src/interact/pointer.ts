@@ -64,7 +64,6 @@ import {
   layoutForView,
   type Rect,
   rowHeight,
-  type ViewLayout,
 } from '../render/geometry.js';
 import { ruleWidth } from '../render/grid/chrome-context.js';
 import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
@@ -242,8 +241,6 @@ const axisSelectionRange = (
 
 type SelectionMarqueeDrag = Extract<DragMode, { kind: 'selection-marquee' }>;
 
-const geometryLayout = (state: State): ViewLayout => layoutForView(state);
-
 const lastVisibleCol = (s: State): number =>
   Math.min(
     MAX_COL,
@@ -294,7 +291,7 @@ function pivotButtonRectAt(
   const mac = (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac';
   const dpr = host.ownerDocument.defaultView?.devicePixelRatio ?? 1;
   const button = pivotFieldButtonRect(
-    cellRect(geometryLayout(s), s.viewport, row, col),
+    cellRect(layoutForView(s), s.viewport, row, col),
     pivotFieldButtonSize(mac, visualZoom(s.viewport.zoom)),
     ruleWidth(dpr),
     s.ui.rightToLeft === true,
@@ -339,7 +336,7 @@ function selectionBorderEdgeAt(
   if ((host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform !== 'mac') return null;
   if ((s.selection.extraRanges?.length ?? 0) > 0) return null;
   const { r0, c0, r1, c1 } = s.selection.range;
-  const layout = geometryLayout(s);
+  const layout = layoutForView(s);
   const first = cellRect(layout, s.viewport, r0, c0);
   const last = cellRect(layout, s.viewport, r1, c1);
   const left = Math.min(first.x, last.x);
@@ -437,7 +434,7 @@ export function attachPointer(
       drag = { kind: 'none' };
       return;
     }
-    const zone = hitZone(geometryLayout(s), s.viewport, x, y, headerFilterRanges(s));
+    const zone = hitZone(layoutForView(s), s.viewport, x, y, headerFilterRanges(s));
     if (!zone) return;
 
     if (marquee.axis === 'cell') {
@@ -661,7 +658,7 @@ export function attachPointer(
     }
     // A right-button drag by the selection frame ends in a menu of drop actions.
     if (moveDragAllowed() && isSelectionBorderHit(s, x, y)) {
-      const grabbed = hitTest(geometryLayout(s), s.viewport, x, y);
+      const grabbed = hitTest(layoutForView(s), s.viewport, x, y);
       if (grabbed) {
         host.focus();
         try {
@@ -682,7 +679,7 @@ export function attachPointer(
         return;
       }
     }
-    const zone = hitZone(geometryLayout(s), s.viewport, x, y, [], { resizeHandles: false });
+    const zone = hitZone(layoutForView(s), s.viewport, x, y, [], { resizeHandles: false });
     if (!zone) return;
     if (zone.kind === 'corner') {
       mutators.selectAll(store, topLeftVisibleCell(s));
@@ -873,7 +870,7 @@ export function attachPointer(
     // The selection frame moves the block. The cell under the pointer is the
     // grab point, so a grab on the bottom edge counts from the row below it.
     if (moveDragAllowed() && !inFormula && isSelectionBorderHit(s, x, y)) {
-      const grabbed = hitTest(geometryLayout(s), s.viewport, x, y);
+      const grabbed = hitTest(layoutForView(s), s.viewport, x, y);
       const { r0, c0, r1, c1 } = s.selection.range;
       // An item of a report is reordered, never moved as a cell.
       const itemSlots =
@@ -905,7 +902,7 @@ export function attachPointer(
     if (inFormula && editor?.replaceReferenceAt) {
       const box = refBoxHitAt(s, x, y);
       const ref = box ? s.ui.editorRefs[box.index] : undefined;
-      const pressed = box ? hitTest(geometryLayout(s), s.viewport, x, y) : null;
+      const pressed = box ? hitTest(layoutForView(s), s.viewport, x, y) : null;
       if (box && ref && pressed) {
         e.preventDefault();
         tryCapture();
@@ -925,7 +922,7 @@ export function attachPointer(
       }
     }
 
-    const layout = geometryLayout(s);
+    const layout = layoutForView(s);
     const zone = hitZone(layout, s.viewport, x, y, headerFilterRanges(s));
     if (!zone) return;
 
@@ -984,7 +981,7 @@ export function attachPointer(
         const rect = host.getBoundingClientRect();
         // The dropdown hangs from the bottom of the in-cell button.
         const button = filterButtonRect(
-          cellRect(geometryLayout(s), s.viewport, zone.range.r0, zone.col),
+          cellRect(layoutForView(s), s.viewport, zone.range.r0, zone.col),
           s.ui.rightToLeft === true,
         );
         host.dispatchEvent(
@@ -1041,7 +1038,7 @@ export function attachPointer(
           col: zone.col,
           spans: headerGestureSpans(s, 'col', zone.col),
           startPointer: x,
-          startSize: colWidth(geometryLayout(s), zone.col, s.viewport),
+          startSize: colWidth(layoutForView(s), zone.col, s.viewport),
           rtl: s.ui.rightToLeft === true,
           preLayout: captureLayoutSnapshot(s),
         };
@@ -1062,7 +1059,7 @@ export function attachPointer(
           row: zone.row,
           spans: headerGestureSpans(s, 'row', zone.row),
           startPointer: y,
-          startSize: rowHeight(geometryLayout(s), zone.row, s.viewport),
+          startSize: rowHeight(layoutForView(s), zone.row, s.viewport),
           preLayout: captureLayoutSnapshot(s),
         };
         return;
@@ -1181,7 +1178,7 @@ export function attachPointer(
     const rect = host.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return null;
     const s = store.getState();
-    const layout = geometryLayout(s);
+    const layout = layoutForView(s);
     const originX = gridOriginX(layout) + frozenColsWidth(layout, s.viewport);
     return {
       left: layout.rtl ? 0 : originX,
@@ -1197,7 +1194,7 @@ export function attachPointer(
     const bounds = autoscrollBounds();
     if (!axes || !bounds) return null;
     const s = store.getState();
-    const layout = geometryLayout(s);
+    const layout = layoutForView(s);
     const clampX = Math.min(bounds.right - 1, Math.max(bounds.left, x));
     const clampY = Math.min(bounds.bottom - 1, Math.max(bounds.top, y));
     return {
@@ -1317,7 +1314,7 @@ export function attachPointer(
         return;
       }
       case 'col-header': {
-        const layout = geometryLayout(s);
+        const layout = layoutForView(s);
         const zone = hitZone(layout, s.viewport, x, y, [], { resizeHandles: false });
         if (zone && (zone.kind === 'col-header' || zone.kind === 'cell')) {
           mutators.selectCols(store, drag.anchorCol, zone.col, s.selection.active.row);
@@ -1327,7 +1324,7 @@ export function attachPointer(
         return;
       }
       case 'row-header': {
-        const layout = geometryLayout(s);
+        const layout = layoutForView(s);
         const zone = hitZone(layout, s.viewport, x, y, [], { resizeHandles: false });
         if (zone && (zone.kind === 'row-header' || zone.kind === 'cell')) {
           mutators.selectRows(store, drag.anchorRow, zone.row, s.selection.active.col);
@@ -1337,7 +1334,7 @@ export function attachPointer(
         return;
       }
       case 'cell': {
-        const layout = geometryLayout(s);
+        const layout = layoutForView(s);
         const zone = hitZone(layout, s.viewport, x, y);
         // Over a header strip the drag reaches the nearest visible edge cell.
         const edge = topLeftVisibleCell(s);
@@ -1354,9 +1351,9 @@ export function attachPointer(
         return;
       }
       case 'fill': {
-        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
+        const cell = hitTest(layoutForView(s), s.viewport, x, y);
         if (!cell) return;
-        const corner = cellRect(geometryLayout(s), s.viewport, drag.src.r1, drag.src.c1);
+        const corner = cellRect(layoutForView(s), s.viewport, drag.src.r1, drag.src.c1);
         const kept = drag.menu
           ? null
           : fillShrinkFor(
@@ -1382,14 +1379,14 @@ export function attachPointer(
         if (last === null || !e) {
           fillTooltip.hide();
         } else {
-          const edge = cellRect(geometryLayout(s), s.viewport, dest.r1, dest.c1);
+          const edge = cellRect(layoutForView(s), s.viewport, dest.r1, dest.c1);
           const at = localXY(e);
           fillTooltip.show(last, e.clientX - at.x + edge.x + edge.w, e.clientY);
         }
         return;
       }
       case 'table-resize': {
-        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
+        const cell = hitTest(layoutForView(s), s.viewport, x, y);
         const table = tableOverlayById(s, drag.id);
         if (!cell || !table) return;
         mutators.setFillPreview(store, tableResizeRange(s, table, cell));
@@ -1397,7 +1394,7 @@ export function attachPointer(
         return;
       }
       case 'move': {
-        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
+        const cell = hitTest(layoutForView(s), s.viewport, x, y);
         if (!cell) return;
         const topLeft = {
           row: Math.max(0, cell.row - drag.grab.row),
@@ -1411,7 +1408,7 @@ export function attachPointer(
       }
       case 'pivot-item': {
         // The pointer rides the dragged item's bottom border, one pixel inside its row.
-        const cell = hitTest(geometryLayout(s), s.viewport, x, y - 1);
+        const cell = hitTest(layoutForView(s), s.viewport, x, y - 1);
         if (!cell) return;
         const { slots } = drag;
         drag.after = Math.min(Math.max(cell.row, slots.firstRow - 1), slots.lastRow);
@@ -1424,7 +1421,7 @@ export function attachPointer(
         };
         mutators.setMovePreview(store, band);
         if (!e) return;
-        const edge = cellRect(geometryLayout(s), s.viewport, band.r1, band.c1);
+        const edge = cellRect(layoutForView(s), s.viewport, band.r1, band.c1);
         const at = localXY(e);
         fillTooltip.show(formatA1Range(band), e.clientX - at.x + edge.x + edge.w, e.clientY);
         return;
@@ -1444,7 +1441,7 @@ export function attachPointer(
         return;
       }
       case 'ref-box': {
-        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
+        const cell = hitTest(layoutForView(s), s.viewport, x, y);
         const editor = getEditor();
         if (!cell || !editor?.replaceReferenceAt) return;
         const next = refBoxRangeFor(drag, cell);
@@ -1461,7 +1458,7 @@ export function attachPointer(
         return;
       }
       case 'range-insert': {
-        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
+        const cell = hitTest(layoutForView(s), s.viewport, x, y);
         if (!cell) return;
         const mergedCell = mergeAnchorOf(s, { sheet: s.data.sheetIndex, ...cell });
         const tip = { row: mergedCell.row, col: mergedCell.col };
@@ -1712,7 +1709,7 @@ export function attachPointer(
         }
         if (drag.menu) {
           const filled = fillOutputRange(drag.src, dest);
-          const last = cellRect(geometryLayout(s), s.viewport, filled.r1, filled.c1);
+          const last = cellRect(layoutForView(s), s.viewport, filled.r1, filled.c1);
           const at = localXY(e);
           host.dispatchEvent(
             new CustomEvent('fc:autofillmenu', {
@@ -1736,7 +1733,7 @@ export function attachPointer(
         const copyOnly = e.ctrlKey || e.metaKey;
         // The chip hangs off the last filled cell, not the pointer.
         const filled = fillOutputRange(drag.src, dest);
-        const last = cellRect(geometryLayout(s), s.viewport, filled.r1, filled.c1);
+        const last = cellRect(layoutForView(s), s.viewport, filled.r1, filled.c1);
         const at = localXY(e);
         commitFill(drag.src, dest, {
           copyOnly,
@@ -1833,7 +1830,7 @@ export function attachPointer(
               : [0, -colDir];
       // The jump starts from the frame cell under the pointer, not the active
       // cell; a blank frame cell just becomes the selection.
-      const under = hitTest(geometryLayout(s), s.viewport, x, y);
+      const under = hitTest(layoutForView(s), s.viewport, x, y);
       if (!under) return;
       const range = s.selection.range;
       const origin: Addr = {
@@ -1860,7 +1857,7 @@ export function attachPointer(
       return;
     }
 
-    const zone = hitZone(geometryLayout(s), s.viewport, x, y);
+    const zone = hitZone(layoutForView(s), s.viewport, x, y);
     if (!zone) return;
 
     if (zone.kind === 'col-resize' || zone.kind === 'row-resize') {

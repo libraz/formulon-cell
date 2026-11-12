@@ -631,7 +631,6 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     overlayPortalFor(deps.host).appendChild(r);
     root = r;
     const position = clampPanelToViewport(r, anchor.x, anchor.y + anchor.h, {
-      pad: 4,
       fallbackWidth: 260,
       fallbackHeight: 320,
     });

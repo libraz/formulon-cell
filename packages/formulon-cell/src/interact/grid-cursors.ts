@@ -1,3 +1,5 @@
+import { isMacHost } from '../extensions/ui-options.js';
+
 /**
  * Pointer shapes the desktop Mac app shows over the grid, which CSS has no
  * keyword for: black arrows over the headers and split triangles on the resize
@@ -24,10 +26,6 @@ export const MAC_GRID_CURSORS = {
   colResize: svgCursor(SPLIT_HORIZONTAL, 'col-resize'),
   rowResize: svgCursor(SPLIT_VERTICAL, 'row-resize'),
 } as const;
-
-/** Whether the grid host renders the Mac profile. */
-export const isMacHost = (host: HTMLElement): boolean =>
-  (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
 
 /** The cursor for a resize boundary: the Mac split shape, else the CSS keyword. */
 export const resizeCursor = (host: HTMLElement, axis: 'col' | 'row'): string => {
