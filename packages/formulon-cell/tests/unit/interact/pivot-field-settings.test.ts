@@ -7,16 +7,11 @@ import { PivotAxis, PivotFilterKind } from '../../../src/engine/types.js';
 import { en } from '../../../src/i18n/strings.js';
 import {
   createPivotAreaSettingsButton,
-  createPivotFilterConditionControls,
   pivotFilterConditionToSpec,
   pivotFilterSpecToCondition,
   splitFilterConditionRange,
 } from '../../../src/interact/pivot-field-settings.js';
 import { showPivotFilterDialog } from '../../../src/interact/pivot-filter-dialog.js';
-import {
-  PIVOT_FILTER_COMPARISONS,
-  PIVOT_FILTER_PERIODS,
-} from '../../../src/interact/pivot-filter-kinds.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -31,7 +26,6 @@ describe('pivot-field-settings shared filter condition model', () => {
 
   it('keeps Pivot settings buttons on the shared helper', () => {
     const source = readFileSync(join(root, 'src/interact/pivot-field-settings.ts'), 'utf8');
-    expect(source).toContain('createPivotAreaSettingsButton(t.filterDialog)');
     expect(source.match(/document\.createElement\('button'\)/g)).toBeNull();
   });
 
@@ -170,182 +164,6 @@ describe('pivot-field-settings shared filter condition model', () => {
     });
     if (!condition) throw new Error('missing condition');
     expect(pivotFilterConditionToSpec('Date', condition)?.value).toBe(46161);
-  });
-
-  it('keeps restored value and date operators in their Excel filter categories', () => {
-    for (const kind of [
-      PivotFilterKind.ValueGreaterThan,
-      PivotFilterKind.ValueBetween,
-      PivotFilterKind.ValueTopCount,
-    ]) {
-      const controls = createPivotFilterConditionControls({
-        strings: en.pivotTableDialog,
-        datePeriods: en.datePeriods,
-        condition: { kind, value: kind === PivotFilterKind.ValueTopCount ? '5' : '10..20' },
-        selectClassName: 'select',
-        valueClassName: 'input',
-        valuesContainerClassName: 'values',
-        categoryDataset: { pivotFilterCategory: 'true' },
-        conditionDataset: { pivotFilterCondition: 'true' },
-        fieldRow: (label, control) => {
-          const row = document.createElement('label');
-          row.append(label, control);
-          return row;
-        },
-        onChange: () => undefined,
-      });
-      const host = document.createElement('div');
-      host.append(...controls);
-      expect(
-        host.querySelector<HTMLSelectElement>('select[data-pivot-filter-category="true"]')?.value,
-        String(kind),
-      ).toBe('value');
-      expect(
-        host.querySelector<HTMLSelectElement>('select[data-pivot-filter-condition="true"]')?.value,
-        String(kind),
-      ).toBe(String(kind));
-    }
-
-    for (const kind of [PivotFilterKind.DateBetween]) {
-      const controls = createPivotFilterConditionControls({
-        strings: en.pivotTableDialog,
-        datePeriods: en.datePeriods,
-        condition: {
-          kind,
-          value: '2026-05-01..2026-05-31',
-        },
-        selectClassName: 'select',
-        valueClassName: 'input',
-        valuesContainerClassName: 'values',
-        categoryDataset: { pivotFilterCategory: 'true' },
-        conditionDataset: { pivotFilterCondition: 'true' },
-        fieldRow: (label, control) => {
-          const row = document.createElement('label');
-          row.append(label, control);
-          return row;
-        },
-        onChange: () => undefined,
-      });
-      const host = document.createElement('div');
-      host.append(...controls);
-      expect(
-        host.querySelector<HTMLSelectElement>('select[data-pivot-filter-category="true"]')?.value,
-        String(kind),
-      ).toBe('date');
-      expect(
-        host.querySelector<HTMLSelectElement>('select[data-pivot-filter-condition="true"]')?.value,
-        String(kind),
-      ).toBe(String(kind));
-    }
-  });
-
-  it('renders shared condition controls and resets condition when category changes', () => {
-    const changes: string[] = [];
-    const controls = createPivotFilterConditionControls({
-      strings: en.pivotTableDialog,
-      datePeriods: en.datePeriods,
-      condition: { kind: PivotFilterKind.LabelContains, value: 'East' },
-      selectClassName: 'select',
-      valueClassName: 'input',
-      valuesContainerClassName: 'values',
-      categoryDataset: { pivotFilterCategory: 'true' },
-      conditionDataset: { pivotFilterCondition: 'true' },
-      fieldRow: (label, control) => {
-        const row = document.createElement('label');
-        row.append(label, control);
-        return row;
-      },
-      onChange: (condition) => changes.push(`${condition.kind}:${condition.value}`),
-    });
-    const host = document.createElement('div');
-    host.append(...controls);
-    const category = host.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-category="true"]',
-    );
-    const condition = host.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-condition="true"]',
-    );
-    const value = host.querySelector<HTMLInputElement>('.values input');
-    if (!category || !condition || !value) throw new Error('missing condition controls');
-    expect(category.className).toBe('select');
-    expect(condition.className).toBe('select');
-    expect(
-      Array.from(category.options).map((option) => [option.value, option.textContent]),
-    ).toEqual([
-      ['label', 'Label Filters'],
-      ['value', 'Value Filters'],
-      ['date', 'Date Filters'],
-    ]);
-    expect(category.value).toBe('label');
-    expect(condition.value).toBe(String(PivotFilterKind.LabelContains));
-    expect(value.value).toBe('East');
-
-    category.value = 'value';
-    category.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(condition.value).toBe('');
-    expect(
-      Array.from(condition.options)
-        .filter((option) => !option.disabled)
-        .map((option) => option.value),
-    ).toEqual([
-      '',
-      ...PIVOT_FILTER_COMPARISONS.value.map(([kind]) => String(kind)),
-      String(PivotFilterKind.ValueTopCount),
-    ]);
-    expect(
-      Array.from(condition.options)
-        .filter((option) => option.disabled)
-        .map((option) => option.value),
-    ).toEqual([]);
-    expect(changes.at(-1)).toBe('null:');
-  });
-
-  it('enables engine-backed Excel PivotTable filter operators', () => {
-    const controls = createPivotFilterConditionControls({
-      strings: en.pivotTableDialog,
-      datePeriods: en.datePeriods,
-      condition: { kind: PivotFilterKind.LabelContains, value: 'East' },
-      selectClassName: 'select',
-      valueClassName: 'input',
-      valuesContainerClassName: 'values',
-      categoryDataset: { pivotFilterCategory: 'true' },
-      conditionDataset: { pivotFilterCondition: 'true' },
-      fieldRow: (label, control) => {
-        const row = document.createElement('label');
-        row.append(label, control);
-        return row;
-      },
-      onChange: () => undefined,
-    });
-    const host = document.createElement('div');
-    host.append(...controls);
-    const category = host.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-category="true"]',
-    );
-    const condition = host.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-condition="true"]',
-    );
-    if (!category || !condition) throw new Error('missing condition controls');
-
-    expect(
-      Array.from(condition.options)
-        .filter((option) => !option.disabled)
-        .map((option) => option.value),
-    ).toEqual(['', ...PIVOT_FILTER_COMPARISONS.label.map(([kind]) => String(kind))]);
-    expect(Array.from(condition.options).filter((option) => option.disabled)).toEqual([]);
-
-    category.value = 'date';
-    category.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(
-      Array.from(condition.options)
-        .filter((option) => !option.disabled)
-        .map((option) => option.value),
-    ).toEqual([
-      '',
-      ...PIVOT_FILTER_COMPARISONS.date.map(([kind]) => String(kind)),
-      ...PIVOT_FILTER_PERIODS.map(([kind]) => String(kind)),
-    ]);
-    expect(Array.from(condition.options).filter((option) => option.disabled)).toHaveLength(1);
   });
 
   it('opens the value filter dialog on the condition kind and returns the edited condition', async () => {

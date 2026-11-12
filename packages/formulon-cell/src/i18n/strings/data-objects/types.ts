@@ -87,22 +87,8 @@ export interface DataObjectsStrings {
     fieldSettingsRowsHelp: string;
     fieldSettingsColumnsHelp: string;
     fieldSettingsValuesHelp: string;
-    filterDialog: string;
-    filterDialogTitle: string;
     filtersArea: string;
     filterField: string;
-    filterConditionCategory: string;
-    filterConditionCategoryLabel: string;
-    filterConditionCategoryValue: string;
-    filterConditionCategoryDate: string;
-    filterCondition: string;
-    filterConditionNone: string;
-    filterConditionValue: string;
-    filterConditionTextPlaceholder: string;
-    filterConditionNumberPlaceholder: string;
-    filterConditionTopCountPlaceholder: string;
-    filterConditionLowValue: string;
-    filterConditionHighValue: string;
     /** The desktop's Label, Value, Date and Top 10 filter dialogs. */
     filterDialogs: {
       operators: Record<FilterOperatorKey, string>;
@@ -126,16 +112,6 @@ export interface DataObjectsStrings {
         percent: string;
         sum: string;
         by: string;
-      };
-      menu: {
-        top10: string;
-        notBetween: string;
-        before: string;
-        after: string;
-        allDatesInPeriod: string;
-        labelFilters: string;
-        valueFilters: string;
-        dateFilters: string;
       };
     };
     filterItems: string;
@@ -254,7 +230,9 @@ export interface DataObjectsStrings {
         | 'between'
         | 'notBetween'
         | 'top10'
-        | 'bottom10',
+        | 'bottom10'
+        | 'before'
+        | 'after',
         string
       >;
     };

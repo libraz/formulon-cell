@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { PivotSourceField } from '../../../src/commands/pivot-table.js';
-import { PivotAggregation, PivotFilterKind, PivotShowValuesAs } from '../../../src/engine/types.js';
+import { PivotAggregation, PivotShowValuesAs } from '../../../src/engine/types.js';
 import { createPivotFieldAreas } from '../../../src/interact/pivot-table-field-areas.js';
 import { createDialogSelect } from '../../../src/toolbar/dialogs/form-controls.js';
 
@@ -60,8 +60,6 @@ describe('createPivotFieldAreas resetSource', () => {
     areas.assignFieldToArea('Channel', 'filters', FIELDS);
     areas.assignFieldToArea('Zone', 'filters', FIELDS);
     areas.assignFieldToArea('Qty', 'values', FIELDS);
-    areas.setFilterCondition('Channel', { kind: PivotFilterKind.LabelContains, value: 'web' });
-    areas.setFilterCondition('Zone', { kind: PivotFilterKind.LabelContains, value: 'north' });
     areas.setFilterItemVisibility('Zone', 'N', false);
     areas.setValueFieldSetting('Qty', { numberFormat: '0.0' });
     areas.setValueFieldSetting('Sales', { aggregation: PivotAggregation.Max });
@@ -76,11 +74,6 @@ describe('createPivotFieldAreas resetSource', () => {
     expect(areas.filterFields).toEqual(['Channel']);
     expect(areas.valueFields).toEqual(['Sales']);
     expect(valueSelect.value).toBe('Sales');
-    expect(areas.selectedFilterCondition('Channel')).toEqual({
-      kind: PivotFilterKind.LabelContains,
-      value: 'web',
-    });
-    expect(areas.selectedFilterCondition('Zone')).toBeUndefined();
     expect(areas.selectedValueSetting('Qty')).toEqual({});
     expect(areas.selectedValueSetting('Sales')).toEqual({ aggregation: PivotAggregation.Max });
     expect(areas.filterItemVisibility('Zone', 'N')).toBe(true);
@@ -125,13 +118,13 @@ describe('createPivotFieldAreas toggleFromFieldList', () => {
     expect(ctx.filterSelect.value).toBe('Channel');
   });
 
-  it('unchecks a filter field and drops its condition', () => {
+  it('unchecks a filter field and drops its item visibility', () => {
     ctx.areas.assignFieldToArea('Channel', 'filters', FIELDS);
-    ctx.areas.setFilterCondition('Channel', { kind: PivotFilterKind.LabelContains, value: 'web' });
+    ctx.areas.setFilterItemVisibility('Channel', 'web', false);
     ctx.areas.toggleFromFieldList('Channel', false, FIELDS);
     expect(ctx.areas.filterFields).toEqual([]);
     expect(ctx.filterSelect.value).toBe('');
-    expect(ctx.areas.selectedFilterCondition('Channel')).toBeUndefined();
+    expect(ctx.areas.filterItemVisibility('Channel', 'web')).toBe(true);
   });
 
   it('unchecks the column field to empty', () => {
@@ -220,7 +213,6 @@ describe('createPivotFieldAreas toCreateSpec', () => {
     const spec = areas.toCreateSpec({
       aggregation: PivotAggregation.Sum,
       numberFormat: '#,##0',
-      filterInput: {},
     });
     expect(spec.valueFieldSettings).toEqual([
       { fieldName: 'Sales', aggregation: PivotAggregation.Sum, numberFormat: '#,##0' },
@@ -233,19 +225,15 @@ describe('createPivotFieldAreas toCreateSpec', () => {
     ]);
   });
 
-  it('flattens item visibility and filter conditions per filter field', () => {
+  it('flattens item visibility per filter field', () => {
     const { areas } = setup();
     areas.assignFieldToArea('Channel', 'filters', FIELDS);
     areas.setFilterItemVisibility('Channel', 'web', false);
-    areas.setFilterCondition('Channel', { kind: PivotFilterKind.LabelContains, value: 'we' });
-    areas.setFilterCondition('Zone', { kind: PivotFilterKind.LabelContains, value: 'ignored' });
     const spec = areas.toCreateSpec({
       aggregation: PivotAggregation.Sum,
       numberFormat: '',
-      filterInput: {},
     });
     expect(spec.filterItems).toEqual([{ fieldName: 'Channel', itemName: 'web', visible: false }]);
-    expect(spec.pivotFilters).toHaveLength(1);
-    expect(spec.pivotFilters[0]?.fieldName).toBe('Channel');
+    expect(spec).not.toHaveProperty('pivotFilters');
   });
 });

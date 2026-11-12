@@ -84,6 +84,7 @@ export const gridPopupsKo: GridPopupsStrings = {
     pivotFilterHideSelected: '선택한 항목 숨기기',
     pivotFilterTop10: '상위 10…',
     pivotFilterLabel: '레이블 필터…',
+    pivotFilterDate: '날짜 필터…',
     pivotFilterValue: '값 필터…',
     pivotSelect: '선택',
     pivotSelectLabels: '레이블',

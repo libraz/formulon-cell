@@ -68,6 +68,7 @@ export interface CreatePivotTableOptions {
   filterField?: string;
   filterFields?: readonly string[];
   filterItems?: readonly PivotFieldItemVisibility[];
+  /** Label, value or date filters; each goes on the report's row or column field. */
   pivotFilters?: readonly PivotFilterSpec[];
   valueField: string;
   valueFields?: readonly string[];
@@ -297,7 +298,9 @@ export function createPivotTableFromRange(
     (opts.columnField && !columnField) ||
     filterFields.some((field) => field === undefined) ||
     Array.from(filterItemFields).some((name) => !filterFieldNames.includes(name)) ||
-    Array.from(pivotFilterFields).some((name) => !filterFieldNames.includes(name)) ||
+    Array.from(pivotFilterFields).some(
+      (name) => name !== rowField?.name && name !== columnField?.name,
+    ) ||
     (rowField !== undefined && rowField.name === columnField?.name) ||
     Array.from(valueFieldSettings.values()).some(
       (settings) =>
@@ -398,6 +401,12 @@ export function createPivotTableFromRange(
     if (!ok) return failAfterPivot('col-sort');
   }
 
+  for (const filter of opts.pivotFilters ?? []) {
+    if (!wb.addPivotFilter(opts.destination.sheet, pivotIndex, filter)) {
+      return failAfterPivot('pivot-filter');
+    }
+  }
+
   for (const filterField of filterFields) {
     if (!filterField) return failAfterPivot('filter-field');
     const filterPivotField = pivotFieldByName.get(filterField.name) as number;
@@ -419,13 +428,6 @@ export function createPivotTableFromRange(
         )
       ) {
         return failAfterPivot('filter-item');
-      }
-    }
-    for (const filter of opts.pivotFilters?.filter(
-      (entry) => entry.fieldName === filterField.name,
-    ) ?? []) {
-      if (!wb.addPivotFilter(opts.destination.sheet, pivotIndex, filter)) {
-        return failAfterPivot('pivot-filter');
       }
     }
   }

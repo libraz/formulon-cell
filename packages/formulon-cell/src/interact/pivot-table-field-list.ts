@@ -324,7 +324,6 @@ export function renderPivotFieldAreas(
 }
 
 export interface PivotFieldListContext {
-  host: HTMLElement;
   readonly strings: Strings;
   areas: PivotFieldAreas;
   controls: PivotFieldSettingsPanelOptions['controls'];
@@ -339,13 +338,9 @@ const renderFieldSettingsPanel = (
 ): void => {
   const { areas, fields } = ctx;
   renderPivotFieldSettingsPanel({
-    host: ctx.host,
     panelEl,
     active: areas.active,
     strings: ctx.strings.pivotTableDialog,
-    datePeriods: ctx.strings.datePeriods,
-    okLabel: ctx.strings.pageSetup.ok,
-    cancelLabel: ctx.strings.pageSetup.cancel,
     fields,
     controls: ctx.controls,
     selectedValueFields: areas.valueFields,
@@ -358,12 +353,6 @@ const renderFieldSettingsPanel = (
     refreshFieldList,
     filterItemVisibility: areas.filterItemVisibility,
     setFilterItemVisibility: areas.setFilterItemVisibility,
-    selectedFilterCondition: areas.selectedFilterCondition,
-    setFilterCondition: (fieldName, condition) =>
-      areas.setFilterCondition(fieldName, {
-        kind: condition.kind,
-        value: condition.value,
-      }),
     inferFilterItems: ctx.inferFilterItems,
   });
 };

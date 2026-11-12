@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { CellRect, PivotWorksheetSourceInput } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
-import { type CellValue, PivotFilterKind, PivotShowValuesAs } from '../../../src/engine/types.js';
+import { type CellValue, PivotShowValuesAs } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachPivotTableDialog } from '../../../src/interact/pivot-table-dialog.js';
@@ -595,56 +595,6 @@ describe('attachPivotTableDialog', () => {
     handle.detach();
   });
 
-  it('opens the shared PivotTable filter dialog from a creation filter field', async () => {
-    const { wb } = makeWb();
-    const store = createSpreadsheetStore();
-    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 });
-    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
-
-    handle.open();
-    const segmentField = document.querySelector<HTMLInputElement>(
-      '[data-pivot-field-list-field="Segment"]',
-    );
-    if (!segmentField) throw new Error('missing Segment field checkbox');
-    segmentField.checked = true;
-    segmentField.dispatchEvent(new Event('change', { bubbles: true }));
-    const channelField = document.querySelector<HTMLInputElement>(
-      '[data-pivot-field-list-field="Channel"]',
-    );
-    if (!channelField) throw new Error('missing Channel field checkbox');
-    channelField.checked = true;
-    channelField.dispatchEvent(new Event('change', { bubbles: true }));
-
-    const settings = document.querySelector<HTMLButtonElement>(
-      '.fc-pivotdlg__area-settings[aria-label="Field Settings: Channel"]',
-    );
-    if (!settings) throw new Error('missing filter field settings button');
-    settings.click();
-    const panel = document.querySelector<HTMLElement>('.fc-pivotdlg__area-settings-panel');
-    const filterDialogButton = Array.from(
-      panel?.querySelectorAll<HTMLButtonElement>('button') ?? [],
-    ).find((button) => button.textContent === 'Filter...');
-    expect(filterDialogButton).toBeTruthy();
-    filterDialogButton?.click();
-
-    const dialog = Array.from(
-      document.body.querySelectorAll<HTMLElement>('.fc-pivotdlg[role="dialog"]:not([hidden])'),
-    ).find((el) => el.textContent?.includes('Label Filter (Channel)'));
-    expect(dialog?.textContent).toContain('Label Filter (Channel)');
-    const operator = dialog?.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-operator="true"]',
-    );
-    expect(operator?.value).toBe(String(PivotFilterKind.LabelEqual));
-    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
-    await Promise.resolve();
-    expect(
-      Array.from(document.body.querySelectorAll<HTMLElement>('.fc-pivotdlg[role="dialog"]')).some(
-        (el) => el.textContent?.includes('Label Filter (Channel)'),
-      ),
-    ).toBe(false);
-    handle.detach();
-  });
-
   it('lets a Values field settings panel change aggregation before submit', () => {
     const { wb, calls } = makeWb();
     const store = createSpreadsheetStore();
@@ -795,117 +745,6 @@ describe('attachPivotTableDialog', () => {
 
     expect(calls).toContain('pivot-field:Channel:3');
     expect(calls).toContain('pivot-item:Retail:false');
-    handle.detach();
-  });
-
-  it('lets a Filters field settings panel add a label condition before submit', () => {
-    const { wb, calls } = makeWb();
-    const store = createSpreadsheetStore();
-    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 });
-    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
-
-    handle.open();
-    const colSelect = Array.from(document.querySelectorAll<HTMLSelectElement>('select'))[2];
-    if (!colSelect) throw new Error('missing column select');
-    colSelect.value = 'Qty';
-    colSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    const channelField = document.querySelector<HTMLInputElement>(
-      '[data-pivot-field-list-field="Channel"]',
-    );
-    if (!channelField) throw new Error('missing Channel field checkbox');
-    channelField.checked = true;
-    channelField.dispatchEvent(new Event('change', { bubbles: true }));
-
-    document
-      .querySelector<HTMLButtonElement>(
-        '.fc-pivotdlg__area-settings[aria-label="Field Settings: Channel"]',
-      )
-      ?.click();
-    const panel = document.querySelector<HTMLElement>('.fc-pivotdlg__area-settings-panel');
-    const conditionSelect = Array.from(
-      panel?.querySelectorAll<HTMLSelectElement>('select') ?? [],
-    ).find((select) =>
-      Array.from(select.options).some(
-        (option) => option.value === String(PivotFilterKind.LabelContains),
-      ),
-    );
-    if (!conditionSelect) throw new Error('missing filter condition controls');
-    conditionSelect.value = String(PivotFilterKind.LabelContains);
-    conditionSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    const nextConditionValue = Array.from(
-      panel?.querySelectorAll<HTMLInputElement>('input') ?? [],
-    ).find((input) => input.placeholder === 'Text');
-    if (!nextConditionValue) throw new Error('missing text condition value');
-    nextConditionValue.value = 'Online';
-    nextConditionValue.dispatchEvent(new Event('input', { bubbles: true }));
-
-    document
-      .querySelector('form')
-      ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
-
-    expect(calls.some((call) => call.startsWith('pivot-filter:Channel:3:'))).toBe(true);
-    handle.detach();
-  });
-
-  it('lets a Filters field settings panel add a value-between condition before submit', () => {
-    const { wb, calls } = makeWb();
-    const store = createSpreadsheetStore();
-    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 });
-    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
-
-    handle.open();
-    const colSelect = Array.from(document.querySelectorAll<HTMLSelectElement>('select'))[2];
-    if (!colSelect) throw new Error('missing column select');
-    colSelect.value = 'Qty';
-    colSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    const channelField = document.querySelector<HTMLInputElement>(
-      '[data-pivot-field-list-field="Channel"]',
-    );
-    if (!channelField) throw new Error('missing Channel field checkbox');
-    channelField.checked = true;
-    channelField.dispatchEvent(new Event('change', { bubbles: true }));
-
-    document
-      .querySelector<HTMLButtonElement>(
-        '.fc-pivotdlg__area-settings[aria-label="Field Settings: Channel"]',
-      )
-      ?.click();
-    const panel = document.querySelector<HTMLElement>('.fc-pivotdlg__area-settings-panel');
-    const categorySelect = panel?.querySelector<HTMLSelectElement>(
-      'select[data-pivot-filter-category="true"]',
-    );
-    if (!categorySelect) throw new Error('missing filter category controls');
-    expect(categorySelect.textContent).toContain('Label Filters');
-    expect(categorySelect.textContent).toContain('Value Filters');
-    expect(categorySelect.textContent).toContain('Date Filters');
-    categorySelect.value = 'value';
-    categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
-    const conditionSelect = Array.from(
-      panel?.querySelectorAll<HTMLSelectElement>('select') ?? [],
-    ).find((select) =>
-      Array.from(select.options).some(
-        (option) => option.value === String(PivotFilterKind.ValueBetween),
-      ),
-    );
-    if (!conditionSelect) throw new Error('missing filter condition controls');
-    conditionSelect.value = String(PivotFilterKind.ValueBetween);
-    conditionSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    const rangeInputs = Array.from(
-      panel?.querySelectorAll<HTMLInputElement>('.fc-pivotdlg__settings-condition-values input') ??
-        [],
-    );
-    const [low, high] = rangeInputs;
-    if (!low || !high) throw new Error('missing between condition inputs');
-    low.value = '10';
-    low.dispatchEvent(new Event('input', { bubbles: true }));
-    high.value = '20';
-    high.dispatchEvent(new Event('input', { bubbles: true }));
-
-    document
-      .querySelector('form')
-      ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
-
-    expect(calls).toContain('pivot-filter:Channel:2:10:20');
     handle.detach();
   });
 

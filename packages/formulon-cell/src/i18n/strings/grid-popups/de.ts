@@ -86,6 +86,7 @@ export const gridPopupsDe: GridPopupsStrings = {
     pivotFilterHideSelected: 'Ausgewählte Elemente ausblenden',
     pivotFilterTop10: 'Top 10…',
     pivotFilterLabel: 'Beschriftungsfilter…',
+    pivotFilterDate: 'Datumsfilter…',
     pivotFilterValue: 'Wertefilter…',
     pivotSelect: 'Auswählen',
     pivotSelectLabels: 'Beschriftung',

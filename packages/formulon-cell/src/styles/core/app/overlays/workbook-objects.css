@@ -536,11 +536,6 @@
       var(--fc-rule-soft, color-mix(in srgb, CanvasText 8%, transparent));
   }
 
-  .fc-objects__pivot-filter-condition-values {
-    display: grid;
-    gap: 6px;
-  }
-
   .fc-objects__pivot-value-settings[hidden] {
     display: none;
   }

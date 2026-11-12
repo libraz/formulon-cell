@@ -28,6 +28,8 @@ export interface PivotFieldFilterModel {
   sortByField: string;
   /** Data field captions the field can sort by. */
   dataFields: string[];
+  /** The field holds dates and no text, so its label filters are date filters. */
+  dateField: boolean;
 }
 
 /** A cache field's item names in cache-index order. */
@@ -40,6 +42,15 @@ function cacheItemNames(wb: WorkbookHandle, cacheId: number, cacheFieldIndex: nu
         ? String(value.value)
         : '',
   );
+}
+
+function cacheFieldHoldsOnlyDates(
+  wb: WorkbookHandle,
+  cacheId: number,
+  cacheFieldIndex: number,
+): boolean {
+  const field = cacheId >= 0 ? wb.pivotCacheFields(cacheId)[cacheFieldIndex] : undefined;
+  return field?.containsDate === true && !field.containsString;
 }
 
 /** The filter state of a report field; null when the definition cannot be read. */
@@ -87,6 +98,7 @@ export function pivotFieldFilterModel(
     sortOrder: field.sortOrder,
     sortByField: field.sortByField,
     dataFields: definition.dataFields.map((d) => d.name ?? '').filter((name) => name !== ''),
+    dateField: cacheFieldHoldsOnlyDates(wb, definition.cacheId, field.cacheFieldIndex),
   };
 }
 

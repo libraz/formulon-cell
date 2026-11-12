@@ -1,15 +1,11 @@
 import type { PivotSourceField } from '../commands/pivot-table.js';
-import { type PivotAggregation, PivotAxis, type PivotFilterSpec } from '../engine/types.js';
+import type { PivotAggregation } from '../engine/types.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import {
   fillPivotFieldSelect,
-  isEmptyPivotFilterCondition,
   type PivotAreaKind,
   type PivotFieldSettingsActive,
-  type PivotFilterConditionState,
-  type PivotFilterInputContext,
   type PivotValueFieldSetting,
-  pivotFilterConditionToSpec,
   resolvePivotShowAsBase,
 } from './pivot-field-settings.js';
 
@@ -23,8 +19,6 @@ export interface PivotFieldAreaSelects {
 export interface PivotCreateSpecDefaults {
   aggregation: PivotAggregation;
   numberFormat: string;
-  /** How the filter conditions' typed operands read. */
-  filterInput: PivotFilterInputContext;
 }
 
 const retainFieldEntries = <V>(map: Map<string, V>, keep: readonly string[]): Map<string, V> =>
@@ -46,7 +40,6 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
   let selectedFilterFields: string[] = [];
   let selectedValueFields: string[] = [];
   let selectedFilterItemVisibility = new Map<string, Map<string, boolean>>();
-  let selectedFilterConditions = new Map<string, PivotFilterConditionState>();
   let selectedValueSettings = new Map<string, PivotValueFieldSetting>();
   let activeFieldSettings: PivotFieldSettingsActive | null = null;
 
@@ -109,7 +102,6 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
   const removeSelectedFilter = (fieldName: string): void => {
     selectedFilterFields = selectedFilterFields.filter((name) => name !== fieldName);
     selectedFilterItemVisibility.delete(fieldName);
-    selectedFilterConditions.delete(fieldName);
     filterSelect.value = selectedFilterFields[0] ?? '';
   };
 
@@ -139,8 +131,6 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
     if (previous !== next) {
       selectedFilterItemVisibility.delete(previous);
       selectedFilterItemVisibility.delete(next);
-      selectedFilterConditions.delete(previous);
-      selectedFilterConditions.delete(next);
     }
     filterSelect.value = selectedFilterFields[0] ?? '';
     activeFieldSettings = { kind: 'filters', fieldName: next };
@@ -157,13 +147,6 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
     selectedFilterItemVisibility = byField;
   };
 
-  const setFilterCondition = (fieldName: string, condition: PivotFilterConditionState): void => {
-    const byField = new Map(selectedFilterConditions);
-    if (isEmptyPivotFilterCondition(condition)) byField.delete(fieldName);
-    else byField.set(fieldName, condition);
-    selectedFilterConditions = byField;
-  };
-
   const removeFieldAssignment = (fieldName: string): void => {
     if (rowSelect.value === fieldName) rowSelect.value = '';
     if (colSelect.value === fieldName) colSelect.value = '';
@@ -171,7 +154,6 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
     selectedValueFields = selectedValueFields.filter((name) => name !== fieldName);
     selectedValueSettings.delete(fieldName);
     selectedFilterItemVisibility.delete(fieldName);
-    selectedFilterConditions.delete(fieldName);
   };
 
   const selectedValueSetting = (fieldName: string): PivotValueFieldSetting =>
@@ -297,7 +279,6 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
       selectedFilterItemVisibility,
       selectedFilterFields,
     );
-    selectedFilterConditions = retainFieldEntries(selectedFilterConditions, selectedFilterFields);
     filterSelect.value = selectedFilterFields[0] ?? '';
     normalizeSelectedFilters();
   };
@@ -337,15 +318,6 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
         }),
       ),
     ),
-    pivotFilters: selectedFilterFields.flatMap<PivotFilterSpec>((fieldName) => {
-      const spec = pivotFilterConditionToSpec(
-        fieldName,
-        selectedFilterConditions.get(fieldName),
-        PivotAxis.Page,
-        defaults.filterInput,
-      );
-      return spec ? [spec] : [];
-    }),
     valueFieldSettings: selectedValueFields.map((fieldName) => {
       const setting = resolvePivotShowAsBase(
         selectedValueSetting(fieldName),
@@ -381,9 +353,6 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
     replaceFilterField,
     filterItemVisibility,
     setFilterItemVisibility,
-    selectedFilterCondition: (fieldName: string): PivotFilterConditionState | undefined =>
-      selectedFilterConditions.get(fieldName),
-    setFilterCondition,
     selectedValueSetting,
     setValueFieldSetting,
     assignFieldToArea,

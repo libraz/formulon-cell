@@ -12,8 +12,6 @@ import {
   type CellValue,
   PIVOT_SHOW_AS_BASE_PREVIOUS,
   PivotAggregation,
-  PivotAxis,
-  PivotFilterKind,
   PivotShowValuesAs,
   PivotSortOrder,
 } from '../../../src/engine/types.js';
@@ -338,28 +336,6 @@ describe('pivot-table command helpers', () => {
     expect(calls.indexOf('clear-items:1')).toBeGreaterThanOrEqual(0);
     expect(calls.indexOf('clear-items:1')).toBeLessThan(calls.indexOf('pivot-item:1:Desk:true'));
     expect(calls).toContain('pivot-item:1:Chair:false');
-  });
-
-  it('adds page/filter condition specs when requested', () => {
-    const { wb, calls } = makeWb();
-    const result = createPivotTableFromRange(wb, {
-      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
-      destination: { sheet: 0, row: 5, col: 0 },
-      rowField: 'Region',
-      filterField: 'Product',
-      pivotFilters: [
-        {
-          axis: PivotAxis.Page,
-          fieldName: 'Product',
-          kind: PivotFilterKind.LabelContains,
-          value: 'Desk',
-        },
-      ],
-      valueField: 'Sales',
-    });
-
-    expect(result.ok).toBe(true);
-    expect(calls).toContain('pivot-filter:Product:3');
   });
 
   it('adds multiple page/filter fields when requested', () => {

@@ -4,7 +4,7 @@ import { applyPivotEdit } from '../commands/pivot-edit.js';
 import { PivotAxis, PivotReportLayout } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import { type PivotAreaKind, pivotFilterInputFor } from './pivot-field-settings.js';
+import type { PivotAreaKind } from './pivot-field-settings.js';
 import {
   type PivotNumberFormatPicker,
   showPivotFieldSettingsDialog,
@@ -21,11 +21,10 @@ import {
 } from './pivot-table-field-list.js';
 import {
   createPivotFieldEditor,
-  editedPivotFilters,
   type PivotEditorTarget,
   type PivotFieldEditor,
-  pivotEditorFilterConditions,
   readPivotEditorModel,
+  retainedPivotFilters,
 } from './workbook-objects-pivot-editor.js';
 
 /** Field indices per area, in display order. */
@@ -96,22 +95,13 @@ export function renderPivotFieldListPane(
   root.setAttribute('aria-label', t.pivotFieldList);
   const editorModel = readPivotEditorModel(wb, pivot);
   const { definition } = editorModel;
-  const filterConditions = pivotEditorFilterConditions(editorModel, pivotFilterInputFor(wb));
   const error = document.createElement('div');
   error.className = 'fc-objects__error';
   error.setAttribute('role', 'alert');
   error.hidden = !ctx.errorText;
   error.textContent = ctx.errorText;
-  let write: (layout: PivotPaneLayout) => void = () => {};
   const editors = editorModel.fields
-    .map((model) =>
-      createPivotFieldEditor(
-        { ...ctx, dataFields: definition?.dataFields.map((spec) => spec.name ?? '') ?? [] },
-        model,
-        filterConditions.get(model.index),
-        () => write(layout),
-      ),
-    )
+    .map((model) => createPivotFieldEditor(ctx, model))
     .sort((a, b) => a.model.index - b.model.index);
   const editorOf = new Map<string, PivotFieldEditor>(
     editors.map((editor) => [editor.model.label, editor]),
@@ -149,7 +139,7 @@ export function renderPivotFieldListPane(
   };
   for (const editor of editors) editor.showFor(axisIn(layout, editor.model.index));
 
-  write = (next: PivotPaneLayout): void => {
+  const write = (next: PivotPaneLayout): void => {
     ctx.setError('');
     const placedIndexes = [...next.rows, ...next.columns];
     const ordered = [
@@ -180,7 +170,7 @@ export function renderPivotFieldListPane(
         layout: PivotReportLayout.Compact,
         ...(before ? { dataFields: before.dataFields } : {}),
         fields: placed.map(({ editor, axis }) => editor.toEditField(axis)),
-        filters: editedPivotFilters(editorModel.pivotFilters, placed),
+        filters: retainedPivotFilters(editorModel.pivotFilters, placed),
       });
       // Value fields keep their written order; a reorder within Values rewrites the list.
       const written = before ? wb.getPivotDefinition(sheetIndex, pivotIndex) : null;
@@ -284,7 +274,7 @@ export function renderPivotFieldListPane(
     },
   };
 
-  // Filter items and conditions stay in the pane; every other setting is in the dialog.
+  // Filter items stay in the pane; every other setting is in the dialog.
   const active = state.active?.kind === 'filters' ? state.active : null;
   const activeEditor =
     active && model.fieldsIn(active.kind).includes(active.fieldName)

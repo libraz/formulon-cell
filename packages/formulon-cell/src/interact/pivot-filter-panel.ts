@@ -25,6 +25,7 @@ import {
 } from './pivot-field-settings.js';
 import { commitPivotChange, type PivotCommitContext } from './pivot-field-settings-dialog-apply.js';
 import { showPivotFilterDialog } from './pivot-filter-dialog.js';
+import { PIVOT_FILTER_PERIODS, pivotFilterOperand } from './pivot-filter-kinds.js';
 
 /**
  * The filter panel a report's drop-down button opens: sort buttons, label and
@@ -82,6 +83,18 @@ const VALUE_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind] | nul
   ['top10', PivotFilterKind.ValueTopCount],
   ['bottom10', PivotFilterKind.ValueBottomCount],
 ];
+
+/** A date field's label filters: the desktop's Date Filters comparisons. */
+const DATE_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind] | null)[] = [
+  null,
+  ['equals', PivotFilterKind.DateEqual],
+  ['before', PivotFilterKind.DateOlderThan],
+  ['after', PivotFilterKind.DateNewerThan],
+  ['between', PivotFilterKind.DateBetween],
+];
+/** Where the desktop's Date Filters menu separates its relative periods: days, weeks, months,
+ *  quarters, years, year to date, then the quarters and months of All Dates in the Period. */
+const PERIOD_GROUP_STARTS = new Set([0, 3, 6, 9, 12, 15, 16, 20]);
 
 const open = new WeakMap<HTMLElement, () => void>();
 
@@ -196,7 +209,7 @@ export function openPivotFieldFilter(
   );
 
   const conditionSelect = (
-    list: typeof LABEL_CONDITIONS,
+    list: readonly (readonly [string, PivotFilterKind] | null)[],
     which: 'label' | 'value',
   ): HTMLSelectElement => {
     const s = select();
@@ -206,12 +219,12 @@ export function openPivotFieldFilter(
       if (entry === null) {
         projectDisabledState(option, true, null);
         option.textContent = '──────────';
-      } else if (entry[0] === '') {
+      } else if (entry[1] === null) {
         option.value = '';
         option.textContent = t.chooseOne;
       } else {
         option.value = String(entry[1]);
-        option.textContent = t.conditions[entry[0]];
+        option.textContent = entry[0];
       }
       s.appendChild(option);
     }
@@ -221,6 +234,12 @@ export function openPivotFieldFilter(
       selectHandles.get(s)?.sync();
       if (!picked || !model) return;
       const kind = Number(picked) as PivotFilterKind;
+      // A relative period takes no operand and applies at once.
+      if (pivotFilterOperand(kind) === 'none') {
+        const spec = { axis: model.axis ?? PivotAxis.Row, fieldName: model.sourceName, kind };
+        commit(() => setPivotFieldCondition(wb, sheet, pivotIndex, fieldIndex, spec));
+        return;
+      }
       const current = pivotFilterSpecToCondition(model.condition ?? undefined, input);
       void showPivotFilterDialog({
         host: ctx.host,
@@ -244,6 +263,16 @@ export function openPivotFieldFilter(
     });
     return s;
   };
+
+  const labeled = (list: typeof LABEL_CONDITIONS) =>
+    list.map((entry) => (entry ? ([t.conditions[entry[0]], entry[1]] as const) : null));
+  const dateConditions = () => [
+    ...labeled(DATE_CONDITIONS),
+    ...PIVOT_FILTER_PERIODS.flatMap(([kind, key], index) => [
+      ...(PERIOD_GROUP_STARTS.has(index) ? [null] : []),
+      [strings.datePeriods[key], kind] as const,
+    ]),
+  ];
 
   const search = doc.createElement('input');
   search.type = 'search';
@@ -335,8 +364,11 @@ export function openPivotFieldFilter(
     row(t.sortBy, sortBy),
     separator,
     heading(t.filterHeading),
-    row(t.byLabel, conditionSelect(LABEL_CONDITIONS, 'label')),
-    row(t.byValue, conditionSelect(VALUE_CONDITIONS, 'value')),
+    row(
+      t.byLabel,
+      conditionSelect(model.dateField ? dateConditions() : labeled(LABEL_CONDITIONS), 'label'),
+    ),
+    row(t.byValue, conditionSelect(labeled(VALUE_CONDITIONS), 'value')),
     searchBox,
     list,
     footer,

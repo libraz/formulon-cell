@@ -497,6 +497,8 @@ export interface PivotMenuTarget {
   fieldCount: number;
   /** The item's field is grouped by date. */
   grouped: boolean;
+  /** The item's field holds dates, so its label filters are date filters. */
+  dateField: boolean;
   /** Whether the field list is hidden, when the host can tell; draws the Hide
    *  Field List check mark. */
   fieldListHidden?: boolean;
@@ -599,7 +601,7 @@ export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntr
       on('pivotFilterHideSelected', t.pivotFilterHideSelected),
       separator(),
       on('pivotFilterTop10', t.pivotFilterTop10),
-      on('pivotFilterLabel', t.pivotFilterLabel),
+      on('pivotFilterLabel', target.dateField ? t.pivotFilterDate : t.pivotFilterLabel),
       on('pivotFilterValue', t.pivotFilterValue),
     ],
   };

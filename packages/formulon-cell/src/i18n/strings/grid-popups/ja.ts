@@ -85,6 +85,7 @@ export const gridPopupsJa: GridPopupsStrings = {
     pivotFilterHideSelected: '選択した項目を表示しない',
     pivotFilterTop10: 'トップテン...',
     pivotFilterLabel: 'ラベル フィルター...',
+    pivotFilterDate: '日付フィルター...',
     pivotFilterValue: '値フィルター...',
     pivotSelect: '選択',
     pivotSelectLabels: 'ラベル',

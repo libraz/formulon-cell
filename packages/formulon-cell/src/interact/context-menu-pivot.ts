@@ -101,6 +101,7 @@ export function pivotMenuTarget(
     fieldPosition: axisOrder.indexOf(field?.index ?? -1),
     fieldCount: axisOrder.length,
     grouped: field?.dateGroup !== null && field?.dateGroup !== undefined,
+    dateField: model?.dateField ?? false,
     ...(fieldListHidden === undefined ? {} : { fieldListHidden }),
     canRefresh: info.cacheId >= 0,
     canOpenFieldList,

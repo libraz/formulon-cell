@@ -84,6 +84,7 @@ export const gridPopupsZh: GridPopupsStrings = {
     pivotFilterHideSelected: '隐藏所选项目',
     pivotFilterTop10: '前 10 项…',
     pivotFilterLabel: '标签筛选…',
+    pivotFilterDate: '日期筛选…',
     pivotFilterValue: '值筛选…',
     pivotSelect: '选择',
     pivotSelectLabels: '标签',

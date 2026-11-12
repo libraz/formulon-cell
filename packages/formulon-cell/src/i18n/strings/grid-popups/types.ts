@@ -86,6 +86,8 @@ export interface GridPopupsStrings {
     pivotFilterHideSelected: string;
     pivotFilterTop10: string;
     pivotFilterLabel: string;
+    /** Label Filters for a field whose items are dates. */
+    pivotFilterDate: string;
     pivotFilterValue: string;
     pivotSelect: string;
     pivotSelectLabels: string;

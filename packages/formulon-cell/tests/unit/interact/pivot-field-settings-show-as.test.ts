@@ -55,7 +55,6 @@ const setup = () => {
       panelEl,
       active: { kind: 'values', fieldName: 'Sales' },
       strings: en.pivotTableDialog,
-      datePeriods: en.datePeriods,
       fields: FIELDS,
       controls: {
         ...selects,
@@ -76,8 +75,6 @@ const setup = () => {
       refreshFieldList: () => {},
       filterItemVisibility: areas.filterItemVisibility,
       setFilterItemVisibility: areas.setFilterItemVisibility,
-      selectedFilterCondition: areas.selectedFilterCondition,
-      setFilterCondition: areas.setFilterCondition,
       inferFilterItems: (name) => ITEMS[name] ?? [],
     });
   render();
@@ -88,7 +85,7 @@ const setup = () => {
     select.dispatchEvent(new Event('change', { bubbles: true }));
   };
   const spec = () =>
-    areas.toCreateSpec({ aggregation: PivotAggregation.Sum, numberFormat: '', filterInput: {} })
+    areas.toCreateSpec({ aggregation: PivotAggregation.Sum, numberFormat: '' })
       .valueFieldSettings[0];
   return { areas, panelEl, selectsIn, choose, spec };
 };

@@ -84,6 +84,7 @@ export const gridPopupsTh: GridPopupsStrings = {
     pivotFilterHideSelected: 'ซ่อนรายการที่เลือก',
     pivotFilterTop10: '10 อันดับแรก…',
     pivotFilterLabel: 'ตัวกรองป้ายชื่อ…',
+    pivotFilterDate: 'ตัวกรองวันที่…',
     pivotFilterValue: 'ตัวกรองค่า…',
     pivotSelect: 'เลือก',
     pivotSelectLabels: 'ป้ายชื่อ',
