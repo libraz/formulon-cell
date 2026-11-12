@@ -29,6 +29,7 @@ import { executeRibbonClearAction } from '../../commands/ribbon-clear.js';
 import { recordFormatChange } from '../../commands/slice-history.js';
 import {
   inferSortHasHeader,
+  type RemoveDuplicatesResult,
   removeDuplicates,
   sortActiveColumnAuto,
   sortRangeWithHistory,
@@ -50,7 +51,11 @@ import type { SpreadsheetInstance } from '../../mount.js';
 import { selectionContainsAddr } from '../../store/selection-geometry.js';
 import { mutators } from '../../store/store.js';
 import { showAdvancedFilterDialog } from '../../toolbar/dialogs/advanced-filter.js';
-import { showRemoveDuplicatesDialog } from '../../toolbar/dialogs/remove-duplicates.js';
+import { showMessage } from '../../toolbar/dialogs/prompt.js';
+import {
+  removeDuplicatesResultMessage,
+  showRemoveDuplicatesDialog,
+} from '../../toolbar/dialogs/remove-duplicates.js';
 import { type SortDialogColumn, showSortDialog } from '../../toolbar/dialogs/sort.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import {
@@ -471,8 +476,9 @@ const buildSortMenuAction =
       }
       runAfterAllowedRangeUnlock(instance.store, [range], () => {
         instance.history.begin();
+        let outcome: RemoveDuplicatesResult;
         try {
-          removeDuplicates(
+          outcome = removeDuplicates(
             instance.store.getState(),
             instance.store,
             instance.workbook,
@@ -484,7 +490,20 @@ const buildSortMenuAction =
           instance.history.end();
         }
         mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
-        instance.host.focus();
+        const message = removeDuplicatesResultMessage(outcome, strings);
+        if (!message) {
+          instance.host.focus();
+          return;
+        }
+        // The Mac shows a title-less alert with one wide OK; the Windows alert is not measured
+        // and keeps the dialog's title.
+        void showMessage({
+          host: instance.host,
+          title: strings.removeDuplicatesDialogTitle,
+          message,
+          okLabel: instance.i18n.strings.pageSetup.ok,
+          alert: mac,
+        }).then(() => instance.host.focus());
       });
       return;
     }

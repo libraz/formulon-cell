@@ -311,8 +311,10 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     removeDuplicatesColumns: '列',
     removeDuplicatesSelectAll: '全选',
     removeDuplicatesUnselectAll: '取消全选',
-    removeDuplicatesNoColumns: '请至少选择一列。',
-    removeDuplicatesStatus: '已删除 {count} 个重复行',
+    removeDuplicatesNoColumns: '若要删除重复值，请选择一个或多个包含重复值的列。',
+    removeDuplicatesResult:
+      '{removed}找到并删除重复值;保留{remaining}唯一值。请注意，计数可能包括空单元格、空格等。',
+    removeDuplicatesNone: '未发现重复值。',
     validationSettings: '数据验证…',
     errorChecking: '错误检查…',
     traceError: '追踪错误',

@@ -313,7 +313,9 @@ export interface RibbonMenusStrings {
     removeDuplicatesSelectAll: string;
     removeDuplicatesUnselectAll: string;
     removeDuplicatesNoColumns: string;
-    removeDuplicatesStatus: string;
+    /** The result alert; `{removed}` and `{remaining}` are row counts. */
+    removeDuplicatesResult: string;
+    removeDuplicatesNone: string;
     validationSettings: string;
     errorChecking: string;
     traceError: string;

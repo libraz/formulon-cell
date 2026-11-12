@@ -311,8 +311,10 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     removeDuplicatesColumns: 'คอลัมน์',
     removeDuplicatesSelectAll: 'เลือกทั้งหมด',
     removeDuplicatesUnselectAll: 'ยกเลิกการเลือกทั้งหมด',
-    removeDuplicatesNoColumns: 'เลือกคอลัมน์อย่างน้อยหนึ่งคอลัมน์',
-    removeDuplicatesStatus: 'เอาแถวที่ซ้ำกันออกแล้ว {count} แถว',
+    removeDuplicatesNoColumns: 'เมื่อต้องการลบค่าที่ซ้ำกัน ให้เลือกอย่างน้อยหนึ่งคอลัมน์ที่มีค่าซ้ำกัน',
+    removeDuplicatesResult:
+      'พบและเอาค่าที่ซ้ํากัน{removed}ออก ค่าที่ไม่ซ้ํากัน{remaining}ยังคงอยู่ โปรดทราบว่าจํานวนอาจรวมถึงเซลล์ว่าง ช่องว่าง และอื่นๆ',
+    removeDuplicatesNone: 'ไม่พบค่าที่ซ้ำกัน',
     validationSettings: 'การตรวจสอบความถูกต้องของข้อมูล…',
     errorChecking: 'การตรวจสอบข้อผิดพลาด…',
     traceError: 'ติดตามข้อผิดพลาด',

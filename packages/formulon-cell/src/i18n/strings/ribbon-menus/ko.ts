@@ -313,8 +313,10 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     removeDuplicatesColumns: '열',
     removeDuplicatesSelectAll: '모두 선택',
     removeDuplicatesUnselectAll: '모두 선택 취소',
-    removeDuplicatesNoColumns: '열을 하나 이상 선택하세요.',
-    removeDuplicatesStatus: '중복 행 {count}개가 제거되었습니다.',
+    removeDuplicatesNoColumns: '중복 값을 삭제하려면 중복 값이 있는 열을 하나 이상 선택하십시오.',
+    removeDuplicatesResult:
+      '중복 값 {removed}개가 발견되어 제거되었습니다. 고유 값 {remaining}개가 남아 있습니다. 개수에는 빈 셀, 공백 등이 포함될 수 있습니다.',
+    removeDuplicatesNone: '중복된 값이 없습니다.',
     validationSettings: '데이터 유효성 검사…',
     errorChecking: '오류 검사…',
     traceError: '오류 추적',

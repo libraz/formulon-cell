@@ -44,7 +44,7 @@ describe('removeDuplicates', () => {
       r1: 1,
       c1: 1,
     });
-    expect(removed).toBe(0);
+    expect(removed).toEqual({ ok: true, removed: 0, remaining: 2 });
   });
 
   it('restores formats on undo', () => {
@@ -64,7 +64,7 @@ describe('removeDuplicates', () => {
       history,
     );
     history.end();
-    expect(removed).toBe(1);
+    expect(removed).toEqual({ ok: true, removed: 1, remaining: 2 });
     expect(
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 0 })),
     ).toMatchObject({ bold: true });

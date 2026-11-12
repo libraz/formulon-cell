@@ -321,8 +321,11 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     removeDuplicatesColumns: 'Spalten',
     removeDuplicatesSelectAll: 'Alle auswählen',
     removeDuplicatesUnselectAll: 'Auswahl für alle aufheben',
-    removeDuplicatesNoColumns: 'Wählen Sie mindestens eine Spalte aus.',
-    removeDuplicatesStatus: '{count} doppelte Zeile(n) entfernt',
+    removeDuplicatesNoColumns:
+      'Wählen Sie zum Löschen doppelter Werte mindestens eine Spalte aus, die doppelte Werte enthält.',
+    removeDuplicatesResult:
+      '{removed} doppelte Werte gefunden und entfernt; {remaining} eindeutigen Werte verbleiben. Beachten Sie, dass die Anzahl leere Zellen, Leerzeichen usw. umfassen kann.',
+    removeDuplicatesNone: 'Es wurden keine doppelten Werte gefunden.',
     validationSettings: 'Datenüberprüfung …',
     errorChecking: 'Fehlerüberprüfung …',
     traceError: 'Fehlerüberwachung',

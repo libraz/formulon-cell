@@ -680,7 +680,7 @@ describe('removeDuplicates', () => {
       c1: 1,
     });
 
-    expect(removed).toBe(1);
+    expect(removed).toMatchObject({ ok: true, removed: 1 });
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'alpha' });
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 1 });
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'beta' });
@@ -705,7 +705,7 @@ describe('removeDuplicates', () => {
       c1: 0,
     });
 
-    expect(removed).toBe(1);
+    expect(removed).toMatchObject({ ok: true, removed: 1 });
     expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual({
       fill: '#fff2cc',
     });
@@ -732,7 +732,7 @@ describe('removeDuplicates', () => {
       { columns: [0] },
     );
 
-    expect(removed).toBe(1);
+    expect(removed).toMatchObject({ ok: true, removed: 1 });
     expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toMatchObject({
       kind: 'error',
       code: 15,
@@ -763,7 +763,7 @@ describe('removeDuplicates', () => {
       { columns: [0] },
     );
 
-    expect(removed).toBe(1);
+    expect(removed).toMatchObject({ ok: true, removed: 1 });
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'alpha' });
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 1 });
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'beta' });
@@ -794,7 +794,7 @@ describe('removeDuplicates', () => {
       { hasHeader: true },
     );
 
-    expect(removed).toBe(1);
+    expect(removed).toMatchObject({ ok: true, removed: 1 });
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'item' });
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: 'qty' });
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'paper' });
@@ -818,7 +818,7 @@ describe('removeDuplicates', () => {
         c1: 0,
       });
 
-      expect(removed).toBe(0);
+      expect(removed).toEqual({ ok: false, reason: 'protected' });
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'alpha' });
       expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'alpha' });
       expect(warn).toHaveBeenCalledTimes(1);
@@ -839,7 +839,7 @@ describe('removeDuplicates', () => {
       c1: 0,
     });
 
-    expect(removed).toBe(0);
+    expect(removed).toEqual({ ok: false, reason: 'too-large' });
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'alpha' });
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'alpha' });
   });

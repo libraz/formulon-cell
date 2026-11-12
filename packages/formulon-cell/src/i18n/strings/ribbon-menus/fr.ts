@@ -317,8 +317,11 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     removeDuplicatesColumns: 'Colonnes',
     removeDuplicatesSelectAll: 'Sélectionner tout',
     removeDuplicatesUnselectAll: 'Désélectionner tout',
-    removeDuplicatesNoColumns: 'Sélectionnez au moins une colonne.',
-    removeDuplicatesStatus: '{count} ligne(s) en double supprimée(s)',
+    removeDuplicatesNoColumns:
+      'Pour supprimer les valeurs en double, sélectionnez une ou plusieurs colonnes contenant des doublons.',
+    removeDuplicatesResult:
+      '{removed} valeurs dupliquées trouvées et supprimées ; {remaining} valeurs uniques sont conservées. Notez que les nombres peuvent inclure des cellules vides, des espaces, etc.',
+    removeDuplicatesNone: 'Aucune valeur en double trouvée.',
     validationSettings: 'Validation des données…',
     errorChecking: 'Vérification des erreurs…',
     traceError: 'Repérer l’erreur',

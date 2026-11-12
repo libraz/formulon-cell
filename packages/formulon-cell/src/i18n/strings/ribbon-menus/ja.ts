@@ -313,8 +313,11 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     removeDuplicatesColumns: '列',
     removeDuplicatesSelectAll: 'すべて選択',
     removeDuplicatesUnselectAll: 'すべて選択解除',
-    removeDuplicatesNoColumns: '1 つ以上の列を選択してください。',
-    removeDuplicatesStatus: '{count} 件の重複する行を削除しました',
+    removeDuplicatesNoColumns:
+      '重複する値を削除するには、重複が含まれている列を 1 つ以上選択します。',
+    removeDuplicatesResult:
+      '{removed} 個の重複する値が見つかり、削除されました。{remaining} 個の一意の値が残ります。カウントには空のセルやスペースなどが含まれる場合があることに注意してください。',
+    removeDuplicatesNone: '重複する値は見つかりませんでした。',
     validationSettings: 'データの入力規則...',
     errorChecking: 'エラー チェック...',
     traceError: 'エラー トレース',

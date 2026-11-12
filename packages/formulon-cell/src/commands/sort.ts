@@ -105,6 +105,12 @@ export interface RemoveDuplicatesOptions {
   hasHeader?: boolean;
 }
 
+/** What Remove Duplicates did: how many data rows it removed and how many unique rows remain, or
+ *  why it refused to run. */
+export type RemoveDuplicatesResult =
+  | { ok: true; removed: number; remaining: number }
+  | { ok: false; reason: 'too-large' | 'merged-cells' | 'protected' | 'engine-failed' };
+
 const cloneFormat = (fmt: CellFormat | undefined): CellFormat | undefined =>
   fmt ? { ...fmt } : undefined;
 
@@ -879,10 +885,10 @@ export function removeDuplicates(
   range: Range,
   options: RemoveDuplicatesOptions = {},
   history: History | null = null,
-): number {
-  if (rangeArea(range) > MAX_SORT_CELLS) return 0;
-  if (rangeIntersectsMerges(state, range)) return 0;
-  if (!ensureWritableRange(state, range)) return 0;
+): RemoveDuplicatesResult {
+  if (rangeArea(range) > MAX_SORT_CELLS) return { ok: false, reason: 'too-large' };
+  if (rangeIntersectsMerges(state, range)) return { ok: false, reason: 'merged-cells' };
+  if (!ensureWritableRange(state, range)) return { ok: false, reason: 'protected' };
   const columns = (options.columns?.length ? options.columns : undefined)?.filter(
     (col, index, arr) =>
       col >= range.c0 && col <= range.c1 && Number.isInteger(col) && arr.indexOf(col) === index,
@@ -891,12 +897,15 @@ export function removeDuplicates(
     ? columns
     : Array.from({ length: range.c1 - range.c0 + 1 }, (_, i) => range.c0 + i);
   const firstDataRow = options.hasHeader ? range.r0 + 1 : range.r0;
-  if (firstDataRow > range.r1) return 0;
+  if (firstDataRow > range.r1) return { ok: true, removed: 0, remaining: 0 };
   const nativeBundle = wb.isStub === false && wb.capabilities.arrayFormulaEvaluation === true;
+  if (nativeBundle && range.r1 - firstDataRow + 1 > MAX_NATIVE_UNIQUE_ROWS) {
+    return { ok: false, reason: 'too-large' };
+  }
   const nativeKeep = nativeBundle
     ? nativeUniqueRows(state, wb, range, firstDataRow, keyColumns)
     : null;
-  if (nativeBundle && nativeKeep === null) return 0;
+  if (nativeBundle && nativeKeep === null) return { ok: false, reason: 'engine-failed' };
   const keep: number[] = options.hasHeader ? [range.r0] : [];
   if (nativeKeep) keep.push(...nativeKeep);
   if (!nativeKeep) {
@@ -922,7 +931,8 @@ export function removeDuplicates(
       keep.push(r);
     }
   }
-  if (keep.length === range.r1 - range.r0 + 1) return 0;
+  const remaining = keep.length - (options.hasHeader ? 1 : 0);
+  if (keep.length === range.r1 - range.r0 + 1) return { ok: true, removed: 0, remaining };
 
   state = hydrateSortComments(store, wb, range, range.r0);
 
@@ -993,7 +1003,7 @@ export function removeDuplicates(
     }
   });
   wb.recalcAuto();
-  return range.r1 - range.r0 + 1 - snaps.length;
+  return { ok: true, removed: range.r1 - range.r0 + 1 - snaps.length, remaining };
 }
 
 export interface SortRangeWithHistoryDeps {

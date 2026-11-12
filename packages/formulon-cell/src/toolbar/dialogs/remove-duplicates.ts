@@ -1,3 +1,5 @@
+import type { RemoveDuplicatesResult } from '../../commands/sort.js';
+import type { RibbonMenusStrings } from '../../i18n/strings/ribbon-menus/types.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -9,6 +11,8 @@ import {
   showDialogError,
 } from './shell.js';
 import type { SortDialogColumn } from './sort.js';
+
+type RibbonMenuStrings = RibbonMenusStrings['ribbonMenu'];
 
 export interface RemoveDuplicatesDialogOptions {
   /** The spreadsheet host; anchors the dialog and picks its platform layout. */
@@ -30,6 +34,19 @@ export interface RemoveDuplicatesDialogResult {
   columns: string[];
   hasHeader: boolean;
 }
+
+/** The alert after Remove Duplicates: the counts, or that none were found. A refusal has its own
+ *  alert, raised where the cause is found, so it gets none here. */
+export const removeDuplicatesResultMessage = (
+  result: RemoveDuplicatesResult,
+  strings: Pick<RibbonMenuStrings, 'removeDuplicatesResult' | 'removeDuplicatesNone'>,
+): string | null => {
+  if (!result.ok) return null;
+  if (result.removed === 0) return strings.removeDuplicatesNone;
+  return strings.removeDuplicatesResult
+    .replace('{removed}', String(result.removed))
+    .replace('{remaining}', String(result.remaining));
+};
 
 export const showRemoveDuplicatesDialog = (
   opts: RemoveDuplicatesDialogOptions,

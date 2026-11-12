@@ -241,7 +241,7 @@ describe('locale sort and filter boundaries', () => {
         columns: [0],
         hasHeader: true,
       }),
-    ).toBe(2);
+    ).toEqual({ ok: true, removed: 2, remaining: 2 });
     expect(formula).toContain('UNIQUE');
     expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 10 });
     expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'number', value: 30 });
@@ -269,7 +269,7 @@ describe('locale sort and filter boundaries', () => {
           hasHeader: true,
         },
       ),
-    ).toBe(1);
+    ).toEqual({ ok: true, removed: 1, remaining: 3 });
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 0 });
     expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'blank' });
     expect(wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'text', value: 'x' });
@@ -413,7 +413,7 @@ describe('locale sort and filter boundaries', () => {
         { sheet: 0, r0: 0, c0: 0, r1: 20_001, c1: 0 },
         { hasHeader: true, columns: [0] },
       ),
-    ).toBe(0);
+    ).toEqual({ ok: false, reason: 'too-large' });
     expect(uniqueCalls).toBe(0);
 
     const filterWb = await WorkbookHandle.createDefault();

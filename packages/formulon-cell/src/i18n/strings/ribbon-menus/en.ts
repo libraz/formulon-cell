@@ -313,8 +313,11 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     removeDuplicatesColumns: 'Columns',
     removeDuplicatesSelectAll: 'Select All',
     removeDuplicatesUnselectAll: 'Unselect All',
-    removeDuplicatesNoColumns: 'Select at least one column.',
-    removeDuplicatesStatus: 'Removed {count} duplicate row(s)',
+    removeDuplicatesNoColumns:
+      'To delete duplicate values, select one or more columns that contain duplicates.',
+    removeDuplicatesResult:
+      '{removed} duplicate values found and removed; {remaining} unique values remain. Note that counts may include empty cells, spaces, etc.',
+    removeDuplicatesNone: 'No duplicate values found.',
     validationSettings: 'Data Validation...',
     errorChecking: 'Error Checking...',
     traceError: 'Trace Error',
