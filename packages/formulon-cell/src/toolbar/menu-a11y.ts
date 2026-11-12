@@ -1,6 +1,8 @@
 type MenuOptions = {
   close: (restoreFocus: boolean) => void;
   restoreFocusTo?: HTMLElement | null;
+  /** Selector for the menu's items; every button by default. */
+  items?: string;
 };
 
 /** Dataset key holding an element's own title while a reason replaces it. */
@@ -57,8 +59,8 @@ export function projectDisabledState<T extends HTMLElement & { disabled?: boolea
   projectDisabledReason(el, disabled ? reason : null, options);
 }
 
-const menuItems = (menu: HTMLElement): HTMLButtonElement[] =>
-  Array.from(menu.querySelectorAll<HTMLButtonElement>('button')).filter(
+const menuItems = (menu: HTMLElement, selector = 'button'): HTMLButtonElement[] =>
+  Array.from(menu.querySelectorAll<HTMLButtonElement>(selector)).filter(
     (item) =>
       !item.disabled &&
       item.getAttribute('aria-disabled') !== 'true' &&
@@ -106,8 +108,12 @@ export function prepareMenu(menu: HTMLElement, label?: string): void {
   }
 }
 
-export function focusMenuItem(menu: HTMLElement, index: number | 'first' | 'last' = 0): void {
-  const items = menuItems(menu);
+export function focusMenuItem(
+  menu: HTMLElement,
+  index: number | 'first' | 'last' = 0,
+  selector?: string,
+): void {
+  const items = menuItems(menu, selector);
   if (items.length === 0) {
     menu.tabIndex = -1;
     menu.focus();
@@ -124,14 +130,14 @@ export function handleMenuKeydown(
   menu: HTMLElement,
   options: MenuOptions,
 ): void {
-  const items = menuItems(menu);
+  const items = menuItems(menu, options.items);
   const active =
     document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
   const idx = active ? items.indexOf(active) : -1;
   const move = (next: number): void => {
     event.preventDefault();
     event.stopPropagation();
-    focusMenuItem(menu, (next + items.length) % items.length);
+    focusMenuItem(menu, (next + items.length) % items.length, options.items);
   };
 
   if (event.key === 'Escape') {
