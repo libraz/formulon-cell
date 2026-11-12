@@ -1,5 +1,6 @@
 import { test } from '@playwright/test';
 
+import { runSortCustomListScenario } from '../../../tests/e2e-shared/scenarios/sort-custom-list.js';
 import { runSortOnCellColorScenario } from '../../../tests/e2e-shared/scenarios/sort-on-color.js';
 
 for (const platform of ['default', 'mac'] as const) {
@@ -7,5 +8,13 @@ for (const platform of ['default', 'mac'] as const) {
     page,
   }) => {
     await runSortOnCellColorScenario(page, platform);
+  });
+}
+
+for (const platform of ['default', 'mac'] as const) {
+  test(`Sort dialog Custom List orders the rows by a typed list (${platform} chrome)`, async ({
+    page,
+  }) => {
+    await runSortCustomListScenario(page, platform);
   });
 }
