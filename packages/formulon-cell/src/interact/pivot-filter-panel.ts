@@ -8,6 +8,7 @@ import {
 } from '../commands/pivot-filter.js';
 import { pivotStyleLayer } from '../engine/pivot-style.js';
 import { type Addr, PivotAxis, PivotFilterKind, PivotSortOrder } from '../engine/types.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
@@ -249,7 +250,7 @@ export function openPivotFieldFilter(
         okLabel: strings.pageSetup.ok,
         cancelLabel: strings.pageSetup.cancel,
         dataFields: model.dataFields,
-        mac: true,
+        mac: isMacHost(ctx.host),
       }).then((condition) => {
         if (!condition || !model) return;
         const spec = pivotFilterConditionToSpec(

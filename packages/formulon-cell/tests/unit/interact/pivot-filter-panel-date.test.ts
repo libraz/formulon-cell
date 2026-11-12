@@ -15,7 +15,7 @@ const MAY_15 = 46157;
 const MAY_31 = 46173;
 
 /** A report whose row field is `Date` (date-formatted serials) or `Region` (text). */
-const setup = async (rowField: 'Date' | 'Region') => {
+const setup = async (rowField: 'Date' | 'Region', platform?: 'mac') => {
   const wb = await WorkbookHandle.createDefault();
   const rows: (string | number)[][] = [
     ['Date', 'Region', 'Amt'],
@@ -45,6 +45,7 @@ const setup = async (rowField: 'Date' | 'Region') => {
   const store = createSpreadsheetStore();
   mutators.replaceCells(store, wb.cells(0));
   const host = document.createElement('div');
+  if (platform) host.dataset.fcPlatform = platform;
   document.body.appendChild(host);
   openPivotFieldFilter(
     {
@@ -141,5 +142,19 @@ describe('PivotTable filter panel on a date field', () => {
       value: 46152,
       valueHigh: 46162,
     });
+  });
+});
+
+describe('PivotTable filter panel dialog titles', () => {
+  it('titles the dialog with the field on the default chrome and without it on the Mac', async () => {
+    await setup('Date');
+    choose(byLabel(), String(PivotFilterKind.DateBetween));
+    expect(dialog()?.getAttribute('aria-label')).toBe('Date Filter (Date)');
+    document.body.replaceChildren();
+    await setup('Date', 'mac');
+    choose(byLabel(), String(PivotFilterKind.DateBetween));
+    expect(dialog()?.getAttribute('aria-label')).toBe(
+      en.pivotTableDialog.filterDialogs.date.macTitle,
+    );
   });
 });

@@ -86,8 +86,7 @@ describe('PivotTable filter panel conditions', () => {
     await setup();
     choose(by('value'), String(PivotFilterKind.ValueBottomCount));
     const d = dialog();
-    expect(d?.textContent).toContain('Top 10 Filter');
-    expect(d?.textContent).not.toContain('Top 10 Filter (');
+    expect(d?.textContent).toContain('Top 10 Filter (Region)');
     expect(
       d?.querySelector<HTMLSelectElement>('select[data-pivot-filter-top10-direction="true"]')
         ?.value,
