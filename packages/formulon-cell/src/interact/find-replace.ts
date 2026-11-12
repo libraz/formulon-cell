@@ -83,17 +83,17 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   titlebar.className = 'fc-fmtdlg__header fc-find__titlebar';
   const title = document.createElement('div');
   title.className = 'fc-find__title';
-  const closeBtn = makeBtn('fc-find__btn--icon');
-  closeBtn.className = 'fc-fmtdlg__close fc-find__btn--icon';
+  const closeBtn = createDialogButton({
+    label: '',
+    baseClass: 'fc-fmtdlg__close fc-find__btn--icon',
+  });
   titlebar.append(title, closeBtn);
 
   const tabs = document.createElement('div');
   tabs.className = 'fc-fmtdlg__tabs fc-find__tabs';
   tabs.setAttribute('role', 'tablist');
-  const findTab = makeBtn('fc-find__tab');
-  const replaceTab = makeBtn('fc-find__tab');
-  findTab.className = 'fc-fmtdlg__tab fc-find__tab';
-  replaceTab.className = 'fc-fmtdlg__tab fc-find__tab';
+  const findTab = createDialogButton({ label: '', baseClass: 'fc-fmtdlg__tab fc-find__tab' });
+  const replaceTab = createDialogButton({ label: '', baseClass: 'fc-fmtdlg__tab fc-find__tab' });
   findTab.setAttribute('role', 'tab');
   replaceTab.setAttribute('role', 'tab');
   tabs.append(findTab, replaceTab);
@@ -220,18 +220,12 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 
   const footer = document.createElement('div');
   footer.className = 'fc-fmtdlg__footer fc-find__footer';
-  const findAllBtn = makeBtn();
-  findAllBtn.classList.add('fc-find__btn--find-all');
-  const prevBtn = makeBtn();
-  prevBtn.classList.add('fc-find__btn--prev');
-  const nextBtn = makeBtn();
-  nextBtn.classList.add('fc-find__btn--next');
-  const replaceBtn = makeBtn();
-  replaceBtn.classList.add('fc-find__btn--replace');
-  const replaceAllBtn = makeBtn();
-  replaceAllBtn.classList.add('fc-find__btn--replace-all');
-  const closeFooterBtn = makeBtn();
-  closeFooterBtn.classList.add('fc-find__btn--close');
+  const findAllBtn = makeBtn('fc-find__btn--find-all');
+  const prevBtn = makeBtn('fc-find__btn--prev');
+  const nextBtn = makeBtn('fc-find__btn--next');
+  const replaceBtn = makeBtn('fc-find__btn--replace');
+  const replaceAllBtn = makeBtn('fc-find__btn--replace-all');
+  const closeFooterBtn = makeBtn('fc-find__btn--close');
   footer.append(findAllBtn, prevBtn, nextBtn, replaceBtn, replaceAllBtn, closeFooterBtn);
 
   // The form and results scroll together when the host is shorter than the panel.
@@ -440,7 +434,6 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       resultsBody.append(tr);
     }
     results.hidden = false;
-    updateSummary(all);
     setStatus(all.length);
     resultsSummary.textContent = t.cellsFound.replace('{count}', String(all.length));
   };
@@ -649,9 +642,6 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     if (e.key === 'Enter') {
       e.preventDefault();
       step(e.shiftKey ? 'prev' : 'next');
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      api.close();
     }
   };
 
@@ -659,9 +649,6 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     if (e.key === 'Enter') {
       e.preventDefault();
       doReplace();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      api.close();
     }
   };
 
@@ -804,12 +791,8 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   return api;
 }
 
-function makeBtn(extraClass?: string): HTMLButtonElement {
-  const b = createDialogButton({ label: '', baseClass: 'fc-find__btn' });
-  b.className = extraClass
-    ? `fc-fmtdlg__btn fc-find__btn ${extraClass}`
-    : 'fc-fmtdlg__btn fc-find__btn';
-  return b;
+function makeBtn(extraClass: string): HTMLButtonElement {
+  return createDialogButton({ label: '', baseClass: `fc-fmtdlg__btn fc-find__btn ${extraClass}` });
 }
 
 function makeSelect(options: [string, string][]): HTMLSelectElement {

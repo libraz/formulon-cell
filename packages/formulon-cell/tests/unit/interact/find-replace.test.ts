@@ -120,7 +120,9 @@ describe('attachFindReplace', () => {
 
   it('keeps Find/Replace buttons on the shared dialog button primitive', () => {
     const source = readFileSync(join(root, 'src/interact/find-replace.ts'), 'utf8');
-    expect(source).toContain("createDialogButton({ label: '', baseClass: 'fc-find__btn' })");
+    expect(source).toMatch(
+      /createDialogButton\(\{ label: '', baseClass: `fc-fmtdlg__btn fc-find__btn /,
+    );
     expect(source).not.toContain("closeBtn.textContent = '×'");
     expect(source).not.toContain("document.createElement('button')");
   });
