@@ -50,7 +50,7 @@ export async function runPivotTableFilterDialogScenario(page: Page): Promise<voi
   // 12 is PivotFilterKind.LabelEqual.
   await panel.locator('select[data-pivot-filter-by="label"]').selectOption('12');
 
-  const filterDialog = page.getByRole('dialog', { name: 'Label Filter', exact: true });
+  const filterDialog = page.getByRole('dialog', { name: 'Label Filter (Channel)' });
   await expect(filterDialog).toBeVisible();
   await expect(
     filterDialog.locator('[data-pivot-filter-operator="true"] option:checked'),

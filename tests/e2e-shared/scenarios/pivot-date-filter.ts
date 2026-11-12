@@ -19,8 +19,8 @@ const DATE_BETWEEN = '5';
 const MAY = '60';
 
 /** Seeds Date and Sales rows and builds a report at E1 with Date on rows and Sum of Sales. */
-const seedDateReport = (page: Page) =>
-  page.evaluate(() => {
+const seedDateReport = (page: Page, mac: boolean) =>
+  page.evaluate((mac) => {
     const w = window as unknown as ProbeWindow;
     const inst = w.__fcInst;
     const s = inst.workbook.sheet(0);
@@ -44,11 +44,12 @@ const seedDateReport = (page: Page) =>
     if (!made.ok) throw new Error(`pivot creation failed: ${made.reason}`);
     inst.history.clear();
     const t = inst.i18n.strings as unknown as {
-      pivotTableDialog: { filterDialogs: { date: { macTitle: string } } };
+      pivotTableDialog: { filterDialogs: { date: { title: string; macTitle: string } } };
     };
-    // The report's filter panel opens the dialogs under their pop-up titles.
-    return t.pivotTableDialog.filterDialogs.date.macTitle;
-  });
+    // The Mac names the dialog alone; elsewhere it carries the field.
+    const { title, macTitle } = t.pivotTableDialog.filterDialogs.date;
+    return mac ? macTitle : title.replace('{field}', 'Date');
+  }, mac);
 
 /** The report's item rows as [date serial, Sum of Sales], then the grand total. */
 const reportRows = (page: Page) =>
@@ -78,11 +79,12 @@ const openDateFilters = async (page: Page) => {
 export async function runPivotDateBetweenScenario(
   page: Page,
   locale: 'en' | 'de' | 'ja',
+  platform: 'default' | 'mac',
 ): Promise<void> {
   const sheet = new UserJourneyPage(page);
-  await sheet.mount({ locale });
+  await sheet.mount({ locale, platform });
   await sheet.expectNoStub();
-  const dialogTitle = await seedDateReport(page);
+  const dialogTitle = await seedDateReport(page, platform === 'mac');
   await expect.poll(() => reportRows(page)).toHaveLength(5);
 
   await (await openDateFilters(page)).selectOption(DATE_BETWEEN);

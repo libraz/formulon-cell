@@ -17,10 +17,12 @@ test('P02 (vue-demo): PivotTable ribbon primary click opens Create PivotTable di
   await runPivotTableRibbonPrimaryDialogScenario(page);
 });
 
-for (const locale of ['en', 'de', 'ja'] as const) {
-  test(`PivotTable Date Filters read ${locale} dates for Between and apply a period at once`, async ({
-    page,
-  }) => {
-    await runPivotDateBetweenScenario(page, locale);
-  });
+for (const platform of ['default', 'mac'] as const) {
+  for (const locale of ['en', 'de', 'ja'] as const) {
+    test(`PivotTable Date Filters read ${locale} dates for Between and apply a period at once (${platform} chrome)`, async ({
+      page,
+    }) => {
+      await runPivotDateBetweenScenario(page, locale, platform);
+    });
+  }
 }

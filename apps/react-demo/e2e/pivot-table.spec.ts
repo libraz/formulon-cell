@@ -24,10 +24,12 @@ test('P03 (react-demo): a protected sheet makes Insert PivotTable unavailable un
   await runPivotTableProtectedSheetScenario(page);
 });
 
-for (const locale of ['en', 'de', 'ja'] as const) {
-  test(`PivotTable Date Filters read ${locale} dates for Between and apply a period at once`, async ({
-    page,
-  }) => {
-    await runPivotDateBetweenScenario(page, locale);
-  });
+for (const platform of ['default', 'mac'] as const) {
+  for (const locale of ['en', 'de', 'ja'] as const) {
+    test(`PivotTable Date Filters read ${locale} dates for Between and apply a period at once (${platform} chrome)`, async ({
+      page,
+    }) => {
+      await runPivotDateBetweenScenario(page, locale, platform);
+    });
+  }
 }
