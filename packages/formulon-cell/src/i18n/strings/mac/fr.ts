@@ -15,7 +15,7 @@ import { macChromeFr, macChromeFrom } from './chrome.js';
 import { macErrorMenuFr } from './error-menu.js';
 import { macExternalLinksPaneFr } from './external-links-pane.js';
 import { macFilterPanelFr } from './filter-panel.js';
-import { macFindReplaceFr, macFindReplaceFrom } from './find-replace.js';
+import { macFindPanelFr, macFindReplaceFr, macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFr, macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogFr, macGoToDialogFrom } from './goto-dialog.js';
 import { macHyperlinkDialogFr, macHyperlinkDialogFrom } from './hyperlink-dialog.js';
@@ -151,7 +151,6 @@ export const macFr: MacStrings = {
     axisMaximum: 'Valeur maximale :',
     axisAutoEach: 'Automatique pour chaque graphique sparkline',
     axisSameAll: 'Identique pour tous les graphiques sparkline',
-    axisRtlUnsupported: 'Cette option n’est pas encore prise en charge.',
     axisTitle: 'Axes',
     customValueLabel: 'Valeur personnalisée :',
     hiddenEmptyMenu: 'Cellules masquées et cellules vides',
@@ -420,6 +419,7 @@ export const macFr: MacStrings = {
   errorMenu: macErrorMenuFr,
   filterPanel: macFilterPanelFr(gridPopupsFr.filterDropdown),
   sheetTabMenu: macSheetTabMenuFr,
+  findPanel: macFindPanelFr,
   findReplace: {
     ...{
       ...macFindReplaceFrom(editDialogsFr.findReplace, 'Distinguer demi-chasse et pleine chasse'),

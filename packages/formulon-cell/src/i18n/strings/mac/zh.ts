@@ -15,7 +15,7 @@ import { macChromeFrom, macChromeZh } from './chrome.js';
 import { macErrorMenuZh } from './error-menu.js';
 import { macExternalLinksPaneZh } from './external-links-pane.js';
 import { macFilterPanelZh } from './filter-panel.js';
-import { macFindReplaceFrom, macFindReplaceZh } from './find-replace.js';
+import { macFindPanelZh, macFindReplaceFrom, macFindReplaceZh } from './find-replace.js';
 import { macFormatDialogFrom, macFormatDialogZh } from './format-dialog.js';
 import { macGoToDialogFrom, macGoToDialogZh } from './goto-dialog.js';
 import { macHyperlinkDialogFrom, macHyperlinkDialogZh } from './hyperlink-dialog.js';
@@ -149,7 +149,6 @@ export const macZh: MacStrings = {
     axisMaximum: '最大值:',
     axisAutoEach: '自动设置每个迷你图',
     axisSameAll: '适用于所有迷你图',
-    axisRtlUnsupported: '此选项尚不受支持。',
     axisTitle: '坐标轴',
     customValueLabel: '自定义值:',
     hiddenEmptyMenu: '隐藏的单元格和空单元格',
@@ -417,6 +416,7 @@ export const macZh: MacStrings = {
   errorMenu: macErrorMenuZh,
   filterPanel: macFilterPanelZh(gridPopupsZh.filterDropdown),
   sheetTabMenu: macSheetTabMenuZh,
+  findPanel: macFindPanelZh,
   findReplace: {
     ...{
       ...macFindReplaceFrom(editDialogsZh.findReplace, '区分全/半角'),

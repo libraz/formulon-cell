@@ -15,7 +15,7 @@ import { macChromeFrom, macChromeKo } from './chrome.js';
 import { macErrorMenuKo } from './error-menu.js';
 import { macExternalLinksPaneKo } from './external-links-pane.js';
 import { macFilterPanelKo } from './filter-panel.js';
-import { macFindReplaceFrom, macFindReplaceKo } from './find-replace.js';
+import { macFindPanelKo, macFindReplaceFrom, macFindReplaceKo } from './find-replace.js';
 import { macFormatDialogFrom, macFormatDialogKo } from './format-dialog.js';
 import { macGoToDialogFrom, macGoToDialogKo } from './goto-dialog.js';
 import { macHyperlinkDialogFrom, macHyperlinkDialogKo } from './hyperlink-dialog.js';
@@ -150,7 +150,6 @@ export const macKo: MacStrings = {
     axisMaximum: '최대값:',
     axisAutoEach: '각 스파크라인에 대해 자동',
     axisSameAll: '모든 스파크라인에 대해 동일하게',
-    axisRtlUnsupported: '이 옵션은 아직 지원되지 않습니다.',
     axisTitle: '축',
     customValueLabel: '사용자 지정 값:',
     hiddenEmptyMenu: '숨겨진 셀/빈 셀',
@@ -418,6 +417,7 @@ export const macKo: MacStrings = {
   errorMenu: macErrorMenuKo,
   filterPanel: macFilterPanelKo(gridPopupsKo.filterDropdown),
   sheetTabMenu: macSheetTabMenuKo,
+  findPanel: macFindPanelKo,
   findReplace: {
     ...{
       ...macFindReplaceFrom(editDialogsKo.findReplace, '반각과 전각 구분'),

@@ -1,0 +1,49 @@
+/* A small menu dropped under its button (openPopupMenu). */
+
+@layer fc.app {
+  .fc-popup-menu {
+    position: fixed;
+    z-index: 13000;
+    min-width: 160px;
+    border: 1px solid var(--fc-rule-strong);
+    border-radius: 6px;
+    background: var(--fc-bg-elev);
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.15),
+      0 1px 4px rgba(0, 0, 0, 0.12);
+    padding: 4px 0;
+  }
+
+  .fc-popup-menu__item {
+    display: block;
+    position: relative;
+    width: 100%;
+    min-height: 22px;
+    border: 0;
+    background: transparent;
+    color: var(--fc-fg-strong);
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 20px 2px 24px;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .fc-popup-menu__item[aria-checked="true"]::before {
+    position: absolute;
+    top: 7px;
+    left: 9px;
+    width: 8px;
+    height: 4px;
+    border-bottom: 2px solid currentColor;
+    border-left: 2px solid currentColor;
+    content: "";
+    transform: rotate(-45deg);
+  }
+
+  .fc-popup-menu__item:hover,
+  .fc-popup-menu__item:focus-visible {
+    background: var(--fc-bg-hover);
+    outline: none;
+  }
+}

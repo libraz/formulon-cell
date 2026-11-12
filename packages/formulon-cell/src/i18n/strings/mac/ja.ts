@@ -9,6 +9,7 @@ import { macDataValidationJa } from './data-validation.js';
 import { macErrorMenuJa } from './error-menu.js';
 import { macExternalLinksPaneJa } from './external-links-pane.js';
 import { macFilterPanelJa } from './filter-panel.js';
+import { macFindPanelJa } from './find-replace.js';
 import { macGoToDialogJa } from './goto-dialog.js';
 import { macHyperlinkDialogJa } from './hyperlink-dialog.js';
 import { macIterativeDialogJa } from './iterative-dialog.js';
@@ -148,7 +149,6 @@ export const macJa: MacStrings = {
     axisMaximum: '最大値:',
     axisAutoEach: 'スパークラインごとに自動設定',
     axisSameAll: 'すべてのスパークラインに同じ値',
-    axisRtlUnsupported: 'このオプションはまだサポートされていません。',
     axisTitle: '軸',
     customValueLabel: 'ユーザー設定値:',
     hiddenEmptyMenu: '非表示および空白のセル',
@@ -265,6 +265,7 @@ export const macJa: MacStrings = {
   errorMenu: macErrorMenuJa,
   filterPanel: macFilterPanelJa(gridPopupsJa.filterDropdown),
   sheetTabMenu: macSheetTabMenuJa,
+  findPanel: macFindPanelJa,
   findReplace: {
     optionsMore: 'オプション',
     optionsLess: 'オプション',

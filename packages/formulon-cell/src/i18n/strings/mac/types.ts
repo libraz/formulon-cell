@@ -10,7 +10,7 @@ import type { MacCreateTableStrings } from './create-table.js';
 import type { MacDataValidationStrings } from './data-validation.js';
 import type { MacErrorMenuStrings } from './error-menu.js';
 import type { MacFilterPanelStrings } from './filter-panel.js';
-import type { MacFindReplaceStrings } from './find-replace.js';
+import type { MacFindPanelStrings, MacFindReplaceStrings } from './find-replace.js';
 import type { MacGoToDialogStrings } from './goto-dialog.js';
 import type { MacHyperlinkDialogStrings } from './hyperlink-dialog.js';
 import type { MacIterativeDialogStrings } from './iterative-dialog.js';
@@ -36,6 +36,8 @@ export interface MacStrings {
   filterPanel: MacFilterPanelStrings;
   sheetTabMenu: MacSheetTabMenuStrings;
   findReplace: MacFindReplaceStrings;
+  /** The floating find panel ⌘F opens. */
+  findPanel: MacFindPanelStrings;
   /** Overrides of `iterativeDialog`, plus its Mac-only labels, that apply on the Mac host only. */
   iterativeDialog: MacIterativeDialogStrings;
   /** Overrides of `namedRangeDialog` that apply on the Mac host only. */
@@ -215,8 +217,6 @@ export interface MacStrings {
     axisMaximum: string;
     axisAutoEach: string;
     axisSameAll: string;
-    /** Why Plot Data Right-to-Left stays greyed. */
-    axisRtlUnsupported: string;
     axisTitle: string;
     customValueLabel: string;
     /** Edit Data > Hidden & Empty Cells: a submenu trigger, so no ellipsis. */

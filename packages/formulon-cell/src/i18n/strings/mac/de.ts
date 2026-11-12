@@ -15,7 +15,7 @@ import { macChromeDe, macChromeFrom } from './chrome.js';
 import { macErrorMenuDe } from './error-menu.js';
 import { macExternalLinksPaneDe } from './external-links-pane.js';
 import { macFilterPanelDe } from './filter-panel.js';
-import { macFindReplaceDe, macFindReplaceFrom } from './find-replace.js';
+import { macFindPanelDe, macFindReplaceDe, macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogDe, macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogDe, macGoToDialogFrom } from './goto-dialog.js';
 import { macHyperlinkDialogDe, macHyperlinkDialogFrom } from './hyperlink-dialog.js';
@@ -152,7 +152,6 @@ export const macDe: MacStrings = {
     axisMaximum: 'Maximalwert:',
     axisAutoEach: 'Automatisch für jede Sparkline',
     axisSameAll: 'Identisch für alle Sparklines',
-    axisRtlUnsupported: 'Diese Option wird noch nicht unterstützt.',
     axisTitle: 'Achsen',
     customValueLabel: 'Benutzerdefinierter Wert:',
     hiddenEmptyMenu: 'Ausgeblendete und leere Zellen',
@@ -422,6 +421,7 @@ export const macDe: MacStrings = {
   errorMenu: macErrorMenuDe,
   filterPanel: macFilterPanelDe(gridPopupsDe.filterDropdown),
   sheetTabMenu: macSheetTabMenuDe,
+  findPanel: macFindPanelDe,
   findReplace: {
     ...{
       ...macFindReplaceFrom(editDialogsDe.findReplace, 'Halbbreite und Vollbreite unterscheiden'),

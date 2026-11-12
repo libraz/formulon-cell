@@ -410,6 +410,13 @@ describe('spreadsheet: update', () => {
     expectFailure(() => sheet.dialogs.open('format'), 'policy-denied');
   });
 
+  it('opens the Find and Replace dialog on the Mac, where Find itself is the floating panel', async () => {
+    const sheet = await mountSheet({ ui: { platform: 'mac' } });
+    sheet.dialogs.open('findReplace');
+    expect(sheet.host.querySelector<HTMLElement>('.fc-find')?.hidden).toBe(false);
+    expect(sheet.host.querySelector('.fc-findpanel:not([hidden])')).toBeNull();
+  });
+
   it('refuses dialogs the protected sheet refuses, as the ribbon and shortcuts do', async () => {
     const sheet = await mountSheet();
     expect(sheet.dialogs.canOpen('pivotTable')).toBe(true);

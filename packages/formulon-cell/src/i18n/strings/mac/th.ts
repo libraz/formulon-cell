@@ -15,7 +15,7 @@ import { macChromeFrom, macChromeTh } from './chrome.js';
 import { macErrorMenuTh } from './error-menu.js';
 import { macExternalLinksPaneTh } from './external-links-pane.js';
 import { macFilterPanelTh } from './filter-panel.js';
-import { macFindReplaceFrom, macFindReplaceTh } from './find-replace.js';
+import { macFindPanelTh, macFindReplaceFrom, macFindReplaceTh } from './find-replace.js';
 import { macFormatDialogFrom, macFormatDialogTh } from './format-dialog.js';
 import { macGoToDialogFrom, macGoToDialogTh } from './goto-dialog.js';
 import { macHyperlinkDialogFrom, macHyperlinkDialogTh } from './hyperlink-dialog.js';
@@ -149,7 +149,6 @@ export const macTh: MacStrings = {
     axisMaximum: 'ค่ามากที่สุด:',
     axisAutoEach: 'จัดรูปแบบเส้นแบบประกายไฟโดยอัตโนมัติ',
     axisSameAll: 'เหมือนกันสำหรับเส้นแบบประกายไฟทั้งหมด',
-    axisRtlUnsupported: 'ยังไม่รองรับตัวเลือกนี้',
     axisTitle: 'แกน',
     customValueLabel: 'ค่าแบบกำหนดเอง:',
     hiddenEmptyMenu: 'ซ่อนเซลล์และล้างเซลล์',
@@ -420,6 +419,7 @@ export const macTh: MacStrings = {
   errorMenu: macErrorMenuTh,
   filterPanel: macFilterPanelTh(gridPopupsTh.filterDropdown),
   sheetTabMenu: macSheetTabMenuTh,
+  findPanel: macFindPanelTh,
   findReplace: {
     ...{
       ...macFindReplaceFrom(editDialogsTh.findReplace, 'แยกอักขระครึ่งความกว้างและเต็มความกว้าง'),

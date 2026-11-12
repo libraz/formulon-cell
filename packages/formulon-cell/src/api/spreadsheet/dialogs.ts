@@ -138,7 +138,8 @@ const ROUTES: { readonly [K in DialogId]: Route<K> } = {
   findReplace: {
     feature: 'findReplace',
     commandId: 'findHome',
-    open: (l, o) => l.openFindReplace(o?.tab),
+    // The dialog itself, even on the Mac where the host's Find is the floating panel.
+    open: (l, o) => l.openFindReplace(o?.tab ?? 'find'),
     close: (l) => l.closeFindReplace(),
   },
   pasteSpecial: {

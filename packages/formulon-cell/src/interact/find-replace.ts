@@ -23,7 +23,9 @@ import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/
 import { showMessage } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createDialogButton, deferInitialFocus } from './dialog-shell.js';
+import { createMacFindPanel, type MacFindPanel } from './mac-find-panel.js';
 import { isNavigationAddrAllowed, navigationPolicyFor } from './navigation-policy.js';
+import { openPopupMenu } from './popup-menu.js';
 
 export interface FindReplaceDeps {
   host: HTMLElement;
@@ -41,6 +43,8 @@ export interface FindReplaceDeps {
 }
 
 export interface FindReplaceHandle {
+  /** Opens the dialog on `tab`. With no tab, opens the host's Find: the floating find panel on
+   *  the Mac, the dialog's Find tab elsewhere. */
   open(tab?: 'find' | 'replace'): void;
   close(): void;
   /** Swap the active dictionary; live-updates labels in place. */
@@ -102,6 +106,16 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   findInput.spellcheck = false;
   findInput.autocomplete = 'off';
   const findRow = labeledControl('fc-find-find-input', findInput);
+  // The Mac find field drops down this session's searches, most recent first.
+  const historyBtn = makeBtn('fc-find__history');
+  historyBtn.setAttribute('aria-haspopup', 'menu');
+  historyBtn.setAttribute('aria-expanded', 'false');
+  const findCombo = document.createElement('div');
+  findCombo.className = 'fc-find__combo';
+  findRow.row.replaceChild(findCombo, findInput);
+  findCombo.append(findInput);
+  if (isMac()) findCombo.append(historyBtn);
+  const searches: string[] = [];
 
   const replaceInput = document.createElement('input');
   replaceInput.type = 'text';
@@ -246,6 +260,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     replaceTab.textContent = t.replaceTab;
     findRow.label.textContent = t.findWhat;
     findInput.setAttribute('aria-label', t.findWhat);
+    historyBtn.setAttribute('aria-label', t.findWhat);
     replaceRow.label.textContent = t.replaceWith;
     replaceInput.setAttribute('aria-label', t.replaceWith);
     optionsBtn.textContent = optionsOpen ? t.optionsLess : t.optionsMore;
@@ -266,6 +281,9 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     findAllBtn.textContent = t.findAll;
     prevBtn.textContent = t.prev;
     nextBtn.textContent = t.next;
+    // Both step buttons are primary on the Mac.
+    prevBtn.classList.toggle('fc-fmtdlg__btn--primary', isMac());
+    nextBtn.classList.toggle('fc-fmtdlg__btn--primary', isMac());
     replaceBtn.textContent = t.replaceOne;
     replaceAllBtn.textContent = t.replaceAll;
     closeBtn.setAttribute('aria-label', t.close);
@@ -279,6 +297,37 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 
   let lastQuery = '';
   let currentMatch: FindMatch | null = null;
+
+  const remember = (query: string): void => {
+    if (!query) return;
+    const at = searches.indexOf(query);
+    if (at >= 0) searches.splice(at, 1);
+    searches.unshift(query);
+    syncHistory();
+  };
+  const syncHistory = (): void => {
+    projectDisabledState(historyBtn, searches.length === 0, null);
+  };
+  let closeHistory: (() => void) | null = null;
+  const onHistoryClick = (): void => {
+    const wasOpen = historyBtn.getAttribute('aria-expanded') === 'true';
+    closeHistory?.();
+    closeHistory = null;
+    if (wasOpen || searches.length === 0) return;
+    closeHistory = openPopupMenu({
+      anchor: historyBtn,
+      label: copy().findWhat,
+      items: searches.map((query) => ({
+        label: query,
+        onPick: () => {
+          findInput.value = query;
+          resetSearch();
+          findInput.focus();
+          findInput.select();
+        },
+      })),
+    });
+  };
 
   const opts = (): FindOptions => ({
     query: findInput.value,
@@ -366,6 +415,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 
   const renderResults = (): void => {
     const t = copy();
+    remember(findInput.value);
     const all = matchesForNavigation(store.getState(), { ...opts(), listFromActive: true });
     resultsBody.replaceChildren();
     const displayOf = findDisplayResolver(store.getState(), opts());
@@ -414,13 +464,15 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     resultsSummary.textContent = `${Math.max(idx, 0)} / ${all.length}`;
   };
 
-  const step = (direction: 'next' | 'prev'): void => {
+  /** Moves to the next or previous match; true when it landed on one. */
+  const step = (direction: 'next' | 'prev'): boolean => {
     const o = opts();
     if (!o.query) {
       currentMatch = null;
       updateSummary();
-      return;
+      return false;
     }
+    remember(o.query);
     const matches = matchesForNavigation(store.getState(), o);
     let from = currentMatch ? currentMatch.addr : store.getState().selection.active;
     const attempted = new Set<string>();
@@ -446,6 +498,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
         alert: true,
       });
     }
+    return m !== null;
   };
 
   const doReplace = (): void => {
@@ -497,6 +550,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       updateSummary();
       return;
     }
+    remember(o.query);
     const history = deps.history ?? null;
     const restricted = navigationRestricted();
     const targets = findAll(store.getState(), o).map((m) => cellRange(m.addr));
@@ -619,8 +673,12 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     }
   };
 
-  const onPrevClick = (): void => step('prev');
-  const onNextClick = (): void => step('next');
+  const onPrevClick = (): void => {
+    step('prev');
+  };
+  const onNextClick = (): void => {
+    step('next');
+  };
   const onCloseClick = (): void => api.close();
   const onOptionsClick = (): void => {
     optionsOpen = !optionsOpen;
@@ -631,6 +689,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   replaceTab.addEventListener('click', () => showTab('replace'));
   optionsBtn.addEventListener('click', onOptionsClick);
   findAllBtn.addEventListener('click', renderResults);
+  historyBtn.addEventListener('click', onHistoryClick);
   prevBtn.addEventListener('click', onPrevClick);
   nextBtn.addEventListener('click', onNextClick);
   replaceBtn.addEventListener('click', doReplace);
@@ -652,8 +711,37 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   }
   overlay.addEventListener('keydown', onOverlayKey);
 
+  let panel: MacFindPanel | null = null;
+  const findPanel = (): MacFindPanel => {
+    panel ??= createMacFindPanel({
+      host,
+      strings: () => strings.mac.findPanel,
+      closeLabel: () => copy().close,
+      query: () => findInput.value,
+      setQuery: (text) => {
+        lastQuery = text;
+        if (findInput.value === text) return;
+        findInput.value = text;
+        resetSearch();
+      },
+      scope: () => (withinSelect.value === 'workbook' ? 'workbook' : 'sheet'),
+      setScope: (scope) => {
+        withinSelect.value = scope;
+        resetSearch();
+      },
+      step,
+      openDialog: (tab) => api.open(tab),
+    });
+    return panel;
+  };
+
   const api: FindReplaceHandle = {
-    open(tab: FindTab = 'find'): void {
+    open(requested?: FindTab): void {
+      if (requested === undefined && isMac()) {
+        findPanel().open();
+        return;
+      }
+      const tab = requested ?? 'find';
       overlay.hidden = false;
       activeTab = tab;
       findInput.value = lastQuery;
@@ -677,10 +765,14 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     setStrings(next: Strings): void {
       strings = next;
       relabel();
+      panel?.relabel();
     },
     detach(): void {
       optionsBtn.removeEventListener('click', onOptionsClick);
       findAllBtn.removeEventListener('click', renderResults);
+      historyBtn.removeEventListener('click', onHistoryClick);
+      closeHistory?.();
+      panel?.detach();
       prevBtn.removeEventListener('click', onPrevClick);
       nextBtn.removeEventListener('click', onNextClick);
       replaceBtn.removeEventListener('click', doReplace);
@@ -707,6 +799,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 
   relabel();
   syncOptions();
+  syncHistory();
 
   return api;
 }

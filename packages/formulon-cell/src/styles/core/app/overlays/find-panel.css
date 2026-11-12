@@ -1,0 +1,136 @@
+/* Mac ⌘F find panel — a compact field floating over the top right of the
+   grid, under the ribbon and over the column headers. */
+
+@layer fc.app {
+  .fc-findpanel {
+    position: absolute;
+    top: 4px;
+    right: 20px;
+    z-index: var(--fc-z-grid, 16777010);
+    box-sizing: border-box;
+    width: 300px;
+    padding: 6px 8px 8px;
+    border: 1px solid var(--fc-rule-strong);
+    border-radius: 8px;
+    background: var(--fc-bg-elev);
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.15),
+      0 1px 4px rgba(0, 0, 0, 0.12);
+    color: var(--fc-fg-strong);
+    font-size: 12px;
+    pointer-events: auto;
+  }
+
+  .fc-findpanel[hidden],
+  .fc-findpanel [hidden] {
+    display: none !important;
+  }
+
+  .fc-findpanel__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .fc-findpanel__title {
+    font-weight: 600;
+  }
+
+  .fc-findpanel button {
+    box-sizing: border-box;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+  }
+
+  .fc-findpanel__close,
+  .fc-findpanel__step,
+  .fc-findpanel__more {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    line-height: 22px;
+    text-align: center;
+  }
+
+  .fc-findpanel button:hover,
+  .fc-findpanel button:focus-visible {
+    background: var(--fc-bg-hover);
+    outline: none;
+  }
+
+  .fc-findpanel__row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .fc-findpanel__field {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    min-width: 0;
+    height: 24px;
+    border: 1px solid var(--fc-rule-strong);
+    border-radius: 6px;
+    background: var(--fc-bg);
+  }
+
+  .fc-findpanel__field:focus-within {
+    border-color: var(--fc-accent, #107c41);
+  }
+
+  /* Magnifier and ▾, drawn in CSS like the dialogs' check marks. */
+  .fc-findpanel__scope {
+    position: relative;
+    flex: none;
+    width: 30px;
+    height: 22px;
+  }
+
+  .fc-findpanel__scope::before {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid currentColor;
+    border-radius: 50%;
+    content: "";
+  }
+
+  .fc-findpanel__scope::after {
+    position: absolute;
+    top: 10px;
+    left: 21px;
+    border-top: 4px solid currentColor;
+    border-right: 3px solid transparent;
+    border-left: 3px solid transparent;
+    content: "";
+  }
+
+  .fc-findpanel__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 22px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    outline: none;
+    padding: 0 2px;
+  }
+
+  .fc-findpanel__clear {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-right: 3px;
+    border-radius: 50%;
+    line-height: 18px;
+    text-align: center;
+  }
+}

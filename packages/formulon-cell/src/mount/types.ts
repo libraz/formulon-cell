@@ -192,6 +192,8 @@ export interface SpreadsheetInstance {
   followActiveHyperlink(): boolean;
   openCommentDialog(options?: { mode?: 'note' | 'thread' }): void;
   openDefineNameDialog(): void;
+  /** Opens Find and Replace on `tab`. With no tab, opens the host's Find: the floating find
+   *  panel on the Mac, the dialog's Find tab elsewhere. */
   openFindReplace(tab?: 'find' | 'replace'): void;
   closeFindReplace(): void;
   openPasteSpecial(opts?: PasteSpecialOpenOptions): void;

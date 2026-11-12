@@ -52,6 +52,11 @@
     padding: 4px 20px 10px;
   }
 
+  /* The find field and its history button; the field keeps its grid cell. */
+  .fc-find__combo {
+    display: contents;
+  }
+
   .fc-find__field {
     display: grid;
     grid-template-columns: 112px minmax(0, 1fr);
@@ -356,6 +361,28 @@
 
   .fc-host[data-fc-platform="mac"] .fc-find .fc-find__form > .fc-find__field:first-child input {
     top: 74px;
+    padding-right: 24px;
+  }
+
+  /* The search history ▾ sits inside the right end of the find field. */
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__history {
+    top: 76px;
+    left: 575px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__history::after {
+    display: block;
+    width: 0;
+    margin: 0 auto;
+    border-top: 4px solid currentColor;
+    border-right: 3px solid transparent;
+    border-left: 3px solid transparent;
+    content: "";
   }
 
   .fc-host[data-fc-platform="mac"] .fc-find .fc-find__replace-row label {

@@ -15,7 +15,7 @@ import { macChromeEn, macChromeFrom } from './chrome.js';
 import { macErrorMenuEn } from './error-menu.js';
 import { macExternalLinksPaneEn } from './external-links-pane.js';
 import { macFilterPanelEn } from './filter-panel.js';
-import { macFindReplaceEn, macFindReplaceFrom } from './find-replace.js';
+import { macFindPanelEn, macFindReplaceEn, macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogEn, macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogEn, macGoToDialogFrom } from './goto-dialog.js';
 import { macHyperlinkDialogEn, macHyperlinkDialogFrom } from './hyperlink-dialog.js';
@@ -150,7 +150,6 @@ export const macEn: MacStrings = {
     axisMaximum: 'Maximum value:',
     axisAutoEach: 'Automatic for each sparkline',
     axisSameAll: 'Same for all sparklines',
-    axisRtlUnsupported: 'This option is not supported yet.',
     axisTitle: 'Axes',
     customValueLabel: 'Custom value:',
     hiddenEmptyMenu: 'Hidden & Empty Cells',
@@ -377,6 +376,7 @@ export const macEn: MacStrings = {
   errorMenu: macErrorMenuEn,
   filterPanel: macFilterPanelEn(gridPopupsEn.filterDropdown),
   sheetTabMenu: macSheetTabMenuEn,
+  findPanel: macFindPanelEn,
   findReplace: {
     ...macFindReplaceFrom(editDialogsEn.findReplace, 'Match half-width and full-width'),
     ...macFindReplaceEn,
