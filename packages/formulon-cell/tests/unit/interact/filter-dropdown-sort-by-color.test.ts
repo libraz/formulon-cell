@@ -50,9 +50,7 @@ describe('Mac column panel sort by color', () => {
         history: new History(),
       }).open(RANGE, 0, { x: 10, y: 20, h: 24 });
       const sortSide = () =>
-        document.querySelectorAll<HTMLElement>(
-          '.fc-filter-dropdown__color-filter',
-        )[0] as HTMLElement;
+        document.querySelector<HTMLElement>('[data-fc-color-side="sort"]') as HTMLElement;
       const kind = sortSide().querySelector<HTMLSelectElement>('select') as HTMLSelectElement;
       expect(kind.disabled).toBe(false);
       kind.value = 'cellIcon';

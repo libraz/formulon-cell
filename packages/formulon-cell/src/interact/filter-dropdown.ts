@@ -864,6 +864,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         const active = side === 'filter' ? activeCriteria?.color : sortColor();
         const wrap = ownerDocument.createElement('div');
         wrap.className = 'fc-filter-dropdown__color-filter';
+        wrap.dataset.fcColorSide = side;
         const row = ownerDocument.createElement('label');
         row.className = 'fc-filter-dropdown__color';
         const text = ownerDocument.createElement('span');

@@ -57,11 +57,10 @@ const open = (store: SpreadsheetStore): void => {
   }).open(RANGE, 0, { x: 10, y: 20, h: 24 });
 };
 
-// The filter side's pop-up, below the sort side's.
 const filterSide = () =>
-  document.querySelectorAll<HTMLElement>(
-    '.fc-filter-dropdown .fc-filter-dropdown__color-filter',
-  )[1] as HTMLElement;
+  document.querySelector<HTMLElement>(
+    '.fc-filter-dropdown [data-fc-color-side="filter"]',
+  ) as HTMLElement;
 const kind = () =>
   filterSide().querySelector<HTMLSelectElement>(
     '.fc-filter-dropdown__color-kind',
