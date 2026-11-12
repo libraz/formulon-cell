@@ -47,7 +47,7 @@ export async function runProtectedSheetHyperlinkScenario(page: Page): Promise<vo
   await page.evaluate(() =>
     (window as unknown as InstanceWindow).__fcInst.workbook
       .sheet(0)
-      .setHyperlink('B3', { target: 'https://example.com/original' }),
+      .setHyperlink({ range: 'B3', target: 'https://example.com/original' }),
   );
   await selectRibbonTab(page, 'insert');
   const link = page.locator('[data-ribbon-command="hyperlinkInsert"]').first();
