@@ -6,9 +6,12 @@
 
   /* Quick Styles strips: the gallery sets each strip's chip size, step and visible count
      (quickStyleStripGeometry); a step below the chip width overlaps neighbours. */
-  .fc-tb__pivotstyle-gallery {
+  .fc-tb__pivotstyle-gallery,
+  .fc-tb__tablestyle-quick-gallery,
+  .fc-tb__sparkline-quick-gallery {
     display: flex;
     align-items: stretch;
+    min-width: 0;
     height: 60px;
   }
 
@@ -16,9 +19,9 @@
   .fc-tb__tablestyle-quick-strip,
   .fc-tb__sparkline-quick-strip {
     display: flex;
-    flex: 0 0 auto;
+    flex: 0 1 calc(var(--fc-strip-step) * var(--fc-strip-visible));
     gap: 0;
-    width: calc(var(--fc-strip-step) * var(--fc-strip-visible));
+    min-width: var(--fc-strip-step);
     overflow: hidden;
   }
 
@@ -61,6 +64,7 @@
 
   .fc-tb__pivotstyle-prev,
   .fc-tb__pivotstyle-next,
+  .fc-tb__pivotstyle-gallery > .fc-tb__rb,
   .fc-tb__tablestyle-quick-prev,
   .fc-tb__tablestyle-quick-next,
   .fc-tb__tablestyle-quick-gallery > .fc-tb__rb,
@@ -102,20 +106,15 @@
     cursor: default;
   }
 
-  .fc-tb__tablestyle-quick-gallery,
-  .fc-tb__sparkline-quick-gallery {
-    display: flex;
-    align-items: stretch;
-    height: 60px;
-  }
-
   /* The Quick Styles button is the strip's more arrow: a chevron without its label. */
+  .fc-tb__pivotstyle-gallery > .fc-tb__rb,
   .fc-tb__tablestyle-quick-gallery > .fc-tb__rb,
   .fc-tb__sparkline-quick-gallery > .fc-tb__rb {
     min-width: 0;
     min-height: 0;
   }
 
+  .fc-tb__pivotstyle-gallery > .fc-tb__rb > :is(span, svg),
   .fc-tb__tablestyle-quick-gallery > .fc-tb__rb > :is(span, svg),
   .fc-tb__sparkline-quick-gallery > .fc-tb__rb > :is(span, svg) {
     display: none;

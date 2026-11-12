@@ -1,16 +1,18 @@
-import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import {
   listCustomTableStyles,
   tableStyleGallerySections,
 } from '../../commands/format-as-table.js';
-import { localizedDecisionReason } from '../../commands/permission-reasons.js';
 import { activeStyleTarget } from '../../commands/table-style-actions.js';
 import { builtinTableStyleElements } from '../../engine/builtin-table-styles.js';
 import { dictionaries } from '../../i18n/strings.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { ToolbarLang } from '../ribbon-model.js';
 import { tableStyleSwatchGrid } from './menus/styles.js';
-import { createQuickStyleStrip, type QuickStyleEntry } from './quick-style-strip.js';
+import {
+  blockedUnlessPermitted,
+  createQuickStyleStrip,
+  type QuickStyleEntry,
+} from './quick-style-strip.js';
 
 export interface TableStyleGalleryOptions {
   lang: ToolbarLang;
@@ -73,15 +75,7 @@ export const createTableStyleGallery = (opts: TableStyleGalleryOptions): HTMLDiv
       );
     },
     current: () => target()?.currentId ?? null,
-    // A refused restyle (a protected sheet) greys the whole strip, with the reason.
-    blocked: () => {
-      const inst = getInst();
-      if (!inst) return { reason: null };
-      const decision = canExecuteBuiltInRequest(inst.store, 'tableQuickStyles', 'ribbon');
-      return decision.allowed
-        ? null
-        : { reason: localizedDecisionReason(decision, inst.i18n.strings) };
-    },
+    blocked: blockedUnlessPermitted(getInst, 'tableQuickStyles'),
     apply: (id) => {
       const picked = target();
       if (!picked) return;

@@ -1,7 +1,11 @@
+import type { BuiltInCommandId } from '../../commands/built-in-command-ids.js';
+import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import { localizedDecisionReason } from '../../commands/permission-reasons.js';
 import {
   createInteractionButton,
   createInteractionChipButton,
 } from '../../interact/chip-button.js';
+import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import type { ToolbarLang } from '../ribbon-model.js';
 
@@ -22,6 +26,7 @@ export interface QuickStyleStripGeometry {
   readonly chipHeight: number;
   /** Left edge to left edge; below the chip width, neighbours overlap. */
   readonly step: number;
+  /** Chips the strip holds at its full width; a narrower strip holds as many as fit. */
   readonly visible: number;
 }
 
@@ -70,18 +75,33 @@ export interface QuickStyleStripOptions {
   readonly more?: { readonly arrow: HTMLButtonElement; readonly menu: HTMLElement | null };
 }
 
+/** A `blocked` hook greying the strip while its ribbon command `commandId` is refused (a
+ *  protected sheet), with the reason. */
+export const blockedUnlessPermitted =
+  (getInst: () => SpreadsheetInstance | null, commandId: BuiltInCommandId) =>
+  (): { readonly reason: string | null } | null => {
+    const inst = getInst();
+    if (!inst) return { reason: null };
+    const decision = canExecuteBuiltIn(inst.store, commandId, 'ribbon');
+    return decision.allowed
+      ? null
+      : { reason: localizedDecisionReason(decision, inst.i18n.strings) };
+  };
+
 const ARROW_LABELS = {
   previous: { ja: '前のクイック スタイル ギャラリー', en: 'Previous Quick Styles gallery' },
   next: { ja: '次のクイック スタイル ギャラリー', en: 'Next Quick Styles gallery' },
 } as const;
 
 /** An in-ribbon style gallery: a row of style chips, refreshed by an `fc-ribbon-control-refresh`
- *  event on the wrapper. Whenever the current style changes the row follows it: paging to its page
- *  between arrows, or on the Mac scrolling it to the middle (the fourth of seven). */
+ *  event on the wrapper, holding as many chips as its width fits. Whenever the current style
+ *  changes the row follows it: paging to its page between arrows, or on the Mac scrolling it to
+ *  the fourth chip (the last, in a strip of four or fewer). */
 export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElement => {
   const { classPrefix } = opts;
   const geometry = quickStyleStripGeometry(opts.kind, opts.mac);
-  const pageSize = geometry.visible;
+  // Chips the strip shows: its full count until a measured width says fewer fit.
+  let fit = geometry.visible;
   const arrowLabel = (key: keyof typeof ARROW_LABELS): string =>
     opts.lang === 'ja' ? ARROW_LABELS[key].ja : ARROW_LABELS[key].en;
   const wrap = document.createElement('div');
@@ -113,8 +133,8 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
   let shownCurrent: string | null | undefined;
   const lastStart = (entries: readonly QuickStyleEntry[]): number =>
     opts.mac
-      ? Math.max(0, entries.length - pageSize)
-      : Math.max(0, Math.ceil(entries.length / pageSize) - 1) * pageSize;
+      ? Math.max(0, entries.length - fit)
+      : Math.max(0, Math.ceil(entries.length / fit) - 1) * fit;
 
   const render = (): void => {
     const entries = opts.entries();
@@ -124,14 +144,12 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
       shownCurrent = current;
       const at = entries.findIndex((entry) => entry.id === current);
       if (at >= 0) {
-        start = opts.mac
-          ? Math.max(0, at - Math.floor(pageSize / 2))
-          : Math.floor(at / pageSize) * pageSize;
+        start = opts.mac ? Math.max(0, at - Math.min(3, fit - 1)) : Math.floor(at / fit) * fit;
       }
     }
     start = Math.min(start, lastStart(entries));
     strip.replaceChildren(
-      ...entries.slice(start, start + pageSize).map((entry) => {
+      ...entries.slice(start, start + fit).map((entry) => {
         const chip = createInteractionChipButton({
           className: `${classPrefix}-chip`,
           label: '',
@@ -154,13 +172,32 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
   };
   wrap.addEventListener('fc-ribbon-control-refresh', () => render());
   prev.addEventListener('click', () => {
-    start = Math.max(0, start - pageSize);
+    start = Math.max(0, start - fit);
     render();
   });
   next.addEventListener('click', () => {
-    start = Math.min(lastStart(opts.entries()), start + pageSize);
+    start = Math.min(lastStart(opts.entries()), start + fit);
     render();
   });
+  // A narrower ribbon narrows the strip; it then shows the chips that fit, re-placing the current one.
+  // The re-render waits a frame: changing the observed strip inside the callback is a resize loop.
+  if (typeof ResizeObserver === 'function') {
+    let frame = 0;
+    new ResizeObserver(() => {
+      const width = strip.clientWidth;
+      if (width <= 0) return;
+      const nextFit = Math.max(1, Math.min(geometry.visible, Math.floor(width / geometry.step)));
+      if (nextFit === fit) return;
+      fit = nextFit;
+      shownCurrent = undefined;
+      if (frame === 0) {
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          render();
+        });
+      }
+    }).observe(strip);
+  }
   render();
   return wrap;
 };

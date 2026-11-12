@@ -41,6 +41,29 @@ describe('Quick Styles strip geometry on the Mac', () => {
     expect(css).toMatch(
       /\.fc-tb__tablestyle-quick-chip \+ \.fc-tb__tablestyle-quick-chip,[^{]*\{\s*margin-left: calc\(var\(--fc-strip-step\) - var\(--fc-strip-chip-w\)\);/,
     );
-    expect(css).toMatch(/width: calc\(var\(--fc-strip-step\) \* var\(--fc-strip-visible\)\);/);
+    expect(css).toMatch(/flex: 0 1 calc\(var\(--fc-strip-step\) \* var\(--fc-strip-visible\)\);/);
+  });
+
+  it('shows each strip more arrow as a bare chevron', () => {
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+    const css = readFileSync(join(root, 'src/styles/toolbar/ribbon/pivot-design.css'), 'utf8');
+    const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]*)\{([^}]*)\}/g)].map(
+      (m) => ({
+        selectors: (m[1] ?? '').split(/,\s*\n/).map((sel) => sel.trim()),
+        body: m[2] ?? '',
+      }),
+    );
+    const styled = (selector: string, declaration: string): boolean =>
+      rules.some((r) => r.selectors.includes(selector) && r.body.includes(declaration));
+    for (const gallery of [
+      'fc-tb__pivotstyle-gallery',
+      'fc-tb__tablestyle-quick-gallery',
+      'fc-tb__sparkline-quick-gallery',
+    ]) {
+      const arrow = `.${gallery} > .fc-tb__rb`;
+      expect(styled(arrow, 'width: 18px'), gallery).toBe(true);
+      expect(styled(arrow, 'min-height: 0'), gallery).toBe(true);
+      expect(styled(`${arrow} > :is(span, svg)`, 'display: none'), gallery).toBe(true);
+    }
   });
 });

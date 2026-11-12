@@ -7,7 +7,11 @@ import { builtinPivotStyleElements } from '../../engine/pivot-style.js';
 import type { StyleElementFormat, StyleElementFormats } from '../../engine/table-style-elements.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { ToolbarLang } from '../ribbon-model.js';
-import { createQuickStyleStrip, type QuickStyleEntry } from './quick-style-strip.js';
+import {
+  blockedUnlessPermitted,
+  createQuickStyleStrip,
+  type QuickStyleEntry,
+} from './quick-style-strip.js';
 
 const FAMILIES = [
   { id: 'Light', ja: '淡色', en: 'Light' },
@@ -165,6 +169,7 @@ export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDiv
     },
     // No report, or one without a style element, shows None as current.
     current: () => target()?.currentId ?? '',
+    blocked: blockedUnlessPermitted(getInst, 'pivotQuickStyles'),
     apply: (id) => {
       const picked = target();
       if (!picked) return;

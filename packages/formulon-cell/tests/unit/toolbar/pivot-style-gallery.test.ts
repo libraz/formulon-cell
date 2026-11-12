@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { canExecuteBuiltIn } from '../../../src/commands/built-in-command-policy.js';
 import { customPivotTableStyleId } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
 import { createPivotTableAtPlacement } from '../../../src/commands/pivot-table.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { dictionaries } from '../../../src/i18n/strings.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 import { createPivotStyleGallery } from '../../../src/toolbar/ribbon/pivot-style-gallery.js';
@@ -99,6 +102,62 @@ describe('PivotTable style gallery', () => {
     wb.dispose();
   });
 
+  // The chip count follows the strip's width: as many 71-step chips as fit, the current style
+  // fourth while more than four fit and last otherwise. The strip re-renders a frame after the
+  // resize, never inside the observer callback (a resize loop in WebKit).
+  it('shows the chips the Mac strip width fits, keeping the current style in place', async () => {
+    const observers: (() => void)[] = [];
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          observers.push(cb);
+        }
+        observe(): void {}
+        disconnect(): void {}
+      },
+    );
+    try {
+      const { wb, inst } = await setup();
+      const gallery = createPivotStyleGallery({
+        lang: 'ja',
+        getInst: () => inst,
+        arrow: document.createElement('button'),
+        menu: null,
+        mac: true,
+      });
+      document.body.appendChild(gallery);
+      const strip = gallery.querySelector<HTMLElement>('.fc-tb__pivotstyle-strip');
+      if (!strip) throw new Error('no strip');
+      const labels = (): string[] =>
+        Array.from(
+          gallery.querySelectorAll('.fc-tb__pivotstyle-chip'),
+          (c) => c.getAttribute('aria-label') ?? '',
+        );
+      const resize = (width: number): string[] => {
+        Object.defineProperty(strip, 'clientWidth', { configurable: true, value: width });
+        const before = labels();
+        for (const cb of observers) cb();
+        expect(labels()).toEqual(before);
+        for (const frame of frames.splice(0)) frame(0);
+        return labels();
+      };
+      const five = resize(5 * 71 + 10);
+      expect(five).toHaveLength(5);
+      expect(five[3]).toContain('(淡色) 16');
+      const two = resize(2 * 71);
+      expect(two).toHaveLength(2);
+      expect(two[1]).toContain('(淡色) 16');
+      expect(resize(40)).toHaveLength(1);
+      expect(resize(2000)).toHaveLength(7);
+      wb.dispose();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('marks the current style and applies a clicked one as a single undo step', async () => {
     const { wb, inst, history } = await setup();
     const gallery = createPivotStyleGallery({
@@ -127,6 +186,37 @@ describe('PivotTable style gallery', () => {
     expect(wb.getPivotStyleInfo(before.sheetIndex, before.pivotIndex)?.name).not.toBe(
       'PivotStyleLight2',
     );
+    wb.dispose();
+  });
+
+  // The strip follows the restyle's permission, as the table and sparkline strips do.
+  it('greys the strip while the restyle is refused', async () => {
+    const { wb, store, inst } = await setup();
+    Object.assign(inst, { i18n: { strings: dictionaries.en } });
+    const gallery = createPivotStyleGallery({
+      lang: 'en',
+      getInst: () => inst,
+      arrow: document.createElement('button'),
+      menu: null,
+      mac: false,
+    });
+    document.body.appendChild(gallery);
+    const chips = () =>
+      Array.from(gallery.querySelectorAll<HTMLButtonElement>('.fc-tb__pivotstyle-chip'));
+    const refresh = () => gallery.dispatchEvent(new Event('fc-ribbon-control-refresh'));
+    expect(chips().every((chip) => !chip.disabled)).toBe(true);
+    setProtectedSheet(store, 0, true);
+    refresh();
+    expect(chips().length).toBeGreaterThan(0);
+    expect(chips().every((chip) => chip.disabled)).toBe(true);
+    // With PivotTables allowed, the strip follows the restyle's own permission.
+    setProtectedSheet(store, 0, true, { permissions: { pivotTables: true } });
+    refresh();
+    const allowed = canExecuteBuiltIn(store, 'pivotQuickStyles', 'ribbon').allowed;
+    expect(chips().every((chip) => chip.disabled === !allowed)).toBe(true);
+    setProtectedSheet(store, 0, false);
+    refresh();
+    expect(chips().every((chip) => !chip.disabled)).toBe(true);
     wb.dispose();
   });
 
