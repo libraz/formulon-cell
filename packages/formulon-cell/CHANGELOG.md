@@ -70,6 +70,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- The Mac column filter offers date conditions on a column of dates: Equals, Before, After, their or-equal forms and Between take a date typed in the workbook's locale and are saved as comparisons, and the relative periods from Tomorrow to Year to Date, the quarters and the months are saved as dynamic filters, kept through a save.
 - PivotTable filters offer every desktop condition: the label and value lists in the filter panel include Not Between and Bottom 10; for a field holding dates the label list becomes Date Filters, with the date comparisons and the relative periods, and the context menu reads Date Filters; and the Label, Value, Date and Top 10 Filter dialogs follow the desktop with Top or Bottom by items, percent or sum and the data field to score.
 - `@libraz/formulon-cell/adapter` also exports what the React and Vue packages share for binding props and deriving values: `SPREADSHEET_OPTION_KEYS`, `optionsFromProps`, `patchFromOptions`, `ribbonHooksKey`, `forwardRibbonHooks`, `isLiveSpreadsheet`, `subscribeToSpreadsheet`, `subscribeToSelection`, `subscribeToLocale` and the `SpreadsheetSubscriber` type.
 - `Workbook.getCalcMode` / `setCalcMode`, `getIterative` / `updateIterative`, `getProfileId` and `listFunctionNames`. Leaving Manual recalculates what the edits made under it left dirty, and a mounted ribbon shows the new mode; `on('change')` reports the `'calc'` part.

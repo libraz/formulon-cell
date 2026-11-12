@@ -1,5 +1,14 @@
 import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
-import { parseLocalizedNumericInput } from '../commands/coerce-input.js';
+import {
+  inputLocaleForWorkbook,
+  parseLocalizedNumericInput,
+  workbookDate1904,
+} from '../commands/coerce-input.js';
+import {
+  DATE_PERIOD_GROUP_STARTS,
+  DATE_PERIODS,
+  numFmtShowsDate,
+} from '../commands/date-periods.js';
 import {
   applyConditionFilter,
   applyValueFilter,
@@ -11,11 +20,14 @@ import {
 } from '../commands/filter.js';
 import { filterUseWrite } from '../commands/filter-actions.js';
 import type { History } from '../commands/history.js';
+import { parseDateTimeInput } from '../commands/input-grammar.js';
 import { sortRangeWithHistory } from '../commands/sort.js';
 import { addrKey } from '../engine/address.js';
 import { createProfileTextSemantics, localeForWorkbook } from '../engine/profile-text-semantics.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { excelSerialToIsoDate } from '../format/date-serial.js';
+import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
@@ -27,6 +39,9 @@ import { deferInitialFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
+
+/** Select value prefix of a relative date period. */
+const DATE_PERIOD_PREFIX = 'datePeriod:';
 
 export interface FilterDropdownDeps {
   store: SpreadsheetStore;
@@ -117,12 +132,35 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     }
   };
 
+  /** A typed date as its serial, read in the workbook's locale; the text itself when it is no date. */
+  const dateOperand = (text: string): string => {
+    const wb = deps.getWb?.();
+    const parsed = parseDateTimeInput(
+      text.trim(),
+      wb ? inputLocaleForWorkbook(wb) : (deps.locale ?? 'en-US'),
+      wb ? workbookDate1904(wb) : false,
+    );
+    return parsed ? String(parsed.value) : text;
+  };
+
   /** The condition the panel's fields describe, or null while an operand is missing. */
-  const readCondition = (op: ConditionFilterOp): ConditionFilterOptions | null => {
+  const readCondition = (picked: string): ConditionFilterOptions | null => {
     if (!root) return null;
-    const field = (name: string): string =>
-      root?.querySelector<HTMLInputElement | HTMLSelectElement>(`.fc-filter-dropdown__${name}`)
-        ?.value ?? '';
+    if (picked.startsWith(DATE_PERIOD_PREFIX)) {
+      return {
+        op: 'datePeriod',
+        value: '',
+        period: picked.slice(DATE_PERIOD_PREFIX.length) as DatePeriodKey,
+      };
+    }
+    const op = picked as ConditionFilterOp;
+    const dates = root.dataset.fcDateColumn === 'true';
+    const field = (name: string): string => {
+      const raw =
+        root?.querySelector<HTMLInputElement | HTMLSelectElement>(`.fc-filter-dropdown__${name}`)
+          ?.value ?? '';
+      return dates && !name.endsWith('unit') ? dateOperand(raw) : raw;
+    };
     const value = field('condition-value').trim();
     if (op === 'aboveAverage' || op === 'belowAverage') return { op, value: '' };
     if (op === 'top10' || op === 'bottom10') {
@@ -164,8 +202,8 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const wb = deps.getWb?.();
     const condition = root.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
     filterUseWrite(dropdownFilter('filterByValue', wb), activeRange, undefined, () => {
-      const op = condition?.value as ConditionFilterOp | '' | undefined;
-      const spec = op ? readCondition(op) : null;
+      const picked = condition?.value ?? '';
+      const spec = picked ? readCondition(picked) : null;
       if (spec) {
         applyConditionFilter(
           deps.store.getState(),
@@ -200,6 +238,21 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       else if (kind === 'text') texts += 1;
     }
     return numbers > 0 && numbers >= texts;
+  };
+
+  /** Whether the column's numbers are mostly dates, which picks the date condition list. */
+  const dateColumn = (range: Range, col: number): boolean => {
+    const state = deps.store.getState();
+    let dates = 0;
+    let others = 0;
+    for (let row = range.r0 + 1; row <= range.r1; row += 1) {
+      const key = addrKey({ sheet: range.sheet, row, col });
+      const kind = state.data.cells.get(key)?.value.kind;
+      if (kind !== 'number' && kind !== 'text') continue;
+      if (kind === 'number' && numFmtShowsDate(state.format.formats.get(key)?.numFmt)) dates += 1;
+      else others += 1;
+    }
+    return dates > 0 && dates >= others;
   };
 
   /** The column's header text, which titles the Mac panel. */
@@ -260,50 +313,84 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const conditionLabel = ownerDocument.createElement('label');
     conditionLabel.className = 'fc-filter-dropdown__condition-label';
     conditionLabel.textContent = t.condition;
-    const numeric = mac && numericColumn(range, col);
-    const conditionOptions: Array<{ value: '' | ConditionFilterOp; label: string }> = mac
+    const dates = mac && dateColumn(range, col);
+    const numeric = mac && !dates && numericColumn(range, col);
+    r.dataset.fcDateColumn = dates ? 'true' : 'false';
+    const conditionOptions: Array<{ value: string; label: string; disabled?: boolean }> = dates
       ? [
+          // The Mac pop-up's order for a date column is provisional until measured on the Mac app.
           { value: '', label: m.chooseOne },
           { value: 'equals', label: m.equals },
           { value: 'notEquals', label: m.notEquals },
-          ...(numeric
-            ? ([
-                { value: 'greaterThan', label: m.greaterThan },
-                { value: 'greaterThanOrEqual', label: m.greaterThanOrEqual },
-                { value: 'lessThan', label: m.lessThan },
-                { value: 'lessThanOrEqual', label: m.lessThanOrEqual },
-                { value: 'between', label: m.between },
-                { value: 'top10', label: m.top10 },
-                { value: 'bottom10', label: m.bottom10 },
-                { value: 'aboveAverage', label: m.aboveAverage },
-                { value: 'belowAverage', label: m.belowAverage },
-              ] as const)
-            : ([
-                { value: 'contains', label: m.contains },
-                { value: 'notContains', label: m.notContains },
-              ] as const)),
+          { value: 'lessThan', label: m.before },
+          { value: 'lessThanOrEqual', label: m.beforeOrEqual },
+          { value: 'greaterThan', label: m.after },
+          { value: 'greaterThanOrEqual', label: m.afterOrEqual },
+          { value: 'between', label: m.between },
+          ...DATE_PERIODS.flatMap(([key], index) => [
+            ...(DATE_PERIOD_GROUP_STARTS.has(index)
+              ? [{ value: `-${index}`, label: '──────────', disabled: true }]
+              : []),
+            { value: `${DATE_PERIOD_PREFIX}${key}`, label: m.periods[key] },
+          ]),
         ]
-      : [
-          { value: '', label: t.conditionNone },
-          { value: 'equals', label: t.conditionEquals },
-          { value: 'notEquals', label: t.conditionNotEquals },
-          { value: 'contains', label: t.conditionContains },
-          { value: 'notContains', label: t.conditionNotContains },
-          { value: 'greaterThan', label: t.conditionGreaterThan },
-          { value: 'greaterThanOrEqual', label: t.conditionGreaterThanOrEqual },
-          { value: 'lessThan', label: t.conditionLessThan },
-          { value: 'lessThanOrEqual', label: t.conditionLessThanOrEqual },
-        ];
+      : mac
+        ? [
+            { value: '', label: m.chooseOne },
+            { value: 'equals', label: m.equals },
+            { value: 'notEquals', label: m.notEquals },
+            ...(numeric
+              ? ([
+                  { value: 'greaterThan', label: m.greaterThan },
+                  { value: 'greaterThanOrEqual', label: m.greaterThanOrEqual },
+                  { value: 'lessThan', label: m.lessThan },
+                  { value: 'lessThanOrEqual', label: m.lessThanOrEqual },
+                  { value: 'between', label: m.between },
+                  { value: 'top10', label: m.top10 },
+                  { value: 'bottom10', label: m.bottom10 },
+                  { value: 'aboveAverage', label: m.aboveAverage },
+                  { value: 'belowAverage', label: m.belowAverage },
+                ] as const)
+              : ([
+                  { value: 'contains', label: m.contains },
+                  { value: 'notContains', label: m.notContains },
+                ] as const)),
+          ]
+        : [
+            { value: '', label: t.conditionNone },
+            { value: 'equals', label: t.conditionEquals },
+            { value: 'notEquals', label: t.conditionNotEquals },
+            { value: 'contains', label: t.conditionContains },
+            { value: 'notContains', label: t.conditionNotContains },
+            { value: 'greaterThan', label: t.conditionGreaterThan },
+            { value: 'greaterThanOrEqual', label: t.conditionGreaterThanOrEqual },
+            { value: 'lessThan', label: t.conditionLessThan },
+            { value: 'lessThanOrEqual', label: t.conditionLessThanOrEqual },
+          ];
     const conditionSelect = createDialogSelect(conditionOptions, '', {
       ariaLabel: t.condition,
       className: 'fc-filter-dropdown__condition-op',
     });
-    if (activeCriteria?.condition) conditionSelect.value = activeCriteria.condition.op;
+    if (activeCriteria?.condition) {
+      const active = activeCriteria.condition;
+      conditionSelect.value =
+        active.op === 'datePeriod' ? `${DATE_PERIOD_PREFIX}${active.period ?? ''}` : active.op;
+    }
     const conditionInput = ownerDocument.createElement('input');
     conditionInput.type = 'text';
     conditionInput.className = 'fc-filter-dropdown__condition-value';
     conditionInput.placeholder = t.conditionValue;
     conditionInput.setAttribute('aria-label', t.conditionValue);
+    // A stored operand as typed back: a date column's serial as its date, any other number in
+    // the active locale (the store keeps the engine's canonical decimal grammar).
+    const operandText = (stored: string): string => {
+      const numeric =
+        parseLocalizedNumericInput(stored, activeLocale) ??
+        parseLocalizedNumericInput(stored, 'en-US');
+      if (numeric === null) return stored;
+      if (dates) return excelSerialToIsoDate(numeric, state.ui.date1904 === true) ?? stored;
+      return new Intl.NumberFormat(activeLocale).format(numeric);
+    };
     if (activeCriteria?.condition) {
       const activeValue = activeCriteria.condition.value;
       if (
@@ -320,11 +407,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         // Criteria are stored in the engine's canonical decimal grammar;
         // accept the active locale first, then decode that canonical form so
         // a reopened German/French dropdown displays `1,5` again.
-        const numeric =
-          parseLocalizedNumericInput(activeValue, activeLocale) ??
-          parseLocalizedNumericInput(activeValue, 'en-US');
-        conditionInput.value =
-          numeric !== null ? new Intl.NumberFormat(activeLocale).format(numeric) : activeValue;
+        conditionInput.value = operandText(activeValue);
       } else {
         conditionInput.value = activeValue;
       }
@@ -344,15 +427,14 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         { ariaLabel: m.items, className: 'fc-filter-dropdown__condition-unit' },
       );
       if (activeCriteria?.condition?.value2 !== undefined) {
-        upperInput.value = new Intl.NumberFormat(activeLocale).format(
-          Number(activeCriteria.condition.value2),
-        );
+        upperInput.value = operandText(activeCriteria.condition.value2);
       }
       // The operand fields each operator needs: none, one value, two values, or a count and unit.
       const syncFields = (): void => {
         const op = conditionSelect.value;
         const ranked = op === 'top10' || op === 'bottom10';
-        const average = op === 'aboveAverage' || op === 'belowAverage';
+        const average =
+          op === 'aboveAverage' || op === 'belowAverage' || op.startsWith(DATE_PERIOD_PREFIX);
         conditionInput.hidden = average;
         upperInput.hidden = op !== 'between';
         unitSelect.hidden = !ranked;
@@ -368,8 +450,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       conditionSelect.addEventListener('change', () => {
         syncFields();
         const op = conditionSelect.value;
-        if (op === 'aboveAverage' || op === 'belowAverage') autoApplyIfOn();
-        else if (op) conditionInput.focus();
+        if (op === 'aboveAverage' || op === 'belowAverage' || op.startsWith(DATE_PERIOD_PREFIX)) {
+          autoApplyIfOn();
+        } else if (op) conditionInput.focus();
         else autoApplyIfOn();
       });
       conditionInput.addEventListener('change', () => autoApplyIfOn());

@@ -9,6 +9,7 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell, fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
+import { excelSerialToDateParts } from '../format/date-serial.js';
 import { sameRange, sameRangeList } from '../store/selection-geometry.js';
 import type {
   FilterConditionSpec,
@@ -19,6 +20,7 @@ import type {
 } from '../store/store.js';
 import { parseLocalizedNumericInput } from './coerce-input.js';
 import { blockDataTableEdit } from './data-table-guard.js';
+import { dateInPeriod, localToday } from './date-periods.js';
 import { activeFilterRange, withFilterRange, withoutFilterRange } from './filter-ranges.js';
 import { formatNumber } from './format.js';
 import type { History } from './history.js';
@@ -341,6 +343,7 @@ export function applyConditionFilter(
       ...(condition.op === 'top10' || condition.op === 'bottom10'
         ? { unit: condition.unit ?? 'items' }
         : {}),
+      ...(condition.op === 'datePeriod' && condition.period ? { period: condition.period } : {}),
     },
   });
   const { hidden, count } = recomputeHiddenFromCriteria(state, criteria, locale);
@@ -404,6 +407,7 @@ function recomputeHiddenFromCriteria(
   for (const c of criteria) {
     if (!canEvaluateFilterRange(c.range)) continue;
     const bound = c.condition ? rankedBound(state, c.range, c.byCol, c.condition) : null;
+    const inPeriod = periodMatcher(c.condition, state.ui.date1904 === true);
     const hiddenSet =
       c.condition || c.color
         ? null
@@ -414,7 +418,7 @@ function recomputeHiddenFromCriteria(
       const hide = c.color
         ? !colorMatches(state, c.range.sheet, r, c.byCol, c.color)
         : c.condition
-          ? !conditionMatches(cell, c.condition, locale, bound)
+          ? !conditionMatches(cell, c.condition, locale, bound, inPeriod)
           : (hiddenSet as Set<string>).has(filterMatchKey(filterValueKey(cell?.value), locale));
       if (hide) next.add(r);
     }
@@ -893,11 +897,27 @@ function rankedBound(
     : (sorted[count - 1] ?? null);
 }
 
+/** Whether a serial falls in a `datePeriod` condition's period, judged against today; null for
+ *  any other condition. */
+function periodMatcher(
+  condition: ConditionFilterOptions | undefined,
+  date1904: boolean,
+): ((serial: number) => boolean) | null {
+  const period = condition?.op === 'datePeriod' ? condition.period : undefined;
+  if (!period) return null;
+  const today = localToday();
+  return (serial) => {
+    const parts = excelSerialToDateParts(serial, date1904);
+    return parts !== null && dateInPeriod(period, parts, today);
+  };
+}
+
 function conditionMatches(
   cell: { value: unknown; formula: string | null } | undefined,
   condition: ConditionFilterOptions,
   locale = 'en-US',
   bound: number | null = null,
+  inPeriod: ((serial: number) => boolean) | null = null,
 ): boolean {
   const needle = condition.value.trim();
   const text = filterValueKey(cell?.value);
@@ -937,6 +957,10 @@ function conditionMatches(
         return false;
       }
       return value >= low && value <= high;
+    }
+    case 'datePeriod': {
+      const value = cellNumber(cell?.value);
+      return value !== null && inPeriod?.(value) === true;
     }
     case 'top10':
     case 'bottom10':

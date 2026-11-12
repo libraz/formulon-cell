@@ -804,8 +804,12 @@ describe('AutoFilter engine sync', () => {
       const importedUnsupported = {
         ...valuesColumn,
         columnOffset: 1,
-        kind: 4,
-        dynamicType: 4,
+        kind: 2,
+        customAnd: false,
+        conditions: [
+          { operator: ComparisonOperator.LessThan, value: '0' },
+          { operator: ComparisonOperator.GreaterThan, value: '9' },
+        ],
       } as AutoFilterColumn;
       expect(
         wb.setAutoFilter(0, {
@@ -832,8 +836,12 @@ describe('AutoFilter engine sync', () => {
         wb.getAutoFilter(0)?.columns.find((column) => column.columnOffset === 1),
       ).toMatchObject({
         columnOffset: 1,
-        kind: 4,
-        dynamicType: 4,
+        kind: 2,
+        customAnd: false,
+        conditions: [
+          { operator: ComparisonOperator.LessThan, value: '0' },
+          { operator: ComparisonOperator.GreaterThan, value: '9' },
+        ],
       });
     } finally {
       wb.dispose();
@@ -875,8 +883,12 @@ describe('AutoFilter engine sync', () => {
       const importedUnsupported = {
         ...valuesColumn,
         columnOffset: 1,
-        kind: 4,
-        dynamicType: 4,
+        kind: 2,
+        customAnd: false,
+        conditions: [
+          { operator: ComparisonOperator.LessThan, value: '0' },
+          { operator: ComparisonOperator.GreaterThan, value: '9' },
+        ],
       };
       expect(
         wb.setAutoFilter(0, {
@@ -898,8 +910,12 @@ describe('AutoFilter engine sync', () => {
       const after = wb.getAutoFilter(0);
       expect(after?.columns.find((column) => column.columnOffset === 1)).toMatchObject({
         columnOffset: 1,
-        kind: 4,
-        dynamicType: 4,
+        kind: 2,
+        customAnd: false,
+        conditions: [
+          { operator: ComparisonOperator.LessThan, value: '0' },
+          { operator: ComparisonOperator.GreaterThan, value: '9' },
+        ],
       });
 
       const importedDateGroups = {

@@ -1,3 +1,4 @@
+import { DATE_PERIOD_GROUP_STARTS } from '../commands/date-periods.js';
 import {
   clearPivotFieldFilter,
   type PivotFieldFilterModel,
@@ -93,10 +94,6 @@ const DATE_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind] | null
   ['after', PivotFilterKind.DateNewerThan],
   ['between', PivotFilterKind.DateBetween],
 ];
-/** Where the desktop's Date Filters menu separates its relative periods: days, weeks, months,
- *  quarters, years, year to date, then the quarters and months of All Dates in the Period. */
-const PERIOD_GROUP_STARTS = new Set([0, 3, 6, 9, 12, 15, 16, 20]);
-
 const open = new WeakMap<HTMLElement, () => void>();
 
 /** The report field the cell at `addr` opens: the field behind a drop-down
@@ -270,7 +267,7 @@ export function openPivotFieldFilter(
   const dateConditions = () => [
     ...labeled(DATE_CONDITIONS),
     ...PIVOT_FILTER_PERIODS.flatMap(([kind, key], index) => [
-      ...(PERIOD_GROUP_STARTS.has(index) ? [null] : []),
+      ...(DATE_PERIOD_GROUP_STARTS.has(index) ? [null] : []),
       [strings.datePeriods[key], kind] as const,
     ]),
   ];

@@ -13,6 +13,7 @@ import type {
   SheetAxisFormatOverride,
   SheetFontOverride,
 } from '../engine/types.js';
+import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
 import type { CellFormat, CustomCellStyle, RangeValidation } from './types/cell-format.js';
 import type { ConditionalRule } from './types/conditional-rule.js';
 import type { PageSetup } from './types/page-setup.js';
@@ -329,14 +330,18 @@ export interface FilterConditionSpec {
     | 'top10'
     | 'bottom10'
     | 'aboveAverage'
-    | 'belowAverage';
+    | 'belowAverage'
+    | 'datePeriod';
   /** Comparison operand; the lower bound for `between`, the item count or
-   *  percentage for `top10`/`bottom10`, empty for the average operators. */
+   *  percentage for `top10`/`bottom10`, empty for the average operators and
+   *  `datePeriod`. A date comparison holds the date's serial. */
   value: string;
   /** Upper bound of `between`. */
   value2?: string;
   /** What `top10`/`bottom10` count; items when omitted. */
   unit?: 'items' | 'percent';
+  /** The relative period of `datePeriod`. */
+  period?: DatePeriodKey;
 }
 
 export type WorkbookViewMode = 'normal' | 'pageLayout' | 'pageBreakPreview';

@@ -11,6 +11,11 @@ import {
   SortMethod,
 } from '@libraz/formulon';
 import { inputLocaleForWorkbook, parseLocalizedNumericInput } from '../commands/coerce-input.js';
+import {
+  datePeriodDynamicType,
+  datePeriodOfDynamicType,
+  datePeriodXmlType,
+} from '../commands/date-periods.js';
 import { distinctValues, normalizeColorKey } from '../commands/filter.js';
 import type { HiddenIndices } from '../store/row-visibility.js';
 import { sameRange } from '../store/selection-geometry.js';
@@ -34,7 +39,10 @@ const escapeXml = (value: string): string =>
 type ConditionOp = NonNullable<ValueFilterCriteria['condition']>['op'];
 
 const conditionOperator: Record<
-  Exclude<ConditionOp, 'between' | 'top10' | 'bottom10' | 'aboveAverage' | 'belowAverage'>,
+  Exclude<
+    ConditionOp,
+    'between' | 'top10' | 'bottom10' | 'aboveAverage' | 'belowAverage' | 'datePeriod'
+  >,
   string
 > = {
   equals: 'equal',
@@ -305,6 +313,15 @@ function customColumnFromCriteria(
       ...base,
       kind: FILTER_KIND_DYNAMIC,
       dynamicType: condition.op === 'aboveAverage' ? DYNAMIC_ABOVE_AVERAGE : DYNAMIC_BELOW_AVERAGE,
+    };
+  }
+  if (condition.op === 'datePeriod') {
+    return {
+      ...base,
+      kind: FILTER_KIND_DYNAMIC,
+      dynamicType: condition.period
+        ? datePeriodDynamicType(condition.period)
+        : DynamicFilterType.Null,
     };
   }
   if (condition.op === 'between') {
@@ -657,6 +674,17 @@ function localCriteriaFromTypedFilter(
       });
       continue;
     }
+    const period =
+      column.kind === FILTER_KIND_DYNAMIC ? datePeriodOfDynamicType(column.dynamicType) : null;
+    if (period) {
+      criteria.push({
+        range,
+        byCol,
+        hiddenValues: [],
+        condition: { op: 'datePeriod', value: '', period },
+      });
+      continue;
+    }
     const [first, second] = column.conditions;
     if (
       column.kind === FILTER_KIND_CUSTOM &&
@@ -725,6 +753,12 @@ export function autoFilterXmlFromState(
       }
       if (op === 'aboveAverage' || op === 'belowAverage') {
         return [`<filterColumn colId="${colId}"><dynamicFilter type="${op}"/></filterColumn>`];
+      }
+      if (op === 'datePeriod') {
+        const type = entry.condition.period ? datePeriodXmlType(entry.condition.period) : '';
+        return type
+          ? [`<filterColumn colId="${colId}"><dynamicFilter type="${type}"/></filterColumn>`]
+          : [];
       }
       if (op === 'between') {
         return [
