@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-
+import { runPivotDateBetweenScenario } from '../../../tests/e2e-shared/scenarios/pivot-date-filter.js';
 import {
   runPivotTableFilterDialogScenario,
   runPivotTableProtectedSheetScenario,
@@ -23,3 +23,11 @@ test('P03 (react-demo): a protected sheet makes Insert PivotTable unavailable un
 }) => {
   await runPivotTableProtectedSheetScenario(page);
 });
+
+for (const locale of ['en', 'de', 'ja'] as const) {
+  test(`PivotTable Date is between reads ${locale} dates and keeps only the rows inside them`, async ({
+    page,
+  }) => {
+    await runPivotDateBetweenScenario(page, locale);
+  });
+}

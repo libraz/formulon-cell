@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-
+import { runPivotDateBetweenScenario } from '../../../tests/e2e-shared/scenarios/pivot-date-filter.js';
 import {
   runPivotTableFilterDialogScenario,
   runPivotTableRibbonPrimaryDialogScenario,
@@ -16,3 +16,11 @@ test('P02 (vue-demo): PivotTable ribbon primary click opens Create PivotTable di
 }) => {
   await runPivotTableRibbonPrimaryDialogScenario(page);
 });
+
+for (const locale of ['en', 'de', 'ja'] as const) {
+  test(`PivotTable Date is between reads ${locale} dates and keeps only the rows inside them`, async ({
+    page,
+  }) => {
+    await runPivotDateBetweenScenario(page, locale);
+  });
+}
