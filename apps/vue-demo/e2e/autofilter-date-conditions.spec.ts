@@ -1,5 +1,8 @@
 import { test } from '@playwright/test';
-import { runMacAutoFilterByColorScenario } from '../../../tests/e2e-shared/scenarios/autofilter-by-color.js';
+import {
+  runMacAutoFilterByColorScenario,
+  runMacSortByColorScenario,
+} from '../../../tests/e2e-shared/scenarios/autofilter-by-color.js';
 import { runMacAutoFilterDateScenario } from '../../../tests/e2e-shared/scenarios/autofilter-date-conditions.js';
 import { runAutoFilterDateTreeScenario } from '../../../tests/e2e-shared/scenarios/autofilter-date-tree.js';
 import { runMacAutoFilterOrPairScenario } from '../../../tests/e2e-shared/scenarios/autofilter-two-conditions.js';
@@ -26,4 +29,10 @@ for (const platform of ['default', 'mac'] as const) {
 
 test('Mac column filter By color keeps only the rows with the picked fill', async ({ page }) => {
   await runMacAutoFilterByColorScenario(page);
+});
+
+test('Mac column sort By color brings the rows with the picked fill to the top', async ({
+  page,
+}) => {
+  await runMacSortByColorScenario(page);
 });
