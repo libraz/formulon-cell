@@ -154,7 +154,7 @@ describe('table style gallery context menu', () => {
     expect(table()?.styleName).toBe('Review');
   });
 
-  it('greys Modify and Delete with the protected reason while a protected sheet table uses the style', () => {
+  it('greys the strip of a table on a protected sheet and opens no menu on its chips', () => {
     createTableStyleFromActiveTable(sheet.instance.store, sheet.instance.history, 'Review', {
       elements: galleryStyleElements('dark', '#4472c4', 'banded'),
     });
@@ -174,13 +174,17 @@ describe('table style gallery context menu', () => {
     setProtectedSheet(sheet.instance.store, 0, true);
     toolbar.rerender();
     toolbar.setActiveTab('tableDesign');
-    rightClick(`[data-table-quick-style="${id}"]`);
-    for (const label of ['Modify...', 'Delete']) {
-      expect(item(label).disabled).toBe(true);
-      expect(item(label).title).toContain(en.protection.protectedCellEdit);
+    const chips = host.querySelectorAll<HTMLButtonElement>('[data-table-quick-style]');
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(chip.disabled).toBe(true);
+      expect(chip.title).toContain(en.protection.protectedCellEdit);
     }
-    expect(item('Duplicate...').disabled).toBe(false);
-    expect(item('Set As Default').disabled).toBe(false);
+    const chip = host.querySelector<HTMLElement>(`[data-table-quick-style="${id}"]`);
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    chip?.dispatchEvent(event);
+    expect(items()).toHaveLength(0);
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it('deletes a custom style, moving its tables to the workbook default table style', () => {

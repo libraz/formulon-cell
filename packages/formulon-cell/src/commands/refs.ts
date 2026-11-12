@@ -428,7 +428,13 @@ export function suggestFunctions(
   if (!/^[\p{L}_]/u.test(token)) return null;
   const upper = token.toLocaleUpperCase();
   const source = opts.names ?? FUNCTION_NAMES;
-  const matches = source.filter((n) => n.toLocaleUpperCase().startsWith(upper)).slice(0, max);
+  // Names that start with the token come first, then those containing it, as on the desktop.
+  const prefix = source.filter((n) => n.toLocaleUpperCase().startsWith(upper));
+  const inner = source.filter((n) => {
+    const name = n.toLocaleUpperCase();
+    return !name.startsWith(upper) && name.includes(upper);
+  });
+  const matches = [...prefix, ...inner].slice(0, max);
   if (matches.length === 0) return null;
   return { token, tokenStart, matches };
 }

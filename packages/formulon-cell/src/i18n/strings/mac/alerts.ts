@@ -51,6 +51,14 @@ export const mergeMacAlerts = (
   overwriteOnMove: { ...base.overwriteOnMove, ...bundle.overwriteOnMove },
 });
 
+/** English Mac app wording from the Excel bundle. The bundle's delete-sheet sentence names the
+ *  vendor's product, so deleteSheet keeps its neutral wording in the same shape. */
+export const macAlertsEn: MacAlertsBundle = {
+  mergeLoseData: {
+    message: 'Merging cells only keeps the upper-left value and discards other values.',
+  },
+};
+
 /** Japanese Mac app wording, measured from Excel for Mac. */
 export const macAlertsJa: MacAlertStrings = {
   mergeLoseData: {

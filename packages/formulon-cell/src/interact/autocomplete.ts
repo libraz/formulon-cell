@@ -743,8 +743,7 @@ function computeContext(
   const custom = suggestCustomFunctions(text, caret, deps.getCustomFunctions?.() ?? []);
   const names = existingCallParenLength ? null : suggestNames(text, caret, deps.getNames?.() ?? []);
   if (!fn && !custom && !names) return null;
-  // Merge runtime and built-in names, then present the complete prefix match
-  // set alphabetically. Keep the first spelling on a case-insensitive clash.
+  // Merge runtime and built-in names. Keep the first spelling on a case-insensitive clash.
   const seen = new Set<string>();
   const merged: string[] = [];
   for (const n of custom?.matches ?? []) {
@@ -760,7 +759,14 @@ function computeContext(
     merged.push(n);
   }
   const tokenStart = fn?.tokenStart ?? custom?.tokenStart ?? names?.tokenStart ?? caret;
-  const functions = sortCaseless(merged, (label) => label);
+  // Prefix matches first, then the names that only contain the token, each run alphabetical.
+  const token = text.slice(tokenStart, caret).toLocaleUpperCase();
+  const sorted = sortCaseless(merged, (label) => label);
+  const startsWithToken = (label: string): boolean => label.toLocaleUpperCase().startsWith(token);
+  const functions = [
+    ...sorted.filter(startsWithToken),
+    ...sorted.filter((label) => !startsWithToken(label)),
+  ];
   const grouped = deps.groupNames?.() ?? false;
   if (!names) {
     return {
@@ -799,7 +805,11 @@ function computeContext(
       entries.push(...run);
     }
   } else {
-    entries.push(...sortCaseless([...functionEntries, ...nameEntries], (e) => e.label));
+    const mixed = sortCaseless([...functionEntries, ...nameEntries], (e) => e.label);
+    entries.push(
+      ...mixed.filter((e) => startsWithToken(e.label)),
+      ...mixed.filter((e) => !startsWithToken(e.label)),
+    );
   }
   return {
     matches: entries.map((e) => e.label),

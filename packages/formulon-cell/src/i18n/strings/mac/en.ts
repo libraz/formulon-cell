@@ -9,7 +9,7 @@ import { ribbonMenusEn } from '../ribbon-menus/en.js';
 import { workbookChromeEn } from '../workbook-chrome/en.js';
 import { macAccessibilityPaneEn } from './accessibility-pane.js';
 import { macAdvancedFilterEn, macAdvancedFilterFrom } from './advanced-filter.js';
-import { macAlertsFrom } from './alerts.js';
+import { macAlertsEn, macAlertsFrom, mergeMacAlerts } from './alerts.js';
 import { macCfRulesDialogEn, macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeEn, macChromeFrom } from './chrome.js';
 import { macErrorMenuEn } from './error-menu.js';
@@ -244,14 +244,17 @@ export const macEn: MacStrings = {
     ...macZoomDialogFrom(ribbonEn.ribbon, cellFormatEn.formatDialog),
     ...macZoomDialogEn,
   },
-  alerts: macAlertsFrom(
-    ribbonEn.ribbon,
-    {
-      message: 'This sheet will be permanently deleted. Do you want to continue?',
-      confirm: 'Delete',
-      cancel: 'Cancel',
-    },
-    editDialogsEn.moveCells,
+  alerts: mergeMacAlerts(
+    macAlertsFrom(
+      ribbonEn.ribbon,
+      {
+        message: 'This sheet will be permanently deleted. Do you want to continue?',
+        confirm: 'Delete',
+        cancel: 'Cancel',
+      },
+      editDialogsEn.moveCells,
+    ),
+    macAlertsEn,
   ),
   protectSheet: {
     ...macProtectSheetFrom(editDialogsEn.protection, {

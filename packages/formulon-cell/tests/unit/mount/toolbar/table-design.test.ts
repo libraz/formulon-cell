@@ -169,6 +169,37 @@ describe('Table Design tab of the ribbon', () => {
     tb.dispose();
   });
 
+  it('greys the Mac table tab on a protected sheet but Refresh', () => {
+    makeTable();
+    mutators.setActive(store(), { sheet: 0, row: 1, col: 1 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+      platform: 'mac',
+    });
+    tb.setActiveTab('tableDesign');
+    setProtectedSheet(store(), 0, true);
+    const greyed = [
+      'tableSummarizePivot',
+      'mac.data.removeDuplicates',
+      'tableConvertRange',
+      'mac.insert.slicer',
+      'tableHeaderRow',
+      'tableTotalRow',
+      'tableBandedRows',
+      'tableFirstColumn',
+      'tableLastColumn',
+      'tableBandedColumns',
+    ];
+    for (const id of greyed) expect(command(id).disabled, id).toBe(true);
+    expect(nameInput().disabled).toBe(true);
+    expect(command('tableRefresh').disabled).toBe(false);
+    const chips = host.querySelectorAll<HTMLButtonElement>('[data-table-quick-style]');
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) expect(chip.disabled).toBe(true);
+    tb.dispose();
+  });
+
   it('keeps the table options when a gallery style is picked', () => {
     makeTable();
     mutators.setActive(store(), { sheet: 0, row: 1, col: 1 });

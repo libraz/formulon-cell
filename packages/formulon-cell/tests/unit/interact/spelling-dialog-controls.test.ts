@@ -114,4 +114,18 @@ describe('Spelling dialog controls on the Mac desktop', () => {
     expect(labels()[0]).toBe('辞書にない単語: teh');
     expect(button('閉じる')).toBeTruthy();
   });
+
+  it('deletes a repeated word with AutoCorrect, adding no AutoCorrect entry', async () => {
+    await open([
+      [0, 0, 'the the'],
+      [1, 0, 'teh'],
+    ]);
+    const entries = sheet.instance.autoCorrect.state().entries.length;
+    button('オートコレクト').click();
+    expect(text(0, 0)).toEqual({ kind: 'text', value: 'the ' });
+    expect(sheet.instance.autoCorrect.state().entries).toHaveLength(entries);
+    expect(labels()[0]).toBe('辞書にない単語: teh');
+    expect(disabled()).not.toContain('直前の修正を元に戻す');
+    expect(button('閉じる')).toBeTruthy();
+  });
 });

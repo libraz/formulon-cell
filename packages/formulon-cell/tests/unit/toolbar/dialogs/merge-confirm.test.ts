@@ -71,4 +71,18 @@ describe('confirmMergeLoseData', () => {
     clickButton('OK');
     expect(await pending).toBe(true);
   });
+
+  it('words the Mac warning in English as the desktop does', async () => {
+    const store = createSpreadsheetStore();
+    seedText(store, '0:0:0');
+    seedText(store, '0:0:1');
+    const mac = { spreadsheetProfileId: () => 'mac-en_US' };
+    const pending = confirmMergeLoseData(defaultStrings, store.getState(), RANGE, false, mac);
+    await Promise.resolve();
+    expect(document.body.querySelector('.fc-tb__dlg__message')?.textContent).toBe(
+      'Merging cells only keeps the upper-left value and discards other values.',
+    );
+    clickButton('Cancel');
+    expect(await pending).toBe(false);
+  });
 });

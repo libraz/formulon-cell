@@ -2,6 +2,7 @@ import { listCustomCellStyles } from '../commands/cell-styles.js';
 import { selectedSessionChart } from '../commands/chart-design.js';
 import { listCustomPivotTableStyles, listCustomTableStyles } from '../commands/format-as-table.js';
 import { subscribeRecentFunctions } from '../commands/function-history.js';
+import { sheetPermits } from '../commands/protection.js';
 import { selectedSessionIllustration } from '../commands/session-illustration.js';
 import { activeTableOverlay } from '../commands/table-design.js';
 import { addrKey } from '../engine/address.js';
@@ -453,7 +454,10 @@ export function mountToolbar(
     if (!item) {
       const workbook = getInstance()?.workbook;
       if (workbook && findPivotTableAtCell(workbook, state.selection.active)) {
-        return PIVOT_CONTEXTUAL_RIBBON_TABS;
+        // A protected sheet that does not allow PivotTable use shows no PivotTable tabs at all.
+        return sheetPermits(state, state.selection.active.sheet, 'pivotTables')
+          ? PIVOT_CONTEXTUAL_RIBBON_TABS
+          : NO_CONTEXTUAL_TABS;
       }
       const inTable = activeTableOverlay(state) !== null;
       const hostsSparkline = state.sparkline.sparklines.has(addrKey(state.selection.active));
@@ -483,6 +487,7 @@ export function mountToolbar(
           state.selection.active,
           state.sparkline.sparklines,
           state.data,
+          state.protection,
         ]
       : [current];
     if (

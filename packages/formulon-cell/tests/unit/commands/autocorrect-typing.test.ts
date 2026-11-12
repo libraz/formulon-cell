@@ -80,9 +80,9 @@ describe('AutoCorrect while typing', () => {
     expect(typeThrough(storeFor('ja'), typed)).toBe(expected);
   });
 
-  it('corrects words inside a formula string', () => {
+  it('corrects words inside a formula string and entries outside it', () => {
     expect(typeThrough(storeFor('en', teh), '="teh"')).toBe('="the"');
-    expect(typeThrough(storeFor('en', teh), '=teh+"teh x"')).toBe('=teh+"the x"');
+    expect(typeThrough(storeFor('en', teh), '=teh+"teh x"')).toBe('=the+"the x"');
   });
 
   it('starts a Japanese UI from the Japanese list only', () => {

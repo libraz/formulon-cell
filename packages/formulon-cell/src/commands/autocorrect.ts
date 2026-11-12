@@ -114,8 +114,11 @@ const replacementAt = (text: string, start: number, entry: AutoCorrectEntry): st
 /** Han and kana, written without spaces between words. */
 const CJK = /^[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]+$/u;
 
-const startsWord = (text: string, at: number): boolean =>
-  at === 0 || START.test(text.charAt(at - 1));
+// In a formula a name starts after any character a name cannot hold, such as `=`, `+` or `(`.
+const FORMULA_START = /[^\p{L}\p{N}_.]/u;
+
+const startsWord = (text: string, at: number, start: RegExp): boolean =>
+  at === 0 || start.test(text.charAt(at - 1));
 const endsWord = (text: string, at: number): boolean =>
   at === text.length || END.test(text.charAt(at));
 
@@ -123,16 +126,22 @@ const longestFirst = (entries: readonly AutoCorrectEntry[]): AutoCorrectEntry[] 
   entries.filter((entry) => entry.from !== '').sort((a, b) => b.from.length - a.from.length);
 
 /** `text` with every entry replaced where it stands as a word: at the start or after white
- *  space, and before the end, white space or punctuation. A Han or kana entry needs no word
- *  boundary, as those scripts have no spaces between words. */
-export function autoCorrectText(text: string, entries: readonly AutoCorrectEntry[]): string {
+ *  space (in formula text, after anything a name cannot hold), and before the end, white space
+ *  or punctuation. A Han or kana entry needs no word boundary, as those scripts have no spaces
+ *  between words. */
+export function autoCorrectText(
+  text: string,
+  entries: readonly AutoCorrectEntry[],
+  formula = false,
+): string {
+  const start = formula ? FORMULA_START : START;
   const ordered = longestFirst(entries);
   if (ordered.length === 0) return text;
   let out = '';
   let at = 0;
   while (at < text.length) {
     let replaced = false;
-    const wordStart = startsWord(text, at);
+    const wordStart = startsWord(text, at, start);
     for (const entry of ordered) {
       const end = at + entry.from.length;
       const free = CJK.test(entry.from);
@@ -303,15 +312,23 @@ export class AutoCorrectStore {
     return out;
   }
 
-  /** A typed entry as AutoCorrect leaves it: a constant whole, a formula inside its strings. */
+  /** A typed entry as AutoCorrect leaves it: a constant whole; in a formula, its strings whole
+   *  and the rest by the AutoCorrect list alone, as the desktop turns `=teh+1` into `=the+1`. */
   correctEntry(raw: string, endsEntry = true): string {
     if (!raw.trimStart().startsWith('=')) return this.correct(raw, endsEntry);
+    const state = this.state();
+    const outside = (text: string): string =>
+      state.replaceAsYouType ? autoCorrectText(text, state.entries, true) : text;
+    let out = '';
+    let last = 0;
     // A closed string has its quote after the last word; an open one ends where the entry does.
-    return raw.replace(
-      /"((?:[^"]|"")*)("|$)/g,
-      (_match, inner: string, close: string) =>
-        `"${this.correct(inner, endsEntry && close === '')}${close}`,
-    );
+    for (const match of raw.matchAll(/"((?:[^"]|"")*)("|$)/g)) {
+      const [whole, inner = '', close = ''] = match;
+      out += outside(raw.slice(last, match.index));
+      out += `"${this.correct(inner, endsEntry && close === '')}${close}`;
+      last = match.index + whole.length;
+    }
+    return out + outside(raw.slice(last));
   }
 
   /** Replacing as you type: when the character before `caret` ends a word, the entry with the

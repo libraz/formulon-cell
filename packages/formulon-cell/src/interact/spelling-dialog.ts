@@ -255,6 +255,7 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
     const dictionary = document.createElement('select');
     dictionary.id = 'fc-spelling-dictionary';
     dictionary.className = 'fc-fmtdlg__select fc-spelling__dictionary';
+    // The desktop lists the custom dictionary's file path; a browser host has no such file.
     const custom = document.createElement('option');
     custom.textContent = t.customDictionaries;
     dictionary.append(custom);
@@ -432,8 +433,13 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
   });
   shell.on(change, 'click', () => applyChange(false));
   shell.on(changeAll, 'click', () => applyChange(true));
-  // AutoCorrect keeps the word and its correction in the AutoCorrect list, then changes it.
+  // AutoCorrect keeps the word and its correction in the AutoCorrect list, then changes it. At a
+  // repeated word it deletes the word, as Delete does, and adds no entry.
   shell.on(autoCorrect, 'click', () => {
+    if (issue?.kind === 'repeated') {
+      applyChange(false);
+      return;
+    }
     if (!issue || changeTo.input.value === '') return;
     const { word: typo } = issue.word;
     const correction = changeTo.input.value;

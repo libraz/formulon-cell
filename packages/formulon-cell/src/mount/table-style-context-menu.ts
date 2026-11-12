@@ -99,6 +99,12 @@ export function attachTableStyleContextMenu(
     const item = target?.closest<HTMLElement>(ITEM_SELECTOR);
     const instance = getInstance();
     if (!item || !instance || !host.contains(item)) return;
+    // A greyed chip takes no right-click: no menu of ours and none of the browser's.
+    if (item instanceof HTMLButtonElement && item.disabled) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const kind: TableStyleKind = item.dataset.pivotStyle !== undefined ? 'pivot' : 'table';
     const styleId = item.dataset.tableQuickStyle ?? item.dataset.pivotStyle ?? '';
     // None is a gallery entry without a style to edit.

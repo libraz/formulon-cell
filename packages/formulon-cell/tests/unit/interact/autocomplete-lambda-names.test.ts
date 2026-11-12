@@ -71,7 +71,7 @@ describe('formula autocomplete list layout', () => {
       input,
       ...custom,
       getNames: () => collectAutocompleteNames(DEFINED, tables, 0),
-      getFunctionNames: () => ['RATE', 'INTRATE', 'SUM'],
+      getFunctionNames: () => ['RATE', 'INTRATE', 'SUM', 'DURATION', 'MDURATION', 'PDURATION'],
       groupNames: () => grouped,
       labels: {
         functions: '関数',
@@ -103,7 +103,16 @@ describe('formula autocomplete list layout', () => {
 
   it('on the Mac, lists other names in their own group above the functions and inserts them bare', () => {
     const { input, handle } = open('=RAT', true);
-    expect(listRows()).toEqual(['# 名前付き一覧', 'RATE1', '# 関数', 'RATE']);
+    expect(listRows()).toEqual([
+      '# 名前付き一覧',
+      'RATE1',
+      '# 関数',
+      'RATE',
+      'DURATION',
+      'INTRATE',
+      'MDURATION',
+      'PDURATION',
+    ]);
     expect(handle.acceptHighlighted()).toBe(true);
     expect(input.value).toBe('=RATE1');
     handle.detach();
@@ -122,6 +131,10 @@ describe('formula autocomplete list layout', () => {
       'Ratio',
       '# 関数',
       'RATE',
+      'DURATION',
+      'INTRATE',
+      'MDURATION',
+      'PDURATION',
     ]);
     handle.move(1);
     handle.move(1);
@@ -130,10 +143,16 @@ describe('formula autocomplete list layout', () => {
     handle.detach();
   });
 
+  it('lists the functions that contain the typed text after those that start with it', () => {
+    const { handle } = open('=DUR', true);
+    expect(listRows()).toEqual(['# 関数', 'DURATION', 'MDURATION', 'PDURATION']);
+    handle.detach();
+  });
+
   // Windows is not measured: it keeps the documented mixed alphabetical list without headers.
   it('on Windows, mixes names alphabetically among the functions without headers', () => {
     const { handle } = open('=RAT', false);
-    expect(listRows()).toEqual(['RATE', 'RATE1']);
+    expect(listRows()).toEqual(['RATE', 'RATE1', 'DURATION', 'INTRATE', 'MDURATION', 'PDURATION']);
     handle.detach();
   });
 });
