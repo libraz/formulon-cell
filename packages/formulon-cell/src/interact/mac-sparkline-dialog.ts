@@ -161,15 +161,19 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
 
   // A location OK may take but refuses with an alert, as the desktop does.
   let refusal: string | null = null;
+  // A failed check forgets the last good ranges and shows `message` under the fields.
+  const fail = (message: string | null): false => {
+    lastSource = null;
+    lastDestination = null;
+    setError(message);
+    return false;
+  };
   const validate = (): boolean => {
     refusal = null;
     const wb = deps.getWb?.() ?? null;
     const source = resolveSparklineRange(sourceInput.value, currentSheet(), wb);
     if (!source) {
-      lastSource = null;
-      lastDestination = null;
-      setError(strings.mac.sparkline.invalidSource);
-      return false;
+      return fail(strings.mac.sparkline.invalidSource);
     }
     const destination = resolveSparklineRange(destinationInput.value, currentSheet(), wb);
     const oneCell =
@@ -177,10 +181,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       destination.r0 === destination.r1 &&
       destination.c0 === destination.c1;
     if (!destination || (!editing && !oneCell)) {
-      lastSource = null;
-      lastDestination = null;
-      setError(strings.mac.sparkline.locationOneCell);
-      return false;
+      return fail(strings.mac.sparkline.locationOneCell);
     }
     const destinationAddr: Addr = {
       sheet: destination.sheet,
@@ -189,34 +190,22 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     };
     const kind = kindSelect.value as SparklineKind;
     if (kind !== 'line' && kind !== 'column' && kind !== 'win-loss') {
-      lastSource = null;
-      lastDestination = null;
-      setError(strings.mac.sparkline.chooseType);
-      return false;
+      return fail(strings.mac.sparkline.chooseType);
     }
     if (
       (editing && destination.sheet !== editing.sheet) ||
       deps.canCommit?.(source, destinationAddr) === false
     ) {
-      lastSource = null;
-      lastDestination = null;
-      setError(strings.mac.sparkline.unavailable);
-      return false;
+      return fail(strings.mac.sparkline.unavailable);
     }
     if (editing) {
       if (destination.r0 !== destination.r1 && destination.c0 !== destination.c1) {
-        lastSource = null;
-        lastDestination = null;
         refusal = strings.mac.sparkline.locationNotLine;
-        setError(null);
-        return false;
+        return fail(null);
       }
       const parts = splitDataForLocation(source, destination);
       if (!parts) {
-        lastSource = null;
-        lastDestination = null;
-        setError(strings.mac.sparkline.invalidSource);
-        return false;
+        return fail(strings.mac.sparkline.invalidSource);
       }
       const width = destination.c1 - destination.c0 + 1;
       lastEntries = parts.map((part, i) => ({

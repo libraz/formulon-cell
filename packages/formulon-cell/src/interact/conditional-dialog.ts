@@ -696,22 +696,22 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     preview.style.color = patch.color ?? '#201f1e';
     preview.style.background = patch.fill ?? 'transparent';
   };
-  const syncCellPreset = (): void => {
-    const preset = cellPresetSelect.value as FormatPreset;
-    const patch =
-      preset === 'custom' && cellCustomStyle ? cellCustomStyle : formatPresetPatch(preset);
-    if (preset === 'custom') applyPatchToConditionalApplyControls(cellValueApplyControls, patch);
-    else applyPresetPatchToConditionalApplyControls(cellValueApplyControls, patch);
-    syncPresetPreview(cellPresetPreview, preset, cellCustomStyle);
+  const syncPreset = (
+    select: HTMLSelectElement,
+    controls: Parameters<typeof collectConditionalApplyPatch>[0],
+    preview: HTMLElement,
+    customStyle: Partial<CellFormat> | null,
+  ): void => {
+    const preset = select.value as FormatPreset;
+    const patch = preset === 'custom' && customStyle ? customStyle : formatPresetPatch(preset);
+    if (preset === 'custom') applyPatchToConditionalApplyControls(controls, patch);
+    else applyPresetPatchToConditionalApplyControls(controls, patch);
+    syncPresetPreview(preview, preset, customStyle);
   };
-  const syncSharedPreset = (): void => {
-    const preset = sharedPresetSelect.value as FormatPreset;
-    const patch =
-      preset === 'custom' && sharedCustomStyle ? sharedCustomStyle : formatPresetPatch(preset);
-    if (preset === 'custom') applyPatchToConditionalApplyControls(sharedApplyControls, patch);
-    else applyPresetPatchToConditionalApplyControls(sharedApplyControls, patch);
-    syncPresetPreview(sharedPresetPreview, preset, sharedCustomStyle);
-  };
+  const syncCellPreset = (): void =>
+    syncPreset(cellPresetSelect, cellValueApplyControls, cellPresetPreview, cellCustomStyle);
+  const syncSharedPreset = (): void =>
+    syncPreset(sharedPresetSelect, sharedApplyControls, sharedPresetPreview, sharedCustomStyle);
   const editCustomPreset = (
     controls: Parameters<typeof collectConditionalApplyPatch>[0],
     customStyle: Partial<CellFormat> | null,
