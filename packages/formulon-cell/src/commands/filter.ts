@@ -10,8 +10,10 @@ import { formatCell, fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
 import { excelSerialToDateParts } from '../format/date-serial.js';
+import { type ConditionalCellOverlay, evaluateConditional } from '../render/conditional.js';
 import { sameRange, sameRangeList } from '../store/selection-geometry.js';
 import type {
+  FilterColorSpec,
   FilterComparisonOp,
   FilterConditionSpec,
   FilterSortSpec,
@@ -203,10 +205,8 @@ function sameCriteriaList(
       !!right &&
       left.byCol === right.byCol &&
       sameRange(left.range, right.range) &&
-      left.condition?.op === right.condition?.op &&
-      left.condition?.value === right.condition?.value &&
-      left.color?.kind === right.color?.kind &&
-      left.color?.color === right.color?.color &&
+      JSON.stringify(left.condition ?? null) === JSON.stringify(right.condition ?? null) &&
+      JSON.stringify(left.color ?? null) === JSON.stringify(right.color ?? null) &&
       left.hiddenValues.length === right.hiddenValues.length &&
       left.hiddenValues.every((value, index) => value === right.hiddenValues[index])
     );
@@ -392,7 +392,7 @@ export function applyColorFilter(
   store: SpreadsheetStore,
   range: Range,
   byCol: number,
-  color: { kind: 'cellColor' | 'fontColor'; color: string },
+  color: FilterColorSpec,
   wb?: WorkbookHandle,
 ): number {
   if (!canEvaluateFilterRange(range)) {
@@ -404,7 +404,10 @@ export function applyColorFilter(
     range,
     byCol,
     hiddenValues: [],
-    color: { kind: color.kind, color: normalizeColorKey(color.color) },
+    color:
+      color.kind === 'cellIcon'
+        ? { kind: 'cellIcon', icon: { set: color.icon.set, slot: color.icon.slot } }
+        : { kind: color.kind, color: normalizeColorKey(color.color) },
   });
   const { hidden, count } = recomputeHiddenFromCriteria(state, criteria, localeForWorkbook(wb));
   store.setState((s) => ({
@@ -439,6 +442,7 @@ function recomputeHiddenFromCriteria(
     if (!canEvaluateFilterRange(c.range)) continue;
     const bound = c.condition ? rankedBound(state, c.range, c.byCol, c.condition) : null;
     const inPeriod = periodMatcher(c.condition, state.ui.date1904 === true);
+    const icons = c.color?.kind === 'cellIcon' ? evaluateConditional(state) : null;
     const hiddenSet =
       c.condition || c.color
         ? null
@@ -447,7 +451,7 @@ function recomputeHiddenFromCriteria(
       if (next.has(r)) continue;
       const cell = state.data.cells.get(addrKey({ sheet: c.range.sheet, row: r, col: c.byCol }));
       const hide = c.color
-        ? !colorMatches(state, c.range.sheet, r, c.byCol, c.color)
+        ? !colorMatches(state, c.range.sheet, r, c.byCol, c.color, icons)
         : c.condition
           ? !criteriaConditionMatches(cell, c.condition, locale, bound, inPeriod)
           : (hiddenSet as Set<string>).has(filterMatchKey(filterValueKey(cell?.value), locale));
@@ -469,9 +473,15 @@ function colorMatches(
   sheet: number,
   row: number,
   col: number,
-  color: { kind: 'cellColor' | 'fontColor'; color: string },
+  color: FilterColorSpec,
+  icons: ReadonlyMap<string, ConditionalCellOverlay> | null,
 ): boolean {
-  const fmt = state.format.formats.get(addrKey({ sheet, row, col }));
+  const key = addrKey({ sheet, row, col });
+  if (color.kind === 'cellIcon') {
+    const overlay = icons?.get(key);
+    return overlay?.iconKind === color.icon.set && overlay.iconSlot === color.icon.slot;
+  }
+  const fmt = state.format.formats.get(key);
   const actual = color.kind === 'cellColor' ? fmt?.fill : fmt?.color;
   return !!actual && normalizeColorKey(actual) === color.color;
 }

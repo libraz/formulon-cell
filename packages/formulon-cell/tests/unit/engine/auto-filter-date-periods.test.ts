@@ -1,7 +1,8 @@
 import { DynamicFilterType, FilterKind } from '@libraz/formulon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DATE_PERIODS } from '../../../src/commands/date-periods.js';
-import { applyConditionFilter } from '../../../src/commands/filter.js';
+import { applyConditionFilter, recordFilterChange } from '../../../src/commands/filter.js';
+import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import {
   autoFilterXmlFromState,
@@ -115,6 +116,33 @@ describe('AutoFilter relative date periods', () => {
       const reloaded = createSpreadsheetStore();
       hydrateAutoFilterFromEngine(wb, reloaded, 0);
       expect(reloaded.getState().ui.filterCriteria[0]?.condition?.op).toBe('aboveAverage');
+    } finally {
+      wb.dispose();
+    }
+  });
+});
+
+describe('AutoFilter period changes in the undo history', () => {
+  it('records a change from one period to another as its own step', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 12, 9, 0));
+    const { wb, store } = await seeded();
+    try {
+      const history = new History();
+      const apply = (period: 'lastYear' | 'nextYear') =>
+        recordFilterChange(history, store, () =>
+          applyConditionFilter(store.getState(), store, range, 0, {
+            op: 'datePeriod',
+            value: '',
+            period,
+          }),
+        );
+      // Both periods hide every row here, so only the condition tells the two steps apart.
+      apply('lastYear');
+      apply('nextYear');
+      expect(store.getState().ui.filterCriteria[0]?.condition?.period).toBe('nextYear');
+      history.undo();
+      expect(store.getState().ui.filterCriteria[0]?.condition?.period).toBe('lastYear');
     } finally {
       wb.dispose();
     }

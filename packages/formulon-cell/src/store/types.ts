@@ -15,7 +15,7 @@ import type {
 } from '../engine/types.js';
 import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
 import type { CellFormat, CustomCellStyle, RangeValidation } from './types/cell-format.js';
-import type { ConditionalRule } from './types/conditional-rule.js';
+import type { ConditionalIconRef, ConditionalRule } from './types/conditional-rule.js';
 import type { PageSetup } from './types/page-setup.js';
 
 export type * from './types/cell-format.js';
@@ -305,10 +305,11 @@ export interface FilterSortSpec {
   keys: Array<{ byCol: number; direction: 'asc' | 'desc' }>;
 }
 
-export interface FilterColorSpec {
-  kind: 'cellColor' | 'fontColor';
-  color: string;
-}
+/** A filter by colour: rows whose cell fill or font colour is `color`, or whose conditional
+ *  formatting draws `icon`. */
+export type FilterColorSpec =
+  | { kind: 'cellColor' | 'fontColor'; color: string }
+  | { kind: 'cellIcon'; icon: ConditionalIconRef };
 
 /** A number/text comparison used by an AutoFilter condition filter. Mirrors
  *  the operator set of the filter dropdown. */

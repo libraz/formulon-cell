@@ -70,6 +70,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- The Mac column filter's By color pop-up lists the cell fills, font colours and conditional formatting icons the column shows and filters by the one picked; icon filters are saved and read back like colour filters.
 - The column filter checklist groups a column's dates by year, month and day, with a checkbox for each year and month, and the kept dates are saved as date-group items that read back into the same checklist.
 - The Mac column filter takes a second comparison joined by And or Or, saved as a two-condition custom filter and read back from the file; Below Average round-trips as Above Average does.
 - The Mac column filter offers date conditions on a column of dates: Equals, Before, After, their or-equal forms and Between take a date typed in the workbook's locale and are saved as comparisons, and the relative periods from Tomorrow to Year to Date, the quarters and the months are saved as dynamic filters, kept through a save.
@@ -104,6 +105,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- Switching a column filter between conditions that hide the same rows, such as two date periods, is its own undo step.
 - PivotTable filters of every kind the file holds stay through an edit of the report, and a PivotTable date filter reads its typed dates in the workbook's locale, as cell entry does.
 - Double-clicking Format Painter keeps it on for repeated pastes until the button is clicked again.
 - On the Mac profile, Clear in the Format dialog for a table style element or a conditional format sits inside the tab area at the desktop size, shifts left on the Border tab, and is absent on the Number tab.

@@ -2333,6 +2333,38 @@
     display: none;
   }
 
+  /* By color: the fills, font colours or icons of the column, as a row of swatches. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__swatches[hidden] {
+    display: none;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__swatch {
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    padding: 1px;
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: 2px;
+    background: var(--fc-swatch, transparent);
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__swatch[aria-pressed="true"] {
+    box-shadow: 0 0 0 2px var(--fc-accent, dodgerblue);
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__swatch-icon {
+    display: block;
+    width: 14px;
+    height: 14px;
+  }
+
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__condition-join {
     display: flex;
     flex-basis: 100%;

@@ -68,6 +68,14 @@ export const customIconFromEngine = (icon: CfIconInput | undefined): Conditional
     : null;
 };
 
+/** The engine form of one icon; null for a set with no file form or a slot outside it. */
+export const customIconToEngine = (icon: ConditionalIconRef): CfIconInput | null => {
+  const iconSet = SET_NAME[icon.set];
+  return iconSet === null || icon.slot < 0 || icon.slot >= iconSetSlotCount(icon.set)
+    ? null
+    : { iconSet, iconIndex: icon.slot };
+};
+
 /** Engine `iconSet` name + optional per-level icons for a family; null when
  *  the family or a custom level has no file form. */
 export function iconSetToEngine(

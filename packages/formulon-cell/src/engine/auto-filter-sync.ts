@@ -34,6 +34,7 @@ import type {
   ValueFilterCriteria,
 } from '../store/store.js';
 import { formatA1Range } from './address.js';
+import { customIconFromEngine, customIconToEngine } from './cf-icon-sets.js';
 import { dxfToApply } from './cf-sync.js';
 import { dxfRecordFromApply } from './cf-writeback.js';
 import { profileTextKey } from './profile-text-semantics.js';
@@ -72,6 +73,7 @@ const FILTER_KIND_CUSTOM = FilterKind.Custom;
 const FILTER_KIND_TOP10 = FilterKind.Top10;
 const FILTER_KIND_DYNAMIC = FilterKind.Dynamic;
 const FILTER_KIND_COLOR = FilterKind.Color;
+const FILTER_KIND_ICON = FilterKind.Icon;
 
 const DYNAMIC_ABOVE_AVERAGE = DynamicFilterType.AboveAverage;
 const DYNAMIC_BELOW_AVERAGE = DynamicFilterType.BelowAverage;
@@ -411,6 +413,17 @@ function colorColumnFromCriteria(
   colId: number,
   color: NonNullable<ValueFilterCriteria['color']>,
 ): AutoFilterColumnInput | null {
+  if (color.kind === 'cellIcon') {
+    const icon = customIconToEngine(color.icon);
+    return icon
+      ? {
+          ...emptyAutoFilterColumn(colId),
+          kind: FILTER_KIND_ICON,
+          iconSet: icon.iconSet,
+          iconIndex: icon.iconIndex,
+        }
+      : null;
+  }
   if (!wb?.capabilities.conditionalFormatDxf) return null;
   const cell = color.kind === 'cellColor';
   const dxf = dxfRecordFromApply(wb, cell ? { fill: color.color } : { color: color.color });
@@ -689,6 +702,14 @@ function localCriteriaFromTypedFilter(
         });
         continue;
       }
+    }
+    const icon =
+      column.kind === FILTER_KIND_ICON && column.iconIndex !== null
+        ? customIconFromEngine({ iconSet: column.iconSet, iconIndex: column.iconIndex })
+        : null;
+    if (icon) {
+      criteria.push({ range, byCol, hiddenValues: [], color: { kind: 'cellIcon', icon } });
+      continue;
     }
     if (column.kind === FILTER_KIND_TOP10 && column.topValue > 0) {
       criteria.push({

@@ -10,6 +10,7 @@ import {
   numFmtShowsDate,
 } from '../commands/date-periods.js';
 import {
+  applyColorFilter,
   applyConditionFilter,
   applyValueFilter,
   type ConditionFilterOp,
@@ -21,6 +22,7 @@ import {
   resetFilterCriteria,
 } from '../commands/filter.js';
 import { filterUseWrite } from '../commands/filter-actions.js';
+import { columnColorChoices } from '../commands/filter-colors.js';
 import { columnDateSerials } from '../commands/filter-date-groups.js';
 import type { History } from '../commands/history.js';
 import { parseDateTimeInput } from '../commands/input-grammar.js';
@@ -32,8 +34,11 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialToDateParts, excelSerialToIsoDate } from '../format/date-serial.js';
 import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { drawConditionalIconArt } from '../render/painters/cf-icons.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
+import type { ConditionalIconSet } from '../store/types/conditional-rule.js';
+import type { FilterColorSpec } from '../store/types.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -276,6 +281,21 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       .data.cells.get(addrKey({ sheet: range.sheet, row: range.r0, col }))?.value;
     if (value?.kind === 'text') return value.value;
     return value?.kind === 'number' ? String(value.value) : '';
+  };
+
+  /** A conditional formatting icon drawn at 14 px, as the grid paints it. */
+  const iconCanvas = (set: ConditionalIconSet, slot: number): HTMLCanvasElement => {
+    const canvas = ownerDocument.createElement('canvas');
+    const ratio = ownerDocument.defaultView?.devicePixelRatio ?? 1;
+    canvas.width = Math.round(14 * ratio);
+    canvas.height = Math.round(14 * ratio);
+    canvas.className = 'fc-filter-dropdown__swatch-icon';
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.scale((14 * ratio) / 12, (14 * ratio) / 12);
+      drawConditionalIconArt(ctx, set, slot);
+    }
+    return canvas;
   };
 
   const open = (range: Range, col: number, anchor: { x: number; y: number; h: number }): void => {
@@ -829,6 +849,88 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         row.append(text, select);
         return row;
       };
+      // The filter side's By color: a kind, then the fills, font colours or icons the column shows.
+      // The pop-up's layout on the Mac app is provisional until measured.
+      const colorFilterRow = (): HTMLElement => {
+        const choices = columnColorChoices(state, range, col);
+        const active = activeCriteria?.color;
+        const wrap = ownerDocument.createElement('div');
+        wrap.className = 'fc-filter-dropdown__color-filter';
+        const row = ownerDocument.createElement('label');
+        row.className = 'fc-filter-dropdown__color';
+        const text = ownerDocument.createElement('span');
+        text.textContent = m.byColor;
+        const select = createDialogSelect(
+          [
+            { value: '', label: m.colorNone },
+            { value: 'cellColor', label: m.cellColor, disabled: choices.fills.length === 0 },
+            { value: 'fontColor', label: m.fontColor, disabled: choices.fonts.length === 0 },
+            { value: 'cellIcon', label: m.cellIcon, disabled: choices.icons.length === 0 },
+          ],
+          active?.kind ?? '',
+          { ariaLabel: m.byColor, className: 'fc-filter-dropdown__color-kind' },
+        );
+        row.append(text, select);
+        const swatches = ownerDocument.createElement('div');
+        swatches.className = 'fc-filter-dropdown__swatches';
+        swatches.setAttribute('role', 'group');
+        const applyColor = (color: FilterColorSpec | null): void => {
+          const wb = deps.getWb?.();
+          filterUseWrite(dropdownFilter('filterByValue', wb), range, undefined, () => {
+            if (color) {
+              applyColorFilter(deps.store.getState(), deps.store, range, col, color, wb);
+            } else {
+              applyValueFilter(deps.store.getState(), deps.store, range, col, [], wb);
+            }
+          });
+          open(range, col, anchor);
+        };
+        const swatch = (label: string, pressed: boolean, color: FilterColorSpec) => {
+          const button = createInteractionButton({
+            className: 'fc-filter-dropdown__swatch',
+            ariaLabel: label,
+          });
+          button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+          button.addEventListener('click', () => applyColor(color));
+          return button;
+        };
+        const renderSwatches = (): void => {
+          swatches.replaceChildren();
+          const kind = select.value;
+          swatches.hidden = kind === '';
+          if (kind === 'cellIcon') {
+            for (const icon of choices.icons) {
+              const pressed =
+                active?.kind === 'cellIcon' &&
+                active.icon.set === icon.set &&
+                active.icon.slot === icon.slot;
+              const button = swatch(`${icon.set} ${icon.slot + 1}`, pressed, {
+                kind: 'cellIcon',
+                icon,
+              });
+              button.dataset.fcIcon = `${icon.set}:${icon.slot}`;
+              button.appendChild(iconCanvas(icon.set, icon.slot));
+              swatches.appendChild(button);
+            }
+            return;
+          }
+          if (kind !== 'cellColor' && kind !== 'fontColor') return;
+          for (const color of kind === 'cellColor' ? choices.fills : choices.fonts) {
+            const pressed = active?.kind === kind && active.color === color;
+            const button = swatch(color, pressed, { kind, color });
+            button.dataset.fcColor = color;
+            button.style.setProperty('--fc-swatch', color);
+            swatches.appendChild(button);
+          }
+        };
+        select.addEventListener('change', () => {
+          if (select.value === '' && active) applyColor(null);
+          else renderSwatches();
+        });
+        renderSwatches();
+        wrap.append(row, swatches);
+        return wrap;
+      };
       const title = ownerDocument.createElement('div');
       title.className = 'fc-filter-dropdown__title';
       title.textContent = columnTitle(range, col);
@@ -854,7 +956,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         rule,
         section(m.filterSection),
       );
-      colorBy = colorSelect(colorChoices);
+      colorBy = colorFilterRow();
     } else {
       actions.append(clear, apply);
     }
