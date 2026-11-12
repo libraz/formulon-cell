@@ -45,8 +45,10 @@ export interface GridPopupsStrings {
     colGroup: string;
     colUngroup: string;
     newComment: string;
-    insertComment: string;
-    deleteComment: string;
+    /** A cell's note items: New Note on a cell without one, Edit and Delete Note on a cell with one. */
+    newNote: string;
+    editNote: string;
+    deleteNote: string;
     showHideNote: string;
     insertHyperlink: string;
     addWatch: string;

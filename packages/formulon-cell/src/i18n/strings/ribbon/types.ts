@@ -266,7 +266,8 @@ export interface RibbonStrings {
     replace: string;
     gotoSpecial: string;
     newComment: string;
-    editComment: string;
+    /** New Note's label while the active cell has a note. */
+    editNote: string;
     proofing: string;
     language: string;
     translate: string;

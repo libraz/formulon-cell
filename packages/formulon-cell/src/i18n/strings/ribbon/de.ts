@@ -259,7 +259,7 @@ export const ribbonDe: RibbonStrings = {
     replace: 'Ersetzen',
     gotoSpecial: 'Gehe zu: Inhalte',
     newComment: 'Neue Notiz',
-    editComment: 'Notiz bearbeiten',
+    editNote: 'Notiz bearbeiten',
     proofing: 'Dokumentprüfung',
     language: 'Sprache',
     translate: 'Übersetzen',

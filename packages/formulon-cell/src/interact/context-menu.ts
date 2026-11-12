@@ -650,7 +650,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
                 strings,
                 commentAt(store.getState(), activeAddr) !== null,
               )
-            : buildCellEntries(strings);
+            : buildCellEntries(strings, commentAt(store.getState(), activeAddr) !== null);
     const stateNow = store.getState();
     const bandRange = stateNow.selection.range;
     const inTable =

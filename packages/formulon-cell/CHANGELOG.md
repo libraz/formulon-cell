@@ -8,6 +8,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- Notes on the default profile follow the desktop: the cell menu offers New Note on a cell without a note and Edit Note, Delete Note and Show/Hide Note on one with a note, and the Review tab's New Note reads Edit Note while the active cell has a note.
 - No UI string names the desktop product any more: the Name Manager's delete confirmation is titled Name Manager, and the screen-clipping notice no longer calls the system picker by the product's name.
 - A command that refuses because its range is too large reads "Selection is too large.", the desktop's own wording, and one the engine cannot carry out reads "Can’t complete this action." in every locale; Go To Special, Name Manager, Create PivotTable and Move PivotTable share these messages.
 - Spelling follows the desktop app: Ignore Once is the default button, so Return leaves the word as it is; Ignore UPPERCASE starts off; Undo Last steps back over any action, an Ignore included; Suggest is greyed while Always suggest is on; a repeated word offers Delete and Delete All, with Add available and AutoCorrect deleting the word as Delete does, and Delete removes only the word, keeping the spaces around it. A Japanese UI checks English. On the Mac the word appears in its label and an Add words to list follows the suggestions.

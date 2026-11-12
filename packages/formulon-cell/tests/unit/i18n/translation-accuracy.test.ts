@@ -26,9 +26,10 @@ describe('seven-language translation dictionary contract', () => {
     expect(ko.findReplace.comments).toBe('메모');
     expect(ko.findReplace.notes).toBe('노트');
     expect(ko.ribbon.newComment).toBe('새 노트');
-    expect(ko.ribbon.editComment).toBe('노트 편집');
-    expect(ko.contextMenu.insertComment).toBe('노트 편집…');
-    expect(ko.contextMenu.deleteComment).toBe('노트 삭제');
+    expect(ko.ribbon.editNote).toBe('노트 편집');
+    expect(ko.contextMenu.newNote).toBe('새 노트');
+    expect(ko.contextMenu.editNote).toBe('노트 편집');
+    expect(ko.contextMenu.deleteNote).toBe('노트 삭제');
     expect(ko.formatDialog.comment).toBe('노트');
   });
   const entries = Object.fromEntries(

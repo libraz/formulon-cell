@@ -257,7 +257,7 @@ export const ribbonKo: RibbonStrings = {
     replace: '바꾸기',
     gotoSpecial: '이동 옵션',
     newComment: '새 노트',
-    editComment: '노트 편집',
+    editNote: '노트 편집',
     proofing: '언어 교정',
     language: '언어',
     translate: '번역',

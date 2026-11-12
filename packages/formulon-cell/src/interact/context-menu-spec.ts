@@ -433,7 +433,7 @@ export function withTableInsertMenu(
   );
 }
 
-export function buildCellEntries(s: Strings): MenuEntry[] {
+export function buildCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
   const t = s.contextMenu;
   return [
     { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
@@ -451,9 +451,15 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'sep', id: 'sep3' },
     // New Comment before New Note, as the desktop Windows menu documents it; not measured here.
     { kind: 'item', id: 'newComment', label: t.newComment },
-    { kind: 'item', id: 'insertComment', label: t.insertComment, hint: '⇧F2' },
-    { kind: 'item', id: 'deleteComment', label: t.deleteComment },
-    { kind: 'item', id: 'showHideNote', label: t.showHideNote },
+    // A note cell swaps New Note for its note items, as on the Mac; the Windows menu is not
+    // measured here.
+    ...(hasNote
+      ? ([
+          { kind: 'item', id: 'insertComment', label: t.editNote, hint: '⇧F2' },
+          { kind: 'item', id: 'deleteComment', label: t.deleteNote },
+          { kind: 'item', id: 'showHideNote', label: t.showHideNote },
+        ] as const)
+      : ([{ kind: 'item', id: 'insertComment', label: t.newNote, hint: '⇧F2' }] as const)),
     { kind: 'sep', id: 'sep4' },
     { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
     { kind: 'item', id: 'pickFromList', label: t.pickFromList },

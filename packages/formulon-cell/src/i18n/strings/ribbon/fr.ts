@@ -258,7 +258,7 @@ export const ribbonFr: RibbonStrings = {
     replace: 'Remplacer',
     gotoSpecial: 'Atteindre spécial',
     newComment: 'Nouvelle note',
-    editComment: 'Modifier la note',
+    editNote: 'Modifier la note',
     proofing: 'Vérification',
     language: 'Langue',
     translate: 'Traduire',

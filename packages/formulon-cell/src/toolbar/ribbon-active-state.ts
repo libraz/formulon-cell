@@ -186,6 +186,8 @@ export const indexRibbonButtons = (host: HTMLElement): Map<string, HTMLButtonEle
 export interface RibbonActiveStateText {
   background?: string;
   sheetBackgroundClear?: string;
+  /** New Note's label while the active cell has a note, in the toolbar's language. */
+  editNote?: string;
 }
 
 const builtInLocaleForBackground = (label: string): Locale | undefined => {
@@ -464,6 +466,28 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
 };
 
 /** Projects the active state onto the ribbon buttons under `host`. */
+/** New Note reads Edit Note while the active cell has a note, as the desktop's does. */
+const projectNoteCommand = (
+  host: HTMLElement,
+  instance: SpreadsheetInstance,
+  editNote: string | undefined,
+): void => {
+  const state = instance.store.getState();
+  const hasNote = commentAt(state, state.selection.active) !== null;
+  for (const button of host.querySelectorAll<HTMLElement>(
+    '[data-ribbon-command="newCommentReview"]',
+  )) {
+    const labelEl = button.querySelector('span');
+    button.dataset.newNoteLabel ??= labelEl?.textContent ?? button.title;
+    const label = hasNote
+      ? editNote?.trim() || instance.i18n.strings.ribbon.editNote
+      : button.dataset.newNoteLabel;
+    if (labelEl) labelEl.textContent = label;
+    button.title = label;
+    button.setAttribute('aria-label', label);
+  }
+};
+
 export const projectRibbonActiveState = (
   host: HTMLElement,
   instance: SpreadsheetInstance | null,
@@ -496,6 +520,7 @@ export const projectRibbonActiveState = (
       }
     }
   }
+  projectNoteCommand(host, instance, text.editNote);
   projectTableDesign(host, instance);
   projectPivotDesign(host, instance);
   projectSparklineDesign(host, instance);

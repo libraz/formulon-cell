@@ -258,7 +258,7 @@ export const ribbonJa: RibbonStrings = {
     replace: '置換',
     gotoSpecial: 'セル選択',
     newComment: 'メモを挿入',
-    editComment: 'メモを編集',
+    editNote: 'メモを編集',
     proofing: '文章校正',
     language: '言語',
     translate: '翻訳',

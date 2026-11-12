@@ -255,7 +255,7 @@ export const ribbonZh: RibbonStrings = {
     replace: '替换',
     gotoSpecial: '定位条件',
     newComment: '新建备注',
-    editComment: '编辑备注',
+    editNote: '编辑备注',
     proofing: '校对',
     language: '语言',
     translate: '翻译',

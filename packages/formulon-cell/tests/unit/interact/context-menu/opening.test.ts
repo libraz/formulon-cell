@@ -117,7 +117,7 @@ describe('attachContextMenu', () => {
     );
 
   it('keeps the Excel-compatible cell menu item sequence', () => {
-    const ids = buildCellEntries(en)
+    const ids = buildCellEntries(en, true)
       .filter((entry) => entry.kind !== 'sep')
       .map((entry) => entry.id);
     expect(ids).toEqual([
@@ -145,6 +145,24 @@ describe('attachContextMenu', () => {
       'editPhonetic',
       'toggleWatch',
       'selectAll',
+    ]);
+  });
+
+  // Windows-unmeasured: a cell without a note offers New Note alone, one with a note its three
+  // note items, as the Mac menu does.
+  it('offers New Note on a plain cell and Edit, Delete and Show/Hide Note on a note cell', () => {
+    const notes = (hasNote: boolean) =>
+      buildCellEntries(en, hasNote).flatMap((entry) =>
+        entry.kind === 'item' &&
+        ['insertComment', 'deleteComment', 'showHideNote'].includes(entry.id)
+          ? [entry.label]
+          : [],
+      );
+    expect(notes(false)).toEqual([en.contextMenu.newNote]);
+    expect(notes(true)).toEqual([
+      en.contextMenu.editNote,
+      en.contextMenu.deleteNote,
+      en.contextMenu.showHideNote,
     ]);
   });
 

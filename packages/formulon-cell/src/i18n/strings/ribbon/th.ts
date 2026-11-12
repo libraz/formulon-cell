@@ -255,7 +255,7 @@ export const ribbonTh: RibbonStrings = {
     replace: 'แทนที่',
     gotoSpecial: 'ไปที่แบบพิเศษ',
     newComment: 'บันทึกย่อใหม่',
-    editComment: 'แก้ไขบันทึกย่อ',
+    editNote: 'แก้ไขบันทึกย่อ',
     proofing: 'การพิสูจน์อักษร',
     language: 'ภาษา',
     translate: 'แปล',
