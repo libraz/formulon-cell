@@ -12,7 +12,7 @@ import {
   workbookObjectName,
   workbookObjectsByKind,
 } from '../../../src/engine/passthrough-sync.js';
-import { PivotAxis, PivotFilterType, PivotFilterValueKind } from '../../../src/engine/types.js';
+import { PivotAxis, PivotFilterKind } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
 const wb = (paths: readonly string[]) =>
@@ -36,9 +36,8 @@ const wbWithPivots = () =>
           {
             axis: PivotAxis.Page,
             fieldName: 'Sales',
-            type: PivotFilterType.ValueGreaterThan,
-            valueKind: PivotFilterValueKind.Double,
-            valueDouble: 10,
+            kind: PivotFilterKind.ValueGreaterThan,
+            value: 10,
           },
         ],
       },
@@ -151,9 +150,8 @@ describe('passthrough workbook objects', () => {
       {
         axis: PivotAxis.Page,
         fieldName: 'Sales',
-        type: PivotFilterType.ValueGreaterThan,
-        valueKind: PivotFilterValueKind.Double,
-        valueDouble: 10,
+        kind: PivotFilterKind.ValueGreaterThan,
+        value: 10,
       },
     ]);
   });

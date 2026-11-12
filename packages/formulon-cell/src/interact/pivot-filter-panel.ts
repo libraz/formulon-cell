@@ -7,7 +7,7 @@ import {
   setPivotFieldItemsChecked,
 } from '../commands/pivot-filter.js';
 import { pivotStyleLayer } from '../engine/pivot-style.js';
-import { type Addr, PivotAxis, PivotSortOrder } from '../engine/types.js';
+import { type Addr, PivotAxis, PivotFilterKind, PivotSortOrder } from '../engine/types.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
@@ -19,8 +19,8 @@ import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
 import {
-  type PivotFilterConditionKind,
   pivotFilterConditionToSpec,
+  pivotFilterInputFor,
   pivotFilterSpecToCondition,
   showPivotFilterDialog,
 } from './pivot-field-settings.js';
@@ -45,20 +45,17 @@ type ConditionKey = keyof PanelStrings['conditions'];
 
 /** The desktop's label and value filter lists; null marks a separator. Entries
  *  the engine can express name their condition kind. */
-const LABEL_CONDITIONS: readonly (
-  | readonly [ConditionKey, PivotFilterConditionKind | null]
-  | null
-)[] = [
+const LABEL_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind | null] | null)[] = [
   null,
   ['equals', null],
   ['notEquals', null],
   null,
-  ['beginsWith', 'label-begins-with'],
+  ['beginsWith', PivotFilterKind.LabelBeginsWith],
   ['notBeginsWith', null],
   ['endsWith', null],
   ['notEndsWith', null],
   null,
-  ['contains', 'label-contains'],
+  ['contains', PivotFilterKind.LabelContains],
   ['notContains', null],
   null,
   ['greater', null],
@@ -68,22 +65,19 @@ const LABEL_CONDITIONS: readonly (
   null,
   ['between', null],
 ];
-const VALUE_CONDITIONS: readonly (
-  | readonly [ConditionKey, PivotFilterConditionKind | null]
-  | null
-)[] = [
+const VALUE_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind | null] | null)[] = [
   null,
   ['equals', null],
   ['notEquals', null],
   null,
-  ['greater', 'value-greater-than'],
+  ['greater', PivotFilterKind.ValueGreaterThan],
   ['greaterOrEqual', null],
   ['less', null],
   ['lessOrEqual', null],
   null,
-  ['between', 'value-between'],
+  ['between', PivotFilterKind.ValueBetween],
   null,
-  ['top10', 'value-top-10'],
+  ['top10', PivotFilterKind.ValueTopCount],
   ['bottom10', null],
 ];
 
@@ -126,6 +120,7 @@ export function openPivotFieldFilter(
     pivotFieldFilterModel(wb, sheet, pivotIndex, fieldIndex);
   let model = read();
   if (!model) return false;
+  const input = pivotFilterInputFor(wb);
 
   const panel = doc.createElement('div');
   panel.className = 'fc-pivot-filter-panel';
@@ -213,18 +208,19 @@ export function openPivotFieldFilter(
         option.value = '';
         option.textContent = t.chooseOne;
       } else {
-        option.value = entry[1] ?? `unsupported:${entry[0]}`;
+        option.value = entry[1] === null ? `unsupported:${entry[0]}` : String(entry[1]);
         option.textContent = t.conditions[entry[0]];
         projectDisabledState(option, entry[1] === null, null);
       }
       s.appendChild(option);
     }
     s.addEventListener('change', () => {
-      const kind = s.value as PivotFilterConditionKind;
+      const picked = s.value;
       s.value = '';
       selectHandles.get(s)?.sync();
-      if (!kind || !model) return;
-      const current = pivotFilterSpecToCondition(model.condition ?? undefined);
+      if (!picked || !model) return;
+      const kind = Number(picked) as PivotFilterKind;
+      const current = pivotFilterSpecToCondition(model.condition ?? undefined, input);
       void showPivotFilterDialog({
         host: ctx.host,
         strings: strings.pivotTableDialog,
@@ -238,6 +234,7 @@ export function openPivotFieldFilter(
           model.sourceName,
           condition,
           model.axis ?? PivotAxis.Row,
+          input,
         );
         if (spec) commit(() => setPivotFieldCondition(wb, sheet, pivotIndex, fieldIndex, spec));
       });

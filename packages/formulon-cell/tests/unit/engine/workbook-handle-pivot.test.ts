@@ -6,8 +6,7 @@ import {
   PivotAxis,
   PivotCalendar,
   PivotDateGrouping,
-  PivotFilterType,
-  PivotFilterValueKind,
+  PivotFilterKind,
   PivotReportLayout,
   PivotSortOrder,
   ValueKind,
@@ -252,16 +251,23 @@ describe('WorkbookHandle PivotTable projection', () => {
         listFilters: () => [
           {
             fieldIndex: 0,
-            kind: PivotFilterType.LabelContains,
+            kind: PivotFilterKind.LabelContains,
             dataFieldIndex: 0,
             value: 'East',
             valueHigh: null,
           },
           {
             fieldIndex: 1,
-            kind: PivotFilterType.LabelDate,
+            kind: PivotFilterKind.DateBetween,
             dataFieldIndex: 0,
-            value: '2026-05-01',
+            value: 46143,
+            valueHigh: 46173,
+          },
+          {
+            fieldIndex: 1,
+            kind: PivotFilterKind.ThisMonth,
+            dataFieldIndex: 0,
+            value: null,
             valueHigh: null,
           },
         ],
@@ -272,17 +278,17 @@ describe('WorkbookHandle PivotTable projection', () => {
       {
         axis: PivotAxis.Page,
         fieldName: 'Region',
-        type: PivotFilterType.LabelContains,
-        valueKind: PivotFilterValueKind.Text,
-        valueText: 'East',
+        kind: PivotFilterKind.LabelContains,
+        value: 'East',
       },
       {
         axis: PivotAxis.Page,
         fieldName: 'Date',
-        type: PivotFilterType.LabelDate,
-        valueKind: PivotFilterValueKind.Text,
-        valueText: '2026-05-01',
+        kind: PivotFilterKind.DateBetween,
+        value: 46143,
+        valueHigh: 46173,
       },
+      { axis: PivotAxis.Page, fieldName: 'Date', kind: PivotFilterKind.ThisMonth },
     ]);
   });
 

@@ -6,8 +6,7 @@ import {
   PivotAggregation,
   PivotAxis,
   type PivotDataFieldSpec,
-  PivotFilterType,
-  PivotFilterValueKind,
+  PivotFilterKind,
   PivotReportLayout,
 } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -180,16 +179,15 @@ const wbWithObjects = () => {
       calls.push(`clear-filters:${sheet}:${pivot}`);
       return true;
     },
+    calcSettings: () => null,
     addPivotFilter: (
       sheet: number,
       pivot: number,
       spec: {
         fieldName: string;
-        type: number;
-        valueText?: string;
-        valueDouble?: number;
-        valueHighDouble?: number;
-        valueInt?: number;
+        kind: number;
+        value?: number | string | null;
+        valueHigh?: number | string | null;
       },
     ) => {
       calls.push(
@@ -198,11 +196,9 @@ const wbWithObjects = () => {
           String(sheet),
           String(pivot),
           spec.fieldName,
-          String(spec.type),
-          spec.valueText ?? '',
-          spec.valueDouble === undefined ? '' : String(spec.valueDouble),
-          spec.valueHighDouble === undefined ? '' : String(spec.valueHighDouble),
-          spec.valueInt === undefined ? '' : String(spec.valueInt),
+          String(spec.kind),
+          String(spec.value ?? ''),
+          String(spec.valueHigh ?? ''),
         ].join(':'),
       );
       return true;
@@ -936,7 +932,7 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(category.textContent).toContain('Value Filters');
     category.value = 'label';
     category.dispatchEvent(new Event('change', { bubbles: true }));
-    condition.value = 'label-contains';
+    condition.value = String(PivotFilterKind.LabelContains);
     condition.dispatchEvent(new Event('change', { bubbles: true }));
     const value = form.querySelector<HTMLInputElement>(
       '.fc-objects__pivot-filter-condition-values input',
@@ -982,7 +978,7 @@ describe('attachWorkbookObjectsPanel', () => {
     const condition = dialog?.querySelector<HTMLSelectElement>(
       'select[data-pivot-filter-condition="true"]',
     );
-    expect(condition?.value).toBe('none');
+    expect(condition?.value).toBe('');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
     await Promise.resolve();
     expect(document.body.textContent).not.toContain('PivotTable Filter: Region');
@@ -1009,11 +1005,9 @@ describe('attachWorkbookObjectsPanel', () => {
           {
             axis: PivotAxis.Page,
             fieldName: 'Sales',
-            type: PivotFilterType.ValueBetween,
-            valueKind: PivotFilterValueKind.Double,
-            valueDouble: -10,
-            valueHighKind: PivotFilterValueKind.Double,
-            valueHighDouble: 20,
+            kind: PivotFilterKind.ValueBetween,
+            value: -10,
+            valueHigh: 20,
           },
         ],
       },
@@ -1041,7 +1035,7 @@ describe('attachWorkbookObjectsPanel', () => {
     const values = Array.from(valueContainer?.querySelectorAll<HTMLInputElement>('input') ?? []);
     expect(axis?.value).toBe(String(PivotAxis.Page));
     expect(category?.value).toBe('value');
-    expect(condition?.value).toBe('value-between');
+    expect(condition?.value).toBe(String(PivotFilterKind.ValueBetween));
     expect(values.map((input) => input.value)).toEqual(['-10', '20']);
     handle.detach();
   });

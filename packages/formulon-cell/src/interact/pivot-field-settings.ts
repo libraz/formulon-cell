@@ -1,15 +1,22 @@
+import {
+  inputLocaleForWorkbook,
+  parseLocalizedNumericInput,
+  workbookDate1904,
+} from '../commands/coerce-input.js';
+import { parseDateTimeInput } from '../commands/input-grammar.js';
 import type { PivotSourceField } from '../commands/pivot-table.js';
 import {
   PIVOT_SHOW_AS_BASE_NEXT,
   PIVOT_SHOW_AS_BASE_PREVIOUS,
   type PivotAggregation,
   PivotAxis,
+  PivotFilterKind,
   type PivotFilterSpec,
-  PivotFilterType,
-  PivotFilterValueKind,
   PivotShowValuesAs,
   type PivotShowValuesAs as PivotShowValuesAsValue,
 } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { excelSerialToIsoDate } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import {
@@ -19,6 +26,11 @@ import {
   createDialogShell,
   deferInitialFocus,
 } from './dialog-shell.js';
+import {
+  type PivotFilterCategory,
+  pivotFilterCategory,
+  pivotFilterOperand,
+} from './pivot-filter-kinds.js';
 
 export type PivotAreaKind = 'filters' | 'columns' | 'rows' | 'values';
 
@@ -100,33 +112,29 @@ export const createPivotAreaSettingsButton = (
   return button;
 };
 
-/** Legacy unsupported kinds remain accepted as input for compatibility;
- * conversion returns null and the dialog only offers formulon 0.12 kinds. */
-export type PivotFilterConditionKind =
-  | 'none'
-  | 'label-equals'
-  | 'label-does-not-equal'
-  | 'label-contains'
-  | 'label-does-not-contain'
-  | 'label-begins-with'
-  | 'label-ends-with'
-  | 'label-date'
-  | 'date-before'
-  | 'date-after'
-  | 'date-between'
-  | 'value-less-than'
-  | 'value-equals'
-  | 'value-greater-than'
-  | 'value-between'
-  | 'value-not-between'
-  | 'value-top-10';
-
-export type PivotFilterConditionCategory = 'label' | 'value' | 'date';
-
+/** The filter a settings or filter dialog edits: an engine filter kind, null for none, and its
+ *  operand as typed; a range kind keeps both bounds as `low..high`. */
 export interface PivotFilterConditionState {
-  kind: PivotFilterConditionKind;
+  kind: PivotFilterKind | null;
   value: string;
 }
+
+/** How typed operands read: the workbook's input locale and date system. */
+export interface PivotFilterInputContext {
+  locale?: string;
+  date1904?: boolean;
+}
+
+/** True when `condition` sets no filter: no kind, or a kind that takes an operand with none typed. */
+export const isEmptyPivotFilterCondition = (condition: PivotFilterConditionState): boolean =>
+  condition.kind === null ||
+  (pivotFilterOperand(condition.kind) !== 'none' && condition.value.trim() === '');
+
+/** The operand reading of `wb`. */
+export const pivotFilterInputFor = (wb: WorkbookHandle): PivotFilterInputContext => ({
+  locale: inputLocaleForWorkbook(wb),
+  date1904: workbookDate1904(wb),
+});
 
 interface PivotFieldSettingsControls {
   rowSelect: HTMLSelectElement;
@@ -222,62 +230,36 @@ export const splitFilterConditionRange = (value: string): [string, string] => {
   return [parts[0]?.trim() ?? '', parts[1]?.trim() ?? ''];
 };
 
-export const categoryForFilterCondition = (
-  kind: PivotFilterConditionKind,
-): PivotFilterConditionCategory => {
-  if (
-    kind === 'label-date' ||
-    kind === 'date-before' ||
-    kind === 'date-after' ||
-    kind === 'date-between'
-  )
-    return 'date';
-  if (
-    kind === 'value-greater-than' ||
-    kind === 'value-less-than' ||
-    kind === 'value-equals' ||
-    kind === 'value-between' ||
-    kind === 'value-not-between' ||
-    kind === 'value-top-10'
-  ) {
-    return 'value';
-  }
-  return 'label';
+/** The kinds each Field Settings filter menu offers, in menu order. */
+const CONDITION_OPTIONS: Record<
+  PivotFilterCategory,
+  readonly [PivotFilterKind, keyof Strings['pivotTableDialog']][]
+> = {
+  label: [
+    [PivotFilterKind.LabelContains, 'filterConditionLabelContains'],
+    [PivotFilterKind.LabelBeginsWith, 'filterConditionLabelBeginsWith'],
+  ],
+  date: [[PivotFilterKind.DateBetween, 'filterConditionDateBetween']],
+  value: [
+    [PivotFilterKind.ValueGreaterThan, 'filterConditionValueGreaterThan'],
+    [PivotFilterKind.ValueBetween, 'filterConditionValueBetween'],
+    [PivotFilterKind.ValueTopCount, 'filterConditionValueTop10'],
+  ],
 };
 
 export const appendFilterConditionOptions = (
   select: HTMLSelectElement,
-  category: PivotFilterConditionCategory,
+  category: PivotFilterCategory,
   strings: Strings['pivotTableDialog'],
 ): void => {
   select.replaceChildren();
-  const options: Array<{ value: PivotFilterConditionKind; label: string }> = [
-    { value: 'none', label: strings.filterConditionNone },
-  ];
-  if (category === 'label') {
-    options.push(
-      { value: 'label-contains', label: strings.filterConditionLabelContains },
-      { value: 'label-begins-with', label: strings.filterConditionLabelBeginsWith },
-    );
-  } else if (category === 'date') {
-    options.push({ value: 'label-date', label: strings.filterConditionLabelDate });
-  } else {
-    options.push(
-      { value: 'value-greater-than', label: strings.filterConditionValueGreaterThan },
-      { value: 'value-between', label: strings.filterConditionValueBetween },
-      { value: 'value-top-10', label: strings.filterConditionValueTop10 },
-    );
-  }
-  appendDialogSelectOptions(select, options);
-};
-
-const parseFilterNumberRange = (value: string): [number, number] | null => {
-  const [lowText, highText] = splitFilterConditionRange(value);
-  if (!lowText || !highText) return null;
-  const low = Number(lowText);
-  const high = Number(highText);
-  if (!Number.isFinite(low) || !Number.isFinite(high)) return null;
-  return [low, high];
+  appendDialogSelectOptions(select, [
+    { value: '', label: strings.filterConditionNone },
+    ...CONDITION_OPTIONS[category].map(([kind, key]) => ({
+      value: String(kind),
+      label: strings[key],
+    })),
+  ]);
 };
 
 const splitFilterDateRange = (value: string): [string, string] => {
@@ -285,109 +267,75 @@ const splitFilterDateRange = (value: string): [string, string] => {
   return [parts[0]?.trim() ?? '', parts[1]?.trim() ?? ''];
 };
 
+/** One typed operand in the engine's form; null when it does not read as `operand` asks. */
+const readOperand = (
+  text: string,
+  operand: 'text' | 'number' | 'date',
+  input: PivotFilterInputContext,
+): number | string | null => {
+  if (operand === 'text') return text === '' ? null : text;
+  if (operand === 'number') return parseLocalizedNumericInput(text, input.locale);
+  return parseDateTimeInput(text, input.locale, input.date1904 === true)?.value ?? null;
+};
+
 export const pivotFilterConditionToSpec = (
   fieldName: string,
   condition: PivotFilterConditionState | undefined,
   axis: PivotAxis = PivotAxis.Page,
+  input: PivotFilterInputContext = {},
 ): PivotFilterSpec | null => {
-  if (!condition || condition.kind === 'none') return null;
-  const valueText = condition.value.trim();
-  if (!valueText) return null;
-  if (condition.kind === 'label-contains' || condition.kind === 'label-begins-with') {
-    const typeByKind: Record<'label-contains' | 'label-begins-with', PivotFilterType> = {
-      'label-contains': PivotFilterType.LabelContains,
-      'label-begins-with': PivotFilterType.LabelBeginsWith,
-    };
+  if (!condition || condition.kind === null) return null;
+  const { kind } = condition;
+  const text = condition.value.trim();
+  const operand = pivotFilterOperand(kind);
+  if (operand === 'none') return { axis, fieldName, kind };
+  if (operand === 'count') {
+    const count = Number(text);
     return {
       axis,
       fieldName,
-      type: typeByKind[condition.kind],
-      valueKind: PivotFilterValueKind.Text,
-      valueText,
+      kind,
+      value: Number.isFinite(count) && count > 0 ? Math.floor(count) : 10,
     };
   }
-  if (condition.kind === 'label-date') {
-    return {
-      axis,
-      fieldName,
-      type: PivotFilterType.LabelDate,
-      valueKind: PivotFilterValueKind.Text,
-      valueText,
-    };
+  if (operand === 'textRange' || operand === 'numberRange' || operand === 'dateRange') {
+    const single = operand === 'textRange' ? 'text' : operand === 'numberRange' ? 'number' : 'date';
+    const [lowText, highText] =
+      single === 'number' ? splitFilterConditionRange(text) : splitFilterDateRange(text);
+    const value = readOperand(lowText, single, input);
+    const valueHigh = readOperand(highText, single, input);
+    if (value === null || valueHigh === null) return null;
+    return { axis, fieldName, kind, value, valueHigh };
   }
-  if (condition.kind === 'value-between') {
-    const range = parseFilterNumberRange(valueText);
-    if (!range) return null;
-    return {
-      axis,
-      fieldName,
-      type: PivotFilterType.ValueBetween,
-      valueKind: PivotFilterValueKind.Double,
-      valueDouble: range[0],
-      valueHighKind: PivotFilterValueKind.Double,
-      valueHighDouble: range[1],
-    };
-  }
-  if (condition.kind === 'value-top-10') {
-    const count = Number(valueText);
-    return {
-      axis,
-      fieldName,
-      type: PivotFilterType.ValueTop10,
-      valueKind: PivotFilterValueKind.Int,
-      valueInt: Number.isFinite(count) && count > 0 ? Math.floor(count) : 10,
-    };
-  }
-  const value = Number(valueText);
-  if (!Number.isFinite(value)) return null;
-  if (condition.kind !== 'value-greater-than') return null;
-  return {
-    axis,
-    fieldName,
-    type: PivotFilterType.ValueGreaterThan,
-    valueKind: PivotFilterValueKind.Double,
-    valueDouble: value,
-  };
+  const value = readOperand(text, operand, input);
+  return value === null ? null : { axis, fieldName, kind, value };
 };
+
+/** One engine operand as the text a dialog shows. */
+const operandText = (
+  value: number | string | null | undefined,
+  date: boolean,
+  date1904: boolean,
+) =>
+  value === null || value === undefined
+    ? ''
+    : typeof value === 'number' && date
+      ? (excelSerialToIsoDate(value, date1904) ?? String(value))
+      : String(value);
 
 export const pivotFilterSpecToCondition = (
   spec: PivotFilterSpec | undefined,
+  input: PivotFilterInputContext = {},
 ): PivotFilterConditionState | null => {
   if (!spec) return null;
-  if (spec.type === PivotFilterType.LabelContains && spec.valueText) {
-    return { kind: 'label-contains', value: spec.valueText };
+  const operand = pivotFilterOperand(spec.kind);
+  const date = operand === 'date' || operand === 'dateRange';
+  const date1904 = input.date1904 === true;
+  const low = operandText(spec.value, date, date1904);
+  if (operand === 'textRange' || operand === 'numberRange' || operand === 'dateRange') {
+    return { kind: spec.kind, value: `${low}..${operandText(spec.valueHigh, date, date1904)}` };
   }
-  if (spec.type === PivotFilterType.LabelBeginsWith && spec.valueText) {
-    return { kind: 'label-begins-with', value: spec.valueText };
-  }
-  if (spec.type === PivotFilterType.LabelDate && spec.valueText) {
-    return { kind: 'label-date', value: spec.valueText };
-  }
-  if (spec.type === PivotFilterType.ValueBetween) {
-    if (
-      typeof spec.valueDouble !== 'number' ||
-      typeof spec.valueHighDouble !== 'number' ||
-      !Number.isFinite(spec.valueDouble) ||
-      !Number.isFinite(spec.valueHighDouble)
-    )
-      return null;
-    return {
-      kind: 'value-between',
-      value: `${spec.valueDouble}..${spec.valueHighDouble}`,
-    };
-  }
-  if (spec.type === PivotFilterType.ValueTop10) {
-    const value =
-      typeof spec.valueInt === 'number' && Number.isFinite(spec.valueInt) && spec.valueInt > 0
-        ? spec.valueInt
-        : 10;
-    return { kind: 'value-top-10', value: String(value) };
-  }
-  if (spec.type === PivotFilterType.ValueGreaterThan) {
-    if (typeof spec.valueDouble !== 'number' || !Number.isFinite(spec.valueDouble)) return null;
-    return { kind: 'value-greater-than', value: String(spec.valueDouble) };
-  }
-  return null;
+  return { kind: spec.kind, value: low };
 };
 
 export interface PivotFilterConditionControlsOptions {
@@ -420,7 +368,7 @@ export const createPivotFilterConditionControls = (
   options: PivotFilterConditionControlsOptions,
 ): HTMLElement[] => {
   const { strings: t } = options;
-  const condition = options.condition ?? { kind: 'none', value: '' };
+  const condition = options.condition ?? { kind: null, value: '' };
   let currentValue = condition.value;
   const conditionCategory = createDialogSelect(
     [
@@ -428,49 +376,47 @@ export const createPivotFilterConditionControls = (
       { value: 'value', label: t.filterConditionCategoryValue },
       { value: 'date', label: t.filterConditionCategoryDate },
     ],
-    categoryForFilterCondition(condition.kind),
+    condition.kind === null ? 'label' : pivotFilterCategory(condition.kind),
     { className: options.selectClassName },
   );
   applyDataset(conditionCategory, options.categoryDataset);
 
   const conditionSelect = createDialogSelect([], '', { className: options.selectClassName });
   applyDataset(conditionSelect, options.conditionDataset);
-  appendFilterConditionOptions(
-    conditionSelect,
-    conditionCategory.value as PivotFilterConditionCategory,
-    t,
-  );
-  conditionSelect.value = condition.kind;
-  if (conditionSelect.value !== condition.kind) conditionSelect.value = 'none';
+  appendFilterConditionOptions(conditionSelect, conditionCategory.value as PivotFilterCategory, t);
+  const initialKind = condition.kind === null ? '' : String(condition.kind);
+  conditionSelect.value = initialKind;
+  if (conditionSelect.value !== initialKind) conditionSelect.value = '';
+  const selectedKind = (): PivotFilterKind | null =>
+    conditionSelect.value === '' ? null : (Number(conditionSelect.value) as PivotFilterKind);
   const conditionValueControls = document.createElement('div');
   conditionValueControls.className = options.valuesContainerClassName;
   const syncCondition = (value: string): void => {
     currentValue = value;
-    options.onChange({
-      kind: conditionSelect.value as PivotFilterConditionKind,
-      value,
-    });
+    options.onChange({ kind: selectedKind(), value });
   };
   const renderConditionValueControls = (): void => {
     conditionValueControls.replaceChildren();
-    const kind = conditionSelect.value as PivotFilterConditionKind;
-    if (kind === 'none') {
+    const kind = selectedKind();
+    const operand = kind === null ? 'none' : pivotFilterOperand(kind);
+    if (operand === 'none') {
       syncCondition('');
       return;
     }
-    if (kind === 'value-between' || kind === 'value-not-between' || kind === 'date-between') {
+    if (operand === 'textRange' || operand === 'numberRange' || operand === 'dateRange') {
       const [lowValue, highValue] =
-        kind === 'date-between'
-          ? splitFilterDateRange(currentValue)
-          : splitFilterConditionRange(currentValue);
-      const low = document.createElement('input');
-      low.type = kind === 'date-between' ? 'date' : 'number';
-      low.className = options.valueClassName;
-      low.value = lowValue;
-      const high = document.createElement('input');
-      high.type = kind === 'date-between' ? 'date' : 'number';
-      high.className = options.valueClassName;
-      high.value = highValue;
+        operand === 'numberRange'
+          ? splitFilterConditionRange(currentValue)
+          : splitFilterDateRange(currentValue);
+      const bound = (text: string): HTMLInputElement => {
+        const input = document.createElement('input');
+        input.type = operand === 'numberRange' ? 'number' : 'text';
+        input.className = options.valueClassName;
+        input.value = text;
+        return input;
+      };
+      const low = bound(lowValue);
+      const high = bound(highValue);
       const syncRange = (): void => syncCondition(`${low.value}..${high.value}`);
       const syncRangeFromUser = (): void => {
         options.onUserChange?.();
@@ -488,21 +434,19 @@ export const createPivotFilterConditionControls = (
     const value = document.createElement('input');
     value.className = options.valueClassName;
     value.value = currentValue;
-    if (kind === 'label-date' || kind === 'date-before' || kind === 'date-after') {
-      value.type = 'date';
-      value.placeholder = 'yyyy-mm-dd';
-    } else if (kind === 'value-greater-than') {
+    if (operand === 'number') {
       value.type = 'number';
       value.placeholder = t.filterConditionNumberPlaceholder;
-    } else if (kind === 'value-top-10') {
+    } else if (operand === 'count') {
       value.type = 'number';
       value.min = '1';
       value.step = '1';
       value.value = currentValue || '10';
       value.placeholder = t.filterConditionTopCountPlaceholder;
     } else {
+      // Dates are typed as text and read through the locale's date grammar, as cells read them.
       value.type = 'text';
-      value.placeholder = t.filterConditionTextPlaceholder;
+      value.placeholder = operand === 'text' ? t.filterConditionTextPlaceholder : '';
     }
     value.addEventListener('input', () => {
       options.onUserChange?.();
@@ -515,10 +459,10 @@ export const createPivotFilterConditionControls = (
     options.onUserChange?.();
     appendFilterConditionOptions(
       conditionSelect,
-      conditionCategory.value as PivotFilterConditionCategory,
+      conditionCategory.value as PivotFilterCategory,
       t,
     );
-    conditionSelect.value = 'none';
+    conditionSelect.value = '';
     renderConditionValueControls();
   });
   conditionSelect.addEventListener('change', () => {
@@ -538,7 +482,7 @@ export const showPivotFilterDialog = (
 ): Promise<PivotFilterConditionState | null> =>
   new Promise<PivotFilterConditionState | null>((resolve) => {
     const title = options.strings.filterDialogTitle.replace('{field}', options.fieldName);
-    let draft: PivotFilterConditionState = options.condition ?? { kind: 'none', value: '' };
+    let draft: PivotFilterConditionState = options.condition ?? { kind: null, value: '' };
     let done = false;
     const finish = (result: PivotFilterConditionState | null): void => {
       if (done) return;

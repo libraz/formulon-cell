@@ -4,7 +4,7 @@ import { applyPivotEdit } from '../commands/pivot-edit.js';
 import { PivotAxis, PivotReportLayout } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import type { PivotAreaKind } from './pivot-field-settings.js';
+import { type PivotAreaKind, pivotFilterInputFor } from './pivot-field-settings.js';
 import {
   type PivotNumberFormatPicker,
   showPivotFieldSettingsDialog,
@@ -96,7 +96,7 @@ export function renderPivotFieldListPane(
   root.setAttribute('aria-label', t.pivotFieldList);
   const editorModel = readPivotEditorModel(wb, pivot);
   const { definition } = editorModel;
-  const filterConditions = pivotEditorFilterConditions(editorModel);
+  const filterConditions = pivotEditorFilterConditions(editorModel, pivotFilterInputFor(wb));
   const error = document.createElement('div');
   error.className = 'fc-objects__error';
   error.setAttribute('role', 'alert');

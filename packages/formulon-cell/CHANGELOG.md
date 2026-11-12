@@ -99,6 +99,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- PivotTable filters of every kind the file holds stay through an edit of the report, and a PivotTable date filter reads its typed dates in the workbook's locale, as cell entry does.
 - Double-clicking Format Painter keeps it on for repeated pastes until the button is clicked again.
 - A link or note removed through the workbook API (`sheet.removeHyperlink`, `sheet.clearHyperlinks`, `sheet.setComment(at, null)`) leaves the grid too; a note hidden that way stops showing. When the engine cannot list a sheet's links, re-reading the sheet keeps the links the grid holds.
 - Refusal reasons the ribbon, context menu and validation alerts show are in the UI language; the API's `reason` stays English with its `code`, and a host's own reason shows as given. A disabled control keeps its own title.

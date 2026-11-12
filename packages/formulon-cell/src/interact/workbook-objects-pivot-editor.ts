@@ -15,8 +15,11 @@ import type { Strings } from '../i18n/strings.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import {
   createPivotFilterConditionControls,
+  isEmptyPivotFilterCondition,
   type PivotFilterConditionState,
+  type PivotFilterInputContext,
   pivotFilterConditionToSpec,
+  pivotFilterInputFor,
   pivotFilterSpecToCondition,
   showPivotFilterDialog,
 } from './pivot-field-settings.js';
@@ -200,7 +203,7 @@ const aggregationOptionsOf = (t: Strings['workbookObjects']) => [
 /** Builds the settings controls of one field. `onFilterDialogClosed` runs after
  *  the filter dialog returns a condition. */
 export function createPivotFieldEditor(
-  ctx: { host: HTMLElement; strings: Strings },
+  ctx: { host: HTMLElement; strings: Strings; wb: WorkbookHandle },
   model: PivotEditorField,
   initialCondition: PivotFilterConditionState | undefined,
   onFilterDialogClosed: () => void,
@@ -229,7 +232,7 @@ export function createPivotFieldEditor(
   filterItems.dataset.pivotFilterItemsFieldIndex = String(index);
   const items = model.items;
   const syncFilterCondition = (condition: PivotFilterConditionState): void => {
-    filterCondition = condition.kind === 'none' || !condition.value.trim() ? undefined : condition;
+    filterCondition = isEmptyPivotFilterCondition(condition) ? undefined : condition;
   };
   const filterConditionControls = createPivotFilterConditionControls({
     strings: strings.pivotTableDialog,
@@ -392,19 +395,26 @@ export function createPivotFieldEditor(
       subtotalMode.value === 'custom' &&
       selectedSubtotalFns().length === 0,
     filterDirty: () => filterConditionDirty,
-    filterSpec: () => pivotFilterConditionToSpec(model.sourceName, filterCondition),
+    filterSpec: () =>
+      pivotFilterConditionToSpec(
+        model.sourceName,
+        filterCondition,
+        PivotAxis.Page,
+        pivotFilterInputFor(ctx.wb),
+      ),
   };
 }
 
 /** Initial filter condition per field index, from the pivot's listed filters. */
 export function pivotEditorFilterConditions(
   model: PivotEditorModel,
+  input: PivotFilterInputContext,
 ): Map<number, PivotFilterConditionState> {
   const conditions = new Map<number, PivotFilterConditionState>();
   for (const spec of model.pivotFilters) {
     const fieldIndex = model.fields.find((field) => field.sourceName === spec.fieldName)?.index;
     if (fieldIndex === undefined || conditions.has(fieldIndex)) continue;
-    const condition = pivotFilterSpecToCondition(spec);
+    const condition = pivotFilterSpecToCondition(spec, input);
     if (condition) conditions.set(fieldIndex, condition);
   }
   return conditions;
@@ -483,7 +493,7 @@ export function renderPivotEditForm(
     { value: String(PivotAxis.Value), label: t.pivotAreaValues },
     { value: AXIS_NONE, label: t.pivotAreaNone },
   ];
-  const filterConditions = pivotEditorFilterConditions(editorModel);
+  const filterConditions = pivotEditorFilterConditions(editorModel, pivotFilterInputFor(ctx.wb));
   const editors: { editor: PivotFieldEditor; axisSelect: HTMLSelectElement }[] = [];
   for (const model of editorModel.fields) {
     const { index } = model;

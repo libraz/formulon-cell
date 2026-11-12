@@ -5,8 +5,7 @@ import { createPivotTableFromRange, deletePivotTables } from '../../../src/comma
 import {
   PivotAggregation,
   PivotAxis,
-  PivotFilterType,
-  PivotFilterValueKind,
+  PivotFilterKind,
   PivotReportLayout,
 } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -118,9 +117,8 @@ describe('pivot field removal', () => {
     wb.addPivotFilter(SHEET, 0, {
       axis: PivotAxis.Page,
       fieldName: 'Product',
-      type: PivotFilterType.LabelContains,
-      valueKind: PivotFilterValueKind.Text,
-      valueText: 'De',
+      kind: PivotFilterKind.LabelContains,
+      value: 'De',
     });
     const ok = applyPivotEdit(
       wb,
@@ -177,9 +175,8 @@ describe('pivot field removal', () => {
     wb.addPivotFilter(SHEET, 0, {
       axis: PivotAxis.Page,
       fieldName: 'Product',
-      type: PivotFilterType.LabelContains,
-      valueKind: PivotFilterValueKind.Text,
-      valueText: 'De',
+      kind: PivotFilterKind.LabelContains,
+      value: 'De',
     });
     applyPivotEdit(
       wb,

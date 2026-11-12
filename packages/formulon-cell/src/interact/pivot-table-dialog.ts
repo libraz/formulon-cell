@@ -28,6 +28,7 @@ import {
   createDialogShell,
 } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
+import { pivotFilterInputFor } from './pivot-field-settings.js';
 import { createPivotFieldAreas } from './pivot-table-field-areas.js';
 import { renderPivotFieldList } from './pivot-table-field-list.js';
 import { createRangePickFormatter } from './range-pick-format.js';
@@ -510,6 +511,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     const { filterItems, pivotFilters, valueFieldSettings } = areas.toCreateSpec({
       aggregation,
       numberFormat: numberFormatInput.value,
+      filterInput: pivotFilterInputFor(wb),
     });
     return createPivotTableAtPlacement(
       { store, workbook: wb, history: deps.history, ...dialogEntry },

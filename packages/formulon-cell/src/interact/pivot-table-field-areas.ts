@@ -1,11 +1,13 @@
 import type { PivotSourceField } from '../commands/pivot-table.js';
-import type { PivotAggregation, PivotFilterSpec } from '../engine/types.js';
+import { type PivotAggregation, PivotAxis, type PivotFilterSpec } from '../engine/types.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import {
   fillPivotFieldSelect,
+  isEmptyPivotFilterCondition,
   type PivotAreaKind,
   type PivotFieldSettingsActive,
   type PivotFilterConditionState,
+  type PivotFilterInputContext,
   type PivotValueFieldSetting,
   pivotFilterConditionToSpec,
   resolvePivotShowAsBase,
@@ -21,6 +23,8 @@ export interface PivotFieldAreaSelects {
 export interface PivotCreateSpecDefaults {
   aggregation: PivotAggregation;
   numberFormat: string;
+  /** How the filter conditions' typed operands read. */
+  filterInput: PivotFilterInputContext;
 }
 
 const retainFieldEntries = <V>(map: Map<string, V>, keep: readonly string[]): Map<string, V> =>
@@ -155,7 +159,7 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
 
   const setFilterCondition = (fieldName: string, condition: PivotFilterConditionState): void => {
     const byField = new Map(selectedFilterConditions);
-    if (condition.kind === 'none' || !condition.value.trim()) byField.delete(fieldName);
+    if (isEmptyPivotFilterCondition(condition)) byField.delete(fieldName);
     else byField.set(fieldName, condition);
     selectedFilterConditions = byField;
   };
@@ -334,7 +338,12 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
       ),
     ),
     pivotFilters: selectedFilterFields.flatMap<PivotFilterSpec>((fieldName) => {
-      const spec = pivotFilterConditionToSpec(fieldName, selectedFilterConditions.get(fieldName));
+      const spec = pivotFilterConditionToSpec(
+        fieldName,
+        selectedFilterConditions.get(fieldName),
+        PivotAxis.Page,
+        defaults.filterInput,
+      );
       return spec ? [spec] : [];
     }),
     valueFieldSettings: selectedValueFields.map((fieldName) => {

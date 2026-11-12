@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { CellRect, PivotWorksheetSourceInput } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
-import { type CellValue, PivotShowValuesAs } from '../../../src/engine/types.js';
+import { type CellValue, PivotFilterKind, PivotShowValuesAs } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachPivotTableDialog } from '../../../src/interact/pivot-table-dialog.js';
@@ -46,6 +46,7 @@ const makeWb = () => {
   let source: CellRect | null = null;
   const wb = {
     capabilities: { pivotTableMutate: true, pivotCacheSource: true },
+    calcSettings: () => null,
     sheetCount: 1,
     sheetName: () => 'Sheet1',
     sheetIndexByName: (name: string) => (name.toLowerCase() === 'sheet1' ? 0 : null),
@@ -148,20 +149,18 @@ const makeWb = () => {
       _pivot: number,
       spec: {
         fieldName: string;
-        type: number;
-        valueDouble?: number;
-        valueHighDouble?: number;
-        valueInt?: number;
+        kind: number;
+        value?: number | string;
+        valueHigh?: number | string;
       },
     ) => {
       calls.push(
         [
           'pivot-filter',
           spec.fieldName,
-          String(spec.type),
-          spec.valueDouble === undefined ? '' : String(spec.valueDouble),
-          spec.valueHighDouble === undefined ? '' : String(spec.valueHighDouble),
-          spec.valueInt === undefined ? '' : String(spec.valueInt),
+          String(spec.kind),
+          String(spec.value ?? ''),
+          String(spec.valueHigh ?? ''),
         ].join(':'),
       );
       return true;
@@ -635,7 +634,7 @@ describe('attachPivotTableDialog', () => {
     const condition = dialog?.querySelector<HTMLSelectElement>(
       'select[data-pivot-filter-condition="true"]',
     );
-    expect(condition?.value).toBe('none');
+    expect(condition?.value).toBe('');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
     await Promise.resolve();
     expect(
@@ -826,10 +825,12 @@ describe('attachPivotTableDialog', () => {
     const conditionSelect = Array.from(
       panel?.querySelectorAll<HTMLSelectElement>('select') ?? [],
     ).find((select) =>
-      Array.from(select.options).some((option) => option.value === 'label-contains'),
+      Array.from(select.options).some(
+        (option) => option.value === String(PivotFilterKind.LabelContains),
+      ),
     );
     if (!conditionSelect) throw new Error('missing filter condition controls');
-    conditionSelect.value = 'label-contains';
+    conditionSelect.value = String(PivotFilterKind.LabelContains);
     conditionSelect.dispatchEvent(new Event('change', { bubbles: true }));
     const nextConditionValue = Array.from(
       panel?.querySelectorAll<HTMLInputElement>('input') ?? [],
@@ -882,10 +883,12 @@ describe('attachPivotTableDialog', () => {
     const conditionSelect = Array.from(
       panel?.querySelectorAll<HTMLSelectElement>('select') ?? [],
     ).find((select) =>
-      Array.from(select.options).some((option) => option.value === 'value-between'),
+      Array.from(select.options).some(
+        (option) => option.value === String(PivotFilterKind.ValueBetween),
+      ),
     );
     if (!conditionSelect) throw new Error('missing filter condition controls');
-    conditionSelect.value = 'value-between';
+    conditionSelect.value = String(PivotFilterKind.ValueBetween);
     conditionSelect.dispatchEvent(new Event('change', { bubbles: true }));
     const rangeInputs = Array.from(
       panel?.querySelectorAll<HTMLInputElement>('.fc-pivotdlg__settings-condition-values input') ??
@@ -902,7 +905,7 @@ describe('attachPivotTableDialog', () => {
       .querySelector('form')
       ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
-    expect(calls).toContain('pivot-filter:Channel:2:10:20:');
+    expect(calls).toContain('pivot-filter:Channel:2:10:20');
     handle.detach();
   });
 

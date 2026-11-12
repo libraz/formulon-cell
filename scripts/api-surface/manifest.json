@@ -348,8 +348,6 @@
         "PivotFieldItemVisibility",
         "PivotFieldSpec",
         "PivotFilterSpec",
-        "PivotFilterType",
-        "PivotFilterValueKind",
         "PivotLayoutResult",
         "PivotShowValuesAs",
         "PivotSortOrder",

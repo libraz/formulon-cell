@@ -13,8 +13,7 @@ import {
   PIVOT_SHOW_AS_BASE_PREVIOUS,
   PivotAggregation,
   PivotAxis,
-  PivotFilterType,
-  PivotFilterValueKind,
+  PivotFilterKind,
   PivotShowValuesAs,
   PivotSortOrder,
 } from '../../../src/engine/types.js';
@@ -144,8 +143,8 @@ const makeWb = () => {
       calls.push(`clear-items:${fieldIdx}`);
       return true;
     },
-    addPivotFilter: (_sheet: number, _pivot: number, spec: { fieldName: string; type: number }) => {
-      calls.push(`pivot-filter:${spec.fieldName}:${spec.type}`);
+    addPivotFilter: (_sheet: number, _pivot: number, spec: { fieldName: string; kind: number }) => {
+      calls.push(`pivot-filter:${spec.fieldName}:${spec.kind}`);
       return true;
     },
     setPivotFieldSort: (
@@ -352,9 +351,8 @@ describe('pivot-table command helpers', () => {
         {
           axis: PivotAxis.Page,
           fieldName: 'Product',
-          type: PivotFilterType.LabelContains,
-          valueKind: PivotFilterValueKind.Text,
-          valueText: 'Desk',
+          kind: PivotFilterKind.LabelContains,
+          value: 'Desk',
         },
       ],
       valueField: 'Sales',

@@ -87,7 +87,7 @@ const setup = () => {
     select.dispatchEvent(new Event('change', { bubbles: true }));
   };
   const spec = () =>
-    areas.toCreateSpec({ aggregation: PivotAggregation.Sum, numberFormat: '' })
+    areas.toCreateSpec({ aggregation: PivotAggregation.Sum, numberFormat: '', filterInput: {} })
       .valueFieldSettings[0];
   return { areas, panelEl, selectsIn, choose, spec };
 };

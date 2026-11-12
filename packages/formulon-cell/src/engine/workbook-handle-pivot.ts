@@ -37,8 +37,6 @@ import {
   type PivotAggregation,
   type PivotAxis,
   PivotDateGrouping,
-  PivotFilterType,
-  PivotFilterValueKind,
   PivotShowValuesAs,
   type PivotSortOrder,
   ValueKind,
@@ -1256,7 +1254,6 @@ export abstract class WorkbookHandlePivotMethods {
   addPivotFilter(sheet: number, pivotIdx: number, spec: PivotFilterSpec): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    if (!isPivotFilterType(spec.type)) return false;
     return attempt(false, () => {
       pivotOf(this, sheet, pivotIdx).addFilter(toFilterInput(spec));
       return true;
@@ -1366,34 +1363,11 @@ function toDataFieldInput(spec: PivotDataFieldSpec) {
 function toFilterInput(spec: PivotFilterSpec): PivotFilterInput {
   return {
     fieldIndex: spec.fieldName,
-    kind: spec.type,
+    kind: spec.kind,
     ...(spec.dataFieldIndex !== undefined ? { dataFieldIndex: spec.dataFieldIndex } : {}),
-    ...operandInput(spec.valueKind, spec.valueInt, spec.valueDouble, spec.valueText, 'value'),
-    ...operandInput(
-      spec.valueHighKind,
-      spec.valueHighInt,
-      spec.valueHighDouble,
-      spec.valueHighText,
-      'valueHigh',
-    ),
+    ...(spec.value !== undefined ? { value: spec.value } : {}),
+    ...(spec.valueHigh !== undefined ? { valueHigh: spec.valueHigh } : {}),
   };
-}
-
-function operandInput(
-  kind: PivotFilterValueKind | undefined,
-  intValue: number | undefined,
-  doubleValue: number | undefined,
-  textValue: string | undefined,
-  key: 'value' | 'valueHigh',
-): Partial<Record<'value' | 'valueHigh', number | string>> {
-  if (kind === PivotFilterValueKind.None) return {};
-  if (kind === PivotFilterValueKind.Int || (kind === undefined && intValue !== undefined)) {
-    return intValue !== undefined ? { [key]: intValue } : {};
-  }
-  if (kind === PivotFilterValueKind.Double || (kind === undefined && doubleValue !== undefined)) {
-    return doubleValue !== undefined ? { [key]: doubleValue } : {};
-  }
-  return textValue !== undefined ? { [key]: textValue } : {};
 }
 
 /**
@@ -1453,48 +1427,21 @@ function pivotFilterSpecs(
   return out;
 }
 
-/** A stored filter in the cell layer's shape; null for a kind the cell layer does not model. */
+/** A stored filter in the cell layer's shape; null when its field has no axis or name. */
 function toFilterSpec(
   filter: PivotFilter,
   axis: PivotAxis | null,
   fieldName: string,
 ): PivotFilterSpec | null {
-  if (axis === null || !isPivotFilterType(filter.kind) || fieldName.trim().length === 0) {
-    return null;
-  }
+  if (axis === null || fieldName.trim().length === 0) return null;
   return {
     axis,
     fieldName: fieldName.trim(),
-    type: filter.kind,
+    kind: filter.kind,
     ...(filter.dataFieldIndex > 0 ? { dataFieldIndex: filter.dataFieldIndex } : {}),
-    ...operandSpec(filter.kind, filter.value, 'value'),
-    ...operandSpec(filter.kind, filter.valueHigh, 'valueHigh'),
+    ...(filter.value !== null ? { value: filter.value } : {}),
+    ...(filter.valueHigh !== null ? { valueHigh: filter.valueHigh } : {}),
   };
-}
-
-function operandSpec(
-  type: PivotFilterType,
-  value: number | string | null,
-  prefix: 'value' | 'valueHigh',
-): Partial<PivotFilterSpec> {
-  if (value === null) return {};
-  if (typeof value === 'string') {
-    return { [`${prefix}Kind`]: PivotFilterValueKind.Text, [`${prefix}Text`]: value };
-  }
-  // A top-N count is an integer; every other numeric operand is a double.
-  return type === PivotFilterType.ValueTop10
-    ? { [`${prefix}Kind`]: PivotFilterValueKind.Int, [`${prefix}Int`]: value }
-    : { [`${prefix}Kind`]: PivotFilterValueKind.Double, [`${prefix}Double`]: value };
-}
-
-/** The cell layer models the engine's filter kinds 0-5 under the same numbers. */
-function isPivotFilterType(value: unknown): value is PivotFilterType {
-  return (
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    value >= PivotFilterType.ValueTop10 &&
-    value <= PivotFilterType.LabelDate
-  );
 }
 
 function pivotCellEntry(

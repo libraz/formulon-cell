@@ -8,6 +8,7 @@ import type {
   GradientFill as EngineGradientFill,
   GradientStop as EngineGradientStop,
   FunctionMetadata,
+  PivotFilterKind,
   PivotLayout,
 } from '@libraz/formulon';
 import { PivotSortOrder as EnginePivotSortOrder } from '@libraz/formulon';
@@ -212,38 +213,6 @@ export interface PivotDataFieldSpec {
   readonly showAsBaseItem?: number;
 }
 
-/** PivotTable filter type ordinals. Only 0–5 are supported by formulon 0.12.
- * Legacy ordinals are retained for source compatibility and rejected by the adapter. */
-export const PivotFilterType = {
-  ValueTop10: 0,
-  ValueGreaterThan: 1,
-  ValueBetween: 2,
-  LabelContains: 3,
-  LabelBeginsWith: 4,
-  LabelDate: 5,
-  /** @deprecated Unsupported by formulon 0.12. */
-  LabelEquals: 6,
-  /** @deprecated Unsupported by formulon 0.12. */
-  LabelDoesNotEqual: 7,
-  /** @deprecated Unsupported by formulon 0.12. */
-  LabelDoesNotContain: 8,
-  /** @deprecated Unsupported by formulon 0.12. */
-  LabelEndsWith: 9,
-  /** @deprecated Unsupported by formulon 0.12. */
-  ValueLessThan: 10,
-  /** @deprecated Unsupported by formulon 0.12. */
-  ValueEquals: 11,
-  /** @deprecated Unsupported by formulon 0.12. */
-  ValueNotBetween: 12,
-  /** @deprecated Unsupported by formulon 0.12. */
-  DateBefore: 13,
-  /** @deprecated Unsupported by formulon 0.12. */
-  DateAfter: 14,
-  /** @deprecated Unsupported by formulon 0.12. */
-  DateBetween: 15,
-} as const;
-export type PivotFilterType = (typeof PivotFilterType)[keyof typeof PivotFilterType];
-
 /** PivotTable date grouping ordinals. `Days` replaces the old `Week` entry;
  * use `intervalDays: 7` when a weekly bucket is wanted. */
 export const PivotDateGrouping = {
@@ -374,31 +343,21 @@ export const SheetVisibility = {
 } as const;
 export type SheetVisibility = (typeof SheetVisibility)[keyof typeof SheetVisibility];
 
-/** Discriminator ordinals for PivotTable filter payload values. */
-export const PivotFilterValueKind = {
-  None: -1,
-  Int: 0,
-  Double: 1,
-  Text: 2,
-} as const;
-export type PivotFilterValueKind = (typeof PivotFilterValueKind)[keyof typeof PivotFilterValueKind];
-
+/** A PivotTable label, value or date filter, in the engine's own kinds and operands
+ *  (`PivotFilterInput`), addressed by axis and source field name. */
 export interface PivotFilterSpec {
   readonly axis: PivotAxis;
   readonly fieldName: string;
-  readonly type: PivotFilterType;
+  readonly kind: PivotFilterKind;
   readonly dataFieldIndex?: number;
-  readonly valueKind?: PivotFilterValueKind;
-  readonly valueInt?: number;
-  readonly valueDouble?: number;
-  readonly valueText?: string;
-  readonly valueHighKind?: PivotFilterValueKind;
-  readonly valueHighInt?: number;
-  readonly valueHighDouble?: number;
-  readonly valueHighText?: string;
+  /** A number for a value or date filter (a date as its serial), a string for a label filter;
+   *  the lower bound of a range kind. */
+  readonly value?: number | string | null;
+  /** The upper bound of a range kind. */
+  readonly valueHigh?: number | string | null;
 }
 
-export { ValueKind } from '@libraz/formulon';
+export { PivotFilterKind, ValueKind } from '@libraz/formulon';
 
 /** A1-style cell coordinate. Zero-indexed. */
 export interface Addr {

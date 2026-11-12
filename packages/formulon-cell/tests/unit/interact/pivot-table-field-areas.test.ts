@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { PivotSourceField } from '../../../src/commands/pivot-table.js';
-import { PivotAggregation, PivotShowValuesAs } from '../../../src/engine/types.js';
+import { PivotAggregation, PivotFilterKind, PivotShowValuesAs } from '../../../src/engine/types.js';
 import { createPivotFieldAreas } from '../../../src/interact/pivot-table-field-areas.js';
 import { createDialogSelect } from '../../../src/toolbar/dialogs/form-controls.js';
 
@@ -60,8 +60,8 @@ describe('createPivotFieldAreas resetSource', () => {
     areas.assignFieldToArea('Channel', 'filters', FIELDS);
     areas.assignFieldToArea('Zone', 'filters', FIELDS);
     areas.assignFieldToArea('Qty', 'values', FIELDS);
-    areas.setFilterCondition('Channel', { kind: 'label-contains', value: 'web' });
-    areas.setFilterCondition('Zone', { kind: 'label-contains', value: 'north' });
+    areas.setFilterCondition('Channel', { kind: PivotFilterKind.LabelContains, value: 'web' });
+    areas.setFilterCondition('Zone', { kind: PivotFilterKind.LabelContains, value: 'north' });
     areas.setFilterItemVisibility('Zone', 'N', false);
     areas.setValueFieldSetting('Qty', { numberFormat: '0.0' });
     areas.setValueFieldSetting('Sales', { aggregation: PivotAggregation.Max });
@@ -77,7 +77,7 @@ describe('createPivotFieldAreas resetSource', () => {
     expect(areas.valueFields).toEqual(['Sales']);
     expect(valueSelect.value).toBe('Sales');
     expect(areas.selectedFilterCondition('Channel')).toEqual({
-      kind: 'label-contains',
+      kind: PivotFilterKind.LabelContains,
       value: 'web',
     });
     expect(areas.selectedFilterCondition('Zone')).toBeUndefined();
@@ -127,7 +127,7 @@ describe('createPivotFieldAreas toggleFromFieldList', () => {
 
   it('unchecks a filter field and drops its condition', () => {
     ctx.areas.assignFieldToArea('Channel', 'filters', FIELDS);
-    ctx.areas.setFilterCondition('Channel', { kind: 'label-contains', value: 'web' });
+    ctx.areas.setFilterCondition('Channel', { kind: PivotFilterKind.LabelContains, value: 'web' });
     ctx.areas.toggleFromFieldList('Channel', false, FIELDS);
     expect(ctx.areas.filterFields).toEqual([]);
     expect(ctx.filterSelect.value).toBe('');
@@ -217,7 +217,11 @@ describe('createPivotFieldAreas toCreateSpec', () => {
       aggregation: PivotAggregation.Max,
       showValuesAs: PivotShowValuesAs.PercentOfTotal,
     });
-    const spec = areas.toCreateSpec({ aggregation: PivotAggregation.Sum, numberFormat: '#,##0' });
+    const spec = areas.toCreateSpec({
+      aggregation: PivotAggregation.Sum,
+      numberFormat: '#,##0',
+      filterInput: {},
+    });
     expect(spec.valueFieldSettings).toEqual([
       { fieldName: 'Sales', aggregation: PivotAggregation.Sum, numberFormat: '#,##0' },
       {
@@ -233,9 +237,13 @@ describe('createPivotFieldAreas toCreateSpec', () => {
     const { areas } = setup();
     areas.assignFieldToArea('Channel', 'filters', FIELDS);
     areas.setFilterItemVisibility('Channel', 'web', false);
-    areas.setFilterCondition('Channel', { kind: 'label-contains', value: 'we' });
-    areas.setFilterCondition('Zone', { kind: 'label-contains', value: 'ignored' });
-    const spec = areas.toCreateSpec({ aggregation: PivotAggregation.Sum, numberFormat: '' });
+    areas.setFilterCondition('Channel', { kind: PivotFilterKind.LabelContains, value: 'we' });
+    areas.setFilterCondition('Zone', { kind: PivotFilterKind.LabelContains, value: 'ignored' });
+    const spec = areas.toCreateSpec({
+      aggregation: PivotAggregation.Sum,
+      numberFormat: '',
+      filterInput: {},
+    });
     expect(spec.filterItems).toEqual([{ fieldName: 'Channel', itemName: 'web', visible: false }]);
     expect(spec.pivotFilters).toHaveLength(1);
     expect(spec.pivotFilters[0]?.fieldName).toBe('Channel');
