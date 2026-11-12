@@ -25,7 +25,12 @@ import {
   cellFont,
   cellFontCss,
 } from '../render/painters/text.js';
-import { cellTextWidth, paintedFontSize, wholePointAdvances } from '../render/text-metrics.js';
+import {
+  cellLinePitch,
+  cellTextWidth,
+  paintedFontSize,
+  wholePointAdvances,
+} from '../render/text-metrics.js';
 import { cellTextHorizontalMetrics, wrapText } from '../render/text-wrap.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { DEFAULT_CELL_FONT_THEME, resolveTheme } from '../theme/resolve.js';
@@ -140,7 +145,7 @@ export function computeAutofitRowHeight(
     theme,
     false,
   );
-  const padding = Math.max(0, defaultHeight - Math.round(normalFont.size * 1.28));
+  const padding = Math.max(0, defaultHeight - cellLinePitch(normalFont.size));
   const mac = wholePointAdvances(state.layout);
   const styleAt = styleElementFormatSource(state, opts.workbook ?? null);
 
@@ -153,7 +158,7 @@ export function computeAutofitRowHeight(
     if (!text) continue;
     const formulaDisplay = showsFormula(state, cell);
     const font = cellFont(format, theme, formulaDisplay);
-    const lineHeight = Math.round(font.size * 1.28);
+    const lineHeight = cellLinePitch(font.size);
     const colW = state.layout.colWidths.get(parsed.col) ?? state.layout.defaultColWidth;
     const lines = autofitLineCount(
       text,

@@ -233,6 +233,9 @@ export const circularPoint = (
 });
 
 /** Build an annular SVG path, including two arcs for each side of a full ring. */
+/** Whether a sweep of `angle` radians closes the circle, allowing for rounding. */
+export const isFullCircle = (angle: number): boolean => angle >= Math.PI * 2 - 1e-9;
+
 export const annularPath = (
   cx: number,
   cy: number,
@@ -241,7 +244,7 @@ export const annularPath = (
   start: number,
   angle: number,
 ): string => {
-  const fullCircle = angle >= Math.PI * 2 - 1e-9;
+  const fullCircle = isFullCircle(angle);
   const outerStart = circularPoint(cx, cy, outerRadius, start);
   const innerStart = circularPoint(cx, cy, innerRadius, start);
   if (fullCircle) {

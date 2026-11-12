@@ -13,6 +13,7 @@ import {
   barGeometry,
   circularFrame,
   doughnutFrame,
+  isFullCircle,
   normalizedMagnitudes,
   segmentsFor,
 } from './series-geometry.js';
@@ -655,7 +656,7 @@ export const addPieMarks = (
       view.originalSeriesIndices[0] ?? 0,
       originalPointIndex,
     );
-    if (angle >= Math.PI * 2 - 1e-9) {
+    if (isFullCircle(angle)) {
       elements.push(
         primitive(
           'circle',

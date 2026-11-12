@@ -21,6 +21,7 @@ import {
   circularFrame,
   circularPoint,
   doughnutFrame,
+  isFullCircle,
   normalizedMagnitudes,
   segmentsFor,
 } from './series-geometry.js';
@@ -713,7 +714,7 @@ const addDoughnutDataLabels = (
   const ringWidth = (outerRadius - holeRadius) / data.series.length;
   const labelAngles = (start: number, angle: number): readonly number[] => {
     const middle = start + angle / 2;
-    if (angle >= Math.PI * 2 - 1e-9) {
+    if (isFullCircle(angle)) {
       return [
         middle,
         middle + Math.PI,

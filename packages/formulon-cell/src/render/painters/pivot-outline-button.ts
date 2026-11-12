@@ -6,7 +6,7 @@ import { rulePx } from '../grid/chrome-context.js';
 export const PIVOT_OUTLINE_STEP_PT = 11.5;
 
 /** Side of the collapse (-) button, in points. */
-export const PIVOT_COLLAPSE_BUTTON_PT = 7;
+const PIVOT_COLLAPSE_BUTTON_PT = 7;
 
 /** The collapse button's offset from the leading edge of its outline step, in points. */
 const COLLAPSE_INSET_PT = 4;

@@ -218,7 +218,7 @@ export function paintErrorSmartTag(
 /** Side of the triangle hot-zone painted by `paintErrorTriangle` /
  *  `paintValidationTriangle`. Click hit-tests in `error-menu` use the same
  *  constant so the visual and clickable areas line up. */
-export const ERROR_TRIANGLE_SIZE = 6;
+const ERROR_TRIANGLE_SIZE = 6;
 
 /** Paint a small filled triangle in the upper-LEFT of the cell. Used for
  *  formula-error and data-validation indicators. The triangle sits flush

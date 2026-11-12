@@ -12,6 +12,7 @@ import type {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { MAX_ROW_HEIGHT_PX } from '../store/layout-limits.js';
 import type { CellFormat, LayoutSlice, State } from '../store/store.js';
+import { cellLinePitch } from './text-metrics.js';
 
 const projectedLayouts = new WeakSet<object>();
 const projectionsByFormats = new WeakMap<object, Map<number, ProjectionCache>>();
@@ -52,7 +53,7 @@ export const markAutomaticFontRowLayoutProjected = (layout: LayoutSlice): void =
 };
 
 const lineHeight = (fontSizeCss: number): number | null => {
-  const line = Math.round(fontSizeCss * 1.28);
+  const line = cellLinePitch(fontSizeCss);
   return Number.isFinite(line) ? line : null;
 };
 

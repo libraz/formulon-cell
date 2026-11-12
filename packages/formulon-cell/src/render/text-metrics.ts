@@ -90,6 +90,9 @@ export const cellTextWidth = (
 /** Painted size of a run: on whole-point advances the zoomed size snaps to a
  *  whole px too (Arial 11 pt paints at 8, 14, 17 and 22 px at 75, 125, 150
  *  and 200%); otherwise the exact product. */
+/** The line pitch of a cell's text at CSS font size `size`, shared by painting and autofit. */
+export const cellLinePitch = (size: number): number => Math.round(size * 1.28);
+
 export const paintedFontSize = (size: number, scale: number, wholePoint: boolean): number =>
   wholePoint ? Math.max(1, Math.round(size * scale)) : size * scale;
 

@@ -138,7 +138,7 @@ export function paintFillHandle(
 }
 
 /** Side length and cell inset of the table resize grip, in CSS pixels. */
-export const TABLE_GRIP_SIZE = 4;
+const TABLE_GRIP_SIZE = 4;
 const TABLE_GRIP_INSET = 1;
 const TABLE_GRIP_THICKNESS = 2;
 const TABLE_GRIP_COLOR = '#485cb1';

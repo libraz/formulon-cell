@@ -11,6 +11,7 @@ import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
 import {
+  cellLinePitch,
   cellTextWidth,
   drawCellTextRun,
   paintedFontSize,
@@ -471,7 +472,7 @@ function paintStackedText(
   },
 ): void {
   const { format, fontSize, padX, padY, indentPx } = opts;
-  const lineH = Math.round(fontSize * 1.28);
+  const lineH = cellLinePitch(fontSize);
   const maxLines = Math.max(1, Math.floor((bounds.h - padY * 2) / lineH));
   const columns = (
     opts.wrap
@@ -732,7 +733,7 @@ export function paintCellText({
       : wrapLogical(ctx, text, baseFont, bounds.w / zoomScale, format?.indent ?? 0, locale);
     ctx.font = paintFontCss;
     // Line pitch rounds in rendered pixels: 14 px for an 11 px run.
-    const lineH = Math.round(fontSize * 1.28);
+    const lineH = cellLinePitch(fontSize);
     const totalH = lineH * lines.length;
     const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
     const measured = withRowDescent(fontMetricsBox(ctx, fontSize), vAlign);
