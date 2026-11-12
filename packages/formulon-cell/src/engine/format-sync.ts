@@ -73,38 +73,20 @@ export function hydrateCommentsAndHyperlinksFromEngine(
     }
   }
 
-  if (wb.capabilities.hyperlinks) {
-    const links: Array<{
-      row: number;
-      col: number;
-      lastRow?: number;
-      lastCol?: number;
-      target: string;
-      location?: string;
-      display: string;
-      tooltip: string;
-    }> =
-      wb.getHyperlinksFull(sheet)?.map((h) => ({
-        row: h.range.firstRow,
-        col: h.range.firstCol,
-        lastRow: h.range.lastRow,
-        lastCol: h.range.lastCol,
-        target: h.target ?? '',
-        ...(h.location === null ? {} : { location: h.location }),
-        display: h.display ?? '',
-        tooltip: h.tooltip ?? '',
-      })) ?? wb.getHyperlinks(sheet);
+  // A list the engine refuses to read says nothing about which links are stale.
+  const links = wb.capabilities.hyperlinks ? wb.getHyperlinksFull(sheet) : null;
+  if (links) {
     for (const h of links) {
+      const target = h.target ?? '';
       const location = h.location ?? '';
-      if (h.target.length === 0 && location.length === 0) continue;
-      const lastRow = h.lastRow ?? h.row;
-      const lastCol = h.lastCol ?? h.col;
+      if (target.length === 0 && location.length === 0) continue;
+      const { firstRow: row, firstCol: col, lastRow, lastCol } = h.range;
       updates.push({
-        key: addrKey({ sheet, row: h.row, col: h.col }),
+        key: addrKey({ sheet, row, col }),
         patch: {
-          hyperlink: h.target || `#${location}`,
+          hyperlink: target || `#${location}`,
           hyperlinkLocation: location || undefined,
-          hyperlinkSpan: lastRow > h.row || lastCol > h.col ? { lastRow, lastCol } : undefined,
+          hyperlinkSpan: lastRow > row || lastCol > col ? { lastRow, lastCol } : undefined,
           hyperlinkDisplay: h.display || undefined,
           hyperlinkTooltip: h.tooltip || undefined,
         },
@@ -114,7 +96,7 @@ export function hydrateCommentsAndHyperlinksFromEngine(
 
   // The engine holds the sheet's links and notes: one it no longer has leaves the store too. Notes
   // are only dropped when the engine can list them all.
-  const linksRead = wb.capabilities.hyperlinks;
+  const linksRead = links !== null;
   const notesRead = wb.capabilities.comments && wb.capabilities.commentsEnumerable;
   const stale = [...store.getState().format.formats].filter(
     ([key, fmt]) =>
