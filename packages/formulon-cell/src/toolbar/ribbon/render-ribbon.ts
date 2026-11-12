@@ -597,7 +597,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
                 getInst: ctx.getInst,
                 arrow: b,
                 menu: submenu?.() ?? null,
-                pageArrows: profile !== 'excel365Mac',
+                mac: profile === 'excel365Mac',
               }),
             );
             continue;
@@ -611,7 +611,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
                 getInst: ctx.getInst,
                 arrow: b,
                 menu: submenu?.() ?? null,
-                pageArrows: profile !== 'excel365Mac',
+                mac: profile === 'excel365Mac',
               }),
             );
             continue;
@@ -624,7 +624,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
                 getInst: ctx.getInst,
                 arrow: b,
                 menu: submenu?.() ?? null,
-                pageArrows: profile !== 'excel365Mac',
+                mac: profile === 'excel365Mac',
               }),
             );
             continue;

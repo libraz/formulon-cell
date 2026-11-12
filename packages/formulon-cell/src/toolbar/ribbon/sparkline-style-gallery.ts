@@ -17,9 +17,6 @@ import {
 import { createQuickStyleStrip } from './quick-style-strip.js';
 import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
 
-// One gallery row: the desktop strip shows seven presets beside its chevron.
-const PAGE_SIZE = 7;
-
 // The desktop strip leaves these presets (Accent 4-6 lighter 40% and Dark #1-#4) to the full
 // gallery behind the chevron.
 const FULL_GALLERY_ONLY: ReadonlySet<number> = new Set([21, 22, 23, 24, 25, 26, 27]);
@@ -31,8 +28,8 @@ export interface SparklineStyleGalleryOptions {
   /** The ribbon's Style button; it opens the full gallery. */
   arrow: HTMLButtonElement;
   menu: HTMLElement | null;
-  /** Page arrows beside the strip; off on the Mac profile. */
-  pageArrows: boolean;
+  /** The Mac profile's strip: no page arrows, scrolled to the current style. */
+  mac: boolean;
 }
 
 /** Sparkline > Style: the strip's 29 presets a row at a time, with the Style button as the more
@@ -42,9 +39,9 @@ export const createSparklineStyleGallery = (opts: SparklineStyleGalleryOptions):
   const wrap = createQuickStyleStrip({
     lang: opts.lang,
     classPrefix: 'fc-tb__sparkline-quick',
-    arrows: opts.pageArrows,
+    kind: 'sparkline',
+    mac: opts.mac,
     chipKey: 'sparklineQuickStyle',
-    pageSize: PAGE_SIZE,
     entries: () => {
       const inst = getInst();
       if (!inst) return [];

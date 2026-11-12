@@ -12,17 +12,14 @@ import type { ToolbarLang } from '../ribbon-model.js';
 import { tableStyleSwatchGrid } from './menus/styles.js';
 import { createQuickStyleStrip, type QuickStyleEntry } from './quick-style-strip.js';
 
-// One gallery row of the seven palette columns; the desktop strip's width is unmeasured.
-const PAGE_SIZE = 7;
-
 export interface TableStyleGalleryOptions {
   lang: ToolbarLang;
   getInst: () => SpreadsheetInstance | null;
   /** The ribbon's Quick Styles button; it opens the full gallery. */
   arrow: HTMLButtonElement;
   menu: HTMLElement | null;
-  /** Page arrows beside the strip; off on the Mac profile. */
-  pageArrows: boolean;
+  /** The Mac profile's strip: no page arrows, scrolled to the current style. */
+  mac: boolean;
 }
 
 /** Table Design > Table Styles: the custom and built-in styles a row at a time, with the Quick
@@ -47,9 +44,9 @@ export const createTableStyleGallery = (opts: TableStyleGalleryOptions): HTMLDiv
   const wrap = createQuickStyleStrip({
     lang,
     classPrefix: 'fc-tb__tablestyle-quick',
-    arrows: opts.pageArrows,
+    kind: 'table',
+    mac: opts.mac,
     chipKey: 'tableQuickStyle',
-    pageSize: PAGE_SIZE,
     entries: () => {
       const inst = getInst();
       if (!inst) return [];

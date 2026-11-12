@@ -13,16 +13,53 @@ export interface QuickStyleEntry {
   readonly thumbnail: () => Element;
 }
 
+/** The ribbon strips built on {@link createQuickStyleStrip}. */
+export type QuickStyleStripKind = 'table' | 'pivot' | 'sparkline';
+
+/** A strip's chip size and pitch in CSS px, and how many chips it shows. */
+export interface QuickStyleStripGeometry {
+  readonly chipWidth: number;
+  readonly chipHeight: number;
+  /** Left edge to left edge; below the chip width, neighbours overlap. */
+  readonly step: number;
+  readonly visible: number;
+}
+
+// Mac measured: seven chips each; table 70 x 54 and PivotTable 73 x 56 stepping 71 in a 497 pt
+// strip, sparkline 80 x 56 stepping 78. The default profile's strips are unmeasured.
+const GEOMETRY: Record<
+  QuickStyleStripKind,
+  { readonly mac: QuickStyleStripGeometry; readonly desktop: QuickStyleStripGeometry }
+> = {
+  table: {
+    mac: { chipWidth: 70, chipHeight: 54, step: 71, visible: 7 },
+    desktop: { chipWidth: 73, chipHeight: 56, step: 75, visible: 7 },
+  },
+  pivot: {
+    mac: { chipWidth: 73, chipHeight: 56, step: 71, visible: 7 },
+    desktop: { chipWidth: 73, chipHeight: 56, step: 75, visible: 6 },
+  },
+  sparkline: {
+    mac: { chipWidth: 80, chipHeight: 56, step: 78, visible: 7 },
+    desktop: { chipWidth: 80, chipHeight: 56, step: 78, visible: 7 },
+  },
+};
+
+export const quickStyleStripGeometry = (
+  kind: QuickStyleStripKind,
+  mac: boolean,
+): QuickStyleStripGeometry => GEOMETRY[kind][mac ? 'mac' : 'desktop'];
+
 export interface QuickStyleStripOptions {
   readonly lang: ToolbarLang;
+  readonly kind: QuickStyleStripKind;
+  /** The Mac strip has no page arrows and scrolls to keep the current style in view. */
+  readonly mac: boolean;
   /** Class prefix of the wrapper and its parts: `<prefix>-gallery`, `-strip`, `-chip`, `-prev`,
    *  `-next`. */
   readonly classPrefix: string;
   /** Dataset key each chip carries its entry id under. */
   readonly chipKey: string;
-  readonly pageSize: number;
-  /** Previous and next page arrows; the Mac strip has none and shows only the current page. */
-  readonly arrows: boolean;
   readonly entries: () => readonly QuickStyleEntry[];
   /** The id of the style in use; null when nothing is selected that takes a style. */
   readonly current: () => string | null;
@@ -38,14 +75,21 @@ const ARROW_LABELS = {
   next: { ja: '次のクイック スタイル ギャラリー', en: 'Next Quick Styles gallery' },
 } as const;
 
-/** An in-ribbon style gallery: a page of style chips, refreshed by an `fc-ribbon-control-refresh`
- *  event on the wrapper, that turns to the page of the current style whenever it changes. */
+/** An in-ribbon style gallery: a row of style chips, refreshed by an `fc-ribbon-control-refresh`
+ *  event on the wrapper. Whenever the current style changes the row follows it: paging to its page
+ *  between arrows, or on the Mac scrolling it to the middle (the fourth of seven). */
 export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElement => {
-  const { classPrefix, pageSize } = opts;
+  const { classPrefix } = opts;
+  const geometry = quickStyleStripGeometry(opts.kind, opts.mac);
+  const pageSize = geometry.visible;
   const arrowLabel = (key: keyof typeof ARROW_LABELS): string =>
     opts.lang === 'ja' ? ARROW_LABELS[key].ja : ARROW_LABELS[key].en;
   const wrap = document.createElement('div');
   wrap.className = `${classPrefix}-gallery`;
+  wrap.style.setProperty('--fc-strip-chip-w', `${geometry.chipWidth}px`);
+  wrap.style.setProperty('--fc-strip-chip-h', `${geometry.chipHeight}px`);
+  wrap.style.setProperty('--fc-strip-step', `${geometry.step}px`);
+  wrap.style.setProperty('--fc-strip-visible', String(geometry.visible));
   const strip = document.createElement('div');
   strip.className = `${classPrefix}-strip`;
   strip.setAttribute('role', 'group');
@@ -57,17 +101,20 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
     className: `${classPrefix}-next`,
     ariaLabel: arrowLabel('next'),
   });
-  if (opts.arrows) wrap.append(prev, strip, next);
+  if (!opts.mac) wrap.append(prev, strip, next);
   else wrap.append(strip);
   if (opts.more) {
     wrap.appendChild(opts.more.arrow);
     if (opts.more.menu) wrap.appendChild(opts.more.menu);
   }
 
-  let page = 0;
+  // The first chip shown; a page start between arrows.
+  let start = 0;
   let shownCurrent: string | null | undefined;
-  const lastPage = (entries: readonly QuickStyleEntry[]): number =>
-    Math.max(0, Math.ceil(entries.length / pageSize) - 1);
+  const lastStart = (entries: readonly QuickStyleEntry[]): number =>
+    opts.mac
+      ? Math.max(0, entries.length - pageSize)
+      : Math.max(0, Math.ceil(entries.length / pageSize) - 1) * pageSize;
 
   const render = (): void => {
     const entries = opts.entries();
@@ -76,11 +123,15 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
     if (current !== shownCurrent) {
       shownCurrent = current;
       const at = entries.findIndex((entry) => entry.id === current);
-      if (at >= 0) page = Math.floor(at / pageSize);
+      if (at >= 0) {
+        start = opts.mac
+          ? Math.max(0, at - Math.floor(pageSize / 2))
+          : Math.floor(at / pageSize) * pageSize;
+      }
     }
-    page = Math.min(page, lastPage(entries));
+    start = Math.min(start, lastStart(entries));
     strip.replaceChildren(
-      ...entries.slice(page * pageSize, page * pageSize + pageSize).map((entry) => {
+      ...entries.slice(start, start + pageSize).map((entry) => {
         const chip = createInteractionChipButton({
           className: `${classPrefix}-chip`,
           label: '',
@@ -98,16 +149,16 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
         return chip;
       }),
     );
-    projectDisabledState(prev, page === 0, null);
-    projectDisabledState(next, page === lastPage(entries), null);
+    projectDisabledState(prev, start === 0, null);
+    projectDisabledState(next, start === lastStart(entries), null);
   };
   wrap.addEventListener('fc-ribbon-control-refresh', () => render());
   prev.addEventListener('click', () => {
-    page = Math.max(0, page - 1);
+    start = Math.max(0, start - pageSize);
     render();
   });
   next.addEventListener('click', () => {
-    page = Math.min(lastPage(opts.entries()), page + 1);
+    start = Math.min(lastStart(opts.entries()), start + pageSize);
     render();
   });
   render();

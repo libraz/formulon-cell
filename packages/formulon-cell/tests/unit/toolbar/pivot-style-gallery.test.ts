@@ -46,7 +46,7 @@ describe('PivotTable style gallery', () => {
       getInst: () => inst,
       arrow: document.createElement('button'),
       menu: null,
-      pageArrows: true,
+      mac: false,
     });
     document.body.appendChild(gallery);
     const labels = (): string[] =>
@@ -70,6 +70,35 @@ describe('PivotTable style gallery', () => {
     wb.dispose();
   });
 
+  // Excel for Mac: seven 73 x 56 chips stepping 71, no page arrows, scrolled so the report's
+  // style is the fourth chip.
+  it('scrolls the Mac strip to keep the current style fourth of seven', async () => {
+    const { wb, inst } = await setup();
+    const gallery = createPivotStyleGallery({
+      lang: 'ja',
+      getInst: () => inst,
+      arrow: document.createElement('button'),
+      menu: null,
+      mac: true,
+    });
+    document.body.appendChild(gallery);
+    const labels = Array.from(
+      gallery.querySelectorAll('.fc-tb__pivotstyle-chip'),
+      (c) => c.getAttribute('aria-label') ?? '',
+    );
+    expect(labels).toHaveLength(7);
+    expect(labels[0]).toContain('(淡色) 13');
+    expect(labels[3]).toContain('(淡色) 16');
+    expect(labels[6]).toContain('(淡色) 19');
+    expect(gallery.querySelector('.fc-tb__pivotstyle-prev')).toBeNull();
+    expect(
+      ['--fc-strip-chip-w', '--fc-strip-chip-h', '--fc-strip-step', '--fc-strip-visible'].map(
+        (name) => gallery.style.getPropertyValue(name),
+      ),
+    ).toEqual(['73px', '56px', '71px', '7']);
+    wb.dispose();
+  });
+
   it('marks the current style and applies a clicked one as a single undo step', async () => {
     const { wb, inst, history } = await setup();
     const gallery = createPivotStyleGallery({
@@ -77,7 +106,7 @@ describe('PivotTable style gallery', () => {
       getInst: () => inst,
       arrow: document.createElement('button'),
       menu: null,
-      pageArrows: true,
+      mac: false,
     });
     document.body.appendChild(gallery);
     const before = wb.getPivotTables()[0];
@@ -108,7 +137,7 @@ describe('PivotTable style gallery', () => {
       getInst: () => inst,
       arrow: document.createElement('button'),
       menu: null,
-      pageArrows: true,
+      mac: false,
     });
     for (let i = 0; i < 20; i += 1) {
       gallery.querySelector<HTMLButtonElement>('.fc-tb__pivotstyle-prev')?.click();
@@ -132,7 +161,7 @@ describe('PivotTable style gallery', () => {
       getInst: () => inst,
       arrow: document.createElement('button'),
       menu: null,
-      pageArrows: true,
+      mac: false,
     });
     for (let i = 0; i < 20; i += 1) {
       gallery.querySelector<HTMLButtonElement>('.fc-tb__pivotstyle-prev')?.click();

@@ -4,12 +4,11 @@
     grid-row: span 2;
   }
 
-  /* PivotTable and Table Design Quick Styles strips: 73 x 56 swatches between two arrows. The
-     table strip's size is unmeasured. */
+  /* Quick Styles strips: the gallery sets each strip's chip size, step and visible count
+     (quickStyleStripGeometry); a step below the chip width overlaps neighbours. */
   .fc-tb__pivotstyle-gallery {
     display: flex;
     align-items: stretch;
-    width: 533px;
     height: 60px;
   }
 
@@ -17,20 +16,28 @@
   .fc-tb__tablestyle-quick-strip,
   .fc-tb__sparkline-quick-strip {
     display: flex;
-    flex: 1 1 auto;
-    gap: 2px;
-    min-width: 0;
+    flex: 0 0 auto;
+    gap: 0;
+    width: calc(var(--fc-strip-step) * var(--fc-strip-visible));
+    overflow: hidden;
   }
 
   .fc-tb__pivotstyle-chip,
-  .fc-tb__tablestyle-quick-chip {
-    flex: 0 0 73px;
-    width: 73px;
-    height: 56px;
+  .fc-tb__tablestyle-quick-chip,
+  .fc-tb__sparkline-quick-chip {
+    flex: 0 0 var(--fc-strip-chip-w);
+    width: var(--fc-strip-chip-w);
+    height: var(--fc-strip-chip-h);
     padding: 2px;
     border: 1px solid var(--fc-rule);
     background: var(--fc-bg);
     cursor: pointer;
+  }
+
+  .fc-tb__pivotstyle-chip + .fc-tb__pivotstyle-chip,
+  .fc-tb__tablestyle-quick-chip + .fc-tb__tablestyle-quick-chip,
+  .fc-tb__sparkline-quick-chip + .fc-tb__sparkline-quick-chip {
+    margin-left: calc(var(--fc-strip-step) - var(--fc-strip-chip-w));
   }
 
   .fc-tb__pivotstyle-chip[aria-pressed="true"],
@@ -116,26 +123,6 @@
 
   .fc-tb__tablestyle-quick-chip .fc-tb__tablestyle-swatch__grid {
     pointer-events: none;
-  }
-
-  /* Sparkline Style strip: seven presets beside the chevron; the chip size is unmeasured. */
-  /* Sparkline Style strip: 80 x 56 chips stepping 78, so neighbours overlap by 2. */
-  .fc-tb__sparkline-quick-strip {
-    gap: 0;
-  }
-
-  .fc-tb__sparkline-quick-chip + .fc-tb__sparkline-quick-chip {
-    margin-left: -2px;
-  }
-
-  .fc-tb__sparkline-quick-chip {
-    flex: 0 0 80px;
-    width: 80px;
-    height: 56px;
-    padding: 2px;
-    border: 1px solid var(--fc-rule);
-    background: var(--fc-bg);
-    cursor: pointer;
   }
 
   .fc-tb__sparkline-quick-chip:disabled {

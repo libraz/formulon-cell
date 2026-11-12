@@ -14,7 +14,6 @@ const FAMILIES = [
   { id: 'Medium', ja: '中間', en: 'Medium' },
   { id: 'Dark', ja: '濃色', en: 'Dark' },
 ] as const;
-const PAGE_SIZE = 6;
 
 /** Colour names Excel (ja) prefixes to each built-in style's accessible name, by family. */
 const JA_COLOUR_NAMES: Readonly<Record<(typeof FAMILIES)[number]['id'], readonly string[]>> = {
@@ -115,8 +114,8 @@ export interface PivotStyleGalleryOptions {
   /** The ribbon's Quick Styles button; it opens the full gallery. */
   arrow: HTMLButtonElement;
   menu: HTMLElement | null;
-  /** Page arrows beside the strip; off on the Mac profile. */
-  pageArrows: boolean;
+  /** The Mac profile's strip: no page arrows, scrolled to the current style. */
+  mac: boolean;
 }
 
 /** The PivotTable Design Quick Styles: custom styles, None and the built-in styles, a page at a
@@ -141,9 +140,9 @@ export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDiv
   const wrap = createQuickStyleStrip({
     lang,
     classPrefix: 'fc-tb__pivotstyle',
-    arrows: opts.pageArrows,
+    kind: 'pivot',
+    mac: opts.mac,
     chipKey: 'pivotStyle',
-    pageSize: PAGE_SIZE,
     entries: () => {
       const inst = getInst();
       if (!inst) return [];
