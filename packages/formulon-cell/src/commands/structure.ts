@@ -33,13 +33,7 @@ import {
   remapSyncedFormatKeysForStructure,
   restoreSyncedFormatKeysForStructure,
 } from '../engine/synced-format-keys.js';
-import type {
-  Addr,
-  CellValue,
-  Range,
-  SheetAxisFormatOverride,
-  SheetFontOverride,
-} from '../engine/types.js';
+import type { Addr, Range, SheetAxisFormatOverride, SheetFontOverride } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import {
   type ActiveWholeSheetFontSnapshot,
@@ -74,6 +68,7 @@ import {
   shiftRangeAxis,
   shiftRangeValidations,
 } from './axis-shift.js';
+import type { CellRecord } from './cell-shift.js';
 import { isMacChrome } from './chrome-platform.js';
 import { alertDataTableEdit, axisEditSplitsDataTable } from './data-table-guard.js';
 import { recordFilterChange } from './filter.js';
@@ -99,12 +94,6 @@ import {
   shiftTablesForCols,
   shiftTablesForRows,
 } from './table-rows.js';
-
-interface CellRecord {
-  addr: Addr;
-  value: CellValue;
-  formula: string | null;
-}
 
 function collectAllCells(wb: WorkbookHandle, sheet: number): CellRecord[] {
   const out: CellRecord[] = [];

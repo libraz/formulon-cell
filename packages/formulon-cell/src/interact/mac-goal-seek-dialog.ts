@@ -183,8 +183,8 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     pickFormat.begin();
     const active = instance.store.getState().selection.active;
     const next: Addr = { ...active, col: Math.min(MAX_COL, active.col + 1) };
-    formulaInput.value = formatMacCellAddress(instance.workbook, active);
-    changingInput.value = formatMacCellAddress(instance.workbook, next);
+    formulaInput.value = formatMacCellAddress(active);
+    changingInput.value = formatMacCellAddress(next);
     iterationInput.value = '100';
     // The Mac desktop dialog starts with only the formula cell filled and has
     // no iteration field: its iteration cap is internal.

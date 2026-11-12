@@ -938,15 +938,15 @@ const subtotalLabel = (value: CellValue): string => {
   return value.text;
 };
 
-export function formatMacCellAddress(_wb: WorkbookHandle, addr: Addr): string {
+export function formatMacCellAddress(addr: Addr): string {
   return formatA1Cell(addr.row, addr.col);
 }
 
 export function formatMacRangeAddress(wb: WorkbookHandle, range: Range): string {
   const sheet = wb.sheetName(range.sheet);
   const prefix = /[^A-Za-z0-9_]/.test(sheet) ? `'${sheet.replaceAll("'", "''")}'!` : `${sheet}!`;
-  const first = formatMacCellAddress(wb, { sheet: range.sheet, row: range.r0, col: range.c0 });
-  const last = formatMacCellAddress(wb, { sheet: range.sheet, row: range.r1, col: range.c1 });
+  const first = formatMacCellAddress({ sheet: range.sheet, row: range.r0, col: range.c0 });
+  const last = formatMacCellAddress({ sheet: range.sheet, row: range.r1, col: range.c1 });
   return `${prefix}${first === last ? first : `${first}:${last}`}`;
 }
 

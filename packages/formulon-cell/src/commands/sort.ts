@@ -3,7 +3,7 @@ import { createProfileTextSemantics, localeForWorkbook } from '../engine/profile
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { rangeArea } from '../store/selection-geometry.js';
+import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
 import { customListsFor } from './autofill-series.js';
@@ -20,15 +20,8 @@ import { recordFormatChange } from './slice-history.js';
 
 /** Spreadsheet parity: refuse to sort when the range intersects any merge —
  *  rearranging rows would tear the merged rectangle apart. */
-const rangeIntersectsMerges = (state: State, range: Range): boolean => {
-  for (const m of state.merges.byAnchor.values()) {
-    if (m.sheet !== range.sheet) continue;
-    if (m.r1 < range.r0 || m.r0 > range.r1) continue;
-    if (m.c1 < range.c0 || m.c0 > range.c1) continue;
-    return true;
-  }
-  return false;
-};
+const rangeIntersectsMerges = (state: State, range: Range): boolean =>
+  [...state.merges.byAnchor.values()].some((m) => rangesIntersect(m, range));
 
 const ensureWritableRange = (state: State, range: Range): boolean => {
   for (let r = range.r0; r <= range.r1; r += 1) {

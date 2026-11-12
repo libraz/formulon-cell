@@ -874,8 +874,7 @@ function writeShiftedCells(
   for (let sheet = 0; sheet < allSheets.length; sheet += 1) {
     const formulaSheet = allSheets[sheet] ?? [];
     for (const cell of formulaSheet) {
-      if (!cell.formula || (sheet === affected.sheet && rangeContainsAddr(affected, cell.addr)))
-        continue;
+      if (!cell.formula || rangeContainsAddr(affected, cell.addr)) continue;
       const nextFormula = adjustFormulaForCellBandShift(cell.formula, affected, axis, delta, {
         editedSheet: affected.sheet,
         formulaSheet: sheet,
