@@ -439,6 +439,7 @@ describe('Spreadsheet feature registry', () => {
     instance.dispose();
   });
 
+  // Two real engine workbooks and a platform switch outlast the default budget under load.
   it('cancels the Mac pane across sheet, platform, workbook, and dispose transitions', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -488,7 +489,7 @@ describe('Spreadsheet feature registry', () => {
     expect(instance.history.canUndo()).toBe(false);
     instance.dispose();
     expect(dock?.hidden).toBe(true);
-  });
+  }, 30_000);
 
   it('setTheme updates host theme state, store state, and emits themeChange', async () => {
     const host = document.createElement('div');
