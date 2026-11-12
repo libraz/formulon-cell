@@ -701,13 +701,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
               commentAt(store.getState(), activeAddr) === null
             ),
         )
-        // A protected sheet without Edit objects drops a note's edit and delete rows entirely.
+        // A protected sheet without Edit objects drops a note's edit and delete rows entirely,
+        // and on the Mac New Note as well.
         .filter(
           (e) =>
             !(
               e.kind === 'item' &&
               (e.id === 'insertComment' || e.id === 'deleteComment') &&
-              commentAt(store.getState(), activeAddr) !== null &&
+              (mac || commentAt(store.getState(), activeAddr) !== null) &&
               !noteChangePermitted(store.getState(), activeAddr)
             ),
         )

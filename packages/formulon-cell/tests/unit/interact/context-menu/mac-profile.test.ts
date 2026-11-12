@@ -239,6 +239,51 @@ describe('context menu on the Mac platform profile', () => {
     expect(label('deleteComment')).toBe('メモの削除');
   });
 
+  it('leaves New Note out of a protected sheet without Edit objects and greys the editing rows', () => {
+    setProtectedSheet(store, 0, true);
+    attach();
+    fireContextMenu(host, 200, 70);
+    expect(item('insertComment')).toBeNull();
+    const row = (id: string) =>
+      item(id) ?? document.querySelector<HTMLElement>(`.fc-ctxmenu [data-fc-submenu="${id}"]`);
+    const disabled = (id: string) => row(id)?.getAttribute('aria-disabled') === 'true';
+    for (const id of [
+      'cut',
+      'copy',
+      'paste',
+      'pasteSpecialMenu',
+      'filterMenu',
+      'sortMenu',
+      'newComment',
+    ]) {
+      expect(row(id), id).not.toBeNull();
+      expect(disabled(id), id).toBe(false);
+    }
+    for (const id of [
+      'insertCells',
+      'deleteCells',
+      'clear',
+      'formatCells',
+      'pickFromList',
+      'showPhonetic',
+      'defineName',
+      'insertHyperlink',
+      'openHyperlink',
+    ]) {
+      expect(disabled(id), id).toBe(true);
+    }
+    // New Comment stands alone between its separators.
+    const rows = Array.from(visibleMenu()?.children ?? []).map((el) =>
+      el.classList.contains('fc-ctxmenu__sep') ? '-' : (el as HTMLElement).dataset.fcAction,
+    );
+    const at = rows.indexOf('newComment');
+    expect([rows[at - 1], rows[at + 1]]).toEqual(['-', '-']);
+    document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    setProtectedSheet(store, 0, true, { permissions: { objects: true } });
+    fireContextMenu(host, 200, 70);
+    expect(label('insertComment')).toBe('新しいメモ');
+  });
+
   it('shows Mac shortcut glyphs and drops the Windows-only hints', () => {
     attach();
     fireContextMenu(host, 200, 70);
