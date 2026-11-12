@@ -51,7 +51,12 @@ const cellValues: { name: string; rule: ConditionalRule; value: CellValue; formu
       period: 'today',
       apply: { fill: conditionalFill },
     },
-    value: { kind: 'number', value: Math.floor(Date.now() / 86_400_000) + 25569 },
+    // Today in the local calendar, which the Today rule judges by.
+    value: {
+      kind: 'number',
+      value:
+        Math.floor((Date.now() - new Date().getTimezoneOffset() * 60_000) / 86_400_000) + 25569,
+    },
   },
   {
     name: 'blank condition',
