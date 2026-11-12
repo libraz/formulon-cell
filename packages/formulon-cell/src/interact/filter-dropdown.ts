@@ -16,6 +16,7 @@ import {
   type ConditionFilterOptions,
   type DistinctFilterFailureReason,
   distinctFilterItemsResult,
+  isFilterComparisonOp,
   resetFilterCriteria,
 } from '../commands/filter.js';
 import { filterUseWrite } from '../commands/filter-actions.js';
@@ -172,7 +173,18 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       const upper = field('condition-value2').trim();
       return value && upper ? { op, value, value2: upper } : null;
     }
-    return value ? { op, value: field('condition-value') } : null;
+    if (!value) return null;
+    const first = { op, value: field('condition-value') };
+    const secondOp =
+      root.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op2')?.value ?? '';
+    const secondValue = field('condition-second').trim();
+    if (!isFilterComparisonOp(op) || !isFilterComparisonOp(secondOp) || !secondValue) {
+      return first;
+    }
+    const or = root.querySelector<HTMLInputElement>(
+      '.fc-filter-dropdown__condition-join input[value="or"]',
+    )?.checked;
+    return { ...first, second: { op: secondOp, value: secondValue }, join: or ? 'or' : 'and' };
   };
 
   /** Append options that stay listed but cannot be chosen. */
@@ -458,7 +470,62 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       conditionInput.addEventListener('change', () => autoApplyIfOn());
       upperInput.addEventListener('change', () => autoApplyIfOn());
       unitSelect.addEventListener('change', () => autoApplyIfOn());
-      conditionPanel.append(conditionSelect, conditionInput, upperInput, unitSelect);
+      // A second comparison joined by And or Or, offered once the first takes one operand. The
+      // row's layout on the Mac app is provisional until measured.
+      const active = activeCriteria?.condition;
+      const joinRow = ownerDocument.createElement('div');
+      joinRow.className = 'fc-filter-dropdown__condition-join';
+      joinRow.setAttribute('role', 'radiogroup');
+      const joinName = `fc-filter-join-${col}`;
+      for (const [value, label] of [
+        ['and', m.and],
+        ['or', m.or],
+      ] as const) {
+        const radioLabel = ownerDocument.createElement('label');
+        const radio = ownerDocument.createElement('input');
+        radio.type = 'radio';
+        radio.name = joinName;
+        radio.value = value;
+        radio.checked = (active?.join ?? 'and') === value;
+        radio.addEventListener('change', () => autoApplyIfOn());
+        radioLabel.append(radio, label);
+        joinRow.appendChild(radioLabel);
+      }
+      const secondSelect = createDialogSelect(
+        conditionOptions.filter(
+          (option) => option.value === '' || isFilterComparisonOp(option.value),
+        ),
+        active?.second?.op ?? '',
+        { ariaLabel: t.condition, className: 'fc-filter-dropdown__condition-op2' },
+      );
+      const secondInput = ownerDocument.createElement('input');
+      secondInput.type = 'text';
+      secondInput.className = 'fc-filter-dropdown__condition-second';
+      secondInput.setAttribute('aria-label', t.conditionValue);
+      if (active?.second) secondInput.value = operandText(active.second.value);
+      const syncSecond = (): void => {
+        const offered = isFilterComparisonOp(conditionSelect.value);
+        joinRow.hidden = !offered;
+        secondSelect.hidden = !offered;
+        secondInput.hidden = !offered || secondSelect.value === '';
+      };
+      syncSecond();
+      conditionSelect.addEventListener('change', syncSecond);
+      secondSelect.addEventListener('change', () => {
+        syncSecond();
+        if (secondSelect.value) secondInput.focus();
+        else autoApplyIfOn();
+      });
+      secondInput.addEventListener('change', () => autoApplyIfOn());
+      conditionPanel.append(
+        conditionSelect,
+        conditionInput,
+        upperInput,
+        unitSelect,
+        joinRow,
+        secondSelect,
+        secondInput,
+      );
     } else {
       conditionLabel.appendChild(conditionSelect);
       conditionPanel.append(conditionLabel, conditionInput);

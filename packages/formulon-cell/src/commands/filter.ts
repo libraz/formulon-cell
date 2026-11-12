@@ -12,6 +12,7 @@ import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
 import { excelSerialToDateParts } from '../format/date-serial.js';
 import { sameRange, sameRangeList } from '../store/selection-geometry.js';
 import type {
+  FilterComparisonOp,
   FilterConditionSpec,
   FilterSortSpec,
   SpreadsheetStore,
@@ -43,6 +44,25 @@ const numericConditionOperator = (op: ConditionFilterOp): boolean =>
   op === 'between' ||
   op === 'top10' ||
   op === 'bottom10';
+
+const COMPARISON_OPS: ReadonlySet<string> = new Set<FilterComparisonOp>([
+  'equals',
+  'notEquals',
+  'contains',
+  'notContains',
+  'beginsWith',
+  'notBeginsWith',
+  'endsWith',
+  'notEndsWith',
+  'greaterThan',
+  'greaterThanOrEqual',
+  'lessThan',
+  'lessThanOrEqual',
+]);
+
+/** Whether `op` is a one-operand comparison, which a two-condition custom filter can combine. */
+export const isFilterComparisonOp = (op: string): op is FilterComparisonOp =>
+  COMPARISON_OPS.has(op);
 
 /** Operators judged against the other numbers of their column. */
 const rankedConditionOperator = (op: ConditionFilterOp): boolean =>
@@ -344,6 +364,17 @@ export function applyConditionFilter(
         ? { unit: condition.unit ?? 'items' }
         : {}),
       ...(condition.op === 'datePeriod' && condition.period ? { period: condition.period } : {}),
+      ...(condition.second
+        ? {
+            second: {
+              op: condition.second.op,
+              value: numericConditionOperator(condition.second.op)
+                ? canonicalNumericCriterion(condition.second.value, locale)
+                : condition.second.value,
+            },
+            join: condition.join ?? 'and',
+          }
+        : {}),
     },
   });
   const { hidden, count } = recomputeHiddenFromCriteria(state, criteria, locale);
@@ -418,7 +449,7 @@ function recomputeHiddenFromCriteria(
       const hide = c.color
         ? !colorMatches(state, c.range.sheet, r, c.byCol, c.color)
         : c.condition
-          ? !conditionMatches(cell, c.condition, locale, bound, inPeriod)
+          ? !criteriaConditionMatches(cell, c.condition, locale, bound, inPeriod)
           : (hiddenSet as Set<string>).has(filterMatchKey(filterValueKey(cell?.value), locale));
       if (hide) next.add(r);
     }
@@ -910,6 +941,21 @@ function periodMatcher(
     const parts = excelSerialToDateParts(serial, date1904);
     return parts !== null && dateInPeriod(period, parts, today);
   };
+}
+
+/** A column's condition, its second comparison included. */
+function criteriaConditionMatches(
+  cell: { value: unknown; formula: string | null } | undefined,
+  condition: ConditionFilterOptions,
+  locale: string,
+  bound: number | null,
+  inPeriod: ((serial: number) => boolean) | null,
+): boolean {
+  const first = conditionMatches(cell, condition, locale, bound, inPeriod);
+  const { second } = condition;
+  if (!second) return first;
+  const other = conditionMatches(cell, { op: second.op, value: second.value }, locale);
+  return condition.join === 'or' ? first || other : first && other;
 }
 
 function conditionMatches(

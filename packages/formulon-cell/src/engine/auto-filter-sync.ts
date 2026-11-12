@@ -1,6 +1,7 @@
 import {
   type AutoFilter,
   type AutoFilterColumnInput,
+  type AutoFilterConditionInput,
   type AutoFilterEval,
   type AutoFilterInput,
   type AutoFilterSortStateInput,
@@ -16,10 +17,11 @@ import {
   datePeriodOfDynamicType,
   datePeriodXmlType,
 } from '../commands/date-periods.js';
-import { distinctValues, normalizeColorKey } from '../commands/filter.js';
+import { distinctValues, isFilterComparisonOp, normalizeColorKey } from '../commands/filter.js';
 import type { HiddenIndices } from '../store/row-visibility.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type {
+  FilterComparisonOp,
   FilterSortSpec,
   SpreadsheetStore,
   State,
@@ -335,40 +337,44 @@ function customColumnFromCriteria(
       ],
     };
   }
-  const literalWildcard = condition.op === 'equals' || condition.op === 'notEquals';
-  const op =
-    condition.op === 'equals' ||
-    condition.op === 'contains' ||
-    condition.op === 'beginsWith' ||
-    condition.op === 'endsWith'
-      ? FILTER_OPERATOR_EQUAL
-      : condition.op === 'notEquals' ||
-          condition.op === 'notContains' ||
-          condition.op === 'notBeginsWith' ||
-          condition.op === 'notEndsWith'
-        ? FILTER_OPERATOR_NOT_EQUAL
-        : condition.op === 'greaterThan'
-          ? FILTER_OPERATOR_GREATER_THAN
-          : condition.op === 'greaterThanOrEqual'
-            ? FILTER_OPERATOR_GREATER_THAN_OR_EQUAL
-            : condition.op === 'lessThan'
-              ? FILTER_OPERATOR_LESS_THAN
-              : FILTER_OPERATOR_LESS_THAN_OR_EQUAL;
+  const first = customConditionInput(condition.op as FilterComparisonOp, condition.value);
   return {
     ...base,
     kind: FILTER_KIND_CUSTOM,
-    conditions: [
-      {
-        operator: op,
-        value: isPatternOp(condition.op)
-          ? wildcardPattern(condition.op, condition.value)
-          : literalWildcard
-            ? escapeAutoFilterWildcardLiteral(condition.value)
-            : condition.value,
-      },
-    ],
+    ...(condition.second
+      ? {
+          customAnd: condition.join !== 'or',
+          conditions: [first, customConditionInput(condition.second.op, condition.second.value)],
+        }
+      : { conditions: [first] }),
   };
 }
+
+/** One comparison as a native custom condition. */
+function customConditionInput(op: FilterComparisonOp, value: string): AutoFilterConditionInput {
+  const operator =
+    op === 'equals' || op === 'contains' || op === 'beginsWith' || op === 'endsWith'
+      ? FILTER_OPERATOR_EQUAL
+      : op === 'notEquals' || op === 'notContains' || op === 'notBeginsWith' || op === 'notEndsWith'
+        ? FILTER_OPERATOR_NOT_EQUAL
+        : op === 'greaterThan'
+          ? FILTER_OPERATOR_GREATER_THAN
+          : op === 'greaterThanOrEqual'
+            ? FILTER_OPERATOR_GREATER_THAN_OR_EQUAL
+            : op === 'lessThan'
+              ? FILTER_OPERATOR_LESS_THAN
+              : FILTER_OPERATOR_LESS_THAN_OR_EQUAL;
+  return { operator, value: encodeComparisonValue(op, value) };
+}
+
+/** A comparison's operand as a custom condition stores it: text patterns become wildcards, and a
+ *  literal wildcard character in an equality is escaped. */
+const encodeComparisonValue = (op: FilterComparisonOp, value: string): string =>
+  isPatternOp(op)
+    ? wildcardPattern(op, value)
+    : op === 'equals' || op === 'notEquals'
+      ? escapeAutoFilterWildcardLiteral(value)
+      : value;
 
 const dxfIdCache = new WeakMap<WorkbookHandle, Map<string, number>>();
 
@@ -705,6 +711,24 @@ function localCriteriaFromTypedFilter(
         continue;
       }
     }
+    if (column.kind === FILTER_KIND_CUSTOM && column.conditions.length === 2 && first && second) {
+      const one = wildcardCondition(first.operator, first.value, locale);
+      const two = wildcardCondition(second.operator, second.value, locale);
+      if (one && two && isFilterComparisonOp(one.op) && isFilterComparisonOp(two.op)) {
+        criteria.push({
+          range,
+          byCol,
+          hiddenValues: [],
+          condition: {
+            op: one.op,
+            value: one.value,
+            second: { op: two.op, value: two.value },
+            join: column.customAnd ? 'and' : 'or',
+          },
+        });
+        continue;
+      }
+    }
     if (
       column.kind === FILTER_KIND_CUSTOM &&
       column.conditions.length === 1 &&
@@ -721,6 +745,10 @@ function localCriteriaFromTypedFilter(
   }
   return { range, criteria, unsupportedColumns };
 }
+
+/** One comparison as a `<customFilter>`. */
+const customFilterXml = (op: FilterComparisonOp, value: string): string =>
+  `<customFilter operator="${conditionOperator[op]}" val="${escapeXml(encodeComparisonValue(op, value))}"/>`;
 
 /** Serialises the application-owned subset of AutoFilter: its range, value
  * checklist and one custom comparison per column. Color criteria cannot be
@@ -765,14 +793,14 @@ export function autoFilterXmlFromState(
           `<filterColumn colId="${colId}"><customFilters and="1"><customFilter operator="greaterThanOrEqual" val="${escapeXml(operand)}"/><customFilter operator="lessThanOrEqual" val="${escapeXml(entry.condition.value2 ?? '')}"/></customFilters></filterColumn>`,
         ];
       }
-      const literalWildcard = entry.condition.op === 'equals' || entry.condition.op === 'notEquals';
-      const value = isPatternOp(entry.condition.op)
-        ? wildcardPattern(entry.condition.op, entry.condition.value)
-        : literalWildcard
-          ? escapeAutoFilterWildcardLiteral(entry.condition.value)
-          : entry.condition.value;
+      const { second } = entry.condition;
+      const filters = [
+        customFilterXml(op as FilterComparisonOp, operand),
+        ...(second ? [customFilterXml(second.op, second.value)] : []),
+      ].join('');
+      const and = second && entry.condition.join !== 'or' ? ' and="1"' : '';
       return [
-        `<filterColumn colId="${colId}"><customFilters><customFilter operator="${conditionOperator[op]}" val="${escapeXml(value)}"/></customFilters></filterColumn>`,
+        `<filterColumn colId="${colId}"><customFilters${and}>${filters}</customFilters></filterColumn>`,
       ];
     }
     const hidden = new Set(entry.hiddenValues.map((value) => filterMatchKey(value, locale)));

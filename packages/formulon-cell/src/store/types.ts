@@ -342,7 +342,28 @@ export interface FilterConditionSpec {
   unit?: 'items' | 'percent';
   /** The relative period of `datePeriod`. */
   period?: DatePeriodKey;
+  /** A second one-operand comparison on the same column, as a two-condition custom filter. */
+  second?: { op: FilterComparisonOp; value: string };
+  /** How `second` joins the first comparison; `and` when omitted. */
+  join?: 'and' | 'or';
 }
+
+/** The one-operand comparisons a two-condition custom filter combines. */
+export type FilterComparisonOp = Extract<
+  FilterConditionSpec['op'],
+  | 'equals'
+  | 'notEquals'
+  | 'contains'
+  | 'notContains'
+  | 'beginsWith'
+  | 'notBeginsWith'
+  | 'endsWith'
+  | 'notEndsWith'
+  | 'greaterThan'
+  | 'greaterThanOrEqual'
+  | 'lessThan'
+  | 'lessThanOrEqual'
+>;
 
 export type WorkbookViewMode = 'normal' | 'pageLayout' | 'pageBreakPreview';
 

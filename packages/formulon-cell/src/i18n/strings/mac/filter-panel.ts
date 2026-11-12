@@ -19,6 +19,9 @@ export interface MacFilterPanelStrings {
   bottom10: string;
   aboveAverage: string;
   belowAverage: string;
+  /** The join of a two-condition filter. */
+  and: string;
+  or: string;
   /** A date column's comparisons and relative periods. */
   before: string;
   beforeOrEqual: string;
@@ -68,6 +71,8 @@ type MacFilterPanelExtras = Pick<
   | 'bottom10'
   | 'aboveAverage'
   | 'belowAverage'
+  | 'and'
+  | 'or'
   | 'before'
   | 'beforeOrEqual'
   | 'after'
@@ -104,6 +109,8 @@ export const macFilterPanelFrom = (
 
 /** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasEn: MacFilterPanelExtras = {
+  and: 'And',
+  or: 'Or',
   sortSection: 'Sort',
   filterSection: 'Filter',
   close: 'Close',
@@ -165,6 +172,8 @@ const extrasEn: MacFilterPanelExtras = {
 
 /** Japanese Mac app wording, measured from Excel for Mac. */
 const extrasJa: MacFilterPanelExtras = {
+  and: 'および',
+  or: 'または',
   sortSection: '並べ替え',
   filterSection: 'フィルター',
   close: '閉じる',
@@ -226,6 +235,8 @@ const extrasJa: MacFilterPanelExtras = {
 
 /** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasDe: MacFilterPanelExtras = {
+  and: 'Und',
+  or: 'Oder',
   sortSection: 'Sortieren',
   filterSection: 'Filter',
   close: 'Schließen',
@@ -287,6 +298,8 @@ const extrasDe: MacFilterPanelExtras = {
 
 /** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasFr: MacFilterPanelExtras = {
+  and: 'Et',
+  or: 'Ou',
   sortSection: 'Trier',
   filterSection: 'Filtrer',
   close: 'Fermer',
@@ -348,6 +361,8 @@ const extrasFr: MacFilterPanelExtras = {
 
 /** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasZh: MacFilterPanelExtras = {
+  and: '与',
+  or: '或者',
   sortSection: '排序',
   filterSection: '筛选器',
   close: '关闭',
@@ -409,6 +424,8 @@ const extrasZh: MacFilterPanelExtras = {
 
 /** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasKo: MacFilterPanelExtras = {
+  and: '그리고',
+  or: '논리합',
   sortSection: '정렬',
   filterSection: '필터',
   close: '닫기',
@@ -470,6 +487,8 @@ const extrasKo: MacFilterPanelExtras = {
 
 /** Shared-derived wording for this locale; the panel builder overrides the fields the Excel bundle answers. */
 const extrasTh: MacFilterPanelExtras = {
+  and: 'และ',
+  or: 'หรือ',
   sortSection: 'เรียงลำดับ',
   filterSection: 'ตัวกรอง',
   close: 'ปิด',
