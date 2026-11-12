@@ -106,7 +106,6 @@ describe('dictionaries', () => {
     expect(ja.pivotTableDialog.fieldSettingsFiltersHelp).toBe(
       'フィルター フィールドはページ軸として作成されます。',
     );
-    expect(ja.workbookObjects.backToWorkbookObjects).toBe('ブック オブジェクトに戻る');
     expect(ja.workbookObjects.compatibilityDetails.loadedTables).toBe(
       'エンジンから報告された読み込み済みテーブルを一覧し、保存時に保持します。',
     );

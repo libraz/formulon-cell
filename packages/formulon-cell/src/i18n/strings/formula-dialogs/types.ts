@@ -30,7 +30,6 @@ export interface FormulaDialogsStrings {
     selectNameActionReason: string;
     filterRequiresNames: string;
     quickRefersRequiresSelection: string;
-    scopeWorkbookOnly: string;
     filterAll: string;
     filterNamesWithErrors: string;
     filterNamesWithoutErrors: string;

@@ -48,7 +48,6 @@ export const macJa: MacStrings = {
     consolidate: {
       title: '統合の設定',
       sources: '統合元範囲:',
-      sourcesHint: '範囲を 1 行に 1 つ入力',
       destination: '統合先',
       function: '集計の方法:',
       replace: '現在の内容を置き換える',

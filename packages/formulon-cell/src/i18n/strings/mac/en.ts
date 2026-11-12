@@ -55,7 +55,6 @@ export const macEn: MacStrings = {
     consolidate: {
       title: 'Consolidate',
       sources: 'References',
-      sourcesHint: 'One range per line',
       destination: 'Copy results to',
       function: 'Function',
       replace: 'Replace current contents',

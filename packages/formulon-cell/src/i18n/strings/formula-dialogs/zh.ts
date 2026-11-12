@@ -25,7 +25,6 @@ export const formulaDialogsZh: FormulaDialogsStrings = {
     selectNameActionReason: '请先选择一个定义的名称。',
     filterRequiresNames: '没有可筛选的定义名称。',
     quickRefersRequiresSelection: '请选择一个定义的名称以编辑其引用。',
-    scopeWorkbookOnly: '在此对话框中创建的名称使用工作簿范围。',
     filterAll: '清除筛选',
     filterNamesWithErrors: '包含错误的名称',
     filterNamesWithoutErrors: '不包含错误的名称',

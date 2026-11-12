@@ -861,16 +861,9 @@ describe('toolbar/ribbon-model', () => {
     expect(toolbarMenuText('en').autosumMoreFunctions).toBe('More Functions...');
     expect(toolbarMenuText('ja').tableStyleDark).toBe('濃色');
     expect(toolbarMenuText('en').tableStyleDark).toBe('Dark');
-    expect(toolbarMenuText('ja').scriptCommandPrompt).toContain(
-      'スクリプト コマンドを入力してください',
-    );
     expect(toolbarMenuText('ja').autoFitRowHeight).toBe('行の高さの自動調整');
     expect(toolbarMenuText('en').autoFitColWidth).toBe('AutoFit Column Width');
     expect(toolbarMenuText('ja').orientationAngleCounterclockwise).toBe('左回りに回転');
-    expect(toolbarMenuText('en').orientationHorizontalText).toBe('Horizontal Text');
-    expect(toolbarMenuText('en').scriptCommandPrompt).toBe(
-      'Script command: uppercase, lowercase, trim, clear',
-    );
     expect(toolbarMenuText('ja').automationRunStatus).toBe(
       'スクリプト · {count} 個のセルを変更しました',
     );

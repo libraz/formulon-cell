@@ -25,8 +25,6 @@ export const formulaDialogsFr: FormulaDialogsStrings = {
     selectNameActionReason: 'Sélectionnez d’abord un nom défini.',
     filterRequiresNames: 'Aucun nom défini à filtrer.',
     quickRefersRequiresSelection: 'Sélectionnez un nom défini pour modifier sa référence.',
-    scopeWorkbookOnly:
-      'Les noms créés dans cette boîte de dialogue utilisent l’étendue du classeur.',
     filterAll: 'Effacer le filtre',
     filterNamesWithErrors: 'Noms comportant des erreurs',
     filterNamesWithoutErrors: 'Noms sans erreur',

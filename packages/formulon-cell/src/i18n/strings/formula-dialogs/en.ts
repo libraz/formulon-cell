@@ -25,7 +25,6 @@ export const formulaDialogsEn: FormulaDialogsStrings = {
     selectNameActionReason: 'Select a defined name first.',
     filterRequiresNames: 'There are no defined names to filter.',
     quickRefersRequiresSelection: 'Select a defined name to edit its reference.',
-    scopeWorkbookOnly: 'Workbook scope is used for names created in this dialog.',
     filterAll: 'Clear Filter',
     filterNamesWithErrors: 'Names with Errors',
     filterNamesWithoutErrors: 'Names without Errors',

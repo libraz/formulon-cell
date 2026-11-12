@@ -55,7 +55,6 @@ export const macZh: MacStrings = {
     consolidate: {
       title: '合并计算',
       sources: '引用位置',
-      sourcesHint: '每行一个区域',
       destination: '将结果复制到',
       function: '函数',
       replace: '替换当前内容',

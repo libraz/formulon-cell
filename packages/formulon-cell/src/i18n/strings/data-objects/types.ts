@@ -39,7 +39,6 @@ export interface DataObjectsStrings {
     filterConditionCategoryDate: string;
     filterCondition: string;
     filterConditionNone: string;
-    filterConditionUnsupportedSuffix: string;
     filterConditionLabelEquals: string;
     filterConditionLabelDoesNotEqual: string;
     filterConditionLabelContains: string;
@@ -57,7 +56,6 @@ export interface DataObjectsStrings {
     filterConditionValueNotBetween: string;
     filterConditionValueTop10: string;
     filterConditionValue: string;
-    filterConditionValuePlaceholder: string;
     filterConditionTextPlaceholder: string;
     filterConditionNumberPlaceholder: string;
     filterConditionTopCountPlaceholder: string;
@@ -182,7 +180,6 @@ export interface DataObjectsStrings {
         string
       >;
     };
-    backToWorkbookObjects: string;
     pivotFieldSearch: string;
     pivotFieldName: string;
     pivotDragFieldsHint: string;

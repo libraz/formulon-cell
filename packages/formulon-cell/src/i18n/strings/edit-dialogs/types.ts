@@ -111,7 +111,6 @@ export interface EditDialogsStrings {
     title: string;
     findTab: string;
     replaceTab: string;
-    replaceLabel: string;
     findWhat: string;
     replaceWith: string;
     optionsMore: string;
@@ -131,7 +130,6 @@ export interface EditDialogsStrings {
     matchEntire: string;
     format: string;
     formatUnavailable: string;
-    lookInRequiresFindTab: string;
     findAll: string;
     prev: string;
     next: string;

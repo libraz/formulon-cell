@@ -117,7 +117,6 @@ export interface MacStrings {
     consolidate: {
       title: string;
       sources: string;
-      sourcesHint: string;
       destination: string;
       function: string;
       replace: string;

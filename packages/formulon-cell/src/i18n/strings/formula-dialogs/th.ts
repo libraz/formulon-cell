@@ -25,7 +25,6 @@ export const formulaDialogsTh: FormulaDialogsStrings = {
     selectNameActionReason: 'เลือกชื่อที่กำหนดไว้ก่อน',
     filterRequiresNames: 'ไม่มีชื่อที่กำหนดไว้ให้กรอง',
     quickRefersRequiresSelection: 'เลือกชื่อที่กำหนดไว้เพื่อแก้ไขการอ้างอิง',
-    scopeWorkbookOnly: 'ชื่อที่สร้างในกล่องโต้ตอบนี้จะใช้ขอบเขตเวิร์กบุ๊ก',
     filterAll: 'ล้างตัวกรอง',
     filterNamesWithErrors: 'ชื่อที่มีข้อผิดพลาด',
     filterNamesWithoutErrors: 'ชื่อที่ไม่มีข้อผิดพลาด',

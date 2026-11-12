@@ -230,7 +230,6 @@ export interface CellFormatStrings {
     hyperlinkPlaceholder: string;
     comment: string;
     commentPlaceholder: string;
-    validationListSource: string;
     validationListPlaceholder: string;
     validationListSourceKind: string;
     validationListSourceLiteral: string;
@@ -296,7 +295,6 @@ export interface CellFormatStrings {
     styleTwoColorScale: string;
     styleThreeColorScale: string;
     rangeLabel: string;
-    rangeAuto: string;
     addRule: string;
     saveRule: string;
     removeRule: string;
@@ -338,7 +336,6 @@ export interface CellFormatStrings {
     formatLightRedFill: string;
     formatRedBorder: string;
     formatCustom: string;
-    formatPlain: string;
     previewText: string;
     bold: string;
     italic: string;
@@ -465,13 +462,10 @@ export interface CellFormatStrings {
     scopeLabel: string;
     scopeCurrentSelection: string;
     scopeThisWorksheet: string;
-    headerPriority: string;
     headerRule: string;
     headerFormat: string;
     headerAppliesTo: string;
     headerStopIfTrue: string;
-    headerType: string;
-    headerRange: string;
     headerActions: string;
     ruleExpression: string;
     ruleCellIs: string;

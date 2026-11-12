@@ -25,7 +25,6 @@ export const formulaDialogsKo: FormulaDialogsStrings = {
     selectNameActionReason: '먼저 정의된 이름을 선택하세요.',
     filterRequiresNames: '필터링할 정의된 이름이 없습니다.',
     quickRefersRequiresSelection: '참조 대상을 편집하려면 정의된 이름을 선택하세요.',
-    scopeWorkbookOnly: '이 대화 상자에서 만든 이름에는 통합 문서 범위가 사용됩니다.',
     filterAll: '필터 지우기',
     filterNamesWithErrors: '오류가 있는 이름',
     filterNamesWithoutErrors: '오류가 없는 이름',

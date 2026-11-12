@@ -1,11 +1,6 @@
 export interface RibbonStrings {
   toolbar: {
     formatPainter: string;
-    formatPainterStickyHint: string;
-    freezePanesMenu: string;
-    freezeFirstRow: string;
-    freezeFirstCol: string;
-    freezeAtSelection: string;
     unfreeze: string;
     unfreezePanes: string;
   };
@@ -101,7 +96,6 @@ export interface RibbonStrings {
     filter: string;
     styles: string;
     conditionalFormatting: string;
-    manageRules: string;
     tables: string;
     charts: string;
     illustrations: string;
@@ -284,7 +278,6 @@ export interface RibbonStrings {
     chart: string;
     pasteSpecial: string;
     borders: string;
-    borderPattern: string;
     borderLineStyle: string;
     noBorder: string;
     outsideBorders: string;
@@ -523,7 +516,6 @@ export interface RibbonStrings {
     status: string;
     location: string;
     typeValue: string;
-    statusValue: string;
     locationValue: string;
     commandUnavailable: string;
   };

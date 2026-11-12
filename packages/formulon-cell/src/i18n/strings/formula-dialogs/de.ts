@@ -26,8 +26,6 @@ export const formulaDialogsDe: FormulaDialogsStrings = {
     filterRequiresNames: 'Es gibt keine definierten Namen zum Filtern.',
     quickRefersRequiresSelection:
       'Wählen Sie einen definierten Namen aus, um dessen Bezug zu bearbeiten.',
-    scopeWorkbookOnly:
-      'Für Namen, die in diesem Dialog erstellt werden, wird der Gültigkeitsbereich Arbeitsmappe verwendet.',
     filterAll: 'Filter löschen',
     filterNamesWithErrors: 'Namen mit Fehlern',
     filterNamesWithoutErrors: 'Namen ohne Fehler',

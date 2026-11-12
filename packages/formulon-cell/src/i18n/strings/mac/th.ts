@@ -55,7 +55,6 @@ export const macTh: MacStrings = {
     consolidate: {
       title: 'รวม',
       sources: 'การอ้างอิง',
-      sourcesHint: 'หนึ่งช่วงต่อหนึ่งบรรทัด',
       destination: 'คัดลอกผลลัพธ์ไปยัง',
       function: 'ฟังก์ชัน',
       replace: 'แทนที่เนื้อหาปัจจุบัน',

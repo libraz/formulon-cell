@@ -55,7 +55,6 @@ export const macKo: MacStrings = {
     consolidate: {
       title: '통합',
       sources: '참조',
-      sourcesHint: '한 줄에 하나의 범위',
       destination: '결과 복사 위치',
       function: '함수',
       replace: '현재 내용 바꾸기',

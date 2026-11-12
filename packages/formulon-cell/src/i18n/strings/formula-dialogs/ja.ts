@@ -25,7 +25,6 @@ export const formulaDialogsJa: FormulaDialogsStrings = {
     selectNameActionReason: '先に定義済みの名前を選択してください。',
     filterRequiresNames: 'フィルターする定義済みの名前がありません。',
     quickRefersRequiresSelection: '参照範囲を編集するには、定義済みの名前を選択してください。',
-    scopeWorkbookOnly: 'このダイアログで作成する名前にはブック範囲を使用します。',
     filterAll: 'フィルターのクリア',
     filterNamesWithErrors: 'エラーのある名前',
     filterNamesWithoutErrors: 'エラーのない名前',
