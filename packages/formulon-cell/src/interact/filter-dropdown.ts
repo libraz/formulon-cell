@@ -39,7 +39,7 @@ import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
 import type { ConditionalIconSet } from '../store/types/conditional-rule.js';
 import type { FilterColorSpec } from '../store/types.js';
-import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
@@ -192,18 +192,6 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       '.fc-filter-dropdown__condition-join input[value="or"]',
     )?.checked;
     return { ...first, second: { op: secondOp, value: secondValue }, join: or ? 'or' : 'and' };
-  };
-
-  /** Append options that stay listed but cannot be chosen. */
-  const appendDisabledOptions = (select: HTMLSelectElement, labels: readonly string[]): void => {
-    const first = select.options.length;
-    appendDialogSelectOptions(
-      select,
-      labels.map((label) => ({ value: label, label })),
-    );
-    for (const option of Array.from(select.options).slice(first)) {
-      projectDisabledState(option, true, strings.mac.filterPanel.unavailable);
-    }
   };
 
   /** A filter change made from this dropdown under `commandId`. */
@@ -836,24 +824,44 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         );
         sortRow.append(button);
       }
-      const colorSelect = (disabledOptions: readonly string[]): HTMLElement => {
-        const row = ownerDocument.createElement('label');
-        row.className = 'fc-filter-dropdown__color';
-        const text = ownerDocument.createElement('span');
-        text.textContent = m.byColor;
-        const select = createDialogSelect([{ value: '', label: m.colorNone }], '', {
-          ariaLabel: m.byColor,
-        });
-        appendDisabledOptions(select, disabledOptions);
-        projectDisabledState(select, true, m.unavailable);
-        row.append(text, select);
-        return row;
+      // The colour or icon the column was last sorted by, which the sort side shows as picked.
+      const sortColor = (): FilterColorSpec | undefined => {
+        const key = deps.store
+          .getState()
+          .ui.filterSorts?.find((spec) => sameRange(spec.range, range))
+          ?.keys.find((k) => k.byCol === col);
+        if (key?.sortOn === 'cellIcon' && key.icon) return { kind: 'cellIcon', icon: key.icon };
+        if ((key?.sortOn === 'cellColor' || key?.sortOn === 'fontColor') && key.color) {
+          return { kind: key.sortOn, color: key.color };
+        }
+        return undefined;
       };
-      // The filter side's By color: a kind, then the fills, font colours or icons the column shows.
-      // The pop-up's layout on the Mac app is provisional until measured.
-      const colorFilterRow = (): HTMLElement => {
-        const choices = columnColorChoices(state, range, col);
-        const active = activeCriteria?.color;
+      // Rows with the colour or icon go first, as the desktop's Sort by color does.
+      const sortByColor = (wb: WorkbookHandle, history: History, color: FilterColorSpec): void => {
+        sortRangeWithHistory({
+          store: deps.store,
+          workbook: wb,
+          history,
+          range,
+          options: {
+            byCol: col,
+            direction: 'asc',
+            hasHeader: true,
+            keys: [
+              color.kind === 'cellIcon'
+                ? { byCol: col, direction: 'asc', sortOn: 'cellIcon', icon: color.icon }
+                : { byCol: col, direction: 'asc', sortOn: color.kind, color: color.color },
+            ],
+          },
+          origin: 'contextMenu',
+          commandId: 'sortAsc',
+        });
+      };
+      // By color, on the sort side and on the filter side: a kind, then the fills, font colours or
+      // icons the column shows. The pop-up's layout on the Mac app is provisional until measured.
+      const choices = columnColorChoices(state, range, col);
+      const colorPopup = (side: 'sort' | 'filter'): HTMLElement => {
+        const active = side === 'filter' ? activeCriteria?.color : sortColor();
         const wrap = ownerDocument.createElement('div');
         wrap.className = 'fc-filter-dropdown__color-filter';
         const row = ownerDocument.createElement('label');
@@ -876,13 +884,17 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         swatches.setAttribute('role', 'group');
         const applyColor = (color: FilterColorSpec | null): void => {
           const wb = deps.getWb?.();
-          filterUseWrite(dropdownFilter('filterByValue', wb), range, undefined, () => {
-            if (color) {
-              applyColorFilter(deps.store.getState(), deps.store, range, col, color, wb);
-            } else {
-              applyValueFilter(deps.store.getState(), deps.store, range, col, [], wb);
-            }
-          });
+          if (side === 'sort') {
+            if (color && wb && deps.history) sortByColor(wb, deps.history, color);
+          } else {
+            filterUseWrite(dropdownFilter('filterByValue', wb), range, undefined, () => {
+              if (color) {
+                applyColorFilter(deps.store.getState(), deps.store, range, col, color, wb);
+              } else {
+                applyValueFilter(deps.store.getState(), deps.store, range, col, [], wb);
+              }
+            });
+          }
           open(range, col, anchor);
         };
         const swatch = (label: string, pressed: boolean, color: FilterColorSpec) => {
@@ -924,9 +936,18 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
           }
         };
         select.addEventListener('change', () => {
-          if (select.value === '' && active) applyColor(null);
+          if (select.value === '' && active && side === 'filter') applyColor(null);
           else renderSwatches();
         });
+        if (side === 'sort') {
+          projectDisabledState(
+            select,
+            !deps.getWb ||
+              !deps.history ||
+              !canExecuteBuiltIn(deps.store, 'sortAsc', 'contextMenu').allowed,
+            m.unavailable,
+          );
+        }
         renderSwatches();
         wrap.append(row, swatches);
         return wrap;
@@ -946,17 +967,16 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       };
       const rule = ownerDocument.createElement('hr');
       rule.className = 'fc-filter-dropdown__rule';
-      const colorChoices = [m.cellColor, m.fontColor, m.cellIcon];
       r.append(
         closeButton,
         title,
         section(m.sortSection),
         sortRow,
-        colorSelect(colorChoices),
+        colorPopup('sort'),
         rule,
         section(m.filterSection),
       );
-      colorBy = colorFilterRow();
+      colorBy = colorPopup('filter');
     } else {
       actions.append(clear, apply);
     }

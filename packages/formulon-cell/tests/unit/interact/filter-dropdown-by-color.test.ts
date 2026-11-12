@@ -57,14 +57,17 @@ const open = (store: SpreadsheetStore): void => {
   }).open(RANGE, 0, { x: 10, y: 20, h: 24 });
 };
 
+// The filter side's pop-up, below the sort side's.
+const filterSide = () =>
+  document.querySelectorAll<HTMLElement>(
+    '.fc-filter-dropdown .fc-filter-dropdown__color-filter',
+  )[1] as HTMLElement;
 const kind = () =>
-  document.querySelector<HTMLSelectElement>(
-    '.fc-filter-dropdown .fc-filter-dropdown__color-kind',
+  filterSide().querySelector<HTMLSelectElement>(
+    '.fc-filter-dropdown__color-kind',
   ) as HTMLSelectElement;
 const swatches = () => [
-  ...document.querySelectorAll<HTMLButtonElement>(
-    '.fc-filter-dropdown .fc-filter-dropdown__swatch',
-  ),
+  ...filterSide().querySelectorAll<HTMLButtonElement>('.fc-filter-dropdown__swatch'),
 ];
 const choose = (value: string): void => {
   kind().value = value;

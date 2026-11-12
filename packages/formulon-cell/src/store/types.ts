@@ -301,8 +301,20 @@ export interface ValueFilterCriteria {
 
 export interface FilterSortSpec {
   range: Range;
-  /** Value sort levels, most significant first. */
-  keys: Array<{ byCol: number; direction: 'asc' | 'desc' }>;
+  /** Sort levels, most significant first. */
+  keys: FilterSortKey[];
+}
+
+/** One sort level of a filtered range: by value, or with one fill, font colour or conditional
+ *  formatting icon first (last when descending). */
+export interface FilterSortKey {
+  byCol: number;
+  direction: 'asc' | 'desc';
+  sortOn?: 'cellColor' | 'fontColor' | 'cellIcon';
+  /** The colour of a colour level, lower-cased. */
+  color?: string;
+  /** The icon of an icon level. */
+  icon?: ConditionalIconRef;
 }
 
 /** A filter by colour: rows whose cell fill or font colour is `color`, or whose conditional

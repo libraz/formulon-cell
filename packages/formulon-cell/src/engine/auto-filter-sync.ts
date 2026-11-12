@@ -4,6 +4,7 @@ import {
   type AutoFilterConditionInput,
   type AutoFilterEval,
   type AutoFilterInput,
+  type AutoFilterSortConditionInput,
   type AutoFilterSortStateInput,
   ComparisonOperator,
   DynamicFilterType,
@@ -28,6 +29,7 @@ import type { HiddenIndices } from '../store/row-visibility.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type {
   FilterComparisonOp,
+  FilterSortKey,
   FilterSortSpec,
   SpreadsheetStore,
   State,
@@ -408,6 +410,32 @@ const dxfIdCache = new WeakMap<WorkbookHandle, Map<string, number>>();
 
 /** Color column backed by a differential style holding the filter color; null
  * when the engine cannot author differential styles. */
+/** The differential format whose fill (`cellColor`) or font colour carries `color`, issued once
+ *  per workbook; null when the engine cannot author one. */
+function dxfIdForColor(
+  wb: WorkbookHandle | undefined,
+  kind: 'cellColor' | 'fontColor',
+  color: string,
+): number | null {
+  if (!wb?.capabilities.conditionalFormatDxf) return null;
+  const dxf = dxfRecordFromApply(wb, kind === 'cellColor' ? { fill: color } : { color });
+  if (!dxf) return null;
+  // addDxf appends, so reuse the id already issued for this color.
+  const key = JSON.stringify(dxf);
+  let ids = dxfIdCache.get(wb);
+  if (!ids) {
+    ids = new Map();
+    dxfIdCache.set(wb, ids);
+  }
+  let dxfId = ids.get(key);
+  if (dxfId === undefined || !wb.getDxf(dxfId)) {
+    dxfId = wb.addDxf(dxf);
+    if (dxfId < 0) return null;
+    ids.set(key, dxfId);
+  }
+  return dxfId;
+}
+
 function colorColumnFromCriteria(
   wb: WorkbookHandle | undefined,
   colId: number,
@@ -424,23 +452,9 @@ function colorColumnFromCriteria(
         }
       : null;
   }
-  if (!wb?.capabilities.conditionalFormatDxf) return null;
   const cell = color.kind === 'cellColor';
-  const dxf = dxfRecordFromApply(wb, cell ? { fill: color.color } : { color: color.color });
-  if (!dxf) return null;
-  // addDxf appends, so reuse the id already issued for this color.
-  const key = JSON.stringify(dxf);
-  let ids = dxfIdCache.get(wb);
-  if (!ids) {
-    ids = new Map();
-    dxfIdCache.set(wb, ids);
-  }
-  let dxfId = ids.get(key);
-  if (dxfId === undefined || !wb.getDxf(dxfId)) {
-    dxfId = wb.addDxf(dxf);
-    if (dxfId < 0) return null;
-    ids.set(key, dxfId);
-  }
+  const dxfId = dxfIdForColor(wb, color.kind, color.color);
+  if (dxfId === null) return null;
   return {
     ...emptyAutoFilterColumn(colId),
     kind: FILTER_KIND_COLOR,
@@ -450,44 +464,75 @@ function colorColumnFromCriteria(
 }
 
 /** The `<sortState>` for a sort of `spec.range`'s data rows by value. */
-function sortStateFromSpec(spec: FilterSortSpec): AutoFilterSortStateInput {
+function sortStateFromSpec(spec: FilterSortSpec, wb?: WorkbookHandle): AutoFilterSortStateInput {
   const { range } = spec;
   return {
     range: { firstRow: range.r0 + 1, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
     columnSort: false,
     caseSensitive: false,
     sortMethod: SortMethod.None,
-    conditions: spec.keys.map((key) => ({
-      range: {
-        firstRow: range.r0 + 1,
-        firstCol: key.byCol,
-        lastRow: range.r1,
-        lastCol: key.byCol,
-      },
-      descending: key.direction === 'desc',
-      sortBy: SORT_BY_VALUE,
-      customList: null,
-    })),
+    conditions: spec.keys.flatMap((key): AutoFilterSortConditionInput[] => {
+      const base = {
+        range: {
+          firstRow: range.r0 + 1,
+          firstCol: key.byCol,
+          lastRow: range.r1,
+          lastCol: key.byCol,
+        },
+        descending: key.direction === 'desc',
+        customList: null,
+      };
+      if ((key.sortOn === 'cellColor' || key.sortOn === 'fontColor') && key.color) {
+        const dxfIndex = dxfIdForColor(wb, key.sortOn, key.color);
+        if (dxfIndex === null) return [];
+        return [
+          {
+            ...base,
+            sortBy: key.sortOn === 'cellColor' ? SortBy.CellColor : SortBy.FontColor,
+            dxfIndex,
+          },
+        ];
+      }
+      if (key.sortOn === 'cellIcon' && key.icon) {
+        const icon = customIconToEngine(key.icon);
+        return icon
+          ? [{ ...base, sortBy: SortBy.Icon, iconSet: icon.iconSet, iconIndex: icon.iconIndex }]
+          : [];
+      }
+      return [{ ...base, sortBy: SORT_BY_VALUE }];
+    }),
   };
 }
 
-/** Value sort levels of a typed `<sortState>`; color, icon and custom-list
- *  levels have no cell-layer representation and are left out. */
-function sortSpecFromTyped(typed: AutoFilter, range: Range): FilterSortSpec | null {
+/** Value, colour and icon sort levels of a typed `<sortState>`; custom-list levels have no
+ *  cell-layer representation and are left out. */
+function sortSpecFromTyped(
+  typed: AutoFilter,
+  range: Range,
+  wb?: WorkbookHandle,
+): FilterSortSpec | null {
   const sort = typed.sort;
   if (!sort || sort.columnSort) return null;
-  const keys = sort.conditions
-    .filter(
-      (condition) =>
-        condition.sortBy === SORT_BY_VALUE &&
-        condition.customList === null &&
-        condition.range.firstCol >= range.c0 &&
-        condition.range.firstCol <= range.c1,
-    )
-    .map((condition) => ({
-      byCol: condition.range.firstCol,
-      direction: condition.descending ? ('desc' as const) : ('asc' as const),
-    }));
+  const keys = sort.conditions.flatMap((condition): FilterSortKey[] => {
+    const byCol = condition.range.firstCol;
+    if (condition.customList !== null || byCol < range.c0 || byCol > range.c1) return [];
+    const base = { byCol, direction: condition.descending ? ('desc' as const) : ('asc' as const) };
+    if (condition.sortBy === SORT_BY_VALUE) return [base];
+    if (condition.sortBy === SortBy.Icon) {
+      const icon =
+        condition.iconIndex === null
+          ? null
+          : customIconFromEngine({ iconSet: condition.iconSet, iconIndex: condition.iconIndex });
+      return icon ? [{ ...base, sortOn: 'cellIcon', icon }] : [];
+    }
+    if (condition.dxfIndex === null || !wb?.capabilities.conditionalFormatDxf) return [];
+    const apply = dxfToApply(wb, condition.dxfIndex);
+    const cell = condition.sortBy === SortBy.CellColor;
+    const color = cell ? apply.fill : apply.color;
+    return color
+      ? [{ ...base, sortOn: cell ? 'cellColor' : 'fontColor', color: normalizeColorKey(color) }]
+      : [];
+  });
   return keys.length > 0 ? { range, keys } : null;
 }
 
@@ -566,7 +611,7 @@ export function typedAutoFilterFromState(
       lastCol: range.c1,
     },
     columns: Array.from(columns.values()).sort((a, b) => a.columnOffset - b.columnOffset),
-    sort: sortForRange(state, range, imported),
+    sort: sortForRange(state, range, imported, wb),
   };
 }
 
@@ -574,15 +619,14 @@ function sortForRange(
   state: State,
   range: Range,
   imported: ImportedTypedFilter | undefined,
+  wb?: WorkbookHandle,
 ): AutoFilterSortStateInput | null {
   const spec = state.ui.filterSorts?.find((entry) => sameRange(entry.range, range));
-  if (spec) return sortStateFromSpec(spec);
-  // Levels the cell layer cannot show stay engine-owned until a sort replaces them.
+  if (spec) return sortStateFromSpec(spec, wb);
+  // Custom-list levels the cell layer cannot show stay engine-owned until a sort replaces them.
   const carried =
     imported && sameAutoFilterRange(imported.filter, range) ? imported.filter.sort : null;
-  return carried?.conditions.some((condition) => condition.sortBy !== SORT_BY_VALUE)
-    ? carried
-    : null;
+  return carried?.conditions.some((condition) => condition.customList !== null) ? carried : null;
 }
 
 function wildcardCondition(
@@ -659,10 +703,6 @@ function localCriteriaFromTypedFilter(
   const unsupportedColumns = new Set<number>();
   for (const column of filter.columns) {
     const byCol = range.c0 + column.columnOffset;
-    if (byCol < range.c0 || byCol > range.c1) {
-      unsupportedColumns.add(column.columnOffset);
-      continue;
-    }
     // The dropdown affordance flags have no cell-layer representation. Keep
     // their native column intact until that column is explicitly edited.
     if (column.hiddenButton || !column.showButton) {
@@ -1128,7 +1168,7 @@ function decodeTypedFilter(
   return {
     range: decoded.range,
     criteria: decoded.criteria,
-    sort: sortSpecFromTyped(typed, decoded.range),
+    sort: sortSpecFromTyped(typed, decoded.range, wb),
   };
 }
 

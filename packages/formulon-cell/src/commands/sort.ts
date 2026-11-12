@@ -3,8 +3,16 @@ import { createProfileTextSemantics, localeForWorkbook } from '../engine/profile
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { type ConditionalCellOverlay, evaluateConditional } from '../render/conditional.js';
 import { isSingleCell, rangeArea, rangesIntersect } from '../store/selection-geometry.js';
-import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import {
+  type CellFormat,
+  type FilterSortKey,
+  mutators,
+  type SpreadsheetStore,
+  type State,
+} from '../store/store.js';
+import type { ConditionalIconRef } from '../store/types/conditional-rule.js';
 import { type AuthorizedIntentFactory, authorizedWrite } from './authorized-write.js';
 import { customListsFor } from './autofill-series.js';
 import { recordCommentChange } from './comment.js';
@@ -62,10 +70,12 @@ export interface SortKey {
    *  For `orientation: 'leftToRight'` this is the key row instead. */
   byCol: number;
   direction: SortDirection;
-  /** Sort by values by default, or by cell/font color when specified. */
-  sortOn?: 'value' | 'cellColor' | 'fontColor' | 'customList';
+  /** Sort by values by default, or by cell/font color or conditional formatting icon. */
+  sortOn?: 'value' | 'cellColor' | 'fontColor' | 'cellIcon' | 'customList';
   /** Target color for color sorts. Matching rows sort first for asc, last for desc. */
   color?: string;
+  /** Target icon for icon sorts, matched as the color is. */
+  icon?: ConditionalIconRef;
   /** Custom list order for `sortOn: "customList"`. Built-in lists are used when omitted. */
   customList?: readonly string[];
 }
@@ -274,7 +284,7 @@ const nativeSortPermutation = (
     const ranks: number[] = [];
     for (let line = start; line <= last; line += 1) {
       const sortValue = sortKeyForCell(state, range.sheet, line, key, builtInLists, horizontal);
-      if (sortOn === 'cellColor' || sortOn === 'fontColor') {
+      if (sortOn === 'cellColor' || sortOn === 'fontColor' || sortOn === 'cellIcon') {
         ranks.push(sortValue.match === true ? 0 : 1);
       } else {
         // Unknown custom-list entries remain after all listed entries in both
@@ -411,6 +421,7 @@ const normalizedSortKeys = (opts: SortOptions): SortKey[] => {
       direction,
       ...(sortOn !== 'value' ? { sortOn } : {}),
       ...(key.color ? { color: key.color } : {}),
+      ...(key.icon ? { icon: { ...key.icon } } : {}),
       ...(key.customList ? { customList: [...key.customList] } : {}),
     });
   }
@@ -439,6 +450,17 @@ interface CellSortKey {
   customIndex?: number | null;
 }
 
+/** The conditional formatting overlays of `state`, computed once per state for an icon sort. */
+const overlayCache = new WeakMap<State, ReadonlyMap<string, ConditionalCellOverlay>>();
+const conditionalOverlays = (state: State): ReadonlyMap<string, ConditionalCellOverlay> => {
+  let overlays = overlayCache.get(state);
+  if (!overlays) {
+    overlays = evaluateConditional(state);
+    overlayCache.set(state, overlays);
+  }
+  return overlays;
+};
+
 const sortKeyForCell = (
   state: State,
   sheet: number,
@@ -450,6 +472,13 @@ const sortKeyForCell = (
   const sortOn = key.sortOn ?? 'value';
   const row = horizontal ? key.byCol : line;
   const col = horizontal ? line : key.byCol;
+  if (sortOn === 'cellIcon') {
+    const overlay = conditionalOverlays(state).get(addrKey({ sheet, row, col }));
+    return {
+      kind: 'color',
+      match: !!key.icon && overlay?.iconKind === key.icon.set && overlay.iconSlot === key.icon.slot,
+    };
+  }
   if (sortOn === 'cellColor' || sortOn === 'fontColor') {
     const fmt = state.format.formats.get(addrKey({ sheet, row, col }));
     const actual = sortOn === 'cellColor' ? fmt?.fill : fmt?.color;
@@ -819,9 +848,24 @@ export function sortRange(
     ? null
     : filterRangeForSort(store.getState(), range, opts.hasHeader === true);
   if (filterRange) {
-    const keys = sortKeys
-      .filter((key) => key.sortOn === undefined || key.sortOn === 'value')
-      .map((key) => ({ byCol: key.byCol, direction: key.direction }));
+    const keys = sortKeys.flatMap((key): FilterSortKey[] => {
+      const sortOn = key.sortOn ?? 'value';
+      if (sortOn === 'value') return [{ byCol: key.byCol, direction: key.direction }];
+      if ((sortOn === 'cellColor' || sortOn === 'fontColor') && key.color) {
+        return [
+          {
+            byCol: key.byCol,
+            direction: key.direction,
+            sortOn,
+            color: normalizeColorKey(key.color),
+          },
+        ];
+      }
+      if (sortOn === 'cellIcon' && key.icon) {
+        return [{ byCol: key.byCol, direction: key.direction, sortOn, icon: { ...key.icon } }];
+      }
+      return [];
+    });
     setFilterSort(store, history, filterRange, keys, wb);
   }
   return true;

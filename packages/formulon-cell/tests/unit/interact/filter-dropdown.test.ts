@@ -485,7 +485,7 @@ describe('attachFilterDropdown', () => {
         'fc-filter-dropdown__title',
         'fc-filter-dropdown__section',
         'fc-filter-dropdown__sort',
-        'fc-filter-dropdown__color',
+        'fc-filter-dropdown__color-filter',
         'fc-filter-dropdown__rule',
         'fc-filter-dropdown__section',
         'fc-filter-dropdown__color-filter',
@@ -551,7 +551,7 @@ describe('attachFilterDropdown', () => {
       handle.detach();
     });
 
-    it('sorts the column from the panel and greys the sort colour popup', async () => {
+    it('sorts the column from the panel and offers only the colours the column shows', async () => {
       const wb = await WorkbookHandle.createDefault();
       try {
         wb.setText({ sheet: 0, row: 0, col: 0 }, 'N');
@@ -582,15 +582,11 @@ describe('attachFilterDropdown', () => {
           '.fc-filter-dropdown__color select',
         );
         expect(colors?.length).toBe(2);
-        // The sort side's By color is still greyed; the filter side's offers what the column
-        // shows, here no colour at all.
-        expect(Array.from(colors ?? [], (c) => c.disabled)).toEqual([true, false]);
-        expect(Array.from(colors?.[1]?.options ?? [], (o) => o.disabled)).toEqual([
-          false,
-          true,
-          true,
-          true,
-        ]);
+        // Both By color pop-ups offer what the column shows, here no colour at all.
+        expect(Array.from(colors ?? [], (c) => c.disabled)).toEqual([false, false]);
+        for (const select of colors ?? []) {
+          expect(Array.from(select.options, (o) => o.disabled)).toEqual([false, true, true, true]);
+        }
         panel?.querySelector<HTMLButtonElement>('.fc-filter-dropdown__sort-asc')?.click();
         expect([1, 2, 3].map((r) => wb.getValue({ sheet: 0, row: r, col: 0 }))).toEqual([
           { kind: 'number', value: 1 },
