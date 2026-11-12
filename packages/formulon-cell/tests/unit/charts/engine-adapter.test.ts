@@ -2585,12 +2585,13 @@ describe('chartDataFromEngine', () => {
   });
 
   it('converts xy series, numbering points without x values', () => {
+    // Without numeric x values the engine reports no x number format.
     const series = (idx: number, x: Float64Array | null) => ({
       plotIndex: 0,
       seriesId: idx,
       name: `S${idx}`,
       numberFormat: 'General',
-      xNumberFormat: 'General',
+      xNumberFormat: x ? 'General' : null,
       filtered: false,
       values: new Float64Array([10, 20]),
       states: new Uint8Array([0, 1]),
@@ -2630,7 +2631,6 @@ describe('chartDataFromEngine', () => {
           id: 'series-1',
           name: 'S1',
           numberFormat: 'General',
-          xNumberFormat: 'General',
           points: [
             { id: 'point-0', x: 1, y: 10, state: 'value' },
             { id: 'point-1', x: 2, y: null, state: 'gap' },

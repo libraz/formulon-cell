@@ -133,8 +133,8 @@ describe('Sparkline Axis dialog on the Mac', () => {
     choose(radio(dlg, '日付軸'));
     expect(dateField?.disabled).toBe(false);
     const rtl = check(dlg, 'データを右から左にプロット');
-    expect(rtl.disabled).toBe(true);
-    expect(rtl.title).toContain('このオプションはまだサポートされていません。');
+    expect(rtl.disabled).toBe(false);
+    expect(rtl.checked).toBe(false);
   });
 
   it('applies the horizontal and vertical choices together as one undo step', async () => {
@@ -146,6 +146,7 @@ describe('Sparkline Axis dialog on the Mac', () => {
     ) as HTMLInputElement;
     dateField.value = 'A9:C9';
     choose(check(dlg, '軸の表示'));
+    choose(check(dlg, 'データを右から左にプロット'));
     dlg.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
     choose(radio(dlg, 'ユーザー設定値:', 0));
     const values = dlg.querySelectorAll<HTMLInputElement>('.fc-macsparkaxis__value');
@@ -159,14 +160,21 @@ describe('Sparkline Axis dialog on the Mac', () => {
       dateAxis: true,
       dateAxisRange: { sheet: 0, rect: { firstRow: 8, firstCol: 0, lastRow: 8, lastCol: 2 } },
       displayXAxis: true,
+      rightToLeft: true,
       minAxisType: SparklineAxisType.Custom,
       manualMin: -2.5,
       maxAxisType: SparklineAxisType.Group,
     });
+    // The dialog opens on the group's settings.
+    const again = await open();
+    expect(check(again, 'データを右から左にプロット').checked).toBe(true);
+    again.querySelector<HTMLButtonElement>('[data-dialog-action="cancel"]')?.click();
+    await vi.waitFor(() => expect(document.querySelector('.fc-macsparkaxis')).toBeNull());
     sheet.instance.history.undo();
     expect(settings()).toMatchObject({
       dateAxis: false,
       displayXAxis: false,
+      rightToLeft: false,
       minAxisType: SparklineAxisType.Individual,
       maxAxisType: SparklineAxisType.Individual,
     });

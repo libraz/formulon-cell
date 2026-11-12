@@ -157,11 +157,24 @@ describe('commands.can: intents', () => {
     const instance = await mount(makeHost());
     disposers.push(instance);
     const sheet = instance.workbook.sheet(0);
-    sheet.setHyperlink('A1', { target: null, location: `'${sheet.name}'!C5` });
+    sheet.setHyperlink({ range: 'A1', target: null, location: `'${sheet.name}'!C5` });
     instance.selection.set('A1');
     expect(instance.commands.can('openHyperlink')).toBe(true);
     instance.commands.execute('openHyperlink');
     expect(instance.selection.get().active).toEqual({ row: 4, col: 2 });
+  });
+
+  it('removes a hyperlink by any cell of its range', async () => {
+    const instance = await mount(makeHost());
+    disposers.push(instance);
+    const sheet = instance.workbook.sheet(0);
+    sheet.setHyperlink({ range: 'A1:B2', target: null, location: `'${sheet.name}'!C5` });
+    sheet.removeHyperlink('B2');
+    expect(sheet.listHyperlinks()).toEqual([]);
+    // The grid drops the link too: following it from A1 goes nowhere.
+    instance.selection.set('A1');
+    instance.commands.execute('openHyperlink');
+    expect(instance.selection.get().active).toEqual({ row: 0, col: 0 });
   });
 
   it('answers select and copy from the policy', async () => {

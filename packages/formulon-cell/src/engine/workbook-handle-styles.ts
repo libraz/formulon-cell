@@ -299,7 +299,7 @@ export abstract class WorkbookHandleStylesMethods {
     if (!this.capabilities.cellFormatting) return [];
     return orFallback([], () =>
       ws(this, sheet)
-        .ooxml.getCellXfIndices(range ? cellRect(range) : undefined)
+        .ooxml.listCellXfIndices(range ? cellRect(range) : undefined)
         .map((e) => ({ addr: { sheet, row: e.row, col: e.col }, xfIndex: e.xfIndex })),
     );
   }

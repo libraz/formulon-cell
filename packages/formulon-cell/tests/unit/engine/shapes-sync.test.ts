@@ -18,6 +18,7 @@ import {
 } from '../../../src/commands/shape-format.js';
 import { deleteRows, insertRows } from '../../../src/commands/structure.js';
 import { hydrateImagesFromEngine } from '../../../src/engine/images-sync.js';
+import { captureShapeRestore, shapeFromNative } from '../../../src/engine/shapes-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { EngineShape } from '../../../src/engine/workbook-handle-drawing-objects.js';
 import {
@@ -563,6 +564,16 @@ describe('loaded shapes the overlay cannot draw', () => {
     const { store } = await session(star);
 
     expect(only(store)).toMatchObject({ nativeLocked: true, lineDash: 'dash', opacity: 0 });
+  });
+
+  it('shows a custom geometry, which has no preset name, as a locked box it cannot restore', async () => {
+    const { wb, store } = await session(star);
+    const shape = wb.listShapes(0)[0];
+    if (!shape) throw new Error('no shape');
+    const custom = { ...shape, presetGeometry: null };
+    expect(shapeFromNative(store, 0, custom)).toMatchObject({ nativeLocked: true });
+    const handle = { listShapes: () => [custom] } as unknown as WorkbookHandle;
+    expect(captureShapeRestore(handle, 0, shape.objectId)).toBeNull();
   });
 
   it('treats a loaded line as a locked box, since its direction is unknown', async () => {

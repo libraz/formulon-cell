@@ -48,11 +48,7 @@ import {
   SPARKLINE_STYLE_SLOTS,
   sparklineStyleThumbnail,
 } from '../../toolbar/ribbon/menus/sparkline.js';
-import {
-  SPARKLINE_AXIS_DISABLED_ITEMS,
-  SPARKLINE_COMMANDS,
-  SPARKLINE_MENU_IDS,
-} from '../../toolbar/ribbon/sparkline-tabs.js';
+import { SPARKLINE_COMMANDS, SPARKLINE_MENU_IDS } from '../../toolbar/ribbon/sparkline-tabs.js';
 import { setMenuControlDisabled } from './menu-feedback.js';
 
 type SparklineDropdownDefaults = Pick<
@@ -229,6 +225,10 @@ export function createSparklineDropdownDefaults(
       const group = activeSparklineGroup(instance.store.getState());
       if (group)
         patchSelectedSparklineGroupsAction(ctx, { displayXAxis: !group.settings.displayXAxis });
+    } else if (value === 'rtl') {
+      const group = activeSparklineGroup(instance.store.getState());
+      if (group)
+        patchSelectedSparklineGroupsAction(ctx, { rightToLeft: !group.settings.rightToLeft });
     } else {
       const [end, mode] = value.split('-');
       if ((end !== 'min' && end !== 'max') || !mode) return;
@@ -349,6 +349,7 @@ export function createSparklineDropdownDefaults(
           general: !settings.dateAxis,
           date: settings.dateAxis,
           show: settings.displayXAxis,
+          rtl: settings.rightToLeft,
           'min-individual': settings.minAxisType === SparklineAxisType.Individual,
           'min-group': settings.minAxisType === SparklineAxisType.Group,
           'min-custom': settings.minAxisType === SparklineAxisType.Custom,
@@ -360,8 +361,6 @@ export function createSparklineDropdownDefaults(
           const value = button.dataset.sparklineAxis ?? '';
           button.setAttribute('aria-checked', String(checked[value] === true));
           button.classList.toggle('fc-tb__menu-item--active', checked[value] === true);
-          // The engine models no right-to-left plot, so that entry never runs.
-          if (SPARKLINE_AXIS_DISABLED_ITEMS.includes(value)) setMenuControlDisabled(button, true);
         }
       }
       if (menu.id === SPARKLINE_MENU_IDS.style) {

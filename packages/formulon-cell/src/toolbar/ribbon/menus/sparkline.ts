@@ -5,7 +5,6 @@ import { SHAPE_LINE_WEIGHTS } from '../../../commands/shape-format.js';
 import type { SparklineStylePreset } from '../../../commands/sparkline-presets.js';
 import { createColorPalette } from '../../../components/color-palette.js';
 import type { MacStrings } from '../../../i18n/strings/mac/types.js';
-import { projectDisabledState } from '../../menu-a11y.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarText } from '../../ribbon-model.js';
 import { createPenColorIcon } from '../border-icons.js';
@@ -294,16 +293,13 @@ export const createSparklineMenuFactories = (
     const menu = createMenu(SPARKLINE_MENU_IDS.axis);
     const radio = (label: string, value: SparklineAxisItem) =>
       checkable(item(label, 'sparklineAxis', value), 'menuitemradio');
-    // The engine models no right-to-left plot, so the entry stays greyed.
-    const rtl = checkable(item(t.plotRtl, 'sparklineAxis', 'rtl'), 'menuitemcheckbox');
-    projectDisabledState(rtl, true, null, { titlePrefix: t.plotRtl });
     menu.append(
       menuSectionHeader(t.horizontalAxis),
       radio(t.generalAxis, 'general'),
       // Date Axis Type opens a dialog, so it checks like the other axis types.
       radio(t.dateAxis, 'date'),
       checkable(item(t.showAxis, 'sparklineAxis', 'show'), 'menuitemcheckbox'),
-      rtl,
+      checkable(item(t.plotRtl, 'sparklineAxis', 'rtl'), 'menuitemcheckbox'),
       menuSeparator(),
       menuSectionHeader(t.verticalMin),
       radio(t.autoEach, 'min-individual'),

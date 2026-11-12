@@ -13,16 +13,29 @@ interface Rec {
 
 const paint = (settings: SparklineGroupSettings, points: SparklinePoint[]): Rec => {
   const rec: Rec = { fills: [], lines: [] };
+  // The horizontal part of the current transform, so recorded x values are on the canvas.
+  let scaleX = 1;
+  let offsetX = 0;
+  const onCanvas = (x: number): number => scaleX * x + offsetX;
   const ctx = {
     save: () => {},
     restore: () => {},
     beginPath: () => {},
     rect: () => {},
     clip: () => {},
-    moveTo: (x: number, y: number) => rec.lines.push({ x, y }),
-    lineTo: (x: number, y: number) => rec.lines.push({ x, y }),
+    translate: (x: number) => {
+      offsetX += scaleX * x;
+    },
+    scale: (x: number) => {
+      scaleX *= x;
+    },
+    moveTo: (x: number, y: number) => rec.lines.push({ x: onCanvas(x), y }),
+    lineTo: (x: number, y: number) => rec.lines.push({ x: onCanvas(x), y }),
     stroke: () => {},
-    fillRect: (x: number, y: number, w: number, h: number) => rec.fills.push({ x, y, w, h }),
+    fillRect: (x: number, y: number, w: number, h: number) => {
+      const left = Math.min(onCanvas(x), onCanvas(x + w));
+      rec.fills.push({ x: left, y, w, h });
+    },
   } as unknown as CanvasRenderingContext2D;
   paintSparkline(
     ctx,
@@ -98,5 +111,28 @@ describe('readSparklinePoints size cap', () => {
     expect(
       readSparklinePoints(state, null, { source: 'A1:A1000000', group: 'g' }, 0, settings),
     ).toBeNull();
+  });
+});
+
+describe('sparkline plotted right to left', () => {
+  const rising = [
+    { x: 0, value: 1 },
+    { x: 1, value: 2 },
+    { x: 2, value: 3 },
+  ];
+
+  it('starts a line at the right edge', () => {
+    const ltr = paint(settingsOf(SparklineType.Line), rising).lines;
+    const rtl = paint(settingsOf(SparklineType.Line, { rightToLeft: true }), rising).lines;
+    expect(ltr[0]?.x).toBeCloseTo(2);
+    expect(rtl[0]?.x).toBeCloseTo(98);
+    expect(rtl.map((p) => p.y)).toEqual(ltr.map((p) => p.y));
+  });
+
+  it('puts the first column at the right edge, mirroring each bar', () => {
+    const ltr = paint(settingsOf(SparklineType.Column), rising).fills;
+    const rtl = paint(settingsOf(SparklineType.Column, { rightToLeft: true }), rising).fills;
+    expect(rtl[0]?.x).toBeCloseTo(100 - (ltr[0]?.x ?? 0) - (ltr[0]?.w ?? 0));
+    expect(rtl[0]?.x).toBeGreaterThan(rtl[2]?.x ?? Number.POSITIVE_INFINITY);
   });
 });

@@ -123,7 +123,8 @@ export function shapeFromNative(
   shape: EngineShape,
 ): SessionIllustration | null {
   if (shape.hidden) return null;
-  const kind = KIND_OF_PRST.get(shape.presetGeometry);
+  // A custom geometry has no preset name.
+  const kind = shape.presetGeometry === null ? undefined : KIND_OF_PRST.get(shape.presetGeometry);
   // The engine reports no flip, so a loaded line's direction is unknown.
   const locked =
     kind === undefined ||
@@ -174,7 +175,7 @@ const shapeInputOf = (shape: EngineShape): EngineShapeInput | null => {
   const fill = paintOf(shape.fill);
   const line = paintOf(shape.line);
   if (
-    shape.presetGeometry === '' ||
+    shape.presetGeometry === null ||
     shape.kind === DrawingObjectKind.Group ||
     fill === 'other' ||
     line === 'other'

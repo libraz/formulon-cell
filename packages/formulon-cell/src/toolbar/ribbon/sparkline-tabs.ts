@@ -31,7 +31,6 @@ export const SPARKLINE_MENU_IDS = {
 } as const;
 
 /** The Plot Data Right-to-Left axis option stays greyed until the engine models it. */
-export const SPARKLINE_AXIS_DISABLED_ITEMS: readonly string[] = ['rtl'];
 
 /** Group variants of the Sparkline tab: Show stacks its toggles in columns of three, and the last
  *  group stacks Group, Ungroup and Clear beside the large Axis button. */

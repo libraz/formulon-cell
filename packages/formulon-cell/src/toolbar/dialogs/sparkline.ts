@@ -183,7 +183,6 @@ export interface SparklineAxisDialogText {
   dateRange: string;
   showAxis: string;
   plotRtl: string;
-  rtlUnsupported: string;
   minimum: string;
   maximum: string;
   autoEach: string;
@@ -209,6 +208,7 @@ export interface SparklineAxisDialogInitial {
   /** The date range text, empty when the group has none. */
   dateRange: string;
   displayXAxis: boolean;
+  rightToLeft: boolean;
   min: SparklineAxisBound;
   max: SparklineAxisBound;
 }
@@ -218,6 +218,7 @@ export interface SparklineAxisDialogResult {
   /** The date range, set whenever `dateAxis` is. */
   dateRange: ResolvedSparklineRange | null;
   displayXAxis: boolean;
+  rightToLeft: boolean;
   min: SparklineAxisBound;
   max: SparklineAxisBound;
 }
@@ -322,7 +323,7 @@ export const showSparklineAxisDialog = (
     const rule = el('hr', 'fc-macsparkaxis__rule');
     horizontal.append(general.wrap, date.wrap, dateCaption, dateRow, rule);
     const showAxis = appendCheckboxRow(horizontal, t.showAxis, opts.initial.displayXAxis);
-    const rtl = appendCheckboxRow(horizontal, t.plotRtl, false);
+    const rtl = appendCheckboxRow(horizontal, t.plotRtl, opts.initial.rightToLeft);
 
     // Vertical: each bound is a caption over a box of three choices, the last with its value.
     const bound = (name: string, caption: string, initial: SparklineAxisBound) => {
@@ -359,7 +360,6 @@ export const showSparklineAxisDialog = (
       for (const end of [min, max]) grey(end.value, !end.choices[2]?.input.checked);
       grey(picker, dateInput.disabled);
     };
-    projectDisabledState(rtl, true, t.rtlUnsupported, { titlePrefix: t.plotRtl });
     shell.body.addEventListener('change', sync);
     sync();
 
@@ -413,6 +413,7 @@ export const showSparklineAxisDialog = (
         dateAxis: date.input.checked,
         dateRange,
         displayXAxis: showAxis.checked,
+        rightToLeft: rtl.checked,
         min: minBound,
         max: maxBound,
       });

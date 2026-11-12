@@ -73,11 +73,4 @@ describe('Sparkline tab buttons greyed by a protected sheet', () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 5 });
     expect(chip()?.disabled).toBe(false);
   });
-
-  it('keeps the name of the disabled Plot Right to Left entry', () => {
-    command('sparklineAxis').click();
-    const rtl = host.querySelector<HTMLButtonElement>('[data-sparkline-axis="rtl"]');
-    expect(rtl?.disabled).toBe(true);
-    expect(rtl?.title).not.toBe('');
-  });
 });

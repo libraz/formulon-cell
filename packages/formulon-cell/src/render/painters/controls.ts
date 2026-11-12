@@ -649,6 +649,11 @@ export function paintSparkline(
   ctx.rect(x, y, w, h);
   ctx.clip();
   ctx.globalAlpha = 1;
+  // A right-to-left group plots its first point at the right edge.
+  if (settings.rightToLeft) {
+    ctx.translate(2 * x + w, 0);
+    ctx.scale(-1, 1);
+  }
 
   // Win/loss bars hang off the mid line whatever the axis limits; others rest on zero.
   const winLoss = settings.type === SparklineType.Stacked;

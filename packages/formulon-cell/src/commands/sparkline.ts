@@ -82,6 +82,7 @@ export function defaultSparklineGroupSettings(type: SparklineType): SparklineGro
     negative: type !== SparklineType.Line,
     displayXAxis: false,
     displayHidden: false,
+    rightToLeft: false,
     minAxisType: SparklineAxisType.Individual,
     maxAxisType: SparklineAxisType.Individual,
     manualMin: null,

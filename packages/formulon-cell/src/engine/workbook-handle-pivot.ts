@@ -1,4 +1,5 @@
 import type {
+  CivilTime,
   CivilTimeInput,
   ErrorCode,
   Formulon,
@@ -781,7 +782,7 @@ export abstract class WorkbookHandlePivotMethods {
       const dateGroup = pivot.getFieldDateGroup(fieldIdx);
       const granularity = dateGroup === null ? null : dateGroupingOf(dateGroup.periods);
       const numericGroup = pivot.getFieldNumericGroup(fieldIdx);
-      const serialOf = (date: Date): number =>
+      const serialOf = (date: CivilTime): number =>
         internals(this).module.convertCivilToSerial(date, {
           date1904: internals(this).wb.getDate1904(),
         });

@@ -181,7 +181,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   showPhoneticCells(sheet: number): readonly Addr[] {
     assertAlive(this);
     if (!this.capabilities.showPhonetic) return [];
-    const cells = attemptRead(() => ws(this, sheet).getShowPhoneticCells());
+    const cells = attemptRead(() => ws(this, sheet).listShowPhoneticCells());
     return cells ? cells.map((c) => ({ sheet, row: c.row, col: c.col })) : [];
   }
 
@@ -505,10 +505,15 @@ export abstract class WorkbookHandleAnnotationsMethods {
     assertAlive(this);
     if (!this.supportsHyperlinkRangeWrite()) return false;
     return attempt(() =>
-      ws(this, sheet).setHyperlink(row, col, {
-        ...hyperlinkInput(target, display, tooltip, location),
-        range: { firstRow: row, firstCol: col, lastRow, lastCol },
-      }),
+      appendHyperlink(
+        ws(this, sheet),
+        hyperlinkInput(target, display, tooltip, location, {
+          firstRow: row,
+          firstCol: col,
+          lastRow,
+          lastCol,
+        }),
+      ),
     );
   }
 
@@ -526,7 +531,15 @@ export abstract class WorkbookHandleAnnotationsMethods {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
     return attempt(() =>
-      ws(this, sheet).setHyperlink(row, col, hyperlinkInput(target, display, tooltip, location)),
+      appendHyperlink(
+        ws(this, sheet),
+        hyperlinkInput(target, display, tooltip, location, {
+          firstRow: row,
+          firstCol: col,
+          lastRow: row,
+          lastCol: col,
+        }),
+      ),
     );
   }
 
@@ -535,7 +548,13 @@ export abstract class WorkbookHandleAnnotationsMethods {
   removeHyperlink(sheet: number, row: number, col: number): boolean {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
-    return attempt(() => ws(this, sheet).setHyperlink(row, col, null));
+    return attempt(() => {
+      const sheetHandle = ws(this, sheet);
+      const index = sheetHandle
+        .listHyperlinks()
+        .findIndex((link) => link.range.firstRow === row && link.range.firstCol === col);
+      if (index >= 0) sheetHandle.removeHyperlinkAt(index);
+    });
   }
 
   /** Remove the hyperlink at `index` of `getHyperlinksFull(sheet)`, leaving others on the same
@@ -566,7 +585,12 @@ export abstract class WorkbookHandleAnnotationsMethods {
   clearHyperlinks(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
-    return attempt(() => ws(this, sheet).clearHyperlinks());
+    return attempt(() => {
+      const sheetHandle = ws(this, sheet);
+      for (let i = sheetHandle.listHyperlinks().length - 1; i >= 0; i -= 1) {
+        sheetHandle.removeHyperlinkAt(i);
+      }
+    });
   }
 }
 
@@ -582,13 +606,21 @@ function hyperlinkInput(
   display: string,
   tooltip: string,
   location: string,
+  range: HyperlinkInput['range'],
 ): HyperlinkInput {
   return {
+    range,
     target: target.length > 0 ? target : null,
     location: location.length > 0 ? location : null,
     display: display.length > 0 ? display : null,
     tooltip: tooltip.length > 0 ? tooltip : null,
   };
+}
+
+/** The store owns cell formats, so links are mirrored with the engine's list-only verbs:
+ *  `setHyperlink`, `removeHyperlink` and `clearHyperlinks` would restyle or reset the cells. */
+function appendHyperlink(sheet: Sheet, link: HyperlinkInput): void {
+  sheet.insertHyperlinkAt(sheet.listHyperlinks().length, link);
 }
 
 export function installAnnotationsMethods(target: WorkbookHandleCtor): void {

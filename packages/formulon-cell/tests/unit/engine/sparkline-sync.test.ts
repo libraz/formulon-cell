@@ -163,6 +163,7 @@ describe('sparklines saved with the workbook', () => {
       negative: true,
       displayXAxis: true,
       displayHidden: true,
+      rightToLeft: true,
       minAxisType: SparklineAxisType.Custom,
       maxAxisType: SparklineAxisType.Group,
       manualMin: -4.5,

@@ -1435,7 +1435,7 @@ export const chartDataFromEngine = (data: EngineChartData): ChartData => {
         id: seriesId(series.seriesId),
         ...(series.name === null ? {} : { name: series.name }),
         numberFormat: series.numberFormat,
-        xNumberFormat: series.xNumberFormat,
+        ...(series.xNumberFormat === null ? {} : { xNumberFormat: series.xNumberFormat }),
         points: Array.from({ length: data.pointCount }, (_, index) => {
           const state = pointState(series.states[index]);
           return {

@@ -196,16 +196,18 @@ describe('Sparkline tab of the ribbon', () => {
     }
   });
 
-  it('sets the axis options, a custom minimum through its dialog, and keeps right-to-left greyed', async () => {
+  it('sets the axis options, right-to-left, and a custom minimum through its dialog', async () => {
     mountOnSparklines();
     command('sparklineAxis').click();
     const checked = (value: string) =>
       host.querySelector(`[data-sparkline-axis="${value}"]`)?.getAttribute('aria-checked');
     expect(checked('general')).toBe('true');
     expect(checked('min-individual')).toBe('true');
-    expect(host.querySelector<HTMLButtonElement>('[data-sparkline-axis="rtl"]')?.disabled).toBe(
-      true,
-    );
+    expect(checked('rtl')).toBe('false');
+    pick('[data-sparkline-axis="rtl"]');
+    expect(settings()?.rightToLeft).toBe(true);
+    command('sparklineAxis').click();
+    expect(checked('rtl')).toBe('true');
 
     pick('[data-sparkline-axis="show"]');
     expect(settings()?.displayXAxis).toBe(true);

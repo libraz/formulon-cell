@@ -58,7 +58,7 @@ export const SHEET_STRUCTURE_MEMBERS = {
       'setColumnCollapsed',
     ],
     view: ['updateView', 'setSelection', 'setTabColor', 'setVisibility'],
-    format: ['setHyperlink', 'clearHyperlinks'],
+    format: ['setHyperlink', 'removeHyperlink', 'clearHyperlinks'],
     comments: ['setComment', 'setCommentVisible'],
     threadedComments: ['addThreadedComment', 'updateThreadedComment', 'removeThreadedComment'],
     sparklineGroups: ['addSparklineGroup', 'updateSparklineGroup', 'removeSparklineGroup'],

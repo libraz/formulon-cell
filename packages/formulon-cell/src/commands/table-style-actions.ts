@@ -208,6 +208,18 @@ export function deleteCustomStyle(
               ),
             )
         : [];
+    // Re-point the PivotTables while the style still exists, so undo can point them back: the
+    // engine re-points any it still finds when the style goes.
+    if (workbook) {
+      const pivotDefault = workbook.getTableStyleDefaults()?.pivotStyle || FALLBACK_PIVOT_STYLE;
+      for (const pivot of pivotUsers) {
+        updatePivotStyleInfo(
+          { store: ctx.store, workbook: workbook as WorkbookHandle, history },
+          pivot,
+          { name: pivotDefault },
+        );
+      }
+    }
     recordTablesChange(history, ctx.store, () => {
       mutators.removeCustomStylesNamed(ctx.store, name);
       if (!forTables) return;
@@ -219,16 +231,6 @@ export function deleteCustomStyle(
           updateTableOverlay(ctx.store, table.id, look);
       }
     });
-    if (workbook) {
-      const pivotDefault = workbook.getTableStyleDefaults()?.pivotStyle || FALLBACK_PIVOT_STYLE;
-      for (const pivot of pivotUsers) {
-        updatePivotStyleInfo(
-          { store: ctx.store, workbook: workbook as WorkbookHandle, history },
-          pivot,
-          { name: pivotDefault },
-        );
-      }
-    }
   } finally {
     if (history && transaction) history.end(transaction);
   }

@@ -32,7 +32,6 @@ export const openSparklineAxisDialog = async (instance: SpreadsheetInstance): Pr
       dateRange: m.dateRangeLabel,
       showAxis: m.axisShow,
       plotRtl: m.axisPlotRtl,
-      rtlUnsupported: m.axisRtlUnsupported,
       minimum: m.axisMinimum,
       maximum: m.axisMaximum,
       autoEach: m.axisAutoEach,
@@ -55,6 +54,7 @@ export const openSparklineAxisDialog = async (instance: SpreadsheetInstance): Pr
           })
         : '',
       displayXAxis: settings.displayXAxis,
+      rightToLeft: settings.rightToLeft,
       min: { type: settings.minAxisType, value: settings.manualMin ?? null },
       max: { type: settings.maxAxisType, value: settings.manualMax ?? null },
     },
@@ -64,6 +64,7 @@ export const openSparklineAxisDialog = async (instance: SpreadsheetInstance): Pr
   const patch: Partial<SparklineGroupSettings> = {
     dateAxis: result.dateAxis,
     displayXAxis: result.displayXAxis,
+    rightToLeft: result.rightToLeft,
     minAxisType: result.min.type,
     maxAxisType: result.max.type,
     ...(r
