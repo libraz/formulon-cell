@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
+import { installDialogLayoutCheck } from './dialog-layout.js';
 
 /** Absolute pointer position from the live sheet layout, including its zoom. */
 export async function gridCellCenter(page: Page, row: number, col: number) {
@@ -49,6 +50,7 @@ export class SpreadsheetPage {
     // Mac geometry is opted into by the dedicated Mac scenarios.
     params.set('platform', opts.platform ?? 'default');
     if (fixture) params.set('fixture', fixture);
+    await installDialogLayoutCheck(this.page);
     await this.page.goto(`/?${params.toString()}`);
     await this.waitForReady();
   }
