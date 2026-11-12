@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-
+import { runMacAutoFilterDateScenario } from '../../../tests/e2e-shared/scenarios/autofilter-date-conditions.js';
 import {
   runFilterShortcutScenario,
   runProtectedSheetFilterAndBackgroundScenario,
@@ -17,3 +17,11 @@ test('a protected sheet disables Background and refuses Ctrl+Shift+L', async ({ 
 test('a protected sheet leaves a filter button inert without Use AutoFilter', async ({ page }) => {
   await runProtectedSheetFilterButtonScenario(page);
 });
+
+for (const locale of ['en', 'de', 'ja'] as const) {
+  test(`Mac date column filter reads a ${locale} Before date and applies a period at once`, async ({
+    page,
+  }) => {
+    await runMacAutoFilterDateScenario(page, locale);
+  });
+}
