@@ -31,6 +31,7 @@ import { nextCalcMode } from '../engine/calc-mode.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { Strings } from '../i18n/strings.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
 import { attachClipboard } from '../interact/clipboard.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
@@ -73,6 +74,33 @@ const refreshCells = (ctx: BuiltInExtensionContext): void => {
   const wb = ctx.workbook;
   mutators.refreshActiveSheetCells(ctx.store, wb);
 };
+
+/** A dialog feature that attaches again with the new strings when the language changes;
+ *  `members` adds the feature's own methods, such as `open`, over the current handle. */
+const dialogExtension = <H extends { close(): void; detach(): void }>(
+  id: string,
+  attach: (ctx: BuiltInExtensionContext, strings: Strings) => H,
+  members: (handle: () => H) => {
+    open(entry?: DialogEntry): void;
+    rebindWorkbook?(wb: WorkbookHandle): void;
+  },
+): Extension =>
+  builtIn({
+    id,
+    priority: 50,
+    setup(ctx: BuiltInExtensionContext) {
+      let handle = attach(ctx, ctx.i18n.strings);
+      return {
+        ...members(() => handle),
+        close: () => handle.close(),
+        setStrings: (next) => {
+          handle.detach();
+          handle = attach(ctx, next);
+        },
+        dispose: () => handle.detach(),
+      };
+    },
+  });
 
 /** Format-painter handle. Built-in id `'formatPainter'`. Pair with
  *  `features: { formatPainter: false }` to replace. */
@@ -393,233 +421,126 @@ export const hoverComment = (): Extension =>
 
 /** Go To Special dialog — id `'gotoSpecial'`. */
 export const gotoSpecial = (): Extension =>
-  builtIn({
-    id: 'gotoSpecial',
-    priority: 50,
-    setup(ctx: BuiltInExtensionContext) {
-      let handle = attachGoToDialog({
+  dialogExtension(
+    'gotoSpecial',
+    (ctx, strings) =>
+      attachGoToDialog({
         host: ctx.host,
         store: ctx.store,
         getWb: () => ctx.workbook,
-        strings: ctx.i18n.strings,
-      });
-      return {
-        open: () => handle.open(),
-        close: () => handle.close(),
-        setStrings: (next) => {
-          handle.detach();
-          handle = attachGoToDialog({
-            host: ctx.host,
-            store: ctx.store,
-            getWb: () => ctx.workbook,
-            strings: next,
-          });
-        },
-        dispose: () => handle.detach(),
-      };
-    },
-  });
+        strings,
+      }),
+    (handle) => ({ open: () => handle().open() }),
+  );
 
 /** Conditional-formatting rule manager — id `'conditional'`. */
 export const conditional = (): Extension =>
-  builtIn({
-    id: 'conditional',
-    priority: 50,
-    setup(ctx: BuiltInExtensionContext) {
-      let handle = attachConditionalDialog({
+  dialogExtension(
+    'conditional',
+    (ctx, strings) =>
+      attachConditionalDialog({
         host: ctx.host,
         store: ctx.store,
         history: ctx.history as History,
-        strings: ctx.i18n.strings,
-      });
-      return {
-        open: () => handle.open(),
-        close: () => handle.close(),
-        setStrings: (next) => {
-          handle.detach();
-          handle = attachConditionalDialog({
-            host: ctx.host,
-            store: ctx.store,
-            history: ctx.history as History,
-            strings: next,
-          });
-        },
-        dispose: () => handle.detach(),
-      };
-    },
-  });
+        strings,
+      }),
+    (handle) => ({ open: () => handle().open() }),
+  );
 
 /** Calculation options dialog (mode, iteration, R1C1, precision, 1904 dates)
  *  — id `'iterative'`. Always-on in the default mount; surfaced here so
  *  consumers building a custom chrome can wire their own opener. */
 export const iterative = (): Extension =>
-  builtIn({
-    id: 'iterative',
-    priority: 50,
-    setup(ctx: BuiltInExtensionContext) {
-      const attach = (strings: typeof ctx.i18n.strings) =>
-        attachIterativeDialog({
-          host: ctx.host,
-          getWb: () => ctx.workbook,
-          strings,
-          store: ctx.store,
-          history: ctx.history,
-        });
-      let handle = attach(ctx.i18n.strings);
-      return {
-        open: () => handle.open(),
-        close: () => handle.close(),
-        setStrings: (next) => {
-          handle.detach();
-          handle = attach(next);
-        },
-        dispose: () => handle.detach(),
-      };
-    },
-  });
+  dialogExtension(
+    'iterative',
+    (ctx, strings) =>
+      attachIterativeDialog({
+        host: ctx.host,
+        getWb: () => ctx.workbook,
+        strings,
+        store: ctx.store,
+        history: ctx.history,
+      }),
+    (handle) => ({ open: () => handle().open() }),
+  );
 
 /** Page Setup dialog — id `'pageSetup'`. */
 export const pageSetup = (): Extension =>
-  builtIn({
-    id: 'pageSetup',
-    priority: 50,
-    setup(ctx: BuiltInExtensionContext) {
-      let handle = attachPageSetupDialog({
+  dialogExtension(
+    'pageSetup',
+    (ctx, strings) =>
+      attachPageSetupDialog({
         host: ctx.host,
         store: ctx.store,
-        strings: ctx.i18n.strings,
+        strings,
         history: ctx.history as History,
-      });
-      return {
-        open: () => handle.open(),
-        close: () => handle.close(),
-        setStrings: (next) => {
-          handle.detach();
-          handle = attachPageSetupDialog({
-            host: ctx.host,
-            store: ctx.store,
-            strings: next,
-            history: ctx.history as History,
-          });
-        },
-        dispose: () => handle.detach(),
-      };
-    },
-  });
+      }),
+    (handle) => ({ open: () => handle().open() }),
+  );
 
 /** Named-range listing dialog — id `'namedRanges'`. */
 export const namedRanges = (): Extension =>
-  builtIn({
-    id: 'namedRanges',
-    priority: 50,
-    setup(ctx: BuiltInExtensionContext) {
-      let handle = attachNamedRangeDialog({
+  dialogExtension(
+    'namedRanges',
+    (ctx, strings) =>
+      attachNamedRangeDialog({
         host: ctx.host,
         store: ctx.store,
         wb: ctx.workbook,
         history: ctx.history as History,
-        strings: ctx.i18n.strings,
-      });
-      return {
-        open: (entry?: DialogEntry) => handle.open(entry),
-        close: () => handle.close(),
-        rebindWorkbook: (wb) => handle.bindWorkbook(wb),
-        setStrings: (next) => {
-          handle.detach();
-          handle = attachNamedRangeDialog({
-            host: ctx.host,
-            store: ctx.store,
-            wb: ctx.workbook,
-            history: ctx.history as History,
-            strings: next,
-          });
-        },
-        dispose: () => handle.detach(),
-      };
-    },
-  });
+        strings,
+      }),
+    (handle) => ({
+      open: (entry?: DialogEntry) => handle().open(entry),
+      rebindWorkbook: (wb: WorkbookHandle) => handle().bindWorkbook(wb),
+    }),
+  );
 
 /** Hyperlink (Ctrl+K) dialog — id `'hyperlink'`. */
 export const hyperlink = (): Extension =>
-  builtIn({
-    id: 'hyperlink',
-    priority: 50,
-    setup(ctx: BuiltInExtensionContext) {
-      const buildHandle = (s: typeof ctx.i18n.strings): ReturnType<typeof attachHyperlinkDialog> =>
-        attachHyperlinkDialog({
-          host: ctx.host,
-          store: ctx.store,
-          strings: s,
-          history: ctx.history as History,
-          getWb: () => ctx.workbook,
-        });
-      let handle = buildHandle(ctx.i18n.strings);
-      return {
-        open: (entry?: DialogEntry) => handle.open(entry),
-        close: () => handle.close(),
-        setStrings: (next) => {
-          handle.detach();
-          handle = buildHandle(next);
-        },
-        dispose: () => handle.detach(),
-      };
-    },
-  });
+  dialogExtension(
+    'hyperlink',
+    (ctx, strings) =>
+      attachHyperlinkDialog({
+        host: ctx.host,
+        store: ctx.store,
+        strings,
+        history: ctx.history as History,
+        getWb: () => ctx.workbook,
+      }),
+    (handle) => ({ open: (entry?: DialogEntry) => handle().open(entry) }),
+  );
 
 /** Comment edit (Shift+F2) dialog — id `'commentDialog'`. */
 export const commentDialog = (): Extension =>
-  builtIn({
-    id: 'commentDialog',
-    priority: 50,
-    setup(ctx: BuiltInExtensionContext) {
-      const buildHandle = (s: typeof ctx.i18n.strings): ReturnType<typeof attachCommentDialog> =>
-        attachCommentDialog({
-          host: ctx.host,
-          store: ctx.store,
-          strings: s,
-          history: ctx.history as History,
-          getWb: () => ctx.workbook,
-        });
-      let handle = buildHandle(ctx.i18n.strings);
-      return {
-        open: () => handle.open(),
-        close: () => handle.close(),
-        setStrings: (next) => {
-          handle.detach();
-          handle = buildHandle(next);
-        },
-        dispose: () => handle.detach(),
-      };
-    },
-  });
+  dialogExtension(
+    'commentDialog',
+    (ctx, strings) =>
+      attachCommentDialog({
+        host: ctx.host,
+        store: ctx.store,
+        strings,
+        history: ctx.history as History,
+        getWb: () => ctx.workbook,
+      }),
+    (handle) => ({ open: () => handle().open() }),
+  );
 
 /** Format-cells dialog (Ctrl+1) — id `'formatDialog'`. */
 export const formatDialog = (): Extension =>
-  builtIn({
-    id: 'formatDialog',
-    priority: 50,
-    setup(ctx: BuiltInExtensionContext) {
-      const buildHandle = (s: typeof ctx.i18n.strings): ReturnType<typeof attachFormatDialog> =>
-        attachFormatDialog({
-          host: ctx.host,
-          store: ctx.store,
-          strings: s,
-          history: ctx.history as History,
-          getWb: () => ctx.workbook,
-          getLocale: () => ctx.i18n.locale,
-        });
-      let handle = buildHandle(ctx.i18n.strings);
-      return {
-        open: () => handle.open(),
-        close: () => handle.close(),
-        setStrings: (next) => {
-          handle.detach();
-          handle = buildHandle(next);
-        },
-        dispose: () => handle.detach(),
-      };
-    },
-  });
+  dialogExtension(
+    'formatDialog',
+    (ctx, strings) =>
+      attachFormatDialog({
+        host: ctx.host,
+        store: ctx.store,
+        strings,
+        history: ctx.history as History,
+        getWb: () => ctx.workbook,
+        getLocale: () => ctx.i18n.locale,
+      }),
+    (handle) => ({ open: () => handle().open() }),
+  );
 
 /** Find/Replace dialog (Ctrl+F) — id `'findReplace'`. Per-workbook
  *  instance: rebinds when the engine swaps. */
