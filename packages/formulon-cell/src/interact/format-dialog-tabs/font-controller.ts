@@ -245,19 +245,21 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
   };
 
   // ── Events ─────────────────────────────────────────────────────────────
-  const onBoldChange = (): void => {
-    touch('bold');
-    draft.bold = boldCk.input.checked;
+  // A change made in the tab leaves Normal font, then redraws the controls and the preview.
+  const edited = (): void => {
     normalFontCk.input.checked = false;
     syncControls();
     renderPreview();
   };
+  const onBoldChange = (): void => {
+    touch('bold');
+    draft.bold = boldCk.input.checked;
+    edited();
+  };
   const onItalicChange = (): void => {
     touch('italic');
     draft.italic = italicCk.input.checked;
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const onUnderlineChange = (): void => {
     touch('underline');
@@ -271,16 +273,12 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
       default:
         draft.underline = false;
     }
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const onStrikeChange = (): void => {
     touch('strike');
     draft.strike = strikeCk.input.checked;
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const onSuperscriptChange = (): void => {
     touch('fontVertAlign');
@@ -290,9 +288,7 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     } else if (draft.fontVertAlign === 'superscript') {
       draft.fontVertAlign = undefined;
     }
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const onSubscriptChange = (): void => {
     touch('fontVertAlign');
@@ -302,16 +298,12 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     } else if (draft.fontVertAlign === 'subscript') {
       draft.fontVertAlign = undefined;
     }
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const onEffectChange = (field: 'fontOutline' | 'fontShadow', input: HTMLInputElement): void => {
     touch(field);
     draft[field] = input.checked;
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const onNormalFontChange = (): void => {
     if (!normalFontCk.input.checked) return;
@@ -338,16 +330,12 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     draft.italic = style === 'italic' || style === 'boldItalic';
     boldCk.input.checked = draft.bold;
     italicCk.input.checked = draft.italic;
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const applyFamilyValue = (value: string): void => {
     touch('fontFamily');
     draft.fontFamily = value;
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const onFamilyInput = (): void => {
     applyFamilyValue(fontFamilyValueFromLabel(currentFontLocale(), familyInput.value));
@@ -370,16 +358,12 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
         draft.fontSize = fontPointsToCssPx(Math.max(1, Math.min(409, points)));
       }
     }
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const onColorInput = (): void => {
     touch('color');
     draft.color = colorInput.value;
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
   };
   const onColorReset = (): void => {
     touch('color');
@@ -396,9 +380,7 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     touch('color');
     draft.color = color;
     colorInput.value = color;
-    normalFontCk.input.checked = false;
-    syncControls();
-    renderPreview();
+    edited();
     palette.setOpen(false);
     fontSwatchesToggle.focus();
   };

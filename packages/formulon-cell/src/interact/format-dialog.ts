@@ -446,13 +446,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     previewValue: () => (dialogMode === 'dxf' ? null : previewValue),
     fontEffects: () => isMacHost(host),
   });
+  // The dialog's differential format; the Mac form leaves a mixed strikethrough unset.
+  const buildCurrentDxf = () => {
+    const dxf = buildDialogDxf(draft, defaultPatternFor, padsNumberRows(getWb()));
+    if (macDxf && isMixedField('strike')) dxf.strike = undefined;
+    return dxf;
+  };
   const macDxfHasContent = (): boolean => {
-    const { numFmt: _numFmt, ...dxf } = buildDialogDxf(
-      draft,
-      defaultPatternFor,
-      padsNumberRows(getWb()),
-    );
-    if (isMixedField('strike')) dxf.strike = undefined;
+    const { numFmt: _numFmt, ...dxf } = buildCurrentDxf();
     return Object.values(dxf).some((v) => v !== undefined && v !== false && v !== '');
   };
   const renderPreview = (): void => {
@@ -598,9 +599,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── Apply OK ───────────────────────────────────────────────────────────
   const applyAndClose = async (): Promise<void> => {
     if (applyDxf) {
-      const dxf = buildDialogDxf(draft, defaultPatternFor, padsNumberRows(getWb()));
-      if (macDxf && isMixedField('strike')) dxf.strike = undefined;
-      applyDxf(dxf);
+      applyDxf(buildCurrentDxf());
       api.close();
       return;
     }
