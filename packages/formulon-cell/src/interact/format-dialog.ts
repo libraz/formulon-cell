@@ -474,6 +474,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── Tab switch ─────────────────────────────────────────────────────────
   const tabOrder = Array.from(tabButtons.keys());
   let lastUsedTab: TabId = 'number';
+  // A differential format's Clear lives in the tab group of the font, border and fill tabs.
+  const syncClearButton = (): void => {
+    clearBtn.hidden = macDxf === null || activeTab === 'number';
+    clearBtn.dataset.fcTab = activeTab;
+  };
+
   const setActiveTab = (id: TabId): void => {
     activeTab = id;
     if (id !== 'more') lastUsedTab = id;
@@ -485,6 +491,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     for (const [tabId, p] of tabPanels) {
       p.hidden = tabId !== id;
     }
+    syncClearButton();
     syncHintBar();
   };
 
@@ -567,7 +574,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
     const dataValidationMode = mode === 'dataValidation';
     const dxfMode = mode === 'dxf';
-    clearBtn.hidden = macDxf === null;
+    syncClearButton();
     const numberMode = mode === 'numberFormat';
     overlay.classList.toggle('fc-fmtdlg--data-validation', dataValidationMode);
     overlay.classList.toggle('fc-fmtdlg--number-format', numberMode);

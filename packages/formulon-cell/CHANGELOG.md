@@ -102,6 +102,7 @@ versioning is [SemVer](https://semver.org/).
 
 - PivotTable filters of every kind the file holds stay through an edit of the report, and a PivotTable date filter reads its typed dates in the workbook's locale, as cell entry does.
 - Double-clicking Format Painter keeps it on for repeated pastes until the button is clicked again.
+- On the Mac profile, Clear in the Format dialog for a table style element or a conditional format sits inside the tab area at the desktop size, shifts left on the Border tab, and is absent on the Number tab.
 - A link or note removed through the workbook API (`sheet.removeHyperlink`, `sheet.clearHyperlinks`, `sheet.setComment(at, null)`) leaves the grid too; a note hidden that way stops showing. When the engine cannot list a sheet's links, re-reading the sheet keeps the links the grid holds.
 - Refusal reasons the ribbon, context menu and validation alerts show are in the UI language; the API's `reason` stays English with its `code`, and a host's own reason shows as given. A disabled control keeps its own title.
 - Spelling: a refused Change All applies nothing, AutoCorrect from the dialog records an entry only once the change is written, Undo Last keeps its record when the undo fails, repeated numbers pass, and words such as `constructor` are no longer flagged.

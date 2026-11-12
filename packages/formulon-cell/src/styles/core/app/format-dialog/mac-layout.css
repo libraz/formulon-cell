@@ -247,6 +247,39 @@
     box-sizing: border-box;
     white-space: nowrap;
   }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel .fc-fmtdlg__footer .fc-fmtdlg__btn.fc-fmtdlg__btn--clear {
+    position: absolute;
+    left: 506px;
+    top: 498px;
+    width: 62px;
+    height: 26px;
+    margin: 0;
+    min-width: 0;
+    min-height: 0;
+    max-width: none;
+    max-height: none;
+    box-sizing: border-box;
+    white-space: nowrap;
+    z-index: 3;
+  }
+  .fc-fmtdlg--mac
+    .fc-fmtdlg__panel
+    .fc-fmtdlg__footer
+    .fc-fmtdlg__btn.fc-fmtdlg__btn--clear[data-fc-tab="border"] {
+    position: absolute;
+    left: 501px;
+    top: 498px;
+    width: 62px;
+    height: 26px;
+    margin: 0;
+    min-width: 0;
+    min-height: 0;
+    max-width: none;
+    max-height: none;
+    box-sizing: border-box;
+    white-space: nowrap;
+    z-index: 3;
+  }
   .fc-fmtdlg--mac
     .fc-fmtdlg__panel-tab[data-fc-tab="align"]
     .fc-fmtdlg__align-select-row--h
@@ -2410,23 +2443,6 @@
     box-sizing: border-box;
   }
 
-  /* A differential format's Clear sits in the tab panel's bottom-right corner, on the panel's
-     inner margin; the footer keeps only Cancel and OK. */
-  .fc-fmtdlg--mac .fc-fmtdlg__panel .fc-fmtdlg__footer .fc-fmtdlg__btn.fc-fmtdlg__btn--clear {
-    left: 501px;
-    top: 511px;
-    z-index: 3;
-  }
-
-  /* The Number tab's bottom hint stops short of Clear. */
-  .fc-fmtdlg--mac.fc-fmtdlg--mac-dxf
-    .fc-fmtdlg__panel
-    .fc-fmtdlg__hintbar:not([data-fc-cat="general"]):not([data-fc-cat="text"]) {
-    width: 464px;
-  }
-
-  /* An unset font color reads Automatic in the color popup: the caption covers the well, left
-     of the chevron, and lets clicks through to it. */
   .fc-fmtdlg--mac
     .fc-fmtdlg__panel-tab[data-fc-tab="font"]
     .fc-fmtdlg__font-color-row

@@ -22,6 +22,9 @@ CHROME=[
  ('.fc-fmtdlg__tab[data-fc-tab="protection"]',(444,43,47,24)),
  ('.fc-fmtdlg__footer .fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)',(414,558,86,26)),
  ('.fc-fmtdlg__footer .fc-fmtdlg__btn--primary',(510,558,86,26)),
+ # A differential format's Clear: a child of the tab group, absent on the Number tab.
+ ('.fc-fmtdlg__footer .fc-fmtdlg__btn.fc-fmtdlg__btn--clear',(506,498,62,26)),
+ ('.fc-fmtdlg__footer .fc-fmtdlg__btn.fc-fmtdlg__btn--clear[data-fc-tab="border"]',(501,498,62,26)),
 ]
 
 tab('align',[
@@ -257,11 +260,29 @@ STRUCT = """
   }
 """
 
+# An unset font color reads Automatic in the color popup: the caption covers the well, left of
+# the chevron, and lets clicks through to it.
+CAPTION="""
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-color-row > .fc-fmtdlg__color-auto {
+    left: 309px;
+    top: 237px;
+    width: 99px;
+    height: 22px;
+    padding-left: 8px;
+    line-height: 22px;
+    border-radius: 4px;
+    background: var(--fc-fmtdlg-input-bg);
+    pointer-events: none;
+    z-index: 1;
+  }
+"""
+
 WRAP=('protection-hint','border-hint','__hint')
 def rule(prefix,sel,f,origin):
     x,y,w,h=f; ox,oy=origin
     extra='' if any(k in sel for k in WRAP) else '    white-space: nowrap;\n'
     if '__tab[' in sel: extra+='    z-index: 2;\n'
+    if '--clear' in sel: extra+='    z-index: 3;\n'
     full=', '.join(prefix+s.strip() for s in sel.split(',')) if ',' in sel and False else prefix+sel
     return f"  {full} {{\n    position: absolute;\n    left: {x-ox}px;\n    top: {y-oy}px;\n    width: {w}px;\n    height: {h}px;\n    margin: 0;\n    min-width: 0;\n    min-height: 0;\n    max-width: none;\n    max-height: none;\n    box-sizing: border-box;\n{extra}  }}\n"
 out=["/* Generated from the Excel Mac Format Cells accessibility frames; every frame is\n   the window-relative rectangle, shifted here to its containing block. Do not\n   edit by hand: change the frame tables and regenerate. */\n\n@layer fc.app {\n"]
@@ -290,6 +311,7 @@ HINT=[('.fc-fmtdlg__hintbar',(29,522,558,18)),
  ('.fc-fmtdlg__hintbar[data-fc-cat="general"], .fc-fmtdlg--mac .fc-fmtdlg__panel .fc-fmtdlg__hintbar[data-fc-cat="text"]',(183,147,393,34)),
  ('.fc-fmtdlg__hintbar[data-fc-cat="date"], .fc-fmtdlg--mac .fc-fmtdlg__panel .fc-fmtdlg__hintbar[data-fc-cat="time"]',(29,490,558,50))]
 for sel,f in HINT: out.append(rule('.fc-fmtdlg--mac .fc-fmtdlg__panel ',sel,f,(0,0)))
+out.append(CAPTION)
 out.append("}\n")
 open(OUT,'w').write(''.join(out))
 print('ok',sum(len(v) for v in T.values()))
