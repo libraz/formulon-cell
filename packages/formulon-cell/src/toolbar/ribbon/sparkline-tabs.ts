@@ -30,8 +30,6 @@ export const SPARKLINE_MENU_IDS = {
   clear: 'menu-sparkline-clear',
 } as const;
 
-/** The Plot Data Right-to-Left axis option stays greyed until the engine models it. */
-
 /** Group variants of the Sparkline tab: Show stacks its toggles in columns of three, and the last
  *  group stacks Group, Ungroup and Clear beside the large Axis button. */
 export const SPARKLINE_STACKED_LAYOUT_GROUP_VARIANTS = ['sparkline-show'] as const;

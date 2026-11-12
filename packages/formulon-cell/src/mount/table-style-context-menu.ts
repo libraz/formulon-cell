@@ -15,17 +15,17 @@ const ITEM_SELECTOR = '[data-table-quick-style], [data-pivot-style]';
 
 type Action = 'applyMaintain' | 'applyClear' | 'modify' | 'duplicate' | 'delete' | 'setDefault';
 
-/**
- * The context menu of a table or PivotTable style gallery item, in the galleries' menus and
- * strips: apply keeping or clearing the cells' formatting, Set As Default, and Delete for a
- * custom style. Modify and Duplicate open the style dialog.
- */
 /** The custom style `styleId` names among `kind`'s custom styles, or null. */
 const customStyleOf = (instance: SpreadsheetInstance, kind: TableStyleKind, styleId: string) =>
   kind === 'table'
     ? customTableStyleById(instance.store.getState(), styleId)
     : customPivotTableStyleById(instance.store.getState(), styleId);
 
+/**
+ * The context menu of a table or PivotTable style gallery item, in the galleries' menus and
+ * strips: apply keeping or clearing the cells' formatting, Set As Default, and Delete for a
+ * custom style. Modify and Duplicate open the style dialog.
+ */
 export function attachTableStyleContextMenu(
   host: HTMLElement,
   getInstance: () => SpreadsheetInstance | null,

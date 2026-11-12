@@ -75,12 +75,6 @@ export interface ValidationAlertHandle {
   detach(): void;
 }
 
-/**
- * Owns the click-to-open list dropdown for cells with `validation.kind === 'list'`.
- * Hit-tests against the chevron rect surfaced by the renderer; clicking opens
- * a popover, picking writes the chosen value to the cell.
- */
-
 /** The active value of a cell as the list shows it selected. */
 const cellText = (
   s: ReturnType<SpreadsheetStore['getState']>,
@@ -93,6 +87,12 @@ const cellText = (
   if (current?.kind === 'bool') return current.value ? 'TRUE' : 'FALSE';
   return '';
 };
+
+/**
+ * Owns the click-to-open list dropdown for cells with `validation.kind === 'list'`.
+ * Hit-tests against the chevron rect surfaced by the renderer; clicking opens
+ * a popover, picking writes the chosen value to the cell.
+ */
 
 export function attachValidationList(deps: ValidationListDeps): ValidationListHandle {
   const { grid, store, wb } = deps;
