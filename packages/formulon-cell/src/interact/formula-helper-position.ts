@@ -1,4 +1,4 @@
-import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
+import { panelSize, placePanel, viewportSize } from './overlay-position.js';
 
 export type FormulaHelperPlacement = 'above' | 'below';
 
@@ -109,13 +109,11 @@ export function positionFormulaHelper(
   if (preferred === 'above' && !fitsAbove && fitsBelow) y = belowY;
 
   const clampCandidate = (x: number, candidateY: number) => {
-    const position = clampPanelToViewport(panel, x, candidateY, {
+    const position = placePanel(panel, x, candidateY, {
       pad,
       fallbackWidth: 260,
       fallbackHeight: 48,
     });
-    panel.style.left = `${position.x}px`;
-    panel.style.top = `${position.y}px`;
     const bounds = panel.getBoundingClientRect();
     return {
       position,

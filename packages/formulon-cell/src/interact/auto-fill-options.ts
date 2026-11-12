@@ -24,7 +24,7 @@ import {
 import { createObjectMenu, type ObjectMenuEntry } from './object-menu.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 
 type AutoFillMode =
   | 'copy'
@@ -176,13 +176,11 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
 
   /** `x`/`y` is the bottom-right corner of the last filled cell; the chip sits just outside it. */
   const position = (x: number, y: number): void => {
-    const buttonPos = clampPanelToViewport(button, x + CHIP_OFFSET_X, y + CHIP_OFFSET_Y, {
+    const buttonPos = placePanel(button, x + CHIP_OFFSET_X, y + CHIP_OFFSET_Y, {
       fallbackWidth: CHIP_FALLBACK_SIZE,
       fallbackHeight: CHIP_FALLBACK_SIZE,
     });
-    button.style.left = `${buttonPos.x}px`;
-    button.style.top = `${buttonPos.y}px`;
-    const menuPos = clampPanelToViewport(
+    placePanel(
       menu,
       buttonPos.x,
       buttonPos.y + (button.offsetHeight || CHIP_FALLBACK_SIZE) + MENU_GAP,
@@ -191,8 +189,6 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
         fallbackHeight: 80,
       },
     );
-    menu.style.left = `${menuPos.x}px`;
-    menu.style.top = `${menuPos.y}px`;
   };
 
   const updateChecked = (): void => {

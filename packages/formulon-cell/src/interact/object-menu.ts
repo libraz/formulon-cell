@@ -9,7 +9,7 @@ import { createInteractionButton } from './chip-button.js';
 import { placeMacMenu } from './context-menu-placement.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 
 /** One row of a chart's or picture's right-click menu. */
 export type ObjectMenuEntry =
@@ -164,9 +164,8 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
       root.style.display = 'block';
       root.style.left = '-9999px';
       root.style.top = '-9999px';
-      const placed = isMacHost(host) ? placeMacMenu(root, x, y) : clampPanelToViewport(root, x, y);
-      root.style.left = `${placed.x}px`;
-      root.style.top = `${placed.y}px`;
+      if (isMacHost(host)) placeMacMenu(root, x, y);
+      else placePanel(root, x, y);
       focusMenuItem(root, 'first');
     },
     close,

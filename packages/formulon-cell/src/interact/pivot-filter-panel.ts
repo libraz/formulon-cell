@@ -17,7 +17,7 @@ import { enhanceCustomSelect } from './custom-select.js';
 import { deferInitialFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 import {
   type PivotFilterConditionKind,
   pivotFilterConditionToSpec,
@@ -367,12 +367,10 @@ export function openPivotFieldFilter(
   const rect = ctx.host.getBoundingClientRect();
   const at = anchor ?? { x: rect.left + 40, y: rect.top + 40 };
   // The desktop hangs the panel 6 pt below the button's bottom-left corner.
-  const position = clampPanelToViewport(panel, at.x, at.y + 6, {
+  placePanel(panel, at.x, at.y + 6, {
     fallbackWidth: 257,
     fallbackHeight: 434,
   });
-  panel.style.left = `${position.x}px`;
-  panel.style.top = `${position.y}px`;
   deferInitialFocus(panel, () => search.focus({ preventScroll: true }));
   const detachOutside = onOutsidePress(
     doc,

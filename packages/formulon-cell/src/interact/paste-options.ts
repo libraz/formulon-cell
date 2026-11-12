@@ -16,7 +16,7 @@ import {
 } from './floating-options-menu.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 
 export type PasteOptionsMode = 'source' | 'values' | 'formatting';
 
@@ -101,18 +101,14 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
     const rtl = state.ui.rightToLeft === true;
     const x = anchor ? hostRect.left + trailingEdgeX(anchor, rtl) : hostRect.left + 24;
     const y = anchor ? hostRect.top + anchor.y + anchor.h : hostRect.top + 24;
-    const { x: left, y: top } = clampPanelToViewport(button, rtl ? x - 31 : x + 3, y + 3, {
+    const { x: left, y: top } = placePanel(button, rtl ? x - 31 : x + 3, y + 3, {
       fallbackWidth: 28,
       fallbackHeight: 28,
     });
-    button.style.left = `${left}px`;
-    button.style.top = `${top}px`;
-    const menuPos = clampPanelToViewport(menu, left, top + 24, {
+    placePanel(menu, left, top + 24, {
       fallbackWidth: 220,
       fallbackHeight: 112,
     });
-    menu.style.left = `${menuPos.x}px`;
-    menu.style.top = `${menuPos.y}px`;
   };
 
   const runPaste = (snap: ClipboardSnapshot, what: PasteSpecialOptions['what']) =>

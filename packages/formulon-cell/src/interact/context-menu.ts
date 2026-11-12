@@ -92,12 +92,7 @@ import { type MenuTarget, resolveContextMenuTarget } from './context-menu-target
 import { openCommentDialogFrom } from './dialog-entry.js';
 import { withDialogAnchor } from './dialog-placement.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import {
-  clampPanelToViewport,
-  panelSize,
-  VIEWPORT_PANEL_PAD,
-  viewportSize,
-} from './overlay-position.js';
+import { panelSize, placePanel, VIEWPORT_PANEL_PAD, viewportSize } from './overlay-position.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
 
 /** Distance from a Mac submenu's top edge to the centre of its first row. */
@@ -468,13 +463,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const mac = isMacPlatform();
     let x = mac ? r.right : r.right - 2;
     if (x + sw > viewport.width - VIEWPORT_PANEL_PAD) x = mac ? r.left - sw : r.left - sw + 2;
-    const pos = clampPanelToViewport(
-      sub,
-      x,
-      mac ? r.top + r.height / 2 - MAC_SUB_ROW_CENTER : r.top - 4,
-    );
-    sub.style.left = `${pos.x}px`;
-    sub.style.top = `${pos.y}px`;
+    placePanel(sub, x, mac ? r.top + r.height / 2 - MAC_SUB_ROW_CENTER : r.top - 4);
     openSub = { id, parentBtn };
     parentBtn.setAttribute('aria-expanded', 'true');
     parentBtn.classList.add('fc-ctxmenu__item--open');
@@ -857,11 +846,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     root.style.left = '-9999px';
     root.style.top = '-9999px';
     visible = true;
-    const { x, y } = isMacPlatform()
-      ? placeMacMenu(root, clientX, clientY)
-      : clampPanelToViewport(root, clientX, clientY);
-    root.style.left = `${x}px`;
-    root.style.top = `${y}px`;
+    if (isMacPlatform()) placeMacMenu(root, clientX, clientY);
+    else placePanel(root, clientX, clientY);
     // A Mac menu opened by the pointer starts with no row highlighted; the
     // first arrow key then lands on the first row.
     if (isMacPlatform() && event.type === 'contextmenu') {

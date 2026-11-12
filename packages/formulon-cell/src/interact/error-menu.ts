@@ -9,7 +9,7 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 
 export type ErrorMenuKind = 'error' | 'validation';
 
@@ -275,9 +275,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
       root.style.left = '-9999px';
       root.style.top = '-9999px';
       visible = true;
-      const { x, y } = clampPanelToViewport(root, screenX, screenY);
-      root.style.left = `${x}px`;
-      root.style.top = `${y}px`;
+      placePanel(root, screenX, screenY);
       detachOutside?.();
       detachOutside = onOutsidePress(
         document,

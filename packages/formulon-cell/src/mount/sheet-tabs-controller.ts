@@ -23,7 +23,7 @@ import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { onOutsidePress } from '../interact/outside-press.js';
-import { clampPanelToViewport } from '../interact/overlay-position.js';
+import { placePanel } from '../interact/overlay-position.js';
 import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-colors.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
@@ -544,13 +544,11 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       sheetMenu.appendChild(sub);
       const menuRect = sheetMenu.getBoundingClientRect();
       const rowRect = trigger.getBoundingClientRect();
-      const { x: left, y: top } = clampPanelToViewport(sub, menuRect.right - 1, rowRect.top, {
+      placePanel(sub, menuRect.right - 1, rowRect.top, {
         pad: 8,
         fallbackWidth: 198,
         fallbackHeight: 285,
       });
-      sub.style.left = `${left}px`;
-      sub.style.top = `${top}px`;
       trigger.setAttribute('aria-expanded', 'true');
     };
     // The Mac desktop's tab menu lists its own entries in its own order.

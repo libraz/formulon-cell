@@ -42,7 +42,7 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport, panelSize } from './overlay-position.js';
+import { panelSize, placePanel } from './overlay-position.js';
 
 export interface StatusBarDeps {
   /** The status bar element built by mount.ts. We take it over and lay
@@ -820,9 +820,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const placeChooser = (clientX: number, clientY: number): void => {
     const { height } = panelSize(popover);
-    const { x, y } = clampPanelToViewport(popover, clientX, clientY - height - 8, {});
-    popover.style.left = `${x}px`;
-    popover.style.top = `${y}px`;
+    placePanel(popover, clientX, clientY - height - 8, {});
   };
 
   const showChooser = (clientX: number, clientY: number): void => {

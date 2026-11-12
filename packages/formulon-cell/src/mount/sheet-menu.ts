@@ -1,4 +1,4 @@
-import { clampPanelToViewport } from '../interact/overlay-position.js';
+import { placePanel } from '../interact/overlay-position.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createHostButton } from './chrome-buttons.js';
@@ -105,11 +105,9 @@ export function positionSheetMenu(menu: HTMLElement, x: number, y: number): void
   menu.hidden = false;
   menu.style.left = '0px';
   menu.style.top = '0px';
-  const { x: left, y: top } = clampPanelToViewport(menu, x, y, {
+  placePanel(menu, x, y, {
     pad: 8,
     fallbackWidth: 180,
     fallbackHeight: 160,
   });
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
 }

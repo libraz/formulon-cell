@@ -6,7 +6,7 @@ import { createInteractionButton } from './chip-button.js';
 import { deferInitialFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 
 const open = new WeakMap<HTMLElement, () => void>();
 
@@ -64,14 +64,12 @@ export function showPivotSpillCallout(
   const height = callout.getBoundingClientRect().height || 241;
   // Above the cell when there is room, else below it, so the cell stays in view.
   const above = hostRect.top + cell.y - height - 8;
-  const position = clampPanelToViewport(
+  placePanel(
     callout,
     hostRect.left + cell.x + cell.w / 2 - 192,
     above >= 4 ? above : hostRect.top + cell.y + cell.h + 8,
     { fallbackWidth: 384, fallbackHeight: 241 },
   );
-  callout.style.left = `${position.x}px`;
-  callout.style.top = `${position.y}px`;
   deferInitialFocus(callout, () => ok.focus({ preventScroll: true }));
   const detachOutside = onOutsidePress(
     doc,

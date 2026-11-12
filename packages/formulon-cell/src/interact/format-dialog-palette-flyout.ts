@@ -1,6 +1,6 @@
 // Swatch palette flyouts for the Format Cells font and border tabs.
 
-import { clampPanelToViewport } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 
 /** A swatch palette that hangs off a color control instead of sitting inline. */
 export interface PaletteFlyout {
@@ -31,9 +31,7 @@ export function createPaletteFlyout(
       flyout.style.left = '-9999px';
       flyout.style.top = '-9999px';
       const anchor = toggle.getBoundingClientRect();
-      const { x, y } = clampPanelToViewport(flyout, anchor.left, anchor.bottom + 4, { pad: 8 });
-      flyout.style.left = `${x}px`;
-      flyout.style.top = `${y}px`;
+      placePanel(flyout, anchor.left, anchor.bottom + 4, { pad: 8 });
       palette.focus();
     },
     isOpen: () => !flyout.hidden,

@@ -26,7 +26,7 @@ import { createInteractionButton } from './chip-button.js';
 import { deferInitialFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { clampPanelToViewport } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 
 export interface FilterDropdownDeps {
   store: SpreadsheetStore;
@@ -626,12 +626,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     r.append(conditionPanel, searchHost, list, actions);
     overlayPortalFor(deps.host).appendChild(r);
     root = r;
-    const position = clampPanelToViewport(r, anchor.x, anchor.y + anchor.h, {
+    placePanel(r, anchor.x, anchor.y + anchor.h, {
       fallbackWidth: 260,
       fallbackHeight: 320,
     });
-    r.style.left = `${position.x}px`;
-    r.style.top = `${position.y}px`;
 
     deferInitialFocus(r, () => search.focus());
 

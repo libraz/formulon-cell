@@ -264,10 +264,10 @@ describe('auto fill options', () => {
         },
       }),
     );
-    expect(button.style.left).toBe('101.5px');
-    expect(button.style.top).toBe('102.7px');
-    expect(menu.style.left).toBe('101.5px');
-    expect(Number.parseFloat(menu.style.top)).toBeCloseTo(102.7 + 22 + 5, 5);
+    expect(button.style.left).toBe('102px');
+    expect(button.style.top).toBe('103px');
+    expect(menu.style.left).toBe('102px');
+    expect(menu.style.top).toBe(`${103 + 22 + 5}px`);
   });
 
   describe('right-button selection drag menu', () => {
