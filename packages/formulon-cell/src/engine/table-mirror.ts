@@ -622,7 +622,8 @@ export class TableMirror {
 
 /** The engine's current range of the table at workbook-wide `index`. */
 function engineTableRange(wb: WorkbookHandle, index: number, sheet: number): Range | null {
-  const parsed = wb.getTables()[index] ? parseRangeRef(wb.getTables()[index]?.ref ?? '') : null;
+  const table = wb.getTables()[index];
+  const parsed = table ? parseRangeRef(table.ref ?? '') : null;
   return parsed ? { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 } : null;
 }
 

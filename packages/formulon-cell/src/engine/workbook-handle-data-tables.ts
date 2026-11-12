@@ -1,4 +1,5 @@
 import type { DataTable } from '@libraz/formulon';
+import { MAX_COL, MAX_ROW } from './address.js';
 import { CALC_MODE_MANUAL } from './calc-mode.js';
 import { isFormulonError } from './result.js';
 import type { Addr, EngineCapabilities, Range, Workbook } from './types.js';
@@ -111,7 +112,7 @@ export abstract class WorkbookHandleDataTablesMethods {
 
   /** Every data table on `sheet`. */
   dataTables(sheet: number): DataTableInfo[] {
-    return this.dataTablesInRange({ sheet, r0: 0, c0: 0, r1: 1048575, c1: 16383 });
+    return this.dataTablesInRange({ sheet, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL });
   }
 
   /** Creates a data table and computes it unless calculation is Manual.

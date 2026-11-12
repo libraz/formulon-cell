@@ -10,6 +10,7 @@ import {
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { renderScale } from '../store/render-scale.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
+import { MAX_ROW } from './address.js';
 import type { EngineDrawingAnchor } from './types.js';
 
 /** `AnchorKind.Absolute`: the engine cannot re-anchor such an object. */
@@ -135,11 +136,11 @@ const colAtX = (layout: ViewLayoutOf, viewport: ViewportOf, x: number, zoom: num
 const rowAtY = (layout: ViewLayoutOf, viewport: ViewportOf, y: number, zoom: number): number => {
   const origin = cellRectUnclamped(layout, viewport, 0, 0);
   let row = Math.max(0, Math.floor((y - origin.y) / Math.max(1, layout.defaultRowHeight * zoom)));
-  row = Math.min(1_048_575, row);
-  for (let i = 0; i < 1_048_576; i += 1) {
+  row = Math.min(MAX_ROW, row);
+  for (let i = 0; i <= MAX_ROW; i += 1) {
     const rect = cellRectUnclamped(layout, viewport, row, 0);
     if (y < rect.y) row = Math.max(0, row - 1);
-    else if (y >= rect.y + rect.h) row = Math.min(1_048_575, row + 1);
+    else if (y >= rect.y + rect.h) row = Math.min(MAX_ROW, row + 1);
     else break;
   }
   return row;

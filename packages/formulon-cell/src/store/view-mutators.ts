@@ -2,7 +2,7 @@ import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
 import { frozenColEnd, frozenColStart, frozenRowEnd, frozenRowStart } from './freeze-band.js';
-import { MAX_ROW_HEIGHT_PX, snapRowHeightPx } from './layout-limits.js';
+import { MAX_COL_WIDTH_PX, MAX_ROW_HEIGHT_PX, snapRowHeightPx } from './layout-limits.js';
 import { clampZoom, renderScale } from './render-scale.js';
 import { sameRange } from './selection-geometry.js';
 import { clampSplitPaneOrigin } from './split-panes.js';
@@ -260,7 +260,7 @@ export const viewMutators = {
       const colWidths = new Map(s.layout.colWidths);
       colWidths.set(
         col,
-        Math.max(minScreenPx(s.layout), Math.min(800, snapToScreenPx(s.layout, px))),
+        Math.max(minScreenPx(s.layout), Math.min(MAX_COL_WIDTH_PX, snapToScreenPx(s.layout, px))),
       );
       return { ...s, layout: { ...s.layout, colWidths } };
     });

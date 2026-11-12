@@ -64,8 +64,8 @@ export function scanPrecedents(wb: WorkbookHandle, addr: Addr): Addr[] {
   return out;
 }
 
-/** Same-sheet regex fallback for `findDependents`. Exported for tests. */
-export function scanDependents(wb: WorkbookHandle, addr: Addr): Addr[] {
+/** Same-sheet regex fallback for `findDependents`. */
+function scanDependents(wb: WorkbookHandle, addr: Addr): Addr[] {
   const out: Addr[] = [];
   for (const cell of wb.cells(addr.sheet)) {
     if (!cell.formula) continue;

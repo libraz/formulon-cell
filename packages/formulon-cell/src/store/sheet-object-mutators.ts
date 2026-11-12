@@ -74,12 +74,13 @@ export const sheetObjectMutators = {
   /** Attach a sparkline member to `addr`. Pass `null` to remove. A group left with no
    *  member is dropped. */
   setSparkline(store: SpreadsheetStore, addr: Addr, spec: Sparkline | null): void {
+    if (spec === null) {
+      sheetObjectMutators.clearSparkline(store, addr);
+      return;
+    }
     store.setState((s) => {
-      const key = addrKey(addr);
-      if (spec === null && !s.sparkline.sparklines.has(key)) return s;
       const sparklines = new Map(s.sparkline.sparklines);
-      if (spec === null) sparklines.delete(key);
-      else sparklines.set(key, { ...spec });
+      sparklines.set(addrKey(addr), { ...spec });
       return { ...s, sparkline: withSparklineMembers(s.sparkline, sparklines) };
     });
   },
