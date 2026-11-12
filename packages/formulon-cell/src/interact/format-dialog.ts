@@ -477,7 +477,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // A differential format's Clear lives in the tab group of the font, border and fill tabs.
   const syncClearButton = (): void => {
     clearBtn.hidden = macDxf === null || activeTab === 'number';
-    clearBtn.dataset.fcTab = activeTab;
+    clearBtn.dataset.fcClearFor = activeTab;
   };
 
   const setActiveTab = (id: TabId): void => {
@@ -751,7 +751,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── Event handlers ─────────────────────────────────────────────────────
   const onTabClick = (e: MouseEvent): void => {
     const target = e.target as HTMLElement;
-    const btn = target.closest('button[data-fc-tab]') as HTMLButtonElement | null;
+    const btn = target.closest('button[role="tab"][data-fc-tab]') as HTMLButtonElement | null;
     if (!btn) return;
     const id = btn.dataset.fcTab as TabId | undefined;
     if (id) {
@@ -768,7 +768,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const onTabKeyDown = (e: KeyboardEvent): void => {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-fc-tab]');
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
+      'button[role="tab"][data-fc-tab]',
+    );
     if (!btn) return;
     const id = btn.dataset.fcTab as TabId | undefined;
     const idx = id ? tabOrder.indexOf(id) : -1;

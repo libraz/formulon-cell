@@ -183,7 +183,7 @@ describe('conditional format Custom Format dialog on the Mac profile', () => {
         (b) => b.textContent === label,
       );
       tab?.click();
-      return [label, clear.hidden, clear.dataset.fcTab];
+      return [label, clear.hidden, clear.dataset.fcClearFor];
     });
     expect(seen).toEqual([
       ['表示形式', true, 'number'],
@@ -191,6 +191,21 @@ describe('conditional format Custom Format dialog on the Mac profile', () => {
       ['罫線', false, 'border'],
       ['塗りつぶし', false, 'fill'],
     ]);
+  });
+
+  it('keeps Clear apart from the tabs: no tab id, and keys or clicks on it switch no tab', () => {
+    openDxf('mac', {}, 'conditional');
+    const selected = () =>
+      document.querySelector('.fc-fmtdlg__tabs [role="tab"][aria-selected="true"]')?.textContent;
+    const clear = q<HTMLButtonElement>('.fc-fmtdlg__btn--clear');
+    // A tab id on Clear would make it match every lookup of that tab.
+    expect(clear.hasAttribute('data-fc-tab')).toBe(false);
+    expect(selected()).toBe('フォント');
+    clear.focus();
+    clear.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(selected()).toBe('フォント');
+    clear.click();
+    expect(selected()).toBe('フォント');
   });
 });
 
@@ -231,7 +246,7 @@ describe('Mac differential format layout', () => {
       506, 498, 62, 26,
     ]);
     const border = clearRules().find(([selector]) =>
-      selector.endsWith('.fc-fmtdlg__btn--clear[data-fc-tab="border"]'),
+      selector.endsWith('.fc-fmtdlg__btn--clear[data-fc-clear-for="border"]'),
     );
     expect(px(border?.[1] ?? '', 'left')).toBe(501);
   });

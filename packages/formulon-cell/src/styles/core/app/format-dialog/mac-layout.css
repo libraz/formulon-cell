@@ -265,7 +265,7 @@
   .fc-fmtdlg--mac
     .fc-fmtdlg__panel
     .fc-fmtdlg__footer
-    .fc-fmtdlg__btn.fc-fmtdlg__btn--clear[data-fc-tab="border"] {
+    .fc-fmtdlg__btn.fc-fmtdlg__btn--clear[data-fc-clear-for="border"] {
     position: absolute;
     left: 501px;
     top: 498px;

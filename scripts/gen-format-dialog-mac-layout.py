@@ -24,7 +24,7 @@ CHROME=[
  ('.fc-fmtdlg__footer .fc-fmtdlg__btn--primary',(510,558,86,26)),
  # A differential format's Clear: a child of the tab group, absent on the Number tab.
  ('.fc-fmtdlg__footer .fc-fmtdlg__btn.fc-fmtdlg__btn--clear',(506,498,62,26)),
- ('.fc-fmtdlg__footer .fc-fmtdlg__btn.fc-fmtdlg__btn--clear[data-fc-tab="border"]',(501,498,62,26)),
+ ('.fc-fmtdlg__footer .fc-fmtdlg__btn.fc-fmtdlg__btn--clear[data-fc-clear-for="border"]',(501,498,62,26)),
 ]
 
 tab('align',[
