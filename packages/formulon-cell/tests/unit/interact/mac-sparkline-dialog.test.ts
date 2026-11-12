@@ -67,6 +67,24 @@ describe('attachMacSparklineDialog', () => {
     handle.detach();
   });
 
+  it('leaves the Enter that confirms IME text in a field to the input method', () => {
+    const handle = attachMacSparklineDialog({ host, store, getWb: makeWorkbook });
+    handle.open();
+    const destination = host.ownerDocument.querySelector<HTMLInputElement>(
+      '.fc-macsparkdlg__destination',
+    );
+    if (!destination) throw new Error('location field missing');
+    destination.value = 'D1';
+    destination.dispatchEvent(new Event('input', { bubbles: true }));
+    destination.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', keyCode: 229, bubbles: true }),
+    );
+    expect(sparklineAt(store.getState(), { sheet: 0, row: 0, col: 3 })).toBeNull();
+    destination.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(sparklineAt(store.getState(), { sheet: 0, row: 0, col: 3 })?.source).toBe('A1:C1');
+    handle.detach();
+  });
+
   it('blocks a multi-cell destination before mutating the store', () => {
     const handle = attachMacSparklineDialog({
       host,

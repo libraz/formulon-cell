@@ -401,6 +401,20 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('Enter in a select or confirming IME text does not apply', () => {
+    const handle = attachFormatDialog({ strings: ja, host, store });
+    handle.open();
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
+    document
+      .querySelector<HTMLSelectElement>('.fc-fmtdlg select')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    document
+      .querySelector<HTMLInputElement>('.fc-fmtdlg input[type="text"]')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 229, bubbles: true }));
+    expect(overlay.hidden).toBe(false);
+    handle.detach();
+  });
+
   it('detach() removes wired listeners (clicking after detach is inert)', () => {
     const handle = attachFormatDialog({ strings: ja, host, store });
     handle.open();

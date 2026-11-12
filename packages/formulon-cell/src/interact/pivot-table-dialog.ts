@@ -27,6 +27,7 @@ import {
   createDialogButton,
   createDialogShell,
 } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createPivotFieldAreas } from './pivot-table-field-areas.js';
 import { renderPivotFieldList } from './pivot-table-field-list.js';
 import { createRangePickFormatter } from './range-pick-format.js';
@@ -542,7 +543,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
-    } else if (e.key === 'Enter' && !okBtn.disabled) {
+    } else if (isSubmitEnter(e) && !okBtn.disabled) {
       e.preventDefault();
       body.requestSubmit();
     }

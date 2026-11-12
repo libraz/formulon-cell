@@ -163,6 +163,20 @@ describe('attachPageSetupDialog', () => {
     handle.detach();
   });
 
+  it('Enter in a select or confirming IME text keeps the dialog open', () => {
+    const handle = attachPageSetupDialog({ host, store });
+    handle.open();
+    const [orientSelect] = selects();
+    orientSelect?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    marginInputs()[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }),
+    );
+    expect(dialog()?.hidden).toBe(false);
+    marginInputs()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(dialog()?.hidden).toBe(true);
+    handle.detach();
+  });
+
   it('refreshes printable bounds from a host printer profile when paper changes', () => {
     const resolvePrintableBounds = vi.fn(() => ({
       top: 0.45,

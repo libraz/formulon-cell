@@ -26,6 +26,7 @@ import {
   createDialogShell,
   deferInitialFocus,
 } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
 
@@ -284,7 +285,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     api.close();
   };
   const onKey = (event: KeyboardEvent): void => {
-    if (event.key === 'Enter' && !event.isComposing) {
+    if (isSubmitEnter(event)) {
       event.preventDefault();
       onOk();
     }

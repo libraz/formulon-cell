@@ -125,6 +125,49 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
+  it('leaves Enter on a button or confirming IME text in an argument to its own meaning', () => {
+    const inserted: string[] = [];
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: (formula) => {
+        inserted.push(formula);
+      },
+    });
+    handle.open('SUM');
+    const cancel = [...document.querySelectorAll<HTMLButtonElement>('.fc-fxdialog button')].find(
+      (b) =>
+        b.classList.contains('fc-fmtdlg__btn') && !b.classList.contains('fc-fmtdlg__btn--primary'),
+    );
+    cancel?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const arg = document.querySelector<HTMLInputElement>('.fc-fxdialog__args input');
+    arg?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }),
+    );
+    expect(inserted).toEqual([]);
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog')?.hidden).toBe(false);
+    arg?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(inserted).toHaveLength(1);
+    handle.detach();
+  });
+
+  it('leaves the Enter that confirms IME text in the search box to the input method', () => {
+    const handle = attachFxDialog({ host, store: createSpreadsheetStore(), onInsert: () => {} });
+    handle.open();
+    const search = document.querySelector<HTMLInputElement>('.fc-fxdialog__search');
+    const args = document.querySelector<HTMLElement>('.fc-fxdialog__args');
+    if (!search) throw new Error('search box missing');
+    search.value = 'SUM';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    search.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }),
+    );
+    expect(args?.hidden).toBe(true);
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(args?.hidden).toBe(false);
+    handle.detach();
+  });
+
   it('prefills seeded function arguments from the spreadsheet context', () => {
     const inserted: string[] = [];
     const handle = attachFxDialog({

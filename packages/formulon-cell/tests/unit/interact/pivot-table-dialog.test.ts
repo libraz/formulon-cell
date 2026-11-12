@@ -1028,6 +1028,29 @@ describe('attachPivotTableDialog', () => {
     handle.detach();
   });
 
+  it('leaves Enter on a button or confirming IME text to its own meaning', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open();
+    const overlay = document.querySelector<HTMLElement>('.fc-pivotdlg');
+    const cancel = [...document.querySelectorAll<HTMLButtonElement>('.fc-pivotdlg button')].find(
+      (b) => !b.classList.contains('fc-fmtdlg__btn--primary'),
+    );
+    cancel?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    document
+      .querySelector<HTMLInputElement>('.fc-pivotdlg input[type="text"]')
+      ?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }),
+      );
+
+    expect(calls).not.toContain('pivot');
+    expect(overlay?.hasAttribute('hidden')).toBe(false);
+    handle.detach();
+  });
+
   it('shows a disabled-state message when mutation is unavailable', () => {
     const { wb } = makeWb();
     Object.defineProperty(wb, 'capabilities', { value: { pivotTableMutate: false } });

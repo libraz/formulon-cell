@@ -35,6 +35,7 @@ import {
   nativeFunctionName,
   resolveCatalogFunctionName,
 } from './function-catalog-text.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
@@ -594,7 +595,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       if (names.length === 0) return;
       highlightIndex = names.length - 1;
       renderList();
-    } else if (e.key === 'Enter') {
+    } else if (isSubmitEnter(e, { actsOn: searchInput })) {
       const target = names[highlightIndex];
       if (!target) return;
       e.preventDefault();
@@ -647,7 +648,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     }
     // Enter inside an arg input commits the assembled formula. The picker
     // step has its own Enter handler on the search input.
-    if (e.key === 'Enter' && !argsWrap.hidden && !insertBtn.disabled) {
+    if (isSubmitEnter(e) && !argsWrap.hidden && !insertBtn.disabled) {
       e.preventDefault();
       onInsertClick();
     }

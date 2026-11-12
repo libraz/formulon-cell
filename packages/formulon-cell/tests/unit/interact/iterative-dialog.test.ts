@@ -147,6 +147,19 @@ describe('attachIterativeDialog', () => {
     handle.detach();
   });
 
+  it('Enter on Cancel or confirming IME text does not press OK', () => {
+    const fake = makeFakeWb();
+    const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });
+    handle.open();
+    cancelBtn()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    textInput()?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }),
+    );
+    expect(fake.setIterative).not.toHaveBeenCalled();
+    expect(overlay()?.hidden).toBe(false);
+    handle.detach();
+  });
+
   it('numeric input clamps min iterations to 1', () => {
     const fake = makeFakeWb();
     const handle = attachIterativeDialog({ strings: ja, host, getWb: () => fake.handle });

@@ -70,6 +70,7 @@ import {
 import { attachProtectionTab } from './format-dialog-tabs/protection-controller.js';
 import { runFormatDialogTransaction } from './format-dialog-transaction.js';
 import { createFormatDialogView } from './format-dialog-view.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
@@ -818,11 +819,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       api.close();
       return;
     }
-    if (e.key === 'Enter') {
-      const target = e.target as HTMLElement;
-      const tag = target.tagName;
-      // Don't intercept Enter inside textarea or buttons that should activate.
-      if (tag === 'BUTTON' || tag === 'TEXTAREA') return;
+    if (isSubmitEnter(e)) {
       e.preventDefault();
       onOk();
     }

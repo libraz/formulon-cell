@@ -741,6 +741,28 @@ describe('attachConditionalDialog', () => {
     handle.detach();
   });
 
+  it('leaves Enter in a select, on a button or confirming IME text to its own meaning', () => {
+    setRange(store, 0, 0, 1, 0);
+    const handle = attachConditionalDialog({ strings: ja, host, store });
+    handle.open();
+    const overlay = document.querySelector<HTMLElement>('.fc-conddlg');
+    const targets = [
+      document.querySelector<HTMLSelectElement>('.fc-conddlg select'),
+      document.querySelector<HTMLButtonElement>('.fc-conddlg button'),
+    ];
+    for (const target of targets) {
+      target?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    }
+    document
+      .querySelector<HTMLInputElement>('.fc-conddlg input[type="text"]')
+      ?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }),
+      );
+    expect(store.getState().conditional.rules).toHaveLength(0);
+    expect(overlay?.hidden).toBe(false);
+    handle.detach();
+  });
+
   it('detach() removes every listener left on still-connected targets', () => {
     const { registered, leaked } = trackConnectedListenerLeaks(() => {
       const handle = attachConditionalDialog({ strings: ja, host, store });

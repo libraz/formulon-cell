@@ -37,6 +37,7 @@ import { conditionalSelect } from './conditional-form-controls.js';
 import { appendIconSetForm } from './conditional-icon-set-form.js';
 import { appendDialogButton, createDialogShell, deferInitialFocus } from './dialog-shell.js';
 import { attachFormatDialog, type FormatDialogHandle } from './format-dialog.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
@@ -1055,7 +1056,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     if (e.key === 'Escape') {
       e.preventDefault();
       api.close();
-    } else if (e.key === 'Enter') {
+    } else if (isSubmitEnter(e)) {
       e.preventDefault();
       onAdd();
     }

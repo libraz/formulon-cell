@@ -33,6 +33,7 @@ import {
   createDialogShell,
   deferInitialFocus,
 } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createHeaderFooterTab } from './page-setup-dialog-tabs/header-footer.js';
 import { createMarginsTab } from './page-setup-dialog-tabs/margins.js';
 import { createPageTab } from './page-setup-dialog-tabs/page.js';
@@ -308,9 +309,8 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
       onCancel();
       return;
     }
-    if (e.key === 'Enter') {
-      if ((e.target as HTMLElement).tagName === 'BUTTON') return;
-      // Enter inside a textbox triggers OK — spreadsheet parity.
+    // Enter inside a textbox triggers OK — spreadsheet parity.
+    if (isSubmitEnter(e)) {
       e.preventDefault();
       onOk();
     }

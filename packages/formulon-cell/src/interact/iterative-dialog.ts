@@ -17,6 +17,7 @@ import {
   createDialogShell,
   deferInitialFocus,
 } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 
 export interface IterativeDialogDeps {
   host: HTMLElement;
@@ -427,7 +428,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   shell.on(shell.overlay, 'keydown', (e) => {
     const event = e as KeyboardEvent;
     event.stopPropagation();
-    if (event.key === 'Enter') {
+    if (isSubmitEnter(event)) {
       event.preventDefault();
       onOk();
     }
