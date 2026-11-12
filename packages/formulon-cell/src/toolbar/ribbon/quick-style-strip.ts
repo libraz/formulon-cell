@@ -75,6 +75,17 @@ export interface QuickStyleStripOptions {
   readonly more?: { readonly arrow: HTMLButtonElement; readonly menu: HTMLElement | null };
 }
 
+/** What a ribbon style gallery (table, PivotTable or sparkline) is built from. */
+export interface RibbonStyleGalleryOptions {
+  readonly lang: ToolbarLang;
+  readonly getInst: () => SpreadsheetInstance | null;
+  /** The ribbon's gallery button; it opens the full gallery. */
+  readonly arrow: HTMLButtonElement;
+  readonly menu: HTMLElement | null;
+  /** The Mac profile's strip: no page arrows, scrolled to the current style. */
+  readonly mac: boolean;
+}
+
 /** A `blocked` hook greying the strip while its ribbon command `commandId` is refused (a
  *  protected sheet), with the reason. */
 export const blockedUnlessPermitted =

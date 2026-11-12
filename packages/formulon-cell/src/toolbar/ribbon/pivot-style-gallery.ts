@@ -2,15 +2,15 @@ import {
   listCustomPivotTableStyles,
   pivotStyleGallerySections,
 } from '../../commands/format-as-table.js';
-import { activeStyleTarget } from '../../commands/table-style-actions.js';
+import { ribbonStyleTarget } from '../../commands/table-style-actions.js';
 import { builtinPivotStyleElements } from '../../engine/pivot-style.js';
 import type { StyleElementFormat, StyleElementFormats } from '../../engine/table-style-elements.js';
-import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { ToolbarLang } from '../ribbon-model.js';
 import {
   blockedUnlessPermitted,
   createQuickStyleStrip,
   type QuickStyleEntry,
+  type RibbonStyleGalleryOptions,
 } from './quick-style-strip.js';
 
 const FAMILIES = [
@@ -112,34 +112,13 @@ export const builtinPivotThumbnailElements = (
   themeColors: readonly number[] | undefined,
 ): StyleElementFormats | null => (name ? builtinPivotStyleElements(name, themeColors) : null);
 
-export interface PivotStyleGalleryOptions {
-  lang: ToolbarLang;
-  getInst: () => SpreadsheetInstance | null;
-  /** The ribbon's Quick Styles button; it opens the full gallery. */
-  arrow: HTMLButtonElement;
-  menu: HTMLElement | null;
-  /** The Mac profile's strip: no page arrows, scrolled to the current style. */
-  mac: boolean;
-}
-
 /** The PivotTable Design Quick Styles: custom styles, None and the built-in styles, a page at a
  *  time, with the Quick Styles button as the more arrow. */
-export const createPivotStyleGallery = (opts: PivotStyleGalleryOptions): HTMLDivElement => {
+export const createPivotStyleGallery = (opts: RibbonStyleGalleryOptions): HTMLDivElement => {
   const { lang, getInst } = opts;
   const target = () => {
     const inst = getInst();
-    return inst
-      ? activeStyleTarget(
-          {
-            store: inst.store,
-            history: inst.history,
-            workbook: inst.workbook,
-            origin: 'ribbon',
-            commandId: 'pivotQuickStyles',
-          },
-          'pivot',
-        )
-      : null;
+    return inst ? ribbonStyleTarget(inst, 'pivot', 'pivotQuickStyles') : null;
   };
   const wrap = createQuickStyleStrip({
     lang,

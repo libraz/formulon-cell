@@ -28,10 +28,10 @@ import {
   tableWrite,
 } from '../../commands/table-actions.js';
 import {
-  activeStyleTarget,
-  clearTableRangeFormatting,
+  afterClearingFormatting,
   createCustomStyle,
   modifyCustomStyle,
+  ribbonStyleTarget,
   type TableStyleKind,
 } from '../../commands/table-style-actions.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
@@ -173,7 +173,7 @@ const buildTableStyleAction =
   (picked, color, variant = 'banded') => {
     const style = picked ?? defaultTableStyleId(instance.store.getState(), instance.workbook);
     const entry = { origin: 'ribbon', commandId: 'formatTableHome' } as const;
-    const table = styleTarget(instance, 'table', entry.commandId);
+    const table = ribbonStyleTarget(instance, 'table', entry.commandId);
     if (!table) {
       void showCreateTableDialog(instance, { style, color, variant }, entry);
       return;
@@ -182,19 +182,6 @@ const buildTableStyleAction =
     table.apply(style);
     instance.host.focus();
   };
-
-/** The ribbon's style target of `kind` under the active cell. */
-const styleTarget = (instance: SpreadsheetInstance, kind: TableStyleKind, commandId: string) =>
-  activeStyleTarget(
-    {
-      store: instance.store,
-      history: instance.history,
-      workbook: instance.workbook,
-      origin: 'ribbon',
-      commandId,
-    },
-    kind,
-  );
 
 /** Each kind's gallery menu: the item attribute that names a style, and its Clear footer. */
 const STYLES_MENU = {
@@ -217,7 +204,7 @@ const updateStylesMenu =
   (instance: SpreadsheetInstance, kind: TableStyleKind) =>
   (menu: HTMLElement): void => {
     const spec = STYLES_MENU[kind];
-    const target = styleTarget(instance, kind, spec.commandId);
+    const target = ribbonStyleTarget(instance, kind, spec.commandId);
     for (const button of menu.querySelectorAll<HTMLButtonElement>(spec.selector)) {
       const active = target !== null && button.dataset[spec.item] === target.currentId;
       button.setAttribute('role', 'menuitemradio');
@@ -311,11 +298,8 @@ export const showCreateTableDialog = async (
     instance.host.focus();
     return;
   }
-  const transaction = options.clearFormatting ? instance.history.begin() : null;
-  let created = false;
-  try {
-    if (options.clearFormatting) clearTableRangeFormatting(ctx, range);
-    created = tableWrite(ctx, range, false, () => {
+  const create = (): boolean =>
+    tableWrite(ctx, range, false, () => {
       let table: unknown = null;
       recordTablesChange(instance.history, instance.store, () => {
         table = formatAsTableByStyleId(
@@ -333,13 +317,9 @@ export const showCreateTableDialog = async (
       });
       return table !== null;
     });
-  } finally {
-    if (transaction) {
-      // The engine can still refuse the table; its formatting then stays as it was.
-      if (created) instance.history.end(transaction);
-      else instance.history.abort(transaction);
-    }
-  }
+  // The engine can still refuse the table; its formatting then stays as it was.
+  if (options.clearFormatting) afterClearingFormatting(ctx, range, create);
+  else create();
   instance.host.focus();
 };
 
@@ -532,7 +512,7 @@ const buildTableStyleFooterAction =
     const strings = instance.i18n.strings;
     if (action === 'clear-table-style' || action === 'clear-pivot-style') {
       const kind = action === 'clear-table-style' ? 'table' : 'pivot';
-      styleTarget(instance, kind, STYLES_MENU[kind].commandId)?.clear();
+      ribbonStyleTarget(instance, kind, STYLES_MENU[kind].commandId)?.clear();
       instance.host.focus();
       return;
     }
@@ -555,7 +535,7 @@ const buildTableStyleFooterAction =
 const buildPivotTableStyleAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyPivotTableStyleFromRibbon'] =>
   (styleId) => {
-    styleTarget(instance, 'pivot', STYLES_MENU.pivot.commandId)?.apply(styleId);
+    ribbonStyleTarget(instance, 'pivot', STYLES_MENU.pivot.commandId)?.apply(styleId);
     instance.host.focus();
   };
 

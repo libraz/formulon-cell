@@ -7,29 +7,21 @@ import {
   sparklineStylePresetIndex,
 } from '../../commands/sparkline-presets.js';
 import { cssOfColorSpec } from '../../engine/theme-color.js';
-import type { SpreadsheetInstance } from '../../mount/types.js';
-import type { ToolbarLang, ToolbarText } from '../ribbon-model.js';
+import type { ToolbarText } from '../ribbon-model.js';
 import {
   SPARKLINE_STYLE_SLOTS,
   sparklineStyleLabel,
   sparklineStyleThumbnail,
 } from './menus/sparkline.js';
-import { createQuickStyleStrip } from './quick-style-strip.js';
+import { createQuickStyleStrip, type RibbonStyleGalleryOptions } from './quick-style-strip.js';
 import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
 
 // The desktop strip leaves these presets (Accent 4-6 lighter 40% and Dark #1-#4) to the full
 // gallery behind the chevron.
 const FULL_GALLERY_ONLY: ReadonlySet<number> = new Set([21, 22, 23, 24, 25, 26, 27]);
 
-export interface SparklineStyleGalleryOptions {
-  lang: ToolbarLang;
-  text: ToolbarText['sparkline'];
-  getInst: () => SpreadsheetInstance | null;
-  /** The ribbon's Style button; it opens the full gallery. */
-  arrow: HTMLButtonElement;
-  menu: HTMLElement | null;
-  /** The Mac profile's strip: no page arrows, scrolled to the current style. */
-  mac: boolean;
+export interface SparklineStyleGalleryOptions extends RibbonStyleGalleryOptions {
+  readonly text: ToolbarText['sparkline'];
 }
 
 /** Sparkline > Style: the strip's 29 presets a row at a time, with the Style button as the more

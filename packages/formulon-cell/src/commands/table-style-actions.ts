@@ -44,16 +44,25 @@ export function applyTableStyle(
 ): boolean {
   if (!options.clearFormatting) return restyle(ctx, table, styleId);
   if (!tableChangeAllowed(ctx, table.range)) return false;
+  return afterClearingFormatting(ctx, table.range, () => restyle(ctx, table, styleId));
+}
+
+/** Clears the direct formatting of `range`, then runs `change`, as one undo step. A refused
+ *  change (false) leaves the cells' formatting as it was. */
+export function afterClearingFormatting(
+  ctx: TableActionContext,
+  range: Range,
+  change: () => boolean,
+): boolean {
   const history = ctx.history;
   const transaction = history?.begin();
   let applied = false;
   try {
-    clearTableRangeFormatting(ctx, table.range);
-    applied = restyle(ctx, table, styleId);
+    clearTableRangeFormatting(ctx, range);
+    applied = change();
     return applied;
   } finally {
     if (history && transaction) {
-      // A refused restyle leaves the cells' formatting as it was.
       if (applied) history.end(transaction);
       else history.abort(transaction);
     }
@@ -411,27 +420,25 @@ export function activeStyleTarget(
     currentId: currentPivotStyleId(state, name),
     apply: (styleId, options) => {
       if (!options?.clearFormatting) return restyle(styleId);
-      const history = ctx.history;
-      const transaction = history?.begin();
-      let applied = false;
-      try {
-        clearTableRangeFormatting(ctx, {
-          sheet: pivot.sheetIndex,
-          r0: pivot.top,
-          c0: pivot.left,
-          r1: pivot.top + pivot.rows - 1,
-          c1: pivot.left + pivot.cols - 1,
-        });
-        applied = restyle(styleId);
-        return applied;
-      } finally {
-        if (history && transaction) {
-          // A refused restyle leaves the cells' formatting as it was.
-          if (applied) history.end(transaction);
-          else history.abort(transaction);
-        }
-      }
+      const range = {
+        sheet: pivot.sheetIndex,
+        r0: pivot.top,
+        c0: pivot.left,
+        r1: pivot.top + pivot.rows - 1,
+        c1: pivot.left + pivot.cols - 1,
+      };
+      return afterClearingFormatting(ctx, range, () => restyle(styleId));
     },
     clear: () => restyle(''),
   };
+}
+
+/** {@link activeStyleTarget} for a pick in a ribbon gallery, under the gallery's `commandId`. */
+export function ribbonStyleTarget(
+  objects: Pick<TableActionContext, 'store' | 'history'> & { readonly workbook: WorkbookHandle },
+  kind: TableStyleKind,
+  commandId: string,
+): ActiveStyleTarget | null {
+  const { store, history, workbook } = objects;
+  return activeStyleTarget({ store, history, workbook, origin: 'ribbon', commandId }, kind);
 }

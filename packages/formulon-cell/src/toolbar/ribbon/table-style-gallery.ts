@@ -2,46 +2,24 @@ import {
   listCustomTableStyles,
   tableStyleGallerySections,
 } from '../../commands/format-as-table.js';
-import { activeStyleTarget } from '../../commands/table-style-actions.js';
+import { ribbonStyleTarget } from '../../commands/table-style-actions.js';
 import { builtinTableStyleElements } from '../../engine/builtin-table-styles.js';
 import { dictionaries } from '../../i18n/strings.js';
-import type { SpreadsheetInstance } from '../../mount/types.js';
-import type { ToolbarLang } from '../ribbon-model.js';
 import { tableStyleSwatchGrid } from './menus/styles.js';
 import {
   blockedUnlessPermitted,
   createQuickStyleStrip,
   type QuickStyleEntry,
+  type RibbonStyleGalleryOptions,
 } from './quick-style-strip.js';
-
-export interface TableStyleGalleryOptions {
-  lang: ToolbarLang;
-  getInst: () => SpreadsheetInstance | null;
-  /** The ribbon's Quick Styles button; it opens the full gallery. */
-  arrow: HTMLButtonElement;
-  menu: HTMLElement | null;
-  /** The Mac profile's strip: no page arrows, scrolled to the current style. */
-  mac: boolean;
-}
 
 /** Table Design > Table Styles: the custom and built-in styles a row at a time, with the Quick
  *  Styles button as the more arrow. A pick restyles the active table. */
-export const createTableStyleGallery = (opts: TableStyleGalleryOptions): HTMLDivElement => {
+export const createTableStyleGallery = (opts: RibbonStyleGalleryOptions): HTMLDivElement => {
   const { lang, getInst } = opts;
   const target = () => {
     const inst = getInst();
-    return inst
-      ? activeStyleTarget(
-          {
-            store: inst.store,
-            history: inst.history,
-            workbook: inst.workbook,
-            origin: 'ribbon',
-            commandId: 'tableQuickStyles',
-          },
-          'table',
-        )
-      : null;
+    return inst ? ribbonStyleTarget(inst, 'table', 'tableQuickStyles') : null;
   };
   const wrap = createQuickStyleStrip({
     lang,
