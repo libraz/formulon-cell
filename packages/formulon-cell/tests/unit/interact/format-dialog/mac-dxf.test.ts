@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ja } from '../../../../src/i18n/strings.js';
 import { attachFormatDialog } from '../../../../src/interact/format-dialog.js';
@@ -170,6 +173,38 @@ describe('conditional format Custom Format dialog on the Mac profile', () => {
     italic.checked = true;
     italic.dispatchEvent(new Event('change', { bubbles: true }));
     expect(clear.disabled).toBe(false);
+  });
+});
+
+describe('Mac differential format layout', () => {
+  const css = readFileSync(
+    join(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../../..'),
+      'src/styles/core/app/format-dialog/mac-layout.css',
+    ),
+    'utf8',
+  );
+  const leftOf = (selectorEnd: string): string | undefined =>
+    [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .filter(([, selector]) => selector?.replace(/\s+/g, ' ').trim().endsWith(selectorEnd))
+      .map(([, , body]) => body?.match(/(?:^|[;\s])left:\s*([^;]+);/)?.[1]?.trim())
+      .filter((left) => left !== undefined)
+      .at(-1);
+
+  // The footer is absolutely positioned: Clear needs its own place, off Cancel's.
+  it('places Clear apart from Cancel', () => {
+    const cancel = leftOf('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)');
+    const clear = leftOf('.fc-fmtdlg__btn.fc-fmtdlg__btn--clear');
+    expect(cancel).toBeDefined();
+    expect(clear).toBeDefined();
+    expect(clear).not.toBe(cancel);
+  });
+
+  it('puts the Automatic caption in the color popup, off the Color label', () => {
+    const label = leftOf('.fc-fmtdlg__font-color-row > span');
+    const caption = leftOf('.fc-fmtdlg__font-color-row > .fc-fmtdlg__color-auto');
+    expect(caption).toBeDefined();
+    expect(caption).not.toBe(label);
   });
 });
 

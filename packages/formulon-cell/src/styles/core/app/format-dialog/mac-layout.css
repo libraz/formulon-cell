@@ -2410,11 +2410,27 @@
     box-sizing: border-box;
   }
 
-  .fc-fmtdlg--mac .fc-fmtdlg__btn--clear {
-    margin-right: auto;
+  /* A differential format's Clear sits at the footer's left end, apart from Cancel and OK; its
+     exact frame is unmeasured. */
+  .fc-fmtdlg--mac .fc-fmtdlg__panel .fc-fmtdlg__footer .fc-fmtdlg__btn.fc-fmtdlg__btn--clear {
+    left: 29px;
   }
 
-  .fc-fmtdlg--mac .fc-fmtdlg__color-auto {
-    margin-left: 8px;
+  /* An unset font color reads Automatic in the color popup: the caption covers the well, left
+     of the chevron, and lets clicks through to it. */
+  .fc-fmtdlg--mac
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"]
+    .fc-fmtdlg__font-color-row
+    > .fc-fmtdlg__color-auto {
+    left: 309px;
+    top: 237px;
+    width: 99px;
+    height: 22px;
+    padding-left: 8px;
+    line-height: 22px;
+    border-radius: 4px;
+    background: var(--fc-fmtdlg-input-bg);
+    pointer-events: none;
+    z-index: 1;
   }
 }
