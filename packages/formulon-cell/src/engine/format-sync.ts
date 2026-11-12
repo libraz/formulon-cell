@@ -3,16 +3,16 @@ import { addrKey, parseAddrKey } from './address.js';
 import type { EngineSyncOptions } from './cell-format-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-type EngineCommentEntry = {
-  row: number;
-  col: number;
+/** The grid fields of a note the engine holds. */
+const commentPatch = (e: {
   author: string | null;
   text: string;
   visible?: boolean;
-};
-type CommentEnumerableWorkbook = WorkbookHandle & {
-  getComments?: (sheet: number) => EngineCommentEntry[];
-};
+}): Partial<CellFormat> => ({
+  comment: e.text,
+  commentAuthor: e.author ?? undefined,
+  ...(e.visible ? { commentVisible: true } : {}),
+});
 
 const strictSyncError = (operation: string, address: string): Error =>
   new Error(`Strict engine sync failed: hyperlinks ${operation} at ${address}`);
@@ -38,37 +38,15 @@ export function hydrateCommentsAndHyperlinksFromEngine(
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
 
   if (wb.capabilities.comments) {
-    const commentEnumerable = wb as CommentEnumerableWorkbook;
-    if (wb.capabilities.commentsEnumerable && typeof commentEnumerable.getComments === 'function') {
-      for (const e of commentEnumerable.getComments(sheet)) {
+    if (wb.capabilities.commentsEnumerable) {
+      for (const e of wb.getComments(sheet)) {
         if (e.text.length === 0) continue;
-        updates.push({
-          key: addrKey({ sheet, row: e.row, col: e.col }),
-          patch: {
-            comment: e.text,
-            commentAuthor: e.author ?? undefined,
-            ...(e.visible ? { commentVisible: true } : {}),
-          },
-        });
+        updates.push({ key: addrKey({ sheet, row: e.row, col: e.col }), patch: commentPatch(e) });
       }
     } else {
-      const cells =
-        typeof (wb as WorkbookHandle & { physicalCells?: WorkbookHandle['cells'] })
-          .physicalCells === 'function'
-          ? wb.physicalCells(sheet)
-          : wb.cells(sheet);
-      for (const c of cells) {
+      for (const c of wb.physicalCells(sheet)) {
         const e = wb.getComment(sheet, c.addr.row, c.addr.col);
-        if (e && e.text.length > 0) {
-          updates.push({
-            key: addrKey(c.addr),
-            patch: {
-              comment: e.text,
-              commentAuthor: e.author ?? undefined,
-              ...(e.visible ? { commentVisible: true } : {}),
-            },
-          });
-        }
+        if (e && e.text.length > 0) updates.push({ key: addrKey(c.addr), patch: commentPatch(e) });
       }
     }
   }

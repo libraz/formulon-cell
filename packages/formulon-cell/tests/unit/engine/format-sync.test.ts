@@ -37,7 +37,7 @@ const makeFake = (opts: {
       commentsEnumerable: commentsList !== undefined,
       hyperlinks: opts.hyperlinks ?? false,
     },
-    cells: function* (sheet: number) {
+    physicalCells: function* (sheet: number) {
       for (const c of cells) if (c.addr.sheet === sheet) yield c;
     },
     getComment: (sheet: number, row: number, col: number) =>
