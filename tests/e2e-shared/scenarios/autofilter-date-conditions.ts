@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
+import { filterButtonPoint, hiddenRows, readAutoFilterRange } from '../pages/autofilter.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 type ProbeWindow = Window & { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
@@ -11,33 +12,6 @@ const BEFORE: Record<'en' | 'de' | 'ja', string> = {
   en: '5/20/2026',
   de: '20.5.2026',
   ja: '2026/5/20',
-};
-
-const hiddenRows = (page: Page) =>
-  page.evaluate(() => {
-    const w = window as unknown as ProbeWindow;
-    const state = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst).store.getState();
-    return [...state.layout.hiddenRows].sort((a, b) => a - b);
-  });
-
-/** Page point of the AutoFilter button in the header cell at (`row`, `col`). */
-const filterButtonPoint = async (page: Page, row: number, col: number) => {
-  const box = await page.locator('.fc-host__grid').first().boundingBox();
-  if (!box) throw new Error('Missing grid');
-  const point = await page.evaluate(
-    ({ row, col }) => {
-      const w = window as unknown as ProbeWindow;
-      const state = w.__fcProbes['mount/internals']
-        .spreadsheetInternals(w.__fcInst)
-        .store.getState();
-      const { cellRectUnclamped, layoutForView } = w.__fcProbes['render/geometry'];
-      const rect = cellRectUnclamped(layoutForView(state), state.viewport, row, col);
-      // The 17 px button sits one px inside the cell's trailing edge and one below its top.
-      return { x: rect.x + rect.w - 1 - 17 / 2, y: rect.y + 1 + 17 / 2 };
-    },
-    { row, col },
-  );
-  return { x: box.x + point.x, y: box.y + point.y };
 };
 
 const openDateFilter = async (page: Page) => {
@@ -72,11 +46,7 @@ export async function runMacAutoFilterDateScenario(
   await sheet.goTo('A2');
   await sheet.shortcut('Shift+L');
   await expect
-    .poll(() =>
-      page.evaluate(
-        () => (window as unknown as ProbeWindow).__fcInst.workbook.sheet(0).getAutoFilter()?.range,
-      ),
-    )
+    .poll(() => readAutoFilterRange(page))
     .toEqual({ firstRow: 0, firstCol: 0, lastRow: 4, lastCol: 1 });
 
   let dropdown = await openDateFilter(page);

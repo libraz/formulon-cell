@@ -1,19 +1,11 @@
 import { expect, type Page } from '@playwright/test';
 
-import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
+import { filterButtonPoint, readAutoFilterRange } from '../pages/autofilter.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 type InstanceWindow = Window & { __fcInst: SpreadsheetInstance };
-type ProbeWindow = InstanceWindow & { __fcProbes: E2eProbes };
-
-const readAutoFilterRange = (page: Page) =>
-  page.evaluate(
-    () =>
-      (window as unknown as InstanceWindow).__fcInst.workbook.sheet(0).getAutoFilter()?.range ??
-      null,
-  );
 
 const seedRegion = (sheet: UserJourneyPage) =>
   sheet.seed({ A1: 'Item', B1: 'Qty', A2: 'Pen', B2: 3, A3: 'Ink', B3: 5, A4: 'Pad', B4: 2 });
@@ -67,26 +59,6 @@ export async function runProtectedSheetFilterAndBackgroundScenario(page: Page): 
     .toEqual({ firstRow: 0, firstCol: 0, lastRow: 3, lastCol: 1 });
   await sheet.expectNoConsoleErrors();
 }
-
-/** Page point of the AutoFilter button in the header cell at (`row`, `col`), left-to-right sheet. */
-const filterButtonPoint = async (page: Page, row: number, col: number) => {
-  const box = await page.locator('.fc-host__grid').first().boundingBox();
-  if (!box) throw new Error('Missing grid');
-  const point = await page.evaluate(
-    ({ row, col }) => {
-      const w = window as unknown as ProbeWindow;
-      const state = w.__fcProbes['mount/internals']
-        .spreadsheetInternals(w.__fcInst)
-        .store.getState();
-      const { cellRectUnclamped, layoutForView } = w.__fcProbes['render/geometry'];
-      const rect = cellRectUnclamped(layoutForView(state), state.viewport, row, col);
-      // The 17 px button sits one px inside the cell's trailing edge and one below its top.
-      return { x: rect.x + rect.w - 1 - 17 / 2, y: rect.y + 1 + 17 / 2 };
-    },
-    { row, col },
-  );
-  return { x: box.x + point.x, y: box.y + point.y };
-};
 
 const readActive = (page: Page) =>
   page.evaluate(() => (window as unknown as InstanceWindow).__fcInst.selection.get().active);
