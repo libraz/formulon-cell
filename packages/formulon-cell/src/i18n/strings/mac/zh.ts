@@ -132,7 +132,6 @@ export const macZh: MacStrings = {
     cancel: '取消',
     invalidSource: '请输入有效的源区域。',
     locationOneCell: '位置必须为一个单元格。',
-    outOfBounds: '所选区域位于工作表之外。',
     chooseType: '请选择迷你图类型。',
     unavailable: '当前选择无法执行此操作。',
     protectedLocation: '迷你图位置受保护。',

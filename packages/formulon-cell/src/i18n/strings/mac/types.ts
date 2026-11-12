@@ -199,7 +199,6 @@ export interface MacStrings {
     cancel: string;
     invalidSource: string;
     locationOneCell: string;
-    outOfBounds: string;
     chooseType: string;
     unavailable: string;
     protectedLocation: string;

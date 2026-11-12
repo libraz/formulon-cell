@@ -133,7 +133,6 @@ export const macKo: MacStrings = {
     cancel: '취소',
     invalidSource: '유효한 원본 범위를 입력하세요.',
     locationOneCell: '위치는 한 셀이어야 합니다.',
-    outOfBounds: '선택한 범위가 워크시트 밖에 있습니다.',
     chooseType: '스파크라인 유형을 선택하세요.',
     unavailable: '현재 선택에서는 이 작업을 사용할 수 없습니다.',
     protectedLocation: '스파크라인 위치가 보호되어 있습니다.',

@@ -135,7 +135,6 @@ export const macDe: MacStrings = {
     cancel: 'Abbrechen',
     invalidSource: 'Geben Sie einen gültigen Quellbereich ein.',
     locationOneCell: 'Die Position muss eine Zelle sein.',
-    outOfBounds: 'Der ausgewählte Bereich liegt außerhalb des Arbeitsblatts.',
     chooseType: 'Wählen Sie einen Sparkline-Typ aus.',
     unavailable: 'Dieser Vorgang ist für die aktuelle Auswahl nicht verfügbar.',
     protectedLocation: 'Die Sparkline-Position ist geschützt.',

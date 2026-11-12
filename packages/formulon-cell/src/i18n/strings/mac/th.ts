@@ -132,7 +132,6 @@ export const macTh: MacStrings = {
     cancel: 'ยกเลิก',
     invalidSource: 'ใส่ช่วงต้นฉบับที่ถูกต้อง',
     locationOneCell: 'ตำแหน่งที่ตั้งต้องเป็นเซลล์เดียว',
-    outOfBounds: 'ช่วงที่เลือกอยู่นอกเวิร์กชีต',
     chooseType: 'เลือกชนิดเส้นประกายไฟ',
     unavailable: 'การดำเนินการนี้ไม่พร้อมใช้งานสำหรับส่วนที่เลือกปัจจุบัน',
     protectedLocation: 'ตำแหน่งเส้นประกายไฟได้รับการป้องกัน',

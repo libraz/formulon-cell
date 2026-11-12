@@ -132,7 +132,6 @@ export const macJa: MacStrings = {
     cancel: 'キャンセル',
     invalidSource: '有効なデータ範囲を入力してください。',
     locationOneCell: '場所は 1 つのセルにしてください。',
-    outOfBounds: '選択した範囲がワークシートの外にあります。',
     chooseType: 'スパークラインの種類を選択してください。',
     unavailable: '現在の選択範囲ではこの操作は使用できません。',
     protectedLocation: 'スパークラインの場所は保護されています。',

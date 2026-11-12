@@ -134,7 +134,6 @@ export const macFr: MacStrings = {
     cancel: 'Annuler',
     invalidSource: 'Entrez une plage source valide.',
     locationOneCell: 'L’emplacement doit être une seule cellule.',
-    outOfBounds: 'La plage sélectionnée se trouve en dehors de la feuille de calcul.',
     chooseType: 'Choisissez un type de graphique sparkline.',
     unavailable: 'Cette opération n’est pas disponible pour la sélection actuelle.',
     protectedLocation: 'L’emplacement du graphique sparkline est protégé.',

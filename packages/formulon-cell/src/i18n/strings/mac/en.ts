@@ -133,7 +133,6 @@ export const macEn: MacStrings = {
     cancel: 'Cancel',
     invalidSource: 'Enter a valid source range.',
     locationOneCell: 'Location must be one cell.',
-    outOfBounds: 'The selected range is outside the worksheet.',
     chooseType: 'Choose a sparkline type.',
     unavailable: 'This operation is unavailable for the current selection.',
     protectedLocation: 'The sparkline location is protected.',

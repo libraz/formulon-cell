@@ -12,7 +12,7 @@ import {
   resolveSparklineRange,
   sparklineSourceText,
 } from '../commands/sparkline-ranges.js';
-import { formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { formatA1Range } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -180,21 +180,6 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       lastSource = null;
       lastDestination = null;
       setError(strings.mac.sparkline.locationOneCell);
-      return false;
-    }
-    if (
-      source.r0 < 0 ||
-      source.c0 < 0 ||
-      source.r1 > MAX_ROW ||
-      source.c1 > MAX_COL ||
-      destination.r0 < 0 ||
-      destination.c0 < 0 ||
-      destination.r0 > MAX_ROW ||
-      destination.c0 > MAX_COL
-    ) {
-      lastSource = null;
-      lastDestination = null;
-      setError(strings.mac.sparkline.outOfBounds);
       return false;
     }
     const destinationAddr: Addr = {
