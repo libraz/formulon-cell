@@ -744,7 +744,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     header.textContent = title;
     overlay.setAttribute('aria-label', title);
     // Excel for Mac: a preset opens a compact rule form that takes its colours from the format popup.
-    const macNew = isNew && isMacPlatform();
+    const macNew = macLayout();
     overlay.classList.toggle('fc-conddlg--mac', macNew);
     rangeRow.hidden = macNew;
     kindRow.hidden = styleSelect.value !== 'classic' || macNew;
@@ -1115,13 +1115,13 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
             : 'classic';
       opSelect.value = options.cellValueOp ?? '>';
       // A Mac preset starts with empty value fields.
-      const startValue = currentMode === 'new' && isMacPlatform() ? '' : '0';
+      const startValue = macLayout() ? '' : '0';
       valueAInput.value = startValue;
       valueBInput.value = startValue;
       colorScale.reset();
       dataBar.reset();
       // Excel for Mac starts a new icon set rule on the unrimmed traffic lights.
-      iconSet.reset(currentMode === 'new' && isMacPlatform() ? 'traffic3' : 'arrows3');
+      iconSet.reset(macLayout() ? 'traffic3' : 'arrows3');
       tbModeSelect.value = options.topBottomMode ?? 'top';
       tbPercentCk.checked = options.topBottomPercent ?? false;
       averageModeSelect.value = options.averageMode ?? 'above';
