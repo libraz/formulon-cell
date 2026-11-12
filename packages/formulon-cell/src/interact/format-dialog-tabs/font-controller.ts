@@ -48,7 +48,7 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     syncControls,
     renderPreview,
     isMacPlatform,
-    isElementDxfMode,
+    macDxfForm,
   } = ctx;
   const {
     boldCk,
@@ -140,10 +140,12 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     }
   };
 
-  // A table style element cannot change the font itself, only its style,
-  // underline, strikethrough and color; an unset color reads as Automatic.
+  // A Mac differential format cannot change the font itself, only its style, strikethrough,
+  // color and, for a style element, underline; an unset color reads as Automatic.
   const syncElementLock = (): void => {
-    const locked = isElementDxfMode();
+    const form = macDxfForm();
+    const locked = form !== null;
+    projectDisabledState(underlineSelect, form === 'conditional', null);
     for (const control of [
       familyInput,
       sizeInput,

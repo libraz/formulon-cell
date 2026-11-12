@@ -55,7 +55,11 @@ import {
 } from './format-dialog-state.js';
 import { attachAlignTab, type MergeSelectionState } from './format-dialog-tabs/align-controller.js';
 import { attachBorderTab } from './format-dialog-tabs/border-controller.js';
-import type { FormatTabContext, FormatTabController } from './format-dialog-tabs/controller.js';
+import type {
+  FormatTabContext,
+  FormatTabController,
+  MacDxfForm,
+} from './format-dialog-tabs/controller.js';
 import { attachFillTab } from './format-dialog-tabs/fill-controller.js';
 import { attachFontTab } from './format-dialog-tabs/font-controller.js';
 import { attachMoreTab } from './format-dialog-tabs/more-controller.js';
@@ -97,9 +101,11 @@ export interface FormatDialogOpenOptions {
   /** Receives the editable differential-format dimensions instead of writing
    *  to the active cell. Used by conditional-format Custom Format. */
   onApplyDxf?: (format: Partial<CellFormat>) => void;
-  /** A table or PivotTable style element's format in `dxf` mode: on the Mac profile, the
-   *  desktop's element form (Font, Border and Fill only, a Clear button, tri-state strike). */
-  styleElement?: boolean;
+  /** Which differential format `dxf` mode edits. On the Mac profile both open on Font with the
+   *  font name, size and super/subscript fixed, a tri-state strikethrough and a Clear button: a
+   *  table or PivotTable style element offers only Font, Border and Fill, and a conditional
+   *  format keeps Number and also fixes the underline. */
+  dxfForm?: MacDxfForm;
   /** Receives the chosen number format in `numberFormat` mode. */
   onApplyNumberFormat?: (numFmt: NumFmt) => void;
   /** The value the sample shows in `numberFormat` mode; the active cell's by default. */
@@ -329,8 +335,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── State ──────────────────────────────────────────────────────────────
   let activeTab: TabId = 'number';
   let applyDxf: ((format: Partial<CellFormat>) => void) | null = null;
-  // A style element's format on the Mac profile (`styleElement`).
-  let elementDxf = false;
+  // The Mac form of the differential format being edited, if any.
+  let macDxf: MacDxfForm | null = null;
   let submitting = false;
   let waitingForConfirmation = false;
   let previewValue: CellValue = { kind: 'blank' };
@@ -382,7 +388,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         );
     for (const field of summary.mixed) mixedFields.add(field);
     // Strikethrough is tri-state there: unset until the user picks a side.
-    if (elementDxf && initialFormat?.strike === undefined) mixedFields.add('strike');
+    if (macDxf && initialFormat?.strike === undefined) mixedFields.add('strike');
     const displayMerge = mergeAt(state, active);
     const displayAddr = displayMerge
       ? { sheet: displayMerge.sheet, row: displayMerge.r0, col: displayMerge.c0 }
@@ -440,7 +446,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     previewValue: () => (dialogMode === 'dxf' ? null : previewValue),
     fontEffects: () => isMacHost(host),
   });
-  const elementDxfHasContent = (): boolean => {
+  const macDxfHasContent = (): boolean => {
     const { numFmt: _numFmt, ...dxf } = buildDialogDxf(
       draft,
       defaultPatternFor,
@@ -452,7 +458,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const renderPreview = (): void => {
     alignTab.syncRotationDial();
     renderPreviewBody();
-    if (elementDxf) projectDisabledState(clearBtn, !elementDxfHasContent(), null);
+    if (macDxf) projectDisabledState(clearBtn, !macDxfHasContent(), null);
   };
 
   const defaultPatternFor = (cat: NumberCategory): string =>
@@ -554,7 +560,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
     const dataValidationMode = mode === 'dataValidation';
     const dxfMode = mode === 'dxf';
-    clearBtn.hidden = !elementDxf;
+    clearBtn.hidden = macDxf === null;
     const numberMode = mode === 'numberFormat';
     overlay.classList.toggle('fc-fmtdlg--data-validation', dataValidationMode);
     overlay.classList.toggle('fc-fmtdlg--number-format', numberMode);
@@ -574,11 +580,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       const macHidden = isMacHost(host) && tabId === 'more' && !showMoreTab;
       button.hidden =
         macHidden ||
-        (elementDxf && tabId === 'number') ||
+        (macDxf === 'styleElement' && tabId === 'number') ||
         (numberMode && tabId !== 'number') ||
         (dxfMode && (tabId === 'align' || tabId === 'protection' || tabId === 'more'));
     }
-    if (elementDxf && activeTab === 'number') {
+    if (macDxf) {
       setActiveTab('font');
     } else if (
       numberMode ||
@@ -592,7 +598,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const applyAndClose = async (): Promise<void> => {
     if (applyDxf) {
       const dxf = buildDialogDxf(draft, defaultPatternFor, padsNumberRows(getWb()));
-      if (elementDxf && isMixedField('strike')) dxf.strike = undefined;
+      if (macDxf && isMixedField('strike')) dxf.strike = undefined;
       applyDxf(dxf);
       api.close();
       return;
@@ -834,7 +840,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     getLocale: getFormatLocale,
     getDate1904,
     isDxfMode: () => dialogMode === 'dxf',
-    isElementDxfMode: () => elementDxf,
+    macDxfForm: () => macDxf,
     isMacPlatform: () => isMacHost(host),
   };
   shell.on(tabsStrip, 'click', onTabClick as EventListener);
@@ -871,7 +877,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       pickFormat.begin();
       dialogMode = options?.mode ?? 'format';
       dialogEntry = options?.entry ?? INSTANCE_API_FORMAT_ENTRY;
-      elementDxf = options?.mode === 'dxf' && options.styleElement === true && isMacHost(host);
+      macDxf =
+        options?.mode === 'dxf' && options.dxfForm && isMacHost(host) ? options.dxfForm : null;
       const onNumberFormat = options?.onApplyNumberFormat;
       applyDxf =
         options?.mode === 'dxf'
@@ -895,7 +902,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         options?.mode === 'numberFormat'
           ? 'number'
           : (tab ?? (isMacHost(host) && options?.mode !== 'dxf' ? remembered : undefined));
-      if (requested && tabButtons.has(requested)) setActiveTab(requested);
+      // The Mac differential-format forms always open on Font.
+      if (requested && tabButtons.has(requested) && !macDxf) setActiveTab(requested);
       if (options?.mode === 'dataValidation') setActiveTab('more');
       shell.open();
       if (mixedFields.size > 0) {

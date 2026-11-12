@@ -41,6 +41,30 @@ describe('Mac conditional formatting presets', () => {
     ).toBe(true);
   });
 
+  it('opens Custom Format in the desktop conditional form, on the font tab', () => {
+    const handle = attachConditionalDialog({ host, store, strings: en });
+    handle.open({ mode: 'new', kind: 'cell-value', cellValueOp: '>' });
+    const preset = Array.from(document.querySelectorAll<HTMLSelectElement>('select')).find(
+      (select) =>
+        !select.hidden &&
+        select.closest<HTMLElement>('[hidden]') === null &&
+        Array.from(select.options).some((option) => option.value === 'custom'),
+    );
+    if (!preset) throw new Error('missing format preset select');
+    preset.value = 'custom';
+    preset.dispatchEvent(new Event('change', { bubbles: true }));
+    const dxf = Array.from(document.querySelectorAll<HTMLElement>('.fc-fmtdlg__panel')).find(
+      (panel) => panel.querySelector('button[data-fc-tab="font"]') !== null,
+    );
+    expect(
+      dxf?.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('data-fc-tab'),
+    ).toBe('font');
+    expect(
+      dxf?.querySelector<HTMLSelectElement>('select[data-fc-input="underline"]')?.disabled,
+    ).toBe(true);
+    handle.detach();
+  });
+
   it('keeps the desktop dialog unchanged off the Mac profile', () => {
     host.dataset.fcPlatform = 'default';
     const handle = attachConditionalDialog({ host, store, strings: en });

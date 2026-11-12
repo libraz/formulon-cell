@@ -382,7 +382,7 @@ const runTableStyleDialog = async (
         });
         format.dialog.open('font', {
           mode: 'dxf',
-          styleElement: true,
+          dxfForm: 'styleElement',
           initialFormat: initial,
           onApplyDxf: apply,
         });

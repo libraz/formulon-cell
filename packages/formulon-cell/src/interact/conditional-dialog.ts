@@ -720,6 +720,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   ): void => {
     getDxfFormatDialog().open('number', {
       mode: 'dxf',
+      dxfForm: 'conditional',
       initialFormat: { ...collectConditionalApplyPatch(controls), ...customStyle },
       onApplyDxf: (style) => {
         setCustomStyle(style);

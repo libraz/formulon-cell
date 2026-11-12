@@ -8,6 +8,9 @@ import type { DialogShell } from '../dialog-shell.js';
 import type { DraftState } from '../format-dialog-model.js';
 import type { FormatDialogField } from '../format-dialog-state.js';
 
+/** The differential format a `dxf` dialog edits. */
+export type MacDxfForm = 'styleElement' | 'conditional';
+
 export interface FormatTabContext {
   /** The dialog's draft; one object for the dialog's lifetime. */
   readonly draft: DraftState;
@@ -27,9 +30,10 @@ export interface FormatTabContext {
   /** Editing a conditional-format differential format, which carries no
    *  gradient fill and no font effects. */
   isDxfMode(): boolean;
-  /** Editing a table style element's format on the Mac profile: the font
-   *  family and size are fixed and strikethrough starts unset. */
-  isElementDxfMode(): boolean;
+  /** The Mac form of the differential format being edited: the font family, size and
+   *  super/subscript are fixed (a conditional format fixes the underline too), and strikethrough
+   *  starts unset. Null otherwise. */
+  macDxfForm(): MacDxfForm | null;
   /** Whether the host renders the Mac desktop profile. */
   isMacPlatform(): boolean;
 }
