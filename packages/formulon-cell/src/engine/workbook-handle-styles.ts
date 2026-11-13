@@ -545,17 +545,25 @@ export abstract class WorkbookHandleStylesMethods {
   }
 
   /** State font 0, the record every cell with no font of its own resolves to.
-   *  Fields the caller leaves out keep whatever the current default carries —
-   *  notably its `<scheme>` theme link, which is what keeps the font tracking
-   *  the workbook theme instead of becoming a literal name. Returns false when
+   *  Fields the caller leaves out keep what the current default carries, except
+   *  that a new name without a stated `scheme` drops the theme link, or the
+   *  theme's font would be drawn instead of the named one. Returns false when
    *  the engine cannot restate its default. */
   setWorkbookDefaultFont(record: Partial<FontRecord>): boolean {
     assertAlive(this);
     if (!this.capabilities.defaultFont || !this.capabilities.cellFormatting) return false;
     const current = this.getFontRecord(0);
     if (!current) return false;
+    const renamed =
+      record.name !== undefined && record.name !== current.name && record.scheme === undefined;
     return orFallback(false, () => {
-      wb(this).setDefaultFont(completeFontRecord({ ...current, ...record }));
+      wb(this).setDefaultFont(
+        completeFontRecord({
+          ...current,
+          ...record,
+          ...(renamed ? { scheme: FontScheme.None } : {}),
+        }),
+      );
       return true;
     });
   }

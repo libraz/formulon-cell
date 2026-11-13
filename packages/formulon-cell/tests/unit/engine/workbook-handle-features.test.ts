@@ -178,17 +178,48 @@ describe('engine/workbook-handle — workbook default font', () => {
     }
   });
 
-  it('keeps the fields the caller left out of a restated default', async () => {
+  it.each([
+    ['ja-JP', '游ゴシック'],
+    ['en-US', 'Calibri'],
+  ])('draws the %s new-book default font as named, not as the theme font', async (locale, name) => {
+    const wb = await WorkbookHandle.createDefault({ locale });
+    try {
+      expect(wb.getFontRecord(0)?.scheme).toBe(FontScheme.None);
+      expect(wb.getResolvedFontRecord(0)?.name).toBe(name);
+      expect(wb.workbookDisplayFont).toEqual({ name, size: 11 });
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('drops the theme link when a restated default names a new font', async () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'en-US' });
     try {
+      expect(wb.setWorkbookDefaultFont({ scheme: FontScheme.Minor })).toBe(true);
       const before = wb.getFontRecord(0);
-      expect(before).not.toBeNull();
       expect(wb.setWorkbookDefaultFont({ name: 'Meiryo' })).toBe(true);
       const after = wb.getFontRecord(0);
       expect(after?.name).toBe('Meiryo');
+      expect(after?.scheme).toBe(FontScheme.None);
       expect(after?.sizePt).toBe(before?.sizePt);
-      expect(after?.scheme).toBe(before?.scheme);
       expect(after?.family).toBe(before?.family);
+      expect(after?.charset).toBe(before?.charset);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('keeps the theme link when a restated default changes only the size', async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'en-US' });
+    try {
+      expect(wb.setWorkbookDefaultFont({ scheme: FontScheme.Minor })).toBe(true);
+      const before = wb.getFontRecord(0);
+      expect(wb.setWorkbookDefaultFont({ sizePt: 14 })).toBe(true);
+      const after = wb.getFontRecord(0);
+      expect(after?.sizePt).toBe(14);
+      expect(after?.name).toBe(before?.name);
+      expect(after?.scheme).toBe(FontScheme.Minor);
+      expect(after?.charset).toBe(before?.charset);
     } finally {
       wb.dispose();
     }
