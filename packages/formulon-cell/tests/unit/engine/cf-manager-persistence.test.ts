@@ -24,18 +24,77 @@ describe('conditional format manager persistence', () => {
       syncTrackedConditionalRulesToEngine(wb, [twin, { ...twin }], 0, { tracked });
       expect(wb.getConditionalFormats(0)).toHaveLength(2);
 
+      // Re-syncing is stable, and dropping one twin removes exactly one rule.
+      syncTrackedConditionalRulesToEngine(wb, [twin, { ...twin }], 0, { tracked });
+      expect(wb.getConditionalFormats(0)).toHaveLength(2);
+      syncTrackedConditionalRulesToEngine(wb, [twin], 0, { tracked });
+      expect(wb.getConditionalFormats(0)).toHaveLength(1);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('keeps two different rules on one range through a reload', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      syncTrackedConditionalRulesToEngine(
+        wb,
+        [blanks({ bold: true }), blanks({ italic: true })],
+        0,
+        {
+          tracked: new Map(),
+        },
+      );
       const restored = await WorkbookHandle.loadBytes(wb.save());
       try {
         expect(restored.getConditionalFormats(0)).toHaveLength(2);
       } finally {
         restored.dispose();
       }
+    } finally {
+      wb.dispose();
+    }
+  });
 
-      // Re-syncing is stable, and dropping one twin removes exactly one rule.
-      syncTrackedConditionalRulesToEngine(wb, [twin, { ...twin }], 0, { tracked });
-      expect(wb.getConditionalFormats(0)).toHaveLength(2);
-      syncTrackedConditionalRulesToEngine(wb, [twin], 0, { tracked });
-      expect(wb.getConditionalFormats(0)).toHaveLength(1);
+  it.each([
+    ['one range', range],
+    ['adjacent ranges', { sheet: 0, r0: 4, c0: 0, r1: 7, c1: 0 }],
+  ])('merges two identical rules on %s into one when the file is read', async (_, second) => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const first = blanks({ bold: true });
+      syncTrackedConditionalRulesToEngine(wb, [first, { ...first, range: second }], 0, {
+        tracked: new Map(),
+      });
+      const authored = wb.getConditionalFormats(0);
+      expect(authored).toHaveLength(2);
+      const restored = await WorkbookHandle.loadBytes(wb.save());
+      try {
+        const merged = restored.getConditionalFormats(0);
+        expect(merged).toHaveLength(1);
+        expect(merged[0]?.priority).toBe(Math.min(...authored.map((rule) => rule.priority)));
+        expect(merged[0]?.ranges).toEqual([
+          { firstRow: 0, firstCol: 0, lastRow: second.r1, lastCol: 0 },
+        ]);
+      } finally {
+        restored.dispose();
+      }
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('keeps two identical duplicate-value rules apart when the file is read', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const twin: ConditionalRule = { kind: 'duplicates', range, apply: { italic: true } };
+      syncTrackedConditionalRulesToEngine(wb, [twin, { ...twin }], 0, { tracked: new Map() });
+      const restored = await WorkbookHandle.loadBytes(wb.save());
+      try {
+        expect(restored.getConditionalFormats(0)).toHaveLength(2);
+      } finally {
+        restored.dispose();
+      }
     } finally {
       wb.dispose();
     }
