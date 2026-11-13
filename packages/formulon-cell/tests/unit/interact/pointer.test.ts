@@ -564,7 +564,10 @@ describe('attachPointer', () => {
       expect(w).toBeGreaterThan(180);
     });
 
-    it('double-click col autofit measures the workbook font ahead of the UI theme', () => {
+    it('double-click col autofit measures the workbook font ahead of the UI theme', async () => {
+      // The stub states no Normal font, so this needs the engine's profile book.
+      wb.dispose();
+      wb = await WorkbookHandle.createDefault({ locale: 'en' });
       seed(store, wb, [{ row: 0, col: 0, value: 'HeaderName' }]);
       const theme = { textCell: 26, fontUi: 'sans-serif', fontMono: 'monospace' };
       detach = attachPointer(host, store, wb, undefined, null, undefined, () => ({ theme }));

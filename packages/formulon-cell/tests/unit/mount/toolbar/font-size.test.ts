@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey } from '../../../../src/engine/address.js';
 import { effectiveCellFormatFromEngine } from '../../../../src/engine/cell-format-projection.js';
-import { defaultFontForLocale, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { BUILT_IN_LOCALES } from '../../../../src/i18n/locales.js';
 import { createDefaultRibbonHelpers } from '../../../../src/mount/toolbar-defaults.js';
 import { Spreadsheet } from '../../../../src/mount.js';
@@ -121,12 +121,26 @@ describe('font-size point semantics at the mounted ribbon boundary', () => {
   });
 });
 
+/** Font 0 of each locale's Windows engine profile. */
+const WINDOWS_PROFILE_FONT: Record<
+  (typeof BUILT_IN_LOCALES)[number],
+  { name: string; size: number }
+> = {
+  en: { name: 'Aptos Narrow', size: 11 },
+  ja: { name: '游ゴシック', size: 11 },
+  de: { name: 'Aptos Narrow', size: 11 },
+  fr: { name: 'Aptos Narrow', size: 11 },
+  zh: { name: '等线', size: 11 },
+  ko: { name: '맑은 고딕', size: 11 },
+  th: { name: 'Tahoma', size: 11 },
+};
+
 describe.each(BUILT_IN_LOCALES)('locale %s workbook font inheritance', (locale) => {
   it('projects the workbook default family and native point size for an unformatted cell', async () => {
     const workbook = await WorkbookHandle.createDefault({ locale });
     expect(workbook.isStub).toBe(false);
     try {
-      const expected = defaultFontForLocale(locale);
+      const expected = WINDOWS_PROFILE_FONT[locale];
       expect(workbook.workbookDisplayFont).toEqual(expected);
       workbook.setText(target, 'inherited');
 

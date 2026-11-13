@@ -72,7 +72,7 @@ describe('automatic font row layout', () => {
     }
   });
 
-  it('projects authored font growth and preserves a manual height with the stub engine', async () => {
+  it('projects no font growth on the stub engine, which states no Normal font', async () => {
     const workbook = await WorkbookHandle.createDefault({ preferStub: true, locale: 'en-US' });
     const mounted = await mountStubSheet({ workbook });
     try {
@@ -81,12 +81,10 @@ describe('automatic font row layout', () => {
       mutators.setActive(store, A1);
       const original = layoutForView(store.getState()).defaultRowHeight;
 
+      expect(workbook.workbookDisplayFont).toBeNull();
       mutators.setCellFormat(store, A1, { fontSize: fontPointsToCssPx(24) });
-      const expanded = layoutForView(store.getState());
-      const normalCss = fontPointsToCssPx(workbook.workbookDisplayFont?.size ?? 11);
-      const expected =
-        original + Math.round(fontPointsToCssPx(24) * 1.28) - Math.round(normalCss * 1.28);
-      expect(expanded.rowHeights.get(0)).toBe(expected);
+      expect(layoutForView(store.getState()).rowHeights.get(0)).toBeUndefined();
+      expect(layoutForView(store.getState()).defaultRowHeight).toBe(original);
 
       mutators.setRowHeight(store, 0, 24);
       mutators.setCellFormat(store, A1, { fontSize: fontPointsToCssPx(36) });

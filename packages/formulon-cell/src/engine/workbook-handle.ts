@@ -22,12 +22,7 @@ import {
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
 import { isFormulonError, orFallback } from './result.js';
-import {
-  engineProfileIdFor,
-  type ProfileLocale,
-  profileLocaleFor,
-  type SpreadsheetPlatform,
-} from './spreadsheet-profile.js';
+import { engineProfileIdFor, type SpreadsheetPlatform } from './spreadsheet-profile.js';
 import { StoreMirror } from './store-mirror.js';
 import type {
   Addr,
@@ -199,41 +194,6 @@ export interface WorkbookSaveOptions {
   snapshot?: boolean;
 }
 
-/** Mac Excel's 12 pt new-workbook family per profile locale; others use Aptos Narrow. */
-const MAC_DEFAULT_FONT_FAMILY: Readonly<Partial<Record<ProfileLocale, string>>> = {
-  ja_JP: '游ゴシック',
-  zh_CN: '等线',
-  zh_TW: '新細明體',
-  ko_KR: '맑은 고딕',
-  th_TH: 'Tahoma',
-};
-
-/** Excel's Japanese UI creates new workbooks with Yu Gothic while the
- * non-Japanese baseline remains Calibri 11 for compatibility with existing
- * formulon workbooks. On `'mac'` it is Mac Excel's 12 pt family for the
- * language. */
-export const defaultFontForLocale = (
-  locale: string | undefined,
-  platform: SpreadsheetPlatform = 'default',
-): FontFace => {
-  if (platform === 'mac') {
-    const family =
-      locale === undefined ? undefined : MAC_DEFAULT_FONT_FAMILY[profileLocaleFor(locale)];
-    return { name: family ?? 'Aptos Narrow', size: 12 };
-  }
-  return {
-    name: locale?.toLowerCase().startsWith('ja') ? '游ゴシック' : 'Calibri',
-    size: 11,
-  };
-};
-
-/** Default row height Windows Excel writes for a new workbook's Normal font,
- *  keyed by `name size`. Fonts outside the table leave the engine default. */
-const WINDOWS_DEFAULT_ROW_HEIGHT_PT: ReadonlyMap<string, number> = new Map([
-  ['Calibri 11', 15],
-  ['游ゴシック 11', 18.75],
-]);
-
 /**
  * Boundary between the WASM Workbook and the rest of the UI. Nothing else
  * in the codebase touches the raw engine. Keeps the dispose contract honest.
@@ -269,9 +229,6 @@ export class WorkbookHandle {
    *  current profile. */
   fontScriptProfile: SpreadsheetProfileId | null = null;
 
-  /** Windows default row height `createDefault` stated, repeated on added sheets. */
-  private newSheetRowHeight: number | undefined;
-
   private readonly module: Formulon;
 
   private readonly wb: Workbook;
@@ -303,10 +260,6 @@ export class WorkbookHandle {
   private history: History | null = null;
 
   private readonly storeMirror = new StoreMirror(this);
-
-  /** Locale default font for a workbook this handle created on an engine that
-   *  cannot state font 0. Null otherwise, since font 0 is then the baseline. */
-  private localeDefaultFont: FontFace | null = null;
 
   /** Host-injected localized function documentation, merged over the
    *  engine's structural `functionMetadata()` result. `null` until a host
@@ -349,51 +302,20 @@ export class WorkbookHandle {
     return excelSerialFromParts(year, month, day, { date1904 }) ?? Number.NaN;
   }
 
-  /** Create a new workbook with the defaults `platform`'s desktop spreadsheet
-   *  gives one for `locale`. A Mac book takes the engine's measured Mac
-   *  profile (font, row height, base column width); a default-profile book
-   *  states the locale font and the row height Windows writes for it. */
+  /** Create a new workbook with the defaults `platform`'s desktop spreadsheet gives one for
+   *  `locale`: the engine's profile for that pair states the font, row height and column width,
+   *  and sheets added later take the same defaults. Rejects when the profile cannot load. A stub
+   *  engine has no profiles, so a stub book carries no profile defaults. */
   static async createDefault(
-    opts: LoadOptions & {
-      locale?: string;
-      platform?: SpreadsheetPlatform;
-      /** Reject when the platform profile cannot load instead of falling back to the default book. */
-      strictProfile?: boolean;
-    } = {},
+    opts: LoadOptions & { locale?: string; platform?: SpreadsheetPlatform } = {},
   ): Promise<WorkbookHandle> {
-    const { locale, platform = 'default', strictProfile = false, ...loadOptions } = opts;
+    const { locale, platform = 'default', ...loadOptions } = opts;
     const module = await loadFormulon(loadOptions);
-    if (platform === 'mac') {
-      let profiled: Workbook | null = null;
-      try {
-        profiled = module.Workbook.createForProfile(engineProfileIdFor(locale ?? 'en', 'mac'));
-      } catch (e) {
-        if (strictProfile || !isFormulonError(e)) throw e;
-      }
-      if (profiled) {
-        const handle = new WorkbookHandle(module, profiled);
-        handle.geometryPlatform = 'mac';
-        return handle;
-      }
-    }
-    const wb = module.Workbook.createDefault();
+    const wb = isUsingStub(module)
+      ? module.Workbook.createDefault()
+      : module.Workbook.createForProfile(engineProfileIdFor(locale ?? 'en', platform));
     const handle = new WorkbookHandle(module, wb);
     handle.geometryPlatform = platform;
-    const font = defaultFontForLocale(locale, platform);
-    // Stating font 0 is what makes an untouched cell save with the locale font;
-    // an engine that cannot restate its default falls back to naming the font
-    // on every cell that carries a format, leaving unformatted cells behind.
-    if (!handle.setWorkbookDefaultFont({ name: font.name, sizePt: font.size })) {
-      handle.localeDefaultFont = font;
-    }
-    const rowHeight =
-      platform === 'default'
-        ? WINDOWS_DEFAULT_ROW_HEIGHT_PT.get(`${font.name} ${font.size}`)
-        : undefined;
-    if (rowHeight !== undefined) {
-      handle.newSheetRowHeight = rowHeight;
-      handle.stateNewSheetRowHeight(0);
-    }
     return handle;
   }
 
@@ -420,13 +342,10 @@ export class WorkbookHandle {
    * back out when engine records are hydrated into the store.
    *
    * Font 0 is that record, for a loaded workbook and for a new one alike —
-   * `createDefault` states the locale font there. `localeDefaultFont` only
-   * holds a value on an engine that cannot restate its default, where the
-   * locale font has to be named on each cell instead.
+   * a new book's comes from its engine profile.
    */
   get workbookDefaultFont(): (FontFace & { scheme?: FontScheme }) | null {
     this.assertAlive();
-    if (this.localeDefaultFont) return this.localeDefaultFont;
     const font = this.getFontRecord(0);
     if (!font) return null;
     return { name: font.name, size: font.sizePt ?? UNSTATED_FONT_SIZE_PT, scheme: font.scheme };
@@ -443,7 +362,6 @@ export class WorkbookHandle {
    */
   get workbookDisplayFont(): FontFace | null {
     this.assertAlive();
-    if (this.localeDefaultFont) return { ...this.localeDefaultFont };
     const resolved = this.getResolvedFontRecord(0);
     if (resolved) return { name: resolved.name, size: resolved.sizePt ?? UNSTATED_FONT_SIZE_PT };
     const fallback = this.workbookDefaultFont;
@@ -478,7 +396,6 @@ export class WorkbookHandle {
       if (!isFormulonError(e)) throw e;
       return -1;
     }
-    this.stateNewSheetRowHeight(idx);
     this.emit({ kind: 'sheet-add', index: idx, name: proposed });
     return idx;
   }
@@ -556,13 +473,6 @@ export class WorkbookHandle {
     }
     this.emit({ kind: 'sheet-copy', source, index, name: copied });
     return index;
-  }
-
-  /** The engine gives sheets added to a Mac-profile book their profile
-   *  defaults; the Windows row height `createDefault` states is ours to repeat. */
-  private stateNewSheetRowHeight(sheet: number): void {
-    if (this.newSheetRowHeight === undefined) return;
-    this.patchSheetFormatDefaults(sheet, { defaultRowHeightPt: this.newSheetRowHeight });
   }
 
   private uniqueSheetName(): string {
@@ -1312,7 +1222,6 @@ export class WorkbookHandle {
   /** Announces a sheet-list change the facade made on the engine directly. */
   noteSheetChange(e: Extract<ChangeEvent, { kind: `sheet-${string}` }>): void {
     this.assertAlive();
-    if (e.kind === 'sheet-add') this.stateNewSheetRowHeight(e.index);
     this.emit(e);
   }
 

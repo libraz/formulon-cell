@@ -1,3 +1,4 @@
+import { FontScheme } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type BuildPrintDocumentOptions,
@@ -879,6 +880,7 @@ describe('buildPrintDocument', () => {
         fontIndex: wb.addFontRecord({
           ...baseFont,
           name: 'Aptos Display',
+          scheme: FontScheme.None,
           sizePt: 24,
         }),
       });

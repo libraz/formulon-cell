@@ -92,7 +92,10 @@ describe('partial cell-shift native style checkpoints', () => {
       expect(value(wb, target)).toEqual({ kind: 'blank' });
       // The target must not retain the direct XF materialized by the move.
       // The axis-format history owns the final inherited source transition.
-      expect(appearance(wb, target)).toMatchObject({ direct: 0, color: 0xff000000 });
+      expect(appearance(wb, target)).toMatchObject({
+        direct: 0,
+        color: wb.getFontRecord(0)?.color?.argb,
+      });
 
       expect(history.redo()).toBe(true);
       expect(appearance(wb, target)).toMatchObject({ direct: 0, color: 0xffff0000 });

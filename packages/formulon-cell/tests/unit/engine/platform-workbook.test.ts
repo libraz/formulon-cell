@@ -1,9 +1,11 @@
 // @vitest-environment node
 
-import { describe, expect, it } from 'vitest';
+import { FontScheme } from '@libraz/formulon';
+import { describe, expect, it, vi } from 'vitest';
 import { hydrateLayoutFromEngine, rehydrateAxisLayout } from '../../../src/engine/layout-sync.js';
+import { loadFormulon } from '../../../src/engine/loader.js';
 import { engineProfileIdFor } from '../../../src/engine/spreadsheet-profile.js';
-import { defaultFontForLocale, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 type RawSheet = {
@@ -43,27 +45,48 @@ describe('engineProfileIdFor', () => {
   });
 });
 
-describe('defaultFontForLocale', () => {
-  it('keeps the 11 pt default-profile fonts', () => {
-    expect(defaultFontForLocale('ja')).toEqual({ name: '游ゴシック', size: 11 });
-    expect(defaultFontForLocale('en')).toEqual({ name: 'Calibri', size: 11 });
-    expect(defaultFontForLocale(undefined)).toEqual({ name: 'Calibri', size: 11 });
-    expect(defaultFontForLocale('ja', 'default')).toEqual({ name: '游ゴシック', size: 11 });
+describe('WorkbookHandle.createDefault profile font', () => {
+  // Font 0 as each engine profile states it: linked to the theme's minor font, drawn as that face.
+  it.each([
+    ['en', 'default', 'Aptos Narrow', 11],
+    ['ja', 'default', '游ゴシック', 11],
+    ['de', 'default', 'Aptos Narrow', 11],
+    ['fr', 'default', 'Aptos Narrow', 11],
+    ['zh', 'default', '等线', 11],
+    ['ko', 'default', '맑은 고딕', 11],
+    ['th', 'default', 'Tahoma', 11],
+    ['ja-JP', 'mac', '游ゴシック', 12],
+    ['zh', 'mac', '等线', 12],
+    ['zh-TW', 'mac', '新細明體', 12],
+    ['zh-Hans-HK', 'mac', '等线', 12],
+    ['ko', 'mac', '맑은 고딕', 12],
+    ['th', 'mac', 'Tahoma', 12],
+    ['en', 'mac', 'Aptos Narrow', 12],
+    ['de', 'mac', 'Aptos Narrow', 12],
+  ] as const)('gives a %s %s book %s %d pt', async (locale, platform, name, size) => {
+    const wb = await WorkbookHandle.createDefault({ locale, platform });
+    try {
+      expect(wb.getFontRecord(0)).toMatchObject({ name, sizePt: size, scheme: FontScheme.Minor });
+      expect(wb.workbookDisplayFont).toEqual({ name, size });
+    } finally {
+      wb.dispose();
+    }
   });
 
-  it.each([
-    ['ja-JP', '游ゴシック'],
-    ['zh', '等线'],
-    ['zh-TW', '新細明體'],
-    ['zh-Hant', '新細明體'],
-    ['zh-Hans-HK', '等线'],
-    ['ko', '맑은 고딕'],
-    ['th', 'Tahoma'],
-    ['en', 'Aptos Narrow'],
-    ['de', 'Aptos Narrow'],
-    ['eo', 'Aptos Narrow'],
-  ])('names the Mac %s family at 12 pt', (locale, name) => {
-    expect(defaultFontForLocale(locale, 'mac')).toEqual({ name, size: 12 });
+  it('rejects when the profile cannot load, rather than making a book without it', async () => {
+    const module = await loadFormulon();
+    const spy = vi.spyOn(module.Workbook, 'createForProfile').mockImplementation(() => {
+      throw new Error('profile unavailable');
+    });
+    try {
+      for (const platform of ['default', 'mac'] as const) {
+        await expect(WorkbookHandle.createDefault({ locale: 'ja', platform })).rejects.toThrow(
+          'profile unavailable',
+        );
+      }
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -134,33 +157,30 @@ describe('WorkbookHandle.createDefault platform', () => {
     }
   });
 
-  it('seeds the Windows default row height on default-profile books', async () => {
-    const en = await WorkbookHandle.createDefault({ locale: 'en' });
-    try {
-      expect(en.geometryPlatform).toBe('default');
-      expect(en.workbookDefaultFont).toMatchObject({ name: 'Calibri', size: 11 });
-      const raw = rawWorkbook(en);
-      expect(raw.sheet(0).getFormatDefaults().defaultRowHeightPt).toBe(15);
-      expect(raw.sheet(0).getRowHeightPt(0)).toBe(15);
-      expect(en.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBe(20);
-      expect(en.getSheetDefaultLayoutPx(0)?.defaultColWidth).toBeCloseTo(64, 1);
-      expect(en.addSheet()).toBe(1);
-      expect(raw.sheet(1).getRowHeightPt(0)).toBe(15);
-      expect(raw.sheet(1).getFormatDefaults().baseColumnWidthChars).toBe(8);
-    } finally {
-      en.dispose();
-    }
-
-    const ja = await WorkbookHandle.createDefault({ locale: 'ja' });
-    try {
-      expect(rawWorkbook(ja).sheet(0).getRowHeightPt(0)).toBe(18.75);
-      expect(ja.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBe(25);
-      // 游ゴシック 11, base 8: 69 px rounded up to 72 px (8.38 characters).
-      expect(ja.getSheetDefaultLayoutPx(0)?.defaultColWidth).toBe(72);
-    } finally {
-      ja.dispose();
-    }
-  });
+  it.each([
+    ['en', 15, 20, 64],
+    ['de', 15, 20, 64],
+    // 游ゴシック 11, base 8: 69 px rounded up to 72 px (8.38 characters).
+    ['ja', 18.75, 25, 72],
+  ])(
+    'takes a Windows %s book row height of %d pt from the profile, on added sheets too',
+    async (locale, pt, px, colPx) => {
+      const wb = await WorkbookHandle.createDefault({ locale });
+      try {
+        expect(wb.geometryPlatform).toBe('default');
+        const raw = rawWorkbook(wb);
+        expect(raw.sheet(0).getFormatDefaults().defaultRowHeightPt).toBe(pt);
+        expect(raw.sheet(0).getRowHeightPt(0)).toBe(pt);
+        expect(wb.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBe(px);
+        expect(wb.getSheetDefaultLayoutPx(0)?.defaultColWidth).toBeCloseTo(colPx, 0);
+        expect(wb.addSheet()).toBe(1);
+        expect(raw.sheet(1).getRowHeightPt(0)).toBe(pt);
+        expect(raw.sheet(1).getFormatDefaults().baseColumnWidthChars).toBe(8);
+      } finally {
+        wb.dispose();
+      }
+    },
+  );
 
   it('keeps a Mac sheet default row height only when customHeight pins it', async () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'ja', platform: 'mac' });
@@ -241,7 +261,8 @@ describe('WorkbookHandle.createDefault platform', () => {
     }
   });
 
-  it('degrades to the platform font and size defaults on the stub', async () => {
+  it('makes a plain book on the stub, which has no profiles', async () => {
+    const plain = await WorkbookHandle.createDefault({ preferStub: true });
     const mac = await WorkbookHandle.createDefault({
       locale: 'ja',
       platform: 'mac',
@@ -249,27 +270,12 @@ describe('WorkbookHandle.createDefault platform', () => {
     });
     try {
       expect(mac.geometryPlatform).toBe('mac');
-      expect(mac.workbookDefaultFont).toMatchObject({ name: '游ゴシック', size: 12 });
+      expect(mac.workbookDefaultFont).toEqual(plain.workbookDefaultFont);
       expect(mac.sheetCount).toBe(1);
       expect(mac.addSheet()).toBe(1);
-      const store = createSpreadsheetStore();
-      hydrateLayoutFromEngine(mac, store, 0);
-      expect(store.getState().layout.defaultColWidth).toBe(100);
-      expect(store.getState().layout.defaultRowHeight).toBeCloseTo(80 / 3, 8);
-      mac.geometryPlatform = 'default';
-      rehydrateAxisLayout(mac, store, 0);
-      expect(store.getState().layout.defaultColWidth).toBe(64);
-      expect(store.getState().layout.defaultRowHeight).toBe(20);
     } finally {
       mac.dispose();
-    }
-
-    const fallback = await WorkbookHandle.createDefault({ locale: 'en', preferStub: true });
-    try {
-      expect(fallback.geometryPlatform).toBe('default');
-      expect(fallback.workbookDefaultFont).toMatchObject({ name: 'Calibri', size: 11 });
-    } finally {
-      fallback.dispose();
+      plain.dispose();
     }
   });
 });

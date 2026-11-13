@@ -127,7 +127,10 @@ describe('real WASM axis selection font size', () => {
         setFont(mounted.instance.store.getState(), mounted.instance.store, { fontSize: 24 }),
       ).toBe(true);
       expect(fontAt(3, 1)).toMatchObject({ sizePt: 18, color: { argb: 0xffff0000 } });
-      expect(fontAt(3, 0)).toMatchObject({ sizePt: 18, color: { argb: 0xff000000 } });
+      expect(fontAt(3, 0)).toMatchObject({
+        sizePt: 18,
+        color: workbook.getFontRecord(0)?.color,
+      });
       expect(fontAt(2, 1)).toMatchObject({ sizePt: 11, color: { argb: 0xffff0000 } });
     } finally {
       mounted.dispose();

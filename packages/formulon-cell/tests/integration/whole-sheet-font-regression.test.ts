@@ -1,3 +1,4 @@
+import { FontScheme } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { clearVisualFormat, setFont } from '../../src/commands/format.js';
 import { History } from '../../src/commands/history.js';
@@ -38,6 +39,8 @@ function installImportedAxisFont(workbook: WorkbookHandle): FontRecord {
   const imported: FontRecord = {
     ...baseFont,
     name: 'Consolas',
+    // A font named apart from the theme face is no longer theme-linked.
+    scheme: FontScheme.None,
     sizePt: 15,
     bold: true,
     charset: 128,

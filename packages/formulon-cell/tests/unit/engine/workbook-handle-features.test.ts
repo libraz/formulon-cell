@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { syncCellFormatsToEngine } from '../../../src/engine/cell-format-sync.js';
 import { SheetVisibility } from '../../../src/engine/types.js';
-import { defaultFontForLocale, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 /**
@@ -72,11 +72,6 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
     expect(typeof wb.capabilities).toBe('object');
   });
 
-  it('selects a locale-appropriate default font for a new workbook', () => {
-    expect(defaultFontForLocale('ja-JP')).toEqual({ name: '游ゴシック', size: 11 });
-    expect(defaultFontForLocale('en-US')).toEqual({ name: 'Calibri', size: 11 });
-  });
-
   it('projects a literal workbook display font in native point units', async () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'en-US' });
     try {
@@ -104,9 +99,10 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
     }
   });
 
-  it('uses the locale fallback as display font on the stub engine', async () => {
+  it('states no default font on the stub engine, which has no profiles', async () => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true, locale: 'ja-JP' });
-    expect(wb.workbookDisplayFont).toEqual({ name: '游ゴシック', size: 11 });
+    expect(wb.workbookDefaultFont).toBeNull();
+    expect(wb.workbookDisplayFont).toBeNull();
   });
 
   it('setSheetVisibility no-ops on stub', async () => {
@@ -173,20 +169,6 @@ describe('engine/workbook-handle — workbook default font', () => {
       expect(xfIndex).not.toBeNull();
       const xf = wb.getCellXf(xfIndex ?? 0);
       expect(wb.getFontRecord(xf?.fontIndex ?? 0)?.name).toBe('游ゴシック');
-    } finally {
-      wb.dispose();
-    }
-  });
-
-  it.each([
-    ['ja-JP', '游ゴシック'],
-    ['en-US', 'Calibri'],
-  ])('draws the %s new-book default font as named, not as the theme font', async (locale, name) => {
-    const wb = await WorkbookHandle.createDefault({ locale });
-    try {
-      expect(wb.getFontRecord(0)?.scheme).toBe(FontScheme.None);
-      expect(wb.getResolvedFontRecord(0)?.name).toBe(name);
-      expect(wb.workbookDisplayFont).toEqual({ name, size: 11 });
     } finally {
       wb.dispose();
     }

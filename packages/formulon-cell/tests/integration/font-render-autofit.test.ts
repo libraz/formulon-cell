@@ -1,3 +1,4 @@
+import { FontScheme } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { computeAutofitColWidth } from '../../src/commands/autofit-measurement.js';
 import { MAX_COL } from '../../src/engine/address.js';
@@ -30,6 +31,7 @@ describe('real WASM inherited typography in AutoFit', () => {
         fontIndex: workbook.addFontRecord({
           ...baseFont,
           name: 'Aptos Display',
+          scheme: FontScheme.None,
           sizePt: 24,
         }),
       });

@@ -540,6 +540,8 @@ const asWorkbook = (wb: StubWorkbook): Workbook => wb as unknown as Workbook;
 
 const stubModule = {
   Workbook: {
+    /** A stub book carries no profile defaults: the stub has no profile data, so its font,
+     *  row height and column width are the stub's own for every locale and platform. */
     createDefault: (): Workbook => asWorkbook(withUnavailableMembers(new StubWorkbook(['Sheet1']))),
     createEmpty: (): Workbook => asWorkbook(withUnavailableMembers(new StubWorkbook([]))),
     createForProfile: (): Workbook => {

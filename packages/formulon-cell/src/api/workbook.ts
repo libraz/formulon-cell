@@ -261,7 +261,6 @@ export class Workbook {
       ...loadOptionsOf(options),
       locale: options.locale ?? 'en',
       platform: options.platform ?? 'default',
-      strictProfile: true,
     }).then(undefined, initFailure);
     return Workbook.#adopt(handle, options, 'xlsx');
   }

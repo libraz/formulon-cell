@@ -24,7 +24,7 @@ const xlsxFile = async (name) => {
 describe('demo startup workbook font and seeded layout', () => {
   it.each([
     ['ja', '游ゴシック'],
-    ['en', 'Calibri'],
+    ['en', 'Aptos Narrow'],
   ])('uses the locale Normal font and seeded column widths for %s', async (locale, fontName) => {
     const workbook = await createInitialDemoWorkbook(`?locale=${locale}`);
     try {

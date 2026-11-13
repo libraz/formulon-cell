@@ -435,7 +435,8 @@ describe('ribbon Format > AutoFit', () => {
     range: { r0: number; c0: number; r1: number; c1: number },
     extraRanges: Array<{ sheet: number; r0: number; c0: number; r1: number; c1: number }> = [],
   ): Promise<{ wb: WorkbookHandle; history: History }> => {
-    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    // The engine's profile book, whose Normal font the measurement reads; the stub states none.
+    const wb = await WorkbookHandle.createDefault({ locale: 'en' });
     const history = new History();
     const host = document.createElement('div');
     store.setState((s) => ({

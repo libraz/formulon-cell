@@ -134,7 +134,10 @@ describe('native axis format invariants', () => {
       });
       const mounted = await mountStubSheet({ workbook, locale: 'ja' });
       try {
-        expect(mounted.instance.store.getState().format.formats.has('0:1:1')).toBe(false);
+        // Only the ja Normal style's centred alignment surfaces; the quote prefix stays native.
+        expect(mounted.instance.store.getState().format.formats.get('0:1:1')).toEqual({
+          vAlign: 'middle',
+        });
         expect(nativeFormat(workbook, 1, 1)).toMatchObject({ size: 11, quotePrefix: true });
         mutators.selectCol(mounted.instance.store, 1);
         expect(

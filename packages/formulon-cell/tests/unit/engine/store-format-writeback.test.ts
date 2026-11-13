@@ -1,3 +1,4 @@
+import { FontScheme } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { recordFormatChange } from '../../../src/commands/slice-history.js';
@@ -214,7 +215,13 @@ describe('WorkbookHandle store format writeback', () => {
       expect(defaultFill).toBeDefined();
       if (!normal || !defaultFont || !defaultFill) return;
 
-      const fontIndex = wb.addFontRecord({ ...defaultFont, name: 'Alignment Font', bold: true });
+      // A font named apart from the theme face is no longer theme-linked.
+      const fontIndex = wb.addFontRecord({
+        ...defaultFont,
+        name: 'Alignment Font',
+        scheme: FontScheme.None,
+        bold: true,
+      });
       const fillIndex = wb.addFillRecord({
         ...defaultFill,
         pattern: 1,
