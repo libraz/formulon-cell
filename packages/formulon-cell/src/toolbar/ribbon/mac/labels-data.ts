@@ -88,7 +88,6 @@ export const MAC_LABEL_SOURCES: Readonly<Record<string, CoreLabelSource>> = {
   translate: { section: 'ribbon', key: 'translate' },
   previousComment: { section: 'ribbon', key: 'previousComment' },
   nextComment: { section: 'ribbon', key: 'nextComment' },
-  sheetViewDelete: { section: 'viewToolbar', key: 'deleteView' },
   standard: { section: 'viewToolbar', key: 'normalView' },
   pageBreakPreview: { section: 'viewToolbar', key: 'pageBreakPreview' },
   pageLayout: { section: 'viewToolbar', key: 'pageLayoutView' },

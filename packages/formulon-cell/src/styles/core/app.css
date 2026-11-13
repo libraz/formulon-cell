@@ -44,6 +44,7 @@
 @import "./app/dialog-modules/spelling.css";
 @import "./app/dialog-modules/autocorrect.css";
 @import "./app/dialog-modules/preferences.css";
+@import "./app/dialog-modules/sheet-view-options.css";
 @import "./app/editor-popups.css";
 @import "./app/dialogs/iterative.css";
 @import "./app/dialogs/evaluate-formula.css";

@@ -400,6 +400,77 @@ export function exitSheetView(store: SpreadsheetStore, history: History | null =
   });
 }
 
+/** Why a name cannot be given to a view of the current sheet, or null when it can. */
+export type SheetViewNameProblem = 'invalid' | 'taken';
+
+export function sheetViewNameProblem(
+  store: SpreadsheetStore,
+  name: string,
+  exceptId?: string,
+): SheetViewNameProblem | null {
+  if (name.trim() === '' || name.includes(';')) return 'invalid';
+  const { sheetViews, data } = store.getState();
+  const folded = name.trim().toLocaleLowerCase();
+  const taken = sheetViews.views.some(
+    (v) =>
+      v.sheet === data.sheetIndex && v.id !== exceptId && v.name.toLocaleLowerCase() === folded,
+  );
+  return taken ? 'taken' : null;
+}
+
+/** Rename a saved view; refused names leave it as it is. */
+export function renameSheetView(
+  store: SpreadsheetStore,
+  id: string,
+  name: string,
+  history: History | null = null,
+): SheetViewNameProblem | 'not-found' | null {
+  if (!findSheetView(store.getState().sheetViews.views, id)) return 'not-found';
+  const problem = sheetViewNameProblem(store, name, id);
+  if (problem) return problem;
+  recordSheetViewsChange(history, store, () => {
+    store.setState((s) => ({
+      ...s,
+      sheetViews: {
+        ...s.sheetViews,
+        views: s.sheetViews.views.map((v) => (v.id === id ? { ...v, name: name.trim() } : v)),
+      },
+    }));
+  });
+  return null;
+}
+
+/** The settings a view holds now: the screen's for the shown view, else its stored ones.
+ *  `DEFAULT_SHEET_VIEW_ID` reads Default. */
+const settingsOf = (store: SpreadsheetStore, id: string): SheetView | null => {
+  const { sheetViews } = store.getState();
+  const shown = (sheetViews.activeViewId ?? DEFAULT_SHEET_VIEW_ID) === id;
+  if (shown) return captureShown(store, id, '');
+  if (id === DEFAULT_SHEET_VIEW_ID) return sheetViews.defaultView ?? captureShown(store, id, '');
+  return findSheetView(sheetViews.views, id);
+};
+
+/** Copy a saved view or Default into a new saved view named `name`; null when the source is
+ *  missing or the name is refused. */
+export function duplicateSheetView(
+  store: SpreadsheetStore,
+  sourceId: string,
+  id: string,
+  name: string,
+  history: History | null = null,
+): SheetView | null {
+  const source = settingsOf(store, sourceId);
+  if (!source || sheetViewNameProblem(store, name)) return null;
+  const copy: SheetView = { ...cloneSheetView(source), id, name };
+  recordSheetViewsChange(history, store, () => {
+    store.setState((s) => ({
+      ...s,
+      sheetViews: { ...s.sheetViews, views: [...s.sheetViews.views, copy] },
+    }));
+  });
+  return copy;
+}
+
 /** Remove a stored sheet view; removing the shown one returns to Default. */
 export function deleteSheetView(
   store: SpreadsheetStore,

@@ -35,7 +35,6 @@ describe('Mac View tab', () => {
         'mac.view.sheetViewExit',
         'mac.view.sheetViewNew',
         'mac.view.sheetViewOptions',
-        'mac.view.sheetViewDelete',
       ],
       [
         'mac.view.standard',
@@ -89,7 +88,7 @@ describe('Mac View tab', () => {
     expect(macRibbonLabelForCommand('mac.view.freeze.panes', 'de')).toBe('Fenster fixieren');
   });
 
-  it('labels the Sheet View group from the desktop strings, Options not built yet', () => {
+  it('labels the Sheet View group from the desktop strings', () => {
     const commands = viewTab()?.groups[0]?.commands ?? [];
     expect(commands.map((command) => command.label)).toEqual([
       'シート ビューの切り替え',
@@ -97,10 +96,8 @@ describe('Mac View tab', () => {
       '終了',
       '新規',
       'オプション',
-      '削除',
     ]);
     expect(commands[0]?.options?.map((option) => option.label)).toEqual(['既定', '一時ビュー']);
-    expect(commands.find((c) => c.id === 'mac.view.sheetViewOptions')?.disabled).toBe(true);
     expect(
       ['sheetViewKeep', 'sheetViewExit', 'sheetViewNew'].map((id) =>
         macRibbonLabelForCommand(`mac.view.${id}`, 'de'),

@@ -45,6 +45,7 @@ import {
 import { setSheetZoom } from '../commands/view.js';
 import { formatA1Range } from '../engine/address.js';
 import { dictionaries } from '../i18n/strings.js';
+import { openSheetViewOptionsDialog } from '../interact/sheet-view-options-dialog.js';
 import { openSpellingDialog } from '../interact/spelling-dialog.js';
 import { reportDialogLabels, showReport } from '../toolbar/dialogs/report.js';
 import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
@@ -522,6 +523,9 @@ export function createDefaultRibbonHooks(
         exitSheetView(instance.store, instance.history);
         opts.refreshCells?.();
         instance.host.focus();
+      },
+      options: () => {
+        openSheetViewOptionsDialog(instance, { onViewChanged: () => opts.refreshCells?.() });
       },
       deleteActive: () => {
         const id = instance.store.getState().sheetViews.activeViewId;

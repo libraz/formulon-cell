@@ -319,7 +319,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   'mac.view.sheetViewKeep': 'sheet',
   'mac.view.sheetViewExit': 'sheet',
   'mac.view.sheetViewNew': 'sheet',
-  'mac.view.sheetViewDelete': 'sheet',
+  'mac.view.sheetViewOptions': 'sheet',
   'mac.automate.showScripts': null,
   'mac.automate.allRowsColumns': 'resizeRows',
   'mac.automate.makeSubtable': 'table',

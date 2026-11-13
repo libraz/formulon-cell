@@ -211,7 +211,6 @@ const labelSeeds: Record<string, LegacyLabel> = {
   sheetViewExit: { ja: '終了', en: 'Exit' },
   sheetViewNew: { ja: '新規', en: 'New' },
   sheetViewOptions: { ja: 'オプション', en: 'Options' },
-  sheetViewDelete: { ja: 'ビューを削除', en: 'Delete View' },
   standard: { ja: '標準', en: 'Normal' },
   pageBreakPreview: { ja: '改ページプレビュー', en: 'Page Break Preview' },
   pageLayout: { ja: 'ページレイアウト', en: 'Page Layout' },

@@ -89,7 +89,7 @@ const aliases: Readonly<Record<string, string>> = {
   'mac.view.sheetViewKeep': 'sheetViewKeep',
   'mac.view.sheetViewExit': 'sheetViewExit',
   'mac.view.sheetViewNew': 'sheetViewNew',
-  'mac.view.sheetViewDelete': 'sheetViewDelete',
+  'mac.view.sheetViewOptions': 'sheetViewOptions',
 };
 
 const chartKinds = {

@@ -92,6 +92,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'mac.pivotTableDialog',
   'mac.protectSheet',
   'mac.removeDuplicates',
+  'mac.sheetViews',
   'mac.sortDialog',
   'mac.zoomDialog',
   'pageView',
@@ -583,6 +584,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'interact/pivot-table-dialog.ts',
     'attachPivotTableDialog',
     'pivotTableDialog',
+    'block',
+  ),
+  shell(
+    'interact.sheetViewOptionsDialog',
+    'interact/sheet-view-options-dialog.ts',
+    'openSheetViewOptionsDialog',
+    'mac.sheetViews',
     'block',
   ),
   shell(

@@ -189,6 +189,7 @@ export interface RibbonHooks {
     create?: () => void;
     keep?: () => void;
     exit?: () => void;
+    options?: () => void;
     deleteActive?: () => void;
     zoomDialog?: () => Promise<unknown> | unknown;
   };
@@ -782,6 +783,9 @@ const applyGenericRibbonCommand = (
       return true;
     case 'sheetViewExit':
       hooks?.sheetView?.exit?.();
+      return true;
+    case 'sheetViewOptions':
+      hooks?.sheetView?.options?.();
       return true;
     case 'sheetViewDelete':
       hooks?.sheetView?.deleteActive?.();

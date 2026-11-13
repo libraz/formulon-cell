@@ -2067,25 +2067,69 @@
       "tcid": 33909,
       "source": "tbbtn",
       "name": "ExitSheetView",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.0.2",
+        "ja": "表示: 0.1.0.0.2",
+        "de": "Ansicht: 0.1.0.0.2",
+        "fr": "Affichage: 0.1.0.0.2",
+        "ko": "보기: 0.1.0.0.2",
+        "th": "มุมมอง: 0.1.0.0.2",
+        "zh": "视图: 0.1.0.0.2"
+      }
     },
     "labels:sheetViewKeep": {
       "tcid": 33929,
       "source": "tbbtn",
       "name": "KeepTemporarySheetView",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.0.1",
+        "ja": "表示: 0.1.0.0.1",
+        "de": "Ansicht: 0.1.0.0.1",
+        "fr": "Affichage: 0.1.0.0.1",
+        "ko": "보기: 0.1.0.0.1",
+        "th": "มุมมอง: 0.1.0.0.1",
+        "zh": "视图: 0.1.0.0.1"
+      }
     },
     "labels:sheetViewNew": {
       "tcid": 33908,
       "source": "tbbtn",
       "name": "NewSheetView",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.0.3",
+        "ja": "表示: 0.1.0.0.3",
+        "de": "Ansicht: 0.1.0.0.3",
+        "fr": "Affichage: 0.1.0.0.3",
+        "ko": "보기: 0.1.0.0.3",
+        "th": "มุมมอง: 0.1.0.0.3",
+        "zh": "视图: 0.1.0.0.3"
+      }
     },
     "labels:sheetViewOptions": {
       "tcid": 33910,
       "source": "tbbtn",
       "name": "SheetViewOptions",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.0.4",
+        "ja": "表示: 0.1.0.0.4",
+        "de": "Ansicht: 0.1.0.0.4",
+        "fr": "Affichage: 0.1.0.0.4",
+        "ko": "보기: 0.1.0.0.4",
+        "th": "มุมมอง: 0.1.0.0.4",
+        "zh": "视图: 0.1.0.0.4"
+      }
     },
     "labels:sheetViewSelect": {
       "tcid": 33911,
@@ -3548,11 +3592,6 @@
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
-    },
-    "labels:sheetViewDelete": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 15314:FlyoutAnchorDeleteTable, 27558:InkToolboxItemRemove, 1592:DeleteComment"
     },
     "labels:sheetViews": {
       "status": "no-consumer",

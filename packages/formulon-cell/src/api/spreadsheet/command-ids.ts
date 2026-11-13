@@ -248,7 +248,6 @@ export const COMMAND_IDS = [
   'mac.view.relativeRecording',
   'mac.view.resetWindow',
   'mac.view.ruler',
-  'mac.view.sheetViewDelete',
   'mac.view.sheetViewExit',
   'mac.view.sheetViewKeep',
   'mac.view.sheetViewNew',
