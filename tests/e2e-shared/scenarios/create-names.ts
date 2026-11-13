@@ -34,6 +34,16 @@ const definedNames = (page: Page) =>
       .sort(),
   );
 
+/** Each defined name with what it refers to, the leading `=` dropped. */
+const definedNameRefs = (page: Page) =>
+  page.evaluate(() =>
+    Object.fromEntries(
+      (window as unknown as InstanceWindow).__fcInst.workbook
+        .listDefinedNames()
+        .map((name) => [name.name, name.formula.replace(/^=/, '')]),
+    ),
+  );
+
 const selectRange = (page: Page, range: string) =>
   page.evaluate(
     (target) => (window as unknown as InstanceWindow).__fcInst.selection.set(target),
@@ -41,7 +51,8 @@ const selectRange = (page: Page, range: string) =>
   );
 
 /** Create Names from Selection: Top row starts checked over a text header row and Left column
- *  does not over numbers; OK names each column after its header. */
+ *  does not over numbers; OK names each column after its header with a sheet-qualified range. A
+ *  second run asks once per name the workbook already holds, and No keeps that name's old range. */
 export async function runCreateNamesScenario(
   page: Page,
   platform: 'default' | 'mac',
@@ -59,7 +70,44 @@ export async function runCreateNamesScenario(
   await expect(dialog.locator('input[data-fc-edge="right"]')).not.toBeChecked();
   await dialog.locator('.fc-fmtdlg__btn--primary').click();
   await expect(dialog).toBeHidden();
-  await expect.poll(() => definedNames(page)).toEqual(['Price', 'Qty']);
+  await expect
+    .poll(() => definedNameRefs(page))
+    .toEqual({
+      Price: 'Sheet1!$B$2:$B$3',
+      Qty: 'Sheet1!$A$2:$A$3',
+    });
+
+  await selectRange(page, 'A1:B2');
+  await (await openCreateNames(page, sheet, platform)).locator('.fc-fmtdlg__btn--primary').click();
+  const t = await page.evaluate(
+    () =>
+      (
+        (window as unknown as InstanceWindow).__fcInst.i18n.strings as unknown as {
+          ribbonMenu: { createNamesTitle: string; createNamesReplace: string };
+        }
+      ).ribbonMenu,
+  );
+  // Yes replaces Qty; No keeps Price as it was.
+  for (const [name, answer] of [
+    ['Qty', 'Yes'],
+    ['Price', 'No'],
+  ] as const) {
+    const prompt = page
+      .locator('[role="alertdialog"]')
+      .filter({ hasText: t.createNamesReplace.replace('{name}', name) });
+    await expect(prompt).toBeVisible();
+    // The Mac asks in a compact alert with no title; elsewhere the prompt is titled Create Names.
+    if (platform === 'mac') await expect(prompt).toHaveClass(/fc-tb__dlg--alert/);
+    else await expect(page.getByRole('alertdialog', { name: t.createNamesTitle })).toBeVisible();
+    await prompt.getByRole('button', { name: answer, exact: true }).click();
+    await expect(prompt).toBeHidden();
+  }
+  await expect
+    .poll(() => definedNameRefs(page))
+    .toEqual({
+      Price: 'Sheet1!$B$2:$B$3',
+      Qty: 'Sheet1!$A$2',
+    });
   await sheet.expectNoConsoleErrors();
 }
 
