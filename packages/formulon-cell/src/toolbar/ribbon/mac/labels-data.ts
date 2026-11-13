@@ -1,5 +1,6 @@
 import type { Locale, Strings } from '../../../i18n/strings.js';
 import { dictionaries } from '../../../i18n/strings.js';
+import { MAC_BUNDLE_LABELS } from './labels-bundle.js';
 
 export const MAC_LOCALES = ['ja', 'en', 'de', 'fr', 'zh', 'ko', 'th'] as const;
 
@@ -1382,6 +1383,8 @@ export const localizedFromTranslations = (
 ): Label => ({ ...seed, ...translations });
 
 export const localizedGroupLabel = (key: string, seed: LegacyLabel): Label => {
+  const bundled = MAC_BUNDLE_LABELS[`groups:${key}`];
+  if (bundled) return bundled;
   const source = MAC_GROUP_SOURCES[key];
   if (source) return localizedFromCore(source);
   const translations = MAC_GROUP_TRANSLATIONS[key];
@@ -1390,6 +1393,8 @@ export const localizedGroupLabel = (key: string, seed: LegacyLabel): Label => {
 };
 
 export const localizedMenuLabel = (key: string, seed: LegacyLabel): Label => {
+  const bundled = MAC_BUNDLE_LABELS[`menu:${key}`];
+  if (bundled) return bundled;
   const translations = MAC_MENU_TRANSLATIONS[key];
   if (translations) return localizedFromTranslations(seed, translations);
   throw new Error(`Missing Mac ribbon translations for menu item: ${key}`);
@@ -1473,6 +1478,8 @@ const withMacJa = (key: string, label: Label): Label => {
 };
 
 export const localizedLabel = (key: string, seed: LegacyLabel): Label => {
+  const bundled = MAC_BUNDLE_LABELS[`labels:${key}`];
+  if (bundled) return bundled;
   const source = MAC_LABEL_SOURCES[key];
   if (source) return withMacJa(key, localizedFromCore(source));
   const translations = MAC_LABEL_TRANSLATIONS[key];

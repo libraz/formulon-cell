@@ -8,7 +8,7 @@ import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js
 describe('Mac View tab', () => {
   it('names the zoom commands as the desktop does', () => {
     expect(macRibbonLabelForCommand('mac.view.zoom100', 'ja')).toBe('ズーム (100%)');
-    expect(macRibbonLabelForCommand('mac.view.zoom100', 'en')).toBe('Zoom (100%)');
+    expect(macRibbonLabelForCommand('mac.view.zoom100', 'en')).toBe('Zoom to 100%');
     expect(macRibbonLabelForCommand('mac.view.zoomSelection', 'ja')).toBe(
       '選択範囲に合わせて拡大/縮小',
     );

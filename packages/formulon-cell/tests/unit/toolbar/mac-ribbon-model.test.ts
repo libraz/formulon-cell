@@ -611,7 +611,7 @@ describe('Mac Excel ribbon profile', () => {
 
     const view = model.find((tab) => tab.id === 'view');
     expect(
-      view?.groups.find((group) => group.title === 'Sheet Views')?.commands.map((c) => c.id),
+      view?.groups.find((group) => group.title === 'Sheet View')?.commands.map((c) => c.id),
     ).toEqual(['sheetViewSelect', 'mac.view.sheetViewSave', 'mac.view.sheetViewDelete']);
     expect(
       view?.groups.find((group) => group.title === 'Workbook Views')?.commands.map((c) => c.id),
