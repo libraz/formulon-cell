@@ -174,6 +174,13 @@ export const editDialogsTh: EditDialogsStrings = {
     close: 'ปิด',
   },
   preferencesDialog: {
+    windowTitle: 'กำหนดลักษณะ',
+    back: 'ย้อนกลับ',
+    forward: 'ส่งต่อ',
+    history: 'ย้อนกลับ/ถัดไป',
+    showAll: 'แสดงทั้งหมด',
+    search: 'ค้นหา',
+    authoringGroup: 'การเขียน',
     viewPane: 'มุมมอง',
     zeroValues: 'ค่าศูนย์',
     zeroValuesTip: 'แสดง 0 (เลขศูนย์) ในเซลล์ที่มีค่าเป็นศูนย์  ส่งผลกระทบต่อ: แผ่นงานที่ใช้งานอยู่เท่านั้น',

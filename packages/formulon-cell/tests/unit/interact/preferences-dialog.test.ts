@@ -7,6 +7,19 @@ import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js
 const dialog = (): HTMLElement | null =>
   document.querySelector<HTMLElement>('.fc-prefs:not([hidden])');
 
+const tool = (label: string): HTMLButtonElement | null =>
+  dialog()?.querySelector<HTMLButtonElement>(`.fc-prefs__tool[aria-label="${label}"]`) ?? null;
+/** Show All's visible groups, each with its visible pane buttons. */
+const showAll = (): [string, string[]][] =>
+  [...(dialog()?.querySelectorAll<HTMLElement>('.fc-prefs__group') ?? [])]
+    .filter((group) => !group.hidden)
+    .map((group) => [
+      group.querySelector('.fc-prefs__group-title')?.textContent ?? '',
+      [...group.querySelectorAll<HTMLButtonElement>('.fc-prefs__pane-button')]
+        .filter((button) => !button.hidden)
+        .map((button) => button.textContent ?? ''),
+    ]);
+
 describe('Preferences window', () => {
   let sheet: MountedStubSheet | undefined;
   afterEach(() => {
@@ -28,9 +41,7 @@ describe('Preferences window', () => {
 
     expect(dialog()?.getAttribute('aria-label')).toBe('表示');
     expect(dialog()?.querySelector('.fc-prefs__header')?.textContent).toBe('表示');
-    expect(
-      [...(dialog()?.querySelectorAll('[role="tab"]') ?? [])].map((tab) => tab.textContent),
-    ).toEqual(['表示']);
+    expect(dialog()?.querySelector('.fc-prefs__heading')?.textContent).toBe('表示');
     const row = dialog()?.querySelector<HTMLLabelElement>('.fc-prefs__check');
     expect(row?.textContent).toBe('ゼロ表示');
     expect(row?.title).toBe('ゼロ値が格納されているセルに 0 を表示します。');
@@ -48,6 +59,59 @@ describe('Preferences window', () => {
     expect(dialog()?.querySelector<HTMLInputElement>('.fc-prefs__check input')?.checked).toBe(
       false,
     );
+  });
+
+  it('carries the desktop toolbar: Back and Forward, Show All, the pane name and Search', async () => {
+    sheet = await mountStubSheet({ locale: 'ja', ui: { platform: 'mac' } });
+    const instance = sheet.instance;
+    createDialogs(() => instance).open('preferences');
+    const toolbar = dialog()?.querySelector<HTMLElement>('[role="toolbar"]');
+    const labels = [...(toolbar?.querySelectorAll('button, input') ?? [])].map((control) =>
+      control.getAttribute('aria-label'),
+    );
+    expect(labels).toEqual(['戻る', '進む', 'すべて表示', '検索']);
+    expect(toolbar?.querySelector('[role="group"]')?.getAttribute('aria-label')).toBe('戻る/次へ');
+    expect(tool('戻る')?.disabled).toBe(true);
+    expect(tool('進む')?.disabled).toBe(true);
+
+    tool('すべて表示')?.click();
+    expect(dialog()?.getAttribute('aria-label')).toBe('環境設定');
+    expect(dialog()?.querySelector('.fc-prefs__heading')?.textContent).toBe('');
+    expect(showAll()).toEqual([['オーサリング', ['表示']]]);
+    expect(dialog()?.querySelector<HTMLElement>('.fc-prefs__pane')?.hidden).toBe(true);
+    expect(tool('戻る')?.disabled).toBe(false);
+    expect(tool('進む')?.disabled).toBe(true);
+
+    tool('戻る')?.click();
+    expect(dialog()?.getAttribute('aria-label')).toBe('表示');
+    expect(dialog()?.querySelector<HTMLElement>('.fc-prefs__all')?.hidden).toBe(true);
+    expect(tool('戻る')?.disabled).toBe(true);
+    expect(tool('進む')?.disabled).toBe(false);
+
+    tool('進む')?.click();
+    dialog()?.querySelector<HTMLButtonElement>('.fc-prefs__pane-button')?.click();
+    expect(dialog()?.getAttribute('aria-label')).toBe('表示');
+    expect(tool('進む')?.disabled).toBe(true);
+  });
+
+  it('narrows Show All to the panes whose names match the search', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const instance = sheet.instance;
+    createDialogs(() => instance).open('preferences');
+    const search = dialog()?.querySelector<HTMLInputElement>('input[type="search"]');
+    const type = (value: string): void => {
+      if (!search) return;
+      search.value = value;
+      search.dispatchEvent(new Event('input'));
+    };
+
+    type('vie');
+    expect(dialog()?.getAttribute('aria-label')).toBe('Preferences');
+    expect(showAll()).toEqual([['Authoring', ['View']]]);
+    type('calc');
+    expect(showAll()).toEqual([]);
+    type('');
+    expect(showAll()).toEqual([['Authoring', ['View']]]);
   });
 
   it('is refused on the default platform, which keeps the setting on its ribbon', async () => {

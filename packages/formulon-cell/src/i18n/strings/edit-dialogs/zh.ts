@@ -174,6 +174,13 @@ export const editDialogsZh: EditDialogsStrings = {
     close: '关闭',
   },
   preferencesDialog: {
+    windowTitle: '偏好设置',
+    back: '上一步',
+    forward: '下一步',
+    history: '上一步/下一步',
+    showAll: '全部显示',
+    search: '搜索',
+    authoringGroup: '创作',
     viewPane: '查看',
     zeroValues: '零值',
     zeroValuesTip: '在包含零值的单元格中显示 0(零)。\n\n影响: 仅活动工作表。',

@@ -175,6 +175,13 @@ export const editDialogsKo: EditDialogsStrings = {
     close: '닫기',
   },
   preferencesDialog: {
+    windowTitle: '기본 설정',
+    back: '뒤로',
+    forward: '앞으로',
+    history: '뒤로/다음',
+    showAll: '모두 표시',
+    search: '검색',
+    authoringGroup: '작성',
     viewPane: '보기',
     zeroValues: '0값',
     zeroValuesTip: '0(영)의 값을 포함하는 셀에 0(영)을 표시합니다. 대상: 활성 시트에만 적용됩니다.',

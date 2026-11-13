@@ -188,6 +188,18 @@ export interface EditDialogsStrings {
   };
   /** The Mac Preferences window: its panes and their settings, worded as the desktop window. */
   preferencesDialog: {
+    /** The window title on Show All, where no pane is shown. */
+    windowTitle: string;
+    /** The toolbar's history segment: its two buttons and the segment's own name. */
+    back: string;
+    forward: string;
+    history: string;
+    /** The toolbar button that lists every pane. */
+    showAll: string;
+    /** The toolbar search field, which narrows Show All to the panes it names. */
+    search: string;
+    /** Show All's heading over the panes that set how a book is shown and edited. */
+    authoringGroup: string;
     /** The View pane's name, which is also the window title while it is shown. */
     viewPane: string;
     zeroValues: string;

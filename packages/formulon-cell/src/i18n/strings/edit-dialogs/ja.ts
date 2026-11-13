@@ -177,6 +177,13 @@ export const editDialogsJa: EditDialogsStrings = {
     close: '閉じる',
   },
   preferencesDialog: {
+    windowTitle: '環境設定',
+    back: '戻る',
+    forward: '進む',
+    history: '戻る/次へ',
+    showAll: 'すべて表示',
+    search: '検索',
+    authoringGroup: 'オーサリング',
     viewPane: '表示',
     zeroValues: 'ゼロ表示',
     zeroValuesTip: 'ゼロ値が格納されているセルに 0 を表示します。',

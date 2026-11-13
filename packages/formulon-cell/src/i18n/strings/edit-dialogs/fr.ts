@@ -177,6 +177,13 @@ export const editDialogsFr: EditDialogsStrings = {
     close: 'Fermer',
   },
   preferencesDialog: {
+    windowTitle: 'Préférences',
+    back: 'Précédent',
+    forward: 'Suivant',
+    history: 'Précédent/Suivant',
+    showAll: 'Tout afficher',
+    search: 'Rechercher',
+    authoringGroup: 'Création',
     viewPane: 'Afficher',
     zeroValues: 'Valeurs nulles',
     zeroValuesTip:

@@ -167,4 +167,31 @@ export const SHELL_ICONS = {
   ],
   // Earlier versions: a clock face wound back by a counter-clockwise arrow.
   versionHistory: [...historyClock(12.2, 12, 8.6)],
+  // A settings window's history arrows: a bare chevron each way.
+  navBack: [
+    stroked(
+      poly([
+        [16, 3],
+        [7, 12],
+        [16, 21],
+      ]),
+      PALETTE.ink,
+      'bold',
+    ),
+  ],
+  navForward: [
+    stroked(
+      poly([
+        [8, 3],
+        [17, 12],
+        [8, 21],
+      ]),
+      PALETTE.ink,
+      'bold',
+    ),
+  ],
+  // Every settings pane at once: a four-by-three grid of dots.
+  showAll: [7, 12, 17].flatMap((y) =>
+    [4.5, 9.5, 14.5, 19.5].map((x) => filled(circle(x, y, 1.75), PALETTE.ink)),
+  ),
 } satisfies Record<string, IconDefinition>;
