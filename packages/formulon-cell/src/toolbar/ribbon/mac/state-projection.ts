@@ -31,7 +31,6 @@ const MAC_ACTIVE_STATE_KEYS: Readonly<Record<string, keyof ReturnType<typeof pro
     'mac.view.pageLayout': 'workbookView',
     'mac.view.gridlines': 'gridlinesVisible',
     'mac.view.headings': 'headingsVisible',
-    'mac.view.zeros': 'zerosVisible',
     'mac.formulas.showFormulas': 'formulasVisible',
     'mac.review.showNotes': 'allNotesVisible',
     'mac.data.filter': 'filterOn',
@@ -336,8 +335,7 @@ export const projectMacRibbonState = (
   }
 
   // The Freeze menu's first item doubles as Unfreeze while panes are frozen.
-  for (const button of buttons.get('mac.view.freeze') ?? []) {
-    if (!button.closest('.fc-tb__menu')) continue;
+  for (const button of buttons.get('mac.view.freeze.panes') ?? []) {
     button.dataset.freezeLabel ??= button.textContent ?? '';
     const label = active.frozen
       ? macRibbonLabelForCommand('mac.view.freeze.off', lang)

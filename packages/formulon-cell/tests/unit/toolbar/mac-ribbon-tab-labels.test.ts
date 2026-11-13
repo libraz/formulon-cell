@@ -113,7 +113,6 @@ describe('Mac ribbon control names', () => {
       '見出し',
       'データ型アイコン',
       'セルにフォーカス',
-      'ゼロ値',
     ]);
     expect(show?.commands.find((c) => c.id === 'mac.view.gridlines')?.className).toContain(
       'mac-checkbox',

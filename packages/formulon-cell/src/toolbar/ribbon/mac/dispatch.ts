@@ -83,7 +83,6 @@ const aliases: Readonly<Record<string, string>> = {
   'mac.view.gridlines': 'viewGridlines',
   'mac.view.headings': 'viewHeadings',
   'mac.view.formulaBar': 'viewFormulaBar',
-  'mac.view.zeros': 'viewZeros',
   'mac.view.zoomSelection': 'zoomSelection',
   'mac.view.zoom': 'zoomDialog',
   'mac.view.zoom100': 'zoom100',
@@ -202,6 +201,7 @@ const operations = [
   'mac.page.printArea.clear',
   'mac.page.pageBreaks',
   'mac.view.freeze',
+  'mac.view.freeze.panes',
   'mac.view.freeze.firstRow',
   'mac.view.freeze.firstColumn',
   'mac.insert.newComment',
@@ -472,6 +472,7 @@ export function dispatchMacRibbonCommand(
       case 'mac.page.break.reset':
         return ctx.applyPageBreakAction('reset-all');
       case 'mac.view.freeze':
+      case 'mac.view.freeze.panes':
         return ctx.applyFreezeAction(
           state.layout.splitPanes !== true &&
             (state.layout.freezeRows > 0 || state.layout.freezeCols > 0)

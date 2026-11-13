@@ -176,6 +176,12 @@ export const editDialogsFr: EditDialogsStrings = {
     delete: 'Supprimer',
     close: 'Fermer',
   },
+  preferencesDialog: {
+    viewPane: 'Afficher',
+    zeroValues: 'Valeurs nulles',
+    zeroValuesTip:
+      'Afficher un 0 (zéro) dans les cellules contenant des valeurs égales à zéro.  Affecte : uniquement les feuilles actives.',
+  },
   goToDialog: {
     title: 'Atteindre spécial',
     goToTitle: 'Atteindre',

@@ -396,7 +396,16 @@
       "name": "FocusActiveCell",
       "match": "en+ja",
       "control": "button",
-      "strip_ellipsis": true
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.2.6",
+        "ja": "表示: 0.1.0.2.6",
+        "de": "Ansicht: 0.1.0.2.6",
+        "fr": "Affichage: 0.1.0.2.6",
+        "ko": "보기: 0.1.0.2.6",
+        "th": "มุมมอง: 0.1.0.2.6",
+        "zh": "视图: 0.1.0.2.6"
+      }
     },
     "labels:chartColumn": {
       "tcid": 15534,
@@ -707,7 +716,16 @@
       "name": "DataTypeIcons",
       "match": "en+ja",
       "control": "button",
-      "strip_ellipsis": true
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.2.5",
+        "ja": "表示: 0.1.0.2.5",
+        "de": "Ansicht: 0.1.0.2.5",
+        "fr": "Affichage: 0.1.0.2.5",
+        "ko": "보기: 0.1.0.2.5",
+        "th": "มุมมอง: 0.1.0.2.5",
+        "zh": "视图: 0.1.0.2.5"
+      }
     },
     "labels:dataTypes": {
       "tcid": 32659,
@@ -960,7 +978,16 @@
       "name": "FormulaBar",
       "match": "en+ja",
       "control": "button",
-      "strip_ellipsis": true
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.2.3",
+        "ja": "表示: 0.1.0.2.3",
+        "de": "Ansicht: 0.1.0.2.3",
+        "fr": "Affichage: 0.1.0.2.3",
+        "ko": "보기: 0.1.0.2.3",
+        "th": "มุมมอง: 0.1.0.2.3",
+        "zh": "视图: 0.1.0.2.3"
+      }
     },
     "labels:formulas": {
       "tcid": 11599,
@@ -979,13 +1006,39 @@
         "zh": "公式: 0.1.6"
       }
     },
+    "labels:freeze": {
+      "tcid": 13961,
+      "source": "tbbtn",
+      "name": "GalFreezePanes",
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.4.2",
+        "ja": "表示: 0.1.0.4.2",
+        "de": "Ansicht: 0.1.0.4.2",
+        "fr": "Affichage: 0.1.0.4.2",
+        "ko": "보기: 0.1.0.4.2",
+        "th": "มุมมอง: 0.1.0.4.2",
+        "zh": "视图: 0.1.0.4.2"
+      }
+    },
     "labels:gridlines": {
       "tcid": 15923,
       "source": "tbbtn",
       "name": "GridlinesExcel",
       "match": "en+ja",
       "control": "button",
-      "strip_ellipsis": true
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.2.2",
+        "ja": "表示: 0.1.0.2.2",
+        "de": "Ansicht: 0.1.0.2.2",
+        "fr": "Affichage: 0.1.0.2.2",
+        "ko": "보기: 0.1.0.2.2",
+        "th": "มุมมอง: 0.1.0.2.2",
+        "zh": "视图: 0.1.0.2.2"
+      }
     },
     "labels:gridlinesHeading": {
       "tcid": 12575,
@@ -1019,7 +1072,16 @@
       "name": "BooleanChoiceViewHeadings2",
       "match": "en+ja",
       "control": "button",
-      "strip_ellipsis": true
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.2.4",
+        "ja": "表示: 0.1.0.2.4",
+        "de": "Ansicht: 0.1.0.2.4",
+        "fr": "Affichage: 0.1.0.2.4",
+        "ko": "보기: 0.1.0.2.4",
+        "th": "มุมมอง: 0.1.0.2.4",
+        "zh": "视图: 0.1.0.2.4"
+      }
     },
     "labels:hide": {
       "tcid": 865,
@@ -1321,7 +1383,16 @@
       "name": "NavigationPaneExcelFeature",
       "match": "en+ja",
       "control": "button",
-      "strip_ellipsis": true
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.2.0",
+        "ja": "表示: 0.1.0.2.0",
+        "de": "Ansicht: 0.1.0.2.0",
+        "fr": "Affichage: 0.1.0.2.0",
+        "ko": "보기: 0.1.0.2.0",
+        "th": "มุมมอง: 0.1.0.2.0",
+        "zh": "视图: 0.1.0.2.0"
+      }
     },
     "labels:newComment": {
       "tcid": 1589,
@@ -1906,7 +1977,16 @@
       "name": "DisplayRuler2",
       "match": "en+ja",
       "control": "button",
-      "strip_ellipsis": true
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.2.1",
+        "ja": "表示: 0.1.0.2.1",
+        "de": "Ansicht: 0.1.0.2.1",
+        "fr": "Affichage: 0.1.0.2.1",
+        "ko": "보기: 0.1.0.2.1",
+        "th": "มุมมอง: 0.1.0.2.1",
+        "zh": "视图: 0.1.0.2.1"
+      }
     },
     "labels:scaleHeight": {
       "tcid": 12562,
@@ -1987,12 +2067,6 @@
       "tcid": 3,
       "source": "tbbtn",
       "name": "Save",
-      "match": "en+ja"
-    },
-    "labels:show": {
-      "tcid": 15640,
-      "source": "tbbtn",
-      "name": "ChunkViewShowHide",
       "match": "en+ja"
     },
     "labels:showChanges": {
@@ -3130,6 +3204,52 @@
         "zh": "审阅: 0.1.0.5.0 > 0.4"
       }
     },
+    "menu:mac.view.cellFocus.autoHighlight": {
+      "tcid": 45906,
+      "source": "tbbtn",
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "View: 0.1.0.2.6 > 0.2",
+        "ja": "表示: 0.1.0.2.6 > 0.2",
+        "de": "Ansicht: 0.1.0.2.6 > 0.2",
+        "fr": "Affichage: 0.1.0.2.6 > 0.2",
+        "ko": "보기: 0.1.0.2.6 > 0.2",
+        "th": "มุมมอง: 0.1.0.2.6 > 0.2",
+        "zh": "视图: 0.1.0.2.6 > 0.2"
+      }
+    },
+    "menu:mac.view.cellFocus.color": {
+      "tcid": 41981,
+      "source": "tbbtn",
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "View: 0.1.0.2.6 > 0.1",
+        "ja": "表示: 0.1.0.2.6 > 0.1",
+        "de": "Ansicht: 0.1.0.2.6 > 0.1",
+        "fr": "Affichage: 0.1.0.2.6 > 0.1",
+        "ko": "보기: 0.1.0.2.6 > 0.1",
+        "th": "มุมมอง: 0.1.0.2.6 > 0.1",
+        "zh": "视图: 0.1.0.2.6 > 0.1"
+      }
+    },
+    "menu:mac.view.cellFocus.focusCell": {
+      "tcid": 34325,
+      "source": "tbbtn",
+      "name": "FocusActiveCell",
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "View: 0.1.0.2.6 > 0.0",
+        "ja": "表示: 0.1.0.2.6 > 0.0",
+        "de": "Ansicht: 0.1.0.2.6 > 0.0",
+        "fr": "Affichage: 0.1.0.2.6 > 0.0",
+        "ko": "보기: 0.1.0.2.6 > 0.0",
+        "th": "มุมมอง: 0.1.0.2.6 > 0.0",
+        "zh": "视图: 0.1.0.2.6 > 0.0"
+      }
+    },
     "menu:mac.view.freeze.firstColumn": {
       "tcid": 13963,
       "source": "tbbtn",
@@ -3258,12 +3378,6 @@
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
-    },
-    "labels:freeze": {
-      "status": "split",
-      "tcid": 13961,
-      "name": "GalFreezePanes",
-      "reason": "one key drawn differently on several controls (it needs one key per control): ja: 'ウインドウ枠の固定' at ['mac.view.freeze @ 表示: 0.1.0.4.2'] | 'ウィンドウ枠の固定' at ['mac.view.freeze @ 表示: 0.1.0.4.2 > 0.0']; de: 'Bereiche einfrieren' at ['mac.view.freeze @ Ansicht: 0.1.0.4.2'] | 'Fenster fixieren' at ['mac.view.freeze @ Ansicht: 0.1.0.4.2 > 0.0']"
     },
     "labels:freezeSelection": {
       "status": "unresolved",
@@ -3427,6 +3541,12 @@
       "name": "ChunkNamedSheetView",
       "reason": "nothing in the label set resolves this key"
     },
+    "labels:show": {
+      "status": "no-consumer",
+      "tcid": 15640,
+      "name": "ChunkViewShowHide",
+      "reason": "nothing in the label set resolves this key"
+    },
     "labels:sortAsc": {
       "status": "pinned-pending",
       "tcid": null,
@@ -3464,11 +3584,6 @@
       "tcid": 12561,
       "name": "GalMaximumWidth",
       "reason": "nothing in the label set resolves this key"
-    },
-    "labels:zeros": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
     },
     "menu:mac.automate.allRowsColumns": {
       "status": "unresolved",
@@ -3769,11 +3884,10 @@
       "name": "FormulaBar",
       "reason": "nothing in the label set resolves this key"
     },
-    "menu:mac.view.freeze": {
-      "status": "no-consumer",
-      "tcid": 443,
-      "name": "FreezePanes",
-      "reason": "nothing in the label set resolves this key"
+    "menu:mac.view.freeze.panes": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "the menu item draws ja 'ウィンドウ枠の固定' and de 'Fenster fixieren', which no tbbtn, tbbtn2 or tbfriendly string carries (FreezePanes 443 reads 'ウインドウ枠の固定' / 'Bereiche einfrieren'); the hand-written labels are the drawn ones"
     },
     "menu:mac.view.gridlines": {
       "status": "no-consumer",
@@ -3786,11 +3900,6 @@
       "tcid": 15644,
       "name": "BooleanChoiceViewHeadings2",
       "reason": "nothing in the label set resolves this key"
-    },
-    "menu:mac.view.zeros": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
     }
   },
   "consumers": [
@@ -3879,6 +3988,7 @@
     "labels:forms",
     "labels:formulaBar",
     "labels:formulas",
+    "labels:freeze",
     "labels:gridlines",
     "labels:gridlinesHeading",
     "labels:group",
@@ -3944,7 +4054,6 @@
     "labels:shapes",
     "labels:sheetRecalc",
     "labels:sheetViewSave",
-    "labels:show",
     "labels:showChanges",
     "labels:showComments",
     "labels:showDetail",
@@ -4014,6 +4123,9 @@
     "menu:mac.review.previousNote",
     "menu:mac.review.showHideNote",
     "menu:mac.review.showNotes",
+    "menu:mac.view.cellFocus.autoHighlight",
+    "menu:mac.view.cellFocus.color",
+    "menu:mac.view.cellFocus.focusCell",
     "menu:mac.view.freeze.firstColumn",
     "menu:mac.view.freeze.firstRow"
   ]

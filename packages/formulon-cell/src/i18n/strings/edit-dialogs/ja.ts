@@ -176,6 +176,11 @@ export const editDialogsJa: EditDialogsStrings = {
     delete: '削除',
     close: '閉じる',
   },
+  preferencesDialog: {
+    viewPane: '表示',
+    zeroValues: 'ゼロ表示',
+    zeroValuesTip: 'ゼロ値が格納されているセルに 0 を表示します。',
+  },
   goToDialog: {
     title: '選択オプション',
     goToTitle: 'ジャンプ',

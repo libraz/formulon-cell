@@ -622,7 +622,6 @@ const viewTab = (): RibbonTabModel =>
           NOT_IMPLEMENTED,
         ),
         disabledCompactCommand('mac.view.cellFocus', t('cellFocus'), 'show', NOT_IMPLEMENTED),
-        checkboxCommand('mac.view.zeros', t('zeros'), 'show'),
       ],
       'compact',
     ),

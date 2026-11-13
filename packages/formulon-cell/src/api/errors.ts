@@ -6,6 +6,7 @@ import type { PermissionDecision } from '../commands/interaction-policy.js';
  *
  * - `disposed`: the object was disposed.
  * - `feature-disabled`: the feature the call needs is switched off in `ui.features`.
+ * - `unsupported-platform`: the call needs a surface the current platform profile does not have.
  * - `policy-denied`: the interaction policy denies the operation.
  * - `protected`: sheet or workbook protection blocks the operation.
  * - `limit-exceeded`: the input is above a formulon-cell size limit.
@@ -14,6 +15,7 @@ import type { PermissionDecision } from '../commands/interaction-policy.js';
 export type SpreadsheetFailure =
   | 'disposed'
   | 'feature-disabled'
+  | 'unsupported-platform'
   | 'policy-denied'
   | 'protected'
   | 'limit-exceeded'
@@ -22,6 +24,7 @@ export type SpreadsheetFailure =
 const FAILURES: ReadonlySet<string> = new Set<SpreadsheetFailure>([
   'disposed',
   'feature-disabled',
+  'unsupported-platform',
   'policy-denied',
   'protected',
   'limit-exceeded',

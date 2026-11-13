@@ -124,8 +124,11 @@ export const runDemoBackstageAction = (opts: RunDemoBackstageActionOptions): voi
   else if (action === 'page-setup') openDemoDialog(instance, 'pageSetup');
   else if (action === 'edit-links') openDemoDialog(instance, 'externalLinks');
   else if (action === 'share') opts.showNotice(opts.ui.share, opts.ui.shareDesc);
-  else if (action === 'options') opts.toggleOptions();
-  else if (action === 'autocorrect-options') openDemoDialog(instance, 'autoCorrect');
+  else if (action === 'options') {
+    // The Mac profile keeps its settings in the Preferences window; elsewhere the demo panel.
+    if (instance?.dialogs.canOpen('preferences')) openDemoDialog(instance, 'preferences');
+    else opts.toggleOptions();
+  } else if (action === 'autocorrect-options') openDemoDialog(instance, 'autoCorrect');
   else if (action === 'close') opts.closeBackstage();
 };
 

@@ -2,6 +2,7 @@ import type { BuiltInCommandId } from '../../commands/built-in-command-ids.js';
 import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import type { Range } from '../../engine/types.js';
 import type { FeatureId } from '../../extensions/features.js';
+import { isMacHost } from '../../extensions/ui-options.js';
 import {
   closeAutoCorrectDialog,
   openAutoCorrectDialog,
@@ -9,6 +10,10 @@ import {
 import type { ConditionalDialogOpenOptions } from '../../interact/conditional-dialog.js';
 import type { FxDialogOpenOptions } from '../../interact/fx-dialog.js';
 import type { PasteSpecialOpenOptions } from '../../interact/paste-special.js';
+import {
+  closePreferencesDialog,
+  openPreferencesDialog,
+} from '../../interact/preferences-dialog.js';
 import type { ChartSettingsTarget } from '../../interact/session-chart-settings.js';
 import { closeSpellingDialog, openSpellingDialog } from '../../interact/spelling-dialog.js';
 import type { SpreadsheetInstance as LegacyInstance } from '../../mount/types.js';
@@ -50,6 +55,7 @@ export interface DialogOptions {
   pivotTable: { readonly placement?: 'new' | 'existing' };
   spelling: undefined;
   autoCorrect: undefined;
+  preferences: undefined;
 }
 
 /** A dialog `SpreadsheetInstance.dialogs` opens: the opener's name without `open` and `Dialog`. */
@@ -57,9 +63,11 @@ export type DialogId = keyof DialogOptions;
 
 /** Opens and closes the host dialogs. */
 export interface Dialogs {
-  /** Opens a dialog on the current selection. Throws `feature-disabled` when its feature is off,
-   *  `policy-denied` when the interaction policy blocks it, and `protected` when sheet or workbook
-   *  protection does, deciding it as the ribbon decides the command that opens the same dialog. */
+  /** Opens a dialog on the current selection. Throws `unsupported-platform` when the platform
+   *  profile has no such dialog (`preferences` is the Mac's), `feature-disabled` when its feature
+   *  is off, `policy-denied` when the interaction policy blocks it, and `protected` when sheet or
+   *  workbook protection does, deciding it as the ribbon decides the command that opens the same
+   *  dialog. */
   open<K extends DialogId>(id: K, options?: DialogOptions[K]): void;
   /** Closes a dialog; does nothing when it is not open. */
   close(id: DialogId): void;
@@ -73,6 +81,8 @@ interface DialogRoute {
   /** The built-in command that opens it from the ribbon: opening is decided as that command is,
    *  from the instance API. `null` for a dialog the feature flag alone decides. */
   readonly commandId: BuiltInCommandId | null;
+  /** The one platform profile that has the dialog; absent when every profile has it. */
+  readonly platform?: 'mac';
   /** Opens it; `false` when there was nothing to open it on (no chart, no pivot). */
   readonly open: (legacy: LegacyInstance, options: never) => unknown;
   readonly close?: (legacy: LegacyInstance) => void;
@@ -94,6 +104,13 @@ const ROUTES: { readonly [K in DialogId]: Route<K> } = {
     commandId: null,
     open: (l) => openAutoCorrectDialog(l),
     close: (l) => closeAutoCorrectDialog(l),
+  },
+  preferences: {
+    feature: null,
+    commandId: null,
+    platform: 'mac',
+    open: (l) => openPreferencesDialog(l),
+    close: (l) => closePreferencesDialog(l),
   },
   conditional: {
     feature: 'conditional',
@@ -250,9 +267,17 @@ const routeOf = (id: DialogId): DialogRoute => {
   return route;
 };
 
-type DialogRefusal = 'feature-disabled' | 'policy-denied' | 'protected' | null;
+type DialogRefusal =
+  | 'feature-disabled'
+  | 'unsupported-platform'
+  | 'policy-denied'
+  | 'protected'
+  | null;
 
 const refusalOf = (legacy: LegacyInstance, route: DialogRoute): DialogRefusal => {
+  if (route.platform === 'mac' && !isMacHost(legacy.host)) {
+    return 'unsupported-platform';
+  }
   if (route.feature !== null && legacy.features[route.feature] === undefined) {
     return 'feature-disabled';
   }

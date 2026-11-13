@@ -173,6 +173,11 @@ export const editDialogsTh: EditDialogsStrings = {
     delete: 'ลบ',
     close: 'ปิด',
   },
+  preferencesDialog: {
+    viewPane: 'มุมมอง',
+    zeroValues: 'ค่าศูนย์',
+    zeroValuesTip: 'แสดง 0 (เลขศูนย์) ในเซลล์ที่มีค่าเป็นศูนย์  ส่งผลกระทบต่อ: แผ่นงานที่ใช้งานอยู่เท่านั้น',
+  },
   goToDialog: {
     title: 'ไปที่แบบพิเศษ',
     goToTitle: 'ไปที่',

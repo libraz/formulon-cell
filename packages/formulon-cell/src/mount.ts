@@ -63,6 +63,7 @@ import {
   setOverlayOptions,
   syncOverlayPortalTheme,
 } from './interact/overlay-portal.js';
+import { closePreferencesDialog } from './interact/preferences-dialog.js';
 import { attachAlwaysOnDialogs } from './mount/always-on-dialogs.js';
 import { createMountChrome } from './mount/chrome.js';
 import { attachChromeSync, type ChromeSyncController } from './mount/chrome-sync.js';
@@ -983,6 +984,7 @@ export const Spreadsheet = {
         }
         if (platformChanged) {
           discardMacPalette();
+          closePreferencesDialog(instance);
           if (featureState.fxDialog) detachHostFeature('fxDialog');
         }
         ui = nextUi;
@@ -1286,6 +1288,7 @@ export const Spreadsheet = {
         cleanup(() => disposeMacGoalSeekDialog(instance));
         cleanup(() => closeSpellingDialog(instance));
         cleanup(() => closeAutoCorrectDialog(instance));
+        cleanup(() => closePreferencesDialog(instance));
         cleanup(() => disposeMacPivotMoveDialog(instance));
         cleanup(() => disposeDataTableDialog(instance));
         cleanup(() => ribbon.dispose());

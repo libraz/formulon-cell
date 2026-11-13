@@ -176,6 +176,12 @@ export const editDialogsDe: EditDialogsStrings = {
     delete: 'Löschen',
     close: 'Schließen',
   },
+  preferencesDialog: {
+    viewPane: 'Ansicht',
+    zeroValues: 'Nullwerte',
+    zeroValuesTip:
+      'Zeigt eine 0 (Null) in Zellen an, die Nullwerte enthalten. Betrifft: nur die aktiven Blätter.',
+  },
   goToDialog: {
     title: 'Gehe zu Spezial',
     goToTitle: 'Gehe zu',

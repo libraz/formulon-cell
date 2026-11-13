@@ -84,6 +84,7 @@ describe('types', () => {
       | 'protected'
       | 'limit-exceeded'
       | 'workbook-in-use'
+      | 'unsupported-platform'
     >();
   });
 

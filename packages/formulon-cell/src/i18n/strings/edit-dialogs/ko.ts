@@ -174,6 +174,11 @@ export const editDialogsKo: EditDialogsStrings = {
     delete: '삭제',
     close: '닫기',
   },
+  preferencesDialog: {
+    viewPane: '보기',
+    zeroValues: '0값',
+    zeroValuesTip: '0(영)의 값을 포함하는 셀에 0(영)을 표시합니다. 대상: 활성 시트에만 적용됩니다.',
+  },
   goToDialog: {
     title: '이동 옵션',
     goToTitle: '이동',

@@ -174,6 +174,12 @@ export const editDialogsEn: EditDialogsStrings = {
     delete: 'Delete',
     close: 'Close',
   },
+  preferencesDialog: {
+    viewPane: 'View',
+    zeroValues: 'Zero values',
+    zeroValuesTip:
+      'Displays a 0 (zero) in cells that contain zero values.  Affects: only the active sheets.',
+  },
   goToDialog: {
     title: 'Go To Special',
     goToTitle: 'Go To',

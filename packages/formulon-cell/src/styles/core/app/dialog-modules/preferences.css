@@ -1,0 +1,54 @@
+@layer fc.app {
+  /* Preferences window: the pane bar over the shown pane's settings. */
+  .fc-prefs__panel {
+    width: min(520px, 92vw);
+  }
+  .fc-prefs__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .fc-prefs__body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .fc-prefs__panes {
+    display: flex;
+    gap: 4px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
+    padding-bottom: 6px;
+  }
+  .fc-prefs__pane-tab {
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: default;
+  }
+  .fc-prefs__pane-tab[aria-selected="true"] {
+    background: color-mix(in srgb, CanvasText 10%, transparent);
+  }
+  .fc-prefs__pane-tab:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: 1px;
+  }
+  .fc-prefs__pane {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .fc-prefs__pane[hidden] {
+    display: none;
+  }
+  .fc-prefs__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+  }
+}

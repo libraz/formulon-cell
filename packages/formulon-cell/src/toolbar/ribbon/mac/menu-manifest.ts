@@ -66,7 +66,7 @@ export const MAC_RIBBON_MENU_COMMANDS = [
   'mac.data.validation',
   'mac.data.whatIf',
   'mac.review.notes',
-  'mac.view.show',
+  'mac.view.cellFocus',
   'mac.view.freeze',
   'mac.automate.gallery',
 ] as const;
@@ -437,14 +437,14 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.review.showNotes', label: 'Show All Notes' },
     { id: 'mac.review.convertNotes', label: 'Convert to Comments' },
   ]),
-  'mac.view.show': menu([
-    { id: 'mac.view.gridlines', label: 'Gridlines' },
-    { id: 'mac.view.headings', label: 'Headings' },
-    { id: 'mac.view.formulaBar', label: 'Formula Bar' },
-    { id: 'mac.view.zeros', label: 'Zero Values' },
-  ]),
+  // Focus Cell is not built yet; the menu carries the desktop's three entries greyed out.
+  'mac.view.cellFocus': menu([
+    { id: 'mac.view.cellFocus.focusCell', label: 'Focus Cell' },
+    { id: 'mac.view.cellFocus.color', label: 'Focus Cell Color' },
+    { id: 'mac.view.cellFocus.autoHighlight', label: 'Show Auto-Highlight' },
+  ]).map((item) => ({ ...item, disabled: true, disabledReason: NOT_IMPLEMENTED.en })),
   'mac.view.freeze': menu([
-    { id: 'mac.view.freeze', label: 'Freeze Panes', labelJa: 'ウィンドウ枠の固定' },
+    { id: 'mac.view.freeze.panes', label: 'Freeze Panes' },
     { id: 'mac.view.freeze.firstRow', label: 'Freeze Top Row' },
     { id: 'mac.view.freeze.firstColumn', label: 'Freeze First Column' },
   ]),
@@ -501,7 +501,7 @@ export const macRibbonMenuIdForCommand = (commandId: string): string | null => {
     'mac.data.validation': 'menu-mac-data-validation',
     'mac.data.whatIf': 'menu-mac-data-what-if',
     'mac.review.notes': 'menu-mac-review-notes',
-    'mac.view.show': 'menu-mac-view-show',
+    'mac.view.cellFocus': 'menu-mac-view-cell-focus',
     'mac.view.freeze': 'menu-mac-view-freeze',
     'mac.automate.gallery': 'menu-mac-automate-gallery',
   };

@@ -173,6 +173,11 @@ export const editDialogsZh: EditDialogsStrings = {
     delete: '删除',
     close: '关闭',
   },
+  preferencesDialog: {
+    viewPane: '查看',
+    zeroValues: '零值',
+    zeroValuesTip: '在包含零值的单元格中显示 0(零)。\n\n影响: 仅活动工作表。',
+  },
   goToDialog: {
     title: '定位条件',
     goToTitle: '定位',

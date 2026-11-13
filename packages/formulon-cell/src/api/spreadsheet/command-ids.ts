@@ -256,7 +256,6 @@ export const COMMAND_IDS = [
   'mac.view.switchWindow',
   'mac.view.syncScroll',
   'mac.view.unhide',
-  'mac.view.zeros',
   'mac.view.zoom',
   'mac.view.zoom100',
   'mac.view.zoomSelection',

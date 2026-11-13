@@ -186,6 +186,13 @@ export interface EditDialogsStrings {
     delete: string;
     close: string;
   };
+  /** The Mac Preferences window: its panes and their settings, worded as the desktop window. */
+  preferencesDialog: {
+    /** The View pane's name, which is also the window title while it is shown. */
+    viewPane: string;
+    zeroValues: string;
+    zeroValuesTip: string;
+  };
   goToDialog: {
     /** Go To Special modal title (header and aria-label). */
     title: string;
