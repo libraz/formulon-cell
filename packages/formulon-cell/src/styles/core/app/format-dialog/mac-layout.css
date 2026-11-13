@@ -437,16 +437,18 @@
   }
   .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="align"] .fc-fmtdlg__align-degree > span {
     position: absolute;
-    left: 395px;
+    left: 413px;
     top: 221px;
-    width: 18px;
+    width: max-content;
     height: 19px;
     margin: 0;
-    min-width: 0;
+    min-width: 18px;
     min-height: 0;
     max-width: none;
     max-height: none;
     box-sizing: border-box;
+    text-align: right;
+    transform: translateX(-100%);
     white-space: nowrap;
   }
   .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="align"] .fc-fmtdlg__align-degree input {

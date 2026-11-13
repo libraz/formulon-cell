@@ -278,8 +278,13 @@ CAPTION="""
 """
 
 WRAP=('protection-hint','border-hint','__hint')
+# Labels whose control sits flush to their right: the frame is measured on the ja label, so the
+# rule keeps the measured right edge and lets a longer label grow leftward.
+END_ANCHORED=('.fc-fmtdlg__align-degree > span',)
 def rule(prefix,sel,f,origin):
     x,y,w,h=f; ox,oy=origin
+    if sel in END_ANCHORED:
+        return f"  {prefix+sel} {{\n    position: absolute;\n    left: {x+w-ox}px;\n    top: {y-oy}px;\n    width: max-content;\n    height: {h}px;\n    margin: 0;\n    min-width: {w}px;\n    min-height: 0;\n    max-width: none;\n    max-height: none;\n    box-sizing: border-box;\n    text-align: right;\n    transform: translateX(-100%);\n    white-space: nowrap;\n  }}\n"
     extra='' if any(k in sel for k in WRAP) else '    white-space: nowrap;\n'
     if '__tab[' in sel: extra+='    z-index: 2;\n'
     if '--clear' in sel: extra+='    z-index: 3;\n'
