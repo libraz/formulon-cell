@@ -420,13 +420,13 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.data.validation.clearRules', label: 'Clear Validation' },
   ]),
   'mac.data.whatIf': menu([
-    { id: 'mac.data.goalSeek', label: 'Goal Seek' },
     {
       id: 'mac.data.scenarioManager',
       label: 'Scenario Manager',
       disabled: true,
       disabledReason: NOT_IMPLEMENTED.en,
     },
+    { id: 'mac.data.goalSeek', label: 'Goal Seek' },
     { id: 'mac.data.dataTable', label: 'Data Table' },
   ]),
   'mac.review.notes': menu([

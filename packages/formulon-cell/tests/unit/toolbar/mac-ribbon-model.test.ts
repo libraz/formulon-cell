@@ -493,13 +493,18 @@ describe('Mac Excel ribbon profile', () => {
 
   it('explains unavailable local menu features in Japanese', () => {
     const menu = createMacRibbonMenuFactory('ja')('mac.data.whatIf');
+    expect(
+      Array.from(menu?.querySelectorAll<HTMLElement>('[data-ribbon-command]') ?? []).map(
+        (item) => item.dataset.ribbonCommand,
+      ),
+    ).toEqual(['mac.data.scenarioManager', 'mac.data.goalSeek', 'mac.data.dataTable']);
     const scenario = menu?.querySelector<HTMLButtonElement>(
       '[data-ribbon-command="mac.data.scenarioManager"]',
     );
     expect(scenario?.getAttribute('aria-disabled')).toBe('true');
     expect(scenario?.title).toContain('この機能は未実装です。');
     expect(scenario?.title).not.toContain('Microsoft 365');
-    expect(scenario?.textContent).toBe('シナリオ マネージャー');
+    expect(scenario?.textContent).toBe('シナリオの登録と管理...');
     const shapes = createMacRibbonMenuFactory('ja')('mac.insert.shapes');
     const callout = shapes?.querySelector<HTMLButtonElement>(
       '[data-ribbon-command="mac.insert.shape.callouts.0"]',

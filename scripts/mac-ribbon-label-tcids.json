@@ -11,7 +11,8 @@
       "tcid": 34778,
       "source": "tbbtn",
       "name": "ChunkOfficeExtensionsAddinFlyout",
-      "match": "en+ja"
+      "match": "en+ja",
+      "evidence": "bundle has U+002D; drawn with U+2011 by the render path"
     },
     "groups:Analysis": {
       "tcid": 32315,
@@ -72,6 +73,13 @@
       "source": "tbbtn",
       "name": "ChunkTimeSeriesForecasting",
       "match": "en+ja"
+    },
+    "groups:Forms": {
+      "tcid": 32833,
+      "source": "tbbtn",
+      "name": "MsFormSplitButton",
+      "match": "en+ja",
+      "evidence": "drawn label"
     },
     "groups:Formula Auditing": {
       "tcid": 11622,
@@ -223,17 +231,43 @@
       "name": "ChunkZoom",
       "match": "en+ja"
     },
+    "labels:accessibility": {
+      "tcid": 19666,
+      "source": "tbbtn",
+      "name": "AccessibilityChecker",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Review: 0.1.0.1.0",
+        "ja": "校閲: 0.1.0.1.0",
+        "de": "Überprüfen: 0.1.0.1.0",
+        "fr": "Révision: 0.1.0.1.0",
+        "ko": "검토: 0.1.0.1.0",
+        "th": "รีวิว: 0.1.0.1.0",
+        "zh": "审阅: 0.1.0.1.0"
+      }
+    },
     "labels:add": {
       "tcid": 27640,
       "source": "tbbtn",
       "name": "AddInkToolsMenu",
-      "match": "ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:addins": {
       "tcid": 34778,
       "source": "tbbtn",
       "name": "ChunkOfficeExtensionsAddinFlyout",
-      "match": "en+ja"
+      "match": "en+ja",
+      "evidence": "bundle has U+002D; drawn with U+2011 by the render path",
+      "drawn_exceptions": {
+        "en": "Add‑ins"
+      },
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:advancedFilter": {
       "tcid": 901,
@@ -241,31 +275,85 @@
       "name": "AdvancedFilter",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Data: 0.1.0.3.6",
+        "ja": "データ: 0.1.0.3.6",
+        "de": "Daten: 0.1.0.3.6",
+        "fr": "Données: 0.1.0.3.6",
+        "ko": "데이터: 0.1.0.3.6",
+        "th": "ข้อมูล: 0.1.0.3.6",
+        "zh": "数据: 0.1.0.3.6"
+      }
     },
     "labels:alwaysReadOnly": {
       "tcid": 32768,
       "source": "tbbtn",
       "name": "MarkAsReadOnlyRecommended",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Review: 0.1.0.7.0",
+        "ja": "校閲: 0.1.0.7.0",
+        "de": "Überprüfen: 0.1.0.7.0",
+        "fr": "Révision: 0.1.0.7.0",
+        "ko": "검토: 0.1.0.7.0",
+        "th": "รีวิว: 0.1.0.7.0",
+        "zh": "审阅: 0.1.0.7.0"
+      }
     },
     "labels:arrange": {
       "tcid": 298,
       "source": "tbbtn",
       "name": "ArrangeWindows",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.4.1",
+        "ja": "表示: 0.1.0.4.1",
+        "de": "Ansicht: 0.1.0.4.1",
+        "fr": "Affichage: 0.1.0.4.1",
+        "ko": "보기: 0.1.0.4.1",
+        "th": "มุมมอง: 0.1.0.4.1",
+        "zh": "视图: 0.1.0.4.1"
+      }
     },
     "labels:autoSum": {
       "tcid": 226,
       "source": "tbbtn",
       "name": "AutoSum",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.0.1",
+        "ja": "数式: 0.1.0.0.1",
+        "de": "Formeln: 0.1.0.0.1",
+        "fr": "Formules: 0.1.0.0.1",
+        "ko": "수식: 0.1.0.0.1",
+        "th": "สูตร: 0.1.0.0.1",
+        "zh": "公式: 0.1.0.0.1"
+      }
     },
     "labels:automate": {
       "tcid": 34583,
       "source": "tbbtn",
       "name": "TabAutomate",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Automate: 0.1.10",
+        "ja": "自動化: 0.1.10",
+        "de": "Automatisieren: 0.1.10",
+        "fr": "Automatisation: 0.1.10",
+        "ko": "자동화: 0.1.10",
+        "th": "อัตโนมัติ: 0.1.10",
+        "zh": "自动化: 0.1.10"
+      }
     },
     "labels:background": {
       "tcid": 952,
@@ -273,91 +361,246 @@
       "name": "SheetBackground",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ribbon-button-rule"
+      "evidence": "ribbon-button-rule",
+      "control": "button",
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.5",
+        "ja": "ページ レイアウト: 0.1.0.1.5",
+        "de": "Seitenlayout: 0.1.0.1.5",
+        "fr": "Mise en page: 0.1.0.1.5",
+        "ko": "페이지 레이아웃: 0.1.0.1.5",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.5",
+        "zh": "页面布局: 0.1.0.1.5"
+      }
     },
     "labels:calcOptions": {
       "tcid": 12590,
       "source": "tbbtn",
       "name": "FlyoutAnchorCalculationOptions",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.4.0",
+        "ja": "数式: 0.1.0.4.0",
+        "de": "Formeln: 0.1.0.4.0",
+        "fr": "Formules: 0.1.0.4.0",
+        "ko": "수식: 0.1.0.4.0",
+        "th": "สูตร: 0.1.0.4.0",
+        "zh": "公式: 0.1.0.4.0"
+      }
     },
     "labels:cellFocus": {
       "tcid": 34325,
       "source": "tbbtn",
       "name": "FocusActiveCell",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:chartColumn": {
       "tcid": 15534,
       "source": "tbbtn",
       "name": "ExcelChartGallery1",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.1",
+        "ja": "挿入: 0.1.0.5.1",
+        "de": "Einfügen: 0.1.0.5.1",
+        "fr": "Insérer: 0.1.0.5.1",
+        "ko": "삽입: 0.1.0.5.1",
+        "th": "แทรก: 0.1.0.5.1",
+        "zh": "插入: 0.1.0.5.1"
+      }
     },
     "labels:chartCombo": {
       "tcid": 24376,
       "source": "tbbtn",
       "name": "ChartTypeComboGallery",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.8",
+        "ja": "挿入: 0.1.0.5.8",
+        "de": "Einfügen: 0.1.0.5.8",
+        "fr": "Insérer: 0.1.0.5.8",
+        "ko": "삽입: 0.1.0.5.8",
+        "th": "แทรก: 0.1.0.5.8",
+        "zh": "插入: 0.1.0.5.8"
+      }
     },
     "labels:chartHierarchy": {
       "tcid": 26297,
       "source": "tbbtn",
       "name": "ChartGalleryHierarchy",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.4",
+        "ja": "挿入: 0.1.0.5.4",
+        "de": "Einfügen: 0.1.0.5.4",
+        "fr": "Insérer: 0.1.0.5.4",
+        "ko": "삽입: 0.1.0.5.4",
+        "th": "แทรก: 0.1.0.5.4",
+        "zh": "插入: 0.1.0.5.4"
+      }
     },
     "labels:chartLine": {
       "tcid": 15535,
       "source": "tbbtn",
       "name": "ExcelChartGallery2",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.2",
+        "ja": "挿入: 0.1.0.5.2",
+        "de": "Einfügen: 0.1.0.5.2",
+        "fr": "Insérer: 0.1.0.5.2",
+        "ko": "삽입: 0.1.0.5.2",
+        "th": "แทรก: 0.1.0.5.2",
+        "zh": "插入: 0.1.0.5.2"
+      }
     },
     "labels:chartMap": {
       "tcid": 26978,
       "source": "tbbtn",
       "name": "ChartGalleryMaps",
-      "match": "ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.9",
+        "ja": "挿入: 0.1.0.5.9",
+        "de": "Einfügen: 0.1.0.5.9",
+        "fr": "Insérer: 0.1.0.5.9",
+        "ko": "삽입: 0.1.0.5.9",
+        "th": "แทรก: 0.1.0.5.9",
+        "zh": "插入: 0.1.0.5.9"
+      }
     },
     "labels:chartPie": {
       "tcid": 15536,
       "source": "tbbtn",
       "name": "ExcelChartGallery3",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.3",
+        "ja": "挿入: 0.1.0.5.3",
+        "de": "Einfügen: 0.1.0.5.3",
+        "fr": "Insérer: 0.1.0.5.3",
+        "ko": "삽입: 0.1.0.5.3",
+        "th": "แทรก: 0.1.0.5.3",
+        "zh": "插入: 0.1.0.5.3"
+      }
     },
     "labels:chartScatter": {
       "tcid": 15539,
       "source": "tbbtn",
       "name": "ExcelChartGallery6",
-      "match": "ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.6",
+        "ja": "挿入: 0.1.0.5.6",
+        "de": "Einfügen: 0.1.0.5.6",
+        "fr": "Insérer: 0.1.0.5.6",
+        "ko": "삽입: 0.1.0.5.6",
+        "th": "แทรก: 0.1.0.5.6",
+        "zh": "插入: 0.1.0.5.6"
+      }
     },
     "labels:chartStatistical": {
       "tcid": 26424,
       "source": "tbbtn",
       "name": "ChartGalleryStatistical",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.5",
+        "ja": "挿入: 0.1.0.5.5",
+        "de": "Einfügen: 0.1.0.5.5",
+        "fr": "Insérer: 0.1.0.5.5",
+        "ko": "삽입: 0.1.0.5.5",
+        "th": "แทรก: 0.1.0.5.5",
+        "zh": "插入: 0.1.0.5.5"
+      }
     },
     "labels:chartWaterfall": {
       "tcid": 26630,
       "source": "tbbtn",
       "name": "ChartGalleryWaterfall",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.7",
+        "ja": "挿入: 0.1.0.5.7",
+        "de": "Einfügen: 0.1.0.5.7",
+        "fr": "Insérer: 0.1.0.5.7",
+        "ko": "삽입: 0.1.0.5.7",
+        "th": "แทรก: 0.1.0.5.7",
+        "zh": "插入: 0.1.0.5.7"
+      }
     },
     "labels:checkBox": {
       "tcid": 34610,
       "source": "tbbtn",
       "name": "InsertInCellCheckbox",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.4.0",
+        "ja": "挿入: 0.1.0.4.0",
+        "de": "Einfügen: 0.1.0.4.0",
+        "fr": "Insérer: 0.1.0.4.0",
+        "ko": "삽입: 0.1.0.4.0",
+        "th": "แทรก: 0.1.0.4.0",
+        "zh": "插入: 0.1.0.4.0"
+      }
     },
     "labels:clear": {
       "tcid": 900,
       "source": "tbbtn2",
       "name": "ShowAll2",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.3.4",
+        "ja": "データ: 0.1.0.3.4",
+        "de": "Daten: 0.1.0.3.4",
+        "fr": "Données: 0.1.0.3.4",
+        "ko": "데이터: 0.1.0.3.4",
+        "th": "ข้อมูล: 0.1.0.3.4",
+        "zh": "数据: 0.1.0.3.4"
+      }
     },
     "labels:color": {
       "tcid": 12245,
       "source": "tbbtn",
       "name": "UxGalColorSchemePicker",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.0.1",
+        "ja": "ページ レイアウト: 0.1.0.0.1",
+        "de": "Seitenlayout: 0.1.0.0.1",
+        "fr": "Mise en page: 0.1.0.0.1",
+        "ko": "페이지 레이아웃: 0.1.0.0.1",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.0.1",
+        "zh": "页面布局: 0.1.0.0.1"
+      }
     },
     "labels:consolidate": {
       "tcid": 863,
@@ -365,7 +608,15 @@
       "name": "Consolidate",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Data: 0.1.0.4.6",
+        "ja": "データ: 0.1.0.4.6",
+        "de": "Daten: 0.1.0.4.6",
+        "fr": "Données: 0.1.0.4.6",
+        "zh": "数据: 0.1.0.4.6"
+      }
     },
     "labels:createFromSelection": {
       "tcid": 880,
@@ -373,7 +624,17 @@
       "name": "CreateName",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Formulas: 0.1.0.2.3",
+        "ja": "数式: 0.1.0.2.3",
+        "de": "Formeln: 0.1.0.2.3",
+        "fr": "Formules: 0.1.0.2.3",
+        "ko": "수식: 0.1.0.2.3",
+        "th": "สูตร: 0.1.0.2.3",
+        "zh": "公式: 0.1.0.2.3"
+      }
     },
     "labels:customViews": {
       "tcid": 950,
@@ -381,31 +642,72 @@
       "name": "CustomViews",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "View: 0.1.0.1.3",
+        "ja": "表示: 0.1.0.1.3",
+        "de": "Ansicht: 0.1.0.1.3",
+        "fr": "Affichage: 0.1.0.1.3",
+        "ko": "보기: 0.1.0.1.3",
+        "th": "มุมมอง: 0.1.0.1.3",
+        "zh": "视图: 0.1.0.1.3"
+      }
     },
     "labels:data": {
       "tcid": 11600,
       "source": "tbbtn",
       "name": "TabData",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.7",
+        "ja": "データ: 0.1.7",
+        "de": "Daten: 0.1.7",
+        "fr": "Données: 0.1.7",
+        "ko": "데이터: 0.1.7",
+        "th": "ข้อมูล: 0.1.7",
+        "zh": "数据: 0.1.7"
+      }
     },
     "labels:dataAnalysis": {
       "tcid": 34210,
       "source": "tbbtn",
       "name": "AnalyzeData",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.4.2",
+        "ja": "データ: 0.1.0.4.2",
+        "de": "Daten: 0.1.0.4.2",
+        "fr": "Données: 0.1.0.4.2",
+        "zh": "数据: 0.1.0.4.2"
+      }
     },
     "labels:dataCleanup": {
       "tcid": 34638,
       "source": "tbbtn",
       "name": "DataCleansing",
-      "match": "ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.4.1",
+        "ja": "データ: 0.1.0.4.1",
+        "de": "Daten: 0.1.0.4.1",
+        "fr": "Données: 0.1.0.4.1",
+        "zh": "数据: 0.1.0.4.1"
+      }
     },
     "labels:dataTypeIcons": {
       "tcid": 34905,
       "source": "tbbtn",
       "name": "DataTypeIcons",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:dataTypes": {
       "tcid": 32659,
@@ -417,7 +719,18 @@
       "tcid": 12819,
       "source": "tbbtn",
       "name": "GalInsertFnDateTime",
-      "match": "ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.0.6",
+        "ja": "数式: 0.1.0.0.6",
+        "de": "Formeln: 0.1.0.0.6",
+        "fr": "Formules: 0.1.0.0.6",
+        "ko": "수식: 0.1.0.0.6",
+        "th": "สูตร: 0.1.0.0.6",
+        "zh": "公式: 0.1.0.0.6"
+      }
     },
     "labels:defineName": {
       "tcid": 13380,
@@ -425,145 +738,369 @@
       "name": "NameRange",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Formulas: 0.1.0.2.1",
+        "ja": "数式: 0.1.0.2.1",
+        "de": "Formeln: 0.1.0.2.1",
+        "fr": "Formules: 0.1.0.2.1",
+        "ko": "수식: 0.1.0.2.1",
+        "th": "สูตร: 0.1.0.2.1",
+        "zh": "公式: 0.1.0.2.1"
+      }
     },
     "labels:deleteComment": {
       "tcid": 1592,
       "source": "tbbtn2",
       "name": "DeleteComment",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Review: 0.1.0.4.1",
+        "ja": "校閲: 0.1.0.4.1",
+        "de": "Überprüfen: 0.1.0.4.1",
+        "fr": "Révision: 0.1.0.4.1",
+        "ko": "검토: 0.1.0.4.1",
+        "th": "รีวิว: 0.1.0.4.1",
+        "zh": "审阅: 0.1.0.4.1"
+      }
     },
     "labels:dependents": {
       "tcid": 451,
       "source": "tbbtn",
       "name": "TraceDependents",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.3.1",
+        "ja": "数式: 0.1.0.3.1",
+        "de": "Formeln: 0.1.0.3.1",
+        "fr": "Formules: 0.1.0.3.1",
+        "ko": "수식: 0.1.0.3.1",
+        "th": "สูตร: 0.1.0.3.1",
+        "zh": "公式: 0.1.0.3.1"
+      }
     },
     "labels:draw": {
       "tcid": 33398,
       "source": "tbbtn",
       "name": "Draw",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Draw: 0.1.4",
+        "ja": "描画: 0.1.4",
+        "de": "Zeichnen: 0.1.4",
+        "fr": "Dessin: 0.1.4",
+        "ko": "그리기: 0.1.4",
+        "th": "วาด: 0.1.4",
+        "zh": "绘图: 0.1.4"
+      }
     },
     "labels:editor": {
       "tcid": 37069,
       "source": "tbbtn",
       "name": "PythonEditorLicensed",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.1.2",
+        "ja": "数式: 0.1.0.1.2",
+        "de": "Formeln: 0.1.0.1.2",
+        "fr": "Formules: 0.1.0.1.2",
+        "ko": "수식: 0.1.0.1.2",
+        "th": "สูตร: 0.1.0.1.2",
+        "zh": "公式: 0.1.0.1.2"
+      }
     },
     "labels:equation": {
       "tcid": 15451,
       "source": "tbbtn",
       "name": "EquationTab",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.11.0",
+        "ja": "挿入: 0.1.0.11.0",
+        "de": "Einfügen: 0.1.0.11.0",
+        "fr": "Insérer: 0.1.0.11.0",
+        "ko": "삽입: 0.1.0.11.0",
+        "th": "แทรก: 0.1.0.11.0",
+        "zh": "插入: 0.1.0.11.0"
+      }
     },
     "labels:eraser": {
       "tcid": 18965,
       "source": "tbbtn",
       "name": "FlyoutAnchorErasers",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Draw: 0.1.0.0.1",
+        "ja": "描画: 0.1.0.0.1",
+        "de": "Zeichnen: 0.1.0.0.1",
+        "fr": "Dessin: 0.1.0.0.1",
+        "ko": "그리기: 0.1.0.0.1",
+        "th": "วาด: 0.1.0.0.1",
+        "zh": "绘图: 0.1.0.0.1"
+      }
+    },
+    "labels:errorCheck": {
+      "tcid": 11945,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorErrorChecking",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.3.4",
+        "ja": "数式: 0.1.0.3.4",
+        "de": "Formeln: 0.1.0.3.4",
+        "fr": "Formules: 0.1.0.3.4",
+        "ko": "수식: 0.1.0.3.4",
+        "th": "สูตร: 0.1.0.3.4",
+        "zh": "公式: 0.1.0.3.4"
+      }
     },
     "labels:filter": {
       "tcid": 899,
       "source": "tbbtn2",
       "name": "AutoFilter",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.3.3",
+        "ja": "データ: 0.1.0.3.3",
+        "de": "Daten: 0.1.0.3.3",
+        "fr": "Données: 0.1.0.3.3",
+        "ko": "데이터: 0.1.0.3.3",
+        "th": "ข้อมูล: 0.1.0.3.3",
+        "zh": "数据: 0.1.0.3.3"
+      }
     },
     "labels:financial": {
       "tcid": 12818,
       "source": "tbbtn",
       "name": "GalInsertFnFinancial",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.0.3",
+        "ja": "数式: 0.1.0.0.3",
+        "de": "Formeln: 0.1.0.0.3",
+        "fr": "Formules: 0.1.0.0.3",
+        "ko": "수식: 0.1.0.0.3",
+        "th": "สูตร: 0.1.0.0.3",
+        "zh": "公式: 0.1.0.0.3"
+      }
     },
     "labels:flashFill": {
       "tcid": 24054,
       "source": "tbbtn",
       "name": "QuickCode",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.4.3",
+        "ja": "データ: 0.1.0.4.3",
+        "de": "Daten: 0.1.0.4.3",
+        "fr": "Données: 0.1.0.4.3",
+        "zh": "数据: 0.1.0.4.3"
+      }
     },
     "labels:font": {
       "tcid": 12863,
       "source": "tbbtn",
       "name": "UxGalFontSchemePicker",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.0.2",
+        "ja": "ページ レイアウト: 0.1.0.0.2",
+        "de": "Seitenlayout: 0.1.0.0.2",
+        "fr": "Mise en page: 0.1.0.0.2",
+        "ko": "페이지 레이아웃: 0.1.0.0.2",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.0.2",
+        "zh": "页面布局: 0.1.0.0.2"
+      }
+    },
+    "labels:forms": {
+      "tcid": 32833,
+      "source": "tbbtn",
+      "name": "MsFormSplitButton",
+      "match": "en+ja",
+      "evidence": "drawn label",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.1.0",
+        "ja": "挿入: 0.1.0.1.0",
+        "de": "Einfügen: 0.1.0.1.0",
+        "fr": "Insérer: 0.1.0.1.0",
+        "ko": "삽입: 0.1.0.1.0",
+        "th": "แทรก: 0.1.0.1.0",
+        "zh": "插入: 0.1.0.1.0"
+      }
     },
     "labels:formulaBar": {
       "tcid": 849,
       "source": "tbbtn",
       "name": "FormulaBar",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:formulas": {
       "tcid": 11599,
       "source": "tbbtn",
       "name": "TabFormulas",
-      "match": "en+ja"
-    },
-    "labels:freeze": {
-      "tcid": 13961,
-      "source": "tbbtn",
-      "name": "GalFreezePanes",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.6",
+        "ja": "数式: 0.1.6",
+        "de": "Formeln: 0.1.6",
+        "fr": "Formules: 0.1.6",
+        "ko": "수식: 0.1.6",
+        "th": "สูตร: 0.1.6",
+        "zh": "公式: 0.1.6"
+      }
     },
     "labels:gridlines": {
       "tcid": 15923,
       "source": "tbbtn",
       "name": "GridlinesExcel",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:gridlinesHeading": {
       "tcid": 12575,
       "source": "tbbtn",
       "name": "LabelGridlines",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
-    "labels:headerFooter": {
-      "tcid": 762,
+    "labels:group": {
+      "tcid": 3454,
       "source": "tbbtn",
-      "name": "HeaderAndFooter",
-      "match": "ja"
+      "name": "GroupCommand (no ribbon node)",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.6.0",
+        "ja": "データ: 0.1.0.6.0",
+        "de": "Daten: 0.1.0.6.0",
+        "fr": "Données: 0.1.0.6.0",
+        "ko": "데이터: 0.1.0.6.0",
+        "th": "ข้อมูล: 0.1.0.6.0",
+        "zh": "数据: 0.1.0.6.0"
+      }
     },
     "labels:headings": {
       "tcid": 15644,
       "source": "tbbtn",
       "name": "BooleanChoiceViewHeadings2",
-      "match": "en+ja"
-    },
-    "labels:headingsHeading": {
-      "tcid": 12576,
-      "source": "tbbtn",
-      "name": "LabelHeadings",
-      "match": "en+ja"
-    },
-    "labels:height": {
-      "tcid": 12562,
-      "source": "tbbtn",
-      "name": "GalMaximumHeight",
-      "match": "ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:hide": {
       "tcid": 865,
       "source": "tbbtn",
       "name": "HideWindow",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.4.4",
+        "ja": "表示: 0.1.0.4.4",
+        "de": "Ansicht: 0.1.0.4.4",
+        "fr": "Affichage: 0.1.0.4.4",
+        "ko": "보기: 0.1.0.4.4",
+        "th": "มุมมอง: 0.1.0.4.4",
+        "zh": "视图: 0.1.0.4.4"
+      }
     },
     "labels:hideDetail": {
       "tcid": 464,
       "source": "tbbtn",
       "name": "Collapse",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.6.4",
+        "ja": "データ: 0.1.0.6.4",
+        "de": "Daten: 0.1.0.6.4",
+        "fr": "Données: 0.1.0.6.4",
+        "ko": "데이터: 0.1.0.6.4",
+        "th": "ข้อมูล: 0.1.0.6.4",
+        "zh": "数据: 0.1.0.6.4"
+      }
     },
     "labels:hideInk": {
       "tcid": 32684,
       "source": "tbfriendly",
       "name": "HideInk",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Review: 0.1.0.8.0",
+        "ja": "校閲: 0.1.0.8.0",
+        "de": "Überprüfen: 0.1.0.8.0",
+        "fr": "Révision: 0.1.0.8.0",
+        "ko": "검토: 0.1.0.8.0",
+        "th": "รีวิว: 0.1.0.8.0",
+        "zh": "审阅: 0.1.0.8.0"
+      }
+    },
+    "labels:highlighter": {
+      "tcid": 27643,
+      "source": "tbbtn",
+      "name": "InkToolboxAddHighlighter",
+      "match": "en+ja",
+      "evidence": "candidates identical in all locales",
+      "ax_path": {
+        "en": "Draw: 0.1.0.1.1 > 0.1",
+        "ja": "描画: 0.1.0.1.1 > 0.1"
+      },
+      "identical_to": [32268, "tbbtn"],
+      "control": "menu-item"
     },
     "labels:home": {
       "tcid": 11954,
       "source": "tbbtn",
       "name": "TabHome",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Home: 0.1.2",
+        "ja": "ホーム: 0.1.2",
+        "de": "Start: 0.1.2",
+        "fr": "Accueil: 0.1.2",
+        "ko": "홈: 0.1.2",
+        "th": "หน้าแรก: 0.1.2",
+        "zh": "开始: 0.1.2"
+      }
     },
     "labels:icons": {
       "tcid": 33273,
@@ -571,13 +1108,57 @@
       "name": "LaunchIconsTaskPane",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Insert: 0.1.0.3.2",
+        "ja": "挿入: 0.1.0.3.2",
+        "de": "Einfügen: 0.1.0.3.2",
+        "fr": "Insérer: 0.1.0.3.2",
+        "ko": "삽입: 0.1.0.3.2",
+        "th": "แทรก: 0.1.0.3.2",
+        "zh": "插入: 0.1.0.3.2"
+      }
+    },
+    "labels:initialize": {
+      "tcid": 46569,
+      "source": "tbbtn",
+      "name": "InitPyEditorLicensed",
+      "match": "en+ja",
+      "evidence": "candidates identical in all locales",
+      "ax_path": {
+        "en": "Formulas: 0.1.0.1.3",
+        "ja": "数式: 0.1.0.1.3"
+      },
+      "identical_to": [45861, "tbbtn"],
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.1.3",
+        "ja": "数式: 0.1.0.1.3",
+        "de": "Formeln: 0.1.0.1.3",
+        "fr": "Formules: 0.1.0.1.3",
+        "ko": "수식: 0.1.0.1.3",
+        "th": "สูตร: 0.1.0.1.3",
+        "zh": "公式: 0.1.0.1.3"
+      }
     },
     "labels:insert": {
       "tcid": 11536,
       "source": "tbbtn",
       "name": "TabInsert",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.3",
+        "ja": "挿入: 0.1.3",
+        "de": "Einfügen: 0.1.3",
+        "fr": "Insérer: 0.1.3",
+        "ko": "삽입: 0.1.3",
+        "th": "แทรก: 0.1.3",
+        "zh": "插入: 0.1.3"
+      }
     },
     "labels:insertFunction": {
       "tcid": 385,
@@ -585,93 +1166,221 @@
       "name": "Function",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Formulas: 0.1.0.0.0",
+        "ja": "数式: 0.1.0.0.0",
+        "de": "Formeln: 0.1.0.0.0",
+        "fr": "Formules: 0.1.0.0.0",
+        "ko": "수식: 0.1.0.0.0",
+        "th": "สูตร: 0.1.0.0.0",
+        "zh": "公式: 0.1.0.0.0"
+      }
     },
     "labels:lasso": {
       "tcid": 12079,
       "source": "tbbtn",
       "name": "JotLassoTool",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Draw: 0.1.0.0.2",
+        "ja": "描画: 0.1.0.0.2",
+        "de": "Zeichnen: 0.1.0.0.2",
+        "fr": "Dessin: 0.1.0.0.2",
+        "ko": "그리기: 0.1.0.0.2",
+        "th": "วาด: 0.1.0.0.2",
+        "zh": "绘图: 0.1.0.0.2"
+      }
     },
     "labels:link": {
       "tcid": 1576,
       "source": "tbbtn2",
       "name": "WebInsertHyperlink",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.8.0",
+        "ja": "挿入: 0.1.0.8.0",
+        "de": "Einfügen: 0.1.0.8.0",
+        "fr": "Insérer: 0.1.0.8.0",
+        "ko": "삽입: 0.1.0.8.0",
+        "th": "แทรก: 0.1.0.8.0",
+        "zh": "插入: 0.1.0.8.0"
+      }
     },
     "labels:logical": {
       "tcid": 12822,
       "source": "tbbtn",
       "name": "GalInsertFnLogical",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.0.4",
+        "ja": "数式: 0.1.0.0.4",
+        "de": "Formeln: 0.1.0.0.4",
+        "fr": "Formules: 0.1.0.0.4",
+        "ko": "수식: 0.1.0.0.4",
+        "th": "สูตร: 0.1.0.0.4",
+        "zh": "公式: 0.1.0.0.4"
+      }
     },
     "labels:lookup": {
       "tcid": 12824,
       "source": "tbbtn",
       "name": "GalInsertFnLookupReference",
-      "match": "ja"
-    },
-    "labels:macros": {
-      "tcid": 16105,
-      "source": "tbbtn",
-      "name": "PlayMacro",
-      "match": "en+ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.0.7",
+        "ja": "数式: 0.1.0.0.7",
+        "de": "Formeln: 0.1.0.0.7",
+        "fr": "Formules: 0.1.0.0.7",
+        "ko": "수식: 0.1.0.0.7",
+        "th": "สูตร: 0.1.0.0.7",
+        "zh": "公式: 0.1.0.0.7"
+      }
     },
     "labels:margins": {
       "tcid": 11475,
       "source": "tbbtn",
       "name": "UxGalPageMargins",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.0",
+        "ja": "ページ レイアウト: 0.1.0.1.0",
+        "de": "Seitenlayout: 0.1.0.1.0",
+        "fr": "Mise en page: 0.1.0.1.0",
+        "ko": "페이지 레이아웃: 0.1.0.1.0",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.0",
+        "zh": "页面布局: 0.1.0.1.0"
+      }
     },
     "labels:math": {
       "tcid": 12820,
       "source": "tbbtn",
       "name": "GalInsertFnMathTrig",
-      "match": "ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.0.8",
+        "ja": "数式: 0.1.0.0.8",
+        "de": "Formeln: 0.1.0.0.8",
+        "fr": "Formules: 0.1.0.0.8",
+        "ko": "수식: 0.1.0.0.8",
+        "th": "สูตร: 0.1.0.0.8",
+        "zh": "公式: 0.1.0.0.8"
+      }
     },
     "labels:more": {
       "tcid": 5808,
       "source": "tbbtn",
       "name": "AutoSumMoreFunctions",
       "match": "ja",
+      "evidence": "ax-ribbon-button: the Formulas tab button draws no ellipsis; the verifier had located the More Functions menu item",
+      "control": "button",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "verified": {
+        "en": "Formulas: 0.1.0.0.9",
+        "ja": "数式: 0.1.0.0.9",
+        "de": "Formeln: 0.1.0.0.9",
+        "fr": "Formules: 0.1.0.0.9",
+        "ko": "수식: 0.1.0.0.9",
+        "th": "สูตร: 0.1.0.0.9",
+        "zh": "公式: 0.1.0.0.9"
+      }
     },
     "labels:namesManager": {
       "tcid": 13369,
       "source": "tbbtn",
       "name": "NameManager",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.2.0",
+        "ja": "数式: 0.1.0.2.0",
+        "de": "Formeln: 0.1.0.2.0",
+        "fr": "Formules: 0.1.0.2.0",
+        "ko": "수식: 0.1.0.2.0",
+        "th": "สูตร: 0.1.0.2.0",
+        "zh": "公式: 0.1.0.2.0"
+      }
     },
     "labels:navigation": {
       "tcid": 34156,
       "source": "tbbtn",
       "name": "NavigationPaneExcelFeature",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:newComment": {
       "tcid": 1589,
       "source": "tbbtn",
       "name": "NewComment",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": ["Insert: 0.1.0.9.0", "Review: 0.1.0.4.0"],
+        "ja": ["挿入: 0.1.0.9.0", "校閲: 0.1.0.4.0"],
+        "de": ["Einfügen: 0.1.0.9.0", "Überprüfen: 0.1.0.4.0"],
+        "fr": ["Insérer: 0.1.0.9.0", "Révision: 0.1.0.4.0"],
+        "ko": ["삽입: 0.1.0.9.0", "검토: 0.1.0.4.0"],
+        "th": ["แทรก: 0.1.0.9.0", "รีวิว: 0.1.0.4.0"],
+        "zh": ["插入: 0.1.0.9.0", "审阅: 0.1.0.4.0"]
+      }
     },
     "labels:newScript": {
       "tcid": 39445,
       "source": "tbbtn",
       "name": "GroupNewScript",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:newWindow": {
       "tcid": 303,
       "source": "tbbtn",
       "name": "NewWindow",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.4.0",
+        "ja": "表示: 0.1.0.4.0",
+        "de": "Ansicht: 0.1.0.4.0",
+        "fr": "Affichage: 0.1.0.4.0",
+        "ko": "보기: 0.1.0.4.0",
+        "th": "มุมมอง: 0.1.0.4.0",
+        "zh": "视图: 0.1.0.4.0"
+      }
     },
     "labels:notes": {
       "tcid": 33479,
       "source": "tbbtn",
       "name": "ChunkCommentsLegacy",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Review: 0.1.0.5.0",
+        "ja": "校閲: 0.1.0.5.0",
+        "de": "Überprüfen: 0.1.0.5.0",
+        "fr": "Révision: 0.1.0.5.0",
+        "ko": "검토: 0.1.0.5.0",
+        "th": "รีวิว: 0.1.0.5.0",
+        "zh": "审阅: 0.1.0.5.0"
+      }
     },
     "labels:object": {
       "tcid": 546,
@@ -679,61 +1388,132 @@
       "name": "InsertObject",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Insert: 0.1.0.10.3",
+        "ja": "挿入: 0.1.0.10.3",
+        "de": "Einfügen: 0.1.0.10.3",
+        "fr": "Insérer: 0.1.0.10.3",
+        "ko": "삽입: 0.1.0.10.3",
+        "th": "แทรก: 0.1.0.10.3",
+        "zh": "插入: 0.1.0.10.3"
+      }
     },
     "labels:orientation": {
       "tcid": 11533,
       "source": "tbbtn",
       "name": "UxGalPageOrientation",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.1",
+        "ja": "ページ レイアウト: 0.1.0.1.1",
+        "de": "Seitenlayout: 0.1.0.1.1",
+        "fr": "Mise en page: 0.1.0.1.1",
+        "ko": "페이지 레이아웃: 0.1.0.1.1",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.1",
+        "zh": "页面布局: 0.1.0.1.1"
+      }
     },
     "labels:pageBreaks": {
       "tcid": 11932,
       "source": "tbbtn",
       "name": "FlyoutAnchorPageBreaks",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.4",
+        "ja": "ページ レイアウト: 0.1.0.1.4",
+        "de": "Seitenlayout: 0.1.0.1.4",
+        "fr": "Mise en page: 0.1.0.1.4",
+        "ko": "페이지 레이아웃: 0.1.0.1.4",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.4",
+        "zh": "页面布局: 0.1.0.1.4"
+      }
     },
-    "labels:pageLayout": {
-      "tcid": 11441,
+    "labels:pencil": {
+      "tcid": 27642,
       "source": "tbbtn",
-      "name": "XLPageLayoutView",
-      "match": "en+ja"
-    },
-    "labels:pageSetup": {
-      "tcid": 11551,
-      "source": "tbbtn",
-      "name": "ChunkPageSetup",
-      "match": "en+ja"
+      "name": "InkToolboxAddPencil",
+      "match": "en+ja",
+      "evidence": "candidates identical in all locales",
+      "ax_path": {
+        "en": "Draw: 0.1.0.1.1 > 0.2",
+        "ja": "描画: 0.1.0.1.1 > 0.2"
+      },
+      "identical_to": [34967, "tbbtn"],
+      "control": "menu-item"
     },
     "labels:photo": {
       "tcid": 31797,
       "source": "tbbtn",
       "name": "InsertPictureSubMenu",
-      "match": "ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.3.0",
+        "ja": "挿入: 0.1.0.3.0",
+        "de": "Einfügen: 0.1.0.3.0",
+        "fr": "Insérer: 0.1.0.3.0",
+        "ko": "삽입: 0.1.0.3.0",
+        "th": "แทรก: 0.1.0.3.0",
+        "zh": "插入: 0.1.0.3.0"
+      }
     },
     "labels:pictureFromData": {
       "tcid": 33995,
       "source": "tbbtn",
       "name": "DataFromPicture",
-      "match": "en+ja"
-    },
-    "labels:pictureFromFile": {
-      "tcid": 33995,
-      "source": "tbbtn",
-      "name": "DataFromPicture",
-      "match": "ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": ["Insert: 0.1.0.2.0", "Data: 0.1.0.0.1"],
+        "ja": ["挿入: 0.1.0.2.0", "データ: 0.1.0.0.1"],
+        "de": ["Einfügen: 0.1.0.2.0", "Daten: 0.1.0.0.1"],
+        "fr": ["Insérer: 0.1.0.2.0", "Données: 0.1.0.0.1"],
+        "ko": ["삽입: 0.1.0.2.0", "데이터: 0.1.0.0.1"],
+        "th": ["แทรก: 0.1.0.2.0", "ข้อมูล: 0.1.0.0.1"],
+        "zh": ["插入: 0.1.0.2.0", "数据: 0.1.0.0.1"]
+      }
     },
     "labels:pivotChart": {
       "tcid": 12248,
       "source": "tbbtn2",
       "name": "sx12NewPivotChart",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.10",
+        "ja": "挿入: 0.1.0.5.10",
+        "de": "Einfügen: 0.1.0.5.10",
+        "fr": "Insérer: 0.1.0.5.10",
+        "ko": "삽입: 0.1.0.5.10",
+        "th": "แทรก: 0.1.0.5.10",
+        "zh": "插入: 0.1.0.5.10"
+      }
     },
     "labels:pivotTable": {
       "tcid": 12247,
       "source": "tbbtn2",
       "name": "sx12NewPivot",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.0.0",
+        "ja": "挿入: 0.1.0.0.0",
+        "de": "Einfügen: 0.1.0.0.0",
+        "fr": "Insérer: 0.1.0.0.0",
+        "ko": "삽입: 0.1.0.0.0",
+        "th": "แทรก: 0.1.0.0.0",
+        "zh": "插入: 0.1.0.0.0"
+      }
     },
     "labels:powerQuery": {
       "tcid": 34213,
@@ -741,31 +1521,85 @@
       "name": "PowerQueryGetTransformData",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Data: 0.1.0.0.0",
+        "ja": "データ: 0.1.0.0.0",
+        "de": "Daten: 0.1.0.0.0",
+        "fr": "Données: 0.1.0.0.0",
+        "ko": "데이터: 0.1.0.0.0",
+        "th": "ข้อมูล: 0.1.0.0.0",
+        "zh": "数据: 0.1.0.0.0"
+      }
     },
     "labels:precedents": {
       "tcid": 486,
       "source": "tbbtn",
       "name": "TracePrecedents",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.3.0",
+        "ja": "数式: 0.1.0.3.0",
+        "de": "Formeln: 0.1.0.3.0",
+        "fr": "Formules: 0.1.0.3.0",
+        "ko": "수식: 0.1.0.3.0",
+        "th": "สูตร: 0.1.0.3.0",
+        "zh": "公式: 0.1.0.3.0"
+      }
     },
     "labels:printArea": {
       "tcid": 11931,
       "source": "tbbtn2",
       "name": "FlyoutAnchorPrintArea",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.3",
+        "ja": "ページ レイアウト: 0.1.0.1.3",
+        "de": "Seitenlayout: 0.1.0.1.3",
+        "fr": "Mise en page: 0.1.0.1.3",
+        "ko": "페이지 레이아웃: 0.1.0.1.3",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.3",
+        "zh": "页面布局: 0.1.0.1.3"
+      }
     },
     "labels:printGridlines": {
       "tcid": 12577,
       "source": "tbbtn",
       "name": "BooleanChoicePrintGridlines",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.3.2",
+        "ja": "ページ レイアウト: 0.1.0.3.2",
+        "de": "Seitenlayout: 0.1.0.3.2",
+        "fr": "Mise en page: 0.1.0.3.2",
+        "ko": "페이지 레이아웃: 0.1.0.3.2",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.3.2",
+        "zh": "页面布局: 0.1.0.3.2"
+      }
     },
     "labels:printHeadings": {
       "tcid": 12577,
       "source": "tbbtn",
       "name": "BooleanChoicePrintGridlines",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.3.5",
+        "ja": "ページ レイアウト: 0.1.0.3.5",
+        "de": "Seitenlayout: 0.1.0.3.5",
+        "fr": "Mise en page: 0.1.0.3.5",
+        "ko": "페이지 레이아웃: 0.1.0.3.5",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.3.5",
+        "zh": "页面布局: 0.1.0.3.5"
+      }
     },
     "labels:printTitles": {
       "tcid": 12588,
@@ -773,21 +1607,34 @@
       "name": "PrintTitles",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ribbon-button-rule"
+      "evidence": "ribbon-button-rule",
+      "control": "button",
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.6",
+        "ja": "ページ レイアウト: 0.1.0.1.6",
+        "de": "Seitenlayout: 0.1.0.1.6",
+        "fr": "Mise en page: 0.1.0.1.6",
+        "ko": "페이지 레이아웃: 0.1.0.1.6",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.6",
+        "zh": "页面布局: 0.1.0.1.6"
+      }
     },
     "labels:properties": {
       "tcid": 1951,
       "source": "tbbtn2",
       "name": "DataRangeProperties",
-      "match": "en+ja"
-    },
-    "labels:protectSheet": {
-      "tcid": 893,
-      "source": "tbbtn",
-      "name": "ProtectSheet",
-      "match": "ja",
+      "match": "en+ja",
+      "control": "button",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "verified": {
+        "en": "Data: 0.1.0.1.2",
+        "ja": "データ: 0.1.0.1.2",
+        "de": "Daten: 0.1.0.1.2",
+        "fr": "Données: 0.1.0.1.2",
+        "ko": "데이터: 0.1.0.1.2",
+        "th": "ข้อมูล: 0.1.0.1.2",
+        "zh": "数据: 0.1.0.1.2"
+      }
     },
     "labels:protectWorkbook": {
       "tcid": 16136,
@@ -795,37 +1642,143 @@
       "name": "RestrictEditing",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Review: 0.1.0.6.1",
+        "ja": "校閲: 0.1.0.6.1",
+        "de": "Überprüfen: 0.1.0.6.1",
+        "fr": "Révision: 0.1.0.6.1",
+        "ko": "검토: 0.1.0.6.1",
+        "th": "รีวิว: 0.1.0.6.1",
+        "zh": "审阅: 0.1.0.6.1"
+      }
     },
     "labels:python": {
       "tcid": 39143,
       "source": "tbbtn",
       "name": "InsertPythonLicensed",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.1.0",
+        "ja": "数式: 0.1.0.1.0",
+        "de": "Formeln: 0.1.0.1.0",
+        "fr": "Formules: 0.1.0.1.0",
+        "ko": "수식: 0.1.0.1.0",
+        "th": "สูตร: 0.1.0.1.0",
+        "zh": "公式: 0.1.0.1.0"
+      }
+    },
+    "labels:queriesConnections": {
+      "tcid": 11205,
+      "source": "tbbtn",
+      "name": "WBConnections",
+      "match": "en+ja",
+      "evidence": "candidates identical in all locales",
+      "ax_path": {
+        "en": "Data: 0.1.0.1.1",
+        "ja": "データ: 0.1.0.1.1"
+      },
+      "identical_to": [11205, "tbbtn2"],
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.1.1",
+        "ja": "データ: 0.1.0.1.1",
+        "de": "Daten: 0.1.0.1.1",
+        "fr": "Données: 0.1.0.1.1",
+        "ko": "데이터: 0.1.0.1.1",
+        "th": "ข้อมูล: 0.1.0.1.1",
+        "zh": "数据: 0.1.0.1.1"
+      }
+    },
+    "labels:reapply": {
+      "tcid": 12231,
+      "source": "tbbtn2",
+      "name": "XLReapplyFilter",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.3.5",
+        "ja": "データ: 0.1.0.3.5",
+        "de": "Daten: 0.1.0.3.5",
+        "fr": "Données: 0.1.0.3.5",
+        "ko": "데이터: 0.1.0.3.5",
+        "th": "ข้อมูล: 0.1.0.3.5",
+        "zh": "数据: 0.1.0.3.5"
+      }
     },
     "labels:recalc": {
       "tcid": 960,
       "source": "tbbtn",
       "name": "CalculateNow",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.4.1",
+        "ja": "数式: 0.1.0.4.1",
+        "de": "Formeln: 0.1.0.4.1",
+        "fr": "Formules: 0.1.0.4.1",
+        "ko": "수식: 0.1.0.4.1",
+        "th": "สูตร: 0.1.0.4.1",
+        "zh": "公式: 0.1.0.4.1"
+      }
     },
     "labels:recent": {
       "tcid": 12817,
       "source": "tbbtn",
       "name": "GalInsertFnRecentlyUsed",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.0.2",
+        "ja": "数式: 0.1.0.0.2",
+        "de": "Formeln: 0.1.0.0.2",
+        "fr": "Formules: 0.1.0.0.2",
+        "ko": "수식: 0.1.0.0.2",
+        "th": "สูตร: 0.1.0.0.2",
+        "zh": "公式: 0.1.0.0.2"
+      }
     },
     "labels:recommendedChart": {
       "tcid": 32009,
       "source": "tbbtn",
       "name": "ChartInsertGalleryRecommended",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.5.0",
+        "ja": "挿入: 0.1.0.5.0",
+        "de": "Einfügen: 0.1.0.5.0",
+        "fr": "Insérer: 0.1.0.5.0",
+        "ko": "삽입: 0.1.0.5.0",
+        "th": "แทรก: 0.1.0.5.0",
+        "zh": "插入: 0.1.0.5.0"
+      }
     },
     "labels:recommendedPivotTable": {
       "tcid": 29979,
       "source": "tbbtn",
       "name": "PivotTableExpress",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.0.1",
+        "ja": "挿入: 0.1.0.0.1",
+        "de": "Einfügen: 0.1.0.0.1",
+        "fr": "Insérer: 0.1.0.0.1",
+        "ko": "삽입: 0.1.0.0.1",
+        "th": "แทรก: 0.1.0.0.1",
+        "zh": "插入: 0.1.0.0.1"
+      }
     },
     "labels:recordMacro": {
       "tcid": 184,
@@ -833,43 +1786,127 @@
       "name": "Record",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "View: 0.1.0.5.1",
+        "ja": "表示: 0.1.0.5.1",
+        "ko": "보기: 0.1.0.5.1",
+        "th": "มุมมอง: 0.1.0.5.1",
+        "zh": "视图: 0.1.0.5.1"
+      }
     },
     "labels:refreshAll": {
       "tcid": 1952,
       "source": "tbbtn",
       "name": "UpdateAll",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.1.0",
+        "ja": "データ: 0.1.0.1.0",
+        "de": "Daten: 0.1.0.1.0",
+        "fr": "Données: 0.1.0.1.0",
+        "ko": "데이터: 0.1.0.1.0",
+        "th": "ข้อมูล: 0.1.0.1.0",
+        "zh": "数据: 0.1.0.1.0"
+      }
+    },
+    "labels:relativeRecording": {
+      "tcid": 896,
+      "source": "tbbtn2",
+      "name": "RelativeReferences",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "View: 0.1.0.5.2",
+        "ja": "表示: 0.1.0.5.2"
+      },
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.5.2",
+        "ja": "表示: 0.1.0.5.2",
+        "ko": "보기: 0.1.0.5.2",
+        "th": "มุมมอง: 0.1.0.5.2",
+        "zh": "视图: 0.1.0.5.2"
+      }
+    },
+    "labels:removeArrows": {
+      "tcid": 453,
+      "source": "tbbtn2",
+      "name": "RemoveAllArrows",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.3.2",
+        "ja": "数式: 0.1.0.3.2",
+        "de": "Formeln: 0.1.0.3.2",
+        "fr": "Formules: 0.1.0.3.2",
+        "ko": "수식: 0.1.0.3.2",
+        "th": "สูตร: 0.1.0.3.2",
+        "zh": "公式: 0.1.0.3.2"
+      }
     },
     "labels:removeDuplicates": {
       "tcid": 12230,
       "source": "tbbtn",
       "name": "XLRemoveDuplicates",
-      "match": "en+ja"
-    },
-    "labels:reset": {
-      "tcid": 12273,
-      "source": "tbbtn",
-      "name": "IgxChunkReset",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.4.4",
+        "ja": "データ: 0.1.0.4.4",
+        "de": "Daten: 0.1.0.4.4",
+        "fr": "Données: 0.1.0.4.4",
+        "zh": "数据: 0.1.0.4.4"
+      }
     },
     "labels:resetWindow": {
       "tcid": 7874,
       "source": "tbbtn",
       "name": "ResetSideBySide",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.4.8",
+        "ja": "表示: 0.1.0.4.8",
+        "de": "Ansicht: 0.1.0.4.8",
+        "fr": "Affichage: 0.1.0.4.8",
+        "ko": "보기: 0.1.0.4.8",
+        "th": "มุมมอง: 0.1.0.4.8",
+        "zh": "视图: 0.1.0.4.8"
+      }
     },
     "labels:review": {
       "tcid": 11601,
       "source": "tbbtn",
       "name": "TabProofComment",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Review: 0.1.8",
+        "ja": "校閲: 0.1.8",
+        "de": "Überprüfen: 0.1.8",
+        "fr": "Révision: 0.1.8",
+        "ko": "검토: 0.1.8",
+        "th": "รีวิว: 0.1.8",
+        "zh": "审阅: 0.1.8"
+      }
     },
     "labels:ruler": {
       "tcid": 15117,
       "source": "tbbtn",
       "name": "DisplayRuler2",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:scaleHeight": {
       "tcid": 12562,
@@ -887,7 +1924,18 @@
       "tcid": 18673,
       "source": "tbbtn",
       "name": "GalInsertScreenshot",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.3.5",
+        "ja": "挿入: 0.1.0.3.5",
+        "de": "Einfügen: 0.1.0.3.5",
+        "fr": "Insérer: 0.1.0.3.5",
+        "ko": "삽입: 0.1.0.3.5",
+        "th": "แทรก: 0.1.0.3.5",
+        "zh": "插入: 0.1.0.3.5"
+      }
     },
     "labels:shapeRoundedRectangle": {
       "tcid": 1115,
@@ -905,25 +1953,41 @@
       "tcid": 11529,
       "source": "tbbtn",
       "name": "GalAllShapes",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.3.1",
+        "ja": "挿入: 0.1.0.3.1",
+        "de": "Einfügen: 0.1.0.3.1",
+        "fr": "Insérer: 0.1.0.3.1",
+        "ko": "삽입: 0.1.0.3.1",
+        "th": "แทรก: 0.1.0.3.1",
+        "zh": "插入: 0.1.0.3.1"
+      }
     },
     "labels:sheetRecalc": {
       "tcid": 999,
       "source": "tbbtn2",
       "name": "CalculateDocument",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.4.2",
+        "ja": "数式: 0.1.0.4.2",
+        "de": "Formeln: 0.1.0.4.2",
+        "fr": "Formules: 0.1.0.4.2",
+        "ko": "수식: 0.1.0.4.2",
+        "th": "สูตร: 0.1.0.4.2",
+        "zh": "公式: 0.1.0.4.2"
+      }
     },
     "labels:sheetViewSave": {
       "tcid": 3,
       "source": "tbbtn",
       "name": "Save",
       "match": "en+ja"
-    },
-    "labels:sheetViews": {
-      "tcid": 33907,
-      "source": "tbbtn",
-      "name": "ChunkNamedSheetView",
-      "match": "ja"
     },
     "labels:show": {
       "tcid": 15640,
@@ -935,43 +1999,148 @@
       "tcid": 34386,
       "source": "tbbtn",
       "name": "LineageShowChanges",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Review: 0.1.0.3.0",
+        "ja": "校閲: 0.1.0.3.0",
+        "de": "Überprüfen: 0.1.0.3.0",
+        "fr": "Révision: 0.1.0.3.0",
+        "ko": "검토: 0.1.0.3.0",
+        "th": "รีวิว: 0.1.0.3.0",
+        "zh": "审阅: 0.1.0.3.0"
+      }
     },
     "labels:showComments": {
       "tcid": 33167,
       "source": "tbfriendly",
       "name": "ShowThreadedComments",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Review: 0.1.0.4.4",
+        "ja": "校閲: 0.1.0.4.4",
+        "de": "Überprüfen: 0.1.0.4.4",
+        "fr": "Révision: 0.1.0.4.4",
+        "ko": "검토: 0.1.0.4.4",
+        "th": "รีวิว: 0.1.0.4.4",
+        "zh": "审阅: 0.1.0.4.4"
+      }
     },
     "labels:showDetail": {
       "tcid": 462,
       "source": "tbbtn",
       "name": "Expand",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.6.3",
+        "ja": "データ: 0.1.0.6.3",
+        "de": "Daten: 0.1.0.6.3",
+        "fr": "Données: 0.1.0.6.3",
+        "ko": "데이터: 0.1.0.6.3",
+        "th": "ข้อมูล: 0.1.0.6.3",
+        "zh": "数据: 0.1.0.6.3"
+      }
     },
     "labels:showFormulas": {
       "tcid": 6059,
       "source": "tbbtn2",
       "name": "ToggleFormulaAuditMode",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.3.3",
+        "ja": "数式: 0.1.0.3.3",
+        "de": "Formeln: 0.1.0.3.3",
+        "fr": "Formules: 0.1.0.3.3",
+        "ko": "수식: 0.1.0.3.3",
+        "th": "สูตร: 0.1.0.3.3",
+        "zh": "公式: 0.1.0.3.3"
+      }
+    },
+    "labels:showGridlines": {
+      "tcid": 485,
+      "source": "tbbtn2",
+      "name": "Grid",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.3.1",
+        "ja": "ページ レイアウト: 0.1.0.3.1",
+        "de": "Seitenlayout: 0.1.0.3.1",
+        "fr": "Mise en page: 0.1.0.3.1",
+        "ko": "페이지 레이아웃: 0.1.0.3.1",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.3.1",
+        "zh": "页面布局: 0.1.0.3.1"
+      }
+    },
+    "labels:showHeadings": {
+      "tcid": 485,
+      "source": "tbbtn2",
+      "name": "Grid",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "identical_to": [12578, "tbbtn"],
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.3.4",
+        "ja": "ページ レイアウト: 0.1.0.3.4",
+        "de": "Seitenlayout: 0.1.0.3.4",
+        "fr": "Mise en page: 0.1.0.3.4",
+        "ko": "페이지 레이아웃: 0.1.0.3.4",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.3.4",
+        "zh": "页面布局: 0.1.0.3.4"
+      }
     },
     "labels:showScripts": {
       "tcid": 46778,
       "source": "tbbtn",
       "name": "GroupViewScripts",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:sideBySide": {
       "tcid": 15977,
       "source": "tbbtn",
       "name": "ArrangeSideBySideExcel",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.4.6",
+        "ja": "表示: 0.1.0.4.6",
+        "de": "Ansicht: 0.1.0.4.6",
+        "fr": "Affichage: 0.1.0.4.6",
+        "ko": "보기: 0.1.0.4.6",
+        "th": "มุมมอง: 0.1.0.4.6",
+        "zh": "视图: 0.1.0.4.6"
+      }
     },
     "labels:size": {
       "tcid": 12610,
       "source": "tbbtn",
       "name": "GalPageSize",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.2",
+        "ja": "ページ レイアウト: 0.1.0.1.2",
+        "de": "Seitenlayout: 0.1.0.1.2",
+        "fr": "Mise en page: 0.1.0.1.2",
+        "ko": "페이지 레이아웃: 0.1.0.1.2",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.2",
+        "zh": "页面布局: 0.1.0.1.2"
+      }
     },
     "labels:slicer": {
       "tcid": 21344,
@@ -979,13 +2148,34 @@
       "name": "SlicerInsert",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Insert: 0.1.0.7.0",
+        "ja": "挿入: 0.1.0.7.0",
+        "de": "Einfügen: 0.1.0.7.0",
+        "fr": "Insérer: 0.1.0.7.0",
+        "ko": "삽입: 0.1.0.7.0",
+        "th": "แทรก: 0.1.0.7.0",
+        "zh": "插入: 0.1.0.7.0"
+      }
     },
     "labels:smartArt": {
       "tcid": 1032,
       "source": "tbbtn2",
       "name": "InsertDiagram",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.3.4",
+        "ja": "挿入: 0.1.0.3.4",
+        "de": "Einfügen: 0.1.0.3.4",
+        "fr": "Insérer: 0.1.0.3.4",
+        "ko": "삽입: 0.1.0.3.4",
+        "th": "แทรก: 0.1.0.3.4",
+        "zh": "插入: 0.1.0.3.4"
+      }
     },
     "labels:sortCustom": {
       "tcid": 12946,
@@ -993,19 +2183,42 @@
       "name": "XLSortRibbon",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Data: 0.1.0.3.2",
+        "ja": "データ: 0.1.0.3.2",
+        "de": "Daten: 0.1.0.3.2",
+        "fr": "Données: 0.1.0.3.2",
+        "ko": "데이터: 0.1.0.3.2",
+        "th": "ข้อมูล: 0.1.0.3.2",
+        "zh": "数据: 0.1.0.3.2"
+      }
     },
     "labels:sortFilter": {
       "tcid": 11948,
       "source": "tbbtn",
       "name": "FlyoutAnchorSortFilter",
-      "match": "ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:sparkline": {
       "tcid": 16702,
       "source": "tbbtn",
       "name": "ChunkInsertSparklines",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.6.0",
+        "ja": "挿入: 0.1.0.6.0",
+        "de": "Einfügen: 0.1.0.6.0",
+        "fr": "Insérer: 0.1.0.6.0",
+        "ko": "삽입: 0.1.0.6.0",
+        "th": "แทรก: 0.1.0.6.0",
+        "zh": "插入: 0.1.0.6.0"
+      }
     },
     "labels:spelling": {
       "tcid": 2,
@@ -1013,37 +2226,111 @@
       "name": "Spelling",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Review: 0.1.0.0.0",
+        "ja": "校閲: 0.1.0.0.0",
+        "de": "Überprüfen: 0.1.0.0.0",
+        "fr": "Révision: 0.1.0.0.0",
+        "ko": "검토: 0.1.0.0.0",
+        "th": "รีวิว: 0.1.0.0.0",
+        "zh": "审阅: 0.1.0.0.0"
+      }
     },
     "labels:split": {
       "tcid": 15688,
       "source": "tbbtn",
       "name": "SplitToggle",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.4.3",
+        "ja": "表示: 0.1.0.4.3",
+        "de": "Ansicht: 0.1.0.4.3",
+        "fr": "Affichage: 0.1.0.4.3",
+        "ko": "보기: 0.1.0.4.3",
+        "th": "มุมมอง: 0.1.0.4.3",
+        "zh": "视图: 0.1.0.4.3"
+      }
     },
     "labels:standard": {
       "tcid": 723,
       "source": "tbbtn",
       "name": "NormalViewExcel",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.1.0",
+        "ja": "表示: 0.1.0.1.0",
+        "de": "Ansicht: 0.1.0.1.0",
+        "fr": "Affichage: 0.1.0.1.0",
+        "ko": "보기: 0.1.0.1.0",
+        "th": "มุมมอง: 0.1.0.1.0",
+        "zh": "视图: 0.1.0.1.0"
+      }
+    },
+    "labels:statistical": {
+      "tcid": 12823,
+      "source": "tbbtn2",
+      "name": "GalInsertFnStatistics",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "control": "button",
+      "strip_ellipsis": true
     },
     "labels:stats": {
       "tcid": 33780,
       "source": "tbbtn",
       "name": "StatusWorkbookStatistics",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Review: 0.1.0.0.2",
+        "ja": "校閲: 0.1.0.0.2",
+        "de": "Überprüfen: 0.1.0.0.2",
+        "fr": "Révision: 0.1.0.0.2",
+        "ko": "검토: 0.1.0.0.2",
+        "th": "รีวิว: 0.1.0.0.2",
+        "zh": "审阅: 0.1.0.0.2"
+      }
     },
     "labels:subtotal": {
       "tcid": 861,
       "source": "tbbtn2",
       "name": "Subtotals",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.6.2",
+        "ja": "データ: 0.1.0.6.2",
+        "de": "Daten: 0.1.0.6.2",
+        "fr": "Données: 0.1.0.6.2",
+        "ko": "데이터: 0.1.0.6.2",
+        "th": "ข้อมูล: 0.1.0.6.2",
+        "zh": "数据: 0.1.0.6.2"
+      }
     },
     "labels:switchWindow": {
       "tcid": 12672,
       "source": "tbbtn",
       "name": "FlyoutAnchorCurrentlyOpenWorkbooks",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.4.9",
+        "ja": "表示: 0.1.0.4.9",
+        "de": "Ansicht: 0.1.0.4.9",
+        "fr": "Affichage: 0.1.0.4.9",
+        "ko": "보기: 0.1.0.4.9",
+        "th": "มุมมอง: 0.1.0.4.9",
+        "zh": "视图: 0.1.0.4.9"
+      }
     },
     "labels:symbol": {
       "tcid": 29581,
@@ -1051,31 +2338,103 @@
       "name": "InsertSymbolFromObjectPalette",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Insert: 0.1.0.11.1",
+        "ja": "挿入: 0.1.0.11.1",
+        "de": "Einfügen: 0.1.0.11.1",
+        "fr": "Insérer: 0.1.0.11.1",
+        "ko": "삽입: 0.1.0.11.1",
+        "th": "แทรก: 0.1.0.11.1",
+        "zh": "插入: 0.1.0.11.1"
+      }
     },
     "labels:syncScroll": {
       "tcid": 7873,
       "source": "tbbtn",
       "name": "SyncScrollSideBySide",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.4.7",
+        "ja": "表示: 0.1.0.4.7",
+        "de": "Ansicht: 0.1.0.4.7",
+        "fr": "Affichage: 0.1.0.4.7",
+        "ko": "보기: 0.1.0.4.7",
+        "th": "มุมมอง: 0.1.0.4.7",
+        "zh": "视图: 0.1.0.4.7"
+      }
     },
     "labels:table": {
       "tcid": 7193,
       "source": "tbbtn2",
       "name": "InsertList",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.0.2",
+        "ja": "挿入: 0.1.0.0.2",
+        "de": "Einfügen: 0.1.0.0.2",
+        "fr": "Insérer: 0.1.0.0.2",
+        "ko": "삽입: 0.1.0.0.2",
+        "th": "แทรก: 0.1.0.0.2",
+        "zh": "插入: 0.1.0.0.2"
+      }
     },
     "labels:text": {
       "tcid": 12821,
       "source": "tbbtn",
       "name": "GalInsertFnText",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.0.5",
+        "ja": "数式: 0.1.0.0.5",
+        "de": "Formeln: 0.1.0.0.5",
+        "fr": "Formules: 0.1.0.0.5",
+        "ko": "수식: 0.1.0.0.5",
+        "th": "สูตร: 0.1.0.0.5",
+        "zh": "公式: 0.1.0.0.5"
+      }
+    },
+    "labels:textBox": {
+      "tcid": 14471,
+      "source": "tbbtn",
+      "name": "TextboxNonEA",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.10.0",
+        "ja": "挿入: 0.1.0.10.0",
+        "de": "Einfügen: 0.1.0.10.0",
+        "fr": "Insérer: 0.1.0.10.0",
+        "ko": "삽입: 0.1.0.10.0",
+        "th": "แทรก: 0.1.0.10.0",
+        "zh": "插入: 0.1.0.10.0"
+      }
     },
     "labels:theme": {
       "tcid": 12497,
       "source": "tbbtn",
       "name": "ChunkXLTheme",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Page Layout: 0.1.0.0.0",
+        "ja": "ページ レイアウト: 0.1.0.0.0",
+        "de": "Seitenlayout: 0.1.0.0.0",
+        "fr": "Mise en page: 0.1.0.0.0",
+        "ko": "페이지 레이아웃: 0.1.0.0.0",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.0.0",
+        "zh": "页面布局: 0.1.0.0.0"
+      }
     },
     "labels:thesaurus": {
       "tcid": 9056,
@@ -1083,19 +2442,69 @@
       "name": "ThesaurusRR",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Review: 0.1.0.0.1",
+        "ja": "校閲: 0.1.0.0.1",
+        "de": "Überprüfen: 0.1.0.0.1",
+        "fr": "Révision: 0.1.0.0.1",
+        "ko": "검토: 0.1.0.0.1",
+        "th": "รีวิว: 0.1.0.0.1",
+        "zh": "审阅: 0.1.0.0.1"
+      }
+    },
+    "labels:threeDModel": {
+      "tcid": 27813,
+      "source": "tbbtn",
+      "name": "DropdownInsert3DModel",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.3.3",
+        "ja": "挿入: 0.1.0.3.3",
+        "de": "Einfügen: 0.1.0.3.3",
+        "fr": "Insérer: 0.1.0.3.3",
+        "ko": "삽입: 0.1.0.3.3",
+        "th": "แทรก: 0.1.0.3.3",
+        "zh": "插入: 0.1.0.3.3"
+      }
     },
     "labels:timeline": {
       "tcid": 22990,
       "source": "tbbtn",
       "name": "TimeSlicerInsert",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.7.1",
+        "ja": "挿入: 0.1.0.7.1",
+        "de": "Einfügen: 0.1.0.7.1",
+        "fr": "Insérer: 0.1.0.7.1",
+        "ko": "삽입: 0.1.0.7.1",
+        "th": "แทรก: 0.1.0.7.1",
+        "zh": "插入: 0.1.0.7.1"
+      }
     },
     "labels:toggle": {
       "tcid": 26992,
       "source": "tbbtn",
       "name": "TabDrawInk",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Draw: 0.1.0.0.0",
+        "ja": "描画: 0.1.0.0.0",
+        "de": "Zeichnen: 0.1.0.0.0",
+        "fr": "Dessin: 0.1.0.0.0",
+        "ko": "그리기: 0.1.0.0.0",
+        "th": "วาด: 0.1.0.0.0",
+        "zh": "绘图: 0.1.0.0.0"
+      }
     },
     "labels:translate": {
       "tcid": 32736,
@@ -1103,7 +2512,36 @@
       "name": "Translator",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "Review: 0.1.0.2.0",
+        "ja": "校閲: 0.1.0.2.0",
+        "de": "Überprüfen: 0.1.0.2.0",
+        "fr": "Révision: 0.1.0.2.0",
+        "ko": "검토: 0.1.0.2.0",
+        "th": "รีวิว: 0.1.0.2.0",
+        "zh": "审阅: 0.1.0.2.0"
+      }
+    },
+    "labels:ungroup": {
+      "tcid": 14575,
+      "source": "tbbtn2",
+      "name": "FlyoutAnchorUnGroupCells",
+      "match": "en+ja",
+      "evidence": "candidates identical in all locales",
+      "identical_to": [165, "tbbtn"],
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.6.1",
+        "ja": "データ: 0.1.0.6.1",
+        "de": "Daten: 0.1.0.6.1",
+        "fr": "Données: 0.1.0.6.1",
+        "ko": "데이터: 0.1.0.6.1",
+        "th": "ข้อมูล: 0.1.0.6.1",
+        "zh": "数据: 0.1.0.6.1"
+      }
     },
     "labels:unhide": {
       "tcid": 866,
@@ -1111,49 +2549,119 @@
       "name": "UnhideWindow",
       "match": "ja",
       "strip_ellipsis": true,
-      "evidence": "ax-ribbon-button"
+      "evidence": "ax-ribbon-button",
+      "control": "button",
+      "verified": {
+        "en": "View: 0.1.0.4.5",
+        "ja": "表示: 0.1.0.4.5",
+        "de": "Ansicht: 0.1.0.4.5",
+        "fr": "Affichage: 0.1.0.4.5",
+        "ko": "보기: 0.1.0.4.5",
+        "th": "มุมมอง: 0.1.0.4.5",
+        "zh": "视图: 0.1.0.4.5"
+      }
     },
     "labels:useInFormula": {
       "tcid": 12589,
       "source": "tbbtn",
       "name": "GalInsertNamedRange",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.2.2",
+        "ja": "数式: 0.1.0.2.2",
+        "de": "Formeln: 0.1.0.2.2",
+        "fr": "Formules: 0.1.0.2.2",
+        "ko": "수식: 0.1.0.2.2",
+        "th": "สูตร: 0.1.0.2.2",
+        "zh": "公式: 0.1.0.2.2"
+      }
     },
     "labels:view": {
       "tcid": 11541,
       "source": "tbbtn",
       "name": "TabView",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.9",
+        "ja": "表示: 0.1.9",
+        "de": "Ansicht: 0.1.9",
+        "fr": "Affichage: 0.1.9",
+        "ko": "보기: 0.1.9",
+        "th": "มุมมอง: 0.1.9",
+        "zh": "视图: 0.1.9"
+      }
     },
     "labels:watch": {
       "tcid": 5686,
       "source": "tbbtn2",
       "name": "ToggleCellWatchToolbar",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.3.5",
+        "ja": "数式: 0.1.0.3.5",
+        "de": "Formeln: 0.1.0.3.5",
+        "fr": "Formules: 0.1.0.3.5",
+        "ko": "수식: 0.1.0.3.5",
+        "th": "สูตร: 0.1.0.3.5",
+        "zh": "公式: 0.1.0.3.5"
+      }
     },
     "labels:whatIf": {
       "tcid": 11936,
       "source": "tbbtn2",
       "name": "FlyoutAnchorWhatIfAnalysis",
-      "match": "en+ja"
-    },
-    "labels:width": {
-      "tcid": 12561,
-      "source": "tbbtn",
-      "name": "GalMaximumWidth",
-      "match": "ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.5.0",
+        "ja": "データ: 0.1.0.5.0",
+        "de": "Daten: 0.1.0.5.0",
+        "fr": "Données: 0.1.0.5.0",
+        "ko": "데이터: 0.1.0.5.0",
+        "th": "ข้อมูล: 0.1.0.5.0",
+        "zh": "数据: 0.1.0.5.0"
+      }
     },
     "labels:wordArt": {
       "tcid": 12119,
       "source": "tbbtn",
       "name": "WordartGallery",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.10.2",
+        "ja": "挿入: 0.1.0.10.2",
+        "de": "Einfügen: 0.1.0.10.2",
+        "fr": "Insérer: 0.1.0.10.2",
+        "ko": "삽입: 0.1.0.10.2",
+        "th": "แทรก: 0.1.0.10.2",
+        "zh": "插入: 0.1.0.10.2"
+      }
     },
     "labels:workbookLinks": {
       "tcid": 34689,
       "source": "tbbtn",
       "name": "WorkbookLinks",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.1.3",
+        "ja": "データ: 0.1.0.1.3",
+        "de": "Daten: 0.1.0.1.3",
+        "fr": "Données: 0.1.0.1.3",
+        "ko": "데이터: 0.1.0.1.3",
+        "th": "ข้อมูล: 0.1.0.1.3",
+        "zh": "数据: 0.1.0.1.3"
+      }
     },
     "labels:zoom": {
       "tcid": 11813,
@@ -1165,165 +2673,494 @@
       "tcid": 16027,
       "source": "tbbtn",
       "name": "ZoomCurrent100",
-      "match": "ja"
+      "match": "ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.3.1",
+        "ja": "表示: 0.1.0.3.1",
+        "de": "Ansicht: 0.1.0.3.1",
+        "fr": "Affichage: 0.1.0.3.1",
+        "ko": "보기: 0.1.0.3.1",
+        "th": "มุมมอง: 0.1.0.3.1",
+        "zh": "视图: 0.1.0.3.1"
+      }
     },
     "labels:zoomSelection": {
       "tcid": 15789,
       "source": "tbbtn",
       "name": "ZoomWindowToSelection",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "View: 0.1.0.3.2",
+        "ja": "表示: 0.1.0.3.2",
+        "de": "Ansicht: 0.1.0.3.2",
+        "fr": "Affichage: 0.1.0.3.2",
+        "ko": "보기: 0.1.0.3.2",
+        "th": "มุมมอง: 0.1.0.3.2",
+        "zh": "视图: 0.1.0.3.2"
+      }
     },
-    "menu:mac.data.clear": {
-      "tcid": 900,
+    "menu:mac.data.dataTable": {
+      "tcid": 862,
       "source": "tbbtn2",
-      "name": "ShowAll2",
-      "match": "en+ja"
+      "name": "DataTable",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Data: 0.1.0.5.0 > 0.2",
+        "ja": "データ: 0.1.0.5.0 > 0.2"
+      },
+      "control": "menu-item",
+      "verified": {
+        "en": "Data: 0.1.0.5.0 > 0.2",
+        "ja": "データ: 0.1.0.5.0 > 0.2",
+        "de": "Daten: 0.1.0.5.0 > 0.2",
+        "fr": "Données: 0.1.0.5.0 > 0.2",
+        "ko": "데이터: 0.1.0.5.0 > 0.2",
+        "th": "ข้อมูล: 0.1.0.5.0 > 0.2",
+        "zh": "数据: 0.1.0.5.0 > 0.2"
+      }
     },
-    "menu:mac.data.filter": {
-      "tcid": 899,
+    "menu:mac.data.goalSeek": {
+      "tcid": 856,
+      "source": "tbbtn",
+      "name": "GoalSeek",
+      "match": "en+ja",
+      "control": "menu-item",
+      "evidence": "drawn label, model-located",
+      "ax_path": {
+        "en": "Data: 0.1.0.5.0 > 0.1",
+        "ja": "データ: 0.1.0.5.0 > 0.1"
+      },
+      "verified": {
+        "en": "Data: 0.1.0.5.0 > 0.1",
+        "ja": "データ: 0.1.0.5.0 > 0.1",
+        "de": "Daten: 0.1.0.5.0 > 0.1",
+        "fr": "Données: 0.1.0.5.0 > 0.1",
+        "ko": "데이터: 0.1.0.5.0 > 0.1",
+        "th": "ข้อมูล: 0.1.0.5.0 > 0.1",
+        "zh": "数据: 0.1.0.5.0 > 0.1"
+      }
+    },
+    "menu:mac.data.scenarioManager": {
+      "tcid": 857,
       "source": "tbbtn2",
-      "name": "AutoFilter",
-      "match": "en+ja"
+      "name": "Scenarios",
+      "match": "en+ja",
+      "control": "menu-item",
+      "evidence": "drawn label, model-located",
+      "ax_path": {
+        "en": "Data: 0.1.0.5.0 > 0.0",
+        "ja": "データ: 0.1.0.5.0 > 0.0"
+      },
+      "verified": {
+        "en": "Data: 0.1.0.5.0 > 0.0",
+        "ja": "データ: 0.1.0.5.0 > 0.0",
+        "de": "Daten: 0.1.0.5.0 > 0.0",
+        "fr": "Données: 0.1.0.5.0 > 0.0",
+        "ko": "데이터: 0.1.0.5.0 > 0.0",
+        "th": "ข้อมูล: 0.1.0.5.0 > 0.0",
+        "zh": "数据: 0.1.0.5.0 > 0.0"
+      }
+    },
+    "menu:mac.data.validation.circleInvalid": {
+      "tcid": 2035,
+      "source": "tbbtn2",
+      "name": "ValidationMarkInvalidData",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Data: 0.1.0.4.5 > 0.1",
+        "ja": "データ: 0.1.0.4.5 > 0.1"
+      },
+      "identical_to": [11947, "tbbtn"],
+      "control": "menu-item"
+    },
+    "menu:mac.data.validation.clearCircles": {
+      "tcid": 2055,
+      "source": "tbbtn",
+      "name": "ValidationUnmarkInvalidData",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Data: 0.1.0.4.5 > 0.2",
+        "ja": "データ: 0.1.0.4.5 > 0.2"
+      },
+      "identical_to": [2055, "tbbtn2"],
+      "control": "menu-item"
     },
     "menu:mac.data.validation.settings": {
-      "tcid": 15653,
-      "source": "tbbtn",
-      "name": "FlyoutAnchorDataValidation",
-      "match": "ja",
-      "strip_ellipsis": true,
-      "evidence": "ax-menu-item"
-    },
-    "menu:mac.draw.eraser": {
-      "tcid": 18965,
-      "source": "tbbtn",
-      "name": "FlyoutAnchorErasers",
-      "match": "en+ja"
-    },
-    "menu:mac.draw.toggle": {
-      "tcid": 26992,
-      "source": "tbbtn",
-      "name": "TabDrawInk",
-      "match": "en+ja"
+      "tcid": 2034,
+      "source": "tbbtn2",
+      "name": "ValidationDefine",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Data: 0.1.0.4.5 > 0.0",
+        "ja": "データ: 0.1.0.4.5 > 0.0"
+      },
+      "identical_to": [7285, "tbbtn"],
+      "control": "menu-item"
     },
     "menu:mac.formulas.calc.auto": {
       "tcid": 12592,
       "source": "tbbtn",
       "name": "BoolCalcAutomatic",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item"
     },
     "menu:mac.formulas.calc.manual": {
       "tcid": 12591,
       "source": "tbbtn",
       "name": "BoolCalcManual",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item"
     },
     "menu:mac.formulas.category.all": {
       "tcid": 5808,
       "source": "tbbtn",
       "name": "AutoSumMoreFunctions",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "Formulas: 0.1.0.0.1 > 0.6",
+        "ja": "数式: 0.1.0.0.1 > 0.6",
+        "de": "Formeln: 0.1.0.0.1 > 0.6",
+        "fr": "Formules: 0.1.0.0.1 > 0.6",
+        "ko": "수식: 0.1.0.0.1 > 0.6",
+        "th": "สูตร: 0.1.0.0.1 > 0.6",
+        "zh": "公式: 0.1.0.0.1 > 0.6"
+      }
     },
     "menu:mac.formulas.category.recent": {
       "tcid": 5808,
       "source": "tbbtn",
       "name": "AutoSumMoreFunctions",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item"
     },
-    "menu:mac.formulas.removeArrows.all": {
-      "tcid": 11946,
+    "menu:mac.formulas.errorCheck.run": {
+      "tcid": 6122,
       "source": "tbbtn",
-      "name": "FlyoutAnchorRemoveArrows",
-      "match": "en+ja"
+      "name": "ErrorChecking",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Formulas: 0.1.0.3.4 > 0.0",
+        "ja": "数式: 0.1.0.3.4 > 0.0"
+      },
+      "control": "menu-item",
+      "verified": {
+        "en": "Formulas: 0.1.0.3.4 > 0.0",
+        "ja": "数式: 0.1.0.3.4 > 0.0",
+        "de": "Formeln: 0.1.0.3.4 > 0.0",
+        "fr": "Formules: 0.1.0.3.4 > 0.0",
+        "ko": "수식: 0.1.0.3.4 > 0.0",
+        "th": "สูตร: 0.1.0.3.4 > 0.0",
+        "zh": "公式: 0.1.0.3.4 > 0.0"
+      }
     },
-    "menu:mac.insert.chartPie": {
-      "tcid": 15536,
+    "menu:mac.formulas.errorCheck.trace": {
+      "tcid": 463,
       "source": "tbbtn",
-      "name": "ExcelChartGallery3",
-      "match": "en+ja"
+      "name": "Error",
+      "match": "en+ja",
+      "evidence": "candidates identical in all locales",
+      "ax_path": {
+        "en": "Formulas: 0.1.0.3.4 > 0.1",
+        "ja": "数式: 0.1.0.3.4 > 0.1"
+      },
+      "identical_to": [22368, "tbbtn"],
+      "control": "menu-item",
+      "verified": {
+        "en": "Formulas: 0.1.0.3.4 > 0.1",
+        "ja": "数式: 0.1.0.3.4 > 0.1",
+        "de": "Formeln: 0.1.0.3.4 > 0.1",
+        "fr": "Formules: 0.1.0.3.4 > 0.1",
+        "ko": "수식: 0.1.0.3.4 > 0.1",
+        "th": "สูตร: 0.1.0.3.4 > 0.1",
+        "zh": "公式: 0.1.0.3.4 > 0.1"
+      }
     },
-    "menu:mac.insert.chartScatter": {
-      "tcid": 15539,
-      "source": "tbbtn",
-      "name": "ExcelChartGallery6",
-      "match": "ja"
-    },
-    "menu:mac.insert.pivotTable": {
-      "tcid": 12247,
+    "menu:mac.formulas.removeArrows.dependents": {
+      "tcid": 450,
       "source": "tbbtn2",
-      "name": "sx12NewPivot",
-      "match": "en+ja"
+      "name": "UntraceDependents",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Formulas: 0.1.0.3.2 > 0.3",
+        "ja": "数式: 0.1.0.3.2 > 0.3"
+      },
+      "control": "menu-item",
+      "verified": {
+        "en": "Formulas: 0.1.0.3.2 > 0.3",
+        "ja": "数式: 0.1.0.3.2 > 0.3",
+        "de": "Formeln: 0.1.0.3.2 > 0.3",
+        "fr": "Formules: 0.1.0.3.2 > 0.3",
+        "ko": "수식: 0.1.0.3.2 > 0.3",
+        "th": "สูตร: 0.1.0.3.2 > 0.3",
+        "zh": "公式: 0.1.0.3.2 > 0.3"
+      }
     },
-    "menu:mac.insert.recommendedPivotTable": {
-      "tcid": 29979,
+    "menu:mac.formulas.removeArrows.precedents": {
+      "tcid": 452,
+      "source": "tbbtn2",
+      "name": "UntracePrecedents",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Formulas: 0.1.0.3.2 > 0.2",
+        "ja": "数式: 0.1.0.3.2 > 0.2"
+      },
+      "control": "menu-item",
+      "verified": {
+        "en": "Formulas: 0.1.0.3.2 > 0.2",
+        "ja": "数式: 0.1.0.3.2 > 0.2",
+        "de": "Formeln: 0.1.0.3.2 > 0.2",
+        "fr": "Formules: 0.1.0.3.2 > 0.2",
+        "ko": "수식: 0.1.0.3.2 > 0.2",
+        "th": "สูตร: 0.1.0.3.2 > 0.2",
+        "zh": "公式: 0.1.0.3.2 > 0.2"
+      }
+    },
+    "menu:mac.page.break.insert": {
+      "tcid": 12608,
+      "source": "tbbtn2",
+      "name": "insert",
+      "match": "en+ja",
+      "evidence": "candidates identical in all locales",
+      "ax_path": {
+        "en": "Page Layout: 0.1.0.1.4 > 0.0",
+        "ja": "ページ レイアウト: 0.1.0.1.4 > 0.0"
+      },
+      "identical_to": [17269, "tbbtn"],
+      "control": "menu-item",
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.4 > 0.0",
+        "ja": "ページ レイアウト: 0.1.0.1.4 > 0.0",
+        "de": "Seitenlayout: 0.1.0.1.4 > 0.0",
+        "fr": "Mise en page: 0.1.0.1.4 > 0.0",
+        "ko": "페이지 레이아웃: 0.1.0.1.4 > 0.0",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.4 > 0.0",
+        "zh": "页面布局: 0.1.0.1.4 > 0.0"
+      }
+    },
+    "menu:mac.page.break.remove": {
+      "tcid": 12609,
+      "source": "tbbtn2",
+      "name": "remove",
+      "match": "en+ja",
+      "evidence": "candidates identical in all locales",
+      "ax_path": {
+        "en": "Page Layout: 0.1.0.1.4 > 0.1",
+        "ja": "ページ レイアウト: 0.1.0.1.4 > 0.1"
+      },
+      "identical_to": [17270, "tbbtn"],
+      "control": "menu-item",
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.4 > 0.1",
+        "ja": "ページ レイアウト: 0.1.0.1.4 > 0.1",
+        "de": "Seitenlayout: 0.1.0.1.4 > 0.1",
+        "fr": "Mise en page: 0.1.0.1.4 > 0.1",
+        "ko": "페이지 레이아웃: 0.1.0.1.4 > 0.1",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.4 > 0.1",
+        "zh": "页面布局: 0.1.0.1.4 > 0.1"
+      }
+    },
+    "menu:mac.page.break.reset": {
+      "tcid": 1585,
       "source": "tbbtn",
-      "name": "PivotTableExpress",
-      "match": "en+ja"
+      "name": "reset",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Page Layout: 0.1.0.1.4 > 0.3",
+        "ja": "ページ レイアウト: 0.1.0.1.4 > 0.3"
+      },
+      "control": "menu-item",
+      "verified": {
+        "en": "Page Layout: 0.1.0.1.4 > 0.3",
+        "ja": "ページ レイアウト: 0.1.0.1.4 > 0.3",
+        "de": "Seitenlayout: 0.1.0.1.4 > 0.3",
+        "fr": "Mise en page: 0.1.0.1.4 > 0.3",
+        "ko": "페이지 레이아웃: 0.1.0.1.4 > 0.3",
+        "th": "เค้าโครงหน้ากระดาษ: 0.1.0.1.4 > 0.3",
+        "zh": "页面布局: 0.1.0.1.4 > 0.3"
+      }
+    },
+    "menu:mac.page.margins.custom": {
+      "tcid": 12795,
+      "source": "tbbtn",
+      "name": "MarginsAdvancedOptions",
+      "match": "en+ja",
+      "evidence": "candidates identical in all locales",
+      "ax_path": {
+        "en": "Page Layout: 0.1.0.1.0 > 0.2",
+        "ja": "ページ レイアウト: 0.1.0.1.0 > 0.2"
+      },
+      "identical_to": [13250, "tbbtn"],
+      "control": "menu-item"
+    },
+    "menu:mac.page.printArea.clear": {
+      "tcid": 1584,
+      "source": "tbbtn",
+      "name": "clear",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Page Layout: 0.1.0.1.3 > 0.1",
+        "ja": "ページ レイアウト: 0.1.0.1.3 > 0.1"
+      },
+      "control": "menu-item"
+    },
+    "menu:mac.page.printArea.set": {
+      "tcid": 364,
+      "source": "tbbtn",
+      "name": "set",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Page Layout: 0.1.0.1.3 > 0.0",
+        "ja": "ページ レイアウト: 0.1.0.1.3 > 0.0"
+      },
+      "control": "menu-item"
+    },
+    "menu:mac.review.convertNotes": {
+      "tcid": 33546,
+      "source": "tbbtn",
+      "name": "ConvertComments",
+      "match": "en+ja",
+      "evidence": "drawn label en+ja",
+      "ax_path": {
+        "en": "Review: 0.1.0.5.0 > 0.5",
+        "ja": "校閲: 0.1.0.5.0 > 0.5"
+      },
+      "control": "menu-item",
+      "verified": {
+        "en": "Review: 0.1.0.5.0 > 0.5",
+        "ja": "校閲: 0.1.0.5.0 > 0.5",
+        "de": "Überprüfen: 0.1.0.5.0 > 0.5",
+        "fr": "Révision: 0.1.0.5.0 > 0.5",
+        "ko": "검토: 0.1.0.5.0 > 0.5",
+        "th": "รีวิว: 0.1.0.5.0 > 0.5",
+        "zh": "审阅: 0.1.0.5.0 > 0.5"
+      }
     },
     "menu:mac.review.newNote": {
       "tcid": 33158,
       "source": "tbbtn",
       "name": "NewCommentLegacy",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "Review: 0.1.0.5.0 > 0.0",
+        "ja": "校閲: 0.1.0.5.0 > 0.0",
+        "de": "Überprüfen: 0.1.0.5.0 > 0.0",
+        "fr": "Révision: 0.1.0.5.0 > 0.0",
+        "ko": "검토: 0.1.0.5.0 > 0.0",
+        "th": "รีวิว: 0.1.0.5.0 > 0.0",
+        "zh": "审阅: 0.1.0.5.0 > 0.0"
+      }
     },
     "menu:mac.review.nextNote": {
       "tcid": 33161,
       "source": "tbbtn",
       "name": "NextCommentLegacy",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "Review: 0.1.0.5.0 > 0.2",
+        "ja": "校閲: 0.1.0.5.0 > 0.2",
+        "de": "Überprüfen: 0.1.0.5.0 > 0.2",
+        "fr": "Révision: 0.1.0.5.0 > 0.2",
+        "ko": "검토: 0.1.0.5.0 > 0.2",
+        "th": "รีวิว: 0.1.0.5.0 > 0.2",
+        "zh": "审阅: 0.1.0.5.0 > 0.2"
+      }
     },
     "menu:mac.review.previousNote": {
       "tcid": 33160,
       "source": "tbbtn",
       "name": "PreviousCommentLegacy",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "Review: 0.1.0.5.0 > 0.1",
+        "ja": "校閲: 0.1.0.5.0 > 0.1",
+        "de": "Überprüfen: 0.1.0.5.0 > 0.1",
+        "fr": "Révision: 0.1.0.5.0 > 0.1",
+        "ko": "검토: 0.1.0.5.0 > 0.1",
+        "th": "รีวิว: 0.1.0.5.0 > 0.1",
+        "zh": "审阅: 0.1.0.5.0 > 0.1"
+      }
     },
     "menu:mac.review.showHideNote": {
       "tcid": 33162,
       "source": "tbbtn",
       "name": "ShowCommentLegacy",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "Review: 0.1.0.5.0 > 0.3",
+        "ja": "校閲: 0.1.0.5.0 > 0.3",
+        "de": "Überprüfen: 0.1.0.5.0 > 0.3",
+        "fr": "Révision: 0.1.0.5.0 > 0.3",
+        "ko": "검토: 0.1.0.5.0 > 0.3",
+        "th": "รีวิว: 0.1.0.5.0 > 0.3",
+        "zh": "审阅: 0.1.0.5.0 > 0.3"
+      }
     },
     "menu:mac.review.showNotes": {
       "tcid": 33163,
       "source": "tbbtn",
       "name": "ShowAllCommentsLegacy",
-      "match": "en+ja"
-    },
-    "menu:mac.view.formulaBar": {
-      "tcid": 849,
-      "source": "tbbtn",
-      "name": "FormulaBar",
-      "match": "en+ja"
-    },
-    "menu:mac.view.freeze": {
-      "tcid": 443,
-      "source": "tbbtn",
-      "name": "FreezePanes",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "Review: 0.1.0.5.0 > 0.4",
+        "ja": "校閲: 0.1.0.5.0 > 0.4",
+        "de": "Überprüfen: 0.1.0.5.0 > 0.4",
+        "fr": "Révision: 0.1.0.5.0 > 0.4",
+        "ko": "검토: 0.1.0.5.0 > 0.4",
+        "th": "รีวิว: 0.1.0.5.0 > 0.4",
+        "zh": "审阅: 0.1.0.5.0 > 0.4"
+      }
     },
     "menu:mac.view.freeze.firstColumn": {
       "tcid": 13963,
       "source": "tbbtn",
       "name": "FreezeFirstColumn",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "View: 0.1.0.4.2 > 0.2",
+        "ja": "表示: 0.1.0.4.2 > 0.2",
+        "de": "Ansicht: 0.1.0.4.2 > 0.2",
+        "fr": "Affichage: 0.1.0.4.2 > 0.2",
+        "ko": "보기: 0.1.0.4.2 > 0.2",
+        "th": "มุมมอง: 0.1.0.4.2 > 0.2",
+        "zh": "视图: 0.1.0.4.2 > 0.2"
+      }
     },
     "menu:mac.view.freeze.firstRow": {
       "tcid": 13962,
       "source": "tbbtn",
       "name": "FreezeTopRow",
-      "match": "en+ja"
-    },
-    "menu:mac.view.gridlines": {
-      "tcid": 15923,
-      "source": "tbbtn",
-      "name": "GridlinesExcel",
-      "match": "en+ja"
-    },
-    "menu:mac.view.headings": {
-      "tcid": 15644,
-      "source": "tbbtn",
-      "name": "BooleanChoiceViewHeadings2",
-      "match": "en+ja"
+      "match": "en+ja",
+      "control": "menu-item",
+      "verified": {
+        "en": "View: 0.1.0.4.2 > 0.1",
+        "ja": "表示: 0.1.0.4.2 > 0.1",
+        "de": "Ansicht: 0.1.0.4.2 > 0.1",
+        "fr": "Affichage: 0.1.0.4.2 > 0.1",
+        "ko": "보기: 0.1.0.4.2 > 0.1",
+        "th": "มุมมอง: 0.1.0.4.2 > 0.1",
+        "zh": "视图: 0.1.0.4.2 > 0.1"
+      }
     }
   },
   "held": {
@@ -1341,12 +3178,6 @@
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
-    },
-    "groups:Forms": {
-      "status": "suspect-bundle-value",
-      "tcid": 32833,
-      "name": "MsFormSplitButton",
-      "reason": "zh value is the untranslated English \"Forms\""
     },
     "groups:Gallery": {
       "status": "unresolved",
@@ -1393,12 +3224,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:accessibility": {
-      "status": "unconfirmed",
-      "tcid": 19666,
-      "name": "AccessibilityChecker",
-      "reason": "unconfirmed: sources tbfriendly/tbbtn disagree outside ja"
-    },
     "labels:allFunctions": {
       "status": "unresolved",
       "tcid": null,
@@ -1412,7 +3237,7 @@
     "labels:analysis": {
       "status": "pinned-pending",
       "tcid": null,
-      "reason": "runtime substitution with no ribbon string source"
+      "reason": "run-time label: the Data slot draws en \"Analysis Tools\" / ja 分析ツール / de Analysetools / fr Outils d’analyse / ko 분석 도구 / th เครื่องมือการวิเคราะห์ / zh 分析工具; no bundle string matches"
     },
     "labels:chartArea": {
       "status": "unresolved",
@@ -1434,16 +3259,11 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:errorCheck": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 11945:FlyoutAnchorErrorChecking, 6122:ErrorChecking"
-    },
-    "labels:forms": {
-      "status": "suspect-bundle-value",
-      "tcid": 32833,
-      "name": "MsFormSplitButton",
-      "reason": "zh value is the untranslated English \"Forms\""
+    "labels:freeze": {
+      "status": "split",
+      "tcid": 13961,
+      "name": "GalFreezePanes",
+      "reason": "one key drawn differently on several controls (it needs one key per control): ja: 'ウインドウ枠の固定' at ['mac.view.freeze @ 表示: 0.1.0.4.2'] | 'ウィンドウ枠の固定' at ['mac.view.freeze @ 表示: 0.1.0.4.2 > 0.0']; de: 'Bereiche einfrieren' at ['mac.view.freeze @ Ansicht: 0.1.0.4.2'] | 'Fenster fixieren' at ['mac.view.freeze @ Ansicht: 0.1.0.4.2 > 0.0']"
     },
     "labels:freezeSelection": {
       "status": "unresolved",
@@ -1455,20 +3275,29 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:group": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 14409:FlyoutAnchorGroup, 164:Group, 19226:GroupSelectedSparklines"
+    "labels:headerFooter": {
+      "status": "drawn-disagrees",
+      "tcid": 762,
+      "name": "HeaderAndFooter",
+      "reason": "tbbtn of TCID 762 disagrees with the drawn label: en at AX Insert: 0.1.0.10.1: drawn 'Header & Footer', bundle 'Header and Footer'; ko at AX 삽입: 0.1.0.10.1: drawn '머리글 및 바닥글', bundle '머리글/바닥글'; th at AX แทรก: 0.1.0.10.1: drawn 'หัวกระดาษและท้ายกระดาษ', bundle 'ส่วนหัวและส่วนท้าย'"
     },
-    "labels:highlighter": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
+    "labels:headingsHeading": {
+      "status": "drawn-disagrees",
+      "tcid": 12576,
+      "name": "LabelHeadings",
+      "reason": "tbbtn of TCID 12576 disagrees with the drawn label: th at AX มุมมอง: 0.1.0.2.4: drawn 'ส่วนหัว', bundle 'หัวเรื่อง'"
     },
-    "labels:initialize": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 46569:InitPyEditorLicensed, 34860:InitPyEditor, 45861:InitPyEditorPreview, 40617:InitPyEditorAllowRequestAndPurchase [ja only]"
+    "labels:height": {
+      "status": "no-consumer",
+      "tcid": 12562,
+      "name": "GalMaximumHeight",
+      "reason": "nothing in the label set resolves this key"
+    },
+    "labels:macros": {
+      "status": "drawn-disagrees",
+      "tcid": 16105,
+      "name": "PlayMacro",
+      "reason": "tbbtn of TCID 16105 disagrees with the drawn label: de at AX Ansicht: 0.1.0.5.0: drawn 'Makros', bundle 'Makros anzeigen'; fr at AX Affichage: 0.1.0.5.0: drawn 'Macros', bundle 'Afficher les macros'"
     },
     "labels:makeSubtable": {
       "status": "unresolved",
@@ -1481,15 +3310,27 @@
       "reason": "no node with matching ja label"
     },
     "labels:nextComment": {
-      "status": "unconfirmed",
+      "status": "drawn-disagrees",
       "tcid": 1591,
       "name": "NextComment",
-      "reason": "unconfirmed: sources tbfriendly/tbbtn disagree outside ja"
+      "reason": "tbfriendly of TCID 1591 disagrees with the drawn label: zh at AX 审阅: 0.1.0.4.3: drawn '下一条批注', bundle '下一条\\u200b\\u200b批注'"
     },
     "labels:pageBreakPreview": {
       "status": "pinned-pending",
       "tcid": null,
-      "reason": "runtime substitution with no ribbon string source"
+      "reason": "runtime substitution with no ribbon string source; th draws \"แสดงตัวอย่างตัวแบ่งหน้า\""
+    },
+    "labels:pageLayout": {
+      "status": "split",
+      "tcid": 11441,
+      "name": "XLPageLayoutView",
+      "reason": "one key drawn differently on several controls (it needs one key per control): fr: 'Mise en page' at ['tab pageLayout @ Mise en page: 0.1.5'] | 'Mode Page' at ['mac.view.pageLayout @ Affichage: 0.1.0.1.2']"
+    },
+    "labels:pageSetup": {
+      "status": "drawn-disagrees",
+      "tcid": 11551,
+      "name": "ChunkPageSetup",
+      "reason": "tbbtn of TCID 11551 disagrees with the drawn label: de at AX Seitenlayout: 0.1.0.1.7: drawn 'Seiteneinrichtung\\xa0…', bundle 'Seite einrichten'"
     },
     "labels:penBlack": {
       "status": "unresolved",
@@ -1501,48 +3342,39 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:pencil": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
+    "labels:pictureFromFile": {
+      "status": "no-consumer",
+      "tcid": 33995,
+      "name": "DataFromPicture",
+      "reason": "nothing in the label set resolves this key"
     },
     "labels:pictureFromOnline": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 34809:LaunchOnlineCellPicturesPane, 33387:LaunchOnlinePicturesPane"
+      "status": "no-consumer",
+      "tcid": 34809,
+      "name": "LaunchOnlineCellPicturesPane",
+      "reason": "nothing in the label set resolves this key"
     },
     "labels:previousComment": {
-      "status": "unconfirmed",
+      "status": "drawn-disagrees",
       "tcid": 1590,
       "name": "PreviousComment",
-      "reason": "unconfirmed: sources tbfriendly/tbbtn disagree outside ja"
+      "reason": "tbfriendly of TCID 1590 disagrees with the drawn label: zh at AX 审阅: 0.1.0.4.2: drawn '上一条批注', bundle '上一条\\u200b\\u200b批注'"
     },
-    "labels:queriesConnections": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "labels:reapply": {
+    "labels:protectSheet": {
       "status": "unconfirmed",
-      "tcid": 12231,
-      "name": "XLReapplyFilter",
-      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
-    },
-    "labels:relativeRecording": {
-      "status": "unconfirmed",
-      "tcid": 896,
-      "name": "RelativeReferences",
-      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
-    },
-    "labels:removeArrows": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 11946:FlyoutAnchorRemoveArrows, 453:RemoveAllArrows"
+      "tcid": 893,
+      "reason": "th Review button (AX 0.1.0.6.0) draws \"ป้องกันแผ่นงาน\"; tbbtn 893 gives \"การป้องกันแผ่นงาน\" and no bundle source gives the drawn text. The Home Format menu item draws \"ป้องกันแผ่นงาน...\"."
     },
     "labels:removeHyperlinks": {
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
+    },
+    "labels:reset": {
+      "status": "drawn-disagrees",
+      "tcid": 12273,
+      "name": "IgxChunkReset",
+      "reason": "tbbtn of TCID 12273 disagrees with the drawn label: fr at AX Formules: 0.1.0.1.1: drawn 'Réinitialiser', bundle 'Rétablir'; ko at AX 수식: 0.1.0.1.1: drawn '다시 설정', bundle '원래대로'"
     },
     "labels:shapeArrow": {
       "status": "unresolved",
@@ -1589,15 +3421,11 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:showGridlines": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 485:Grid, 12578:BooleanChoiceViewHeadings, 11541:TabView"
-    },
-    "labels:showHeadings": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 485:Grid, 12578:BooleanChoiceViewHeadings, 11541:TabView"
+    "labels:sheetViews": {
+      "status": "no-consumer",
+      "tcid": 33907,
+      "name": "ChunkNamedSheetView",
+      "reason": "nothing in the label set resolves this key"
     },
     "labels:sortAsc": {
       "status": "pinned-pending",
@@ -1609,47 +3437,33 @@
       "tcid": null,
       "reason": "runtime substitution with no ribbon string source"
     },
-    "labels:statistical": {
-      "status": "unconfirmed",
-      "tcid": 12823,
-      "name": "GalInsertFnStatistics",
-      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
-    },
     "labels:tableToJson": {
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:textBox": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 14471:TextboxNonEA, 13098:FlyoutAnchorTextbox, 219:EditBox"
-    },
     "labels:textToColumns": {
       "status": "pinned-pending",
-      "tcid": null,
-      "reason": "runtime substitution with no ribbon string source"
-    },
-    "labels:threeDModel": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 33308:Insert3DModelFallback, 27813:DropdownInsert3DModel"
+      "tcid": 806,
+      "name": "TextToTable",
+      "reason": "run-time substitution: the slot draws en \"Text to Columns\" and de \"Text in Spalten\", while tbbtn reads \"Convert Text to Table...\""
     },
     "labels:trackpad": {
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:ungroup": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 165:Ungroup, 3160:UngroupCells, 19227:UngroupSelectedSparklines"
-    },
     "labels:validation": {
-      "status": "unconfirmed",
-      "tcid": 2034,
-      "name": "ValidationDefine",
-      "reason": "sources disagree after stripping the ellipsis"
+      "status": "pinned-pending",
+      "tcid": 15653,
+      "name": "FlyoutAnchorDataValidation",
+      "reason": "run-time label: the ribbon slot draws en \"Data Validation\" and ja 入力規則, while tbbtn reads データの入力規則"
+    },
+    "labels:width": {
+      "status": "no-consumer",
+      "tcid": 12561,
+      "name": "GalMaximumWidth",
+      "reason": "nothing in the label set resolves this key"
     },
     "labels:zeros": {
       "status": "unresolved",
@@ -1697,28 +3511,23 @@
       "name": "AdvancedFilter",
       "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
     },
-    "menu:mac.data.dataTable": {
-      "status": "unconfirmed",
-      "tcid": 862,
-      "name": "DataTable",
-      "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
+    "menu:mac.data.clear": {
+      "status": "no-consumer",
+      "tcid": 900,
+      "name": "ShowAll2",
+      "reason": "nothing in the label set resolves this key"
     },
-    "menu:mac.data.goalSeek": {
-      "status": "unconfirmed",
-      "tcid": 856,
-      "name": "GoalSeek",
-      "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
+    "menu:mac.data.filter": {
+      "status": "no-consumer",
+      "tcid": 899,
+      "name": "AutoFilter",
+      "reason": "nothing in the label set resolves this key"
     },
     "menu:mac.data.reapply": {
-      "status": "unconfirmed",
+      "status": "no-consumer",
       "tcid": 12231,
       "name": "XLReapplyFilter",
-      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
-    },
-    "menu:mac.data.scenarioManager": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
+      "reason": "nothing in the label set resolves this key"
     },
     "menu:mac.data.sortAsc": {
       "status": "pinned-pending",
@@ -1726,37 +3535,31 @@
       "reason": "runtime substitution with no ribbon string source"
     },
     "menu:mac.data.sortCustom": {
-      "status": "unconfirmed",
-      "tcid": 12946,
-      "name": "XLSortRibbon",
-      "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
+      "status": "no-consumer",
+      "tcid": 12949,
+      "reason": "mac.data.sortCustom resolves through labels:sortCustom (the Data tab button, drawn 並べ替え); no menu item of ours shows the drawn menu text ユーザー設定の並べ替え...."
     },
     "menu:mac.data.sortDesc": {
       "status": "pinned-pending",
       "tcid": null,
       "reason": "runtime substitution with no ribbon string source"
     },
-    "menu:mac.data.validation.circleInvalid": {
-      "status": "unconfirmed",
-      "tcid": 2035,
-      "name": "ValidationMarkInvalidData",
-      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
-    },
-    "menu:mac.data.validation.clearCircles": {
-      "status": "suspect-bundle-value",
-      "tcid": 2055,
-      "name": "ValidationUnmarkInvalidData",
-      "reason": "th value is a long description, not a command name"
-    },
     "menu:mac.data.validation.clearRules": {
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
     },
+    "menu:mac.draw.eraser": {
+      "status": "no-consumer",
+      "tcid": 18965,
+      "name": "FlyoutAnchorErasers",
+      "reason": "nothing in the label set resolves this key"
+    },
     "menu:mac.draw.highlighter": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
+      "status": "no-consumer",
+      "tcid": 27643,
+      "name": "InkToolboxAddHighlighter",
+      "reason": "nothing in the label set resolves this key"
     },
     "menu:mac.draw.penBlack": {
       "status": "unresolved",
@@ -1769,9 +3572,16 @@
       "reason": "no node with matching ja label"
     },
     "menu:mac.draw.pencil": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
+      "status": "no-consumer",
+      "tcid": 27642,
+      "name": "InkToolboxAddPencil",
+      "reason": "nothing in the label set resolves this key"
+    },
+    "menu:mac.draw.toggle": {
+      "status": "no-consumer",
+      "tcid": 26992,
+      "name": "TabDrawInk",
+      "reason": "nothing in the label set resolves this key"
     },
     "menu:mac.formulas.calc.autoNoTable": {
       "status": "unresolved",
@@ -1788,25 +3598,11 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "menu:mac.formulas.errorCheck.run": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "ambiguous: 11945:FlyoutAnchorErrorChecking, 6122:ErrorChecking"
-    },
-    "menu:mac.formulas.errorCheck.trace": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.formulas.removeArrows.dependents": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.formulas.removeArrows.precedents": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
+    "menu:mac.formulas.removeArrows.all": {
+      "status": "drawn-disagrees",
+      "tcid": 11946,
+      "name": "FlyoutAnchorRemoveArrows",
+      "reason": "tbbtn of TCID 11946 disagrees with the drawn label: ja at AX 数式: 0.1.0.3.2 > 0.0 (the menu item; the ribbon button 0.1.0.3.2 draws the same): drawn 'トレース矢印の削除', bundle '矢印の削除'. 453 tbbtn2 matches all 7 locales."
     },
     "menu:mac.insert.chartArea": {
       "status": "unresolved",
@@ -1827,6 +3623,30 @@
       "status": "unresolved",
       "tcid": null,
       "reason": "ambiguous: 15535:ExcelChartGallery2, 18927:InsertLineSparkline"
+    },
+    "menu:mac.insert.chartPie": {
+      "status": "no-consumer",
+      "tcid": 15536,
+      "name": "ExcelChartGallery3",
+      "reason": "nothing in the label set resolves this key"
+    },
+    "menu:mac.insert.chartScatter": {
+      "status": "no-consumer",
+      "tcid": 15539,
+      "name": "ExcelChartGallery6",
+      "reason": "nothing in the label set resolves this key"
+    },
+    "menu:mac.insert.pivotTable": {
+      "status": "no-consumer",
+      "tcid": 12247,
+      "name": "sx12NewPivot",
+      "reason": "nothing in the label set resolves this key"
+    },
+    "menu:mac.insert.recommendedPivotTable": {
+      "status": "no-consumer",
+      "tcid": 29979,
+      "name": "PivotTableExpress",
+      "reason": "nothing in the label set resolves this key"
     },
     "menu:mac.insert.shapeArrow": {
       "status": "unresolved",
@@ -1863,21 +3683,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "menu:mac.page.break.insert": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.break.remove": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.break.reset": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "menu:mac.page.color.gray": {
       "status": "unresolved",
       "tcid": null,
@@ -1897,12 +3702,6 @@
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.margins.custom": {
-      "status": "unconfirmed",
-      "tcid": 12795,
-      "name": "MarginsAdvancedOptions",
-      "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
     },
     "menu:mac.page.margins.narrow": {
       "status": "unresolved",
@@ -1930,16 +3729,6 @@
       "reason": "no node with matching ja label"
     },
     "menu:mac.page.printArea.add": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.printArea.clear": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.printArea.set": {
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
@@ -1974,16 +3763,258 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "menu:mac.review.convertNotes": {
-      "status": "suspect-bundle-value",
-      "tcid": 33546,
-      "name": "ConvertComments",
-      "reason": "ko value is descriptive text, not a command name"
+    "menu:mac.view.formulaBar": {
+      "status": "no-consumer",
+      "tcid": 849,
+      "name": "FormulaBar",
+      "reason": "nothing in the label set resolves this key"
+    },
+    "menu:mac.view.freeze": {
+      "status": "no-consumer",
+      "tcid": 443,
+      "name": "FreezePanes",
+      "reason": "nothing in the label set resolves this key"
+    },
+    "menu:mac.view.gridlines": {
+      "status": "no-consumer",
+      "tcid": 15923,
+      "name": "GridlinesExcel",
+      "reason": "nothing in the label set resolves this key"
+    },
+    "menu:mac.view.headings": {
+      "status": "no-consumer",
+      "tcid": 15644,
+      "name": "BooleanChoiceViewHeadings2",
+      "reason": "nothing in the label set resolves this key"
     },
     "menu:mac.view.zeros": {
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
     }
-  }
+  },
+  "consumers": [
+    "groups:Accessibility",
+    "groups:Add-ins",
+    "groups:Analysis",
+    "groups:Calculation",
+    "groups:Charts",
+    "groups:Comments",
+    "groups:Controls",
+    "groups:Data Tools",
+    "groups:Data Types",
+    "groups:Defined Names",
+    "groups:Filters",
+    "groups:Forecast",
+    "groups:Forms",
+    "groups:Formula Auditing",
+    "groups:Function Library",
+    "groups:Get & Transform Data",
+    "groups:Illustrations",
+    "groups:Ink",
+    "groups:Language",
+    "groups:Links",
+    "groups:Macros",
+    "groups:Notes",
+    "groups:Outline",
+    "groups:Page Setup",
+    "groups:Pens",
+    "groups:Proofing",
+    "groups:Protect",
+    "groups:Python",
+    "groups:Scale to Fit",
+    "groups:Sheet Views",
+    "groups:Show",
+    "groups:Sparklines",
+    "groups:Symbols",
+    "groups:Tables",
+    "groups:Themes",
+    "groups:Tools",
+    "groups:Workbook Views",
+    "groups:Zoom",
+    "labels:accessibility",
+    "labels:add",
+    "labels:addins",
+    "labels:advancedFilter",
+    "labels:alwaysReadOnly",
+    "labels:arrange",
+    "labels:autoSum",
+    "labels:automate",
+    "labels:background",
+    "labels:calcOptions",
+    "labels:cellFocus",
+    "labels:chartColumn",
+    "labels:chartCombo",
+    "labels:chartHierarchy",
+    "labels:chartLine",
+    "labels:chartMap",
+    "labels:chartPie",
+    "labels:chartScatter",
+    "labels:chartStatistical",
+    "labels:chartWaterfall",
+    "labels:checkBox",
+    "labels:clear",
+    "labels:color",
+    "labels:consolidate",
+    "labels:createFromSelection",
+    "labels:customViews",
+    "labels:data",
+    "labels:dataAnalysis",
+    "labels:dataCleanup",
+    "labels:dataTypeIcons",
+    "labels:dataTypes",
+    "labels:dateTime",
+    "labels:defineName",
+    "labels:deleteComment",
+    "labels:dependents",
+    "labels:draw",
+    "labels:editor",
+    "labels:equation",
+    "labels:eraser",
+    "labels:errorCheck",
+    "labels:filter",
+    "labels:financial",
+    "labels:flashFill",
+    "labels:font",
+    "labels:forms",
+    "labels:formulaBar",
+    "labels:formulas",
+    "labels:gridlines",
+    "labels:gridlinesHeading",
+    "labels:group",
+    "labels:headings",
+    "labels:hide",
+    "labels:hideDetail",
+    "labels:hideInk",
+    "labels:highlighter",
+    "labels:home",
+    "labels:icons",
+    "labels:initialize",
+    "labels:insert",
+    "labels:insertFunction",
+    "labels:lasso",
+    "labels:link",
+    "labels:logical",
+    "labels:lookup",
+    "labels:margins",
+    "labels:math",
+    "labels:more",
+    "labels:namesManager",
+    "labels:navigation",
+    "labels:newComment",
+    "labels:newScript",
+    "labels:newWindow",
+    "labels:notes",
+    "labels:object",
+    "labels:orientation",
+    "labels:pageBreaks",
+    "labels:pencil",
+    "labels:photo",
+    "labels:pictureFromData",
+    "labels:pivotChart",
+    "labels:pivotTable",
+    "labels:powerQuery",
+    "labels:precedents",
+    "labels:printArea",
+    "labels:printGridlines",
+    "labels:printHeadings",
+    "labels:printTitles",
+    "labels:properties",
+    "labels:protectWorkbook",
+    "labels:python",
+    "labels:queriesConnections",
+    "labels:reapply",
+    "labels:recalc",
+    "labels:recent",
+    "labels:recommendedChart",
+    "labels:recommendedPivotTable",
+    "labels:recordMacro",
+    "labels:refreshAll",
+    "labels:relativeRecording",
+    "labels:removeArrows",
+    "labels:removeDuplicates",
+    "labels:resetWindow",
+    "labels:review",
+    "labels:ruler",
+    "labels:scaleHeight",
+    "labels:scaleWidth",
+    "labels:screenshot",
+    "labels:shapeRoundedRectangle",
+    "labels:shapeTriangle",
+    "labels:shapes",
+    "labels:sheetRecalc",
+    "labels:sheetViewSave",
+    "labels:show",
+    "labels:showChanges",
+    "labels:showComments",
+    "labels:showDetail",
+    "labels:showFormulas",
+    "labels:showGridlines",
+    "labels:showHeadings",
+    "labels:showScripts",
+    "labels:sideBySide",
+    "labels:size",
+    "labels:slicer",
+    "labels:smartArt",
+    "labels:sortCustom",
+    "labels:sortFilter",
+    "labels:sparkline",
+    "labels:spelling",
+    "labels:split",
+    "labels:standard",
+    "labels:statistical",
+    "labels:stats",
+    "labels:subtotal",
+    "labels:switchWindow",
+    "labels:symbol",
+    "labels:syncScroll",
+    "labels:table",
+    "labels:text",
+    "labels:textBox",
+    "labels:theme",
+    "labels:thesaurus",
+    "labels:threeDModel",
+    "labels:timeline",
+    "labels:toggle",
+    "labels:translate",
+    "labels:ungroup",
+    "labels:unhide",
+    "labels:useInFormula",
+    "labels:view",
+    "labels:watch",
+    "labels:whatIf",
+    "labels:wordArt",
+    "labels:workbookLinks",
+    "labels:zoom",
+    "labels:zoom100",
+    "labels:zoomSelection",
+    "menu:mac.data.dataTable",
+    "menu:mac.data.goalSeek",
+    "menu:mac.data.scenarioManager",
+    "menu:mac.data.validation.circleInvalid",
+    "menu:mac.data.validation.clearCircles",
+    "menu:mac.data.validation.settings",
+    "menu:mac.formulas.calc.auto",
+    "menu:mac.formulas.calc.manual",
+    "menu:mac.formulas.category.all",
+    "menu:mac.formulas.category.recent",
+    "menu:mac.formulas.errorCheck.run",
+    "menu:mac.formulas.errorCheck.trace",
+    "menu:mac.formulas.removeArrows.dependents",
+    "menu:mac.formulas.removeArrows.precedents",
+    "menu:mac.page.break.insert",
+    "menu:mac.page.break.remove",
+    "menu:mac.page.break.reset",
+    "menu:mac.page.margins.custom",
+    "menu:mac.page.printArea.clear",
+    "menu:mac.page.printArea.set",
+    "menu:mac.review.convertNotes",
+    "menu:mac.review.newNote",
+    "menu:mac.review.nextNote",
+    "menu:mac.review.previousNote",
+    "menu:mac.review.showHideNote",
+    "menu:mac.review.showNotes",
+    "menu:mac.view.freeze.firstColumn",
+    "menu:mac.view.freeze.firstRow"
+  ]
 }

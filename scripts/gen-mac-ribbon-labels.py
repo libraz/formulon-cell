@@ -10,7 +10,9 @@ Inputs (read-only; the app is never launched):
     -> TCID and the string source whose ja text equals the observed ja label.
 
 Per entry and locale the label is the cleaned string of that source for the TCID's key; there
-is no fallback between sources. Entries flagged `strip_ellipsis` additionally lose a trailing
+is no fallback between sources. An entry with `identical_to: [tcid, source]` fails the run
+when that candidate's strings differ in any locale from the mapped ones. Entries flagged
+`strip_ellipsis` additionally lose a trailing
 ellipsis in every locale (see strip_trailing_ellipsis). Keys under `held` (unconfirmed source,
 pinned pending, suspect value, no match) are not generated and keep their current text.
 
@@ -46,7 +48,8 @@ def clean(v):
       1. strip a "(&X)" or "(&&)" accelerator suffix;
       2. "&&" is a literal "&";
       3. a trailing "+&" is the key name "Ctrl+&";
-      4. every other "&" is an accelerator marker and is removed.
+      4. every other "&" is an accelerator marker and is removed; a leading one also takes the
+         single space after it.
 
     >>> clean('書式(&F)'), clean('クエリと接続(&&)')
     ('書式', 'クエリと接続')
@@ -56,8 +59,16 @@ def clean(v):
     'Ctrl+&'
     >>> clean('& Format Painter'), clean('Zum& ersten Bildschirm wechseln')
     ('Format Painter', 'Zum ersten Bildschirm wechseln')
+    >>> clean('表格  ')
+    '表格  '
     >>> clean('Afficher les modifications&')
     'Afficher les modifications'
+
+    Every other code point passes through as the bundle has it (the ribbon draws these
+    zero-width spaces).
+
+    >>> clean('次の\u200bコメント') == '次の\u200bコメント'
+    True
 
     The ribbon treats a spaced " & " as a marker too and keeps both spaces (the ja Data tab
     draws "クエリ  接続").
@@ -68,19 +79,24 @@ def clean(v):
     v = re.sub(r'\s*\(&[^)]\)', '', v)
     v = v.replace('&&', LITERAL_AMP)
     v = re.sub(r'\+&$', '+' + LITERAL_AMP, v)
-    v = v.replace('&', '').replace(LITERAL_AMP, '&')
-    return v.replace('\u200b', '').strip()
+    v = re.sub(r'^& ?', '', v)
+    return v.replace('&', '').replace(LITERAL_AMP, '&')
 
 
 def strip_trailing_ellipsis(v):
-    """Drop a trailing "..." or "…" and the space before it.
+    """Drop a trailing "..." or "…" and the space before it, also when zero-width spaces follow.
 
     Rule, bundle side only: ribbon buttons are drawn without the ellipsis their bundle
     strings carry (every captured button agrees). A menu entry keeps its ellipsis unless
     the capture shows that menu item without one, so only map entries flagged
-    `strip_ellipsis` use this.
+    `strip_ellipsis` use this. Zero-width spaces after the ellipsis stay.
+
+    >>> strip_trailing_ellipsis('슬라이서...\u200b\u200b') == '슬라이서\u200b\u200b'
+    True
+    >>> strip_trailing_ellipsis('Online Pictures ...'), strip_trailing_ellipsis('Gitter\u2026')
+    ('Online Pictures', 'Gitter')
     """
-    return re.sub(r'\s*(\.\.\.|\u2026)$', '', v).strip()
+    return re.sub(r'\s*(\.\.\.|\u2026)(?=\u200b*$)', '', v)
 
 
 def decode_ribbon(path):
@@ -177,7 +193,12 @@ def out_of_scope(ours):
 
 
 def q(v):
-    return "'" + v.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n') + "'"
+    """A TS string literal quoted the way the formatter writes it: single quotes unless the
+    value holds a single quote and no double quote."""
+    v = v.replace('\\', '\\\\').replace('\n', '\\n')
+    if "'" in v and '"' not in v:
+        return '"' + v + '"'
+    return "'" + v.replace("'", "\\'") + "'"
 
 
 def render(rows):
@@ -208,10 +229,33 @@ def build(b, ours, mapfile):
         if key in m.get('held', {}):
             problems.append((key, 'key is both mapped and held'))
             continue
+        if key.startswith('menu:') and e.get('evidence') and not e.get('ax_path'):
+            # A drawn reading for a menu item must name the menu it was read from.
+            problems.append((key, 'menu evidence without the AX path of the menu item'))
+            continue
+        control = e.get('control')
+        if control == 'button' and not e.get('strip_ellipsis'):
+            problems.append((key, 'a button is drawn without the bundle ellipsis: set strip_ellipsis'))
+            continue
+        if control == 'menu-item' and e.get('strip_ellipsis'):
+            problems.append((key, 'a menu item keeps its ellipsis: remove strip_ellipsis'))
+            continue
+        if e.get('disagrees'):
+            problems.append((key, f'recorded disagreement with the drawn label: {e["disagrees"]}'))
+            continue
         labs, why = b.labels(e['tcid'], e['source'])
         if labs is None:
             problems.append((key, why))
             continue
+        if e.get('identical_to'):
+            other, why = b.labels(*e['identical_to'])
+            if other is None:
+                problems.append((key, f'identical_to: {why}'))
+                continue
+            if other != labs:
+                diff = [loc for loc in LOCS if other[loc] != labs[loc]]
+                problems.append((key, f'identical_to {e["identical_to"]} differs in {diff}'))
+                continue
         if e.get('strip_ellipsis'):
             labs = {loc: strip_trailing_ellipsis(v) for loc, v in labs.items()}
         rows[key] = labs
@@ -273,6 +317,16 @@ def main():
     if problems:
         return 2
     if a.check:
+        doc = json.load(open(a.map, encoding='utf-8'))
+        mapped = doc['map']
+        consumers = set(doc.get('consumers', ()))
+        unresolved = sorted(k for k in rows if k not in consumers)
+        if unresolved:
+            print(f'mapped keys that our label set never resolves (run verify-mac-ribbon-labels.py --write): '
+                  f'{unresolved}', file=sys.stderr)
+            return 1
+        unverified = {loc: sum(1 for k in rows if loc not in mapped[k].get('verified', {})) for loc in LOCS}
+        print(f'mapped rows without a drawn reading, per locale: {unverified}', file=sys.stderr)
         path = Path(a.check)
         if not path.exists() or path.read_text(encoding='utf-8') != text:
             print(f'{a.check} differs from the generated output', file=sys.stderr)
