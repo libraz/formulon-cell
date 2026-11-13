@@ -730,7 +730,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     const suggest = (text: string): string => {
       if (!text) return '';
       if (isValidDefinedName(text)) return text;
-      const cleaned = sanitizeName(text, '');
+      const cleaned = sanitizeName(text);
       return isValidDefinedName(cleaned) ? cleaned : '';
     };
     const name =

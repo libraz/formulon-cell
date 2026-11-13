@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
-  createDefinedNamesFromSelection,
   definedNameDisplayFormula,
   definedNameExists,
   definedNameValueText,
@@ -9,7 +8,9 @@ import {
   insertDefinedNameFormula,
   isValidDefinedName,
   listDefinedNames,
+  planDefinedNamesFromSelection,
   recordDefinedNamesChange,
+  sanitizeName,
   upsertDefinedName,
 } from '../../../src/commands/named-ranges.js';
 import type { Addr } from '../../../src/engine/types.js';
@@ -27,6 +28,7 @@ interface MutableWb {
   setFormula?(addr: Addr, formula: string): void;
   recalc(): void;
   recalcAuto(): void;
+  sheetName(sheet: number): string;
 }
 
 const makeWb = (
@@ -67,14 +69,21 @@ const makeWb = (
     recalcAuto() {
       recalcCount += 1;
     },
+    sheetName: (sheet) => ['Sheet1', 'My Sheet'][sheet] ?? '',
   };
   return { wb: fake as unknown as WorkbookHandle, calls, formulas, recalcs: () => recalcCount };
 };
 
-const seedText = (store: SpreadsheetStore, row: number, col: number, value: string): void => {
+const seedText = (
+  store: SpreadsheetStore,
+  row: number,
+  col: number,
+  value: string,
+  sheet = 0,
+): void => {
   store.setState((s) => {
     const cells = new Map(s.data.cells);
-    cells.set(`0:${row}:${col}`, { value: { kind: 'text', value }, formula: null });
+    cells.set(`${sheet}:${row}:${col}`, { value: { kind: 'text', value }, formula: null });
     return { ...s, data: { ...s.data, cells } };
   });
 };
@@ -268,24 +277,6 @@ describe('named range commands', () => {
     expect(isValidDefinedName(name)).toBe(false);
   });
 
-  it('keeps Japanese labels when creating names from the selection', () => {
-    const store = createSpreadsheetStore();
-    const { wb } = makeWb();
-    seedText(store, 0, 0, '売上 合計');
-    seedText(store, 0, 1, 'TRUE');
-    seedText(store, 0, 2, '1月');
-    seedText(store, 0, 3, 'a-b');
-    setRange(store, 0, 0, 2, 3);
-    const result = createDefinedNamesFromSelection(store.getState(), wb, 'top-row');
-    expect(result.ok && result.entries.map((e) => e.name)).toEqual([
-      '売上_合計',
-      '_TRUE',
-      '_1月',
-      'a_b',
-    ]);
-    if (result.ok) for (const e of result.entries) expect(isValidDefinedName(e.name)).toBe(true);
-  });
-
   it('detects duplicate names within a scope ignoring case and width', () => {
     const { wb } = makeWb();
     expect(definedNameExists(wb, 'taxrate')).toBe(true);
@@ -323,21 +314,6 @@ describe('named range commands', () => {
     expect(text('=Sheet1!$A$1:$Z$100').endsWith('…')).toBe(true);
   });
 
-  it('sanitizes header labels that collide with cell references (H-33)', () => {
-    const store = createSpreadsheetStore();
-    const { wb } = makeWb();
-    // A header of "A1" would sanitize to the valid identifier "A1", which is a
-    // cell reference — the create path must prefix it so the write succeeds.
-    seedText(store, 0, 0, 'A1');
-    setRange(store, 0, 0, 2, 0);
-
-    const result = createDefinedNamesFromSelection(store.getState(), wb, 'top-row');
-    expect(result).toEqual({
-      ok: true,
-      entries: [{ name: '_A1', formula: '$A$2:$A$3', localSheetId: -1 }],
-    });
-  });
-
   it('reports unsupported and failed writes', () => {
     expect(upsertDefinedName(makeWb(false).wb, 'Name', '=A1')).toEqual({
       ok: false,
@@ -360,109 +336,13 @@ describe('named range commands', () => {
     expect(calls).toEqual([{ name: 'TaxRate', formula: '', localSheetId: -1 }]);
   });
 
-  it('creates defined names from the top row of the selection', () => {
-    const store = createSpreadsheetStore();
-    const { wb, calls } = makeWb();
-    seedText(store, 0, 0, 'Sales Total');
-    seedText(store, 0, 1, '2026 Rate');
-    setRange(store, 0, 0, 2, 1);
-
-    const result = createDefinedNamesFromSelection(store.getState(), wb, 'top-row');
-
-    expect(result).toEqual({
-      ok: true,
-      entries: [
-        { name: 'Sales_Total', formula: '$A$2:$A$3', localSheetId: -1 },
-        { name: '_2026_Rate', formula: '$B$2:$B$3', localSheetId: -1 },
-      ],
-    });
-    expect(calls).toEqual([
-      { name: 'Sales_Total', formula: '=$A$2:$A$3', localSheetId: -1 },
-      { name: '_2026_Rate', formula: '=$B$2:$B$3', localSheetId: -1 },
-    ]);
-  });
-
-  it('creates defined names from the bottom row of the selection', () => {
-    const store = createSpreadsheetStore();
-    const { wb, calls } = makeWb();
-    seedText(store, 2, 0, 'Sales Total');
-    seedText(store, 2, 1, 'Tax Rate');
-    setRange(store, 0, 0, 2, 1);
-
-    const result = createDefinedNamesFromSelection(store.getState(), wb, 'bottom-row');
-
-    expect(result).toEqual({
-      ok: true,
-      entries: [
-        { name: 'Sales_Total', formula: '$A$1:$A$2', localSheetId: -1 },
-        { name: 'Tax_Rate', formula: '$B$1:$B$2', localSheetId: -1 },
-      ],
-    });
-    expect(calls).toEqual([
-      { name: 'Sales_Total', formula: '=$A$1:$A$2', localSheetId: -1 },
-      { name: 'Tax_Rate', formula: '=$B$1:$B$2', localSheetId: -1 },
-    ]);
-  });
-
-  it('creates defined names from the left and right columns of the selection', () => {
-    const store = createSpreadsheetStore();
-    const left = makeWb();
-    seedText(store, 0, 0, 'North');
-    seedText(store, 1, 0, 'South');
-    setRange(store, 0, 0, 1, 2);
-
-    expect(createDefinedNamesFromSelection(store.getState(), left.wb, 'left-column')).toEqual({
-      ok: true,
-      entries: [
-        { name: 'North', formula: '$B$1:$C$1', localSheetId: -1 },
-        { name: 'South', formula: '$B$2:$C$2', localSheetId: -1 },
-      ],
-    });
-
-    const right = makeWb();
-    seedText(store, 0, 2, 'West');
-    seedText(store, 1, 2, 'East');
-
-    expect(createDefinedNamesFromSelection(store.getState(), right.wb, 'right-column')).toEqual({
-      ok: true,
-      entries: [
-        { name: 'West', formula: '$A$1:$B$1', localSheetId: -1 },
-        { name: 'East', formula: '$A$2:$B$2', localSheetId: -1 },
-      ],
-    });
-  });
-
-  it('refuses to create defined names from huge whole-row or whole-column selections', () => {
-    const store = createSpreadsheetStore();
-    const top = makeWb();
-    setRange(store, 0, 0, 1, 16_383);
-
-    expect(createDefinedNamesFromSelection(store.getState(), top.wb, 'top-row')).toEqual({
-      ok: false,
-      reason: 'too-large',
-    });
-    expect(top.calls).toEqual([]);
-
-    const left = makeWb();
-    setRange(store, 0, 0, 1_048_575, 1);
-
-    expect(createDefinedNamesFromSelection(store.getState(), left.wb, 'left-column')).toEqual({
-      ok: false,
-      reason: 'too-large',
-    });
-    expect(left.calls).toEqual([]);
-  });
-
   it('records defined-name mutations as one undoable history action', () => {
-    const store = createSpreadsheetStore();
     const { wb } = makeWb();
     const history = new History();
-    seedText(store, 0, 0, 'Sales Total');
-    seedText(store, 0, 1, '2026 Rate');
-    setRange(store, 0, 0, 2, 1);
 
     recordDefinedNamesChange(history, wb, () => {
-      createDefinedNamesFromSelection(store.getState(), wb, 'top-row');
+      upsertDefinedName(wb, 'Sales_Total', '=Sheet1!$A$2:$A$3');
+      upsertDefinedName(wb, '_2026_Rate', '=Sheet1!$B$2:$B$3');
     });
 
     expect([...wb.definedNames()].map((entry) => entry.name)).toEqual([
@@ -567,5 +447,192 @@ describe('named range commands', () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+// Labels and the names the desktop's Create from Selection gave them, measured over every edge.
+const MEASURED_LABELS: readonly (readonly [string, string])[] = [
+  ['Q1', 'Q1_'],
+  ['A1', 'A1_'],
+  ['XFD1048576', 'XFD1048576_'],
+  ['XFE1', 'XFE1'],
+  ['R1C1', '_R1C1'],
+  ['R', 'R_'],
+  ['C', 'C_'],
+  ['r', 'r_'],
+  ['2020', '_2020'],
+  ['1abc', '_1abc'],
+  ['a b', 'a_b'],
+  ['Sales-Total', 'Sales_Total'],
+  ['Sales.Total', 'Sales.Total'],
+  ['TRUE', 'TRUE_'],
+  ['_x', '_x'],
+  ['Ä1', 'Ä1'],
+  ['売上', '売上'],
+  ['Q1 ', 'Q1_'],
+  ['=x', 'x'],
+];
+
+describe('Create from Selection names', () => {
+  it.each(MEASURED_LABELS)('names the text label %j as %j', (label, name) => {
+    expect(sanitizeName(label)).toBe(name);
+    expect(isValidDefinedName(name)).toBe(true);
+  });
+
+  it('gives no name for a blank label', () => {
+    expect(sanitizeName('')).toBe('');
+    expect(sanitizeName('   ')).toBe('');
+  });
+
+  it.each([
+    ['top', { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 }],
+    ['left', { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 }],
+  ] as const)('names every measured label the same way on the %s edge', (edge, range) => {
+    const edges = { top: edge === 'top', left: edge === 'left', bottom: false, right: false };
+    for (const [label, name] of MEASURED_LABELS) {
+      const store = createSpreadsheetStore();
+      seedText(store, 0, 0, label);
+      const planned = planDefinedNamesFromSelection(store.getState(), makeWb().wb, range, edges);
+      expect(planned.ok && planned.names.map((n) => n.name), label).toEqual([name]);
+    }
+  });
+
+  it('defines the measured header row: later labels win, numbers, booleans and blanks give none', () => {
+    const store = createSpreadsheetStore();
+    const headers = ['Q1', 'A1', 'XFD1048576', 'XFE1', 'R1C1', 'R', 'C', 'r', 2020, '1abc', 'a b'];
+    const more = [
+      'Sales-Total',
+      'Sales.Total',
+      true,
+      null,
+      '_x',
+      'Ä1',
+      '売上',
+      'Q1 ',
+      'Dup',
+      'Dup',
+    ];
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      for (const [col, label] of [...headers, ...more].entries()) {
+        if (label === null) continue;
+        const value =
+          typeof label === 'number'
+            ? { kind: 'number' as const, value: label }
+            : typeof label === 'boolean'
+              ? { kind: 'bool' as const, value: label }
+              : { kind: 'text' as const, value: label };
+        cells.set(`0:0:${col}`, { value, formula: null });
+      }
+      return { ...s, data: { ...s.data, cells } };
+    });
+    const planned = planDefinedNamesFromSelection(
+      store.getState(),
+      makeWb().wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 20 },
+      { top: true, left: false, bottom: false, right: false },
+    );
+    const measured = [
+      ['_1abc', '=Sheet1!$J$2:$J$3'],
+      ['_R1C1', '=Sheet1!$E$2:$E$3'],
+      ['_x', '=Sheet1!$P$2:$P$3'],
+      ['a_b', '=Sheet1!$K$2:$K$3'],
+      ['Ä1', '=Sheet1!$Q$2:$Q$3'],
+      ['A1_', '=Sheet1!$B$2:$B$3'],
+      ['C_', '=Sheet1!$G$2:$G$3'],
+      ['Dup', '=Sheet1!$U$2:$U$3'],
+      ['Q1_', '=Sheet1!$S$2:$S$3'],
+      ['r_', '=Sheet1!$H$2:$H$3'],
+      ['Sales_Total', '=Sheet1!$L$2:$L$3'],
+      ['Sales.Total', '=Sheet1!$M$2:$M$3'],
+      ['XFD1048576_', '=Sheet1!$C$2:$C$3'],
+      ['XFE1', '=Sheet1!$D$2:$D$3'],
+      ['売上', '=Sheet1!$R$2:$R$3'],
+    ];
+    const byName = (a: string[], b: string[]) => (a[0] ?? '').localeCompare(b[0] ?? '');
+    expect(planned.ok && planned.names.map((n) => [n.name, n.formula]).sort(byName)).toEqual(
+      measured.sort(byName),
+    );
+  });
+
+  it('leaves the other checked edges out of each name, qualified by the sheet', () => {
+    const store = createSpreadsheetStore();
+    seedText(store, 0, 1, 'Qty', 1);
+    seedText(store, 0, 2, 'Price', 1);
+    seedText(store, 1, 0, 'North', 1);
+    seedText(store, 2, 0, 'South', 1);
+    const planned = planDefinedNamesFromSelection(
+      store.getState(),
+      makeWb().wb,
+      { sheet: 1, r0: 0, c0: 0, r1: 2, c1: 2 },
+      { top: true, left: true, bottom: false, right: false },
+    );
+    expect(planned).toEqual({
+      ok: true,
+      names: [
+        { name: 'Qty', formula: "='My Sheet'!$B$2:$B$3" },
+        { name: 'Price', formula: "='My Sheet'!$C$2:$C$3" },
+        { name: 'North', formula: "='My Sheet'!$B$2:$C$2" },
+        { name: 'South', formula: "='My Sheet'!$B$3:$C$3" },
+      ],
+    });
+  });
+
+  it('names from the bottom row and right column, and gives a single cell its own reference', () => {
+    const store = createSpreadsheetStore();
+    seedText(store, 1, 0, 'Total');
+    seedText(store, 0, 1, 'East');
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    const wb = makeWb().wb;
+    expect(
+      planDefinedNamesFromSelection(store.getState(), wb, range, {
+        top: false,
+        left: false,
+        bottom: true,
+        right: false,
+      }),
+    ).toEqual({ ok: true, names: [{ name: 'Total', formula: '=Sheet1!$A$1' }] });
+    expect(
+      planDefinedNamesFromSelection(store.getState(), wb, range, {
+        top: false,
+        left: false,
+        bottom: false,
+        right: true,
+      }),
+    ).toEqual({ ok: true, names: [{ name: 'East', formula: '=Sheet1!$A$1' }] });
+  });
+
+  it('resolves a name two edges give to the later edge', () => {
+    const store = createSpreadsheetStore();
+    seedText(store, 0, 1, 'Total');
+    seedText(store, 1, 0, 'TOTAL');
+    const planned = planDefinedNamesFromSelection(
+      store.getState(),
+      makeWb().wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
+      { top: true, left: true, bottom: false, right: false },
+    );
+    expect(planned).toEqual({ ok: true, names: [{ name: 'TOTAL', formula: '=Sheet1!$B$2' }] });
+  });
+
+  it('refuses huge whole-row or whole-column selections', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    expect(
+      planDefinedNamesFromSelection(
+        store.getState(),
+        wb,
+        { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 16_383 },
+        { top: true, left: false, bottom: false, right: false },
+      ),
+    ).toEqual({ ok: false, reason: 'too-large' });
+    expect(
+      planDefinedNamesFromSelection(
+        store.getState(),
+        wb,
+        { sheet: 0, r0: 0, c0: 0, r1: 1_048_575, c1: 1 },
+        { top: false, left: true, bottom: false, right: false },
+      ),
+    ).toEqual({ ok: false, reason: 'too-large' });
   });
 });

@@ -1,3 +1,4 @@
+import type { CreateDefinedNamesEdges } from '../../commands/named-ranges.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import {
   appendDialogActions,
@@ -5,14 +6,6 @@ import {
   installDialogLifecycle,
   mountDialog,
 } from './shell.js';
-
-/** The selection's edges whose labels name the rest of each row or column. */
-export interface CreateNamesEdges {
-  top: boolean;
-  left: boolean;
-  bottom: boolean;
-  right: boolean;
-}
 
 export interface CreateNamesDialogOptions {
   /** The spreadsheet host; anchors the dialog and picks its platform layout. */
@@ -28,7 +21,7 @@ export interface CreateNamesDialogOptions {
     cancel: string;
   };
   /** The edges checked on open. */
-  initial: CreateNamesEdges;
+  initial: CreateDefinedNamesEdges;
 }
 
 const EDGES = ['top', 'left', 'bottom', 'right'] as const;
@@ -38,8 +31,8 @@ const EDGES = ['top', 'left', 'bottom', 'right'] as const;
  *  greyed while no edge is checked. */
 export const showCreateNamesDialog = (
   opts: CreateNamesDialogOptions,
-): Promise<CreateNamesEdges | null> =>
-  new Promise<CreateNamesEdges | null>((resolve) => {
+): Promise<CreateDefinedNamesEdges | null> =>
+  new Promise<CreateDefinedNamesEdges | null>((resolve) => {
     const t = opts.labels;
     const shell = createDialogShell({ host: opts.host, title: t.title, bodyVariant: 'app' });
     shell.panel.classList.add('fc-createnames');
@@ -67,7 +60,7 @@ export const showCreateNamesDialog = (
       cancelLabel: t.cancel,
       okLabel: t.ok,
     });
-    const edges = (): CreateNamesEdges => ({
+    const edges = (): CreateDefinedNamesEdges => ({
       top: boxes.top.checked,
       left: boxes.left.checked,
       bottom: boxes.bottom.checked,
@@ -78,7 +71,7 @@ export const showCreateNamesDialog = (
     for (const edge of EDGES) boxes[edge].addEventListener('change', sync);
     sync();
 
-    const lifecycle = installDialogLifecycle<CreateNamesEdges | null>({
+    const lifecycle = installDialogLifecycle<CreateDefinedNamesEdges | null>({
       shell,
       resolve,
       onCancel: () => null,

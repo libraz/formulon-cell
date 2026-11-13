@@ -4,9 +4,12 @@ import { DATA_TABLE_COMMAND } from '../../commands/data-table.js';
 import { cellValueIsFormulaError } from '../../commands/error-indicators.js';
 import { namedRangeWrite } from '../../commands/named-range-actions.js';
 import {
-  createDefinedNamesFromSelection,
+  definedNameExists,
   insertDefinedNameFormula,
   listDefinedNames,
+  type PlannedDefinedName,
+  planDefinedNamesFromSelection,
+  upsertDefinedName,
 } from '../../commands/named-ranges.js';
 import { localizedDecisionReason } from '../../commands/permission-reasons.js';
 import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
@@ -20,6 +23,7 @@ import {
 } from '../../commands/watch.js';
 import { addrKey } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
+import { isMacHost } from '../../extensions/ui-options.js';
 import { openDataTableDialogFrom } from '../../interact/data-table-dialog.js';
 import { openDefineNameDialogFrom, openNamedRangeDialogFrom } from '../../interact/dialog-entry.js';
 import { openMacGoalSeekDialog } from '../../interact/mac-goal-seek-dialog.js';
@@ -28,6 +32,7 @@ import { mutators } from '../../store/store.js';
 import { showCommandRefusal } from '../../toolbar/dialogs/command-refusal.js';
 import { showCreateNamesDialog } from '../../toolbar/dialogs/create-names.js';
 import { showDefinedNamePickerDialog } from '../../toolbar/dialogs/defined-name-picker.js';
+import { showConfirm } from '../../toolbar/dialogs/prompt.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { handleAutoSum } from '../../wrappers/toolbar-actions.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
@@ -252,13 +257,6 @@ const updateClearArrowsMenu =
     }
   };
 
-const CREATE_NAMES_SOURCES = [
-  ['top', 'top-row'],
-  ['left', 'left-column'],
-  ['bottom', 'bottom-row'],
-  ['right', 'right-column'],
-] as const;
-
 /** Whether any cell of `range` holds text, which the Create Names dialog reads as labels. */
 const holdsText = (instance: SpreadsheetInstance, range: Range): boolean => {
   const cells = instance.store.getState().data.cells;
@@ -270,9 +268,8 @@ const holdsText = (instance: SpreadsheetInstance, range: Range): boolean => {
   return false;
 };
 
-/** Create from Selection: the Create Names dialog, then names from each checked edge as one step.
- *  An edge's names leave out the other checked edges, so with Top row and Left column checked the
- *  column names start after the left column and the row names after the top row. */
+/** Create from Selection: the Create Names dialog, then the names from each checked edge as one
+ *  step. */
 async function createNamesFromSelection(instance: SpreadsheetInstance): Promise<void> {
   const strings = instance.i18n.strings;
   const t = strings.ribbonMenu;
@@ -308,16 +305,40 @@ async function createNamesFromSelection(instance: SpreadsheetInstance): Promise<
     },
   });
   if (!edges) return;
-  const narrowed = (source: (typeof CREATE_NAMES_SOURCES)[number][1]): Range => {
-    const rows = source === 'top-row' || source === 'bottom-row';
-    return {
-      ...range,
-      r0: !rows && edges.top ? range.r0 + 1 : range.r0,
-      r1: !rows && edges.bottom ? range.r1 - 1 : range.r1,
-      c0: rows && edges.left ? range.c0 + 1 : range.c0,
-      c1: rows && edges.right ? range.c1 - 1 : range.c1,
-    };
-  };
+  const planned = planDefinedNamesFromSelection(
+    instance.store.getState(),
+    instance.workbook,
+    range,
+    edges,
+  );
+  if (!planned.ok) {
+    await showCommandRefusal({
+      host: instance.host,
+      strings,
+      title: t.createNamesTitle,
+      reason: 'too-large',
+    });
+    return;
+  }
+  // A name the workbook already holds is replaced only on Yes. Provisional: asked before any
+  // write rather than as each name is reached.
+  const names: PlannedDefinedName[] = [];
+  for (const entry of planned.names) {
+    if (
+      definedNameExists(instance.workbook, entry.name) &&
+      !(await showConfirm({
+        title: t.createNamesTitle,
+        message: t.createNamesReplace.replace('{name}', entry.name),
+        okLabel: t.createNamesReplaceYes,
+        cancelLabel: t.createNamesReplaceNo,
+        alert: isMacHost(instance.host),
+      }))
+    ) {
+      continue;
+    }
+    names.push(entry);
+  }
+  if (names.length === 0) return;
   const written = namedRangeWrite(
     {
       store: instance.store,
@@ -327,22 +348,21 @@ async function createNamesFromSelection(instance: SpreadsheetInstance): Promise<
       commandId: 'namedRanges',
     },
     () => {
-      for (const [edge, source] of CREATE_NAMES_SOURCES) {
-        if (!edges[edge]) continue;
-        const state = instance.store.getState();
-        const result = createDefinedNamesFromSelection(
-          { ...state, selection: { ...state.selection, range: narrowed(source) } },
-          instance.workbook,
-          source,
-        );
-        if (!result.ok) return result;
+      for (const { name, formula } of names) {
+        const result = upsertDefinedName(instance.workbook, name, formula);
+        if (!result.ok) return result.reason;
       }
       return null;
     },
   );
-  const reason = written.ok && written.value ? written.value.reason : null;
-  if (reason === 'too-large' || reason === 'engine-failed') {
-    await showCommandRefusal({ host: instance.host, strings, title: t.createNamesTitle, reason });
+  const failure = written.ok ? written.value : null;
+  if (failure !== null && failure !== 'unsupported') {
+    await showCommandRefusal({
+      host: instance.host,
+      strings,
+      title: t.createNamesTitle,
+      reason: 'engine-failed',
+    });
   }
 }
 

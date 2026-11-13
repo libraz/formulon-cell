@@ -1,10 +1,10 @@
 import {
   addrKey,
   colFromLetters,
-  colLetter,
   formatA1Range,
   MAX_COL,
   MAX_ROW,
+  quoteSheetName,
 } from '../engine/address.js';
 import { rangeForRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
@@ -45,11 +45,18 @@ export type DefinedNameDeleteResult =
   | { ok: true; entry: DefinedNameEntry }
   | { ok: false; reason: 'empty-name' | 'unsupported' | 'engine-failed' };
 
-export type CreateDefinedNamesSource = 'top-row' | 'bottom-row' | 'left-column' | 'right-column';
+/** The selection's edges whose labels name the rest of each row or column. */
+export interface CreateDefinedNamesEdges {
+  top: boolean;
+  left: boolean;
+  bottom: boolean;
+  right: boolean;
+}
 
-export interface CreateDefinedNamesResult {
-  ok: true;
-  entries: DefinedNameEntry[];
+/** A workbook-scoped name Create from Selection defines, and the range it refers to. */
+export interface PlannedDefinedName {
+  name: string;
+  formula: string;
 }
 
 type DefinedNamesSnapshot = Map<string, DefinedNameEntry>;
@@ -61,16 +68,16 @@ const MAX_CREATE_DEFINED_NAMES = 10_000;
  * defined name. Covers A1-style addresses within the sheet grid (up to column
  * XFD / row 1048576) and R1C1-style tokens (R, C, RC, R1C1, …).
  */
-const looksLikeCellRef = (name: string): boolean => {
-  const up = name.toUpperCase();
-  const a1 = up.match(/^([A-Z]{1,3})([0-9]{1,7})$/);
-  if (a1) {
-    const col = colFromLetters(a1[1] ?? '');
-    const row = Number.parseInt(a1[2] ?? '', 10) - 1;
-    if (col >= 0 && col <= MAX_COL && row >= 0 && row <= MAX_ROW) return true;
-  }
-  if (/^R[0-9]*C[0-9]*$/.test(up)) return true;
-  return false;
+const looksLikeCellRef = (name: string): boolean =>
+  isA1CellRef(name) || /^R[0-9]*C[0-9]*$/i.test(name);
+
+/** Whether `name` is an A1 address inside the sheet grid (`XFD1048576`, not `XFE1`). */
+const isA1CellRef = (name: string): boolean => {
+  const a1 = name.toUpperCase().match(/^([A-Z]{1,3})([0-9]{1,7})$/);
+  if (!a1) return false;
+  const col = colFromLetters(a1[1] ?? '');
+  const row = Number.parseInt(a1[2] ?? '', 10) - 1;
+  return col >= 0 && col <= MAX_COL && row >= 0 && row <= MAX_ROW;
 };
 
 /** Fold fullwidth ASCII (U+FF01-FF5E), the wave dash and the fullwidth yen to their ASCII-range forms. */
@@ -139,37 +146,28 @@ export function definedNameExists(wb: WorkbookHandle, name: string, localSheetId
   return false;
 }
 
-const absRangeRef = (r0: number, c0: number, r1: number, c1: number): string =>
-  formatA1Range({ r0, c0, r1, c1 }, { absolute: true, collapse: false });
-
-const cellText = (state: State, sheet: number, row: number, col: number): string => {
-  const cell = state.data.cells.get(addrKey({ sheet, row, col }));
-  if (!cell) return '';
-  if (cell.value.kind === 'text') return cell.value.value;
-  if (cell.value.kind === 'number') return String(cell.value.value);
-  return '';
+/** The text label of a cell; a number, a boolean, an error or a blank cell labels nothing. */
+const labelText = (state: State, sheet: number, row: number, col: number): string => {
+  const value = state.data.cells.get(addrKey({ sheet, row, col }))?.value;
+  return value?.kind === 'text' ? value.value : '';
 };
 
-/** Turn arbitrary label text into a name that passes `isValidDefinedName`. */
-export const sanitizeName = (raw: string, fallback: string): string => {
-  const folded = foldName(raw.trim()).replace(/\s+/g, '_');
+/**
+ * Turn label text into a defined name the way Create from Selection does, or `''` when the label
+ * gives none. Surrounding whitespace and a leading `=` are dropped, and whitespace runs and other
+ * characters a name cannot hold become `_`. A label that reads as an A1 cell, TRUE, FALSE or a
+ * bare R or C takes a trailing `_`; one shaped like an R1C1 reference, or starting with a digit,
+ * a leading `_`.
+ */
+export const sanitizeName = (raw: string): string => {
+  const folded = foldName(raw.trim()).replace(/^=+/, '').replace(/\s+/g, '_');
   let body = '';
   for (const ch of folded) body += isNameChar(ch, false) ? ch : '_';
-  body = (body || foldName(fallback)).slice(0, 254);
-  const prefixed = isNameChar([...body][0] ?? '', true) ? body : `_${body}`;
-  // A label like "A1" or "TRUE" is a valid identifier but not a usable name.
-  return isReservedName(prefixed) ? `_${prefixed}` : prefixed;
-};
-
-const uniqueName = (base: string, used: Set<string>): string => {
-  let candidate = base;
-  let suffix = 2;
-  while (used.has(candidate.toLowerCase())) {
-    candidate = `${base}_${suffix}`;
-    suffix += 1;
-  }
-  used.add(candidate.toLowerCase());
-  return candidate;
+  body = body.slice(0, 254);
+  if (!body) return '';
+  if (isA1CellRef(body) || /^(?:true|false|[rc])$/i.test(body)) return `${body}_`;
+  const first = [...body][0] ?? '';
+  return isNameChar(first, true) && !isReservedName(body) ? body : `_${body}`;
 };
 
 const captureDefinedNamesSnapshot = (wb: WorkbookHandle): DefinedNamesSnapshot =>
@@ -426,80 +424,60 @@ export function deleteDefinedName(
   return { ok: true, entry: { name: trimmedName, formula: '', localSheetId } };
 }
 
-export function createDefinedNamesFromSelection(
+/**
+ * The names Create from Selection defines over `range` from the labels on each checked edge. An
+ * edge's names leave out the other checked edges, so with Top row and Left column checked the
+ * column names start after the left column and the row names after the top row. A label that
+ * gives no name is skipped; where two labels give the same name (ignoring case and width), the
+ * later one wins with its own spelling, the edges taken top, left, bottom, right.
+ */
+export function planDefinedNamesFromSelection(
   state: State,
   wb: WorkbookHandle,
-  source: CreateDefinedNamesSource,
-):
-  | CreateDefinedNamesResult
-  | { ok: false; reason: 'unsupported' | 'empty-selection' | 'too-large' | 'engine-failed' } {
-  if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
-  const sheet = state.selection.range.sheet;
-  const r = state.selection.range;
-  const used = new Set([...wb.definedNames()].map((entry) => entry.name.toLowerCase()));
-  const entries: DefinedNameEntry[] = [];
-
-  if (source === 'top-row') {
-    if (r.r0 >= r.r1) return { ok: false, reason: 'empty-selection' };
-    if (r.c1 - r.c0 + 1 > MAX_CREATE_DEFINED_NAMES) {
-      return { ok: false, reason: 'too-large' };
+  range: Range,
+  edges: CreateDefinedNamesEdges,
+): { ok: true; names: PlannedDefinedName[] } | { ok: false; reason: 'too-large' } {
+  const { sheet } = range;
+  const sheetName = quoteSheetName(wb.sheetName(sheet));
+  const r0 = edges.top ? range.r0 + 1 : range.r0;
+  const r1 = edges.bottom ? range.r1 - 1 : range.r1;
+  const c0 = edges.left ? range.c0 + 1 : range.c0;
+  const c1 = edges.right ? range.c1 - 1 : range.c1;
+  const planned = new Map<string, PlannedDefinedName>();
+  const add = (label: string, refers: Omit<Range, 'sheet'>): void => {
+    const name = sanitizeName(label);
+    if (!name) return;
+    const key = nameKey(name);
+    planned.delete(key);
+    planned.set(key, {
+      name,
+      formula: `=${sheetName}!${formatA1Range(refers, { absolute: true })}`,
+    });
+  };
+  // `labels` is the label row or column; the names refer from `from` to `to` across it.
+  const sides = [
+    { checked: edges.top, across: 'cols', labels: range.r0, from: range.r0 + 1, to: range.r1 },
+    { checked: edges.left, across: 'rows', labels: range.c0, from: range.c0 + 1, to: range.c1 },
+    { checked: edges.bottom, across: 'cols', labels: range.r1, from: range.r0, to: range.r1 - 1 },
+    { checked: edges.right, across: 'rows', labels: range.c1, from: range.c0, to: range.c1 - 1 },
+  ] as const;
+  for (const side of sides) {
+    if (!side.checked || side.from > side.to) continue;
+    const count = side.across === 'cols' ? c1 - c0 + 1 : r1 - r0 + 1;
+    if (count > MAX_CREATE_DEFINED_NAMES) return { ok: false, reason: 'too-large' };
+    if (side.across === 'cols') {
+      for (let col = c0; col <= c1; col += 1) {
+        const label = labelText(state, sheet, side.labels, col);
+        add(label, { r0: side.from, c0: col, r1: side.to, c1: col });
+      }
+    } else {
+      for (let row = r0; row <= r1; row += 1) {
+        const label = labelText(state, sheet, row, side.labels);
+        add(label, { r0: row, c0: side.from, r1: row, c1: side.to });
+      }
     }
-    for (let col = r.c0; col <= r.c1; col += 1) {
-      const label = cellText(state, sheet, r.r0, col);
-      const name = uniqueName(sanitizeName(label, `Column_${colLetter(col)}`), used);
-      const formula = `=${absRangeRef(r.r0 + 1, col, r.r1, col)}`;
-      const result = upsertDefinedName(wb, name, formula);
-      if (!result.ok) return { ok: false, reason: 'engine-failed' };
-      entries.push(result.entry);
-    }
-    return { ok: true, entries };
   }
-
-  if (source === 'bottom-row') {
-    if (r.r0 >= r.r1) return { ok: false, reason: 'empty-selection' };
-    if (r.c1 - r.c0 + 1 > MAX_CREATE_DEFINED_NAMES) {
-      return { ok: false, reason: 'too-large' };
-    }
-    for (let col = r.c0; col <= r.c1; col += 1) {
-      const label = cellText(state, sheet, r.r1, col);
-      const name = uniqueName(sanitizeName(label, `Column_${colLetter(col)}`), used);
-      const formula = `=${absRangeRef(r.r0, col, r.r1 - 1, col)}`;
-      const result = upsertDefinedName(wb, name, formula);
-      if (!result.ok) return { ok: false, reason: 'engine-failed' };
-      entries.push(result.entry);
-    }
-    return { ok: true, entries };
-  }
-
-  if (source === 'left-column') {
-    if (r.c0 >= r.c1) return { ok: false, reason: 'empty-selection' };
-    if (r.r1 - r.r0 + 1 > MAX_CREATE_DEFINED_NAMES) {
-      return { ok: false, reason: 'too-large' };
-    }
-    for (let row = r.r0; row <= r.r1; row += 1) {
-      const label = cellText(state, sheet, row, r.c0);
-      const name = uniqueName(sanitizeName(label, `Row_${row + 1}`), used);
-      const formula = `=${absRangeRef(row, r.c0 + 1, row, r.c1)}`;
-      const result = upsertDefinedName(wb, name, formula);
-      if (!result.ok) return { ok: false, reason: 'engine-failed' };
-      entries.push(result.entry);
-    }
-    return { ok: true, entries };
-  }
-
-  if (r.c0 >= r.c1) return { ok: false, reason: 'empty-selection' };
-  if (r.r1 - r.r0 + 1 > MAX_CREATE_DEFINED_NAMES) {
-    return { ok: false, reason: 'too-large' };
-  }
-  for (let row = r.r0; row <= r.r1; row += 1) {
-    const label = cellText(state, sheet, row, r.c1);
-    const name = uniqueName(sanitizeName(label, `Row_${row + 1}`), used);
-    const formula = `=${absRangeRef(row, r.c0, row, r.c1 - 1)}`;
-    const result = upsertDefinedName(wb, name, formula);
-    if (!result.ok) return { ok: false, reason: 'engine-failed' };
-    entries.push(result.entry);
-  }
-  return { ok: true, entries };
+  return { ok: true, names: [...planned.values()] };
 }
 
 export function insertDefinedNameFormula(

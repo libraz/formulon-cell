@@ -90,10 +90,10 @@ describe('Create from Selection', () => {
       [...instance.workbook.definedNames()].map((entry) => [entry.name, entry.formula]),
     );
     expect(names).toEqual({
-      Spring: '$B$2:$B$3',
-      Summer: '$C$2:$C$3',
-      East: '$B$2:$C$2',
-      West: '$B$3:$C$3',
+      Spring: 'Sheet1!$B$2:$B$3',
+      Summer: 'Sheet1!$C$2:$C$3',
+      East: 'Sheet1!$B$2:$C$2',
+      West: 'Sheet1!$B$3:$C$3',
     });
     instance.history.undo();
     expect([...instance.workbook.definedNames()]).toEqual([]);
@@ -114,5 +114,46 @@ describe('Create from Selection', () => {
     void createFormulasDropdownDefaults(instance).applyDefinedNameAction('create-from-selection');
     await settle();
     expect([edge('top').checked, edge('left').checked]).toEqual([true, false]);
+  });
+
+  // Provisional: every name the workbook already holds is asked about before any is written.
+  it('asks before replacing a name the workbook holds: No keeps it, Yes replaces it', async () => {
+    sheet = await mountStubSheet({ locale: 'en', workbook: await WorkbookHandle.createDefault() });
+    const { instance } = sheet;
+    instance.workbook.setText({ sheet: 0, row: 0, col: 0 }, 'Qty');
+    instance.workbook.setText({ sheet: 0, row: 0, col: 1 }, 'Price');
+    mutators.replaceCells(instance.store, instance.workbook.cells(0));
+    mutators.setRange(instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    instance.workbook.setDefinedNameEntry('QTY', '=Sheet1!$Z$1');
+    const names = () =>
+      Object.fromEntries(
+        [...instance.workbook.definedNames()].map((entry) => [entry.name, entry.formula]),
+      );
+    /** Runs Create from Selection with Top row, answering each replace alert in turn. */
+    const run = async (...answers: ('Yes' | 'No')[]): Promise<(string | null | undefined)[]> => {
+      const done =
+        createFormulasDropdownDefaults(instance).applyDefinedNameAction('create-from-selection');
+      await settle();
+      ok()?.click();
+      const messages = [];
+      for (const answer of answers) {
+        await settle();
+        const alert = document.querySelector('[role="alertdialog"]');
+        messages.push(alert?.querySelector('.fc-tb__dlg__message')?.textContent);
+        [...(alert?.querySelectorAll('button') ?? [])]
+          .find((button) => button.textContent === answer)
+          ?.click();
+      }
+      await done;
+      return messages;
+    };
+
+    expect(await run('No')).toEqual(["Replace existing definition of 'Qty'?"]);
+    expect(names()).toEqual({ QTY: 'Sheet1!$Z$1', Price: 'Sheet1!$B$2:$B$3' });
+    expect(await run('Yes', 'No')).toEqual([
+      "Replace existing definition of 'Qty'?",
+      "Replace existing definition of 'Price'?",
+    ]);
+    expect(names()).toEqual({ Qty: 'Sheet1!$A$2:$A$3', Price: 'Sheet1!$B$2:$B$3' });
   });
 });

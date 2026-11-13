@@ -273,6 +273,10 @@ export interface RibbonMenusStrings {
     createNamesLeft: string;
     createNamesBottom: string;
     createNamesRight: string;
+    /** Asks before replacing a name the workbook already holds; `{name}` is the name. */
+    createNamesReplace: string;
+    createNamesReplaceYes: string;
+    createNamesReplaceNo: string;
     nameManager: string;
     calcAutomatic: string;
     calcAutoNoTable: string;
