@@ -42,11 +42,15 @@ export function defineDemoAppConfig(app: DemoApp) {
     // (apps/<id>/playwright.config.ts), so `./e2e` points at each demo's
     // own spec directory.
     testDir: './e2e',
-    // Visual regression specs live under `e2e/visual/` and require a Linux
-    // baseline. Normal e2e runs skip them; opt in with FC_VISUAL=1.
+    // Visual regression specs live under `e2e/visual/` and compare against macOS baselines kept
+    // only on the release machine. Normal e2e runs skip them; opt in with FC_VISUAL=1.
     testIgnore: process.env.FC_VISUAL ? [] : ['**/visual/**'],
-    // A secondary app runs only the adapter-specific specs unless the full run is requested.
-    ...(app.id === PRIMARY_DEMO_APP || runFullE2E()
+    // A missing baseline fails without being written; only an explicit --update-snapshots run
+    // takes one.
+    updateSnapshots: 'none',
+    // A secondary app runs only the adapter-specific specs unless the full run or the visual walk
+    // is requested.
+    ...(app.id === PRIMARY_DEMO_APP || runFullE2E() || process.env.FC_VISUAL
       ? {}
       : { testMatch: ADAPTER_SPECS.map(({ spec }) => `**/${spec}`) }),
     fullyParallel: true,
