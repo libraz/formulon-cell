@@ -8,7 +8,7 @@ import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 const STARTUP = {
   default: {
     ja: { rowHeight: 25, font: { name: '游ゴシック', size: 11 }, textPx: 11 * (96 / 72) },
-    en: { rowHeight: 20, font: { name: 'Calibri', size: 11 }, textPx: 11 * (96 / 72) },
+    en: { rowHeight: 20, font: { name: 'Aptos Narrow', size: 11 }, textPx: 11 * (96 / 72) },
   },
   mac: {
     ja: { rowHeight: 80 / 3, font: { name: '游ゴシック', size: 12 }, textPx: 12 },

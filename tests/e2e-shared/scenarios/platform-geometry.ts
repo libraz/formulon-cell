@@ -30,7 +30,7 @@ const EXPECTED: Record<'default' | 'mac', Record<'ja' | 'en', Expected>> = {
   },
   default: {
     ja: { row: 25, font: { name: '游ゴシック', size: 11 }, textPx: 11 * (96 / 72) },
-    en: { row: 20, col: 64, font: { name: 'Calibri', size: 11 }, textPx: 11 * (96 / 72) },
+    en: { row: 20, col: 64, font: { name: 'Aptos Narrow', size: 11 }, textPx: 11 * (96 / 72) },
   },
 };
 
