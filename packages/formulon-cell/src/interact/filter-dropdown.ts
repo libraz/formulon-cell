@@ -49,6 +49,15 @@ import { placePanel } from './overlay-position.js';
 
 /** Select value prefix of a relative date period. */
 const DATE_PERIOD_PREFIX = 'datePeriod:';
+/** Select value of the date condition whose operand is a quarter or month of any year. */
+const ALL_DATES_IN_PERIOD = 'allDatesInPeriod';
+/** Where the quarters and months of All Dates in the Period start in DATE_PERIODS. */
+const ALL_DATES_PERIODS_START = DATE_PERIODS.findIndex(([key]) => key === 'quarter1');
+const ALL_DATES_PERIOD_KEYS: ReadonlySet<DatePeriodKey> = new Set(
+  DATE_PERIODS.slice(ALL_DATES_PERIODS_START).map(([key]) => key),
+);
+
+type ConditionOption = { value: string; label: string; disabled?: boolean };
 
 export interface FilterDropdownDeps {
   store: SpreadsheetStore;
@@ -159,6 +168,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         value: '',
         period: picked.slice(DATE_PERIOD_PREFIX.length) as DatePeriodKey,
       };
+    }
+    if (picked === ALL_DATES_IN_PERIOD) {
+      const period = root.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-period');
+      return period ? { op: 'datePeriod', value: '', period: period.value as DatePeriodKey } : null;
     }
     const op = picked as ConditionFilterOp;
     const dates = root.dataset.fcDateColumn === 'true';
@@ -322,45 +335,80 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const dates = mac && dateColumn(range, col);
     const numeric = mac && !dates && numericColumn(range, col);
     r.dataset.fcDateColumn = dates ? 'true' : 'false';
-    const conditionOptions: Array<{ value: string; label: string; disabled?: boolean }> = dates
+    /** The Mac wording of a stored operator, for one the column's menu does not list. */
+    const storedOpLabel = (op: string): string => {
+      const labels: Record<string, string> = {
+        equals: m.equals,
+        notEquals: m.notEquals,
+        contains: m.contains,
+        notContains: m.notContains,
+        beginsWith: m.beginsWith,
+        notBeginsWith: m.notBeginsWith,
+        endsWith: m.endsWith,
+        notEndsWith: m.notEndsWith,
+        greaterThan: dates ? m.after : m.greaterThan,
+        greaterThanOrEqual: dates ? m.afterOrEqual : m.greaterThanOrEqual,
+        lessThan: dates ? m.before : m.lessThan,
+        lessThanOrEqual: dates ? m.beforeOrEqual : m.lessThanOrEqual,
+        between: m.between,
+        top10: m.top10,
+        bottom10: m.bottom10,
+        aboveAverage: m.aboveAverage,
+        belowAverage: m.belowAverage,
+      };
+      return labels[op] ?? op;
+    };
+    let separators = 0;
+    const separator = (): ConditionOption => ({
+      value: `-${separators++}`,
+      label: '──────────',
+      disabled: true,
+    });
+    const menuOptions: ConditionOption[] = dates
       ? [
-          // The Mac pop-up's order for a date column is provisional until measured on the Mac app.
           { value: '', label: m.chooseOne },
+          separator(),
           { value: 'equals', label: m.equals },
-          { value: 'notEquals', label: m.notEquals },
+          separator(),
           { value: 'lessThan', label: m.before },
-          { value: 'lessThanOrEqual', label: m.beforeOrEqual },
           { value: 'greaterThan', label: m.after },
-          { value: 'greaterThanOrEqual', label: m.afterOrEqual },
           { value: 'between', label: m.between },
-          ...DATE_PERIODS.flatMap(([key], index) => [
-            ...(DATE_PERIOD_GROUP_STARTS.has(index)
-              ? [{ value: `-${index}`, label: '──────────', disabled: true }]
-              : []),
+          ...DATE_PERIODS.slice(0, ALL_DATES_PERIODS_START).flatMap(([key], index) => [
+            ...(DATE_PERIOD_GROUP_STARTS.has(index) ? [separator()] : []),
             { value: `${DATE_PERIOD_PREFIX}${key}`, label: m.periods[key] },
           ]),
+          separator(),
+          { value: ALL_DATES_IN_PERIOD, label: m.allDatesInPeriod },
         ]
       : mac
         ? [
             { value: '', label: m.chooseOne },
+            separator(),
             { value: 'equals', label: m.equals },
             { value: 'notEquals', label: m.notEquals },
+            separator(),
             ...(numeric
-              ? ([
+              ? [
                   { value: 'greaterThan', label: m.greaterThan },
                   { value: 'greaterThanOrEqual', label: m.greaterThanOrEqual },
                   { value: 'lessThan', label: m.lessThan },
                   { value: 'lessThanOrEqual', label: m.lessThanOrEqual },
                   { value: 'between', label: m.between },
+                  separator(),
                   { value: 'top10', label: m.top10 },
                   { value: 'bottom10', label: m.bottom10 },
                   { value: 'aboveAverage', label: m.aboveAverage },
                   { value: 'belowAverage', label: m.belowAverage },
-                ] as const)
-              : ([
+                ]
+              : [
+                  { value: 'beginsWith', label: m.beginsWith },
+                  { value: 'notBeginsWith', label: m.notBeginsWith },
+                  { value: 'endsWith', label: m.endsWith },
+                  { value: 'notEndsWith', label: m.notEndsWith },
+                  separator(),
                   { value: 'contains', label: m.contains },
                   { value: 'notContains', label: m.notContains },
-                ] as const)),
+                ]),
           ]
         : [
             { value: '', label: t.conditionNone },
@@ -373,15 +421,29 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
             { value: 'lessThan', label: t.conditionLessThan },
             { value: 'lessThanOrEqual', label: t.conditionLessThanOrEqual },
           ];
+    const activePeriod =
+      activeCriteria?.condition?.op === 'datePeriod' ? activeCriteria.condition.period : undefined;
+    const activePeriodInMenu =
+      activePeriod !== undefined && !ALL_DATES_PERIOD_KEYS.has(activePeriod);
+    const activeOp = activeCriteria?.condition
+      ? activePeriod !== undefined
+        ? activePeriodInMenu
+          ? `${DATE_PERIOD_PREFIX}${activePeriod}`
+          : ALL_DATES_IN_PERIOD
+        : activeCriteria.condition.op
+      : '';
+    // A stored operator the Mac menu does not list (a date column's Before or Equal To, say) stays
+    // shown as one more item after the menu, so reopening never drops it.
+    const withStoredOp = (options: ConditionOption[], op: string): ConditionOption[] =>
+      !mac || !op || options.some((option) => option.value === op)
+        ? options
+        : [...options, separator(), { value: op, label: storedOpLabel(op) }];
+    const conditionOptions = withStoredOp(menuOptions, activeOp);
     const conditionSelect = createDialogSelect(conditionOptions, '', {
       ariaLabel: t.condition,
       className: 'fc-filter-dropdown__condition-op',
     });
-    if (activeCriteria?.condition) {
-      const active = activeCriteria.condition;
-      conditionSelect.value =
-        active.op === 'datePeriod' ? `${DATE_PERIOD_PREFIX}${active.period ?? ''}` : active.op;
-    }
+    conditionSelect.value = activeOp;
     const conditionInput = ownerDocument.createElement('input');
     conditionInput.type = 'text';
     conditionInput.className = 'fc-filter-dropdown__condition-value';
@@ -435,13 +497,24 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       if (activeCriteria?.condition?.value2 !== undefined) {
         upperInput.value = operandText(activeCriteria.condition.value2);
       }
+      // All Dates in the Period takes its quarter or month from a pop-up; the pop-up's form and
+      // order are provisional until measured on the Mac app.
+      const periodSelect = createDialogSelect(
+        DATE_PERIODS.slice(ALL_DATES_PERIODS_START).map(([key]) => ({
+          value: key,
+          label: m.periods[key],
+        })),
+        activePeriodInMenu || activePeriod === undefined ? 'quarter1' : activePeriod,
+        { ariaLabel: m.allDatesInPeriod, className: 'fc-filter-dropdown__condition-period' },
+      );
       // The operand fields each operator needs: none, one value, two values, or a count and unit.
       const syncFields = (): void => {
         const op = conditionSelect.value;
         const ranked = op === 'top10' || op === 'bottom10';
         const average =
           op === 'aboveAverage' || op === 'belowAverage' || op.startsWith(DATE_PERIOD_PREFIX);
-        conditionInput.hidden = average;
+        conditionInput.hidden = average || op === ALL_DATES_IN_PERIOD;
+        periodSelect.hidden = op !== ALL_DATES_IN_PERIOD;
         upperInput.hidden = op !== 'between';
         unitSelect.hidden = !ranked;
         conditionInput.type = ranked ? 'number' : 'text';
@@ -456,13 +529,19 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       conditionSelect.addEventListener('change', () => {
         syncFields();
         const op = conditionSelect.value;
-        if (op === 'aboveAverage' || op === 'belowAverage' || op.startsWith(DATE_PERIOD_PREFIX)) {
+        if (
+          op === 'aboveAverage' ||
+          op === 'belowAverage' ||
+          op === ALL_DATES_IN_PERIOD ||
+          op.startsWith(DATE_PERIOD_PREFIX)
+        ) {
           autoApplyIfOn();
         } else if (op) conditionInput.focus();
         else autoApplyIfOn();
       });
       conditionInput.addEventListener('change', () => autoApplyIfOn());
       upperInput.addEventListener('change', () => autoApplyIfOn());
+      periodSelect.addEventListener('change', () => autoApplyIfOn());
       unitSelect.addEventListener('change', () => autoApplyIfOn());
       // A second comparison joined by And or Or, offered once the first takes one operand. The
       // row's layout on the Mac app is provisional until measured.
@@ -485,10 +564,17 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         radioLabel.append(radio, label);
         joinRow.appendChild(radioLabel);
       }
+      // The second row offers the one-operand comparisons, grouped as the first row groups them.
+      const secondOptions = menuOptions
+        .filter(
+          (option) => option.value === '' || option.disabled || isFilterComparisonOp(option.value),
+        )
+        .filter(
+          (option, index, kept) =>
+            !option.disabled || (index < kept.length - 1 && !kept[index + 1]?.disabled),
+        );
       const secondSelect = createDialogSelect(
-        conditionOptions.filter(
-          (option) => option.value === '' || isFilterComparisonOp(option.value),
-        ),
+        withStoredOp(secondOptions, active?.second?.op ?? ''),
         active?.second?.op ?? '',
         { ariaLabel: t.condition, className: 'fc-filter-dropdown__condition-op2' },
       );
@@ -514,6 +600,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       conditionPanel.append(
         conditionSelect,
         conditionInput,
+        periodSelect,
         upperInput,
         unitSelect,
         joinRow,

@@ -449,29 +449,45 @@ describe('attachFilterDropdown', () => {
       return handle;
     };
 
+    /** A condition pop-up's items as drawn, a separator as '-'. */
+    const menuItems = (className: string): string[] =>
+      Array.from(
+        document.querySelectorAll<HTMLOptionElement>(`.fc-filter-dropdown__${className} option`),
+        (o) => (o.disabled ? '-' : (o.textContent ?? '')),
+      );
+
     it('titles the panel with the column header and lists the numeric conditions', () => {
       const handle = openMac();
       const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
       expect(panel?.querySelector('.fc-filter-dropdown__title')?.textContent).toBe('N');
-      const options = Array.from(
-        panel?.querySelectorAll<HTMLOptionElement>('.fc-filter-dropdown__condition-op option') ??
-          [],
-        (o) =>
-          `${o.getAttribute('aria-disabled') === 'true' || o.disabled ? '[DIS]' : ''}${o.textContent}`,
-      );
-      expect(options).toEqual([
+      expect(menuItems('condition-op')).toEqual([
         '1 つ選択してください',
+        '-',
         '指定の値に等しい',
         '指定の値に等しくない',
+        '-',
         '指定の値より大きい',
         '指定の値以上',
         '指定の値より小さい',
         '指定の値以下',
         '指定の範囲内',
+        '-',
         '上位 10 項目',
         '下位 10 項目',
         '平均より上',
         '平均より下',
+      ]);
+      // The second row offers the comparisons only, ending at less than or equal.
+      expect(menuItems('condition-op2')).toEqual([
+        '1 つ選択してください',
+        '-',
+        '指定の値に等しい',
+        '指定の値に等しくない',
+        '-',
+        '指定の値より大きい',
+        '指定の値以上',
+        '指定の値より小さい',
+        '指定の値以下',
       ]);
       handle.detach();
     });
@@ -537,17 +553,22 @@ describe('attachFilterDropdown', () => {
       });
       const handle = attachFilterDropdown({ store, host, strings: ja });
       handle.open({ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
-      const options = Array.from(
-        document.querySelectorAll<HTMLOptionElement>('.fc-filter-dropdown__condition-op option'),
-        (o) => o.textContent,
-      );
-      expect(options).toEqual([
+      const textMenu = [
         '1 つ選択してください',
+        '-',
         '指定の値に等しい',
         '指定の値に等しくない',
+        '-',
+        'で始まる',
+        'で始まらない',
+        'で終わる',
+        'で終わらない',
+        '-',
         'を含む',
         'を含まない',
-      ]);
+      ];
+      expect(menuItems('condition-op')).toEqual(textMenu);
+      expect(menuItems('condition-op2')).toEqual(textMenu);
       handle.detach();
     });
 

@@ -10,6 +10,10 @@ export interface MacFilterPanelStrings {
   notEquals: string;
   contains: string;
   notContains: string;
+  beginsWith: string;
+  notBeginsWith: string;
+  endsWith: string;
+  notEndsWith: string;
   greaterThan: string;
   greaterThanOrEqual: string;
   lessThan: string;
@@ -28,6 +32,8 @@ export interface MacFilterPanelStrings {
   after: string;
   afterOrEqual: string;
   periods: Record<DatePeriodKey, string>;
+  /** The date condition whose value is a quarter or month of any year. */
+  allDatesInPeriod: string;
   /** Units of the Top/Bottom count. */
   items: string;
   percent: string;
@@ -78,6 +84,11 @@ type MacFilterPanelExtras = Pick<
   | 'after'
   | 'afterOrEqual'
   | 'periods'
+  | 'allDatesInPeriod'
+  | 'beginsWith'
+  | 'notBeginsWith'
+  | 'endsWith'
+  | 'notEndsWith'
   | 'items'
   | 'percent'
   | 'unavailable'
@@ -134,6 +145,11 @@ const extrasEn: MacFilterPanelExtras = {
   beforeOrEqual: 'Before or Equal To',
   after: 'After',
   afterOrEqual: 'After or Equal To',
+  beginsWith: 'Begins With',
+  notBeginsWith: 'Does Not Begin With',
+  endsWith: 'Ends With',
+  notEndsWith: 'Does Not End With',
+  allDatesInPeriod: 'All Dates in the Period',
   periods: {
     tomorrow: 'Tomorrow',
     today: 'Today',
@@ -197,6 +213,11 @@ const extrasJa: MacFilterPanelExtras = {
   beforeOrEqual: '以前',
   after: 'より後',
   afterOrEqual: '以後',
+  beginsWith: 'で始まる',
+  notBeginsWith: 'で始まらない',
+  endsWith: 'で終わる',
+  notEndsWith: 'で終わらない',
+  allDatesInPeriod: '期間内の全日付...',
   periods: {
     tomorrow: '明日',
     today: '今日',
@@ -260,6 +281,11 @@ const extrasDe: MacFilterPanelExtras = {
   beforeOrEqual: 'vor oder gleich',
   after: 'nach',
   afterOrEqual: 'nach oder gleich',
+  beginsWith: 'Beginnt mit',
+  notBeginsWith: 'Beginnt nicht mit',
+  endsWith: 'Endet mit',
+  notEndsWith: 'Endet nicht mit',
+  allDatesInPeriod: 'Alle Datumswerte im Zeitraum',
   periods: {
     tomorrow: 'Morgen',
     today: 'Heute',
@@ -323,6 +349,11 @@ const extrasFr: MacFilterPanelExtras = {
   beforeOrEqual: 'Antérieur ou égal au',
   after: 'Après',
   afterOrEqual: 'Postérieur ou égal au',
+  beginsWith: 'Commence par',
+  notBeginsWith: 'Ne commence pas par',
+  endsWith: 'Se termine par',
+  notEndsWith: 'Ne se termine pas par',
+  allDatesInPeriod: 'Toutes les dates de cette période',
   periods: {
     tomorrow: 'Demain',
     today: 'Aujourd’hui',
@@ -386,6 +417,11 @@ const extrasZh: MacFilterPanelExtras = {
   beforeOrEqual: '早于或等于',
   after: '之后',
   afterOrEqual: '晚于或等于',
+  beginsWith: '开头是',
+  notBeginsWith: '开头不是',
+  endsWith: '结尾是',
+  notEndsWith: '结尾不是',
+  allDatesInPeriod: '该期间的所有日期',
   periods: {
     tomorrow: '明天',
     today: '今天',
@@ -449,6 +485,11 @@ const extrasKo: MacFilterPanelExtras = {
   beforeOrEqual: '이전 또는 같음',
   after: '이후',
   afterOrEqual: '이후 또는 같음',
+  beginsWith: '시작 문자',
+  notBeginsWith: '제외할 시작 문자',
+  endsWith: '끝 문자',
+  notEndsWith: '제외할 끝 문자',
+  allDatesInPeriod: '기간 내의 모든 날짜',
   periods: {
     tomorrow: '내일',
     today: '오늘',
@@ -512,6 +553,11 @@ const extrasTh: MacFilterPanelExtras = {
   beforeOrEqual: 'ก่อนหรือเท่ากับ',
   after: 'หลัง',
   afterOrEqual: 'หลังหรือเท่ากับ',
+  beginsWith: 'เริ่มต้นด้วย',
+  notBeginsWith: 'ไม่ได้เริ่มต้นด้วย',
+  endsWith: 'ลงท้ายด้วย',
+  notEndsWith: 'ไม่ได้ลงท้ายด้วย',
+  allDatesInPeriod: 'วันที่ทั้งหมดในช่วงเวลา',
   periods: {
     tomorrow: 'พรุ่งนี้',
     today: 'วันนี้',

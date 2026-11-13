@@ -54,30 +54,122 @@ const type = (name: string, text: string) => {
   field.dispatchEvent(new Event('change'));
 };
 
+/** Closes the panel and opens it again on the same column. */
+const reopen = (store: SpreadsheetStore, strings = ja): void => {
+  document.body.replaceChildren();
+  const host = document.createElement('div');
+  host.className = 'fc-host';
+  host.dataset.fcPlatform = 'mac';
+  document.body.appendChild(host);
+  attachFilterDropdown({ store, host, strings, locale: 'en-US' }).open(RANGE, 0, {
+    x: 10,
+    y: 20,
+    h: 24,
+  });
+};
+
 afterEach(() => {
   vi.useRealTimers();
   document.body.replaceChildren();
 });
 
 describe('Mac column filter on a date column', () => {
-  // The Mac pop-up's order for a date column is provisional: it follows the desktop Date Filters
-  // until measured on the Mac app.
-  it('lists the date comparisons, then the relative periods, in the Mac wording', () => {
+  it('lists the date conditions in the Mac order, ending at All Dates in the Period', () => {
     openMac(true);
     const m = ja.mac.filterPanel;
-    const enabled = [...op().options].filter((o) => !o.disabled).map((o) => o.textContent);
-    expect(enabled).toEqual([
+    const items = [...op().options].map((o) => (o.disabled ? '-' : o.textContent));
+    const p = m.periods;
+    expect(items).toEqual([
       m.chooseOne,
+      '-',
       m.equals,
-      m.notEquals,
+      '-',
       m.before,
-      m.beforeOrEqual,
       m.after,
-      m.afterOrEqual,
       m.between,
-      ...DATE_PERIODS.map(([key]) => m.periods[key]),
+      '-',
+      p.tomorrow,
+      p.today,
+      p.yesterday,
+      '-',
+      p.nextWeek,
+      p.thisWeek,
+      p.lastWeek,
+      '-',
+      p.nextMonth,
+      p.thisMonth,
+      p.lastMonth,
+      '-',
+      p.nextQuarter,
+      p.thisQuarter,
+      p.lastQuarter,
+      '-',
+      p.nextYear,
+      p.thisYear,
+      p.lastYear,
+      '-',
+      p.yearToDate,
+      '-',
+      m.allDatesInPeriod,
     ]);
-    expect([...op().options].filter((o) => o.disabled)).toHaveLength(8);
+    expect(m.allDatesInPeriod).toBe('期間内の全日付...');
+  });
+
+  it('takes All Dates in the Period from a quarter and month pop-up and reopens on it', () => {
+    const store = openMac(true);
+    const m = ja.mac.filterPanel;
+    const period = () =>
+      panel().querySelector<HTMLSelectElement>(
+        '.fc-filter-dropdown__condition-period',
+      ) as HTMLSelectElement;
+    expect(period().hidden).toBe(true);
+    op().value = 'allDatesInPeriod';
+    op().dispatchEvent(new Event('change'));
+    expect([period().hidden, input('condition-value').hidden]).toEqual([false, true]);
+    expect([...period().options].map((o) => o.textContent)).toEqual(
+      DATE_PERIODS.slice(DATE_PERIODS.findIndex(([key]) => key === 'quarter1')).map(
+        ([key]) => m.periods[key],
+      ),
+    );
+    period().value = 'november';
+    period().dispatchEvent(new Event('change'));
+    expect(store.getState().ui.filterCriteria[0]?.condition).toEqual({
+      op: 'datePeriod',
+      value: '',
+      period: 'november',
+    });
+    expect([...store.getState().layout.hiddenRows]).toEqual([3]);
+    reopen(store);
+    expect([op().value, period().value, period().hidden]).toEqual([
+      'allDatesInPeriod',
+      'november',
+      false,
+    ]);
+  });
+
+  it('shows a stored operator the menu does not list as an item after it', () => {
+    const store = openMac(true, en);
+    store.setState((state) => ({
+      ...state,
+      ui: {
+        ...state.ui,
+        filterCriteria: [
+          {
+            range: RANGE,
+            byCol: 0,
+            hiddenValues: [],
+            condition: { op: 'lessThanOrEqual', value: '46338' },
+          },
+        ],
+      },
+    }));
+    reopen(store, en);
+    const last = [...op().options].at(-1);
+    expect([op().value, last?.textContent]).toEqual([
+      'lessThanOrEqual',
+      en.mac.filterPanel.beforeOrEqual,
+    ]);
+    expect(input('condition-value').value).toBe('2026-11-12');
   });
 
   it('keeps the numeric list for a column of plain numbers', () => {
