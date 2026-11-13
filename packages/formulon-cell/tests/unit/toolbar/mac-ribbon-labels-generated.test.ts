@@ -48,6 +48,12 @@ describe('generated Mac ribbon labels', () => {
     }
   });
 
+  it('cleans accelerator markers the way the generator documents', () => {
+    expect(() =>
+      execFileSync('python3', ['-I', '-m', 'doctest', GENERATOR], { stdio: 'pipe' }),
+    ).not.toThrow();
+  });
+
   it.skipIf(!existsSync(MAC_APP))('matches what the generator produces from the app bundle', () => {
     expect(() =>
       execFileSync('python3', ['-I', GENERATOR, '--check', BUNDLE_FILE], { stdio: 'pipe' }),

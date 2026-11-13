@@ -32,9 +32,43 @@ NAMESPACES = ('labels', 'groups', 'menu')
 REDIRECT = re.compile(r':rctcidstring\((\d+)\)')
 
 
+LITERAL_AMP = '\0'
+
+
 def clean(v):
-    v = re.sub(r'\s*\(&[^&]\)', '', v)
-    v = v.replace('&&', '\0').replace('&', '').replace('\0', '&')
+    """Turn a command-table string (tbbtn, tbbtn2, tbfriendly) into the drawn label.
+
+    Accelerator markers are dropped and a literal "&" is kept. Dialog nib strings get no such
+    processing: the desktop draws them verbatim ("Find & Replace").
+
+    Steps, in order; a literal "&" is held as a placeholder until the end so a later step
+    cannot consume it:
+      1. strip a "(&X)" or "(&&)" accelerator suffix;
+      2. "&&" is a literal "&";
+      3. a trailing "+&" is the key name "Ctrl+&";
+      4. every other "&" is an accelerator marker and is removed.
+
+    >>> clean('書式(&F)'), clean('クエリと接続(&&)')
+    ('書式', 'クエリと接続')
+    >>> clean('Find && Replace'), clean('คิวรี &&& &การเชื่อมต่อ')
+    ('Find & Replace', 'คิวรี & การเชื่อมต่อ')
+    >>> clean('Ctrl+&')
+    'Ctrl+&'
+    >>> clean('& Format Painter'), clean('Zum& ersten Bildschirm wechseln')
+    ('Format Painter', 'Zum ersten Bildschirm wechseln')
+    >>> clean('Afficher les modifications&')
+    'Afficher les modifications'
+
+    The ribbon treats a spaced " & " as a marker too and keeps both spaces (the ja Data tab
+    draws "クエリ  接続").
+
+    >>> clean('クエリ & 接続(&&)')
+    'クエリ  接続'
+    """
+    v = re.sub(r'\s*\(&[^)]\)', '', v)
+    v = v.replace('&&', LITERAL_AMP)
+    v = re.sub(r'\+&$', '+' + LITERAL_AMP, v)
+    v = v.replace('&', '').replace(LITERAL_AMP, '&')
     return v.replace('\u200b', '').strip()
 
 
