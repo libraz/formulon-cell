@@ -1,6 +1,11 @@
 import type { History } from '../commands/history.js';
 import { applyFreezeMode } from '../commands/row-col-layout.js';
-import { activateSheetView, deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
+import {
+  activateSheetView,
+  deleteSheetView,
+  exitSheetView,
+  saveSheetView,
+} from '../commands/sheet-views.js';
 import {
   setGridlinesVisible,
   setHeadingsVisible,
@@ -175,7 +180,7 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
   });
   sheetViewsSelect.addEventListener('change', () => {
     if (sheetViewsSelect.value === CURRENT_VIEW_VALUE) {
-      store.setState((s) => ({ ...s, sheetViews: { ...s.sheetViews, activeViewId: null } }));
+      exitSheetView(store);
       applyChanged();
       return;
     }

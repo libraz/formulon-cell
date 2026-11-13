@@ -86,7 +86,9 @@ const aliases: Readonly<Record<string, string>> = {
   'mac.view.zoomSelection': 'zoomSelection',
   'mac.view.zoom': 'zoomDialog',
   'mac.view.zoom100': 'zoom100',
-  'mac.view.sheetViewSave': 'sheetViewSave',
+  'mac.view.sheetViewKeep': 'sheetViewKeep',
+  'mac.view.sheetViewExit': 'sheetViewExit',
+  'mac.view.sheetViewNew': 'sheetViewNew',
   'mac.view.sheetViewDelete': 'sheetViewDelete',
 };
 

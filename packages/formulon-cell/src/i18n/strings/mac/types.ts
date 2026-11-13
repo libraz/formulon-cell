@@ -23,6 +23,7 @@ import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
 import type { MacProtectSheetStrings } from './protect-sheet.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
 import type { MacSheetTabMenuStrings } from './sheet-tab-menu.js';
+import type { MacSheetViewStrings } from './sheet-views.js';
 import type { MacSortDialogStrings } from './sort-dialog.js';
 import type { MacStyleDialogStrings } from './style-dialog.js';
 import type { MacWatchWindowStrings } from './watch-window.js';
@@ -95,6 +96,8 @@ export interface MacStrings {
     preview: string;
     stripeSize: string;
   };
+  /** Names of the views the Sheet View switcher lists besides the named ones. */
+  sheetViews: MacSheetViewStrings;
   /** Labels of the Mac Zoom dialog. */
   zoomDialog: MacZoomDialogStrings;
   /** Texts of the Mac compact alert panels. */

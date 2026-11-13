@@ -22,6 +22,7 @@ import { macPivotTableDialogJa } from './pivot-table-dialog.js';
 import { macProtectSheetJa } from './protect-sheet.js';
 import { macRemoveDuplicatesJa } from './remove-duplicates.js';
 import { macSheetTabMenuJa } from './sheet-tab-menu.js';
+import { macSheetViewsJa } from './sheet-views.js';
 import { macSortDialogJa } from './sort-dialog.js';
 import { macStyleDialogJa } from './style-dialog.js';
 import { macTextToColumnsWizardJa } from './text-to-columns-wizard.js';
@@ -228,6 +229,7 @@ export const macJa: MacStrings = {
   namedRangeDialog: macNamedRangeDialogJa,
   pageSetup: macPageSetupJa,
   pasteSpecial: macPasteSpecialJa,
+  sheetViews: macSheetViewsJa,
   zoomDialog: macZoomDialogJa,
   alerts: macAlertsJa,
   protectSheet: macProtectSheetJa,

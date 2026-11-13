@@ -2063,10 +2063,34 @@
         "zh": "公式: 0.1.0.4.2"
       }
     },
-    "labels:sheetViewSave": {
-      "tcid": 3,
+    "labels:sheetViewExit": {
+      "tcid": 33909,
       "source": "tbbtn",
-      "name": "Save",
+      "name": "ExitSheetView",
+      "match": "en+ja"
+    },
+    "labels:sheetViewKeep": {
+      "tcid": 33929,
+      "source": "tbbtn",
+      "name": "KeepTemporarySheetView",
+      "match": "en+ja"
+    },
+    "labels:sheetViewNew": {
+      "tcid": 33908,
+      "source": "tbbtn",
+      "name": "NewSheetView",
+      "match": "en+ja"
+    },
+    "labels:sheetViewOptions": {
+      "tcid": 33910,
+      "source": "tbbtn",
+      "name": "SheetViewOptions",
+      "match": "en+ja"
+    },
+    "labels:sheetViewSelect": {
+      "tcid": 33911,
+      "source": "tbbtn",
+      "name": "SheetViewComboBox",
       "match": "en+ja"
     },
     "labels:showChanges": {
@@ -3530,11 +3554,6 @@
       "tcid": null,
       "reason": "ambiguous: 15314:FlyoutAnchorDeleteTable, 27558:InkToolboxItemRemove, 1592:DeleteComment"
     },
-    "labels:sheetViewSelect": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "labels:sheetViews": {
       "status": "no-consumer",
       "tcid": 33907,
@@ -4053,7 +4072,11 @@
     "labels:shapeTriangle",
     "labels:shapes",
     "labels:sheetRecalc",
-    "labels:sheetViewSave",
+    "labels:sheetViewExit",
+    "labels:sheetViewKeep",
+    "labels:sheetViewNew",
+    "labels:sheetViewOptions",
+    "labels:sheetViewSelect",
     "labels:showChanges",
     "labels:showComments",
     "labels:showDetail",

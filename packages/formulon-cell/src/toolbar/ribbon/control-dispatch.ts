@@ -22,7 +22,12 @@ import {
   setPageOrientation,
   setPaperSize,
 } from '../../commands/page-setup.js';
-import { activateSheetView } from '../../commands/sheet-views.js';
+import {
+  activateSheetView,
+  DEFAULT_SHEET_VIEW_ID,
+  exitSheetView,
+  TEMPORARY_SHEET_VIEW_ID,
+} from '../../commands/sheet-views.js';
 import {
   recordPageSetupChange,
   recordRepeatableFormatChange,
@@ -137,7 +142,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
     if (id === 'scaleHeight') return String(pageSetup?.fitHeight ?? 0);
     if (id === 'scalePercent') return String(Math.round((pageSetup?.scale ?? 1) * 100));
     if (id === 'sheetViewSelect')
-      return inst?.store.getState().sheetViews.activeViewId ?? 'current';
+      return inst?.store.getState().sheetViews.activeViewId ?? DEFAULT_SHEET_VIEW_ID;
     return '';
   };
 
@@ -366,13 +371,15 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
     } else if (id === 'sheetViewSelect') {
       const i = getInst();
       if (!i) return;
-      if (value === 'current') {
-        i.store.setState((s) => ({ ...s, sheetViews: { ...s.sheetViews, activeViewId: null } }));
+      if (value === TEMPORARY_SHEET_VIEW_ID) return;
+      if (value === DEFAULT_SHEET_VIEW_ID) {
+        exitSheetView(i.store, i.history);
+        refreshWorkbookCells();
         projectFormatToolbar();
         focusSheet();
         return;
       }
-      const result = activateSheetView(i.store, value);
+      const result = activateSheetView(i.store, value, i.history);
       if (result.ok) {
         refreshWorkbookCells();
         projectFormatToolbar();

@@ -34,7 +34,14 @@ import {
   ungroupRows,
 } from '../commands/outline.js';
 import { layoutWrite } from '../commands/row-col-actions.js';
-import { deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
+import {
+  deleteSheetView,
+  exitSheetView,
+  keepSheetView,
+  newSheetView,
+  nextSheetViewName,
+  saveSheetView,
+} from '../commands/sheet-views.js';
 import { setSheetZoom } from '../commands/view.js';
 import { formatA1Range } from '../engine/address.js';
 import { dictionaries } from '../i18n/strings.js';
@@ -498,21 +505,28 @@ export function createDefaultRibbonHooks(
     },
     sheetView: {
       save: () => {
-        const state = instance.store.getState();
-        const count =
-          state.sheetViews.views.filter((view) => view.sheet === state.data.sheetIndex).length + 1;
-        saveSheetView(
-          instance.store,
-          `view-${state.data.sheetIndex}-${count}`,
-          `${instance.i18n.strings.viewToolbar.views} ${count}`,
-          undefined,
-          instance.history,
-        );
+        const name = nextSheetViewName(instance.store, instance.i18n.strings.viewToolbar.views);
+        saveSheetView(instance.store, name.id, name.name, undefined, instance.history);
+        instance.host.focus();
+      },
+      create: () => {
+        newSheetView(instance.store, instance.history);
+        instance.host.focus();
+      },
+      keep: () => {
+        const name = nextSheetViewName(instance.store, instance.i18n.strings.viewToolbar.views);
+        keepSheetView(instance.store, name.id, name.name, instance.history);
+        instance.host.focus();
+      },
+      exit: () => {
+        exitSheetView(instance.store, instance.history);
+        opts.refreshCells?.();
         instance.host.focus();
       },
       deleteActive: () => {
         const id = instance.store.getState().sheetViews.activeViewId;
         if (id) deleteSheetView(instance.store, id, instance.history);
+        opts.refreshCells?.();
         instance.host.focus();
       },
       zoomDialog: async () => {

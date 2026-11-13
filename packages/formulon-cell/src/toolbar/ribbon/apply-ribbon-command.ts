@@ -186,6 +186,9 @@ export interface RibbonHooks {
   };
   sheetView?: {
     save?: () => Promise<unknown> | unknown;
+    create?: () => void;
+    keep?: () => void;
+    exit?: () => void;
     deleteActive?: () => void;
     zoomDialog?: () => Promise<unknown> | unknown;
   };
@@ -770,6 +773,15 @@ const applyGenericRibbonCommand = (
     }
     case 'sheetViewSave':
       void hooks?.sheetView?.save?.();
+      return true;
+    case 'sheetViewNew':
+      hooks?.sheetView?.create?.();
+      return true;
+    case 'sheetViewKeep':
+      hooks?.sheetView?.keep?.();
+      return true;
+    case 'sheetViewExit':
+      hooks?.sheetView?.exit?.();
       return true;
     case 'sheetViewDelete':
       hooks?.sheetView?.deleteActive?.();

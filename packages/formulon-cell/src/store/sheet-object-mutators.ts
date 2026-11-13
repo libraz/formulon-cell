@@ -411,6 +411,7 @@ export const sheetObjectMutators = {
       return {
         ...s,
         sheetViews: {
+          ...s.sheetViews,
           views,
           activeViewId: s.sheetViews.activeViewId === id ? null : s.sheetViews.activeViewId,
         },

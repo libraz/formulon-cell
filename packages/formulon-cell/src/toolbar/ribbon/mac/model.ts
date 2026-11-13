@@ -1,4 +1,5 @@
 import { allFunctionNames } from '../../../commands/function-categories.js';
+import { DEFAULT_SHEET_VIEW_ID, TEMPORARY_SHEET_VIEW_ID } from '../../../commands/sheet-views.js';
 import { dictionaries, type Strings } from '../../../i18n/strings.js';
 import type { ExcelRibbonIconName } from '../../excel-ribbon-icons.js';
 import type {
@@ -585,9 +586,18 @@ const viewTab = (): RibbonTabModel =>
       { ja: 'シート ビュー', en: 'Sheet Views' },
       [
         selectCommand('sheetViewSelect', t('sheetViewSelect'), [
-          { value: 'current', label: 'Current View' },
+          { value: DEFAULT_SHEET_VIEW_ID, label: 'Default' },
+          { value: TEMPORARY_SHEET_VIEW_ID, label: 'Temporary View' },
         ]),
-        compactCommand('mac.view.sheetViewSave', t('sheetViewSave'), 'save'),
+        compactCommand('mac.view.sheetViewKeep', t('sheetViewKeep'), 'save'),
+        compactCommand('mac.view.sheetViewExit', t('sheetViewExit'), 'paneClose'),
+        compactCommand('mac.view.sheetViewNew', t('sheetViewNew'), 'plus'),
+        disabledCompactCommand(
+          'mac.view.sheetViewOptions',
+          t('sheetViewOptions'),
+          'options',
+          NOT_IMPLEMENTED,
+        ),
         compactCommand('mac.view.sheetViewDelete', t('sheetViewDelete'), 'clear'),
       ],
       'compact',
@@ -872,8 +882,10 @@ export const buildMacRibbonModel = (lang: ToolbarLang, home: RibbonTabModel): Ri
     return options.map((option) => ({
       ...option,
       label:
-        commandId === 'sheetViewSelect' && option.value === 'current'
-          ? strings.viewToolbar.currentView
+        commandId === 'sheetViewSelect'
+          ? option.value === TEMPORARY_SHEET_VIEW_ID
+            ? strings.mac.sheetViews.temporaryView
+            : strings.mac.sheetViews.defaultView
           : pageLabel(option.value),
     }));
   };

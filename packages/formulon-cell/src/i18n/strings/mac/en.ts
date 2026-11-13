@@ -29,6 +29,7 @@ import { macPivotTableDialogEn, macPivotTableDialogFrom } from './pivot-table-di
 import { macProtectSheetEn, macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesEn, macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSheetTabMenuEn } from './sheet-tab-menu.js';
+import { macSheetViewsEn } from './sheet-views.js';
 import { macSortDialogEn, macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogEn } from './style-dialog.js';
 import { macTextToColumnsWizardEn } from './text-to-columns-wizard.js';
@@ -241,6 +242,7 @@ export const macEn: MacStrings = {
     ...macNamedRangeDialogEn,
   },
   pasteSpecial: { ...macPasteSpecialFrom(editDialogsEn.pasteSpecialDialog), ...macPasteSpecialEn },
+  sheetViews: macSheetViewsEn,
   zoomDialog: {
     ...macZoomDialogFrom(ribbonEn.ribbon, cellFormatEn.formatDialog),
     ...macZoomDialogEn,

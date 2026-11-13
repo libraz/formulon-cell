@@ -6,7 +6,11 @@ import {
   applySheetView,
   captureSheetView,
   deleteSheetView,
+  exitSheetView,
   findSheetView,
+  keepSheetView,
+  newSheetView,
+  nextSheetViewName,
   recordSheetViewsChange,
   removeSheetView,
   type SheetView,
@@ -250,5 +254,87 @@ describe('store-backed sheet views', () => {
     expect(history.undo()).toBe(true);
     expect(store.getState().sheetViews.views).toMatchObject([{ id: 'v1', name: 'Ops' }]);
     expect(store.getState().sheetViews.activeViewId).toBe('v1');
+  });
+});
+
+describe('sheet view switching', () => {
+  const hideRows = (store: ReturnType<typeof createSpreadsheetStore>, rows: number[]): void =>
+    store.setState((s) => ({ ...s, layout: { ...s.layout, hiddenRows: new Set(rows) } }));
+  const hidden = (store: ReturnType<typeof createSpreadsheetStore>): number[] =>
+    [...store.getState().layout.hiddenRows].sort((a, b) => a - b);
+
+  it('opens a temporary view, keeps it by name, and exits back to Default', () => {
+    const store = createSpreadsheetStore();
+    hideRows(store, [3]);
+
+    newSheetView(store);
+    expect(store.getState().sheetViews.activeViewId).toBe('temporary');
+    expect(hidden(store)).toEqual([3]);
+    hideRows(store, [3, 5]);
+
+    const kept = keepSheetView(store, 'view-0-1', 'View 1');
+    expect(kept).toMatchObject({ id: 'view-0-1', name: 'View 1', hiddenRows: [3, 5] });
+    expect(store.getState().sheetViews).toMatchObject({
+      activeViewId: 'view-0-1',
+      temporary: null,
+    });
+
+    exitSheetView(store);
+    expect(hidden(store)).toEqual([3]);
+    expect(store.getState().sheetViews).toMatchObject({ activeViewId: null, defaultView: null });
+  });
+
+  it('keeps the changes made in a named view and drops a temporary one on leaving', () => {
+    const store = createSpreadsheetStore();
+    mutators.upsertSheetView(store, { id: 'v1', name: 'Ops', sheet: 0 });
+    activateSheetView(store, 'v1');
+    hideRows(store, [7]);
+    exitSheetView(store);
+    expect(hidden(store)).toEqual([]);
+
+    activateSheetView(store, 'v1');
+    expect(hidden(store)).toEqual([7]);
+
+    newSheetView(store);
+    hideRows(store, [7, 8]);
+    exitSheetView(store);
+    expect(store.getState().sheetViews.temporary).toBeNull();
+    expect(store.getState().sheetViews.views).toMatchObject([{ id: 'v1', hiddenRows: [7] }]);
+    expect(keepSheetView(store, 'v2', 'Late')).toBeNull();
+  });
+
+  it('undoes an exit back into the view it left', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    mutators.upsertSheetView(store, { id: 'v1', name: 'Ops', sheet: 0, hiddenRows: [2] });
+    activateSheetView(store, 'v1', history);
+    exitSheetView(store, history);
+    expect(hidden(store)).toEqual([]);
+
+    expect(history.undo()).toBe(true);
+    expect(store.getState().sheetViews.activeViewId).toBe('v1');
+    expect(hidden(store)).toEqual([2]);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().sheetViews.activeViewId).toBeNull();
+    expect(hidden(store)).toEqual([]);
+  });
+
+  it('returns to Default when the shown view is deleted', () => {
+    const store = createSpreadsheetStore();
+    hideRows(store, [1]);
+    mutators.upsertSheetView(store, { id: 'v1', name: 'Ops', sheet: 0, hiddenRows: [4] });
+    activateSheetView(store, 'v1');
+
+    deleteSheetView(store, 'v1');
+    expect(hidden(store)).toEqual([1]);
+    expect(store.getState().sheetViews).toMatchObject({ activeViewId: null, views: [] });
+  });
+
+  it('numbers a new view with the first id no view of the sheet holds', () => {
+    const store = createSpreadsheetStore();
+    mutators.upsertSheetView(store, { id: 'view-0-2', name: 'View 2', sheet: 0 });
+    expect(nextSheetViewName(store, 'View')).toEqual({ id: 'view-0-1', name: 'View 1' });
+    mutators.upsertSheetView(store, { id: 'view-0-1', name: 'View 1', sheet: 0 });
+    expect(nextSheetViewName(store, 'View')).toEqual({ id: 'view-0-3', name: 'View 3' });
   });
 });

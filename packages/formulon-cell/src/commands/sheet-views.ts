@@ -150,9 +150,18 @@ export type SheetViewStoreResult =
   | { ok: true; view: SheetView }
   | { ok: false; reason: 'not-found' | 'different-sheet' };
 
+/** Select value of Default, the sheet's own view outside every sheet view. */
+export const DEFAULT_SHEET_VIEW_ID = 'current';
+/** `activeViewId` of the view New opened and Keep has not named yet. */
+export const TEMPORARY_SHEET_VIEW_ID = 'temporary';
+
 interface SheetViewsSnapshot {
   views: SheetView[];
   activeViewId: string | null;
+  temporary: SheetView | null;
+  defaultView: SheetView | null;
+  /** The view settings on screen, so undo puts back what a switch replaced. */
+  shown: SheetView;
 }
 
 const cloneSheetView = (view: SheetView): SheetView => ({
@@ -165,20 +174,77 @@ const cloneSheetView = (view: SheetView): SheetView => ({
   ...(view.hiddenCols ? { hiddenCols: [...view.hiddenCols] } : {}),
 });
 
-const captureSheetViewsSnapshot = (store: SpreadsheetStore): SheetViewsSnapshot => {
+const cloneOrNull = (view: SheetView | null): SheetView | null =>
+  view ? cloneSheetView(view) : null;
+
+/** The current sheet's view settings as a view with the given id and name. */
+const captureShown = (
+  store: SpreadsheetStore,
+  id: string,
+  name: string,
+  sort?: SheetViewSort,
+): SheetView => {
   const state = store.getState();
+  return captureSheetView(id, name, {
+    sheet: state.data.sheetIndex,
+    filterRanges: state.ui.filterRanges,
+    filterCriteria: state.ui.filterCriteria,
+    freezeRows: state.layout.freezeRows,
+    freezeCols: state.layout.freezeCols,
+    freezeOriginRow: state.layout.freezeOriginRow,
+    freezeOriginCol: state.layout.freezeOriginCol,
+    hiddenRows: state.layout.hiddenRows,
+    hiddenCols: state.layout.hiddenCols,
+    sort,
+  });
+};
+
+/** Puts a view's settings on screen. */
+const showSettings = (store: SpreadsheetStore, view: SheetView): void => {
+  const patch = applySheetView(view);
+  store.setState((s) => {
+    const layout = {
+      ...s.layout,
+      freezeRows: Math.max(0, Math.floor(patch.freezeRows)),
+      freezeCols: Math.max(0, Math.floor(patch.freezeCols)),
+      freezeOriginRow: Math.max(0, Math.floor(patch.freezeOriginRow)),
+      freezeOriginCol: Math.max(0, Math.floor(patch.freezeOriginCol)),
+      hiddenRows: new Set(patch.hiddenRows),
+      hiddenCols: new Set(patch.hiddenCols),
+    };
+    return {
+      ...s,
+      layout,
+      viewport: {
+        ...s.viewport,
+        rowStart: Math.max(frozenRowEnd(layout), s.viewport.rowStart),
+        colStart: Math.max(frozenColEnd(layout), s.viewport.colStart),
+      },
+      ui: { ...s.ui, filterRanges: patch.filterRanges, filterCriteria: patch.filterCriteria },
+    };
+  });
+};
+
+const captureSheetViewsSnapshot = (store: SpreadsheetStore): SheetViewsSnapshot => {
+  const { sheetViews } = store.getState();
   return {
-    views: state.sheetViews.views.map(cloneSheetView),
-    activeViewId: state.sheetViews.activeViewId,
+    views: sheetViews.views.map(cloneSheetView),
+    activeViewId: sheetViews.activeViewId,
+    temporary: cloneOrNull(sheetViews.temporary),
+    defaultView: cloneOrNull(sheetViews.defaultView),
+    shown: captureShown(store, '', ''),
   };
 };
 
 const applySheetViewsSnapshot = (store: SpreadsheetStore, snapshot: SheetViewsSnapshot): void => {
+  showSettings(store, snapshot.shown);
   store.setState((s) => ({
     ...s,
     sheetViews: {
       views: snapshot.views.map(cloneSheetView),
       activeViewId: snapshot.activeViewId,
+      temporary: cloneOrNull(snapshot.temporary),
+      defaultView: cloneOrNull(snapshot.defaultView),
     },
   }));
 };
@@ -204,6 +270,47 @@ export function recordSheetViewsChange<T>(
   return result;
 }
 
+/** Keeps the shown view's settings as it is left: Default's are held, a named view's are
+ *  updated, and the temporary view is discarded. */
+const leaveShownView = (store: SpreadsheetStore): void => {
+  const { activeViewId, views } = store.getState().sheetViews;
+  if (activeViewId === TEMPORARY_SHEET_VIEW_ID) {
+    store.setState((s) => ({ ...s, sheetViews: { ...s.sheetViews, temporary: null } }));
+    return;
+  }
+  if (activeViewId === null) {
+    const held = captureShown(store, DEFAULT_SHEET_VIEW_ID, '');
+    store.setState((s) => ({ ...s, sheetViews: { ...s.sheetViews, defaultView: held } }));
+    return;
+  }
+  const named = findSheetView(views, activeViewId);
+  if (!named) return;
+  const updated = captureShown(store, named.id, named.name, named.sort);
+  store.setState((s) => ({
+    ...s,
+    sheetViews: {
+      ...s.sheetViews,
+      views: s.sheetViews.views.map((v) => (v.id === named.id ? updated : v)),
+    },
+  }));
+};
+
+const markShown = (store: SpreadsheetStore, activeViewId: string | null): void => {
+  store.setState((s) => ({ ...s, sheetViews: { ...s.sheetViews, activeViewId } }));
+};
+
+/** The first free id and numbered name for a new view of the current sheet. */
+export function nextSheetViewName(
+  store: SpreadsheetStore,
+  prefix: string,
+): { id: string; name: string } {
+  const { sheetViews, data } = store.getState();
+  const taken = new Set(sheetViews.views.map((v) => v.id));
+  let n = 1;
+  while (taken.has(`view-${data.sheetIndex}-${n}`)) n += 1;
+  return { id: `view-${data.sheetIndex}-${n}`, name: `${prefix} ${n}` };
+}
+
 /** Capture the current store view settings and register them in the store. */
 export function saveSheetView(
   store: SpreadsheetStore,
@@ -212,19 +319,7 @@ export function saveSheetView(
   sort?: SheetViewSort,
   history: History | null = null,
 ): SheetView {
-  const state = store.getState();
-  const view = captureSheetView(id, name, {
-    sheet: state.data.sheetIndex,
-    filterRanges: state.ui.filterRanges,
-    filterCriteria: state.ui.filterCriteria,
-    freezeRows: state.layout.freezeRows,
-    freezeCols: state.layout.freezeCols,
-    freezeOriginRow: state.layout.freezeOriginRow,
-    freezeOriginCol: state.layout.freezeOriginCol,
-    hiddenRows: state.layout.hiddenRows,
-    hiddenCols: state.layout.hiddenCols,
-    sort,
-  });
+  const view = captureShown(store, id, name, sort);
   recordSheetViewsChange(history, store, () => {
     store.setState((s) => {
       const next = s.sheetViews.views.filter((v) => v.id !== view.id);
@@ -234,55 +329,97 @@ export function saveSheetView(
   return view;
 }
 
-/** Apply a previously captured sheet view to the current sheet. */
-export function activateSheetView(store: SpreadsheetStore, id: string): SheetViewStoreResult {
+/** Switch to a named view of the current sheet, keeping the settings of the view left. */
+export function activateSheetView(
+  store: SpreadsheetStore,
+  id: string,
+  history: History | null = null,
+): SheetViewStoreResult {
   const state = store.getState();
   const view = findSheetView(state.sheetViews.views, id);
   if (!view) return { ok: false, reason: 'not-found' };
-  const patch = applySheetView(view);
-  if (patch.sheet !== state.data.sheetIndex) return { ok: false, reason: 'different-sheet' };
-  store.setState((s) => {
-    const layout = {
-      ...s.layout,
-      freezeRows: Math.max(0, Math.floor(patch.freezeRows)),
-      freezeCols: Math.max(0, Math.floor(patch.freezeCols)),
-      freezeOriginRow: Math.max(0, Math.floor(patch.freezeOriginRow)),
-      freezeOriginCol: Math.max(0, Math.floor(patch.freezeOriginCol)),
-      hiddenRows: new Set(patch.hiddenRows),
-      hiddenCols: new Set(patch.hiddenCols),
-    };
-    return {
-      ...s,
-      layout,
-      viewport: {
-        ...s.viewport,
-        rowStart: Math.max(frozenRowEnd(layout), s.viewport.rowStart),
-        colStart: Math.max(frozenColEnd(layout), s.viewport.colStart),
-      },
-      ui: { ...s.ui, filterRanges: patch.filterRanges, filterCriteria: patch.filterCriteria },
-      sheetViews: { ...s.sheetViews, activeViewId: id },
-    };
+  if (view.sheet !== state.data.sheetIndex) return { ok: false, reason: 'different-sheet' };
+  if (state.sheetViews.activeViewId === id) return { ok: true, view };
+  recordSheetViewsChange(history, store, () => {
+    leaveShownView(store);
+    showSettings(store, view);
+    markShown(store, id);
   });
   return { ok: true, view };
 }
 
-/** Remove a stored sheet view and clear the active marker when needed. */
+/** Open a temporary view holding the current settings in place of the shown view. */
+export function newSheetView(store: SpreadsheetStore, history: History | null = null): SheetView {
+  return recordSheetViewsChange(history, store, () => {
+    leaveShownView(store);
+    const temporary = captureShown(store, TEMPORARY_SHEET_VIEW_ID, '');
+    store.setState((s) => ({
+      ...s,
+      sheetViews: { ...s.sheetViews, temporary, activeViewId: TEMPORARY_SHEET_VIEW_ID },
+    }));
+    return temporary;
+  });
+}
+
+/** Keep the open temporary view as a named view; null when no temporary view is open. */
+export function keepSheetView(
+  store: SpreadsheetStore,
+  id: string,
+  name: string,
+  history: History | null = null,
+): SheetView | null {
+  if (store.getState().sheetViews.activeViewId !== TEMPORARY_SHEET_VIEW_ID) return null;
+  const view = captureShown(store, id, name);
+  recordSheetViewsChange(history, store, () => {
+    store.setState((s) => ({
+      ...s,
+      sheetViews: {
+        ...s.sheetViews,
+        views: [...s.sheetViews.views.filter((v) => v.id !== id), view],
+        temporary: null,
+        activeViewId: id,
+      },
+    }));
+  });
+  return view;
+}
+
+/** Leave the shown sheet view for Default, putting Default's held settings back. */
+export function exitSheetView(store: SpreadsheetStore, history: History | null = null): void {
+  if (store.getState().sheetViews.activeViewId === null) return;
+  recordSheetViewsChange(history, store, () => {
+    leaveShownView(store);
+    const { defaultView } = store.getState().sheetViews;
+    if (defaultView && defaultView.sheet === store.getState().data.sheetIndex) {
+      showSettings(store, defaultView);
+    }
+    store.setState((s) => ({
+      ...s,
+      sheetViews: { ...s.sheetViews, defaultView: null, activeViewId: null },
+    }));
+  });
+}
+
+/** Remove a stored sheet view; removing the shown one returns to Default. */
 export function deleteSheetView(
   store: SpreadsheetStore,
   id: string,
   history: History | null = null,
 ): void {
+  const { views, activeViewId, defaultView } = store.getState().sheetViews;
+  if (!findSheetView(views, id)) return;
   recordSheetViewsChange(history, store, () => {
-    store.setState((s) => {
-      const views = s.sheetViews.views.filter((v) => v.id !== id);
-      if (views.length === s.sheetViews.views.length) return s;
-      return {
-        ...s,
-        sheetViews: {
-          views,
-          activeViewId: s.sheetViews.activeViewId === id ? null : s.sheetViews.activeViewId,
-        },
-      };
-    });
+    const shown = activeViewId === id;
+    if (shown && defaultView && defaultView.sheet === store.getState().data.sheetIndex) {
+      showSettings(store, defaultView);
+    }
+    store.setState((s) => ({
+      ...s,
+      sheetViews: {
+        ...s.sheetViews,
+        views: s.sheetViews.views.filter((v) => v.id !== id),
+        ...(shown ? { activeViewId: null, defaultView: null } : {}),
+      },
+    }));
   });
 }

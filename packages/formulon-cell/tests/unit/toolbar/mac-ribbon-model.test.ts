@@ -617,7 +617,14 @@ describe('Mac Excel ribbon profile', () => {
     const view = model.find((tab) => tab.id === 'view');
     expect(
       view?.groups.find((group) => group.title === 'Sheet View')?.commands.map((c) => c.id),
-    ).toEqual(['sheetViewSelect', 'mac.view.sheetViewSave', 'mac.view.sheetViewDelete']);
+    ).toEqual([
+      'sheetViewSelect',
+      'mac.view.sheetViewKeep',
+      'mac.view.sheetViewExit',
+      'mac.view.sheetViewNew',
+      'mac.view.sheetViewOptions',
+      'mac.view.sheetViewDelete',
+    ]);
     expect(
       view?.groups.find((group) => group.title === 'Workbook Views')?.commands.map((c) => c.id),
     ).toEqual([
@@ -933,7 +940,7 @@ describe('Mac Excel ribbon profile', () => {
     expect(command('scaleWidth')).toMatchObject({ kind: 'select' });
     expect(command('scaleHeight')).toMatchObject({ kind: 'select' });
     expect(command('sheetViewSelect')).toMatchObject({ kind: 'select' });
-    expect(command('mac.view.sheetViewSave')).toMatchObject({ disabled: undefined });
+    expect(command('mac.view.sheetViewNew')).toMatchObject({ disabled: undefined });
     expect(command('mac.view.sheetViewDelete')).toMatchObject({ disabled: undefined });
     expect(command('mac.data.showDetail')).toMatchObject({ disabled: undefined });
     expect(command('mac.data.hideDetail')).toMatchObject({ disabled: undefined });

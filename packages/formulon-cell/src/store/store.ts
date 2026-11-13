@@ -104,7 +104,7 @@ export const createSpreadsheetStore = () =>
     pageSetup: { setupBySheet: new Map() },
     slicers: { slicers: [] },
     tables: { tables: [], customTableStyles: [], customPivotTableStyles: [], pivotTableStyles: [] },
-    sheetViews: { views: [], activeViewId: null },
+    sheetViews: { views: [], activeViewId: null, temporary: null, defaultView: null },
     protection: { protectedSheets: new Map(), allowedEditRanges: [] },
   }));
 

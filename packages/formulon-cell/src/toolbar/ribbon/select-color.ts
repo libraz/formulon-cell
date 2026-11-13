@@ -1,9 +1,11 @@
 import type { Locale } from '../../i18n/strings.js';
+
 // Ribbon `<select>`-style dropdown and color-picker control builders extracted
 // from main.ts. The factory wires in i18n, host hooks (apply/read control
 // value, font availability, color palette) and produces the DOM elements that
 // renderRibbon mounts.
 
+import { TEMPORARY_SHEET_VIEW_ID } from '../../commands/sheet-views.js';
 import { createColorPalette, themeColorColumns } from '../../components/color-palette.js';
 import { addrKey } from '../../engine/address.js';
 import { onOutsidePress } from '../../interact/outside-press.js';
@@ -38,7 +40,6 @@ export interface SelectColorRibbonText {
   fontSectionAll: string;
   fontRoleHeading: string;
   fontRoleBody: string;
-  currentView: string;
 }
 
 export interface SelectColorPageScaleText {
@@ -175,7 +176,11 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           .getState()
           .sheetViews.views.filter((view) => view.sheet === inst?.store.getState().data.sheetIndex)
           .map((view) => ({ value: view.id, label: view.name })) ?? [];
-      return [{ value: 'current', label: ribbonText.currentView }, ...views];
+      // Default and the temporary view are named by the command; the temporary one is listed while open.
+      const unnamed = options.filter(
+        (option) => option.value !== TEMPORARY_SHEET_VIEW_ID || current === TEMPORARY_SHEET_VIEW_ID,
+      );
+      return [...unnamed, ...views];
     }
     if (command.id !== 'fontFamily') return options;
     const fonts = fontFamilyOptions(ribbonLang, current, options, shouldShowFontOption);
@@ -608,9 +613,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
 
   const ribbonSelectLabel = (wrap: HTMLElement, current: string): string => {
     if (wrap.dataset.ribbonSelect === 'sheetViewSelect') {
-      if (current === 'current') return ribbonText.currentView;
-      const state = getInst()?.store.getState();
-      return state?.sheetViews.views.find((view) => view.id === current)?.name ?? current;
+      const named = getInst()
+        ?.store.getState()
+        .sheetViews.views.find((view) => view.id === current);
+      if (named) return named.name;
     }
     try {
       const options = JSON.parse(wrap.dataset.ribbonOptions ?? '[]') as {

@@ -199,7 +199,6 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(selectColorSource).toContain('ribbonText.fontSectionAll');
     expect(selectColorSource).toContain('ribbonText.fontRoleHeading');
     expect(selectColorSource).toContain('ribbonText.fontRoleBody');
-    expect(selectColorSource).toContain('ribbonText.currentView');
     expect(selectColorSource).toContain('ribbonText.marginsCustomDialog');
     expect(selectColorSource).toContain('ribbonText.marginTop');
     expect(selectColorSource).not.toContain("arrow.textContent = '›'");

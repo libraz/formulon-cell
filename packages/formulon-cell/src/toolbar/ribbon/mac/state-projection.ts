@@ -7,6 +7,7 @@ import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
 import { noteChangePermitted } from '../../../commands/protection.js';
 import { arrangeStackPosition } from '../../../commands/session-illustration.js';
+import { TEMPORARY_SHEET_VIEW_ID } from '../../../commands/sheet-views.js';
 import { activeTableOverlay } from '../../../commands/table-design.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
 import { findPivotTableAtCell } from '../../../engine/passthrough-sync.js';
@@ -88,6 +89,8 @@ const MAC_CONTENT_STATE_COMMANDS = [
   'mac.data.workbookLinks',
   'mac.insert.slicer',
   'mac.formulas.useInFormula',
+  'mac.view.sheetViewKeep',
+  'mac.view.sheetViewExit',
 ] as const;
 
 const contentDisabledReason = (
@@ -99,6 +102,15 @@ const contentDisabledReason = (
     return instance.workbook.getExternalLinks().length === 0
       ? MAC_CONTEXT_LABELS.externalLinksRequired[lang]
       : null;
+  }
+  if (id === 'mac.view.sheetViewKeep' || id === 'mac.view.sheetViewExit') {
+    const shown = instance.store.getState().sheetViews.activeViewId;
+    if (id === 'mac.view.sheetViewKeep') {
+      return shown === TEMPORARY_SHEET_VIEW_ID
+        ? null
+        : MAC_CONTEXT_LABELS.temporarySheetViewRequired[lang];
+    }
+    return shown === null ? MAC_CONTEXT_LABELS.sheetViewRequired[lang] : null;
   }
   if (id === 'mac.insert.slicer') {
     const state = instance.store.getState();

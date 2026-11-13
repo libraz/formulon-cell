@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { keepSheetView, newSheetView } from '../../../src/commands/sheet-views.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
 import { macRibbonLabelForCommand } from '../../../src/toolbar/ribbon/mac/labels.js';
 import { macRibbonMenuIdForCommand } from '../../../src/toolbar/ribbon/mac/menu-manifest.js';
@@ -7,6 +9,7 @@ import { createMacRibbonMenuFactory } from '../../../src/toolbar/ribbon/mac/menu
 import { projectMacRibbonState } from '../../../src/toolbar/ribbon/mac/state-projection.js';
 import { buildRibbonModel } from '../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
+import { stubHelpers } from '../mount/toolbar/fixtures.js';
 
 const viewTab = () =>
   buildRibbonModel('ja', { profile: 'excel365Mac' }).find((tab) => tab.id === 'view');
@@ -26,7 +29,14 @@ const menuItems = (commandId: string) =>
 describe('Mac View tab', () => {
   it('lays out the groups and their commands in the desktop order', () => {
     expect(viewTab()?.groups.map((group) => group.commands.map((command) => command.id))).toEqual([
-      ['sheetViewSelect', 'mac.view.sheetViewSave', 'mac.view.sheetViewDelete'],
+      [
+        'sheetViewSelect',
+        'mac.view.sheetViewKeep',
+        'mac.view.sheetViewExit',
+        'mac.view.sheetViewNew',
+        'mac.view.sheetViewOptions',
+        'mac.view.sheetViewDelete',
+      ],
       [
         'mac.view.standard',
         'mac.view.pageBreakPreview',
@@ -79,6 +89,25 @@ describe('Mac View tab', () => {
     expect(macRibbonLabelForCommand('mac.view.freeze.panes', 'de')).toBe('Fenster fixieren');
   });
 
+  it('labels the Sheet View group from the desktop strings, Options not built yet', () => {
+    const commands = viewTab()?.groups[0]?.commands ?? [];
+    expect(commands.map((command) => command.label)).toEqual([
+      'シート ビューの切り替え',
+      '保持',
+      '終了',
+      '新規',
+      'オプション',
+      '削除',
+    ]);
+    expect(commands[0]?.options?.map((option) => option.label)).toEqual(['既定', '一時ビュー']);
+    expect(commands.find((c) => c.id === 'mac.view.sheetViewOptions')?.disabled).toBe(true);
+    expect(
+      ['sheetViewKeep', 'sheetViewExit', 'sheetViewNew'].map((id) =>
+        macRibbonLabelForCommand(`mac.view.${id}`, 'de'),
+      ),
+    ).toEqual(['Beibehalten', 'Beenden', 'Neu']);
+  });
+
   it('names the zoom commands as the desktop does', () => {
     expect(macRibbonLabelForCommand('mac.view.zoom100', 'ja')).toBe('ズーム (100%)');
     expect(macRibbonLabelForCommand('mac.view.zoom100', 'en')).toBe('Zoom to 100%');
@@ -117,6 +146,51 @@ describe('Mac View tab', () => {
       mutators.setFormulaBarVisible(instance.store, false);
       projectMacRibbonState(host, instance);
       expect(formulaBar.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('offers Keep only for a temporary view and Exit only away from Default', async () => {
+      sheet = await mountStubSheet({
+        workbook: await WorkbookHandle.createDefault({ preferStub: true }),
+        locale: 'ja',
+      });
+      const { instance } = sheet;
+      const host = document.createElement('div');
+      const button = (id: string) => {
+        const el = document.createElement('button');
+        el.dataset.ribbonCommand = id;
+        host.appendChild(el);
+        return el;
+      };
+      const keep = button('mac.view.sheetViewKeep');
+      const exit = button('mac.view.sheetViewExit');
+      const offered = () => [keep.disabled, exit.disabled].map((off) => !off);
+
+      projectMacRibbonState(host, instance);
+      expect(offered()).toEqual([false, false]);
+      newSheetView(instance.store);
+      projectMacRibbonState(host, instance);
+      expect(offered()).toEqual([true, true]);
+      keepSheetView(instance.store, 'view-0-1', 'View 1');
+      projectMacRibbonState(host, instance);
+      expect(offered()).toEqual([false, true]);
+    });
+
+    it('routes New, Keep and Exit from the ribbon to the sheet views', async () => {
+      sheet = await mountStubSheet({ locale: 'ja', ui: { platform: 'mac' } });
+      const { instance } = sheet;
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const tb = Spreadsheet.mountToolbar(host, instance, { helpers: stubHelpers() });
+      const views = () => instance.store.getState().sheetViews;
+
+      expect(tb.applyCommand('mac.view.sheetViewNew')).toBe(true);
+      expect(views().activeViewId).toBe('temporary');
+      expect(tb.applyCommand('mac.view.sheetViewKeep')).toBe(true);
+      expect(views().views.map((view) => [view.id, view.name])).toEqual([['view-0-1', 'ビュー 1']]);
+      expect(tb.applyCommand('mac.view.sheetViewExit')).toBe(true);
+      expect(views().activeViewId).toBeNull();
+      tb.dispose();
+      host.remove();
     });
   });
 });

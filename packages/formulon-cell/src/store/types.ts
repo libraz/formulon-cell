@@ -664,7 +664,12 @@ export interface TablesSlice {
 
 export interface SheetViewsSlice {
   views: readonly SheetView[];
+  /** The named view shown, `TEMPORARY_SHEET_VIEW_ID` for the temporary view, null for Default. */
   activeViewId: string | null;
+  /** The view New opened, until Keep names it or leaving it discards it. */
+  temporary: SheetView | null;
+  /** Default's state, held while a sheet view is shown in its place. */
+  defaultView: SheetView | null;
 }
 
 /** A `<protectedRange>`. `range` is the first area; `extraAreas` holds the
