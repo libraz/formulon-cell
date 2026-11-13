@@ -33,8 +33,10 @@ const toggleShowAll = async (
 ): Promise<Locator> => {
   await selectRibbonTab(page, 'review');
   if (platform === 'default') {
-    await sheet.clickRibbon('showAllNotesReview');
-    return page.locator('[data-ribbon-command="showAllNotesReview"]').first();
+    await sheet.clickRibbon('notesReview');
+    const item = page.locator('#menu-review-notes [data-comment-action="toggle-all-notes"]');
+    await item.click();
+    return item;
   }
   await sheet.clickRibbon('mac.review.notes');
   const item = page.locator('.fc-tb__menu [data-ribbon-command="mac.review.showNotes"]').first();
@@ -42,12 +44,12 @@ const toggleShowAll = async (
   return item;
 };
 
-/** Reopens the Mac Notes menu to read the pressed state, then closes it. */
+/** Reopens the Notes menu to read the pressed state, then closes it. */
 const expectPressed = async (page: Page, platform: Platform, button: Locator, pressed: boolean) => {
-  if (platform === 'mac')
-    await page.locator('[data-ribbon-command="mac.review.notes"]').first().click();
+  const notes = platform === 'mac' ? 'mac.review.notes' : 'notesReview';
+  await page.locator(`[data-ribbon-command="${notes}"]`).first().click();
   await expect(button).toHaveAttribute('aria-pressed', String(pressed));
-  if (platform === 'mac') await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
 };
 
 /** Show All Notes is a view toggle: it draws every note without writing any note's own shown

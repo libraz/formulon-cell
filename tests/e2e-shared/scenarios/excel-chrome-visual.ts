@@ -672,11 +672,10 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   );
   await switchRibbonTab(page, 'review');
   await snapshotDemo(page, 'excel-chrome-review-full-1440');
-  await snapshotRibbonSecondaryMenu(page, {
-    command: 'deleteCommentReview',
-    menuId: 'menu-review-comments',
-    name: 'excel-chrome-review-comments-menu-1440',
-    activation: 'splitPrimary',
+  await snapshotRibbonMenu(page, {
+    command: 'notesReview',
+    menuId: 'menu-review-notes',
+    name: 'excel-chrome-review-notes-menu-1440',
   });
   await snapshotRibbonSecondaryMenu(page, {
     command: 'protectReview',
@@ -708,7 +707,8 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await snapshotPage(page, 'excel-chrome-review-translate-dialog-1440');
   await translate.getByRole('button', { name: 'OK', exact: true }).click();
   await expect(translate).toBeHidden();
-  await page.locator('[data-ribbon-command="newCommentReview"]').click();
+  await page.locator('[data-ribbon-command="notesReview"]').click();
+  await page.locator('#menu-review-notes [data-comment-action="new-note"]').click();
   const note = page.getByRole('dialog', { name: 'メモを挿入' });
   await expect(note).toBeVisible();
   await snapshotPage(page, 'excel-chrome-review-insert-note-dialog-1440');

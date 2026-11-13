@@ -790,10 +790,12 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     'スペル チェック',
     'アクセシビリティ',
     '翻訳',
-    'メモを挿入',
+    '新しいコメント',
     'コメントまたはメモの削除',
-    '前のコメントまたはメモ',
-    '次のコメントまたはメモ',
+    '前のコメント',
+    '次のコメント',
+    'コメントの表示',
+    'メモ',
     '検索 (Ctrl+F)',
     '保護',
     'ブックの保護...',
@@ -804,13 +806,17 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await expect(reviewRibbon).not.toContainText('Spelling');
   await expect(reviewRibbon).not.toContainText('Accessibility');
   await expect(reviewRibbon).not.toContainText('Translate');
-  await expect(page.locator('[data-ribbon-command="deleteCommentReview"]').first()).toHaveAttribute(
+  // Delete is a plain button; the note commands sit in the Notes dropdown.
+  await expect(
+    page.locator('[data-ribbon-command="deleteCommentReview"]').first(),
+  ).not.toHaveAttribute('data-ribbon-menu-id');
+  await expect(page.locator('[data-ribbon-command="notesReview"]').first()).toHaveAttribute(
     'data-ribbon-activation',
-    'splitPrimary',
+    'dropdown',
   );
-  await expect(page.locator('[data-ribbon-command="deleteCommentReview"]').first()).toHaveAttribute(
+  await expect(page.locator('[data-ribbon-command="notesReview"]').first()).toHaveAttribute(
     'data-ribbon-menu-id',
-    'menu-review-comments',
+    'menu-review-notes',
   );
   await expect(page.locator('[data-ribbon-command="protectReview"]').first()).toHaveAttribute(
     'data-ribbon-activation',
@@ -838,6 +844,13 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await expect(translateDialog).toHaveCount(0);
 
   await page.locator('[data-ribbon-command="newCommentReview"]').first().click();
+  const threadDialog = page.locator('.fc-cmtnote').first();
+  await expect(threadDialog.getByPlaceholder('コメントを入力')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(threadDialog).toBeHidden();
+
+  await page.locator('[data-ribbon-command="notesReview"]').first().click();
+  await page.locator('#menu-review-notes [data-comment-action="new-note"]').click();
   const commentDialog = page.getByRole('dialog', { name: 'メモを挿入' });
   await expect(commentDialog).toBeVisible();
   await expect(commentDialog.getByPlaceholder('メモを入力')).toBeVisible();

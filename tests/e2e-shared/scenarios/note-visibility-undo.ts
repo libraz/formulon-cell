@@ -26,7 +26,7 @@ const toggleFromCellMenu = async (sheet: UserJourneyPage, page: Page) => {
   await expect(menu).toBeHidden();
 };
 
-/** Runs a Review note command: a ribbon button on Windows, a Notes menu row on Mac. */
+/** Runs a Review note command from the Notes menu. */
 const runNoteCommand = async (
   sheet: UserJourneyPage,
   page: Page,
@@ -36,7 +36,9 @@ const runNoteCommand = async (
   await sheet.goTo('B2');
   await selectRibbonTab(page, 'review');
   if (platform === 'default') {
-    await sheet.clickRibbon(command === 'showHide' ? 'showHideNoteReview' : 'showAllNotesReview');
+    await sheet.clickRibbon('notesReview');
+    const action = command === 'showHide' ? 'toggle-note' : 'toggle-all-notes';
+    await page.locator(`#menu-review-notes [data-comment-action="${action}"]`).click();
     return;
   }
   await sheet.clickRibbon('mac.review.notes');

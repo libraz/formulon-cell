@@ -77,8 +77,8 @@ export async function runNativeImageSaveScenario(page: Page): Promise<void> {
   await sp.expectNoStub();
   await sp.goTo('B3');
   await selectRibbonTab(page, 'review');
-  await sp.openRibbonSplitMenu('newCommentReview', 'menu-review-new-comment');
-  await page.locator('#menu-review-new-comment [data-comment-action="thread"]').click();
+  // New Comment starts a threaded comment.
+  await sp.clickRibbon('newCommentReview');
   const comment = page.locator('.fc-cmtnote').first();
   await comment.locator('textarea').fill('Persist this thread');
   await comment.locator('.fc-cmtnote__btn--primary').click();

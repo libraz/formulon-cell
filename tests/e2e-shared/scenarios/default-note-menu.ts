@@ -16,8 +16,8 @@ const openCellMenu = async (page: Page, row: number, col: number) => {
 };
 
 /** On the default profile a plain cell's menu offers New Note alone, a cell with a note offers
- *  Edit Note, Delete Note and Show/Hide Note, and the Review tab's New Note reads Edit Note while
- *  the active cell has one. */
+ *  Edit Note, Delete Note and Show/Hide Note, and the Review tab's Notes > New Note reads Edit
+ *  Note while the active cell has one. */
 export async function runDefaultNoteMenuScenario(page: Page): Promise<void> {
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ locale: 'en' });
@@ -43,11 +43,16 @@ export async function runDefaultNoteMenuScenario(page: Page): Promise<void> {
   await expect(menu).toBeHidden();
 
   await selectRibbonTab(page, 'review');
-  const newNote = page.locator('[data-ribbon-command="newCommentReview"]').first();
-  await sheet.goTo('A1');
-  await expect(newNote).toHaveAttribute('aria-label', 'New Note');
-  await sheet.goTo('B2');
-  await expect(newNote).toHaveAttribute('aria-label', 'Edit Note');
-  await expect(newNote).toContainText('Edit Note');
+  const newNote = page.locator('#menu-review-notes [data-comment-action="new-note"]');
+  for (const [cell, label] of [
+    ['A1', 'New Note'],
+    ['B2', 'Edit Note'],
+  ] as const) {
+    await sheet.goTo(cell);
+    await sheet.clickRibbon('notesReview');
+    await expect(newNote).toHaveText(label);
+    await page.keyboard.press('Escape');
+    await expect(newNote).toBeHidden();
+  }
   await sheet.expectNoConsoleErrors();
 }
