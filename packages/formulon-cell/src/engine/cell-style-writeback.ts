@@ -8,6 +8,7 @@ import {
   customCellStyleId,
   formatForCellStyleGroups,
   getCellStyle,
+  isBuiltinCellStyleId,
   stylePayloadMatches,
   stylePayloadMatchesNative,
 } from '../commands/cell-styles.js';
@@ -188,8 +189,7 @@ const sameNamedStyleFormat = (
 };
 
 const isUnrepresentedNativeBuiltin = (entry: NamedStyleCatalogEntry): boolean =>
-  entry.builtinId >= 0 &&
-  entry.builtinId <= 53 &&
+  isBuiltinCellStyleId(entry.builtinId) &&
   !CELL_STYLES.some((style) => style.builtinId === entry.builtinId);
 
 const isImportedNativeBuiltin = (
@@ -280,7 +280,7 @@ const namedStyleRecordFor = (
 
 /** Built-in ordinals in the OOXML catalog are accepted by formulon 0.13. */
 const writableBuiltinId = (builtinId: number | null): number | null =>
-  builtinId !== null && builtinId >= 0 && builtinId <= 53 ? builtinId : null;
+  isBuiltinCellStyleId(builtinId) ? builtinId : null;
 
 /** Stage named-style catalog changes until all cell XF and metadata writes have
  *  succeeded. A later failed registration rolls back replacements and removes

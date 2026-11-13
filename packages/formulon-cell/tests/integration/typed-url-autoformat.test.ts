@@ -1,6 +1,7 @@
 import { ColorKind } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import { commitCellInput } from '../../src/commands/cell-input-commit.js';
+import { isBuiltinCellStyleId } from '../../src/commands/cell-styles.js';
 import { applySelectionFormatAction, setFont } from '../../src/commands/format.js';
 import { hyperlinkAt } from '../../src/commands/hyperlinks.js';
 import { interactionControllerFor } from '../../src/commands/interaction-controller.js';
@@ -25,6 +26,18 @@ function rawNamedStyleMetadata(workbook: WorkbookHandle) {
   return Array.from({ length: workbook.cellStyleCount() }, (_, index) =>
     workbook.getCellStyle(index),
   ).filter((style) => style !== null);
+}
+
+/** Named styles keyed the way a save keeps them: a built-in by its id, since the file is written
+ *  under the profile's name for it and in the profile's order; a custom style by its name. */
+function namedStylesByIdentity(workbook: WorkbookHandle) {
+  return Object.fromEntries(
+    rawNamedStyleMetadata(workbook).map(({ name, ...style }) =>
+      isBuiltinCellStyleId(style.builtinId)
+        ? [`builtin:${style.builtinId}`, style]
+        : [`custom:${name}`, { name, ...style }],
+    ),
+  );
 }
 
 function addLocalizedHyperlinkStyle(workbook: WorkbookHandle, hidden: boolean) {
@@ -525,7 +538,8 @@ describe('typed URL autoformat', () => {
           expect(fontAt(secondReload, FAR).sizePt).toBe(24);
           expect(fontAt(secondReload, B1).sizePt).toBe(24);
           expect(hyperlinkAt(finalMount.instance.store.getState(), A1)).toBe(URL);
-          expect(rawNamedStyleMetadata(secondReload)).toEqual(rawNamedStyleMetadata(workbook));
+          expect(namedStylesByIdentity(secondReload)).toEqual(namedStylesByIdentity(workbook));
+          expect(namedStylesByIdentity(secondReload)['builtin:8']).toMatchObject({ hidden: true });
         } finally {
           finalMount.dispose();
         }

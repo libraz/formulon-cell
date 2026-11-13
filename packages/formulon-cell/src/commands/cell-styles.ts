@@ -16,6 +16,7 @@ import {
   type CellStyleFormatGroup,
   type CellStyleId,
   EXCEL365_MAC_STYLE_OVERRIDES,
+  isBuiltinCellStyleId,
   numberStyleNumFmt,
 } from './cell-style-catalog.js';
 import {
@@ -39,7 +40,7 @@ export type {
   CellStyleGroupId,
   CellStyleId,
 } from './cell-style-catalog.js';
-export { CELL_STYLE_GROUPS, CELL_STYLES } from './cell-style-catalog.js';
+export { CELL_STYLE_GROUPS, CELL_STYLES, isBuiltinCellStyleId } from './cell-style-catalog.js';
 export {
   cellStyleGroupMatches,
   formatForCellStyleGroups,
@@ -66,9 +67,6 @@ export interface CreateCellStyleOptions {
 
 const STYLE_BY_ID = new Map<CellStyleId, CellStyleDef>(CELL_STYLES.map((s) => [s.id, s]));
 const CUSTOM_STYLE_PREFIX = 'custom:';
-const BUILT_IN_STYLE_NAMES = new Set(
-  CELL_STYLES.flatMap((style) => [style.id.toLowerCase(), style.label.toLowerCase()]),
-);
 
 export type CellStyleFallbackProfile = 'default' | 'excel365Mac';
 
@@ -507,10 +505,7 @@ export function mergeCellStylesFromWorkbook(
       skipped += 1;
       continue;
     }
-    if (
-      BUILT_IN_STYLE_NAMES.has(label.toLowerCase()) ||
-      CELL_STYLES.some((builtin) => builtin.builtinId === style.builtinId)
-    ) {
+    if (isBuiltinCellStyleId(style.builtinId)) {
       skipped += 1;
       continue;
     }

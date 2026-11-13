@@ -137,6 +137,24 @@ describe('applyCellStyle', () => {
     ).toBeUndefined();
   });
 
+  it('skips every built-in style by its id, whatever the book names it', () => {
+    const store = createSpreadsheetStore();
+    const workbook = namedStyleWorkbook();
+    const styles = workbook.getNamedCellStyles();
+    workbook.getNamedCellStyles = () => [
+      ...styles,
+      { index: 2, name: 'LienWeb', xfId: 2, builtinId: 8, iLevel: 0, customBuiltin: true },
+    ];
+
+    expect(mergeCellStylesFromWorkbook(store, null, workbook)).toEqual({
+      imported: 1,
+      skipped: 2,
+    });
+    expect(listCustomCellStyles(store.getState()).map((style) => style.label)).toEqual([
+      'Imported Review',
+    ]);
+  });
+
   it('merges visible workbook named styles into the session custom style registry', () => {
     const store = createSpreadsheetStore();
     const history = new History();

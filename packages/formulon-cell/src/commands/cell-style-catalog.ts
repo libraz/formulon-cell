@@ -387,6 +387,11 @@ const CELL_STYLE_METADATA: Partial<
   accent6_60: { builtinId: 52, includedGroups: ['font', 'fill'] },
 };
 
+/** Whether a named style's id is one of the OOXML built-in style ordinals (0-53). A book may
+ *  write a built-in under any name, so the id alone identifies it. */
+export const isBuiltinCellStyleId = (builtinId: number | null | undefined): boolean =>
+  builtinId != null && builtinId >= 0 && builtinId <= 53;
+
 export const CELL_STYLES: readonly CellStyleDef[] = CELL_STYLE_DEFS.map((style) => ({
   ...style,
   ...CELL_STYLE_METADATA[style.id],
