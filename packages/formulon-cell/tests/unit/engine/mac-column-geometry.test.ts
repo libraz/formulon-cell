@@ -17,10 +17,6 @@ const MEASURED: ReadonlyArray<readonly [string, number, readonly number[], numbe
   ['Aptos Narrow', 11, [55, 64, 124], 65],
   ['游ゴシック', 11, [55, 64, 124], 65],
   ['游ゴシック', 12, [64, 75, 145], 75],
-];
-// Measured with a 7 pt digit, which the engine lays out at 6 pt; each passes once the engine
-// carries the font's Mac row.
-const ENGINE_DISAGREES: typeof MEASURED = [
   ['Meiryo', 11, [64, 75, 145], 75],
   ['Helvetica Neue', 12, [64, 75, 145], 75],
   ['Arial', 12, [64, 75, 145], 75],
@@ -53,12 +49,6 @@ describe('Mac column geometry from the engine profile', () => {
     expect(laid.widths).toEqual(widths);
     expect(laid.base).toBeCloseTo(base, 6);
   });
-
-  for (const [font, size, widths] of ENGINE_DISAGREES) {
-    it.fails(`lays out ${font} ${size} pt columns as measured (engine disagrees)`, async () => {
-      expect((await layOut(font, size)).widths).toEqual(widths);
-    });
-  }
 });
 
 type RawSheet = { setColumnWidth(first: number, last: number, chars: number): void };
