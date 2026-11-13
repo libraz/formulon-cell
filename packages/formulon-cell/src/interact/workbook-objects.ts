@@ -659,13 +659,21 @@ export function attachWorkbookObjectsPanel(
     return true;
   };
 
+  // Selection Pane shows the object list whichever pivot view the pane showed last.
+  const openObjectList = (): void => {
+    activePivotEditKey = '';
+    activePivotFieldListKey = '';
+    pivotEditError = '';
+    openPanel();
+  };
+
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') close(true);
   };
   root.addEventListener('keydown', onKey);
 
   return {
-    open: openPanel,
+    open: openObjectList,
     openPivotFieldList,
     openPivotFieldSettings: (addr) =>
       openPivotFieldSettingsAt(

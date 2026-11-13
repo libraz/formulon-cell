@@ -401,6 +401,22 @@ describe('PivotTable Fields pane', () => {
     wb.dispose();
   });
 
+  it('opens the selection list, not the last field list, from the general open', async () => {
+    const wb = await setup();
+    const { handle } = open(wb, undefined, ja);
+    handle.open();
+    expect(handle.isPivotFieldListOpen()).toBe(false);
+    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    handle.close();
+    handle.open();
+    const root = host.querySelector<HTMLElement>('.fc-objects');
+    expect(root?.querySelector('.fc-objects__title')?.textContent).toBe(ja.workbookObjects.title);
+    expect(root?.classList.contains('fc-objects--taskpane')).toBe(false);
+    expect(handle.isPivotFieldListOpen()).toBe(false);
+    handle.detach();
+    wb.dispose();
+  });
+
   it('closes on Escape', async () => {
     const wb = await setup();
     const { handle } = open(wb);
