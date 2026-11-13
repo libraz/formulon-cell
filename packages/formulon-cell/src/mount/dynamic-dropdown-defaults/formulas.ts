@@ -291,9 +291,18 @@ async function createNamesFromSelection(instance: SpreadsheetInstance): Promise<
       ok: strings.pageSetup.ok,
       cancel: strings.pageSetup.cancel,
     },
+    // The corner cell the top row and left column share decides neither.
     initial: {
-      top: holdsText(instance, { ...range, r1: range.r0 }),
-      left: holdsText(instance, { ...range, c1: range.c0 }),
+      top: holdsText(instance, {
+        ...range,
+        r1: range.r0,
+        c0: range.c1 > range.c0 ? range.c0 + 1 : range.c0,
+      }),
+      left: holdsText(instance, {
+        ...range,
+        c1: range.c0,
+        r0: range.r1 > range.r0 ? range.r0 + 1 : range.r0,
+      }),
       bottom: false,
       right: false,
     },

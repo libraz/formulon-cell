@@ -98,4 +98,21 @@ describe('Create from Selection', () => {
     instance.history.undo();
     expect([...instance.workbook.definedNames()]).toEqual([]);
   });
+
+  // Provisional until measured: the shared corner cell decides neither edge.
+  it('starts with only the top row checked over a header row of numbers', async () => {
+    sheet = await mountStubSheet({ locale: 'en', workbook: await WorkbookHandle.createDefault() });
+    const { instance } = sheet;
+    instance.workbook.setText({ sheet: 0, row: 0, col: 0 }, 'Qty');
+    instance.workbook.setText({ sheet: 0, row: 0, col: 1 }, 'Price');
+    for (const row of [1, 2]) {
+      instance.workbook.setNumber({ sheet: 0, row, col: 0 }, row * 2 + 1);
+      instance.workbook.setNumber({ sheet: 0, row, col: 1 }, row * 10);
+    }
+    mutators.replaceCells(instance.store, instance.workbook.cells(0));
+    mutators.setRange(instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    void createFormulasDropdownDefaults(instance).applyDefinedNameAction('create-from-selection');
+    await settle();
+    expect([edge('top').checked, edge('left').checked]).toEqual([true, false]);
+  });
 });
