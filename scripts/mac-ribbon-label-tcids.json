@@ -1,0 +1,1989 @@
+{
+  "_comment": "map: our key -> ribbon TCID and the string source (tbbtn|tbbtn2|tbfriendly) whose ja text equals the current observed ja label; match says whether en also matched the bundle. held: keys left on their current text, with the reason.",
+  "map": {
+    "groups:Accessibility": {
+      "tcid": 27151,
+      "source": "tbbtn",
+      "name": "ChunkAccessibility",
+      "match": "en+ja"
+    },
+    "groups:Add-ins": {
+      "tcid": 34778,
+      "source": "tbbtn",
+      "name": "ChunkOfficeExtensionsAddinFlyout",
+      "match": "en+ja"
+    },
+    "groups:Analysis": {
+      "tcid": 32315,
+      "source": "tbbtn",
+      "name": "ChunkSolver",
+      "match": "en+ja"
+    },
+    "groups:Calculation": {
+      "tcid": 12604,
+      "source": "tbbtn",
+      "name": "ChunkCalculation",
+      "match": "en+ja"
+    },
+    "groups:Charts": {
+      "tcid": 15533,
+      "source": "tbbtn",
+      "name": "ChunkExcelChartGallery",
+      "match": "en+ja"
+    },
+    "groups:Comments": {
+      "tcid": 11563,
+      "source": "tbbtn",
+      "name": "ChunkComments",
+      "match": "en+ja"
+    },
+    "groups:Controls": {
+      "tcid": 34609,
+      "source": "tbbtn",
+      "name": "ChunkCellControls",
+      "match": "en+ja"
+    },
+    "groups:Data Tools": {
+      "tcid": 11627,
+      "source": "tbbtn",
+      "name": "ChunkDataDataTools",
+      "match": "en+ja"
+    },
+    "groups:Data Types": {
+      "tcid": 32659,
+      "source": "tbbtn",
+      "name": "ChunkConvertToLinkedEntity",
+      "match": "en+ja"
+    },
+    "groups:Defined Names": {
+      "tcid": 11621,
+      "source": "tbbtn",
+      "name": "ChunkFormulaNamedCells",
+      "match": "en+ja"
+    },
+    "groups:Filters": {
+      "tcid": 18879,
+      "source": "tbbtn",
+      "name": "ChunkSlicerInsert",
+      "match": "en+ja"
+    },
+    "groups:Forecast": {
+      "tcid": 26537,
+      "source": "tbbtn",
+      "name": "ChunkTimeSeriesForecasting",
+      "match": "en+ja"
+    },
+    "groups:Formula Auditing": {
+      "tcid": 11622,
+      "source": "tbbtn",
+      "name": "ChunkFormulaFormulaAuditing",
+      "match": "en+ja"
+    },
+    "groups:Function Library": {
+      "tcid": 11620,
+      "source": "tbbtn",
+      "name": "ChunkFormulaInsertFunction",
+      "match": "en+ja"
+    },
+    "groups:Get & Transform Data": {
+      "tcid": 27652,
+      "source": "tbbtn",
+      "name": "ChunkPowerQueryGetTransformData",
+      "match": "ja"
+    },
+    "groups:Illustrations": {
+      "tcid": 11548,
+      "source": "tbbtn",
+      "name": "ChunkIllustrations",
+      "match": "en+ja"
+    },
+    "groups:Ink": {
+      "tcid": 13964,
+      "source": "tbbtn",
+      "name": "ChunkInking",
+      "match": "en+ja"
+    },
+    "groups:Language": {
+      "tcid": 19382,
+      "source": "tbbtn",
+      "name": "ChunkLanguage",
+      "match": "en+ja"
+    },
+    "groups:Links": {
+      "tcid": 12599,
+      "source": "tbbtn",
+      "name": "ChunkLinks",
+      "match": "en+ja"
+    },
+    "groups:Macros": {
+      "tcid": 16104,
+      "source": "tbbtn",
+      "name": "ChunkMacros",
+      "match": "en+ja"
+    },
+    "groups:Notes": {
+      "tcid": 33479,
+      "source": "tbbtn",
+      "name": "ChunkCommentsLegacy",
+      "match": "en+ja"
+    },
+    "groups:Outline": {
+      "tcid": 11626,
+      "source": "tbbtn",
+      "name": "ChunkDataDataOutline",
+      "match": "en+ja"
+    },
+    "groups:Page Setup": {
+      "tcid": 11551,
+      "source": "tbbtn",
+      "name": "ChunkPageSetup",
+      "match": "en+ja"
+    },
+    "groups:Pens": {
+      "tcid": 17502,
+      "source": "tbbtn",
+      "name": "JotChunkPens",
+      "match": "en+ja"
+    },
+    "groups:Proofing": {
+      "tcid": 11546,
+      "source": "tbbtn",
+      "name": "ChunkProofing",
+      "match": "en+ja"
+    },
+    "groups:Protect": {
+      "tcid": 12792,
+      "source": "tbbtn",
+      "name": "ChunkProtect",
+      "match": "en+ja"
+    },
+    "groups:Python": {
+      "tcid": 34691,
+      "source": "tbbtn",
+      "name": "ChunkPython",
+      "match": "en+ja"
+    },
+    "groups:Scale to Fit": {
+      "tcid": 11617,
+      "source": "tbbtn",
+      "name": "ChunkPageLayoutScaleToFit",
+      "match": "en+ja"
+    },
+    "groups:Sheet Views": {
+      "tcid": 33907,
+      "source": "tbbtn",
+      "name": "ChunkNamedSheetView",
+      "match": "ja"
+    },
+    "groups:Show": {
+      "tcid": 15640,
+      "source": "tbbtn",
+      "name": "ChunkViewShowHide",
+      "match": "en+ja"
+    },
+    "groups:Sparklines": {
+      "tcid": 16702,
+      "source": "tbbtn",
+      "name": "ChunkInsertSparklines",
+      "match": "en+ja"
+    },
+    "groups:Symbols": {
+      "tcid": 12600,
+      "source": "tbbtn",
+      "name": "ChunkSymbols",
+      "match": "en+ja"
+    },
+    "groups:Tables": {
+      "tcid": 11611,
+      "source": "tbbtn",
+      "name": "ChunkInsertTables",
+      "match": "en+ja"
+    },
+    "groups:Themes": {
+      "tcid": 12497,
+      "source": "tbbtn",
+      "name": "ChunkXLTheme",
+      "match": "en+ja"
+    },
+    "groups:Tools": {
+      "tcid": 17500,
+      "source": "tbbtn",
+      "name": "JotChunkWrite",
+      "match": "en+ja"
+    },
+    "groups:Workbook Views": {
+      "tcid": 15642,
+      "source": "tbbtn",
+      "name": "ChunkWorkbookViews",
+      "match": "en+ja"
+    },
+    "groups:Zoom": {
+      "tcid": 11813,
+      "source": "tbbtn",
+      "name": "ChunkZoom",
+      "match": "en+ja"
+    },
+    "labels:add": {
+      "tcid": 27640,
+      "source": "tbbtn",
+      "name": "AddInkToolsMenu",
+      "match": "ja"
+    },
+    "labels:addins": {
+      "tcid": 34778,
+      "source": "tbbtn",
+      "name": "ChunkOfficeExtensionsAddinFlyout",
+      "match": "en+ja"
+    },
+    "labels:advancedFilter": {
+      "tcid": 901,
+      "source": "tbbtn2",
+      "name": "AdvancedFilter",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:alwaysReadOnly": {
+      "tcid": 32768,
+      "source": "tbbtn",
+      "name": "MarkAsReadOnlyRecommended",
+      "match": "en+ja"
+    },
+    "labels:arrange": {
+      "tcid": 298,
+      "source": "tbbtn",
+      "name": "ArrangeWindows",
+      "match": "en+ja"
+    },
+    "labels:autoSum": {
+      "tcid": 226,
+      "source": "tbbtn",
+      "name": "AutoSum",
+      "match": "en+ja"
+    },
+    "labels:automate": {
+      "tcid": 34583,
+      "source": "tbbtn",
+      "name": "TabAutomate",
+      "match": "en+ja"
+    },
+    "labels:background": {
+      "tcid": 952,
+      "source": "tbbtn",
+      "name": "SheetBackground",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ribbon-button-rule"
+    },
+    "labels:calcOptions": {
+      "tcid": 12590,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorCalculationOptions",
+      "match": "en+ja"
+    },
+    "labels:cellFocus": {
+      "tcid": 34325,
+      "source": "tbbtn",
+      "name": "FocusActiveCell",
+      "match": "en+ja"
+    },
+    "labels:chartColumn": {
+      "tcid": 15534,
+      "source": "tbbtn",
+      "name": "ExcelChartGallery1",
+      "match": "en+ja"
+    },
+    "labels:chartCombo": {
+      "tcid": 24376,
+      "source": "tbbtn",
+      "name": "ChartTypeComboGallery",
+      "match": "en+ja"
+    },
+    "labels:chartHierarchy": {
+      "tcid": 26297,
+      "source": "tbbtn",
+      "name": "ChartGalleryHierarchy",
+      "match": "en+ja"
+    },
+    "labels:chartLine": {
+      "tcid": 15535,
+      "source": "tbbtn",
+      "name": "ExcelChartGallery2",
+      "match": "en+ja"
+    },
+    "labels:chartMap": {
+      "tcid": 26978,
+      "source": "tbbtn",
+      "name": "ChartGalleryMaps",
+      "match": "ja"
+    },
+    "labels:chartPie": {
+      "tcid": 15536,
+      "source": "tbbtn",
+      "name": "ExcelChartGallery3",
+      "match": "en+ja"
+    },
+    "labels:chartScatter": {
+      "tcid": 15539,
+      "source": "tbbtn",
+      "name": "ExcelChartGallery6",
+      "match": "ja"
+    },
+    "labels:chartStatistical": {
+      "tcid": 26424,
+      "source": "tbbtn",
+      "name": "ChartGalleryStatistical",
+      "match": "en+ja"
+    },
+    "labels:chartWaterfall": {
+      "tcid": 26630,
+      "source": "tbbtn",
+      "name": "ChartGalleryWaterfall",
+      "match": "en+ja"
+    },
+    "labels:checkBox": {
+      "tcid": 34610,
+      "source": "tbbtn",
+      "name": "InsertInCellCheckbox",
+      "match": "en+ja"
+    },
+    "labels:clear": {
+      "tcid": 900,
+      "source": "tbbtn2",
+      "name": "ShowAll2",
+      "match": "en+ja"
+    },
+    "labels:color": {
+      "tcid": 12245,
+      "source": "tbbtn",
+      "name": "UxGalColorSchemePicker",
+      "match": "en+ja"
+    },
+    "labels:consolidate": {
+      "tcid": 863,
+      "source": "tbbtn",
+      "name": "Consolidate",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:createFromSelection": {
+      "tcid": 880,
+      "source": "tbbtn2",
+      "name": "CreateName",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:customViews": {
+      "tcid": 950,
+      "source": "tbbtn",
+      "name": "CustomViews",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:data": {
+      "tcid": 11600,
+      "source": "tbbtn",
+      "name": "TabData",
+      "match": "en+ja"
+    },
+    "labels:dataAnalysis": {
+      "tcid": 34210,
+      "source": "tbbtn",
+      "name": "AnalyzeData",
+      "match": "en+ja"
+    },
+    "labels:dataCleanup": {
+      "tcid": 34638,
+      "source": "tbbtn",
+      "name": "DataCleansing",
+      "match": "ja"
+    },
+    "labels:dataTypeIcons": {
+      "tcid": 34905,
+      "source": "tbbtn",
+      "name": "DataTypeIcons",
+      "match": "en+ja"
+    },
+    "labels:dataTypes": {
+      "tcid": 32659,
+      "source": "tbbtn",
+      "name": "ChunkConvertToLinkedEntity",
+      "match": "en+ja"
+    },
+    "labels:dateTime": {
+      "tcid": 12819,
+      "source": "tbbtn",
+      "name": "GalInsertFnDateTime",
+      "match": "ja"
+    },
+    "labels:defineName": {
+      "tcid": 13380,
+      "source": "tbbtn",
+      "name": "NameRange",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:deleteComment": {
+      "tcid": 1592,
+      "source": "tbbtn2",
+      "name": "DeleteComment",
+      "match": "en+ja"
+    },
+    "labels:dependents": {
+      "tcid": 451,
+      "source": "tbbtn",
+      "name": "TraceDependents",
+      "match": "en+ja"
+    },
+    "labels:draw": {
+      "tcid": 33398,
+      "source": "tbbtn",
+      "name": "Draw",
+      "match": "en+ja"
+    },
+    "labels:editor": {
+      "tcid": 37069,
+      "source": "tbbtn",
+      "name": "PythonEditorLicensed",
+      "match": "en+ja"
+    },
+    "labels:equation": {
+      "tcid": 15451,
+      "source": "tbbtn",
+      "name": "EquationTab",
+      "match": "en+ja"
+    },
+    "labels:eraser": {
+      "tcid": 18965,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorErasers",
+      "match": "en+ja"
+    },
+    "labels:filter": {
+      "tcid": 899,
+      "source": "tbbtn2",
+      "name": "AutoFilter",
+      "match": "en+ja"
+    },
+    "labels:financial": {
+      "tcid": 12818,
+      "source": "tbbtn",
+      "name": "GalInsertFnFinancial",
+      "match": "en+ja"
+    },
+    "labels:flashFill": {
+      "tcid": 24054,
+      "source": "tbbtn",
+      "name": "QuickCode",
+      "match": "en+ja"
+    },
+    "labels:font": {
+      "tcid": 12863,
+      "source": "tbbtn",
+      "name": "UxGalFontSchemePicker",
+      "match": "en+ja"
+    },
+    "labels:formulaBar": {
+      "tcid": 849,
+      "source": "tbbtn",
+      "name": "FormulaBar",
+      "match": "en+ja"
+    },
+    "labels:formulas": {
+      "tcid": 11599,
+      "source": "tbbtn",
+      "name": "TabFormulas",
+      "match": "en+ja"
+    },
+    "labels:freeze": {
+      "tcid": 13961,
+      "source": "tbbtn",
+      "name": "GalFreezePanes",
+      "match": "en+ja"
+    },
+    "labels:gridlines": {
+      "tcid": 15923,
+      "source": "tbbtn",
+      "name": "GridlinesExcel",
+      "match": "en+ja"
+    },
+    "labels:gridlinesHeading": {
+      "tcid": 12575,
+      "source": "tbbtn",
+      "name": "LabelGridlines",
+      "match": "en+ja"
+    },
+    "labels:headerFooter": {
+      "tcid": 762,
+      "source": "tbbtn",
+      "name": "HeaderAndFooter",
+      "match": "ja"
+    },
+    "labels:headings": {
+      "tcid": 15644,
+      "source": "tbbtn",
+      "name": "BooleanChoiceViewHeadings2",
+      "match": "en+ja"
+    },
+    "labels:headingsHeading": {
+      "tcid": 12576,
+      "source": "tbbtn",
+      "name": "LabelHeadings",
+      "match": "en+ja"
+    },
+    "labels:height": {
+      "tcid": 12562,
+      "source": "tbbtn",
+      "name": "GalMaximumHeight",
+      "match": "ja"
+    },
+    "labels:hide": {
+      "tcid": 865,
+      "source": "tbbtn",
+      "name": "HideWindow",
+      "match": "en+ja"
+    },
+    "labels:hideDetail": {
+      "tcid": 464,
+      "source": "tbbtn",
+      "name": "Collapse",
+      "match": "en+ja"
+    },
+    "labels:hideInk": {
+      "tcid": 32684,
+      "source": "tbfriendly",
+      "name": "HideInk",
+      "match": "en+ja"
+    },
+    "labels:home": {
+      "tcid": 11954,
+      "source": "tbbtn",
+      "name": "TabHome",
+      "match": "en+ja"
+    },
+    "labels:icons": {
+      "tcid": 33273,
+      "source": "tbbtn",
+      "name": "LaunchIconsTaskPane",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:insert": {
+      "tcid": 11536,
+      "source": "tbbtn",
+      "name": "TabInsert",
+      "match": "en+ja"
+    },
+    "labels:insertFunction": {
+      "tcid": 385,
+      "source": "tbbtn2",
+      "name": "Function",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:lasso": {
+      "tcid": 12079,
+      "source": "tbbtn",
+      "name": "JotLassoTool",
+      "match": "en+ja"
+    },
+    "labels:link": {
+      "tcid": 1576,
+      "source": "tbbtn2",
+      "name": "WebInsertHyperlink",
+      "match": "en+ja"
+    },
+    "labels:logical": {
+      "tcid": 12822,
+      "source": "tbbtn",
+      "name": "GalInsertFnLogical",
+      "match": "en+ja"
+    },
+    "labels:lookup": {
+      "tcid": 12824,
+      "source": "tbbtn",
+      "name": "GalInsertFnLookupReference",
+      "match": "ja"
+    },
+    "labels:macros": {
+      "tcid": 16105,
+      "source": "tbbtn",
+      "name": "PlayMacro",
+      "match": "en+ja"
+    },
+    "labels:margins": {
+      "tcid": 11475,
+      "source": "tbbtn",
+      "name": "UxGalPageMargins",
+      "match": "en+ja"
+    },
+    "labels:math": {
+      "tcid": 12820,
+      "source": "tbbtn",
+      "name": "GalInsertFnMathTrig",
+      "match": "ja"
+    },
+    "labels:more": {
+      "tcid": 5808,
+      "source": "tbbtn",
+      "name": "AutoSumMoreFunctions",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:namesManager": {
+      "tcid": 13369,
+      "source": "tbbtn",
+      "name": "NameManager",
+      "match": "en+ja"
+    },
+    "labels:navigation": {
+      "tcid": 34156,
+      "source": "tbbtn",
+      "name": "NavigationPaneExcelFeature",
+      "match": "en+ja"
+    },
+    "labels:newComment": {
+      "tcid": 1589,
+      "source": "tbbtn",
+      "name": "NewComment",
+      "match": "en+ja"
+    },
+    "labels:newScript": {
+      "tcid": 39445,
+      "source": "tbbtn",
+      "name": "GroupNewScript",
+      "match": "en+ja"
+    },
+    "labels:newWindow": {
+      "tcid": 303,
+      "source": "tbbtn",
+      "name": "NewWindow",
+      "match": "en+ja"
+    },
+    "labels:notes": {
+      "tcid": 33479,
+      "source": "tbbtn",
+      "name": "ChunkCommentsLegacy",
+      "match": "en+ja"
+    },
+    "labels:object": {
+      "tcid": 546,
+      "source": "tbbtn",
+      "name": "InsertObject",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:orientation": {
+      "tcid": 11533,
+      "source": "tbbtn",
+      "name": "UxGalPageOrientation",
+      "match": "en+ja"
+    },
+    "labels:pageBreaks": {
+      "tcid": 11932,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorPageBreaks",
+      "match": "en+ja"
+    },
+    "labels:pageLayout": {
+      "tcid": 11441,
+      "source": "tbbtn",
+      "name": "XLPageLayoutView",
+      "match": "en+ja"
+    },
+    "labels:pageSetup": {
+      "tcid": 11551,
+      "source": "tbbtn",
+      "name": "ChunkPageSetup",
+      "match": "en+ja"
+    },
+    "labels:photo": {
+      "tcid": 31797,
+      "source": "tbbtn",
+      "name": "InsertPictureSubMenu",
+      "match": "ja"
+    },
+    "labels:pictureFromData": {
+      "tcid": 33995,
+      "source": "tbbtn",
+      "name": "DataFromPicture",
+      "match": "en+ja"
+    },
+    "labels:pictureFromFile": {
+      "tcid": 33995,
+      "source": "tbbtn",
+      "name": "DataFromPicture",
+      "match": "ja"
+    },
+    "labels:pivotChart": {
+      "tcid": 12248,
+      "source": "tbbtn2",
+      "name": "sx12NewPivotChart",
+      "match": "en+ja"
+    },
+    "labels:pivotTable": {
+      "tcid": 12247,
+      "source": "tbbtn2",
+      "name": "sx12NewPivot",
+      "match": "en+ja"
+    },
+    "labels:powerQuery": {
+      "tcid": 34213,
+      "source": "tbbtn",
+      "name": "PowerQueryGetTransformData",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:precedents": {
+      "tcid": 486,
+      "source": "tbbtn",
+      "name": "TracePrecedents",
+      "match": "en+ja"
+    },
+    "labels:printArea": {
+      "tcid": 11931,
+      "source": "tbbtn2",
+      "name": "FlyoutAnchorPrintArea",
+      "match": "en+ja"
+    },
+    "labels:printGridlines": {
+      "tcid": 12577,
+      "source": "tbbtn",
+      "name": "BooleanChoicePrintGridlines",
+      "match": "en+ja"
+    },
+    "labels:printHeadings": {
+      "tcid": 12577,
+      "source": "tbbtn",
+      "name": "BooleanChoicePrintGridlines",
+      "match": "en+ja"
+    },
+    "labels:printTitles": {
+      "tcid": 12588,
+      "source": "tbbtn",
+      "name": "PrintTitles",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ribbon-button-rule"
+    },
+    "labels:properties": {
+      "tcid": 1951,
+      "source": "tbbtn2",
+      "name": "DataRangeProperties",
+      "match": "en+ja"
+    },
+    "labels:protectSheet": {
+      "tcid": 893,
+      "source": "tbbtn",
+      "name": "ProtectSheet",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:protectWorkbook": {
+      "tcid": 16136,
+      "source": "tbbtn",
+      "name": "RestrictEditing",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:python": {
+      "tcid": 39143,
+      "source": "tbbtn",
+      "name": "InsertPythonLicensed",
+      "match": "en+ja"
+    },
+    "labels:recalc": {
+      "tcid": 960,
+      "source": "tbbtn",
+      "name": "CalculateNow",
+      "match": "en+ja"
+    },
+    "labels:recent": {
+      "tcid": 12817,
+      "source": "tbbtn",
+      "name": "GalInsertFnRecentlyUsed",
+      "match": "en+ja"
+    },
+    "labels:recommendedChart": {
+      "tcid": 32009,
+      "source": "tbbtn",
+      "name": "ChartInsertGalleryRecommended",
+      "match": "en+ja"
+    },
+    "labels:recommendedPivotTable": {
+      "tcid": 29979,
+      "source": "tbbtn",
+      "name": "PivotTableExpress",
+      "match": "en+ja"
+    },
+    "labels:recordMacro": {
+      "tcid": 184,
+      "source": "tbbtn2",
+      "name": "Record",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:refreshAll": {
+      "tcid": 1952,
+      "source": "tbbtn",
+      "name": "UpdateAll",
+      "match": "en+ja"
+    },
+    "labels:removeDuplicates": {
+      "tcid": 12230,
+      "source": "tbbtn",
+      "name": "XLRemoveDuplicates",
+      "match": "en+ja"
+    },
+    "labels:reset": {
+      "tcid": 12273,
+      "source": "tbbtn",
+      "name": "IgxChunkReset",
+      "match": "en+ja"
+    },
+    "labels:resetWindow": {
+      "tcid": 7874,
+      "source": "tbbtn",
+      "name": "ResetSideBySide",
+      "match": "en+ja"
+    },
+    "labels:review": {
+      "tcid": 11601,
+      "source": "tbbtn",
+      "name": "TabProofComment",
+      "match": "en+ja"
+    },
+    "labels:ruler": {
+      "tcid": 15117,
+      "source": "tbbtn",
+      "name": "DisplayRuler2",
+      "match": "en+ja"
+    },
+    "labels:scaleHeight": {
+      "tcid": 12562,
+      "source": "tbbtn",
+      "name": "GalMaximumHeight",
+      "match": "ja"
+    },
+    "labels:scaleWidth": {
+      "tcid": 12561,
+      "source": "tbbtn",
+      "name": "GalMaximumWidth",
+      "match": "ja"
+    },
+    "labels:screenshot": {
+      "tcid": 18673,
+      "source": "tbbtn",
+      "name": "GalInsertScreenshot",
+      "match": "en+ja"
+    },
+    "labels:shapeRoundedRectangle": {
+      "tcid": 1115,
+      "source": "tbbtn",
+      "name": "ShapeRoundRectangle",
+      "match": "en+ja"
+    },
+    "labels:shapeTriangle": {
+      "tcid": 1117,
+      "source": "tbbtn",
+      "name": "ShapeIsocelesTriangle",
+      "match": "en+ja"
+    },
+    "labels:shapes": {
+      "tcid": 11529,
+      "source": "tbbtn",
+      "name": "GalAllShapes",
+      "match": "en+ja"
+    },
+    "labels:sheetRecalc": {
+      "tcid": 999,
+      "source": "tbbtn2",
+      "name": "CalculateDocument",
+      "match": "en+ja"
+    },
+    "labels:sheetViewSave": {
+      "tcid": 3,
+      "source": "tbbtn",
+      "name": "Save",
+      "match": "en+ja"
+    },
+    "labels:sheetViews": {
+      "tcid": 33907,
+      "source": "tbbtn",
+      "name": "ChunkNamedSheetView",
+      "match": "ja"
+    },
+    "labels:show": {
+      "tcid": 15640,
+      "source": "tbbtn",
+      "name": "ChunkViewShowHide",
+      "match": "en+ja"
+    },
+    "labels:showChanges": {
+      "tcid": 34386,
+      "source": "tbbtn",
+      "name": "LineageShowChanges",
+      "match": "en+ja"
+    },
+    "labels:showComments": {
+      "tcid": 33167,
+      "source": "tbfriendly",
+      "name": "ShowThreadedComments",
+      "match": "en+ja"
+    },
+    "labels:showDetail": {
+      "tcid": 462,
+      "source": "tbbtn",
+      "name": "Expand",
+      "match": "en+ja"
+    },
+    "labels:showFormulas": {
+      "tcid": 6059,
+      "source": "tbbtn2",
+      "name": "ToggleFormulaAuditMode",
+      "match": "en+ja"
+    },
+    "labels:showScripts": {
+      "tcid": 46778,
+      "source": "tbbtn",
+      "name": "GroupViewScripts",
+      "match": "en+ja"
+    },
+    "labels:sideBySide": {
+      "tcid": 15977,
+      "source": "tbbtn",
+      "name": "ArrangeSideBySideExcel",
+      "match": "en+ja"
+    },
+    "labels:size": {
+      "tcid": 12610,
+      "source": "tbbtn",
+      "name": "GalPageSize",
+      "match": "en+ja"
+    },
+    "labels:slicer": {
+      "tcid": 21344,
+      "source": "tbbtn",
+      "name": "SlicerInsert",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:smartArt": {
+      "tcid": 1032,
+      "source": "tbbtn2",
+      "name": "InsertDiagram",
+      "match": "en+ja"
+    },
+    "labels:sortCustom": {
+      "tcid": 12946,
+      "source": "tbbtn",
+      "name": "XLSortRibbon",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:sortFilter": {
+      "tcid": 11948,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorSortFilter",
+      "match": "ja"
+    },
+    "labels:sparkline": {
+      "tcid": 16702,
+      "source": "tbbtn",
+      "name": "ChunkInsertSparklines",
+      "match": "en+ja"
+    },
+    "labels:spelling": {
+      "tcid": 2,
+      "source": "tbbtn",
+      "name": "Spelling",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:split": {
+      "tcid": 15688,
+      "source": "tbbtn",
+      "name": "SplitToggle",
+      "match": "en+ja"
+    },
+    "labels:standard": {
+      "tcid": 723,
+      "source": "tbbtn",
+      "name": "NormalViewExcel",
+      "match": "en+ja"
+    },
+    "labels:stats": {
+      "tcid": 33780,
+      "source": "tbbtn",
+      "name": "StatusWorkbookStatistics",
+      "match": "en+ja"
+    },
+    "labels:subtotal": {
+      "tcid": 861,
+      "source": "tbbtn2",
+      "name": "Subtotals",
+      "match": "en+ja"
+    },
+    "labels:switchWindow": {
+      "tcid": 12672,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorCurrentlyOpenWorkbooks",
+      "match": "en+ja"
+    },
+    "labels:symbol": {
+      "tcid": 29581,
+      "source": "tbbtn",
+      "name": "InsertSymbolFromObjectPalette",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:syncScroll": {
+      "tcid": 7873,
+      "source": "tbbtn",
+      "name": "SyncScrollSideBySide",
+      "match": "en+ja"
+    },
+    "labels:table": {
+      "tcid": 7193,
+      "source": "tbbtn2",
+      "name": "InsertList",
+      "match": "en+ja"
+    },
+    "labels:text": {
+      "tcid": 12821,
+      "source": "tbbtn",
+      "name": "GalInsertFnText",
+      "match": "en+ja"
+    },
+    "labels:theme": {
+      "tcid": 12497,
+      "source": "tbbtn",
+      "name": "ChunkXLTheme",
+      "match": "en+ja"
+    },
+    "labels:thesaurus": {
+      "tcid": 9056,
+      "source": "tbbtn",
+      "name": "ThesaurusRR",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:timeline": {
+      "tcid": 22990,
+      "source": "tbbtn",
+      "name": "TimeSlicerInsert",
+      "match": "en+ja"
+    },
+    "labels:toggle": {
+      "tcid": 26992,
+      "source": "tbbtn",
+      "name": "TabDrawInk",
+      "match": "en+ja"
+    },
+    "labels:translate": {
+      "tcid": 32736,
+      "source": "tbbtn",
+      "name": "Translator",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:unhide": {
+      "tcid": 866,
+      "source": "tbbtn",
+      "name": "UnhideWindow",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-ribbon-button"
+    },
+    "labels:useInFormula": {
+      "tcid": 12589,
+      "source": "tbbtn",
+      "name": "GalInsertNamedRange",
+      "match": "en+ja"
+    },
+    "labels:view": {
+      "tcid": 11541,
+      "source": "tbbtn",
+      "name": "TabView",
+      "match": "en+ja"
+    },
+    "labels:watch": {
+      "tcid": 5686,
+      "source": "tbbtn2",
+      "name": "ToggleCellWatchToolbar",
+      "match": "en+ja"
+    },
+    "labels:whatIf": {
+      "tcid": 11936,
+      "source": "tbbtn2",
+      "name": "FlyoutAnchorWhatIfAnalysis",
+      "match": "en+ja"
+    },
+    "labels:width": {
+      "tcid": 12561,
+      "source": "tbbtn",
+      "name": "GalMaximumWidth",
+      "match": "ja"
+    },
+    "labels:wordArt": {
+      "tcid": 12119,
+      "source": "tbbtn",
+      "name": "WordartGallery",
+      "match": "en+ja"
+    },
+    "labels:workbookLinks": {
+      "tcid": 34689,
+      "source": "tbbtn",
+      "name": "WorkbookLinks",
+      "match": "en+ja"
+    },
+    "labels:zoom": {
+      "tcid": 11813,
+      "source": "tbbtn",
+      "name": "ChunkZoom",
+      "match": "en+ja"
+    },
+    "labels:zoom100": {
+      "tcid": 16027,
+      "source": "tbbtn",
+      "name": "ZoomCurrent100",
+      "match": "ja"
+    },
+    "labels:zoomSelection": {
+      "tcid": 15789,
+      "source": "tbbtn",
+      "name": "ZoomWindowToSelection",
+      "match": "en+ja"
+    },
+    "menu:mac.data.clear": {
+      "tcid": 900,
+      "source": "tbbtn2",
+      "name": "ShowAll2",
+      "match": "en+ja"
+    },
+    "menu:mac.data.filter": {
+      "tcid": 899,
+      "source": "tbbtn2",
+      "name": "AutoFilter",
+      "match": "en+ja"
+    },
+    "menu:mac.data.validation.settings": {
+      "tcid": 15653,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorDataValidation",
+      "match": "ja",
+      "strip_ellipsis": true,
+      "evidence": "ax-menu-item"
+    },
+    "menu:mac.draw.eraser": {
+      "tcid": 18965,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorErasers",
+      "match": "en+ja"
+    },
+    "menu:mac.draw.toggle": {
+      "tcid": 26992,
+      "source": "tbbtn",
+      "name": "TabDrawInk",
+      "match": "en+ja"
+    },
+    "menu:mac.formulas.calc.auto": {
+      "tcid": 12592,
+      "source": "tbbtn",
+      "name": "BoolCalcAutomatic",
+      "match": "en+ja"
+    },
+    "menu:mac.formulas.calc.manual": {
+      "tcid": 12591,
+      "source": "tbbtn",
+      "name": "BoolCalcManual",
+      "match": "en+ja"
+    },
+    "menu:mac.formulas.category.all": {
+      "tcid": 5808,
+      "source": "tbbtn",
+      "name": "AutoSumMoreFunctions",
+      "match": "en+ja"
+    },
+    "menu:mac.formulas.category.recent": {
+      "tcid": 5808,
+      "source": "tbbtn",
+      "name": "AutoSumMoreFunctions",
+      "match": "en+ja"
+    },
+    "menu:mac.formulas.removeArrows.all": {
+      "tcid": 11946,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorRemoveArrows",
+      "match": "en+ja"
+    },
+    "menu:mac.insert.chartPie": {
+      "tcid": 15536,
+      "source": "tbbtn",
+      "name": "ExcelChartGallery3",
+      "match": "en+ja"
+    },
+    "menu:mac.insert.chartScatter": {
+      "tcid": 15539,
+      "source": "tbbtn",
+      "name": "ExcelChartGallery6",
+      "match": "ja"
+    },
+    "menu:mac.insert.pivotTable": {
+      "tcid": 12247,
+      "source": "tbbtn2",
+      "name": "sx12NewPivot",
+      "match": "en+ja"
+    },
+    "menu:mac.insert.recommendedPivotTable": {
+      "tcid": 29979,
+      "source": "tbbtn",
+      "name": "PivotTableExpress",
+      "match": "en+ja"
+    },
+    "menu:mac.review.newNote": {
+      "tcid": 33158,
+      "source": "tbbtn",
+      "name": "NewCommentLegacy",
+      "match": "en+ja"
+    },
+    "menu:mac.review.nextNote": {
+      "tcid": 33161,
+      "source": "tbbtn",
+      "name": "NextCommentLegacy",
+      "match": "en+ja"
+    },
+    "menu:mac.review.previousNote": {
+      "tcid": 33160,
+      "source": "tbbtn",
+      "name": "PreviousCommentLegacy",
+      "match": "en+ja"
+    },
+    "menu:mac.review.showHideNote": {
+      "tcid": 33162,
+      "source": "tbbtn",
+      "name": "ShowCommentLegacy",
+      "match": "en+ja"
+    },
+    "menu:mac.review.showNotes": {
+      "tcid": 33163,
+      "source": "tbbtn",
+      "name": "ShowAllCommentsLegacy",
+      "match": "en+ja"
+    },
+    "menu:mac.view.formulaBar": {
+      "tcid": 849,
+      "source": "tbbtn",
+      "name": "FormulaBar",
+      "match": "en+ja"
+    },
+    "menu:mac.view.freeze": {
+      "tcid": 443,
+      "source": "tbbtn",
+      "name": "FreezePanes",
+      "match": "en+ja"
+    },
+    "menu:mac.view.freeze.firstColumn": {
+      "tcid": 13963,
+      "source": "tbbtn",
+      "name": "FreezeFirstColumn",
+      "match": "en+ja"
+    },
+    "menu:mac.view.freeze.firstRow": {
+      "tcid": 13962,
+      "source": "tbbtn",
+      "name": "FreezeTopRow",
+      "match": "en+ja"
+    },
+    "menu:mac.view.gridlines": {
+      "tcid": 15923,
+      "source": "tbbtn",
+      "name": "GridlinesExcel",
+      "match": "en+ja"
+    },
+    "menu:mac.view.headings": {
+      "tcid": 15644,
+      "source": "tbbtn",
+      "name": "BooleanChoiceViewHeadings2",
+      "match": "en+ja"
+    }
+  },
+  "held": {
+    "groups:Automation": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Changes": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Draw": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Forms": {
+      "status": "suspect-bundle-value",
+      "tcid": 32833,
+      "name": "MsFormSplitButton",
+      "reason": "zh value is the untranslated English \"Forms\""
+    },
+    "groups:Gallery": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Options": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Pictures": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Queries & Connections": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Read-Only": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Sheet Options": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Sort & Filter": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Text": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "groups:Window": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:accessibility": {
+      "status": "unconfirmed",
+      "tcid": 19666,
+      "name": "AccessibilityChecker",
+      "reason": "unconfirmed: sources tbfriendly/tbbtn disagree outside ja"
+    },
+    "labels:allFunctions": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:allRowsColumns": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:analysis": {
+      "status": "pinned-pending",
+      "tcid": null,
+      "reason": "runtime substitution with no ribbon string source"
+    },
+    "labels:chartArea": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:chartBar": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:countEmptyRows": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:dynamicArray": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:errorCheck": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 11945:FlyoutAnchorErrorChecking, 6122:ErrorChecking"
+    },
+    "labels:forms": {
+      "status": "suspect-bundle-value",
+      "tcid": 32833,
+      "name": "MsFormSplitButton",
+      "reason": "zh value is the untranslated English \"Forms\""
+    },
+    "labels:freezeSelection": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:gallery": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:group": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 14409:FlyoutAnchorGroup, 164:Group, 19226:GroupSelectedSparklines"
+    },
+    "labels:highlighter": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:initialize": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 46569:InitPyEditorLicensed, 34860:InitPyEditor, 45861:InitPyEditorPreview, 40617:InitPyEditorAllowRequestAndPurchase [ja only]"
+    },
+    "labels:makeSubtable": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:newPivotTable": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:nextComment": {
+      "status": "unconfirmed",
+      "tcid": 1591,
+      "name": "NextComment",
+      "reason": "unconfirmed: sources tbfriendly/tbbtn disagree outside ja"
+    },
+    "labels:pageBreakPreview": {
+      "status": "pinned-pending",
+      "tcid": null,
+      "reason": "runtime substitution with no ribbon string source"
+    },
+    "labels:penBlack": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:penRed": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:pencil": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:pictureFromOnline": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 34809:LaunchOnlineCellPicturesPane, 33387:LaunchOnlinePicturesPane"
+    },
+    "labels:previousComment": {
+      "status": "unconfirmed",
+      "tcid": 1590,
+      "name": "PreviousComment",
+      "reason": "unconfirmed: sources tbfriendly/tbbtn disagree outside ja"
+    },
+    "labels:queriesConnections": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:reapply": {
+      "status": "unconfirmed",
+      "tcid": 12231,
+      "name": "XLReapplyFilter",
+      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
+    },
+    "labels:relativeRecording": {
+      "status": "unconfirmed",
+      "tcid": 896,
+      "name": "RelativeReferences",
+      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
+    },
+    "labels:removeArrows": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 11946:FlyoutAnchorRemoveArrows, 453:RemoveAllArrows"
+    },
+    "labels:removeHyperlinks": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:shapeArrow": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:shapeCallout": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:shapeDiamond": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:shapeLine": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:shapeOval": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:shapeRectangle": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:sheetView": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:sheetViewDelete": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 15314:FlyoutAnchorDeleteTable, 27558:InkToolboxItemRemove, 1592:DeleteComment"
+    },
+    "labels:sheetViewSelect": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:showGridlines": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 485:Grid, 12578:BooleanChoiceViewHeadings, 11541:TabView"
+    },
+    "labels:showHeadings": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 485:Grid, 12578:BooleanChoiceViewHeadings, 11541:TabView"
+    },
+    "labels:sortAsc": {
+      "status": "pinned-pending",
+      "tcid": null,
+      "reason": "runtime substitution with no ribbon string source"
+    },
+    "labels:sortDesc": {
+      "status": "pinned-pending",
+      "tcid": null,
+      "reason": "runtime substitution with no ribbon string source"
+    },
+    "labels:statistical": {
+      "status": "unconfirmed",
+      "tcid": 12823,
+      "name": "GalInsertFnStatistics",
+      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
+    },
+    "labels:tableToJson": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:textBox": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 14471:TextboxNonEA, 13098:FlyoutAnchorTextbox, 219:EditBox"
+    },
+    "labels:textToColumns": {
+      "status": "pinned-pending",
+      "tcid": null,
+      "reason": "runtime substitution with no ribbon string source"
+    },
+    "labels:threeDModel": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 33308:Insert3DModelFallback, 27813:DropdownInsert3DModel"
+    },
+    "labels:trackpad": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "labels:ungroup": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 165:Ungroup, 3160:UngroupCells, 19227:UngroupSelectedSparklines"
+    },
+    "labels:validation": {
+      "status": "unconfirmed",
+      "tcid": 2034,
+      "name": "ValidationDefine",
+      "reason": "sources disagree after stripping the ellipsis"
+    },
+    "labels:zeros": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.automate.allRowsColumns": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.automate.countEmptyRows": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.automate.freezeSelection": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.automate.makeSubtable": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.automate.newPivotTable": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.automate.removeHyperlinks": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.automate.tableToJson": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.data.advancedFilter": {
+      "status": "unconfirmed",
+      "tcid": 901,
+      "name": "AdvancedFilter",
+      "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
+    },
+    "menu:mac.data.dataTable": {
+      "status": "unconfirmed",
+      "tcid": 862,
+      "name": "DataTable",
+      "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
+    },
+    "menu:mac.data.goalSeek": {
+      "status": "unconfirmed",
+      "tcid": 856,
+      "name": "GoalSeek",
+      "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
+    },
+    "menu:mac.data.reapply": {
+      "status": "unconfirmed",
+      "tcid": 12231,
+      "name": "XLReapplyFilter",
+      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
+    },
+    "menu:mac.data.scenarioManager": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.data.sortAsc": {
+      "status": "pinned-pending",
+      "tcid": null,
+      "reason": "runtime substitution with no ribbon string source"
+    },
+    "menu:mac.data.sortCustom": {
+      "status": "unconfirmed",
+      "tcid": 12946,
+      "name": "XLSortRibbon",
+      "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
+    },
+    "menu:mac.data.sortDesc": {
+      "status": "pinned-pending",
+      "tcid": null,
+      "reason": "runtime substitution with no ribbon string source"
+    },
+    "menu:mac.data.validation.circleInvalid": {
+      "status": "unconfirmed",
+      "tcid": 2035,
+      "name": "ValidationMarkInvalidData",
+      "reason": "unconfirmed: sources tbbtn2/tbbtn disagree outside ja"
+    },
+    "menu:mac.data.validation.clearCircles": {
+      "status": "suspect-bundle-value",
+      "tcid": 2055,
+      "name": "ValidationUnmarkInvalidData",
+      "reason": "th value is a long description, not a command name"
+    },
+    "menu:mac.data.validation.clearRules": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.draw.highlighter": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.draw.penBlack": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.draw.penRed": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.draw.pencil": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.formulas.calc.autoNoTable": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.formulas.calc.iterative": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.formulas.errorCheck.ignore": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.formulas.errorCheck.run": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 11945:FlyoutAnchorErrorChecking, 6122:ErrorChecking"
+    },
+    "menu:mac.formulas.errorCheck.trace": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.formulas.removeArrows.dependents": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.formulas.removeArrows.precedents": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.insert.chartArea": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.insert.chartBar": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.insert.chartColumn": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 15534:ExcelChartGallery1, 18928:InsertColumnSparkline"
+    },
+    "menu:mac.insert.chartLine": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "ambiguous: 15535:ExcelChartGallery2, 18927:InsertLineSparkline"
+    },
+    "menu:mac.insert.shapeArrow": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.insert.shapeDiamond": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.insert.shapeLine": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.insert.shapeOval": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.insert.shapeRectangle": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.insert.shapeRoundedRectangle": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.insert.shapeTriangle": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.break.insert": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.break.remove": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.break.reset": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.color.gray": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.color.office": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.font.gray": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.font.office": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.margins.custom": {
+      "status": "unconfirmed",
+      "tcid": 12795,
+      "name": "MarginsAdvancedOptions",
+      "reason": "menu entry: no menu-item capture, so the bundle ellipsis stays unverified"
+    },
+    "menu:mac.page.margins.narrow": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.margins.normal": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.margins.wide": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.orientation.landscape": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.orientation.portrait": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.printArea.add": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.printArea.clear": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.printArea.set": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.size.a3": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.size.a4": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.size.legal": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.size.letter": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.theme.gray": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.page.theme.office": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    },
+    "menu:mac.review.convertNotes": {
+      "status": "suspect-bundle-value",
+      "tcid": 33546,
+      "name": "ConvertComments",
+      "reason": "ko value is descriptive text, not a command name"
+    },
+    "menu:mac.view.zeros": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no node with matching ja label"
+    }
+  }
+}
