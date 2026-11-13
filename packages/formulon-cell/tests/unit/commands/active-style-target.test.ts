@@ -11,9 +11,10 @@ import {
 import { addrKey } from '../../../src/engine/address.js';
 import { mutators } from '../../../src/store/store.js';
 import type { MountedStubSheet } from '../../test-utils/mount.js';
+import { scaledTimeout } from '../../timeouts.js';
 import { mountPivotSheet } from '../mount/toolbar/fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 const TABLE_CELL = { sheet: 0, row: 21, col: 0 };
 const PIVOT_CELL = { sheet: 0, row: 9, col: 4 };

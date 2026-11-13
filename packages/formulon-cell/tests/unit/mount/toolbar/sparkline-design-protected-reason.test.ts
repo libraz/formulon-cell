@@ -8,9 +8,10 @@ import {
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import { stubHelpers } from './fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 describe('Sparkline tab buttons greyed by a protected sheet', () => {
   let sheet: MountedStubSheet;

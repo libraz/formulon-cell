@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openNewTableStyle } from '../../../src/mount/dynamic-dropdown-defaults/styles.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
+import { scaledTimeout } from '../../timeouts.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 describe('New Table Style element Format on the Mac', () => {
   let sheet: MountedStubSheet;

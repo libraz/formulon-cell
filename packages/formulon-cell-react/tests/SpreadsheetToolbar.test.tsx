@@ -6,7 +6,7 @@ import { RIBBON_TABS } from '@libraz/formulon-cell/toolbar';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { scaledTimeout } from '../../formulon-cell/tests/timeouts.js';
 import { SpreadsheetToolbar, type SpreadsheetToolbarProps } from '../src/SpreadsheetToolbar';
 import {
   installReactDomStubs,
@@ -24,7 +24,7 @@ vi.mock('@libraz/formulon-cell/toolbar', async (importOriginal) => {
 });
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 8; i += 1) await Promise.resolve();

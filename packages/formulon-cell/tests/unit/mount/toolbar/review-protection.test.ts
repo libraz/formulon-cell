@@ -8,11 +8,12 @@ import {
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import { stubHelpers, waitFor } from './fixtures.js';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 describe('Spreadsheet.mountToolbar', () => {
   let sheet: MountedStubSheet;

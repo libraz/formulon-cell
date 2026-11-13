@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 import { entryAliases } from '../entry-aliases.js';
+import { scaledTimeout } from '../timeouts.js';
 
 const packageDir = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -16,7 +17,8 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts', './tests/api/setup-dom.ts'],
     include: ['tests/api/**/*.test.ts'],
     globals: false,
-    testTimeout: 15_000,
+    testTimeout: scaledTimeout(15_000),
+    hookTimeout: scaledTimeout(10_000),
     typecheck: {
       enabled: true,
       include: ['tests/api/**/*.test-d.ts'],

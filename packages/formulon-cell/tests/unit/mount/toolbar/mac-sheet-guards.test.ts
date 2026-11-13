@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import { stubHelpers } from './fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 // Excel for Mac leaves Hide Sheet and Delete Sheet enabled on a one-sheet workbook and answers
 // the click with an alert; the desktop profile keeps them disabled.

@@ -10,9 +10,10 @@ import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import measured from '../../../fixtures/excel-sparkline-style-presets.json' with { type: 'json' };
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import { stubHelpers } from './fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 const at = (row: number) => ({ sheet: 0, row, col: 5 });
 

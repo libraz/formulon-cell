@@ -4,9 +4,10 @@ import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { RIBBON_TABS } from '../../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import { seedNumber, seedText, stubHelpers, waitFor } from './fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 describe('Spreadsheet.mountToolbar', () => {
   let sheet: MountedStubSheet;

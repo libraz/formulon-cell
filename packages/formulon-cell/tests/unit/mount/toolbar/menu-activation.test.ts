@@ -45,6 +45,7 @@ import {
   ribbonActivatableSurfaceCommandIds,
 } from '../../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import {
   CONTEXTUAL_SELECTIONS,
   dynamicDropdownNoopOverrides,
@@ -52,7 +53,7 @@ import {
   stubHelpers,
 } from './fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 describe('Spreadsheet.mountToolbar', () => {
   let sheet: MountedStubSheet;
@@ -190,63 +191,69 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('wires every registered dynamic ribbon dropdown to a rendered button and menu', async () => {
-    // A contextual tab shows only while its kind of object is selected.
-    const rendered = new Set<string>();
-    const contexts = [
-      ...CONTEXTUAL_SELECTIONS.map((select) => () => {
-        select(sheet.instance.store);
-        return sheet.instance;
-      }),
-      () => pivotSheet.instance,
-    ];
-    for (const context of contexts) {
-      const instance = context();
-      const tb = Spreadsheet.mountToolbar(host, instance, {
-        ribbonTabs: RIBBON_TABS,
-        dynamicDropdowns: true,
-        helpers: stubHelpers(),
-      });
-      expect(Array.from(tb.dropdownsApi?.DYNAMIC_RIBBON_DROPDOWN_IDS ?? []).sort()).toEqual(
-        Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND).sort(),
-      );
-
-      for (const [command, menuId] of Object.entries(RIBBON_DROPDOWN_MENU_FOR_COMMAND)) {
-        // Each command is checked in the first context that renders it.
-        if (rendered.has(command)) continue;
-        const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
-        if (!button) continue;
-        rendered.add(command);
-        const menu = host.querySelector<HTMLDivElement>(`#${menuId}`);
-        expect(menu, `${command} menu`).toBeTruthy();
-        expect(button.dataset.ribbonMenuId, `${command} menu id metadata`).toBe(menuId);
-        expect(button.getAttribute('aria-haspopup'), `${command} aria-haspopup`).toBe('menu');
-        expect(
-          button.querySelector('.fc-tb__rb-split-chevron'),
-          `${command} renders dropdown affordance`,
-        ).toBeTruthy();
-        expect(tb.dropdownsApi?.dynamicDropdownSpecForButton(button)).toEqual({
-          command,
-          menuId,
+  it(
+    'wires every registered dynamic ribbon dropdown to a rendered button and menu',
+    async () => {
+      // A contextual tab shows only while its kind of object is selected.
+      const rendered = new Set<string>();
+      const contexts = [
+        ...CONTEXTUAL_SELECTIONS.map((select) => () => {
+          select(sheet.instance.store);
+          return sheet.instance;
+        }),
+        () => pivotSheet.instance,
+      ];
+      for (const context of contexts) {
+        const instance = context();
+        const tb = Spreadsheet.mountToolbar(host, instance, {
+          ribbonTabs: RIBBON_TABS,
+          dynamicDropdowns: true,
+          helpers: stubHelpers(),
         });
-        expect(tb.dropdownsApi?.dynamicDropdownSpecForMenu(menu as HTMLDivElement)).toEqual({
-          command,
-          menuId,
-        });
+        expect(Array.from(tb.dropdownsApi?.DYNAMIC_RIBBON_DROPDOWN_IDS ?? []).sort()).toEqual(
+          Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND).sort(),
+        );
 
-        tb.dropdownsApi?.openDynamicRibbonDropdown({ command, menuId }, button);
-        expect(menu?.hidden, `${command} opens ${menuId}`).toBe(false);
-        expect(button.getAttribute('aria-expanded'), `${command} aria-expanded`).toBe('true');
-        tb.dropdownsApi?.closeDynamicRibbonDropdown({ command, menuId });
-        expect(menu?.hidden, `${command} closes ${menuId}`).toBe(true);
+        for (const [command, menuId] of Object.entries(RIBBON_DROPDOWN_MENU_FOR_COMMAND)) {
+          // Each command is checked in the first context that renders it.
+          if (rendered.has(command)) continue;
+          const button = host.querySelector<HTMLButtonElement>(
+            `[data-ribbon-command="${command}"]`,
+          );
+          if (!button) continue;
+          rendered.add(command);
+          const menu = host.querySelector<HTMLDivElement>(`#${menuId}`);
+          expect(menu, `${command} menu`).toBeTruthy();
+          expect(button.dataset.ribbonMenuId, `${command} menu id metadata`).toBe(menuId);
+          expect(button.getAttribute('aria-haspopup'), `${command} aria-haspopup`).toBe('menu');
+          expect(
+            button.querySelector('.fc-tb__rb-split-chevron'),
+            `${command} renders dropdown affordance`,
+          ).toBeTruthy();
+          expect(tb.dropdownsApi?.dynamicDropdownSpecForButton(button)).toEqual({
+            command,
+            menuId,
+          });
+          expect(tb.dropdownsApi?.dynamicDropdownSpecForMenu(menu as HTMLDivElement)).toEqual({
+            command,
+            menuId,
+          });
+
+          tb.dropdownsApi?.openDynamicRibbonDropdown({ command, menuId }, button);
+          expect(menu?.hidden, `${command} opens ${menuId}`).toBe(false);
+          expect(button.getAttribute('aria-expanded'), `${command} aria-expanded`).toBe('true');
+          tb.dropdownsApi?.closeDynamicRibbonDropdown({ command, menuId });
+          expect(menu?.hidden, `${command} closes ${menuId}`).toBe(true);
+        }
+        tb.dispose();
       }
-      tb.dispose();
-    }
-    expect(new Set(Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND)).size).toBe(
-      Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND).length,
-    );
-    expect([...rendered].sort()).toEqual(Object.keys(RIBBON_DROPDOWN_MENU_FOR_COMMAND).sort());
-  }, 30_000);
+      expect(new Set(Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND)).size).toBe(
+        Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND).length,
+      );
+      expect([...rendered].sort()).toEqual(Object.keys(RIBBON_DROPDOWN_MENU_FOR_COMMAND).sort());
+    },
+    scaledTimeout(30_000),
+  );
 
   it('opens every dropdown and gallery command menu from primary click', async () => {
     // A contextual tab shows only while its kind of object is selected.

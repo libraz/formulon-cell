@@ -4,6 +4,7 @@ import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
 import type { Extension, ExtensionHandle } from '../../src/extensions/types.js';
 import { Spreadsheet } from '../../src/mount.js';
 import { mutators } from '../../src/store/store.js';
+import { scaledTimeout } from '../timeouts.js';
 
 class TestResizeObserver {
   static callbacks: ResizeObserverCallback[] = [];
@@ -440,56 +441,60 @@ describe('Spreadsheet feature registry', () => {
   });
 
   // Two real engine workbooks and a platform switch outlast the default budget under load.
-  it('cancels the Mac pane across sheet, platform, workbook, and dispose transitions', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const oldWorkbook = await WorkbookHandle.createDefault();
-    expect(oldWorkbook.isStub).toBe(false);
-    const anchor = { sheet: 0, row: 0, col: 0 };
-    oldWorkbook.setNumber(anchor, 9);
-    const instance = await Spreadsheet.mount(host, {
-      workbook: oldWorkbook,
-      ui: { platform: 'mac' },
-    });
-    mutators.replaceCells(instance.store, oldWorkbook.cells(0));
-    mutators.setActive(instance.store, anchor);
-    instance.history.clear();
-    instance.openFunctionArguments('SUM');
-    const macRoot = host.querySelector<HTMLElement>('.fc-mac-formula-palette');
-    const dock = host.querySelector<HTMLElement>('.fc-host__taskpane-dock');
-    expect(macRoot?.hidden).toBe(false);
-    expect(oldWorkbook.cellFormula(anchor)).toBeNull();
-    expect(instance.history.canUndo()).toBe(false);
+  it(
+    'cancels the Mac pane across sheet, platform, workbook, and dispose transitions',
+    async () => {
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const oldWorkbook = await WorkbookHandle.createDefault();
+      expect(oldWorkbook.isStub).toBe(false);
+      const anchor = { sheet: 0, row: 0, col: 0 };
+      oldWorkbook.setNumber(anchor, 9);
+      const instance = await Spreadsheet.mount(host, {
+        workbook: oldWorkbook,
+        ui: { platform: 'mac' },
+      });
+      mutators.replaceCells(instance.store, oldWorkbook.cells(0));
+      mutators.setActive(instance.store, anchor);
+      instance.history.clear();
+      instance.openFunctionArguments('SUM');
+      const macRoot = host.querySelector<HTMLElement>('.fc-mac-formula-palette');
+      const dock = host.querySelector<HTMLElement>('.fc-host__taskpane-dock');
+      expect(macRoot?.hidden).toBe(false);
+      expect(oldWorkbook.cellFormula(anchor)).toBeNull();
+      expect(instance.history.canUndo()).toBe(false);
 
-    mutators.setSheetIndex(instance.store, 1);
-    expect(macRoot?.hidden).toBe(true);
-    expect(oldWorkbook.getValue(anchor)).toEqual({ kind: 'number', value: 9 });
-    expect(instance.history.canUndo()).toBe(false);
+      mutators.setSheetIndex(instance.store, 1);
+      expect(macRoot?.hidden).toBe(true);
+      expect(oldWorkbook.getValue(anchor)).toEqual({ kind: 'number', value: 9 });
+      expect(instance.history.canUndo()).toBe(false);
 
-    instance.setUi({ platform: 'default' });
-    expect(host.querySelector('.fc-mac-formula-palette')).toBeNull();
-    expect(document.querySelector('.fc-fxdialog')).toBeTruthy();
-    instance.setUi({ platform: 'mac' });
-    expect(host.querySelector('.fc-mac-formula-palette')).toBeTruthy();
-    mutators.setSheetIndex(instance.store, 0);
-    mutators.replaceCells(instance.store, oldWorkbook.cells(0));
-    mutators.setActive(instance.store, anchor);
-    instance.openFunctionArguments('SUM');
+      instance.setUi({ platform: 'default' });
+      expect(host.querySelector('.fc-mac-formula-palette')).toBeNull();
+      expect(document.querySelector('.fc-fxdialog')).toBeTruthy();
+      instance.setUi({ platform: 'mac' });
+      expect(host.querySelector('.fc-mac-formula-palette')).toBeTruthy();
+      mutators.setSheetIndex(instance.store, 0);
+      mutators.replaceCells(instance.store, oldWorkbook.cells(0));
+      mutators.setActive(instance.store, anchor);
+      instance.openFunctionArguments('SUM');
 
-    const nextWorkbook = await WorkbookHandle.createDefault();
-    expect(nextWorkbook.isStub).toBe(false);
-    await instance.setWorkbook(nextWorkbook);
-    expect(host.querySelector<HTMLElement>('.fc-mac-formula-palette')?.hidden).toBe(true);
-    expect(oldWorkbook.getValue(anchor)).toEqual({ kind: 'number', value: 9 });
-    expect(nextWorkbook.cellFormula(anchor)).toBeNull();
-    expect(instance.history.canUndo()).toBe(false);
+      const nextWorkbook = await WorkbookHandle.createDefault();
+      expect(nextWorkbook.isStub).toBe(false);
+      await instance.setWorkbook(nextWorkbook);
+      expect(host.querySelector<HTMLElement>('.fc-mac-formula-palette')?.hidden).toBe(true);
+      expect(oldWorkbook.getValue(anchor)).toEqual({ kind: 'number', value: 9 });
+      expect(nextWorkbook.cellFormula(anchor)).toBeNull();
+      expect(instance.history.canUndo()).toBe(false);
 
-    instance.openFunctionArguments('SUM');
-    expect(nextWorkbook.cellFormula(anchor)).toBeNull();
-    expect(instance.history.canUndo()).toBe(false);
-    instance.dispose();
-    expect(dock?.hidden).toBe(true);
-  }, 30_000);
+      instance.openFunctionArguments('SUM');
+      expect(nextWorkbook.cellFormula(anchor)).toBeNull();
+      expect(instance.history.canUndo()).toBe(false);
+      instance.dispose();
+      expect(dock?.hidden).toBe(true);
+    },
+    scaledTimeout(30_000),
+  );
 
   it('setTheme updates host theme state, store state, and emits themeChange', async () => {
     const host = document.createElement('div');

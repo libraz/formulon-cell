@@ -17,9 +17,10 @@ import {
 import { addrKey } from '../../../src/engine/address.js';
 import { mutators } from '../../../src/store/store.js';
 import type { MountedStubSheet } from '../../test-utils/mount.js';
+import { scaledTimeout } from '../../timeouts.js';
 import { mountPivotSheet } from '../mount/toolbar/fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 const elements = { headerRow: { fill: '#336699', bold: true } };
 const RANGE = { sheet: 0, r0: 20, c0: 0, r1: 22, c1: 0 };

@@ -8,9 +8,10 @@ import {
   projectMacFunctionMenus,
 } from '../../../../src/toolbar/ribbon/mac/menus.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import { stubHelpers } from './fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 describe('Spreadsheet.mountToolbar', () => {
   let sheet: MountedStubSheet;

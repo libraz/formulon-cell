@@ -9,9 +9,10 @@ import { createIllustrationDropdownDefaults } from '../../../../src/mount/dynami
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators, type SessionIllustration } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import { selectStoreChart, selectStorePicture, stubHelpers } from './fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 describe('shape and picture tabs of the ribbon', () => {
   let sheet: MountedStubSheet;

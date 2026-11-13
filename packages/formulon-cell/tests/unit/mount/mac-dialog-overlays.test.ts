@@ -5,9 +5,10 @@ import { attachExternalLinksDialog } from '../../../src/interact/external-links-
 import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
+import { scaledTimeout } from '../../timeouts.js';
 import { seedText, stubHelpers } from './toolbar/fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 // The Mac dictionary carries the wording, so the Mac host opens the desktop surfaces.
 describe('Mac dialog overlays', () => {

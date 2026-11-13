@@ -1,6 +1,7 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 
 import { entryAliases } from './tests/entry-aliases.js';
+import { scaledTimeout } from './tests/timeouts.js';
 
 export default defineConfig({
   resolve: { alias: entryAliases },
@@ -20,7 +21,8 @@ export default defineConfig({
     globals: false,
     // Full-mount tests take ~1s locally but exceed 5s on contended CI runners
     // under coverage; the timeout only has to catch hangs.
-    testTimeout: 15_000,
+    testTimeout: scaledTimeout(15_000),
+    hookTimeout: scaledTimeout(10_000),
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

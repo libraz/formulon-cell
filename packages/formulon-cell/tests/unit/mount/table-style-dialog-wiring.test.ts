@@ -8,9 +8,10 @@ import { openNewTableStyle } from '../../../src/mount/dynamic-dropdown-defaults/
 import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
 import type { MountedStubSheet } from '../../test-utils/mount.js';
+import { scaledTimeout } from '../../timeouts.js';
 import { mountPivotSheet, stubHelpers } from './toolbar/fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 

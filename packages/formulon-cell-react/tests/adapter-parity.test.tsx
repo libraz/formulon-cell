@@ -21,15 +21,16 @@ const reactSrc = path.resolve(here, '../src/index.ts');
 const vueSpreadsheet = path.resolve(here, '../../formulon-cell-vue/src/Spreadsheet.ts');
 const vueIndex = path.resolve(here, '../../formulon-cell-vue/src/index.ts');
 
-const program = ts.createProgram([reactSrc, vueSpreadsheet, vueIndex], {
-  target: ts.ScriptTarget.ES2022,
-  module: ts.ModuleKind.ESNext,
-  moduleResolution: ts.ModuleResolutionKind.Bundler,
-  jsx: ts.JsxEmit.ReactJSX,
-  strict: true,
-  skipLibCheck: true,
-  noEmit: true,
-});
+// Core's types come from its source through the adapters' type-check config, as `yarn typecheck`
+// reads them, so the comparison never depends on a built core.
+const typecheckConfig = path.resolve(here, '../tsconfig.typecheck.json');
+const { options } = ts.parseJsonConfigFileContent(
+  ts.readConfigFile(typecheckConfig, ts.sys.readFile).config,
+  ts.sys,
+  path.dirname(typecheckConfig),
+);
+const coreIndex = path.resolve(here, '../../formulon-cell/src/index.ts');
+const program = ts.createProgram([reactSrc, vueSpreadsheet, vueIndex], options);
 const checker = program.getTypeChecker();
 
 const exportedTypeKeys = (file: string, name: string): string[] => {
@@ -92,6 +93,10 @@ describe('React and Vue adapter parity', () => {
   const reactProps = exportedTypeKeys(reactSrc, 'SpreadsheetProps');
   const vueProps = vueOptionKeys('props');
   const vueEmits = vueOptionKeys('emits');
+
+  it('read core from source', () => {
+    expect(program.getSourceFile(coreIndex)).toBeDefined();
+  });
 
   it('accept the same option props', () => {
     const react = reactProps.filter((p) => !/^on[A-Z]/.test(p) && !REACT_ONLY.has(p));

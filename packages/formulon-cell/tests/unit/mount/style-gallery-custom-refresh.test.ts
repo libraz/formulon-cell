@@ -12,9 +12,10 @@ import { createCustomStyle } from '../../../src/commands/table-style-actions.js'
 import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
 import type { MountedStubSheet } from '../../test-utils/mount.js';
+import { scaledTimeout } from '../../timeouts.js';
 import { mountPivotSheet, stubHelpers } from './toolbar/fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 // The style galleries are built with the custom styles, so one made after the ribbon is up
 // must still show without a remount.

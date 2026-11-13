@@ -3,9 +3,10 @@ import { customPivotTableStyleId } from '../../../src/commands/format-as-table.j
 import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
 import type { MountedStubSheet } from '../../test-utils/mount.js';
+import { scaledTimeout } from '../../timeouts.js';
 import { mountPivotSheet, stubHelpers } from './toolbar/fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 describe('PivotTable Styles gallery', () => {
   let sheet: MountedStubSheet;

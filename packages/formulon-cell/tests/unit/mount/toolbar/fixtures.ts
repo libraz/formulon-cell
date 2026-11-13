@@ -12,6 +12,7 @@ import { mutators, type SpreadsheetStore } from '../../../../src/store/store.js'
 import type { DynamicDropdownsCtx } from '../../../../src/toolbar/ribbon/dynamic-dropdowns.js';
 import type { RibbonRenderHelpers } from '../../../../src/toolbar/ribbon/render-ribbon.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 
 // Minimal helpers stub: enough for the renderer to emit a shell, no real
 // dropdown DOM. The toolbar still needs `createSelect/Color/Icon/makeSvg`
@@ -140,7 +141,10 @@ export const mountPivotSheet = async (locale: 'en' | 'ja' = 'en'): Promise<Mount
   return sheet;
 };
 
-export const waitFor = async (predicate: () => boolean, timeoutMs = 250): Promise<void> => {
+export const waitFor = async (
+  predicate: () => boolean,
+  timeoutMs = scaledTimeout(250),
+): Promise<void> => {
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
     if (Date.now() >= deadline) throw new Error('Timed out waiting for expected state.');

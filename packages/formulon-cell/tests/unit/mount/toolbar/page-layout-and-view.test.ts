@@ -8,9 +8,10 @@ import {
   HOME_TILE_LAYOUT_GROUP_VARIANTS,
 } from '../../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import { stubHelpers, waitFor } from './fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 const glyphPaths = (glyph: string): (string | null)[] =>
   (EXCEL_RIBBON_ICON_PATHS[glyph] ?? []).map((segment) => segment.d);

@@ -21,6 +21,7 @@ import {
   type LocaleSurfaceSection,
   type LocaleSurfaceToolbarRoute,
 } from '../test-utils/locale-surface-manifest.js';
+import { scaledTimeout } from '../timeouts.js';
 
 // Vitest serves transformed modules with a non-file `import.meta.url`; the
 // package test command runs from this workspace package, so cwd is the stable
@@ -562,7 +563,7 @@ describe('seven-language locale surface manifest', () => {
         panel.close(instance);
       }
     },
-    60_000,
+    scaledTimeout(60_000),
   );
 
   it.each(LOCALE_SURFACE_LOCALES)(
@@ -653,6 +654,6 @@ describe('seven-language locale surface manifest', () => {
       cancelToolbarDialog(host);
       expect(instance.setLocale(locale)).toBe(true);
     },
-    60_000,
+    scaledTimeout(60_000),
   );
 });

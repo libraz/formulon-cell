@@ -8,6 +8,7 @@ import {
   RIBBON_MENU_FOR_COMMAND,
 } from '../../../../src/toolbar/ribbon/activation.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { scaledTimeout } from '../../../timeouts.js';
 import {
   dynamicDropdownNoopOverrides,
   seedText,
@@ -15,7 +16,7 @@ import {
   stubHelpers,
 } from './fixtures.js';
 
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: scaledTimeout(20_000) });
 
 describe('Spreadsheet.mountToolbar', () => {
   let sheet: MountedStubSheet;
