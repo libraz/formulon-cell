@@ -18,6 +18,7 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
       return {
         setup: state.pageSetup.setupBySheet.get(0),
         views: state.sheetViews.views,
+        shown: state.sheetViews.activeViewId,
         freezeRows: state.layout.freezeRows,
       };
     });
@@ -32,15 +33,29 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
   }
   await expect.poll(async () => (await read()).setup).toMatchObject({ fitWidth: 1, fitHeight: 2 });
   await selectRibbonTab(page, 'view');
+  // New opens a temporary view; Keep saves it under a numbered name and stays on it.
+  await sp.clickRibbon('mac.view.sheetViewNew');
+  await expect.poll(async () => (await read()).shown).toBe('temporary');
   await sp.clickRibbon('mac.view.freeze');
   await page
     .locator('#menu-mac-view-freeze [data-ribbon-command="mac.view.freeze.firstRow"]')
     .click();
-  await sp.clickRibbon('mac.view.sheetViewSave');
+  await sp.clickRibbon('mac.view.sheetViewKeep');
   await expect.poll(async () => (await read()).views.length).toBe(1);
   const view = (await read()).views[0];
-  if (!view) throw new Error('saved sheet view is missing');
+  if (!view) throw new Error('kept sheet view is missing');
   const id = view.id;
+  await expect.poll(read).toMatchObject({ shown: id, freezeRows: 1 });
+  // Exit puts Default's settings back.
+  await sp.clickRibbon('mac.view.sheetViewExit');
+  await expect.poll(read).toMatchObject({ shown: null, freezeRows: 0 });
+  const select = page.locator('[data-ribbon-select="sheetViewSelect"]');
+  const showView = async (): Promise<void> => {
+    await select.locator('.fc-tb__rb-dd__btn').click();
+    await select.locator(`[role="option"][data-value="${id}"]`).click();
+  };
+  await showView();
+  await expect.poll(read).toMatchObject({ shown: id, freezeRows: 1 });
   await sp.clickRibbon('mac.view.freeze');
   // While panes are frozen the menu's first item is Unfreeze Panes.
   const unfreeze = page.locator(
@@ -49,10 +64,11 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
   await expect(unfreeze).toHaveText('Unfreeze Panes');
   await unfreeze.click();
   await expect.poll(async () => (await read()).freezeRows).toBe(0);
-  const select = page.locator('[data-ribbon-select="sheetViewSelect"]');
-  await select.locator('.fc-tb__rb-dd__btn').click();
-  await select.locator(`[role="option"][data-value="${id}"]`).click();
-  await expect.poll(async () => (await read()).freezeRows).toBe(1);
+  // Leaving a saved view keeps its changes.
+  await sp.clickRibbon('mac.view.sheetViewExit');
+  await expect.poll(async () => (await read()).shown).toBeNull();
+  await showView();
+  await expect.poll(read).toMatchObject({ shown: id, freezeRows: 0 });
   await sp.clickRibbon('mac.view.sheetViewDelete');
   await expect.poll(async () => (await read()).views.length).toBe(0);
   await page.locator('.fc-host').focus();
