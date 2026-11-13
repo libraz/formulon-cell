@@ -97,12 +97,7 @@ describe('Show/Hide Note is a view operation', () => {
     const controller = new InteractionController({ store, getWb: () => wb, history });
     const unregister = registerInteractionController(store, controller);
     controller.setPolicy(viewerPolicy());
-    for (const id of [
-      'showHideNoteReview',
-      'showAllNotesReview',
-      'mac.review.showHideNote',
-      'mac.review.showNotes',
-    ] as const) {
+    for (const id of ['notesReview', 'mac.review.showHideNote', 'mac.review.showNotes'] as const) {
       expect(BUILT_IN_COMMAND_OPERATION[id]).toBeNull();
       expect(canExecuteBuiltIn(store, id, 'ribbon').allowed).toBe(true);
     }

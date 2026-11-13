@@ -1,18 +1,23 @@
-// Review tab menus: comments, watch window, sheet/workbook protection. Each
+// Review tab menus: notes, watch window, sheet/workbook protection. Each
 // factory builds shared icon menu rows extracted from main.ts.
 
 import type { ToolbarMenuText } from '../../menu-text.js';
+import type { ToolbarText } from '../../ribbon-model.js';
 
 import { createMenu, menuIconButton, menuIdForCommand, menuSeparator } from './general.js';
 
 export interface ReviewMenuFactories {
   createWatchMenu: (id: string) => HTMLDivElement;
-  createReviewCommentsMenu: (id?: string) => HTMLDivElement;
+  createReviewNotesMenu: () => HTMLDivElement;
   createProtectMenu: (id: string) => HTMLDivElement;
 }
 
-export const createReviewMenuFactories = (ribbonMenuText: ToolbarMenuText): ReviewMenuFactories => {
+export const createReviewMenuFactories = (
+  ribbonMenuText: ToolbarMenuText,
+  ribbonText: ToolbarText,
+): ReviewMenuFactories => {
   const t = ribbonMenuText;
+  const r = ribbonText;
 
   const createWatchMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
@@ -26,13 +31,17 @@ export const createReviewMenuFactories = (ribbonMenuText: ToolbarMenuText): Revi
     return menu;
   };
 
-  const createReviewCommentsMenu = (id = 'menu-review-comments'): HTMLDivElement => {
-    const menu = createMenu(id);
-    menu.append(menuIconButton(t.commentThread, 'commentAction', 'thread', 'comment-add'));
-    if (id === 'menu-review-new-comment') return menu;
+  /** Review > Notes: New Note (Edit Note on a note cell), note navigation, Show/Hide Note, Show All
+   *  Notes and Convert to Comments. */
+  const createReviewNotesMenu = (): HTMLDivElement => {
+    const menu = createMenu('menu-review-notes');
     menu.append(
-      menuIconButton(t.commentDelete, 'commentAction', 'delete-active', 'comment-delete'),
-      menuIconButton(t.commentDeleteAll, 'commentAction', 'delete-all', 'comment-delete-all'),
+      menuIconButton(r.newNote, 'commentAction', 'new-note', 'comment-add'),
+      menuIconButton(r.previousNote, 'commentAction', 'previous-note', 'comment-previous'),
+      menuIconButton(r.nextNote, 'commentAction', 'next-note', 'comment-next'),
+      menuIconButton(r.showHideNote, 'commentAction', 'toggle-note', 'note-show-hide'),
+      menuIconButton(r.showAllNotes, 'commentAction', 'toggle-all-notes', 'note-show-all'),
+      menuIconButton(r.convertNotes, 'commentAction', 'convert-notes', 'comment-convert'),
     );
     return menu;
   };
@@ -91,5 +100,5 @@ export const createReviewMenuFactories = (ribbonMenuText: ToolbarMenuText): Revi
     return menu;
   };
 
-  return { createWatchMenu, createReviewCommentsMenu, createProtectMenu };
+  return { createWatchMenu, createReviewNotesMenu, createProtectMenu };
 };

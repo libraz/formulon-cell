@@ -359,7 +359,8 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(ribbonActivationForCommand('formatTableHome').kind).toBe('gallery');
     expect(ribbonActivationForCommand('conditional').kind).toBe('gallery');
     expect(ribbonActivationForCommand('dataValidation').kind).toBe('splitPrimary');
-    expect(ribbonActivationForCommand('deleteCommentReview').kind).toBe('splitPrimary');
+    expect(ribbonActivationForCommand('deleteCommentReview').kind).toBe('primaryAction');
+    expect(ribbonActivationForCommand('notesReview').kind).toBe('dropdown');
     expect(ribbonActivationForCommand('errorChecking').kind).toBe('splitPrimary');
     expect(ribbonActivationForCommand('protect').kind).toBe('splitPrimary');
     expect(ribbonActivationForCommand('protectReview').kind).toBe('splitPrimary');

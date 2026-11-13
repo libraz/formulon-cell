@@ -23,7 +23,6 @@ import {
   updatePivotStyleInfo,
 } from '../../commands/pivot-style-info.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
-import { executeNoteVisibilityAction } from '../../commands/ribbon-comment.js';
 import {
   deleteColumnsAction,
   deleteRowsAction,
@@ -167,6 +166,8 @@ export interface RibbonHooks {
     accessibility?: () => void;
     deleteComment?: () => void;
     selectComment?: (direction: 1 | -1, mode?: 'note' | 'thread' | 'all') => void;
+    /** Show Comments: lists the active sheet's threads. */
+    showComments?: () => void;
   };
   protection?: {
     runSheet?: () => Promise<unknown> | unknown;
@@ -815,20 +816,13 @@ const applyGenericRibbonCommand = (
       hooks?.review?.deleteComment?.();
       return true;
     case 'previousCommentReview':
-      hooks?.review?.selectComment?.(-1);
+      hooks?.review?.selectComment?.(-1, 'thread');
       return true;
     case 'nextCommentReview':
-      hooks?.review?.selectComment?.(1);
+      hooks?.review?.selectComment?.(1, 'thread');
       return true;
-    case 'showHideNoteReview':
-    case 'showAllNotesReview':
-      executeNoteVisibilityAction({
-        store: i.store,
-        workbook: i.workbook,
-        action: id === 'showHideNoteReview' ? 'toggle-active' : 'toggle-all',
-      });
-      runtime.projectFormatToolbar();
-      runtime.focusSheet();
+    case 'showCommentsReview':
+      hooks?.review?.showComments?.();
       return true;
     case 'protectReview':
     case 'protect':

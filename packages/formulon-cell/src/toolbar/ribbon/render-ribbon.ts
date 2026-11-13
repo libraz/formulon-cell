@@ -117,8 +117,7 @@ export interface RibbonMenus {
   clearArrows?: RibbonMenuFactory;
   errorChecking?: RibbonMenuFactory;
   watch?: RibbonMenuFactory;
-  reviewComments?: RibbonMenuFactory;
-  reviewNewComment?: RibbonMenuFactory;
+  reviewNotes?: RibbonMenuFactory;
   protect?: RibbonMenuFactory;
   calcOptions?: RibbonMenuFactory;
   whatIf?: RibbonMenuFactory;

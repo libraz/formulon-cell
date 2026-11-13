@@ -198,6 +198,9 @@ export interface RibbonStrings {
     notes: string;
     showHideNote: string;
     showAllNotes: string;
+    previousNote: string;
+    nextNote: string;
+    showComments: string;
     convertNotes: string;
     /** Convert to Comments asks this before turning every note into a thread. */
     convertNotesMessage: string;
@@ -269,7 +272,9 @@ export interface RibbonStrings {
     find: string;
     replace: string;
     gotoSpecial: string;
+    /** New Comment: a threaded comment. */
     newComment: string;
+    newNote: string;
     /** New Note's label while the active cell has a note. */
     editNote: string;
     proofing: string;
@@ -466,8 +471,8 @@ export interface RibbonStrings {
     functionArgumentsTitle: string;
     zoomToTitle: string;
     deleteCommentOrNoteTitle: string;
-    previousCommentOrNoteTitle: string;
-    nextCommentOrNoteTitle: string;
+    previousCommentTitle: string;
+    nextCommentTitle: string;
     groupSelectedRowsOrColumnsTitle: string;
     ungroupSelectedRowsOrColumnsTitle: string;
     showGroupedDetailTitle: string;

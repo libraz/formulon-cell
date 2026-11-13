@@ -548,7 +548,6 @@ export function mountToolbar(
     projectRibbonActiveState(host, getInstance(), {
       background: text.background,
       sheetBackgroundClear: menuText.sheetBackgroundClear,
-      editNote: text.editNote,
     });
     const instance = getInstance();
     if (instance && platform === 'mac') {

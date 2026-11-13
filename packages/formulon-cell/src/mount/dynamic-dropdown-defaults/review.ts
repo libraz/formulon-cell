@@ -1,12 +1,19 @@
 import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import { isMacChrome } from '../../commands/chrome-platform.js';
-import { commentAt, listComments } from '../../commands/comment.js';
+import {
+  commentAt,
+  listComments,
+  listThreadedComments,
+  noteVisibleAt,
+} from '../../commands/comment.js';
 import { convertNotesToThreads, workbookHasNotes } from '../../commands/convert-notes.js';
+import { interactionControllerFor } from '../../commands/interaction-controller.js';
 import {
   allowedEditRangeHasPassword,
   allowedEditRangesForSheet,
   isSheetProtected,
   isWorkbookStructureProtected,
+  noteChangePermitted,
   protectionCheckpoint,
   verifyAllowedEditRangePassword,
   verifyWorkbookStructurePassword,
@@ -18,9 +25,12 @@ import {
   setWorkbookProtectionAction,
   updateAllowedEditRangeAction,
 } from '../../commands/protection-actions.js';
-import { executeRibbonCommentAction } from '../../commands/ribbon-comment.js';
+import {
+  executeNoteVisibilityAction,
+  executeRibbonCommentAction,
+} from '../../commands/ribbon-comment.js';
 import { executeRibbonProtectionAction } from '../../commands/ribbon-protection.js';
-import { formatA1Range } from '../../engine/address.js';
+import { formatA1Cell, formatA1Range, MAX_COL } from '../../engine/address.js';
 import {
   allowedEditRangeAreas,
   areasFromSqref,
@@ -28,8 +38,10 @@ import {
 } from '../../engine/protection-sync.js';
 import { isMacHost } from '../../extensions/ui-options.js';
 import { type DialogEntry, openCommentDialogFrom } from '../../interact/dialog-entry.js';
+import { isNavigationAddrAllowed } from '../../interact/navigation-policy.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
+import { mutators } from '../../store/store.js';
 import { showConfirm } from '../../toolbar/dialogs/prompt.js';
 import {
   type AllowEditRangesManagerResult,
@@ -37,6 +49,7 @@ import {
   showAllowEditRangesManagerDialog,
   showProtectWorkbookDialog,
 } from '../../toolbar/dialogs/protection.js';
+import { projectPressedState } from '../../toolbar/ribbon/button.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { createCellsDropdownDefaults } from './cells.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
@@ -48,31 +61,87 @@ import {
 } from './protection-flows.js';
 import { normalizedSelectionRange } from './selection.js';
 
+/** Move to an adjacent note or thread in sheet order and open its editor. */
+export const selectAdjacentComment = (
+  instance: SpreadsheetInstance,
+  direction: 1 | -1,
+  mode: 'note' | 'thread' | 'all' = 'all',
+): void => {
+  const state = instance.store.getState();
+  if (interactionControllerFor(instance.store)?.canSelect().allowed === false) return;
+  const notes = [
+    ...(mode === 'thread'
+      ? []
+      : listComments(state).map((entry) => ({ ...entry, mode: 'note' as const }))),
+    ...(mode === 'note'
+      ? []
+      : (state.threadedComments.bySheet.get(state.data.sheetIndex) ?? [])
+          .filter((entry) => !entry.parentId)
+          .map((entry) => ({
+            addr: { sheet: state.data.sheetIndex, row: entry.cell.row, col: entry.cell.col },
+            mode: 'thread' as const,
+          }))),
+  ]
+    .filter((entry) => isNavigationAddrAllowed(instance.store, entry.addr))
+    .sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col);
+  const active = state.selection.active;
+  const rank = (addr: { row: number; col: number }): number => addr.row * (MAX_COL + 1) + addr.col;
+  const next =
+    direction === 1
+      ? (notes.find((note) => rank(note.addr) > rank(active)) ?? notes[0])
+      : (notes
+          .slice()
+          .reverse()
+          .find((note) => rank(note.addr) < rank(active)) ?? notes.at(-1));
+  if (!next) return;
+  mutators.setActive(instance.store, next.addr);
+  const selected = instance.store.getState().selection.active;
+  if (
+    selected.sheet !== next.addr.sheet ||
+    selected.row !== next.addr.row ||
+    selected.col !== next.addr.col
+  )
+    return;
+  instance.openCommentDialog({ mode: next.mode });
+};
+
+/** Review > Notes: navigation needs a note on the sheet and Show/Hide one on the active cell; New
+ *  Note reads Edit Note on a note cell and is absent while that note is locked; Convert to Comments
+ *  needs a note anywhere in the book. The two Show toggles read as pressed while on. */
 const updateReviewCommentsMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateReviewCommentsMenu'] =>
   (menu) => {
     const state = instance.store.getState();
-    const threads = state.threadedComments.bySheet.get(state.data.sheetIndex) ?? [];
-    const hasActiveComment =
-      commentAt(state, state.selection.active) !== null ||
-      threads.some(
-        (entry) =>
-          !entry.parentId &&
-          entry.cell.row === state.selection.active.row &&
-          entry.cell.col === state.selection.active.col,
-      );
-    const hasAnyComment =
-      listComments(state, state.data.sheetIndex).length > 0 || threads.length > 0;
-    const strings = instance.i18n.strings.ribbonMenu;
+    const active = state.selection.active;
+    const activeNote = commentAt(state, active) !== null;
+    const anyNote = listComments(state, state.data.sheetIndex).length > 0;
+    const strings = instance.i18n.strings;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-comment-action]')) {
       const action = button.dataset.commentAction;
-      const disabled =
-        (action === 'thread' && !instance.workbook.capabilities.threadedComments) ||
-        (action === 'delete-active' && !hasActiveComment) ||
-        (action === 'delete-all' && !hasAnyComment);
+      if (action === 'new-note') {
+        const text = button.querySelector('.fc-tb__menu-item__text') ?? button;
+        button.dataset.newNoteLabel ??= text.textContent ?? '';
+        const label = activeNote ? strings.ribbon.editNote : button.dataset.newNoteLabel;
+        text.textContent = label;
+        button.setAttribute('aria-label', label);
+        button.hidden = activeNote && !noteChangePermitted(state, active);
+        continue;
+      }
+      if (action === 'toggle-note') projectPressedState(button, noteVisibleAt(state, active));
+      if (action === 'toggle-all-notes') projectPressedState(button, state.ui.showAllNotes);
       const reason =
-        action === 'delete-active' ? strings.commentDeleteRequiresActive : strings.commentNone;
-      setMenuControlDisabled(button, disabled, reason);
+        action === 'convert-notes'
+          ? workbookHasNotes(instance.workbook)
+            ? null
+            : strings.ribbonMenu.commentNone
+          : action === 'toggle-all-notes'
+            ? null
+            : !anyNote
+              ? strings.ribbonMenu.commentNone
+              : action === 'toggle-note' && !activeNote
+                ? strings.ribbonMenu.commentDeleteRequiresActive
+                : null;
+      setMenuControlDisabled(button, reason !== null, reason ?? undefined);
     }
   };
 
@@ -335,28 +404,67 @@ const updateProtectMenu =
     }
   };
 
+/** The Review tab's comment and note actions: Delete Comment, and the Notes menu's items. */
 const buildReviewCommentAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyReviewCommentAction'] =>
   (action) => {
-    if (action === 'thread') {
-      if (instance.workbook.capabilities.threadedComments)
-        openCommentDialogFrom(instance.store, 'thread', {
+    const entry = { origin: 'ribbon', commandId: 'notesReview' } as const;
+    switch (action) {
+      case 'delete-active':
+        executeRibbonCommentAction({
+          store: instance.store,
+          workbook: instance.workbook,
+          history: instance.history,
+          action,
           origin: 'ribbon',
-          commandId: 'newCommentReview',
+          commandId: 'deleteCommentReview',
         });
-      return;
+        instance.host.focus();
+        return;
+      case 'new-note':
+        openCommentDialogFrom(instance.store, 'note', entry);
+        return;
+      case 'previous-note':
+      case 'next-note':
+        selectAdjacentComment(instance, action === 'next-note' ? 1 : -1, 'note');
+        return;
+      case 'toggle-note':
+      case 'toggle-all-notes':
+        executeNoteVisibilityAction({
+          store: instance.store,
+          workbook: instance.workbook,
+          action: action === 'toggle-note' ? 'toggle-active' : 'toggle-all',
+        });
+        instance.host.focus();
+        return;
+      case 'convert-notes':
+        void convertNotesFrom(instance, 'notesReview');
+        return;
     }
-    if (action !== 'delete-active' && action !== 'delete-all') return;
-    executeRibbonCommentAction({
-      store: instance.store,
-      workbook: instance.workbook,
-      history: instance.history,
-      action,
-      origin: 'ribbon',
-      commandId: 'deleteCommentReview',
-    });
-    instance.host.focus();
   };
+
+/** Show Comments: the active sheet's threads, each under its cell, leaving out cells the
+ *  navigation policy keeps out of reach. */
+export const showCommentsList = (instance: SpreadsheetInstance, title: string): Promise<void> => {
+  const sheet = instance.store.getState().data.sheetIndex;
+  return showInstanceReport(
+    instance,
+    title,
+    listThreadedComments(instance.store, sheet, instance.workbook)
+      .filter((entry) =>
+        isNavigationAddrAllowed(instance.store, {
+          sheet,
+          row: entry.cell.row,
+          col: entry.cell.col,
+        }),
+      )
+      .map((entry) => ({
+        severity: 'info' as const,
+        label: formatA1Cell(entry.cell.row, entry.cell.col),
+        detail: entry.text,
+      })),
+  );
+};
 
 /** Convert to Comments: asks first, then turns every note of the workbook into a thread as one
  *  undo step. Does nothing when the workbook holds no note. */

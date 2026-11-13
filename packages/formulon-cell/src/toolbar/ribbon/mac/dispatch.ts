@@ -16,7 +16,7 @@ import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../comm
 import { pageSetupWrite } from '../../../commands/page-setup-actions.js';
 import { FUNCTION_SIGNATURES } from '../../../commands/refs.js';
 import { executeNoteVisibilityAction } from '../../../commands/ribbon-comment.js';
-import { formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
+import { MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import {
   openCommentDialogFrom,
   openDataValidationDialogFrom,
@@ -26,10 +26,13 @@ import {
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
 import { createChartVariantFromSelection } from '../../../mount/dynamic-dropdown-defaults/insert.js';
-import { convertNotesFrom } from '../../../mount/dynamic-dropdown-defaults/review.js';
+import {
+  convertNotesFrom,
+  selectAdjacentComment,
+  showCommentsList,
+} from '../../../mount/dynamic-dropdown-defaults/review.js';
 import { showCreateTableDialog } from '../../../mount/dynamic-dropdown-defaults/styles.js';
 import { createDefaultDynamicDropdownsCtx } from '../../../mount/dynamic-dropdowns-defaults.js';
-import { selectAdjacentComment } from '../../../mount/toolbar-defaults.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { applyWorkbookTheme } from '../../../mount/workbook-theme-action.js';
 import { reportDialogLabels, showReport } from '../../dialogs/report.js';
@@ -520,23 +523,10 @@ export function dispatchMacRibbonCommand(
         }
         return selectAdjacentComment(instance, id === 'mac.review.nextNote' ? 1 : -1, 'note');
       case 'mac.review.showComments':
-        return showReport({
-          title: MAC_CONTEXT_LABELS.commentsTitle[toolbarLangForLocale(instance.i18n.locale)],
-          items: listThreadedComments(instance.store, sheet, instance.workbook)
-            .filter((entry) =>
-              isNavigationAddrAllowed(instance.store, {
-                sheet,
-                row: entry.cell.row,
-                col: entry.cell.col,
-              }),
-            )
-            .map((entry) => ({
-              severity: 'info' as const,
-              label: formatA1Cell(entry.cell.row, entry.cell.col),
-              detail: entry.text,
-            })),
-          ...reportDialogLabels(instance.i18n.strings),
-        });
+        return showCommentsList(
+          instance,
+          MAC_CONTEXT_LABELS.commentsTitle[toolbarLangForLocale(instance.i18n.locale)],
+        );
       case 'mac.review.convertNotes':
         return convertNotesFrom(instance, id);
       case 'mac.review.showHideNote':

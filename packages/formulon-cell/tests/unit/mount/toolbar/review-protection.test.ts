@@ -420,7 +420,7 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('deletes the active comment from primary click and keeps delete-all secondary', () => {
+  it('lays out Comments as plain buttons and opens the Notes menu from its button', () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
     setComment(sheet.instance.store, { sheet: 0, row: 0, col: 0 }, 'note', sheet.workbook);
     setComment(sheet.instance.store, { sheet: 0, row: 1, col: 0 }, 'other note', sheet.workbook);
@@ -430,57 +430,46 @@ describe('Spreadsheet.mountToolbar', () => {
     });
     tb.setActiveTab('review');
 
-    const commentsButton = host.querySelector<HTMLButtonElement>(
+    const groupCommands = (label: string) =>
+      [...host.querySelectorAll<HTMLElement>('.fc-tb__ribbon-group')]
+        .find((group) => group.getAttribute('aria-label') === label && !group.closest('[hidden]'))
+        ?.querySelectorAll<HTMLElement>('[data-ribbon-command]');
+    expect([...(groupCommands('Comments') ?? [])].map((b) => b.dataset.ribbonCommand)).toEqual([
+      'newCommentReview',
+      'deleteCommentReview',
+      'previousCommentReview',
+      'nextCommentReview',
+      'showCommentsReview',
+    ]);
+    expect([...(groupCommands('Notes') ?? [])].map((b) => b.dataset.ribbonCommand)).toEqual([
+      'notesReview',
+    ]);
+
+    const deleteButton = host.querySelector<HTMLButtonElement>(
       '[data-ribbon-command="deleteCommentReview"]',
     );
-    expect(commentsButton).toBeTruthy();
-    expect(commentsButton?.dataset.ribbonActivation).toBe('splitPrimary');
-    commentsButton?.click();
-
-    expect(host.querySelector<HTMLDivElement>('#menu-review-comments')?.hidden).toBe(true);
+    expect(deleteButton?.dataset.ribbonActivation).toBe('primaryAction');
+    deleteButton?.click();
     expect(commentAt(sheet.instance.store.getState(), { sheet: 0, row: 0, col: 0 })).toBeNull();
     expect(commentAt(sheet.instance.store.getState(), { sheet: 0, row: 1, col: 0 })).toBe(
       'other note',
     );
 
-    tb.dropdownsApi?.openDynamicRibbonDropdown(
-      { command: 'deleteCommentReview', menuId: 'menu-review-comments' },
-      commentsButton as HTMLButtonElement,
-    );
-    expect(host.querySelectorAll('#menu-review-comments .fc-tb__menu-item--iconic').length).toBe(3);
-    const deleteActiveButton = host.querySelector<HTMLButtonElement>(
-      '[data-comment-action="delete-active"]',
-    );
-    expect(deleteActiveButton?.disabled).toBe(true);
-    const deleteAllButton = host.querySelector<HTMLButtonElement>(
-      '[data-comment-action="delete-all"]',
-    );
-    expect(deleteAllButton).toBeTruthy();
-    expect(deleteAllButton?.disabled).toBe(false);
-    const event = new MouseEvent('click', { bubbles: true });
-    Object.defineProperty(event, 'target', { value: deleteAllButton });
-    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
-
-    expect(commentAt(sheet.instance.store.getState(), { sheet: 0, row: 1, col: 0 })).toBeNull();
-
-    tb.dropdownsApi?.openDynamicRibbonDropdown(
-      { command: 'deleteCommentReview', menuId: 'menu-review-comments' },
-      commentsButton as HTMLButtonElement,
-    );
-    expect(deleteActiveButton?.disabled).toBe(true);
-    expect(deleteAllButton?.disabled).toBe(true);
-
-    setComment(sheet.instance.store, { sheet: 0, row: 0, col: 0 }, 'fresh note', sheet.workbook);
-    tb.dropdownsApi?.openDynamicRibbonDropdown(
-      { command: 'deleteCommentReview', menuId: 'menu-review-comments' },
-      commentsButton as HTMLButtonElement,
-    );
-    expect(deleteActiveButton?.disabled).toBe(false);
-    expect(deleteAllButton?.disabled).toBe(false);
-    const deleteActiveEvent = new MouseEvent('click', { bubbles: true });
-    Object.defineProperty(deleteActiveEvent, 'target', { value: deleteActiveButton });
-    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(deleteActiveEvent)).toBe(true);
-    expect(commentAt(sheet.instance.store.getState(), { sheet: 0, row: 0, col: 0 })).toBeNull();
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="notesReview"]')?.click();
+    const menu = host.querySelector<HTMLDivElement>('#menu-review-notes');
+    expect(menu?.hidden).toBe(false);
+    expect(
+      [...(menu?.querySelectorAll<HTMLElement>('[data-comment-action]') ?? [])].map(
+        (item) => item.dataset.commentAction,
+      ),
+    ).toEqual([
+      'new-note',
+      'previous-note',
+      'next-note',
+      'toggle-note',
+      'toggle-all-notes',
+      'convert-notes',
+    ]);
 
     tb.dispose();
   });

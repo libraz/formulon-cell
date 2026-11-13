@@ -65,7 +65,7 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   commentInsert: (i) =>
     openCommentDialogFrom(i.store, 'note', { origin: 'ribbon', commandId: 'commentInsert' }),
   newCommentReview: (i) =>
-    openCommentDialogFrom(i.store, 'note', { origin: 'ribbon', commandId: 'newCommentReview' }),
+    openCommentDialogFrom(i.store, 'thread', { origin: 'ribbon', commandId: 'newCommentReview' }),
   dataValidation: (i) =>
     openDataValidationDialogFrom(i.store, { origin: 'ribbon', commandId: 'dataValidation' }),
   namedRanges: (i) =>
@@ -99,7 +99,6 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
  *  primary face opens the dialog, while the secondary face keeps the related
  *  Excel-style menu available. */
 export const RIBBON_PRIMARY_SPLIT_DIALOG_COMMANDS: ReadonlySet<string> = new Set([
-  'newCommentReview',
   'dataValidation',
   'linksData',
   'namedRanges',

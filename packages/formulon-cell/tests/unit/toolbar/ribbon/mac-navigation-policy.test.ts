@@ -60,16 +60,22 @@ describe('Mac note navigation bounds', () => {
   });
 
   it('routes Mac note navigation through the shared review hook so a host override applies to both surfaces', () => {
-    const calls: number[] = [];
+    const calls: string[] = [];
     const deps = {
       inst: { store: createSpreadsheetStore() } as unknown as SpreadsheetInstance,
       runtime: { projectFormatToolbar: () => {} },
-      hooks: { review: { selectComment: (direction: 1 | -1) => calls.push(direction) } },
+      hooks: {
+        review: {
+          selectComment: (direction: 1 | -1, mode?: string) => calls.push(`${direction}:${mode}`),
+        },
+      },
     } as unknown as ApplyRibbonCommandDeps;
     expect(applyRibbonCommand('mac.review.nextNote', deps)).toBe(true);
     expect(applyRibbonCommand('mac.review.previousNote', deps)).toBe(true);
+    // The Comments group's Previous and Next walk threads; notes have their own menu items.
     expect(applyRibbonCommand('nextCommentReview', deps)).toBe(true);
-    expect(calls).toEqual([1, -1, 1]);
+    expect(applyRibbonCommand('previousCommentReview', deps)).toBe(true);
+    expect(calls).toEqual(['1:note', '-1:note', '1:thread', '-1:thread']);
   });
 
   it('moves between notes from the default shared ribbon hook', async () => {
@@ -94,9 +100,9 @@ describe('Mac note navigation bounds', () => {
     setComment(store, { sheet: 0, row: 0, col: 1 }, 'first');
     setComment(store, { sheet: 0, row: 3, col: 0 }, 'second');
     try {
-      applyRibbonCommand('nextCommentReview', deps);
-      applyRibbonCommand('nextCommentReview', deps);
-      applyRibbonCommand('previousCommentReview', deps);
+      applyRibbonCommand('mac.review.nextNote', deps);
+      applyRibbonCommand('mac.review.nextNote', deps);
+      applyRibbonCommand('mac.review.previousNote', deps);
       expect(opened).toEqual(['0:1', '3:0', '0:1']);
     } finally {
       workbook.dispose();

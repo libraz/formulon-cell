@@ -23,9 +23,7 @@ import {
   cellStyleFallbackProfileForPlatform,
   listCustomCellStyles,
 } from '../commands/cell-styles.js';
-import { listComments } from '../commands/comment.js';
 import { listCustomPivotTableStyles, listCustomTableStyles } from '../commands/format-as-table.js';
-import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
   groupCols,
   groupRows,
@@ -38,11 +36,9 @@ import {
 import { layoutWrite } from '../commands/row-col-actions.js';
 import { deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
 import { setSheetZoom } from '../commands/view.js';
-import { formatA1Range, MAX_COL } from '../engine/address.js';
+import { formatA1Range } from '../engine/address.js';
 import { dictionaries } from '../i18n/strings.js';
-import { isNavigationAddrAllowed } from '../interact/navigation-policy.js';
 import { openSpellingDialog } from '../interact/spelling-dialog.js';
-import { mutators } from '../store/store.js';
 import { reportDialogLabels, showReport } from '../toolbar/dialogs/report.js';
 import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
 import { backstageMenuText, pageScaleMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
@@ -77,6 +73,7 @@ import type { RibbonMenus, RibbonRenderHelpers } from '../toolbar/ribbon/render-
 import { createSelectColorRibbon } from '../toolbar/ribbon/select-color.js';
 import { toolbarText } from '../toolbar/ribbon-model.js';
 import { dispatchHostClipboard, handleAutoSum } from '../wrappers/toolbar-actions.js';
+import { selectAdjacentComment, showCommentsList } from './dynamic-dropdown-defaults/review.js';
 import { showCreateTableDialog } from './dynamic-dropdown-defaults/styles.js';
 import { createDefaultDynamicDropdownsCtx } from './dynamic-dropdowns-defaults.js';
 import type { SpreadsheetInstance } from './types.js';
@@ -180,7 +177,7 @@ export function createDefaultRibbonMenus(
     dictionaries[lang].mac.sparkline,
   );
   const formulaFactories = createFormulasMenuFactories(ribbonMenuText, lang);
-  const reviewFactories = createReviewMenuFactories(ribbonMenuText);
+  const reviewFactories = createReviewMenuFactories(ribbonMenuText, ribbonText);
   const homeFactories = createHomeMenuFactories({
     ribbonLang: lang,
     ribbonMenuText,
@@ -267,8 +264,7 @@ export function createDefaultRibbonMenus(
 
     // Review tab
     watch: reviewFactories.createWatchMenu,
-    reviewComments: () => reviewFactories.createReviewCommentsMenu(),
-    reviewNewComment: () => reviewFactories.createReviewCommentsMenu('menu-review-new-comment'),
+    reviewNotes: () => reviewFactories.createReviewNotesMenu(),
     protect: reviewFactories.createProtectMenu,
 
     // Home tab
@@ -305,50 +301,6 @@ export function createDefaultRibbonMenus(
 /** Hooks the toolbar can satisfy from instance methods alone — clipboard,
  *  drawing, autoSum. Hosts merge their own categories (review, protection,
  *  automation, …) on top because those involve app-specific dialogs. */
-/** Move to an adjacent note or thread in sheet order and open its editor. */
-export const selectAdjacentComment = (
-  instance: SpreadsheetInstance,
-  direction: 1 | -1,
-  mode: 'note' | 'thread' | 'all' = 'all',
-): void => {
-  const state = instance.store.getState();
-  if (interactionControllerFor(instance.store)?.canSelect().allowed === false) return;
-  const notes = [
-    ...(mode === 'thread'
-      ? []
-      : listComments(state).map((entry) => ({ ...entry, mode: 'note' as const }))),
-    ...(mode === 'note'
-      ? []
-      : (state.threadedComments.bySheet.get(state.data.sheetIndex) ?? [])
-          .filter((entry) => !entry.parentId)
-          .map((entry) => ({
-            addr: { sheet: state.data.sheetIndex, row: entry.cell.row, col: entry.cell.col },
-            mode: 'thread' as const,
-          }))),
-  ]
-    .filter((entry) => isNavigationAddrAllowed(instance.store, entry.addr))
-    .sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col);
-  const active = state.selection.active;
-  const rank = (addr: { row: number; col: number }): number => addr.row * (MAX_COL + 1) + addr.col;
-  const next =
-    direction === 1
-      ? (notes.find((note) => rank(note.addr) > rank(active)) ?? notes[0])
-      : (notes
-          .slice()
-          .reverse()
-          .find((note) => rank(note.addr) < rank(active)) ?? notes.at(-1));
-  if (!next) return;
-  mutators.setActive(instance.store, next.addr);
-  const selected = instance.store.getState().selection.active;
-  if (
-    selected.sheet !== next.addr.sheet ||
-    selected.row !== next.addr.row ||
-    selected.col !== next.addr.col
-  )
-    return;
-  instance.openCommentDialog({ mode: next.mode });
-};
-
 export function createDefaultRibbonHooks(
   instance: SpreadsheetInstance,
   opts: ToolbarDefaultsOptions = {},
@@ -499,6 +451,9 @@ export function createDefaultRibbonHooks(
         dropdowns.applyReviewCommentAction('delete-active');
       },
       selectComment: (direction, mode) => selectAdjacentComment(instance, direction, mode),
+      showComments: () => {
+        void showCommentsList(instance, instance.i18n.strings.ribbon.showComments);
+      },
     },
     protection: {
       runSheet: () =>

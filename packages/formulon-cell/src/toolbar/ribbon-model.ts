@@ -306,8 +306,8 @@ export function buildRibbonModel(
   const zoomTitle = (percent: string): string => interpolate(tr.zoomToTitle, { percent });
   const commentTitle = (kind: 'delete' | 'previous' | 'next'): string => {
     if (kind === 'delete') return tr.deleteCommentOrNoteTitle;
-    if (kind === 'previous') return tr.previousCommentOrNoteTitle;
-    return tr.nextCommentOrNoteTitle;
+    if (kind === 'previous') return tr.previousCommentTitle;
+    return tr.nextCommentTitle;
   };
   const outlineTitle = (kind: 'group' | 'ungroup' | 'show' | 'hide'): string => {
     if (kind === 'group') return tr.groupSelectedRowsOrColumnsTitle;
@@ -490,9 +490,7 @@ export function buildRibbonModel(
       group(tr.links, [
         cmd('hyperlinkInsert', tr.hyperlink, `${tr.hyperlink} (Ctrl+K)`, 'link', 'wide'),
       ]),
-      group(tr.comments, [
-        cmd('commentInsert', tr.newComment, tr.newComment, 'commentAdd', 'wide'),
-      ]),
+      group(tr.comments, [cmd('commentInsert', tr.newNote, tr.newNote, 'commentAdd', 'wide')]),
       group(tr.symbols, [cmd('symbolInsert', tr.symbol, tr.symbol, 'function', 'wide')]),
     ]),
     tab('pageLayout', [
@@ -705,11 +703,9 @@ export function buildRibbonModel(
         cmd('deleteCommentReview', tr.deleteComment, commentTitle('delete'), 'clear', 'wide'),
         cmd('previousCommentReview', tr.previousComment, commentTitle('previous'), 'goTo', 'wide'),
         cmd('nextCommentReview', tr.nextComment, commentTitle('next'), 'goTo', 'wide'),
+        cmd('showCommentsReview', tr.showComments, tr.showComments, 'commentAdd', 'wide'),
       ]),
-      group(tr.notes, [
-        cmd('showHideNoteReview', tr.showHideNote, tr.showHideNote, 'noteShowHide', 'wide'),
-        cmd('showAllNotesReview', tr.showAllNotes, tr.showAllNotes, 'noteShowAll', 'wide'),
-      ]),
+      group(tr.notes, [cmd('notesReview', tr.notes, tr.notes, 'noteShowAll', 'wide')]),
       group(tr.find, [cmd('findReview', tr.find, `${tr.find} (Ctrl+F)`, 'find', 'wide')]),
       group(tr.protection, [
         cmd('protectReview', tr.protect, tr.protect, 'protect', 'wide'),

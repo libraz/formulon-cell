@@ -23,6 +23,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { legacyInstanceOf } from '../../src/api/spreadsheet/instance.js';
 import { workbookHandleOf } from '../../src/api/workbook.js';
 import { setComment } from '../../src/commands/comment.js';
+import { executeNoteVisibilityAction } from '../../src/commands/ribbon-comment.js';
 import { spreadsheetInternals } from '../../src/mount/internals.js';
 import { expectFailure, expectFormulonError, makeHost } from './helpers.js';
 
@@ -222,7 +223,12 @@ describe('spreadsheet: update', () => {
     const updates = vi.fn();
     sheet.on('update', updates);
 
-    sheet.commands.execute('showAllNotesReview');
+    // The Notes menu's Show All Notes runs this.
+    executeNoteVisibilityAction({
+      store,
+      workbook: workbookHandleOf(sheet.workbook),
+      action: 'toggle-all',
+    });
     expect(updates).toHaveBeenCalledTimes(1);
     expect(updates).toHaveBeenCalledWith({ keys: ['showAllNotes'], source: 'user' });
     expect(sheet.options.showAllNotes).toBe(true);
@@ -241,9 +247,11 @@ describe('spreadsheet: update', () => {
     setComment(store, { sheet: 0, row: 1, col: 1 }, 'note', workbookHandleOf(sheet.workbook));
     sheet.selection.set('B2');
     sheet.history.clear();
-    sheet.commands.execute('showHideNoteReview');
+    const workbook = workbookHandleOf(sheet.workbook);
+    // The Notes menu's Show/Hide Note and Show All Notes run these.
+    executeNoteVisibilityAction({ store, workbook, action: 'toggle-active' });
     expect(store.getState().format.formats.get('0:1:1')?.commentVisible).toBe(true);
-    sheet.commands.execute('showAllNotesReview');
+    executeNoteVisibilityAction({ store, workbook, action: 'toggle-all' });
     expect(sheet.options.showAllNotes).toBe(true);
     expect(sheet.history.canUndo).toBe(false);
   });
