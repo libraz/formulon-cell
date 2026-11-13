@@ -38,12 +38,13 @@ const watchDialogLayout = (prefix: string): void => {
     return rect.width >= MIN && rect.height >= MIN;
   };
 
-  /** `rect` cut to the visible part of every clipping ancestor up to `root`. */
+  /** `rect` cut to the visible part of `el` and every clipping ancestor up to `root`; an
+   *  ellipsised span clips its own text. */
   const clip = (el: Element, rect: DOMRect | Box, root: Element): Box | null => {
     let box: Box =
       'r' in rect ? rect : { x: rect.left, y: rect.top, r: rect.right, b: rect.bottom };
     for (
-      let node = el.parentElement;
+      let node: Element | null = el;
       node && node !== root.parentElement;
       node = node.parentElement
     ) {
