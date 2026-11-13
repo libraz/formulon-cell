@@ -237,6 +237,7 @@ export const dataObjectsJa: DataObjectsStrings = {
         bottom10: '下位 10 項目',
         before: '指定の値より前',
         after: '指定の値より後',
+        allDatesInPeriod: '期間内の全日付...',
       },
     },
     pivotFieldSearch: 'フィールドの検索',

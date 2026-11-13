@@ -161,6 +161,18 @@ export const PIVOT_FILTER_PERIODS: readonly (readonly [PivotFilterKind, DatePeri
   [PivotFilterKind.M12, 'december'],
 ];
 
+const ALL_DATES_START = PIVOT_FILTER_PERIODS.findIndex(([kind]) => kind === PivotFilterKind.Q1);
+
+/** The relative periods Date Filters lists itself, through Year to Date. */
+export const PIVOT_LISTED_PERIODS = PIVOT_FILTER_PERIODS.slice(0, ALL_DATES_START);
+
+/** The quarters and months All Dates in the Period picks from. */
+export const PIVOT_ALL_DATES_PERIODS = PIVOT_FILTER_PERIODS.slice(ALL_DATES_START);
+
+/** Whether `kind` is a quarter or month of All Dates in the Period. */
+export const isPivotAllDatesPeriod = (kind: PivotFilterKind): boolean =>
+  PIVOT_ALL_DATES_PERIODS.some(([period]) => period === kind);
+
 /** What a Top 10 filter shows: the top or bottom, by items, percent or sum. */
 export type PivotTop10Direction = 'top' | 'bottom';
 export type PivotTop10Basis = 'items' | 'percent' | 'sum';

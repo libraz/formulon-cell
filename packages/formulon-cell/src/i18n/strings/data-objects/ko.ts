@@ -235,6 +235,7 @@ export const dataObjectsKo: DataObjectsStrings = {
         bottom10: '하위 10',
         before: '이전',
         after: '이후',
+        allDatesInPeriod: '기간 내의 모든 날짜',
       },
     },
     pivotFieldSearch: '필드 검색',

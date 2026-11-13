@@ -65,21 +65,35 @@ afterEach(() => {
 });
 
 describe('PivotTable filter panel conditions', () => {
-  it('lists every label and value entry enabled, with Not Between after Between', async () => {
+  it('lists every entry enabled, Not Between on the label list only', async () => {
     await setup();
     for (const which of ['label', 'value'] as const) {
-      const options = [...by(which).options];
-      const entries = options.filter((o) => !/^─+$/.test(o.text));
+      const entries = [...by(which).options].filter((o) => !/^─+$/.test(o.text));
       expect(
         entries.every((o) => !o.disabled),
         which,
       ).toBe(true);
-      expect(options.some((o) => o.value.startsWith('unsupported'))).toBe(false);
-      const texts = entries.map((o) => o.text);
-      expect(texts[texts.indexOf('Between') + 1], which).toBe('Not Between');
+      expect(entries.some((o) => o.value.startsWith('unsupported'))).toBe(false);
     }
-    const values = [...by('value').options].map((o) => o.text);
-    expect(values.slice(-2)).toEqual(['Top 10', 'Bottom 10']);
+    const labels = [...by('label').options].map((o) => o.text);
+    expect(labels[labels.indexOf('Between') + 1]).toBe('Not Between');
+    const values = [...by('value').options].map((o) => (/^─+$/.test(o.text) ? '-' : o.text));
+    expect(values).toEqual([
+      'Choose One',
+      '-',
+      'Equals',
+      'Does Not Equal',
+      '-',
+      'Greater Than',
+      'Greater Than or Equal To',
+      'Less Than',
+      'Less Than or Equal To',
+      '-',
+      'Between',
+      '-',
+      'Top 10',
+      'Bottom 10',
+    ]);
   });
 
   it('opens the Top 10 dialog with Bottom preselected for Bottom 10', async () => {
@@ -108,13 +122,17 @@ describe('PivotTable filter panel conditions', () => {
     );
   });
 
-  it('commits Not Between from the value list', async () => {
+  it('commits Not Between through the Value Filter dialog opened from Between', async () => {
     const { wb } = await setup();
-    choose(by('value'), String(PivotFilterKind.ValueNotBetween));
+    choose(by('value'), String(PivotFilterKind.ValueBetween));
     const d = dialog();
+    const operator = d?.querySelector<HTMLSelectElement>(
+      'select[data-pivot-filter-operator="true"]',
+    );
     const low = d?.querySelector<HTMLInputElement>('input[data-pivot-filter-value="true"]');
     const high = d?.querySelector<HTMLInputElement>('input[data-pivot-filter-value-high="true"]');
-    if (!low || !high) throw new Error('missing range inputs');
+    if (!operator || !low || !high) throw new Error('missing range controls');
+    choose(operator, String(PivotFilterKind.ValueNotBetween));
     low.value = '400';
     high.value = '600';
     d?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();

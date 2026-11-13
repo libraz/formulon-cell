@@ -29,6 +29,9 @@ export interface PivotFilterDialogOptions {
   cancelLabel: string;
   /** Data field captions a value or Top 10 filter can score; the index is the data field index. */
   dataFields?: readonly string[];
+  /** The quarters and months All Dates in the Period picks from, with their labels; given, the
+   *  date dialog offers them in one pop-up in place of a comparison and its operand. */
+  periods?: readonly (readonly [PivotFilterKind, string])[];
   /** The desktop's Mac dialogs carry no field name in their title. */
   mac: boolean;
 }
@@ -130,7 +133,17 @@ export const showPivotFilterDialog = (
 
     let read: () => PivotFilterConditionState;
 
-    if (category === 'top10') {
+    if (options.periods) {
+      // The pop-up's form and order are provisional until measured on the Mac app.
+      const period = createDialogSelect(
+        options.periods.map(([kind, label]) => ({ value: String(kind), label })),
+        String(initialKind),
+        { className: 'fc-fmtdlg__select' },
+      );
+      period.dataset.pivotFilterPeriod = 'true';
+      grid.append(settingsRow(d.date.prompt), settingsRow(null, period));
+      read = () => ({ kind: Number(period.value) as PivotFilterKind, value: '' });
+    } else if (category === 'top10') {
       const parts = top10Parts as { direction: PivotTop10Direction; basis: PivotTop10Basis };
       const direction = createDialogSelect(
         [

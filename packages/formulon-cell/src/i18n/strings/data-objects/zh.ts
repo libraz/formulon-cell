@@ -235,6 +235,7 @@ export const dataObjectsZh: DataObjectsStrings = {
         bottom10: '后 10 项',
         before: '之前',
         after: '之后',
+        allDatesInPeriod: '该期间的所有日期',
       },
     },
     pivotFieldSearch: '搜索字段',

@@ -240,6 +240,7 @@ export const dataObjectsFr: DataObjectsStrings = {
         bottom10: '10 derniers',
         before: 'Avant',
         after: 'Après',
+        allDatesInPeriod: 'Toutes les dates de cette période',
       },
     },
     pivotFieldSearch: 'Rechercher des champs',

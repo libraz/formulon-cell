@@ -235,6 +235,7 @@ export const dataObjectsTh: DataObjectsStrings = {
         bottom10: '10 อันดับสุดท้าย',
         before: 'ก่อนหน้า',
         after: 'หลังจาก',
+        allDatesInPeriod: 'วันที่ทั้งหมดในช่วงเวลา',
       },
     },
     pivotFieldSearch: 'ค้นหาเขตข้อมูล',

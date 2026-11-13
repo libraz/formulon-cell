@@ -242,6 +242,7 @@ export const dataObjectsDe: DataObjectsStrings = {
         bottom10: 'Untere 10',
         before: 'Vor',
         after: 'Nach',
+        allDatesInPeriod: 'Alle Datumswerte im Zeitraum',
       },
     },
     pivotFieldSearch: 'Felder durchsuchen',

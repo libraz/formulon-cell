@@ -5,7 +5,7 @@ import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js'
 import { PivotAggregation, PivotFilterKind } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
-import { PIVOT_FILTER_PERIODS } from '../../../src/interact/pivot-filter-kinds.js';
+import { PIVOT_ALL_DATES_PERIODS } from '../../../src/interact/pivot-filter-kinds.js';
 import { openPivotFieldFilter } from '../../../src/interact/pivot-filter-panel.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -90,23 +90,74 @@ describe('PivotTable filter panel on a date field', () => {
     expect(pivotFieldFilterModel(text.wb, 0, 0, region ?? -1)?.dateField).toBe(false);
   });
 
-  // The desktop's Date Filters menu in place of Label Filters. The Mac pop-up's exact contents
-  // are provisional: they follow the desktop menu until measured on the Mac app.
-  it('lists the date comparisons, then the relative periods, in place of the label list', async () => {
+  it('lists the column filter date menu in place of the label list', async () => {
     await setup('Date');
-    const enabled = [...byLabel().options]
-      .filter((o) => !o.disabled && o.value !== '')
-      .map((o) => [Number(o.value), o.textContent]);
-    expect(enabled).toEqual([
-      [PivotFilterKind.DateEqual, en.workbookObjects.pivotFilterPanel.conditions.equals],
-      [PivotFilterKind.DateOlderThan, en.workbookObjects.pivotFilterPanel.conditions.before],
-      [PivotFilterKind.DateNewerThan, en.workbookObjects.pivotFilterPanel.conditions.after],
-      [PivotFilterKind.DateBetween, en.workbookObjects.pivotFilterPanel.conditions.between],
-      ...PIVOT_FILTER_PERIODS.map(([kind, key]) => [kind, en.datePeriods[key]]),
+    const c = en.workbookObjects.pivotFilterPanel.conditions;
+    const items = [...byLabel().options].map((o) =>
+      o.disabled ? '-' : o.value === '' ? 'Choose One' : o.textContent,
+    );
+    const p = en.datePeriods;
+    expect(items).toEqual([
+      'Choose One',
+      '-',
+      c.equals,
+      '-',
+      c.before,
+      c.after,
+      c.between,
+      '-',
+      p.tomorrow,
+      p.today,
+      p.yesterday,
+      '-',
+      p.nextWeek,
+      p.thisWeek,
+      p.lastWeek,
+      '-',
+      p.nextMonth,
+      p.thisMonth,
+      p.lastMonth,
+      '-',
+      p.nextQuarter,
+      p.thisQuarter,
+      p.lastQuarter,
+      '-',
+      p.nextYear,
+      p.thisYear,
+      p.lastYear,
+      '-',
+      p.yearToDate,
+      '-',
+      c.allDatesInPeriod,
     ]);
     expect(
       [...byLabel().options].some((o) => o.value === String(PivotFilterKind.LabelContains)),
     ).toBe(false);
+  });
+
+  it('picks All Dates in the Period from a quarter and month pop-up in the dialog', async () => {
+    const { wb } = await setup('Date');
+    choose(byLabel(), 'allDatesInPeriod');
+    const period = dialog()?.querySelector<HTMLSelectElement>(
+      'select[data-pivot-filter-period="true"]',
+    );
+    if (!period) throw new Error('missing period pop-up');
+    expect([...period.options].map((o) => o.textContent)).toEqual(
+      PIVOT_ALL_DATES_PERIODS.map(([, key]) => en.datePeriods[key]),
+    );
+    expect(period.value).toBe(String(PivotFilterKind.Q1));
+    choose(period, String(PivotFilterKind.M5));
+    dialog()?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await settle();
+    expect(pivotFieldFilterModel(wb, 0, 0, 0)?.condition).toMatchObject({
+      fieldName: 'Date',
+      kind: PivotFilterKind.M5,
+    });
+    choose(byLabel(), 'allDatesInPeriod');
+    // Reopened on the stored month.
+    expect(
+      dialog()?.querySelector<HTMLSelectElement>('select[data-pivot-filter-period="true"]')?.value,
+    ).toBe(String(PivotFilterKind.M5));
   });
 
   it('keeps the label list for a text field', async () => {

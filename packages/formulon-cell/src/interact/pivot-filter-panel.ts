@@ -27,7 +27,12 @@ import {
 } from './pivot-field-settings.js';
 import { commitPivotChange, type PivotCommitContext } from './pivot-field-settings-dialog-apply.js';
 import { showPivotFilterDialog } from './pivot-filter-dialog.js';
-import { PIVOT_FILTER_PERIODS, pivotFilterOperand } from './pivot-filter-kinds.js';
+import {
+  isPivotAllDatesPeriod,
+  PIVOT_ALL_DATES_PERIODS,
+  PIVOT_LISTED_PERIODS,
+  pivotFilterOperand,
+} from './pivot-filter-kinds.js';
 
 /**
  * The filter panel a report's drop-down button opens: sort buttons, label and
@@ -80,21 +85,24 @@ const VALUE_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind] | nul
   ['lessOrEqual', PivotFilterKind.ValueLessThanOrEqual],
   null,
   ['between', PivotFilterKind.ValueBetween],
-  ['notBetween', PivotFilterKind.ValueNotBetween],
   null,
   ['top10', PivotFilterKind.ValueTopCount],
   ['bottom10', PivotFilterKind.ValueBottomCount],
 ];
 
-/** A date field's label filters: the desktop's Date Filters comparisons. */
+/** A date field's label filters: the column filter's date comparisons. */
 const DATE_CONDITIONS: readonly (readonly [ConditionKey, PivotFilterKind] | null)[] = [
   null,
   ['equals', PivotFilterKind.DateEqual],
+  null,
   ['before', PivotFilterKind.DateOlderThan],
   ['after', PivotFilterKind.DateNewerThan],
   ['between', PivotFilterKind.DateBetween],
 ];
 const open = new WeakMap<HTMLElement, () => void>();
+
+/** The date menu's entry whose quarter or month the filter dialog picks. */
+const ALL_DATES_IN_PERIOD = 'allDatesInPeriod';
 
 /** The report field the cell at `addr` opens: the field behind a drop-down
  *  button, else the row, column or filter field of a label cell. */
@@ -207,7 +215,7 @@ export function openPivotFieldFilter(
   );
 
   const conditionSelect = (
-    list: readonly (readonly [string, PivotFilterKind] | null)[],
+    list: readonly (readonly [string, PivotFilterKind | typeof ALL_DATES_IN_PERIOD] | null)[],
     which: 'label' | 'value',
   ): HTMLSelectElement => {
     const s = select();
@@ -231,9 +239,15 @@ export function openPivotFieldFilter(
       s.value = '';
       selectHandles.get(s)?.sync();
       if (!picked || !model) return;
-      const kind = Number(picked) as PivotFilterKind;
+      const held = model.condition?.kind;
+      const kind =
+        picked === ALL_DATES_IN_PERIOD
+          ? held !== undefined && isPivotAllDatesPeriod(held)
+            ? held
+            : PivotFilterKind.Q1
+          : (Number(picked) as PivotFilterKind);
       // A relative period takes no operand and applies at once.
-      if (pivotFilterOperand(kind) === 'none') {
+      if (pivotFilterOperand(kind) === 'none' && picked !== ALL_DATES_IN_PERIOD) {
         const spec = { axis: model.axis ?? PivotAxis.Row, fieldName: model.sourceName, kind };
         commit(() => setPivotFieldCondition(wb, sheet, pivotIndex, fieldIndex, spec));
         return;
@@ -247,6 +261,13 @@ export function openPivotFieldFilter(
         okLabel: strings.pageSetup.ok,
         cancelLabel: strings.pageSetup.cancel,
         dataFields: model.dataFields,
+        ...(picked === ALL_DATES_IN_PERIOD
+          ? {
+              periods: PIVOT_ALL_DATES_PERIODS.map(
+                ([period, key]) => [period, strings.datePeriods[key]] as const,
+              ),
+            }
+          : {}),
         mac: isMacHost(ctx.host),
       }).then((condition) => {
         if (!condition || !model) return;
@@ -266,10 +287,12 @@ export function openPivotFieldFilter(
     list.map((entry) => (entry ? ([t.conditions[entry[0]], entry[1]] as const) : null));
   const dateConditions = () => [
     ...labeled(DATE_CONDITIONS),
-    ...PIVOT_FILTER_PERIODS.flatMap(([kind, key], index) => [
+    ...PIVOT_LISTED_PERIODS.flatMap(([kind, key], index) => [
       ...(DATE_PERIOD_GROUP_STARTS.has(index) ? [null] : []),
       [strings.datePeriods[key], kind] as const,
     ]),
+    null,
+    [t.conditions.allDatesInPeriod, ALL_DATES_IN_PERIOD] as const,
   ];
 
   const search = doc.createElement('input');

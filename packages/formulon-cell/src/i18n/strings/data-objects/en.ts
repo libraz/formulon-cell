@@ -235,6 +235,7 @@ export const dataObjectsEn: DataObjectsStrings = {
         bottom10: 'Bottom 10',
         before: 'Before',
         after: 'After',
+        allDatesInPeriod: 'All Dates in the Period',
       },
     },
     pivotFieldSearch: 'Search fields',

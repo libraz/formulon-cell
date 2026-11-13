@@ -231,7 +231,8 @@ export interface DataObjectsStrings {
         | 'top10'
         | 'bottom10'
         | 'before'
-        | 'after',
+        | 'after'
+        | 'allDatesInPeriod',
         string
       >;
     };
