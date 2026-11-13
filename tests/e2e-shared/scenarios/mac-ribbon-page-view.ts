@@ -69,8 +69,19 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
   await expect.poll(async () => (await read()).shown).toBeNull();
   await showView();
   await expect.poll(read).toMatchObject({ shown: id, freezeRows: 0 });
-  await sp.clickRibbon('mac.view.sheetViewDelete');
-  await expect.poll(async () => (await read()).views.length).toBe(0);
+  // Sheet View Options deletes the selected view after a confirmation, and deleting the shown
+  // view returns to Default.
+  await sp.clickRibbon('mac.view.sheetViewOptions');
+  const options = page.locator('.fc-sheetviewopts');
+  await expect(options).toBeVisible();
+  await options.locator(`[role="option"][data-view-id="${id}"]`).click();
+  await options.getByRole('button', { name: 'Delete', exact: true }).click();
+  const confirm = page.locator('.fc-tb__dlg').filter({ hasText: 'Delete this sheet view?' });
+  await confirm.locator('.fc-fmtdlg__btn--primary').click();
+  await expect.poll(read).toMatchObject({ views: [], shown: null });
+  await expect(options.locator('[role="option"]')).toHaveCount(1);
+  await options.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(options).toBeHidden();
   await page.locator('.fc-host').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(async () => (await read()).views.length).toBe(1);
