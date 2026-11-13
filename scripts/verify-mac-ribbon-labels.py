@@ -198,6 +198,11 @@ class Surface:
         self.direct = direct
         model_src = (MAC / 'model.ts').read_text(encoding='utf-8')
         self.group_titles = set(re.findall(r"group\(\s*\{[^}]*\ben: '([^']+)'", model_src))
+        # The shared Home tab's groups are keyed by position; chart tab groups name their key last.
+        home = re.search(r"MAC_HOME_GROUP_KEYS = \[(.*?)\]", model_src, re.S)
+        self.group_titles |= set(re.findall(r"'([^']+)'", home.group(1))) if home else set()
+        objects = (MAC / 'object-tabs.ts').read_text(encoding='utf-8')
+        self.group_titles |= set(re.findall(r"\],\s*'([^']+)',?\s*\)", objects))
 
     def key_of(self, cid):
         """The label key a command id renders with (labels.ts labelFor), or None."""

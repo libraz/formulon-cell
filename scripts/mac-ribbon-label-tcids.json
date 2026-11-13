@@ -14,10 +14,22 @@
       "match": "en+ja",
       "evidence": "bundle has U+002D; drawn with U+2011 by the render path"
     },
+    "groups:Alignment": {
+      "tcid": 11608,
+      "source": "tbbtn",
+      "name": "ChunkEnterDataAlignment",
+      "match": "en+ja"
+    },
     "groups:Analysis": {
       "tcid": 32315,
       "source": "tbbtn",
       "name": "ChunkSolver",
+      "match": "en+ja"
+    },
+    "groups:Arrange": {
+      "tcid": 11581,
+      "source": "tbbtn",
+      "name": "ChunkPosition",
       "match": "en+ja"
     },
     "groups:Calculation": {
@@ -26,10 +38,40 @@
       "name": "ChunkCalculation",
       "match": "en+ja"
     },
+    "groups:Cells": {
+      "tcid": 11609,
+      "source": "tbbtn",
+      "name": "ChunkEnterDataCells",
+      "match": "en+ja"
+    },
+    "groups:Changes": {
+      "tcid": 34385,
+      "source": "tbbtn",
+      "name": "ChunkLineage",
+      "match": "en+ja"
+    },
+    "groups:Chart Layouts": {
+      "tcid": 11602,
+      "source": "tbbtn",
+      "name": "ChunkChartChartStructures",
+      "match": "en+ja"
+    },
+    "groups:Chart Styles": {
+      "tcid": 11603,
+      "source": "tbbtn",
+      "name": "ChunkChartChartStyles",
+      "match": "en+ja"
+    },
     "groups:Charts": {
       "tcid": 15533,
       "source": "tbbtn",
       "name": "ChunkExcelChartGallery",
+      "match": "en+ja"
+    },
+    "groups:Clipboard": {
+      "tcid": 12597,
+      "source": "tbbtn",
+      "name": "ChunkClipboard",
       "match": "en+ja"
     },
     "groups:Comments": {
@@ -42,6 +84,18 @@
       "tcid": 34609,
       "source": "tbbtn",
       "name": "ChunkCellControls",
+      "match": "en+ja"
+    },
+    "groups:Current Selection": {
+      "tcid": 15046,
+      "source": "tbbtn",
+      "name": "ChunkChartCurrentSelection",
+      "match": "en+ja"
+    },
+    "groups:Data": {
+      "tcid": 13215,
+      "source": "tbbtn",
+      "name": "ChunkChartData",
       "match": "en+ja"
     },
     "groups:Data Tools": {
@@ -62,16 +116,34 @@
       "name": "ChunkFormulaNamedCells",
       "match": "en+ja"
     },
+    "groups:Editing": {
+      "tcid": 12831,
+      "source": "tbbtn",
+      "name": "ChunkEditingTools",
+      "match": "en+ja"
+    },
     "groups:Filters": {
       "tcid": 18879,
       "source": "tbbtn",
       "name": "ChunkSlicerInsert",
       "match": "en+ja"
     },
+    "groups:Font": {
+      "tcid": 11543,
+      "source": "tbbtn",
+      "name": "ChunkFont",
+      "match": "en+ja"
+    },
     "groups:Forecast": {
       "tcid": 26537,
       "source": "tbbtn",
       "name": "ChunkTimeSeriesForecasting",
+      "match": "en+ja"
+    },
+    "groups:Format": {
+      "tcid": 15154,
+      "source": "tbbtn",
+      "name": "ChunkFormat",
       "match": "en+ja"
     },
     "groups:Forms": {
@@ -111,6 +183,12 @@
       "name": "ChunkInking",
       "match": "en+ja"
     },
+    "groups:Insert Shapes": {
+      "tcid": 24378,
+      "source": "tbbtn",
+      "name": "ChunkShapesChart",
+      "match": "en+ja"
+    },
     "groups:Language": {
       "tcid": 19382,
       "source": "tbbtn",
@@ -123,16 +201,46 @@
       "name": "ChunkLinks",
       "match": "en+ja"
     },
+    "groups:Location": {
+      "tcid": 13216,
+      "source": "tbbtn",
+      "name": "ChunkChartLocation",
+      "match": "en+ja"
+    },
     "groups:Macros": {
       "tcid": 16104,
       "source": "tbbtn",
       "name": "ChunkMacros",
       "match": "en+ja"
     },
+    "groups:Mode": {
+      "tcid": 33718,
+      "source": "tbbtn",
+      "name": "ChunkInkModes",
+      "match": "en+ja"
+    },
     "groups:Notes": {
       "tcid": 33479,
       "source": "tbbtn",
       "name": "ChunkCommentsLegacy",
+      "match": "en+ja"
+    },
+    "groups:Number": {
+      "tcid": 11607,
+      "source": "tbbtn",
+      "name": "ChunkEnterDataNumber",
+      "match": "en+ja"
+    },
+    "groups:Office Scripts": {
+      "tcid": 34629,
+      "source": "tbbtn",
+      "name": "ChunkScriptingTools",
+      "match": "en+ja"
+    },
+    "groups:Office Scripts Gallery": {
+      "tcid": 34523,
+      "source": "tbbtn",
+      "name": "ChunkOfficeScripts",
       "match": "en+ja"
     },
     "groups:Outline": {
@@ -165,16 +273,28 @@
       "name": "ChunkProtect",
       "match": "en+ja"
     },
-    "groups:Python": {
-      "tcid": 34691,
+    "groups:Python (Preview)": {
+      "tcid": 46092,
       "source": "tbbtn",
-      "name": "ChunkPython",
+      "name": "ChunkPythonConsumerPreview",
       "match": "en+ja"
     },
     "groups:Scale to Fit": {
       "tcid": 11617,
       "source": "tbbtn",
       "name": "ChunkPageLayoutScaleToFit",
+      "match": "en+ja"
+    },
+    "groups:Shape Styles": {
+      "tcid": 34766,
+      "source": "tbbtn",
+      "name": "ChunkChartShapeStyles",
+      "match": "en+ja"
+    },
+    "groups:Sheet Options": {
+      "tcid": 11618,
+      "source": "tbbtn",
+      "name": "ChunkPageLayoutSheetOptions",
       "match": "en+ja"
     },
     "groups:Sheet Views": {
@@ -189,10 +309,28 @@
       "name": "ChunkViewShowHide",
       "match": "en+ja"
     },
+    "groups:Size": {
+      "tcid": 11877,
+      "source": "tbbtn",
+      "name": "ChunkSize",
+      "match": "en+ja"
+    },
+    "groups:Sort & Filter": {
+      "tcid": 11610,
+      "source": "tbbtn",
+      "name": "ChunkEnterDataDataTools",
+      "match": "en+ja"
+    },
     "groups:Sparklines": {
       "tcid": 16702,
       "source": "tbbtn",
       "name": "ChunkInsertSparklines",
+      "match": "en+ja"
+    },
+    "groups:Styles": {
+      "tcid": 11545,
+      "source": "tbbtn",
+      "name": "ChunkQuickFormatting",
       "match": "en+ja"
     },
     "groups:Symbols": {
@@ -207,6 +345,12 @@
       "name": "ChunkInsertTables",
       "match": "en+ja"
     },
+    "groups:Text": {
+      "tcid": 15291,
+      "source": "tbbtn",
+      "name": "ChunkInsertText",
+      "match": "en+ja"
+    },
     "groups:Themes": {
       "tcid": 12497,
       "source": "tbbtn",
@@ -217,6 +361,24 @@
       "tcid": 17500,
       "source": "tbbtn",
       "name": "JotChunkWrite",
+      "match": "en+ja"
+    },
+    "groups:Type": {
+      "tcid": 13217,
+      "source": "tbbtn",
+      "name": "ChunkChartType",
+      "match": "en+ja"
+    },
+    "groups:Window": {
+      "tcid": 15641,
+      "source": "tbbtn",
+      "name": "ChunkWindow",
+      "match": "en+ja"
+    },
+    "groups:WordArt Styles": {
+      "tcid": 14834,
+      "source": "tbbtn",
+      "name": "ChunkTextStyles",
       "match": "en+ja"
     },
     "groups:Workbook Views": {
@@ -3357,11 +3519,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "groups:Changes": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "groups:Draw": {
       "status": "unresolved",
       "tcid": null,
@@ -3388,26 +3545,6 @@
       "reason": "no node with matching ja label"
     },
     "groups:Read-Only": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "groups:Sheet Options": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "groups:Sort & Filter": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "groups:Text": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "groups:Window": {
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
@@ -3963,40 +4100,67 @@
   "consumers": [
     "groups:Accessibility",
     "groups:Add-ins",
+    "groups:Alignment",
     "groups:Analysis",
+    "groups:Arrange",
     "groups:Calculation",
+    "groups:Cells",
+    "groups:Changes",
+    "groups:Chart Layouts",
+    "groups:Chart Styles",
     "groups:Charts",
+    "groups:Clipboard",
     "groups:Comments",
     "groups:Controls",
+    "groups:Current Selection",
+    "groups:Data",
     "groups:Data Tools",
     "groups:Data Types",
     "groups:Defined Names",
+    "groups:Editing",
     "groups:Filters",
+    "groups:Font",
     "groups:Forecast",
+    "groups:Format",
     "groups:Forms",
     "groups:Formula Auditing",
     "groups:Function Library",
     "groups:Get & Transform Data",
     "groups:Illustrations",
     "groups:Ink",
+    "groups:Insert Shapes",
     "groups:Language",
     "groups:Links",
+    "groups:Location",
     "groups:Macros",
+    "groups:Mode",
     "groups:Notes",
+    "groups:Number",
+    "groups:Office Scripts",
+    "groups:Office Scripts Gallery",
     "groups:Outline",
     "groups:Page Setup",
     "groups:Pens",
     "groups:Proofing",
     "groups:Protect",
-    "groups:Python",
+    "groups:Python (Preview)",
     "groups:Scale to Fit",
+    "groups:Shape Styles",
+    "groups:Sheet Options",
     "groups:Sheet Views",
     "groups:Show",
+    "groups:Size",
+    "groups:Sort & Filter",
     "groups:Sparklines",
+    "groups:Styles",
     "groups:Symbols",
     "groups:Tables",
+    "groups:Text",
     "groups:Themes",
     "groups:Tools",
+    "groups:Type",
+    "groups:Window",
+    "groups:WordArt Styles",
     "groups:Workbook Views",
     "groups:Zoom",
     "labels:accessibility",

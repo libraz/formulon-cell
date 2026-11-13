@@ -1,0 +1,514 @@
+{
+  "groups": {
+    "home": [
+      "ChunkClipboard",
+      "ChunkFont",
+      "ChunkEnterDataAlignment",
+      "ChunkEnterDataNumber",
+      "ChunkQuickFormatting",
+      "ChunkEnterDataCells",
+      "ChunkEditingTools",
+      "ChunkOfficeExtensionsAddinFlyout"
+    ],
+    "insert": [
+      "ChunkInsertTables",
+      "MsFormSplitButton",
+      "ChunkDataFromPicture",
+      "ChunkIllustrations",
+      "ChunkCellControls",
+      "ChunkExcelChartGallery",
+      "ChunkInsertSparklines",
+      "ChunkSlicerInsert",
+      "ChunkLinks",
+      "ChunkThreadedComments",
+      "ChunkInsertText",
+      "ChunkSymbols"
+    ],
+    "draw": ["JotChunkWrite", "JotChunkPens", "ChunkInkModes"],
+    "pageLayout": [
+      "ChunkXLTheme",
+      "ChunkPageSetup",
+      "ChunkPageLayoutScaleToFit",
+      "ChunkPageLayoutSheetOptions"
+    ],
+    "formulas": [
+      "ChunkFormulaInsertFunction",
+      "ChunkPythonConsumerPreview",
+      "ChunkFormulaNamedCells",
+      "ChunkFormulaFormulaAuditing",
+      "ChunkCalculation"
+    ],
+    "data": [
+      "ChunkPowerQueryGetTransformData",
+      "ChunkDataConnections",
+      "ChunkConvertToLinkedEntity",
+      "ChunkEnterDataDataTools",
+      "ChunkDataDataTools",
+      "ChunkTimeSeriesForecasting",
+      "ChunkDataDataOutline",
+      "ChunkSolver"
+    ],
+    "review": [
+      "ChunkProofing",
+      "ChunkAccessibility",
+      "ChunkLanguage",
+      "ChunkLineage",
+      "ChunkThreadedComments",
+      "ChunkCommentsLegacy",
+      "ChunkProofCommentChanges",
+      "ChunkProtect",
+      "ChunkInking"
+    ],
+    "view": [
+      "ChunkNamedSheetView",
+      "ChunkWorkbookViews",
+      "ChunkViewShowHide",
+      "ChunkZoom",
+      "ChunkWindow",
+      "ChunkMacros"
+    ],
+    "automate": ["ChunkScriptingTools", "ChunkOfficeScripts"],
+    "chartDesign": [
+      "ChunkChartChartStructures",
+      "ChunkChartChartStyles",
+      "ChunkChartData",
+      "ChunkChartType",
+      "ChunkChartLocation"
+    ],
+    "chartFormat": [
+      "ChunkChartCurrentSelection",
+      "ChunkShapesChart",
+      "ChunkChartShapeStyles",
+      "ChunkTextStyles",
+      "ChunkPosition",
+      "ChunkSize",
+      "ChunkFormat"
+    ]
+  },
+  "titles": {
+    "en": {
+      "home": ["Clipboard", "Font", "Alignment", "Number", "Styles", "Cells", "Editing", "Add-ins"],
+      "insert": [
+        "Tables",
+        "Forms",
+        "Data from Picture",
+        "Illustrations",
+        "Controls",
+        "Charts",
+        "Sparklines",
+        "Filters",
+        "Links",
+        "Comments",
+        "Text",
+        "Symbols"
+      ],
+      "draw": ["Tools", "Pens", "Mode"],
+      "pageLayout": ["Themes", "Page Setup", "Scale to Fit", "Sheet Options"],
+      "formulas": [
+        "Function Library",
+        "Python (Preview)",
+        "Defined Names",
+        "Formula Auditing",
+        "Calculation"
+      ],
+      "data": [
+        "Get & Transform Data",
+        "Connections",
+        "Data Types",
+        "Sort & Filter",
+        "Data Tools",
+        "Forecast",
+        "Outline",
+        "Analysis"
+      ],
+      "review": [
+        "Proofing",
+        "Accessibility",
+        "Language",
+        "Changes",
+        "Comments",
+        "Notes",
+        "Changes",
+        "Protect",
+        "Ink"
+      ],
+      "view": ["Sheet View", "Workbook Views", "Show", "Zoom", "Window", "Macros"],
+      "automate": ["Office Scripts", "Office Scripts Gallery"],
+      "chartDesign": ["Chart Layouts", "Chart Styles", "Data", "Type", "Location"],
+      "chartFormat": [
+        "Current Selection",
+        "Insert Shapes",
+        "Shape Styles",
+        "WordArt Styles",
+        "Arrange",
+        "Size",
+        "Format"
+      ]
+    },
+    "ja": {
+      "home": [
+        "クリップボード",
+        "フォント",
+        "配置",
+        "数値",
+        "スタイル",
+        "セル",
+        "編集",
+        "アドイン"
+      ],
+      "insert": [
+        "テーブル",
+        "フォーム",
+        "画像からのデータ",
+        "図",
+        "コントロール",
+        "グラフ",
+        "スパークライン",
+        "フィルター",
+        "リンク",
+        "コメント",
+        "テキスト",
+        "記号と特殊文字"
+      ],
+      "draw": ["ツール", "ペン", "モード"],
+      "pageLayout": ["テーマ", "ページ設定", "拡大縮小印刷", "シート オプション"],
+      "formulas": [
+        "関数ライブラリ",
+        "Python (プレビュー)",
+        "定義された名前",
+        "ワークシート分析",
+        "計算方法"
+      ],
+      "data": [
+        "データの取得と変換",
+        "接続",
+        "データの種類",
+        "並べ替え/フィルター",
+        "データ ツール",
+        "予測",
+        "アウトライン",
+        "分析"
+      ],
+      "review": [
+        "文章校正",
+        "アクセシビリティ",
+        "言語",
+        "変更内容",
+        "コメント",
+        "メモ",
+        "変更箇所",
+        "保護",
+        "インク"
+      ],
+      "view": ["シート ビュー", "ブックの表示", "表示", "ズーム", "ウインドウ", "マクロ"],
+      "automate": ["Office スクリプト", "Office スクリプト ギャラリー"],
+      "chartDesign": ["グラフのレイアウト", "グラフのスタイル", "データ", "種類", "場所"],
+      "chartFormat": [
+        "現在の選択項目",
+        "図形の挿入",
+        "図形のスタイル",
+        "ワードアート スタイル",
+        "整列",
+        "サイズ",
+        "書式"
+      ]
+    },
+    "de": {
+      "home": [
+        "Zwischenablage",
+        "Schriftart",
+        "Ausrichtung",
+        "Zahlen",
+        "Formatvorlagen",
+        "Zellen",
+        "Bearbeiten",
+        "Add-Ins"
+      ],
+      "insert": [
+        "Tabellen",
+        "Formulare",
+        "Daten aus Bild",
+        "Illustrationen",
+        "Steuerelemente",
+        "Diagramme",
+        "Sparklines",
+        "Filter",
+        "Verknüpfungen",
+        "Kommentare",
+        "Text",
+        "Symbole"
+      ],
+      "draw": ["Extras", "Stifte", "Modus"],
+      "pageLayout": ["Designs", "Seite einrichten", "An Format anpassen", "Blattoptionen"],
+      "formulas": [
+        "Funktionsbibliothek",
+        "Python (Vorschau)",
+        "Definierte Namen",
+        "Formelüberwachung",
+        "Berechnung"
+      ],
+      "data": [
+        "Daten abrufen und transformieren",
+        "Verbindungen",
+        "Datentypen",
+        "Sortieren und Filtern",
+        "Datentools",
+        "Prognose",
+        "Gliederung",
+        "Analyse"
+      ],
+      "review": [
+        "Dokumentprüfung",
+        "Barrierefreiheit",
+        "Sprache",
+        "Änderungen",
+        "Kommentare",
+        "Notizen",
+        "Änderungen",
+        "Schützen",
+        "Freihand"
+      ],
+      "view": [
+        "Tabellenansicht",
+        "Arbeitsmappenansichten",
+        "Anzeigen",
+        "Zoom",
+        "Fenster",
+        "Makros"
+      ],
+      "automate": ["Office-Skripts", "Office-Skriptkatalog"],
+      "chartDesign": ["Diagrammlayouts", "Diagrammformatvorlagen", "Daten", "Typ", "Ort"],
+      "chartFormat": [
+        "Aktuelle Auswahl",
+        "Formen einfügen",
+        "Formenarten",
+        "WordArt-Formatvorlagen",
+        "Anordnen",
+        "Größe",
+        "Format"
+      ]
+    },
+    "fr": {
+      "home": [
+        "Presse-papiers",
+        "Police",
+        "Alignement",
+        "Numéro",
+        "Styles",
+        "Cellules",
+        "Édition",
+        "Compléments"
+      ],
+      "insert": [
+        "Tableaux",
+        "Forms",
+        "Données de l’image",
+        "Illustrations",
+        "Contrôles",
+        "Graphiques",
+        "Graphiques sparkline",
+        "Filtres",
+        "Liens",
+        "Commentaires",
+        "Texte",
+        "Symboles"
+      ],
+      "draw": ["Outils", "Stylets", "Mode"],
+      "pageLayout": ["Thèmes", "Mise en page", "Mettre à l’échelle", "Options de feuille"],
+      "formulas": [
+        "Bibliothèque de fonctions",
+        "Python (préversion)",
+        "Noms définis",
+        "Audit de formules",
+        "Calcul"
+      ],
+      "data": [
+        "Récupérer et transformer des données",
+        "Connexions",
+        "Types de données",
+        "Trier et filtrer",
+        "Outils de données",
+        "Prévision",
+        "Plan",
+        "Analyse"
+      ],
+      "review": [
+        "Vérification",
+        "Accessibilité",
+        "Langue",
+        "Modifications",
+        "Commentaires",
+        "Notes",
+        "Modifications",
+        "Protéger",
+        "Entrée manuscrite"
+      ],
+      "view": [
+        "Feuille personnelle",
+        "Affichages classeur",
+        "Afficher",
+        "Zoom",
+        "Fenêtre",
+        "Macros"
+      ],
+      "automate": ["Scripts Office", "Galerie de scripts Office"],
+      "chartDesign": [
+        "Dispositions du graphique",
+        "Styles du graphique",
+        "Données",
+        "Type",
+        "Emplacement"
+      ],
+      "chartFormat": [
+        "Sélection actuelle",
+        "Insérer des formes",
+        "Styles de forme",
+        "Styles WordArt",
+        "Réorganiser",
+        "Taille",
+        "Mise en forme"
+      ]
+    },
+    "zh": {
+      "home": ["剪贴板", "字体", "对齐方式", "编号", "样式", "单元格", "编辑", "加载项"],
+      "insert": [
+        "表格",
+        "Forms",
+        "来自图片的数据",
+        "插图",
+        "控件",
+        "图表",
+        "迷你图",
+        "筛选器",
+        "链接",
+        "批注",
+        "文本",
+        "符号"
+      ],
+      "draw": ["工具", "笔", "模式"],
+      "pageLayout": ["主题", "页面设置", "调整为合适大小", "工作表选项"],
+      "formulas": ["函数库", "Python (预览版)", "定义的名称", "公式审核", "计算"],
+      "data": [
+        "获取转换数据&",
+        "连接",
+        "数据类型",
+        "排序和筛选",
+        "数据工具",
+        "预测",
+        "分级显示",
+        "分析"
+      ],
+      "review": ["校对", "辅助功能", "语言", "更改", "批注", "注释", "更改", "保护", "墨迹"],
+      "view": ["工作表视图", "工作簿视图", "显示", "缩放", "窗口", "宏"],
+      "automate": ["Office 脚本", "Office 脚本库"],
+      "chartDesign": ["图表布局", "图表样式", "数据", "类型", "位置"],
+      "chartFormat": ["当前所选内容", "插入形状", "形状样式", "艺术字样式", "排列", "大小", "格式"]
+    },
+    "ko": {
+      "home": ["클립보드", "글꼴", "맞춤", "숫자", "스타일", "셀", "편집", "추가 기능"],
+      "insert": [
+        "표",
+        "양식",
+        "그림의 데이터",
+        "일러스트레이션",
+        "컨트롤",
+        "차트",
+        "스파크라인",
+        "필터",
+        "링크",
+        "메모",
+        "텍스트",
+        "기호"
+      ],
+      "draw": ["도구", "펜", "모드"],
+      "pageLayout": ["테마", "페이지 설정", "크기 조정", "시트 옵션"],
+      "formulas": ["함수 라이브러리", "Python(미리 보기)", "정의된 이름", "수식 분석", "계산"],
+      "data": [
+        "데이터 가져오기 및 변환",
+        "연결",
+        "데이터 형식",
+        "정렬 및 필터",
+        "데이터 도구",
+        "예측",
+        "개요",
+        "분석"
+      ],
+      "review": [
+        "언어 교정",
+        "접근성",
+        "언어",
+        "변경 내용",
+        "메모",
+        "메모",
+        "변경 내용",
+        "보호",
+        "잉크"
+      ],
+      "view": ["시트 보기", "통합 문서 보기", "표시", "확대/축소", "창", "매크로"],
+      "automate": ["Office 스크립트", "Office 스크립트 갤러리"],
+      "chartDesign": ["차트 레이아웃", "차트 스타일", "데이터", "유형", "위치"],
+      "chartFormat": [
+        "현재 선택 영역",
+        "도형 삽입",
+        "도형 스타일",
+        "WordArt 스타일",
+        "정렬",
+        "크기",
+        "서식"
+      ]
+    },
+    "th": {
+      "home": ["คลิปบอร์ด", "ฟอนต์", "การจัดแนว", "ตัวเลข", "สไตล์", "เซลล์", "การแก้ไข", "Add-in"],
+      "insert": [
+        "ตาราง",
+        "ฟอร์ม",
+        "ข้อมูลจากรูปภาพ",
+        "ภาพประกอบ",
+        "ตัวควบคุม",
+        "แผนภูมิ",
+        "เส้นแบบประกายไฟ",
+        "ตัวกรอง",
+        "ลิงก์",
+        "ข้อคิดเห็น",
+        "ข้อความ",
+        "สัญลักษณ์"
+      ],
+      "draw": ["เครื่องมือ", "ปากกา", "โหมด"],
+      "pageLayout": ["ธีม", "ตั้งค่าหน้ากระดาษ", "ปรับพอดี", "ตัวเลือกของแผ่นงาน"],
+      "formulas": ["ไลบรารีฟังก์ชัน", "Python (ตัวอย่าง)", "ชื่อที่กำหนด", "ตรวจสอบสูตร", "การคำนวณ"],
+      "data": [
+        "รับข้อมูลแปลง & ",
+        "การเชื่อมต่อ",
+        "ชนิดข้อมูล",
+        "เรียงลำดับ & ตัวกรอง",
+        "เครื่องมือข้อมูล",
+        "การพยากรณ์",
+        "เค้าร่าง",
+        "วิเคราะห์"
+      ],
+      "review": [
+        "การพิสูจน์อักษร",
+        "การช่วยสำหรับการเข้าถึง",
+        "ภาษา",
+        "การเปลี่ยนแปลง",
+        "ข้อคิดเห็น",
+        "โน้ต",
+        "การเปลี่ยนแปลง",
+        "ป้องกัน",
+        "หมึก"
+      ],
+      "view": ["มุมมองแผ่นงาน", "มุมมองเวิร์กบุ๊ก", "แสดง", "ย่อ/ขยาย", "หน้าต่าง", "แมโคร"],
+      "automate": ["สคริปต์ Office", "แกลเลอรีสคริปต์ Office"],
+      "chartDesign": ["เค้าโครงของแผนภูมิ", "สไตล์แผนภูมิ", "ข้อมูล", "ชนิด", "ตำแหน่งที่ตั้ง"],
+      "chartFormat": [
+        "สิ่งที่เลือกปัจจุบัน",
+        "แทรกรูปร่าง",
+        "สไตล์รูปร่าง",
+        "สไตล์อักษรศิลป์",
+        "จัดเรียง",
+        "ขนาด",
+        "รูปแบบ"
+      ]
+    }
+  }
+}

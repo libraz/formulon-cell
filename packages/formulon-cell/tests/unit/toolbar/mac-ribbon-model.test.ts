@@ -638,11 +638,15 @@ describe('Mac Excel ribbon profile', () => {
 
     const automate = model.find((tab) => tab.id === 'automate');
     expect(
-      automate?.groups.find((group) => group.title === 'Automation')?.commands.map((c) => c.id),
+      automate?.groups.find((group) => group.title === 'Office Scripts')?.commands.map((c) => c.id),
     ).toContain('mac.automate.gallery');
-    expect(automate?.groups.find((group) => group.title === 'Gallery')?.variant).toBe('gallery');
     expect(
-      automate?.groups.find((group) => group.title === 'Gallery')?.commands.map((c) => c.id),
+      automate?.groups.find((group) => group.title === 'Office Scripts Gallery')?.variant,
+    ).toBe('gallery');
+    expect(
+      automate?.groups
+        .find((group) => group.title === 'Office Scripts Gallery')
+        ?.commands.map((c) => c.id),
     ).toEqual([
       'mac.automate.allRowsColumns',
       'mac.automate.freezeSelection',

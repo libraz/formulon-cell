@@ -4,6 +4,7 @@ import type {
   RibbonTabModel,
   ToolbarLang,
 } from '../../ribbon-model.js';
+import { GROUP_LABELS } from './labels.js';
 import { MAC_OBJECT_TAB_DISABLED_COMMAND_IDS } from './object-tab-ids.js';
 
 /** Wording of the Mac table and chart tabs: Japanese is measured, other languages read as English. */
@@ -78,8 +79,9 @@ export const buildMacObjectTabs = (
     kind: opts.kind ?? 'wide',
     ...(MAC_OBJECT_TAB_DISABLED_COMMAND_IDS.includes(id) ? { disabled: true } : {}),
   });
-  const group = (commands: RibbonCommand[]): RibbonGroupModel => ({
-    title: '',
+  // The table tab's group titles are unmeasured, so its groups stay untitled.
+  const group = (commands: RibbonCommand[], title?: string): RibbonGroupModel => ({
+    title: title === undefined ? '' : (GROUP_LABELS[title]?.[lang] ?? title),
     commands,
     variant: 'compact',
   });
@@ -114,17 +116,23 @@ export const buildMacObjectTabs = (
       label: tabLabels.chartDesign,
       contextual: true,
       groups: [
-        group([
-          command('chartAddElement', 'addElement'),
-          command('chartQuickLayout', 'quickLayout'),
-        ]),
-        group([command('chartColors', 'changeColors'), command('chartQuickStyles', 'quickStyles')]),
-        group([
-          command('chartSwitchRowColumn', 'switchRowColumn'),
-          command('chartSelectData', 'selectData'),
-        ]),
-        group([command('chartChangeType', 'changeType')]),
-        group([command('chartMove', 'moveChart')]),
+        group(
+          [command('chartAddElement', 'addElement'), command('chartQuickLayout', 'quickLayout')],
+          'Chart Layouts',
+        ),
+        group(
+          [command('chartColors', 'changeColors'), command('chartQuickStyles', 'quickStyles')],
+          'Chart Styles',
+        ),
+        group(
+          [
+            command('chartSwitchRowColumn', 'switchRowColumn'),
+            command('chartSelectData', 'selectData'),
+          ],
+          'Data',
+        ),
+        group([command('chartChangeType', 'changeType')], 'Type'),
+        group([command('chartMove', 'moveChart')], 'Location'),
       ],
     },
     {
@@ -132,34 +140,46 @@ export const buildMacObjectTabs = (
       label: tabLabels.chartFormat,
       contextual: true,
       groups: [
-        group([
-          command('chartElementSelect', 'chartElement'),
-          command('chartResetStyle', 'resetStyle'),
-        ]),
-        group([command('chartShapes', 'shapes'), command('chartChangeShape', 'changeShape')]),
-        group([
-          command('chartShapeQuickStyles', 'quickStyles'),
-          command('chartShapeFill', 'shapeFill'),
-          command('chartShapeOutline', 'shapeOutline'),
-          command('chartShapeEffects', 'shapeEffects'),
-        ]),
-        group([
-          command('chartTextQuickStyles', 'quickStyles'),
-          command('chartTextFill', 'textFill'),
-          command('chartTextOutline', 'textOutline'),
-          command('chartTextEffects', 'textEffects'),
-        ]),
-        group([
-          command('objectBringForward', 'bringForward'),
-          command('objectSendBackward', 'sendBackward'),
-          command('objectSelectionPane', 'selectionPane'),
-          command('chartArrangeObjects', 'arrangeObjects'),
-          command('chartAlign', 'align'),
-          command('chartGroup', 'group'),
-          command('chartRotate', 'rotate'),
-        ]),
-        group([command('chartLockAspect', 'lockAspect')]),
-        group([command('chartFormatSelection', 'formatPane')]),
+        group(
+          [command('chartElementSelect', 'chartElement'), command('chartResetStyle', 'resetStyle')],
+          'Current Selection',
+        ),
+        group(
+          [command('chartShapes', 'shapes'), command('chartChangeShape', 'changeShape')],
+          'Insert Shapes',
+        ),
+        group(
+          [
+            command('chartShapeQuickStyles', 'quickStyles'),
+            command('chartShapeFill', 'shapeFill'),
+            command('chartShapeOutline', 'shapeOutline'),
+            command('chartShapeEffects', 'shapeEffects'),
+          ],
+          'Shape Styles',
+        ),
+        group(
+          [
+            command('chartTextQuickStyles', 'quickStyles'),
+            command('chartTextFill', 'textFill'),
+            command('chartTextOutline', 'textOutline'),
+            command('chartTextEffects', 'textEffects'),
+          ],
+          'WordArt Styles',
+        ),
+        group(
+          [
+            command('objectBringForward', 'bringForward'),
+            command('objectSendBackward', 'sendBackward'),
+            command('objectSelectionPane', 'selectionPane'),
+            command('chartArrangeObjects', 'arrangeObjects'),
+            command('chartAlign', 'align'),
+            command('chartGroup', 'group'),
+            command('chartRotate', 'rotate'),
+          ],
+          'Arrange',
+        ),
+        group([command('chartLockAspect', 'lockAspect')], 'Size'),
+        group([command('chartFormatSelection', 'formatPane')], 'Format'),
       ],
     },
   ];

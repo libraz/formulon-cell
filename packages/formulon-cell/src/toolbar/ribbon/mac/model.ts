@@ -295,7 +295,7 @@ const drawTab = (): RibbonTabModel =>
       'pens',
     ),
     group(
-      { ja: '描画', en: 'Draw' },
+      { ja: 'モード', en: 'Mode' },
       [compactCommand('mac.draw.trackpad', t('trackpad'), 'trackpad')],
       'compact',
     ),
@@ -370,7 +370,7 @@ const formulasTab = (): RibbonTabModel =>
       'function-library',
     ),
     group(
-      { ja: 'Python', en: 'Python' },
+      { ja: 'Python (プレビュー)', en: 'Python (Preview)' },
       [
         disabledCommand('mac.formulas.python', t('python'), 'python', OFFICE_REQUIRED),
         disabledCommand('mac.formulas.reset', t('reset'), 'clear', OFFICE_REQUIRED),
@@ -698,7 +698,7 @@ const viewTab = (): RibbonTabModel =>
 const automateTab = (): RibbonTabModel =>
   macTab('automate', t('automate'), [
     group(
-      { ja: '自動化', en: 'Automation' },
+      { ja: 'Office スクリプト', en: 'Office Scripts' },
       [
         disabledCompactCommand('mac.automate.newScript', t('newScript'), 'script', OFFICE_REQUIRED),
         compactCommand('mac.automate.showScripts', t('showScripts'), 'script'),
@@ -707,7 +707,7 @@ const automateTab = (): RibbonTabModel =>
       'compact',
     ),
     group(
-      { ja: 'ギャラリー', en: 'Gallery' },
+      { ja: 'Office スクリプト ギャラリー', en: 'Office Scripts Gallery' },
       [
         compactCommand('mac.automate.allRowsColumns', t('allRowsColumns'), 'show'),
         compactCommand('mac.automate.freezeSelection', t('freezeSelection'), 'freeze'),
@@ -814,10 +814,22 @@ const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonComm
   return commandWithMacHomeLabel;
 };
 
+/** The shared Home tab's groups in order, keyed for their Mac group titles. */
+const MAC_HOME_GROUP_KEYS = [
+  'Clipboard',
+  'Font',
+  'Alignment',
+  'Number',
+  'Styles',
+  'Cells',
+  'Editing',
+] as const;
+
 const macHomeTab = (home: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => ({
   ...home,
   groups: [
-    ...home.groups.map((current) => {
+    ...home.groups.map((shared, index) => {
+      const current = { ...shared, title: MAC_HOME_GROUP_KEYS[index] ?? shared.title };
       if (current.variant === 'cells') {
         // Tile layout rather than the shared stacked-rows layout.
         return {
