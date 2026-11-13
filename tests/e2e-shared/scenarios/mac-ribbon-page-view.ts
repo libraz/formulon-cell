@@ -43,7 +43,9 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
   const id = view.id;
   await sp.clickRibbon('mac.view.freeze');
   // While panes are frozen the menu's first item is Unfreeze Panes.
-  const unfreeze = page.locator('#menu-mac-view-freeze [data-ribbon-command="mac.view.freeze"]');
+  const unfreeze = page.locator(
+    '#menu-mac-view-freeze [data-ribbon-command="mac.view.freeze.panes"]',
+  );
   await expect(unfreeze).toHaveText('Unfreeze Panes');
   await unfreeze.click();
   await expect.poll(async () => (await read()).freezeRows).toBe(0);
