@@ -435,12 +435,7 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.review.nextNote', label: 'Next Note' },
     { id: 'mac.review.showHideNote', label: 'Show/Hide Note' },
     { id: 'mac.review.showNotes', label: 'Show All Notes' },
-    {
-      id: 'mac.review.convertNotes',
-      label: 'Convert to Comments',
-      disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
-    },
+    { id: 'mac.review.convertNotes', label: 'Convert to Comments' },
   ]),
   'mac.view.show': menu([
     { id: 'mac.view.gridlines', label: 'Gridlines' },

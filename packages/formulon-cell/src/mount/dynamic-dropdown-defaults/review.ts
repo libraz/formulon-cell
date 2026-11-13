@@ -1,6 +1,7 @@
 import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import { isMacChrome } from '../../commands/chrome-platform.js';
 import { commentAt, listComments } from '../../commands/comment.js';
+import { convertNotesToThreads, workbookHasNotes } from '../../commands/convert-notes.js';
 import {
   allowedEditRangeHasPassword,
   allowedEditRangesForSheet,
@@ -25,9 +26,11 @@ import {
   areasFromSqref,
   sqrefFromAreas,
 } from '../../engine/protection-sync.js';
+import { isMacHost } from '../../extensions/ui-options.js';
 import { type DialogEntry, openCommentDialogFrom } from '../../interact/dialog-entry.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
+import { showConfirm } from '../../toolbar/dialogs/prompt.js';
 import {
   type AllowEditRangesManagerResult,
   showAllowEditRangeDialog,
@@ -354,6 +357,33 @@ const buildReviewCommentAction =
     });
     instance.host.focus();
   };
+
+/** Convert to Comments: asks first, then turns every note of the workbook into a thread as one
+ *  undo step. Does nothing when the workbook holds no note. */
+export async function convertNotesFrom(
+  instance: SpreadsheetInstance,
+  commandId: string,
+): Promise<void> {
+  if (!workbookHasNotes(instance.workbook)) return;
+  const t = instance.i18n.strings.ribbon;
+  const confirmed = await showConfirm({
+    title: t.convertNotes,
+    message: t.convertNotesMessage,
+    okLabel: t.convertNotesConfirm,
+    cancelLabel: instance.i18n.strings.pageSetup.cancel,
+    alert: isMacHost(instance.host),
+  });
+  if (confirmed) {
+    convertNotesToThreads({
+      store: instance.store,
+      workbook: instance.workbook,
+      history: instance.history,
+      origin: 'ribbon',
+      commandId,
+    });
+  }
+  instance.host.focus();
+}
 
 type ReviewDropdownDefaults = Pick<
   DynamicDropdownsCtx,

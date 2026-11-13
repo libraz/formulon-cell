@@ -313,6 +313,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   'mac.review.newComment': 'comment',
   'mac.review.deleteComment': 'comment',
   'mac.review.newNote': 'comment',
+  'mac.review.convertNotes': 'comment',
   'mac.review.protectSheet': 'protection',
   'mac.review.protectWorkbook': 'protection',
   'mac.view.sheetViewSave': 'sheet',

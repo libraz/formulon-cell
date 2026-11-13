@@ -189,6 +189,10 @@ export const ribbonTh: RibbonStrings = {
     notes: 'บันทึกย่อ',
     showHideNote: 'แสดง/ซ่อนบันทึกย่อ',
     showAllNotes: 'แสดงบันทึกย่อทั้งหมด',
+    convertNotes: 'แปลงเป็นข้อคิดเห็น',
+    convertNotesMessage:
+      'เมื่อแปลงบันทึกย่อเป็นข้อคิดเห็น รูปและการจัดรูปแบบใดๆ ภายในบันทึกย่อเหล่านั้นจะถูกเอาออก\n\nคุณต้องการแปลงบันทึกย่อทั้งหมดเป็นข้อคิดเห็นหรือไม่',
+    convertNotesConfirm: 'แปลงบันทึกย่อทั้งหมด',
     script: 'สคริปต์',
     recordActions: 'บันทึกการกระทำ',
     allScripts: 'สคริปต์ทั้งหมด',

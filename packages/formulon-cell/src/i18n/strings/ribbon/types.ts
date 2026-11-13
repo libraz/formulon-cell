@@ -198,6 +198,10 @@ export interface RibbonStrings {
     notes: string;
     showHideNote: string;
     showAllNotes: string;
+    convertNotes: string;
+    /** Convert to Comments asks this before turning every note into a thread. */
+    convertNotesMessage: string;
+    convertNotesConfirm: string;
     script: string;
     recordActions: string;
     allScripts: string;

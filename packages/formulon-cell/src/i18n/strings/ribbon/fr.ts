@@ -192,6 +192,10 @@ export const ribbonFr: RibbonStrings = {
     notes: 'Notes',
     showHideNote: 'Afficher/masquer la note',
     showAllNotes: 'Afficher toutes les notes',
+    convertNotes: 'Convertir en commentaires',
+    convertNotesMessage:
+      'Lors de la conversion des notes en commentaires, les images et la mise en forme associées seront supprimées.\n\nVoulez-vous convertir toutes les notes en commentaires ?',
+    convertNotesConfirm: 'Convertir toutes les notes',
     script: 'Script',
     recordActions: 'Enregistrer les actions',
     allScripts: 'Tous les scripts',

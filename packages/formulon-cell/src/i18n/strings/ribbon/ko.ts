@@ -191,6 +191,10 @@ export const ribbonKo: RibbonStrings = {
     notes: '메모',
     showHideNote: '메모 표시/숨기기',
     showAllNotes: '모든 메모 표시',
+    convertNotes: '댓글로 변환',
+    convertNotesMessage:
+      '노트를 댓글로 변환하면 내부의 모든 이미지와 서식이 제거됩니다.\n\n모든 노트를 댓글로 변환하시겠습니까?',
+    convertNotesConfirm: '모든 노트 변환',
     script: '스크립트',
     recordActions: '작업 기록',
     allScripts: '모든 스크립트',

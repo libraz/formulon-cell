@@ -192,6 +192,10 @@ export const ribbonJa: RibbonStrings = {
     notes: 'メモ',
     showHideNote: 'メモの表示/非表示',
     showAllNotes: 'すべてのメモを表示',
+    convertNotes: 'コメントに変換',
+    convertNotesMessage:
+      'メモをコメントに変換する場合、メモ内の画像と書式設定はすべて削除されます。\n\nすべてのメモをコメントに変換しますか?',
+    convertNotesConfirm: 'すべてのメモを変換',
     script: 'スクリプト',
     recordActions: 'アクションの記録',
     allScripts: 'すべてのスクリプト',

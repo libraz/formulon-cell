@@ -189,6 +189,10 @@ export const ribbonZh: RibbonStrings = {
     notes: '备注',
     showHideNote: '显示/隐藏备注',
     showAllNotes: '显示所有备注',
+    convertNotes: '转换为批注',
+    convertNotesMessage:
+      '将注释转换为批注时，所含的任何图像和格式都将被删除。\n\n是否要将所有注释转换为批注?',
+    convertNotesConfirm: '转换所有注释',
     script: '脚本',
     recordActions: '录制操作',
     allScripts: '所有脚本',

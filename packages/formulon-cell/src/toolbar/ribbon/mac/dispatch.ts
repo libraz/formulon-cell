@@ -26,6 +26,7 @@ import {
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
 import { createChartVariantFromSelection } from '../../../mount/dynamic-dropdown-defaults/insert.js';
+import { convertNotesFrom } from '../../../mount/dynamic-dropdown-defaults/review.js';
 import { showCreateTableDialog } from '../../../mount/dynamic-dropdown-defaults/styles.js';
 import { createDefaultDynamicDropdownsCtx } from '../../../mount/dynamic-dropdowns-defaults.js';
 import { selectAdjacentComment } from '../../../mount/toolbar-defaults.js';
@@ -211,6 +212,7 @@ const operations = [
   'mac.review.newNote',
   'mac.review.showHideNote',
   'mac.review.showNotes',
+  'mac.review.convertNotes',
   'mac.draw.toggle',
   'mac.draw.eraser',
   'mac.draw.penBlack',
@@ -535,6 +537,8 @@ export function dispatchMacRibbonCommand(
             })),
           ...reportDialogLabels(instance.i18n.strings),
         });
+      case 'mac.review.convertNotes':
+        return convertNotesFrom(instance, id);
       case 'mac.review.showHideNote':
       case 'mac.review.showNotes':
         return executeNoteVisibilityAction({

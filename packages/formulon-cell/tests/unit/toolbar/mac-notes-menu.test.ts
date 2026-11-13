@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { listThreadedComments } from '../../../src/commands/comment.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { mutators } from '../../../src/store/store.js';
+import type { ApplyRibbonCommandDeps } from '../../../src/toolbar/ribbon/apply-ribbon-command.js';
+import { dispatchMacRibbonCommand } from '../../../src/toolbar/ribbon/mac/dispatch.js';
 import { macRibbonLabelForCommand } from '../../../src/toolbar/ribbon/mac/labels.js';
 import { MAC_RIBBON_MENU_ITEMS } from '../../../src/toolbar/ribbon/mac/menu-manifest.js';
 import { projectMacRibbonState } from '../../../src/toolbar/ribbon/mac/state-projection.js';
@@ -24,7 +27,7 @@ describe('Mac Review > Notes menu', () => {
     sheet = undefined;
   });
 
-  it('lists the desktop rows in order, with Convert to Comments unavailable', () => {
+  it('lists the desktop rows in order', () => {
     const items = MAC_RIBBON_MENU_ITEMS['mac.review.notes'] ?? [];
     expect(items.map((item) => item.id)).toEqual([...NOTE_IDS]);
     expect(items.map((item) => macRibbonLabelForCommand(item.id, 'ja'))).toEqual([
@@ -35,7 +38,7 @@ describe('Mac Review > Notes menu', () => {
       'すべてのメモを表示',
       'コメントに変換',
     ]);
-    expect(items.find((item) => item.id === 'mac.review.convertNotes')?.disabled).toBe(true);
+    expect(items.some((item) => item.disabled)).toBe(false);
   });
 
   it('disables navigation and Show/Hide until the book has notes and the active cell has one', async () => {
@@ -115,5 +118,50 @@ describe('Mac Review > Notes menu', () => {
     mutators.setActive(instance.store, { sheet: 0, row: 3, col: 3 });
     projectMacRibbonState(host, instance);
     expect([button.textContent, button.hidden]).toEqual(['新しいメモ', false]);
+  });
+
+  it('converts every note to a thread after the compact alert, and only once a note exists', async () => {
+    sheet = await mountStubSheet({ workbook: await WorkbookHandle.createDefault(), locale: 'en' });
+    const { instance } = sheet;
+    instance.host.dataset.fcPlatform = 'mac';
+    const host = document.createElement('div');
+    const button = document.createElement('button');
+    button.dataset.ribbonCommand = 'mac.review.convertNotes';
+    host.appendChild(button);
+    projectMacRibbonState(host, instance);
+    expect(button.disabled).toBe(true);
+
+    instance.workbook.setCommentEntry(0, 1, 1, 'Ann', 'Check the total');
+    projectMacRibbonState(host, instance);
+    expect(button.disabled).toBe(false);
+
+    const deps = {
+      inst: instance,
+      runtime: { projectFormatToolbar: () => undefined, focusSheet: () => undefined },
+    } as unknown as ApplyRibbonCommandDeps;
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+    const answer = async (label: string) => {
+      dispatchMacRibbonCommand('mac.review.convertNotes', deps, () => false);
+      await settle();
+      const alert = document.querySelector<HTMLElement>('[role="alertdialog"]');
+      const text = [
+        alert?.querySelector<HTMLElement>('.fc-fmtdlg__header')?.hidden,
+        alert?.querySelector('.fc-tb__dlg__message')?.textContent,
+      ];
+      [...(alert?.querySelectorAll('button') ?? [])]
+        .find((candidate) => candidate.textContent === label)
+        ?.click();
+      await settle();
+      return text;
+    };
+    const message =
+      'When converting notes to comments, any images and formatting inside them will be removed.\n\nDo you want to convert all notes to comments?';
+    expect(await answer('Cancel')).toEqual([true, message]);
+    expect(instance.workbook.getComments(0)).toHaveLength(1);
+    expect(await answer('Convert all notes')).toEqual([true, message]);
+    expect(instance.workbook.getComments(0)).toEqual([]);
+    expect(
+      listThreadedComments(instance.store, 0, instance.workbook).map((entry) => entry.text),
+    ).toEqual(['Check the total']);
   });
 });

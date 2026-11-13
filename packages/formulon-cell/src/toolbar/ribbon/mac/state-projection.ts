@@ -1,6 +1,7 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
 import { selectedSessionChart } from '../../../commands/chart-design.js';
 import { commentAt } from '../../../commands/comment.js';
+import { workbookHasNotes } from '../../../commands/convert-notes.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
 import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
@@ -59,6 +60,7 @@ const MAC_POLICY_PROJECTED_COMMANDS = [
   'mac.review.previousNote',
   'mac.review.nextNote',
   'mac.review.showHideNote',
+  'mac.review.convertNotes',
   'mac.data.sortAsc',
   'mac.data.sortDesc',
   'mac.data.sortCustom',
@@ -220,6 +222,12 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
       return strings.commentNone;
     if (id === 'mac.review.showHideNote' && commentAt(state, state.selection.active) === null)
       return strings.commentDeleteRequiresActive;
+  }
+  // Convert to Comments needs a thread-capable engine and a note on some sheet. Provisional.
+  if (id === 'mac.review.convertNotes') {
+    if (!instance.workbook?.capabilities?.threadedComments)
+      return MAC_CONTEXT_LABELS.threadedCommentsUnavailable[lang];
+    if (instance.workbook && !workbookHasNotes(instance.workbook)) return strings.commentNone;
   }
   if (id === 'mac.view.split' && !instance.workbook?.capabilities?.sheetSplit) {
     return strings.splitNotSaved;
