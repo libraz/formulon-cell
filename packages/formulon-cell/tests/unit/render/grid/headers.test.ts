@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { setWorkbookView } from '../../../../src/commands/view.js';
 import { addrKey } from '../../../../src/engine/address.js';
-import { macDigitAdvance } from '../../../../src/engine/mac-column-model.js';
+import { macDigitAdvance } from '../../../../src/engine/mac-digit-metrics.js';
 import {
   buildColLayout,
   buildRowLayout,

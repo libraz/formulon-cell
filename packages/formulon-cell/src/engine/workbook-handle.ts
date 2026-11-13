@@ -241,10 +241,27 @@ const WINDOWS_DEFAULT_ROW_HEIGHT_PT: ReadonlyMap<string, number> = new Map([
 export class WorkbookHandle {
   readonly capabilities: EngineCapabilities;
 
-  /** Platform whose column-width model converts between store px and the
-   *  engine's raw widths. Set by `createDefault` and by the mount, whose
-   *  `ui.platform` wins over the value a host-created handle carries. */
-  geometryPlatform: SpreadsheetPlatform = 'default';
+  /** The platform an engine without profiles reports; a profile-capable engine reads it from its
+   *  profile instead. */
+  private profilelessPlatform: SpreadsheetPlatform = 'default';
+
+  /** Desktop platform the workbook lays out for. On a profile-capable engine this is the
+   *  profile's platform, so the engine's column geometry and this value cannot disagree; setting
+   *  it moves the profile to that platform in the same language and recalculates. */
+  get geometryPlatform(): SpreadsheetPlatform {
+    const profile = this.spreadsheetProfileId();
+    if (profile === null) return this.profilelessPlatform;
+    return profile.startsWith('mac-') ? 'mac' : 'default';
+  }
+
+  set geometryPlatform(platform: SpreadsheetPlatform) {
+    this.profilelessPlatform = platform;
+    const profile = this.spreadsheetProfileId();
+    if (profile === null || this.geometryPlatform === platform) return;
+    const language = profile.slice(profile.indexOf('-') + 1);
+    const next = `${platform === 'mac' ? 'mac' : 'windows'}-${language}` as SpreadsheetProfileId;
+    if (this.setSpreadsheetProfileId(next)) this.recalc();
+  }
 
   /** Profile whose language picks the theme script face of a charset-less
    *  theme font. The mount pins it when it binds the workbook, so a later UI

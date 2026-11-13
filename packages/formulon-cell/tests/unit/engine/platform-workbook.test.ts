@@ -227,6 +227,20 @@ describe('WorkbookHandle.createDefault platform', () => {
     }
   });
 
+  it('reads the layout platform from the profile, and moves the profile when it is set', async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'ja', platform: 'mac' });
+    try {
+      expect(wb.spreadsheetProfileId()).toBe('mac-ja_JP');
+      expect(wb.geometryPlatform).toBe('mac');
+      expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
+      expect(wb.geometryPlatform).toBe('default');
+      wb.geometryPlatform = 'mac';
+      expect(wb.spreadsheetProfileId()).toBe('mac-ja_JP');
+    } finally {
+      wb.dispose();
+    }
+  });
+
   it('degrades to the platform font and size defaults on the stub', async () => {
     const mac = await WorkbookHandle.createDefault({
       locale: 'ja',

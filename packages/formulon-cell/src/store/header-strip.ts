@@ -1,4 +1,4 @@
-import { macColumnPaddingPt, roundDigitAdvance } from '../engine/mac-column-model.js';
+import { macColumnPaddingPt, roundDigitAdvance } from '../engine/mac-digit-metrics.js';
 import type { LayoutSlice, ViewportSlice } from './types.js';
 
 /** Fewest digits the row-number strip is sized for. */

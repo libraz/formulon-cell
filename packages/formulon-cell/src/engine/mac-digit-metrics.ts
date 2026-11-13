@@ -1,15 +1,11 @@
 /**
- * @file Mac desktop column-width model.
+ * @file Mac desktop digit metrics for the row-number strip.
  *
- * The engine's width models are Windows-calibrated; Mac Excel lays a column
- * out as `round(raw × MDW)` points, where `raw` is the stored OOXML width
- * (padding included) and MDW is the Normal font's maximum digit width in
- * whole points. A sheet without `defaultColWidth` uses `baseColWidth × MDW` plus the padding.
- *
- * MDW is `roundHalfUp(em × sizePt)` with a per-family digit-advance em fitted
- * to xlwings measurements of Mac Excel 16.x; families outside the table use
- * {@link UNKNOWN_FAMILY_EM}. Font names are matched after NFKC and case folding.
- * The padding scales with the digit width (see {@link macColumnPaddingPt}).
+ * Column widths come from the engine's Mac profile; this table only sizes the
+ * row-number strip, which the engine does not lay out. A digit advance is
+ * `em × sizePt` with a per-family em fitted to xlwings measurements of Mac
+ * Excel 16.x; families outside the table use {@link UNKNOWN_FAMILY_EM}. Font
+ * names are matched after NFKC and case folding.
  */
 
 /** Padding Mac Excel adds around `mdw`-point digits, in points: a quarter
@@ -17,9 +13,6 @@
  *  11 for 3-4 / 5-8 / 9-12 / 14 / 17 pt digits (Arial 6: 8 × 3 + 3 = 27 pt,
  *  Courier New 20: 8 × 12 + 7 = 103 pt, and the row-number strip). */
 export const macColumnPaddingPt = (mdw: number): number => 2 * Math.ceil(mdw / 4) + 1;
-
-/** OOXML stores column widths in 1/256 character steps. */
-const RAW_WIDTH_STEPS = 256;
 
 /** Digit-advance em for a family the table does not list. */
 const UNKNOWN_FAMILY_EM = 0.55;
@@ -66,25 +59,3 @@ export function macDigitAdvance(fontName: string, sizePt: number): number {
 
 /** Whole-point digit width for a digit advance, rounding half up. */
 export const roundDigitAdvance = (advance: number): number => Math.floor(advance + 0.5);
-
-/** Maximum digit width in whole points for a Normal font on Mac. */
-export function macMdw(fontName: string, sizePt: number): number {
-  return roundDigitAdvance(macDigitAdvance(fontName, sizePt));
-}
-
-/** Displayed width in points of a stored raw column width. */
-export function macRawToPt(raw: number, mdw: number): number {
-  return Math.round(raw * mdw);
-}
-
-/** Raw width Mac Excel saves for a column `pt` wide, after snapping to whole points. */
-export function macPtToRaw(pt: number, mdw: number): number {
-  const width = Math.round(pt);
-  if (width <= 0) return 0;
-  return Math.trunc((width / mdw) * RAW_WIDTH_STEPS) / RAW_WIDTH_STEPS;
-}
-
-/** Width in points of a default column on a sheet that states no `defaultColWidth`. */
-export function macDefaultColumnPt(baseColWidth: number, mdw: number): number {
-  return baseColWidth * mdw + macColumnPaddingPt(mdw);
-}

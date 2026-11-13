@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { macDigitAdvance } from '../../../src/engine/mac-column-model.js';
+import { macDigitAdvance } from '../../../src/engine/mac-digit-metrics.js';
 import { macDefaultRowPt } from '../../../src/engine/mac-row-model.js';
 import { headerLabelScale, headerStripSize } from '../../../src/store/header-strip.js';
 
