@@ -40,6 +40,29 @@ const selectRange = (page: Page, range: string) =>
     range,
   );
 
+/** Create Names from Selection: Top row starts checked over a text header row and Left column
+ *  does not over numbers; OK names each column after its header. */
+export async function runCreateNamesScenario(
+  page: Page,
+  platform: 'default' | 'mac',
+): Promise<void> {
+  const sheet = new UserJourneyPage(page);
+  await sheet.mount({ locale: 'en', platform });
+  await sheet.expectNoStub();
+  await sheet.seed({ A1: 'Qty', B1: 'Price', A2: 3, B2: 10, A3: 5, B3: 20 });
+  await selectRange(page, 'A1:B3');
+
+  const dialog = await openCreateNames(page, sheet, platform);
+  await expect(dialog.locator('input[data-fc-edge="top"]')).toBeChecked();
+  await expect(dialog.locator('input[data-fc-edge="left"]')).not.toBeChecked();
+  await expect(dialog.locator('input[data-fc-edge="bottom"]')).not.toBeChecked();
+  await expect(dialog.locator('input[data-fc-edge="right"]')).not.toBeChecked();
+  await dialog.locator('.fc-fmtdlg__btn--primary').click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => definedNames(page)).toEqual(['Price', 'Qty']);
+  await sheet.expectNoConsoleErrors();
+}
+
 /** Create Names from Selection over two whole rows refuses with the desktop's "Selection is too
  *  large." alert and defines no names; the Mac shows it as a compact alert. */
 export async function runCreateNamesTooLargeScenario(
