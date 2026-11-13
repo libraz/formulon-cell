@@ -16,12 +16,13 @@ const STARTUP = {
   },
 } as const;
 
-const STARTUP_COLUMN_WIDTHS = {
-  default: { ja: [112, 80, 104, 128], en: [112, 80, 104, 128] },
-  mac: {
-    ja: [116, 248 / 3, 108, 400 / 3],
-    en: [128, 92, 356 / 3, 440 / 3],
-  },
+/** The demo's seeded column widths in px, which read back unchanged on every platform. */
+const SEEDED_COLUMN_WIDTHS = [112, 80, 104, 128] as const;
+
+/** A fresh book's default column and row px: the profile's measured points x 4/3. */
+const FRESH_BOOK = {
+  default: { ja: { colWidth: 72, rowHeight: 25 }, en: { colWidth: 64, rowHeight: 20 } },
+  mac: { ja: { colWidth: 100, rowHeight: 80 / 3 }, en: { colWidth: 260 / 3, rowHeight: 64 / 3 } },
 } as const;
 
 type FontProbeWindow = Window & {
@@ -117,8 +118,7 @@ export async function runStartupFont(
   await expect(page.locator('[data-ribbon-command="fontFamily"] button').first()).toContainText(
     fontName,
   );
-  // The demo seeds widths through the Windows column model, so Mac lands on other px values.
-  for (const [col, width] of STARTUP_COLUMN_WIDTHS[platform][locale].entries()) {
+  for (const [col, width] of SEEDED_COLUMN_WIDTHS.entries()) {
     expect(startup.widths[col]).toBeCloseTo(width, 1);
   }
   expect(startup.rowHeight).toBeCloseTo(expected.rowHeight, 4);
@@ -223,5 +223,28 @@ export async function runStartupFont(
     String(STARTUP[platform][nextLocale].font.size),
   );
   await spreadsheet.expectNoStub();
+  expect(errors.read()).toEqual([]);
+}
+
+/** A fresh book takes the profile's default column width and row height. */
+export async function runFreshBookDefaults(
+  page: Page,
+  locale: 'ja' | 'en',
+  platform: 'default' | 'mac',
+): Promise<void> {
+  const spreadsheet = new SpreadsheetPage(page);
+  const errors = spreadsheet.collectConsoleErrors();
+  await spreadsheet.mount({ locale, platform });
+  await spreadsheet.expectNoStub();
+  const layout = await page.evaluate(() => {
+    const probe = window as unknown as FontProbeWindow;
+    const { layout } = probe.__fcProbes['mount/internals']
+      .spreadsheetInternals(probe.__fcInst)
+      .store.getState();
+    return { colWidth: layout.defaultColWidth, rowHeight: layout.defaultRowHeight };
+  });
+  const expected = FRESH_BOOK[platform][locale];
+  expect(layout.colWidth).toBeCloseTo(expected.colWidth, 4);
+  expect(layout.rowHeight).toBeCloseTo(expected.rowHeight, 4);
   expect(errors.read()).toEqual([]);
 }
