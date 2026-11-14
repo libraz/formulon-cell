@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
@@ -659,5 +660,55 @@ export async function runMacCalculationGroupAndNamesScenario(page: Page): Promis
   await expect(paste).toHaveText('Paste Names...');
   await expect(paste).not.toHaveAttribute('aria-disabled', 'true');
   await page.keyboard.press('Escape');
+
+  // The menu lists the workbook's names and the active sheet's own above Paste Names, sorted
+  // case-insensitively; hidden names and other sheets' names stay out, and a sheet's own name
+  // stands in for the workbook name it shadows.
+  await page.evaluate(() => {
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const inst = w.__fcInst;
+    inst.workbook.addSheet('Other');
+    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(inst.workbook);
+    const set = (name: string, formula: string, sheet = -1) => {
+      if (!handle.setDefinedNameEntry(name, formula, sheet)) throw new Error(`${name} not set`);
+    };
+    set('beta', '=3');
+    set('Alpha', '=4');
+    set('Zed', '=8');
+    if (!handle.setDefinedNameAttrs('Zed', -1, { hidden: true })) throw new Error('Zed not hidden');
+    set('Local0', '=5', 0);
+    set('Rate', '=7', 0);
+    set('Other1', '=6', 1);
+  });
+  const menu = page.locator('#menu-mac-formulas-use-in-formula');
+  const rows = menu.locator('[data-defined-name-insert]:not([data-defined-name-insert=""])');
+  const openMenu = async () => {
+    await useInFormula.click();
+    await expect(menu).toBeVisible();
+  };
+  await sp.goTo('C3');
+  await openMenu();
+  await expect(rows).toHaveText(['Alpha', 'beta', 'Local0', 'Rate']);
+  await expect(menu.locator('[data-defined-name-insert=""]')).toHaveCount(1);
+  // The separator sits between the last name and Paste Names.
+  expect(
+    await menu.evaluate((root) => {
+      const paste = root.querySelector('[data-ribbon-command="mac.formulas.useInFormula.paste"]');
+      const before = paste?.previousElementSibling as HTMLElement | null;
+      return [
+        before?.dataset.definedNameInsert,
+        (before?.previousElementSibling as HTMLElement | null)?.dataset.definedNameInsert,
+      ];
+    }),
+  ).toEqual(['', 'Rate']);
+  await rows.filter({ hasText: 'beta' }).click();
+  await expect(menu).toBeHidden();
+  await expect.poll(() => sp.readValue('C3')).toEqual({ kind: 'number', value: 3 });
+  await sp.goTo('C4');
+  await openMenu();
+  // Reopening rebuilds the rows rather than appending to them.
+  await expect(rows).toHaveCount(4);
+  await rows.filter({ hasText: 'Rate' }).click();
+  await expect.poll(() => sp.readValue('C4')).toEqual({ kind: 'number', value: 7 });
   await sp.expectNoConsoleErrors();
 }
