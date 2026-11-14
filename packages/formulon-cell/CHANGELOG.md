@@ -135,6 +135,7 @@ versioning is [SemVer](https://semver.org/).
 - On the Mac, Calculation Options reads Automatic, Partial and Manual, as the desktop draws it in every language, and its menus carry the desktop's separators.
 - On the Mac, Review › Check Accessibility › Format as Table opens Create Table on the current region, and Unmerge Cells unmerges the selection, as the Home tab's commands do. `mac.review.accessibility.formatTable` and `mac.review.accessibility.unmerge` join the command ids.
 - On the Mac, the Formulas tab's Calculate Now and Calculate Sheet are a two-row stack of 26 pt buttons beside Calculation Options, as on the desktop. Use in Formula's entry reads Paste Names... in every language, and the button and its entry are greyed out until the workbook has a defined name the Name Manager lists.
+- On the Mac, the Insert tab's chart gallery cells are 36 pt wide, and Waterfall and Combo sit in a two-row stack of 26 pt cells beside them, as the desktop draws the Charts group.
 
 ### Fixed
 

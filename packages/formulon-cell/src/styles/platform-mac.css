@@ -1398,6 +1398,65 @@
     padding: 1px;
   }
 
+  /* Charts: two columns of 36pt icon cells in three rows, then Waterfall and Combo as a two-row
+   * stack of 38x26pt cells, 3pt below the tile top on a 28pt pitch. Six 12px tracks hold both. */
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--charts.fc-tb__ribbon-group--mixed
+    .fc-tb__ribbon-tools {
+    grid-template-rows: repeat(6, 12px);
+    row-gap: 0;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--charts.fc-tb__ribbon-group--mixed
+    .fc-tb__rb--wide:not(.fc-tb__rb--stacked),
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--charts.fc-tb__ribbon-group--mixed
+    .fc-tb__rb--large {
+    grid-row: 1 / span 6;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--charts.fc-tb__ribbon-group--mixed
+    .fc-tb__rb--mac-icon-only {
+    grid-row: span 2;
+    width: 36px;
+    min-width: 36px;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--charts.fc-tb__ribbon-group--mixed
+    [data-ribbon-command="mac.insert.chartWaterfall"],
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--charts.fc-tb__ribbon-group--mixed
+    [data-ribbon-command="mac.insert.chartCombo"] {
+    grid-row: span 3;
+    width: 38px;
+    min-width: 38px;
+    height: 26px;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--charts.fc-tb__ribbon-group--mixed
+    [data-ribbon-command="mac.insert.chartWaterfall"] {
+    margin-top: 3px;
+  }
+
+  /* Combo's track starts 36px down; the desktop draws it at 31. */
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--charts.fc-tb__ribbon-group--mixed
+    [data-ribbon-command="mac.insert.chartCombo"] {
+    margin-top: -5px;
+  }
+
   /* Calculate Now and Calculate Sheet are a two-row stack: 26px buttons, 3px below the tile top on a 32px pitch. */
   [data-fc-platform="mac"]
     > .fc-tb__ribbon-shell
