@@ -1300,20 +1300,25 @@ const nativeDistinctFilterItems = (
       if (rows) rows.push(row);
       else candidates.set(key, [row]);
     }
-    const offsets = new Map<string, number>();
+    const sourceAt = (row: number): CellValue =>
+      state.data.cells.get(addrKey({ sheet: range.sheet, row, col: byCol }))?.value ?? {
+        kind: 'blank',
+      };
+    const used = new Set<number>();
     const items: FilterValueItem[] = [];
     for (const value of values) {
       if (!value) return null;
-      const nativeKey = nativeFilterValueKey(value);
-      const rows = candidates.get(nativeKey);
-      const offset = offsets.get(nativeKey) ?? 0;
-      const representative = rows?.[offset];
+      const rows = (candidates.get(nativeFilterValueKey(value)) ?? []).filter(
+        (row) => !used.has(row),
+      );
+      // Zero and blank share a key; a blank the engine returns as such takes a blank row.
+      const representative =
+        rows.find((row) => (sourceAt(row).kind === 'blank') === (value.kind === 'blank')) ??
+        rows[0];
       if (representative === undefined) return null;
-      offsets.set(nativeKey, offset + 1);
+      used.add(representative);
       const addr = { sheet: range.sheet, row: representative, col: byCol };
-      const sourceValue =
-        state.data.cells.get(addrKey({ sheet: range.sheet, row: representative, col: byCol }))
-          ?.value ?? ({ kind: 'blank' } as const);
+      const sourceValue = sourceAt(representative);
       const key = sourceValue.kind === 'blank' ? '' : filterValueKey(value);
       items.push({
         key,
