@@ -36,6 +36,8 @@ export interface ErrorMenuDeps {
   onTraceError?: (addr: Addr, kind: ErrorMenuKind) => void;
   /** Hook for the stale rule's Calculate Now and Switch to Automatic Calculation. */
   onCalculate?: (action: 'calculate-now' | 'auto') => void;
+  /** Hook for Error Checking Options; the mount layer opens Preferences on that pane. */
+  onOptions?: () => void;
 }
 
 export interface ErrorMenuHandle {
@@ -188,7 +190,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
             { id: 'disableFormatStale', label: m.disableFormatStale },
             { id: 'ignore', label: m.ignore },
             { id: 'editCell', label: m.editInFormulaBar },
-            { id: 'options', label: m.options, unavailable: m.optionsUnavailable },
+            { id: 'options', label: m.options },
           ]
         : rule
           ? [
@@ -199,7 +201,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
               ...(rule === 'divZero' ? [{ id: 'traceError' as const, label: m.trace }] : []),
               { id: 'ignore', label: m.ignore },
               { id: 'editCell', label: m.editInFormulaBar },
-              { id: 'options', label: m.options, unavailable: m.optionsUnavailable },
+              { id: 'options', label: m.options },
             ]
           : [
               { id: 'showInfo', label: t.showInfo },
@@ -273,6 +275,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
         mutators.setFormatStaleValues(store, false);
         return;
       case 'options':
+        deps.onOptions?.();
         return;
     }
   };

@@ -55,6 +55,7 @@ import { attachOverlayScrollbars } from '../interact/overlay-scrollbars.js';
 import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { showPivotSpillCallout } from '../interact/pivot-spill-callout.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
+import type { PreferencesOpenOptions } from '../interact/preferences-dialog.js';
 import { attachSessionCharts, type SessionChartsHandle } from '../interact/session-charts.js';
 import {
   attachSessionIllustrations,
@@ -263,6 +264,7 @@ interface HostFeatureControllerInput {
   getWorkbookName?: () => string | null | undefined;
   localeSwitcher: HTMLElement;
   setLocale: (locale: string) => boolean;
+  openPreferences: (options: PreferencesOpenOptions) => void;
   isMacPlatform: () => boolean;
   projectFormulaDraftMirror: (anchor: Addr, raw: string | null) => void;
   refreshFeaturesView: () => void;

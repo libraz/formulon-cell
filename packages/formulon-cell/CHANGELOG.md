@@ -72,6 +72,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- `dialogs.open('preferences', { pane })` opens Preferences on a given pane (`'view'`, `'autoCorrect'`, `'calculation'` or `'errorChecking'`), and the Mac error menu's Error Checking Options opens it on Error Checking.
 - `@libraz/formulon-cell/adapter` also exports what the React and Vue packages share for binding props and deriving values: `SPREADSHEET_OPTION_KEYS`, `optionsFromProps`, `patchFromOptions`, `ribbonHooksKey`, `forwardRibbonHooks`, `isLiveSpreadsheet`, `subscribeToSpreadsheet`, `subscribeToSelection`, `subscribeToLocale`, `sameProp`, `propsPatch`, `reconcileProps` and the `SpreadsheetSubscriber` type.
 - `@libraz/formulon-cell/toolbar` exports the ribbon's search family (`buildRibbonSearchIndex`, `queryRibbonSearchIndex`, their types, `projectDisabledReason`) and icon family (`createExcelRibbonSvg`, `ExcelRibbonIconName`), so a host title bar, quick access toolbar or backstage matches the ribbon; `@libraz/formulon-cell/extensions` exports `resolveSpreadsheetUiOptions` and `isFeatureDefaultOff` for a host feature-toggle panel. `InstanceRibbon` is the type of `instance.toolbar`.
 - `Workbook.getCalcMode` / `setCalcMode`, `getIterative` / `updateIterative`, `getProfileId` and `listFunctionNames`. Leaving Manual recalculates what the edits made under it left dirty, and a mounted ribbon shows the new mode; `on('change')` reports the `'calc'` part.

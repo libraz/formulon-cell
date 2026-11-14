@@ -16,9 +16,18 @@ import {
 
 type PrefStrings = Strings['preferencesDialog'];
 
+/** The panes the Preferences window opens on. */
+export type PreferencesPaneId = 'view' | 'autoCorrect' | 'calculation' | 'errorChecking';
+
+/** Options of `openPreferencesDialog`. */
+export interface PreferencesOpenOptions {
+  /** Pane to open on; the View pane when omitted or unknown. */
+  readonly pane?: PreferencesPaneId;
+}
+
 /** A pane of the Preferences window: its name, the Show All group it sits in, and its settings. */
 interface PreferencePane {
-  readonly id: string;
+  readonly id: PreferencesPaneId;
   readonly label: (t: PrefStrings) => string;
   readonly group: (t: PrefStrings) => string;
   readonly render: (instance: SpreadsheetInstance, body: HTMLElement, on: Listen) => void;
@@ -174,7 +183,10 @@ type Page = PreferencePane | 'all';
  *  window has no buttons, only a close control and the desktop's toolbar: Back and Forward
  *  through the pages shown, Show All listing the panes under their group headings, the shown
  *  pane's name, and a search field narrowing Show All to the panes whose names match. */
-export function openPreferencesDialog(instance: SpreadsheetInstance): void {
+export function openPreferencesDialog(
+  instance: SpreadsheetInstance,
+  options?: PreferencesOpenOptions,
+): void {
   openDialogs.get(instance)?.();
   const t = instance.i18n.strings.preferencesDialog;
   const close = instance.i18n.strings.watchPanel.close;
@@ -336,7 +348,7 @@ export function openPreferencesDialog(instance: SpreadsheetInstance): void {
   openDialogs.set(instance, dismiss);
 
   const [first] = PANES;
-  go(first ?? 'all');
+  go(PANES.find((pane) => pane.id === options?.pane) ?? first ?? 'all');
   shell.open();
 }
 

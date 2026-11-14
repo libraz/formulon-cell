@@ -19,7 +19,6 @@ export interface MacErrorMenuStrings {
   editInFormulaBar: string;
   options: string;
   /** Why the options entry cannot be used. */
-  optionsUnavailable: string;
 }
 
 /** Mac wording for this locale; not measured. */
@@ -37,7 +36,6 @@ export const macErrorMenuEn: MacErrorMenuStrings = {
   ignore: 'Ignore Error',
   editInFormulaBar: 'Edit in Formula Bar',
   options: 'Error Checking Options...',
-  optionsUnavailable: 'This feature is not implemented yet.',
 };
 
 /** Japanese Mac app wording, measured from Excel for Mac. */
@@ -55,10 +53,9 @@ export const macErrorMenuJa: MacErrorMenuStrings = {
   ignore: 'エラーを無視する(I)',
   editInFormulaBar: '数式バーで編集(F)',
   options: 'エラー チェック オプション...',
-  optionsUnavailable: 'この機能は未実装です。',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar, optionsUnavailable. */
+/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar. */
 export const macErrorMenuDe: MacErrorMenuStrings = {
   divZeroHeading: 'Division durch Null',
   numberAsTextHeading: 'Als Text gespeicherte Zahlen',
@@ -74,10 +71,9 @@ export const macErrorMenuDe: MacErrorMenuStrings = {
   ignore: 'Fehler ignorieren',
   editInFormulaBar: 'In Bearbeitungsleiste bearbeiten',
   options: 'Optionen zur Fehlerüberprüfung...',
-  optionsUnavailable: 'Diese Funktion ist noch nicht implementiert.',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar, optionsUnavailable. */
+/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar. */
 export const macErrorMenuFr: MacErrorMenuStrings = {
   divZeroHeading: 'Erreur lors de la division par zéro',
   numberAsTextHeading: 'Nombre stocké sous forme de texte',
@@ -93,7 +89,6 @@ export const macErrorMenuFr: MacErrorMenuStrings = {
   ignore: 'Ignorer l’erreur',
   editInFormulaBar: 'Modifier dans la barre de formule',
   options: 'Options de vérification des erreurs...',
-  optionsUnavailable: 'Cette fonctionnalité n’est pas encore implémentée.',
 };
 
 /** Mac app wording from the Excel bundle; not answered by it: divZeroHeading, convertToNumber, help, trace, ignore, editInFormulaBar, and 1 more. */
@@ -111,10 +106,9 @@ export const macErrorMenuZh: MacErrorMenuStrings = {
   ignore: '忽略错误',
   editInFormulaBar: '在编辑栏中编辑',
   options: '错误检查选项...',
-  optionsUnavailable: '此功能尚未实现。',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar, optionsUnavailable. */
+/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar. */
 export const macErrorMenuKo: MacErrorMenuStrings = {
   divZeroHeading: '0으로 나누기 오류',
   numberAsTextHeading: '텍스트 형식으로 저장된 숫자',
@@ -129,10 +123,9 @@ export const macErrorMenuKo: MacErrorMenuStrings = {
   ignore: '오류 무시',
   editInFormulaBar: '수식 입력줄에서 편집',
   options: '오류 검사 옵션...',
-  optionsUnavailable: '이 기능은 아직 구현되지 않았습니다.',
 };
 
-/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar, optionsUnavailable. */
+/** Mac app wording from the Excel bundle; not answered by it: convertToNumber, help, trace, ignore, editInFormulaBar. */
 export const macErrorMenuTh: MacErrorMenuStrings = {
   divZeroHeading: 'ข้อผิดพลาดจากการหารด้วยศูนย์',
   numberAsTextHeading: 'ตัวเลขที่ถูกเก็บในรูปข้อความ',
@@ -147,5 +140,4 @@ export const macErrorMenuTh: MacErrorMenuStrings = {
   ignore: 'ละเว้นข้อผิดพลาด',
   editInFormulaBar: 'แก้ไขในแถบสูตร',
   options: 'ตัวเลือกการตรวจสอบข้อผิดพลาด...',
-  optionsUnavailable: 'ฟีเจอร์นี้ยังไม่ได้ใช้งาน',
 };

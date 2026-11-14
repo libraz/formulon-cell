@@ -409,3 +409,38 @@ describe('Preferences window', () => {
     expect(dialog()).toBeNull();
   });
 });
+
+describe('Preferences window pane option', () => {
+  let sheet: MountedStubSheet | undefined;
+  afterEach(() => {
+    sheet?.dispose();
+    sheet = undefined;
+    document.body.replaceChildren();
+  });
+  const mount = async (): Promise<MountedStubSheet> =>
+    mountStubSheet({
+      locale: 'en',
+      ui: { platform: 'mac' },
+      workbook: await WorkbookHandle.createDefault(),
+    });
+
+  it('opens on the requested pane', async () => {
+    sheet = await mount();
+    const instance = sheet.instance;
+    createDialogs(() => instance).open('preferences', { pane: 'errorChecking' });
+    const title = instance.i18n.strings.preferencesDialog.errorCheckingPane;
+    expect(dialog()?.querySelector('.fc-prefs__header')?.textContent).toBe(title);
+    expect(
+      dialog()?.querySelector<HTMLElement>('.fc-prefs__pane:not([hidden])')?.dataset.pane,
+    ).toBe('errorChecking');
+  });
+
+  it('falls back to the View pane for an unknown id', async () => {
+    sheet = await mount();
+    const instance = sheet.instance;
+    createDialogs(() => instance).open('preferences', { pane: 'nope' as never });
+    expect(
+      dialog()?.querySelector<HTMLElement>('.fc-prefs__pane:not([hidden])')?.dataset.pane,
+    ).toBe('view');
+  });
+});

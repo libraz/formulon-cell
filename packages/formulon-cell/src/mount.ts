@@ -63,7 +63,7 @@ import {
   setOverlayOptions,
   syncOverlayPortalTheme,
 } from './interact/overlay-portal.js';
-import { closePreferencesDialog } from './interact/preferences-dialog.js';
+import { closePreferencesDialog, openPreferencesDialog } from './interact/preferences-dialog.js';
 import { closeSheetViewOptionsDialog } from './interact/sheet-view-options-dialog.js';
 import { attachAlwaysOnDialogs } from './mount/always-on-dialogs.js';
 import { createMountChrome } from './mount/chrome.js';
@@ -676,6 +676,7 @@ export const Spreadsheet = {
       getWorkbookName: opts.getWorkbookName,
       localeSwitcher,
       setLocale: (locale) => instance.setLocale(locale),
+      openPreferences: (options) => openPreferencesDialog(instance, options),
       isMacPlatform: () => host.dataset.fcPlatform === 'mac',
       projectFormulaDraftMirror: formulaDraftMirror.project,
       refreshFeaturesView,

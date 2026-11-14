@@ -13,6 +13,7 @@ import type { PasteSpecialOpenOptions } from '../../interact/paste-special.js';
 import {
   closePreferencesDialog,
   openPreferencesDialog,
+  type PreferencesOpenOptions,
 } from '../../interact/preferences-dialog.js';
 import type { ChartSettingsTarget } from '../../interact/session-chart-settings.js';
 import { closeSpellingDialog, openSpellingDialog } from '../../interact/spelling-dialog.js';
@@ -55,7 +56,7 @@ export interface DialogOptions {
   pivotTable: { readonly placement?: 'new' | 'existing' };
   spelling: undefined;
   autoCorrect: undefined;
-  preferences: undefined;
+  preferences: PreferencesOpenOptions;
 }
 
 /** A dialog `SpreadsheetInstance.dialogs` opens: the opener's name without `open` and `Dialog`. */
@@ -109,7 +110,7 @@ const ROUTES: { readonly [K in DialogId]: Route<K> } = {
     feature: null,
     commandId: null,
     platform: 'mac',
-    open: (l) => openPreferencesDialog(l),
+    open: (l, o) => openPreferencesDialog(l, o),
     close: (l) => closePreferencesDialog(l),
   },
   conditional: {

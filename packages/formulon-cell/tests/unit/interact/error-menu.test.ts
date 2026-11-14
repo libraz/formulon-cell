@@ -213,7 +213,7 @@ describe('attachErrorMenu', () => {
         'エラーのトレース(T)',
         'エラーを無視する(I)',
         '数式バーで編集(F)',
-        '[DIS]エラー チェック オプション...',
+        'エラー チェック オプション...',
       ]);
       handle.detach();
     });
@@ -226,9 +226,43 @@ describe('attachErrorMenu', () => {
         'このエラーに関するヘルプ(H)',
         'エラーを無視する(I)',
         '数式バーで編集(F)',
-        '[DIS]エラー チェック オプション...',
+        'エラー チェック オプション...',
       ]);
       handle.detach();
     });
+  });
+});
+
+describe('attachErrorMenu options entry', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('enables Options on the Mac menu and calls onOptions', () => {
+    const fc = document.createElement('div');
+    fc.className = 'fc-host';
+    fc.dataset.fcPlatform = 'mac';
+    const host = document.createElement('div');
+    fc.appendChild(host);
+    document.body.appendChild(fc);
+    const store = createSpreadsheetStore();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.replaceCells(store, [
+      {
+        addr,
+        value: { kind: 'error', text: '#DIV/0!' },
+        formula: '=1/0',
+      },
+    ] as never);
+    const onOptions = vi.fn();
+    const handle = attachErrorMenu({ host, store, getWb: fakeWb, strings: en, onOptions });
+    handle.open(addr, 10, 10, 'error');
+    const item = document.querySelector<HTMLButtonElement>(
+      '.fc-errmenu__item[data-fc-action="options"]',
+    );
+    expect(item?.disabled).toBe(false);
+    item?.click();
+    expect(onOptions).toHaveBeenCalledOnce();
+    handle.detach();
   });
 });
