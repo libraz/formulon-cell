@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
-import { installDialogLayoutCheck } from './dialog-layout.js';
+import { DIALOG_LAYOUT_PREFIX, installDialogLayoutCheck } from './dialog-layout.js';
 
 /** Absolute pointer position from the live sheet layout, including its zoom. */
 export async function gridCellCenter(page: Page, row: number, col: number) {
@@ -118,11 +118,13 @@ export class SpreadsheetPage {
   }
 
   /** Fail the surrounding test if any console error fired during the run.
-   *  Bind once near the start of a test, drain at the end. */
+   *  Bind once near the start of a test, drain at the end. Dialog layout faults are left to the
+   *  shared `test`, which fails on them in every spec. */
   collectConsoleErrors(): { read: () => string[] } {
     const errors: string[] = [];
     this.page.on('console', (msg) => {
-      if (msg.type() === 'error') errors.push(msg.text());
+      if (msg.type() === 'error' && !msg.text().startsWith(DIALOG_LAYOUT_PREFIX))
+        errors.push(msg.text());
     });
     this.page.on('pageerror', (err) => errors.push(err.message));
     return { read: () => [...errors] };

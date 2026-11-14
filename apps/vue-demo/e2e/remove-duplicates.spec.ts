@@ -1,6 +1,5 @@
-import { test } from '@playwright/test';
-
 import { runRemoveDuplicatesResultScenario } from '../../../tests/e2e-shared/scenarios/remove-duplicates-result.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const platform of ['default', 'mac'] as const) {
   for (const locale of ['en', 'ja'] as const) {

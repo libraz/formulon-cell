@@ -1,9 +1,9 @@
-import { test } from '@playwright/test';
 import {
   runCfRulesDialogScenario,
   runConditionalDialogScenario,
 } from '../../../tests/e2e-shared/scenarios/cf-dialog.js';
 import { runCfRulesKeyboardScenario } from '../../../tests/e2e-shared/scenarios/cf-rules-keyboard.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('D05 (vue-demo): openCfRulesDialog() surfaces the CF rules overlay', async ({ page }) => {
   await runCfRulesDialogScenario(page);

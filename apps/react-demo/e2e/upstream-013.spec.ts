@@ -1,9 +1,9 @@
-import { test } from '@playwright/test';
 import {
   runNativeImageSaveScenario,
   runNativeR1C1Scenario,
   runNativeThreadThemeScenario,
 } from '../../../tests/e2e-shared/scenarios/upstream-013.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('native R1C1 display and editing', async ({ page }) => {
   await runNativeR1C1Scenario(page);

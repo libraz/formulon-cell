@@ -1,9 +1,8 @@
-import { test } from '@playwright/test';
-
 import {
   runBoldToggleScenario,
   runFormatDialogShortcutScenario,
 } from '../../../tests/e2e-shared/scenarios/format.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('F-bold (react-demo): Mod+B toggle leaves the page error-free', async ({ page }) => {
   await runBoldToggleScenario(page);

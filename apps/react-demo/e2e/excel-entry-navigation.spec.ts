@@ -1,10 +1,10 @@
-import { test } from '@playwright/test';
 import {
   runTabReturnCommits,
   runTabReturnMergesAndHidden,
   runTabReturnNavigation,
   runTabReturnResets,
 } from '../../../tests/e2e-shared/scenarios/excel-entry-navigation.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Excel: Return after forward Tabs starts the next input row', async ({ page }) => {
   await runTabReturnNavigation(page);

@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   type FormulaHelperSurface,
   formulaHelperVisualCases,
@@ -7,6 +6,7 @@ import {
   runFormulaHelperVisual,
   runFormulaKeyboardPointing,
 } from '../../../tests/e2e-shared/scenarios/formula-helper-compat.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const platform of ['default', 'mac'] as const) {
   for (const surface of ['inline', 'bar'] satisfies FormulaHelperSurface[]) {

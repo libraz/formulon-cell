@@ -1,5 +1,3 @@
-import { test } from '@playwright/test';
-
 import {
   runBudgetEntryScenario,
   runContactListScenario,
@@ -11,6 +9,7 @@ import {
   runTableOrganizationScenario,
 } from '../../../tests/e2e-shared/scenarios/user-journeys.js';
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('user journey: budget entry, currency, formulas, undo, and redo (vue-demo)', async ({
   page,

@@ -1,8 +1,8 @@
-import { test } from '@playwright/test';
 import {
   runSelectEscapeLayers,
   runSelectHomeEndAndDeparture,
 } from '../../../tests/e2e-shared/scenarios/custom-select-keyboard.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Excel: selector Home and End commit the highlighted option and Tab closes it', async ({
   page,

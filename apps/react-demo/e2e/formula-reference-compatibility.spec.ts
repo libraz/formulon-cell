@@ -1,9 +1,9 @@
-import { test } from '@playwright/test';
 import {
   formulaDataEdgeCases,
   runFormulaDataEdgeNavigation,
   runStructuredReferenceCompletion,
 } from '../../../tests/e2e-shared/scenarios/formula-reference-compatibility.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const scenario of formulaDataEdgeCases) {
   test(`react-demo: ${scenario.platform} ${scenario.surface} ${scenario.style} formula data edge`, async ({

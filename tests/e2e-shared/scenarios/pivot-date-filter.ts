@@ -14,8 +14,9 @@ const RANGE: Record<'en' | 'de' | 'ja', readonly [string, string]> = {
   ja: ['2026/5/15', '2026/5/31'],
 };
 
-// PivotFilterKind values the panel's options carry.
+// PivotFilterKind values the panel's options carry; months sit behind All Dates in the Period.
 const DATE_BETWEEN = '5';
+const ALL_DATES_IN_PERIOD = 'allDatesInPeriod';
 const MAY = '60';
 
 /** Seeds Date and Sales rows and builds a report at E1 with Date on rows and Sum of Sales. */
@@ -75,7 +76,8 @@ const openDateFilters = async (page: Page) => {
 };
 
 /** A date row field's Date Filters: Between opens the Date Filter dialog, which reads both bounds
- *  with the locale's date grammar; a period such as May applies at once. */
+ *  with the locale's date grammar; All Dates in the Period opens it on a month pop-up, and May
+ *  keeps the May dates. */
 export async function runPivotDateBetweenScenario(
   page: Page,
   locale: 'en' | 'de' | 'ja',
@@ -105,7 +107,10 @@ export async function runPivotDateBetweenScenario(
     ]);
 
   await page.keyboard.press('Escape');
-  await (await openDateFilters(page)).selectOption(MAY);
+  await (await openDateFilters(page)).selectOption(ALL_DATES_IN_PERIOD);
+  await expect(filter).toBeVisible();
+  await filter.locator('select[data-pivot-filter-period="true"]').selectOption(MAY);
+  await filter.locator('.fc-fmtdlg__btn--primary').click();
   await expect(filter).toBeHidden();
   await expect
     .poll(() => reportRows(page))

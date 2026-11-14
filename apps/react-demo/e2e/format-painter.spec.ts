@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import {
   runCurrencyFormatScenario,
   runFormatPainterScenario,
 } from '../../../tests/e2e-shared/scenarios/format-painter.js';
 import { runStickyFormatPainterScenario } from '../../../tests/e2e-shared/scenarios/format-painter-sticky.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('F02 (react-demo): apply currency format imperatively without errors', async ({ page }) => {
   await runCurrencyFormatScenario(page);

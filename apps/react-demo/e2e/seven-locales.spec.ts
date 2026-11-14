@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   runConditionalFormulaLocaleScenario,
   runConditionalLocaleDialogScenario,
@@ -9,6 +8,7 @@ import { runLocaleFormulaScenario } from '../../../tests/e2e-shared/scenarios/lo
 import { runLocaleInputScenario } from '../../../tests/e2e-shared/scenarios/locale-input.js';
 import { runLocaleShortcutsScenario } from '../../../tests/e2e-shared/scenarios/locale-shortcuts.js';
 import { runSevenLocalesScenario } from '../../../tests/e2e-shared/scenarios/seven-locales.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('I02 (react-demo): switching the seven locale profiles updates core and engine', async ({
   page,

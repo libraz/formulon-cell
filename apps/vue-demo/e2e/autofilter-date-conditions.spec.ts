@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   runMacAutoFilterByColorScenario,
   runMacSortByColorScenario,
@@ -6,6 +5,7 @@ import {
 import { runMacAutoFilterDateScenario } from '../../../tests/e2e-shared/scenarios/autofilter-date-conditions.js';
 import { runAutoFilterDateTreeScenario } from '../../../tests/e2e-shared/scenarios/autofilter-date-tree.js';
 import { runMacAutoFilterOrPairScenario } from '../../../tests/e2e-shared/scenarios/autofilter-two-conditions.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const locale of ['en', 'de', 'ja'] as const) {
   test(`Mac date column filter reads a ${locale} Before date and applies a period at once`, async ({

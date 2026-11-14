@@ -1,8 +1,8 @@
-import { test } from '@playwright/test';
 import {
   runDirectionFocusFeedbackScenario,
   runMiniToolbarFeedbackScenario,
 } from '../../../tests/e2e-shared/scenarios/visual-feedback.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('direction choices show keyboard focus in every theme (react-demo)', async ({ page }) => {
   await runDirectionFocusFeedbackScenario(page);

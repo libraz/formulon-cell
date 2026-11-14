@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import { runArrowSequenceScenario } from '../../../tests/e2e-shared/scenarios/arrow-sequence.js';
 import {
   runArrowAndTabNavScenario,
   runF2EscapeScenario,
 } from '../../../tests/e2e-shared/scenarios/nav.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('E03 (vue-demo): Tab / Shift+Tab / Arrow navigate the grid', async ({ page }) => {
   await runArrowAndTabNavScenario(page);

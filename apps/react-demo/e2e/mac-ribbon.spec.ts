@@ -1,5 +1,3 @@
-import { test } from '@playwright/test';
-
 import {
   runMacAuditMenusScenario,
   runMacAutoSumMenuScenario,
@@ -26,6 +24,7 @@ import {
   runMacValidationMenuScenario,
   runMacViewShowScenario,
 } from '../../../tests/e2e-shared/scenarios/mac-ribbon.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const locale of ['en', 'ja'] as const) {
   test(`Mac: ${locale} editing palette preserves drafts and edits a compound formula in one undo`, async ({

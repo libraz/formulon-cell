@@ -1,9 +1,8 @@
-import { test } from '@playwright/test';
-
 import {
   runProtectedSheetObjectScenario,
   runProtectedSheetSlicerScenario,
 } from '../../../tests/e2e-shared/scenarios/object-protection.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('a protected sheet offers chart and shape insertion only with Edit objects', async ({
   page,

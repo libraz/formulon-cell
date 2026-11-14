@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   runMacCollapseSelection,
   runMacCommandReturnFill,
@@ -8,6 +7,7 @@ import {
   runMacSelectionEntry,
   runMacSelectionTraversal,
 } from '../../../tests/e2e-shared/scenarios/mac-cell-navigation.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Mac: Return and Tab cycle within the selected rectangle', async ({ page }) => {
   await runMacSelectionTraversal(page);

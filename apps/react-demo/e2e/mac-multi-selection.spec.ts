@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   runMacHeaderSelectionToggle,
   runMacMergedSelectionToggle,
@@ -7,6 +6,7 @@ import {
   runMacSelectionInputWithHole,
   runMacSelectionToggle,
 } from '../../../tests/e2e-shared/scenarios/mac-multi-selection.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Mac: Command click deselects and reselects cells without changing their values', async ({
   page,

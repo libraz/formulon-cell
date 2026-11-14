@@ -1,6 +1,5 @@
-import { test } from '@playwright/test';
-
 import { runPrintPdfSmokeScenario } from '../../../tests/e2e-shared/scenarios/print-pdf.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Print PDF smoke (vue-demo): preview HTML can render to a browser PDF', async ({
   browserName,

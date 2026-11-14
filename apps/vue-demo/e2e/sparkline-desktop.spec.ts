@@ -1,11 +1,10 @@
-import { test } from '@playwright/test';
-
 import {
   runSparklineFlatRenderScenario,
   runSparklineHiddenEmptyScenario,
   runSparklineRightToLeftScenario,
   runSparklineStyleStripScenario,
 } from '../../../tests/e2e-shared/scenarios/sparkline-desktop.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const platform of ['default', 'mac'] as const) {
   test(`Edit Data > Hidden & Empty Cells is a submenu on the Mac and a dialog elsewhere (${platform} chrome)`, async ({

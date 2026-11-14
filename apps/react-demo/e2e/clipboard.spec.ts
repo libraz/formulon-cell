@@ -1,11 +1,10 @@
-import { test } from '@playwright/test';
-
 import {
   runCopyPasteScenario,
   runCutPasteScenario,
   runRibbonPasteUndoScenario,
 } from '../../../tests/e2e-shared/scenarios/clipboard.js';
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 // Paste routes through `navigator.clipboard.readText()` because the host is a
 // non-editable div that never receives a native paste event. WebKit rejects

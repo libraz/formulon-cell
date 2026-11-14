@@ -1,9 +1,8 @@
-import { test } from '@playwright/test';
-
 import {
   runCreateNamesScenario,
   runCreateNamesTooLargeScenario,
 } from '../../../tests/e2e-shared/scenarios/create-names.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const platform of ['default', 'mac'] as const) {
   test(`Create Names from Selection names each column after its header (${platform} chrome)`, async ({

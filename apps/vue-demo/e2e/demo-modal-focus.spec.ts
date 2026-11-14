@@ -1,9 +1,8 @@
-import { test } from '@playwright/test';
-
 import {
   runDemoModalFocusScenario,
   runDemoStatusBarHostStateScenario,
 } from '../../../tests/e2e-shared/scenarios/demo-modal-focus.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('B8 (vue-demo): Review and Automate modals trap focus and return it to the grid', async ({
   page,

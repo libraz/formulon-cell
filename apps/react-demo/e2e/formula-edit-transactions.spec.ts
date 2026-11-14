@@ -1,8 +1,8 @@
-import { test } from '@playwright/test';
 import {
   runFormulaDraftTransactions,
   runR1C1ReferenceTransactions,
 } from '../../../tests/e2e-shared/scenarios/formula-edit-transactions.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const platform of ['default', 'mac'] as const) {
   for (const surface of ['inline', 'bar'] as const) {

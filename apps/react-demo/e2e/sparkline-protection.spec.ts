@@ -1,6 +1,5 @@
-import { test } from '@playwright/test';
-
 import { runSparklineProtectionScenario } from '../../../tests/e2e-shared/scenarios/sparkline-protection.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const platform of ['default', 'mac'] as const) {
   for (const cells of ['locked', 'unlocked'] as const) {

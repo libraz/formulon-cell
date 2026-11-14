@@ -1,9 +1,8 @@
-import { test } from '@playwright/test';
-
 import {
   runFillDownScenario,
   runRibbonFillDownScenario,
 } from '../../../tests/e2e-shared/scenarios/fill.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Fill-down (react-demo): Mod+D propagates the anchor value down the selection', async ({
   page,

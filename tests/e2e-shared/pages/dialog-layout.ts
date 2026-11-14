@@ -9,7 +9,8 @@ export const DIALOG_LAYOUT_PREFIX = '[fc-dialog-layout]';
  * checks then fail on, when two visible controls overlap, two text runs overlap, or a text run
  * overlaps a control it is not part of. A button or a caption may sit inside a text field, as an
  * icon, a clear button or a colour well's Automatic does; two buttons never share space. Rects are
- * clipped to their scrolling ancestors, so a list item scrolled out of view does not count.
+ * clipped to their scrolling ancestors, so a list item scrolled out of view does not count, and
+ * an open combobox popup is a layer above the dialog, so what it covers does not count either.
  */
 const watchDialogLayout = (prefix: string): void => {
   const CONTROLS = [
@@ -98,10 +99,33 @@ const watchDialogLayout = (prefix: string): void => {
     console.error(`${prefix} ${name.trim().slice(0, 40)}: ${a} overlaps ${b} at ${where}`);
   };
 
+  /** Whether `el` sits in the open popup of an expanded combobox: a listbox the combobox names in
+   *  `aria-controls`, or one beside it in the same parent. The popup is a layer above the dialog,
+   *  so what it covers is not a layout fault; the combobox itself is still checked. */
+  const inOpenPopup = (el: Element): boolean => {
+    const list = el.closest('[role="listbox"]');
+    if (!list?.parentElement) return false;
+    const opener = (combo: Element): boolean =>
+      combo.getAttribute('aria-expanded') === 'true' &&
+      combo.getAttribute('aria-haspopup') === 'listbox';
+    if (
+      list.id &&
+      [...document.querySelectorAll('[role="combobox"]')].some(
+        (combo) =>
+          opener(combo) &&
+          (combo.getAttribute('aria-controls') ?? '').split(/\s+/).includes(list.id),
+      )
+    )
+      return true;
+    return [...list.parentElement.children].some(
+      (sibling) => sibling.getAttribute('role') === 'combobox' && opener(sibling),
+    );
+  };
+
   const checkDialog = (root: Element): void => {
     const controls: { el: Element; box: Box }[] = [];
     for (const el of root.querySelectorAll(CONTROLS)) {
-      if (!visible(el)) continue;
+      if (!visible(el) || inOpenPopup(el)) continue;
       const box = clip(el, el.getBoundingClientRect(), root);
       if (box) controls.push({ el, box });
     }
@@ -128,7 +152,7 @@ const watchDialogLayout = (prefix: string): void => {
       const el = node.parentElement;
       if (!el || !node.textContent?.trim() || el.closest('select,option,textarea,script,style'))
         continue;
-      if (!visible(el)) continue;
+      if (!visible(el) || inOpenPopup(el)) continue;
       const range = document.createRange();
       range.selectNodeContents(node);
       for (const rect of range.getClientRects()) {
@@ -156,16 +180,18 @@ const watchDialogLayout = (prefix: string): void => {
     }
   };
 
+  // Checks on the frame after any mutation, so a dialog a scenario passes through quickly is
+  // checked whatever the machine load; nothing is checked before the fonts have loaded.
   let pending = 0;
+  let fontsReady = false;
   const schedule = (): void => {
-    window.clearTimeout(pending);
-    pending = window.setTimeout(() => {
-      requestAnimationFrame(() => {
-        for (const root of document.querySelectorAll('[role="dialog"],[role="alertdialog"]')) {
-          if (visible(root)) checkDialog(root);
-        }
-      });
-    }, 120);
+    if (pending || !fontsReady) return;
+    pending = requestAnimationFrame(() => {
+      pending = 0;
+      for (const root of document.querySelectorAll('[role="dialog"],[role="alertdialog"]')) {
+        if (visible(root)) checkDialog(root);
+      }
+    });
   };
   const start = (): void => {
     new MutationObserver(schedule).observe(document.documentElement, {
@@ -173,6 +199,10 @@ const watchDialogLayout = (prefix: string): void => {
       childList: true,
       attributes: true,
       attributeFilter: ['hidden', 'class', 'style', 'aria-selected', 'aria-expanded', 'disabled'],
+    });
+    void document.fonts.ready.then(() => {
+      fontsReady = true;
+      schedule();
     });
   };
   if (document.documentElement) start();

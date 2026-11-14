@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import {
   runExcelDataBarAppearanceScenario,
   runExcelDataBarBoundsScenario,
   runExcelIconComparisonScenario,
 } from '../../../tests/e2e-shared/scenarios/excel-conditional-parity.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const locale of ['en', 'ja'] as const) {
   test(`Excel data bar appearance survives edit and XLSX reload (vue-demo, ${locale})`, async ({

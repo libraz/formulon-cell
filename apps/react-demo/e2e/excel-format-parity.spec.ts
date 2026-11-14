@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import {
   runExcelFormatCategoryVisibilityScenario,
   runExcelFormatPreviewScenario,
   runExcelGeneralNotationScenario,
 } from '../../../tests/e2e-shared/scenarios/excel-format-parity.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const locale of ['en', 'ja'] as const) {
   test(`Excel General notation previews large and tiny values (react-demo, ${locale})`, async ({

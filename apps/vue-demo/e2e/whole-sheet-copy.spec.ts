@@ -1,6 +1,6 @@
-import { test } from '@playwright/test';
 import { runWholeSheetCopy } from '../../../tests/e2e-shared/scenarios/whole-sheet-copy.js';
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test.skip(({ browserName }) => browserName === 'webkit', 'WebKit denies clipboard reads');
 

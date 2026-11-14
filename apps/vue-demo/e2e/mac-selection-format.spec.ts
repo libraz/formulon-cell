@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   runMacSelectionAccentStyles,
   runMacSelectionBordersWithHole,
@@ -10,6 +9,7 @@ import {
   runMacSelectionFormatRepeat,
   runMacSelectionFormatWithHole,
 } from '../../../tests/e2e-shared/scenarios/mac-selection-format.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Mac: Japanese Accent cell styles expose all chips and repeat with one undo', async ({
   page,

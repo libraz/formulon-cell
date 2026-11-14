@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import {
   runFindReplaceShortcutScenario,
   runFunctionDialogShortcutScenario,
   runUndoSubsystemSmokeScenario,
 } from '../../../tests/e2e-shared/scenarios/dialogs.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('D02 (react-demo): Mod+F opens Find/Replace without errors', async ({ page }) => {
   await runFindReplaceShortcutScenario(page);

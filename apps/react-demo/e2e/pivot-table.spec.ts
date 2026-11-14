@@ -1,10 +1,10 @@
-import { test } from '@playwright/test';
 import { runPivotDateBetweenScenario } from '../../../tests/e2e-shared/scenarios/pivot-date-filter.js';
 import {
   runPivotTableFilterDialogScenario,
   runPivotTableProtectedSheetScenario,
   runPivotTableRibbonPrimaryDialogScenario,
 } from '../../../tests/e2e-shared/scenarios/pivot-table.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('P01 (react-demo): Label Filters on a row field open the Label Filter dialog', async ({
   page,
@@ -26,7 +26,7 @@ test('P03 (react-demo): a protected sheet makes Insert PivotTable unavailable un
 
 for (const platform of ['default', 'mac'] as const) {
   for (const locale of ['en', 'de', 'ja'] as const) {
-    test(`PivotTable Date Filters read ${locale} dates for Between and apply a period at once (${platform} chrome)`, async ({
+    test(`PivotTable Date Filters read ${locale} dates for Between and All Dates in the Period (${platform} chrome)`, async ({
       page,
     }) => {
       await runPivotDateBetweenScenario(page, locale, platform);

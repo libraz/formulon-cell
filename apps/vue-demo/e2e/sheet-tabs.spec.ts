@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import {
   runSheetTabCopyScenario,
   runSheetTabSwitchScenario,
   runSheetTabsScenario,
 } from '../../../tests/e2e-shared/scenarios/sheet-tabs.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('T01 (vue-demo): the + button adds a new sheet and makes it active', async ({ page }) => {
   await runSheetTabsScenario(page);

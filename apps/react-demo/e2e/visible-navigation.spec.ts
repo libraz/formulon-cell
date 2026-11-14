@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   runHiddenBandCommit,
   runHiddenBandNavigation,
@@ -7,6 +6,7 @@ import {
   runHiddenMergeNavigation,
   runMergedSelectionCycles,
 } from '../../../tests/e2e-shared/scenarios/visible-navigation.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const platform of ['mac', 'default'] as const) {
   test(`Excel: ${platform} keyboard skips hidden rows and columns`, async ({ page }) => {

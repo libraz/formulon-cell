@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import {
   runSheetRenameCancelScenario,
   runSheetRenameHistoryScenario,
   runSheetRenameScenario,
 } from '../../../tests/e2e-shared/scenarios/sheet-rename.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Sheet rename (vue-demo): F2 → type → Enter renames the active tab', async ({ page }) => {
   await runSheetRenameScenario(page);

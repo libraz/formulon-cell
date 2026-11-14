@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   runCellBandReferencesScenario,
   runCopiedBandInsertRoutesScenario,
@@ -15,6 +14,7 @@ import {
   runWholeRowCopyInsertScenario,
 } from '../../../tests/e2e-shared/scenarios/excel-operations-parity.js';
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test.skip(({ browserName }) => browserName === 'webkit', 'WebKit denies clipboard reads');
 

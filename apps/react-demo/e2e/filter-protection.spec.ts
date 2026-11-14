@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   runMacAutoFilterByColorScenario,
   runMacSortByColorScenario,
@@ -11,6 +10,7 @@ import {
   runProtectedSheetFilterAndBackgroundScenario,
   runProtectedSheetFilterButtonScenario,
 } from '../../../tests/e2e-shared/scenarios/filter-protection.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Ctrl+Shift+L toggles AutoFilter over the current region', async ({ page }) => {
   await runFilterShortcutScenario(page);

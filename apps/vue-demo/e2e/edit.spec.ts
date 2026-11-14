@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import {
   runEditBasicScenario,
   runFormulaScenario,
   runRecalcAfterEditScenario,
 } from '../../../tests/e2e-shared/scenarios/edit.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('E01 (vue-demo): typing a value commits on Enter', async ({ page }) => {
   await runEditBasicScenario(page);

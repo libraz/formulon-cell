@@ -1,6 +1,6 @@
-import { test } from '@playwright/test';
 import { runAxisFormatStructure } from '../../../tests/e2e-shared/scenarios/axis-format-structure.js';
 import { runSelectionFormat } from '../../../tests/e2e-shared/scenarios/selection-format.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 for (const locale of ['en', 'ja', 'de', 'fr', 'zh', 'ko', 'th']) {
   for (const platform of ['default', 'mac'] as const) {

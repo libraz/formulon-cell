@@ -1,11 +1,10 @@
-import { test } from '@playwright/test';
-
 import {
   runMacChromeScenario,
   runMacRibbonDisplayScenario,
   runMacRibbonLayoutScenario,
   runRibbonDisplayPlacementScenario,
 } from '../../../tests/e2e-shared/scenarios/mac-chrome.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Mac Excel chrome (vue-demo): compact tabs, geometry, and Home backstage entry', async ({
   page,

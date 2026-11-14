@@ -1,4 +1,3 @@
-import { test } from '@playwright/test';
 import {
   runKeyboardMenuLayoutScenario,
   runMacSubmenuLayoutScenario,
@@ -6,6 +5,7 @@ import {
   runPopupViewportScenario,
   runSubmenuHighlightScenario,
 } from '../../../tests/e2e-shared/scenarios/popup-focus.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('keyboard context menus follow the selected cell and close on resize (vue-demo)', async ({
   page,

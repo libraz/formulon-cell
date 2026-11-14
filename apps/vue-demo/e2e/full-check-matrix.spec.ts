@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import {
   FULL_CHECK_MATRIX,
   runFullCheckMatrixRow,
 } from '../../../tests/e2e-shared/scenarios/full-check-matrix.js';
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test.describe('full locale/runtime pairwise matrix (vue-demo)', () => {
   test.describe.configure({ mode: 'parallel' });

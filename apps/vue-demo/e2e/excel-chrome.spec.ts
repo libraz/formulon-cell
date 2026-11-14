@@ -1,5 +1,3 @@
-import { test } from '@playwright/test';
-
 import {
   runExcelChromeBackstageSearchScenario,
   runExcelChromeConditionalFormattingMenuScenario,
@@ -7,6 +5,7 @@ import {
   runExcelChromeHomeDenseRibbonScenario,
   runExcelChromeTableStyleGalleryScenario,
 } from '../../../tests/e2e-shared/scenarios/excel-chrome.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Excel chrome (vue-demo): File backstage, F6 landmarks, and Alt+Q search are wired', async ({
   page,

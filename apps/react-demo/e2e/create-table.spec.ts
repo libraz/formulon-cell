@@ -1,10 +1,9 @@
-import { test } from '@playwright/test';
-
 import {
   runCreateTableEntryPointsScenario,
   runFormatAsTableGalleryScenario,
   runMacCreateTableScenario,
 } from '../../../tests/e2e-shared/scenarios/create-table.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('Ctrl+T, Ctrl+L and Insert > Table open Create Table on the current region', async ({
   page,

@@ -1,10 +1,10 @@
-import { test } from '@playwright/test';
 import {
   runContextDialogReturnScenario,
   runHyperlinkCancelScenario,
   runPasteSpecialCancelScenario,
 } from '../../../tests/e2e-shared/scenarios/dialog-handoff.js';
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
+import { test } from '../../../tests/e2e-shared/test.js';
 
 test('context menu dialogs restore grid focus (react-demo)', async ({ page }) => {
   await runContextDialogReturnScenario(page);
