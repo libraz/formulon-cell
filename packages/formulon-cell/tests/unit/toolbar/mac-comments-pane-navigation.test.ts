@@ -43,4 +43,15 @@ describe('Mac Comments pane navigation policy', () => {
     expect(pane()?.querySelectorAll('.fc-commentspane__item').length).toBe(0);
     expect(pane()?.querySelector('.fc-commentspane__empty')).not.toBeNull();
   });
+
+  it('re-filters the open pane when the host narrows navigation', async () => {
+    const { store, workbook } = await mount(() => true);
+    addThreadedComment(store, { sheet: 0, row: 3, col: 2 }, 'kept', workbook);
+    addThreadedComment(store, { sheet: 0, row: 7, col: 2 }, 'dropped', workbook);
+    mutators.setCommentsPaneOpen(store, true);
+    expect(pane()?.querySelectorAll('.fc-commentspane__item').length).toBe(2);
+    sheet?.instance.setViewportOptions({ selectable: (addr: { row: number }) => addr.row !== 7 });
+    const items = [...(pane()?.querySelectorAll('.fc-commentspane__item') ?? [])];
+    expect(items.map((item) => item.textContent)).toEqual([expect.stringContaining('C4')]);
+  });
 });

@@ -7,7 +7,7 @@ import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { MAC_CONTEXT_LABELS } from '../toolbar/ribbon/mac/labels-data.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
 import { appendDialogButton } from './dialog-shell.js';
-import { isNavigationAddrAllowed } from './navigation-policy.js';
+import { isNavigationAddrAllowed, subscribeNavigationPolicy } from './navigation-policy.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
 export interface CommentsPaneDeps {
@@ -116,6 +116,9 @@ export function attachCommentsPane(deps: CommentsPaneDeps): CommentsPaneHandle {
     if (open) render();
   };
   const unsubscribe = store.subscribe(sync);
+  const unsubscribePolicy = subscribeNavigationPolicy(store, () => {
+    if (store.getState().ui.commentsPaneOpen) render();
+  });
   closeBtn.addEventListener('click', () => {
     mutators.setCommentsPaneOpen(store, false);
     host.focus();
@@ -126,6 +129,7 @@ export function attachCommentsPane(deps: CommentsPaneDeps): CommentsPaneHandle {
   return {
     detach: () => {
       unsubscribe();
+      unsubscribePolicy();
       root.remove();
       if (dock) syncTaskpaneDock(dock);
     },

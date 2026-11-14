@@ -115,6 +115,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- An open Mac Comments pane re-filters its list when the host changes the navigation range or selectable cells.
 - The Mac Comments pane lists only comments on cells the host lets the user navigate to, as the comment list does.
 - The .xlsb compatibility notes state what an .xlsb save writes (notes, threaded comments, filters, pictures, shapes and charts), which features make it refuse and offer .xlsx instead, and what it may leave out and count.
 - The Mac PivotTable Options dialog uses the desktop's labels in all seven languages.

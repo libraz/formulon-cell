@@ -69,6 +69,23 @@ interface PolicyRecord {
 }
 
 const registry = new WeakMap<SpreadsheetStore, PolicyRecord>();
+const policyListeners = new WeakMap<SpreadsheetStore, Set<() => void>>();
+
+/** Call `listener` whenever the store's navigation policy changes; a policy can change without
+ *  any store update (a new `selectable` over the same bounds). Returns the unsubscribe. */
+export function subscribeNavigationPolicy(
+  store: SpreadsheetStore,
+  listener: () => void,
+): () => void {
+  const set = policyListeners.get(store) ?? new Set<() => void>();
+  policyListeners.set(store, set);
+  set.add(listener);
+  return () => set.delete(listener);
+}
+
+const notifyPolicyChange = (store: SpreadsheetStore): void => {
+  for (const listener of [...(policyListeners.get(store) ?? [])]) listener();
+};
 
 /** A bounded scan is enough for an embedded form and prevents a sparse
  * predicate from turning Tab into a billion-cell loop. */
@@ -254,6 +271,7 @@ export function attachNavigationPolicy(
         record.options = undefined;
         registry.delete(store);
         syncNavigationViewport(store);
+        notifyPolicyChange(store);
         return;
       }
       // Validate and normalize before replacing the current policy.
@@ -262,6 +280,7 @@ export function attachNavigationPolicy(
       record.options = normalized;
       registry.set(store, record);
       syncNavigationViewport(store);
+      notifyPolicyChange(store);
     },
     dispose(): void {
       if (registry.get(store) !== record) return;
@@ -269,6 +288,7 @@ export function attachNavigationPolicy(
       registry.delete(store);
       record.options = undefined;
       syncNavigationViewport(store);
+      notifyPolicyChange(store);
     },
   };
   record.getWb = getWb;
@@ -278,6 +298,7 @@ export function attachNavigationPolicy(
     record.options = normalizeOptions(options, getWb(), store.getState());
     registry.set(store, record);
     syncNavigationViewport(store);
+    notifyPolicyChange(store);
   }
   return handle;
 }
