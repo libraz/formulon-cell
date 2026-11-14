@@ -20,18 +20,42 @@ const VERSION_TEMPLATES: Readonly<
   3: 'compatibilityVersionUnsupported',
 };
 
-/** The drawn label of a Compatibility Version entry. */
+/** The drawn label of a Compatibility Version entry; `shown` is the number it names, which for
+ *  the unsupported entry is the book's own stamp. */
 export const compatibilityVersionLabel = (
   text: Pick<Strings['ribbonMenu'], CompatibilityVersionTemplateKey>,
   version: CompatibilityVersionCode,
-): string => text[VERSION_TEMPLATES[version]].replace('{n}', String(version));
+  shown: number = version,
+): string => text[VERSION_TEMPLATES[version]].replace('{n}', String(shown));
 
-/** Whether `version` is listed while the workbook holds `current`: version 3 only on a book
- *  stamped 3. */
-export const compatibilityVersionListed = (
+/** How a Compatibility Version entry shows while the workbook holds the stamp `current`. */
+export interface CompatibilityVersionRow {
+  /** Version 1 and 2 always; the unsupported entry only on a book stamped 3 or higher. */
+  readonly listed: boolean;
+  readonly checked: boolean;
+  /** The number the entry names: the book's own stamp for the unsupported entry. */
+  readonly shown: number;
+  /** See {@link compatibilityStampLocked}. */
+  readonly locked: boolean;
+}
+
+/** Whether the stamp `current` is one the setter cannot set back (above 3), so a change away
+ *  from it could not be undone. */
+export const compatibilityStampLocked = (current: number | null): boolean =>
+  current !== null && current > 3;
+
+export const compatibilityVersionRow = (
   version: CompatibilityVersionCode,
-  current: CompatibilityVersionCode | null,
-): boolean => version !== 3 || current === 3;
+  current: number | null,
+): CompatibilityVersionRow => {
+  const unsupported = current !== null && current >= 3;
+  return {
+    listed: version !== 3 || unsupported,
+    checked: version === 3 ? unsupported : current === version,
+    shown: version === 3 && unsupported ? current : version,
+    locked: compatibilityStampLocked(current),
+  };
+};
 
 /** Chooses a Compatibility Version as one undo step; undo sets the previous value back. The held
  *  value records nothing. Returns whether the workbook changed. */
@@ -42,6 +66,8 @@ export function chooseCompatibilityVersion(
 ): boolean {
   const previous = wb.compatibilityVersion();
   if (previous === null || previous === version) return false;
+  // The setter cannot restore a stamp above 3.
+  if (previous !== 1 && previous !== 2 && previous !== 3) return false;
   if (!wb.setCompatibilityVersion(version)) return false;
   if (history && !history.isReplaying()) {
     history.push({

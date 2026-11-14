@@ -111,7 +111,7 @@ type CircularReferenceAccess = {
 
 /** The engine's Compatibility Version accessor, absent from engine builds that predate it. */
 type CompatibilityVersionAccess = {
-  getCompatibilityVersion?: () => CompatibilityVersionCode;
+  getCompatibilityVersion?: () => number;
   setCompatibilityVersion?: (version: CompatibilityVersionCode) => void;
 };
 
@@ -534,8 +534,9 @@ export abstract class WorkbookHandleFormulasMethods {
     return attempt(() => s.isCellStale?.(addr.row, addr.col)) === true;
   }
 
-  /** The workbook's Compatibility Version, or `null` when the engine has no accessor. */
-  compatibilityVersion(): CompatibilityVersionCode | null {
+  /** The workbook's Compatibility Version stamp, or `null` when the engine has no accessor. A
+   *  loaded stamp above 3 reads back as its own number. */
+  compatibilityVersion(): number | null {
     assertAlive(this);
     const w = wb(this) as Workbook & CompatibilityVersionAccess;
     if (!hasMethod(w, 'getCompatibilityVersion')) return null;

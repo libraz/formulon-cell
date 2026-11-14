@@ -3,7 +3,9 @@ import { selectedSessionChart } from '../../../commands/chart-design.js';
 import { commentAt } from '../../../commands/comment.js';
 import {
   COMPATIBILITY_VERSIONS,
-  compatibilityVersionListed,
+  compatibilityStampLocked,
+  compatibilityVersionLabel,
+  compatibilityVersionRow,
 } from '../../../commands/compatibility-version.js';
 import { workbookHasNotes } from '../../../commands/convert-notes.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
@@ -271,11 +273,11 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
     }
   }
 
-  if (
-    id.startsWith('mac.formulas.calc.compatVersion.') &&
-    (instance.workbook?.compatibilityVersion?.() ?? null) === null
-  )
-    return instance.i18n.strings.backstage.commandUnavailable;
+  if (id.startsWith('mac.formulas.calc.compatVersion.')) {
+    const stamp = instance.workbook?.compatibilityVersion?.() ?? null;
+    if (stamp === null || compatibilityStampLocked(stamp))
+      return instance.i18n.strings.backstage.commandUnavailable;
+  }
 
   if (id === 'mac.formulas.errorCheck.trace') {
     const active = state.selection.active;
@@ -437,9 +439,21 @@ export const projectMacRibbonState = (
     });
   }
   for (const version of COMPATIBILITY_VERSIONS) {
+    const row = compatibilityVersionRow(version, compatVersion);
     for (const button of buttons.get(`mac.formulas.calc.compatVersion.${version}`) ?? []) {
-      button.hidden = !compatibilityVersionListed(version, compatVersion);
-      button.setAttribute('aria-checked', String(compatVersion === version));
+      button.hidden = !row.listed;
+      button.setAttribute('aria-checked', String(row.checked));
+      // The unsupported entry names the book's own stamp.
+      if (version === 3) {
+        const label = compatibilityVersionLabel(
+          instance.i18n.strings.ribbonMenu,
+          version,
+          row.shown,
+        );
+        button.textContent = label;
+        button.title = label;
+        button.setAttribute('aria-label', label);
+      }
     }
   }
 

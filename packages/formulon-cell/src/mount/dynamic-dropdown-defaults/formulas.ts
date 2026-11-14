@@ -4,7 +4,8 @@ import { circularReferenceEntries } from '../../commands/circular-references.js'
 import {
   COMPATIBILITY_VERSIONS,
   chooseCompatibilityVersion,
-  compatibilityVersionListed,
+  compatibilityVersionLabel,
+  compatibilityVersionRow,
 } from '../../commands/compatibility-version.js';
 import { DATA_TABLE_COMMAND } from '../../commands/data-table.js';
 import { cellValueIsFormulaError } from '../../commands/error-indicators.js';
@@ -186,9 +187,17 @@ const updateCalcOptionsMenu =
     for (const choice of COMPATIBILITY_VERSIONS) {
       const button = menu.querySelector<HTMLButtonElement>(`[data-calc-option="compat-${choice}"]`);
       if (!button) continue;
-      button.hidden = !compatibilityVersionListed(choice, version);
-      button.setAttribute('aria-checked', String(version === choice));
-      setMenuControlDisabled(button, version === null, unavailable);
+      const row = compatibilityVersionRow(choice, version);
+      button.hidden = !row.listed;
+      button.setAttribute('aria-checked', String(row.checked));
+      const text = button.querySelector('.fc-tb__menu-item__text');
+      if (text)
+        text.textContent = compatibilityVersionLabel(
+          instance.i18n.strings.ribbonMenu,
+          choice,
+          row.shown,
+        );
+      setMenuControlDisabled(button, version === null || row.locked, unavailable);
     }
     // The host has no help page to open.
     const learnMore = menu.querySelector<HTMLButtonElement>(
