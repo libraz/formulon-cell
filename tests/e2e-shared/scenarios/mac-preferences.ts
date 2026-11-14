@@ -49,3 +49,45 @@ export async function runMacPreferencesScenario(page: Page): Promise<void> {
   await expect(forward).toBeEnabled();
   await sp.expectNoConsoleErrors();
 }
+
+/** The View pane title as the desktop draws it per UI language. */
+const VIEW_PANE_TITLE = {
+  en: 'View',
+  ja: '表示',
+  de: 'Ansicht',
+  fr: 'Affichage',
+  zh: '视图',
+} as const;
+
+/** The File backstage's Options entry per UI language. */
+const OPTIONS_LABEL = {
+  en: 'Options',
+  ja: 'オプション',
+  de: 'Optionen',
+  fr: 'Options',
+  zh: '选项',
+} as const;
+
+/** The Preferences window opens on View, and its toolbar heading and accessible name carry the
+ *  pane title in the UI language. */
+export async function runMacPreferencesViewTitleScenario(
+  page: Page,
+  locale: keyof typeof VIEW_PANE_TITLE,
+): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount({ platform: 'mac', locale });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await sp.expectNoStub();
+  await page.locator('.demo__brand-mark').first().click();
+  const backstage = page.locator('.fc-tb__backstage[role="dialog"]').first();
+  await expect(backstage).toBeVisible();
+  await backstage.getByRole('button', { name: OPTIONS_LABEL[locale], exact: true }).first().click();
+  const prefs = page.locator('.fc-prefs[role="dialog"]:not([hidden])');
+  await expect(prefs).toBeVisible();
+  const title = VIEW_PANE_TITLE[locale];
+  await expect(prefs.locator('.fc-prefs__pane[data-pane="view"]')).toBeVisible();
+  await expect(prefs.locator('.fc-prefs__heading')).toHaveText(title);
+  await expect(prefs.locator('.fc-prefs__header')).toContainText(title);
+  await expect(prefs).toHaveAttribute('aria-label', title);
+  await sp.expectNoConsoleErrors();
+}
