@@ -65,6 +65,15 @@ afterEach(() => {
 });
 
 describe('PivotTable filter panel conditions', () => {
+  it('offers the field itself, then each data field, as the sort target', async () => {
+    await setup();
+    const sortBy = document.querySelector<HTMLSelectElement>(
+      'select[data-pivot-filter-sort-by]',
+    ) as HTMLSelectElement;
+    expect([...sortBy.options].map((o) => o.text)).toEqual(['Region', 'Sum of Amt']);
+    expect(sortBy.value).toBe('');
+  });
+
   it('lists every entry enabled, Not Between on the label list only', async () => {
     await setup();
     for (const which of ['label', 'value'] as const) {
