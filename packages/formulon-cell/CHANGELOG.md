@@ -95,6 +95,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- On the Mac, a new cell note opens at the desktop's default size (104 x 76 pt) beside its cell, flips up at the last row and left at the last column, uses 10 pt Yu Gothic UI, scales with the zoom, and commits to its own cell when you click away.
 - On the Mac, the Table, PivotTable Analyze, PivotTable Design and Sparkline tabs title their groups in every locale, in the desktop's words. Insert Slicer moves into the Table tab's Tools group, and the PivotTable Design tab's totals and layout controls share one Layout group, as on the desktop.
 - `customLists` on the mount options: the user's custom lists, which custom-list sorting and AutoFill follow after the locale's built-in day and month lists. The Sort dialog's Order offers Custom List…, opening Custom Lists, where NEW LIST takes typed entries, Add and Delete change the user's lists (the built-in lists stay read-only) and each change emits `update` with `source: 'user'`; the chosen list is written to the file with the sort level.
 - The Sort dialog sorts on cell colour, font colour or conditional formatting icon as well as values: Sort On offers the kinds the column shows, a colour or icon level picks from the column's own fills, font colours or icons, and its order is On Top or On Bottom.

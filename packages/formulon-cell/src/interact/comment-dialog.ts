@@ -13,10 +13,10 @@ import {
 import { commentWrite, threadWrite } from '../commands/comment-actions.js';
 import { DEFAULT_COMMENT_AUTHOR } from '../commands/comment-author.js';
 import type { History } from '../commands/history.js';
-import { formatA1Cell } from '../engine/address.js';
+import { formatA1Cell, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { cellRect, layoutForView } from '../render/geometry.js';
+import { cellRect, layoutForView, pointPx } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -52,6 +52,16 @@ const NOTE_MIN_H = 132;
 const START_W = 244;
 const START_H = 104;
 const GAP = 8;
+// The Mac note shape in pt, scaled to screen px by `pointPx`: size, gap right of the cell, lift above
+// the cell top, and the distance from the sheet bottom when flipped up.
+const MAC_NOTE_W = 104;
+const MAC_NOTE_H = 76;
+const MAC_NOTE_GAP = 15;
+const MAC_NOTE_LIFT = 10;
+const MAC_NOTE_FLIP_UP = 88;
+const MAC_NOTE_FONT_PT = 10;
+// Trims float noise from pt-to-px products.
+const px = (v: number): number => Math.round(v * 100) / 100;
 
 /**
  * Edit-comment popover. Renders as an desktop-spreadsheet style yellow sticky note
@@ -164,6 +174,9 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   let threadedMode = false;
   let startMode = false;
+  let macNote = false;
+  // The cell the dialog opened on: a click that commits the note may already have moved the selection.
+  let target = store.getState().selection.active;
   let editingThreadId: string | null = null;
   let replyingTo: string | null = null;
   const labels = {
@@ -244,8 +257,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   };
 
   const writeComment = (next: string | undefined): boolean => {
-    const state = store.getState();
-    const addr = state.selection.active;
+    const addr = target;
     const wb = getWb() ?? undefined;
     if (
       wb?.capabilities.threadedComments &&
@@ -286,7 +298,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   const writeThread = (): boolean => {
     const state = store.getState();
-    const addr = state.selection.active;
+    const addr = target;
     const wb = getWb() ?? undefined;
     if (!wb?.capabilities.threadedComments || textarea.value.length === 0) {
       error.textContent = labels.writeFailed;
@@ -345,8 +357,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   const onRemove = (): void => {
     if (threadedMode) {
-      const state = store.getState();
-      const addr = state.selection.active;
+      const addr = target;
       const wb = getWb() ?? undefined;
       const opening = threadedCommentsAt(store, addr, wb)[0];
       if (opening && wb) {
@@ -376,8 +387,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   const onReply = (): void => {
     if (!threadedMode) return;
-    const state = store.getState();
-    const addr = state.selection.active;
+    const addr = target;
     const opening = threadedCommentsAt(store, addr, getWb() ?? undefined)[0];
     if (!opening) return;
     editingThreadId = null;
@@ -388,8 +398,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   const onResolve = (): void => {
     if (!threadedMode) return;
-    const state = store.getState();
-    const addr = state.selection.active;
+    const addr = target;
     const wb = getWb() ?? undefined;
     const opening = threadedCommentsAt(store, addr, wb)[0];
     if (opening && wb) {
@@ -450,7 +459,9 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     const s = store.getState();
     const a = s.selection.active;
     const hostW = host.clientWidth;
-    const noteW = startMode ? START_W : NOTE_W;
+    const z = macNote ? pointPx(s.layout, s.viewport) : 1;
+    const noteW = startMode ? START_W : macNote ? MAC_NOTE_W * z : NOTE_W;
+    const gap = macNote ? MAC_NOTE_GAP * z : GAP;
     let left = Math.max(8, hostW / 2 - noteW / 2);
     let top = 80;
     let tailLeft: number | null = null;
@@ -469,23 +480,35 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       // Prefer the side the sheet reads towards, and fall back to the other
       // when the note would run off the host.
       const rtl = s.ui.rightToLeft === true;
-      const preferred = rtl ? cellLeft - GAP - noteW : cellLeft + r.w + GAP;
-      const fallback = rtl ? cellLeft + r.w + GAP : cellLeft - GAP - noteW;
-      const preferredFits = rtl ? preferred >= 8 : preferred + noteW <= hostW - 8;
+      const preferred = rtl ? cellLeft - gap - noteW : cellLeft + r.w + gap;
+      const fallback = rtl ? cellLeft + r.w + gap : cellLeft - gap - noteW;
+      const sheetEdge = macNote && !rtl && a.col >= MAX_COL;
+      const preferredFits = !sheetEdge && (rtl ? preferred >= 8 : preferred + noteW <= hostW - 8);
       const leftCandidate = preferredFits ? preferred : fallback;
       const placedRight = rtl ? !preferredFits : preferredFits;
       left = Math.max(8, leftCandidate);
       // Keep the note vertically near the cell — the tail is positioned at
       // top:14 inside the note, so we line that up with the cell mid.
-      top = Math.max(8, startMode ? cellMid - START_H / 2 : cellMid - 14 - 6);
+      if (macNote) {
+        const flipTop = a.row >= MAX_ROW ? cellTop + r.h - MAC_NOTE_FLIP_UP * z : null;
+        top = Math.max(8, flipTop ?? cellTop - MAC_NOTE_LIFT * z);
+      } else top = Math.max(8, startMode ? cellMid - START_H / 2 : cellMid - 14 - 6);
       tailLeft = placedRight ? -7 : noteW - 1;
     } catch {
       tailLeft = null;
     }
     wrap.style.left = `${Math.round(left)}px`;
     wrap.style.top = `${Math.round(top)}px`;
-    wrap.style.width = `${noteW}px`;
-    wrap.style.minHeight = `${startMode ? START_H : NOTE_MIN_H}px`;
+    wrap.style.width = `${px(noteW)}px`;
+    if (macNote) {
+      wrap.style.minHeight = '';
+      wrap.style.height = `${px(MAC_NOTE_H * z)}px`;
+      wrap.style.fontSize = `${px(MAC_NOTE_FONT_PT * z)}px`;
+    } else {
+      wrap.style.height = '';
+      wrap.style.fontSize = '';
+      wrap.style.minHeight = `${startMode ? START_H : NOTE_MIN_H}px`;
+    }
     if (tailLeft == null) {
       tail.style.display = 'none';
     } else {
@@ -529,6 +552,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       mutationAuthorization = options.entry ?? INSTANCE_API_COMMENT_ENTRY;
       const state = store.getState();
       const addr = state.selection.active;
+      target = addr;
       const wb = getWb() ?? undefined;
       const current = commentAt(state, addr) ?? '';
       const threads = wb?.capabilities.threadedComments ? threadedCommentsAt(store, addr, wb) : [];
@@ -543,9 +567,16 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
         threadedMode &&
         threads.length === 0 &&
         (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac';
+      // A new note on the Mac profile is a bare text box with no header or footer.
+      macNote =
+        !startMode &&
+        !threadedMode &&
+        !current &&
+        (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac';
       wrap.classList.toggle('fc-cmtnote--start', startMode);
-      head.hidden = startMode;
-      footer.hidden = startMode;
+      wrap.classList.toggle('fc-cmtnote--mac-note', macNote);
+      head.hidden = startMode || macNote;
+      footer.hidden = startMode || macNote;
       start.hidden = !startMode;
       sendBtn.hidden = !startMode;
       projectDisabledState(sendBtn, true, null);
@@ -578,7 +609,8 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
           () => [wrap],
           () => {
             if (wrap.hidden) return;
-            onCancel();
+            if (macNote) onOk();
+            else onCancel();
           },
           { event: 'mousedown' },
         );

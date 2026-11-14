@@ -178,6 +178,19 @@
     filter: brightness(1.05);
   }
 
+  /* Mac new note: a bare text box; size and font size are set inline (zoomed). */
+  .fc-cmtnote--mac-note {
+    font-family: "Yu Gothic UI", var(--fc-font-ui, system-ui), sans-serif;
+    color: #000;
+    line-height: normal;
+    overflow: hidden;
+  }
+  .fc-cmtnote--mac-note .fc-cmtnote__textarea {
+    min-height: 0;
+    padding: 2px 4px;
+    color: #000;
+  }
+
   /* Mac conversation card: author row over a separator, then a rounded input
      with the send icon inside it. Sizes in pt taken as px. */
   .fc-cmtnote--start {
