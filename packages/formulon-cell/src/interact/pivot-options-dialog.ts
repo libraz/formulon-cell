@@ -1,3 +1,4 @@
+import type { PivotCacheOptions, PivotOptions } from '@libraz/formulon';
 import { pivotReportEffects, pivotWrite } from '../commands/pivot-actions.js';
 import type { Strings } from '../i18n/strings.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
@@ -12,43 +13,88 @@ import {
 } from './dialog-shell.js';
 import type { PivotCommitContext } from './pivot-field-settings-dialog-apply.js';
 
-export interface PivotOptionsDialogOptions {
-  host: HTMLElement;
-  strings: Strings;
-  /** The report's current name. */
-  name: string;
-  /** Whether the report's columns autofit when it updates. */
-  autofitColumns: boolean;
-}
+/** The report options the dialog edits. */
+export type PivotOptionsEdit = Pick<
+  PivotOptions,
+  | 'showDrill'
+  | 'printDrill'
+  | 'showDataTips'
+  | 'showHeaders'
+  | 'gridDropZones'
+  | 'showError'
+  | 'errorCaption'
+  | 'showMissing'
+  | 'missingCaption'
+  | 'showEmptyRow'
+  | 'showEmptyColumn'
+  | 'itemPrintTitles'
+  | 'fieldPrintTitles'
+  | 'multipleFieldFilters'
+  | 'autoFormatting'
+  | 'preserveFormatting'
+  | 'mergeItem'
+  | 'indent'
+  | 'pageOverThenDown'
+  | 'pageWrap'
+  | 'customListSort'
+  | 'enableDrill'
+  | 'altText'
+  | 'altTextSummary'
+>;
 
-export interface PivotOptionsResult {
-  name: string;
-  autofitColumns: boolean;
-}
+/** The options of the report's cache the dialog edits. */
+export type PivotCacheOptionsEdit = Pick<PivotCacheOptions, 'saveData' | 'refreshOnLoad'>;
 
 /** The report settings the dialog edits. */
 export interface PivotOptionsValues {
   name: string;
-  autofitColumns: boolean;
+  options: PivotOptionsEdit;
+  cache: PivotCacheOptionsEdit;
 }
 
+export interface PivotOptionsDialogOptions extends PivotOptionsValues {
+  host: HTMLElement;
+  strings: Strings;
+}
+
+export type PivotOptionsResult = PivotOptionsValues;
+
 type TabId = 'display' | 'layout' | 'data' | 'altText';
+type OptionKey = keyof PivotOptionsEdit;
+type CacheKey = keyof PivotCacheOptionsEdit;
+type CaptionKey = 'errorCaption' | 'missingCaption';
+
+/** The largest compact-form indent the engine stores; the dialog shows each value plus one. */
+const MAX_INDENT = 126;
+/** The largest number of report filter fields per column or row. */
+const MAX_PAGE_WRAP = 255;
 
 /** One control row of a tab: a check box, a radio group, a popup or a text field.
- *  Only the name and the autofit check box have an engine setter; every other
- *  option renders with the desktop default and stays disabled. */
+ *  A row bound to an option or a cache option edits it; an unbound row renders the
+ *  desktop default and stays disabled. */
 type OptionRow =
   | {
       kind: 'check';
       label: string;
       checked: boolean;
       indent?: boolean;
-      field?: boolean;
-      autofit?: boolean;
+      option?: OptionKey;
+      cache?: CacheKey;
+      caption?: { key: CaptionKey; value: string | null };
     }
-  | { kind: 'radios'; label?: string; options: readonly string[]; selected: number }
-  | { kind: 'popup'; label: string; value: string }
-  | { kind: 'rule' };
+  | {
+      kind: 'radios';
+      label?: string;
+      options: readonly string[];
+      selected: number;
+      option?: 'pageOverThenDown';
+    }
+  | {
+      kind: 'popup';
+      label: string;
+      value: number;
+      option?: { key: 'indent' | 'pageWrap'; offset: number; max: number };
+    };
 
 interface OptionGroup {
   label: string;
@@ -58,6 +104,9 @@ interface OptionGroup {
 const disable = (el: HTMLElement & { disabled?: boolean }, reason: string): void => {
   projectDisabledState(el, true, reason, { datasetKey: 'disabledReason' });
 };
+
+const range = (from: number, to: number): number[] =>
+  Array.from({ length: to - from + 1 }, (_, index) => from + index);
 
 function renderGroups(
   panel: HTMLElement,
@@ -79,22 +128,27 @@ function renderGroups(
     const controls = document.createElement('div');
     controls.className = 'fc-pvoptdlg__controls';
     for (const row of group.rows) {
-      if (row.kind === 'rule') continue;
       if (row.kind === 'check') {
         const line = document.createElement('label');
         line.className = `fc-pvoptdlg__check${row.indent ? ' fc-pvoptdlg__check--indent' : ''}`;
         const box = document.createElement('input');
         box.type = 'checkbox';
         box.checked = row.checked;
-        if (row.autofit) box.dataset.pvoptAutofit = '';
+        if (row.option) box.dataset.pvoptOption = row.option;
+        else if (row.cache) box.dataset.pvoptCache = row.cache;
         else disable(box, reason);
         line.append(box, document.createTextNode(row.label));
-        if (row.field) {
+        if (row.caption) {
           const text = document.createElement('input');
           text.type = 'text';
           text.className = 'fc-pvoptdlg__field';
           text.setAttribute('aria-label', row.label);
-          disable(text, reason);
+          text.value = row.caption.value ?? '';
+          text.dataset.pvoptOption = row.caption.key;
+          // The caption applies while its check box is on, as on the desktop.
+          const follow = (): void => projectDisabledState(text, !box.checked, null);
+          follow();
+          box.addEventListener('change', follow);
           line.appendChild(text);
         }
         controls.appendChild(line);
@@ -111,13 +165,17 @@ function renderGroups(
         list.className = 'fc-pvoptdlg__radios';
         list.setAttribute('role', 'radiogroup');
         if (row.label) list.setAttribute('aria-label', row.label);
+        if (row.option) list.dataset.pvoptOption = row.option;
+        const groupName = `fc-pvoptdlg-${row.option ?? row.options.join('|')}`;
         for (const [index, option] of row.options.entries()) {
           const line = document.createElement('label');
           line.className = 'fc-pvoptdlg__radio';
           const radio = document.createElement('input');
           radio.type = 'radio';
+          radio.name = groupName;
+          radio.value = String(index);
           radio.checked = index === row.selected;
-          disable(radio, reason);
+          if (!row.option) disable(radio, reason);
           line.append(radio, document.createTextNode(option));
           list.appendChild(line);
         }
@@ -129,11 +187,17 @@ function renderGroups(
         const caption = document.createElement('span');
         caption.className = 'fc-pvoptdlg__caption';
         caption.textContent = row.label;
-        const select = createDialogSelect([{ value: row.value, label: row.value }], row.value, {
-          className: 'fc-fmtdlg__select fc-pvoptdlg__popup',
-        });
+        const bind = row.option;
+        const values = bind ? range(bind.offset, bind.max + bind.offset) : [row.value];
+        const shown = String(row.value);
+        const select = createDialogSelect(
+          values.map((value) => ({ value: String(value), label: String(value) })),
+          shown,
+          { className: 'fc-fmtdlg__select fc-pvoptdlg__popup' },
+        );
         select.setAttribute('aria-label', row.label);
-        disable(select, reason);
+        if (bind) select.dataset.pvoptOption = bind.key;
+        else disable(select, reason);
         line.append(caption, select);
         controls.appendChild(line);
       }
@@ -143,7 +207,31 @@ function renderGroups(
   }
 }
 
-/** The PivotTable Options dialog. Only the name and the autofit option apply; resolves null on cancel. */
+/** Reads the bound controls of the dialog back into option values. */
+function readControls(
+  root: HTMLElement,
+  initial: PivotOptionsValues,
+): Pick<PivotOptionsValues, 'options' | 'cache'> {
+  const options: Record<string, unknown> = { ...initial.options };
+  const cache: Record<string, unknown> = { ...initial.cache };
+  for (const el of root.querySelectorAll<HTMLElement>('[data-pvopt-option]')) {
+    const key = el.dataset.pvoptOption as OptionKey;
+    if (el instanceof HTMLInputElement && el.type === 'checkbox') options[key] = el.checked;
+    else if (el instanceof HTMLSelectElement)
+      options[key] = Number(el.value) - (key === 'indent' ? 1 : 0);
+    else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)
+      options[key] = el.value === '' ? null : el.value;
+    else options[key] = el.querySelector<HTMLInputElement>('input:checked')?.value === '1';
+  }
+  for (const el of root.querySelectorAll<HTMLInputElement>('[data-pvopt-cache]'))
+    cache[el.dataset.pvoptCache as CacheKey] = el.checked;
+  return {
+    options: options as unknown as PivotOptionsEdit,
+    cache: cache as unknown as PivotCacheOptionsEdit,
+  };
+}
+
+/** The PivotTable Options dialog; resolves null on cancel. */
 export const showPivotOptionsDialog = (
   opts: PivotOptionsDialogOptions,
 ): Promise<PivotOptionsResult | null> =>
@@ -222,6 +310,7 @@ export const showPivotOptionsDialog = (
     for (const [id, pair] of pairs) pair.button.addEventListener('click', () => activate(id));
 
     const reason = t.unavailable;
+    const o = opts.options;
     const d = t.display;
     const display = pairs.get('display')?.panel;
     if (display) {
@@ -231,29 +320,82 @@ export const showPivotOptionsDialog = (
           {
             label: d.group,
             rows: [
-              { kind: 'check', label: d.expandButtons, checked: true },
-              { kind: 'check', label: d.printExpandButtons, checked: false, indent: true },
-              { kind: 'check', label: d.contextualTooltips, checked: true },
-              { kind: 'check', label: d.fieldCaptions, checked: true },
-              { kind: 'check', label: d.classicLayout, checked: false },
-              { kind: 'check', label: d.errorValues, checked: false, field: true },
-              { kind: 'check', label: d.emptyCells, checked: true, field: true },
+              { kind: 'check', label: d.expandButtons, checked: o.showDrill, option: 'showDrill' },
+              {
+                kind: 'check',
+                label: d.printExpandButtons,
+                checked: o.printDrill,
+                indent: true,
+                option: 'printDrill',
+              },
+              {
+                kind: 'check',
+                label: d.contextualTooltips,
+                checked: o.showDataTips,
+                option: 'showDataTips',
+              },
+              {
+                kind: 'check',
+                label: d.fieldCaptions,
+                checked: o.showHeaders,
+                option: 'showHeaders',
+              },
+              {
+                kind: 'check',
+                label: d.classicLayout,
+                checked: o.gridDropZones,
+                option: 'gridDropZones',
+              },
+              {
+                kind: 'check',
+                label: d.errorValues,
+                checked: o.showError,
+                option: 'showError',
+                caption: { key: 'errorCaption', value: o.errorCaption },
+              },
+              {
+                kind: 'check',
+                label: d.emptyCells,
+                checked: o.showMissing,
+                option: 'showMissing',
+                caption: { key: 'missingCaption', value: o.missingCaption },
+              },
             ],
           },
           'rule',
           {
             label: d.noDataGroup,
             rows: [
-              { kind: 'check', label: d.noDataRows, checked: false },
-              { kind: 'check', label: d.noDataColumns, checked: false },
+              {
+                kind: 'check',
+                label: d.noDataRows,
+                checked: o.showEmptyRow,
+                option: 'showEmptyRow',
+              },
+              {
+                kind: 'check',
+                label: d.noDataColumns,
+                checked: o.showEmptyColumn,
+                option: 'showEmptyColumn',
+              },
             ],
           },
           'rule',
           {
             label: d.printGroup,
             rows: [
-              { kind: 'check', label: d.repeatRowLabels, checked: true },
-              { kind: 'check', label: d.printTitles, checked: false },
+              {
+                kind: 'check',
+                label: d.repeatRowLabels,
+                checked: o.itemPrintTitles,
+                option: 'itemPrintTitles',
+              },
+              {
+                kind: 'check',
+                label: d.printTitles,
+                checked: o.fieldPrintTitles,
+                option: 'fieldPrintTitles',
+              },
               { kind: 'check', label: d.itemLabels, checked: true },
             ],
           },
@@ -270,16 +412,31 @@ export const showPivotOptionsDialog = (
           {
             label: l.group,
             rows: [
-              { kind: 'check', label: l.multipleFilters, checked: false },
+              {
+                kind: 'check',
+                label: l.multipleFilters,
+                checked: o.multipleFieldFilters,
+                option: 'multipleFieldFilters',
+              },
               {
                 kind: 'check',
                 label: l.autofitColumns,
-                checked: opts.autofitColumns,
-                autofit: true,
+                checked: o.autoFormatting,
+                option: 'autoFormatting',
               },
-              { kind: 'check', label: l.preserveFormatting, checked: true },
-              { kind: 'check', label: l.mergeLabels, checked: false },
-              { kind: 'popup', label: l.compactIndent, value: '1' },
+              {
+                kind: 'check',
+                label: l.preserveFormatting,
+                checked: o.preserveFormatting,
+                option: 'preserveFormatting',
+              },
+              { kind: 'check', label: l.mergeLabels, checked: o.mergeItem, option: 'mergeItem' },
+              {
+                kind: 'popup',
+                label: l.compactIndent,
+                value: o.indent + 1,
+                option: { key: 'indent', offset: 1, max: MAX_INDENT },
+              },
             ],
           },
           'rule',
@@ -290,16 +447,27 @@ export const showPivotOptionsDialog = (
                 kind: 'radios',
                 label: l.fieldOrder,
                 options: [l.downThenOver, l.overThenDown],
-                selected: 0,
+                selected: o.pageOverThenDown ? 1 : 0,
+                option: 'pageOverThenDown',
               },
-              { kind: 'popup', label: l.fieldsPerColumn, value: '0' },
+              {
+                kind: 'popup',
+                label: l.fieldsPerColumn,
+                value: o.pageWrap,
+                option: { key: 'pageWrap', offset: 0, max: MAX_PAGE_WRAP },
+              },
             ],
           },
           'rule',
           {
             label: l.sortGroup,
             rows: [
-              { kind: 'check', label: l.customLists, checked: true },
+              {
+                kind: 'check',
+                label: l.customLists,
+                checked: o.customListSort,
+                option: 'customListSort',
+              },
               { kind: 'radios', options: [l.sortAscending, l.sortDataSource], selected: 1 },
             ],
           },
@@ -316,8 +484,18 @@ export const showPivotOptionsDialog = (
           {
             label: dt.group,
             rows: [
-              { kind: 'check', label: dt.saveSourceData, checked: true },
-              { kind: 'check', label: dt.enableShowDetails, checked: true },
+              {
+                kind: 'check',
+                label: dt.saveSourceData,
+                checked: opts.cache.saveData,
+                cache: 'saveData',
+              },
+              {
+                kind: 'check',
+                label: dt.enableShowDetails,
+                checked: o.enableDrill,
+                option: 'enableDrill',
+              },
               { kind: 'check', label: dt.retainDeletedItems, checked: true },
               {
                 kind: 'radios',
@@ -325,7 +503,12 @@ export const showPivotOptionsDialog = (
                 options: [dt.retainAutomatic, dt.retainMax],
                 selected: 0,
               },
-              { kind: 'check', label: dt.refreshOnOpen, checked: false },
+              {
+                kind: 'check',
+                label: dt.refreshOnOpen,
+                checked: opts.cache.refreshOnLoad,
+                cache: 'refreshOnLoad',
+              },
               { kind: 'check', label: dt.refreshOnChange, checked: false },
             ],
           },
@@ -351,14 +534,16 @@ export const showPivotOptionsDialog = (
       title.type = 'text';
       title.className = 'fc-pvoptdlg__alt-title';
       title.setAttribute('aria-label', a.title);
-      disable(title, reason);
+      title.value = o.altText ?? '';
+      title.dataset.pvoptOption = 'altText';
       const descLabel = document.createElement('label');
       descLabel.className = 'fc-pvoptdlg__alt-label';
       descLabel.textContent = a.description;
       const desc = document.createElement('textarea');
       desc.className = 'fc-pvoptdlg__alt-description';
       desc.setAttribute('aria-label', a.description);
-      disable(desc, reason);
+      desc.value = o.altTextSummary ?? '';
+      desc.dataset.pvoptOption = 'altTextSummary';
       const help = document.createElement('p');
       help.className = 'fc-pvoptdlg__alt-help';
       help.textContent = a.help;
@@ -382,10 +567,7 @@ export const showPivotOptionsDialog = (
     cancel.dataset.pvoptCancel = '';
     ok.dataset.pvoptOk = '';
     shell.on(cancel, 'click', () => finish(null));
-    const autofit = layout?.querySelector<HTMLInputElement>('[data-pvopt-autofit]');
-    shell.on(ok, 'click', () =>
-      finish({ name: name.value, autofitColumns: autofit?.checked ?? opts.autofitColumns }),
-    );
+    shell.on(ok, 'click', () => finish({ name: name.value, ...readControls(body, opts) }));
     shell.on(name, 'keydown', (event) => {
       if ((event as KeyboardEvent).key !== 'Enter') return;
       event.preventDefault();
@@ -396,8 +578,16 @@ export const showPivotOptionsDialog = (
     deferInitialFocus(shell.overlay, () => focusAndSelectInput(name));
   });
 
-/** Applies the name and autofit option as one undo step; an empty or unchanged name and
- *  an unchanged option do nothing. */
+/** The members of `next` that differ from `from`. */
+const changed = <T extends object>(from: T, next: T): Partial<T> =>
+  Object.fromEntries(
+    Object.entries(next).filter(([key, value]) => from[key as keyof T] !== value),
+  ) as Partial<T>;
+
+const isEmpty = (patch: object): boolean => Object.keys(patch).length === 0;
+
+/** Applies the name and the options as one undo step; an empty name keeps the
+ *  current one, and nothing changed does nothing. */
 export function applyPivotOptions(
   ctx: PivotCommitContext,
   sheetIndex: number,
@@ -407,9 +597,15 @@ export function applyPivotOptions(
 ): boolean {
   const next: PivotOptionsValues = {
     name: result.name.trim() || previous.name,
-    autofitColumns: result.autofitColumns,
+    options: result.options,
+    cache: result.cache,
   };
-  if (next.name === previous.name && next.autofitColumns === previous.autofitColumns) return true;
+  if (
+    next.name === previous.name &&
+    isEmpty(changed(previous.options, next.options)) &&
+    isEmpty(changed(previous.cache, next.cache))
+  )
+    return true;
   return pivotWrite(
     ctx,
     ctx.history,
@@ -428,10 +624,15 @@ const writePivotOptions = (
 ): boolean => {
   const { wb } = ctx;
   // Only a changed setting is written: the engine refuses a rename onto the current name.
-  const move = (from: PivotOptionsValues, to: PivotOptionsValues): boolean =>
-    (from.name === to.name || wb.renamePivotTable(sheetIndex, pivotIndex, to.name)) &&
-    (from.autofitColumns === to.autofitColumns ||
-      wb.setPivotAutofitColumns(sheetIndex, pivotIndex, to.autofitColumns));
+  const move = (from: PivotOptionsValues, to: PivotOptionsValues): boolean => {
+    const options = changed(from.options, to.options);
+    const cache = changed(from.cache, to.cache);
+    return (
+      (from.name === to.name || wb.renamePivotTable(sheetIndex, pivotIndex, to.name)) &&
+      (isEmpty(options) || wb.updatePivotOptions(sheetIndex, pivotIndex, options)) &&
+      (isEmpty(cache) || wb.updatePivotCacheOptions(sheetIndex, pivotIndex, cache))
+    );
+  };
   if (!move(previous, next)) return false;
   const history = ctx.history && !ctx.history.isReplaying() ? ctx.history : null;
   history?.push({
@@ -448,16 +649,55 @@ const writePivotOptions = (
   return true;
 };
 
-/** Opens the dialog on a report and applies the result. */
+/** The settings the dialog edits, read from the report; null when the report cannot be read. */
+function readPivotOptions(
+  ctx: PivotCommitContext,
+  sheetIndex: number,
+  pivotIndex: number,
+): PivotOptionsValues | null {
+  const options = ctx.wb.pivotOptions(sheetIndex, pivotIndex);
+  const cache = ctx.wb.pivotCacheOptions(sheetIndex, pivotIndex);
+  if (!options || !cache) return null;
+  return {
+    name: ctx.wb.pivotTableName(sheetIndex, pivotIndex) ?? '',
+    options: {
+      showDrill: options.showDrill,
+      printDrill: options.printDrill,
+      showDataTips: options.showDataTips,
+      showHeaders: options.showHeaders,
+      gridDropZones: options.gridDropZones,
+      showError: options.showError,
+      errorCaption: options.errorCaption,
+      showMissing: options.showMissing,
+      missingCaption: options.missingCaption,
+      showEmptyRow: options.showEmptyRow,
+      showEmptyColumn: options.showEmptyColumn,
+      itemPrintTitles: options.itemPrintTitles,
+      fieldPrintTitles: options.fieldPrintTitles,
+      multipleFieldFilters: options.multipleFieldFilters,
+      autoFormatting: options.autoFormatting,
+      preserveFormatting: options.preserveFormatting,
+      mergeItem: options.mergeItem,
+      indent: options.indent,
+      pageOverThenDown: options.pageOverThenDown,
+      pageWrap: options.pageWrap,
+      customListSort: options.customListSort,
+      enableDrill: options.enableDrill,
+      altText: options.altText,
+      altTextSummary: options.altTextSummary,
+    },
+    cache: { saveData: cache.saveData, refreshOnLoad: cache.refreshOnLoad },
+  };
+}
+
+/** Opens the dialog on a report and applies the result; false when the report cannot be read. */
 export function openPivotOptions(
   ctx: PivotCommitContext & { host: HTMLElement; strings: Strings },
   sheetIndex: number,
   pivotIndex: number,
 ): Promise<boolean> {
-  const previous: PivotOptionsValues = {
-    name: ctx.wb.pivotTableName(sheetIndex, pivotIndex) ?? '',
-    autofitColumns: ctx.wb.pivotAutofitColumns(sheetIndex, pivotIndex),
-  };
+  const previous = readPivotOptions(ctx, sheetIndex, pivotIndex);
+  if (!previous) return Promise.resolve(false);
   return showPivotOptionsDialog({ host: ctx.host, strings: ctx.strings, ...previous }).then(
     (result) => (result ? applyPivotOptions(ctx, sheetIndex, pivotIndex, previous, result) : false),
   );

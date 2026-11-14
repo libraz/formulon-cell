@@ -826,7 +826,7 @@ export function refreshPivotReportsAfterEdit(
   clearVacatedReportCells(wb, sheet, before?.reports.map((r) => r.range) ?? []);
   mutators.replaceCells(store, wb.cells(sheet));
   reflowPivotFormats(store, wb);
-  finishPivotReportUpdate(store, wb, opts);
+  autofitPivotTableColumns(store, wb, opts);
   return { spilled: wb.pivotSpills(sheet) };
 }
 

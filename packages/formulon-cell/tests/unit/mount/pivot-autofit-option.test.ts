@@ -76,7 +76,7 @@ describe('PivotTable "autofit column widths on update" option', () => {
     addFacadePivot(false);
     finishPivotReportUpdate(store, wb);
     expect(widthOfReportColumn()).toBe(NARROW);
-    wb.setPivotAutofitColumns(0, 0, true);
+    wb.updatePivotOptions(0, 0, { autoFormatting: true });
     finishPivotReportUpdate(store, wb);
     expect(widthOfReportColumn()).toBeGreaterThan(NARROW);
   });
@@ -95,7 +95,9 @@ describe('PivotTable "autofit column widths on update" option', () => {
       onChanged: () => {},
     };
     const box = (): HTMLInputElement => {
-      const el = document.querySelector<HTMLInputElement>('.fc-pvoptdlg [data-pvopt-autofit]');
+      const el = document.querySelector<HTMLInputElement>(
+        '.fc-pvoptdlg [data-pvopt-option="autoFormatting"]',
+      );
       if (!el) throw new Error('autofit check box missing');
       return el;
     };

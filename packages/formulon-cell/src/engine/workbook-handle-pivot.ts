@@ -7,8 +7,12 @@ import type {
   Pivot,
   PivotCache,
   PivotCacheField,
+  PivotCacheOptions,
+  PivotCacheOptionsPatch,
   PivotFilter,
   PivotFilterInput,
+  PivotOptions,
+  PivotOptionsPatch,
   PivotWorksheetSourceInput,
 } from '@libraz/formulon';
 import { PivotDatePeriod, StatusCode } from '@libraz/formulon';
@@ -937,11 +941,36 @@ export abstract class WorkbookHandlePivotMethods {
     return attempt(true, () => pivotOf(this, sheet, pivotIdx).getOptions().autoFormatting);
   }
 
-  setPivotAutofitColumns(sheet: number, pivotIdx: number, enabled: boolean): boolean {
+  /** The report's PivotTable Options; null when unreadable. */
+  pivotOptions(sheet: number, pivotIdx: number): PivotOptions | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return null;
+    return attempt(null, () => pivotOf(this, sheet, pivotIdx).getOptions());
+  }
+
+  /** Writes the members of `patch` to the report's options; an omitted member keeps its value. */
+  updatePivotOptions(sheet: number, pivotIdx: number, patch: PivotOptionsPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
     return attempt(false, () => {
-      pivotOf(this, sheet, pivotIdx).updateOptions({ autoFormatting: enabled });
+      pivotOf(this, sheet, pivotIdx).updateOptions(patch);
+      return true;
+    });
+  }
+
+  /** The options of the cache the report reads; null when unreadable. */
+  pivotCacheOptions(sheet: number, pivotIdx: number): PivotCacheOptions | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return null;
+    return attempt(null, () => pivotOf(this, sheet, pivotIdx).cache().getOptions());
+  }
+
+  /** Writes the members of `patch` to the options of the cache the report reads. */
+  updatePivotCacheOptions(sheet: number, pivotIdx: number, patch: PivotCacheOptionsPatch): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotTableMutate) return false;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).cache().updateOptions(patch);
       return true;
     });
   }

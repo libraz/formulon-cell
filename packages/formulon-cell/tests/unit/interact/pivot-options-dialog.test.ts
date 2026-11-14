@@ -58,7 +58,7 @@ describe('PivotTable Options dialog', () => {
       label.querySelector('input')?.checked,
     ]);
 
-  it('lays out the desktop tabs and options, with only the name and autofit editable', async () => {
+  it('lays out the desktop tabs and options, editable where the report has the option', async () => {
     const wb = await setup();
     const done = openPivotOptions(
       {
@@ -132,19 +132,27 @@ describe('PivotTable Options dialog', () => {
     expect(panel('altText').querySelector('.fc-pvoptdlg__alt-help')?.textContent).toMatch(
       /^タイトルと説明は、表、図表、画像/,
     );
-    const editable = Array.from(
+    // Only the controls with no report or cache option stay disabled.
+    const disabled = Array.from(
       root.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
         'input, select, textarea',
       ),
-    ).filter((control) => !control.disabled);
-    expect(
-      editable.map((control) => [
-        control.dataset.pvoptName !== undefined,
-        control.dataset.pvoptAutofit !== undefined,
-      ]),
-    ).toEqual([
-      [true, false],
-      [false, true],
+    )
+      .filter((control) => control.disabled)
+      .map(
+        (control) => control.closest('label')?.textContent ?? control.getAttribute('aria-label'),
+      );
+    expect(disabled).toEqual([
+      'エラー値に表示する値:',
+      '値の領域にフィールドがない場合のアイテムのラベル',
+      '昇順で並べ替え',
+      'データ ソース順で並べ替え',
+      'データ ソースから削除されたアイテムの保持',
+      '自動',
+      '最大値',
+      'ソース データが変更されたときに自動的に更新する',
+      'パスワードをファイルに保存する',
+      'バックグラウンドでクエリを実行する',
     ]);
     expect(
       Array.from(root.querySelectorAll('.fc-pvoptdlg__footer button')).map((b) => b.textContent),
@@ -183,6 +191,98 @@ describe('PivotTable Options dialog', () => {
     expect(wb.pivotTableName(0, 0)).toBe('PivotTable1');
     expect(history.redo()).toBe(true);
     expect(wb.pivotTableName(0, 0)).toBe('Sales by region');
+    wb.dispose();
+  });
+
+  it('writes the options and the cache options it edits as one undo step, and reopens showing them', async () => {
+    const wb = await setup();
+    const history = new History();
+    let changes = 0;
+    const ctx = {
+      store: createSpreadsheetStore(),
+      origin: 'ribbon' as const,
+      commandId: 'test',
+      host,
+      strings: ja,
+      wb,
+      history,
+      onChanged: () => (changes += 1),
+    };
+    const before = wb.pivotOptions(0, 0);
+    const beforeCache = wb.pivotCacheOptions(0, 0);
+    if (!before || !beforeCache) throw new Error('options unreadable');
+    const control = <T extends HTMLElement>(selector: string): T => {
+      const el = dialog().querySelector<T>(selector);
+      if (!el) throw new Error(`missing ${selector}`);
+      return el;
+    };
+    const option = <T extends HTMLElement>(key: string) =>
+      control<T>(`[data-pvopt-option="${key}"]`);
+    const done = openPivotOptions(ctx, 0, 0);
+    option<HTMLInputElement>('showDrill').click();
+    option<HTMLInputElement>('mergeItem').click();
+    option<HTMLInputElement>('enableDrill').click();
+    const errorBox = option<HTMLInputElement>('showError');
+    expect(option<HTMLInputElement>('errorCaption').disabled).toBe(!errorBox.checked);
+    if (!errorBox.checked) errorBox.click();
+    errorBox.dispatchEvent(new Event('change'));
+    expect(option<HTMLInputElement>('errorCaption').disabled).toBe(false);
+    option<HTMLInputElement>('errorCaption').value = 'n/a';
+    const indent = option<HTMLSelectElement>('indent');
+    expect(indent.value).toBe(String(before.indent + 1));
+    indent.value = '4';
+    option<HTMLSelectElement>('pageWrap').value = '3';
+    control<HTMLInputElement>('[data-pvopt-option="pageOverThenDown"] input[value="1"]').click();
+    option<HTMLInputElement>('altText').value = 'Sales';
+    option<HTMLTextAreaElement>('altTextSummary').value = 'Amount by region';
+    control<HTMLInputElement>('[data-pvopt-cache="refreshOnLoad"]').click();
+    control<HTMLButtonElement>('[data-pvopt-ok]').click();
+    expect(await done).toBe(true);
+    expect(changes).toBe(1);
+
+    const expected = {
+      ...before,
+      showDrill: !before.showDrill,
+      mergeItem: !before.mergeItem,
+      enableDrill: !before.enableDrill,
+      showError: true,
+      errorCaption: 'n/a',
+      indent: 3,
+      pageWrap: 3,
+      pageOverThenDown: true,
+      altText: 'Sales',
+      altTextSummary: 'Amount by region',
+    };
+    expect(wb.pivotOptions(0, 0)).toEqual(expected);
+    expect(wb.pivotCacheOptions(0, 0)).toEqual({
+      ...beforeCache,
+      refreshOnLoad: !beforeCache.refreshOnLoad,
+    });
+
+    const reopened = openPivotOptions(ctx, 0, 0);
+    expect(option<HTMLInputElement>('showDrill').checked).toBe(expected.showDrill);
+    expect(option<HTMLInputElement>('errorCaption').value).toBe('n/a');
+    expect(option<HTMLSelectElement>('indent').value).toBe('4');
+    expect(option<HTMLSelectElement>('pageWrap').value).toBe('3');
+    expect(
+      control<HTMLInputElement>('[data-pvopt-option="pageOverThenDown"] input[value="1"]').checked,
+    ).toBe(true);
+    expect(option<HTMLTextAreaElement>('altTextSummary').value).toBe('Amount by region');
+    control<HTMLButtonElement>('[data-pvopt-cancel]').click();
+    expect(await reopened).toBe(false);
+
+    expect(history.undo()).toBe(true);
+    expect(wb.pivotOptions(0, 0)).toEqual(before);
+    expect(wb.pivotCacheOptions(0, 0)).toEqual(beforeCache);
+    expect(history.redo()).toBe(true);
+    expect(wb.pivotOptions(0, 0)).toEqual(expected);
+    const reloaded = await WorkbookHandle.loadBytes(wb.save());
+    try {
+      expect(reloaded.pivotOptions(0, 0)).toEqual(expected);
+      expect(reloaded.pivotCacheOptions(0, 0)?.refreshOnLoad).toBe(!beforeCache.refreshOnLoad);
+    } finally {
+      reloaded.dispose();
+    }
     wb.dispose();
   });
 
