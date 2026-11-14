@@ -192,9 +192,9 @@ export const cellFormatKo: CellFormatStrings = {
     fillNone: '채우기 없음',
     fillNoColor: '색 없음',
     borderPresets: '미리 설정:',
-    borderOutline: '윤곽선:',
+    borderOutline: '테두리:',
     borderHint:
-      'Click a line style and color, then click a preset or the individual border buttons. You can also click inside the preview box to apply borders.',
+      '선 스타일과 색상을 클릭한 다음, 미리 설정된 테두리 패턴 또는 개별 테두리 단추를 클릭합니다. 미리 보기 상자에서 클릭하면 테두리를 적용할 수 있습니다.',
     borderInsideHorizontal: '안쪽 가로',
     borderInsideVertical: '안쪽 세로',
     borderPreviewText: '텍스트',

@@ -194,9 +194,9 @@ export const cellFormatFr: CellFormatStrings = {
     fillNone: 'Aucun remplissage',
     fillNoColor: 'Aucune couleur',
     borderPresets: 'Présélections :',
-    borderOutline: 'Contour :',
+    borderOutline: 'Bordure :',
     borderHint:
-      'Click a line style and color, then click a preset or the individual border buttons. You can also click inside the preview box to apply borders.',
+      'Cliquez sur un style et une couleur de trait, puis cliquez sur un motif de bordure prédéfini ou sur les boutons de bordure individuels. Vous pouvez également appliquer des bordures en cliquant sur la zone d’aperçu.',
     borderInsideHorizontal: 'Intérieur horizontal',
     borderInsideVertical: 'Intérieur vertical',
     borderPreviewText: 'Texte',

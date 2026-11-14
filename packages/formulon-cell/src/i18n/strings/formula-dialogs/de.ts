@@ -60,7 +60,7 @@ export const formulaDialogsDe: FormulaDialogsStrings = {
     recalcBeforeSave: 'Arbeitsmappe vor dem Speichern neu berechnen',
     recalcBeforeSaveRequiresManual: 'Nur bei manueller Berechnung verfügbar.',
     formulasSection: 'Arbeiten mit Formeln',
-    r1c1: 'Z1S1-Bezugsart',
+    r1c1: 'Z1S1-Verweisart verwenden',
     workbookSection: 'Beim Berechnen dieser Arbeitsmappe',
     precisionAsDisplayed: 'Genauigkeit wie angezeigt festlegen',
     precisionWarning: 'Daten verlieren dauerhaft an Genauigkeit.',

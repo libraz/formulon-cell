@@ -194,7 +194,7 @@ export const cellFormatEn: CellFormatStrings = {
     borderPresets: 'Presets:',
     borderOutline: 'Border:',
     borderHint:
-      'Click a line style and color, then click a preset or the individual border buttons. You can also click inside the preview box to apply borders.',
+      'Click a line style and color, and then click a preset border pattern or individual border buttons. You can also apply borders by clicking in the preview box.',
     borderInsideHorizontal: 'Inside horizontal',
     borderInsideVertical: 'Inside vertical',
     borderPreviewText: 'Text',

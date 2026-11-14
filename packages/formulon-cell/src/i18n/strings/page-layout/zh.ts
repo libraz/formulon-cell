@@ -73,7 +73,7 @@ export const pageLayoutZh: PageLayoutStrings = {
     invalidPrintTitleRows: '请输入要重复的有效行，例如 1:3。',
     invalidPrintTitleCols: '请输入要重复的有效列，例如 A:B。',
     printOptions: '打印',
-    blackAndWhite: '黑白',
+    blackAndWhite: '单色打印',
     draftQuality: '草稿质量',
     comments: '批注和注释',
     commentsNone: '（无）',

@@ -259,7 +259,8 @@ export const editDialogsEn: EditDialogsStrings = {
     tabProtection: 'Protection',
     locked: 'Locked',
     hiddenFormula: 'Hidden',
-    lockedHint: 'Locking cells only takes effect once the sheet is protected.',
+    lockedHint:
+      'To lock cells or hide formulas, protect the worksheet. On the Review tab, click Protect Sheet.',
     protectSheet: 'Protect Sheet',
     unprotectSheet: 'Unprotect Sheet',
     password: 'Password',

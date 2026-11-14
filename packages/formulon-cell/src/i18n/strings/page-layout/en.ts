@@ -85,7 +85,7 @@ export const pageLayoutEn: PageLayoutStrings = {
     cellErrorsBlank: '<blank>',
     cellErrorsDash: '--',
     cellErrorsNA: '#N/A',
-    pageOrder: 'Page order',
+    pageOrder: 'Page Order',
     pageOrderDownThenOver: 'Down, then over',
     pageOrderOverThenDown: 'Over, then down',
     scaling: 'Scaling',

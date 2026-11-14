@@ -58,7 +58,7 @@ export const formulaDialogsEn: FormulaDialogsStrings = {
     recalcBeforeSave: 'Recalculate workbook before saving',
     recalcBeforeSaveRequiresManual: 'Available when calculation is Manual.',
     formulasSection: 'Working with formulas',
-    r1c1: 'R1C1 reference style',
+    r1c1: 'Use R1C1 reference style',
     workbookSection: 'When calculating this workbook',
     precisionAsDisplayed: 'Set precision as displayed',
     precisionWarning: 'Data will permanently lose accuracy.',

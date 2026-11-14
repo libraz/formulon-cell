@@ -191,10 +191,10 @@ export const cellFormatTh: CellFormatStrings = {
     fill: 'พื้นหลัง',
     fillNone: 'ไม่มีการเติม',
     fillNoColor: 'ไม่มีสี',
-    borderPresets: 'ค่าที่ตั้งไว้ล่วงหน้า:',
-    borderOutline: 'เส้นกรอบ:',
+    borderPresets: 'ค่าที่ตั้งไว้:',
+    borderOutline: 'เส้นขอบ:',
     borderHint:
-      'Click a line style and color, then click a preset or the individual border buttons. You can also click inside the preview box to apply borders.',
+      'คลิกสไตล์เส้นและสี แล้วคลิกรูปแบบเส้นขอบที่กำหนดไว้หรือปุ่มเส้นขอบเฉพาะ คุณยังสามารถนำเส้นขอบมาใช้ได้โดยคลิกกล่องแสดงตัวอย่าง',
     borderInsideHorizontal: 'ภายในแนวนอน',
     borderInsideVertical: 'ภายในแนวตั้ง',
     borderPreviewText: 'ข้อความ',

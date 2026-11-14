@@ -58,7 +58,7 @@ export const formulaDialogsZh: FormulaDialogsStrings = {
     recalcBeforeSave: '保存工作簿前重新计算',
     recalcBeforeSaveRequiresManual: '仅在手动计算时可用。',
     formulasSection: '使用公式',
-    r1c1: 'R1C1 引用样式',
+    r1c1: '使用 R1C1 引用样式',
     workbookSection: '计算此工作簿时',
     precisionAsDisplayed: '将精度设为所显示的精度',
     precisionWarning: '数据将永久失去精度。',
