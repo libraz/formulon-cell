@@ -8,6 +8,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- Saving as .xlsb follows the engine's current writer: notes are written on every sheet and no longer warned about, a default size or sheet view the format cannot hold is written as the default and counted among other settings, and a data bar with a formula threshold refuses the save and offers .xlsx.
 - On the Mac, `dialogs.open('preferences')` with no pane, or an unknown one, opens the Preferences window on Show All, as the desktop opens it.
 - The Mac PivotTable Options dialog no longer offers a table-level sort order, and Show items with no data on rows and columns is shown greyed out, as on the desktop.
 - **Breaking:** Requires `@libraz/formulon` 0.19.0, whose model the engine passthrough follows. Engine failures surface as `FormulonError`; optional list reads (merges, hyperlinks, conditional formats, tables, external links, passthrough parts) still fall back to an empty list.

@@ -202,7 +202,7 @@ export function summarizeSpreadsheetCompatibility(
       label: 'Binary workbook (.xlsb)',
       status: c.xlsbSave ? 'writable' : 'unsupported',
       reason: c.xlsbSave
-        ? 'Workbooks can be saved as .xlsb. Notes, threaded comments, filters, and pictures, shapes and charts are written. Saving is refused and a save as .xlsx is offered when the workbook has protected ranges or sparklines the format cannot hold, a default column width, row height or outline levels the format cannot hold, or sheet views it cannot store. PivotTables and slicers read from .xlsx, some filter conditions, drawings that hold other graphics, custom views, some page and workbook settings, and custom table styles may be left out and counted. The engine reports one total for these, so saving warns with the categories present before the file is delivered.'
+        ? 'Workbooks can be saved as .xlsb. Notes, threaded comments, filters, and pictures, shapes and charts are written. Saving is refused and a save as .xlsx is offered when the workbook has protected ranges or sparklines the format cannot hold, or a data bar whose minimum or maximum is a formula. PivotTables and slicers read from .xlsx, some filter conditions, drawings that hold other graphics, custom views, sheet views and default sizes the format cannot hold, some page and workbook settings, and custom table styles may be left out and counted. The engine reports one total for these, so saving warns with the categories present before the file is delivered.'
         : 'Saving as .xlsb requires the engine saveWithDiagnostics API.',
     },
     {

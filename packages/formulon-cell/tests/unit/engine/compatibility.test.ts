@@ -237,7 +237,7 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(xlsb).toContain('pictures, shapes and charts are written');
     expect(xlsb).not.toContain('not written');
     expect(xlsb).toContain('save as .xlsx is offered');
-    for (const refused of ['protected ranges', 'sparklines', 'outline levels', 'sheet views']) {
+    for (const refused of ['protected ranges', 'sparklines', 'data bar']) {
       expect(xlsb).toContain(refused);
     }
     expect(xlsb).toContain('PivotTables and slicers read from .xlsx');

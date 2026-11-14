@@ -149,9 +149,7 @@ export const workbookChromeZh: WorkbookChromeStrings = {
     unwritableTitle: '无法以此格式保存',
     unwritableMessage: '此工作簿包含所选文件格式不支持的一个或多个以下功能:',
     saveAsFormat: '另存为{format}',
-    formatDefaults: '默认列宽和行高',
-    outlineLevels: '分级显示级别',
-    sheetView: '工作表视图设置',
+    dataBars: '数据条',
     unknownFeature: '此文件格式无法包含的功能',
   },
 };

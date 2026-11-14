@@ -155,9 +155,7 @@ export const workbookChromeDe: WorkbookChromeStrings = {
     unwritableMessage:
       'Diese Arbeitsmappe enthält mindestens eines der folgenden Features, die für das ausgewählte Dateiformat nicht unterstützt werden:',
     saveAsFormat: 'Als {format} speichern',
-    formatDefaults: 'Standardspaltenbreite und -zeilenhöhe',
-    outlineLevels: 'Gliederungsebenen',
-    sheetView: 'Blattansichtseinstellungen',
+    dataBars: 'Datenbalken',
     unknownFeature: 'Ein Feature, das dieses Dateiformat nicht enthalten kann',
   },
 };

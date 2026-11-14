@@ -151,9 +151,7 @@ export const workbookChromeEn: WorkbookChromeStrings = {
     unwritableMessage:
       'This workbook contains one or more of the following features that are not supported by the selected file format:',
     saveAsFormat: 'Save as {format}',
-    formatDefaults: 'Default column width and row height',
-    outlineLevels: 'Outline levels',
-    sheetView: 'Sheet view settings',
+    dataBars: 'Data bars',
     unknownFeature: 'A feature this file type cannot hold',
   },
 };

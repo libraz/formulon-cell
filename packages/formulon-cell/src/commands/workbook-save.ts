@@ -61,17 +61,17 @@ const sheetIndexes = (wb: WorkbookHandle): number[] =>
 const sumSheets = (wb: WorkbookHandle, count: (sheet: number) => number): number =>
   sheetIndexes(wb).reduce((total, sheet) => total + count(sheet), 0);
 
-/** Itemize what the `.xlsb` writer deferred. Every category is written except
- *  in some cases (a note past the second sheet, a filter criterion without the
- *  bounds the desktop computed, a drawing holding another graphic frame), so
- *  each is listed as a possible loss. `otherSettings` covers deferred units no
- *  present category can account for (print settings, views, workbook
- *  protection, styles). Each `bound` is the most units a category can add to
- *  the engine's aggregate `deferredFeatureCount`. */
+/** Itemize what the `.xlsb` writer deferred. Notes and threaded comments are
+ *  always written. The rest are written except in some cases (a filter
+ *  criterion without the bounds the desktop computed, a drawing holding
+ *  another graphic frame, a PivotTable or table the format cannot hold, a
+ *  slicer read from `.xlsx`), so each is listed as a possible loss.
+ *  `otherSettings` covers deferred units no present category can account for
+ *  (print settings, views, default sizes, workbook protection, styles). Each
+ *  `bound` is the most units a category can add to the engine's aggregate
+ *  `deferredFeatureCount`. */
 function xlsbContentLosses(wb: WorkbookHandle, deferred: number): WorkbookSaveLoss[] {
   const possible = [
-    { id: 'notes', count: sumSheets(wb, (s) => wb.getComments(s).length) },
-    { id: 'threadedComments', count: sumSheets(wb, (s) => wb.getThreadedComments(s).length) },
     { id: 'autoFilters', count: sumSheets(wb, (s) => (wb.getAutoFilter(s) ? 1 : 0)) },
     {
       id: 'drawings',
@@ -98,13 +98,7 @@ function xlsbContentLosses(wb: WorkbookHandle, deferred: number): WorkbookSaveLo
 }
 
 /** A feature the `.xlsb` writer refuses outright: the save writes nothing. */
-export type XlsbUnwritableId =
-  | 'protectedRanges'
-  | 'sparklines'
-  | 'formatDefaults'
-  | 'outlineLevels'
-  | 'sheetView'
-  | 'unknownFeature';
+export type XlsbUnwritableId = 'protectedRanges' | 'sparklines' | 'dataBars' | 'unknownFeature';
 
 /** The refused feature and, for a sheet-scoped one, its sheet index. */
 export interface XlsbUnwritable {
@@ -119,9 +113,7 @@ const UNWRITABLE_KINDS: Readonly<Record<string, XlsbUnwritableId>> = {
   protected_range_sqref: 'protectedRanges',
   protected_range_title: 'protectedRanges',
   sparklines: 'sparklines',
-  format_defaults: 'formatDefaults',
-  outline_level: 'outlineLevels',
-  sheet_view: 'sheetView',
+  data_bar: 'dataBars',
 };
 
 /** The feature an `.xlsb` save failed on, or null when `error` is not that refusal. */

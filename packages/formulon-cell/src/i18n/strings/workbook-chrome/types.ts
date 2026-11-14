@@ -162,9 +162,7 @@ export interface WorkbookChromeStrings {
     unwritableMessage: string;
     /** The notice's save button; `{format}` is the `.xlsx` file type label. */
     saveAsFormat: string;
-    formatDefaults: string;
-    outlineLevels: string;
-    sheetView: string;
+    dataBars: string;
     /** A refused feature the notice cannot name. */
     unknownFeature: string;
   };

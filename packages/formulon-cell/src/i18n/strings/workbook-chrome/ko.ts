@@ -152,9 +152,7 @@ export const workbookChromeKo: WorkbookChromeStrings = {
     unwritableMessage:
       '이 통합 문서에는 선택한 파일 형식에서 지원하지 않는 다음과 같은 기능 중 하나 이상이 포함되어 있습니다.',
     saveAsFormat: '{format}(으)로 저장',
-    formatDefaults: '기본 열 너비 및 행 높이',
-    outlineLevels: '윤곽 수준',
-    sheetView: '시트 보기 설정',
+    dataBars: '데이터 막대',
     unknownFeature: '이 파일 형식에서 유지할 수 없는 기능',
   },
 };

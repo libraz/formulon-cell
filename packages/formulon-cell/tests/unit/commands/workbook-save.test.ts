@@ -17,13 +17,42 @@ import {
 
 const canLoadWasm = (): boolean => typeof WebAssembly !== 'undefined';
 
-/** A note on the third sheet: `.xlsb` keeps notes on the first two sheets only. */
+/** A note on the third sheet, which `.xlsb` writes like any other. */
 const noteWorkbook = async (): Promise<WorkbookHandle> => {
   const wb = await WorkbookHandle.createDefault();
   wb.addSheet('Sheet2');
   wb.addSheet('Sheet3');
   wb.setText({ sheet: 2, row: 0, col: 0 }, 'x');
   wb.setCommentEntry(2, 0, 0, 'Author', 'A note');
+  return wb;
+};
+
+/** A shape plus an engine deferred-feature count, which makes an `.xlsb` save lossy. The shape
+ *  is written; the count is a unit no category accounts for. */
+const insertBox = (wb: WorkbookHandle, deferredFeatureCount: number): void => {
+  wb.insertShape(0, {
+    name: 'Box',
+    presetGeometry: 'rect',
+    anchor: {
+      kind: AnchorKind.TwoCell,
+      editAs: AnchorEditAs.TwoCell,
+      fromRow: 1,
+      fromCol: 1,
+      toRow: 3,
+      toCol: 3,
+    },
+    fill: { color: '#336699' },
+  });
+  const save = wb.saveWithDiagnostics.bind(wb);
+  vi.spyOn(wb, 'saveWithDiagnostics').mockImplementation((format) => {
+    const written = save(format);
+    return { ...written, diagnostics: { ...written.diagnostics, deferredFeatureCount } };
+  });
+};
+
+const lossyWorkbook = async (): Promise<WorkbookHandle> => {
+  const wb = await WorkbookHandle.createDefault();
+  insertBox(wb, 1);
   return wb;
 };
 
@@ -84,14 +113,10 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
     }
   });
 
-  it('itemizes notes the binary format may drop, next to the engine counter', async () => {
+  it('reports no loss for notes on any sheet', async () => {
     const wb = await noteWorkbook();
     try {
-      const outcome = writeWorkbook(wb, 'xlsb');
-      expect(outcome.losses).toEqual([
-        { id: 'notes', count: 1, certain: false },
-        { id: 'deferredFeature', count: 1, certain: true },
-      ]);
+      expect(writeWorkbook(wb, 'xlsb').losses).toEqual([]);
       expect(writeWorkbook(wb, 'xlsx').losses).toEqual([]);
     } finally {
       wb.dispose();
@@ -101,25 +126,7 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
   it('lists drawings as possibly lost and reports deferred settings it cannot itemize', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
-      wb.insertShape(0, {
-        name: 'Box',
-        presetGeometry: 'rect',
-        anchor: {
-          kind: AnchorKind.TwoCell,
-          editAs: AnchorEditAs.TwoCell,
-          fromRow: 1,
-          fromCol: 1,
-          toRow: 3,
-          toCol: 3,
-        },
-        fill: { color: '#336699' },
-      });
-      // The shape is written; a deferred unit no category accounts for is reported apart.
-      const save = wb.saveWithDiagnostics.bind(wb);
-      vi.spyOn(wb, 'saveWithDiagnostics').mockImplementation((format) => {
-        const written = save(format);
-        return { ...written, diagnostics: { ...written.diagnostics, deferredFeatureCount: 1 } };
-      });
+      insertBox(wb, 1);
       const outcome = writeWorkbook(wb, 'xlsb');
       expect(outcome.losses).toEqual(
         expect.arrayContaining([
@@ -134,18 +141,13 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
   });
 
   it('separates content that will be lost from content that may be', async () => {
-    const wb = await noteWorkbook();
+    const wb = await WorkbookHandle.createDefault();
     try {
-      // One deferred unit beyond the note, which no category accounts for.
-      const save = wb.saveWithDiagnostics.bind(wb);
-      vi.spyOn(wb, 'saveWithDiagnostics').mockImplementation((format) => {
-        const written = save(format);
-        return { ...written, diagnostics: { ...written.diagnostics, deferredFeatureCount: 2 } };
-      });
+      insertBox(wb, 2);
       const pending = saveWithPrompts(spreadsheetOf(wb), { format: 'xlsb' });
       await flush();
       const text = dialog()?.textContent ?? '';
-      expect(text).toContain(defaultStrings.workbookSave.notes);
+      expect(text).toContain(defaultStrings.workbookSave.drawings);
       expect(text).toContain(
         defaultStrings.workbookSave.mayLoseMessage.replace(
           '{format}',
@@ -161,11 +163,11 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
   });
 
   it('asks before delivering a lossy .xlsb and returns null when cancelled', async () => {
-    const wb = await noteWorkbook();
+    const wb = await lossyWorkbook();
     try {
       const pending = saveWithPrompts(spreadsheetOf(wb), { format: 'xlsb' });
       await flush();
-      expect(dialog()?.textContent).toContain(defaultStrings.workbookSave.notes);
+      expect(dialog()?.textContent).toContain(defaultStrings.workbookSave.otherSettings);
       clickButton(defaultStrings.workbookSave.cancel);
       expect(await pending).toBeNull();
     } finally {
@@ -174,7 +176,7 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
   });
 
   it('delivers the bytes once the warning is accepted', async () => {
-    const wb = await noteWorkbook();
+    const wb = await lossyWorkbook();
     try {
       const pending = saveWithPrompts(spreadsheetOf(wb), { format: 'xlsb' });
       await flush();
@@ -267,13 +269,17 @@ describe.skipIf(!canLoadWasm())('workbook save refused by the .xlsb writer', () 
   it('reads the feature and sheet from the refusal and nothing else', () => {
     const refusal = (context: string) =>
       new FormulonError(StatusCode.IoFeatureNotWritable, 'not writable', context);
-    expect(xlsbUnwritableOf(refusal('context=write_xlsb kind=sheet_view sheet_index=3'))).toEqual({
-      id: 'sheetView',
+    expect(xlsbUnwritableOf(refusal('context=write_xlsb kind=sparklines sheet_index=3'))).toEqual({
+      id: 'sparklines',
       sheet: 3,
     });
     expect(
       xlsbUnwritableOf(refusal('context=write_xlsb kind=protected_range_rects sheet_index=0')),
     ).toEqual({ id: 'protectedRanges', sheet: 0 });
+    expect(xlsbUnwritableOf(refusal('context=write_xlsb kind=data_bar sheet_index=1'))).toEqual({
+      id: 'dataBars',
+      sheet: 1,
+    });
     expect(xlsbUnwritableOf(refusal('context=write_xlsb kind=x14_data_bar'))).toEqual({
       id: 'unknownFeature',
       sheet: null,

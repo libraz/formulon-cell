@@ -150,9 +150,7 @@ export const workbookChromeJa: WorkbookChromeStrings = {
     unwritableMessage:
       'このブックには、選択したファイル形式でサポートされていない次の機能が 1 つ以上含まれています:',
     saveAsFormat: '{format} として保存',
-    formatDefaults: '既定の列幅と行の高さ',
-    outlineLevels: 'アウトライン レベル',
-    sheetView: 'シートの表示設定',
+    dataBars: 'データ バー',
     unknownFeature: 'このファイル形式で保持できない機能',
   },
 };

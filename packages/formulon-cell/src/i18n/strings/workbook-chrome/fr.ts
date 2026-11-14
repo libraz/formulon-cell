@@ -156,9 +156,7 @@ export const workbookChromeFr: WorkbookChromeStrings = {
     unwritableMessage:
       'Ce classeur contient une ou plusieurs des fonctionnalités suivantes qui ne sont pas prises en charge par le format de fichier sélectionné :',
     saveAsFormat: 'Enregistrer en tant que {format}',
-    formatDefaults: 'Largeur de colonne et hauteur de ligne par défaut',
-    outlineLevels: 'Niveaux de plan',
-    sheetView: 'Paramètres d’affichage de la feuille',
+    dataBars: 'Barres de données',
     unknownFeature: 'Une fonctionnalité que ce format de fichier ne peut pas contenir',
   },
 };
