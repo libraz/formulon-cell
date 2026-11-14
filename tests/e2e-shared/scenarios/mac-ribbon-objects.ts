@@ -15,7 +15,11 @@ export async function runMacSparklineScenario(page: Page): Promise<void> {
   await sp.enter('C1', '2');
   await sp.goTo('A1:C1');
   await selectRibbonTab(page, 'insert');
+  // Sparklines is a menu; Line opens the dialog with that type chosen.
   await sp.clickRibbon('mac.insert.sparkline');
+  await page
+    .locator('[role=menu]:not([hidden]) [data-ribbon-command="mac.insert.sparkline.line"]')
+    .click();
   const dialog = page.locator('.fc-macsparkdlg[role=dialog]');
   await expect(dialog).toBeVisible();
   await dialog.locator('.fc-macsparkdlg__source').fill('A1:C1');
