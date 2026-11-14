@@ -353,6 +353,10 @@
     min-width: 0;
     box-sizing: border-box;
   }
+  /* The pop-up button takes its grid track's width, not the custom select's 128 px floor. */
+  .fc-conddlg__icon-threshold-row > .fc-select > .fc-select__button {
+    min-width: 0;
+  }
   .fc-conddlg__style-row {
     padding-bottom: 8px;
     border-bottom: 1px solid var(--fc-rule-subtle);
