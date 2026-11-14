@@ -139,6 +139,15 @@ export async function runCalcOptionsMenusScenario(page: Page, platform: Platform
   await expect.poll(staleB2).toBe(false);
   await expect.poll(() => sp.readValue('B2')).toEqual({ kind: 'number', value: 6 });
 
+  if (platform === 'mac')
+    await runMacStaleValueMenu(page, sp, {
+      openCalcMenu,
+      calcMenu,
+      p: PROFILE.mac,
+      staleB2,
+      stalePreference,
+    });
+
   // Compatibility Version: a new book is version 2; version 1 counts UTF-16 units.
   const version = () =>
     page.evaluate(() => {
@@ -217,6 +226,129 @@ export async function runCalcOptionsMenusScenario(page: Page, platform: Platform
   await page.keyboard.press('Escape');
   expect(await version()).toBe(4);
   await sp.expectNoConsoleErrors();
+}
+
+type StaleMenuDeps = {
+  openCalcMenu: () => Promise<void>;
+  calcMenu: Locator;
+  p: (typeof PROFILE)['mac'];
+  staleB2: () => Promise<boolean>;
+  stalePreference: () => Promise<boolean>;
+};
+
+/** On the Mac a stale formula value's error menu is headed Stale Value; its Calculate Now, Switch
+ *  to Automatic Calculation and Disable Format Stale Cells act on the workbook. B2 is =A2*2. */
+async function runMacStaleValueMenu(
+  page: Page,
+  sp: UserJourneyPage,
+  { openCalcMenu, calcMenu, p, staleB2, stalePreference }: StaleMenuDeps,
+): Promise<void> {
+  const menu = page.locator('.fc-errmenu:visible');
+  const calcMode = () =>
+    page.evaluate(() => {
+      const w = window as unknown as ProbeWindow;
+      return w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook).calcMode();
+    });
+  const triangleAtB2 = () =>
+    page.evaluate(() => {
+      const w = window as unknown as ProbeWindow;
+      const grid = document.querySelector<HTMLElement>('.fc-host__grid');
+      const canvas = document.querySelector<HTMLCanvasElement>('.fc-host__canvas');
+      if (!grid || !canvas) return null;
+      const hit = w.__fcProbes['render/grid/hit-state']
+        .gridHitState(grid)
+        .errorTriangles.find(({ addr }) => addr.sheet === 0 && addr.row === 1 && addr.col === 1);
+      if (!hit) return null;
+      const box = canvas.getBoundingClientRect();
+      return { x: box.x + hit.rect.x + hit.rect.w / 2, y: box.y + hit.rect.y + hit.rect.h / 2 };
+    });
+  const errorTag = () =>
+    page.evaluate(() => {
+      const w = window as unknown as ProbeWindow;
+      const grid = document.querySelector<HTMLElement>('.fc-host__grid');
+      const canvas = document.querySelector<HTMLCanvasElement>('.fc-host__canvas');
+      const tag = grid ? w.__fcProbes['render/grid/hit-state'].gridHitState(grid).errorTag : null;
+      if (!tag || !canvas) return null;
+      const box = canvas.getBoundingClientRect();
+      return { x: box.x + tag.rect.x + tag.rect.w / 2, y: box.y + tag.rect.y + tag.rect.h / 2 };
+    });
+  // Manual calculation and an edit to A2 leave B2 stale and flagged.
+  const makeStale = async (value: string): Promise<void> => {
+    await openCalcMenu();
+    await calcMenu.locator(p.manual).click();
+    await sp.enter('A2', value);
+    await expect.poll(staleB2).toBe(true);
+  };
+  // The Mac triangle marks the cell; the menu opens from its smart tag.
+  const openStaleMenu = async (): Promise<void> => {
+    await expect.poll(triangleAtB2).not.toBeNull();
+    const triangle = await triangleAtB2();
+    if (!triangle) throw new Error('B2 has no error-check triangle');
+    await page.mouse.click(triangle.x, triangle.y);
+    await expect.poll(errorTag).not.toBeNull();
+    const tag = await errorTag();
+    if (!tag) throw new Error('B2 has no error smart tag');
+    await page.mouse.click(tag.x, tag.y);
+    await expect(menu).toBeVisible();
+  };
+
+  await makeStale('4');
+  await openStaleMenu();
+  await expect(menu).toHaveAttribute('aria-label', 'Stale Value');
+  const items = menu.locator('[data-fc-action]');
+  await expect(items).toHaveText([
+    'Help on This Error',
+    'Calculate Now (F9)',
+    'Switch to Automatic Calculation',
+    'Disable Format Stale Cells',
+    'Ignore Error',
+    'Edit in Formula Bar',
+    'Error Checking Options...',
+  ]);
+  expect(
+    await items.evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.fcAction)),
+  ).toEqual([
+    'showInfo',
+    'calculateNow',
+    'switchToAutomatic',
+    'disableFormatStale',
+    'ignore',
+    'editCell',
+    'options',
+  ]);
+  await expect(menu.locator('[data-fc-action="options"]')).toHaveAttribute('aria-disabled', 'true');
+
+  // Calculate Now recalculates and keeps manual calculation.
+  await menu.locator('[data-fc-action="calculateNow"]').click();
+  await expect(menu).toBeHidden();
+  await expect.poll(staleB2).toBe(false);
+  await expect.poll(() => sp.readValue('B2')).toEqual({ kind: 'number', value: 8 });
+  expect(await calcMode()).toBe(1);
+  await expect.poll(triangleAtB2).toBeNull();
+
+  // Switch to Automatic Calculation recalculates and leaves manual mode.
+  await makeStale('5');
+  await openStaleMenu();
+  await menu.locator('[data-fc-action="switchToAutomatic"]').click();
+  await expect.poll(calcMode).toBe(0);
+  await expect.poll(staleB2).toBe(false);
+  await expect.poll(() => sp.readValue('B2')).toEqual({ kind: 'number', value: 10 });
+
+  // Disable Format Stale Cells turns the preference off; B2 stays stale but unmarked.
+  await makeStale('6');
+  await openStaleMenu();
+  await menu.locator('[data-fc-action="disableFormatStale"]').click();
+  await expect.poll(stalePreference).toBe(false);
+  expect(await staleB2()).toBe(true);
+  await expect.poll(triangleAtB2).toBeNull();
+  await openCalcMenu();
+  await expect(calcMenu.locator(p.formatStale)).toHaveAttribute('aria-checked', 'false');
+  await calcMenu.locator(p.formatStale).click();
+  await expect.poll(stalePreference).toBe(true);
+  await openCalcMenu();
+  await calcMenu.locator(p.auto).click();
+  await expect.poll(staleB2).toBe(false);
+  await expect.poll(() => sp.readValue('B2')).toEqual({ kind: 'number', value: 12 });
 }
 
 /** Opens a workbook from `tests/e2e-shared/fixtures/compat-version`. */
