@@ -137,6 +137,7 @@ versioning is [SemVer](https://semver.org/).
 - On the Mac, the Formulas tab's Calculate Now and Calculate Sheet are a two-row stack of 26 pt buttons beside Calculation Options, as on the desktop. Use in Formula's entry reads Paste Names... in every language, and the button and its entry are greyed out until the workbook has a defined name the Name Manager lists.
 - On the Mac, the Insert tab's chart gallery cells are 36 pt wide, and Waterfall and Combo sit in a two-row stack of 26 pt cells beside them, as the desktop draws the Charts group.
 - Saving as `.xlsb` a workbook that holds a feature the binary writer cannot write, such as a protected range with a security descriptor, names the feature and its sheet and offers to save as `.xlsx` instead. `saveWithPrompts` then resolves the `.xlsx` bytes, or null when cancelled.
+- On the Mac, the error-check menu of a stale formula value is headed Stale Value and lists Help on This Error, Calculate Now, Switch to Automatic Calculation, Disable Format Stale Cells, Ignore Error, Edit in Formula Bar and Error Checking Options, as the desktop does.
 
 ### Fixed
 

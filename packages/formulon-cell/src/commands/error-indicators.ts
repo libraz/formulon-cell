@@ -1,4 +1,5 @@
 import { addrKey, parseAddrKey } from '../engine/address.js';
+import { calcModeLeavesStaleValues } from '../engine/calc-mode.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
@@ -222,6 +223,17 @@ export function convertTextToNumber(
   });
   return result.status === 'applied';
 }
+
+/** Whether stale formula values are marked: Format Stale Values is on, the calc mode can leave
+ *  values stale, and the engine reports staleness. */
+export const staleValuesMarked = (
+  wb: Pick<WorkbookHandle, 'calcMode' | 'staleValuesSupported'> | null | undefined,
+  formatStaleValues: boolean,
+): boolean =>
+  !!wb &&
+  formatStaleValues &&
+  calcModeLeavesStaleValues(wb.calcMode?.() ?? null) &&
+  wb.staleValuesSupported?.() === true;
 
 /** Whether a cell carries the error-check triangle: the one rule the grid
  *  paints by and Error Checking walks. */

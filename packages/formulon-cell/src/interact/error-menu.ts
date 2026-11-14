@@ -1,5 +1,9 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
-import { convertTextToNumber, numberStoredAsText } from '../commands/error-indicators.js';
+import {
+  convertTextToNumber,
+  numberStoredAsText,
+  staleValuesMarked,
+} from '../commands/error-indicators.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -30,6 +34,8 @@ export interface ErrorMenuDeps {
   /** Hook to draw trace arrows for the error cell. The mount layer wires
    *  this to same-sheet precedent tracing. */
   onTraceError?: (addr: Addr, kind: ErrorMenuKind) => void;
+  /** Hook for the stale rule's Calculate Now and Switch to Automatic Calculation. */
+  onCalculate?: (action: 'calculate-now' | 'auto') => void;
 }
 
 export interface ErrorMenuHandle {
@@ -76,7 +82,16 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
 
   const onScroll = (): void => close(false);
 
-  type ErrorMenuAction = 'showInfo' | 'editCell' | 'traceError' | 'ignore' | 'convert' | 'options';
+  type ErrorMenuAction =
+    | 'showInfo'
+    | 'editCell'
+    | 'traceError'
+    | 'ignore'
+    | 'convert'
+    | 'calculateNow'
+    | 'switchToAutomatic'
+    | 'disableFormatStale'
+    | 'options';
   type ErrorMenuEntry = { id: ErrorMenuAction; label: string; unavailable?: string };
 
   const fcHost = host.closest<HTMLElement>('.fc-host') ?? host;
@@ -96,9 +111,18 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
   };
 
   /** The error-check rule a cell breaks, for the rules the Mac menu words itself. */
-  const macRuleOf = (addr: Addr): 'divZero' | 'numberAsText' | null => {
-    const cell = store.getState().data.cells.get(addrKey(addr));
+  const macRuleOf = (addr: Addr): 'divZero' | 'numberAsText' | 'stale' | null => {
+    const state = store.getState();
+    const cell = state.data.cells.get(addrKey(addr));
     if (!cell) return null;
+    const wb = getWb();
+    if (
+      cell.formula &&
+      staleValuesMarked(wb, state.ui.formatStaleValues) &&
+      wb?.isCellStale(addr)
+    ) {
+      return 'stale';
+    }
     if (cell.value.kind === 'error' && cell.value.text === '#DIV/0!') return 'divZero';
     let locale: string | undefined;
     try {
@@ -139,10 +163,13 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     heading.className = 'fc-errmenu__heading';
     const m = strings.mac.errorMenu;
     const rule = mac && kind === 'error' ? macRuleOf(addr) : null;
+    const ruleHeadings = {
+      divZero: m.divZeroHeading,
+      numberAsText: m.numberAsTextHeading,
+      stale: m.staleHeading,
+    };
     const label = rule
-      ? rule === 'divZero'
-        ? m.divZeroHeading
-        : m.numberAsTextHeading
+      ? ruleHeadings[rule]
       : kind === 'validation'
         ? t.validationHeading
         : t.errorHeading;
@@ -152,23 +179,34 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     heading.classList.toggle('fc-errmenu__heading--rule', rule !== null);
     root.appendChild(heading);
 
-    const entries: ErrorMenuEntry[] = rule
-      ? [
-          ...(rule === 'numberAsText'
-            ? [{ id: 'convert' as const, label: m.convertToNumber }]
-            : []),
-          { id: 'showInfo', label: m.help },
-          ...(rule === 'divZero' ? [{ id: 'traceError' as const, label: m.trace }] : []),
-          { id: 'ignore', label: m.ignore },
-          { id: 'editCell', label: m.editInFormulaBar },
-          { id: 'options', label: m.options, unavailable: m.optionsUnavailable },
-        ]
-      : [
-          { id: 'showInfo', label: t.showInfo },
-          { id: 'editCell', label: t.editCell },
-          { id: 'traceError', label: t.traceError },
-          { id: 'ignore', label: t.ignore },
-        ];
+    const entries: ErrorMenuEntry[] =
+      rule === 'stale'
+        ? [
+            { id: 'showInfo', label: m.help },
+            { id: 'calculateNow', label: m.calculateNow },
+            { id: 'switchToAutomatic', label: m.switchToAutomatic },
+            { id: 'disableFormatStale', label: m.disableFormatStale },
+            { id: 'ignore', label: m.ignore },
+            { id: 'editCell', label: m.editInFormulaBar },
+            { id: 'options', label: m.options, unavailable: m.optionsUnavailable },
+          ]
+        : rule
+          ? [
+              ...(rule === 'numberAsText'
+                ? [{ id: 'convert' as const, label: m.convertToNumber }]
+                : []),
+              { id: 'showInfo', label: m.help },
+              ...(rule === 'divZero' ? [{ id: 'traceError' as const, label: m.trace }] : []),
+              { id: 'ignore', label: m.ignore },
+              { id: 'editCell', label: m.editInFormulaBar },
+              { id: 'options', label: m.options, unavailable: m.optionsUnavailable },
+            ]
+          : [
+              { id: 'showInfo', label: t.showInfo },
+              { id: 'editCell', label: t.editCell },
+              { id: 'traceError', label: t.traceError },
+              { id: 'ignore', label: t.ignore },
+            ];
 
     for (const entry of entries) {
       const btn = createErrorMenuItemButton(entry);
@@ -225,6 +263,15 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
         if (wb) convertTextToNumber(store, wb, addr);
         return;
       }
+      case 'calculateNow':
+        deps.onCalculate?.('calculate-now');
+        return;
+      case 'switchToAutomatic':
+        deps.onCalculate?.('auto');
+        return;
+      case 'disableFormatStale':
+        mutators.setFormatStaleValues(store, false);
+        return;
       case 'options':
         return;
     }

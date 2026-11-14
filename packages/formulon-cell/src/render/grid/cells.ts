@@ -1,5 +1,5 @@
 import { inputLocaleForWorkbook } from '../../commands/coerce-input.js';
-import { errorCheckFlagged } from '../../commands/error-indicators.js';
+import { errorCheckFlagged, staleValuesMarked } from '../../commands/error-indicators.js';
 import { filterButtonHidden } from '../../commands/filter-ranges.js';
 import { activeFilterRanges } from '../../commands/filter-state.js';
 import {
@@ -9,7 +9,6 @@ import {
 } from '../../commands/format-as-table.js';
 import { formatA1FormulaAsR1C1 } from '../../commands/refs.js';
 import { addrKey } from '../../engine/address.js';
-import { calcModeLeavesStaleValues } from '../../engine/calc-mode.js';
 import { effectiveCellFormatFromEngine } from '../../engine/cell-format-projection.js';
 import { evaluateCfFromEngine } from '../../engine/cf-sync.js';
 import { formulaForEdit } from '../../engine/edit-seed.js';
@@ -233,10 +232,7 @@ export function paintCells(
   const triangleHits: ErrorTriangleHit[] = [];
   // Format Stale Values: decided once per paint, then read for formula cells only.
   const staleAt =
-    wb &&
-    state.ui.formatStaleValues &&
-    calcModeLeavesStaleValues(wb.calcMode?.() ?? null) &&
-    wb.staleValuesSupported?.() === true
+    wb && staleValuesMarked(wb, state.ui.formatStaleValues)
       ? (row: number, col: number): boolean => wb.isCellStale({ sheet: data.sheetIndex, row, col })
       : null;
   const locale = normalizeFormatLocale(cellCtx.locale);

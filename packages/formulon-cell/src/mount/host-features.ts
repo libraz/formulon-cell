@@ -832,6 +832,14 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             tracePrecedentArrows(input.store, input.wb(), addr);
             input.renderer.invalidate();
           },
+          onCalculate: (action) => {
+            const wb = input.wb();
+            if (action === 'auto') wb.setCalcMode(0);
+            else wb.recalc();
+            mutators.refreshActiveSheetCells(input.store, wb);
+            s.statusBar?.refresh();
+            input.renderer.invalidate();
+          },
         });
         if (!s.canvasErrorClickAttached) {
           const handler = input.getOnCanvasClick();
