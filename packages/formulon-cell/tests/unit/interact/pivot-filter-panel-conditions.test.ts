@@ -65,6 +65,13 @@ afterEach(() => {
 });
 
 describe('PivotTable filter panel conditions', () => {
+  it('closes the panel when a condition opens its filter dialog, so the dialog is not covered', async () => {
+    await setup();
+    choose(by('label'), String(PivotFilterKind.LabelEqual));
+    expect(dialog()).not.toBeNull();
+    expect(document.querySelector('.fc-pivot-filter-panel')).toBeNull();
+  });
+
   it('offers the field itself, then each data field, as the sort target', async () => {
     await setup();
     const sortBy = document.querySelector<HTMLSelectElement>(

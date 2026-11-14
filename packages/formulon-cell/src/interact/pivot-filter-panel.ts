@@ -253,6 +253,8 @@ export function openPivotFieldFilter(
         return;
       }
       const current = pivotFilterSpecToCondition(model.condition ?? undefined, input);
+      // The panel hands over to the dialog, as the column filter panel does for Custom Sort.
+      close();
       void showPivotFilterDialog({
         host: ctx.host,
         strings: strings.pivotTableDialog,
@@ -432,11 +434,7 @@ export function openPivotFieldFilter(
   const detachOutside = onOutsidePress(
     doc,
     () => [panel],
-    (e) => {
-      // The filter dialog the panel opened sits over it; leave the panel be.
-      if ((e.target as Element | null)?.closest?.('.fc-pivotdlg--filter')) return;
-      close();
-    },
+    () => close(),
     { event: 'mousedown' },
   );
   doc.addEventListener('keydown', onDocKey, true);

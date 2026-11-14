@@ -47,20 +47,19 @@ const setup = async (rowField: 'Date' | 'Region', platform?: 'mac') => {
   const host = document.createElement('div');
   if (platform) host.dataset.fcPlatform = platform;
   document.body.appendChild(host);
-  openPivotFieldFilter(
-    {
-      host,
-      store,
-      origin: 'contextMenu' as const,
-      commandId: 'pivotFilterLabel',
-      wb,
-      history: new History(),
-      strings: en,
-      onChanged: () => mutators.replaceCells(store, wb.cells(0)),
-    },
-    { sheet: 0, row: 2, col: 0 },
-  );
-  return { wb };
+  const ctx = {
+    host,
+    store,
+    origin: 'contextMenu' as const,
+    commandId: 'pivotFilterLabel',
+    wb,
+    history: new History(),
+    strings: en,
+    onChanged: () => mutators.replaceCells(store, wb.cells(0)),
+  };
+  const reopen = (): boolean => openPivotFieldFilter(ctx, { sheet: 0, row: 2, col: 0 });
+  reopen();
+  return { wb, reopen };
 };
 
 const byLabel = () =>
@@ -136,7 +135,7 @@ describe('PivotTable filter panel on a date field', () => {
   });
 
   it('picks All Dates in the Period from a quarter and month pop-up in the dialog', async () => {
-    const { wb } = await setup('Date');
+    const { wb, reopen } = await setup('Date');
     choose(byLabel(), 'allDatesInPeriod');
     const period = dialog()?.querySelector<HTMLSelectElement>(
       'select[data-pivot-filter-period="true"]',
@@ -153,6 +152,8 @@ describe('PivotTable filter panel on a date field', () => {
       fieldName: 'Date',
       kind: PivotFilterKind.M5,
     });
+    // The panel closed when it handed over to the dialog; open it again.
+    reopen();
     choose(byLabel(), 'allDatesInPeriod');
     // Reopened on the stored month.
     expect(
