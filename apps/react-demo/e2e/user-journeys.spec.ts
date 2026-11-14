@@ -7,6 +7,7 @@ import {
   runReportHeaderScenario,
   runSaveOpenContinueScenario,
   runTableOrganizationScenario,
+  runXlsbRefusalScenario,
 } from '../../../tests/e2e-shared/scenarios/user-journeys.js';
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
 import { test } from '../../../tests/e2e-shared/test.js';
@@ -45,6 +46,12 @@ test('user journey: monthly sheets and cross-sheet copy (react-demo)', {
 
 test('user journey: save, open, and continue editing (react-demo)', async ({ page }) => {
   await runSaveOpenContinueScenario(page);
+});
+
+test('user journey: save as .xlsb offers .xlsx for a feature it cannot hold (react-demo)', async ({
+  page,
+}) => {
+  await runXlsbRefusalScenario(page);
 });
 
 test('user journey: merged selection, AutoSum, and function arguments (react-demo)', async ({

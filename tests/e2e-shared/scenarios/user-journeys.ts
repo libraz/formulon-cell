@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -528,4 +529,102 @@ export async function runSaveOpenContinueScenario(page: Page): Promise<void> {
   } finally {
     await fresh.close();
   }
+}
+
+/** Save As .xlsb on a workbook holding a feature the binary writer refuses: the notice names the
+ *  feature and its sheet, Cancel saves nothing, and Save as Workbook (.xlsx) delivers an .xlsx that
+ *  keeps the feature. */
+export async function runXlsbRefusalScenario(page: Page): Promise<void> {
+  const sp = await start(page);
+  await page.evaluate(() => {
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    w.__fcInst.workbook.addSheet('Locked');
+    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    const added = handle.addProtectedRange(1, {
+      name: 'Edit',
+      ranges: 'A1:B2',
+      securityDescriptor: 'O:WDG:WDD:(A;;CC;;;WD)',
+    });
+    if (!added) throw new Error('protected range not added');
+  });
+  let downloads = 0;
+  page.on('download', () => {
+    downloads += 1;
+  });
+  const notice = page.getByRole('alertdialog', { name: 'Cannot Save in This Format' });
+  const saveAsXlsb = async (): Promise<void> => {
+    const backstage = page.locator('.fc-tb__backstage[role="dialog"]').first();
+    // Cancel leaves the backstage open, as on the desktop.
+    if (!(await backstage.isVisible()))
+      await page.locator('[data-ribbon-tab="file"]').first().click();
+    await expect(backstage).toBeVisible();
+    await backstage.getByRole('button', { name: 'Save As', exact: true }).click();
+    const chooser = page.getByRole('dialog', { name: 'Save As' });
+    await expect(chooser).toBeVisible();
+    await chooser.locator('[data-fc-save-format]').selectOption('xlsb');
+    await chooser.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(notice).toBeVisible();
+  };
+
+  await test.step('the notice names the refused feature and its sheet', async () => {
+    await saveAsXlsb();
+    await expect(notice).toContainText(
+      'This workbook contains one or more of the following features that are not supported by the selected file format:',
+    );
+    await expect(notice.locator('li')).toHaveText(['Protected ranges (Locked)']);
+    await expect(
+      notice.getByRole('button', { name: 'Save as Workbook (.xlsx)', exact: true }),
+    ).toBeVisible();
+    await expect(notice.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  });
+
+  await test.step('Cancel saves nothing', async () => {
+    await notice.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(notice).toBeHidden();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(page.locator('.fc-tb__backstage[role="dialog"]').first()).toBeVisible();
+    expect(downloads).toBe(0);
+  });
+
+  const path = await test.step('Save as Workbook (.xlsx) delivers an .xlsx', async () => {
+    await saveAsXlsb();
+    const downloadPromise = page.waitForEvent('download');
+    await notice.getByRole('button', { name: 'Save as Workbook (.xlsx)', exact: true }).click();
+    const download = await downloadPromise;
+    await expect(notice).toBeHidden();
+    expect(download.suggestedFilename()).toMatch(/\.xlsx$/);
+    expect(await download.failure()).toBeNull();
+    const saved = await download.path();
+    if (!saved) throw new Error('The .xlsx save exposed no download path');
+    return saved;
+  });
+
+  await test.step('the .xlsx keeps the protected range', async () => {
+    const fresh = await page.context().newPage();
+    const reopened = new UserJourneyPage(fresh);
+    try {
+      await reopened.mount({ fixture: 'empty' });
+      await reopened.expectNoStub();
+      await reopened.openDownload(path);
+      await expect.poll(() => reopened.sheetName(1)).toBe('Locked');
+      await expect
+        .poll(() =>
+          fresh.evaluate(() => {
+            const w = window as unknown as {
+              __fcInst: SpreadsheetInstance;
+              __fcProbes: E2eProbes;
+            };
+            const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+            return handle
+              .getProtectedRanges(1)
+              .map((range) => [range.name, range.securityDescriptor]);
+          }),
+        )
+        .toEqual([['Edit', 'O:WDG:WDD:(A;;CC;;;WD)']]);
+      await reopened.expectNoConsoleErrors();
+    } finally {
+      await fresh.close();
+    }
+  });
+  await sp.expectNoConsoleErrors();
 }
