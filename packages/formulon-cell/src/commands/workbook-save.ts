@@ -23,7 +23,10 @@ export const WORKBOOK_SAVE_FORMATS: Readonly<
   },
 };
 
-/** Workbook content the engine's `.xlsb` writer can leave out. */
+/** Workbook content the engine's `.xlsb` writer can leave out.
+ *  `notes` and `threadedComments` are no longer reported: the writer now writes them.
+ *  `sparklines` and `protectedRanges` the writer refuses instead, so a save holding one
+ *  fails with the `.xlsx` offer (see {@link xlsbUnwritableOf}) rather than listing it. */
 export type XlsbContentLossId =
   | 'notes'
   | 'threadedComments'
@@ -83,6 +86,7 @@ function xlsbContentLosses(wb: WorkbookHandle, deferred: number): WorkbookSaveLo
     { id: 'pivotTables', count: wb.getPivotTables().length },
     { id: 'slicers', count: sumSheets(wb, (s) => wb.listSlicers(s).length) },
     { id: 'tables', count: wb.getTables().length },
+    // Kept for the published loss ids: a book holding either refuses the .xlsb save first.
     { id: 'sparklines', count: sumSheets(wb, (s) => wb.listSparklineGroups(s).length) },
     { id: 'protectedRanges', count: sumSheets(wb, (s) => wb.getProtectedRanges(s).length) },
   ] as const;
