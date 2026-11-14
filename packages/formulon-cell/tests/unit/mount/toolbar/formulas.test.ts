@@ -104,8 +104,9 @@ describe('Spreadsheet.mountToolbar', () => {
     calcButton?.click();
     const menu = host.querySelector<HTMLElement>('#menu-calc-options');
     expect(menu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(6);
+    // The Compatibility Version radios sit in their own submenu panel.
     const radios = Array.from(
-      menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [],
+      menu?.querySelectorAll<HTMLButtonElement>(':scope > [role="menuitemradio"]') ?? [],
     );
     expect(radios.map((button) => button.dataset.calcOption)).toEqual([
       'auto',

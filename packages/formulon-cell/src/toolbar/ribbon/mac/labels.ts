@@ -1,3 +1,8 @@
+import {
+  COMPATIBILITY_VERSIONS,
+  compatibilityVersionLabel,
+} from '../../../commands/compatibility-version.js';
+import { dictionaries } from '../../../i18n/strings.js';
 import type { ToolbarLang } from '../../ribbon-model.js';
 import { MAC_AUTOMATION_GALLERY } from './automation-gallery.js';
 import {
@@ -445,6 +450,7 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
   },
   'mac.formulas.errorCheck.run': { ja: 'エラー チェック...', en: 'Error Checking...' },
   'mac.formulas.errorCheck.trace': { ja: 'エラー トレース', en: 'Trace Error' },
+  'mac.formulas.errorCheck.circular': { ja: '循環参照', en: 'Circular References' },
   'mac.formulas.reset.clear': { ja: 'リセット', en: 'Reset' },
   'mac.formulas.reset.runtime': { ja: '実行時刻のリセット', en: 'Reset Runtime' },
   'mac.formulas.reset.versionStable': { ja: '安定', en: 'Stable' },
@@ -533,6 +539,9 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
     en: 'Automatic Except for Data Tables',
   },
   'mac.formulas.calc.manual': { ja: '手動', en: 'Manual' },
+  'mac.formulas.calc.formatStale': { ja: '古い値の書式設定', en: 'Format Stale Values' },
+  'mac.formulas.calc.compatVersion': { ja: '互換性バージョン', en: 'Compatibility Version' },
+  'mac.formulas.calc.compatVersion.learnMore': { ja: '詳細を表示', en: 'Learn More' },
   'mac.data.goalSeek': { ja: 'ゴール シーク', en: 'Goal Seek' },
   'mac.data.scenarioManager': { ja: 'シナリオ マネージャー', en: 'Scenario Manager' },
   'mac.data.dataTable': { ja: 'データ テーブル', en: 'Data Table' },
@@ -555,4 +564,17 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
 const MENU_LABELS: Readonly<Record<string, Label>> = Object.fromEntries([
   ...Object.entries(menuLabelSeeds).map(([key, seed]) => [key, localizedMenuLabel(key, seed)]),
   ...MAC_AUTOMATION_GALLERY.map((script) => [script.commandId, script.labels] as const),
+  // The desktop composes these from a per-locale template and the version number.
+  ...COMPATIBILITY_VERSIONS.map(
+    (version) =>
+      [
+        `mac.formulas.calc.compatVersion.${version}`,
+        Object.fromEntries(
+          MAC_LOCALES.map((locale) => [
+            locale,
+            compatibilityVersionLabel(dictionaries[locale].ribbonMenu, version),
+          ]),
+        ) as Label,
+      ] as const,
+  ),
 ]);

@@ -141,6 +141,8 @@ export interface DynamicDropdownsCtx {
   applyFindSelectAction: (action: string) => void;
   applyAutoSumFormula: (fn: AutoSumFormulaName) => void;
   applyFormulaAuditAction: (action: string) => void;
+  /** Selects a Circular References entry, `sheet:row:col`. */
+  selectCircularReference: (cell: string) => void;
   applyWatchAction: (action: string) => void;
   applyReviewCommentAction: (action: string) => void;
   /** `entry` names the UI entry point; the ribbon's own command id when absent. */
@@ -230,6 +232,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'find-select',
   'autosum-fn',
   'formula-audit-action',
+  'circular-reference',
   'watch-action',
   'comment-action',
   'protect-action',
@@ -319,6 +322,10 @@ const applyVerticalViewportLimit = (
 
 /** Menus whose `data-format-submenu` entries open the `data-format-panel` beside them. */
 const FORMAT_SUBMENU_MENU_IDS: ReadonlySet<string> = new Set([
+  'menu-calc-options',
+  'menu-error-checking',
+  'menu-mac-formulas-calc-options',
+  'menu-mac-formulas-error-check',
   'menu-format-cells',
   'menu-shape-outline',
   SPARKLINE_MENU_IDS.color,
@@ -363,6 +370,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-defined-names': 'updateDefinedNamesMenu',
   'menu-delete-cells': 'updateCellDeleteMenu',
   'menu-error-checking': 'updateErrorCheckingMenu',
+  'menu-mac-formulas-error-check': 'updateErrorCheckingMenu',
   'menu-fill': 'updateFillMenu',
   'menu-format-cells': 'updateFormatCellsMenu',
   'menu-freeze': 'updateFreezeMenu',
@@ -779,6 +787,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'find-select', handler: (v) => ctx.applyFindSelectAction(v) },
     { attr: 'autosum-fn', handler: (v) => ctx.applyAutoSumFormula(v as AutoSumFormulaName) },
     { attr: 'formula-audit-action', handler: (v) => ctx.applyFormulaAuditAction(v) },
+    { attr: 'circular-reference', handler: (v) => ctx.selectCircularReference(v) },
     { attr: 'watch-action', handler: (v) => ctx.applyWatchAction(v) },
     { attr: 'comment-action', handler: (v) => ctx.applyReviewCommentAction(v) },
     { attr: 'protect-action', handler: (v) => ctx.applyProtectAction(v) },

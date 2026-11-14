@@ -75,6 +75,12 @@ export const viewMutators = {
     );
   },
 
+  setFormatStaleValues(store: SpreadsheetStore, on: boolean): void {
+    store.setState((s) =>
+      s.ui.formatStaleValues === on ? s : { ...s, ui: { ...s.ui, formatStaleValues: on } },
+    );
+  },
+
   setShowOutlineSymbols(store: SpreadsheetStore, on: boolean): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showOutlineSymbols: on } }));
   },

@@ -791,6 +791,11 @@ describe('Spreadsheet.mountToolbar', () => {
       elements: galleryStyleElements('medium', '#70ad47', 'bandedFirstCol'),
     });
     const renderedKeys = new Set<string>();
+    // Circular References lists its cells when Error Checking opens, so one book holds a cycle.
+    const cycleWorkbook = await WorkbookHandle.createDefault();
+    cycleWorkbook.setFormula({ sheet: 0, row: 0, col: 0 }, '=B1');
+    cycleWorkbook.setFormula({ sheet: 0, row: 0, col: 1 }, '=A1');
+    const cycleSheet = await mountStubSheet({ locale: 'en', workbook: cycleWorkbook });
     // A contextual tab shows only while its kind of object is selected.
     const contexts = [
       ...CONTEXTUAL_SELECTIONS.map((select) => () => {
@@ -798,6 +803,7 @@ describe('Spreadsheet.mountToolbar', () => {
         return sheet.instance;
       }),
       () => pivotSheet.instance,
+      () => cycleSheet.instance,
     ];
     // Some menus build a profile's own rows, so both profiles count.
     for (const [context, platform] of contexts.flatMap((context) =>
@@ -809,6 +815,10 @@ describe('Spreadsheet.mountToolbar', () => {
         helpers: stubHelpers(),
         ...(platform === 'mac' ? { platform } : {}),
       });
+      const errorChecking = host.querySelector<HTMLElement>('#menu-error-checking');
+      const errorCheckingSpec =
+        errorChecking && tb.dropdownsApi?.dynamicDropdownSpecForMenu(errorChecking);
+      if (errorCheckingSpec) tb.dropdownsApi?.openDynamicRibbonDropdown(errorCheckingSpec);
       for (const menuId of tb.dropdownsApi?.DYNAMIC_RIBBON_DROPDOWN_IDS ?? []) {
         const menu = host.querySelector<HTMLElement>(`#${menuId}`);
         if (!menu) continue;
@@ -818,6 +828,7 @@ describe('Spreadsheet.mountToolbar', () => {
       }
       tb.dispose();
     }
+    cycleSheet.dispose();
 
     const missing = Array.from(DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS)
       .filter((key) => !renderedKeys.has(key))

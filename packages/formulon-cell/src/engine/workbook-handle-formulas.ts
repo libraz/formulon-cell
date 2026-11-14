@@ -1,5 +1,5 @@
 import { type CalcMode, type ProfileId, RefMode } from '@libraz/formulon';
-import { CALC_MODE_MANUAL, type CalcModeCode } from './calc-mode.js';
+import { CALC_MODE_MANUAL, type CalcModeCode, type CompatibilityVersionCode } from './calc-mode.js';
 import {
   canonicalizeFormula,
   canonicalizeFormulaForEngine,
@@ -102,6 +102,33 @@ function attemptWrite(write: () => void): boolean {
     if (!isFormulonError(e)) throw e;
     return false;
   }
+}
+
+/** The engine's circular-reference listing, absent from engine builds that predate it. */
+type CircularReferenceAccess = {
+  listCircularReferences?: () => readonly { readonly row: number; readonly col: number }[];
+};
+
+/** The engine's Compatibility Version accessor, absent from engine builds that predate it. */
+type CompatibilityVersionAccess = {
+  getCompatibilityVersion?: () => CompatibilityVersionCode;
+  setCompatibilityVersion?: (version: CompatibilityVersionCode) => void;
+};
+
+/** The engine's stale-value read, absent from engine builds that predate it. */
+type StaleValueAccess = {
+  isCellStale?: (row: number, col: number) => boolean;
+};
+
+/** Whether `target` has `method`. `in`, because the stub engine answers every member read. */
+function hasMethod(target: object, method: string): boolean {
+  return method in target && typeof (target as Record<string, unknown>)[method] === 'function';
+}
+
+/** Whether the engine's sheet objects expose `method`, probed on the first sheet. */
+function sheetHasMethod(handle: unknown, method: string): boolean {
+  const w = wb(handle);
+  return w.hasSheet(0) && hasMethod(w.sheet(0), method);
 }
 
 /** Defined-name formula text as `definedNames()` reports it: without the `=`. */
@@ -473,6 +500,58 @@ export abstract class WorkbookHandleFormulasMethods {
     assertAlive(this);
     if (!this.capabilities.calcMode) return null;
     return attempt(() => wb(this).getCalcMode());
+  }
+
+  /** Whether the engine lists a sheet's circular references (`Sheet.listCircularReferences`). */
+  circularReferencesSupported(): boolean {
+    assertAlive(this);
+    return sheetHasMethod(this, 'listCircularReferences');
+  }
+
+  /** Cells of `sheet` in an unresolved circular reference, in the engine's order; `null` when
+   *  the engine cannot list them. Under automatic calculation the read recalculates first, so
+   *  call it when the list is shown, never per render. */
+  circularReferences(sheet: number): readonly { row: number; col: number }[] | null {
+    assertAlive(this);
+    if (!sheetHasMethod(this, 'listCircularReferences')) return null;
+    const s = ws(this, sheet) as Sheet & CircularReferenceAccess;
+    const cells = attempt(() => s.listCircularReferences?.() ?? []);
+    return cells?.map(({ row, col }) => ({ row, col })) ?? null;
+  }
+
+  /** Whether the engine reports a formula cell's stale value (`Sheet.isCellStale`). */
+  staleValuesSupported(): boolean {
+    assertAlive(this);
+    return sheetHasMethod(this, 'isCellStale');
+  }
+
+  /** Whether the formula at `addr` holds a value a recalc would change; `false` when the engine
+   *  cannot tell. The read never recalculates. */
+  isCellStale(addr: Addr): boolean {
+    assertAlive(this);
+    const s = ws(this, addr.sheet) as Sheet & StaleValueAccess;
+    if (!hasMethod(s, 'isCellStale')) return false;
+    return attempt(() => s.isCellStale?.(addr.row, addr.col)) === true;
+  }
+
+  /** The workbook's Compatibility Version, or `null` when the engine has no accessor. */
+  compatibilityVersion(): CompatibilityVersionCode | null {
+    assertAlive(this);
+    const w = wb(this) as Workbook & CompatibilityVersionAccess;
+    if (!hasMethod(w, 'getCompatibilityVersion')) return null;
+    return attempt(() => w.getCompatibilityVersion?.() ?? null);
+  }
+
+  /** Sets the Compatibility Version and recalculates the formulas the engine marked. Returns
+   *  `false` when the engine has no setter or refuses the value; the held value changes nothing. */
+  setCompatibilityVersion(version: CompatibilityVersionCode): boolean {
+    assertAlive(this);
+    const w = wb(this) as Workbook & CompatibilityVersionAccess;
+    if (!hasMethod(w, 'setCompatibilityVersion')) return false;
+    if (this.compatibilityVersion() === version) return true;
+    if (!attemptWrite(() => w.setCompatibilityVersion?.(version))) return false;
+    (this as unknown as WorkbookHandle).recalcAuto();
+    return true;
   }
 
   /** Sets the calc mode, throwing the engine's error for a mode it refuses. Leaving Manual runs

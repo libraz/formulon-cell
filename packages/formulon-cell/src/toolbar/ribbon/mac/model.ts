@@ -21,7 +21,7 @@ import {
   t,
   text,
 } from './labels.js';
-import { MAC_RIBBON_MENU_COMMANDS, MAC_RIBBON_MENU_ITEMS } from './menu-manifest.js';
+import { MAC_RIBBON_MENU_COMMANDS, MAC_RIBBON_MENU_ITEMS, macMenuLeaves } from './menu-manifest.js';
 
 export { macRibbonDisabledReason, macRibbonLabelForCommand } from './labels.js';
 export {
@@ -30,6 +30,7 @@ export {
   MAC_RIBBON_MENU_COMMANDS,
   MAC_RIBBON_MENU_ITEMS,
   type MacRibbonMenuItem,
+  macMenuLeaves,
   macRibbonMenuIdForCommand,
 } from './menu-manifest.js';
 export { projectMacRibbonState } from './state-projection.js';
@@ -863,7 +864,7 @@ export const buildMacRibbonModel = (lang: ToolbarLang, home: RibbonTabModel): Ri
 const macCatalogHome: RibbonTabModel = { id: 'home', label: 'Home', groups: [] };
 const macCatalog = buildMacRibbonModel('en', macCatalogHome).filter((tab) => tab.id !== 'home');
 const macMenuLeafCommandIds = Object.values(MAC_RIBBON_MENU_ITEMS).flatMap((items) =>
-  items.map((item) => item.id),
+  macMenuLeaves(items).map((item) => item.id),
 );
 
 export const MAC_RIBBON_COMMAND_IDS: readonly string[] = Object.freeze(
@@ -883,6 +884,8 @@ export const MAC_RIBBON_DISABLED_COMMAND_IDS: ReadonlySet<string> = new Set([
     tab.groups.flatMap((g) => g.commands.filter((c) => c.disabled).map((c) => c.id)),
   ),
   ...Object.values(MAC_RIBBON_MENU_ITEMS).flatMap((items) =>
-    items.filter((item) => item.disabled).map((item) => item.id),
+    macMenuLeaves(items)
+      .filter((item) => item.disabled)
+      .map((item) => item.id),
   ),
 ]);

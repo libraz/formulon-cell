@@ -32,6 +32,7 @@ import {
   MAC_RIBBON_DISABLED_COMMAND_IDS,
   MAC_RIBBON_MENU_COMMAND_SET,
   MAC_RIBBON_MENU_ITEMS,
+  macMenuLeaves,
   macRibbonLabelForCommand,
   macRibbonMenuIdForCommand,
   projectMacRibbonState,
@@ -114,6 +115,8 @@ describe('Mac Excel ribbon profile', () => {
       'mac.formulas.calc.auto',
       'mac.formulas.calc.autoNoTable',
       'mac.formulas.calc.manual',
+      'mac.formulas.calc.formatStale',
+      'mac.formulas.calc.compatVersion',
     ]);
     expect(MAC_RIBBON_MENU_ITEMS['mac.formulas.autoSum']?.map((item) => item.id)).toEqual([
       'mac.autosum.SUM',
@@ -901,7 +904,7 @@ describe('Mac Excel ribbon profile', () => {
     for (const [root, items] of Object.entries(MAC_RIBBON_MENU_ITEMS)) {
       expect(MAC_RIBBON_MENU_COMMAND_SET.has(root)).toBe(true);
       expect(macRibbonMenuIdForCommand(root)).toMatch(/^menu-mac-/);
-      for (const item of items.filter((candidate) => !candidate.heading)) {
+      for (const item of macMenuLeaves(items).filter((candidate) => !candidate.heading)) {
         expect(MAC_RIBBON_COMMAND_IDS).toContain(item.id);
         const activation = ribbonActivationForCommand(item.id);
         const expectedKind = item.disabled
@@ -1145,6 +1148,7 @@ describe('Mac Excel ribbon profile', () => {
       expect(MAC_RIBBON_MENU_ITEMS['mac.formulas.errorCheck']?.map((item) => item.id)).toEqual([
         'mac.formulas.errorCheck.run',
         'mac.formulas.errorCheck.trace',
+        'mac.formulas.errorCheck.circular',
       ]);
       expect(isMacRibbonCommandSupported('mac.formulas.errorCheck.ignore')).toBe(false);
     });

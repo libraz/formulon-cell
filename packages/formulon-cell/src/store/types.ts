@@ -214,6 +214,9 @@ export interface UiSlice {
   /** Review > Show All Notes: every note is drawn whatever its own shown state. A view
    *  preference of this spreadsheet, never written to the workbook. */
   showAllNotes: boolean;
+  /** Formulas › Calculation Options › Format Stale Values: formula cells whose value is stale
+   *  are drawn with the stale look. A host preference, never written to the workbook. */
+  formatStaleValues: boolean;
   /** Excel End mode: the next arrow key jumps to the edge of the current data region. */
   endMode: boolean;
   /** Workbook view mode surfaced by View > Workbook Views. Page Layout folds

@@ -11,6 +11,10 @@ import {
   DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS,
   type DynamicDropdownsCtx,
 } from '../../../../src/toolbar/ribbon/dynamic-dropdowns.js';
+import {
+  MAC_RIBBON_MENU_COMMANDS,
+  macRibbonMenuIdForCommand,
+} from '../../../../src/toolbar/ribbon/mac/menu-manifest.js';
 import { ribbonDir, root, sourceFilesUnder, sourcesOutsidePrimitives } from './fixtures.js';
 
 describe('toolbar/ribbon menu primitives', () => {
@@ -46,7 +50,10 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(dynamicDropdownsSource).toContain('DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS');
     expect(dynamicDropdownsSource).toContain('menuRefreshers[spec.menuId]?.(menu)');
     expect(dynamicDropdownsSource).not.toContain("if (spec.menuId === 'menu-");
-    const registeredMenuIds = new Set(Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND));
+    const registeredMenuIds = new Set([
+      ...Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND),
+      ...MAC_RIBBON_MENU_COMMANDS.map(macRibbonMenuIdForCommand),
+    ]);
     const refresherMenuIds = Object.keys(DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS);
 
     expect(refresherMenuIds.filter((id) => !registeredMenuIds.has(id))).toEqual([]);
@@ -93,6 +100,7 @@ describe('toolbar/ribbon menu primitives', () => {
       applyFindSelectAction: vi.fn(),
       applyAutoSumFormula: vi.fn(),
       applyFormulaAuditAction: vi.fn(),
+      selectCircularReference: vi.fn(),
       applyWatchAction: vi.fn(),
       applyReviewCommentAction: vi.fn(),
       applyProtectAction: vi.fn(),

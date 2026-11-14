@@ -4,7 +4,10 @@ import {
   OTHER_BUILT_IN_COMMAND_IDS,
 } from '../../../src/commands/built-in-command-ids.js';
 import { BUILTIN_ITEM_IDS } from '../../../src/interact/context-menu-spec.js';
-import { MAC_RIBBON_MENU_ITEMS } from '../../../src/toolbar/ribbon/mac/menu-manifest.js';
+import {
+  MAC_RIBBON_MENU_ITEMS,
+  macMenuLeaves,
+} from '../../../src/toolbar/ribbon/mac/menu-manifest.js';
 import {
   buildRibbonModel,
   CONTEXTUAL_RIBBON_TABS,
@@ -34,7 +37,7 @@ const modelIds = (): Set<string> => {
 const menuIds = (): Set<string> => {
   const ids = new Set<string>();
   for (const items of Object.values(MAC_RIBBON_MENU_ITEMS)) {
-    for (const item of items) {
+    for (const item of macMenuLeaves(items)) {
       if (!item.heading && !item.disabled && !item.id.startsWith('mac.function.')) ids.add(item.id);
     }
   }

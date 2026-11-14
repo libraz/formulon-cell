@@ -3123,6 +3123,34 @@
       "match": "en+ja",
       "control": "menu-item"
     },
+    "menu:mac.formulas.calc.formatStale": {
+      "tcid": 34747,
+      "source": "tbbtn",
+      "name": "StaleValueNotification",
+      "match": "en+ja",
+      "control": "menu-item"
+    },
+    "menu:mac.formulas.calc.compatVersion": {
+      "tcid": 35311,
+      "source": "tbbtn",
+      "name": "XlWorkbookAmendmentCompatibilityVersion",
+      "match": "en+ja",
+      "control": "menu-item"
+    },
+    "menu:mac.formulas.calc.compatVersion.learnMore": {
+      "tcid": 35744,
+      "source": "tbbtn",
+      "name": "XlWorkbookAmendmentLearnMore",
+      "match": "en+ja",
+      "control": "menu-item"
+    },
+    "menu:mac.formulas.errorCheck.circular": {
+      "tcid": 1623,
+      "source": "tbbtn2",
+      "name": "CircularReferenceDropdown",
+      "match": "en+ja",
+      "control": "menu-item"
+    },
     "menu:mac.formulas.category.all": {
       "tcid": 5808,
       "source": "tbbtn",
@@ -4315,9 +4343,13 @@
     "menu:mac.data.validation.clearCircles",
     "menu:mac.data.validation.settings",
     "menu:mac.formulas.calc.auto",
+    "menu:mac.formulas.calc.compatVersion",
+    "menu:mac.formulas.calc.compatVersion.learnMore",
+    "menu:mac.formulas.calc.formatStale",
     "menu:mac.formulas.calc.manual",
     "menu:mac.formulas.category.all",
     "menu:mac.formulas.category.recent",
+    "menu:mac.formulas.errorCheck.circular",
     "menu:mac.formulas.errorCheck.run",
     "menu:mac.formulas.errorCheck.trace",
     "menu:mac.formulas.removeArrows.dependents",

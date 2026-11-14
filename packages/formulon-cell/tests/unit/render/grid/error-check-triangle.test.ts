@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createPivotTableFromRange,
   refreshPivotReportsAfterEdit,
@@ -58,6 +58,7 @@ const theme = {
 /** Paint the sheet and record every fillRect with the fill colour it used. */
 function paint(store: SpreadsheetStore, mac: boolean, wb: WorkbookHandle | null = null) {
   const rects: { color: string; rect: number[] }[] = [];
+  const lines: number[][] = [];
   const target: Record<string, unknown> = {
     fillStyle: '',
     font: '',
@@ -65,6 +66,7 @@ function paint(store: SpreadsheetStore, mac: boolean, wb: WorkbookHandle | null 
     measureText: () =>
       ({ width: 7, actualBoundingBoxAscent: 9, actualBoundingBoxDescent: 2 }) as TextMetrics,
     fillRect: (...rect: number[]) => rects.push({ color: String(target.fillStyle), rect }),
+    lineTo: (...point: number[]) => lines.push(point),
   };
   const ctx = new Proxy(target, {
     get: (o, p: string) => (p in o ? o[p] : () => undefined),
@@ -96,7 +98,7 @@ function paint(store: SpreadsheetStore, mac: boolean, wb: WorkbookHandle | null 
     buildColLayout(view.layout, view.viewport),
     buildRowLayout(view.layout, view.viewport),
   );
-  return { result, rects };
+  return { result, rects, lines };
 }
 
 const at = (store: SpreadsheetStore, row: number, col: number, value: CellValue, formula: string) =>
@@ -227,5 +229,56 @@ describe('formula rules of the default error check (Mac desktop)', () => {
 
   it('applies none of them on the other profiles', () => {
     expect(paint(sheet(), false).result.errorTriangles).toEqual([]);
+  });
+});
+
+describe('Format Stale Values', () => {
+  /** B1 = A1*2 in Manual mode; A1 is edited afterwards, so B1 holds a stale 2. */
+  const staleBook = async () => {
+    const wb = await WorkbookHandle.createDefault();
+    wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+    wb.setFormula({ sheet: 0, row: 0, col: 1 }, '=A1*2');
+    wb.setCalcMode(1);
+    wb.setNumber({ sheet: 0, row: 0, col: 0 }, 5);
+    const store = createSpreadsheetStore();
+    at(store, 0, 0, { kind: 'number', value: 5 }, '');
+    at(store, 0, 1, { kind: 'number', value: 2 }, '=A1*2');
+    return { wb, store };
+  };
+  const drawn = (store: SpreadsheetStore, wb: WorkbookHandle) => {
+    const { result, lines } = paint(store, true, wb);
+    return {
+      triangles: result.errorTriangles.map((t) => `${t.addr.row}:${t.addr.col}`),
+      struck: lines.length > 0,
+    };
+  };
+
+  it('strikes the stale formula value and marks it with the error-check triangle', async () => {
+    const { wb, store } = await staleBook();
+    try {
+      expect(wb.isCellStale({ sheet: 0, row: 0, col: 1 })).toBe(true);
+      expect(drawn(store, wb)).toEqual({ triangles: ['0:1'], struck: true });
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('draws nothing after a recalc, under Automatic, or with the preference off', async () => {
+    const { wb, store } = await staleBook();
+    try {
+      mutators.setFormatStaleValues(store, false);
+      expect(drawn(store, wb)).toEqual({ triangles: [], struck: false });
+      mutators.setFormatStaleValues(store, true);
+      const automatic = vi.spyOn(wb, 'calcMode').mockReturnValue(0);
+      expect(wb.isCellStale({ sheet: 0, row: 0, col: 1 })).toBe(true);
+      expect(drawn(store, wb)).toEqual({ triangles: [], struck: false });
+      automatic.mockRestore();
+      expect(drawn(store, wb)).toEqual({ triangles: ['0:1'], struck: true });
+      wb.recalc();
+      expect(wb.isCellStale({ sheet: 0, row: 0, col: 1 })).toBe(false);
+      expect(drawn(store, wb)).toEqual({ triangles: [], struck: false });
+    } finally {
+      wb.dispose();
+    }
   });
 });

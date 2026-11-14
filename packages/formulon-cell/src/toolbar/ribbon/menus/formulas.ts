@@ -3,17 +3,23 @@
 // menuitem/menuitemradio entries so the parent can toggle the radio state after
 // rendering.
 
+import {
+  COMPATIBILITY_VERSIONS,
+  compatibilityVersionLabel,
+} from '../../../commands/compatibility-version.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarLang } from '../../ribbon-model.js';
 
 import {
   createMenu,
+  createSubmenu,
   type MenuIconSlug,
   menuIconButton,
   menuIconSpacer,
   menuIdForCommand,
   menuPresetButton,
   menuSeparator,
+  menuSubmenuTrigger,
 } from './general.js';
 
 export type AutoSumFormulaName = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN' | 'MORE';
@@ -44,6 +50,42 @@ const calcOptionButton = (label: string, value: string, icon: MenuIconSlug): HTM
   return button;
 };
 
+/** A checkable entry without an icon: `menuitemcheckbox` or `menuitemradio`, unchecked. */
+const checkableOption = (
+  label: string,
+  attr: string,
+  value: string,
+  role: 'menuitemcheckbox' | 'menuitemradio',
+): HTMLButtonElement => {
+  const button = menuPresetButton(label, attr, value, menuIconSpacer());
+  button.setAttribute('role', role);
+  button.setAttribute('aria-checked', 'false');
+  return button;
+};
+
+/** A submenu row and its panel, in the shared format-submenu markup. */
+const formatSubmenu = (
+  menuId: string,
+  key: string,
+  label: string,
+  children: readonly Node[],
+): [HTMLButtonElement, HTMLDivElement] => {
+  const id = `${menuId}-${key}`;
+  const trigger = menuSubmenuTrigger(
+    menuPresetButton(label, 'formatSubmenu', key, menuIconSpacer()),
+    undefined,
+    { controlsId: id },
+  );
+  const panel = createSubmenu({
+    id,
+    className: 'fc-tb__submenu fc-tb__submenu--format',
+    label,
+    dataset: { formatPanel: key },
+  });
+  panel.append(...children);
+  return [trigger, panel];
+};
+
 export const createFormulasMenuFactories = (
   ribbonMenuText: ToolbarMenuText,
   _ribbonLang: ToolbarLang,
@@ -70,6 +112,26 @@ export const createFormulasMenuFactories = (
       calcOptionButton(t.calcAutomatic, 'auto', 'calc-auto'),
       calcOptionButton(t.calcAutoNoTable, 'auto-no-table', 'calc-auto-no-table'),
       calcOptionButton(t.calcManual, 'manual', 'calc-manual'),
+      menuSeparator(),
+      checkableOption(t.formatStaleValues, 'calcOption', 'format-stale', 'menuitemcheckbox'),
+      menuSeparator(),
+      ...formatSubmenu('menu-calc-options', 'compat-version', t.compatibilityVersion, [
+        ...COMPATIBILITY_VERSIONS.map((version) =>
+          checkableOption(
+            compatibilityVersionLabel(t, version),
+            'calcOption',
+            `compat-${version}`,
+            'menuitemradio',
+          ),
+        ),
+        menuSeparator(),
+        menuPresetButton(
+          t.compatibilityVersionLearnMore,
+          'calcOption',
+          'compat-learn-more',
+          menuIconSpacer(),
+        ),
+      ]),
       menuSeparator(),
       calcOptionButton(t.calcCalculateNow, 'calculate-now', 'calc-now'),
       calcOptionButton(t.calcCalculateSheet, 'calculate-sheet', 'calc-sheet'),
@@ -114,6 +176,8 @@ export const createFormulasMenuFactories = (
     menu.append(
       menuIconButton(t.errorChecking, 'formulaAuditAction', 'error-checking', 'error-checking'),
       menuIconButton(t.traceError, 'formulaAuditAction', 'trace-error', 'trace-error'),
+      // Its entries are the active sheet's cycle members, listed when the menu opens.
+      ...formatSubmenu('menu-error-checking', 'circular', t.circularReferences, []),
       menuSeparator(),
       menuIconButton(t.ignoreError, 'formulaAuditAction', 'ignore-error', 'ignore-error'),
     );

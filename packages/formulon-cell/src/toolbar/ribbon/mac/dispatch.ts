@@ -168,6 +168,10 @@ const operations = [
   'mac.formulas.calc.auto',
   'mac.formulas.calc.manual',
   'mac.formulas.calc.autoNoTable',
+  'mac.formulas.calc.formatStale',
+  'mac.formulas.calc.compatVersion.1',
+  'mac.formulas.calc.compatVersion.2',
+  'mac.formulas.calc.compatVersion.3',
   'mac.page.break.insert',
   'mac.page.break.remove',
   'mac.page.break.reset',
@@ -463,6 +467,12 @@ export function dispatchMacRibbonCommand(
         return ctx.applyCalcOptionAction('manual');
       case 'mac.formulas.calc.autoNoTable':
         return ctx.applyCalcOptionAction('auto-no-table');
+      case 'mac.formulas.calc.formatStale':
+        return ctx.applyCalcOptionAction('format-stale');
+      case 'mac.formulas.calc.compatVersion.1':
+      case 'mac.formulas.calc.compatVersion.2':
+      case 'mac.formulas.calc.compatVersion.3':
+        return ctx.applyCalcOptionAction(`compat-${id.slice(-1)}`);
       case 'mac.data.flashFill':
         return ctx.applyFillDirection('flash');
       case 'mac.data.textToColumns':

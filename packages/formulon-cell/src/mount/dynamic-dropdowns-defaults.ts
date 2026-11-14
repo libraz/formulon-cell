@@ -217,6 +217,7 @@ export function createDefaultDynamicDropdownsCtx(
     updateTextOrientationMenu: formattingDefaults.updateTextOrientationMenu,
     applyAutoSumFormula: formulaDefaults.applyAutoSumFormula,
     applyFormulaAuditAction: formulaDefaults.applyFormulaAuditAction,
+    selectCircularReference: formulaDefaults.selectCircularReference,
     applyWatchAction: formulaDefaults.applyWatchAction,
     applyCalcOptionAction: formulaDefaults.applyCalcOptionAction,
     applyWhatIfAction: formulaDefaults.applyWhatIfAction,

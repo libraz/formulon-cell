@@ -61,6 +61,7 @@ export const createSpreadsheetStore = () =>
       showFormulas: false,
       showOutlineSymbols: true,
       showAllNotes: false,
+      formatStaleValues: true,
       endMode: false,
       workbookView: 'normal',
       zoomBeforePreview: null,

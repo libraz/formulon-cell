@@ -1,3 +1,4 @@
+import { COMPATIBILITY_VERSIONS } from '../../../commands/compatibility-version.js';
 import {
   type CatalogFunctionCategory,
   supportedFunctionNames,
@@ -24,7 +25,16 @@ export interface MacRibbonMenuItem {
   heading?: boolean;
   /** The label is the gallery's own wording, not the command's ribbon label. */
   own?: boolean;
+  /** The row opens a side panel of these entries (the shared `data-format-submenu` markup). The
+   *  row itself is not a command. */
+  submenu?: readonly MacRibbonMenuItem[];
+  /** A checkable row: `menuitemcheckbox` or `menuitemradio`, its state in `aria-checked`. */
+  check?: 'checkbox' | 'radio';
 }
+
+/** The command rows of a menu: a submenu row contributes its entries, not itself. */
+export const macMenuLeaves = (items: readonly MacRibbonMenuItem[]): MacRibbonMenuItem[] =>
+  items.flatMap((item) => (item.submenu ? macMenuLeaves(item.submenu) : [item]));
 
 /** Root command ids whose primary face opens a Mac menu. The mount can use
  * this explicit list to apply menu-first behavior without changing the
@@ -97,7 +107,8 @@ export const MAC_RIBBON_MENU_COMMAND_SET: ReadonlySet<string> = new Set(MAC_RIBB
 const menu = (items: readonly MacRibbonMenuItem[]): readonly MacRibbonMenuItem[] =>
   items.map((item) => {
     const label = labelFor(item.id);
-    return label ? { ...item, label: label.en, labelJa: label.ja } : item;
+    const localized = label ? { ...item, label: label.en, labelJa: label.ja } : item;
+    return item.submenu ? { ...localized, submenu: menu(item.submenu) } : localized;
   });
 /** A menu whose entries the host cannot run: every row greyed out with the same reason. */
 const unavailable = (
@@ -533,6 +544,26 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
       labelJa: 'データ テーブル以外は自動',
     },
     { id: 'mac.formulas.calc.manual', label: 'Manual', labelJa: '手動' },
+    { id: 'mac.formulas.calc.formatStale', label: 'Format Stale Values', check: 'checkbox' },
+    {
+      id: 'mac.formulas.calc.compatVersion',
+      label: 'Compatibility Version',
+      submenu: [
+        ...COMPATIBILITY_VERSIONS.map(
+          (version): MacRibbonMenuItem => ({
+            id: `mac.formulas.calc.compatVersion.${version}`,
+            label: `Version ${version}`,
+            check: 'radio',
+          }),
+        ),
+        {
+          id: 'mac.formulas.calc.compatVersion.learnMore',
+          label: 'Learn More',
+          disabled: true,
+          disabledReason: NOT_IMPLEMENTED.en,
+        },
+      ],
+    },
   ]),
   // The host has no linked data types, so the gallery lists Excel's entries greyed out.
   'mac.data.dataTypes': [
@@ -561,6 +592,8 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   'mac.formulas.errorCheck': menu([
     { id: 'mac.formulas.errorCheck.run', label: 'Error Checking...' },
     { id: 'mac.formulas.errorCheck.trace', label: 'Trace Error' },
+    // Its entries are the active sheet's cycle members, listed when the menu opens.
+    { id: 'mac.formulas.errorCheck.circular', label: 'Circular References', submenu: [] },
   ]),
   'mac.data.validation': menu([
     { id: 'mac.data.validation.settings', label: 'Data Validation...' },

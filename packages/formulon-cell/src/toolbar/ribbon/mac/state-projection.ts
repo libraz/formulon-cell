@@ -1,6 +1,10 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
 import { selectedSessionChart } from '../../../commands/chart-design.js';
 import { commentAt } from '../../../commands/comment.js';
+import {
+  COMPATIBILITY_VERSIONS,
+  compatibilityVersionListed,
+} from '../../../commands/compatibility-version.js';
 import { workbookHasNotes } from '../../../commands/convert-notes.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
 import { activeFilterRange } from '../../../commands/filter-ranges.js';
@@ -10,6 +14,7 @@ import { arrangeStackPosition } from '../../../commands/session-illustration.js'
 import { TEMPORARY_SHEET_VIEW_ID } from '../../../commands/sheet-views.js';
 import { activeTableOverlay } from '../../../commands/table-design.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
+import { calcModeLeavesStaleValues } from '../../../engine/calc-mode.js';
 import { findPivotTableAtCell } from '../../../engine/passthrough-sync.js';
 import { getMacInk } from '../../../interact/mac-ink.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
@@ -73,6 +78,9 @@ const MAC_POLICY_PROJECTED_COMMANDS = [
   'mac.formulas.removeArrows.dependents',
   'mac.formulas.errorCheck.run',
   'mac.formulas.errorCheck.trace',
+  'mac.formulas.calc.compatVersion.1',
+  'mac.formulas.calc.compatVersion.2',
+  'mac.formulas.calc.compatVersion.3',
   'mac.data.dataTable',
   'mac.view.split',
   'mac.data.validation.settings',
@@ -263,6 +271,12 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
     }
   }
 
+  if (
+    id.startsWith('mac.formulas.calc.compatVersion.') &&
+    (instance.workbook?.compatibilityVersion?.() ?? null) === null
+  )
+    return instance.i18n.strings.backstage.commandUnavailable;
+
   if (id === 'mac.formulas.errorCheck.trace') {
     const active = state.selection.active;
     const cell = state.data.cells.get(addrKey(active));
@@ -383,6 +397,50 @@ export const projectMacRibbonState = (
     ['mac.insert.recommendedChart.apply', hasData],
   ] as const) {
     for (const button of buttons.get(id) ?? []) button.hidden = !shown;
+  }
+
+  // Calculation Options entries wait on engine methods found at run time. Circular References
+  // is projected when its menu opens, since listing cycles may recalculate.
+  const unavailable = instance.i18n.strings.backstage.commandUnavailable;
+  const compatVersion = instance.workbook?.compatibilityVersion?.() ?? null;
+  for (const trigger of host.querySelectorAll<HTMLButtonElement>(
+    '[data-format-submenu="mac.formulas.calc.compatVersion"]',
+  )) {
+    projectDisabledState(
+      trigger,
+      compatVersion === null,
+      compatVersion === null ? unavailable : null,
+      {
+        datasetKey: 'ribbonDisabledReason',
+        titlePrefix:
+          trigger.getAttribute('aria-label')?.trim() ||
+          macRibbonLabelForCommand('mac.formulas.calc.compatVersion', lang),
+      },
+    );
+  }
+  // Format Stale Values also stays off under Automatic, which the desktop gives no reason for.
+  const staleReason =
+    instance.workbook?.staleValuesSupported?.() === true &&
+    canExecuteBuiltIn(instance.store, 'mac.formulas.calc.formatStale', 'ribbon').allowed
+      ? null
+      : unavailable;
+  const staleOff =
+    staleReason !== null || !calcModeLeavesStaleValues(instance.workbook?.calcMode?.() ?? null);
+  const formatStale = instance.store.getState().ui.formatStaleValues;
+  for (const button of buttons.get('mac.formulas.calc.formatStale') ?? []) {
+    button.setAttribute('aria-checked', String(formatStale));
+    projectDisabledState(button, staleOff, staleReason, {
+      datasetKey: 'ribbonDisabledReason',
+      titlePrefix:
+        button.getAttribute('aria-label')?.trim() ||
+        macRibbonLabelForCommand('mac.formulas.calc.formatStale', lang),
+    });
+  }
+  for (const version of COMPATIBILITY_VERSIONS) {
+    for (const button of buttons.get(`mac.formulas.calc.compatVersion.${version}`) ?? []) {
+      button.hidden = !compatibilityVersionListed(version, compatVersion);
+      button.setAttribute('aria-checked', String(compatVersion === version));
+    }
   }
 
   // A chart moves only among the sheet's charts: nothing in front or behind it

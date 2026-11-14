@@ -9,6 +9,7 @@ import {
 } from '../../commands/format-as-table.js';
 import { formatA1FormulaAsR1C1 } from '../../commands/refs.js';
 import { addrKey } from '../../engine/address.js';
+import { calcModeLeavesStaleValues } from '../../engine/calc-mode.js';
 import { effectiveCellFormatFromEngine } from '../../engine/cell-format-projection.js';
 import { evaluateCfFromEngine } from '../../engine/cf-sync.js';
 import { formulaForEdit } from '../../engine/edit-seed.js';
@@ -230,6 +231,14 @@ export function paintCells(
     return resolver;
   };
   const triangleHits: ErrorTriangleHit[] = [];
+  // Format Stale Values: decided once per paint, then read for formula cells only.
+  const staleAt =
+    wb &&
+    state.ui.formatStaleValues &&
+    calcModeLeavesStaleValues(wb.calcMode?.() ?? null) &&
+    wb.staleValuesSupported?.() === true
+      ? (row: number, col: number): boolean => wb.isCellStale({ sheet: data.sheetIndex, row, col })
+      : null;
   const locale = normalizeFormatLocale(cellCtx.locale);
   // Numbers stored as text are read the way typing them would be.
   const inputLocale = (wb && inputLocaleForWorkbook(wb)) ?? cellCtx.locale;
@@ -566,7 +575,9 @@ export function paintCells(
               ...fmt,
             }
           : undefined;
-      const effectiveFmt: typeof fmt =
+      // A stale formula value is drawn struck through and carries the error-check triangle.
+      const stale = staleAt !== null && !!cell?.formula && staleAt(r, c);
+      const litFmt: typeof fmt =
         overlay && (overlay.fill || overlay.color || overlay.bold || overlay.italic)
           ? {
               ...baseFmt,
@@ -579,6 +590,7 @@ export function paintCells(
               strike: overlay.strike || baseFmt?.strike,
             }
           : baseFmt;
+      const effectiveFmt: typeof fmt = stale ? { ...litFmt, strike: true } : litFmt;
 
       if (isMergeAnchor) {
         for (const mergedRect of mergedRects) {
@@ -817,6 +829,7 @@ export function paintCells(
           (spill) => spill.anchor.row === r && spill.anchor.col === c,
         );
         if (
+          stale ||
           errorCheckFlagged(
             value,
             storedFormula,

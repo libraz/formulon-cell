@@ -1,5 +1,11 @@
 import type { AutoSumFunction } from '../../commands/auto-sum.js';
 import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import { circularReferenceEntries } from '../../commands/circular-references.js';
+import {
+  COMPATIBILITY_VERSIONS,
+  chooseCompatibilityVersion,
+  compatibilityVersionListed,
+} from '../../commands/compatibility-version.js';
 import { DATA_TABLE_COMMAND } from '../../commands/data-table.js';
 import { cellValueIsFormulaError } from '../../commands/error-indicators.js';
 import { namedRangeWrite } from '../../commands/named-range-actions.js';
@@ -21,11 +27,16 @@ import {
   unwatchCell,
   watchRange,
 } from '../../commands/watch.js';
-import { addrKey } from '../../engine/address.js';
+import { addrKey, formatA1Cell, quoteSheetName } from '../../engine/address.js';
+import {
+  type CompatibilityVersionCode,
+  calcModeLeavesStaleValues,
+} from '../../engine/calc-mode.js';
 import type { Range } from '../../engine/types.js';
 import { isMacHost } from '../../extensions/ui-options.js';
 import { openDataTableDialogFrom } from '../../interact/data-table-dialog.js';
 import { openDefineNameDialogFrom, openNamedRangeDialogFrom } from '../../interact/dialog-entry.js';
+import { followHyperlink } from '../../interact/hyperlink-follow.js';
 import { openMacGoalSeekDialog } from '../../interact/mac-goal-seek-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators } from '../../store/store.js';
@@ -34,6 +45,7 @@ import { showCreateNamesDialog } from '../../toolbar/dialogs/create-names.js';
 import { showDefinedNamePickerDialog } from '../../toolbar/dialogs/defined-name-picker.js';
 import { showConfirm } from '../../toolbar/dialogs/prompt.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
+import { menuIconSpacer, menuPresetButton } from '../../toolbar/ribbon/menus/general.js';
 import { handleAutoSum } from '../../wrappers/toolbar-actions.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
 
@@ -116,6 +128,25 @@ const buildCalcOptionAction =
     }
     if (action === 'iterative') {
       instance.openIterativeDialog();
+      return;
+    }
+    const version = /^compat-([123])$/.exec(action)?.[1];
+    if (version) {
+      chooseCompatibilityVersion(
+        instance.workbook,
+        instance.history,
+        Number(version) as CompatibilityVersionCode,
+      );
+      instance.host.focus();
+      return;
+    }
+    if (action === 'format-stale') {
+      if (!instance.workbook.staleValuesSupported()) return;
+      mutators.setFormatStaleValues(
+        instance.store,
+        !instance.store.getState().ui.formatStaleValues,
+      );
+      instance.host.focus();
     }
   };
 
@@ -129,12 +160,41 @@ const calcOptionForMode = (mode: 0 | 1 | 2 | null): 'auto' | 'manual' | 'auto-no
 const updateCalcOptionsMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateCalcOptionsMenu'] =>
   (menu) => {
-    const current = calcOptionForMode(instance.workbook.calcMode());
+    const mode = instance.workbook.calcMode();
+    const current = calcOptionForMode(mode);
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')) {
+      if (button.dataset.calcOption?.startsWith('compat-')) continue;
       const active = button.dataset.calcOption === current;
       button.setAttribute('aria-checked', String(active));
       button.classList.toggle('fc-tb__menu-item--active', active);
     }
+    const unavailable = instance.i18n.strings.backstage.commandUnavailable;
+    const stale = menu.querySelector<HTMLButtonElement>('[data-calc-option="format-stale"]');
+    if (stale) {
+      // Under Automatic it stays off with no reason, as on the desktop.
+      const supported = instance.workbook.staleValuesSupported();
+      setMenuControlDisabled(
+        stale,
+        !supported || !calcModeLeavesStaleValues(mode),
+        supported ? undefined : unavailable,
+      );
+      stale.setAttribute('aria-checked', String(instance.store.getState().ui.formatStaleValues));
+    }
+    const version = instance.workbook.compatibilityVersion();
+    const trigger = menu.querySelector<HTMLButtonElement>('[data-format-submenu="compat-version"]');
+    if (trigger) setMenuControlDisabled(trigger, version === null, unavailable);
+    for (const choice of COMPATIBILITY_VERSIONS) {
+      const button = menu.querySelector<HTMLButtonElement>(`[data-calc-option="compat-${choice}"]`);
+      if (!button) continue;
+      button.hidden = !compatibilityVersionListed(choice, version);
+      button.setAttribute('aria-checked', String(version === choice));
+      setMenuControlDisabled(button, version === null, unavailable);
+    }
+    // The host has no help page to open.
+    const learnMore = menu.querySelector<HTMLButtonElement>(
+      '[data-calc-option="compat-learn-more"]',
+    );
+    if (learnMore) setMenuControlDisabled(learnMore, true, unavailable);
   };
 
 const buildWhatIfAction =
@@ -231,6 +291,66 @@ const updateErrorCheckingMenu =
         (action === 'trace-error' || action === 'ignore-error') && !activeFormulaError;
       setMenuControlDisabled(button, disabled, disabledReason);
     }
+    projectCircularReferences(instance, menu);
+  };
+
+/** Both profiles' Circular References row and panel; the Mac keys them by command id. */
+const CIRCULAR_SUBMENU = [
+  '[data-format-submenu="circular"]',
+  '[data-format-submenu="mac.formulas.errorCheck.circular"]',
+].join(', ');
+const CIRCULAR_PANEL = [
+  '[data-format-panel="circular"]',
+  '[data-format-panel="mac.formulas.errorCheck.circular"]',
+].join(', ');
+
+/** Lists the cycle members as the menu opens; the row is off when there are none. */
+const projectCircularReferences = (instance: SpreadsheetInstance, menu: HTMLElement): void => {
+  const trigger = menu.querySelector<HTMLButtonElement>(CIRCULAR_SUBMENU);
+  const panel = menu.querySelector<HTMLElement>(CIRCULAR_PANEL);
+  if (!trigger || !panel) return;
+  const supported = instance.workbook.circularReferencesSupported();
+  const state = instance.store.getState();
+  const entries = supported
+    ? circularReferenceEntries(instance.workbook, state.data.sheetIndex)
+    : [];
+  const active = state.selection.active;
+  const ticked =
+    entries.find(
+      (entry) =>
+        entry.sheet === active.sheet && entry.row === active.row && entry.col === active.col,
+    ) ?? entries[0];
+  const mac = menu.classList.contains('fc-tb__menu--mac');
+  panel.replaceChildren(
+    ...entries.map((entry) => {
+      const button = menuPresetButton(
+        entry.label,
+        'circularReference',
+        `${entry.sheet}:${entry.row}:${entry.col}`,
+        menuIconSpacer(),
+      );
+      if (mac) button.classList.add('fc-tb__menu-item--mac');
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(entry === ticked));
+      button.tabIndex = -1;
+      return button;
+    }),
+  );
+  setMenuControlDisabled(
+    trigger,
+    entries.length === 0,
+    supported ? undefined : instance.i18n.strings.backstage.commandUnavailable,
+  );
+};
+
+const buildSelectCircularReference =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['selectCircularReference'] =>
+  (cell) => {
+    const [sheet, row, col] = cell.split(':').map(Number);
+    if (sheet === undefined || row === undefined || col === undefined) return;
+    const target = `#${quoteSheetName(instance.workbook.sheetName(sheet))}!${formatA1Cell(row, col, true)}`;
+    followHyperlink({ store: instance.store, wb: instance.workbook }, target);
+    instance.host.focus();
   };
 
 const updateClearArrowsMenu =
@@ -448,6 +568,7 @@ type FormulasDropdownDefaults = Pick<
   | 'applyAutoSumFormula'
   | 'applyFormulaAuditAction'
   | 'updateErrorCheckingMenu'
+  | 'selectCircularReference'
   | 'updateClearArrowsMenu'
   | 'applyWatchAction'
   | 'updateWatchMenu'
@@ -466,6 +587,7 @@ export function createFormulasDropdownDefaults(
     applyAutoSumFormula: buildAutoSumFormula(instance),
     applyFormulaAuditAction: buildFormulaAuditAction(instance),
     updateErrorCheckingMenu: updateErrorCheckingMenu(instance),
+    selectCircularReference: buildSelectCircularReference(instance),
     updateClearArrowsMenu: updateClearArrowsMenu(instance),
     applyWatchAction: buildWatchAction(instance),
     updateWatchMenu: updateWatchMenu(instance),

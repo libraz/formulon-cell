@@ -302,6 +302,10 @@ const menuItemButton = (
           dataset: { ribbonCommand: item.id },
           text: label,
         });
+  if (item.check) {
+    button.setAttribute('role', item.check === 'radio' ? 'menuitemradio' : 'menuitemcheckbox');
+    button.setAttribute('aria-checked', 'false');
+  }
   projectDisabledState(
     button,
     !!item.disabled,
@@ -312,6 +316,40 @@ const menuItemButton = (
     },
   );
   return button;
+};
+
+/** A submenu row and its panel. The row carries no command, so a click opens the panel. */
+const menuSubmenuRow = (
+  item: MacRibbonMenuItem,
+  menuId: string,
+  lang: Locale,
+): [HTMLButtonElement, HTMLDivElement] => {
+  const label = macRibbonLabelForCommand(item.id, lang);
+  const key = (item.id.split('.').at(-1) ?? item.id).replace(
+    /[A-Z]/g,
+    (c) => `-${c.toLowerCase()}`,
+  );
+  const panelId = `${menuId}-${key}`;
+  const trigger = menuSubmenuTrigger(
+    createRibbonButton({
+      className: 'fc-tb__menu-item fc-tb__menu-item--mac',
+      role: 'menuitem',
+      title: label,
+      ariaLabel: label,
+      text: label,
+    }),
+    { formatSubmenu: item.id },
+    { controlsId: panelId },
+  );
+  const panel = createSubmenu({
+    id: panelId,
+    className: 'fc-tb__submenu fc-tb__submenu--format',
+    label,
+    dataset: { formatPanel: item.id },
+  });
+  panel.append(...(item.submenu ?? []).map((entry) => menuItemButton(entry, lang)));
+  prepareMenu(panel, label);
+  return [trigger, panel];
 };
 
 const createMoreFunctionsMenu = (lang: Locale): HTMLDivElement => {
@@ -396,7 +434,10 @@ export const createMacRibbonMenuFactory = (lang: Locale): MacRibbonMenuFactory =
         }
       }
     } else {
-      for (const item of items) menu.appendChild(menuItemButton(item, lang));
+      for (const item of items) {
+        if (item.submenu) menu.append(...menuSubmenuRow(item, id, lang));
+        else menu.appendChild(menuItemButton(item, lang));
+      }
     }
     return menu;
   };

@@ -284,6 +284,15 @@ export interface RibbonMenusStrings {
     calcCalculateNow: string;
     calcCalculateSheet: string;
     calcIterative: string;
+    formatStaleValues: string;
+    compatibilityVersion: string;
+    /** A Compatibility Version entry; `{n}` is the version number. */
+    compatibilityVersionItem: string;
+    /** The entry for the recommended version; `{n}` is the version number. */
+    compatibilityVersionRecommended: string;
+    /** The entry for a version the engine stores but does not evaluate; `{n}` is the version number. */
+    compatibilityVersionUnsupported: string;
+    compatibilityVersionLearnMore: string;
     whatIfGoalSeek: string;
     whatIfDataTable: string;
     whatIfDataTableUnavailable: string;
@@ -343,6 +352,7 @@ export interface RibbonMenusStrings {
     validationSettings: string;
     errorChecking: string;
     traceError: string;
+    circularReferences: string;
     traceErrorRequiresFormulaError: string;
     traceNoPrecedents: string;
     traceNoDependents: string;
