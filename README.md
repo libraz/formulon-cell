@@ -22,7 +22,7 @@
 - **Desktop formula editing** — F4 and arrow-key reference picking, Ctrl+arrow while pointing, undo inside the draft, F9 on a selection, R1C1 references.
 - **Canvas grid with themes** — styled through CSS tokens; `paper`, `ink` and `contrast` ship in the box. [Theming](https://formulon.libraz.net/cell/theming)
 - **Charts** — seven chart types with a settings panel, edited in place and saved back. [Charts](https://formulon.libraz.net/cell/charts)
-- **XLSX persistence** — comments, images, charts, tables, PivotTables, slicers, protection and more survive a save; Save As can write `.xlsb`. [Host integration](https://formulon.libraz.net/cell/host-integration)
+- **XLSX persistence** — comments, images, charts, tables, PivotTables, slicers, protection and more survive a save; Save As can write `.xlsb`, and offers `.xlsx` instead when the binary writer cannot carry a feature. [Host integration](https://formulon.libraz.net/cell/host-integration)
 - **Restricted embedding** — `fixedFormPolicy(ranges)` and `viewerPolicy()` limit what users may change on every input path, independently of which UI is shown. [Embedding and use cases](https://formulon.libraz.net/cell/embedding)
 - **UI profiles and extensions** — `ui.profile` (`embedded`, `minimal`, `standard`, `full`), with any piece swappable or left out through extensions. [Extensions](https://formulon.libraz.net/cell/extensions)
 - **Mac profile** — `ui: { platform: 'mac' }` switches to the Mac ribbon, shortcuts and argument palette. [Platform and Mac UI](https://formulon.libraz.net/cell/platform)

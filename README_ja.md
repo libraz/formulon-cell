@@ -22,7 +22,7 @@
 - **デスクトップ版と同じ数式編集** — 矢印キーと F4 での参照の選択と切り替え、参照中の Ctrl+矢印、入力途中の取り消し、選択部分の F9 評価、R1C1 参照形式。
 - **テーマ付きの Canvas グリッド** — CSS トークンで見た目を変えられ、`paper`、`ink`、`contrast` を同梱しています。[テーマ](https://formulon.libraz.net/ja/cell/theming)
 - **グラフ** — 7 種類のグラフを設定パネルで扱い、その場で編集して保存できます。[グラフ](https://formulon.libraz.net/ja/cell/charts)
-- **XLSX への保存** — コメント、画像、グラフ、テーブル、ピボットテーブル、スライサー、保護などを保存でき、名前を付けて保存では `.xlsb` も書き出せます。[ホストとの連携](https://formulon.libraz.net/ja/cell/host-integration)
+- **XLSX への保存** — コメント、画像、グラフ、テーブル、ピボットテーブル、スライサー、保護などを保存でき、名前を付けて保存では `.xlsb` も書き出せ、バイナリ形式で書けない機能がある場合は `.xlsx` での保存を提案します。[ホストとの連携](https://formulon.libraz.net/ja/cell/host-integration)
 - **制限付きの埋め込み** — `fixedFormPolicy(ranges)` と `viewerPolicy()` で、ユーザーが変更できる範囲をすべての入力経路で制限します。表示する UI とは独立に設定します。[埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding)
 - **UI プロファイルと拡張** — `ui.profile`（`embedded`、`minimal`、`standard`、`full`）から選び、個々の部品は拡張で差し替えも省略もできます。[拡張](https://formulon.libraz.net/ja/cell/extensions)
 - **Mac プロファイル** — `ui: { platform: 'mac' }` で Mac 向けのリボン、ショートカット、関数引数パレットに切り替わります。[プラットフォームと Mac UI](https://formulon.libraz.net/ja/cell/platform)
