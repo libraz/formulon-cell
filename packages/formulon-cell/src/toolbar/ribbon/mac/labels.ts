@@ -458,7 +458,7 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
   'mac.formulas.reset.versionLearnMore': { ja: '詳細情報', en: 'Learn More' },
   'mac.formulas.defineName.define': { ja: '名前の定義...', en: 'Define Name...' },
   'mac.formulas.defineName.apply': { ja: '引用...', en: 'Apply...' },
-  'mac.formulas.useInFormula.paste': { ja: 'ペースト...', en: 'Paste...' },
+  'mac.formulas.useInFormula.paste': { ja: '名前の貼り付け...', en: 'Paste Names...' },
   'mac.draw.penBlack': { ja: 'ペン: 黒、0.35 mm', en: 'Pen: Black, 0.35 mm' },
   'mac.draw.penRed': { ja: 'ペン: 赤、0.35 mm', en: 'Pen: Red, 0.35 mm' },
   'mac.draw.pencil': { ja: '鉛筆書き: 灰色、0.5 mm', en: 'Pencil: Gray, 0.5 mm' },

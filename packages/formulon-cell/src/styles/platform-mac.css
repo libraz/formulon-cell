@@ -1398,6 +1398,30 @@
     padding: 1px;
   }
 
+  /* Calculate Now and Calculate Sheet are a two-row stack: 26px buttons, 3px below the tile top on a 32px pitch. */
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--calculation.fc-tb__ribbon-group--mixed
+    .fc-tb__ribbon-tools {
+    grid-template-rows: repeat(2, 32px);
+    row-gap: 0;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--calculation.fc-tb__ribbon-group--mixed
+    .fc-tb__rb--wide:not(.fc-tb__rb--stacked) {
+    grid-row: 1 / span 2;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--calculation.fc-tb__ribbon-group--mixed
+    .fc-tb__rb--stacked {
+    height: 26px;
+    margin-top: 3px;
+  }
+
   [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-display {
     right: 10px;
     bottom: 6px;

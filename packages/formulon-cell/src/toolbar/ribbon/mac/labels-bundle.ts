@@ -2200,6 +2200,15 @@ export const MAC_BUNDLE_LABELS: Readonly<
     th: 'เอาลูกศรแสดงการถูกอ้างออก',
     zh: '删除引用单元格追踪箭头',
   },
+  'menu:mac.formulas.useInFormula.paste': {
+    en: 'Paste Names...',
+    ja: '名前の貼り付け...',
+    de: 'Namen einfügen...',
+    fr: 'Coller des noms...',
+    ko: '이름 붙여넣기...',
+    th: 'วางชื่อ...',
+    zh: '粘贴名称...',
+  },
   'menu:mac.page.break.insert': {
     en: 'Insert Page Break',
     ja: 'ページ区切りの挿入',

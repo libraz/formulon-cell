@@ -840,15 +840,6 @@ export const MAC_CONTEXT_LABELS = {
     ko: '먼저 표 또는 피벗 테이블을 선택하세요.',
     th: 'เลือกตารางหรือพีวอตเทเบิลก่อน',
   },
-  namesRequired: {
-    ja: 'このブックには名前が定義されていません。',
-    en: 'This workbook has no defined names.',
-    de: 'Diese Arbeitsmappe enthält keine definierten Namen.',
-    fr: 'Ce classeur ne contient aucun nom défini.',
-    zh: '此工作簿没有已定义的名称。',
-    ko: '이 통합 문서에 정의된 이름이 없습니다.',
-    th: 'สมุดงานนี้ไม่มีชื่อที่กำหนด',
-  },
   externalLinksRequired: {
     ja: 'このブックには外部リンクがありません。',
     en: 'This workbook has no external links.',
@@ -1184,13 +1175,6 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     zh: '应用...',
     ko: '적용...',
     th: 'นําไปใช้...',
-  },
-  'mac.formulas.useInFormula.paste': {
-    de: 'Einfügen...',
-    fr: 'Coller...',
-    zh: '粘贴...',
-    ko: '붙여넣기...',
-    th: 'วาง...',
   },
   'mac.draw.penBlack': {
     de: 'Stift: Schwarz, 0.35 mm',

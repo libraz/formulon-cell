@@ -1113,7 +1113,7 @@ describe('Mac Excel ribbon profile', () => {
         ['mac.formulas.defineName.apply', 'Apply...', true],
       ]);
       expect(items('mac.formulas.useInFormula')).toEqual([
-        ['mac.formulas.useInFormula.paste', 'Paste...', false],
+        ['mac.formulas.useInFormula.paste', 'Paste Names...', false],
       ]);
       for (const root of [
         'mac.formulas.reset',

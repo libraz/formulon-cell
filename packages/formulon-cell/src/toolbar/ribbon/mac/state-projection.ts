@@ -10,6 +10,7 @@ import {
 import { workbookHasNotes } from '../../../commands/convert-notes.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
 import { activeFilterRange } from '../../../commands/filter-ranges.js';
+import { hasListedDefinedNames } from '../../../commands/named-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
 import { isWorkbookStructureProtected, noteChangePermitted } from '../../../commands/protection.js';
 import { arrangeStackPosition } from '../../../commands/session-illustration.js';
@@ -97,7 +98,6 @@ const MAC_CONTENT_STATE_COMMANDS = [
   'mac.data.hideDetail',
   'mac.data.workbookLinks',
   'mac.insert.slicer',
-  'mac.formulas.useInFormula',
   'mac.view.sheetViewKeep',
   'mac.view.sheetViewExit',
 ] as const;
@@ -126,11 +126,6 @@ const contentDisabledReason = (
     const onTable = activeTableOverlay(state) != null;
     const onPivot = findPivotTableAtCell(instance.workbook, state.selection.active);
     return onTable || onPivot ? null : MAC_CONTEXT_LABELS.slicerRequired[lang];
-  }
-  if (id === 'mac.formulas.useInFormula') {
-    return instance.workbook.definedNames().next().done === true
-      ? MAC_CONTEXT_LABELS.namesRequired[lang]
-      : null;
   }
   return hasOutlineDetail(instance.store, instance.store.getState().selection.range)
     ? null
@@ -454,6 +449,18 @@ export const projectMacRibbonState = (
         button.title = label;
         button.setAttribute('aria-label', label);
       }
+    }
+  }
+
+  // Use in Formula and its Paste Names entry need a listed defined name; the desktop gives no reason.
+  const noNames = !hasListedDefinedNames(instance.workbook);
+  for (const id of ['mac.formulas.useInFormula', 'mac.formulas.useInFormula.paste']) {
+    for (const button of buttons.get(id) ?? []) {
+      projectDisabledState(button, noNames, null, {
+        datasetKey: 'ribbonDisabledReason',
+        titlePrefix:
+          button.getAttribute('aria-label')?.trim() || macRibbonLabelForCommand(id, lang),
+      });
     }
   }
 

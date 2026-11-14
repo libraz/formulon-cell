@@ -345,6 +345,12 @@ export function listDefinedNames(wb: WorkbookHandle): DefinedNameEntry[] {
   return [...wb.definedNames()];
 }
 
+/** Whether the workbook has a name the Name Manager lists: any scope, hidden names excluded. */
+export function hasListedDefinedNames(wb: WorkbookHandle): boolean {
+  for (const entry of wb.definedNames()) if (!entry.hidden) return true;
+  return false;
+}
+
 /** Add or replace a workbook- or sheet-scoped defined name. */
 export function upsertDefinedName(
   wb: WorkbookHandle,

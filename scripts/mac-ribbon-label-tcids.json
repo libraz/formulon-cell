@@ -3150,6 +3150,13 @@
       "match": "en+ja",
       "control": "menu-item"
     },
+    "menu:mac.formulas.useInFormula.paste": {
+      "tcid": 879,
+      "source": "tbbtn2",
+      "name": "PasteName",
+      "match": "en+ja",
+      "control": "menu-item"
+    },
     "menu:mac.formulas.errorCheck.circular": {
       "tcid": 1623,
       "source": "tbbtn2",
@@ -4356,6 +4363,7 @@
     "menu:mac.formulas.errorCheck.trace",
     "menu:mac.formulas.removeArrows.dependents",
     "menu:mac.formulas.removeArrows.precedents",
+    "menu:mac.formulas.useInFormula.paste",
     "menu:mac.page.break.insert",
     "menu:mac.page.break.remove",
     "menu:mac.page.break.reset",

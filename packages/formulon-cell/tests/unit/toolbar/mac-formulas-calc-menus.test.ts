@@ -246,3 +246,77 @@ describe('Mac Formulas > Calculation Options and Error Checking', () => {
     expect(instance.store.getState().ui.formatStaleValues).toBe(false);
   });
 });
+
+describe('Mac Formulas > Use in Formula', () => {
+  let sheet: MountedStubSheet | undefined;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    sheet?.dispose();
+    sheet = undefined;
+  });
+
+  type Name = { name: string; formula: string; localSheetId: number; hidden?: boolean };
+  const withNames = function* (names: Name[]) {
+    yield* names;
+  };
+
+  it('labels its entry Paste Names... as drawn', () => {
+    expect(
+      (['en', 'ja', 'fr', 'de', 'th', 'ko', 'zh'] as const).map((locale) =>
+        macRibbonLabelForCommand('mac.formulas.useInFormula.paste', locale),
+      ),
+    ).toEqual([
+      'Paste Names...',
+      '名前の貼り付け...',
+      'Coller des noms...',
+      'Namen einfügen...',
+      'วางชื่อ...',
+      '이름 붙여넣기...',
+      '粘贴名称...',
+    ]);
+  });
+
+  it('disables the button and Paste Names without a reason until the book has a listed name', async () => {
+    sheet = await mountStubSheet({
+      workbook: await WorkbookHandle.createDefault({ preferStub: true }),
+      locale: 'en',
+    });
+    const { instance } = sheet;
+    const host = document.createElement('div');
+    const root = document.createElement('button');
+    root.dataset.ribbonCommand = 'mac.formulas.useInFormula';
+    root.setAttribute('aria-label', 'Use in Formula');
+    const menu = createMacRibbonMenuFactory('en')('mac.formulas.useInFormula');
+    if (!menu) throw new Error('Use in Formula has no menu');
+    host.append(root, menu);
+    const paste = menu.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.formulas.useInFormula.paste"]',
+    );
+    const state = () => {
+      projectMacRibbonState(host, instance);
+      return [root, paste].map((button) => [
+        button?.getAttribute('aria-disabled'),
+        button?.dataset.ribbonDisabledReason ?? null,
+      ]);
+    };
+    const names = vi.spyOn(instance.workbook, 'definedNames');
+
+    names.mockImplementation(() => withNames([]));
+    expect(state()).toEqual([
+      ['true', null],
+      ['true', null],
+    ]);
+    names.mockImplementation(() =>
+      withNames([{ name: 'Secret', formula: 'Sheet1!$A$1', localSheetId: -1, hidden: true }]),
+    );
+    expect(state()[0]).toEqual(['true', null]);
+    names.mockImplementation(() =>
+      withNames([{ name: 'Rate', formula: 'Sheet1!$A$1', localSheetId: 0 }]),
+    );
+    expect(state()).toEqual([
+      ['false', null],
+      ['false', null],
+    ]);
+  });
+});

@@ -542,7 +542,9 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
       disabledReason: NOT_IMPLEMENTED.en,
     },
   ]),
-  'mac.formulas.useInFormula': menu([{ id: 'mac.formulas.useInFormula.paste', label: 'Paste...' }]),
+  'mac.formulas.useInFormula': menu([
+    { id: 'mac.formulas.useInFormula.paste', label: 'Paste Names...' },
+  ]),
   'mac.formulas.calcOptions': menu([
     { id: 'mac.formulas.calc.auto', label: 'Automatic', labelJa: '自動' },
     {
