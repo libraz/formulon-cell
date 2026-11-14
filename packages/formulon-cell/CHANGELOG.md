@@ -16,12 +16,11 @@ versioning is [SemVer](https://semver.org/).
   - Absent values read as `null` rather than `-1` or `''`; a chart without a title reads `null`.
   - Engine enums use the engine's numbering: `PivotSortOrder`, comparison operators in validations and conditional formats, and the other renumbered pivot, chart and drawing enums.
   - Conditional-format reads return the engine's rule records, and formula operands keep their leading `=`.
-- **Breaking:** Mutations take the engine's input and patch types:
-  - `createTable(sheet, input)` takes the sheet first.
-  - `updateTable(index, patch)`, `updateShape`, `updateSlicer`, `updateSparklineGroup` and `patchSheetFormatDefaults` take partial patches.
-  - `setAutoFilter` / `setTableAutoFilter` take `AutoFilterInput`; `setWorkbookProtection` takes `null` to remove protection.
-  - Protected ranges, cell XFs and custom table styles take their `*Input` types; `setDrawingAnchor` takes a drawing-anchor patch.
-- **Breaking:** `evalFormula`, `evaluateFormulaText` and `evaluateFormulaArray` return the engine value (or a 2-D array of values) and `null` when the formula cannot be evaluated.
+- **Breaking:** Mutations on the sheet's engine methods take the engine's input and patch types:
+  - `Sheet.addTable` takes the engine's `TableInput`; `Table.update`, a shape's or slicer's `update` and `Sheet.updateSparklineGroup` take partial patches.
+  - `setAutoFilter` (on a sheet or a table) takes `AutoFilterInput`; `setWorkbookProtection` takes `null` to remove protection.
+  - Protected ranges, cell XFs and custom table styles take their `*Input` types.
+- **Breaking:** `Sheet.evaluateFormulaArray` returns a 2-D array of engine values, and `null` when the formula cannot be evaluated.
 - The engine provides every capability; the opt-in stub engine reports them off.
 - A new default-profile workbook takes the defaults of the engine's Windows profile for its language, as a new Mac workbook takes the Mac profile's: font 0 is the profile's theme-linked minor font (Aptos Narrow 11 for English, German and French, 游ゴシック 11 for Japanese, 等线 11 for Chinese, 맑은 고딕 11 for Korean, Tahoma 11 for Thai) and the row height is the profile's (18.75 pt for Japanese, 15 pt otherwise), on added sheets too. `Workbook.createDefault` rejects when the profile cannot load; the stub engine has no profiles, so a stub workbook carries no locale font.
 - **Breaking:** `applyChanges` is all or nothing and is decided by the interaction policy and sheet protection whatever its history mode, `'reset'` included: when any change is refused, nothing is written and the result carries the one refusal. Ungated writes go through the Sheet facade's setters and `Sheet.importCsv`.
