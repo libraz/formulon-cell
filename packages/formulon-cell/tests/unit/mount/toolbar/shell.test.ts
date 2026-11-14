@@ -286,6 +286,25 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('keeps the display-mode API working on both profiles, with the toggle on default only', () => {
+    for (const platform of ['mac', 'default'] as const) {
+      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+        helpers: stubHelpers(),
+        platform,
+      });
+      expect(!!host.querySelector('.fc-tb__ribbon-display')).toBe(platform === 'default');
+      expect(!!host.querySelector('[data-ribbon-toggle]')).toBe(platform === 'default');
+      for (const mode of ['singleLine', 'autoHide', 'tabsOnly', 'full'] as const) {
+        tb.setDisplayMode(mode);
+        expect(tb.getDisplayMode()).toBe(mode);
+        expect(host.querySelector(`.fc-tb__ribbon-shell--${mode}`)).toBeTruthy();
+      }
+      tb.setCollapsed(true);
+      expect(tb.getDisplayMode()).toBe('tabsOnly');
+      tb.dispose();
+    }
+  });
+
   it('reveals collapsed tabs without replacing buttons or changing the saved display mode', () => {
     const onTabChange = vi.fn();
     const onDisplayModeChange = vi.fn();
