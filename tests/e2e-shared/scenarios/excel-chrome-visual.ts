@@ -134,20 +134,27 @@ const seedPivotFilterSelection = async (page: Page): Promise<void> => {
   });
 };
 
-/** Builds a report at G1 over the seeded rows: Channel on rows, Sum of Sales. */
+/** Builds a report at G1 over the seeded rows, Channel on rows and Sum of Sales, as the Create
+ *  PivotTable dialog does: place it, refresh the sheet's cells and fit the report's columns. */
 const createChannelReport = (page: Page): Promise<void> =>
   page.evaluate(() => {
     const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
-    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
-    const made = w.__fcProbes['commands/pivot-table'].createPivotTableFromRange(handle, {
-      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 },
-      destination: { sheet: 0, row: 0, col: 6 },
-      name: 'ChannelReport',
-      rowField: 'Channel',
-      valueField: 'Sales',
-      aggregation: 0,
-    });
+    const workbook = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    const made = w.__fcProbes['commands/pivot-table'].createPivotTableAtPlacement(
+      { store, workbook, history: null, origin: 'instanceApi', commandId: 'pivotTableInsert' },
+      {
+        source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 },
+        name: 'ChannelReport',
+        rowField: 'Channel',
+        valueField: 'Sales',
+        aggregation: 0,
+      },
+      { row: 0, col: 6 },
+    );
     if (!made.ok) throw new Error(`pivot creation failed: ${made.reason}`);
+    w.__fcProbes['store/store'].mutators.refreshActiveSheetCells(store, workbook);
+    w.__fcProbes['commands/pivot-table'].autofitPivotTableColumns(store, workbook);
     w.__fcInst.history.clear();
   });
 
