@@ -224,6 +224,27 @@ function importedFiltersFor(wb: WorkbookHandle): Map<string, ImportedTypedFilter
   return filters;
 }
 
+/** The kind of the file criterion on `col` of the filter over `range` that the cell UI cannot
+ *  show (it stays in the engine's definition), or null when the column holds none. */
+export function unshownFilterKind(
+  wb: WorkbookHandle,
+  state: State,
+  range: Range,
+  col: number,
+): FilterKind | null {
+  const filters = importedTypedFilters.get(wb);
+  if (!filters?.size) return null;
+  const slot = filterSlotsForSheet(wb, state, range.sheet).find(
+    (candidate) => candidate.range && sameRange(candidate.range, range),
+  );
+  const imported = slot ? filters.get(slot.target.key) : undefined;
+  const offset = col - range.c0;
+  if (!imported?.unsupportedColumns.has(offset) || !sameAutoFilterRange(imported.filter, range)) {
+    return null;
+  }
+  return imported.filter.columns.find((column) => column.columnOffset === offset)?.kind ?? null;
+}
+
 /** Drop the imported definition of the removed table `index` and re-key the
  * later tables, whose workbook-wide indexes shift down by one. */
 export function forgetTableAutoFilterImport(wb: WorkbookHandle, index: number): void {

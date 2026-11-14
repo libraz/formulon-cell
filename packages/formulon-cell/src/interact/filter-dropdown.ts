@@ -1,3 +1,4 @@
+import { FilterKind } from '@libraz/formulon';
 import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import {
   inputLocaleForWorkbook,
@@ -29,6 +30,7 @@ import type { History } from '../commands/history.js';
 import { parseDateTimeInput } from '../commands/input-grammar.js';
 import { sortRangeWithHistory } from '../commands/sort.js';
 import { addrKey } from '../engine/address.js';
+import { unshownFilterKind } from '../engine/auto-filter-sync.js';
 import { createProfileTextSemantics, localeForWorkbook } from '../engine/profile-text-semantics.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -304,10 +306,16 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     if (distinctResult.failure) deps.onDistinctFailure?.(distinctResult.failure);
     const distinct = distinctResult.items;
     const activeCriteria = findColumnCriteria(state.ui.filterCriteria, range, col);
+    // A file criterion the panel cannot show (a wildcard ordering comparison, say) opens as the
+    // desktop opens it: no condition, every item unchecked, and a custom one's second row shown.
+    const unshownKind =
+      mac && !activeCriteria && wb ? unshownFilterKind(wb, state, range, col) : null;
     const hidden = new Set<string>(
-      activeCriteria && !activeCriteria.condition && !activeCriteria.color
-        ? activeCriteria.hiddenValues
-        : [],
+      unshownKind !== null
+        ? distinct.map((item) => item.key)
+        : activeCriteria && !activeCriteria.condition && !activeCriteria.color
+          ? activeCriteria.hiddenValues
+          : [],
     );
     activeHidden = hidden;
 
@@ -587,7 +595,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       secondInput.setAttribute('aria-label', t.conditionValue);
       if (active?.second) secondInput.value = operandText(active.second.value);
       const syncSecond = (): void => {
-        const offered = isFilterComparisonOp(conditionSelect.value);
+        const offered =
+          isFilterComparisonOp(conditionSelect.value) ||
+          (unshownKind === FilterKind.Custom && conditionSelect.value === '');
         joinRow.hidden = !offered;
         secondSelect.hidden = !offered;
         secondInput.hidden = !offered || secondSelect.value === '';
