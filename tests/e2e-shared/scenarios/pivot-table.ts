@@ -237,6 +237,7 @@ export async function runPivotTableOptionsScenario(page: Page): Promise<void> {
         pageWrap: o.pageWrap,
         altText: o.altText,
         refreshOnLoad: c.refreshOnLoad,
+        missingItemsLimit: c.missingItemsLimit,
       };
     });
   const dialog = page.getByRole('dialog', { name: 'PivotTable Options' });
@@ -258,7 +259,10 @@ export async function runPivotTableOptionsScenario(page: Page): Promise<void> {
     pageWrap: 2,
     altText: 'Sales by channel',
     refreshOnLoad: true,
+    missingItemsLimit: 1048576,
   };
+  const retain = dialog.locator('[data-pvopt-cache="missingItemsLimit"]');
+  const limit = (value: '0' | '1') => dialog.locator(`[data-pvopt-limit] input[value="${value}"]`);
   const expectEditedControls = async () => {
     await tab('display').click();
     await expect(option('showDrill')).not.toBeChecked();
@@ -274,9 +278,19 @@ export async function runPivotTableOptionsScenario(page: Page): Promise<void> {
     await expect(option('pageWrap')).toHaveValue('2');
     await tab('data').click();
     await expect(dialog.locator('[data-pvopt-cache="refreshOnLoad"]')).toBeChecked();
+    await expect(retain).toBeChecked();
+    await expect(limit('1')).toBeChecked();
     await tab('altText').click();
     await expect(option('altText')).toHaveValue('Sales by channel');
   };
+  const reload = () =>
+    page.evaluate(async () => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const { Workbook } = w.__fcProbes['api/workbook'];
+      const next = await Workbook.load(w.__fcInst.workbook.save().bytes);
+      if (next.engine !== 'wasm') throw new Error('Reload must use the real WASM engine');
+      w.__fcInst.update({ workbook: next });
+    });
 
   await buildReport();
   const before = await readOptions();
@@ -301,6 +315,11 @@ export async function runPivotTableOptionsScenario(page: Page): Promise<void> {
   await option('pageWrap').selectOption('2');
   await tab('data').click();
   await dialog.locator('[data-pvopt-cache="refreshOnLoad"]').check();
+  // A new report retains deleted items with the Automatic limit.
+  await expect(retain).toBeChecked();
+  await expect(limit('0')).toBeChecked();
+  await expect(limit('1')).toBeEnabled();
+  await limit('1').check();
   await tab('altText').click();
   await option('altText').fill('Sales by channel');
   await dialog.locator('[data-pvopt-ok]').click();
@@ -316,18 +335,42 @@ export async function runPivotTableOptionsScenario(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
   expect(await readOptions()).toEqual(edited);
 
-  await page.evaluate(async () => {
-    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
-    const { Workbook } = w.__fcProbes['api/workbook'];
-    const next = await Workbook.load(w.__fcInst.workbook.save().bytes);
-    if (next.engine !== 'wasm') throw new Error('Reload must use the real WASM engine');
-    w.__fcInst.update({ workbook: next });
-  });
+  await reload();
   await expect.poll(readOptions).toEqual(edited);
   await openDialog();
   await expectEditedControls();
   await dialog.locator('[data-pvopt-cancel]').click();
   await expect(dialog).toBeHidden();
+
+  // Unchecking Retain keeps no deleted items: the pair greys out showing Max, and 0 is stored.
+  await openDialog();
+  await tab('data').click();
+  await limit('0').check();
+  await retain.uncheck();
+  await expect(limit('1')).toBeChecked();
+  for (const value of ['0', '1'] as const) {
+    await expect(limit(value)).toBeDisabled();
+    await expect(limit(value)).toHaveAttribute('aria-disabled', 'true');
+  }
+  await dialog.locator('[data-pvopt-ok]').click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(readOptions).toEqual({ ...edited, missingItemsLimit: 0 });
+  await reload();
+  await expect.poll(readOptions).toEqual({ ...edited, missingItemsLimit: 0 });
+
+  // Checking it again re-enables the pair; Automatic leaves the limit to the file.
+  await openDialog();
+  await tab('data').click();
+  await expect(retain).not.toBeChecked();
+  await expect(limit('0')).toBeDisabled();
+  await retain.check();
+  await expect(limit('0')).toBeEnabled();
+  await limit('0').check();
+  await dialog.locator('[data-pvopt-ok]').click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(readOptions).toEqual({ ...edited, missingItemsLimit: null });
+  await reload();
+  await expect.poll(readOptions).toEqual({ ...edited, missingItemsLimit: null });
 
   expect(consoleErrors.read()).toEqual([]);
 }
