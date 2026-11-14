@@ -8,6 +8,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- The Mac PivotTable Options dialog no longer offers a table-level sort order, and Show items with no data on rows and columns is shown greyed out, as on the desktop.
 - **Breaking:** Requires `@libraz/formulon` 0.19.0, whose model the engine passthrough follows. Engine failures surface as `FormulonError`; optional list reads (merges, hyperlinks, conditional formats, tables, external links, passthrough parts) still fall back to an empty list.
   - Records are the engine's own types and field names: font `sizePt`, fill `foreground` / `background` colours, `color.argb`, `EffectiveStyle`, `WorkbookTheme`, `Pagination`, `AutoFilterEval`.
   - Absent values read as `null` rather than `-1` or `''`; a chart without a title reads `null`.

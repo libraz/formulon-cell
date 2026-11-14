@@ -119,7 +119,7 @@ describe('PivotTable Options dialog', () => {
     ]);
     expect(
       Array.from(panel('layout').querySelectorAll('.fc-pvoptdlg__radio')).map((r) => r.textContent),
-    ).toEqual(['下から上へ', '上から下へ', '昇順で並べ替え', 'データ ソース順で並べ替え']);
+    ).toEqual(['下から上へ', '上から下へ']);
     expect(checks('data').map(([label]) => label)).toEqual([
       'ファイルに元のデータを保存する',
       '詳細を表示可能にする',
@@ -144,9 +144,9 @@ describe('PivotTable Options dialog', () => {
       );
     expect(disabled).toEqual([
       'エラー値に表示する値:',
+      '行に表示する',
+      '列に表示する',
       '値の領域にフィールドがない場合のアイテムのラベル',
-      '昇順で並べ替え',
-      'データ ソース順で並べ替え',
       'ソース データが変更されたときに自動的に更新する',
       'パスワードをファイルに保存する',
       'バックグラウンドでクエリを実行する',
@@ -280,6 +280,115 @@ describe('PivotTable Options dialog', () => {
     } finally {
       reloaded.dispose();
     }
+    wb.dispose();
+  });
+
+  it('writes every wired boolean and caption option and keeps them through save and load', async () => {
+    const wb = await setup();
+    const history = new History();
+    const ctx = {
+      store: createSpreadsheetStore(),
+      origin: 'ribbon' as const,
+      commandId: 'test',
+      host,
+      strings: ja,
+      wb,
+      history,
+      onChanged: () => {},
+    };
+    const before = wb.pivotOptions(0, 0);
+    const beforeCache = wb.pivotCacheOptions(0, 0);
+    if (!before || !beforeCache) throw new Error('options unreadable');
+    const flags = [
+      'showDrill',
+      'printDrill',
+      'showDataTips',
+      'showHeaders',
+      'gridDropZones',
+      'showError',
+      'showMissing',
+      'itemPrintTitles',
+      'fieldPrintTitles',
+      'multipleFieldFilters',
+      'autoFormatting',
+      'preserveFormatting',
+      'mergeItem',
+      'customListSort',
+      'enableDrill',
+    ] as const;
+    const done = openPivotOptions(ctx, 0, 0);
+    for (const key of flags) {
+      document
+        .querySelector<HTMLInputElement>(`.fc-pvoptdlg [data-pvopt-option="${key}"]`)
+        ?.click();
+    }
+    const missing = document.querySelector<HTMLInputElement>(
+      '.fc-pvoptdlg [data-pvopt-option="missingCaption"]',
+    );
+    if (!missing) throw new Error('missing caption field absent');
+    missing.value = 'none';
+    document.querySelector<HTMLInputElement>('.fc-pvoptdlg [data-pvopt-cache="saveData"]')?.click();
+    document.querySelector<HTMLButtonElement>('.fc-pvoptdlg [data-pvopt-ok]')?.click();
+    expect(await done).toBe(true);
+
+    const expected = {
+      ...before,
+      ...Object.fromEntries(flags.map((key) => [key, !before[key]])),
+      missingCaption: 'none',
+    };
+    expect(wb.pivotOptions(0, 0)).toEqual(expected);
+    expect(wb.pivotCacheOptions(0, 0)?.saveData).toBe(!beforeCache.saveData);
+    const reloaded = await WorkbookHandle.loadBytes(wb.save());
+    try {
+      expect(reloaded.pivotOptions(0, 0)).toEqual(expected);
+    } finally {
+      reloaded.dispose();
+    }
+    expect(history.undo()).toBe(true);
+    expect(wb.pivotOptions(0, 0)).toEqual(before);
+    expect(wb.pivotCacheOptions(0, 0)).toEqual(beforeCache);
+    wb.dispose();
+  });
+
+  it('renders the controls with no engine option disabled through the shared projection', async () => {
+    const wb = await setup();
+    const done = openPivotOptions(
+      {
+        store: createSpreadsheetStore(),
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        host,
+        strings: ja,
+        wb,
+        history: new History(),
+        onChanged: () => {},
+      },
+      0,
+      0,
+    );
+    const unbound = Array.from(
+      dialog().querySelectorAll<HTMLInputElement>('input[type="checkbox"], input[type="radio"]'),
+    ).filter(
+      (el) =>
+        !el.dataset.pvoptOption &&
+        !el.dataset.pvoptCache &&
+        !el.closest('[data-pvopt-option], [data-pvopt-limit]'),
+    );
+    expect(unbound.length).toBe(6);
+    for (const el of unbound) {
+      expect(el.disabled).toBe(true);
+      expect(el.dataset.disabledReason).toBe(ja.mac.pivotOptions.unavailable);
+    }
+    expect(unbound.filter((el) => el.type === 'checkbox').map((el) => el.checked)).toEqual([
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+    ]);
+    dialog().querySelector<HTMLButtonElement>('[data-pvopt-cancel]')?.click();
+    expect(await done).toBe(false);
     wb.dispose();
   });
 

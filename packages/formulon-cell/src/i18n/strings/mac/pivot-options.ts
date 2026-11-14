@@ -37,8 +37,6 @@ export interface MacPivotOptionsStrings {
     fieldsPerColumn: string;
     sortGroup: string;
     customLists: string;
-    sortAscending: string;
-    sortDataSource: string;
   };
   data: {
     group: string;
@@ -104,8 +102,6 @@ export const macPivotOptionsEn: MacPivotOptionsStrings = {
     fieldsPerColumn: 'Fields per column:',
     sortGroup: 'Sort:',
     customLists: 'Use custom lists when sorting',
-    sortAscending: 'Sort A to Z',
-    sortDataSource: 'Sort in data source order',
   },
   data: {
     group: 'Data:',
@@ -170,8 +166,6 @@ export const macPivotOptionsJa: MacPivotOptionsStrings = {
     fieldsPerColumn: '列ごとのフィールド数:',
     sortGroup: '並べ替え:',
     customLists: '並べ替え時にユーザー設定リストを使用する',
-    sortAscending: '昇順で並べ替え',
-    sortDataSource: 'データ ソース順で並べ替え',
   },
   data: {
     group: 'データ:',
@@ -236,8 +230,6 @@ export const macPivotOptionsDe: MacPivotOptionsStrings = {
     fieldsPerColumn: 'Felder pro Spalte:',
     sortGroup: 'Sortieren:',
     customLists: 'Beim Sortieren benutzerdefinierte Listen verwenden',
-    sortAscending: 'Von A bis Z sortieren',
-    sortDataSource: 'In Datenquellenreihenfolge sortieren',
   },
   data: {
     group: 'Daten:',
@@ -302,8 +294,6 @@ export const macPivotOptionsFr: MacPivotOptionsStrings = {
     fieldsPerColumn: 'Champs par colonne :',
     sortGroup: 'Trier :',
     customLists: 'Utiliser des listes personnalisées lors du tri',
-    sortAscending: 'Trier de A à Z',
-    sortDataSource: 'Trier par ordre de source de données',
   },
   data: {
     group: 'Données :',
@@ -368,8 +358,6 @@ export const macPivotOptionsZh: MacPivotOptionsStrings = {
     fieldsPerColumn: '每列字段数:',
     sortGroup: '排序:',
     customLists: '排序时使用自定义列表',
-    sortAscending: '升序',
-    sortDataSource: '按数据源顺序排序',
   },
   data: {
     group: '数据:',
@@ -434,8 +422,6 @@ export const macPivotOptionsKo: MacPivotOptionsStrings = {
     fieldsPerColumn: '열당 필드 수:',
     sortGroup: '정렬:',
     customLists: '정렬에 사용자 지정 목록 사용',
-    sortAscending: '텍스트 오름차순 정렬',
-    sortDataSource: '데이터 원본 순서로 정렬',
   },
   data: {
     group: '데이터:',
@@ -500,8 +486,6 @@ export const macPivotOptionsTh: MacPivotOptionsStrings = {
     fieldsPerColumn: 'เขตข้อมูลต่อคอลัมน์:',
     sortGroup: 'เรียงลำดับ:',
     customLists: 'ใช้รายการแบบกำหนดเองเมื่อเรียงลำดับ',
-    sortAscending: 'เรียงลำดับจาก ก ถึง ฮ',
-    sortDataSource: 'เรียงตามลำดับแหล่งข้อมูล',
   },
   data: {
     group: 'ข้อมูล:',
