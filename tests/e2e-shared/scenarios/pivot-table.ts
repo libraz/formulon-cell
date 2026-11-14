@@ -374,3 +374,72 @@ export async function runPivotTableOptionsScenario(page: Page): Promise<void> {
 
   expect(consoleErrors.read()).toEqual([]);
 }
+
+const MAC_PIVOT_OPTIONS = {
+  en: {
+    title: 'PivotTable Options',
+    noData: ['On rows', 'On columns'],
+    sort: ['Sort A to Z', 'Sort in data source order'],
+  },
+  ja: {
+    title: 'ピボットテーブル オプション',
+    noData: ['行に表示する', '列に表示する'],
+    sort: ['昇順で並べ替え', 'データ ソース順で並べ替え'],
+  },
+} as const;
+
+/** The Mac PivotTable Options dialog greys "Show items with no data" on rows and columns and has
+ *  no table-level sort choice, as the desktop draws it. */
+export async function runMacPivotOptionsLayoutScenario(
+  page: Page,
+  locale: keyof typeof MAC_PIVOT_OPTIONS,
+): Promise<void> {
+  const text = MAC_PIVOT_OPTIONS[locale];
+  const sp = new SpreadsheetPage(page);
+  const consoleErrors = sp.collectConsoleErrors();
+  await sp.mount({ platform: 'mac', locale });
+  await sp.expectNoStub();
+  await page.evaluate(() => {
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const inst = w.__fcInst;
+    const sheet = inst.workbook.sheet(0);
+    inst.workbook.batch(() => {
+      sheet.setText(0, 0, 'Channel');
+      sheet.setText(0, 1, 'Sales');
+      sheet.setText(1, 0, 'Online');
+      sheet.setNumber(1, 1, 10);
+      sheet.setText(2, 0, 'Retail');
+      sheet.setNumber(2, 1, 20);
+    });
+    const handle = w.__fcProbes['api/workbook'].workbookHandleOf(inst.workbook);
+    const made = w.__fcProbes['commands/pivot-table'].createPivotTableFromRange(handle, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
+      destination: { sheet: 0, row: 0, col: 3 },
+      name: 'ChannelReport',
+      rowField: 'Channel',
+      valueField: 'Sales',
+      aggregation: 0,
+    });
+    if (!made.ok) throw new Error(`pivot creation failed: ${made.reason}`);
+    inst.history.clear();
+  });
+  const cell = await gridCellCenter(page, 1, 3);
+  await page.mouse.click(cell.x, cell.y, { button: 'right' });
+  await page.locator('.fc-ctxmenu [data-fc-action="pivotOptions"]').click();
+  const dialog = page.getByRole('dialog', { name: text.title });
+  await expect(dialog).toBeVisible();
+  await dialog.locator('[data-pvopt-tab="display"]').click();
+  for (const label of text.noData) {
+    const box = dialog.getByRole('checkbox', { name: label, exact: true });
+    await expect(box).toBeVisible();
+    await expect(box).toBeDisabled();
+  }
+  for (const tab of await dialog.locator('[data-pvopt-tab]').all()) {
+    await tab.click();
+    for (const label of text.sort)
+      await expect(dialog.getByText(label, { exact: true })).toHaveCount(0);
+  }
+  await dialog.locator('[data-pvopt-cancel]').click();
+  await expect(dialog).toBeHidden();
+  expect(consoleErrors.read()).toEqual([]);
+}

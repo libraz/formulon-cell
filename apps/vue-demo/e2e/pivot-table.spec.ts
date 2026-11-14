@@ -1,5 +1,6 @@
 import { runPivotDateBetweenScenario } from '../../../tests/e2e-shared/scenarios/pivot-date-filter.js';
 import {
+  runMacPivotOptionsLayoutScenario,
   runPivotTableFilterDialogScenario,
   runPivotTableOptionsScenario,
   runPivotTableRibbonPrimaryDialogScenario,
@@ -32,4 +33,12 @@ for (const platform of ['default', 'mac'] as const) {
       await runPivotDateBetweenScenario(page, locale, platform);
     });
   }
+}
+
+for (const locale of ['en', 'ja'] as const) {
+  test(`Mac PivotTable Options greys Show items with no data and has no table sort (${locale})`, async ({
+    page,
+  }) => {
+    await runMacPivotOptionsLayoutScenario(page, locale);
+  });
 }
