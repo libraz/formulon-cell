@@ -24,7 +24,7 @@ const openDateFilter = async (page: Page) => {
 };
 
 /** The Mac column filter on a date column: Before reads the bound with the locale's date grammar,
- *  and a period such as June hides the value field and applies at once. */
+ *  and All Dates in the Period hides the value field and applies the month its pop-up picks. */
 export async function runMacAutoFilterDateScenario(
   page: Page,
   locale: 'en' | 'de' | 'ja',
@@ -61,8 +61,12 @@ export async function runMacAutoFilterDateScenario(
   await expect(dropdown).toBeHidden();
 
   dropdown = await openDateFilter(page);
-  await dropdown.locator('select.fc-filter-dropdown__condition-op').selectOption('datePeriod:june');
+  // Months sit behind All Dates in the Period, whose own pop-up picks one.
+  await dropdown
+    .locator('select.fc-filter-dropdown__condition-op')
+    .selectOption('allDatesInPeriod');
   await expect(dropdown.locator('.fc-filter-dropdown__condition-value')).toBeHidden();
+  await dropdown.locator('select.fc-filter-dropdown__condition-period').selectOption('june');
   await expect.poll(() => hiddenRows(page)).toEqual([1, 2, 3]);
   await page.keyboard.press('Escape');
   await sheet.expectNoConsoleErrors();
