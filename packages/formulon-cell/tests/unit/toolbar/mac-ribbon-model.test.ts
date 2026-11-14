@@ -1104,10 +1104,20 @@ describe('Mac Excel ribbon profile', () => {
       expect(items('mac.formulas.reset')).toEqual([
         ['mac.formulas.reset.clear', 'Reset', true],
         ['mac.formulas.reset.runtime', 'Reset Runtime', true],
+        ['separator', '', true],
+        ['mac.formulas.reset.version', 'Version', true],
+      ]);
+      expect(
+        MAC_RIBBON_MENU_ITEMS['mac.formulas.reset']
+          ?.find((item) => item.id === 'mac.formulas.reset.version')
+          ?.submenu?.map((item) => [item.id, item.label, !!item.disabled]),
+      ).toEqual([
         ['mac.formulas.reset.versionStable', 'Stable', true],
         ['mac.formulas.reset.versionLatest', 'Latest', true],
+        ['separator', '', true],
         ['mac.formulas.reset.versionLearnMore', 'Learn More', true],
       ]);
+      expect(macRibbonLabelForCommand('mac.formulas.reset.version', 'ja')).toBe('バージョン');
       expect(items('mac.formulas.defineName')).toEqual([
         ['mac.formulas.defineName.define', 'Define Name...', false],
         ['mac.formulas.defineName.apply', 'Apply...', true],
@@ -1133,6 +1143,7 @@ describe('Mac Excel ribbon profile', () => {
         for (const id of [
           'mac.formulas.reset.clear',
           'mac.formulas.reset.runtime',
+          'mac.formulas.reset.version',
           'mac.formulas.reset.versionStable',
           'mac.formulas.reset.versionLatest',
           'mac.formulas.reset.versionLearnMore',

@@ -117,12 +117,19 @@ const menu = (items: readonly MacRibbonMenuItem[]): readonly MacRibbonMenuItem[]
     const localized = label ? { ...item, label: label.en, labelJa: label.ja } : item;
     return item.submenu ? { ...localized, submenu: menu(item.submenu) } : localized;
   });
+/** Disable a row and, recursively, every entry of its submenu. */
+const greyOutItem = (item: MacRibbonMenuItem, reason: Label): MacRibbonMenuItem => ({
+  ...item,
+  disabled: true,
+  disabledReason: reason.en,
+  ...(item.submenu ? { submenu: item.submenu.map((entry) => greyOutItem(entry, reason)) } : {}),
+});
+
 /** A menu whose entries the host cannot run: every row greyed out with the same reason. */
 const unavailable = (
   items: readonly MacRibbonMenuItem[],
   reason: Label,
-): readonly MacRibbonMenuItem[] =>
-  menu(items).map((item) => ({ ...item, disabled: true, disabledReason: reason.en }));
+): readonly MacRibbonMenuItem[] => menu(items).map((item) => greyOutItem(item, reason));
 const leaf = (
   id: string,
   key: string,
@@ -529,10 +536,18 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   'mac.formulas.reset': menu([
     { id: 'mac.formulas.reset.clear', label: 'Reset' },
     { id: 'mac.formulas.reset.runtime', label: 'Reset Runtime' },
-    { id: 'mac.formulas.reset.versionStable', label: 'Stable' },
-    { id: 'mac.formulas.reset.versionLatest', label: 'Latest' },
-    { id: 'mac.formulas.reset.versionLearnMore', label: 'Learn More' },
-  ]).map((item) => ({ ...item, disabled: true, disabledReason: OFFICE_REQUIRED.en })),
+    separator,
+    {
+      id: 'mac.formulas.reset.version',
+      label: 'Version',
+      submenu: [
+        { id: 'mac.formulas.reset.versionStable', label: 'Stable' },
+        { id: 'mac.formulas.reset.versionLatest', label: 'Latest' },
+        separator,
+        { id: 'mac.formulas.reset.versionLearnMore', label: 'Learn More' },
+      ],
+    },
+  ]).map((item) => greyOutItem(item, OFFICE_REQUIRED)),
   'mac.formulas.defineName': menu([
     { id: 'mac.formulas.defineName.define', label: 'Define Name...' },
     {

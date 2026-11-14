@@ -2398,6 +2398,15 @@ export const MAC_BUNDLE_LABELS: Readonly<
     th: 'เอาลูกศรแสดงการถูกอ้างออก',
     zh: '删除引用单元格追踪箭头',
   },
+  'menu:mac.formulas.reset.version': {
+    en: 'Version',
+    ja: 'バージョン',
+    de: 'Version',
+    fr: 'Version',
+    ko: '버전',
+    th: 'รุ่น',
+    zh: '版本',
+  },
   'menu:mac.formulas.useInFormula.paste': {
     en: 'Paste Names...',
     ja: '名前の貼り付け...',

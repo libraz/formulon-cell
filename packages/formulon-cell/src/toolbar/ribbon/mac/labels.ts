@@ -480,6 +480,7 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
   'mac.formulas.errorCheck.circular': { ja: '循環参照', en: 'Circular References' },
   'mac.formulas.reset.clear': { ja: 'リセット', en: 'Reset' },
   'mac.formulas.reset.runtime': { ja: '実行時刻のリセット', en: 'Reset Runtime' },
+  'mac.formulas.reset.version': { ja: 'バージョン', en: 'Version' },
   'mac.formulas.reset.versionStable': { ja: '安定', en: 'Stable' },
   'mac.formulas.reset.versionLatest': { ja: '最新', en: 'Latest' },
   'mac.formulas.reset.versionLearnMore': { ja: '詳細情報', en: 'Learn More' },
