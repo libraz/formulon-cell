@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
+
+const FIXTURES = fileURLToPath(new URL('../fixtures/compat-version/', import.meta.url));
 
 type Platform = 'default' | 'mac';
 type ProbeWindow = { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
@@ -191,5 +195,38 @@ export async function runCalcOptionsMenusScenario(page: Page, platform: Platform
   await expect(item('3')).toHaveAttribute('aria-checked', 'true');
   await expect(item('2')).toHaveAttribute('aria-checked', 'false');
   await page.keyboard.press('Escape');
+
+  // A loaded book with no stamp is version 1.
+  await loadFixture(page, 'stamp_none.xlsx');
+  await expect.poll(version).toBe(1);
+  await openCompat();
+  await expect(item('1')).toHaveAttribute('aria-checked', 'true');
+  await expect(item('2')).toHaveAttribute('aria-checked', 'false');
+  await expect(item('3')).toBeHidden();
+  await page.keyboard.press('Escape');
+
+  // A stamp above 3 shows under its own number and locks the choice, since it cannot be set back.
+  await loadFixture(page, 'stamp_4.xlsx');
+  await expect.poll(version).toBe(4);
+  await openCompat();
+  await expect(item('3')).toHaveText('Version 4 (Unsupported)');
+  await expect(item('3')).toHaveAttribute('aria-checked', 'true');
+  for (const id of ['1', '2', '3'])
+    await expect(item(id), id).toHaveAttribute('aria-disabled', 'true');
+  await item('1').click({ force: true });
+  await page.keyboard.press('Escape');
+  expect(await version()).toBe(4);
   await sp.expectNoConsoleErrors();
+}
+
+/** Opens a workbook from `tests/e2e-shared/fixtures/compat-version`. */
+async function loadFixture(page: Page, name: string): Promise<void> {
+  const bytes = [...readFileSync(`${FIXTURES}${name}`)];
+  await page.evaluate(async (data) => {
+    const w = window as unknown as ProbeWindow;
+    const { Workbook } = w.__fcProbes['api/workbook'];
+    const next = await Workbook.load(new Uint8Array(data));
+    if (next.engine !== 'wasm') throw new Error('Load must use the real WASM engine');
+    w.__fcInst.update({ workbook: next });
+  }, bytes);
 }
