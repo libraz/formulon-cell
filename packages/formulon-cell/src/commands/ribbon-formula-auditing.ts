@@ -84,6 +84,7 @@ export const executeRibbonFormulaAuditingAction = (
       macNa: deps.macNa,
       numberAsText: deps.macNa,
       formulaRules: deps.macNa,
+      errorChecking: { ...store.getState().ui.errorChecking, enabled: true },
       locale: inputLocaleForWorkbook(workbook),
       workbook,
     })
@@ -106,6 +107,7 @@ export const executeRibbonFormulaAuditingAction = (
   return selectNextFormulaError(store, undefined, undefined, {
     macNa: deps.macNa,
     numberAsText: deps.macNa,
+    errorChecking: { ...store.getState().ui.errorChecking, enabled: true },
     locale: inputLocaleForWorkbook(workbook),
     workbook,
   })

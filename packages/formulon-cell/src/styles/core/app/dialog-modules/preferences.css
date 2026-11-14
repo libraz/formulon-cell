@@ -115,4 +115,28 @@
     gap: 6px;
     font-size: 12px;
   }
+  .fc-prefs__row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .fc-prefs__subheading {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .fc-prefs__button,
+  .fc-prefs__menu-button {
+    align-self: flex-start;
+    font-size: 12px;
+  }
+  .fc-prefs__menu-button {
+    width: 40px;
+    height: 18px;
+  }
+  .fc-prefs__button:disabled,
+  .fc-prefs__menu-button:disabled {
+    opacity: 0.5;
+  }
 }

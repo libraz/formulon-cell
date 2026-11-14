@@ -5,6 +5,7 @@ import {
   clearIgnoredCellErrors,
   clearValidationCircles,
   convertTextToNumber,
+  errorCheckFlagged,
   formulaErrorCellsInRange,
   formulaErrorIsFlagged,
   ignoreCellError,
@@ -457,5 +458,64 @@ describe('convertTextToNumber', () => {
     } finally {
       wb.dispose();
     }
+  });
+
+  describe('error checking setting', () => {
+    const errValue = { kind: 'error', code: 7, text: '#DIV/0!' } as const;
+    const textValue = { kind: 'text', value: '12' } as const;
+
+    it('defaults to the desktop values: on, every rule on except empty cells', () => {
+      const { enabled, rules } = createSpreadsheetStore().getState().ui.errorChecking;
+      expect(enabled).toBe(true);
+      expect(Object.entries(rules).filter(([, on]) => !on)).toEqual([['emptyCells', false]]);
+    });
+
+    it('hides every triangle while background checking is off', () => {
+      const store = createSpreadsheetStore();
+      const flagged = (): boolean =>
+        errorCheckFlagged(errValue, '=1/0', false, {
+          errorChecking: store.getState().ui.errorChecking,
+        });
+      expect(flagged()).toBe(true);
+      mutators.setErrorCheckingEnabled(store, false);
+      expect(flagged()).toBe(false);
+      expect(
+        errorCheckFlagged(textValue, null, true, {
+          numberAsText: true,
+          errorChecking: store.getState().ui.errorChecking,
+        }),
+      ).toBe(false);
+    });
+
+    it('lets one rule switch its own triangle off', () => {
+      const store = createSpreadsheetStore();
+      const opts = () => ({
+        numberAsText: true,
+        errorChecking: store.getState().ui.errorChecking,
+      });
+      expect(errorCheckFlagged(textValue, null, false, opts())).toBe(true);
+      mutators.setErrorCheckRule(store, 'numberAsText', false);
+      expect(errorCheckFlagged(textValue, null, false, opts())).toBe(false);
+      expect(errorCheckFlagged(errValue, '=1/0', false, opts())).toBe(true);
+      mutators.setErrorCheckRule(store, 'error', false);
+      expect(errorCheckFlagged(errValue, '=1/0', false, opts())).toBe(false);
+    });
+
+    it('lets the unlocked-formula rule switch off apart from the other formula rules', () => {
+      const store = createSpreadsheetStore();
+      const cell = { addr: { sheet: 0, row: 0, col: 0 }, locked: false, cellAt: () => undefined };
+      const num = { kind: 'number', value: 1 } as const;
+      const flagged = (): boolean =>
+        errorCheckFlagged(
+          num,
+          '=1',
+          false,
+          { formulaRules: true, errorChecking: store.getState().ui.errorChecking },
+          cell,
+        );
+      expect(flagged()).toBe(true);
+      mutators.setErrorCheckRule(store, 'unlocked', false);
+      expect(flagged()).toBe(false);
+    });
   });
 });

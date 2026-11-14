@@ -93,7 +93,7 @@ describe('Preferences window', () => {
     expect(dialog()?.querySelector('.fc-prefs__heading')?.textContent).toBe('');
     expect(showAll()).toEqual([
       ['オーサリング', ['表示', 'オートコレクト']],
-      ['数式とリスト', ['計算']],
+      ['数式とリスト', ['計算', 'エラー チェック']],
     ]);
     expect(dialog()?.querySelector<HTMLElement>('.fc-prefs__pane')?.hidden).toBe(true);
     expect(tool('戻る')?.disabled).toBe(false);
@@ -129,10 +129,12 @@ describe('Preferences window', () => {
     expect(showAll()).toEqual([]);
     type('calc');
     expect(showAll()).toEqual([['Formulas and Lists', ['Calculation']]]);
+    type('error');
+    expect(showAll()).toEqual([['Formulas and Lists', ['Error Checking']]]);
     type('');
     expect(showAll()).toEqual([
       ['Authoring', ['View', 'AutoCorrect']],
-      ['Formulas and Lists', ['Calculation']],
+      ['Formulas and Lists', ['Calculation', 'Error Checking']],
     ]);
   });
 
@@ -185,6 +187,138 @@ describe('Preferences window', () => {
     dialogs.close('autoCorrect');
     dialogs.close('preferences');
   });
+
+  const errorPane = (): HTMLElement | null =>
+    dialog()?.querySelector<HTMLElement>('.fc-prefs__pane[data-pane="errorChecking"]') ?? null;
+  const errorRows = (): HTMLLabelElement[] => [
+    ...(errorPane()?.querySelectorAll<HTMLLabelElement>('.fc-prefs__check') ?? []),
+  ];
+
+  it('binds the implemented Error Checking controls to the store and leaves the rest disabled', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const instance = sheet.instance;
+    createDialogs(() => instance).open('preferences');
+    dialog()?.querySelector<HTMLButtonElement>('[data-pane="errorChecking"]')?.click();
+    const boxes = errorRows().map((row) => row.querySelector('input') as HTMLInputElement);
+    expect(boxes.map((box) => !box.disabled)).toEqual([
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+    ]);
+    const flip = (box: HTMLInputElement): void => {
+      box.checked = !box.checked;
+      box.dispatchEvent(new Event('change'));
+    };
+    const state = () => instance.store.getState().ui;
+    flip(boxes[0] as HTMLInputElement);
+    expect(state().errorChecking.enabled).toBe(false);
+    flip(boxes[3] as HTMLInputElement);
+    expect(state().errorChecking.rules.numberAsText).toBe(false);
+    flip(boxes[6] as HTMLInputElement);
+    expect(state().errorChecking.rules.unlocked).toBe(false);
+    flip(boxes[11] as HTMLInputElement);
+    expect(state().formatStaleValues).toBe(false);
+  });
+
+  it('lists the Error Checking controls in the desktop order, at the desktop defaults', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const instance = sheet.instance;
+    createDialogs(() => instance).open('preferences');
+    dialog()?.querySelector<HTMLButtonElement>('[data-pane="errorChecking"]')?.click();
+    expect(dialog()?.getAttribute('aria-label')).toBe('Error Checking');
+    const rows = errorRows();
+    expect(rows.map((row) => row.textContent)).toEqual([
+      'Turn on background error checking',
+      'Formulas that result in an error',
+      'Years in 2 digits',
+      'Numbers formatted as text',
+      "Formulas that don't match nearby formulas",
+      'Formulas omitting cells in a region',
+      'Unlocked cells containing formulas',
+      'Formulas referring to empty cells',
+      'Inconsistent calculated column formula in tables',
+      'Misleading number formats',
+      "Cells containing data types that couldn't refresh",
+      'Cells containing stale values',
+    ]);
+    expect(rows.map((row) => row.querySelector('input')?.checked)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(errorPane()?.querySelector('.fc-prefs__subheading')?.textContent).toBe(
+      'Show Errors For',
+    );
+    expect(errorPane()?.querySelector('.fc-prefs__row')?.textContent).toBe(
+      'Indicate errors using this color:',
+    );
+    const color = errorPane()?.querySelector<HTMLButtonElement>('[data-prefs-action="color"]');
+    expect(color?.disabled).toBe(true);
+    expect(color?.getAttribute('aria-label')).toBe('Indicate errors using this color');
+    expect(rows[6]?.title).toContain('unlocked and editable cells');
+    expect(rows[11]?.title).toBe('');
+  });
+
+  it('resets the ignored errors from the Error Checking pane, and undoes it', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const instance = sheet.instance;
+    instance.store.setState((s) => ({
+      ...s,
+      errorIndicators: { ...s.errorIndicators, ignoredErrors: new Set(['0:0:0', '0:1:1']) },
+    }));
+    createDialogs(() => instance).open('preferences');
+    dialog()?.querySelector<HTMLButtonElement>('[data-pane="errorChecking"]')?.click();
+    const reset = errorPane()?.querySelector<HTMLButtonElement>('[data-prefs-action="reset"]');
+    expect(reset?.textContent).toBe('Reset Ignored Errors');
+    expect(reset?.disabled).toBe(false);
+    reset?.click();
+    expect(instance.store.getState().errorIndicators.ignoredErrors.size).toBe(0);
+    instance.history.undo();
+    expect(instance.store.getState().errorIndicators.ignoredErrors.size).toBe(2);
+  });
+
+  it.each([
+    ['ja', 'エラー チェック', '無視したエラーのリセット', '表示するエラー'],
+    ['de', 'Fehlerüberprüfung', 'Zu ignorierende Fehler zurücksetzen', 'Fehler anzeigen für'],
+    [
+      'fr',
+      'Vérification des erreurs',
+      'Rétablir les erreurs ignorées',
+      'Afficher les erreurs pour',
+    ],
+    ['ko', '오류 검사', '무시한 오류를 원래대로', '오류 표시 대상:'],
+    ['th', 'การตรวจสอบข้อผิดพลาด', 'รีเซ็ตให้ข้อผิดพลาดที่ถูกละเว้นไป', 'แสดงข้อผิดพลาดของ'],
+    ['zh', '错误检查', '重新设置忽略错误', '显示以下内容的错误'],
+  ] as const)(
+    'words the Error Checking pane in %s from the bundle',
+    async (locale, name, reset, show) => {
+      sheet = await mountStubSheet({ locale, ui: { platform: 'mac' } });
+      const instance = sheet.instance;
+      createDialogs(() => instance).open('preferences');
+      dialog()?.querySelector<HTMLButtonElement>('[data-pane="errorChecking"]')?.click();
+      expect(dialog()?.getAttribute('aria-label')).toBe(name);
+      expect(errorPane()?.querySelector('[data-prefs-action="reset"]')?.textContent).toBe(reset);
+      expect(errorPane()?.querySelector('.fc-prefs__subheading')?.textContent).toBe(show);
+    },
+  );
 
   const calcPane = (): HTMLElement | null =>
     dialog()?.querySelector<HTMLElement>('.fc-prefs__pane[data-pane="calculation"]') ?? null;

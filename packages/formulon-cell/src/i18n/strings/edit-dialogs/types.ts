@@ -206,6 +206,27 @@ export interface EditDialogsStrings {
     calculationPane: string;
     /** The group the Calculation pane sits in under Show All. */
     formulasGroup: string;
+    /** The Error Checking pane's name, which is also the window title while it is shown. */
+    errorCheckingPane: string;
+    errorCheckingOn: string;
+    resetIgnoredErrors: string;
+    errorColor: string;
+    errorColorAria: string;
+    showErrorsFor: string;
+    ruleError: string;
+    ruleTwoDigitYears: string;
+    ruleNumberAsText: string;
+    ruleInconsistent: string;
+    ruleOmitsCells: string;
+    ruleUnlocked: string;
+    ruleEmptyCells: string;
+    ruleTableColumn: string;
+    ruleNumberFormat: string;
+    ruleDataType: string;
+    ruleStale: string;
+    /** Tooltips of the rules the desktop words one for; the others have none. */
+    ruleNumberFormatTip: string;
+    ruleUnlockedTip: string;
     zeroValues: string;
     zeroValuesTip: string;
   };

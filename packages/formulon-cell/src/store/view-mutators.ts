@@ -12,6 +12,7 @@ import type {
   CopyMode,
   EditorMode,
   EditorRefHighlight,
+  ErrorCheckRuleId,
   SelectedObject,
   State,
   StatusAggKey,
@@ -79,6 +80,23 @@ export const viewMutators = {
     store.setState((s) =>
       s.ui.formatStaleValues === on ? s : { ...s, ui: { ...s.ui, formatStaleValues: on } },
     );
+  },
+
+  setErrorCheckingEnabled(store: SpreadsheetStore, on: boolean): void {
+    store.setState((s) =>
+      s.ui.errorChecking.enabled === on
+        ? s
+        : { ...s, ui: { ...s.ui, errorChecking: { ...s.ui.errorChecking, enabled: on } } },
+    );
+  },
+
+  setErrorCheckRule(store: SpreadsheetStore, rule: ErrorCheckRuleId, on: boolean): void {
+    store.setState((s) => {
+      const { errorChecking } = s.ui;
+      if (errorChecking.rules[rule] === on) return s;
+      const rules = { ...errorChecking.rules, [rule]: on };
+      return { ...s, ui: { ...s.ui, errorChecking: { ...errorChecking, rules } } };
+    });
   },
 
   setShowOutlineSymbols(store: SpreadsheetStore, on: boolean): void {

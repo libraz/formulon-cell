@@ -8,7 +8,13 @@ import { ERROR_LITERALS } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeValidationCells } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
-import { type CellValidation, mutators, type SpreadsheetStore } from '../store/store.js';
+import {
+  type CellValidation,
+  type ErrorCheckingSettings,
+  type ErrorCheckRuleId,
+  mutators,
+  type SpreadsheetStore,
+} from '../store/store.js';
 import { commitCellInput } from './cell-input-commit.js';
 import { inputLocaleForWorkbook, parseLocalizedNumericInput } from './coerce-input.js';
 import type { History } from './history.js';
@@ -110,6 +116,8 @@ export interface FormulaErrorCheckOptions {
    *  with its neighbours, one that omits adjacent data, an unlocked formula. */
   formulaRules?: boolean;
   locale?: string;
+  /** The Preferences › Error Checking flags; absent means every rule is on. */
+  errorChecking?: ErrorCheckingSettings;
   workbook?: Pick<WorkbookHandle, 'pivotSpills'> | null;
 }
 
@@ -179,11 +187,15 @@ function omitsAdjacentCells(formula: string, cell: ErrorCheckCell): boolean {
 
 /** The formula rules of the default error check, for a formula whose value is
  *  not an error. */
-function formulaRuleFlagged(formula: string, cell: ErrorCheckCell): boolean {
+function formulaRuleFlagged(
+  formula: string,
+  cell: ErrorCheckCell,
+  on: (rule: ErrorCheckRuleId) => boolean,
+): boolean {
   return (
-    cell.locked === false ||
-    inconsistentWithRegion(formula, cell) ||
-    omitsAdjacentCells(formula, cell)
+    (on('unlocked') && cell.locked === false) ||
+    (on('inconsistent') && inconsistentWithRegion(formula, cell)) ||
+    (on('omitsCells') && omitsAdjacentCells(formula, cell))
   );
 }
 
@@ -249,18 +261,24 @@ export function errorCheckFlagged(
   value: CellValue,
   formula: string | null | undefined,
   pivotSpill: boolean,
-  opts: Pick<FormulaErrorCheckOptions, 'macNa' | 'numberAsText' | 'formulaRules' | 'locale'> = {},
+  opts: Pick<
+    FormulaErrorCheckOptions,
+    'macNa' | 'numberAsText' | 'formulaRules' | 'locale' | 'errorChecking'
+  > = {},
   cell?: ErrorCheckCell,
 ): boolean {
+  if (opts.errorChecking?.enabled === false) return false;
+  const on = (rule: ErrorCheckRuleId): boolean => opts.errorChecking?.rules[rule] !== false;
   return (
-    pivotSpill ||
-    formulaErrorIsFlagged(value, formula, opts) ||
-    (opts.numberAsText === true && numberStoredAsText(value, formula, opts.locale)) ||
+    (on('error') && (pivotSpill || formulaErrorIsFlagged(value, formula, opts))) ||
+    (opts.numberAsText === true &&
+      on('numberAsText') &&
+      numberStoredAsText(value, formula, opts.locale)) ||
     (opts.formulaRules === true &&
       !!formula &&
       value.kind !== 'error' &&
       cell !== undefined &&
-      formulaRuleFlagged(formula, cell))
+      formulaRuleFlagged(formula, cell, on))
   );
 }
 

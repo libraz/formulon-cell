@@ -169,6 +169,25 @@ export interface SelectedObject {
 /** Which clipboard command raised the marquee. */
 export type CopyMode = 'copy' | 'cut';
 
+/** The error-check rules with a setting of their own. Stale values follow `formatStaleValues`. */
+export type ErrorCheckRuleId =
+  | 'error'
+  | 'twoDigitYears'
+  | 'numberAsText'
+  | 'inconsistent'
+  | 'omitsCells'
+  | 'unlocked'
+  | 'emptyCells'
+  | 'tableColumn'
+  | 'numberFormat'
+  | 'dataType';
+
+/** Background error checking: the master switch and each rule's flag. */
+export interface ErrorCheckingSettings {
+  enabled: boolean;
+  rules: Record<ErrorCheckRuleId, boolean>;
+}
+
 export interface UiSlice {
   editor: EditorMode;
   hover: Addr | null;
@@ -217,6 +236,8 @@ export interface UiSlice {
   /** Formulas › Calculation Options › Format Stale Values: formula cells whose value is stale
    *  are drawn with the stale look. A host preference, never written to the workbook. */
   formatStaleValues: boolean;
+  /** Preferences › Error Checking. A host preference, never written to the workbook. */
+  errorChecking: ErrorCheckingSettings;
   /** Excel End mode: the next arrow key jumps to the edge of the current data region. */
   endMode: boolean;
   /** Workbook view mode surfaced by View > Workbook Views. Page Layout folds

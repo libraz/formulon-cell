@@ -1,6 +1,8 @@
+import { clearIgnoredCellErrors, recordIgnoredErrorsChange } from '../commands/error-indicators.js';
 import { setZerosVisible } from '../commands/view.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
+import { type ErrorCheckRuleId, mutators } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendAutoCorrectOptions } from './autocorrect-options.js';
@@ -27,15 +29,23 @@ type Listen = (target: EventTarget, event: string, handler: EventListener) => vo
 const checkbox = (
   body: HTMLElement,
   on: Listen,
-  opts: { label: string; tip: string; checked: boolean; set: (on: boolean) => void },
+  opts: {
+    label: string;
+    tip?: string;
+    checked: boolean;
+    /** Without a setter the control is drawn but disabled: no setting backs it yet. */
+    set?: (on: boolean) => void;
+  },
 ): void => {
   const row = document.createElement('label');
   row.className = 'fc-prefs__check';
-  row.title = opts.tip;
+  row.title = opts.tip ?? '';
   const box = document.createElement('input');
   box.type = 'checkbox';
   box.checked = opts.checked;
-  on(box, 'change', () => opts.set(box.checked));
+  const { set } = opts;
+  if (set) on(box, 'change', () => set(box.checked));
+  else projectDisabledState(box, true, null);
   row.append(box, document.createTextNode(opts.label));
   body.appendChild(row);
 };
@@ -84,6 +94,73 @@ const PANES: readonly PreferencePane[] = [
         'fc-prefs-calculation',
       );
       options.refresh();
+    },
+  },
+  {
+    id: 'errorChecking',
+    label: (t) => t.errorCheckingPane,
+    group: (t) => t.formulasGroup,
+    render(instance, body, on) {
+      const t = instance.i18n.strings.preferencesDialog;
+      const { enabled, rules: flags } = instance.store.getState().ui.errorChecking;
+      checkbox(body, on, {
+        label: t.errorCheckingOn,
+        checked: enabled,
+        set: (value) => mutators.setErrorCheckingEnabled(instance.store, value),
+      });
+      const reset = appendDialogButton(body, {
+        label: t.resetIgnoredErrors,
+        baseClass: 'fc-prefs__button',
+      });
+      reset.dataset.prefsAction = 'reset';
+      on(reset, 'click', () =>
+        recordIgnoredErrorsChange(instance.history, instance.store, () =>
+          clearIgnoredCellErrors(instance.store),
+        ),
+      );
+      const colorRow = document.createElement('div');
+      colorRow.className = 'fc-prefs__row';
+      colorRow.append(document.createTextNode(t.errorColor));
+      const color = appendDialogButton(colorRow, { label: '', baseClass: 'fc-prefs__menu-button' });
+      color.dataset.prefsAction = 'color';
+      color.setAttribute('aria-label', t.errorColorAria);
+      projectDisabledState(color, true, null);
+      body.appendChild(colorRow);
+      const subheading = document.createElement('div');
+      subheading.className = 'fc-prefs__subheading';
+      subheading.textContent = t.showErrorsFor;
+      body.appendChild(subheading);
+      // Only the rules the desktop words a tooltip for carry one. A rule that is not implemented
+      // shows its stored flag and stays disabled. Stale values are the Format Stale Values preference.
+      const rules: [string, ErrorCheckRuleId | 'stale', boolean, string?][] = [
+        [t.ruleError, 'error', true],
+        [t.ruleTwoDigitYears, 'twoDigitYears', false],
+        [t.ruleNumberAsText, 'numberAsText', true],
+        [t.ruleInconsistent, 'inconsistent', true],
+        [t.ruleOmitsCells, 'omitsCells', true],
+        [t.ruleUnlocked, 'unlocked', true, t.ruleUnlockedTip],
+        [t.ruleEmptyCells, 'emptyCells', false],
+        [t.ruleTableColumn, 'tableColumn', false],
+        [t.ruleNumberFormat, 'numberFormat', false, t.ruleNumberFormatTip],
+        [t.ruleDataType, 'dataType', false],
+        [t.ruleStale, 'stale', true],
+      ];
+      const { store } = instance;
+      for (const [label, rule, implemented, tip] of rules) {
+        checkbox(body, on, {
+          label,
+          checked: rule === 'stale' ? store.getState().ui.formatStaleValues : flags[rule],
+          ...(tip ? { tip } : {}),
+          ...(implemented
+            ? {
+                set: (value: boolean) =>
+                  rule === 'stale'
+                    ? mutators.setFormatStaleValues(store, value)
+                    : mutators.setErrorCheckRule(store, rule, value),
+              }
+            : {}),
+        });
+      }
     },
   },
 ];

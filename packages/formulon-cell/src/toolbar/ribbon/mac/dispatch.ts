@@ -292,6 +292,7 @@ const runMacErrorCheck = (instance: SpreadsheetInstance): Promise<void> | void =
       macNa: true,
       numberAsText: true,
       formulaRules: true,
+      errorChecking: { ...state.ui.errorChecking, enabled: true },
       locale: inputLocaleForWorkbook(instance.workbook),
       workbook: instance.workbook,
     },

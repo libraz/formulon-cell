@@ -230,6 +230,7 @@ export function paintCells(
     return resolver;
   };
   const triangleHits: ErrorTriangleHit[] = [];
+  const { errorChecking } = state.ui;
   // Format Stale Values: decided once per paint, then read for formula cells only.
   const staleAt =
     wb && staleValuesMarked(wb, state.ui.formatStaleValues)
@@ -825,7 +826,7 @@ export function paintCells(
           (spill) => spill.anchor.row === r && spill.anchor.col === c,
         );
         if (
-          stale ||
+          (stale && errorChecking.enabled) ||
           errorCheckFlagged(
             value,
             storedFormula,
@@ -835,6 +836,7 @@ export function paintCells(
               numberAsText: cellCtx.fontEffects,
               formulaRules: cellCtx.fontEffects,
               locale: inputLocale,
+              errorChecking,
             },
             {
               addr: cellAddr,
