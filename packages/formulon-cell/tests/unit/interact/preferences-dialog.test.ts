@@ -37,7 +37,7 @@ describe('Preferences window', () => {
     const instance = sheet.instance;
     const dialogs = createDialogs(() => instance);
     expect(dialogs.canOpen('preferences')).toBe(true);
-    dialogs.open('preferences');
+    dialogs.open('preferences', { pane: 'view' });
 
     expect(dialog()?.getAttribute('aria-label')).toBe('表示');
     expect(dialog()?.querySelector('.fc-prefs__header')?.textContent).toBe('表示');
@@ -55,7 +55,7 @@ describe('Preferences window', () => {
 
     dialogs.close('preferences');
     expect(dialog()).toBeNull();
-    dialogs.open('preferences');
+    dialogs.open('preferences', { pane: 'view' });
     expect(dialog()?.querySelector<HTMLInputElement>('.fc-prefs__check input')?.checked).toBe(
       false,
     );
@@ -69,16 +69,26 @@ describe('Preferences window', () => {
     async (locale, title, zeros) => {
       sheet = await mountStubSheet({ locale, ui: { platform: 'mac' } });
       const instance = sheet.instance;
-      createDialogs(() => instance).open('preferences');
+      createDialogs(() => instance).open('preferences', { pane: 'view' });
       expect(dialog()?.querySelector('.fc-prefs__header')?.textContent).toBe(title);
       expect(dialog()?.querySelector('.fc-prefs__check')?.textContent).toBe(zeros);
     },
   );
 
+  it('opens on Show All when no pane is asked for', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const instance = sheet.instance;
+    createDialogs(() => instance).open('preferences');
+    expect(dialog()?.querySelector('.fc-prefs__header')?.textContent).toBe(
+      instance.i18n.strings.preferencesDialog.windowTitle,
+    );
+    expect(showAll().length).toBeGreaterThan(0);
+  });
+
   it('carries the desktop toolbar: Back and Forward, Show All, the pane name and Search', async () => {
     sheet = await mountStubSheet({ locale: 'ja', ui: { platform: 'mac' } });
     const instance = sheet.instance;
-    createDialogs(() => instance).open('preferences');
+    createDialogs(() => instance).open('preferences', { pane: 'view' });
     const toolbar = dialog()?.querySelector<HTMLElement>('[role="toolbar"]');
     const labels = [...(toolbar?.querySelectorAll('button, input') ?? [])].map((control) =>
       control.getAttribute('aria-label'),
@@ -114,7 +124,7 @@ describe('Preferences window', () => {
   it('narrows Show All to the panes whose names match the search', async () => {
     sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
     const instance = sheet.instance;
-    createDialogs(() => instance).open('preferences');
+    createDialogs(() => instance).open('preferences', { pane: 'view' });
     const search = dialog()?.querySelector<HTMLInputElement>('input[type="search"]');
     const type = (value: string): void => {
       if (!search) return;
@@ -142,7 +152,7 @@ describe('Preferences window', () => {
     sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
     const instance = sheet.instance;
     const dialogs = createDialogs(() => instance);
-    dialogs.open('preferences');
+    dialogs.open('preferences', { pane: 'view' });
     dialog()?.querySelector<HTMLButtonElement>('[data-pane="autoCorrect"]')?.click();
     expect(dialog()?.getAttribute('aria-label')).toBe('AutoCorrect');
     const pane = dialog()?.querySelector<HTMLElement>('.fc-prefs__pane[data-pane="autoCorrect"]');
@@ -179,7 +189,7 @@ describe('Preferences window', () => {
   it('keeps the pane and the AutoCorrect dialog ids apart while both are open', async () => {
     sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
     const dialogs = createDialogs(() => sheet?.instance as NonNullable<typeof sheet>['instance']);
-    dialogs.open('preferences');
+    dialogs.open('preferences', { pane: 'view' });
     dialog()?.querySelector<HTMLButtonElement>('[data-pane="autoCorrect"]')?.click();
     dialogs.open('autoCorrect');
     const ids = [...document.querySelectorAll<HTMLElement>('[id]')].map((el) => el.id);
@@ -197,7 +207,7 @@ describe('Preferences window', () => {
   it('binds the implemented Error Checking controls to the store and leaves the rest disabled', async () => {
     sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
     const instance = sheet.instance;
-    createDialogs(() => instance).open('preferences');
+    createDialogs(() => instance).open('preferences', { pane: 'view' });
     dialog()?.querySelector<HTMLButtonElement>('[data-pane="errorChecking"]')?.click();
     const boxes = errorRows().map((row) => row.querySelector('input') as HTMLInputElement);
     expect(boxes.map((box) => !box.disabled)).toEqual([
@@ -232,7 +242,7 @@ describe('Preferences window', () => {
   it('lists the Error Checking controls in the desktop order, at the desktop defaults', async () => {
     sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
     const instance = sheet.instance;
-    createDialogs(() => instance).open('preferences');
+    createDialogs(() => instance).open('preferences', { pane: 'view' });
     dialog()?.querySelector<HTMLButtonElement>('[data-pane="errorChecking"]')?.click();
     expect(dialog()?.getAttribute('aria-label')).toBe('Error Checking');
     const rows = errorRows();
@@ -284,7 +294,7 @@ describe('Preferences window', () => {
       ...s,
       errorIndicators: { ...s.errorIndicators, ignoredErrors: new Set(['0:0:0', '0:1:1']) },
     }));
-    createDialogs(() => instance).open('preferences');
+    createDialogs(() => instance).open('preferences', { pane: 'view' });
     dialog()?.querySelector<HTMLButtonElement>('[data-pane="errorChecking"]')?.click();
     const reset = errorPane()?.querySelector<HTMLButtonElement>('[data-prefs-action="reset"]');
     expect(reset?.textContent).toBe('Reset Ignored Errors');
@@ -312,7 +322,7 @@ describe('Preferences window', () => {
     async (locale, name, reset, show) => {
       sheet = await mountStubSheet({ locale, ui: { platform: 'mac' } });
       const instance = sheet.instance;
-      createDialogs(() => instance).open('preferences');
+      createDialogs(() => instance).open('preferences', { pane: 'view' });
       dialog()?.querySelector<HTMLButtonElement>('[data-pane="errorChecking"]')?.click();
       expect(dialog()?.getAttribute('aria-label')).toBe(name);
       expect(errorPane()?.querySelector('[data-prefs-action="reset"]')?.textContent).toBe(reset);
@@ -328,7 +338,7 @@ describe('Preferences window', () => {
   it('shows the Mac calculation controls on the Calculation pane', async () => {
     sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
     const instance = sheet.instance;
-    createDialogs(() => instance).open('preferences');
+    createDialogs(() => instance).open('preferences', { pane: 'view' });
     dialog()?.querySelector<HTMLButtonElement>('[data-pane="calculation"]')?.click();
     expect(dialog()?.getAttribute('aria-label')).toBe('Calculation');
     const pane = calcPane();
@@ -354,7 +364,7 @@ describe('Preferences window', () => {
     sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
     const instance = sheet.instance;
     const dialogs = createDialogs(() => instance);
-    dialogs.open('preferences');
+    dialogs.open('preferences', { pane: 'view' });
     dialog()?.querySelector<HTMLButtonElement>('[data-pane="calculation"]')?.click();
     const r1c1 = calcBox(calcPane(), 'r1c1') as HTMLInputElement;
     r1c1.checked = true;
@@ -370,7 +380,7 @@ describe('Preferences window', () => {
   it('keeps the pane and the dialog element ids and radio groups apart while both are open', async () => {
     sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
     const dialogs = createDialogs(() => sheet?.instance as NonNullable<typeof sheet>['instance']);
-    dialogs.open('preferences');
+    dialogs.open('preferences', { pane: 'view' });
     dialog()?.querySelector<HTMLButtonElement>('[data-pane="calculation"]')?.click();
     dialogs.open('iterative');
     const ids = [...document.querySelectorAll<HTMLElement>('[id]')].map((el) => el.id);
@@ -392,7 +402,7 @@ describe('Preferences window', () => {
     expect(dialogs.canOpen('preferences')).toBe(false);
     let failure: unknown;
     try {
-      dialogs.open('preferences');
+      dialogs.open('preferences', { pane: 'view' });
     } catch (error) {
       failure = error;
     }
@@ -403,7 +413,7 @@ describe('Preferences window', () => {
   it('closes when the platform leaves the Mac profile', async () => {
     sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
     const instance = sheet.instance;
-    createDialogs(() => instance).open('preferences');
+    createDialogs(() => instance).open('preferences', { pane: 'view' });
     expect(dialog()?.getAttribute('aria-label')).toBe('View');
     instance.setUi({ platform: 'default' });
     expect(dialog()).toBeNull();
@@ -435,12 +445,13 @@ describe('Preferences window pane option', () => {
     ).toBe('errorChecking');
   });
 
-  it('falls back to the View pane for an unknown id', async () => {
+  it('falls back to Show All for an unknown id', async () => {
     sheet = await mount();
     const instance = sheet.instance;
     createDialogs(() => instance).open('preferences', { pane: 'nope' as never });
-    expect(
-      dialog()?.querySelector<HTMLElement>('.fc-prefs__pane:not([hidden])')?.dataset.pane,
-    ).toBe('view');
+    expect(dialog()?.querySelector('.fc-prefs__pane:not([hidden])')).toBeNull();
+    expect(dialog()?.querySelector('.fc-prefs__header')?.textContent).toBe(
+      instance.i18n.strings.preferencesDialog.windowTitle,
+    );
   });
 });

@@ -21,7 +21,7 @@ export type PreferencesPaneId = 'view' | 'autoCorrect' | 'calculation' | 'errorC
 
 /** Options of `openPreferencesDialog`. */
 export interface PreferencesOpenOptions {
-  /** Pane to open on; the View pane when omitted or unknown. */
+  /** Pane to open on; Show All when omitted or unknown, as the desktop opens the window. */
   readonly pane?: PreferencesPaneId;
 }
 
@@ -179,7 +179,7 @@ const openDialogs = new WeakMap<SpreadsheetInstance, () => void>();
 /** Show All, or one pane, as the window's history records them. */
 type Page = PreferencePane | 'all';
 
-/** Opens the Preferences window on its first pane. Every setting applies as it changes; the
+/** Opens the Preferences window on Show All, or on `options.pane`. Every setting applies as it changes; the
  *  window has no buttons, only a close control and the desktop's toolbar: Back and Forward
  *  through the pages shown, Show All listing the panes under their group headings, the shown
  *  pane's name, and a search field narrowing Show All to the panes whose names match. */
@@ -347,8 +347,7 @@ export function openPreferencesDialog(
   }
   openDialogs.set(instance, dismiss);
 
-  const [first] = PANES;
-  go(PANES.find((pane) => pane.id === options?.pane) ?? first ?? 'all');
+  go(PANES.find((pane) => pane.id === options?.pane) ?? 'all');
   shell.open();
 }
 
