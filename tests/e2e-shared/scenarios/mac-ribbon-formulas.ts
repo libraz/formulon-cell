@@ -712,3 +712,69 @@ export async function runMacCalculationGroupAndNamesScenario(page: Page): Promis
   await expect.poll(() => sp.readValue('C4')).toEqual({ kind: 'number', value: 7 });
   await sp.expectNoConsoleErrors();
 }
+
+/** The Version row label of the Python Reset menu per UI language. */
+const PYTHON_VERSION_LABEL = {
+  en: 'Version',
+  ja: 'バージョン',
+  fr: 'Version',
+  zh: '版本',
+} as const;
+
+/** The Python group's Reset menu lists Reset, Reset Runtime and a Version submenu holding
+ *  Stable, Latest and Learn More. The group needs a cloud service, so every row is greyed and
+ *  only the structure can be walked. */
+export async function runMacPythonVersionSubmenuScenario(
+  page: Page,
+  locale: keyof typeof PYTHON_VERSION_LABEL,
+): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount({ platform: 'mac', locale });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await sp.expectNoStub();
+  await selectRibbonTab(page, 'formulas');
+  const reset = page.locator(
+    '[data-ribbon-panel="formulas"] [data-ribbon-command="mac.formulas.reset"]',
+  );
+  await expect(reset).toBeDisabled();
+  await expect(reset).toHaveAttribute('data-ribbon-menu-id', 'menu-mac-formulas-reset');
+
+  const menu = page.locator('#menu-mac-formulas-reset[role="menu"]');
+  const rows = await menu.evaluate((el) =>
+    Array.from(el.querySelectorAll(':scope > [role="menuitem"]')).map((row) => ({
+      id: row.getAttribute('data-ribbon-command') ?? row.getAttribute('data-format-submenu'),
+      disabled: row.getAttribute('aria-disabled') === 'true',
+    })),
+  );
+  expect(rows.map((row) => row.id)).toEqual([
+    'mac.formulas.reset.clear',
+    'mac.formulas.reset.runtime',
+    'mac.formulas.reset.version',
+  ]);
+  expect(rows.slice(0, 2).every((row) => row.disabled)).toBe(true);
+  const label = PYTHON_VERSION_LABEL[locale];
+  const trigger = menu.locator('[data-format-submenu="mac.formulas.reset.version"]');
+  await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+  await expect(trigger).toHaveAttribute('aria-controls', 'menu-mac-formulas-reset-version');
+  await expect(trigger).toHaveAttribute('aria-label', label);
+  await expect(trigger).toContainText(label);
+
+  const panel = page.locator('.fc-tb__submenu[data-format-panel="mac.formulas.reset.version"]');
+  await expect(panel).toHaveAttribute('role', 'menu');
+  await expect(panel).toHaveAttribute('aria-label', label);
+  const entries = await panel.evaluate((el) =>
+    Array.from(el.querySelectorAll('[role="menuitem"]')).map((row) => ({
+      id: row.getAttribute('data-ribbon-command'),
+      disabled: row.getAttribute('aria-disabled') === 'true',
+      reason: row.getAttribute('data-ribbon-disabled-reason') !== null,
+    })),
+  );
+  expect(entries).toEqual(
+    ['versionStable', 'versionLatest', 'versionLearnMore'].map((key) => ({
+      id: `mac.formulas.reset.${key}`,
+      disabled: true,
+      reason: true,
+    })),
+  );
+  await sp.expectNoConsoleErrors();
+}

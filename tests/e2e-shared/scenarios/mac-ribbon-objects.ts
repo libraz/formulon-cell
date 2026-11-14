@@ -262,11 +262,45 @@ export async function runMacChartCellGeometryScenario(page: Page): Promise<void>
   const scatter = drawn('mac.insert.chartScatter');
   expect(waterfall.x).toBeGreaterThan(scatter.x + scatter.width - 1);
 
-  // At 1440 the panel fits by stages; none of them may widen a chart cell.
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(charts).toHaveClass(/fc-tb__ribbon-group--narrow/);
+  // At 1280 the panel fits by stages on its neighbours; Charts keeps a stage only if it got
+  // narrower, and no stage may widen a chart cell.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const insert = page.locator('[data-ribbon-panel="insert"]');
+  await expect
+    .poll(() =>
+      insert.evaluate(
+        (p) =>
+          p.scrollWidth <= p.clientWidth &&
+          p.querySelector(':scope > .fc-tb__ribbon-group--narrow') !== null,
+      ),
+    )
+    .toBe(true);
+  await expect(charts).not.toHaveClass(/fc-tb__ribbon-group--collapsed/);
   const fitted = await measure();
   for (const id of [...icons, ...stack])
     expect(fitted(id).width, id).toBeLessThanOrEqual(drawn(id).width + 0.5);
+  await sp.expectNoConsoleErrors();
+}
+
+/** With a cell selected, Insert greys Slicer, Timeline and Symbol; Symbol opens up while a cell
+ *  is being edited, and greys again once the edit is committed. */
+export async function runMacInsertSymbolStateScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount({ platform: 'mac', locale: 'en', fixture: 'empty' });
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await sp.expectNoStub();
+  await selectRibbonTab(page, 'insert');
+  const command = (id: string) =>
+    page.locator(`[data-ribbon-panel="insert"] [data-ribbon-command="${id}"]`).first();
+  const symbol = command('mac.insert.symbol');
+  await sp.goTo('B2');
+  for (const id of ['mac.insert.slicer', 'mac.insert.timeline', 'mac.insert.symbol'])
+    await expect(command(id)).toBeDisabled();
+  await sp.typeIntoActiveCell('ab', { commit: false });
+  await expect(page.locator('.fc-host__editor')).toBeVisible();
+  await expect(symbol).toBeEnabled();
+  await page.keyboard.press('Enter');
+  await expect(symbol).toBeDisabled();
+  await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'text', value: 'ab' });
   await sp.expectNoConsoleErrors();
 }

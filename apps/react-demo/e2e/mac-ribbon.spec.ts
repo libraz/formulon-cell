@@ -16,15 +16,18 @@ import {
   runMacHomeMenusScenario,
   runMacInkScenario,
   runMacInsertGalleryScenario,
+  runMacInsertSymbolStateScenario,
   runMacOutlineDetailScenario,
   runMacPageAndCalculationScenario,
   runMacPageToggleAndZoomScenario,
+  runMacPythonVersionSubmenuScenario,
   runMacRibbonSwitchingScenario,
   runMacScaleAndSheetViewScenario,
   runMacSparklineScenario,
   runMacSubtotalScenario,
   runMacValidationMenuScenario,
   runMacViewShowScenario,
+  runRibbonDisplayToggleScenario,
 } from '../../../tests/e2e-shared/scenarios/mac-ribbon.js';
 import { test } from '../../../tests/e2e-shared/test.js';
 
@@ -153,3 +156,21 @@ test('Mac: formula palette previews without writes, retains Done, and reseeds fr
 }) => {
   await runMacFormulaPaletteScenario(page);
 });
+
+for (const locale of ['en', 'ja', 'fr', 'zh'] as const) {
+  test(`Mac: Python Reset menu holds a Version submenu (${locale})`, async ({ page }) => {
+    await runMacPythonVersionSubmenuScenario(page, locale);
+  });
+}
+
+test('Mac: Insert greys Symbol unless a cell is being edited', async ({ page }) => {
+  await runMacInsertSymbolStateScenario(page);
+});
+
+for (const platform of ['default', 'mac'] as const) {
+  test(`ribbon display toggle: Mac drops it and its reserve, default keeps it (${platform} chrome)`, async ({
+    page,
+  }) => {
+    await runRibbonDisplayToggleScenario(page, platform);
+  });
+}

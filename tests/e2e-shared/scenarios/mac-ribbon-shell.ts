@@ -363,3 +363,44 @@ export async function runMacRibbonSwitchingScenario(
     }
   }
 }
+
+/** The Mac ribbon has no display-options toggle: its panel sits 8 px in from each side with no
+ *  right-edge reserve, and the display-mode API still switches modes. The default chrome keeps
+ *  its toggle. */
+export async function runRibbonDisplayToggleScenario(
+  page: Page,
+  platform: 'default' | 'mac',
+): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount({ platform, locale: 'en', fixture: 'empty' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await sp.expectNoStub();
+  await selectRibbonTab(page, 'home');
+  const shell = page.locator('.fc-tb__ribbon-shell').first();
+  const panel = page.locator('[data-ribbon-panel="home"]');
+  await expect(panel).toBeVisible();
+  const toggle = page.locator('.fc-tb__ribbon-display');
+  if (platform === 'mac') {
+    await expect(toggle).toBeHidden();
+    const inset = await panel.evaluate((p) => {
+      const host = p.closest('.fc-tb__ribbon-shell') as HTMLElement;
+      const a = p.getBoundingClientRect();
+      const b = host.getBoundingClientRect();
+      return {
+        left: Math.round(a.left - b.left),
+        right: Math.round(b.right - a.right),
+        padEnd: getComputedStyle(p).paddingInlineEnd,
+      };
+    });
+    expect(inset).toEqual({ left: 8, right: 8, padEnd: '6px' });
+  } else {
+    await expect(toggle.first()).toBeVisible();
+  }
+  await setRibbonDisplayMode(page, 'tabsOnly');
+  await expect(shell).toHaveAttribute('data-ribbon-display-mode', 'tabsOnly');
+  await expect(panel).toBeHidden();
+  await setRibbonDisplayMode(page, 'full');
+  await expect(shell).toHaveAttribute('data-ribbon-display-mode', 'full');
+  await expect(panel).toBeVisible();
+  await sp.expectNoConsoleErrors();
+}
