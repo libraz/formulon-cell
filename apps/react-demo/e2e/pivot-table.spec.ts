@@ -1,6 +1,7 @@
 import { runPivotDateBetweenScenario } from '../../../tests/e2e-shared/scenarios/pivot-date-filter.js';
 import {
   runPivotTableFilterDialogScenario,
+  runPivotTableOptionsScenario,
   runPivotTableProtectedSheetScenario,
   runPivotTableRibbonPrimaryDialogScenario,
 } from '../../../tests/e2e-shared/scenarios/pivot-table.js';
@@ -22,6 +23,12 @@ test('P03 (react-demo): a protected sheet makes Insert PivotTable unavailable un
   page,
 }) => {
   await runPivotTableProtectedSheetScenario(page);
+});
+
+test('PivotTable Options edits report and cache options that survive a reopen and an XLSX round trip (react-demo)', async ({
+  page,
+}) => {
+  await runPivotTableOptionsScenario(page);
 });
 
 for (const platform of ['default', 'mac'] as const) {

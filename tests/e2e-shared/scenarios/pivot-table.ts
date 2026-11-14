@@ -185,3 +185,149 @@ export async function runPivotTableProtectedSheetScenario(page: Page): Promise<v
   expect(await canOpenPivot()).toBe(true);
   expect(consoleErrors.read()).toEqual([]);
 }
+
+/** PivotTable Options edits the report and cache options it shows; a reopen and an XLSX round
+ *  trip both show the edited values. */
+export async function runPivotTableOptionsScenario(page: Page): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  const consoleErrors = sp.collectConsoleErrors();
+  await sp.mount();
+  await sp.expectNoStub();
+
+  const buildReport = () =>
+    page.evaluate(() => {
+      const w = window as unknown as { __fcInst?: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const inst = w.__fcInst;
+      if (!inst) throw new Error('window.__fcInst is required');
+      const sheet = inst.workbook.sheet(0);
+      inst.workbook.batch(() => {
+        sheet.setText(0, 0, 'Channel');
+        sheet.setText(0, 1, 'Sales');
+        sheet.setText(1, 0, 'Online');
+        sheet.setNumber(1, 1, 10);
+        sheet.setText(2, 0, 'Retail');
+        sheet.setNumber(2, 1, 20);
+      });
+      const handle = w.__fcProbes['api/workbook'].workbookHandleOf(inst.workbook);
+      const made = w.__fcProbes['commands/pivot-table'].createPivotTableFromRange(handle, {
+        source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
+        destination: { sheet: 0, row: 0, col: 3 },
+        name: 'ChannelReport',
+        rowField: 'Channel',
+        valueField: 'Sales',
+        aggregation: 0,
+      });
+      if (!made.ok) throw new Error(`pivot creation failed: ${made.reason}`);
+      inst.history.clear();
+    });
+  const readOptions = () =>
+    page.evaluate(() => {
+      const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+      const handle = w.__fcProbes['api/workbook'].workbookHandleOf(w.__fcInst.workbook);
+      const o = handle.pivotOptions(0, 0);
+      const c = handle.pivotCacheOptions(0, 0);
+      if (!o || !c) return null;
+      return {
+        showDrill: o.showDrill,
+        showError: o.showError,
+        errorCaption: o.errorCaption,
+        mergeItem: o.mergeItem,
+        indent: o.indent,
+        pageOverThenDown: o.pageOverThenDown,
+        pageWrap: o.pageWrap,
+        altText: o.altText,
+        refreshOnLoad: c.refreshOnLoad,
+      };
+    });
+  const dialog = page.getByRole('dialog', { name: 'PivotTable Options' });
+  const tab = (id: string) => dialog.locator(`[data-pvopt-tab="${id}"]`);
+  const option = (key: string) => dialog.locator(`[data-pvopt-option="${key}"]`);
+  const openDialog = async () => {
+    const cell = await gridCellCenter(page, 1, 3);
+    await page.mouse.click(cell.x, cell.y, { button: 'right' });
+    await page.locator('.fc-ctxmenu [data-fc-action="pivotOptions"]').click();
+    await expect(dialog).toBeVisible();
+  };
+  const edited = {
+    showDrill: false,
+    showError: true,
+    errorCaption: 'n/a',
+    mergeItem: true,
+    indent: 2,
+    pageOverThenDown: true,
+    pageWrap: 2,
+    altText: 'Sales by channel',
+    refreshOnLoad: true,
+  };
+  const expectEditedControls = async () => {
+    await tab('display').click();
+    await expect(option('showDrill')).not.toBeChecked();
+    await expect(option('showError')).toBeChecked();
+    await expect(
+      dialog.locator('input[type="text"][data-pvopt-option="errorCaption"]'),
+    ).toHaveValue('n/a');
+    await tab('layout').click();
+    await expect(option('mergeItem')).toBeChecked();
+    // The popup shows each stored indent plus one.
+    await expect(option('indent')).toHaveValue('3');
+    await expect(option('pageOverThenDown').locator('input[value="1"]')).toBeChecked();
+    await expect(option('pageWrap')).toHaveValue('2');
+    await tab('data').click();
+    await expect(dialog.locator('[data-pvopt-cache="refreshOnLoad"]')).toBeChecked();
+    await tab('altText').click();
+    await expect(option('altText')).toHaveValue('Sales by channel');
+  };
+
+  await buildReport();
+  const before = await readOptions();
+  if (!before) throw new Error('pivot options unreadable');
+  // Every edited value differs from the new report's, so each one proves its control is bound.
+  for (const [key, value] of Object.entries(edited))
+    expect(before[key as keyof typeof edited], key).not.toEqual(value);
+  await openDialog();
+
+  await tab('display').click();
+  await option('showDrill').uncheck();
+  const caption = dialog.locator('input[type="text"][data-pvopt-option="errorCaption"]');
+  // A caption applies only while its check box is on.
+  await expect(caption).toBeDisabled();
+  await option('showError').check();
+  await expect(caption).toBeEnabled();
+  await caption.fill('n/a');
+  await tab('layout').click();
+  await option('mergeItem').check();
+  await option('indent').selectOption('3');
+  await option('pageOverThenDown').locator('input[value="1"]').check();
+  await option('pageWrap').selectOption('2');
+  await tab('data').click();
+  await dialog.locator('[data-pvopt-cache="refreshOnLoad"]').check();
+  await tab('altText').click();
+  await option('altText').fill('Sales by channel');
+  await dialog.locator('[data-pvopt-ok]').click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(readOptions).toEqual(edited);
+
+  // Cancel keeps every value.
+  await openDialog();
+  await expectEditedControls();
+  await tab('layout').click();
+  await option('mergeItem').uncheck();
+  await dialog.locator('[data-pvopt-cancel]').click();
+  await expect(dialog).toBeHidden();
+  expect(await readOptions()).toEqual(edited);
+
+  await page.evaluate(async () => {
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { Workbook } = w.__fcProbes['api/workbook'];
+    const next = await Workbook.load(w.__fcInst.workbook.save().bytes);
+    if (next.engine !== 'wasm') throw new Error('Reload must use the real WASM engine');
+    w.__fcInst.update({ workbook: next });
+  });
+  await expect.poll(readOptions).toEqual(edited);
+  await openDialog();
+  await expectEditedControls();
+  await dialog.locator('[data-pvopt-cancel]').click();
+  await expect(dialog).toBeHidden();
+
+  expect(consoleErrors.read()).toEqual([]);
+}

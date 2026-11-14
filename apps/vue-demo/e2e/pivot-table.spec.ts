@@ -1,6 +1,7 @@
 import { runPivotDateBetweenScenario } from '../../../tests/e2e-shared/scenarios/pivot-date-filter.js';
 import {
   runPivotTableFilterDialogScenario,
+  runPivotTableOptionsScenario,
   runPivotTableRibbonPrimaryDialogScenario,
 } from '../../../tests/e2e-shared/scenarios/pivot-table.js';
 import { test } from '../../../tests/e2e-shared/test.js';
@@ -15,6 +16,12 @@ test('P02 (vue-demo): PivotTable ribbon primary click opens Create PivotTable di
   page,
 }) => {
   await runPivotTableRibbonPrimaryDialogScenario(page);
+});
+
+test('PivotTable Options edits report and cache options that survive a reopen and an XLSX round trip (vue-demo)', async ({
+  page,
+}) => {
+  await runPivotTableOptionsScenario(page);
 });
 
 for (const platform of ['default', 'mac'] as const) {
