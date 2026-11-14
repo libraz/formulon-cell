@@ -128,6 +128,8 @@ versioning is [SemVer](https://semver.org/).
 - On the Mac, the Format Cells Alignment tab keeps the Degrees label clear of its field in every language.
 - On the Mac, Paste Special keeps each label clear of the column beside it in every language, widening the dialog where the labels need it.
 - In a conditional format's icon set rule, each threshold's operator pop-up stays inside its column instead of covering the Type pop-up.
+- The column filter checklist lists zero with the numbers and (Blanks) last when a blank cell comes above the zero; before, the two swapped places, and two blanks above a zero dropped the zero from the list.
+- On the Mac, a column filter whose criterion from the file the panel cannot show, such as a greater-than comparison with a wildcard, opens as on the desktop: no condition chosen, every item unchecked, and for a custom filter the second condition row with And. The criterion stays in the file and keeps filtering the rows.
 - Remove Duplicates and Create from Selection no longer refuse silently: a range too large to handle, or an action the engine cannot carry out, raises an alert, the title-less one on the Mac and one titled with the command elsewhere. Go To Special and the Find & Select searches (Formulas, Constants and the rest) raise their too-large alert the same way.
 - A sort by a custom list inside a filtered range is remembered with the filter and written to the file's sort state with its list, and a custom-list sort level read from a file comes back into the filter's sort.
 - A filter column whose dropdown button the file hides shows no button, keeps its filter applied and editable, and keeps the hidden button through a save.
