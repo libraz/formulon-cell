@@ -33,6 +33,7 @@ import {
 } from '../interact/autocomplete.js';
 import { attachBorderDraw, type BorderDrawHandle } from '../interact/border-draw.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
+import { attachCommentsPane } from '../interact/comments-pane.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
 import type { InlineEditor } from '../interact/editor.js';
 import { attachErrorMenu, type ErrorMenuHandle } from '../interact/error-menu.js';
@@ -202,6 +203,7 @@ export interface HostFeatureState {
   pivotTableDialog: ReturnType<typeof attachPivotTableDialog> | null;
   hyperlinkDialog: ReturnType<typeof attachHyperlinkDialog> | null;
   commentDialog: ReturnType<typeof attachCommentDialog> | null;
+  commentsPane: ReturnType<typeof attachCommentsPane> | null;
   statusBar: ReturnType<typeof attachStatusBar> | null;
   /** The Mac accessibility checker pane, attached with the status bar it reports to. */
   accessibilityPane: AccessibilityPaneHandle | null;
@@ -308,6 +310,7 @@ export function createHostFeatureState(autocompleteStub: AutocompleteHandle): Ho
     pivotTableDialog: null,
     hyperlinkDialog: null,
     commentDialog: null,
+    commentsPane: null,
     statusBar: null,
     accessibilityPane: null,
     watchPanel: null,
@@ -612,6 +615,15 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           'commentDialog',
           input.wrapHandle(s.commentDialog, () => s.commentDialog?.detach()),
         );
+        if (input.isMacPlatform()) {
+          s.commentsPane = attachCommentsPane({
+            host: input.host,
+            store: input.store,
+            getWb: input.wb,
+            getStrings: input.strings,
+            getLocale: input.i18nLocale,
+          });
+        }
         break;
       case 'statusBar': {
         if (s.statusBar) return;
@@ -653,6 +665,18 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             mutators.refreshActiveSheetCells(input.store, input.wb());
             s.statusBar?.refresh();
             input.renderer.invalidate();
+          },
+          hasStaleValues: () => {
+            const wb = input.wb();
+            const state = input.store.getState();
+            if (!staleValuesMarked(wb, state.ui.formatStaleValues)) return false;
+            for (const [key, cell] of state.data.cells) {
+              if (cell.formula == null) continue;
+              const [sheet, row, col] = key.split(':').map(Number) as [number, number, number];
+              if (sheet === state.data.sheetIndex && wb.isCellStale({ sheet, row, col }))
+                return true;
+            }
+            return false;
           },
           onZoomChange: (zoom) => {
             setSheetZoom(input.store, zoom, input.wb());
@@ -1019,6 +1043,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
       case 'commentDialog':
         s.commentDialog?.detach();
         s.commentDialog = null;
+        s.commentsPane?.detach();
+        s.commentsPane = null;
         input.featureRegistry.delete('commentDialog');
         break;
       case 'statusBar':

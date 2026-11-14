@@ -99,6 +99,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- On the Mac, Show Comments on the Review tab toggles a docked Comments pane and is drawn pressed while the pane is open.
 - The Mac Preferences window has an Error Checking pane: background error checking, Reset Ignored Errors and the per-rule switches for the rules the grid checks, defaulting as on the desktop; the other rules and the indicator colour are shown disabled.
 - On the Mac, the status bar shows a Calculate button while a manually calculated workbook holds stale values; hovering a stale value's error triangle shows a Stale Value tooltip on both profiles.
 - On the Mac, a new cell note opens at the desktop's default size (104 x 76 pt) beside its cell, flips up at the last row and left at the last column, uses 10 pt Yu Gothic UI, scales with the zoom, and commits to its own cell when you click away.

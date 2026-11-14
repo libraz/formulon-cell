@@ -12,6 +12,7 @@ import { macAdvancedFilterFrom, macAdvancedFilterTh } from './advanced-filter.js
 import { macAlertsFrom, macAlertsTh, mergeMacAlerts } from './alerts.js';
 import { macCfRulesDialogFrom, macCfRulesDialogTh } from './cf-rules-dialog.js';
 import { macChromeFrom, macChromeTh } from './chrome.js';
+import { macCommentsPaneTh } from './comments-pane.js';
 import { macErrorMenuTh } from './error-menu.js';
 import { macExternalLinksPaneTh } from './external-links-pane.js';
 import { macFilterPanelTh } from './filter-panel.js';
@@ -310,6 +311,7 @@ export const macTh: MacStrings = {
   externalLinksPane: macExternalLinksPaneTh,
   watchWindow: macWatchWindowTh,
   accessibilityPane: macAccessibilityPaneTh,
+  commentsPane: macCommentsPaneTh,
   cfRulesDialog: {
     ...{
       ...macCfRulesDialogFrom(cellFormatTh.cfRulesDialog, {

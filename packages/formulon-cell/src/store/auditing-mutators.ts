@@ -87,6 +87,13 @@ export const auditingMutators = {
     );
   },
 
+  /** Show or hide the Mac Comments pane. */
+  setCommentsPaneOpen(store: SpreadsheetStore, open: boolean): void {
+    store.setState((s) =>
+      s.ui.commentsPaneOpen === open ? s : { ...s, ui: { ...s.ui, commentsPaneOpen: open } },
+    );
+  },
+
   /** Append a trace arrow to the visible set. Duplicates (same kind +
    *  identical endpoints) are dropped so repeated `tracePrecedents()` calls
    *  on the same active cell don't pile up overlapping arrows. */

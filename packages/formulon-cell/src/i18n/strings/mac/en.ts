@@ -12,6 +12,7 @@ import { macAdvancedFilterEn, macAdvancedFilterFrom } from './advanced-filter.js
 import { macAlertsEn, macAlertsFrom, mergeMacAlerts } from './alerts.js';
 import { macCfRulesDialogEn, macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeEn, macChromeFrom } from './chrome.js';
+import { macCommentsPaneEn } from './comments-pane.js';
 import { macErrorMenuEn } from './error-menu.js';
 import { macExternalLinksPaneEn } from './external-links-pane.js';
 import { macFilterPanelEn } from './filter-panel.js';
@@ -285,6 +286,7 @@ export const macEn: MacStrings = {
   externalLinksPane: macExternalLinksPaneEn,
   watchWindow: macWatchWindowEn,
   accessibilityPane: macAccessibilityPaneEn,
+  commentsPane: macCommentsPaneEn,
   cfRulesDialog: {
     ...macCfRulesDialogFrom(cellFormatEn.cfRulesDialog, {
       orderLabel: 'Change rule order:',

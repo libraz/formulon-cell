@@ -1843,9 +1843,10 @@ describe('Mac Excel ribbon profile', () => {
       }
     });
 
-    it('keeps Show Comments enabled on a sheet without comments and opens an empty list', async () => {
+    it('keeps Show Comments enabled on a sheet without comments and opens the empty Comments pane', async () => {
       const sheet = await mountStubSheet({
         locale: 'en',
+        ui: { platform: 'mac' },
         workbook: await WorkbookHandle.createDefault(),
       });
       const { instance } = sheet;
@@ -1862,10 +1863,13 @@ describe('Mac Excel ribbon profile', () => {
           runtime: { projectFormatToolbar: () => undefined },
         } as unknown as ApplyRibbonCommandDeps;
         expect(dispatchMacRibbonCommand('mac.review.showComments', deps, () => false)).toBe(true);
-        // The list opens with its empty notice and no rows.
-        const list = document.querySelector('.fc-tb__dlg__list');
-        expect(list?.textContent).toBe(instance.i18n.strings.reviewReports.noIssues);
-        expect(list?.querySelectorAll('strong').length).toBe(0);
+        // The pane opens with its empty notice and no rows.
+        const pane = instance.host.querySelector<HTMLElement>('.fc-commentspane');
+        expect(pane?.hidden).toBe(false);
+        expect(pane?.querySelector('.fc-commentspane__empty')?.textContent).toBe(
+          'There are no comments in this file.',
+        );
+        expect(pane?.querySelectorAll('.fc-commentspane__item').length).toBe(0);
       } finally {
         document.body.innerHTML = '';
         sheet.dispose();

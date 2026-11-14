@@ -1,0 +1,61 @@
+@layer fc.app {
+  /* Mac Comments pane: a 300 pt task pane with a tab header and one block per thread. */
+  .fc-commentspane {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    border-left: 1px solid var(--fc-rule);
+    background: var(--fc-bg-rail, var(--fc-bg));
+    color: var(--fc-fg);
+    font-family: var(--fc-font-ui);
+    font-size: 13px;
+  }
+  .fc-commentspane[hidden] {
+    display: none;
+  }
+  .fc-commentspane__header {
+    display: flex;
+    flex: 0 0 36px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px 0 12px;
+    border-bottom: 1px solid var(--fc-rule);
+  }
+  .fc-commentspane__title {
+    font-weight: 600;
+  }
+  .fc-commentspane__close {
+    --fc-tb-icon-paper: var(--fc-bg-rail, var(--fc-bg));
+    position: relative;
+    display: flex;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--fc-fg-mute);
+    cursor: pointer;
+  }
+  .fc-commentspane__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .fc-commentspane__empty {
+    margin: 0;
+    color: var(--fc-fg-mute);
+    text-align: center;
+  }
+  .fc-commentspane__item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--fc-bg);
+  }
+  .fc-commentspane__text {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
+  }
+}

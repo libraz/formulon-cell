@@ -4,6 +4,7 @@ import { macAdvancedFilterJa } from './advanced-filter.js';
 import { macAlertsJa } from './alerts.js';
 import { macCfRulesDialogJa } from './cf-rules-dialog.js';
 import { macChromeJa } from './chrome.js';
+import { macCommentsPaneJa } from './comments-pane.js';
 import { macCreateTableJa } from './create-table.js';
 import { macDataValidationJa } from './data-validation.js';
 import { macErrorMenuJa } from './error-menu.js';
@@ -241,6 +242,7 @@ export const macJa: MacStrings = {
   externalLinksPane: macExternalLinksPaneJa,
   watchWindow: macWatchWindowJa,
   accessibilityPane: macAccessibilityPaneJa,
+  commentsPane: macCommentsPaneJa,
   createTable: macCreateTableJa,
   tableStyleDialog: {
     newTitle: '新しいテーブル スタイル',

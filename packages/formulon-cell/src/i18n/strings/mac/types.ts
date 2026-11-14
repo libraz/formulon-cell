@@ -6,6 +6,7 @@ import type { MacAdvancedFilterStrings } from './advanced-filter.js';
 import type { MacAlertStrings } from './alerts.js';
 import type { MacCfRulesDialogStrings } from './cf-rules-dialog.js';
 import type { MacChromeStrings } from './chrome.js';
+import type { MacCommentsPaneStrings } from './comments-pane.js';
 import type { MacCreateTableStrings } from './create-table.js';
 import type { MacDataValidationStrings } from './data-validation.js';
 import type { MacErrorMenuStrings } from './error-menu.js';
@@ -73,6 +74,7 @@ export interface MacStrings {
   watchWindow: MacWatchWindowStrings;
   /** The Mac accessibility checker task pane. */
   accessibilityPane: MacAccessibilityPaneStrings;
+  commentsPane: MacCommentsPaneStrings;
   /** Overrides of `cfRulesDialog`, plus its Mac-only labels, that apply on the Mac host only. */
   cfRulesDialog: MacCfRulesDialogStrings;
   /** Overrides of `hyperlinkDialog`, plus its Mac-only labels, that apply on the Mac host only. */

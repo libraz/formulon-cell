@@ -57,6 +57,7 @@
 @import "./app/panels/error-menu.css";
 @import "./app/panels/page-setup.css";
 @import "./app/panels/accessibility.css";
+@import "./app/panels/comments-pane.css";
 @import "./app/mac-ink.css";
 
 @layer fc.surface {

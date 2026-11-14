@@ -334,10 +334,9 @@ export const projectMacRibbonState = (
     'mac.view.zoomSelection': false,
     // Lasso Select is a toggle the host cannot turn on.
     'mac.draw.lasso': false,
-    // Show Changes and Always Open Read-Only have no state here, and Show Comments opens a
-    // list rather than holding a view on.
+    // Show Changes and Always Open Read-Only have no state here.
     'mac.review.showChanges': false,
-    'mac.review.showComments': false,
+    'mac.review.showComments': instance.store.getState().ui.commentsPaneOpen,
     'mac.review.alwaysReadOnly': false,
     'mac.review.protectWorkbook': isWorkbookStructureProtected(instance.store.getState()),
   };

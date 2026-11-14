@@ -104,6 +104,7 @@ export const createSpreadsheetStore = () =>
       filterHiddenButtons: [],
       watchPanelOpen: false,
       workbookObjectsOpen: false,
+      commentsPaneOpen: false,
       formulaBarVisible: true,
       sheetBackgroundImages: new Map(),
     },

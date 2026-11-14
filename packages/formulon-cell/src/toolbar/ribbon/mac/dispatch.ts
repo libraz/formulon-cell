@@ -29,12 +29,12 @@ import { createChartVariantFromSelection } from '../../../mount/dynamic-dropdown
 import {
   convertNotesFrom,
   selectAdjacentComment,
-  showCommentsList,
 } from '../../../mount/dynamic-dropdown-defaults/review.js';
 import { showCreateTableDialog } from '../../../mount/dynamic-dropdown-defaults/styles.js';
 import { createDefaultDynamicDropdownsCtx } from '../../../mount/dynamic-dropdowns-defaults.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { applyWorkbookTheme } from '../../../mount/workbook-theme-action.js';
+import { mutators } from '../../../store/store.js';
 import { reportDialogLabels, showReport } from '../../dialogs/report.js';
 import type { ApplyRibbonCommandDeps } from '../apply-ribbon-command.js';
 import { createMacRibbonActions, MAC_RIBBON_ACTION_IDS } from './actions.js';
@@ -551,10 +551,11 @@ export function dispatchMacRibbonCommand(
         }
         return selectAdjacentComment(instance, id === 'mac.review.nextNote' ? 1 : -1, 'note');
       case 'mac.review.showComments':
-        return showCommentsList(
-          instance,
-          MAC_CONTEXT_LABELS.commentsTitle[toolbarLangForLocale(instance.i18n.locale)],
+        mutators.setCommentsPaneOpen(
+          instance.store,
+          !instance.store.getState().ui.commentsPaneOpen,
         );
+        return true;
       case 'mac.review.convertNotes':
         return convertNotesFrom(instance, id);
       case 'mac.review.showHideNote':
