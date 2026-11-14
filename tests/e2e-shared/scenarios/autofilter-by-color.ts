@@ -11,6 +11,7 @@ const sortSide = (dropdown: Locator) => dropdown.locator('[data-fc-color-side="s
 const filterSide = (dropdown: Locator) => dropdown.locator('[data-fc-color-side="filter"]');
 const yellowSwatch = (side: Locator) =>
   side.locator('.fc-filter-dropdown__swatch[data-fc-color*="ffff00"]');
+const swatches = (side: Locator) => side.locator('.fc-filter-dropdown__swatches > *');
 
 /** Seeds Pen, Ink, Pad and Cap under Item with Ink and Cap filled yellow, and turns AutoFilter on. */
 const seedFilledColumn = async (page: Page, sheet: UserJourneyPage) => {
@@ -41,8 +42,9 @@ const reopenedColumnFilter = async (page: Page) => {
   return (await dropdown.isVisible()) ? dropdown : openColumnFilter(page);
 };
 
-/** The Mac column filter's By color: Cell Color offers the column's fills, a swatch keeps only the
- *  rows filled with it, the reopened panel shows that swatch pressed, and no choice clears it. */
+/** The Mac column filter's By color: every kind is offered, Cell Color lists the column's fills
+ *  then No Fill, a swatch keeps only the rows filled with it, the reopened panel shows that swatch
+ *  pressed, no choice clears it, and No Fill keeps only the unfilled rows. */
 export async function runMacAutoFilterByColorScenario(page: Page): Promise<void> {
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ locale: 'en', platform: 'mac' });
@@ -51,10 +53,16 @@ export async function runMacAutoFilterByColorScenario(page: Page): Promise<void>
 
   let dropdown = await openColumnFilter(page);
   const kind = filterSide(dropdown).locator('select.fc-filter-dropdown__color-kind');
-  // The column has fills but no icon set, so Cell Icon is greyed.
-  await expect(kind.locator('option[value="cellColor"]')).not.toHaveAttribute('disabled');
-  await expect(kind.locator('option[value="cellIcon"]')).toHaveAttribute('disabled', '');
+  // Every kind is offered, even Cell Icon on a column with no icon set.
+  for (const value of ['cellColor', 'fontColor', 'cellIcon'])
+    await expect(kind.locator(`option[value="${value}"]`)).not.toHaveAttribute('disabled');
   await kind.selectOption('cellColor');
+  // The used fill, then No Fill because Pen and Pad have none.
+  await expect(swatches(filterSide(dropdown))).toHaveCount(2);
+  await expect(swatches(filterSide(dropdown)).first()).toHaveAttribute('data-fc-color', /ffff00/i);
+  const noFill = swatches(filterSide(dropdown)).last();
+  await expect(noFill).toHaveClass(/fc-filter-dropdown__swatch--none/);
+  await expect(noFill).toHaveText('No Fill');
   await yellowSwatch(filterSide(dropdown)).click();
   // Pen and Pad have no fill and drop out.
   await expect.poll(() => hiddenRows(page)).toEqual([1, 3]);
@@ -63,12 +71,21 @@ export async function runMacAutoFilterByColorScenario(page: Page): Promise<void>
   await expect(yellowSwatch(filterSide(dropdown))).toHaveAttribute('aria-pressed', 'true');
   await filterSide(dropdown).locator('select.fc-filter-dropdown__color-kind').selectOption('');
   await expect.poll(() => hiddenRows(page)).toEqual([]);
+
+  dropdown = await reopenedColumnFilter(page);
+  await filterSide(dropdown)
+    .locator('select.fc-filter-dropdown__color-kind')
+    .selectOption('cellColor');
+  await filterSide(dropdown).locator('.fc-filter-dropdown__swatch--none').click();
+  // Ink and Cap are filled and drop out.
+  await expect.poll(() => hiddenRows(page)).toEqual([2, 4]);
   await page.keyboard.press('Escape');
   await sheet.expectNoConsoleErrors();
 }
 
 /** The Mac panel's sort-side By color: Cell Color and the yellow swatch bring the filled rows to
- *  the top, and the reopened panel shows that swatch pressed. */
+ *  the top, the reopened panel shows that swatch pressed, and Custom Sort..., last in the list,
+ *  opens the Sort dialog. */
 export async function runMacSortByColorScenario(page: Page): Promise<void> {
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ locale: 'en', platform: 'mac' });
@@ -89,6 +106,13 @@ export async function runMacSortByColorScenario(page: Page): Promise<void> {
 
   dropdown = await reopenedColumnFilter(page);
   await expect(yellowSwatch(sortSide(dropdown))).toHaveAttribute('aria-pressed', 'true');
+  const customSort = swatches(sortSide(dropdown)).last();
+  await expect(customSort).toHaveClass(/fc-filter-dropdown__custom-sort/);
+  await customSort.click();
+  await expect(dropdown).toBeHidden();
+  const sortDialog = page.getByRole('dialog').filter({ has: page.locator('.fc-sortdlg__level') });
+  await expect(sortDialog).toBeVisible();
   await page.keyboard.press('Escape');
+  await expect(sortDialog).toBeHidden();
   await sheet.expectNoConsoleErrors();
 }
