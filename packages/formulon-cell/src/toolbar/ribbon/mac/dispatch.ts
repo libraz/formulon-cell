@@ -75,6 +75,7 @@ const aliases: Readonly<Record<string, string>> = {
   'mac.review.spelling': 'spellingReview',
   'mac.review.accessibility': 'accessibility',
   'mac.review.accessibility.check': 'accessibility',
+  'mac.review.accessibility.formatTable': 'formatTableHome',
   'mac.review.protectSheet': 'protectReview',
   'mac.review.protectWorkbook': 'protectWorkbookReview',
   'mac.view.standard': 'viewNormal',
@@ -139,6 +140,10 @@ const formulaAuditActions = {
   'mac.formulas.removeArrows.dependents': 'clear-dependents',
   'mac.formulas.errorCheck.run': 'error-checking',
   'mac.formulas.errorCheck.trace': 'trace-error',
+} as const;
+
+const mergeActions = {
+  'mac.review.accessibility.unmerge': 'unmergeCells',
 } as const;
 
 const validationActions = {
@@ -251,6 +256,7 @@ export const isMacRibbonCommandSupported = (id: string, liveNames?: LiveFunction
     id in autoSumFunctions ||
     id in formulaAuditActions ||
     id in validationActions ||
+    id in mergeActions ||
     operations.some((operation) => operation === id) ||
     (MAC_RIBBON_ACTION_IDS as readonly string[]).includes(id)
   );
@@ -374,6 +380,8 @@ export function dispatchMacRibbonCommand(
     if (auditAction) return ctx.applyFormulaAuditAction(auditAction);
     const validationAction = validationActions[id as keyof typeof validationActions];
     if (validationAction) return ctx.applyDataValidationAction(validationAction);
+    const mergeAction = mergeActions[id as keyof typeof mergeActions];
+    if (mergeAction) return ctx.applyMergeAction(mergeAction);
     if (id.startsWith('mac.function.'))
       return instance.openFunctionArguments(id.slice('mac.function.'.length));
     // Page-setup writes run under the Mac command id that asked for them.

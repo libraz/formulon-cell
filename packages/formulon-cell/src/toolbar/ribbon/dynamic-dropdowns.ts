@@ -112,7 +112,7 @@ export interface DynamicDropdownsCtx {
   applyUnderlineAction: (action: string) => void | Promise<void>;
   applyPhoneticAction: (action: string) => void | Promise<void>;
   applyWrapAction: (action: string) => void | Promise<void>;
-  applyMergeAction: (action: string) => void;
+  applyMergeAction: (action: string) => void | Promise<void>;
   applyFreezeAction: (action: string) => void;
   applyTextOrientationAction: (action: string) => void;
   applyCellInsertAction: (action: string) => void | Promise<void>;

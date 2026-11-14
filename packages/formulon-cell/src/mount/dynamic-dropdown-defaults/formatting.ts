@@ -109,7 +109,7 @@ const buildMergeAction =
     ) {
       return;
     }
-    void applyMergeAction(
+    return applyMergeAction(
       {
         store: instance.store,
         workbook: instance.workbook,

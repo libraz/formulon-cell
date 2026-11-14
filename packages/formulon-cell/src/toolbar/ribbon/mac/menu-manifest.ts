@@ -621,15 +621,21 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.data.goalSeek', label: 'Goal Seek' },
     { id: 'mac.data.dataTable', label: 'Data Table' },
   ]),
-  // Only the checker is built; the other entries are the desktop's and have nothing behind them.
+  // Alt Text and Accessibility Help have nothing behind them.
   'mac.review.accessibility': menu([
     { id: 'mac.review.accessibility.check', label: 'Check Accessibility' },
-    ...menu([
-      { id: 'mac.review.accessibility.altText', label: 'Alt Text' },
-      { id: 'mac.review.accessibility.formatTable', label: 'Format as Table' },
-      { id: 'mac.review.accessibility.unmerge', label: 'Unmerge Cells' },
-      { id: 'mac.review.accessibility.help', label: 'Accessibility Help' },
-    ]).map((item) => ({ ...item, disabled: true, disabledReason: NOT_IMPLEMENTED.en })),
+    ...menu([{ id: 'mac.review.accessibility.altText', label: 'Alt Text' }]).map((item) => ({
+      ...item,
+      disabled: true,
+      disabledReason: NOT_IMPLEMENTED.en,
+    })),
+    { id: 'mac.review.accessibility.formatTable', label: 'Format as Table' },
+    { id: 'mac.review.accessibility.unmerge', label: 'Unmerge Cells' },
+    ...menu([{ id: 'mac.review.accessibility.help', label: 'Accessibility Help' }]).map((item) => ({
+      ...item,
+      disabled: true,
+      disabledReason: NOT_IMPLEMENTED.en,
+    })),
   ]),
   // Ink cannot be hidden or deleted in this host, so every entry is greyed out.
   'mac.review.hideInk': [

@@ -1690,14 +1690,14 @@ describe('Mac Excel ribbon profile', () => {
       }
     });
 
-    it('opens Check Accessibility as a menu of five items, only the check enabled', () => {
+    it('opens Check Accessibility as a menu of five items, Alt Text and Help disabled', () => {
       expect(MAC_RIBBON_MENU_COMMAND_SET.has('mac.review.accessibility')).toBe(true);
       expect(findCommand('review', 'mac.review.accessibility')?.disabled).toBeFalsy();
       expect(items('mac.review.accessibility')).toEqual([
         ['mac.review.accessibility.check', 'Check Accessibility', false],
         ['mac.review.accessibility.altText', 'Alt Text', true],
-        ['mac.review.accessibility.formatTable', 'Format as Table', true],
-        ['mac.review.accessibility.unmerge', 'Unmerge Cells', true],
+        ['mac.review.accessibility.formatTable', 'Format as Table', false],
+        ['mac.review.accessibility.unmerge', 'Unmerge Cells', false],
         ['mac.review.accessibility.help', 'Accessibility Help', true],
       ]);
       for (const item of MAC_RIBBON_MENU_ITEMS['mac.review.accessibility'] ?? []) {
