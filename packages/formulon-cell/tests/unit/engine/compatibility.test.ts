@@ -232,16 +232,16 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(on.byId['font-effects'].status).toBe('writable');
     expect(on.byId['gradient-fills'].status).toBe('writable');
     expect(on.byId['xlsb-save'].status).toBe('writable');
-    expect(on.byId['xlsb-save'].reason).toContain('Notes');
-    for (const deferred of [
-      'page setup',
-      'protected ranges',
-      'sheet views',
-      'sparklines',
-      'tables',
-    ]) {
-      expect(on.byId['xlsb-save'].reason).toContain(deferred);
+    const xlsb = on.byId['xlsb-save'].reason;
+    expect(xlsb).toContain('Notes, threaded comments, filters');
+    expect(xlsb).toContain('pictures, shapes and charts are written');
+    expect(xlsb).not.toContain('not written');
+    expect(xlsb).toContain('save as .xlsx is offered');
+    for (const refused of ['protected ranges', 'sparklines', 'outline levels', 'sheet views']) {
+      expect(xlsb).toContain(refused);
     }
+    expect(xlsb).toContain('PivotTables and slicers read from .xlsx');
+    expect(xlsb).toContain('left out and counted');
     expect(on.byId['font-effects'].reason).toContain('only under the Mac profile');
 
     const off = summarizeSpreadsheetCompatibility(wb({}));
