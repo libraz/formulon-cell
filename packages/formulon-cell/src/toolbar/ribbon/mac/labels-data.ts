@@ -840,6 +840,15 @@ export const MAC_CONTEXT_LABELS = {
     ko: '먼저 표 또는 피벗 테이블을 선택하세요.',
     th: 'เลือกตารางหรือพีวอตเทเบิลก่อน',
   },
+  symbolEditRequired: {
+    ja: 'セルを編集中にのみ使用できます。',
+    en: 'Available only while editing a cell.',
+    de: 'Nur beim Bearbeiten einer Zelle verfügbar.',
+    fr: 'Disponible uniquement pendant la modification d’une cellule.',
+    zh: '仅在编辑单元格时可用。',
+    ko: '셀을 편집하는 동안에만 사용할 수 있습니다.',
+    th: 'ใช้ได้เฉพาะขณะแก้ไขเซลล์',
+  },
   externalLinksRequired: {
     ja: 'このブックには外部リンクがありません。',
     en: 'This workbook has no external links.',

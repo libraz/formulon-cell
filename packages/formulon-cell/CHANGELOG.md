@@ -8,6 +8,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- On the Mac Insert tab, Symbol is available only while a cell is being edited.
 - On the Mac, the ribbon panel keeps the desktop's 8 pt inset on both sides with no display-options strip; the ribbon collapses and expands from the active tab, and the display-mode API works as before.
 - On the Mac, full-height ribbon buttons sit side by side and wrap their labels onto two lines, and a ribbon that does not fit reduces the groups the desktop reduces at a 1440 pt window in English, French, German and Japanese.
 - On the Mac, the Python group's Reset menu lists Stable, Latest and Learn More under a Version submenu, separated as on the desktop.

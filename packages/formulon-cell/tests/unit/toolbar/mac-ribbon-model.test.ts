@@ -877,6 +877,31 @@ describe('Mac Excel ribbon profile', () => {
     i18n.dispose();
   });
 
+  it('keeps Symbol disabled until a cell is being edited', () => {
+    const { instance, i18n } = testInstance();
+    const host = document.createElement('div');
+    const symbol = projectedButton(host, 'mac.insert.symbol');
+    projectMacRibbonState(host, instance);
+    expect(symbol.disabled).toBe(true);
+    instance.store.setState((state) => ({
+      ...state,
+      ui: { ...state.ui, editor: { kind: 'edit', raw: 'a', caret: 1 } },
+    }));
+    projectMacRibbonState(host, instance);
+    expect(symbol.disabled).toBe(false);
+    i18n.dispose();
+  });
+
+  it('leaves Timeline disabled in the Insert tab model', () => {
+    const insert = buildRibbonModel('en', { profile: 'excel365Mac' }).find(
+      (tab) => tab.id === 'insert',
+    );
+    const timeline = insert?.groups
+      .flatMap((group) => group.commands)
+      .find((command) => command.id === 'mac.insert.timeline');
+    expect(timeline?.disabled).toBe(true);
+  });
+
   it('uses Japanese labels while retaining the same action surface', () => {
     const model = buildRibbonModel('ja', { profile: 'excel365Mac' });
     const home = model.find((tab) => tab.id === 'home');

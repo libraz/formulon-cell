@@ -98,6 +98,7 @@ const MAC_CONTENT_STATE_COMMANDS = [
   'mac.data.hideDetail',
   'mac.data.workbookLinks',
   'mac.insert.slicer',
+  'mac.insert.symbol',
   'mac.view.sheetViewKeep',
   'mac.view.sheetViewExit',
 ] as const;
@@ -120,6 +121,11 @@ const contentDisabledReason = (
         : MAC_CONTEXT_LABELS.temporarySheetViewRequired[lang];
     }
     return shown === null ? MAC_CONTEXT_LABELS.sheetViewRequired[lang] : null;
+  }
+  if (id === 'mac.insert.symbol') {
+    return instance.store.getState().ui.editor.kind === 'idle'
+      ? MAC_CONTEXT_LABELS.symbolEditRequired[lang]
+      : null;
   }
   if (id === 'mac.insert.slicer') {
     const state = instance.store.getState();
