@@ -605,3 +605,59 @@ export async function runMacDirectAutomationScenario(page: Page): Promise<void> 
   await page.keyboard.press('Escape');
   await sp.expectNoConsoleErrors();
 }
+
+/** The Calculation group stacks Calculate Now over Calculate Sheet beside Calculation Options, and
+ *  Use in Formula stays greyed out, with no reason, until the book has a listed defined name. */
+export async function runMacCalculationGroupAndNamesScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await sp.expectNoStub();
+  await selectRibbonTab(page, 'formulas');
+  const panel = page.locator('[data-ribbon-panel="formulas"]');
+  const box = async (id: string) => {
+    const bounds = await panel.locator(`[data-ribbon-command="${id}"]`).first().boundingBox();
+    if (!bounds) throw new Error(`${id} has no bounds`);
+    return bounds;
+  };
+  const options = await box('mac.formulas.calcOptions');
+  const now = await box('mac.formulas.recalc');
+  const sheet = await box('mac.formulas.sheetRecalc');
+  expect(now.height).toBeCloseTo(26, 0);
+  expect(sheet.height).toBeCloseTo(26, 0);
+  expect(now.y - options.y).toBeCloseTo(3, 0);
+  expect(sheet.y - now.y).toBeCloseTo(32, 0);
+  expect(sheet.x).toBeCloseTo(now.x, 0);
+  expect(now.x).toBeGreaterThan(options.x + options.width - 1);
+
+  const useInFormula = panel.locator('[data-ribbon-command="mac.formulas.useInFormula"]').first();
+  const paste = page.locator(
+    '[role=menu]:not([hidden]) [data-ribbon-command="mac.formulas.useInFormula.paste"]',
+  );
+  const expectGreyedOut = async (button: typeof useInFormula) => {
+    await expect(button).toHaveAttribute('aria-disabled', 'true');
+    await expect(button).not.toHaveAttribute('data-ribbon-disabled-reason', /./);
+  };
+  await expectGreyedOut(useInFormula);
+  // A table's name is not a defined name.
+  await page.evaluate(() => {
+    const inst = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const sheet0 = inst.workbook.sheet(0);
+    sheet0.setText(0, 0, 'Item');
+    sheet0.setNumber(1, 0, 1);
+    sheet0.addTable({ range: 'A1:A2', name: 'Items' });
+  });
+  await sp.goTo('C1');
+  await expectGreyedOut(useInFormula);
+  await page.evaluate(() => {
+    const inst = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    inst.workbook.setDefinedName({ name: 'Rate', formula: '=2' });
+  });
+  await sp.goTo('C2');
+  await expect(useInFormula).not.toHaveAttribute('aria-disabled', 'true');
+  await useInFormula.click();
+  await expect(paste).toHaveText('Paste Names...');
+  await expect(paste).not.toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Escape');
+  await sp.expectNoConsoleErrors();
+}

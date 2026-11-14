@@ -1,6 +1,7 @@
 import {
   runMacAuditMenusScenario,
   runMacAutoSumMenuScenario,
+  runMacCalculationGroupAndNamesScenario,
   runMacChartKindScenario,
   runMacCollapsedRibbonScenario,
   runMacConsolidateScenario,
@@ -114,6 +115,11 @@ test('Mac: formula audit menus remove specific arrows and ignore actual errors',
   page,
 }) => {
   await runMacAuditMenusScenario(page);
+});
+test('Mac: Calculation group stacks its buttons and Use in Formula needs a defined name', async ({
+  page,
+}) => {
+  await runMacCalculationGroupAndNamesScenario(page);
 });
 test('Mac: Data Validation menu configures, circles, clears and restores rules', async ({
   page,
