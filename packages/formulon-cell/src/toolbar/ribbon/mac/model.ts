@@ -633,15 +633,10 @@ const viewTab = (): RibbonTabModel =>
 
 const automateTab = (): RibbonTabModel =>
   macTab('automate', t('automate'), [
-    group(
-      { ja: 'Office スクリプト', en: 'Office Scripts' },
-      [
-        disabledCompactCommand('mac.automate.newScript', t('newScript'), 'script', OFFICE_REQUIRED),
-        compactCommand('mac.automate.showScripts', t('showScripts'), 'script'),
-        menuCommand('mac.automate.gallery', t('gallery'), 'script'),
-      ],
-      'compact',
-    ),
+    group({ ja: 'Office スクリプト', en: 'Office Scripts' }, [
+      disabledCommand('mac.automate.newScript', t('newScript'), 'script', OFFICE_REQUIRED),
+      menuCommand('mac.automate.showScripts', t('showScripts'), 'script'),
+    ]),
     group(
       { ja: 'Office スクリプト ギャラリー', en: 'Office Scripts Gallery' },
       [

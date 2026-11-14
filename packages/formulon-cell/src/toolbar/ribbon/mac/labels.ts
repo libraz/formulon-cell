@@ -1,5 +1,5 @@
 import type { ToolbarLang } from '../../ribbon-model.js';
-import { MAC_AUTOMATION_GALLERY, MAC_AUTOMATION_GALLERY_TITLE } from './automation-gallery.js';
+import { MAC_AUTOMATION_GALLERY } from './automation-gallery.js';
 import {
   type Label,
   type LabelLike,
@@ -241,7 +241,6 @@ const labelSeeds: Record<string, LegacyLabel> = {
 
 export const labels: Record<string, Label> = Object.fromEntries([
   ...Object.entries(labelSeeds).map(([key, seed]) => [key, localizedLabel(key, seed)]),
-  ['gallery', MAC_AUTOMATION_GALLERY_TITLE],
   ...MAC_AUTOMATION_GALLERY.map((script) => [script.id, script.labels] as const),
 ]);
 
@@ -422,6 +421,17 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
     ja: 'ブック内のすべてのインクを削除',
     en: 'Delete All Ink in Workbook',
   },
+  'mac.automate.newScript.editor': { ja: 'コード エディターで作成', en: 'Create in Code Editor' },
+  'mac.automate.newScript.recording': {
+    ja: 'レコーディングから作成する',
+    en: 'Create from Recording',
+  },
+  'mac.automate.showScripts.recent': { ja: '最近使用したスクリプト', en: 'Recent Scripts' },
+  'mac.automate.showScripts.workbook': {
+    ja: 'このブックのスクリプト',
+    en: 'Scripts from this Workbook',
+  },
+  'mac.automate.showScripts.samples': { ja: 'サンプル', en: 'Samples' },
   'mac.formulas.removeArrows.all': { ja: '矢印の削除', en: 'Remove Arrows' },
   'mac.formulas.removeArrows.precedents': {
     ja: '参照元の矢印の削除',

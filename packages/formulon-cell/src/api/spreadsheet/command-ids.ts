@@ -93,7 +93,6 @@ export const COMMAND_IDS = [
   'mac.automate.allRowsColumns',
   'mac.automate.countEmptyRows',
   'mac.automate.freezeSelection',
-  'mac.automate.gallery',
   'mac.automate.makeSubtable',
   'mac.automate.newPivotTable',
   'mac.automate.newScript',

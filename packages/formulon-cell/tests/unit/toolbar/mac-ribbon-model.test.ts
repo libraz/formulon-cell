@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { COMMAND_IDS } from '../../../src/api/spreadsheet/command-ids.js';
 import {
   FUNCTION_CATEGORY_NAMES,
   supportedFunctionNames,
@@ -641,7 +642,7 @@ describe('Mac Excel ribbon profile', () => {
     const automate = model.find((tab) => tab.id === 'automate');
     expect(
       automate?.groups.find((group) => group.title === 'Office Scripts')?.commands.map((c) => c.id),
-    ).toContain('mac.automate.gallery');
+    ).toEqual(['mac.automate.newScript', 'mac.automate.showScripts']);
     expect(
       automate?.groups.find((group) => group.title === 'Office Scripts Gallery')?.variant,
     ).toBe('gallery');
@@ -1818,6 +1819,103 @@ describe('Mac Excel ribbon profile', () => {
         const list = document.querySelector('.fc-tb__dlg__list');
         expect(list?.textContent).toBe(instance.i18n.strings.reviewReports.noIssues);
         expect(list?.querySelectorAll('strong').length).toBe(0);
+      } finally {
+        document.body.innerHTML = '';
+        sheet.dispose();
+      }
+    });
+  });
+
+  describe('Automate tab layout', () => {
+    const toolsGroup = () =>
+      buildRibbonModel('en', { profile: 'excel365Mac' })
+        .find((tab) => tab.id === 'automate')
+        ?.groups.find((group) => group.title === 'Office Scripts');
+    const items = (root: string) =>
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+
+    it('draws New Script and View Scripts as large menu buttons and no Script Gallery button', () => {
+      const commands = toolsGroup()?.commands ?? [];
+      expect(commands.map((command) => [command.id, command.layout])).toEqual([
+        ['mac.automate.newScript', undefined],
+        ['mac.automate.showScripts', undefined],
+      ]);
+      for (const root of ['mac.automate.newScript', 'mac.automate.showScripts']) {
+        expect(MAC_RIBBON_MENU_COMMAND_SET.has(root), root).toBe(true);
+        expect(ribbonActivationForCommand(root), root).toEqual({
+          kind: 'dropdown',
+          menuId: macRibbonMenuIdForCommand(root),
+        });
+      }
+      expect(MAC_RIBBON_MENU_COMMAND_SET.has('mac.automate.gallery')).toBe(false);
+      expect(MAC_RIBBON_MENU_ITEMS['mac.automate.gallery']).toBeUndefined();
+    });
+
+    it('keeps New Script disabled with its reason and every item of its menu disabled', () => {
+      expect(findCommand('automate', 'mac.automate.newScript')?.disabled).toBe(true);
+      expect(findCommand('automate', 'mac.automate.newScript')?.disabledReason).toBeTruthy();
+      expect(items('mac.automate.newScript')).toEqual([
+        ['mac.automate.newScript.editor', 'Create in Code Editor', true],
+        ['mac.automate.newScript.recording', 'Create from Recording', true],
+      ]);
+      for (const item of MAC_RIBBON_MENU_ITEMS['mac.automate.newScript'] ?? []) {
+        expect(item.disabledReason, item.id).toBeTruthy();
+      }
+    });
+
+    it('opens View Scripts as a menu where only Samples is enabled', () => {
+      expect(findCommand('automate', 'mac.automate.showScripts')?.disabled).toBeFalsy();
+      expect(items('mac.automate.showScripts')).toEqual([
+        ['mac.automate.showScripts.recent', 'Recent Scripts', true],
+        ['mac.automate.showScripts.workbook', 'Scripts from this Workbook', true],
+        ['mac.automate.showScripts.samples', 'Samples', false],
+      ]);
+      for (const item of MAC_RIBBON_MENU_ITEMS['mac.automate.showScripts'] ?? []) {
+        expect(!!item.disabledReason, item.id).toBe(!!item.disabled);
+      }
+    });
+
+    it('labels the menu items in all seven locales', () => {
+      for (const locale of ['en', 'ja', 'de', 'fr', 'ko', 'th', 'zh'] as const) {
+        for (const root of ['mac.automate.newScript', 'mac.automate.showScripts']) {
+          for (const item of MAC_RIBBON_MENU_ITEMS[root] ?? []) {
+            expect(macRibbonLabelForCommand(item.id, locale), `${locale} ${item.id}`).not.toBe(
+              item.id,
+            );
+          }
+        }
+      }
+      expect(macRibbonLabelForCommand('mac.automate.showScripts.samples', 'ja')).toBe('サンプル');
+      expect(macRibbonLabelForCommand('mac.automate.newScript.editor', 'de')).toBe(
+        'Im Code-Editor erstellen',
+      );
+    });
+
+    it('carries no Script Gallery id anywhere in the Mac model', () => {
+      for (const profile of ['default', 'excel365Mac'] as const) {
+        const ids = buildRibbonModel('en', { profile }).flatMap((tab) =>
+          tab.groups.flatMap((group) => group.commands.map((command) => command.id)),
+        );
+        expect(ids).not.toContain('mac.automate.gallery');
+      }
+      expect(MAC_RIBBON_COMMAND_IDS).not.toContain('mac.automate.gallery');
+      expect(COMMAND_IDS as readonly string[]).not.toContain('mac.automate.gallery');
+    });
+
+    it('opens the script gallery dialog from View Scripts > Samples', async () => {
+      const sheet = await mountStubSheet({ locale: 'en' });
+      try {
+        const deps = {
+          inst: sheet.instance,
+          runtime: { projectFormatToolbar: () => undefined },
+        } as unknown as ApplyRibbonCommandDeps;
+        expect(isMacRibbonCommandSupported('mac.automate.showScripts.samples')).toBe(true);
+        expect(document.querySelector('.fc-macautomationdlg')).toBeNull();
+        expect(
+          dispatchMacRibbonCommand('mac.automate.showScripts.samples', deps, () => false),
+        ).toBe(true);
+        expect(document.querySelector('.fc-macautomationdlg')).not.toBeNull();
+        expect(document.querySelectorAll('[data-mac-automation-script]').length).toBe(7);
       } finally {
         document.body.innerHTML = '';
         sheet.dispose();

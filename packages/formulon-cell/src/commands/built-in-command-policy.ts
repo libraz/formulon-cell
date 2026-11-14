@@ -357,7 +357,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   inspect: null,
   linksData: null,
   'mac.automate.freezeSelection': null,
-  'mac.automate.gallery': null,
+  'mac.automate.showScripts.samples': null,
   'mac.data.dataTypes': null,
   'mac.data.pictureFromData': null,
   'mac.data.validation': null,

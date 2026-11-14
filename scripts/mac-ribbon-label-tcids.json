@@ -3584,11 +3584,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:gallery": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "labels:headerFooter": {
       "status": "drawn-disagrees",
       "tcid": 762,

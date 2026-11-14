@@ -2,7 +2,6 @@ import {
   type CatalogFunctionCategory,
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
-import { MAC_AUTOMATION_GALLERY } from './automation-gallery.js';
 import {
   EMBEDDED_UNSUPPORTED,
   type Label,
@@ -89,7 +88,8 @@ export const MAC_RIBBON_MENU_COMMANDS = [
   'mac.review.notes',
   'mac.view.cellFocus',
   'mac.view.freeze',
-  'mac.automate.gallery',
+  'mac.automate.newScript',
+  'mac.automate.showScripts',
 ] as const;
 
 export const MAC_RIBBON_MENU_COMMAND_SET: ReadonlySet<string> = new Set(MAC_RIBBON_MENU_COMMANDS);
@@ -623,9 +623,25 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.view.freeze.firstRow', label: 'Freeze Top Row' },
     { id: 'mac.view.freeze.firstColumn', label: 'Freeze First Column' },
   ]),
-  'mac.automate.gallery': menu(
-    MAC_AUTOMATION_GALLERY.map((script) => ({ id: script.commandId, label: script.label })),
+  // Office Scripts is a cloud feature the host does not provide, so New Script's menu stays greyed out.
+  'mac.automate.newScript': unavailable(
+    [
+      { id: 'mac.automate.newScript.editor', label: 'Create in Code Editor' },
+      { id: 'mac.automate.newScript.recording', label: 'Create from Recording' },
+    ],
+    OFFICE_REQUIRED,
   ),
+  // Samples opens the script gallery; the other two lists have no script storage behind them.
+  'mac.automate.showScripts': [
+    ...unavailable(
+      [
+        { id: 'mac.automate.showScripts.recent', label: 'Recent Scripts' },
+        { id: 'mac.automate.showScripts.workbook', label: 'Scripts from this Workbook' },
+      ],
+      NOT_IMPLEMENTED,
+    ),
+    ...menu([{ id: 'mac.automate.showScripts.samples', label: 'Samples' }]),
+  ],
 };
 
 /** DOM id of the Mac Formulas "More Functions" menu. */
@@ -692,7 +708,8 @@ export const macRibbonMenuIdForCommand = (commandId: string): string | null => {
     'mac.review.notes': 'menu-mac-review-notes',
     'mac.view.cellFocus': 'menu-mac-view-cell-focus',
     'mac.view.freeze': 'menu-mac-view-freeze',
-    'mac.automate.gallery': 'menu-mac-automate-gallery',
+    'mac.automate.newScript': 'menu-mac-automate-new-script',
+    'mac.automate.showScripts': 'menu-mac-automate-view-scripts',
   };
   return ids[commandId] ?? null;
 };
