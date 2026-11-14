@@ -637,11 +637,12 @@ export const ribbonActivationForCommand = (commandId: string): RibbonActivationS
   if (RIBBON_DIALOG_COMMANDS.has(commandId)) return { kind: 'dialog' };
   if (RIBBON_TOGGLE_COMMANDS.has(commandId)) return { kind: 'toggle' };
   if (RIBBON_PRIMARY_ACTION_COMMANDS.has(commandId)) return { kind: 'primaryAction' };
-  if (MAC_RIBBON_DISABLED_COMMAND_IDS.has(commandId)) return { kind: 'disabled' };
+  // A menu root keeps its chevron while disabled; the model's disabled flag greys it out.
   if (MAC_RIBBON_MENU_COMMAND_SET.has(commandId)) {
     const macMenuId = macRibbonMenuIdForCommand(commandId);
     return macMenuId ? { kind: 'dropdown', menuId: macMenuId } : { kind: 'primaryAction' };
   }
+  if (MAC_RIBBON_DISABLED_COMMAND_IDS.has(commandId)) return { kind: 'disabled' };
   if (MAC_RIBBON_COMMAND_IDS.includes(commandId)) return { kind: 'primaryAction' };
   return { kind: 'disabled' };
 };

@@ -138,7 +138,6 @@ const formulaAuditActions = {
   'mac.formulas.removeArrows.dependents': 'clear-dependents',
   'mac.formulas.errorCheck.run': 'error-checking',
   'mac.formulas.errorCheck.trace': 'trace-error',
-  'mac.formulas.errorCheck.ignore': 'ignore-error',
 } as const;
 
 const validationActions = {
@@ -157,7 +156,9 @@ const operations = [
   'mac.insert.symbol',
   'mac.formulas.autoSum',
   'mac.formulas.defineName',
+  'mac.formulas.defineName.define',
   'mac.formulas.useInFormula',
+  'mac.formulas.useInFormula.paste',
   'mac.formulas.createFromSelection',
   'mac.formulas.errorCheck',
   'mac.formulas.removeArrows',
@@ -437,11 +438,13 @@ export function dispatchMacRibbonCommand(
       case 'mac.formulas.autoSum':
         return ctx.applyAutoSumFormula('SUM');
       case 'mac.formulas.defineName':
+      case 'mac.formulas.defineName.define':
         return openDefineNameDialogFrom(instance.store, {
           origin: 'ribbon',
           commandId: 'mac.formulas.defineName',
         });
       case 'mac.formulas.useInFormula':
+      case 'mac.formulas.useInFormula.paste':
         return ctx.applyDefinedNameAction('use-formula');
       case 'mac.formulas.createFromSelection':
         return ctx.applyDefinedNameAction('create-from-selection');

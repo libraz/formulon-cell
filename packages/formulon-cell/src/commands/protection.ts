@@ -148,6 +148,7 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   // Define Name and Create from Selection; the Name Manager stays available.
   'defineName',
   'mac.formulas.defineName',
+  'mac.formulas.defineName.define',
   'mac.formulas.createFromSelection',
   // The Data Validation dialog.
   'dataValidation',

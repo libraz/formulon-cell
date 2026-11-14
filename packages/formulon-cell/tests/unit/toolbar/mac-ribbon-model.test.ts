@@ -559,14 +559,11 @@ describe('Mac Excel ribbon profile', () => {
         expect(command.disabledReason).toBeTruthy();
       }
       if (MAC_RIBBON_MENU_COMMAND_SET.has(command.id)) {
-        if (command.disabled) {
-          expect(ribbonActivationForCommand(command.id)).toEqual({ kind: 'disabled' });
-        } else {
-          expect(ribbonActivationForCommand(command.id)).toEqual({
-            kind: 'dropdown',
-            menuId: macRibbonMenuIdForCommand(command.id),
-          });
-        }
+        // A disabled menu root still draws its chevron; the disabled flag greys it out.
+        expect(ribbonActivationForCommand(command.id)).toEqual({
+          kind: 'dropdown',
+          menuId: macRibbonMenuIdForCommand(command.id),
+        });
         if (command.id !== 'mac.formulas.more') {
           expect(MAC_RIBBON_MENU_ITEMS[command.id]?.length).toBeGreaterThan(0);
         }
@@ -765,7 +762,6 @@ describe('Mac Excel ribbon profile', () => {
       'mac.formulas.removeArrows.precedents',
       'mac.formulas.removeArrows.dependents',
       'mac.formulas.errorCheck.trace',
-      'mac.formulas.errorCheck.ignore',
       'mac.data.validation.circleInvalid',
       'mac.data.validation.clearCircles',
       'mac.data.validation.clearRules',
@@ -1007,6 +1003,140 @@ describe('Mac Excel ribbon profile', () => {
       .filter((command) => !isMacRibbonCommandSupported(command.id))
       .map((command) => command.id);
     expect(unsupported).toEqual([]);
+  });
+
+  describe('Formulas tab layout', () => {
+    const formulasGroups = () =>
+      buildRibbonModel('en', { profile: 'excel365Mac' }).find((tab) => tab.id === 'formulas')
+        ?.groups ?? [];
+    const layoutOf = (groupTitle: string) =>
+      formulasGroups()
+        .find((group) => group.title === groupTitle)
+        ?.commands.map((command) => [command.id, command.layout === 'stacked' ? 'small' : 'large']);
+
+    it('draws each group as large tiles beside stacked rows in the drawn order', () => {
+      expect(formulasGroups().map((group) => group.title)).toEqual([
+        'Function Library',
+        'Python (Preview)',
+        'Defined Names',
+        'Formula Auditing',
+        'Calculation',
+      ]);
+      expect(layoutOf('Python (Preview)')).toEqual([
+        ['mac.formulas.python', 'large'],
+        ['mac.formulas.reset', 'small'],
+        ['mac.formulas.editor', 'small'],
+        ['mac.formulas.initialize', 'small'],
+      ]);
+      expect(layoutOf('Defined Names')).toEqual([
+        ['mac.formulas.namesManager', 'large'],
+        ['mac.formulas.defineName', 'small'],
+        ['mac.formulas.useInFormula', 'small'],
+        ['mac.formulas.createFromSelection', 'small'],
+      ]);
+      expect(layoutOf('Formula Auditing')).toEqual([
+        ['mac.formulas.precedents', 'small'],
+        ['mac.formulas.dependents', 'small'],
+        ['mac.formulas.removeArrows', 'small'],
+        ['mac.formulas.showFormulas', 'large'],
+        ['mac.formulas.errorCheck', 'large'],
+        ['mac.formulas.watch', 'large'],
+      ]);
+      expect(layoutOf('Calculation')).toEqual([
+        ['mac.formulas.calcOptions', 'large'],
+        ['mac.formulas.recalc', 'small'],
+        ['mac.formulas.sheetRecalc', 'small'],
+      ]);
+    });
+
+    it('renders the Python, names, auditing and calculation groups with the mixed layout', async () => {
+      const sheet = await mountStubSheet({ locale: 'en' });
+      const toolbarHost = document.createElement('div');
+      document.body.append(toolbarHost);
+      const toolbar = Spreadsheet.mountToolbar(toolbarHost, sheet.instance, {
+        platform: 'mac',
+        activeTab: 'formulas',
+        helpers: mountedRibbonHelpers(),
+      });
+      try {
+        const mixed = Array.from(
+          toolbarHost.querySelectorAll<HTMLElement>(
+            '[data-ribbon-panel="formulas"] .fc-tb__ribbon-group--mixed',
+          ),
+        ).map((group) => group.getAttribute('aria-label'));
+        expect(mixed).toEqual([
+          'Python (Preview)',
+          'Defined Names',
+          'Formula Auditing',
+          'Calculation',
+        ]);
+        const reset = toolbarHost.querySelector<HTMLButtonElement>(
+          '[data-ribbon-command="mac.formulas.reset"]',
+        );
+        expect(reset?.disabled || reset?.getAttribute('aria-disabled') === 'true').toBe(true);
+        expect(reset?.querySelector('.fc-tb__rb-split-chevron')).not.toBeNull();
+      } finally {
+        toolbar.dispose();
+        toolbarHost.remove();
+        sheet.dispose();
+      }
+    });
+
+    it('declares Reset, Define Name and Use in Formula as menu buttons with the drawn items', () => {
+      const items = (root: string) =>
+        MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+      expect(items('mac.formulas.reset')).toEqual([
+        ['mac.formulas.reset.clear', 'Reset', true],
+        ['mac.formulas.reset.runtime', 'Reset Runtime', true],
+        ['mac.formulas.reset.versionStable', 'Stable', true],
+        ['mac.formulas.reset.versionLatest', 'Latest', true],
+        ['mac.formulas.reset.versionLearnMore', 'Learn More', true],
+      ]);
+      expect(items('mac.formulas.defineName')).toEqual([
+        ['mac.formulas.defineName.define', 'Define Name...', false],
+        ['mac.formulas.defineName.apply', 'Apply...', true],
+      ]);
+      expect(items('mac.formulas.useInFormula')).toEqual([
+        ['mac.formulas.useInFormula.paste', 'Paste...', false],
+      ]);
+      for (const root of [
+        'mac.formulas.reset',
+        'mac.formulas.defineName',
+        'mac.formulas.useInFormula',
+      ]) {
+        expect(MAC_RIBBON_MENU_COMMAND_SET.has(root)).toBe(true);
+        expect(ribbonActivationForCommand(root).kind).toBe('dropdown');
+      }
+      expect(isMacRibbonCommandSupported('mac.formulas.defineName.define')).toBe(true);
+      expect(isMacRibbonCommandSupported('mac.formulas.useInFormula.paste')).toBe(true);
+      expect(MAC_RIBBON_DISABLED_COMMAND_IDS.has('mac.formulas.defineName.apply')).toBe(true);
+    });
+
+    it('localizes the new menu items in every locale', () => {
+      for (const locale of ['en', 'ja', 'de', 'fr', 'ko', 'th', 'zh'] as const) {
+        for (const id of [
+          'mac.formulas.reset.clear',
+          'mac.formulas.reset.runtime',
+          'mac.formulas.reset.versionStable',
+          'mac.formulas.reset.versionLatest',
+          'mac.formulas.reset.versionLearnMore',
+          'mac.formulas.defineName.define',
+          'mac.formulas.defineName.apply',
+          'mac.formulas.useInFormula.paste',
+        ]) {
+          expect(macRibbonLabelForCommand(id, locale)).not.toBe(id);
+        }
+      }
+      expect(macRibbonLabelForCommand('mac.formulas.defineName.apply', 'ja')).toBe('引用...');
+    });
+
+    it('leaves Ignore Error out of the Error Checking menu', () => {
+      expect(MAC_RIBBON_MENU_ITEMS['mac.formulas.errorCheck']?.map((item) => item.id)).toEqual([
+        'mac.formulas.errorCheck.run',
+        'mac.formulas.errorCheck.trace',
+      ]);
+      expect(isMacRibbonCommandSupported('mac.formulas.errorCheck.ignore')).toBe(false);
+    });
   });
 
   it('names the Draw tab controls as Excel for Mac does', () => {

@@ -73,7 +73,6 @@ const MAC_POLICY_PROJECTED_COMMANDS = [
   'mac.formulas.removeArrows.dependents',
   'mac.formulas.errorCheck.run',
   'mac.formulas.errorCheck.trace',
-  'mac.formulas.errorCheck.ignore',
   'mac.data.dataTable',
   'mac.view.split',
   'mac.data.validation.settings',
@@ -268,7 +267,7 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
     }
   }
 
-  if (id === 'mac.formulas.errorCheck.trace' || id === 'mac.formulas.errorCheck.ignore') {
+  if (id === 'mac.formulas.errorCheck.trace') {
     const active = state.selection.active;
     const cell = state.data.cells.get(addrKey(active));
     if (!cell?.formula || !cellValueIsFormulaError(cell.value)) {

@@ -3903,11 +3903,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "menu:mac.formulas.errorCheck.ignore": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "menu:mac.formulas.removeArrows.all": {
       "status": "drawn-disagrees",
       "tcid": 11946,

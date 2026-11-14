@@ -3,7 +3,7 @@ import {
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
 import { MAC_AUTOMATION_GALLERY } from './automation-gallery.js';
-import { type Label, labelFor, labels, NOT_IMPLEMENTED } from './labels.js';
+import { type Label, labelFor, labels, NOT_IMPLEMENTED, OFFICE_REQUIRED } from './labels.js';
 import { MAC_SHAPE_GALLERY } from './shape-gallery.js';
 
 /** A leaf rendered in one of the Mac Office-style command menus. */
@@ -57,6 +57,9 @@ export const MAC_RIBBON_MENU_COMMANDS = [
   'mac.formulas.lookup',
   'mac.formulas.math',
   'mac.formulas.more',
+  'mac.formulas.reset',
+  'mac.formulas.defineName',
+  'mac.formulas.useInFormula',
   'mac.formulas.calcOptions',
   'mac.formulas.removeArrows',
   'mac.formulas.errorCheck',
@@ -370,6 +373,24 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   'mac.formulas.lookup': functionMenu('lookup'),
   'mac.formulas.math': functionMenu('math'),
   'mac.formulas.more': menu([]),
+  // Python is a cloud feature the host does not provide, so its menu stays greyed out.
+  'mac.formulas.reset': menu([
+    { id: 'mac.formulas.reset.clear', label: 'Reset' },
+    { id: 'mac.formulas.reset.runtime', label: 'Reset Runtime' },
+    { id: 'mac.formulas.reset.versionStable', label: 'Stable' },
+    { id: 'mac.formulas.reset.versionLatest', label: 'Latest' },
+    { id: 'mac.formulas.reset.versionLearnMore', label: 'Learn More' },
+  ]).map((item) => ({ ...item, disabled: true, disabledReason: OFFICE_REQUIRED.en })),
+  'mac.formulas.defineName': menu([
+    { id: 'mac.formulas.defineName.define', label: 'Define Name...' },
+    {
+      id: 'mac.formulas.defineName.apply',
+      label: 'Apply...',
+      disabled: true,
+      disabledReason: NOT_IMPLEMENTED.en,
+    },
+  ]),
+  'mac.formulas.useInFormula': menu([{ id: 'mac.formulas.useInFormula.paste', label: 'Paste...' }]),
   'mac.formulas.calcOptions': menu([
     { id: 'mac.formulas.calc.auto', label: 'Automatic', labelJa: '自動' },
     {
@@ -411,7 +432,6 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   'mac.formulas.errorCheck': menu([
     { id: 'mac.formulas.errorCheck.run', label: 'Error Checking...' },
     { id: 'mac.formulas.errorCheck.trace', label: 'Trace Error' },
-    { id: 'mac.formulas.errorCheck.ignore', label: 'Ignore Error' },
   ]),
   'mac.data.validation': menu([
     { id: 'mac.data.validation.settings', label: 'Data Validation...' },
@@ -492,6 +512,9 @@ export const macRibbonMenuIdForCommand = (commandId: string): string | null => {
     'mac.formulas.lookup': 'menu-mac-formulas-lookup',
     'mac.formulas.math': 'menu-mac-formulas-math',
     'mac.formulas.more': MAC_FORMULAS_MORE_MENU_ID,
+    'mac.formulas.reset': 'menu-mac-formulas-reset',
+    'mac.formulas.defineName': 'menu-mac-formulas-define-name',
+    'mac.formulas.useInFormula': 'menu-mac-formulas-use-in-formula',
     'mac.formulas.calcOptions': 'menu-mac-formulas-calc-options',
     'mac.formulas.removeArrows': 'menu-mac-formulas-remove-arrows',
     'mac.formulas.errorCheck': 'menu-mac-formulas-error-check',
