@@ -41,7 +41,8 @@ export async function runMacNotesMenuScenario(page: Page): Promise<void> {
   const dialog = page.locator('.fc-cmtnote').first();
   await expect(dialog).toBeVisible();
   await dialog.locator('textarea').fill('Check the total');
-  await dialog.locator('.fc-cmtnote__btn--primary').click();
+  // A new Mac note is a bare text box; Cmd+Enter keeps it.
+  await page.keyboard.press('Meta+Enter');
   await expect(dialog).toBeHidden();
 
   row = await openNoteRow(sheet, page, 'B2');
