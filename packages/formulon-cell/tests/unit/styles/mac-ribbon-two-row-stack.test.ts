@@ -78,3 +78,22 @@ describe('Mac Insert Charts group', () => {
     );
   });
 });
+
+describe('ribbon narrow fit stage', () => {
+  const groups = readFileSync(join(root, 'src/styles/toolbar/ribbon/groups.css'), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    '',
+  );
+
+  it('leaves icon-only cells at their drawn width', () => {
+    const narrow = [...groups.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
+      ([, selectors = '', body = '']) =>
+        selectors.includes('.fc-tb__ribbon-group--narrow.fc-tb__ribbon-group--narrow') &&
+        /min-width:\s*48px/.test(body),
+    );
+    expect(narrow.length).toBeGreaterThan(0);
+    for (const [, selectors = ''] of narrow) {
+      expect(selectors).toContain(':not(.fc-tb__rb--mac-icon-only)');
+    }
+  });
+});

@@ -235,11 +235,12 @@
   /* Width-fitting stages set by fit-ribbon when the panel is too narrow. The
      doubled class outranks the platform tile rules. Narrow: tiles wrap their
      labels onto two lines (fit-ribbon sets each label's narrowest two-line
-     width), never narrower than their longest word. */
+     width), never narrower than their longest word. Icon-only cells keep
+     their drawn width. */
   .fc-tb__ribbon
     .fc-tb__ribbon-group--narrow.fc-tb__ribbon-group--narrow
     .fc-tb__ribbon-tools
-    > .fc-tb__rb:not(.fc-tb__rb--stacked) {
+    > .fc-tb__rb:not(.fc-tb__rb--stacked):not(.fc-tb__rb--mac-icon-only) {
     min-width: 48px;
     max-width: none;
     padding-inline: 3px;
