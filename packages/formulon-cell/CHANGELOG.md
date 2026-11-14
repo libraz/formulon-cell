@@ -128,6 +128,7 @@ versioning is [SemVer](https://semver.org/).
 - On the Mac, the Format Cells Alignment tab keeps the Degrees label clear of its field in every language.
 - On the Mac, Paste Special keeps each label clear of the column beside it in every language, widening the dialog where the labels need it.
 - In a conditional format's icon set rule, each threshold's operator pop-up stays inside its column instead of covering the Type pop-up.
+- The PivotTable filter panel closes when a condition opens its Label, Value, Date or Top 10 filter dialog, which it used to cover.
 - The filter panel of a PivotTable report filter field shows only the search field, the item checklist and Clear Filter, as on the desktop; the sort and label or value filter rows belong to row and column fields.
 - The column filter checklist lists zero with the numbers and (Blanks) last when a blank cell comes above the zero; before, the two swapped places, and two blanks above a zero dropped the zero from the list.
 - On the Mac, a column filter whose criterion from the file the panel cannot show, such as a greater-than comparison with a wildcard, opens as on the desktop: no condition chosen, every item unchecked, and for a custom filter the second condition row with And. The criterion stays in the file and keeps filtering the rows.
