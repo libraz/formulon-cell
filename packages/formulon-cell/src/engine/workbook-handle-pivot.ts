@@ -930,6 +930,22 @@ export abstract class WorkbookHandlePivotMethods {
     });
   }
 
+  /** Whether the report fits its column widths when it updates; true when unreadable. */
+  pivotAutofitColumns(sheet: number, pivotIdx: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return true;
+    return attempt(true, () => pivotOf(this, sheet, pivotIdx).getOptions().autoFormatting);
+  }
+
+  setPivotAutofitColumns(sheet: number, pivotIdx: number, enabled: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotTableMutate) return false;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).updateOptions({ autoFormatting: enabled });
+      return true;
+    });
+  }
+
   getPivotReportLayout(sheet: number, pivotIdx: number): PivotReportLayout | null {
     assertAlive(this);
     if (!this.capabilities.pivotReportLayout) return null;

@@ -19,7 +19,7 @@
 
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
-import { autofitPivotTableColumns, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
+import { finishPivotReportUpdate, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import {
   clearSessionIllustration,
   duplicateSessionIllustration,
@@ -302,9 +302,8 @@ export const pivotTableDialog = (): Extension =>
         strings: ctx.i18n.strings,
         history: ctx.history,
         onAfterCreate: () => {
-          refreshCells(ctx);
           const wb = ctx.workbook;
-          if (wb) autofitPivotTableColumns(ctx.store, wb, { theme: resolveTheme(ctx.host) });
+          if (wb) finishPivotReportUpdate(ctx.store, wb, { theme: resolveTheme(ctx.host) });
         },
         invalidate: () => ctx.invalidate(),
       });

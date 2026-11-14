@@ -17,19 +17,35 @@ export interface PivotOptionsDialogOptions {
   strings: Strings;
   /** The report's current name. */
   name: string;
+  /** Whether the report's columns autofit when it updates. */
+  autofitColumns: boolean;
 }
 
 export interface PivotOptionsResult {
   name: string;
+  autofitColumns: boolean;
+}
+
+/** The report settings the dialog edits. */
+export interface PivotOptionsValues {
+  name: string;
+  autofitColumns: boolean;
 }
 
 type TabId = 'display' | 'layout' | 'data' | 'altText';
 
 /** One control row of a tab: a check box, a radio group, a popup or a text field.
- *  Every option but the name has no engine setter, so each renders with the
- *  desktop default and stays disabled. */
+ *  Only the name and the autofit check box have an engine setter; every other
+ *  option renders with the desktop default and stays disabled. */
 type OptionRow =
-  | { kind: 'check'; label: string; checked: boolean; indent?: boolean; field?: boolean }
+  | {
+      kind: 'check';
+      label: string;
+      checked: boolean;
+      indent?: boolean;
+      field?: boolean;
+      autofit?: boolean;
+    }
   | { kind: 'radios'; label?: string; options: readonly string[]; selected: number }
   | { kind: 'popup'; label: string; value: string }
   | { kind: 'rule' };
@@ -70,7 +86,8 @@ function renderGroups(
         const box = document.createElement('input');
         box.type = 'checkbox';
         box.checked = row.checked;
-        disable(box, reason);
+        if (row.autofit) box.dataset.pvoptAutofit = '';
+        else disable(box, reason);
         line.append(box, document.createTextNode(row.label));
         if (row.field) {
           const text = document.createElement('input');
@@ -126,7 +143,7 @@ function renderGroups(
   }
 }
 
-/** The PivotTable Options dialog. Only the name applies; resolves null on cancel. */
+/** The PivotTable Options dialog. Only the name and the autofit option apply; resolves null on cancel. */
 export const showPivotOptionsDialog = (
   opts: PivotOptionsDialogOptions,
 ): Promise<PivotOptionsResult | null> =>
@@ -254,7 +271,12 @@ export const showPivotOptionsDialog = (
             label: l.group,
             rows: [
               { kind: 'check', label: l.multipleFilters, checked: false },
-              { kind: 'check', label: l.autofitColumns, checked: true },
+              {
+                kind: 'check',
+                label: l.autofitColumns,
+                checked: opts.autofitColumns,
+                autofit: true,
+              },
               { kind: 'check', label: l.preserveFormatting, checked: true },
               { kind: 'check', label: l.mergeLabels, checked: false },
               { kind: 'popup', label: l.compactIndent, value: '1' },
@@ -360,7 +382,10 @@ export const showPivotOptionsDialog = (
     cancel.dataset.pvoptCancel = '';
     ok.dataset.pvoptOk = '';
     shell.on(cancel, 'click', () => finish(null));
-    shell.on(ok, 'click', () => finish({ name: name.value }));
+    const autofit = layout?.querySelector<HTMLInputElement>('[data-pvopt-autofit]');
+    shell.on(ok, 'click', () =>
+      finish({ name: name.value, autofitColumns: autofit?.checked ?? opts.autofitColumns }),
+    );
     shell.on(name, 'keydown', (event) => {
       if ((event as KeyboardEvent).key !== 'Enter') return;
       event.preventDefault();
@@ -371,42 +396,51 @@ export const showPivotOptionsDialog = (
     deferInitialFocus(shell.overlay, () => focusAndSelectInput(name));
   });
 
-/** Renames the report as one undo step; an empty or unchanged name does nothing. */
+/** Applies the name and autofit option as one undo step; an empty or unchanged name and
+ *  an unchanged option do nothing. */
 export function applyPivotOptions(
   ctx: PivotCommitContext,
   sheetIndex: number,
   pivotIndex: number,
-  previous: string,
+  previous: PivotOptionsValues,
   result: PivotOptionsResult,
 ): boolean {
-  const next = result.name.trim();
-  if (!next || next === previous) return true;
+  const next: PivotOptionsValues = {
+    name: result.name.trim() || previous.name,
+    autofitColumns: result.autofitColumns,
+  };
+  if (next.name === previous.name && next.autofitColumns === previous.autofitColumns) return true;
   return pivotWrite(
     ctx,
     ctx.history,
     pivotReportEffects(ctx.wb, sheetIndex, pivotIndex),
     false,
-    () => renamePivot(ctx, sheetIndex, pivotIndex, previous, next),
+    () => writePivotOptions(ctx, sheetIndex, pivotIndex, previous, next),
   );
 }
 
-const renamePivot = (
+const writePivotOptions = (
   ctx: PivotCommitContext,
   sheetIndex: number,
   pivotIndex: number,
-  previous: string,
-  next: string,
+  previous: PivotOptionsValues,
+  next: PivotOptionsValues,
 ): boolean => {
   const { wb } = ctx;
-  if (!wb.renamePivotTable(sheetIndex, pivotIndex, next)) return false;
+  // Only a changed setting is written: the engine refuses a rename onto the current name.
+  const move = (from: PivotOptionsValues, to: PivotOptionsValues): boolean =>
+    (from.name === to.name || wb.renamePivotTable(sheetIndex, pivotIndex, to.name)) &&
+    (from.autofitColumns === to.autofitColumns ||
+      wb.setPivotAutofitColumns(sheetIndex, pivotIndex, to.autofitColumns));
+  if (!move(previous, next)) return false;
   const history = ctx.history && !ctx.history.isReplaying() ? ctx.history : null;
   history?.push({
     undo: () => {
-      wb.renamePivotTable(sheetIndex, pivotIndex, previous);
+      move(next, previous);
       ctx.onChanged();
     },
     redo: () => {
-      wb.renamePivotTable(sheetIndex, pivotIndex, next);
+      move(previous, next);
       ctx.onChanged();
     },
   });
@@ -420,8 +454,11 @@ export function openPivotOptions(
   sheetIndex: number,
   pivotIndex: number,
 ): Promise<boolean> {
-  const previous = ctx.wb.pivotTableName(sheetIndex, pivotIndex) ?? '';
-  return showPivotOptionsDialog({ host: ctx.host, strings: ctx.strings, name: previous }).then(
+  const previous: PivotOptionsValues = {
+    name: ctx.wb.pivotTableName(sheetIndex, pivotIndex) ?? '',
+    autofitColumns: ctx.wb.pivotAutofitColumns(sheetIndex, pivotIndex),
+  };
+  return showPivotOptionsDialog({ host: ctx.host, strings: ctx.strings, ...previous }).then(
     (result) => (result ? applyPivotOptions(ctx, sheetIndex, pivotIndex, previous, result) : false),
   );
 }

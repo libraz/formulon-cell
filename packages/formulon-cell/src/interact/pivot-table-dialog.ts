@@ -16,6 +16,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { resolveTheme } from '../theme/resolve.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
@@ -481,9 +482,10 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       return;
     }
     const placement = dest ?? 'new-sheet';
+    const autofit = { theme: resolveTheme(host) };
     const result = mac
       ? createPivotTableAtPlacement(
-          { store, workbook: wb, history: deps.history, ...dialogEntry },
+          { store, workbook: wb, history: deps.history, autofit, ...dialogEntry },
           { source: range, name: nameInput.value, rowField: '', valueField: '' },
           placement,
         )
@@ -511,7 +513,13 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       numberFormat: numberFormatInput.value,
     });
     return createPivotTableAtPlacement(
-      { store, workbook: wb, history: deps.history, ...dialogEntry },
+      {
+        store,
+        workbook: wb,
+        history: deps.history,
+        autofit: { theme: resolveTheme(host) },
+        ...dialogEntry,
+      },
       {
         source: range,
         name: nameInput.value,

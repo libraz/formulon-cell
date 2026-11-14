@@ -1,6 +1,6 @@
 import { createAccessibilityStatus } from '../commands/accessibility-check.js';
 import type { History } from '../commands/history.js';
-import { autofitPivotTableColumns, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
+import { finishPivotReportUpdate, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
 import {
   clearSessionIllustration,
@@ -559,10 +559,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           wb: input.wb(),
           strings,
           history: input.history,
-          onAfterCreate: () => {
-            mutators.refreshActiveSheetCells(input.store, input.wb());
-            autofitPivotTableColumns(input.store, input.wb(), { theme: resolveTheme(input.host) });
-          },
+          onAfterCreate: () =>
+            finishPivotReportUpdate(input.store, input.wb(), { theme: resolveTheme(input.host) }),
           invalidate: () => input.renderer.invalidate(),
         });
         input.featureRegistry.set(

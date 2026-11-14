@@ -507,7 +507,8 @@ export function refreshPivotTable(
  *  (report at A3), or a cell of the source sheet. */
 /** Fit the columns of the PivotTables on the sheet on show to their content,
  *  as the desktop does after a report update; a column can shrink, and columns
- *  outside the reports keep their width. Part of the update, so no undo step. */
+ *  outside the reports keep their width. A report whose "autofit column widths
+ *  on update" option is off keeps its columns. Part of the update, so no undo step. */
 export function autofitPivotTableColumns(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
@@ -518,9 +519,20 @@ export function autofitPivotTableColumns(
   const empty = new Set(pivotStyleLayer(wb, state).placeholders.map((p) => p.pivotIndex));
   const ranges = wb
     .pivotBounds(state.data.sheetIndex)
-    .filter((b) => !empty.has(b.pivotIndex))
+    .filter((b) => !empty.has(b.pivotIndex) && wb.pivotAutofitColumns(b.range.sheet, b.pivotIndex))
     .map((b) => b.range);
   if (ranges.length > 0) autofitColsWidthForRanges(store, null, ranges, wb, opts);
+}
+
+/** Complete a report create or update on the sheet on show: reload its cells,
+ *  then refit the report columns that opt in. */
+export function finishPivotReportUpdate(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  opts?: AutofitOptions,
+): void {
+  mutators.refreshActiveSheetCells(store, wb);
+  autofitPivotTableColumns(store, wb, opts);
 }
 
 export type PivotPlacement = 'new-sheet' | { row: number; col: number };
@@ -550,6 +562,8 @@ export interface CreatePlacedPivotDeps extends PivotAuthorization {
   store: SpreadsheetStore;
   workbook: WorkbookHandle;
   history?: History | null;
+  /** Measures the report columns refitted when an undo or redo brings the report back. */
+  autofit?: AutofitOptions;
 }
 
 /** Source range for a new report: the selection, or for a single cell the
@@ -640,7 +654,7 @@ function createPlacedReport(
     let current = result;
     const refresh = (): void => {
       if (store.getState().data.sheetIndex === destination.sheet) {
-        mutators.replaceCells(store, wb.cells(destination.sheet));
+        finishPivotReportUpdate(store, wb, deps.autofit);
       }
     };
     history.push({
@@ -812,7 +826,7 @@ export function refreshPivotReportsAfterEdit(
   clearVacatedReportCells(wb, sheet, before?.reports.map((r) => r.range) ?? []);
   mutators.replaceCells(store, wb.cells(sheet));
   reflowPivotFormats(store, wb);
-  autofitPivotTableColumns(store, wb, opts);
+  finishPivotReportUpdate(store, wb, opts);
   return { spilled: wb.pivotSpills(sheet) };
 }
 

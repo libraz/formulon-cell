@@ -4,6 +4,7 @@ import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { localizedDecisionReason } from '../commands/permission-reasons.js';
 import { setPivotGuardSink } from '../commands/pivot-guard.js';
+import { finishPivotReportUpdate } from '../commands/pivot-table.js';
 import { setProtectionAlertSink } from '../commands/protection-alert.js';
 import { addrKey } from '../engine/address.js';
 import { hydrateThreadedCommentsFromEngine } from '../engine/annotations-sync.js';
@@ -680,6 +681,11 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     const sheet = change.sheet ?? active;
     if (sheet < 0 || sheet >= wb.sheetCount) return;
     const hydrate = (): void => {
+      // A report on the sheet on show also refits its columns; another sheet only reloads.
+      if (change.kind === 'pivot' && sheet === active) {
+        finishPivotReportUpdate(store, wb, { theme: resolveTheme(host) });
+        return;
+      }
       for (const fn of FACADE_HYDRATORS[change.kind]) fn(wb, store, sheet, change.range);
     };
     wb.withEngineSyncMuted(hydrate);

@@ -58,7 +58,7 @@ describe('PivotTable Options dialog', () => {
       label.querySelector('input')?.checked,
     ]);
 
-  it('lays out the desktop tabs and options, with only the name editable', async () => {
+  it('lays out the desktop tabs and options, with only the name and autofit editable', async () => {
     const wb = await setup();
     const done = openPivotOptions(
       {
@@ -137,7 +137,15 @@ describe('PivotTable Options dialog', () => {
         'input, select, textarea',
       ),
     ).filter((control) => !control.disabled);
-    expect(editable.map((control) => control.dataset.pvoptName !== undefined)).toEqual([true]);
+    expect(
+      editable.map((control) => [
+        control.dataset.pvoptName !== undefined,
+        control.dataset.pvoptAutofit !== undefined,
+      ]),
+    ).toEqual([
+      [true, false],
+      [false, true],
+    ]);
     expect(
       Array.from(root.querySelectorAll('.fc-pvoptdlg__footer button')).map((b) => b.textContent),
     ).toEqual(['キャンセル', 'OK']);
