@@ -105,3 +105,44 @@ export async function runMacCreateTableScenario(page: Page): Promise<void> {
     .toEqual([{ rect: REGION, headerRow: true, columns: ['Item', 'Qty'] }]);
   await sheet.expectNoConsoleErrors();
 }
+
+/** Review > Check Accessibility carries Format as Table, which opens Create Table on the current
+ *  region, and Unmerge Cells, which unmerges the selection as one undo step. */
+export async function runMacAccessibilityMenuScenario(page: Page): Promise<void> {
+  const sheet = new UserJourneyPage(page);
+  await sheet.mount({ locale: 'en', platform: 'mac' });
+  await sheet.expectNoStub();
+  await seedRegion(sheet);
+  await page.evaluate(() => {
+    const inst = (window as unknown as InstanceWindow).__fcInst;
+    inst.workbook.sheet(0).addMerge('D2:E3');
+    inst.history.clear();
+  });
+  const menu = page.locator('#menu-mac-review-accessibility');
+  const item = (id: string) =>
+    menu.locator(`[data-ribbon-command="mac.review.accessibility.${id}"]`);
+  await selectRibbonTab(page, 'review');
+
+  await sheet.goTo('A2');
+  await sheet.clickRibbon('mac.review.accessibility');
+  await expect(menu).toBeVisible();
+  await expect(item('formatTable')).toBeEnabled();
+  await expect(item('unmerge')).toBeEnabled();
+  await item('formatTable').click();
+  await expect(menu).toBeHidden();
+  const dialog = await expectCreateTableDialog(page, '=$A$1:$B$3');
+  await dialog.getByRole('button', { name: 'OK' }).click();
+  await expect
+    .poll(() => readTableRects(page))
+    .toEqual([{ rect: REGION, headerRow: true, columns: ['Item', 'Qty'] }]);
+
+  await expect.poll(() => sheet.readMerge('D2')).toEqual({ sheet: 0, r0: 1, c0: 3, r1: 2, c1: 4 });
+  await sheet.goTo('D2');
+  await sheet.clickRibbon('mac.review.accessibility');
+  await item('unmerge').click();
+  await expect.poll(() => sheet.readMerge('D2')).toBeNull();
+  await page.locator('.fc-host').focus();
+  await sheet.shortcut('z');
+  await expect.poll(() => sheet.readMerge('D2')).toEqual({ sheet: 0, r0: 1, c0: 3, r1: 2, c1: 4 });
+  await sheet.expectNoConsoleErrors();
+}
