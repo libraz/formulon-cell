@@ -188,6 +188,12 @@ export interface ErrorCheckingSettings {
   rules: Record<ErrorCheckRuleId, boolean>;
 }
 
+/** The settings with the master switch on and every rule flag unchanged. */
+export const errorCheckingEnabled = (settings: ErrorCheckingSettings): ErrorCheckingSettings => ({
+  ...settings,
+  enabled: true,
+});
+
 export interface UiSlice {
   editor: EditorMode;
   hover: Addr | null;

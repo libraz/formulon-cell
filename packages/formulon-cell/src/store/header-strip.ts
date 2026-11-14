@@ -14,18 +14,6 @@ const stripZoom = (zoom: number | undefined): number => (zoom !== undefined && z
 const zoomedDigitPt = (advance: number, zoom: number): number =>
   Math.max(MIN_ZOOMED_DIGIT_PT, roundDigitAdvance(advance * zoom));
 
-/** Header labels scale with the strip's zoomed digit, not the raw zoom, so
- *  they keep fitting it (Excel 40-25%: one third, like the 4 px digit step).
- *  Fixed chrome strips keep their labels at full size. */
-export function headerLabelScale(
-  layout: Pick<LayoutSlice, 'headerDigitAdvance'>,
-  zoom: number | undefined,
-): number {
-  const advance = layout.headerDigitAdvance;
-  if (advance === undefined) return 1;
-  return zoomedDigitPt(advance, stripZoom(zoom)) / zoomedDigitPt(advance, 1);
-}
-
 /** Pitch of the row-number digits: the strip's zoomed whole-point digit
  *  (Excel '995' glyphs 12 device px apart for MS PGothic 11, 14 for Courier
  *  New 11), or undefined for fixed chrome strips. */

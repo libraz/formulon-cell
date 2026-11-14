@@ -1,10 +1,12 @@
+import { staleFormulaMarked } from '../commands/error-indicators.js';
 import { hyperlinkCoverAt, isFollowableHyperlinkTarget } from '../commands/hyperlinks.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 import { cellRect, hitTest, layoutForView, pointPx } from '../render/geometry.js';
-import { gridHitState } from '../render/grid/hit-state.js';
+import { gridHitState, triangleHitContains } from '../render/grid/hit-state.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -21,6 +23,22 @@ export interface HoverDeps {
   staleTip?: {
     strings: () => Strings;
     isStale: (addr: Addr) => boolean;
+  };
+}
+
+/** The hover stale-value tip for a store, reading the workbook lazily. */
+export function staleTipFor(
+  store: SpreadsheetStore,
+  getWb: () => WorkbookHandle | null,
+  strings: () => Strings,
+): NonNullable<HoverDeps['staleTip']> {
+  return {
+    strings,
+    isStale: (addr) => {
+      const state = store.getState();
+      const cell = state.data.cells.get(addrKey(addr));
+      return staleFormulaMarked(getWb(), state.ui.formatStaleValues, cell?.formula, addr);
+    },
   };
 }
 
@@ -110,12 +128,7 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     const x = e.clientX - box.left;
     const y = e.clientY - box.top;
     const hit = gridHitState(grid).errorTriangles.find(
-      (t) =>
-        t.kind === 'error' &&
-        x >= t.rect.x - 2 &&
-        x <= t.rect.x + t.rect.w + 2 &&
-        y >= t.rect.y - 2 &&
-        y <= t.rect.y + t.rect.h + 2,
+      (t) => t.kind === 'error' && triangleHitContains(t, x, y),
     );
     if (!hit || !stale.isStale(hit.addr)) return undefined;
     const m = stale.strings().mac.errorMenu;

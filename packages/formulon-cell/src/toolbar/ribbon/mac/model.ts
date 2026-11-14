@@ -11,9 +11,9 @@ import type {
 } from '../../ribbon-model.js';
 import {
   EMBEDDED_UNSUPPORTED,
-  GROUP_LABELS,
   type LabelLike,
   labels,
+  macGroupTitle,
   macRibbonDisabledReason,
   macRibbonLabelForCommand,
   NOT_IMPLEMENTED,
@@ -832,7 +832,7 @@ export const buildMacRibbonModel = (lang: ToolbarLang, home: RibbonTabModel): Ri
     label: labels[tab.id]?.[lang] ?? tab.label,
     groups: tab.groups.map((g) => ({
       ...g,
-      title: GROUP_LABELS[g.title]?.[lang] ?? g.title,
+      title: macGroupTitle(g.title, lang),
       commands: g.commands.map((c) => ({
         ...c,
         title:

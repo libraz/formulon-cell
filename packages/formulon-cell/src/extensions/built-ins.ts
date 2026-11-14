@@ -18,7 +18,6 @@
 // replacement registered under the same id participates correctly.
 
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
-import { staleFormulaMarked } from '../commands/error-indicators.js';
 import type { History } from '../commands/history.js';
 import { finishPivotReportUpdate, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import {
@@ -43,7 +42,7 @@ import { attachFindReplace } from '../interact/find-replace.js';
 import { attachFormatDialog, type FormatDialogHandle } from '../interact/format-dialog.js';
 import { attachFormatPainter } from '../interact/format-painter.js';
 import { attachGoToDialog } from '../interact/goto-dialog.js';
-import { attachHover } from '../interact/hover.js';
+import { attachHover, staleTipFor } from '../interact/hover.js';
 import { attachHyperlinkDialog, type HyperlinkDialogHandle } from '../interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from '../interact/iterative-dialog.js';
 import {
@@ -417,19 +416,11 @@ export const hoverComment = (): Extension =>
       const handle = attachHover({
         grid: ctx.grid,
         store: ctx.store,
-        staleTip: {
-          strings: () => ctx.i18n.strings,
-          isStale: (addr) => {
-            const state = ctx.store.getState();
-            const cell = state.data.cells.get(addrKey(addr));
-            return staleFormulaMarked(
-              ctx.workbook,
-              state.ui.formatStaleValues,
-              cell?.formula,
-              addr,
-            );
-          },
-        },
+        staleTip: staleTipFor(
+          ctx.store,
+          () => ctx.workbook,
+          () => ctx.i18n.strings,
+        ),
       });
       return { ...handle, dispose: handle.detach };
     },

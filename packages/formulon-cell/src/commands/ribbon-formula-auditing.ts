@@ -14,6 +14,7 @@ import { addrKey } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { errorCheckingEnabled } from '../store/types.js';
 import { inputLocaleForWorkbook } from './coerce-input.js';
 import {
   cellValueIsFormulaError,
@@ -84,7 +85,7 @@ export const executeRibbonFormulaAuditingAction = (
       macNa: deps.macNa,
       numberAsText: deps.macNa,
       formulaRules: deps.macNa,
-      errorChecking: { ...store.getState().ui.errorChecking, enabled: true },
+      errorChecking: errorCheckingEnabled(store.getState().ui.errorChecking),
       locale: inputLocaleForWorkbook(workbook),
       workbook,
     })
@@ -107,7 +108,7 @@ export const executeRibbonFormulaAuditingAction = (
   return selectNextFormulaError(store, undefined, undefined, {
     macNa: deps.macNa,
     numberAsText: deps.macNa,
-    errorChecking: { ...store.getState().ui.errorChecking, enabled: true },
+    errorChecking: errorCheckingEnabled(store.getState().ui.errorChecking),
     locale: inputLocaleForWorkbook(workbook),
     workbook,
   })

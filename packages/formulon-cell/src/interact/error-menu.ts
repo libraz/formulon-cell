@@ -2,7 +2,7 @@ import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import {
   convertTextToNumber,
   numberStoredAsText,
-  staleValuesMarked,
+  staleFormulaMarked,
 } from '../commands/error-indicators.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
@@ -118,17 +118,11 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     const cell = state.data.cells.get(addrKey(addr));
     if (!cell) return null;
     const wb = getWb();
-    if (
-      cell.formula &&
-      staleValuesMarked(wb, state.ui.formatStaleValues) &&
-      wb?.isCellStale(addr)
-    ) {
-      return 'stale';
-    }
+    if (staleFormulaMarked(wb, state.ui.formatStaleValues, cell.formula, addr)) return 'stale';
     if (cell.value.kind === 'error' && cell.value.text === '#DIV/0!') return 'divZero';
     let locale: string | undefined;
     try {
-      locale = inputLocaleForWorkbook(getWb() as WorkbookHandle);
+      locale = inputLocaleForWorkbook(wb as WorkbookHandle);
     } catch {
       locale = undefined;
     }

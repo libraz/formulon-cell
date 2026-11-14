@@ -223,7 +223,7 @@ export const MAC_AUTOMATION_GALLERY: readonly MacAutomationScriptDescriptor[] = 
 ];
 
 /** Gallery dialog title, shared with the ribbon command that opens it. */
-export const MAC_AUTOMATION_GALLERY_TITLE: Label = automationLabel(
+const MAC_AUTOMATION_GALLERY_TITLE: Label = automationLabel(
   'スクリプト ギャラリー',
   'Script Gallery',
   'Skriptgalerie',

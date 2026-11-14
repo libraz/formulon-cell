@@ -5,7 +5,7 @@ import type {
   RibbonTabModel,
   ToolbarLang,
 } from '../ribbon-model.js';
-import { GROUP_LABELS } from './mac/labels.js';
+import { macGroupTitle } from './mac/labels.js';
 import { PIVOT_DISABLED_COMMAND_IDS } from './pivot-command-ids.js';
 
 /** Wording of the PivotTable tabs: Japanese is measured, other languages read as English. */
@@ -74,7 +74,7 @@ export const buildPivotContextualTabs = (
     ...(PIVOT_DISABLED_COMMAND_IDS.includes(id) ? { disabled: true } : {}),
   });
   const group = (commands: RibbonCommand[], title?: string): RibbonGroupModel => ({
-    title: mac && title !== undefined ? (GROUP_LABELS[title]?.[lang] ?? title) : '',
+    title: mac && title !== undefined ? macGroupTitle(title, lang) : '',
     commands,
     variant: 'compact',
   });

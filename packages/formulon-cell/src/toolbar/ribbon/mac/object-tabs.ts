@@ -4,7 +4,7 @@ import type {
   RibbonTabModel,
   ToolbarLang,
 } from '../../ribbon-model.js';
-import { GROUP_LABELS } from './labels.js';
+import { macGroupTitle } from './labels.js';
 import { MAC_OBJECT_TAB_DISABLED_COMMAND_IDS } from './object-tab-ids.js';
 
 /** Wording of the Mac table and chart tabs: Japanese is measured, other languages read as English. */
@@ -80,7 +80,7 @@ export const buildMacObjectTabs = (
     ...(MAC_OBJECT_TAB_DISABLED_COMMAND_IDS.includes(id) ? { disabled: true } : {}),
   });
   const group = (commands: RibbonCommand[], title?: string): RibbonGroupModel => ({
-    title: title === undefined ? '' : (GROUP_LABELS[title]?.[lang] ?? title),
+    title: title === undefined ? '' : macGroupTitle(title, lang),
     commands,
     variant: 'compact',
   });

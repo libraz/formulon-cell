@@ -1,6 +1,6 @@
 import { isMacHost } from '../extensions/ui-options.js';
 import type { ErrorMenuHandle } from '../interact/error-menu.js';
-import type { ErrorTriangleHit } from '../render/grid/hit-state.js';
+import { type ErrorTriangleHit, triangleHitContains } from '../render/grid/hit-state.js';
 import { gridHitState } from '../render/grid.js';
 
 export interface ErrorIndicatorClickDeps {
@@ -25,8 +25,6 @@ interface ArmedTriangle {
   hit: ErrorTriangleHit;
 }
 
-const HIT_PADDING = 2;
-
 function pointerIdOf(e: MouseEvent): number | null {
   const pointerId = (e as MouseEvent & { pointerId?: unknown }).pointerId;
   return typeof pointerId === 'number' && Number.isFinite(pointerId) ? pointerId : null;
@@ -38,16 +36,6 @@ function sameHit(a: ErrorTriangleHit, b: ErrorTriangleHit): boolean {
     a.addr.sheet === b.addr.sheet &&
     a.addr.row === b.addr.row &&
     a.addr.col === b.addr.col
-  );
-}
-
-function hitContains(hit: ErrorTriangleHit, x: number, y: number): boolean {
-  const r = hit.rect;
-  return (
-    x >= r.x - HIT_PADDING &&
-    x <= r.x + r.w + HIT_PADDING &&
-    y >= r.y - HIT_PADDING &&
-    y <= r.y + r.h + HIT_PADDING
   );
 }
 
@@ -69,7 +57,7 @@ export function createErrorIndicatorClickHandler(
 
   const hitAt = (e: MouseEvent): ErrorTriangleHit | null => {
     const { x, y } = localPoint(e);
-    return gridHitState(grid).errorTriangles.find((hit) => hitContains(hit, x, y)) ?? null;
+    return gridHitState(grid).errorTriangles.find((hit) => triangleHitContains(hit, x, y)) ?? null;
   };
 
   const reset = (): void => {
@@ -112,7 +100,7 @@ export function createErrorIndicatorClickHandler(
   const onPointerMove = (e: PointerEvent): void => {
     if (!armed || e.pointerId !== armed.pointerId) return;
     const { x, y } = localPoint(e);
-    if (!hitContains(armed.hit, x, y)) reset();
+    if (!triangleHitContains(armed.hit, x, y)) reset();
   };
 
   const onPointerCancel = (e: PointerEvent): void => {

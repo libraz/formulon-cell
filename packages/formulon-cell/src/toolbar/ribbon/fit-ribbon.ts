@@ -299,7 +299,8 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
     const groups = [...shell.querySelectorAll<HTMLElement>('.fc-tb__ribbon-group')];
     clearFit(groups);
     for (const label of groups.flatMap(tileLabels)) clearLabelWidth(label);
-    if (root.dataset.fcPlatform === 'mac' && !singleLine) {
+    const mac = root.dataset.fcPlatform === 'mac';
+    if (mac && !singleLine) {
       for (const label of shell.querySelectorAll<HTMLElement>(TWO_LINE_LABELS)) {
         fitLabelToTwoLines(label);
       }
@@ -314,7 +315,6 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
         if (lineCount(label) > 2) fitLabelToTwoLines(label);
       }
     }
-    const mac = root.dataset.fcPlatform === 'mac';
     fitRibbonPanel(panel, {
       collapse: mac,
       plan: mac ? macRibbonFitPlan(root.lang, panel.dataset.ribbonPanel ?? '') : undefined,

@@ -35,6 +35,7 @@ import { createDefaultDynamicDropdownsCtx } from '../../../mount/dynamic-dropdow
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { applyWorkbookTheme } from '../../../mount/workbook-theme-action.js';
 import { mutators } from '../../../store/store.js';
+import { errorCheckingEnabled } from '../../../store/types.js';
 import { reportDialogLabels, showReport } from '../../dialogs/report.js';
 import type { ApplyRibbonCommandDeps } from '../apply-ribbon-command.js';
 import { createMacRibbonActions, MAC_RIBBON_ACTION_IDS } from './actions.js';
@@ -292,7 +293,7 @@ const runMacErrorCheck = (instance: SpreadsheetInstance): Promise<void> | void =
       macNa: true,
       numberAsText: true,
       formulaRules: true,
-      errorChecking: { ...state.ui.errorChecking, enabled: true },
+      errorChecking: errorCheckingEnabled(state.ui.errorChecking),
       locale: inputLocaleForWorkbook(instance.workbook),
       workbook: instance.workbook,
     },

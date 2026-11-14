@@ -49,6 +49,20 @@ export interface ErrorTriangleHit {
   kind: ErrorTriangleKind;
 }
 
+/** Slack, in px, around a triangle's rect that still counts as a hit. */
+const TRIANGLE_HIT_PADDING = 2;
+
+/** Whether a grid-relative point lands on a triangle's padded hot-zone. */
+export function triangleHitContains(hit: ErrorTriangleHit, x: number, y: number): boolean {
+  const r = hit.rect;
+  return (
+    x >= r.x - TRIANGLE_HIT_PADDING &&
+    x <= r.x + r.w + TRIANGLE_HIT_PADDING &&
+    y >= r.y - TRIANGLE_HIT_PADDING &&
+    y <= r.y + r.h + TRIANGLE_HIT_PADDING
+  );
+}
+
 /** The error-check smart tag painted beside the active cell. */
 export interface ErrorTagHit {
   rect: Rect;

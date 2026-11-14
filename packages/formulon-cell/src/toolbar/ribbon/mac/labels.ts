@@ -401,6 +401,10 @@ export const GROUP_LABELS: Readonly<Record<string, Label>> = Object.fromEntries(
   Object.entries(groupSeeds).map(([key, seed]) => [key, localizedGroupLabel(key, seed)]),
 );
 
+/** A ribbon group title in `lang`, or `key` itself when it has no label. */
+export const macGroupTitle = (key: string, lang: ToolbarLang): string =>
+  GROUP_LABELS[key]?.[lang] ?? key;
+
 export const macRibbonDisabledReason = (
   reason: string | undefined,
   lang: ToolbarLang,

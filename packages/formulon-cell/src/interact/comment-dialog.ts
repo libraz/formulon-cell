@@ -428,9 +428,6 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   const onCancel = (): void => api.close();
 
-  // Click-outside guard — committed cancel when the user clicks anywhere
-  // that isn't the note. Captured at document level so we beat host-bound
-  // pointer handlers (selection, autofill, etc.).
   const onKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -457,7 +454,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   // geometry isn't yet available (e.g. on first mount before a paint).
   const place = (): void => {
     const s = store.getState();
-    const a = s.selection.active;
+    const a = target;
     const hostW = host.clientWidth;
     const z = macNote ? pointPx(s.layout, s.viewport) : 1;
     const noteW = startMode ? START_W : macNote ? MAC_NOTE_W * z : NOTE_W;
@@ -563,16 +560,11 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       );
       editingThreadId = null;
       replyingTo = null;
-      startMode =
-        threadedMode &&
-        threads.length === 0 &&
+      const macHost =
         (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac';
+      startMode = threadedMode && threads.length === 0 && macHost;
       // A new note on the Mac profile is a bare text box with no header or footer.
-      macNote =
-        !startMode &&
-        !threadedMode &&
-        !current &&
-        (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac';
+      macNote = !startMode && !threadedMode && !current && macHost;
       wrap.classList.toggle('fc-cmtnote--start', startMode);
       wrap.classList.toggle('fc-cmtnote--mac-note', macNote);
       head.hidden = startMode || macNote;
@@ -604,6 +596,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       wrap.hidden = false;
       place();
       if (!attached) {
+        // An outside press cancels the note; a Mac new note commits instead.
         detachOutside = onOutsidePress(
           document,
           () => [wrap],

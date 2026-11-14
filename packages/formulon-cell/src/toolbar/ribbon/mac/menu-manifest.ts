@@ -533,21 +533,24 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   'mac.formulas.math': functionMenu('math'),
   'mac.formulas.more': menu([]),
   // Python is a cloud feature the host does not provide, so its menu stays greyed out.
-  'mac.formulas.reset': menu([
-    { id: 'mac.formulas.reset.clear', label: 'Reset' },
-    { id: 'mac.formulas.reset.runtime', label: 'Reset Runtime' },
-    separator,
-    {
-      id: 'mac.formulas.reset.version',
-      label: 'Version',
-      submenu: [
-        { id: 'mac.formulas.reset.versionStable', label: 'Stable' },
-        { id: 'mac.formulas.reset.versionLatest', label: 'Latest' },
-        separator,
-        { id: 'mac.formulas.reset.versionLearnMore', label: 'Learn More' },
-      ],
-    },
-  ]).map((item) => greyOutItem(item, OFFICE_REQUIRED)),
+  'mac.formulas.reset': unavailable(
+    [
+      { id: 'mac.formulas.reset.clear', label: 'Reset' },
+      { id: 'mac.formulas.reset.runtime', label: 'Reset Runtime' },
+      separator,
+      {
+        id: 'mac.formulas.reset.version',
+        label: 'Version',
+        submenu: [
+          { id: 'mac.formulas.reset.versionStable', label: 'Stable' },
+          { id: 'mac.formulas.reset.versionLatest', label: 'Latest' },
+          separator,
+          { id: 'mac.formulas.reset.versionLearnMore', label: 'Learn More' },
+        ],
+      },
+    ],
+    OFFICE_REQUIRED,
+  ),
   'mac.formulas.defineName': menu([
     { id: 'mac.formulas.defineName.define', label: 'Define Name...' },
     {
@@ -674,11 +677,14 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.review.convertNotes', label: 'Convert to Comments' },
   ]),
   // Focus Cell is not built yet; the menu carries the desktop's three entries greyed out.
-  'mac.view.cellFocus': menu([
-    { id: 'mac.view.cellFocus.focusCell', label: 'Focus Cell' },
-    { id: 'mac.view.cellFocus.color', label: 'Focus Cell Color' },
-    { id: 'mac.view.cellFocus.autoHighlight', label: 'Show Auto-Highlight' },
-  ]).map((item) => ({ ...item, disabled: true, disabledReason: NOT_IMPLEMENTED.en })),
+  'mac.view.cellFocus': unavailable(
+    [
+      { id: 'mac.view.cellFocus.focusCell', label: 'Focus Cell' },
+      { id: 'mac.view.cellFocus.color', label: 'Focus Cell Color' },
+      { id: 'mac.view.cellFocus.autoHighlight', label: 'Show Auto-Highlight' },
+    ],
+    NOT_IMPLEMENTED,
+  ),
   'mac.view.freeze': menu([
     { id: 'mac.view.freeze.panes', label: 'Freeze Panes' },
     { id: 'mac.view.freeze.firstRow', label: 'Freeze Top Row' },

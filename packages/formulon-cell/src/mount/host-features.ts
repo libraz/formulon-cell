@@ -1,5 +1,5 @@
 import { createAccessibilityStatus } from '../commands/accessibility-check.js';
-import { staleFormulaMarked, staleValuesMarked } from '../commands/error-indicators.js';
+import { staleValuesMarked } from '../commands/error-indicators.js';
 import type { History } from '../commands/history.js';
 import { finishPivotReportUpdate, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
@@ -10,7 +10,7 @@ import {
 } from '../commands/session-illustration.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
 import { setSheetZoom, setWorkbookView } from '../commands/view.js';
-import { addrKey, formatA1Range } from '../engine/address.js';
+import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
 import { nextCalcMode } from '../engine/calc-mode.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { editSeedForAddr } from '../engine/edit-seed.js';
@@ -41,7 +41,7 @@ import { attachFormatDialog } from '../interact/format-dialog.js';
 import { attachFormatPainter, type FormatPainterHandle } from '../interact/format-painter.js';
 import { attachFxDialog, type FxDialogHandle } from '../interact/fx-dialog.js';
 import { attachGoToDialog } from '../interact/goto-dialog.js';
-import { attachHover } from '../interact/hover.js';
+import { attachHover, staleTipFor } from '../interact/hover.js';
 import { attachHyperlinkDialog } from '../interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from '../interact/iterative-dialog.js';
 import { attachLocaleSwitcher, type LocaleSwitcherHandle } from '../interact/locale-switcher.js';
@@ -397,19 +397,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.hover = attachHover({
           grid: input.grid,
           store: input.store,
-          staleTip: {
-            strings: input.strings,
-            isStale: (addr) => {
-              const state = input.store.getState();
-              const cell = state.data.cells.get(addrKey(addr));
-              return staleFormulaMarked(
-                input.wb(),
-                state.ui.formatStaleValues,
-                cell?.formula,
-                addr,
-              );
-            },
-          },
+          staleTip: staleTipFor(input.store, input.wb, input.strings),
         });
         input.featureRegistry.set(
           'hoverComment',
@@ -674,9 +662,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             if (!staleValuesMarked(wb, state.ui.formatStaleValues)) return false;
             for (const [key, cell] of state.data.cells) {
               if (cell.formula == null) continue;
-              const [sheet, row, col] = key.split(':').map(Number) as [number, number, number];
-              if (sheet === state.data.sheetIndex && wb.isCellStale({ sheet, row, col }))
-                return true;
+              const addr = parseAddrKey(key);
+              if (addr && addr.sheet === state.data.sheetIndex && wb.isCellStale(addr)) return true;
             }
             return false;
           },

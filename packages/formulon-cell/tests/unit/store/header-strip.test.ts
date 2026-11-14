@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { macDigitAdvance } from '../../../src/engine/mac-digit-metrics.js';
 import { macDefaultRowPt } from '../../../src/engine/mac-row-model.js';
-import { headerLabelScale, headerStripSize } from '../../../src/store/header-strip.js';
+import { headerStripSize } from '../../../src/store/header-strip.js';
 
 const PX_PER_PT = 96 / 72;
 
@@ -82,24 +82,5 @@ describe('headerStripSize at a small Normal font and a low zoom', () => {
   ] as const)('sizes the strips at %d zoom as measured', (zoom, widths, height) => {
     expect([3, 4, 5, 6].map((d) => stripAt('MS PGothic', 11, zoom, d)[0])).toEqual(widths);
     expect(stripAt('MS PGothic', 11, zoom, 3)[1]).toBe(height);
-  });
-});
-
-describe('headerLabelScale', () => {
-  // Labels shrink with the strip's zoomed digit: "995" ink 33 / 18 / 12 px at
-  // 100 / 50 / 40-25% (MS PGothic 11, digit step 12 / 6 / 4 px).
-  it.each([
-    [1, 1],
-    [0.5, 1 / 2],
-    [0.4, 1 / 3],
-    [0.33, 1 / 3],
-    [0.25, 1 / 3],
-  ] as const)('scales the labels at %d zoom by the digit step', (zoom, scale) => {
-    const layout = { headerDigitAdvance: macDigitAdvance('MS PGothic', 11) };
-    expect(headerLabelScale(layout, zoom)).toBeCloseTo(scale, 9);
-  });
-
-  it('keeps fixed-chrome labels at their size', () => {
-    expect(headerLabelScale({ headerDigitAdvance: undefined }, 0.5)).toBe(1);
   });
 });

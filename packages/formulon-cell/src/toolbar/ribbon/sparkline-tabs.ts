@@ -6,7 +6,7 @@ import type {
   ToolbarLang,
   ToolbarText,
 } from '../ribbon-model.js';
-import { GROUP_LABELS } from './mac/labels.js';
+import { macGroupTitle } from './mac/labels.js';
 
 /** The ribbon command ids of the Sparkline tab, by the control they name. */
 export const SPARKLINE_COMMANDS = {
@@ -49,7 +49,7 @@ export const buildSparklineDesignTab = (
   const mac = profile === 'excel365Mac';
   /** The group title: the Mac label of `macKey` on the Mac profile, else `fallback`. */
   const title = (macKey: string, fallback: string): string =>
-    mac ? (GROUP_LABELS[macKey]?.[lang] ?? fallback) : fallback;
+    mac ? macGroupTitle(macKey, lang) : fallback;
   const large = (id: string, label: string, icon: string): RibbonCommand => ({
     id,
     title: label,
@@ -107,7 +107,7 @@ export const buildSparklineDesignTab = (
         title('Group (Sparkline)', t.group),
         [
           large(
-            profile === 'excel365Mac' ? SPARKLINE_COMMANDS.axisDialog : SPARKLINE_COMMANDS.axis,
+            mac ? SPARKLINE_COMMANDS.axisDialog : SPARKLINE_COMMANDS.axis,
             t.axis,
             'sparklineAxis',
           ),

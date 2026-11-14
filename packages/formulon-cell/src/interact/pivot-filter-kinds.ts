@@ -126,7 +126,7 @@ export const PIVOT_FILTER_COMPARISONS: Record<
 };
 
 /** The relative date periods in the desktop's Date Filters order, with their shared label. */
-export const PIVOT_FILTER_PERIODS: readonly (readonly [PivotFilterKind, DatePeriodKey])[] = [
+const PIVOT_FILTER_PERIODS: readonly (readonly [PivotFilterKind, DatePeriodKey])[] = [
   [PivotFilterKind.Tomorrow, 'tomorrow'],
   [PivotFilterKind.Today, 'today'],
   [PivotFilterKind.Yesterday, 'yesterday'],

@@ -106,7 +106,7 @@ export const confirmWorkbookSaveLosses = (
 
 /** Tell the user the `.xlsb` writer cannot hold `feature`, on sheet `sheetName` when it is
  *  sheet-scoped. Resolves true to save as `.xlsx` instead. */
-export const offerXlsxForUnwritable = (
+const offerXlsxForUnwritable = (
   strings: Strings,
   feature: XlsbUnwritable,
   sheetName: string | null,
