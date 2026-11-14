@@ -564,7 +564,8 @@ describe('Mac Excel ribbon profile', () => {
           kind: 'dropdown',
           menuId: macRibbonMenuIdForCommand(command.id),
         });
-        if (command.id !== 'mac.formulas.more') {
+        // More Functions builds its menu from the catalog and the WordArt gallery lists no entries.
+        if (command.id !== 'mac.formulas.more' && command.id !== 'mac.insert.wordArt') {
           expect(MAC_RIBBON_MENU_ITEMS[command.id]?.length).toBeGreaterThan(0);
         }
       }
@@ -1136,6 +1137,236 @@ describe('Mac Excel ribbon profile', () => {
         'mac.formulas.errorCheck.trace',
       ]);
       expect(isMacRibbonCommandSupported('mac.formulas.errorCheck.ignore')).toBe(false);
+    });
+  });
+
+  describe('Insert tab layout', () => {
+    const insertGroups = () =>
+      buildRibbonModel('en', { profile: 'excel365Mac' }).find((tab) => tab.id === 'insert')
+        ?.groups ?? [];
+    const sizeOf = (command: { layout?: string; className?: string }) =>
+      command.layout === 'stacked'
+        ? 'small'
+        : command.className?.includes('mac-icon-only')
+          ? 'icon'
+          : 'large';
+    const layoutOf = (groupTitle: string) =>
+      insertGroups()
+        .find((group) => group.title === groupTitle)
+        ?.commands.map((command) => [command.id, sizeOf(command)]);
+    const items = (root: string) =>
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+
+    it('keeps the drawn group order with Data from Picture as the third group', () => {
+      expect(insertGroups().map((group) => group.title)).toEqual([
+        'Tables',
+        'Forms',
+        'Data from Picture',
+        'Illustrations',
+        'Controls',
+        'Charts',
+        'Sparklines',
+        'Filters',
+        'Links',
+        'Comments',
+        'Text',
+        'Symbols',
+      ]);
+      expect(layoutOf('Data from Picture')).toEqual([['mac.insert.pictureFromData', 'large']]);
+    });
+
+    it('draws Illustrations and Charts with full-height tiles beside stacked rows', () => {
+      expect(layoutOf('Illustrations')).toEqual([
+        ['mac.insert.photo', 'large'],
+        ['mac.insert.shapes', 'large'],
+        ['mac.insert.icons', 'large'],
+        ['mac.insert.threeDModel', 'small'],
+        ['mac.insert.smartArt', 'small'],
+        ['mac.insert.screenshot', 'small'],
+      ]);
+      expect(layoutOf('Charts')).toEqual([
+        ['mac.insert.recommendedChart', 'large'],
+        ['mac.insert.chartColumn', 'icon'],
+        ['mac.insert.chartLine', 'icon'],
+        ['mac.insert.chartPie', 'icon'],
+        ['mac.insert.chartHierarchy', 'icon'],
+        ['mac.insert.chartStatistical', 'icon'],
+        ['mac.insert.chartScatter', 'icon'],
+        ['mac.insert.chartWaterfall', 'icon'],
+        ['mac.insert.chartCombo', 'icon'],
+        ['mac.insert.chartMap', 'large'],
+        ['mac.insert.pivotChart', 'large'],
+      ]);
+    });
+
+    it('renders Illustrations and Charts with the mixed layout and keeps menu chevrons', async () => {
+      const sheet = await mountStubSheet({ locale: 'en' });
+      const toolbarHost = document.createElement('div');
+      document.body.append(toolbarHost);
+      const toolbar = Spreadsheet.mountToolbar(toolbarHost, sheet.instance, {
+        platform: 'mac',
+        activeTab: 'insert',
+        helpers: mountedRibbonHelpers(),
+      });
+      try {
+        const mixed = Array.from(
+          toolbarHost.querySelectorAll<HTMLElement>(
+            '[data-ribbon-panel="insert"] .fc-tb__ribbon-group--mixed',
+          ),
+        ).map((group) => group.getAttribute('aria-label'));
+        expect(mixed).toEqual(['Illustrations', 'Charts']);
+        const button = (id: string) =>
+          toolbarHost.querySelector<HTMLButtonElement>(`[data-ribbon-command="${id}"]`);
+        for (const id of ['mac.insert.forms', 'mac.insert.threeDModel', 'mac.insert.wordArt']) {
+          expect(button(id)?.querySelector('.fc-tb__rb-split-chevron'), id).not.toBeNull();
+        }
+        expect(
+          button('mac.insert.pivotTable')?.querySelector('.fc-tb__rb-split-chevron'),
+        ).toBeNull();
+      } finally {
+        toolbar.dispose();
+        toolbarHost.remove();
+        sheet.dispose();
+      }
+    });
+
+    it('declares the drawn menu buttons with the desktop items', () => {
+      expect(items('mac.insert.forms')).toEqual([
+        ['mac.insert.forms.new', 'New Form', true],
+        ['mac.insert.forms.preview', 'Preview Form', true],
+        ['mac.insert.forms.edit', 'Edit Form', true],
+        ['mac.insert.forms.send', 'Send Form', true],
+      ]);
+      expect(items('mac.insert.pictureFromData')).toEqual([
+        ['mac.insert.pictureFromData.file', 'Picture From File...', true],
+        ['mac.insert.pictureFromData.clipboard', 'Picture From Clipboard', true],
+      ]);
+      expect(items('mac.insert.photo')).toEqual([
+        ['mac.insert.photo.browser', 'Photo Browser…', true],
+        ['mac.insert.photo.file', 'Picture from File...', false],
+        ['mac.insert.photo.stock', 'Stock Images...', true],
+        ['mac.insert.photo.online', 'Online Pictures...', true],
+      ]);
+      expect(items('mac.insert.threeDModel')).toEqual([
+        ['mac.insert.threeDModel.device', 'This Device...', true],
+        ['mac.insert.threeDModel.stock', 'Stock 3D Models...', true],
+      ]);
+      expect(items('mac.insert.smartArt')?.map((item) => item[1])).toEqual([
+        'List',
+        'Process',
+        'Cycle',
+        'Hierarchy',
+        'Relationship',
+        'Matrix',
+        'Pyramid',
+        'Picture',
+      ]);
+      expect(items('mac.insert.screenshot')).toEqual([
+        ['mac.insert.screenshot.clipping', 'Screen Clipping', false],
+      ]);
+      expect(items('mac.insert.sparkline')).toEqual([
+        ['mac.insert.sparkline.line', 'Line', false],
+        ['mac.insert.sparkline.column', 'Column', false],
+        ['mac.insert.sparkline.winLoss', 'Win/Loss', false],
+      ]);
+      expect(items('mac.insert.textBox')).toEqual([
+        ['mac.insert.textBox.horizontal', 'Horizontal Text Box', true],
+        ['mac.insert.textBox.vertical', 'Vertical Text Box', true],
+      ]);
+      expect(items('mac.insert.wordArt')).toEqual([]);
+      expect(items('mac.insert.equation')).toEqual([
+        ['mac.insert.equation.insert', 'Equation', true],
+      ]);
+      for (const root of [
+        'mac.insert.forms',
+        'mac.insert.pictureFromData',
+        'mac.insert.photo',
+        'mac.insert.threeDModel',
+        'mac.insert.smartArt',
+        'mac.insert.screenshot',
+        'mac.insert.sparkline',
+        'mac.insert.textBox',
+        'mac.insert.wordArt',
+        'mac.insert.equation',
+      ]) {
+        expect(MAC_RIBBON_MENU_COMMAND_SET.has(root), root).toBe(true);
+        expect(ribbonActivationForCommand(root).kind, root).toBe('dropdown');
+      }
+    });
+
+    it('keeps the existing actions reachable from the menu items', () => {
+      for (const id of [
+        'mac.insert.photo.file',
+        'mac.insert.screenshot.clipping',
+        'mac.insert.sparkline.line',
+      ]) {
+        expect(isMacRibbonCommandSupported(id), id).toBe(true);
+      }
+    });
+
+    it('keeps disabled controls disabled and PivotTable a plain button', () => {
+      for (const id of [
+        'mac.insert.forms',
+        'mac.insert.pictureFromData',
+        'mac.insert.icons',
+        'mac.insert.threeDModel',
+        'mac.insert.smartArt',
+        'mac.insert.checkBox',
+        'mac.insert.pivotChart',
+        'mac.insert.textBox',
+        'mac.insert.wordArt',
+        'mac.insert.object',
+        'mac.insert.equation',
+      ]) {
+        expect(findCommand('insert', id)?.disabled, id).toBe(true);
+      }
+      expect(findCommand('insert', 'mac.insert.symbol')?.disabled).toBeUndefined();
+      expect(MAC_RIBBON_MENU_COMMAND_SET.has('mac.insert.pivotTable')).toBe(false);
+      expect(MAC_RIBBON_MENU_ITEMS['mac.insert.pivotTable']).toBeUndefined();
+      expect(macRibbonMenuIdForCommand('mac.insert.pivotTable')).toBeNull();
+      expect(ribbonActivationForCommand('mac.insert.pivotTable')).toEqual({
+        kind: 'primaryAction',
+      });
+    });
+
+    it('titles the picture group Data from Picture and localizes the new items', () => {
+      const titles: Record<string, string> = {
+        en: 'Data from Picture',
+        ja: '画像からのデータ',
+        de: 'Daten aus Bild',
+        fr: 'Données de l’image',
+        ko: '그림의 데이터',
+        th: 'ข้อมูลจากรูปภาพ',
+        zh: '来自图片的数据',
+      };
+      for (const [locale, title] of Object.entries(titles)) {
+        const insert = buildRibbonModel(locale as 'en', { profile: 'excel365Mac' }).find(
+          (tab) => tab.id === 'insert',
+        );
+        expect(insert?.groups[2]?.title, locale).toBe(title);
+      }
+      for (const locale of ['en', 'ja', 'de', 'fr', 'ko', 'th', 'zh'] as const) {
+        for (const root of [
+          'mac.insert.forms',
+          'mac.insert.pictureFromData',
+          'mac.insert.photo',
+          'mac.insert.threeDModel',
+          'mac.insert.smartArt',
+          'mac.insert.screenshot',
+          'mac.insert.sparkline',
+          'mac.insert.textBox',
+          'mac.insert.equation',
+        ]) {
+          for (const item of MAC_RIBBON_MENU_ITEMS[root] ?? []) {
+            if (item.id === root) continue;
+            expect(macRibbonLabelForCommand(item.id, locale), `${locale} ${item.id}`).not.toBe(
+              item.id,
+            );
+          }
+        }
+      }
+      expect(macRibbonLabelForCommand('mac.insert.photo.browser', 'ja')).toBe('写真ブラウザー…');
+      expect(macRibbonLabelForCommand('mac.insert.smartArt.hierarchy', 'ja')).toBe('階層構造');
     });
   });
 

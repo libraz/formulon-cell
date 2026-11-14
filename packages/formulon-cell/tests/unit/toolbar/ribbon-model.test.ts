@@ -20,6 +20,7 @@ import {
   HOME_MIXED_LAYOUT_GROUP_VARIANTS,
   HOME_STACKED_LAYOUT_GROUP_VARIANTS,
   HOME_TILE_LAYOUT_GROUP_VARIANTS,
+  INSERT_MIXED_LAYOUT_GROUP_VARIANTS,
   matchesRibbonShortcut,
   OPTIONAL_RIBBON_TABS,
   ribbonActivatableCommandIds,
@@ -439,6 +440,7 @@ describe('toolbar/ribbon-model', () => {
       ...HOME_STACKED_LAYOUT_GROUP_VARIANTS,
       ...HOME_MIXED_LAYOUT_GROUP_VARIANTS,
       ...FORMULAS_MIXED_LAYOUT_GROUP_VARIANTS,
+      ...INSERT_MIXED_LAYOUT_GROUP_VARIANTS,
     ]) {
       expect(() => widthFor(variant)).toThrow();
     }

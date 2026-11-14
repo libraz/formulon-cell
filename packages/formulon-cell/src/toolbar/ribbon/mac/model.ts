@@ -76,19 +76,6 @@ const compactCommand = (id: string, label: LabelLike, icon?: string): RibbonComm
 const iconCommand = (id: string, label: LabelLike, icon?: string): RibbonCommand =>
   command(id, label, icon, { kind: 'button', className: 'fc-tb__rb--mac-icon-only' });
 
-const disabledIconCommand = (
-  id: string,
-  label: LabelLike,
-  icon: string | undefined,
-  reason: LabelLike,
-): RibbonCommand =>
-  command(id, label, icon, {
-    kind: 'button',
-    className: 'fc-tb__rb--mac-icon-only',
-    disabled: true,
-    disabledReason: reason,
-  });
-
 const disabledCompactCommand = (
   id: string,
   label: LabelLike,
@@ -195,24 +182,20 @@ const insertTab = (): RibbonTabModel =>
     group({ ja: 'フォーム', en: 'Forms' }, [
       disabledCommand('mac.insert.forms', t('forms'), 'form', OFFICE_REQUIRED),
     ]),
-    group(
-      { ja: '画像', en: 'Pictures' },
-      [
-        disabledCompactCommand(
-          'mac.insert.pictureFromData',
-          t('pictureFromData'),
-          'picture',
-          OFFICE_REQUIRED,
-        ),
-      ],
-      'compact',
-    ),
+    group({ ja: '画像からのデータ', en: 'Data from Picture' }, [
+      disabledCommand(
+        'mac.insert.pictureFromData',
+        t('pictureFromData'),
+        'picture',
+        OFFICE_REQUIRED,
+      ),
+    ]),
     group(
       { ja: 'イラスト', en: 'Illustrations' },
       [
-        compactCommand('mac.insert.photo', t('photo'), 'picture'),
-        compactCommand('mac.insert.shapes', t('shapes'), 'shapes'),
-        disabledCompactCommand('mac.insert.icons', t('icons'), 'icons', NOT_IMPLEMENTED),
+        menuCommand('mac.insert.photo', t('photo'), 'picture'),
+        menuCommand('mac.insert.shapes', t('shapes'), 'shapes'),
+        disabledCommand('mac.insert.icons', t('icons'), 'icons', NOT_IMPLEMENTED),
         disabledCompactCommand(
           'mac.insert.threeDModel',
           t('threeDModel'),
@@ -222,7 +205,7 @@ const insertTab = (): RibbonTabModel =>
         disabledCompactCommand('mac.insert.smartArt', t('smartArt'), 'smartArt', NOT_IMPLEMENTED),
         compactCommand('mac.insert.screenshot', t('screenshot'), 'screenshot'),
       ],
-      'compact',
+      'illustrations',
     ),
     group({ ja: 'コントロール', en: 'Controls' }, [
       disabledCommand('mac.insert.checkBox', t('checkBox'), 'checkBox', NOT_IMPLEMENTED),
@@ -230,7 +213,7 @@ const insertTab = (): RibbonTabModel =>
     group(
       { ja: 'グラフ', en: 'Charts' },
       [
-        iconCommand('mac.insert.recommendedChart', t('recommendedChart'), 'chartRecommended'),
+        menuCommand('mac.insert.recommendedChart', t('recommendedChart'), 'chartRecommended'),
         iconCommand('mac.insert.chartColumn', t('chartColumn'), 'chartColumn'),
         iconCommand('mac.insert.chartLine', t('chartLine'), 'chartLine'),
         iconCommand('mac.insert.chartPie', t('chartPie'), 'chartPie'),
@@ -239,15 +222,10 @@ const insertTab = (): RibbonTabModel =>
         iconCommand('mac.insert.chartScatter', t('chartScatter'), 'chartScatter'),
         iconCommand('mac.insert.chartWaterfall', t('chartWaterfall'), 'chartWaterfall'),
         iconCommand('mac.insert.chartCombo', t('chartCombo'), 'chartCombo'),
-        iconCommand('mac.insert.chartMap', t('chartMap'), 'chartMap'),
-        disabledIconCommand(
-          'mac.insert.pivotChart',
-          t('pivotChart'),
-          'pivotTable',
-          NOT_IMPLEMENTED,
-        ),
+        menuCommand('mac.insert.chartMap', t('chartMap'), 'chartMap'),
+        disabledCommand('mac.insert.pivotChart', t('pivotChart'), 'pivotTable', NOT_IMPLEMENTED),
       ],
-      'compact-icons',
+      'charts',
     ),
     group({ ja: 'スパークライン', en: 'Sparklines' }, [
       menuCommand('mac.insert.sparkline', t('sparkline'), 'sparkline'),

@@ -58,7 +58,8 @@ export interface MacSparklineEditTarget {
 
 export interface MacSparklineDialogHandle {
   /** Open the Insert Sparkline chooser, or Edit Sparklines for `edit`. */
-  open(edit?: MacSparklineEditTarget): void;
+  /** `kind` preselects the type pop-up for a new group (the ribbon's Line, Column and Win/Loss). */
+  open(edit?: MacSparklineEditTarget, kind?: SparklineKind): void;
   close(): void;
   refresh(): void;
   setStrings(next: Strings): void;
@@ -328,7 +329,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   };
 
   const api: MacSparklineDialogHandle = {
-    open(edit?: MacSparklineEditTarget): void {
+    open(edit?: MacSparklineEditTarget, kind: SparklineKind = 'line'): void {
       const range = store.getState().selection.range;
       editing = edit ?? null;
       pickFormat.begin();
@@ -336,7 +337,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       // The desktop dialog opens with the location empty; OK stays disabled
       // without flagging an error the user has not made yet.
       destinationInput.value = edit ? edit.location : '';
-      kindSelect.value = 'line';
+      kindSelect.value = kind;
       lastSource = null;
       lastDestination = null;
       refreshLabels();

@@ -109,6 +109,19 @@ describe('attachMacSparklineDialog', () => {
     handle.detach();
   });
 
+  it('opens with the type the ribbon menu picked, and with Line otherwise', () => {
+    const handle = attachMacSparklineDialog({ host, store, getWb: makeWorkbook });
+    const type = () => document.querySelector<HTMLSelectElement>('.fc-macsparkdlg__type')?.value;
+    handle.open(undefined, 'win-loss');
+    expect(type()).toBe('win-loss');
+    handle.close();
+    handle.open(undefined, 'column');
+    expect(type()).toBe('column');
+    handle.close();
+    handle.open();
+    expect(type()).toBe('line');
+  });
+
   it('keeps the strings set last across refresh and keeps the chosen type', () => {
     const handle = attachMacSparklineDialog({ host, store, getWb: makeWorkbook, strings: ja });
     handle.open();

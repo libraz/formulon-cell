@@ -151,7 +151,9 @@ const operations = [
   'mac.insert.recommendedPivotTable',
   'mac.insert.table',
   'mac.insert.photo',
+  'mac.insert.photo.file',
   'mac.insert.screenshot',
+  'mac.insert.screenshot.clipping',
   'mac.insert.headerFooter',
   'mac.insert.symbol',
   'mac.formulas.autoSum',
@@ -425,8 +427,10 @@ export function dispatchMacRibbonCommand(
       case 'mac.insert.table':
         return showCreateTableDialog(instance, {}, { origin: 'ribbon', commandId: id });
       case 'mac.insert.photo':
+      case 'mac.insert.photo.file':
         return ctx.insertPictureFromRibbon('device');
       case 'mac.insert.screenshot':
+      case 'mac.insert.screenshot.clipping':
         return ctx.insertScreenshotFromRibbon();
       case 'mac.insert.headerFooter':
         return openPageSetupDialogFrom(instance.store, 'headerFooter', {

@@ -11,12 +11,8 @@ const measured = JSON.parse(
 
 /** Groups whose content differs from the desktop's, so their slots are compared once the tab
  *  carries the desktop group: ours by English title, the desktop's by ribbon group. */
-const OURS_PENDING = new Set(['Pictures', 'Queries & Connections', 'Read-Only']);
-const DESKTOP_PENDING = new Set([
-  'ChunkDataFromPicture',
-  'ChunkDataConnections',
-  'ChunkProofCommentChanges',
-]);
+const OURS_PENDING = new Set(['Queries & Connections', 'Read-Only']);
+const DESKTOP_PENDING = new Set(['ChunkDataConnections', 'ChunkProofCommentChanges']);
 
 const titles = (lang: ToolbarLang): Map<string, string[]> =>
   new Map(

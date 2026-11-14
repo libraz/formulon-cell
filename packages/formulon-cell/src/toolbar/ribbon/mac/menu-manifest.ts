@@ -3,7 +3,14 @@ import {
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
 import { MAC_AUTOMATION_GALLERY } from './automation-gallery.js';
-import { type Label, labelFor, labels, NOT_IMPLEMENTED, OFFICE_REQUIRED } from './labels.js';
+import {
+  EMBEDDED_UNSUPPORTED,
+  type Label,
+  labelFor,
+  labels,
+  NOT_IMPLEMENTED,
+  OFFICE_REQUIRED,
+} from './labels.js';
 import { MAC_SHAPE_GALLERY } from './shape-gallery.js';
 
 /** A leaf rendered in one of the Mac Office-style command menus. */
@@ -24,8 +31,13 @@ export interface MacRibbonMenuItem {
  * this explicit list to apply menu-first behavior without changing the
  * generic ribbon activation manifest. */
 export const MAC_RIBBON_MENU_COMMANDS = [
-  'mac.insert.pivotTable',
+  'mac.insert.forms',
+  'mac.insert.pictureFromData',
+  'mac.insert.photo',
   'mac.insert.shapes',
+  'mac.insert.threeDModel',
+  'mac.insert.smartArt',
+  'mac.insert.screenshot',
   'mac.insert.recommendedChart',
   'mac.insert.chartColumn',
   'mac.insert.chartBar',
@@ -38,6 +50,10 @@ export const MAC_RIBBON_MENU_COMMANDS = [
   'mac.insert.chartWaterfall',
   'mac.insert.chartCombo',
   'mac.insert.chartMap',
+  'mac.insert.sparkline',
+  'mac.insert.textBox',
+  'mac.insert.wordArt',
+  'mac.insert.equation',
   'mac.draw.eraser',
   'mac.draw.add',
   'mac.page.theme',
@@ -81,6 +97,12 @@ const menu = (items: readonly MacRibbonMenuItem[]): readonly MacRibbonMenuItem[]
     const label = labelFor(item.id);
     return label ? { ...item, label: label.en, labelJa: label.ja } : item;
   });
+/** A menu whose entries the host cannot run: every row greyed out with the same reason. */
+const unavailable = (
+  items: readonly MacRibbonMenuItem[],
+  reason: Label,
+): readonly MacRibbonMenuItem[] =>
+  menu(items).map((item) => ({ ...item, disabled: true, disabledReason: reason.en }));
 const leaf = (
   id: string,
   key: string,
@@ -274,11 +296,58 @@ const functionMenu = (category: CatalogFunctionCategory): readonly MacRibbonMenu
  *  and restricted-interaction guard can handle them exactly like top-level
  *  buttons. */
 export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMenuItem[]>> = {
-  'mac.insert.pivotTable': menu([
-    leaf('mac.insert.pivotTable', 'pivotTable'),
-    leaf('mac.insert.recommendedPivotTable', 'recommendedPivotTable'),
-  ]),
+  // Forms is a cloud feature the host does not provide, so its menu stays greyed out.
+  'mac.insert.forms': unavailable(
+    [
+      { id: 'mac.insert.forms.new', label: 'New Form' },
+      { id: 'mac.insert.forms.preview', label: 'Preview Form' },
+      { id: 'mac.insert.forms.edit', label: 'Edit Form' },
+      { id: 'mac.insert.forms.send', label: 'Send Form' },
+    ],
+    OFFICE_REQUIRED,
+  ),
+  'mac.insert.pictureFromData': unavailable(
+    [
+      { id: 'mac.insert.pictureFromData.file', label: 'Picture From File...' },
+      { id: 'mac.insert.pictureFromData.clipboard', label: 'Picture From Clipboard' },
+    ],
+    OFFICE_REQUIRED,
+  ),
+  // Photo Browser, Stock Images and Online Pictures need the cloud or the OS photo library.
+  'mac.insert.photo': menu([
+    { id: 'mac.insert.photo.browser', label: 'Photo Browser…' },
+    { id: 'mac.insert.photo.file', label: 'Picture from File...' },
+    { id: 'mac.insert.photo.stock', label: 'Stock Images...' },
+    { id: 'mac.insert.photo.online', label: 'Online Pictures...' },
+  ]).map((item) =>
+    item.id === 'mac.insert.photo.file'
+      ? item
+      : { ...item, disabled: true, disabledReason: NOT_IMPLEMENTED.en },
+  ),
   'mac.insert.shapes': MAC_SHAPE_GALLERY,
+  'mac.insert.threeDModel': unavailable(
+    [
+      { id: 'mac.insert.threeDModel.device', label: 'This Device...' },
+      { id: 'mac.insert.threeDModel.stock', label: 'Stock 3D Models...' },
+    ],
+    NOT_IMPLEMENTED,
+  ),
+  'mac.insert.smartArt': unavailable(
+    [
+      { id: 'mac.insert.smartArt.list', label: 'List' },
+      { id: 'mac.insert.smartArt.process', label: 'Process' },
+      { id: 'mac.insert.smartArt.cycle', label: 'Cycle' },
+      { id: 'mac.insert.smartArt.hierarchy', label: 'Hierarchy' },
+      { id: 'mac.insert.smartArt.relationship', label: 'Relationship' },
+      { id: 'mac.insert.smartArt.matrix', label: 'Matrix' },
+      { id: 'mac.insert.smartArt.pyramid', label: 'Pyramid' },
+      { id: 'mac.insert.smartArt.picture', label: 'Picture' },
+    ],
+    NOT_IMPLEMENTED,
+  ),
+  'mac.insert.screenshot': menu([
+    { id: 'mac.insert.screenshot.clipping', label: 'Screen Clipping' },
+  ]),
   // With no data selected the menu carries only the explanation; otherwise the recommendation.
   'mac.insert.recommendedChart': [
     {
@@ -306,6 +375,25 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   'mac.insert.chartWaterfall': chartGallery.waterfall,
   'mac.insert.chartCombo': chartGallery.combo,
   'mac.insert.chartMap': chartGallery.map,
+  // Each type opens the sparkline dialog with that type chosen.
+  'mac.insert.sparkline': menu([
+    { id: 'mac.insert.sparkline.line', label: 'Line' },
+    { id: 'mac.insert.sparkline.column', label: 'Column' },
+    { id: 'mac.insert.sparkline.winLoss', label: 'Win/Loss' },
+  ]),
+  'mac.insert.textBox': unavailable(
+    [
+      { id: 'mac.insert.textBox.horizontal', label: 'Horizontal Text Box' },
+      { id: 'mac.insert.textBox.vertical', label: 'Vertical Text Box' },
+    ],
+    EMBEDDED_UNSUPPORTED,
+  ),
+  // The WordArt gallery carries styles, not named entries.
+  'mac.insert.wordArt': [],
+  'mac.insert.equation': unavailable(
+    [{ id: 'mac.insert.equation.insert', label: 'Equation' }],
+    NOT_IMPLEMENTED,
+  ),
   'mac.draw.eraser': menu([leaf('mac.draw.eraser', 'eraser'), leaf('mac.draw.toggle', 'draw')]),
   'mac.draw.add': menu([
     leaf('mac.draw.penBlack', 'penBlack'),
@@ -479,8 +567,13 @@ export const MAC_FORMULAS_MORE_MENU_ID = 'menu-mac-formulas-more';
 export const macRibbonMenuIdForCommand = (commandId: string): string | null => {
   if (!MAC_RIBBON_MENU_COMMAND_SET.has(commandId)) return null;
   const ids: Readonly<Record<string, string>> = {
-    'mac.insert.pivotTable': 'menu-mac-insert-pivot',
+    'mac.insert.forms': 'menu-mac-insert-forms',
+    'mac.insert.pictureFromData': 'menu-mac-insert-picture-from-data',
+    'mac.insert.photo': 'menu-mac-insert-photo',
     'mac.insert.shapes': 'menu-mac-insert-shapes',
+    'mac.insert.threeDModel': 'menu-mac-insert-3d-models',
+    'mac.insert.smartArt': 'menu-mac-insert-smartart',
+    'mac.insert.screenshot': 'menu-mac-insert-screenshot',
     'mac.insert.recommendedChart': 'menu-mac-insert-chart',
     'mac.insert.chartColumn': 'menu-mac-insert-chart-column',
     'mac.insert.chartBar': 'menu-mac-insert-chart-bar',
@@ -493,6 +586,10 @@ export const macRibbonMenuIdForCommand = (commandId: string): string | null => {
     'mac.insert.chartWaterfall': 'menu-mac-insert-chart-waterfall',
     'mac.insert.chartCombo': 'menu-mac-insert-chart-combo',
     'mac.insert.chartMap': 'menu-mac-insert-chart-map',
+    'mac.insert.sparkline': 'menu-mac-insert-sparkline',
+    'mac.insert.textBox': 'menu-mac-insert-text-box',
+    'mac.insert.wordArt': 'menu-mac-insert-wordart',
+    'mac.insert.equation': 'menu-mac-insert-equation',
     'mac.draw.eraser': 'menu-mac-draw-eraser',
     'mac.draw.add': 'menu-mac-draw-add',
     'mac.page.theme': 'menu-mac-page-theme',

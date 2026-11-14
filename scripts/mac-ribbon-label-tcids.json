@@ -3534,11 +3534,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "groups:Pictures": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "groups:Queries & Connections": {
       "status": "unresolved",
       "tcid": null,

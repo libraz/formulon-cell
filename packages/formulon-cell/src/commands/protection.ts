@@ -143,6 +143,9 @@ const REFUSED_ON_PROTECTED_SHEET: ReadonlySet<string> = new Set([
   'cellStyles',
   'mac.data.dataTable',
   'mac.insert.sparkline',
+  'mac.insert.sparkline.line',
+  'mac.insert.sparkline.column',
+  'mac.insert.sparkline.winLoss',
   // Refused by the insertion itself whatever the sheet's options.
   'insertCopiedCells',
   // Define Name and Create from Selection; the Name Manager stays available.

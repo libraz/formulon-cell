@@ -1382,10 +1382,14 @@
     height: 66px;
   }
 
-  /* Sort & Filter's A-Z / Z-A pair are icon-only rows beside the full-height tiles. */
+  /* Sort & Filter's A-Z / Z-A pair and the Charts gallery buttons are icon-only rows beside the full-height tiles. */
   [data-fc-platform="mac"]
     > .fc-tb__ribbon-shell
     .fc-tb__ribbon-group--sort-filter
+    .fc-tb__rb--mac-icon-only,
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--charts
     .fc-tb__rb--mac-icon-only {
     box-sizing: border-box;
     width: 28px;
