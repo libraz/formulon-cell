@@ -378,22 +378,26 @@ export function openPivotFieldFilter(
   const footer = doc.createElement('div');
   footer.className = 'fc-pivot-filter-panel__footer';
   footer.appendChild(clear);
-  panel.append(
-    titleBar,
-    heading(t.sortHeading),
-    sortRow,
-    row(t.sortBy, sortBy),
-    separator,
-    heading(t.filterHeading),
-    row(
-      t.byLabel,
-      conditionSelect(model.dateField ? dateConditions() : labeled(LABEL_CONDITIONS), 'label'),
-    ),
-    row(t.byValue, conditionSelect(labeled(VALUE_CONDITIONS), 'value')),
-    searchBox,
-    list,
-    footer,
-  );
+  // A report filter field takes item selection only: no sort and no label or value filter.
+  if (model.axis === PivotAxis.Page) panel.append(titleBar, searchBox, list, footer);
+  else {
+    panel.append(
+      titleBar,
+      heading(t.sortHeading),
+      sortRow,
+      row(t.sortBy, sortBy),
+      separator,
+      heading(t.filterHeading),
+      row(
+        t.byLabel,
+        conditionSelect(model.dateField ? dateConditions() : labeled(LABEL_CONDITIONS), 'label'),
+      ),
+      row(t.byValue, conditionSelect(labeled(VALUE_CONDITIONS), 'value')),
+      searchBox,
+      list,
+      footer,
+    );
+  }
   // The desktop's pop-up buttons: the shared custom select over each native one.
   for (const s of panel.querySelectorAll<HTMLSelectElement>('select')) {
     const handle = enhanceCustomSelect(s);
