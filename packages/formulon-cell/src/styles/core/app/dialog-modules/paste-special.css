@@ -59,13 +59,18 @@
 
   /* Mac, measured from Excel for Mac (pt = CSS px, window-relative): a 461 x 432
      panel; ペースト radios on a 22 px pitch in columns at x 32 / 188, 演算 at
-     x 31 / 187, rules under each section, Paste Link left of Cancel / OK. */
+     x 31 / 187, rules under each section, Paste Link left of Cancel / OK. The
+     second column starts after the first column's widest label when that is
+     longer than the measured one, and the panel widens to fit; the 3 px end
+     padding keeps the ja panel at its measured 461 px. */
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__panel {
     position: relative;
-    width: 461px;
+    box-sizing: border-box;
+    width: max-content;
+    min-width: 461px;
     max-width: none;
     height: 432px;
-    padding: 0;
+    padding: 0 3px 0 0;
     overflow: hidden;
     border: 0;
     outline: 1px solid var(--fc-fmtdlg-rule, var(--fc-rule-strong));
@@ -82,20 +87,45 @@
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__body,
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__cols,
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__group,
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__list,
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__bottomrow,
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__panel .fc-fmtdlg__footer {
     position: static;
     display: block;
+    min-width: 0;
     margin: 0;
     padding: 0;
     border: 0;
     background: none;
   }
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__legend,
+  /* Each section is a grid: the first track never narrower than the measured column, the
+     second starting 12 px after the first column's widest label. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__list,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__bottomrow {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-columns: minmax(144px, max-content) max-content;
+    column-gap: 12px;
+    row-gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__group:first-child .fc-pastesp__list {
+    grid-template-rows: repeat(6, 18px);
+    margin: 44px 0 0 32px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group
+    + .fc-pastesp__group
+    .fc-pastesp__list {
+    grid-template-rows: repeat(3, 18px);
+    margin: 54px 0 0 31px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__bottomrow {
+    grid-template-rows: 18px;
+    margin: 31px 0 0 31px;
+  }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__list > .fc-fmtdlg__radio,
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__bottomrow > .fc-fmtdlg__check {
-    position: absolute;
     box-sizing: border-box;
     height: 18px;
     min-height: 0;
@@ -105,9 +135,15 @@
     white-space: nowrap;
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__legend {
+    position: absolute;
     left: 19px;
+    height: 18px;
+    margin: 0;
+    padding: 0;
     font-size: inherit;
     font-weight: 600;
+    line-height: 18px;
+    white-space: nowrap;
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__group:first-child .fc-pastesp__legend {
     top: 51px;
@@ -117,162 +153,6 @@
     + .fc-pastesp__group
     .fc-pastesp__legend {
     top: 234px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(1) {
-    top: 76px;
-    left: 32px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(2) {
-    top: 98px;
-    left: 32px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(3) {
-    top: 120px;
-    left: 32px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(4) {
-    top: 142px;
-    left: 32px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(5) {
-    top: 164px;
-    left: 32px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(6) {
-    top: 186px;
-    left: 32px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(7) {
-    top: 76px;
-    left: 188px;
-    width: 252px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(8) {
-    top: 98px;
-    left: 188px;
-    width: 252px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(9) {
-    top: 120px;
-    left: 188px;
-    width: 252px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(10) {
-    top: 142px;
-    left: 188px;
-    width: 252px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(11) {
-    top: 164px;
-    left: 188px;
-    width: 252px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group:first-child
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(12) {
-    top: 186px;
-    left: 188px;
-    width: 252px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group
-    + .fc-pastesp__group
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(1) {
-    top: 258px;
-    left: 31px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group
-    + .fc-pastesp__group
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(2) {
-    top: 280px;
-    left: 31px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group
-    + .fc-pastesp__group
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(3) {
-    top: 302px;
-    left: 31px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group
-    + .fc-pastesp__group
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(4) {
-    top: 258px;
-    left: 187px;
-    width: 115px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__group
-    + .fc-pastesp__group
-    .fc-pastesp__list
-    > .fc-fmtdlg__radio:nth-child(5) {
-    top: 280px;
-    left: 187px;
-    width: 115px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__bottomrow > .fc-fmtdlg__check {
-    top: 351px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__bottomrow
-    > .fc-fmtdlg__check:nth-child(1) {
-    left: 31px;
-    width: 108px;
-  }
-  .fc-overlay-portal[data-fc-platform="mac"]
-    .fc-pastesp__bottomrow
-    > .fc-fmtdlg__check:nth-child(2) {
-    left: 187px;
-    width: 115px;
   }
   .fc-overlay-portal[data-fc-platform="mac"]
     .fc-pastesp__panel
@@ -287,6 +167,7 @@
     padding: 0;
     white-space: nowrap;
   }
+  /* Paste Link keeps the left edge; Cancel and OK keep their distance from the right one. */
   .fc-overlay-portal[data-fc-platform="mac"]
     .fc-pastesp__panel
     .fc-fmtdlg__footer
@@ -299,20 +180,20 @@
     .fc-fmtdlg__footer
     > .fc-pastesp__link
     + .fc-fmtdlg__btn {
-    left: 259px;
+    right: 116px;
   }
   .fc-overlay-portal[data-fc-platform="mac"]
     .fc-pastesp__panel
     .fc-fmtdlg__footer
     > .fc-fmtdlg__btn--primary {
-    left: 355px;
+    right: 20px;
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__cols::before,
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__cols::after {
     content: "";
     position: absolute;
+    right: 12px;
     left: 12px;
-    width: 437px;
     height: 1px;
     background: var(--fc-fmtdlg-rule, var(--fc-rule));
   }
