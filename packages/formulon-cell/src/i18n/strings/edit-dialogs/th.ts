@@ -182,6 +182,7 @@ export const editDialogsTh: EditDialogsStrings = {
     search: 'ค้นหา',
     authoringGroup: 'การเขียน',
     viewPane: 'มุมมอง',
+    autoCorrectPane: 'การแก้ไขอัตโนมัติ',
     zeroValues: 'ค่าศูนย์',
     zeroValuesTip: 'แสดง 0 (เลขศูนย์) ในเซลล์ที่มีค่าเป็นศูนย์  ส่งผลกระทบต่อ: แผ่นงานที่ใช้งานอยู่เท่านั้น',
   },

@@ -185,6 +185,7 @@ export const editDialogsJa: EditDialogsStrings = {
     search: '検索',
     authoringGroup: 'オーサリング',
     viewPane: '表示',
+    autoCorrectPane: 'オートコレクト',
     zeroValues: 'ゼロ表示',
     zeroValuesTip: 'ゼロ値が格納されているセルに 0 を表示します。',
   },

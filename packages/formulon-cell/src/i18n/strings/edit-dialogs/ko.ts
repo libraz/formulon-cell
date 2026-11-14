@@ -183,6 +183,7 @@ export const editDialogsKo: EditDialogsStrings = {
     search: '검색',
     authoringGroup: '작성',
     viewPane: '보기',
+    autoCorrectPane: '자동 고침',
     zeroValues: '0값',
     zeroValuesTip: '0(영)의 값을 포함하는 셀에 0(영)을 표시합니다. 대상: 활성 시트에만 적용됩니다.',
   },

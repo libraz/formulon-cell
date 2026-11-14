@@ -77,7 +77,7 @@ describe('Preferences window', () => {
     tool('すべて表示')?.click();
     expect(dialog()?.getAttribute('aria-label')).toBe('環境設定');
     expect(dialog()?.querySelector('.fc-prefs__heading')?.textContent).toBe('');
-    expect(showAll()).toEqual([['オーサリング', ['表示']]]);
+    expect(showAll()).toEqual([['オーサリング', ['表示', 'オートコレクト']]]);
     expect(dialog()?.querySelector<HTMLElement>('.fc-prefs__pane')?.hidden).toBe(true);
     expect(tool('戻る')?.disabled).toBe(false);
     expect(tool('進む')?.disabled).toBe(true);
@@ -111,7 +111,57 @@ describe('Preferences window', () => {
     type('calc');
     expect(showAll()).toEqual([]);
     type('');
-    expect(showAll()).toEqual([['Authoring', ['View']]]);
+    expect(showAll()).toEqual([['Authoring', ['View', 'AutoCorrect']]]);
+  });
+
+  it('lists the AutoCorrect options in the desktop order, all on, sharing the dialog store', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const instance = sheet.instance;
+    const dialogs = createDialogs(() => instance);
+    dialogs.open('preferences');
+    dialog()?.querySelector<HTMLButtonElement>('[data-pane="autoCorrect"]')?.click();
+    expect(dialog()?.getAttribute('aria-label')).toBe('AutoCorrect');
+    const pane = dialog()?.querySelector<HTMLElement>('.fc-prefs__pane[data-pane="autoCorrect"]');
+    const rows = [...(pane?.querySelectorAll<HTMLLabelElement>('.fc-autocorrect__check') ?? [])];
+    expect(rows.map((row) => row.textContent)).toEqual([
+      'Replace internet and network paths with hyperlinks',
+      'Capitalize names of days',
+      'Correct TWo INitial CApitals',
+      'Capitalize first letter of sentences',
+      'Replace text as you type',
+    ]);
+    expect(rows.map((row) => row.querySelector('input')?.checked)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+
+    const days = rows[1]?.querySelector('input') as HTMLInputElement;
+    days.checked = false;
+    days.dispatchEvent(new Event('change'));
+    expect(instance.autoCorrect.state().capitalizeDays).toBe(false);
+
+    dialogs.close('preferences');
+    dialogs.open('autoCorrect');
+    const reopened = [
+      ...document.querySelectorAll<HTMLLabelElement>('.fc-autocorrect .fc-autocorrect__check'),
+    ].find((row) => row.textContent === 'Capitalize names of days');
+    expect(reopened?.querySelector('input')?.checked).toBe(false);
+    dialogs.close('autoCorrect');
+  });
+
+  it('keeps the pane and the AutoCorrect dialog ids apart while both are open', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const dialogs = createDialogs(() => sheet?.instance as NonNullable<typeof sheet>['instance']);
+    dialogs.open('preferences');
+    dialog()?.querySelector<HTMLButtonElement>('[data-pane="autoCorrect"]')?.click();
+    dialogs.open('autoCorrect');
+    const ids = [...document.querySelectorAll<HTMLElement>('[id]')].map((el) => el.id);
+    expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
+    dialogs.close('autoCorrect');
+    dialogs.close('preferences');
   });
 
   it('is refused on the default platform, which keeps the setting on its ribbon', async () => {

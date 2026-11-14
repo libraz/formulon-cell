@@ -182,6 +182,7 @@ export const editDialogsZh: EditDialogsStrings = {
     search: '搜索',
     authoringGroup: '创作',
     viewPane: '查看',
+    autoCorrectPane: '自动更正',
     zeroValues: '零值',
     zeroValuesTip: '在包含零值的单元格中显示 0(零)。\n\n影响: 仅活动工作表。',
   },

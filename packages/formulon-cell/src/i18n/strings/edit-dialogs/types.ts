@@ -202,6 +202,7 @@ export interface EditDialogsStrings {
     authoringGroup: string;
     /** The View pane's name, which is also the window title while it is shown. */
     viewPane: string;
+    autoCorrectPane: string;
     zeroValues: string;
     zeroValuesTip: string;
   };

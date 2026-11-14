@@ -3,6 +3,7 @@ import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { appendAutoCorrectOptions } from './autocorrect-options.js';
 import {
   appendDialogButton,
   appendDialogFrame,
@@ -52,6 +53,15 @@ const PANES: readonly PreferencePane[] = [
         checked: instance.store.getState().ui.showZeros !== false,
         set: (show) => setZerosVisible(instance.store, show, instance.workbook),
       });
+    },
+  },
+  {
+    id: 'autoCorrect',
+    label: (t) => t.autoCorrectPane,
+    group: (t) => t.authoringGroup,
+    render(instance, body, on) {
+      const label = instance.i18n.strings.preferencesDialog.autoCorrectPane;
+      appendAutoCorrectOptions(instance, body, on, label, 'fc-prefs-autocorrect');
     },
   },
 ];
