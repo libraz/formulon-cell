@@ -844,4 +844,20 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
     await expectWorkbookSurfaceChrome(page);
     await snapshotDemo(page, 'excel-chrome-home-full-mobile-390');
   });
+
+  await test.step('mac home and preferences', async () => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await sp.mount({ locale: 'ja', platform: 'mac' });
+    await sp.expectNoStub();
+    // The book opens on Home; clicking the selected tab would collapse the ribbon.
+    await expect(page.locator('[data-ribbon-tab="home"][aria-selected="true"]')).toHaveCount(1);
+    await expect(page.locator('[data-ribbon-command="wrap"]').first()).toBeVisible();
+    await snapshotDemo(page, 'excel-chrome-mac-home-full-1440');
+    await page.locator('.demo__brand-mark').first().click();
+    const backstage = page.locator('.fc-tb__backstage[role="dialog"]').first();
+    await expect(backstage).toBeVisible();
+    await backstage.getByRole('button', { name: 'オプション', exact: true }).first().click();
+    await expect(page.locator('.fc-prefs[role="dialog"]')).toBeVisible();
+    await snapshotPage(page, 'excel-chrome-mac-preferences-1440');
+  });
 }
