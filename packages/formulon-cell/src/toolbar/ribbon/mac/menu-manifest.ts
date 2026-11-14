@@ -84,6 +84,8 @@ export const MAC_RIBBON_MENU_COMMANDS = [
   'mac.data.sortFilter',
   'mac.data.validation',
   'mac.data.whatIf',
+  'mac.review.accessibility',
+  'mac.review.hideInk',
   'mac.review.notes',
   'mac.view.cellFocus',
   'mac.view.freeze',
@@ -581,6 +583,27 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.data.goalSeek', label: 'Goal Seek' },
     { id: 'mac.data.dataTable', label: 'Data Table' },
   ]),
+  // Only the checker is built; the other entries are the desktop's and have nothing behind them.
+  'mac.review.accessibility': menu([
+    { id: 'mac.review.accessibility.check', label: 'Check Accessibility' },
+    ...menu([
+      { id: 'mac.review.accessibility.altText', label: 'Alt Text' },
+      { id: 'mac.review.accessibility.formatTable', label: 'Format as Table' },
+      { id: 'mac.review.accessibility.unmerge', label: 'Unmerge Cells' },
+      { id: 'mac.review.accessibility.help', label: 'Accessibility Help' },
+    ]).map((item) => ({ ...item, disabled: true, disabledReason: NOT_IMPLEMENTED.en })),
+  ]),
+  // Ink cannot be hidden or deleted in this host, so every entry is greyed out.
+  'mac.review.hideInk': [
+    ...unavailable([{ id: 'mac.review.hideInk.hide', label: 'Hide Ink' }], EMBEDDED_UNSUPPORTED),
+    ...unavailable(
+      [
+        { id: 'mac.review.hideInk.deleteSheet', label: 'Delete All Ink on Sheet' },
+        { id: 'mac.review.hideInk.deleteWorkbook', label: 'Delete All Ink in Workbook' },
+      ],
+      NOT_IMPLEMENTED,
+    ),
+  ],
   'mac.review.notes': menu([
     { id: 'mac.review.newNote', label: 'New Note' },
     { id: 'mac.review.previousNote', label: 'Previous Note' },
@@ -664,6 +687,8 @@ export const macRibbonMenuIdForCommand = (commandId: string): string | null => {
     'mac.data.sortFilter': 'menu-mac-data-sort-filter',
     'mac.data.validation': 'menu-mac-data-validation',
     'mac.data.whatIf': 'menu-mac-data-what-if',
+    'mac.review.accessibility': 'menu-mac-review-accessibility',
+    'mac.review.hideInk': 'menu-mac-review-hide-ink',
     'mac.review.notes': 'menu-mac-review-notes',
     'mac.view.cellFocus': 'menu-mac-view-cell-focus',
     'mac.view.freeze': 'menu-mac-view-freeze',

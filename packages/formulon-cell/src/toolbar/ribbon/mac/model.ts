@@ -477,90 +477,43 @@ const dataTab = (): RibbonTabModel =>
 
 const reviewTab = (): RibbonTabModel =>
   macTab('review', t('review'), [
-    group(
-      { ja: '文章校正', en: 'Proofing' },
-      [
-        compactCommand('mac.review.spelling', t('spelling'), 'spelling'),
-        disabledCompactCommand(
-          'mac.review.thesaurus',
-          t('thesaurus'),
-          'spelling',
-          EMBEDDED_UNSUPPORTED,
-        ),
-        compactCommand('mac.review.stats', t('stats'), 'count'),
-      ],
-      'compact',
-    ),
-    group(
-      { ja: 'アクセシビリティ', en: 'Accessibility' },
-      [compactCommand('mac.review.accessibility', t('accessibility'), 'accessibility')],
-      'compact',
-    ),
-    group(
-      { ja: '言語', en: 'Language' },
-      [
-        disabledCompactCommand(
-          'mac.review.translate',
-          t('translate'),
-          'translate',
-          NOT_IMPLEMENTED,
-        ),
-      ],
-      'compact',
-    ),
-    group(
-      { ja: '変更', en: 'Changes' },
-      [
-        disabledCompactCommand(
-          'mac.review.showChanges',
-          t('showChanges'),
-          'showChanges',
-          EMBEDDED_UNSUPPORTED,
-        ),
-      ],
-      'compact',
-    ),
-    group(
-      { ja: 'コメント', en: 'Comments' },
-      [
-        compactCommand('mac.review.newComment', t('newComment'), 'commentAdd'),
-        compactCommand('mac.review.deleteComment', t('deleteComment'), 'clear'),
-        compactCommand('mac.review.previousComment', t('previousComment'), 'goTo'),
-        compactCommand('mac.review.nextComment', t('nextComment'), 'goTo'),
-        compactCommand('mac.review.showComments', t('showComments'), 'commentAdd'),
-      ],
-      'compact',
-    ),
-    group(
-      { ja: 'メモ', en: 'Notes' },
-      [compactCommand('mac.review.notes', t('notes'), 'commentAdd')],
-      'compact',
-    ),
-    group(
-      { ja: '保護', en: 'Protect' },
-      [
-        compactCommand('mac.review.protectSheet', t('protectSheet'), 'protect'),
-        compactCommand('mac.review.protectWorkbook', t('protectWorkbook'), 'protect'),
-      ],
-      'compact',
-    ),
-    group(
-      { ja: '読み取り専用', en: 'Read-Only' },
-      [
-        disabledCompactCommand(
-          'mac.review.alwaysReadOnly',
-          t('alwaysReadOnly'),
-          'protect',
-          NOT_IMPLEMENTED,
-        ),
-      ],
-      'compact',
-    ),
-    group(
-      { ja: 'インク', en: 'Ink' },
-      [disabledCompactCommand('mac.review.hideInk', t('hideInk'), 'pen', EMBEDDED_UNSUPPORTED)],
-      'compact',
-    ),
+    group({ ja: '文章校正', en: 'Proofing' }, [
+      menuCommand('mac.review.spelling', t('spelling'), 'spelling'),
+      disabledCommand('mac.review.thesaurus', t('thesaurus'), 'spelling', EMBEDDED_UNSUPPORTED),
+      menuCommand('mac.review.stats', t('stats'), 'count'),
+    ]),
+    group({ ja: 'アクセシビリティ', en: 'Accessibility' }, [
+      menuCommand('mac.review.accessibility', t('accessibility'), 'accessibility'),
+    ]),
+    group({ ja: '言語', en: 'Language' }, [
+      disabledCommand('mac.review.translate', t('translate'), 'translate', NOT_IMPLEMENTED),
+    ]),
+    group({ ja: '変更', en: 'Changes' }, [
+      disabledCommand(
+        'mac.review.showChanges',
+        t('showChanges'),
+        'showChanges',
+        EMBEDDED_UNSUPPORTED,
+      ),
+    ]),
+    group({ ja: 'コメント', en: 'Comments' }, [
+      menuCommand('mac.review.newComment', t('newComment'), 'commentAdd'),
+      menuCommand('mac.review.deleteComment', t('deleteComment'), 'clear'),
+      menuCommand('mac.review.previousComment', t('previousComment'), 'goTo'),
+      menuCommand('mac.review.nextComment', t('nextComment'), 'goTo'),
+      menuCommand('mac.review.showComments', t('showComments'), 'commentAdd'),
+    ]),
+    group({ ja: 'メモ', en: 'Notes' }, [menuCommand('mac.review.notes', t('notes'), 'commentAdd')]),
+    group({ ja: '変更箇所', en: 'Protection Changes' }, [
+      menuCommand('mac.review.protectSheet', t('protectSheet'), 'protect'),
+      menuCommand('mac.review.protectWorkbook', t('protectWorkbook'), 'protect'),
+    ]),
+    group({ ja: '保護', en: 'Protect' }, [
+      disabledCommand('mac.review.alwaysReadOnly', t('alwaysReadOnly'), 'protect', NOT_IMPLEMENTED),
+    ]),
+    group({ ja: 'インク', en: 'Ink' }, [
+      disabledCommand('mac.review.hideInk', t('hideInk'), 'pen', EMBEDDED_UNSUPPORTED),
+    ]),
   ]);
 
 const viewTab = (): RibbonTabModel =>

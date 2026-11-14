@@ -5,7 +5,7 @@ import { workbookHasNotes } from '../../../commands/convert-notes.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
 import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
-import { noteChangePermitted } from '../../../commands/protection.js';
+import { isWorkbookStructureProtected, noteChangePermitted } from '../../../commands/protection.js';
 import { arrangeStackPosition } from '../../../commands/session-illustration.js';
 import { TEMPORARY_SHEET_VIEW_ID } from '../../../commands/sheet-views.js';
 import { activeTableOverlay } from '../../../commands/table-design.js';
@@ -213,12 +213,8 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
       )
     )
       return strings.commentDeleteRequiresActive;
-    if (
-      ['mac.review.previousComment', 'mac.review.nextComment', 'mac.review.showComments'].includes(
-        id,
-      ) &&
-      !roots.length
-    )
+    // Show Comments stays available on an empty sheet; it opens an empty list.
+    if (['mac.review.previousComment', 'mac.review.nextComment'].includes(id) && !roots.length)
       return strings.commentNone;
   }
   // Note navigation needs a note anywhere in the book; Show/Hide needs one on the active cell.
@@ -321,6 +317,12 @@ export const projectMacRibbonState = (
     'mac.view.zoomSelection': false,
     // Lasso Select is a toggle the host cannot turn on.
     'mac.draw.lasso': false,
+    // Show Changes and Always Open Read-Only have no state here, and Show Comments opens a
+    // list rather than holding a view on.
+    'mac.review.showChanges': false,
+    'mac.review.showComments': false,
+    'mac.review.alwaysReadOnly': false,
+    'mac.review.protectWorkbook': isWorkbookStructureProtected(instance.store.getState()),
   };
   for (const [command, pressed] of Object.entries({ ...drawingStates, ...toggleStates })) {
     for (const button of buttons.get(command) ?? []) {

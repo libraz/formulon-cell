@@ -16,7 +16,11 @@ import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import { Spreadsheet } from '../../../src/mount.js';
 import { createSpreadsheetStore, defaultPageSetup, mutators } from '../../../src/store/store.js';
 import { ribbonActivationForCommand } from '../../../src/toolbar/ribbon/activation.js';
-import { isMacRibbonCommandSupported } from '../../../src/toolbar/ribbon/mac/dispatch.js';
+import type { ApplyRibbonCommandDeps } from '../../../src/toolbar/ribbon/apply-ribbon-command.js';
+import {
+  dispatchMacRibbonCommand,
+  isMacRibbonCommandSupported,
+} from '../../../src/toolbar/ribbon/mac/dispatch.js';
 import {
   createMacRibbonMenuFactory,
   projectMacFunctionCategoryMenus,
@@ -1619,6 +1623,203 @@ describe('Mac Excel ribbon profile', () => {
       } finally {
         toolbar.dispose();
         toolbarHost.remove();
+        sheet.dispose();
+      }
+    });
+  });
+
+  describe('Review tab layout', () => {
+    const reviewGroups = () =>
+      buildRibbonModel('en', { profile: 'excel365Mac' }).find((tab) => tab.id === 'review')
+        ?.groups ?? [];
+    const sizeOf = (command: { layout?: string }) =>
+      command.layout === 'stacked' ? 'small' : 'large';
+    const items = (root: string) =>
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+    const commandIds = [
+      'mac.review.spelling',
+      'mac.review.thesaurus',
+      'mac.review.stats',
+      'mac.review.accessibility',
+      'mac.review.translate',
+      'mac.review.showChanges',
+      'mac.review.newComment',
+      'mac.review.deleteComment',
+      'mac.review.previousComment',
+      'mac.review.nextComment',
+      'mac.review.showComments',
+      'mac.review.notes',
+      'mac.review.protectSheet',
+      'mac.review.protectWorkbook',
+      'mac.review.alwaysReadOnly',
+      'mac.review.hideInk',
+    ];
+
+    it('draws all sixteen controls as large tiles in the desktop order', () => {
+      const commands = reviewGroups().flatMap((group) => group.commands);
+      expect(commands.map((command) => [command.id, sizeOf(command)])).toEqual(
+        commandIds.map((id) => [id, 'large']),
+      );
+      expect(reviewGroups().map((group) => group.commands.length)).toEqual([
+        3, 1, 1, 1, 5, 1, 2, 1, 1,
+      ]);
+    });
+
+    it('keeps Thesaurus, Translate, Show Changes, Always Open Read-Only and Hide Ink disabled with a reason', () => {
+      for (const id of [
+        'mac.review.thesaurus',
+        'mac.review.translate',
+        'mac.review.showChanges',
+        'mac.review.alwaysReadOnly',
+        'mac.review.hideInk',
+      ]) {
+        expect(findCommand('review', id)?.disabled, id).toBe(true);
+        expect(findCommand('review', id)?.disabledReason, id).toBeTruthy();
+      }
+    });
+
+    it('opens Check Accessibility as a menu of five items, only the check enabled', () => {
+      expect(MAC_RIBBON_MENU_COMMAND_SET.has('mac.review.accessibility')).toBe(true);
+      expect(findCommand('review', 'mac.review.accessibility')?.disabled).toBeFalsy();
+      expect(items('mac.review.accessibility')).toEqual([
+        ['mac.review.accessibility.check', 'Check Accessibility', false],
+        ['mac.review.accessibility.altText', 'Alt Text', true],
+        ['mac.review.accessibility.formatTable', 'Format as Table', true],
+        ['mac.review.accessibility.unmerge', 'Unmerge Cells', true],
+        ['mac.review.accessibility.help', 'Accessibility Help', true],
+      ]);
+      for (const item of MAC_RIBBON_MENU_ITEMS['mac.review.accessibility'] ?? []) {
+        expect(!!item.disabledReason, item.id).toBe(!!item.disabled);
+      }
+      expect(isMacRibbonCommandSupported('mac.review.accessibility.check')).toBe(true);
+      expect(macRibbonLabelForCommand('mac.review.accessibility.unmerge', 'ja')).toBe(
+        'セル結合の解除',
+      );
+    });
+
+    it('opens Hide Ink as a menu of three items, all disabled with a reason', () => {
+      expect(MAC_RIBBON_MENU_COMMAND_SET.has('mac.review.hideInk')).toBe(true);
+      expect(items('mac.review.hideInk')).toEqual([
+        ['mac.review.hideInk.hide', 'Hide Ink', true],
+        ['mac.review.hideInk.deleteSheet', 'Delete All Ink on Sheet', true],
+        ['mac.review.hideInk.deleteWorkbook', 'Delete All Ink in Workbook', true],
+      ]);
+      for (const item of MAC_RIBBON_MENU_ITEMS['mac.review.hideInk'] ?? []) {
+        expect(item.disabledReason, item.id).toBeTruthy();
+      }
+      expect(macRibbonLabelForCommand('mac.review.hideInk.deleteSheet', 'ja')).toBe(
+        'シート内のすべてのインクを削除',
+      );
+    });
+
+    it('labels the menu items in all seven locales', () => {
+      for (const locale of ['en', 'ja', 'de', 'fr', 'ko', 'th', 'zh'] as const) {
+        for (const root of ['mac.review.accessibility', 'mac.review.hideInk']) {
+          for (const item of MAC_RIBBON_MENU_ITEMS[root] ?? []) {
+            expect(macRibbonLabelForCommand(item.id, locale), `${locale} ${item.id}`).not.toBe(
+              item.id,
+            );
+          }
+        }
+      }
+      expect(macRibbonLabelForCommand('mac.review.accessibility.altText', 'fr')).toBe('Texte Alt');
+      expect(macRibbonLabelForCommand('mac.review.hideInk.hide', 'zh')).toBe('隐藏墨迹');
+    });
+
+    it('titles the Protect Sheet group Changes and the read-only group Protect in every language', () => {
+      const titles: Record<string, [string, string]> = {
+        en: ['Changes', 'Protect'],
+        ja: ['変更箇所', '保護'],
+        de: ['Änderungen', 'Schützen'],
+        fr: ['Modifications', 'Protéger'],
+        ko: ['변경 내용', '보호'],
+        th: ['การเปลี่ยนแปลง', 'ป้องกัน'],
+        zh: ['更改', '保护'],
+      };
+      for (const [locale, [changes, protect]] of Object.entries(titles)) {
+        const groups = buildRibbonModel(locale as 'en', { profile: 'excel365Mac' }).find(
+          (tab) => tab.id === 'review',
+        )?.groups;
+        expect(groups?.[6]?.title, locale).toBe(changes);
+        expect(groups?.[6]?.commands.map((command) => command.id)).toEqual([
+          'mac.review.protectSheet',
+          'mac.review.protectWorkbook',
+        ]);
+        expect(groups?.[7]?.title, locale).toBe(protect);
+        expect(groups?.[7]?.commands.map((command) => command.id)).toEqual([
+          'mac.review.alwaysReadOnly',
+        ]);
+      }
+    });
+
+    it('renders four toggles pressed only where the model holds the state, and the menu chevrons', async () => {
+      const sheet = await mountStubSheet({ locale: 'en' });
+      const toolbarHost = document.createElement('div');
+      document.body.append(toolbarHost);
+      const toolbar = Spreadsheet.mountToolbar(toolbarHost, sheet.instance, {
+        platform: 'mac',
+        activeTab: 'review',
+        helpers: {
+          ...mountedRibbonHelpers(),
+          createIcon: () => document.createElementNS('http://www.w3.org/2000/svg', 'svg'),
+        },
+      });
+      try {
+        projectMacRibbonState(toolbarHost, sheet.instance);
+        const button = (id: string) =>
+          toolbarHost.querySelector<HTMLButtonElement>(`[data-ribbon-command="${id}"]`);
+        const toggles = [
+          'mac.review.showChanges',
+          'mac.review.showComments',
+          'mac.review.protectWorkbook',
+          'mac.review.alwaysReadOnly',
+        ];
+        for (const id of toggles) {
+          expect(button(id)?.getAttribute('aria-pressed'), id).toBe('false');
+        }
+        expect(button('mac.review.spelling')?.hasAttribute('aria-pressed')).toBe(false);
+        for (const id of ['mac.review.accessibility', 'mac.review.hideInk', 'mac.review.notes']) {
+          expect(button(id)?.querySelector('.fc-tb__rb-split-chevron') !== null, id).toBe(true);
+        }
+        expect(button('mac.review.spelling')?.querySelector('.fc-tb__rb-split-chevron')).toBeNull();
+        mutators.setWorkbookStructureProtected(sheet.instance.store, true);
+        projectMacRibbonState(toolbarHost, sheet.instance);
+        expect(button('mac.review.protectWorkbook')?.getAttribute('aria-pressed')).toBe('true');
+        for (const id of toggles.filter((id) => id !== 'mac.review.protectWorkbook')) {
+          expect(button(id)?.getAttribute('aria-pressed'), id).toBe('false');
+        }
+      } finally {
+        toolbar.dispose();
+        toolbarHost.remove();
+        sheet.dispose();
+      }
+    });
+
+    it('keeps Show Comments enabled on a sheet without comments and opens an empty list', async () => {
+      const sheet = await mountStubSheet({
+        locale: 'en',
+        workbook: await WorkbookHandle.createDefault(),
+      });
+      const { instance } = sheet;
+      expect(instance.workbook.capabilities.threadedComments).toBe(true);
+      try {
+        const host = document.createElement('div');
+        const button = projectedButton(host, 'mac.review.showComments');
+        projectMacRibbonState(host, instance);
+        expect(button.disabled).toBe(false);
+        expect(instance.store.getState().threadedComments.bySheet.get(0) ?? []).toEqual([]);
+
+        const deps = {
+          inst: instance,
+          runtime: { projectFormatToolbar: () => undefined },
+        } as unknown as ApplyRibbonCommandDeps;
+        expect(dispatchMacRibbonCommand('mac.review.showComments', deps, () => false)).toBe(true);
+        // The list opens with its empty notice and no rows.
+        const list = document.querySelector('.fc-tb__dlg__list');
+        expect(list?.textContent).toBe(instance.i18n.strings.reviewReports.noIssues);
+        expect(list?.querySelectorAll('strong').length).toBe(0);
+      } finally {
+        document.body.innerHTML = '';
         sheet.dispose();
       }
     });

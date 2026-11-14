@@ -272,6 +272,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'mac.page.theme.gray',
   'mac.page.theme.office',
   'mac.review.accessibility',
+  'mac.review.accessibility.check',
   'mac.review.convertNotes',
   'mac.review.deleteComment',
   'mac.review.newComment',

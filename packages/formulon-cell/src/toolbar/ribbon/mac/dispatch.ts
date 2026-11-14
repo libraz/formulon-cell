@@ -74,6 +74,7 @@ const aliases: Readonly<Record<string, string>> = {
   'mac.formulas.calcOptions': 'calcOptions',
   'mac.review.spelling': 'spellingReview',
   'mac.review.accessibility': 'accessibility',
+  'mac.review.accessibility.check': 'accessibility',
   'mac.review.protectSheet': 'protectReview',
   'mac.review.protectWorkbook': 'protectWorkbookReview',
   'mac.view.standard': 'viewNormal',

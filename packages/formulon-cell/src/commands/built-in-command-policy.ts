@@ -391,6 +391,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   'mac.page.size': null,
   'mac.page.theme': null,
   'mac.review.accessibility': null,
+  'mac.review.accessibility.check': null,
   'mac.review.nextComment': null,
   'mac.review.nextNote': null,
   'mac.review.notes': null,
