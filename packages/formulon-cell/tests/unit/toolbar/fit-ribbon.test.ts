@@ -15,9 +15,12 @@ type GroupSpec = {
   /** Width at each stage: base, narrow, condensed, icon-only. */
   widths: readonly [number, number, number, number];
   buttons?: readonly string[];
+  /** Command buttons, so the group can collapse. */
+  commands?: number;
 };
 
 const widthOf = (group: HTMLElement, spec: GroupSpec): number => {
+  if (group.classList.contains(RIBBON_GROUP_COLLAPSED_CLASS)) return 48;
   if (group.classList.contains(RIBBON_GROUP_ICON_ONLY_CLASS)) return spec.widths[3];
   if (group.classList.contains(RIBBON_GROUP_CONDENSED_CLASS)) return spec.widths[2];
   if (group.classList.contains(RIBBON_GROUP_NARROW_CLASS)) return spec.widths[1];
@@ -36,6 +39,12 @@ const makePanel = (clientWidth: number, specs: readonly GroupSpec[]) => {
     for (const kind of spec.buttons ?? []) {
       const button = document.createElement('button');
       button.className = `fc-tb__rb fc-tb__rb--${kind}`;
+      tools.appendChild(button);
+    }
+    for (let i = 0; i < (spec.commands ?? 0); i++) {
+      const button = document.createElement('button');
+      button.className = 'fc-tb__rb';
+      button.dataset.ribbonCommand = `cmd-${i}`;
       tools.appendChild(button);
     }
     group.appendChild(tools);
@@ -116,6 +125,147 @@ describe('toolbar/ribbon fit', () => {
     fit.refit();
     fit.detach();
     expect(classesOf(groups)).toEqual([[]]);
+  });
+});
+
+describe('toolbar/ribbon measured fit plan', () => {
+  const specs = (): GroupSpec[] => [
+    { variant: 'mixed', widths: [300, 280, 250, 150] },
+    { variant: 'tiles', widths: [200, 180, 150, 100], commands: 3 },
+    { variant: 'tiles', widths: [200, 180, 150, 100] },
+  ];
+  const collapsedOf = (groups: readonly HTMLElement[]) =>
+    groups.map((group) => group.classList.contains(RIBBON_GROUP_COLLAPSED_CLASS));
+  const plan = { reduce: [0], collapse: [1] };
+
+  it('applies the planned reductions as one step instead of narrowing from the right', () => {
+    const { panel, groups } = makePanel(650, specs());
+    fitRibbonPanel(panel, { collapse: true, plan });
+    expect(classesOf(groups)).toEqual([['narrow', 'condensed', 'icon-only'], [], []]);
+    expect(collapsedOf(groups)).toEqual([false, true, false]);
+  });
+
+  it('leaves a panel that fits untouched', () => {
+    const { panel, groups } = makePanel(800, specs());
+    fitRibbonPanel(panel, { collapse: true, plan });
+    expect(classesOf(groups)).toEqual([[], [], []]);
+    expect(collapsedOf(groups)).toEqual([false, false, false]);
+  });
+
+  it('falls back to the stages for the other groups when the plan is not enough', () => {
+    const { panel, groups } = makePanel(350, specs());
+    fitRibbonPanel(panel, { collapse: true, plan });
+    expect(classesOf(groups)).toEqual([
+      ['narrow', 'condensed', 'icon-only'],
+      [],
+      ['narrow', 'condensed'],
+    ]);
+    expect(collapsedOf(groups)).toEqual([false, true, false]);
+  });
+
+  const mountMac = (lang: string) => {
+    const root = document.createElement('div');
+    root.dataset.fcPlatform = 'mac';
+    root.lang = lang;
+    const shell = document.createElement('div');
+    shell.className = 'fc-tb__ribbon-shell';
+    const formulas = Array.from(
+      { length: 5 },
+      (): GroupSpec => ({ variant: 'mixed', widths: [300, 280, 250, 150] }),
+    );
+    const { panel, groups } = makePanel(1400, formulas);
+    panel.dataset.ribbonPanel = 'formulas';
+    shell.appendChild(panel);
+    root.appendChild(shell);
+    const fit = attachRibbonFit(root);
+    fit.refit();
+    fit.detach();
+    return groups;
+  };
+
+  it('picks the plan for the host language and active tab on the Mac profile', () => {
+    expect(classesOf(mountMac('fr'))).toEqual([
+      [],
+      [],
+      [],
+      [],
+      ['narrow', 'condensed', 'icon-only'],
+    ]);
+  });
+
+  it('keeps the stage order for a locale with no measured plan', () => {
+    expect(classesOf(mountMac('th'))).toEqual([
+      ['narrow'],
+      ['narrow'],
+      ['narrow'],
+      ['narrow'],
+      ['narrow'],
+    ]);
+  });
+});
+
+describe('toolbar/ribbon Mac tile labels', () => {
+  /** A "New Comment" label: 47px for its longest word, 80px on one line. */
+  const mountTile = (panelId: string, variant: string) => {
+    const root = document.createElement('div');
+    root.dataset.fcPlatform = 'mac';
+    const shell = document.createElement('div');
+    shell.className = 'fc-tb__ribbon-shell';
+    const panel = document.createElement('div');
+    panel.className = 'fc-tb__ribbon';
+    panel.dataset.ribbonPanel = panelId;
+    const group = document.createElement('section');
+    group.className = `fc-tb__ribbon-group fc-tb__ribbon-group--${variant}`;
+    const tools = document.createElement('div');
+    tools.className = 'fc-tb__ribbon-tools';
+    const button = document.createElement('button');
+    button.className = 'fc-tb__rb fc-tb__rb--wide';
+    const label = document.createElement('span');
+    label.textContent = 'New Comment';
+    const widthOf = (): number => {
+      const width = label.style.width;
+      if (width === 'min-content') return 47;
+      if (width === 'max-content' || width === '') return 80;
+      return Number.parseFloat(width);
+    };
+    label.getBoundingClientRect = () => ({ width: widthOf() }) as DOMRect;
+    button.append(label);
+    tools.append(button);
+    group.append(tools);
+    panel.append(group);
+    shell.append(panel);
+    root.append(shell);
+    return { root, label, widthOf };
+  };
+
+  const withLineLayout = (widthOf: () => number, run: () => void): void => {
+    const original = document.createRange;
+    document.createRange = (() => ({
+      selectNodeContents: () => {},
+      getClientRects: () => {
+        const width = widthOf();
+        const lines = width >= 80 ? 1 : width >= 47 ? 2 : 3;
+        return Array.from({ length: lines }, (_, i) => ({ top: i * 12 }));
+      },
+    })) as unknown as typeof document.createRange;
+    try {
+      run();
+    } finally {
+      document.createRange = original;
+    }
+  };
+
+  it.each([
+    ['review', 'tiles'],
+    ['formulas', 'mixed'],
+  ])('wraps a %s tile label to its narrowest two-line width', (panelId, variant) => {
+    const { root, label, widthOf } = mountTile(panelId, variant);
+    withLineLayout(widthOf, () => {
+      const fit = attachRibbonFit(root);
+      fit.refit();
+      fit.detach();
+    });
+    expect(label.style.width).toBe('47px');
   });
 });
 

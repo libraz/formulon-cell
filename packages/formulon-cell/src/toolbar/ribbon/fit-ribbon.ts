@@ -8,12 +8,15 @@
  * name and tooltip stay). Command order never changes; only density does. A
  * stage is kept on a group only if it made the group narrower. On the Mac
  * profile a panel that still overflows then collapses whole groups, rightmost
- * first, into one named button that opens the group as a popup.
+ * first, into one named button that opens the group as a popup. Where the Mac
+ * tab has a measured plan, an overflowing panel first applies that plan in one
+ * step, and the stages above only run if it still overflows.
  */
 
 import { onOutsidePress } from '../../interact/outside-press.js';
 import { placePanel, viewportSize } from '../../interact/overlay-position.js';
 import { createRibbonButton } from './button.js';
+import { type MacRibbonFitPlan, macRibbonFitPlan } from './mac/fit-plan.js';
 
 export const RIBBON_GROUP_NARROW_CLASS = 'fc-tb__ribbon-group--narrow';
 export const RIBBON_GROUP_CONDENSED_CLASS = 'fc-tb__ribbon-group--condensed';
@@ -54,9 +57,8 @@ const FIT_CLASSES = FIT_STAGES.map(([stage]) => stage);
 const LABEL = 'span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron)';
 /** Labels of a group's full-height tiles. */
 const TILE_LABELS = `:scope > .fc-tb__ribbon-tools > .fc-tb__rb:not(.fc-tb__rb--stacked) > ${LABEL}`;
-/** Mac Home style and editing tiles: Excel sizes each to the narrowest width
- *  that keeps its label on two lines. */
-const TWO_LINE_LABELS = `:scope > .fc-tb__ribbon :is(.fc-tb__ribbon-group--styles, .fc-tb__ribbon-group--editing) .fc-tb__rb--wide:not(.fc-tb__rb--stacked) > ${LABEL}`;
+/** Mac full-height tiles: each takes the narrowest width that keeps its label on two lines. */
+const TWO_LINE_LABELS = `:scope > .fc-tb__ribbon :is(.fc-tb__ribbon-group--tiles, .fc-tb__ribbon-group--mixed) .fc-tb__rb--wide:not(.fc-tb__rb--stacked) > ${LABEL}`;
 
 const overflows = (panel: HTMLElement): boolean => panel.scrollWidth > panel.clientWidth + 1;
 
@@ -170,35 +172,64 @@ const collapseGroup = (group: HTMLElement): void => {
   group.classList.add(RIBBON_GROUP_COLLAPSED_CLASS);
 };
 
-/** Shrink the visible panel's groups, stage by stage and rightmost first, until it fits.
+/** Apply `stage` to `group`, keeping it only if the group got narrower.
  *  Narrowing sets each tile label to its narrowest two-line width; condensing
  *  drops those widths for the row layout. */
-export const fitRibbonPanel = (panel: HTMLElement, options: { collapse?: boolean } = {}): void => {
+const applyStage = (group: HTMLElement, stage: string): void => {
+  const before = group.getBoundingClientRect().width;
+  const labels = stage === RIBBON_GROUP_ICON_ONLY_CLASS ? [] : tileLabels(group);
+  const saved = labels.map((label) => [label.style.width, label.style.maxWidth] as const);
+  group.classList.add(stage);
+  for (const label of labels) {
+    if (stage === RIBBON_GROUP_NARROW_CLASS) fitLabelToTwoLines(label);
+    else clearLabelWidth(label);
+  }
+  if (group.getBoundingClientRect().width >= before) {
+    group.classList.remove(stage);
+    labels.forEach((label, index) => {
+      [label.style.width, label.style.maxWidth] = saved[index] ?? ['', ''];
+    });
+  }
+};
+
+const isCollapsed = (group: HTMLElement): boolean =>
+  group.classList.contains(RIBBON_GROUP_COLLAPSED_CLASS);
+
+/** Apply a measured plan: planned groups take every stage they allow or fold. */
+const applyPlan = (groups: readonly HTMLElement[], plan: MacRibbonFitPlan): void => {
+  for (const index of plan.reduce) {
+    const group = groups[index];
+    if (!group) continue;
+    for (const [stage, applies] of FIT_STAGES) {
+      if (applies(group)) applyStage(group, stage);
+    }
+  }
+  for (const index of plan.collapse) {
+    const group = groups[index];
+    if (group && canCollapse(group)) collapseGroup(group);
+  }
+};
+
+/** Shrink the visible panel's groups until it fits: a measured plan first, then
+ *  stage by stage and rightmost first. */
+export const fitRibbonPanel = (
+  panel: HTMLElement,
+  options: { collapse?: boolean; plan?: MacRibbonFitPlan } = {},
+): void => {
   const all = [...panel.querySelectorAll<HTMLElement>(':scope > .fc-tb__ribbon-group')];
   clearFit(all);
   if (panel.clientWidth === 0) return;
+  if (options.plan && overflows(panel)) applyPlan(all, options.plan);
   for (const [stage, applies] of FIT_STAGES) {
-    const groups = all.filter(applies);
+    const groups = all.filter(
+      (group) => !isCollapsed(group) && !group.classList.contains(stage) && applies(group),
+    );
     for (let i = groups.length - 1; i >= 0 && overflows(panel); i--) {
-      const group = groups[i] as HTMLElement;
-      const before = group.getBoundingClientRect().width;
-      const labels = stage === RIBBON_GROUP_ICON_ONLY_CLASS ? [] : tileLabels(group);
-      const saved = labels.map((label) => [label.style.width, label.style.maxWidth] as const);
-      group.classList.add(stage);
-      for (const label of labels) {
-        if (stage === RIBBON_GROUP_NARROW_CLASS) fitLabelToTwoLines(label);
-        else clearLabelWidth(label);
-      }
-      if (group.getBoundingClientRect().width >= before) {
-        group.classList.remove(stage);
-        labels.forEach((label, index) => {
-          [label.style.width, label.style.maxWidth] = saved[index] ?? ['', ''];
-        });
-      }
+      applyStage(groups[i] as HTMLElement, stage);
     }
   }
   if (!options.collapse) return;
-  const collapsible = all.filter(canCollapse);
+  const collapsible = all.filter((group) => !isCollapsed(group) && canCollapse(group));
   for (let i = collapsible.length - 1; i >= 0 && overflows(panel); i--) {
     collapseGroup(collapsible[i] as HTMLElement);
   }
@@ -283,7 +314,11 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
         if (lineCount(label) > 2) fitLabelToTwoLines(label);
       }
     }
-    fitRibbonPanel(panel, { collapse: root.dataset.fcPlatform === 'mac' });
+    const mac = root.dataset.fcPlatform === 'mac';
+    fitRibbonPanel(panel, {
+      collapse: mac,
+      plan: mac ? macRibbonFitPlan(root.lang, panel.dataset.ribbonPanel ?? '') : undefined,
+    });
   };
   let lastWidth = -1;
   const observer =
