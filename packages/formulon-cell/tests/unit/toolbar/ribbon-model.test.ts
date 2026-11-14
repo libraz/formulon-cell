@@ -14,6 +14,7 @@ import {
 import {
   buildRibbonModel,
   CONTEXTUAL_RIBBON_TABS,
+  DRAW_MIXED_LAYOUT_GROUP_VARIANTS,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   FORMULAS_MIXED_LAYOUT_GROUP_VARIANTS,
@@ -441,6 +442,7 @@ describe('toolbar/ribbon-model', () => {
       ...HOME_MIXED_LAYOUT_GROUP_VARIANTS,
       ...FORMULAS_MIXED_LAYOUT_GROUP_VARIANTS,
       ...INSERT_MIXED_LAYOUT_GROUP_VARIANTS,
+      ...DRAW_MIXED_LAYOUT_GROUP_VARIANTS,
     ]) {
       expect(() => widthFor(variant)).toThrow();
     }

@@ -394,13 +394,37 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     [{ id: 'mac.insert.equation.insert', label: 'Equation' }],
     NOT_IMPLEMENTED,
   ),
-  'mac.draw.eraser': menu([leaf('mac.draw.eraser', 'eraser'), leaf('mac.draw.toggle', 'draw')]),
-  'mac.draw.add': menu([
-    leaf('mac.draw.penBlack', 'penBlack'),
-    leaf('mac.draw.penRed', 'penRed'),
-    leaf('mac.draw.pencil', 'pencil'),
-    leaf('mac.draw.highlighter', 'highlighter'),
+  // Only the whole-stroke eraser exists; point and segment erasing are not built.
+  'mac.draw.eraser': menu([
+    { id: 'mac.draw.eraser.stroke', label: 'Stroke Eraser' },
+    {
+      id: 'mac.draw.eraser.small',
+      label: 'Small Eraser',
+      disabled: true,
+      disabledReason: NOT_IMPLEMENTED.en,
+    },
+    {
+      id: 'mac.draw.eraser.medium',
+      label: 'Medium Eraser',
+      disabled: true,
+      disabledReason: NOT_IMPLEMENTED.en,
+    },
+    {
+      id: 'mac.draw.eraser.segment',
+      label: 'Segment Eraser',
+      disabled: true,
+      disabledReason: NOT_IMPLEMENTED.en,
+    },
   ]),
+  // Adding a pen kind to the strip is not built; the four pens have fixed buttons.
+  'mac.draw.add': unavailable(
+    [
+      { id: 'mac.draw.add.pen', label: 'Pen' },
+      { id: 'mac.draw.add.highlighter', label: 'Highlighter' },
+      { id: 'mac.draw.add.pencil', label: 'Pencil' },
+    ],
+    NOT_IMPLEMENTED,
+  ),
   'mac.page.theme': menu([
     { id: 'mac.page.theme.office', label: 'Office', labelJa: 'Office' },
     { id: 'mac.page.theme.gray', label: 'Grayscale', labelJa: 'グレースケール' },

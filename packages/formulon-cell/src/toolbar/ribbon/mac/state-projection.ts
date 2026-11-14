@@ -319,6 +319,8 @@ export const projectMacRibbonState = (
     // toggle the desktop never leaves pressed.
     'mac.view.ruler': true,
     'mac.view.zoomSelection': false,
+    // Lasso Select is a toggle the host cannot turn on.
+    'mac.draw.lasso': false,
   };
   for (const [command, pressed] of Object.entries({ ...drawingStates, ...toggleStates })) {
     for (const button of buttons.get(command) ?? []) {

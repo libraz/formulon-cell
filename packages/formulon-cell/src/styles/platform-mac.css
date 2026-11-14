@@ -1604,7 +1604,10 @@
     gap: 4px;
     min-height: 72px;
   }
-  [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--pens .fc-tb__rb {
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--pens
+    .fc-tb__rb--mac-icon-only {
     width: 44px;
     min-width: 44px;
     height: 60px;

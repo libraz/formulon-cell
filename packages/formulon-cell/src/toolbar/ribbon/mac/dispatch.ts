@@ -223,6 +223,7 @@ const operations = [
   'mac.review.convertNotes',
   'mac.draw.toggle',
   'mac.draw.eraser',
+  'mac.draw.eraser.stroke',
   'mac.draw.penBlack',
   'mac.draw.penRed',
   'mac.draw.pencil',
@@ -558,6 +559,7 @@ export function dispatchMacRibbonCommand(
         return ink.setTrackpadMode(!ink.isActive() || !ink.getTrackpadMode());
       const tools = {
         'mac.draw.eraser': 'eraser',
+        'mac.draw.eraser.stroke': 'eraser',
         'mac.draw.penBlack': 'pen-black',
         'mac.draw.penRed': 'pen-red',
         'mac.draw.pencil': 'pencil',

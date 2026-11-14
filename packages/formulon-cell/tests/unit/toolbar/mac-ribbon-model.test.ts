@@ -1370,6 +1370,129 @@ describe('Mac Excel ribbon profile', () => {
     });
   });
 
+  describe('Draw tab layout', () => {
+    const drawGroups = (lang: 'en' | 'ja' = 'en') =>
+      buildRibbonModel(lang, { profile: 'excel365Mac' }).find((tab) => tab.id === 'draw')?.groups ??
+      [];
+    const sizeOf = (command: { layout?: string; className?: string }) =>
+      command.layout === 'stacked'
+        ? 'small'
+        : command.className?.includes('mac-icon-only')
+          ? 'icon'
+          : 'large';
+    const layoutOf = (groupTitle: string) =>
+      drawGroups()
+        .find((group) => group.title === groupTitle)
+        ?.commands.map((command) => [command.id, sizeOf(command)]);
+    const items = (root: string) =>
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+
+    it('draws Tools as three large tiles, Add beside the pen strip and Trackpad as a large tile', () => {
+      expect(drawGroups().map((group) => group.title)).toEqual(['Tools', 'Pens', 'Mode']);
+      expect(layoutOf('Tools')).toEqual([
+        ['mac.draw.toggle', 'large'],
+        ['mac.draw.eraser', 'large'],
+        ['mac.draw.lasso', 'large'],
+      ]);
+      expect(layoutOf('Pens')).toEqual([
+        ['mac.draw.penBlack', 'icon'],
+        ['mac.draw.penRed', 'icon'],
+        ['mac.draw.pencil', 'icon'],
+        ['mac.draw.highlighter', 'icon'],
+        ['mac.draw.add', 'large'],
+      ]);
+      expect(layoutOf('Mode')).toEqual([['mac.draw.trackpad', 'large']]);
+      expect(findCommand('draw', 'mac.draw.lasso')?.disabled).toBe(true);
+      expect(findCommand('draw', 'mac.draw.lasso')?.disabledReason).toBeTruthy();
+    });
+
+    it('names each pen by its description and leaves the pen buttons unlabelled', () => {
+      const pens = drawGroups('ja').find((group) => group.title === 'ペン')?.commands ?? [];
+      expect(pens.slice(0, 4).map((command) => command.title)).toEqual([
+        'ペン: 黒、0.35 mm',
+        'ペン: 赤、0.35 mm',
+        '鉛筆書き: 灰色、0.5 mm',
+        '蛍光ペン: 黄、6 mm',
+      ]);
+      expect(pens.slice(0, 4).map((command) => command.label)).toEqual(
+        pens.slice(0, 4).map((command) => command.title),
+      );
+      expect(macRibbonLabelForCommand('mac.draw.penBlack', 'en')).toBe('Pen: Black, 0.35 mm');
+      expect(macRibbonLabelForCommand('mac.draw.pencil', 'en')).toBe('Pencil: Gray, 0.5 mm');
+      expect(macRibbonLabelForCommand('mac.draw.penRed', 'fr')).toBe('Stylo : Rouge, 0.35 mm');
+      expect(macRibbonLabelForCommand('mac.draw.highlighter', 'zh')).toBe('荧光笔: 黄色，6 毫米');
+    });
+
+    it('declares Add as a menu of three pen kinds that cannot be added', () => {
+      expect(MAC_RIBBON_MENU_COMMAND_SET.has('mac.draw.add')).toBe(true);
+      expect(findCommand('draw', 'mac.draw.add')?.disabled).toBeFalsy();
+      expect(items('mac.draw.add')).toEqual([
+        ['mac.draw.add.pen', 'Pen', true],
+        ['mac.draw.add.highlighter', 'Highlighter', true],
+        ['mac.draw.add.pencil', 'Pencil', true],
+      ]);
+      for (const item of MAC_RIBBON_MENU_ITEMS['mac.draw.add'] ?? []) {
+        expect(item.disabledReason, item.id).toBeTruthy();
+      }
+      expect(macRibbonLabelForCommand('mac.draw.add.highlighter', 'ja')).toBe('蛍光ペン');
+    });
+
+    it('opens the Eraser menu with the four eraser variants and only the stroke eraser enabled', () => {
+      expect(items('mac.draw.eraser')).toEqual([
+        ['mac.draw.eraser.stroke', 'Stroke Eraser', false],
+        ['mac.draw.eraser.small', 'Small Eraser', true],
+        ['mac.draw.eraser.medium', 'Medium Eraser', true],
+        ['mac.draw.eraser.segment', 'Segment Eraser', true],
+      ]);
+      expect(macRibbonLabelForCommand('mac.draw.eraser.segment', 'ja')).toBe('セグメント消しゴム');
+      expect(macRibbonLabelForCommand('mac.draw.eraser.stroke', 'ja')).toBe(
+        '消しゴム (ストローク)',
+      );
+      expect(isMacRibbonCommandSupported('mac.draw.eraser.stroke')).toBe(true);
+      expect(isMacRibbonCommandSupported('mac.draw.eraser.small')).toBe(false);
+    });
+
+    it('renders the Draw groups with the mixed layout, toggles for Draw, Lasso and Trackpad, and unlabelled pens', async () => {
+      const sheet = await mountStubSheet({ locale: 'en' });
+      const toolbarHost = document.createElement('div');
+      document.body.append(toolbarHost);
+      const toolbar = Spreadsheet.mountToolbar(toolbarHost, sheet.instance, {
+        platform: 'mac',
+        activeTab: 'draw',
+        helpers: {
+          ...mountedRibbonHelpers(),
+          createIcon: () => document.createElementNS('http://www.w3.org/2000/svg', 'svg'),
+        },
+      });
+      try {
+        projectMacRibbonState(toolbarHost, sheet.instance);
+        const mixed = Array.from(
+          toolbarHost.querySelectorAll<HTMLElement>(
+            '[data-ribbon-panel="draw"] .fc-tb__ribbon-group--mixed',
+          ),
+        ).map((group) => group.getAttribute('aria-label'));
+        expect(mixed).toEqual(['Tools', 'Pens', 'Mode']);
+        const button = (id: string) =>
+          toolbarHost.querySelector<HTMLButtonElement>(`[data-ribbon-command="${id}"]`);
+        for (const id of ['mac.draw.toggle', 'mac.draw.lasso', 'mac.draw.trackpad']) {
+          expect(button(id)?.getAttribute('aria-pressed'), id).toBe('false');
+        }
+        for (const id of ['mac.draw.eraser', 'mac.draw.add', 'mac.draw.lasso']) {
+          expect(button(id)?.querySelector('.fc-tb__rb-split-chevron') !== null, id).toBe(
+            id !== 'mac.draw.lasso',
+          );
+        }
+        const pen = button('mac.draw.penBlack');
+        expect(pen?.getAttribute('aria-label')).toBe('Pen: Black, 0.35 mm');
+        expect(pen?.textContent).toBe('');
+      } finally {
+        toolbar.dispose();
+        toolbarHost.remove();
+        sheet.dispose();
+      }
+    });
+  });
+
   it('names the Draw tab controls as Excel for Mac does', () => {
     const draw = buildRibbonModel('ja', { profile: 'excel365Mac' }).find(
       (tab) => tab.id === 'draw',

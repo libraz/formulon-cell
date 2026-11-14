@@ -240,6 +240,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   'mac.draw.pencil': 'object',
   'mac.draw.highlighter': 'object',
   'mac.draw.trackpad': 'object',
+  'mac.draw.eraser.stroke': null,
   'mac.page.theme.office': 'format',
   'mac.page.theme.gray': 'format',
   'mac.page.color.office': 'format',

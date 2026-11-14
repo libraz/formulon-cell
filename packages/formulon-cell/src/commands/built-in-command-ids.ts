@@ -144,6 +144,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'mac.data.workbookLinks',
   'mac.draw.add',
   'mac.draw.eraser',
+  'mac.draw.eraser.stroke',
   'mac.draw.highlighter',
   'mac.draw.penBlack',
   'mac.draw.penRed',

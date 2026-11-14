@@ -255,11 +255,11 @@ const drawTab = (): RibbonTabModel =>
     group(
       { ja: 'ツール', en: 'Tools' },
       [
-        compactCommand('mac.draw.toggle', t('draw'), 'pen'),
-        compactCommand('mac.draw.eraser', t('eraser'), 'eraser'),
-        disabledCompactCommand('mac.draw.lasso', t('lasso'), 'lasso', EMBEDDED_UNSUPPORTED),
+        menuCommand('mac.draw.toggle', t('draw'), 'pen'),
+        menuCommand('mac.draw.eraser', t('eraser'), 'eraser'),
+        disabledCommand('mac.draw.lasso', t('lasso'), 'lasso', EMBEDDED_UNSUPPORTED),
       ],
-      'compact',
+      'draw-tools',
     ),
     group(
       { ja: 'ペン', en: 'Pens' },
@@ -268,14 +268,14 @@ const drawTab = (): RibbonTabModel =>
         iconCommand('mac.draw.penRed', t('penRed'), 'penRed'),
         iconCommand('mac.draw.pencil', t('pencil'), 'pencil'),
         iconCommand('mac.draw.highlighter', t('highlighter'), 'highlighter'),
-        iconCommand('mac.draw.add', t('add'), 'plus'),
+        menuCommand('mac.draw.add', t('add'), 'plus'),
       ],
       'pens',
     ),
     group(
       { ja: 'モード', en: 'Mode' },
-      [compactCommand('mac.draw.trackpad', t('trackpad'), 'trackpad')],
-      'compact',
+      [menuCommand('mac.draw.trackpad', t('trackpad'), 'trackpad')],
+      'draw-mode',
     ),
   ]);
 
