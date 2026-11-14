@@ -146,5 +146,12 @@ export const workbookChromeTh: WorkbookChromeStrings = {
     sparklines: 'เส้นแบบประกายไฟ',
     protectedRanges: 'ช่วงที่อนุญาตให้แก้ไข',
     otherSettings: 'การตั้งค่าอื่นๆ (ตั้งค่าหน้ากระดาษ มุมมอง การป้องกันเวิร์กบุ๊ก สไตล์แบบกำหนดเอง)',
+    unwritableTitle: 'ไม่สามารถบันทึกในรูปแบบนี้',
+    unwritableMessage: 'เวิร์กบุ๊กนี้มีฟีเจอร์ต่อไปนี้อย่างน้อยหนึ่งฟีเจอร์ที่ไม่ได้รับการสนับสนุนโดยรูปแบบไฟล์ที่เลือก:',
+    saveAsFormat: 'บันทึกเป็น {format}',
+    formatDefaults: 'ความกว้างคอลัมน์และความสูงแถวเริ่มต้น',
+    outlineLevels: 'ระดับเค้าร่าง',
+    sheetView: 'การตั้งค่ามุมมองแผ่นงาน',
+    unknownFeature: 'ฟีเจอร์ที่รูปแบบไฟล์นี้ไม่สามารถเก็บได้',
   },
 };

@@ -151,5 +151,13 @@ export const workbookChromeDe: WorkbookChromeStrings = {
     protectedRanges: 'Bearbeitbare Bereiche',
     otherSettings:
       'Weitere Einstellungen (Seite einrichten, Ansichten, Arbeitsmappenschutz, benutzerdefinierte Formatvorlagen)',
+    unwritableTitle: 'In diesem Format nicht speicherbar',
+    unwritableMessage:
+      'Diese Arbeitsmappe enthält mindestens eines der folgenden Features, die für das ausgewählte Dateiformat nicht unterstützt werden:',
+    saveAsFormat: 'Als {format} speichern',
+    formatDefaults: 'Standardspaltenbreite und -zeilenhöhe',
+    outlineLevels: 'Gliederungsebenen',
+    sheetView: 'Blattansichtseinstellungen',
+    unknownFeature: 'Ein Feature, das dieses Dateiformat nicht enthalten kann',
   },
 };

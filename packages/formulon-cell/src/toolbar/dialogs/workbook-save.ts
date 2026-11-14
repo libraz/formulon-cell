@@ -5,6 +5,8 @@ import {
   type WorkbookSaveLoss,
   type WorkbookSaveOutcome,
   writeWorkbook,
+  type XlsbUnwritable,
+  xlsbUnwritableOf,
 } from '../../commands/workbook-save.js';
 import type { FileLossId } from '../../engine/file-diagnostics.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
@@ -102,6 +104,43 @@ export const confirmWorkbookSaveLosses = (
     mountDialog(shell, cancelBtn);
   });
 
+/** Tell the user the `.xlsb` writer cannot hold `feature`, on sheet `sheetName` when it is
+ *  sheet-scoped. Resolves true to save as `.xlsx` instead. */
+export const offerXlsxForUnwritable = (
+  strings: Strings,
+  feature: XlsbUnwritable,
+  sheetName: string | null,
+  host?: HTMLElement,
+): Promise<boolean> =>
+  new Promise<boolean>((resolve) => {
+    const t = strings.workbookSave;
+    const shell = createDialogShell({
+      host,
+      title: t.unwritableTitle,
+      role: 'alertdialog',
+      bodyVariant: 'app',
+    });
+    appendMessage(shell.body, t.unwritableMessage);
+    const list = shell.body.ownerDocument.createElement('ul');
+    list.className = 'fc-tb__dlg__loss-list';
+    const item = shell.body.ownerDocument.createElement('li');
+    item.textContent = sheetName === null ? t[feature.id] : `${t[feature.id]} (${sheetName})`;
+    list.appendChild(item);
+    shell.body.appendChild(list);
+    const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
+      cancelLabel: t.cancel,
+      okLabel: t.saveAsFormat.replace('{format}', formatLabel(strings, 'xlsx')),
+    });
+    const lifecycle = installDialogLifecycle<boolean>({
+      shell,
+      resolve,
+      onCancel: () => false,
+    });
+    okBtn.addEventListener('click', () => lifecycle.finish(true));
+    cancelBtn.addEventListener('click', () => lifecycle.finish(false));
+    mountDialog(shell, cancelBtn);
+  });
+
 /** File types `wb` can be written as, in menu order. */
 export const workbookSaveFormats = (wb: WorkbookHandle): WorkbookSaveFormat[] =>
   wb.capabilities.xlsbSave ? ['xlsx', 'xlsb'] : ['xlsx'];
@@ -156,7 +195,8 @@ export interface SaveWithPromptsOptions {
 
 /** Write the spreadsheet's workbook and ask before handing over a file that
  *  leaves content out. Without `format` the Save As dialog picks the file type
- *  first. Resolves the bytes to deliver, or null when the user cancels. */
+ *  first. An `.xlsb` save the writer refuses offers `.xlsx` instead. Resolves
+ *  the bytes to deliver, or null when the user cancels. */
 export async function saveWithPrompts(
   spreadsheet: SpreadsheetInstance,
   options: SaveWithPromptsOptions = {},
@@ -164,9 +204,19 @@ export async function saveWithPrompts(
   const wb = workbookHandleOf(spreadsheet.workbook);
   const strings = spreadsheet.i18n.strings;
   const host = options.host ?? spreadsheet.host;
-  const format = options.format ?? (await chooseWorkbookSaveFormat(wb, strings, host));
+  let format = options.format ?? (await chooseWorkbookSaveFormat(wb, strings, host));
   if (format === null) return null;
-  const outcome = writeWorkbook(wb, format);
+  let outcome: WorkbookSaveOutcome;
+  try {
+    outcome = writeWorkbook(wb, format);
+  } catch (error) {
+    const refused = format === 'xlsb' ? xlsbUnwritableOf(error) : null;
+    if (!refused) throw error;
+    const sheet = refused.sheet === null ? null : wb.sheetName(refused.sheet);
+    if (!(await offerXlsxForUnwritable(strings, refused, sheet, host))) return null;
+    format = 'xlsx';
+    outcome = writeWorkbook(wb, format);
+  }
   if (outcome.losses.length === 0) return outcome;
   const proceed = await confirmWorkbookSaveLosses(strings, format, outcome.losses, host);
   return proceed ? outcome : null;

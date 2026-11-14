@@ -156,5 +156,16 @@ export interface WorkbookChromeStrings {
     sparklines: string;
     protectedRanges: string;
     otherSettings: string;
+    /** Title of the notice shown when `.xlsb` cannot hold a feature of the workbook. */
+    unwritableTitle: string;
+    /** Lead-in of that notice; the refused feature is listed below it. */
+    unwritableMessage: string;
+    /** The notice's save button; `{format}` is the `.xlsx` file type label. */
+    saveAsFormat: string;
+    formatDefaults: string;
+    outlineLevels: string;
+    sheetView: string;
+    /** A refused feature the notice cannot name. */
+    unknownFeature: string;
   };
 }

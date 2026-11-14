@@ -146,5 +146,13 @@ export const workbookChromeJa: WorkbookChromeStrings = {
     sparklines: 'スパークライン',
     protectedRanges: '範囲の編集の許可',
     otherSettings: 'その他の設定 (ページ設定、表示、ブックの保護、ユーザー設定のスタイル)',
+    unwritableTitle: 'この形式では保存できません',
+    unwritableMessage:
+      'このブックには、選択したファイル形式でサポートされていない次の機能が 1 つ以上含まれています:',
+    saveAsFormat: '{format} として保存',
+    formatDefaults: '既定の列幅と行の高さ',
+    outlineLevels: 'アウトライン レベル',
+    sheetView: 'シートの表示設定',
+    unknownFeature: 'このファイル形式で保持できない機能',
   },
 };

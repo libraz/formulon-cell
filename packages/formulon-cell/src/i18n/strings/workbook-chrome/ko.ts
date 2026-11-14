@@ -148,5 +148,13 @@ export const workbookChromeKo: WorkbookChromeStrings = {
     sparklines: '스파크라인',
     protectedRanges: '범위 편집 허용',
     otherSettings: '기타 설정(페이지 설정, 보기, 통합 문서 보호, 사용자 지정 스타일)',
+    unwritableTitle: '이 형식으로 저장할 수 없음',
+    unwritableMessage:
+      '이 통합 문서에는 선택한 파일 형식에서 지원하지 않는 다음과 같은 기능 중 하나 이상이 포함되어 있습니다.',
+    saveAsFormat: '{format}(으)로 저장',
+    formatDefaults: '기본 열 너비 및 행 높이',
+    outlineLevels: '윤곽 수준',
+    sheetView: '시트 보기 설정',
+    unknownFeature: '이 파일 형식에서 유지할 수 없는 기능',
   },
 };

@@ -1,8 +1,12 @@
-import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind, FormulonError, StatusCode } from '@libraz/formulon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SpreadsheetInstance } from '../../../src/api/spreadsheet/instance.js';
 import { workbookOf } from '../../../src/api/workbook.js';
-import { WORKBOOK_SAVE_FORMATS, writeWorkbook } from '../../../src/commands/workbook-save.js';
+import {
+  WORKBOOK_SAVE_FORMATS,
+  writeWorkbook,
+  xlsbUnwritableOf,
+} from '../../../src/commands/workbook-save.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import {
@@ -241,6 +245,68 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
     try {
       expect(workbookSaveFormats(wb)).toEqual(['xlsx']);
       expect(() => wb.saveWithDiagnostics('xlsb')).toThrow(/xlsb/);
+    } finally {
+      wb.dispose();
+    }
+  });
+});
+
+describe.skipIf(!canLoadWasm())('workbook save refused by the .xlsb writer', () => {
+  /** A protected range with a security descriptor on Sheet2, which `.xlsb` cannot hold. */
+  const refusedWorkbook = async (): Promise<WorkbookHandle> => {
+    const wb = await WorkbookHandle.createDefault();
+    wb.addSheet('Sheet2');
+    wb.addProtectedRange(1, {
+      name: 'Edit',
+      ranges: 'A1:B2',
+      securityDescriptor: 'O:WDG:WDD:(A;;CC;;;WD)',
+    });
+    return wb;
+  };
+
+  it('reads the feature and sheet from the refusal and nothing else', () => {
+    const refusal = (context: string) =>
+      new FormulonError(StatusCode.IoFeatureNotWritable, 'not writable', context);
+    expect(xlsbUnwritableOf(refusal('context=write_xlsb kind=sheet_view sheet_index=3'))).toEqual({
+      id: 'sheetView',
+      sheet: 3,
+    });
+    expect(
+      xlsbUnwritableOf(refusal('context=write_xlsb kind=protected_range_rects sheet_index=0')),
+    ).toEqual({ id: 'protectedRanges', sheet: 0 });
+    expect(xlsbUnwritableOf(refusal('context=write_xlsb kind=x14_data_bar'))).toEqual({
+      id: 'unknownFeature',
+      sheet: null,
+    });
+    expect(xlsbUnwritableOf(new FormulonError(StatusCode.IoWriteFailed, 'io', ''))).toBeNull();
+    expect(xlsbUnwritableOf(new Error('x'))).toBeNull();
+  });
+
+  it('names the feature and its sheet, and saves as .xlsx when asked', async () => {
+    const wb = await refusedWorkbook();
+    try {
+      const pending = saveWithPrompts(spreadsheetOf(wb), { format: 'xlsb' });
+      await flush();
+      const t = defaultStrings.workbookSave;
+      const text = dialog()?.textContent ?? '';
+      expect(text).toContain(t.unwritableMessage);
+      expect(text).toContain(`${t.protectedRanges} (Sheet2)`);
+      clickButton(t.saveAsFormat.replace('{format}', t.formatXlsx));
+      const outcome = await pending;
+      expect(outcome?.format).toBe('xlsx');
+      expect(outcome?.bytes.length).toBeGreaterThan(0);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('returns null when the notice is cancelled', async () => {
+    const wb = await refusedWorkbook();
+    try {
+      const pending = saveWithPrompts(spreadsheetOf(wb), { format: 'xlsb' });
+      await flush();
+      clickButton(defaultStrings.workbookSave.cancel);
+      expect(await pending).toBeNull();
     } finally {
       wb.dispose();
     }

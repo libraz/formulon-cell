@@ -1,4 +1,4 @@
-import { DrawingObjectKind } from '@libraz/formulon';
+import { DrawingObjectKind, FormulonError, StatusCode } from '@libraz/formulon';
 import {
   emptyLoadDiagnostics,
   type FileLossId,
@@ -95,6 +95,48 @@ function xlsbContentLosses(wb: WorkbookHandle, deferred: number): WorkbookSaveLo
   }
   if (deferred > explained) rows.push({ id: 'otherSettings', certain: false });
   return rows;
+}
+
+/** A feature the `.xlsb` writer refuses outright: the save writes nothing. */
+export type XlsbUnwritableId =
+  | 'protectedRanges'
+  | 'sparklines'
+  | 'formatDefaults'
+  | 'outlineLevels'
+  | 'sheetView'
+  | 'unknownFeature';
+
+/** The refused feature and, for a sheet-scoped one, its sheet index. */
+export interface XlsbUnwritable {
+  id: XlsbUnwritableId;
+  sheet: number | null;
+}
+
+/** The engine's `kind=` context values, by the feature they name. */
+const UNWRITABLE_KINDS: Readonly<Record<string, XlsbUnwritableId>> = {
+  protected_range_descriptor: 'protectedRanges',
+  protected_range_rects: 'protectedRanges',
+  protected_range_sqref: 'protectedRanges',
+  protected_range_title: 'protectedRanges',
+  sparklines: 'sparklines',
+  format_defaults: 'formatDefaults',
+  outline_level: 'outlineLevels',
+  sheet_view: 'sheetView',
+};
+
+/** The feature an `.xlsb` save failed on, or null when `error` is not that refusal. */
+export function xlsbUnwritableOf(error: unknown): XlsbUnwritable | null {
+  if (!(error instanceof FormulonError) || error.code !== StatusCode.IoFeatureNotWritable) {
+    return null;
+  }
+  const kind = /(?:^|\s)kind=(\S+)/.exec(error.context)?.[1] ?? '';
+  const sheet = /(?:^|\s)sheet_index=(\d+)/.exec(error.context)?.[1];
+  return {
+    id: Object.hasOwn(UNWRITABLE_KINDS, kind)
+      ? (UNWRITABLE_KINDS[kind] as XlsbUnwritableId)
+      : 'unknownFeature',
+    sheet: sheet === undefined ? null : Number(sheet),
+  };
 }
 
 /** Write `wb` as `format` without delivering it, reporting what the file
