@@ -135,7 +135,7 @@ const seedPivotFilterSelection = async (page: Page): Promise<void> => {
 };
 
 /** Builds a report at G1 over the seeded rows, Channel on rows and Sum of Sales, as the Create
- *  PivotTable dialog does: place it, refresh the sheet's cells and fit the report's columns. */
+ *  PivotTable dialog does: place it, then finish the update the dialog finishes it with. */
 const createChannelReport = (page: Page): Promise<void> =>
   page.evaluate(() => {
     const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
@@ -153,8 +153,7 @@ const createChannelReport = (page: Page): Promise<void> =>
       { row: 0, col: 6 },
     );
     if (!made.ok) throw new Error(`pivot creation failed: ${made.reason}`);
-    w.__fcProbes['store/store'].mutators.refreshActiveSheetCells(store, workbook);
-    w.__fcProbes['commands/pivot-table'].autofitPivotTableColumns(store, workbook);
+    w.__fcProbes['commands/pivot-table'].finishPivotReportUpdate(store, workbook);
     w.__fcInst.history.clear();
   });
 
