@@ -2,6 +2,7 @@ import {
   runMacAuditMenusScenario,
   runMacAutoSumMenuScenario,
   runMacCalculationGroupAndNamesScenario,
+  runMacChartCellGeometryScenario,
   runMacChartKindScenario,
   runMacCollapsedRibbonScenario,
   runMacConsolidateScenario,
@@ -68,6 +69,9 @@ test('Mac: Page presets, breaks and calculation options execute their selected a
 });
 test('Mac: Chart galleries preserve selected chart kinds and history', async ({ page }) => {
   await runMacChartKindScenario(page);
+});
+test('Mac: Charts group cells keep their drawn size at every fit stage', async ({ page }) => {
+  await runMacChartCellGeometryScenario(page);
 });
 test('Mac: Subtotal inserts calculated groups in one undoable operation', async ({ page }) => {
   await runMacSubtotalScenario(page);

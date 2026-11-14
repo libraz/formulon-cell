@@ -200,3 +200,73 @@ export async function runMacInsertGalleryScenario(page: Page): Promise<void> {
   await expect.poll(shapes).toEqual(['line', 'rectangle', 'rounded-rectangle', 'oval', 'triangle']);
   await sp.expectNoConsoleErrors();
 }
+
+/** The Charts group draws two columns of 36 pt icon cells three high, then Waterfall over Combo as
+ *  a two-row stack of 38x26 pt cells; a width-fitting stage never widens a cell past that. */
+export async function runMacChartCellGeometryScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount({ platform: 'mac' });
+  await page.setViewportSize({ width: 2560, height: 900 });
+  await sp.expectNoStub();
+  await selectRibbonTab(page, 'insert');
+  const charts = page.locator('[data-ribbon-panel="insert"] .fc-tb__ribbon-group--charts');
+  const icons = [
+    'mac.insert.chartColumn',
+    'mac.insert.chartLine',
+    'mac.insert.chartPie',
+    'mac.insert.chartHierarchy',
+    'mac.insert.chartStatistical',
+    'mac.insert.chartScatter',
+  ];
+  const stack = ['mac.insert.chartWaterfall', 'mac.insert.chartCombo'];
+  type Box = { x: number; y: number; width: number; height: number };
+  const measure = async (): Promise<(id: string) => Box> => {
+    const boxes = await charts.evaluate(
+      (group, ids) =>
+        ids.map((id) => {
+          const cell = group.querySelector(`.fc-tb__rb[data-ribbon-command="${id}"]`);
+          if (!cell) throw new Error(`${id} is missing from the Charts group`);
+          const { x, y, width, height } = cell.getBoundingClientRect();
+          return [id, { x, y, width, height }] as const;
+        }),
+      [...icons, ...stack],
+    );
+    const byId = new Map<string, Box>(boxes);
+    return (id) => {
+      const box = byId.get(id);
+      if (!box) throw new Error(`${id} was not measured`);
+      return box;
+    };
+  };
+  await expect(charts).not.toHaveClass(/fc-tb__ribbon-group--(narrow|condensed|icon-only)/);
+  const drawn = await measure();
+  const top = drawn('mac.insert.chartColumn');
+  const secondColumn = drawn('mac.insert.chartHierarchy');
+  icons.forEach((id, index) => {
+    const cell = drawn(id);
+    expect(cell.width, id).toBeCloseTo(36, 0);
+    expect(cell.height, id).toBeCloseTo(24, 0);
+    expect(cell.y - top.y, id).toBeCloseTo((index % 3) * 24, 0);
+    expect(cell.x, id).toBeCloseTo((index < 3 ? top : secondColumn).x, 0);
+  });
+  expect(secondColumn.x).toBeGreaterThan(top.x + top.width - 1);
+  const waterfall = drawn('mac.insert.chartWaterfall');
+  const combo = drawn('mac.insert.chartCombo');
+  for (const cell of [waterfall, combo]) {
+    expect(cell.width).toBeCloseTo(38, 0);
+    expect(cell.height).toBeCloseTo(26, 0);
+  }
+  expect(waterfall.y - top.y).toBeCloseTo(3, 0);
+  expect(combo.y - waterfall.y).toBeCloseTo(28, 0);
+  expect(combo.x).toBeCloseTo(waterfall.x, 0);
+  const scatter = drawn('mac.insert.chartScatter');
+  expect(waterfall.x).toBeGreaterThan(scatter.x + scatter.width - 1);
+
+  // At 1440 the panel fits by stages; none of them may widen a chart cell.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(charts).toHaveClass(/fc-tb__ribbon-group--narrow/);
+  const fitted = await measure();
+  for (const id of [...icons, ...stack])
+    expect(fitted(id).width, id).toBeLessThanOrEqual(drawn(id).width + 0.5);
+  await sp.expectNoConsoleErrors();
+}
