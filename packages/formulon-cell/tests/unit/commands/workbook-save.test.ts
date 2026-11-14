@@ -1,5 +1,5 @@
 import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SpreadsheetInstance } from '../../../src/api/spreadsheet/instance.js';
 import { workbookOf } from '../../../src/api/workbook.js';
 import { WORKBOOK_SAVE_FORMATS, writeWorkbook } from '../../../src/commands/workbook-save.js';
@@ -13,10 +13,13 @@ import {
 
 const canLoadWasm = (): boolean => typeof WebAssembly !== 'undefined';
 
+/** A note on the third sheet: `.xlsb` keeps notes on the first two sheets only. */
 const noteWorkbook = async (): Promise<WorkbookHandle> => {
   const wb = await WorkbookHandle.createDefault();
-  wb.setText({ sheet: 0, row: 0, col: 0 }, 'x');
-  wb.setCommentEntry(0, 0, 0, 'Author', 'A note');
+  wb.addSheet('Sheet2');
+  wb.addSheet('Sheet3');
+  wb.setText({ sheet: 2, row: 0, col: 0 }, 'x');
+  wb.setCommentEntry(2, 0, 0, 'Author', 'A note');
   return wb;
 };
 
@@ -77,12 +80,12 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
     }
   });
 
-  it('itemizes notes the binary format drops, next to the engine counter', async () => {
+  it('itemizes notes the binary format may drop, next to the engine counter', async () => {
     const wb = await noteWorkbook();
     try {
       const outcome = writeWorkbook(wb, 'xlsb');
       expect(outcome.losses).toEqual([
-        { id: 'notes', count: 1, certain: true },
+        { id: 'notes', count: 1, certain: false },
         { id: 'deferredFeature', count: 1, certain: true },
       ]);
       expect(writeWorkbook(wb, 'xlsx').losses).toEqual([]);
@@ -107,7 +110,12 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
         },
         fill: { color: '#336699' },
       });
-      wb.setSheetHeaderFooter(0, { oddHeader: 'Title' });
+      // The shape is written; a deferred unit no category accounts for is reported apart.
+      const save = wb.saveWithDiagnostics.bind(wb);
+      vi.spyOn(wb, 'saveWithDiagnostics').mockImplementation((format) => {
+        const written = save(format);
+        return { ...written, diagnostics: { ...written.diagnostics, deferredFeatureCount: 1 } };
+      });
       const outcome = writeWorkbook(wb, 'xlsb');
       expect(outcome.losses).toEqual(
         expect.arrayContaining([
@@ -124,7 +132,12 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
   it('separates content that will be lost from content that may be', async () => {
     const wb = await noteWorkbook();
     try {
-      wb.setSheetHeaderFooter(0, { oddHeader: 'Title' });
+      // One deferred unit beyond the note, which no category accounts for.
+      const save = wb.saveWithDiagnostics.bind(wb);
+      vi.spyOn(wb, 'saveWithDiagnostics').mockImplementation((format) => {
+        const written = save(format);
+        return { ...written, diagnostics: { ...written.diagnostics, deferredFeatureCount: 2 } };
+      });
       const pending = saveWithPrompts(spreadsheetOf(wb), { format: 'xlsb' });
       await flush();
       const text = dialog()?.textContent ?? '';

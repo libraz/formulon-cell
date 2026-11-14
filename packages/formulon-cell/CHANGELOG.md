@@ -65,6 +65,7 @@ versioning is [SemVer](https://semver.org/).
 - Formulas that refer to a deleted range on another sheet keep the sheet qualifier (`=Sheet1!#REF!`), and structured references read back in their short form (`=[@Qty]*10`), both as the desktop app shows them.
 - Legacy array (Ctrl+Shift+Enter) formulas are no longer outlined as spill ranges.
 - XLSB saves keep pictures, charts and shapes.
+- XLSB saves keep notes, threaded comments, AutoFilters and page setup. The save warning lists notes, threaded comments and filters among the content that may be lost, for the cases the binary writer still leaves out.
 - **Breaking:** `applyChanges` is all or nothing: when any change is refused, nothing is written and the result carries the one refusal.
 - **Breaking:** `applyChanges` is decided by the interaction policy and sheet protection whatever its history mode, `'reset'` included. Ungated writes go through the Sheet facade's setters and `Sheet.importCsv`.
 - **Breaking:** `importCSV` takes the store instead of its state, and is one write decided by the interaction policy and sheet protection: it writes nothing when any target cell is refused. `Sheet.importCsv` is host code and writes every field, protected sheet or not.

@@ -61,19 +61,18 @@ const sheetIndexes = (wb: WorkbookHandle): number[] =>
 const sumSheets = (wb: WorkbookHandle, count: (sheet: number) => number): number =>
   sheetIndexes(wb).reduce((total, sheet) => total + count(sheet), 0);
 
-/** Itemize what the `.xlsb` writer deferred. Notes, threaded comments and
- *  filters are always dropped; the other categories only sometimes, so they
- *  are listed as possible losses. `otherSettings` covers deferred units no
- *  present category can account for (page setup, views, workbook protection,
- *  custom styles). Each `bound` is the most units a category can add to the
- *  engine's aggregate `deferredFeatureCount`. */
+/** Itemize what the `.xlsb` writer deferred. Every category is written except
+ *  in some cases (a note past the second sheet, a filter criterion without the
+ *  bounds the desktop computed, a drawing holding another graphic frame), so
+ *  each is listed as a possible loss. `otherSettings` covers deferred units no
+ *  present category can account for (print settings, views, workbook
+ *  protection, styles). Each `bound` is the most units a category can add to
+ *  the engine's aggregate `deferredFeatureCount`. */
 function xlsbContentLosses(wb: WorkbookHandle, deferred: number): WorkbookSaveLoss[] {
-  const certain = [
+  const possible = [
     { id: 'notes', count: sumSheets(wb, (s) => wb.getComments(s).length) },
     { id: 'threadedComments', count: sumSheets(wb, (s) => wb.getThreadedComments(s).length) },
     { id: 'autoFilters', count: sumSheets(wb, (s) => (wb.getAutoFilter(s) ? 1 : 0)) },
-  ] as const;
-  const possible = [
     {
       id: 'drawings',
       count: sumSheets(wb, (s) => wb.listDrawingObjects(s).length),
@@ -89,11 +88,6 @@ function xlsbContentLosses(wb: WorkbookHandle, deferred: number): WorkbookSaveLo
   ] as const;
   const rows: WorkbookSaveLoss[] = [];
   let explained = 0;
-  for (const row of certain) {
-    if (row.count === 0) continue;
-    rows.push({ id: row.id, count: row.count, certain: true });
-    explained += row.count;
-  }
   for (const row of possible) {
     if (row.count === 0) continue;
     rows.push({ id: row.id, count: row.count, certain: false });
