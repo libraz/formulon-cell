@@ -547,7 +547,7 @@ export const ribbonFr: RibbonStrings = {
     optionsBody:
       'Ouvrez les paramètres du classeur pour les formules, l’affichage et les options avancées.',
     workbookInfo: 'Informations du classeur',
-    properties: 'Propriétés',
+    properties: 'Propriétés...',
     protect: 'Protéger le classeur',
     protectBody:
       'Ouvrez les paramètres de protection pour limiter les modifications ou changements de structure.',

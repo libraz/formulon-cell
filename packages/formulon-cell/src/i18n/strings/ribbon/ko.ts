@@ -543,7 +543,7 @@ export const ribbonKo: RibbonStrings = {
     editLinksBody: '파일에 포함된 외부 통합 문서 참조를 검토합니다.',
     optionsBody: '수식, 보기 및 고급 옵션에 대한 통합 문서 설정을 엽니다.',
     workbookInfo: '통합 문서 정보',
-    properties: '속성',
+    properties: '속성...',
     protect: '통합 문서 보호',
     protectBody: '편집 또는 구조 변경을 제한하는 보호 설정을 엽니다.',
     inspect: '통합 문서 검사',

@@ -115,6 +115,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- Home menu, File menu and Remove Arrows labels match the desktop's in the languages where they differed.
 - Text to Columns, Format Cells (Border), Go To Special, Calculation preferences, Page Setup, protection and Find labels match the desktop's in the languages where they differed.
 - Error Checking Options in the Mac error menu opens Preferences on the Error Checking pane in a mounted spreadsheet.
 - An open Mac Comments pane re-filters its list when the host changes the navigation range or selectable cells.

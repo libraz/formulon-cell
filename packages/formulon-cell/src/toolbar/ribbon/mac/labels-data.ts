@@ -1105,7 +1105,7 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     de: 'Pfeile entfernen',
     fr: 'Supprimer les flèches',
     zh: '删除箭头',
-    ko: '화살표 제거',
+    ko: '연결선 제거',
     th: 'เอาลูกศรออก',
   },
   'mac.formulas.removeArrows.precedents': {

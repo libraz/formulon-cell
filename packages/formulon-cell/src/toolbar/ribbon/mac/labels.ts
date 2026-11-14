@@ -466,7 +466,7 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
     en: 'Scripts from this Workbook',
   },
   'mac.automate.showScripts.samples': { ja: 'サンプル', en: 'Samples' },
-  'mac.formulas.removeArrows.all': { ja: '矢印の削除', en: 'Remove Arrows' },
+  'mac.formulas.removeArrows.all': { ja: 'トレース矢印の削除', en: 'Remove Arrows' },
   'mac.formulas.removeArrows.precedents': {
     ja: '参照元の矢印の削除',
     en: 'Remove Precedent Arrows',
