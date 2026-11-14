@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { NO_COLOR } from '../../../src/commands/filter.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { en } from '../../../src/i18n/strings.js';
@@ -78,21 +79,29 @@ afterEach(() => {
 });
 
 describe('Mac column filter by color', () => {
-  it('offers only the kinds the column shows', () => {
-    open(seeded(false));
+  it('offers every kind, an empty Cell Icon list included', () => {
+    const store = seeded(false);
+    store.setState((state) => ({
+      ...state,
+      conditional: { ...state.conditional, rules: [] },
+    }));
+    open(store);
     expect([...kind().options].map((o) => [o.value, o.disabled])).toEqual([
       ['', false],
       ['cellColor', false],
-      ['fontColor', true],
+      ['fontColor', false],
       ['cellIcon', false],
     ]);
+    choose('cellIcon');
+    expect(swatches()).toEqual([]);
   });
 
-  it('lists the column fills and filters by the one clicked', () => {
+  it('lists the column fills in first-appearance order, No Fill last, and filters by one', () => {
     const store = seeded();
     open(store);
     choose('cellColor');
-    expect(swatches().map((b) => b.dataset.fcColor)).toEqual(['#ff0000', '#00ff00']);
+    expect(swatches().map((b) => b.dataset.fcColor)).toEqual(['#ff0000', '#00ff00', NO_COLOR]);
+    expect(swatches().at(-1)?.textContent).toBe(en.mac.filterPanel.noFill);
     swatches()[1]?.click();
     expect(store.getState().ui.filterCriteria[0]?.color).toEqual({
       kind: 'cellColor',
@@ -100,7 +109,64 @@ describe('Mac column filter by color', () => {
     });
     expect([...store.getState().layout.hiddenRows].sort()).toEqual([1, 2]);
     expect(kind().value).toBe('cellColor');
-    expect(swatches().map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+    expect(swatches().map((b) => b.getAttribute('aria-pressed'))).toEqual([
+      'false',
+      'true',
+      'false',
+    ]);
+  });
+
+  it('filters by No Fill and by an Automatic font colour', () => {
+    const store = seeded();
+    open(store);
+    choose('cellColor');
+    swatches().at(-1)?.click();
+    expect(store.getState().ui.filterCriteria[0]?.color).toEqual({
+      kind: 'cellColor',
+      color: NO_COLOR,
+    });
+    expect([...store.getState().layout.hiddenRows].sort()).toEqual([1, 3]);
+    choose('fontColor');
+    expect(swatches().map((b) => b.textContent || b.dataset.fcColor)).toEqual([
+      '#0000ff',
+      en.mac.filterPanel.fontAutomatic,
+    ]);
+    swatches().at(-1)?.click();
+    expect([...store.getState().layout.hiddenRows].sort()).toEqual([1]);
+  });
+
+  it('ends the sort side with Custom Sort..., which opens the Sort dialog from the header', () => {
+    const store = seeded();
+    const host = document.createElement('div');
+    host.className = 'fc-host';
+    host.dataset.fcPlatform = 'mac';
+    document.body.appendChild(host);
+    let opened = 0;
+    attachFilterDropdown({
+      store,
+      host,
+      strings: en,
+      locale: 'en-US',
+      history: new History(),
+      getWb: () => ({}) as never,
+      onCustomSort: () => {
+        opened += 1;
+      },
+    }).open(RANGE, 0, { x: 10, y: 20, h: 24 });
+    const sortSide = document.querySelector<HTMLElement>(
+      '.fc-filter-dropdown [data-fc-color-side="sort"]',
+    ) as HTMLElement;
+    const sortKind = sortSide.querySelector<HTMLSelectElement>(
+      '.fc-filter-dropdown__color-kind',
+    ) as HTMLSelectElement;
+    sortKind.value = 'cellIcon';
+    sortKind.dispatchEvent(new Event('change'));
+    const last = sortSide.querySelector('.fc-filter-dropdown__swatches')?.lastElementChild;
+    expect(last?.textContent).toBe(en.mac.filterPanel.customSort);
+    (last as HTMLButtonElement).click();
+    expect(opened).toBe(1);
+    expect(document.querySelector('.fc-filter-dropdown')).toBeNull();
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
   });
 
   it('lists the icons the conditional format draws and filters by one', () => {

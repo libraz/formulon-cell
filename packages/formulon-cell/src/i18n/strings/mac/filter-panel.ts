@@ -49,6 +49,11 @@ export interface MacFilterPanelStrings {
   cellColor: string;
   fontColor: string;
   cellIcon: string;
+  /** The last cell colour (no fill) and font colour (no colour of its own) of the By color lists. */
+  noFill: string;
+  fontAutomatic: string;
+  /** The sort side's last By color entry, which opens the Sort dialog. */
+  customSort: string;
   /** Bold section labels above the sort and filter controls, and the close button's name. */
   sortSection: string;
   filterSection: string;
@@ -71,6 +76,9 @@ type MacFilterPanelExtras = Pick<
   | 'cellColor'
   | 'fontColor'
   | 'cellIcon'
+  | 'noFill'
+  | 'fontAutomatic'
+  | 'customSort'
   | 'autoApply'
   | 'between'
   | 'top10'
@@ -132,6 +140,9 @@ const extrasEn: MacFilterPanelExtras = {
   cellColor: 'Cell Color',
   fontColor: 'Font Color',
   cellIcon: 'Cell Icon',
+  noFill: 'No Fill',
+  fontAutomatic: 'Automatic',
+  customSort: 'Custom Sort...',
   autoApply: 'Auto Apply',
   between: 'Between',
   top10: 'Top 10',
@@ -200,6 +211,9 @@ const extrasJa: MacFilterPanelExtras = {
   cellColor: 'セルの色',
   fontColor: 'フォントの色',
   cellIcon: 'セルのアイコン',
+  noFill: '塗りつぶしなし',
+  fontAutomatic: '自動',
+  customSort: 'ユーザー設定の並べ替え...',
   autoApply: '自動適用',
   between: '指定の範囲内',
   top10: '上位 10 項目',
@@ -268,6 +282,9 @@ const extrasDe: MacFilterPanelExtras = {
   cellColor: 'Zellenfarbe',
   fontColor: 'Schriftfarbe',
   cellIcon: 'Zellensymbol',
+  noFill: 'Keine Füllung',
+  fontAutomatic: 'Automatisch',
+  customSort: 'Benutzerdefiniertes Sortieren...',
   autoApply: 'Automatisch anwenden',
   between: 'zwischen',
   top10: 'Top 10',
@@ -336,6 +353,9 @@ const extrasFr: MacFilterPanelExtras = {
   cellColor: 'Couleur de cellule',
   fontColor: 'Couleur de police',
   cellIcon: 'Icône de cellule',
+  noFill: 'Aucun remplissage',
+  fontAutomatic: 'Automatique\u00a0',
+  customSort: 'Tri personnalisé...',
   autoApply: 'Appliquer automatiquement',
   between: 'Compris entre',
   top10: '10 premiers',
@@ -404,6 +424,9 @@ const extrasZh: MacFilterPanelExtras = {
   cellColor: '单元格颜色',
   fontColor: '字体颜色',
   cellIcon: '单元格图标',
+  noFill: '无填充',
+  fontAutomatic: '自动',
+  customSort: '自定义排序...',
   autoApply: '自动应用',
   between: '之间',
   top10: '前 10 项',
@@ -472,6 +495,9 @@ const extrasKo: MacFilterPanelExtras = {
   cellColor: '셀 색',
   fontColor: '글꼴 색',
   cellIcon: '셀 아이콘',
+  noFill: '채우기 없음',
+  fontAutomatic: '자동',
+  customSort: '사용자 지정 정렬...',
   autoApply: '자동 적용',
   between: '사이',
   top10: '상위 10개',
@@ -540,6 +566,9 @@ const extrasTh: MacFilterPanelExtras = {
   cellColor: 'สีเซลล์',
   fontColor: 'สีฟอนต์',
   cellIcon: 'ไอคอนเซลล์',
+  noFill: 'ไม่เติม',
+  fontAutomatic: 'อัตโนมัติ',
+  customSort: 'เรียงลำดับแบบกำหนดเอง...',
   autoApply: 'ใช้อัตโนมัติ',
   between: 'ระหว่าง',
   top10: '10 อันดับแรก',

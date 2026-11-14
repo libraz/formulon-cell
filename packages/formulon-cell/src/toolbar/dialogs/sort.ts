@@ -1,4 +1,8 @@
 import type { ColumnColorChoices } from '../../commands/filter-colors.js';
+
+/** The colours and icons a Sort dialog colour or icon level picks from. */
+type SortColorChoices = Pick<ColumnColorChoices, 'fills' | 'fonts' | 'icons'>;
+
 import type { MacSortDialogLabels } from '../../i18n/strings/mac/sort-dialog.js';
 import { conditionalIconCanvas } from '../../render/painters/cf-icons.js';
 import type { ConditionalIconRef } from '../../store/types/conditional-rule.js';
@@ -45,7 +49,7 @@ export interface SortDialogOptions {
   sortOn: SortDialogSortOnLabels;
   /** The fills, font colours and conditional formatting icons a column's data shows, keyed by
    *  the column's value; a colour or icon level picks from them. */
-  colorChoices?: (column: string) => ColumnColorChoices;
+  colorChoices?: (column: string) => SortColorChoices;
   /** Order › Custom List…: its label and the Custom Lists dialog it opens, which resolves with
    *  the chosen list or `null`. Without it the order offers no custom list. */
   customList?: { label: string; open(initial: readonly string[] | null): Promise<string[] | null> };
@@ -151,7 +155,7 @@ const appendSortLevelRow = (
     sortOn.value === 'values'
       ? undefined
       : (sortOn.value as 'cellColor' | 'fontColor' | 'cellIcon');
-  const choices = (): ColumnColorChoices =>
+  const choices = (): SortColorChoices =>
     opts.colorChoices?.(column.value) ?? { fills: [], fonts: [], icons: [] };
 
   const renderSortOn = (): void => {

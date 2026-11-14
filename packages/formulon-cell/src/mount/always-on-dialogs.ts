@@ -37,6 +37,8 @@ export interface AlwaysOnDialogsDeps {
     currentFormats: ReturnType<WorkbookHandle['getConditionalFormats']>,
   ) => ReadonlySet<number>;
   openConditionalDialog: (options: ConditionalDialogOpenOptions) => void;
+  /** Opens the Sort dialog for the range around the active cell, as Custom Sort does. */
+  openCustomSort: () => void;
   /** Whether the host policy allows `operation`; `null` names a dialog that edits nothing. */
   permits: (operation: InteractionOperation | null) => boolean;
 }
@@ -86,6 +88,7 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
       getWb,
       strings: getStrings(),
       locale: getLocale(),
+      onCustomSort: deps.openCustomSort,
     });
 
   let externalLinksDialog = attachExternalLinks();

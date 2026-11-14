@@ -6,6 +6,7 @@ import {
   type AutoFilterInput,
   type AutoFilterSortConditionInput,
   type AutoFilterSortStateInput,
+  ColorKind,
   ComparisonOperator,
   DynamicFilterType,
   FilterKind,
@@ -18,7 +19,12 @@ import {
   datePeriodOfDynamicType,
   datePeriodXmlType,
 } from '../commands/date-periods.js';
-import { distinctValues, isFilterComparisonOp, normalizeColorKey } from '../commands/filter.js';
+import {
+  distinctValues,
+  isFilterComparisonOp,
+  NO_COLOR,
+  normalizeColorKey,
+} from '../commands/filter.js';
 import {
   columnDateSerials,
   dateGroupItemsXml,
@@ -40,9 +46,11 @@ import { formatA1Range } from './address.js';
 import { customIconFromEngine, customIconToEngine } from './cf-icon-sets.js';
 import { dxfToApply } from './cf-sync.js';
 import { dxfRecordFromApply } from './cf-writeback.js';
+import { fillRecordFromFormat, fontRecordFromFormat } from './format-writeback.js';
 import { profileTextKey } from './profile-text-semantics.js';
 import { parseRangeRef } from './range-resolver.js';
-import type { Range } from './types.js';
+import { noColor } from './style-records.js';
+import type { DxfRecord, Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 const escapeXml = (value: string): string =>
@@ -408,6 +416,25 @@ const encodeComparisonValue = (op: FilterComparisonOp, value: string): string =>
       ? escapeAutoFilterWildcardLiteral(value)
       : value;
 
+const AUTOMATIC = { ...noColor(), kind: ColorKind.Auto };
+
+/** The differential format of No Fill (a fill with no pattern) or of an Automatic font colour. */
+const noColorDxf = (kind: 'cellColor' | 'fontColor'): DxfRecord =>
+  kind === 'cellColor'
+    ? { fill: fillRecordFromFormat({}) }
+    : { font: { ...fontRecordFromFormat({}), sizePt: null, vertAlign: 0, color: AUTOMATIC } };
+
+/** The colour key a colour filter or sort level's differential format holds: its fill or font
+ *  colour, `NO_COLOR` for No Fill or Automatic, null for one that states neither. */
+function colorKeyOfDxf(wb: WorkbookHandle, dxfIndex: number, cell: boolean): string | null {
+  const dxf = wb.getDxf(dxfIndex);
+  if (cell && dxf?.fill && dxf.fill.pattern === 0 && !dxf.fill.gradient) return NO_COLOR;
+  if (!cell && dxf?.font?.color?.kind === ColorKind.Auto) return NO_COLOR;
+  const apply = dxfToApply(wb, dxfIndex);
+  const color = cell ? apply.fill : apply.color;
+  return color ? normalizeColorKey(color) : null;
+}
+
 const dxfIdCache = new WeakMap<WorkbookHandle, Map<string, number>>();
 
 /** Color column backed by a differential style holding the filter color; null
@@ -420,7 +447,10 @@ function dxfIdForColor(
   color: string,
 ): number | null {
   if (!wb?.capabilities.conditionalFormatDxf) return null;
-  const dxf = dxfRecordFromApply(wb, kind === 'cellColor' ? { fill: color } : { color });
+  const dxf =
+    color === NO_COLOR
+      ? noColorDxf(kind)
+      : dxfRecordFromApply(wb, kind === 'cellColor' ? { fill: color } : { color });
   if (!dxf) return null;
   // addDxf appends, so reuse the id already issued for this color.
   const key = JSON.stringify(dxf);
@@ -534,12 +564,9 @@ function sortSpecFromTyped(
       return icon ? [{ ...base, sortOn: 'cellIcon', icon }] : [];
     }
     if (condition.dxfIndex === null || !wb?.capabilities.conditionalFormatDxf) return [];
-    const apply = dxfToApply(wb, condition.dxfIndex);
     const cell = condition.sortBy === SortBy.CellColor;
-    const color = cell ? apply.fill : apply.color;
-    return color
-      ? [{ ...base, sortOn: cell ? 'cellColor' : 'fontColor', color: normalizeColorKey(color) }]
-      : [];
+    const color = colorKeyOfDxf(wb, condition.dxfIndex, cell);
+    return color ? [{ ...base, sortOn: cell ? 'cellColor' : 'fontColor', color }] : [];
   });
   return keys.length > 0 ? { range, keys } : null;
 }
@@ -750,17 +777,13 @@ function localCriteriaFromTypedFilter(
       column.dxfIndex !== null &&
       wb?.capabilities.conditionalFormatDxf
     ) {
-      const apply = dxfToApply(wb, column.dxfIndex);
-      const color = column.cellColor ? apply.fill : apply.color;
+      const color = colorKeyOfDxf(wb, column.dxfIndex, column.cellColor);
       if (color) {
         criteria.push({
           range,
           byCol,
           hiddenValues: [],
-          color: {
-            kind: column.cellColor ? 'cellColor' : 'fontColor',
-            color: normalizeColorKey(color),
-          },
+          color: { kind: column.cellColor ? 'cellColor' : 'fontColor', color },
         });
         continue;
       }

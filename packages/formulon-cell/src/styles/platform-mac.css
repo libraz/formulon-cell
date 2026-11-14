@@ -2355,6 +2355,26 @@
     background: var(--fc-swatch, transparent);
   }
 
+  /* No Fill and Automatic read as text after the colours; Custom Sort... closes the sort side's list. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__swatch--none {
+    width: auto;
+    padding: 0 6px;
+    font: inherit;
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__custom-sort {
+    flex-basis: 100%;
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 11px;
+    text-align: start;
+  }
+
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__swatch[aria-pressed="true"] {
     box-shadow: 0 0 0 2px var(--fc-accent, dodgerblue);
   }

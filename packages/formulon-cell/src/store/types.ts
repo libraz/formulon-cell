@@ -320,7 +320,7 @@ export interface FilterSortKey {
   byCol: number;
   direction: 'asc' | 'desc';
   sortOn?: 'cellColor' | 'fontColor' | 'cellIcon' | 'customList';
-  /** The colour of a colour level, lower-cased. */
+  /** The colour of a colour level, lower-cased; `NO_COLOR` for No Fill or Automatic. */
   color?: string;
   /** The icon of an icon level. */
   icon?: ConditionalIconRef;
@@ -328,8 +328,8 @@ export interface FilterSortKey {
   customList?: string[];
 }
 
-/** A filter by colour: rows whose cell fill or font colour is `color`, or whose conditional
- *  formatting draws `icon`. */
+/** A filter by colour: rows whose cell fill or font colour is `color` (`NO_COLOR` for No Fill or an
+ *  Automatic font colour), or whose conditional formatting draws `icon`. */
 export type FilterColorSpec =
   | { kind: 'cellColor' | 'fontColor'; color: string }
   | { kind: 'cellIcon'; icon: ConditionalIconRef };

@@ -19,6 +19,7 @@ import {
   distinctFilterItemsResult,
   type FilterValueItem,
   isFilterComparisonOp,
+  NO_COLOR,
   resetFilterCriteria,
 } from '../commands/filter.js';
 import { filterUseWrite } from '../commands/filter-actions.js';
@@ -36,7 +37,7 @@ import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { conditionalIconCanvas } from '../render/painters/cf-icons.js';
 import { sameRange } from '../store/selection-geometry.js';
-import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type ValueFilterCriteria } from '../store/store.js';
 import type { FilterColorSpec } from '../store/types.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
@@ -74,6 +75,8 @@ export interface FilterDropdownDeps {
   /** Receives an explicit native checklist refusal/failure. The result still
    *  contains a safe locale-aware approximation for rendering. */
   onDistinctFailure?: (reason: DistinctFilterFailureReason) => void;
+  /** Opens the Sort dialog for the filtered range; the sort side's Custom Sort... calls it. */
+  onCustomSort?: () => void;
   /** Where to anchor the popover. When omitted the popover is centred. */
   anchorRect?: { x: number; y: number; w: number; h: number };
 }
@@ -943,9 +946,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         const select = createDialogSelect(
           [
             { value: '', label: m.colorNone },
-            { value: 'cellColor', label: m.cellColor, disabled: choices.fills.length === 0 },
-            { value: 'fontColor', label: m.fontColor, disabled: choices.fonts.length === 0 },
-            { value: 'cellIcon', label: m.cellIcon, disabled: choices.icons.length === 0 },
+            { value: 'cellColor', label: m.cellColor },
+            { value: 'fontColor', label: m.fontColor },
+            { value: 'cellIcon', label: m.cellIcon },
           ],
           active?.kind ?? '',
           { ariaLabel: m.byColor, className: 'fc-filter-dropdown__color-kind' },
@@ -998,15 +1001,36 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
               button.appendChild(canvas);
               swatches.appendChild(button);
             }
-            return;
+          } else if (kind === 'cellColor' || kind === 'fontColor') {
+            // The colours in first-appearance order, then No Fill or Automatic when a row has none.
+            const none = kind === 'cellColor' ? choices.noFill : choices.automaticFont;
+            const colors = [...(kind === 'cellColor' ? choices.fills : choices.fonts)];
+            if (none) colors.push(NO_COLOR);
+            for (const color of colors) {
+              const pressed = active?.kind === kind && active.color === color;
+              const label =
+                color !== NO_COLOR ? color : kind === 'cellColor' ? m.noFill : m.fontAutomatic;
+              const button = swatch(label, pressed, { kind, color });
+              button.dataset.fcColor = color;
+              if (color === NO_COLOR) {
+                button.classList.add('fc-filter-dropdown__swatch--none');
+                button.textContent = label;
+              } else button.style.setProperty('--fc-swatch', color);
+              swatches.appendChild(button);
+            }
           }
-          if (kind !== 'cellColor' && kind !== 'fontColor') return;
-          for (const color of kind === 'cellColor' ? choices.fills : choices.fonts) {
-            const pressed = active?.kind === kind && active.color === color;
-            const button = swatch(color, pressed, { kind, color });
-            button.dataset.fcColor = color;
-            button.style.setProperty('--fc-swatch', color);
-            swatches.appendChild(button);
+          // The sort side ends every list with Custom Sort..., which opens the Sort dialog.
+          if (side === 'sort' && kind !== '' && deps.onCustomSort) {
+            const customSort = createInteractionButton({
+              className: 'fc-filter-dropdown__custom-sort',
+              text: m.customSort,
+            });
+            customSort.addEventListener('click', () => {
+              close();
+              mutators.setActive(deps.store, { sheet: range.sheet, row: range.r0, col });
+              deps.onCustomSort?.();
+            });
+            swatches.appendChild(customSort);
           }
         };
         select.addEventListener('change', () => {

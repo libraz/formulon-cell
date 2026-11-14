@@ -463,6 +463,19 @@ function recomputeHiddenFromCriteria(
 
 export const normalizeColorKey = (color: string): string => color.trim().toLocaleLowerCase();
 
+/** The colour key of a cell with no fill (No Fill) or no font colour of its own (Automatic). */
+export const NO_COLOR = 'none';
+
+/** The key a colour filter or sort level matches in a cell: its fill or font colour, lower-cased, or
+ *  `NO_COLOR` when it has none. */
+export const cellColorKey = (
+  fmt: { fill?: string; color?: string } | undefined,
+  kind: 'cellColor' | 'fontColor',
+): string => {
+  const actual = kind === 'cellColor' ? fmt?.fill : fmt?.color;
+  return actual ? normalizeColorKey(actual) : NO_COLOR;
+};
+
 /** Formulon's AutoFilter text matcher follows Excel and compares text without
  * regard to case. Keep checklist labels in their original case, but fold
  * value keys whenever a selection is evaluated. */
@@ -481,9 +494,7 @@ function colorMatches(
     const overlay = icons?.get(key);
     return overlay?.iconKind === color.icon.set && overlay.iconSlot === color.icon.slot;
   }
-  const fmt = state.format.formats.get(key);
-  const actual = color.kind === 'cellColor' ? fmt?.fill : fmt?.color;
-  return !!actual && normalizeColorKey(actual) === color.color;
+  return cellColorKey(state.format.formats.get(key), color.kind) === color.color;
 }
 
 /** Apply an Excel-style "Filter by Selected Cell's Value" action. The active

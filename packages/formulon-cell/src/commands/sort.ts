@@ -18,7 +18,13 @@ import { recordCommentChange } from './comment.js';
 import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
 import { allCustomLists } from './custom-lists.js';
 import { blockDataTableEdit } from './data-table-guard.js';
-import { filterRangeForSort, inferAutoFilterRange, setFilterSort } from './filter.js';
+import {
+  cellColorKey,
+  filterRangeForSort,
+  inferAutoFilterRange,
+  normalizeColorKey,
+  setFilterSort,
+} from './filter.js';
 import { filterRangeAt } from './filter-ranges.js';
 import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';
@@ -435,7 +441,6 @@ const normalizedSortKeys = (opts: SortOptions): SortKey[] => {
   return out;
 };
 
-const normalizeColorKey = (color: string): string => color.trim().toLocaleLowerCase();
 const normalizeListKey = (value: string): string => value.trim().toLocaleLowerCase();
 
 type SortValueKind = 'number' | 'text' | 'bool' | 'error' | 'blank' | 'color' | 'custom';
@@ -488,10 +493,9 @@ const sortKeyForCell = (
   }
   if (sortOn === 'cellColor' || sortOn === 'fontColor') {
     const fmt = state.format.formats.get(addrKey({ sheet, row, col }));
-    const actual = sortOn === 'cellColor' ? fmt?.fill : fmt?.color;
     return {
       kind: 'color',
-      match: !!actual && !!key.color && normalizeColorKey(actual) === normalizeColorKey(key.color),
+      match: !!key.color && cellColorKey(fmt, sortOn) === normalizeColorKey(key.color),
     };
   }
   const keyCell = state.data.cells.get(addrKey({ sheet, row, col }));

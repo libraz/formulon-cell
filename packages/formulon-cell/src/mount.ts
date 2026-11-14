@@ -68,6 +68,7 @@ import { closeSheetViewOptionsDialog } from './interact/sheet-view-options-dialo
 import { attachAlwaysOnDialogs } from './mount/always-on-dialogs.js';
 import { createMountChrome } from './mount/chrome.js';
 import { attachChromeSync, type ChromeSyncController } from './mount/chrome-sync.js';
+import { createEditingDropdownDefaults } from './mount/dynamic-dropdown-defaults/editing.js';
 import { toggleSheetProtectionFlow } from './mount/dynamic-dropdown-defaults/protection-flows.js';
 import { showCreateTableDialog } from './mount/dynamic-dropdown-defaults/styles.js';
 import { attachEngineBinding, type EngineBinding } from './mount/engine-binding.js';
@@ -472,6 +473,8 @@ export const Spreadsheet = {
       getSessionConditionalFormatIndexes: (sheet, currentFormats) =>
         getTrackedConditionalRuleIndexes(currentFormats, sheet, syncedSessionCfRules),
       openConditionalDialog: (options) => featureState.conditionalDialog?.open(options),
+      openCustomSort: () =>
+        void createEditingDropdownDefaults(instance).applySortMenuAction('custom'),
       permits: (operation) => policyPermits(commands.policy, operation),
     });
 
