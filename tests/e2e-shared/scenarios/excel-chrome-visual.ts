@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
+import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 interface SnapshotOptions {
@@ -866,4 +867,27 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
     await expect(page.locator('.fc-prefs[role="dialog"]')).toBeVisible();
     await snapshotPage(page, 'excel-chrome-mac-preferences-1440');
   });
+
+  // Shot at the ribbon alone, so a change inside one tab is not diluted by the sheet.
+  for (const locale of ['ja', 'en'] as const) {
+    await test.step(`mac ribbon tabs (${locale})`, async () => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await sp.mount({ locale, platform: 'mac' });
+      await sp.expectNoStub();
+      for (const tab of ['formulas', 'insert', 'review', 'view'] as const) {
+        await selectRibbonTab(page, tab);
+        const panel = page.locator(`[data-ribbon-panel="${tab}"]`);
+        await expect(panel).toBeVisible();
+        await expect.poll(() => panel.evaluate((p) => p.scrollWidth <= p.clientWidth)).toBe(true);
+        await parkPointer(page);
+        await expect
+          .soft(page.locator('.fc-tb__ribbon-shell').first())
+          .toHaveScreenshot(`excel-chrome-mac-${tab}-ribbon-${locale}-1440.png`, {
+            animations: 'disabled',
+            caret: 'hide',
+            maxDiffPixelRatio: 0.01,
+          });
+      }
+    });
+  }
 }
