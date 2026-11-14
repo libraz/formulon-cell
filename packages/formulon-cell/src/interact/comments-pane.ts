@@ -7,6 +7,7 @@ import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { MAC_CONTEXT_LABELS } from '../toolbar/ribbon/mac/labels-data.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
 import { appendDialogButton } from './dialog-shell.js';
+import { isNavigationAddrAllowed } from './navigation-policy.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
 export interface CommentsPaneDeps {
@@ -23,7 +24,8 @@ export interface CommentsPaneHandle {
 }
 
 /**
- * The Mac Comments task pane: the active sheet's threads, each under its cell.
+ * The Mac Comments task pane: the active sheet's threads, each under its cell, leaving out
+ * cells the navigation policy keeps out of reach.
  * Its visibility is `ui.commentsPaneOpen`, so every opener and closer shares one state.
  */
 export function attachCommentsPane(deps: CommentsPaneDeps): CommentsPaneHandle {
@@ -66,7 +68,9 @@ export function attachCommentsPane(deps: CommentsPaneDeps): CommentsPaneHandle {
     root.setAttribute('aria-label', heading);
     closeBtn.setAttribute('aria-label', deps.getStrings().workbookObjects.close);
     const sheet = store.getState().data.sheetIndex;
-    const entries = listThreadedComments(store, sheet, getWb());
+    const entries = listThreadedComments(store, sheet, getWb()).filter((entry) =>
+      isNavigationAddrAllowed(store, { sheet, row: entry.cell.row, col: entry.cell.col }),
+    );
     body.replaceChildren();
     const roots = entries.filter((entry) => !entry.parentId);
     if (roots.length === 0) {
