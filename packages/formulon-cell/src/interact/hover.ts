@@ -1,7 +1,10 @@
 import { hyperlinkCoverAt, isFollowableHyperlinkTarget } from '../commands/hyperlinks.js';
 import { addrKey } from '../engine/address.js';
+import type { Addr } from '../engine/types.js';
 import { isMacHost } from '../extensions/ui-options.js';
+import type { Strings } from '../i18n/strings.js';
 import { cellRect, hitTest, layoutForView, pointPx } from '../render/geometry.js';
+import { gridHitState } from '../render/grid/hit-state.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -14,6 +17,11 @@ export interface HoverDeps {
   /** The grid surface hosting pointer events. */
   grid: HTMLElement;
   store: SpreadsheetStore;
+  /** Hover tip on the error triangle of a stale formula value. */
+  staleTip?: {
+    strings: () => Strings;
+    isStale: (addr: Addr) => boolean;
+  };
 }
 
 export interface HoverHandle {
@@ -94,6 +102,26 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     fmt: ReturnType<typeof cellFormatAt>;
   } | null = null;
 
+  // The stale-value tip rides the cell's error triangle.
+  const staleTipAt = (e: PointerEvent): string | undefined => {
+    const stale = deps.staleTip;
+    if (!stale) return undefined;
+    const box = grid.getBoundingClientRect();
+    const x = e.clientX - box.left;
+    const y = e.clientY - box.top;
+    const hit = gridHitState(grid).errorTriangles.find(
+      (t) =>
+        t.kind === 'error' &&
+        x >= t.rect.x - 2 &&
+        x <= t.rect.x + t.rect.w + 2 &&
+        y >= t.rect.y - 2 &&
+        y <= t.rect.y + t.rect.h + 2,
+    );
+    if (!hit || !stale.isStale(hit.addr)) return undefined;
+    const m = stale.strings().mac.errorMenu;
+    return `${m.staleHeading}\n${m.staleBody}`;
+  };
+
   const onMove = (e: PointerEvent): void => {
     const at = cellAt(e);
     let fmt: ReturnType<typeof cellFormatAt> = null;
@@ -116,7 +144,7 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     }
     // A shown note is already on the canvas; hovering it adds no popup.
     const note = fmt?.commentVisible || store.getState().ui.showAllNotes ? undefined : fmt?.comment;
-    const tooltip = note || fmt?.hyperlinkTooltip;
+    const tooltip = staleTipAt(e) || note || fmt?.hyperlinkTooltip;
     if (tooltip) {
       if (tooltip !== shownText) {
         tip.textContent = tooltip;

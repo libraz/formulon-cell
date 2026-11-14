@@ -6,6 +6,8 @@ export interface MacErrorMenuStrings {
   numberAsTextHeading: string;
   /** Heading of a stale formula value. */
   staleHeading: string;
+  /** Hover tip body of a stale formula value. */
+  staleBody: string;
   /** The stale rule's actions. */
   calculateNow: string;
   switchToAutomatic: string;
@@ -25,6 +27,7 @@ export const macErrorMenuEn: MacErrorMenuStrings = {
   divZeroHeading: 'Divide by Zero Error',
   numberAsTextHeading: 'Number Stored as Text',
   staleHeading: 'Stale Value',
+  staleBody: 'The value in this cell is stale. Calculate the workbook to see an up-to-date value.',
   calculateNow: 'Calculate Now (F9)',
   switchToAutomatic: 'Switch to Automatic Calculation',
   disableFormatStale: 'Disable Format Stale Cells',
@@ -42,6 +45,7 @@ export const macErrorMenuJa: MacErrorMenuStrings = {
   divZeroHeading: '0 除算のエラー',
   numberAsTextHeading: '数値が文字列として保存されています',
   staleHeading: '古くなった値',
+  staleBody: 'このセルの値は古くなっています。ブックを計算して、最新の値を表示します。',
   calculateNow: '今すぐ計算(C) (F9)',
   switchToAutomatic: '自動計算に切り替える(A)',
   disableFormatStale: '古くなったセルのフォーマットを無効にする(D)',
@@ -59,6 +63,8 @@ export const macErrorMenuDe: MacErrorMenuStrings = {
   divZeroHeading: 'Division durch Null',
   numberAsTextHeading: 'Als Text gespeicherte Zahlen',
   staleHeading: 'Veralteter Wert',
+  staleBody:
+    'Der Wert in dieser Zelle ist veraltet. Berechnen Sie die Arbeitsmappe, um einen aktuellen Wert anzuzeigen.',
   calculateNow: 'Jetzt berechnen (F9)',
   switchToAutomatic: 'Zur automatischen Berechnung wechseln',
   disableFormatStale: 'Veraltete Zellenformatierung deaktivieren',
@@ -76,6 +82,8 @@ export const macErrorMenuFr: MacErrorMenuStrings = {
   divZeroHeading: 'Erreur lors de la division par zéro',
   numberAsTextHeading: 'Nombre stocké sous forme de texte',
   staleHeading: 'Valeur périmée',
+  staleBody:
+    'La valeur de cette cellule est périmée. Calculez le classeur pour voir une valeur à jour.',
   calculateNow: 'Calculer maintenant (F9)',
   switchToAutomatic: 'Basculer vers le calcul automatique',
   disableFormatStale: 'Désactiver le format des cellules périmées',
@@ -93,6 +101,7 @@ export const macErrorMenuZh: MacErrorMenuStrings = {
   divZeroHeading: '除以零错误',
   numberAsTextHeading: '以文本形式存储的数字',
   staleHeading: '过时值',
+  staleBody: '此单元格中的值已过时。请计算工作簿以查看最新值。',
   calculateNow: '立即计算(F9)',
   switchToAutomatic: '切换到自动计算',
   disableFormatStale: '禁用过时单元格格式',
@@ -110,6 +119,7 @@ export const macErrorMenuKo: MacErrorMenuStrings = {
   divZeroHeading: '0으로 나누기 오류',
   numberAsTextHeading: '텍스트 형식으로 저장된 숫자',
   staleHeading: '부실 값',
+  staleBody: '이 셀의 값이 부실합니다. 통합 문서를 계산하여 최신 값을 확인하세요.',
   calculateNow: '지금 계산(F9)',
   switchToAutomatic: '자동 계산으로 전환',
   disableFormatStale: '부실 셀 서식 사용 안 함',
@@ -127,6 +137,7 @@ export const macErrorMenuTh: MacErrorMenuStrings = {
   divZeroHeading: 'ข้อผิดพลาดจากการหารด้วยศูนย์',
   numberAsTextHeading: 'ตัวเลขที่ถูกเก็บในรูปข้อความ',
   staleHeading: 'ค่าเก่า',
+  staleBody: 'ค่าในเซลล์นี้เก่า คํานวณเวิร์กบุ๊กเพื่อดูค่าล่าสุด',
   calculateNow: 'คำนวณทันที (F9)',
   switchToAutomatic: 'สลับไปยังการคำนวณอัตโนมัติ',
   disableFormatStale: 'ปิดใช้งานการจัดรูปแบบเซลล์เก่า',

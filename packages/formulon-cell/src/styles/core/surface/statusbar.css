@@ -281,6 +281,30 @@
     border-color: var(--fc-statusbar-fg, var(--fc-fg-mute));
   }
 
+  .fc-host__statusbar-recalc {
+    flex: 0 0 auto;
+    appearance: none;
+    border: 1px solid
+      var(--fc-statusbar-control, color-mix(in srgb, var(--fc-accent-fg) 32%, transparent));
+    border-radius: 2px;
+    background: transparent;
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    padding: 1px 7px;
+    margin: 0 8px;
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.4;
+    cursor: pointer;
+  }
+
+  .fc-host__statusbar-recalc[hidden] {
+    display: none;
+  }
+
+  .fc-host__statusbar-recalc:hover {
+    border-color: var(--fc-statusbar-fg, var(--fc-fg-mute));
+  }
+
   .fc-host__statusbar-dot {
     display: inline-block;
     width: 6px;

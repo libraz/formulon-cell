@@ -1,4 +1,5 @@
 import { createAccessibilityStatus } from '../commands/accessibility-check.js';
+import { staleFormulaMarked, staleValuesMarked } from '../commands/error-indicators.js';
 import type { History } from '../commands/history.js';
 import { finishPivotReportUpdate, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
@@ -388,7 +389,23 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         break;
       case 'hoverComment':
         if (s.hover) return;
-        s.hover = attachHover({ grid: input.grid, store: input.store });
+        s.hover = attachHover({
+          grid: input.grid,
+          store: input.store,
+          staleTip: {
+            strings: input.strings,
+            isStale: (addr) => {
+              const state = input.store.getState();
+              const cell = state.data.cells.get(addrKey(addr));
+              return staleFormulaMarked(
+                input.wb(),
+                state.ui.formatStaleValues,
+                cell?.formula,
+                addr,
+              );
+            },
+          },
+        });
         input.featureRegistry.set(
           'hoverComment',
           input.wrapHandle(s.hover, () => s.hover?.detach()),
@@ -634,6 +651,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           onRecalc: () => {
             input.wb().recalc();
             mutators.refreshActiveSheetCells(input.store, input.wb());
+            s.statusBar?.refresh();
             input.renderer.invalidate();
           },
           onZoomChange: (zoom) => {

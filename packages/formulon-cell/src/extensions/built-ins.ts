@@ -18,6 +18,7 @@
 // replacement registered under the same id participates correctly.
 
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
+import { staleFormulaMarked } from '../commands/error-indicators.js';
 import type { History } from '../commands/history.js';
 import { finishPivotReportUpdate, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import {
@@ -413,7 +414,23 @@ export const hoverComment = (): Extension =>
     id: 'hoverComment',
     priority: 50,
     setup(ctx: BuiltInExtensionContext) {
-      const handle = attachHover({ grid: ctx.grid, store: ctx.store });
+      const handle = attachHover({
+        grid: ctx.grid,
+        store: ctx.store,
+        staleTip: {
+          strings: () => ctx.i18n.strings,
+          isStale: (addr) => {
+            const state = ctx.store.getState();
+            const cell = state.data.cells.get(addrKey(addr));
+            return staleFormulaMarked(
+              ctx.workbook,
+              state.ui.formatStaleValues,
+              cell?.formula,
+              addr,
+            );
+          },
+        },
+      });
       return { ...handle, dispose: handle.detach };
     },
   });

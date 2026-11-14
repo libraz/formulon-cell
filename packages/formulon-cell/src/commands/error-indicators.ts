@@ -235,6 +235,14 @@ export const staleValuesMarked = (
   calcModeLeavesStaleValues(wb.calcMode?.() ?? null) &&
   wb.staleValuesSupported?.() === true;
 
+/** Whether the formula cell at `addr` holds a stale value the grid marks. */
+export const staleFormulaMarked = (
+  wb: Pick<WorkbookHandle, 'calcMode' | 'staleValuesSupported' | 'isCellStale'> | null | undefined,
+  formatStaleValues: boolean,
+  formula: string | null | undefined,
+  addr: Addr,
+): boolean => !!formula && staleValuesMarked(wb, formatStaleValues) && !!wb?.isCellStale(addr);
+
 /** Whether a cell carries the error-check triangle: the one rule the grid
  *  paints by and Error Checking walks. */
 export function errorCheckFlagged(

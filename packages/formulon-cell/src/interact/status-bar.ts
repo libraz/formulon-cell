@@ -63,6 +63,9 @@ export interface StatusBarDeps {
   getCalcMode?: () => 0 | 1 | 2 | null;
   onCycleCalcMode?: () => void;
   onRecalc?: () => void;
+  /** Whether a manual-mode workbook holds stale formula values. Drives the
+   *  Mac host's Calculate button, which presses `onRecalc`. */
+  hasStaleValues?: () => boolean;
   /** Formula bar editing is tracked outside store.editor; this hook lets the
    *  status bar derive Excel's Edit/Point mode without owning extra state. */
   getFormulaEditing?: () => boolean;
@@ -271,6 +274,13 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     deps.onRecalc?.();
   });
 
+  const recalcButton = createStatusBarButton('fc-host__statusbar-recalc');
+  recalcButton.hidden = true;
+  recalcButton.addEventListener('click', () => {
+    deps.onRecalc?.();
+    refresh();
+  });
+
   const right = document.createElement('span');
   right.className = 'fc-host__statusbar-right';
   right.textContent = '';
@@ -326,6 +336,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     left,
     center,
     calcBadge,
+    recalcButton,
     right,
     lockIndicators,
     uploadStatus,
@@ -364,6 +375,16 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     calcBadge.title = t.calcRecalcHint;
     calcBadge.setAttribute('aria-label', `${calcBadge.textContent}. ${t.calcRecalcHint}`);
     calcBadge.dataset.calcMode = String(mode);
+  };
+
+  const refreshRecalcButton = (): void => {
+    const show = isMacHost(statusbar) && deps.hasStaleValues?.() === true;
+    recalcButton.hidden = !show;
+    if (!show) return;
+    const t = strings.mac.chrome;
+    recalcButton.textContent = t.calculate;
+    recalcButton.title = t.calculateHint;
+    recalcButton.setAttribute('aria-label', t.calculate);
   };
 
   const refreshStaticLabels = (): void => {
@@ -651,6 +672,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
     refreshCalcBadge();
+    refreshRecalcButton();
   };
 
   const setZoom = (next: number): void => {
