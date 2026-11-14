@@ -101,6 +101,7 @@ See [Embedding and use cases](https://formulon.libraz.net/cell/embedding) for vi
 - [Modals and fullscreen](https://formulon.libraz.net/cell/modals)
 - [Theming](https://formulon.libraz.net/cell/theming)
 - [Language and labels](https://formulon.libraz.net/cell/i18n)
+- [Changelog](https://github.com/libraz/formulon-cell/blob/main/packages/formulon-cell/CHANGELOG.md) (this package's changes are listed with the core's)
 
 ## License
 

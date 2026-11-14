@@ -101,6 +101,7 @@ import '@libraz/formulon-cell/styles/toolbar.css';
 - [モーダルと全画面表示](https://formulon.libraz.net/ja/cell/modals)
 - [テーマ](https://formulon.libraz.net/ja/cell/theming)
 - [言語と表示文言](https://formulon.libraz.net/ja/cell/i18n)
+- [変更履歴](https://github.com/libraz/formulon-cell/blob/main/packages/formulon-cell/CHANGELOG.md)（このパッケージの変更もコアと同じファイルに記載しています）
 
 ## ライセンス
 
