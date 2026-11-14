@@ -1,6 +1,5 @@
 import { expect, type Page } from '@playwright/test';
 
-import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { gridCellCenter } from '../pages/SpreadsheetPage.js';
@@ -529,22 +528,12 @@ export async function runMacAuditMenusScenario(page: Page): Promise<void> {
   ).toBeEnabled();
   await error.locator('[data-ribbon-command="mac.formulas.errorCheck.trace"]').click();
   await expect.poll(traces).toEqual(['precedent']);
+  // Ignore Error lives on the cell's error menu, not in Error Checking.
   await sp.clickRibbon('mac.formulas.errorCheck');
-  await error.locator('[data-ribbon-command="mac.formulas.errorCheck.ignore"]').click();
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
-        const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
-        return Array.from(store.getState().errorIndicators.ignoredErrors);
-      }),
-    )
-    .toContain('0:0:4');
-  await sp.goTo('A1');
-  await sp.clickRibbon('mac.formulas.errorCheck');
-  await expect(
-    error.locator('[data-ribbon-command="mac.formulas.errorCheck.ignore"]'),
-  ).toBeDisabled();
+  await expect(error).toBeVisible();
+  await expect(error.locator('[data-ribbon-command="mac.formulas.errorCheck.ignore"]')).toHaveCount(
+    0,
+  );
   await page.keyboard.press('Escape');
   await sp.expectNoConsoleErrors();
 }
