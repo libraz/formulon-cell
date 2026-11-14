@@ -95,7 +95,9 @@ export async function runMacInkScenario(page: Page): Promise<void> {
   await page.keyboard.press('Meta+Shift+z');
   await expect(stroke).toHaveCount(1);
   await sp.clickRibbon('mac.draw.eraser');
-  await page.locator('#menu-mac-draw-eraser [data-ribbon-command="mac.draw.eraser"]').click();
+  await page
+    .locator('#menu-mac-draw-eraser [data-ribbon-command="mac.draw.eraser.stroke"]')
+    .click();
   await page.mouse.click(start.x + 40, start.y + 20);
   await expect(stroke).toHaveCount(0);
   await page.keyboard.press('Escape');
