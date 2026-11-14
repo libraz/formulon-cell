@@ -966,6 +966,35 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     ko: '회색조',
     th: 'ระดับสีเทา',
   },
+  'mac.page.theme.enableUpdates': {
+    de: 'Inhaltsaktualisierungen aktivieren',
+    fr: 'Activer les mises à jour de contenu',
+    zh: '启用内容更新',
+    ko: '콘텐츠 업데이트 사용',
+    th: 'เปิดใช้งานการอัปเดตเนื้อหา',
+  },
+  'mac.page.theme.browse': {
+    de: 'Nach Designs suchen...',
+    fr: 'Rechercher des thèmes...',
+    zh: '浏览主题...',
+    ko: '테마 찾아보기...',
+    th: 'เรียกดูธีม...',
+  },
+  'mac.page.theme.save': {
+    de: 'Aktuelles Design speichern...',
+    fr: 'Enregistrer le thème actif...',
+    zh: '保存当前主题...',
+    ko: '현재 테마 저장...',
+    th: 'บันทึกธีมปัจจุบัน...',
+  },
+  // The View tab button; the Page Layout tab keeps the shared `pageLayout` label.
+  'mac.view.pageLayout': {
+    de: 'Seitenlayout',
+    fr: 'Mode Page',
+    zh: '页面布局',
+    ko: '페이지 레이아웃',
+    th: 'เค้าโครงหน้ากระดาษ',
+  },
   'mac.formulas.removeArrows.all': {
     de: 'Pfeile entfernen',
     fr: 'Supprimer les flèches',

@@ -425,9 +425,29 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     ],
     NOT_IMPLEMENTED,
   ),
+  // Office and Grayscale are the themes the host can apply; the commands below them
+  // are the desktop's online-gallery, browse and save-to-file entries, which it has no backing for.
   'mac.page.theme': menu([
     { id: 'mac.page.theme.office', label: 'Office', labelJa: 'Office' },
     { id: 'mac.page.theme.gray', label: 'Grayscale', labelJa: 'グレースケール' },
+    {
+      id: 'mac.page.theme.enableUpdates',
+      label: 'Enable Content Updates',
+      disabled: true,
+      disabledReason: OFFICE_REQUIRED.en,
+    },
+    {
+      id: 'mac.page.theme.browse',
+      label: 'Browse for Themes...',
+      disabled: true,
+      disabledReason: NOT_IMPLEMENTED.en,
+    },
+    {
+      id: 'mac.page.theme.save',
+      label: 'Save Current Theme...',
+      disabled: true,
+      disabledReason: NOT_IMPLEMENTED.en,
+    },
   ]),
   'mac.page.color': menu([
     { id: 'mac.page.color.office', label: 'Office', labelJa: 'Office' },

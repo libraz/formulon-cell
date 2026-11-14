@@ -401,6 +401,13 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
   'mac.page.color.gray': { ja: 'グレースケール', en: 'Grayscale' },
   'mac.page.font.office': { ja: 'Office', en: 'Office' },
   'mac.page.font.gray': { ja: 'グレースケール', en: 'Grayscale' },
+  'mac.page.theme.enableUpdates': {
+    ja: 'コンテンツ更新を有効にする',
+    en: 'Enable Content Updates',
+  },
+  'mac.page.theme.browse': { ja: 'テーマを参照...', en: 'Browse for Themes...' },
+  'mac.page.theme.save': { ja: '現在のテーマを保存...', en: 'Save Current Theme...' },
+  'mac.view.pageLayout': { ja: 'ページ レイアウト', en: 'Page Layout' },
   'mac.formulas.removeArrows.all': { ja: '矢印の削除', en: 'Remove Arrows' },
   'mac.formulas.removeArrows.precedents': {
     ja: '参照元の矢印の削除',

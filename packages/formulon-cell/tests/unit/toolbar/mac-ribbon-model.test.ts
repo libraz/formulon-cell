@@ -1493,6 +1493,137 @@ describe('Mac Excel ribbon profile', () => {
     });
   });
 
+  describe('Page Layout tab layout', () => {
+    const pageGroups = () =>
+      buildRibbonModel('en', { profile: 'excel365Mac' }).find((tab) => tab.id === 'pageLayout')
+        ?.groups ?? [];
+    const sizeOf = (command: { layout?: string }) =>
+      command.layout === 'stacked' ? 'small' : 'large';
+    const layoutOf = (groupTitle: string) =>
+      pageGroups()
+        .find((group) => group.title === groupTitle)
+        ?.commands.map((command) => [command.id, sizeOf(command)]);
+    const items = (root: string) =>
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+
+    it('draws Page Setup as eight large tiles and Themes as a large tile beside two small rows', () => {
+      expect(pageGroups().map((group) => group.title)).toEqual([
+        'Themes',
+        'Page Setup',
+        'Scale to Fit',
+        'Sheet Options',
+      ]);
+      expect(layoutOf('Themes')).toEqual([
+        ['mac.page.theme', 'large'],
+        ['mac.page.color', 'small'],
+        ['mac.page.font', 'small'],
+      ]);
+      expect(layoutOf('Page Setup')).toEqual([
+        ['mac.page.margins', 'large'],
+        ['mac.page.orientation', 'large'],
+        ['mac.page.size', 'large'],
+        ['mac.page.printArea', 'large'],
+        ['mac.page.pageBreaks', 'large'],
+        ['mac.page.background', 'large'],
+        ['mac.page.printTitles', 'large'],
+        ['mac.page.pageSetup', 'large'],
+      ]);
+    });
+
+    it('keeps the Scale to Fit combos as selects', () => {
+      const scale = pageGroups().find((group) => group.title === 'Scale to Fit');
+      expect(scale?.commands.map((command) => [command.id, command.kind])).toEqual([
+        ['scaleWidth', 'select'],
+        ['scaleHeight', 'select'],
+      ]);
+    });
+
+    it('lists the desktop theme commands after the working themes, disabled with a reason', () => {
+      expect(items('mac.page.theme')).toEqual([
+        ['mac.page.theme.office', 'Office', false],
+        ['mac.page.theme.gray', 'Grayscale', false],
+        ['mac.page.theme.enableUpdates', 'Enable Content Updates', true],
+        ['mac.page.theme.browse', 'Browse for Themes...', true],
+        ['mac.page.theme.save', 'Save Current Theme...', true],
+      ]);
+      for (const item of MAC_RIBBON_MENU_ITEMS['mac.page.theme'] ?? []) {
+        if (item.disabled) expect(item.disabledReason, item.id).toBeTruthy();
+      }
+      expect(items('mac.page.color')?.map(([id]) => id)).toEqual([
+        'mac.page.color.office',
+        'mac.page.color.gray',
+      ]);
+      expect(macRibbonLabelForCommand('mac.page.theme.browse', 'ja')).toBe('テーマを参照...');
+      expect(macRibbonLabelForCommand('mac.page.theme.save', 'fr')).toBe(
+        'Enregistrer le thème actif...',
+      );
+      expect(macRibbonLabelForCommand('mac.page.theme.enableUpdates', 'zh')).toBe('启用内容更新');
+    });
+
+    it('gives the View tab button its own label while the tab keeps the Page Layout wording', () => {
+      const viewLabels = {
+        en: 'Page Layout',
+        ja: 'ページ レイアウト',
+        de: 'Seitenlayout',
+        fr: 'Mode Page',
+        zh: '页面布局',
+        ko: '페이지 레이아웃',
+        th: 'เค้าโครงหน้ากระดาษ',
+      } as const;
+      const tabLabels = {
+        en: 'Page Layout',
+        ja: 'ページ レイアウト',
+        de: 'Seitenlayout',
+        fr: 'Mise en page',
+        zh: '页面布局',
+        ko: '페이지 레이아웃',
+        th: 'เค้าโครงหน้ากระดาษ',
+      } as const;
+      for (const locale of Object.keys(viewLabels) as (keyof typeof viewLabels)[]) {
+        const model = buildRibbonModel(locale, { profile: 'excel365Mac' });
+        const button = model
+          .find((tab) => tab.id === 'view')
+          ?.groups.flatMap((group) => group.commands)
+          .find((command) => command.id === 'mac.view.pageLayout');
+        expect(button?.label, locale).toBe(viewLabels[locale]);
+        expect(button?.title, locale).toBe(viewLabels[locale]);
+        expect(model.find((tab) => tab.id === 'pageLayout')?.label, locale).toBe(tabLabels[locale]);
+      }
+    });
+
+    it('renders Themes and Page Setup with the mixed layout and keeps the theme menu chevrons', async () => {
+      const sheet = await mountStubSheet({ locale: 'en' });
+      const toolbarHost = document.createElement('div');
+      document.body.append(toolbarHost);
+      const toolbar = Spreadsheet.mountToolbar(toolbarHost, sheet.instance, {
+        platform: 'mac',
+        activeTab: 'pageLayout',
+        helpers: {
+          ...mountedRibbonHelpers(),
+          createIcon: () => document.createElementNS('http://www.w3.org/2000/svg', 'svg'),
+        },
+      });
+      try {
+        projectMacRibbonState(toolbarHost, sheet.instance);
+        const mixed = Array.from(
+          toolbarHost.querySelectorAll<HTMLElement>(
+            '[data-ribbon-panel="pageLayout"] .fc-tb__ribbon-group--mixed',
+          ),
+        ).map((group) => group.getAttribute('aria-label'));
+        expect(mixed).toEqual(['Themes', 'Page Setup']);
+        const button = (id: string) =>
+          toolbarHost.querySelector<HTMLButtonElement>(`[data-ribbon-command="${id}"]`);
+        for (const id of ['mac.page.theme', 'mac.page.color', 'mac.page.font']) {
+          expect(button(id)?.querySelector('.fc-tb__rb-split-chevron') !== null, id).toBe(true);
+        }
+      } finally {
+        toolbar.dispose();
+        toolbarHost.remove();
+        sheet.dispose();
+      }
+    });
+  });
+
   it('names the Draw tab controls as Excel for Mac does', () => {
     const draw = buildRibbonModel('ja', { profile: 'excel365Mac' }).find(
       (tab) => tab.id === 'draw',

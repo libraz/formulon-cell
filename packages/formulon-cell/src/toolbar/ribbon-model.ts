@@ -81,6 +81,7 @@ export const FORMULAS_MIXED_LAYOUT_GROUP_VARIANTS = [
 ] as const;
 export const INSERT_MIXED_LAYOUT_GROUP_VARIANTS = ['illustrations', 'charts'] as const;
 export const DRAW_MIXED_LAYOUT_GROUP_VARIANTS = ['draw-tools', 'pens', 'draw-mode'] as const;
+export const PAGE_LAYOUT_MIXED_LAYOUT_GROUP_VARIANTS = ['themes', 'page-setup'] as const;
 
 export const EXCEL365_STANDARD_RIBBON_TABS: readonly RibbonTab[] = [
   'file',

@@ -24,6 +24,7 @@ import {
   INSERT_MIXED_LAYOUT_GROUP_VARIANTS,
   matchesRibbonShortcut,
   OPTIONAL_RIBBON_TABS,
+  PAGE_LAYOUT_MIXED_LAYOUT_GROUP_VARIANTS,
   ribbonActivatableCommandIds,
   ribbonActivatableSurfaceCommandIds,
   ribbonCommandIds,
@@ -443,6 +444,7 @@ describe('toolbar/ribbon-model', () => {
       ...FORMULAS_MIXED_LAYOUT_GROUP_VARIANTS,
       ...INSERT_MIXED_LAYOUT_GROUP_VARIANTS,
       ...DRAW_MIXED_LAYOUT_GROUP_VARIANTS,
+      ...PAGE_LAYOUT_MIXED_LAYOUT_GROUP_VARIANTS,
     ]) {
       expect(() => widthFor(variant)).toThrow();
     }
