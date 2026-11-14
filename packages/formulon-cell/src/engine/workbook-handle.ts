@@ -220,7 +220,8 @@ export class WorkbookHandle {
     if (profile === null || this.geometryPlatform === platform) return;
     const language = profile.slice(profile.indexOf('-') + 1);
     const next = `${platform === 'mac' ? 'mac' : 'windows'}-${language}` as SpreadsheetProfileId;
-    if (this.setSpreadsheetProfileId(next)) this.recalc();
+    // A manual-calculation book keeps its cached values, as the desktop leaves it at open.
+    if (this.setSpreadsheetProfileId(next)) this.recalcAuto();
   }
 
   /** Profile whose language picks the theme script face of a charset-less

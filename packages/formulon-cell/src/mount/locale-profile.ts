@@ -74,7 +74,7 @@ const errorMessage = (error: unknown): string =>
 
 /**
  * Apply a locale profile to a workbook and recalculate exactly once when the
- * effective profile changes. Returns `true` only after the new profile was
+ * effective profile changes, unless the book is in manual calculation. Returns `true` only after the new profile was
  * read back successfully and the recalc completed.
  *
  * Profile selection is an optional capability. A stub or older package is a
@@ -106,7 +106,7 @@ export function syncLocaleProfile(
         if (wb.spreadsheetProfileId() !== current) {
           return `restoration readback was ${wb.spreadsheetProfileId() ?? 'unavailable'}`;
         }
-        wb.recalc();
+        wb.recalcAuto();
       }
       return null;
     } catch (error) {
@@ -140,7 +140,8 @@ export function syncLocaleProfile(
   }
 
   try {
-    wb.recalc();
+    // Skipped under manual calculation: the book keeps its cached values, as at open.
+    wb.recalcAuto();
   } catch (error) {
     return reject(`recalc failed: ${errorMessage(error)}`);
   }

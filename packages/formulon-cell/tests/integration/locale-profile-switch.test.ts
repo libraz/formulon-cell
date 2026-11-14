@@ -73,7 +73,7 @@ describe('integration: locale profile switching', () => {
 
   it('recalculates once after a real platform profile switch', async () => {
     const workbook = await WorkbookHandle.createDefault();
-    const recalc = vi.spyOn(workbook, 'recalc');
+    const recalc = vi.spyOn(workbook, 'recalcAuto');
     try {
       sheet = await mountStubSheet({ workbook, locale: 'ja', ui: { platform: 'default' } });
       expect(workbook.spreadsheetProfileId()).toBe('windows-ja_JP');
@@ -92,7 +92,7 @@ describe('integration: locale profile switching', () => {
 
   it('reselects the workbook profile when the UI locale changes', async () => {
     const workbook = await WorkbookHandle.createDefault();
-    const recalc = vi.spyOn(workbook, 'recalc');
+    const recalc = vi.spyOn(workbook, 'recalcAuto');
     try {
       sheet = await mountStubSheet({ workbook, locale: 'en', ui: { platform: 'default' } });
       expect(workbook.spreadsheetProfileId()).toBe('windows-en_US');
@@ -219,7 +219,7 @@ describe('integration: locale profile switching', () => {
 
   it('exposes an atomic public locale setter', async () => {
     const workbook = await WorkbookHandle.createDefault();
-    const recalc = vi.spyOn(workbook, 'recalc');
+    const recalc = vi.spyOn(workbook, 'recalcAuto');
     try {
       sheet = await mountStubSheet({ workbook, locale: 'en', ui: { platform: 'default' } });
       expect(sheet.instance.locale).toBe('en');
@@ -462,7 +462,7 @@ describe('integration: locale profile switching', () => {
         .spyOn(workbook, 'spreadsheetProfileId')
         .mockImplementationOnce(() => 'windows-ja_JP')
         .mockImplementationOnce(() => 'windows-en_US');
-      const recalc = vi.spyOn(workbook, 'recalc');
+      const recalc = vi.spyOn(workbook, 'recalcAuto');
 
       expect(syncLocaleProfile(workbook, 'de', 'default')).toBe(false);
       expect(setProfile.mock.calls.map(([profile]) => profile)).toEqual([
@@ -483,7 +483,7 @@ describe('integration: locale profile switching', () => {
       expect(workbook.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
       const setProfile = vi.spyOn(workbook, 'setSpreadsheetProfileId');
       let recalcCalls = 0;
-      vi.spyOn(workbook, 'recalc').mockImplementation(() => {
+      vi.spyOn(workbook, 'recalcAuto').mockImplementation(() => {
         recalcCalls += 1;
         if (recalcCalls === 1) throw new Error('target recalc failed');
       });

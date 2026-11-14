@@ -146,6 +146,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- Opening a manually calculated workbook under another platform or locale profile no longer recalculates it, so stale values and their marks survive the open; automatic workbooks still recalculate.
 - The Mac Preferences window titles the View pane as the desktop draws it in French (Affichage) and Simplified Chinese (视图).
 - Column and row header letters on the Mac use the Normal font at the size cell text paints at, so at 150% zoom their letters match the cells'.
 - Bottom-aligned text in Calibri and Aptos Narrow sits 10 pt above the cell's bottom edge at every font size and row height, scaling with the zoom, as the desktop places it.
