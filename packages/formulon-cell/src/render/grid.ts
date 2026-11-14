@@ -2,6 +2,7 @@ import { totalsCellAt } from '../commands/format-as-table.js';
 import { paginationFor, type SheetPagination } from '../commands/pagination.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormatFromEngine } from '../engine/cell-format-projection.js';
+import { fontPointsToCssPx } from '../engine/font-units.js';
 import { pivotStyleLayer } from '../engine/pivot-style.js';
 import { findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
 import { spillBlockers, spillOccupancy } from '../engine/spill-blockers.js';
@@ -10,11 +11,12 @@ import { SPILL_ERROR_CODE } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
-import { headerLabelScale } from '../store/header-strip.js';
 import { validationAt } from '../store/range-validations.js';
+import { renderScale } from '../store/render-scale.js';
 import { isSingleCell, isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { CellFormat, State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
+import type { LayoutSlice, ViewportSlice } from '../store/types.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { automaticFontRowLayout } from './automatic-font-row-layout.js';
 import { createConditionalCache } from './conditional.js';
@@ -81,12 +83,30 @@ import {
   paintTableGrip,
   paintValidationChevron,
 } from './painters.js';
+import { paintedFontSize, wholePointAdvances } from './text-metrics.js';
 
 /** Header labels follow a Normal font larger than the default one at its own size. */
 export const headerLabelSize = (normalSize: number | undefined, fallback: number): number =>
   normalSize !== undefined && normalSize > DEFAULT_NORMAL_SIZE ? normalSize : fallback;
 
 const DEFAULT_NORMAL_SIZE = 11;
+
+/** Painted header-letter size. With a Normal-font digit advance (Mac) the
+ *  letters take the Normal font (points) at the zoomed cell-text size, whole
+ *  px like the cells; fixed chrome strips keep the theme size. */
+export const headerLabelPaintSize = (
+  normalSize: number | undefined,
+  fallback: number,
+  layout: Pick<LayoutSlice, 'screenScale' | 'headerDigitAdvance'>,
+  viewport: Pick<ViewportSlice, 'zoom'>,
+): number =>
+  normalSize !== undefined && layout.headerDigitAdvance !== undefined
+    ? paintedFontSize(
+        fontPointsToCssPx(normalSize),
+        renderScale(layout, viewport),
+        wholePointAdvances(layout),
+      )
+    : headerLabelSize(normalSize, fallback);
 
 type SpillCandidateCells = ReadonlyMap<string, { value: CellValue; formula: string | null }>;
 type SpillErrorCandidate = { row: number; col: number };
@@ -672,8 +692,7 @@ export class GridRenderer {
       cols,
       rows,
       cellFontFamily(normalFont?.name, theme.fontUi),
-      headerLabelSize(normalFont?.size, theme.textHeader) *
-        headerLabelScale(state.layout, state.viewport.zoom),
+      headerLabelPaintSize(normalFont?.size, theme.textHeader, state.layout, state.viewport),
     );
   }
 
