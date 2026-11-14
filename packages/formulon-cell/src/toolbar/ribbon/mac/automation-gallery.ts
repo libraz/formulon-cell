@@ -76,13 +76,13 @@ export const MAC_AUTOMATION_GALLERY: readonly MacAutomationScriptDescriptor[] = 
   automationScript(
     'allRowsColumns',
     automationLabel(
-      'すべての行と列を表示',
-      'Show all rows and columns',
+      'すべての行と列を再表示',
+      'Unhide All Rows and Columns',
       'Alle Zeilen und Spalten einblenden',
       'Afficher toutes les lignes et colonnes',
-      '显示所有行和列',
-      '모든 행 및 열 표시',
-      'แสดงแถวและคอลัมน์ทั้งหมด',
+      '取消隐藏所有行和列',
+      '모든 행 및 열 숨기기 취소',
+      'ยกเลิกการซ่อนแถวและคอลัมน์ทั้งหมด',
     ),
     automationLabel(
       '使用範囲の行と列の非表示を解除します。',
@@ -97,8 +97,8 @@ export const MAC_AUTOMATION_GALLERY: readonly MacAutomationScriptDescriptor[] = 
   automationScript(
     'freezeSelection',
     automationLabel(
-      '選択範囲を固定',
-      'Freeze selection',
+      '選択範囲の固定',
+      'Freeze Selection',
       'Auswahl fixieren',
       'Figer la sélection',
       '冻结所选内容',
@@ -118,12 +118,12 @@ export const MAC_AUTOMATION_GALLERY: readonly MacAutomationScriptDescriptor[] = 
   automationScript(
     'makeSubtable',
     automationLabel(
-      '選択範囲からサブテーブルを作成',
-      'Create a subtable from selection',
-      'Aus Auswahl eine Teiltabelle erstellen',
-      'Créer un sous-tableau à partir de la sélection',
-      '根据所选内容创建子表',
-      '선택 영역에서 하위 표 만들기',
+      '選択範囲からサブテーブルを作成する',
+      'Make a Subtable from a Selection',
+      'Untertabelle aus einer Auswahl erstellen',
+      'Effectuer une sous-table à partir d’une sélection',
+      '从所选内容中创建子表',
+      '선택 영역에서 하위 테이블 만들기',
       'สร้างตารางย่อยจากส่วนที่เลือก',
     ),
     automationLabel(
@@ -139,13 +139,13 @@ export const MAC_AUTOMATION_GALLERY: readonly MacAutomationScriptDescriptor[] = 
   automationScript(
     'removeHyperlinks',
     automationLabel(
-      'シートのハイパーリンクを削除',
-      'Remove hyperlinks from sheet',
-      'Hyperlinks aus dem Blatt entfernen',
-      'Supprimer les liens hypertexte de la feuille',
+      'シートからハイパーリンクを削除する',
+      'Remove Hyperlinks from Sheet',
+      'Links aus Blatt entfernen',
+      'Supprimer des liens hypertexte de la feuille',
       '从工作表中删除超链接',
       '시트에서 하이퍼링크 제거',
-      'เอาไฮเปอร์ลิงก์ออกจากแผ่นงาน',
+      'นำไฮเปอร์ลิงก์ออกจากแผ่นงาน',
     ),
     automationLabel(
       'アクティブなシートのハイパーリンクをすべて削除します。',
@@ -160,13 +160,13 @@ export const MAC_AUTOMATION_GALLERY: readonly MacAutomationScriptDescriptor[] = 
   automationScript(
     'countEmptyRows',
     automationLabel(
-      '空白行を数える',
-      'Count blank rows',
+      '空の行数をカウントする',
+      'Count Empty Rows',
       'Leere Zeilen zählen',
       'Compter les lignes vides',
-      '统计空白行',
-      '빈 행 개수 세기',
-      'นับแถวว่าง',
+      '空行计数',
+      '빈 행 수',
+      'นับแถวที่ว่าง',
     ),
     automationLabel(
       '使用範囲内の空白行を数えます。',
@@ -182,12 +182,12 @@ export const MAC_AUTOMATION_GALLERY: readonly MacAutomationScriptDescriptor[] = 
     'tableToJson',
     automationLabel(
       'テーブルデータを JSON として取得',
-      'Return table data as JSON',
+      'Return Table Data as JSON',
       'Tabellendaten als JSON zurückgeben',
-      'Retourner les données du tableau au format JSON',
-      '将表格数据作为 JSON 返回',
-      '표 데이터를 JSON으로 반환',
-      'ส่งคืนข้อมูลตารางเป็น JSON',
+      'Renvoyer les données de table au format JSON',
+      '将表数据返回为 JSON',
+      '테이블 데이터를 JSON으로 반환',
+      'ส่งกลับข้อมูลตารางเป็น JSON',
     ),
     automationLabel(
       'アクティブなテーブルまたは選択範囲を JSON に変換して表示します。',
@@ -202,12 +202,12 @@ export const MAC_AUTOMATION_GALLERY: readonly MacAutomationScriptDescriptor[] = 
   automationScript(
     'newPivotTable',
     automationLabel(
-      'テーブルから新しいピボットテーブルを作成',
-      'Create new PivotTable from table',
-      'Neue PivotTable aus Tabelle erstellen',
-      'Créer un tableau croisé dynamique à partir du tableau',
-      '从表格创建新的数据透视表',
-      '표에서 새 피벗 테이블 만들기',
+      'テーブルから新しいピボットテーブルを作成する',
+      'Create a New PivotTable from a Table',
+      'Neue PivotTable aus einer Tabelle erstellen',
+      'Créer un tableau croisé dynamique à partir d’un tableau',
+      '根据表创建新的数据透视表',
+      '테이블에서 새 피벗 테이블 만들기',
       'สร้าง PivotTable ใหม่จากตาราง',
     ),
     automationLabel(

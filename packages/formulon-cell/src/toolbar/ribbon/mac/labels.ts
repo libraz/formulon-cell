@@ -266,7 +266,7 @@ const MORE_FUNCTION_CATEGORY_LABELS: Readonly<Record<string, Label>> = {
     de: 'Cube',
     fr: 'Cube',
     zh: '多维数据集',
-    ko: '큐브',
+    ko: '정육면체',
     th: 'คิวบ์',
   },
   information: {
@@ -407,6 +407,8 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
   'mac.page.theme.browse': { ja: 'テーマを参照...', en: 'Browse for Themes...' },
   'mac.page.theme.save': { ja: '現在のテーマを保存...', en: 'Save Current Theme...' },
   'mac.view.pageLayout': { ja: 'ページ レイアウト', en: 'Page Layout' },
+  'mac.review.previousComment': { ja: '前のコメント', en: 'Previous Comment' },
+  'mac.review.nextComment': { ja: '次のコメント', en: 'Next Comment' },
   'mac.review.accessibility.check': { ja: 'アクセシビリティ チェック', en: 'Check Accessibility' },
   'mac.review.accessibility.altText': { ja: '代替テキスト', en: 'Alt Text' },
   'mac.review.accessibility.formatTable': { ja: 'テーブルとして書式設定', en: 'Format as Table' },

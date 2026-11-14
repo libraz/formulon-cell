@@ -191,7 +191,7 @@ describe('Mac automation gallery', () => {
     const cancel = document.querySelector<HTMLButtonElement>(
       '.fc-macautomationdlg .fc-fmtdlg__btn',
     );
-    expect(first?.textContent).toBe('すべての行と列を表示');
+    expect(first?.textContent).toBe('すべての行と列を再表示');
     expect(cancel?.textContent).toBe('キャンセル');
     cancel?.click();
     await pending;
