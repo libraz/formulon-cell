@@ -465,9 +465,10 @@ export async function runMacFormulaAndAutomationScenario(page: Page): Promise<vo
   await sp.enter('A3', '1');
   await sp.goTo('A1:A3');
   await selectRibbonTab(page, 'automate');
-  await sp.clickRibbon('mac.automate.gallery');
   await page
-    .locator('.fc-tb__menu--mac:not([hidden]) [data-ribbon-command="mac.automate.countEmptyRows"]')
+    .locator(
+      '[data-ribbon-panel="automate"] .fc-tb__ribbon-tools > [data-ribbon-command="mac.automate.countEmptyRows"]',
+    )
     .click();
   const result = page.locator('.fc-macautomationresult[role=dialog]');
   await expect(result).toBeVisible();
