@@ -501,11 +501,11 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
     await pivotFilterPanel.locator('select[data-pivot-filter-by="label"]').selectOption('12');
     const pivotFilter = page.getByRole('dialog', { name: 'ラベル フィルター (Channel)' });
     await expect(pivotFilter).toBeVisible();
+    // The panel closes as it hands over to the dialog.
+    await expect(pivotFilterPanel).toBeHidden();
     await snapshotPage(page, 'excel-chrome-pivot-label-filter-dialog-1440');
     await pivotFilter.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await expect(pivotFilter).toBeHidden();
-    await pivotFilterPanel.locator('.fc-pivot-filter-panel__close').click();
-    await expect(pivotFilterPanel).toBeHidden();
     // The report's field list holds the side pane later steps open into.
     const fieldList = page.getByRole('dialog', { name: 'ピボットテーブルのフィールド' });
     await fieldList.getByRole('button', { name: '閉じる', exact: true }).click();

@@ -92,6 +92,8 @@ export async function runPivotDateBetweenScenario(
   await (await openDateFilters(page)).selectOption(DATE_BETWEEN);
   const filter = page.getByRole('dialog', { name: dialogTitle });
   await expect(filter).toBeVisible();
+  // The panel closes as it hands over to the dialog.
+  await expect(page.locator('.fc-pivot-filter-panel')).toBeHidden();
   await expect(filter.locator('[data-pivot-filter-operator="true"]')).toHaveValue(DATE_BETWEEN);
   const [low, high] = RANGE[locale];
   await filter.locator('[data-pivot-filter-value="true"]').fill(low);
@@ -106,9 +108,9 @@ export async function runPivotDateBetweenScenario(
       [expect.any(String), 50],
     ]);
 
-  await page.keyboard.press('Escape');
   await (await openDateFilters(page)).selectOption(ALL_DATES_IN_PERIOD);
   await expect(filter).toBeVisible();
+  await expect(page.locator('.fc-pivot-filter-panel')).toBeHidden();
   await filter.locator('select[data-pivot-filter-period="true"]').selectOption(MAY);
   await filter.locator('.fc-fmtdlg__btn--primary').click();
   await expect(filter).toBeHidden();

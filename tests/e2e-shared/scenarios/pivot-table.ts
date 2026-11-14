@@ -52,6 +52,8 @@ export async function runPivotTableFilterDialogScenario(page: Page): Promise<voi
 
   const filterDialog = page.getByRole('dialog', { name: 'Label Filter (Channel)' });
   await expect(filterDialog).toBeVisible();
+  // The panel closes as it hands over to the dialog.
+  await expect(panel).toBeHidden();
   await expect(
     filterDialog.locator('[data-pivot-filter-operator="true"] option:checked'),
   ).toHaveText('equals');
