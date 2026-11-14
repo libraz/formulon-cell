@@ -4,6 +4,7 @@ import type { SpreadsheetInstance } from '../mount/types.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendAutoCorrectOptions } from './autocorrect-options.js';
+import { appendCalculationOptions } from './calculation-options.js';
 import {
   appendDialogButton,
   appendDialogFrame,
@@ -62,6 +63,27 @@ const PANES: readonly PreferencePane[] = [
     render(instance, body, on) {
       const label = instance.i18n.strings.preferencesDialog.autoCorrectPane;
       appendAutoCorrectOptions(instance, body, on, label, 'fc-prefs-autocorrect');
+    },
+  },
+  {
+    id: 'calculation',
+    label: (t) => t.calculationPane,
+    group: (t) => t.formulasGroup,
+    render(instance, body, on) {
+      const options = appendCalculationOptions(
+        {
+          host: instance.host,
+          getWb: () => instance.workbook,
+          getLocale: () => instance.i18n.locale,
+          strings: instance.i18n.strings,
+          store: instance.store,
+          history: instance.history,
+        },
+        body,
+        on,
+        'fc-prefs-calculation',
+      );
+      options.refresh();
     },
   },
 ];

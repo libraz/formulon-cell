@@ -184,6 +184,8 @@ export const editDialogsEn: EditDialogsStrings = {
     authoringGroup: 'Authoring',
     viewPane: 'View',
     autoCorrectPane: 'AutoCorrect',
+    calculationPane: 'Calculation',
+    formulasGroup: 'Formulas and Lists',
     zeroValues: 'Zero values',
     zeroValuesTip:
       'Displays a 0 (zero) in cells that contain zero values.  Affects: only the active sheets.',

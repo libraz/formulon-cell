@@ -1,0 +1,436 @@
+import { inputLocaleForWorkbook, parseLocalizedNumericInput } from '../commands/coerce-input.js';
+import type { History } from '../commands/history.js';
+import { setPrecisionAsDisplayed } from '../commands/precision-as-displayed.js';
+import { hydrateCalcSettingsFromEngine } from '../engine/calc-settings-sync.js';
+import { formatEditableNumber } from '../engine/value.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { WorkbookCalcSettings } from '../engine/workbook-handle-formulas.js';
+import { isMacHost } from '../extensions/ui-options.js';
+import type { Strings } from '../i18n/strings.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { showConfirm } from '../toolbar/dialogs/prompt.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+
+/** Registers a listener whose lifetime the owning surface manages. */
+type Listen = (target: EventTarget, event: string, handler: EventListener) => void;
+
+export interface CalculationOptionsDeps {
+  host: HTMLElement;
+  /** Lazy workbook accessor — keeps the controls in lockstep with `setWorkbook`
+   *  swaps so every setting always targets the live engine. */
+  getWb: () => WorkbookHandle | null;
+  /** Live input locale. Defaults to the canonical English grammar. */
+  getLocale?: () => string;
+  strings: Strings;
+  /** Store mirroring the reference style and date system. Without it those
+   *  settings go to the engine directly. */
+  store?: SpreadsheetStore;
+  /** Undo stack for the constants Set precision as displayed rounds. */
+  history?: History | null;
+}
+
+export interface CalculationOptions {
+  /** Re-reads the labels and the workbook's settings into the controls. */
+  refresh(): void;
+  /** Applies the draft (the dialog's OK). Returns whether the surface may close. */
+  commit(): boolean;
+  focus(): void;
+}
+
+type CalcMode = 0 | 1 | 2;
+
+interface CalcOptionsDraft extends WorkbookCalcSettings {
+  calcMode: CalcMode | null;
+  iterative: boolean;
+  maxIterations: number;
+  maxChange: number;
+}
+
+const DEFAULTS: CalcOptionsDraft = {
+  calcMode: 0,
+  calcOnSave: true,
+  iterative: false,
+  maxIterations: 100,
+  maxChange: 0.001,
+  r1c1: false,
+  fullPrecision: true,
+  date1904: false,
+};
+
+const CALC_MODES: readonly { mode: CalcMode; option: string }[] = [
+  { mode: 0, option: 'auto' },
+  { mode: 2, option: 'auto-no-table' },
+  { mode: 1, option: 'manual' },
+];
+
+/**
+ * Appends the calculation controls to `body`: workbook calculation mode,
+ * recalculate before saving, iterative calculation, R1C1 reference style, Set
+ * precision as displayed and the 1904 date system. Shared by the Iterative
+ * Calculation dialog and the Mac Preferences Calculation pane, which write the
+ * same workbook settings. On the Mac host each change applies at once; elsewhere
+ * `commit` applies the draft. `idPrefix` keeps the radio group of the two
+ * surfaces apart when both are open. Iteration wires a progress callback that
+ * surfaces residual / iteration counts through the `fc:iterative-progress`
+ * custom event.
+ */
+export function appendCalculationOptions(
+  deps: CalculationOptionsDeps,
+  body: HTMLElement,
+  on: Listen,
+  idPrefix: string,
+): CalculationOptions {
+  const { host, getWb, strings } = deps;
+  const getLocale = (): string => {
+    const workbook = getWb();
+    return (
+      deps.getLocale?.() ?? (workbook ? inputLocaleForWorkbook(workbook) : undefined) ?? 'en-US'
+    );
+  };
+  const shared = strings.iterativeDialog;
+  const menuText = strings.ribbonMenu;
+  // The Mac Calculation pane words a few labels differently and has no mode
+  // group label, explanatory note or formulas heading; resolved per refresh.
+  const isMac = (): boolean => isMacHost(host);
+  let t: typeof shared = shared;
+
+  const root = document.createElement('div');
+  root.className = 'fc-iterdlg__options';
+  body.appendChild(root);
+
+  const section = (title: string): HTMLDivElement => {
+    const heading = document.createElement('div');
+    heading.className = 'fc-iterdlg__section';
+    heading.textContent = title;
+    root.appendChild(heading);
+    return heading;
+  };
+  const choice = (type: 'checkbox' | 'radio', option: string, label: string): HTMLInputElement => {
+    const row = document.createElement('label');
+    row.className = 'fc-iterdlg__row';
+    const input = document.createElement('input');
+    input.type = type;
+    input.dataset.calcOption = option;
+    if (type === 'radio') input.name = `${idPrefix}-calc-mode`;
+    const span = document.createElement('span');
+    span.textContent = label;
+    row.append(input, span);
+    root.appendChild(row);
+    return input;
+  };
+
+  section(t.calculationSection);
+  const modeLabel = document.createElement('div');
+  modeLabel.className = 'fc-iterdlg__label';
+  modeLabel.textContent = t.workbookCalculation;
+  root.appendChild(modeLabel);
+  const modeLabels: Record<CalcMode, string> = {
+    0: menuText.calcAutomatic,
+    1: menuText.calcManual,
+    2: menuText.calcAutoNoTable,
+  };
+  const modeInputs = CALC_MODES.map(({ mode, option }) => ({
+    mode,
+    input: choice('radio', option, modeLabels[mode]),
+  }));
+  const calcOnSaveInput = choice('checkbox', 'calcOnSave', t.recalcBeforeSave);
+
+  const note = document.createElement('p');
+  note.className = 'fc-iterdlg__note';
+  note.textContent = t.note;
+  root.appendChild(note);
+
+  const enableInput = choice('checkbox', 'iterative', t.enable);
+  const labelOf = (input: HTMLInputElement): HTMLElement => input.nextElementSibling as HTMLElement;
+
+  const maxIterRow = document.createElement('label');
+  maxIterRow.className = 'fc-iterdlg__row';
+  const maxIterLabel = document.createElement('span');
+  maxIterLabel.textContent = t.maxIterations;
+  const maxIterInput = document.createElement('input');
+  maxIterInput.type = 'number';
+  maxIterInput.min = '1';
+  maxIterInput.max = '32767';
+  maxIterInput.step = '1';
+  maxIterRow.append(maxIterLabel, maxIterInput);
+  root.appendChild(maxIterRow);
+
+  const maxChangeRow = document.createElement('label');
+  maxChangeRow.className = 'fc-iterdlg__row';
+  const maxChangeLabel = document.createElement('span');
+  maxChangeLabel.textContent = t.maxChange;
+  const maxChangeInput = document.createElement('input');
+  maxChangeInput.type = 'text';
+  maxChangeInput.inputMode = 'decimal';
+  maxChangeInput.spellcheck = false;
+  maxChangeInput.autocomplete = 'off';
+  maxChangeRow.append(maxChangeLabel, maxChangeInput);
+  root.appendChild(maxChangeRow);
+
+  const formulasHeading = section(t.formulasSection);
+  const r1c1Input = choice('checkbox', 'r1c1', t.r1c1);
+  const workbookHeading = section(t.workbookSection);
+  const precisionInput = choice('checkbox', 'precisionAsDisplayed', t.precisionAsDisplayed);
+  const date1904Input = choice('checkbox', 'date1904', t.date1904);
+
+  const status = document.createElement('div');
+  status.className = 'fc-iterdlg__status';
+  root.appendChild(status);
+
+  const applyPlatformLabels = (): void => {
+    const mac = isMac();
+    const overlay = mac ? strings.mac.iterativeDialog : null;
+    t = overlay ? { ...shared, ...overlay } : shared;
+    modeLabel.hidden = mac;
+    note.hidden = mac;
+    formulasHeading.hidden = mac;
+    const autoNoTable = modeInputs.find(({ mode }) => mode === 2)?.input;
+    if (autoNoTable) {
+      labelOf(autoNoTable).textContent = overlay?.calcAutoNoTable ?? menuText.calcAutoNoTable;
+    }
+    labelOf(enableInput).textContent = t.enable;
+    maxIterLabel.textContent = t.maxIterations;
+    maxChangeLabel.textContent = t.maxChange;
+    workbookHeading.textContent = t.workbookSection;
+  };
+
+  const draft: CalcOptionsDraft = { ...DEFAULTS };
+  let opened: CalcOptionsDraft = { ...DEFAULTS };
+  let invalidMaxIterations = false;
+  let invalidMaxChange = false;
+  let confirmingPrecision = false;
+
+  const workbookSupports = (): { calcMode: boolean; settings: boolean } => {
+    const caps = getWb()?.capabilities;
+    return { calcMode: !!caps?.calcMode, settings: !!caps?.calcSettings };
+  };
+
+  const disable = (input: HTMLInputElement, reason: string | null, titlePrefix?: string): void => {
+    projectDisabledState(input, reason !== null, reason, {
+      datasetKey: 'disabledReason',
+      ...(titlePrefix ? { titlePrefix } : {}),
+    });
+  };
+
+  const syncControls = (): void => {
+    const supports = workbookSupports();
+    const unsaved = t.settingUnavailable;
+    for (const { mode, input } of modeInputs) {
+      input.checked = draft.calcMode === mode;
+      disable(input, supports.calcMode ? null : unsaved);
+    }
+    calcOnSaveInput.checked = draft.calcOnSave;
+    disable(
+      calcOnSaveInput,
+      !supports.settings ? unsaved : draft.calcMode !== 1 ? t.recalcBeforeSaveRequiresManual : null,
+    );
+    enableInput.checked = draft.iterative;
+    if (!invalidMaxIterations) maxIterInput.value = String(draft.maxIterations);
+    if (!invalidMaxChange)
+      maxChangeInput.value = formatEditableNumber(draft.maxChange, getLocale());
+    const iterationReason = draft.iterative ? null : t.inputsRequireEnabled;
+    disable(maxIterInput, iterationReason, t.maxIterations);
+    disable(maxChangeInput, iterationReason, t.maxChange);
+    r1c1Input.checked = draft.r1c1;
+    precisionInput.checked = !draft.fullPrecision;
+    date1904Input.checked = draft.date1904;
+    disable(date1904Input, supports.settings ? null : unsaved);
+    // Rounding the constants needs the store's number formats.
+    disable(precisionInput, supports.settings && deps.store ? null : unsaved);
+    // The store alone can still flip the reference style for the session.
+    disable(r1c1Input, supports.settings || deps.store ? null : unsaved);
+  };
+
+  const onIter = (): void => {
+    const n = parseLocalizedNumericInput(maxIterInput.value, getLocale());
+    invalidMaxIterations = n === null || !Number.isInteger(n);
+    maxIterInput.setCustomValidity(invalidMaxIterations ? 'invalid' : '');
+    if (n !== null && !invalidMaxIterations) {
+      draft.maxIterations = Math.max(1, Math.min(32767, n));
+    }
+  };
+  const onChange = (): void => {
+    const n = parseLocalizedNumericInput(maxChangeInput.value, getLocale());
+    invalidMaxChange = n === null || n <= 0;
+    maxChangeInput.setCustomValidity(invalidMaxChange ? 'invalid' : '');
+    if (n !== null && !invalidMaxChange) draft.maxChange = n;
+  };
+
+  /** Turning precision as displayed on loses data, so the desktop app asks
+   *  first; declining leaves the box clear. */
+  const onPrecision = async (): Promise<void> => {
+    if (!precisionInput.checked) {
+      draft.fullPrecision = true;
+      return;
+    }
+    if (!opened.fullPrecision) {
+      draft.fullPrecision = false;
+      return;
+    }
+    confirmingPrecision = true;
+    const accepted = await showConfirm({
+      title: t.title,
+      message: t.precisionWarning,
+      okLabel: t.ok,
+      cancelLabel: t.cancel,
+    });
+    confirmingPrecision = false;
+    draft.fullPrecision = !accepted;
+    syncControls();
+    commitLive();
+  };
+
+  const applyIterative = (wb: WorkbookHandle): boolean => {
+    const changed =
+      draft.iterative !== opened.iterative ||
+      draft.maxIterations !== opened.maxIterations ||
+      draft.maxChange !== opened.maxChange;
+    if (!changed && !draft.iterative) return true;
+    if (!wb.setIterative(draft.iterative, draft.maxIterations, draft.maxChange)) return false;
+    if (draft.iterative) {
+      // Wire the progress callback to a host event the chrome can render.
+      wb.setIterativeProgress((iteration, maxResidual, maxIterations) => {
+        host.dispatchEvent(
+          new CustomEvent('fc:iterative-progress', {
+            detail: { iteration, maxResidual, maxIterations },
+          }),
+        );
+      });
+    } else {
+      wb.setIterativeProgress(null);
+    }
+    return true;
+  };
+
+  const applySettings = (wb: WorkbookHandle): void => {
+    const { store } = deps;
+    if (draft.calcMode !== null && draft.calcMode !== opened.calcMode) {
+      wb.setCalcMode(draft.calcMode);
+    }
+    if (draft.calcOnSave !== opened.calcOnSave) wb.setCalcSetting('calcOnSave', draft.calcOnSave);
+    if (draft.r1c1 !== opened.r1c1) {
+      // The store binding writes refMode through.
+      if (store) mutators.setR1C1(store, draft.r1c1);
+      else wb.setCalcSetting('r1c1', draft.r1c1);
+    }
+    if (draft.date1904 !== opened.date1904 && wb.setCalcSetting('date1904', draft.date1904)) {
+      // Stored serials stay put; the engine re-dirties the date formulas.
+      if (store) hydrateCalcSettingsFromEngine(wb, store);
+      wb.recalcAuto();
+    }
+    if (draft.fullPrecision !== opened.fullPrecision) {
+      if (store) setPrecisionAsDisplayed(wb, store, deps.history ?? null, !draft.fullPrecision);
+      else wb.setCalcSetting('fullPrecision', draft.fullPrecision);
+    }
+  };
+
+  /** The Mac pane applies each change at once instead of waiting for OK. */
+  function commitLive(): void {
+    if (!isMac() || confirmingPrecision || invalidMaxIterations || invalidMaxChange) return;
+    const wb = getWb();
+    if (!wb) return;
+    if (!applyIterative(wb)) {
+      status.textContent = t.unsupported;
+      return;
+    }
+    status.textContent = '';
+    applySettings(wb);
+    if (deps.store) {
+      mutators.refreshActiveSheetCells(deps.store, wb);
+    }
+    opened = { ...draft };
+  }
+
+  for (const { mode, input } of modeInputs) {
+    on(input, 'change', () => {
+      if (!input.checked) return;
+      draft.calcMode = mode;
+      syncControls();
+      commitLive();
+    });
+  }
+  on(calcOnSaveInput, 'change', () => {
+    draft.calcOnSave = calcOnSaveInput.checked;
+    commitLive();
+  });
+  on(enableInput, 'change', () => {
+    draft.iterative = enableInput.checked;
+    syncControls();
+    commitLive();
+  });
+  on(maxIterInput, 'input', onIter);
+  on(maxIterInput, 'change', commitLive);
+  on(maxChangeInput, 'input', onChange);
+  on(maxChangeInput, 'change', commitLive);
+  on(r1c1Input, 'change', () => {
+    draft.r1c1 = r1c1Input.checked;
+    commitLive();
+  });
+  on(precisionInput, 'change', () => {
+    void onPrecision();
+  });
+  on(date1904Input, 'change', () => {
+    draft.date1904 = date1904Input.checked;
+    commitLive();
+  });
+
+  /** Open on what the workbook carries — a loaded file can hold settings this
+   *  surface never wrote, and the engine clamps the iteration cap on the way
+   *  in. Engines without a readback leave that part of the draft alone. */
+  const refreshFromWorkbook = (): void => {
+    Object.assign(draft, DEFAULTS);
+    const workbook = getWb();
+    if (workbook) {
+      if (typeof workbook.calcMode === 'function') draft.calcMode = workbook.calcMode();
+      const settings = typeof workbook.calcSettings === 'function' ? workbook.calcSettings() : null;
+      if (settings) Object.assign(draft, settings);
+      const iterative =
+        typeof workbook.getIterative === 'function' ? workbook.getIterative() : null;
+      if (iterative) {
+        draft.iterative = iterative.enabled;
+        if (iterative.maxIterations > 0) draft.maxIterations = iterative.maxIterations;
+        if (iterative.maxChange > 0) draft.maxChange = iterative.maxChange;
+      }
+    }
+    if (deps.store) draft.r1c1 = deps.store.getState().ui.r1c1;
+    opened = { ...draft };
+  };
+
+  return {
+    refresh(): void {
+      applyPlatformLabels();
+      status.textContent = '';
+      invalidMaxIterations = false;
+      invalidMaxChange = false;
+      confirmingPrecision = false;
+      maxIterInput.setCustomValidity('');
+      maxChangeInput.setCustomValidity('');
+      refreshFromWorkbook();
+      syncControls();
+    },
+    commit(): boolean {
+      if (confirmingPrecision) return false;
+      if (invalidMaxIterations || invalidMaxChange) {
+        const invalid = invalidMaxIterations ? maxIterInput : maxChangeInput;
+        invalid.setCustomValidity('invalid');
+        invalid.focus();
+        return false;
+      }
+      const wb = getWb();
+      if (!wb) return true;
+      if (!applyIterative(wb)) {
+        status.textContent = t.unsupported;
+        return false;
+      }
+      applySettings(wb);
+      // Mode, date-system and precision changes can recalculate formulas.
+      if (deps.store) {
+        mutators.refreshActiveSheetCells(deps.store, wb);
+      }
+      return true;
+    },
+    focus(): void {
+      enableInput.focus();
+    },
+  };
+}

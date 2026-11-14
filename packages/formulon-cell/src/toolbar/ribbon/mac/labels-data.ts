@@ -1606,13 +1606,6 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     ko: '수동',
     th: 'ด้วยตนเอง',
   },
-  'mac.formulas.calc.iterative': {
-    de: 'Iterative Berechnung aktivieren',
-    fr: 'Activer le calcul itératif',
-    zh: '启用迭代计算',
-    ko: '반복 계산 사용',
-    th: 'เปิดใช้งานการคำนวณแบบวนซ้ำ',
-  },
   'mac.data.goalSeek': {
     de: 'Zielwertsuche',
     fr: 'Valeur cible',

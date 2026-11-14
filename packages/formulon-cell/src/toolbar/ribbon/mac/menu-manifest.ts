@@ -533,11 +533,6 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
       labelJa: 'データ テーブル以外は自動',
     },
     { id: 'mac.formulas.calc.manual', label: 'Manual', labelJa: '手動' },
-    {
-      id: 'mac.formulas.calc.iterative',
-      label: 'Enable Iterative Calculation',
-      labelJa: '反復計算を有効にする',
-    },
   ]),
   // The host has no linked data types, so the gallery lists Excel's entries greyed out.
   'mac.data.dataTypes': [

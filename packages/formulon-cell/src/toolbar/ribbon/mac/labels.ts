@@ -531,10 +531,6 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
     en: 'Automatic Except for Data Tables',
   },
   'mac.formulas.calc.manual': { ja: '手動', en: 'Manual' },
-  'mac.formulas.calc.iterative': {
-    ja: '反復計算を有効にする',
-    en: 'Enable Iterative Calculation',
-  },
   'mac.data.goalSeek': { ja: 'ゴール シーク', en: 'Goal Seek' },
   'mac.data.scenarioManager': { ja: 'シナリオ マネージャー', en: 'Scenario Manager' },
   'mac.data.dataTable': { ja: 'データ テーブル', en: 'Data Table' },

@@ -246,7 +246,6 @@ describe('built-in Mac command policy catalog', () => {
         'mac.formulas.calc.auto',
         'mac.formulas.calc.autoNoTable',
         'mac.formulas.calc.manual',
-        'mac.formulas.calc.iterative',
       ] as const) {
         expect(BUILT_IN_COMMAND_OPERATION[id], id).toBeNull();
         expect(canExecuteBuiltIn(store, id, 'ribbon'), id).toEqual({ allowed: true });

@@ -203,6 +203,9 @@ export interface EditDialogsStrings {
     /** The View pane's name, which is also the window title while it is shown. */
     viewPane: string;
     autoCorrectPane: string;
+    calculationPane: string;
+    /** The group the Calculation pane sits in under Show All. */
+    formulasGroup: string;
     zeroValues: string;
     zeroValuesTip: string;
   };

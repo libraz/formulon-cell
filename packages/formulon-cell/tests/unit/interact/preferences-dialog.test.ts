@@ -77,7 +77,10 @@ describe('Preferences window', () => {
     tool('すべて表示')?.click();
     expect(dialog()?.getAttribute('aria-label')).toBe('環境設定');
     expect(dialog()?.querySelector('.fc-prefs__heading')?.textContent).toBe('');
-    expect(showAll()).toEqual([['オーサリング', ['表示', 'オートコレクト']]]);
+    expect(showAll()).toEqual([
+      ['オーサリング', ['表示', 'オートコレクト']],
+      ['数式とリスト', ['計算']],
+    ]);
     expect(dialog()?.querySelector<HTMLElement>('.fc-prefs__pane')?.hidden).toBe(true);
     expect(tool('戻る')?.disabled).toBe(false);
     expect(tool('進む')?.disabled).toBe(true);
@@ -108,10 +111,15 @@ describe('Preferences window', () => {
     type('vie');
     expect(dialog()?.getAttribute('aria-label')).toBe('Preferences');
     expect(showAll()).toEqual([['Authoring', ['View']]]);
-    type('calc');
+    type('zzz');
     expect(showAll()).toEqual([]);
+    type('calc');
+    expect(showAll()).toEqual([['Formulas and Lists', ['Calculation']]]);
     type('');
-    expect(showAll()).toEqual([['Authoring', ['View', 'AutoCorrect']]]);
+    expect(showAll()).toEqual([
+      ['Authoring', ['View', 'AutoCorrect']],
+      ['Formulas and Lists', ['Calculation']],
+    ]);
   });
 
   it('lists the AutoCorrect options in the desktop order, all on, sharing the dialog store', async () => {
@@ -161,6 +169,71 @@ describe('Preferences window', () => {
     const ids = [...document.querySelectorAll<HTMLElement>('[id]')].map((el) => el.id);
     expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
     dialogs.close('autoCorrect');
+    dialogs.close('preferences');
+  });
+
+  const calcPane = (): HTMLElement | null =>
+    dialog()?.querySelector<HTMLElement>('.fc-prefs__pane[data-pane="calculation"]') ?? null;
+  const calcBox = (root: ParentNode | null, option: string): HTMLInputElement | null =>
+    root?.querySelector<HTMLInputElement>(`[data-calc-option="${option}"]`) ?? null;
+
+  it('shows the Mac calculation controls on the Calculation pane', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const instance = sheet.instance;
+    createDialogs(() => instance).open('preferences');
+    dialog()?.querySelector<HTMLButtonElement>('[data-pane="calculation"]')?.click();
+    expect(dialog()?.getAttribute('aria-label')).toBe('Calculation');
+    const pane = calcPane();
+    expect(pane?.hidden).toBe(false);
+    const labels = [...(pane?.querySelectorAll<HTMLElement>('.fc-iterdlg__row') ?? [])]
+      .filter((row) => !row.closest('[hidden]'))
+      .map((row) => row.textContent);
+    expect(labels).toEqual([
+      'Automatic',
+      'Automatic except for data tables',
+      'Manual',
+      'Recalculate workbook before saving',
+      'Use iterative calculation',
+      'Maximum iterations:',
+      'Maximum change:',
+      expect.stringContaining('R1C1'),
+      'Set precision as displayed',
+      'Use 1904 date system',
+    ]);
+  });
+
+  it('writes the same settings the Iterative Calculation dialog reads', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const instance = sheet.instance;
+    const dialogs = createDialogs(() => instance);
+    dialogs.open('preferences');
+    dialog()?.querySelector<HTMLButtonElement>('[data-pane="calculation"]')?.click();
+    const r1c1 = calcBox(calcPane(), 'r1c1') as HTMLInputElement;
+    r1c1.checked = true;
+    r1c1.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(instance.store.getState().ui.r1c1).toBe(true);
+
+    dialogs.close('preferences');
+    dialogs.open('iterative');
+    expect(calcBox(document.querySelector('.fc-iterdlg'), 'r1c1')?.checked).toBe(true);
+    dialogs.close('iterative');
+  });
+
+  it('keeps the pane and the dialog element ids and radio groups apart while both are open', async () => {
+    sheet = await mountStubSheet({ locale: 'en', ui: { platform: 'mac' } });
+    const dialogs = createDialogs(() => sheet?.instance as NonNullable<typeof sheet>['instance']);
+    dialogs.open('preferences');
+    dialog()?.querySelector<HTMLButtonElement>('[data-pane="calculation"]')?.click();
+    dialogs.open('iterative');
+    const ids = [...document.querySelectorAll<HTMLElement>('[id]')].map((el) => el.id);
+    expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
+    const groups = [
+      ...document.querySelectorAll<HTMLInputElement>(
+        '.fc-prefs [data-calc-option], .fc-iterdlg [data-calc-option]',
+      ),
+    ].map((input) => input.name);
+    expect(new Set(groups.filter(Boolean)).size).toBe(2);
+    dialogs.close('iterative');
     dialogs.close('preferences');
   });
 

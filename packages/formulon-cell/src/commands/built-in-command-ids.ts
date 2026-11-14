@@ -154,7 +154,6 @@ export const BUILT_IN_COMMAND_IDS = [
   'mac.formulas.autoSum',
   'mac.formulas.calc.auto',
   'mac.formulas.calc.autoNoTable',
-  'mac.formulas.calc.iterative',
   'mac.formulas.calc.manual',
   'mac.formulas.calcOptions',
   'mac.formulas.category.all',

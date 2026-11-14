@@ -110,6 +110,11 @@ describe('Mac Excel ribbon profile', () => {
     }
     const shapes = createMacRibbonMenuFactory('en')('mac.insert.shapes');
     expect(shapes?.querySelectorAll('.fc-tb__visual-tile').length).toBe(7);
+    expect(MAC_RIBBON_MENU_ITEMS['mac.formulas.calcOptions']?.map((item) => item.id)).toEqual([
+      'mac.formulas.calc.auto',
+      'mac.formulas.calc.autoNoTable',
+      'mac.formulas.calc.manual',
+    ]);
     expect(MAC_RIBBON_MENU_ITEMS['mac.formulas.autoSum']?.map((item) => item.id)).toEqual([
       'mac.autosum.SUM',
       'mac.autosum.AVERAGE',

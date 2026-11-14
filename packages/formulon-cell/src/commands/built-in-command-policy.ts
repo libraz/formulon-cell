@@ -293,7 +293,6 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   'mac.formulas.calc.auto': null,
   'mac.formulas.calc.autoNoTable': null,
   'mac.formulas.calc.manual': null,
-  'mac.formulas.calc.iterative': null,
   'mac.data.sortAsc': 'sort',
   'mac.data.sortDesc': 'sort',
   'mac.data.sortCustom': 'sort',

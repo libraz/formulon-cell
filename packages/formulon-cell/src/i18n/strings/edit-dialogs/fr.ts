@@ -186,6 +186,8 @@ export const editDialogsFr: EditDialogsStrings = {
     authoringGroup: 'Création',
     viewPane: 'Afficher',
     autoCorrectPane: 'Correction automatique',
+    calculationPane: 'Calcul',
+    formulasGroup: 'Formules et listes',
     zeroValues: 'Valeurs nulles',
     zeroValuesTip:
       'Afficher un 0 (zéro) dans les cellules contenant des valeurs égales à zéro.  Affecte : uniquement les feuilles actives.',

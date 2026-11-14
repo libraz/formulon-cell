@@ -186,6 +186,8 @@ export const editDialogsJa: EditDialogsStrings = {
     authoringGroup: 'オーサリング',
     viewPane: '表示',
     autoCorrectPane: 'オートコレクト',
+    calculationPane: '計算',
+    formulasGroup: '数式とリスト',
     zeroValues: 'ゼロ表示',
     zeroValuesTip: 'ゼロ値が格納されているセルに 0 を表示します。',
   },

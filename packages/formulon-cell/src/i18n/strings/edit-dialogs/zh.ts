@@ -183,6 +183,8 @@ export const editDialogsZh: EditDialogsStrings = {
     authoringGroup: '创作',
     viewPane: '查看',
     autoCorrectPane: '自动更正',
+    calculationPane: '计算',
+    formulasGroup: '公式和列表',
     zeroValues: '零值',
     zeroValuesTip: '在包含零值的单元格中显示 0(零)。\n\n影响: 仅活动工作表。',
   },

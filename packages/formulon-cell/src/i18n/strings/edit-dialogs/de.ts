@@ -186,6 +186,8 @@ export const editDialogsDe: EditDialogsStrings = {
     authoringGroup: 'Erstellung',
     viewPane: 'Ansicht',
     autoCorrectPane: 'AutoKorrektur',
+    calculationPane: 'Berechnung',
+    formulasGroup: 'Formeln und Listen',
     zeroValues: 'Nullwerte',
     zeroValuesTip:
       'Zeigt eine 0 (Null) in Zellen an, die Nullwerte enthalten. Betrifft: nur die aktiven Blätter.',
