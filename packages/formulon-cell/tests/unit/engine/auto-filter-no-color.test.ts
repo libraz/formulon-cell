@@ -13,11 +13,6 @@ import type { FilterColorSpec } from '../../../src/store/types.js';
 
 const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
 
-/** Whether the engine writes AutoFilter to `.xlsb`. It does not yet: the save reports the filter as
- *  deferred and the reopened book has none. Flip this once it does; the xlsb case then expects the
- *  same round trip as `.xlsx`. */
-const XLSB_WRITES_AUTOFILTER = false;
-
 /** A header and three rows: row 1 filled red with a blue font, rows 2 and 3 with neither. */
 const seeded = async (): Promise<{ wb: WorkbookHandle; store: SpreadsheetStore }> => {
   const wb = await WorkbookHandle.createDefault();
@@ -87,7 +82,7 @@ describe('No Fill and Automatic colour filters', () => {
     }
   });
 
-  it('follows the engine AutoFilter contract on an .xlsb save', async () => {
+  it('keeps the No Fill filter through an .xlsb save, as through .xlsx', async () => {
     const { wb, store } = await seeded();
     try {
       applyColorFilter(
@@ -100,13 +95,8 @@ describe('No Fill and Automatic colour filters', () => {
       );
       const { bytes, diagnostics } = wb.saveWithDiagnostics('xlsb');
       const criteria = (await reopened(bytes)).getState().ui.filterCriteria;
-      if (XLSB_WRITES_AUTOFILTER) {
-        expect(criteria).toEqual([
-          { range, byCol: 0, hiddenValues: [], color: NO_COLOR_FILTERS[0] },
-        ]);
-      } else {
-        expect([diagnostics.deferredFeatureCount, criteria]).toEqual([1, []]);
-      }
+      expect(diagnostics.deferredFeatureCount).toBe(0);
+      expect(criteria).toEqual([{ range, byCol: 0, hiddenValues: [], color: NO_COLOR_FILTERS[0] }]);
     } finally {
       wb.dispose();
     }
