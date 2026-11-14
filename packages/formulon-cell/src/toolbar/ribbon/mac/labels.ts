@@ -368,6 +368,33 @@ const groupSeeds: Record<string, LegacyLabel> = {
   Arrange: { ja: '整列', en: 'Arrange' },
   Size: { ja: 'サイズ', en: 'Size' },
   Format: { ja: '書式', en: 'Format' },
+  // Contextual tabs: a key with a parenthesized tab name is a group the desktop translates
+  // differently from the same English title elsewhere.
+  Properties: { ja: 'プロパティ', en: 'Properties' },
+  'Tools (Table)': { ja: 'ツール', en: 'Tools' },
+  'External Table Data': { ja: '外部テーブル データ', en: 'External Table Data' },
+  'Table Style Options': { ja: 'テーブル スタイル オプション', en: 'Table Style Options' },
+  'Table Styles': { ja: '表のスタイル', en: 'Table Styles' },
+  PivotTable: { ja: 'ピボットテーブル', en: 'PivotTable' },
+  'Active Field': { ja: 'アクティブなフィールド', en: 'Active Field' },
+  'Group (PivotTable)': { ja: 'グループ', en: 'Group' },
+  Filter: { ja: 'フィルター', en: 'Filter' },
+  'Data (PivotTable)': { ja: 'データ', en: 'Data' },
+  Actions: { ja: 'アクション', en: 'Actions' },
+  Calculations: { ja: '計算', en: 'Calculations' },
+  'Tools (PivotTable)': { ja: 'ツール', en: 'Tools' },
+  'Show (PivotTable)': { ja: '表示', en: 'Show' },
+  Layout: { ja: 'レイアウト', en: 'Layout' },
+  'PivotTable Style Options': {
+    ja: 'ピボットテーブル スタイルのオプション',
+    en: 'PivotTable Style Options',
+  },
+  'PivotTable Styles': { ja: 'ピボットテーブル スタイル', en: 'PivotTable Styles' },
+  Sparkline: { ja: 'スパークライン', en: 'Sparkline' },
+  'Type (Sparkline)': { ja: '種類', en: 'Type' },
+  'Show (Sparkline)': { ja: '表示', en: 'Show' },
+  Style: { ja: 'スタイル', en: 'Style' },
+  'Group (Sparkline)': { ja: 'グループ', en: 'Group' },
 };
 
 export const GROUP_LABELS: Readonly<Record<string, Label>> = Object.fromEntries(

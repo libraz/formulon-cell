@@ -79,7 +79,6 @@ export const buildMacObjectTabs = (
     kind: opts.kind ?? 'wide',
     ...(MAC_OBJECT_TAB_DISABLED_COMMAND_IDS.includes(id) ? { disabled: true } : {}),
   });
-  // The table tab's group titles are unmeasured, so its groups stay untitled.
   const group = (commands: RibbonCommand[], title?: string): RibbonGroupModel => ({
     title: title === undefined ? '' : (GROUP_LABELS[title]?.[lang] ?? title),
     commands,
@@ -91,24 +90,30 @@ export const buildMacObjectTabs = (
       label: text('tableTab'),
       contextual: true,
       groups: [
-        group([command('tableName', 'tableName', { kind: 'input' })]),
-        group([
-          command('tableSummarizePivot', 'summarizePivot'),
-          command('mac.data.removeDuplicates', 'removeDuplicates'),
-          command('tableConvertRange', 'convertRange'),
-        ]),
-        group([command('mac.insert.slicer', 'insertSlicer', { kind: 'large' })]),
-        group([command('tableRefresh', 'refresh', { kind: 'large' })]),
-        group([
-          command('tableHeaderRow', 'headerRow'),
-          command('tableTotalRow', 'totalRow'),
-          command('tableBandedRows', 'bandedRows'),
-          command('tableFirstColumn', 'firstColumn'),
-          command('tableLastColumn', 'lastColumn'),
-          command('tableBandedColumns', 'bandedColumns'),
-          command('tableFilterButton', 'filterButton'),
-        ]),
-        group([command('tableQuickStyles', 'quickStyles')]),
+        group([command('tableName', 'tableName', { kind: 'input' })], 'Properties'),
+        group(
+          [
+            command('tableSummarizePivot', 'summarizePivot'),
+            command('mac.data.removeDuplicates', 'removeDuplicates'),
+            command('tableConvertRange', 'convertRange'),
+            command('mac.insert.slicer', 'insertSlicer', { kind: 'large' }),
+          ],
+          'Tools (Table)',
+        ),
+        group([command('tableRefresh', 'refresh', { kind: 'large' })], 'External Table Data'),
+        group(
+          [
+            command('tableHeaderRow', 'headerRow'),
+            command('tableTotalRow', 'totalRow'),
+            command('tableBandedRows', 'bandedRows'),
+            command('tableFirstColumn', 'firstColumn'),
+            command('tableLastColumn', 'lastColumn'),
+            command('tableBandedColumns', 'bandedColumns'),
+            command('tableFilterButton', 'filterButton'),
+          ],
+          'Table Style Options',
+        ),
+        group([command('tableQuickStyles', 'quickStyles')], 'Table Styles'),
       ],
     },
     {

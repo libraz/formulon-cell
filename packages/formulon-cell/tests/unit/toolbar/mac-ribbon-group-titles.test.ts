@@ -18,7 +18,14 @@ const titles = (lang: ToolbarLang): Map<string, string[]> =>
   new Map(
     buildRibbonModel(lang, {
       profile: 'excel365Mac',
-      contextualTabs: ['chartDesign', 'chartFormat'],
+      contextualTabs: [
+        'chartDesign',
+        'chartFormat',
+        'tableDesign',
+        'pivotAnalyze',
+        'pivotDesign',
+        'sparklineDesign',
+      ],
     }).map((tab) => [tab.id, tab.groups.map((group) => group.title)]),
   );
 

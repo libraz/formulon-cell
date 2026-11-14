@@ -1,9 +1,11 @@
 import type {
   RibbonCommand,
   RibbonGroupModel,
+  RibbonProfile,
   RibbonTabModel,
   ToolbarLang,
 } from '../ribbon-model.js';
+import { GROUP_LABELS } from './mac/labels.js';
 import { PIVOT_DISABLED_COMMAND_IDS } from './pivot-command-ids.js';
 
 /** Wording of the PivotTable tabs: Japanese is measured, other languages read as English. */
@@ -49,11 +51,15 @@ const LABELS = {
   quickStyles: L('クイック スタイル', 'Quick Styles'),
 } as const;
 
-/** The two tabs a PivotTable report adds. Commands the host cannot run stay disabled in place. */
+/** The two tabs a PivotTable report adds. Commands the host cannot run stay disabled in place.
+ *  The Mac profile titles the groups and lays out the Design tab the way the desktop draws them;
+ *  elsewhere the groups stay untitled. */
 export const buildPivotContextualTabs = (
   lang: ToolbarLang,
   tabLabels: { pivotAnalyze: string; pivotDesign: string },
+  profile: RibbonProfile = 'default',
 ): RibbonTabModel[] => {
+  const mac = profile === 'excel365Mac';
   const text = (key: keyof typeof LABELS): string => LABELS[key][lang] ?? LABELS[key].en;
   const command = (
     id: string,
@@ -67,46 +73,69 @@ export const buildPivotContextualTabs = (
     kind: opts.kind ?? 'wide',
     ...(PIVOT_DISABLED_COMMAND_IDS.includes(id) ? { disabled: true } : {}),
   });
-  const group = (commands: RibbonCommand[]): RibbonGroupModel => ({
-    title: '',
+  const group = (commands: RibbonCommand[], title?: string): RibbonGroupModel => ({
+    title: mac && title !== undefined ? (GROUP_LABELS[title]?.[lang] ?? title) : '',
     commands,
     variant: 'compact',
   });
+  const totals = [
+    command('pivotSubtotals', 'subtotals'),
+    command('pivotGrandTotals', 'grandTotals'),
+  ];
+  const layout = [
+    command('pivotReportLayout', 'reportLayout'),
+    command('pivotBlankRows', 'blankRows'),
+  ];
   return [
     {
       id: 'pivotAnalyze',
       label: tabLabels.pivotAnalyze,
       contextual: true,
       groups: [
-        group([
-          command('pivotName', 'name', { kind: 'input' }),
-          command('pivotOptions', 'options'),
-        ]),
-        group([
-          command('pivotActiveField', 'activeField', { kind: 'input' }),
-          command('pivotFieldSettings', 'fieldSettings'),
-          command('pivotExpandField', 'expandField'),
-          command('pivotCollapseField', 'collapseField'),
-        ]),
-        group([command('pivotGroupSelection', 'groupSelection')]),
-        group([
-          command('pivotInsertSlicer', 'insertSlicer'),
-          command('pivotInsertTimeline', 'insertTimeline'),
-          command('pivotFilterConnections', 'filterConnections'),
-        ]),
-        group([command('pivotRefresh', 'refresh'), command('pivotChangeSource', 'changeSource')]),
-        group([
-          command('pivotClear', 'clear'),
-          command('pivotSelect', 'select'),
-          command('pivotMove', 'move'),
-        ]),
-        group([command('pivotFieldsItemsSets', 'fieldsItemsSets')]),
-        group([command('pivotChart', 'pivotChart')]),
-        group([
-          command('pivotFieldList', 'fieldList'),
-          command('pivotButtons', 'buttons'),
-          command('pivotHeaders', 'headers'),
-        ]),
+        group(
+          [command('pivotName', 'name', { kind: 'input' }), command('pivotOptions', 'options')],
+          'PivotTable',
+        ),
+        group(
+          [
+            command('pivotActiveField', 'activeField', { kind: 'input' }),
+            command('pivotFieldSettings', 'fieldSettings'),
+            command('pivotExpandField', 'expandField'),
+            command('pivotCollapseField', 'collapseField'),
+          ],
+          'Active Field',
+        ),
+        group([command('pivotGroupSelection', 'groupSelection')], 'Group (PivotTable)'),
+        group(
+          [
+            command('pivotInsertSlicer', 'insertSlicer'),
+            command('pivotInsertTimeline', 'insertTimeline'),
+            command('pivotFilterConnections', 'filterConnections'),
+          ],
+          'Filter',
+        ),
+        group(
+          [command('pivotRefresh', 'refresh'), command('pivotChangeSource', 'changeSource')],
+          'Data (PivotTable)',
+        ),
+        group(
+          [
+            command('pivotClear', 'clear'),
+            command('pivotSelect', 'select'),
+            command('pivotMove', 'move'),
+          ],
+          'Actions',
+        ),
+        group([command('pivotFieldsItemsSets', 'fieldsItemsSets')], 'Calculations'),
+        group([command('pivotChart', 'pivotChart')], 'Tools (PivotTable)'),
+        group(
+          [
+            command('pivotFieldList', 'fieldList'),
+            command('pivotButtons', 'buttons'),
+            command('pivotHeaders', 'headers'),
+          ],
+          'Show (PivotTable)',
+        ),
       ],
     },
     {
@@ -114,18 +143,17 @@ export const buildPivotContextualTabs = (
       label: tabLabels.pivotDesign,
       contextual: true,
       groups: [
-        group([command('pivotSubtotals', 'subtotals'), command('pivotGrandTotals', 'grandTotals')]),
-        group([
-          command('pivotReportLayout', 'reportLayout'),
-          command('pivotBlankRows', 'blankRows'),
-        ]),
-        group([
-          command('pivotRowHeaders', 'rowHeaders'),
-          command('pivotColHeaders', 'colHeaders'),
-          command('pivotRowStripes', 'rowStripes'),
-          command('pivotColStripes', 'colStripes'),
-        ]),
-        group([command('pivotQuickStyles', 'quickStyles')]),
+        ...(mac ? [group([...totals, ...layout], 'Layout')] : [group(totals), group(layout)]),
+        group(
+          [
+            command('pivotRowHeaders', 'rowHeaders'),
+            command('pivotColHeaders', 'colHeaders'),
+            command('pivotRowStripes', 'rowStripes'),
+            command('pivotColStripes', 'colStripes'),
+          ],
+          'PivotTable Style Options',
+        ),
+        group([command('pivotQuickStyles', 'quickStyles')], 'PivotTable Styles'),
       ],
     },
   ];

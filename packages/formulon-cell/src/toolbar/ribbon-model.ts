@@ -304,6 +304,12 @@ export function buildRibbonModel(
 ): RibbonTabModel[] {
   const strings = resolveStrings(input);
   const tr = strings.ribbon;
+  const profileLang: ToolbarLang =
+    typeof input === 'string'
+      ? input
+      : ((Object.entries(dictionaries).find(([, dictionary]) => dictionary === strings)?.[0] as
+          | ToolbarLang
+          | undefined) ?? 'ja');
   const fontLocale = typeof input === 'string' ? input : fontFamilyLocaleForStrings(strings);
   const menuText = toolbarMenuText(strings);
   const pageScaleText = pageScaleMenuText(strings);
@@ -944,16 +950,10 @@ export function buildRibbonModel(
       ]),
       contextual: true,
     },
-    buildSparklineDesignTab(tr, opts.profile),
+    buildSparklineDesignTab(tr, opts.profile, profileLang),
   ];
   const homeTab = allTabs.find((candidate) => candidate.id === 'home');
   if (!homeTab) return [];
-  const profileLang: ToolbarLang =
-    typeof input === 'string'
-      ? input
-      : ((Object.entries(dictionaries).find(([, dictionary]) => dictionary === strings)?.[0] as
-          | ToolbarLang
-          | undefined) ?? 'ja');
   const profileTabs =
     opts.profile === 'excel365Mac' ? buildMacRibbonModel(profileLang, homeTab) : allTabs;
   const requestedTabs =
@@ -961,7 +961,9 @@ export function buildRibbonModel(
   const tabsById = new Map(profileTabs.map((tab) => [tab.id, tab]));
   const contextualById = new Map([
     ...contextualTabs.map((tab) => [tab.id, tab] as const),
-    ...buildPivotContextualTabs(profileLang, tr.tabs).map((tab) => [tab.id, tab] as const),
+    ...buildPivotContextualTabs(profileLang, tr.tabs, opts.profile).map(
+      (tab) => [tab.id, tab] as const,
+    ),
     ...(opts.profile === 'excel365Mac'
       ? buildMacObjectTabs(profileLang, tr.tabs).map((tab) => [tab.id, tab] as const)
       : []),

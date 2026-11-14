@@ -7,6 +7,18 @@
       "name": "ChunkAccessibility",
       "match": "en+ja"
     },
+    "groups:Actions": {
+      "tcid": 16025,
+      "source": "tbbtn",
+      "name": "ChunkPivotActions",
+      "match": "en+ja"
+    },
+    "groups:Active Field": {
+      "tcid": 11888,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableActiveField",
+      "match": "en+ja"
+    },
     "groups:Add-ins": {
       "tcid": 34778,
       "source": "tbbtn",
@@ -36,6 +48,12 @@
       "tcid": 12604,
       "source": "tbbtn",
       "name": "ChunkCalculation",
+      "match": "en+ja"
+    },
+    "groups:Calculations": {
+      "tcid": 18835,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableCalculations",
       "match": "en+ja"
     },
     "groups:Cells": {
@@ -98,6 +116,12 @@
       "name": "ChunkChartData",
       "match": "en+ja"
     },
+    "groups:Data (PivotTable)": {
+      "tcid": 11897,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableDataSource",
+      "match": "en+ja"
+    },
     "groups:Data Tools": {
       "tcid": 11627,
       "source": "tbbtn",
@@ -120,6 +144,18 @@
       "tcid": 12831,
       "source": "tbbtn",
       "name": "ChunkEditingTools",
+      "match": "en+ja"
+    },
+    "groups:External Table Data": {
+      "tcid": 12830,
+      "source": "tbbtn",
+      "name": "ChunkExternalTableData",
+      "match": "en+ja"
+    },
+    "groups:Filter": {
+      "tcid": 11891,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableSortAndFilter",
       "match": "en+ja"
     },
     "groups:Filters": {
@@ -171,6 +207,18 @@
       "name": "ChunkPowerQueryGetTransformData",
       "match": "ja"
     },
+    "groups:Group (PivotTable)": {
+      "tcid": 11895,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableGrouping",
+      "match": "en+ja"
+    },
+    "groups:Group (Sparkline)": {
+      "tcid": 19220,
+      "source": "tbbtn",
+      "name": "ChunkSparklineGroup",
+      "match": "en+ja"
+    },
     "groups:Illustrations": {
       "tcid": 11548,
       "source": "tbbtn",
@@ -193,6 +241,12 @@
       "tcid": 19382,
       "source": "tbbtn",
       "name": "ChunkLanguage",
+      "match": "en+ja"
+    },
+    "groups:Layout": {
+      "tcid": 11890,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableLayout",
       "match": "en+ja"
     },
     "groups:Links": {
@@ -261,10 +315,34 @@
       "name": "JotChunkPens",
       "match": "en+ja"
     },
+    "groups:PivotTable": {
+      "tcid": 11898,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableOptions",
+      "match": "en+ja"
+    },
+    "groups:PivotTable Style Options": {
+      "tcid": 11900,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableLayoutOptions",
+      "match": "en+ja"
+    },
+    "groups:PivotTable Styles": {
+      "tcid": 11899,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableStyles",
+      "match": "en+ja"
+    },
     "groups:Proofing": {
       "tcid": 11546,
       "source": "tbbtn",
       "name": "ChunkProofing",
+      "match": "en+ja"
+    },
+    "groups:Properties": {
+      "tcid": 11574,
+      "source": "tbbtn",
+      "name": "ChunkTableOptions",
       "match": "en+ja"
     },
     "groups:Protect": {
@@ -309,6 +387,18 @@
       "name": "ChunkViewShowHide",
       "match": "en+ja"
     },
+    "groups:Show (PivotTable)": {
+      "tcid": 11892,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableShowHide",
+      "match": "en+ja"
+    },
+    "groups:Show (Sparkline)": {
+      "tcid": 20449,
+      "source": "tbbtn",
+      "name": "ChunkShowSparklineDetails",
+      "match": "en+ja"
+    },
     "groups:Size": {
       "tcid": 11877,
       "source": "tbbtn",
@@ -321,10 +411,22 @@
       "name": "ChunkEnterDataDataTools",
       "match": "en+ja"
     },
+    "groups:Sparkline": {
+      "tcid": 20448,
+      "source": "tbbtn",
+      "name": "ChunkEditSparklineData",
+      "match": "en+ja"
+    },
     "groups:Sparklines": {
       "tcid": 16702,
       "source": "tbbtn",
       "name": "ChunkInsertSparklines",
+      "match": "en+ja"
+    },
+    "groups:Style": {
+      "tcid": 19449,
+      "source": "tbbtn",
+      "name": "ChunkSparklineStyle",
       "match": "en+ja"
     },
     "groups:Styles": {
@@ -337,6 +439,18 @@
       "tcid": 12600,
       "source": "tbbtn",
       "name": "ChunkSymbols",
+      "match": "en+ja"
+    },
+    "groups:Table Style Options": {
+      "tcid": 12827,
+      "source": "tbbtn",
+      "name": "ChunkLayout",
+      "match": "en+ja"
+    },
+    "groups:Table Styles": {
+      "tcid": 15091,
+      "source": "tbbtn",
+      "name": "ChunkStylesTableExcel",
       "match": "en+ja"
     },
     "groups:Tables": {
@@ -363,10 +477,28 @@
       "name": "JotChunkWrite",
       "match": "en+ja"
     },
+    "groups:Tools (PivotTable)": {
+      "tcid": 11896,
+      "source": "tbbtn",
+      "name": "ChunkPivotTableTools",
+      "match": "en+ja"
+    },
+    "groups:Tools (Table)": {
+      "tcid": 11575,
+      "source": "tbbtn",
+      "name": "ChunkTableTools",
+      "match": "en+ja"
+    },
     "groups:Type": {
       "tcid": 13217,
       "source": "tbbtn",
       "name": "ChunkChartType",
+      "match": "en+ja"
+    },
+    "groups:Type (Sparkline)": {
+      "tcid": 19241,
+      "source": "tbbtn",
+      "name": "ChunkSparklineType",
       "match": "en+ja"
     },
     "groups:Window": {
@@ -4120,11 +4252,14 @@
   },
   "consumers": [
     "groups:Accessibility",
+    "groups:Actions",
+    "groups:Active Field",
     "groups:Add-ins",
     "groups:Alignment",
     "groups:Analysis",
     "groups:Arrange",
     "groups:Calculation",
+    "groups:Calculations",
     "groups:Cells",
     "groups:Changes",
     "groups:Chart Layouts",
@@ -4135,10 +4270,13 @@
     "groups:Controls",
     "groups:Current Selection",
     "groups:Data",
+    "groups:Data (PivotTable)",
     "groups:Data Tools",
     "groups:Data Types",
     "groups:Defined Names",
     "groups:Editing",
+    "groups:External Table Data",
+    "groups:Filter",
     "groups:Filters",
     "groups:Font",
     "groups:Forecast",
@@ -4147,10 +4285,13 @@
     "groups:Formula Auditing",
     "groups:Function Library",
     "groups:Get & Transform Data",
+    "groups:Group (PivotTable)",
+    "groups:Group (Sparkline)",
     "groups:Illustrations",
     "groups:Ink",
     "groups:Insert Shapes",
     "groups:Language",
+    "groups:Layout",
     "groups:Links",
     "groups:Location",
     "groups:Macros",
@@ -4162,7 +4303,11 @@
     "groups:Outline",
     "groups:Page Setup",
     "groups:Pens",
+    "groups:PivotTable",
+    "groups:PivotTable Style Options",
+    "groups:PivotTable Styles",
     "groups:Proofing",
+    "groups:Properties",
     "groups:Protect",
     "groups:Python (Preview)",
     "groups:Scale to Fit",
@@ -4170,16 +4315,25 @@
     "groups:Sheet Options",
     "groups:Sheet Views",
     "groups:Show",
+    "groups:Show (PivotTable)",
+    "groups:Show (Sparkline)",
     "groups:Size",
     "groups:Sort & Filter",
+    "groups:Sparkline",
     "groups:Sparklines",
+    "groups:Style",
     "groups:Styles",
     "groups:Symbols",
+    "groups:Table Style Options",
+    "groups:Table Styles",
     "groups:Tables",
     "groups:Text",
     "groups:Themes",
     "groups:Tools",
+    "groups:Tools (PivotTable)",
+    "groups:Tools (Table)",
     "groups:Type",
+    "groups:Type (Sparkline)",
     "groups:Window",
     "groups:WordArt Styles",
     "groups:Workbook Views",

@@ -3,8 +3,10 @@ import type {
   RibbonGroupModel,
   RibbonProfile,
   RibbonTabModel,
+  ToolbarLang,
   ToolbarText,
 } from '../ribbon-model.js';
+import { GROUP_LABELS } from './mac/labels.js';
 
 /** The ribbon command ids of the Sparkline tab, by the control they name. */
 export const SPARKLINE_COMMANDS = {
@@ -36,12 +38,18 @@ export const SPARKLINE_STACKED_LAYOUT_GROUP_VARIANTS = ['sparkline-show'] as con
 export const SPARKLINE_MIXED_LAYOUT_GROUP_VARIANTS = ['sparkline-group'] as const;
 
 /** The Sparkline contextual tab, shown while the active cell hosts a sparkline. The Mac profile's
- *  Axis button opens the Axis dialog; elsewhere it opens the Axis menu. */
+ *  Axis button opens the Axis dialog, and its group titles are the desktop's Mac group labels in
+ *  `lang`; elsewhere Axis opens the Axis menu. */
 export const buildSparklineDesignTab = (
   tr: ToolbarText,
   profile: RibbonProfile = 'default',
+  lang: ToolbarLang = 'en',
 ): RibbonTabModel => {
   const t = tr.sparkline;
+  const mac = profile === 'excel365Mac';
+  /** The group title: the Mac label of `macKey` on the Mac profile, else `fallback`. */
+  const title = (macKey: string, fallback: string): string =>
+    mac ? (GROUP_LABELS[macKey]?.[lang] ?? fallback) : fallback;
   const large = (id: string, label: string, icon: string): RibbonCommand => ({
     id,
     title: label,
@@ -70,14 +78,16 @@ export const buildSparklineDesignTab = (
     label: tr.tabs.sparklineDesign,
     contextual: true,
     groups: [
-      group(t.title, [large(SPARKLINE_COMMANDS.editData, t.editData, 'chartSelectData')]),
-      group(t.type, [
+      group(title('Sparkline', t.title), [
+        large(SPARKLINE_COMMANDS.editData, t.editData, 'chartSelectData'),
+      ]),
+      group(title('Type (Sparkline)', t.type), [
         large('sparklineTypeLine', t.line, 'sparkline'),
         large('sparklineTypeColumn', t.column, 'sparklineColumn'),
         large('sparklineTypeWinLoss', t.winLoss, 'sparklineWinLoss'),
       ]),
       group(
-        t.show,
+        title('Show (Sparkline)', t.show),
         [
           check('sparklineShowHigh', t.highPoint, 'sparklineHigh'),
           check('sparklineShowLow', t.lowPoint, 'sparklineLow'),
@@ -88,13 +98,13 @@ export const buildSparklineDesignTab = (
         ],
         SPARKLINE_STACKED_LAYOUT_GROUP_VARIANTS[0],
       ),
-      group(t.style, [
+      group(title('Style', t.style), [
         large(SPARKLINE_COMMANDS.styleGallery, t.style, 'chartStyles'),
         large(SPARKLINE_COMMANDS.color, t.color, 'shapeOutline'),
         large(SPARKLINE_COMMANDS.markerColor, t.markerColor, 'fillColor'),
       ]),
       group(
-        t.group,
+        title('Group (Sparkline)', t.group),
         [
           large(
             profile === 'excel365Mac' ? SPARKLINE_COMMANDS.axisDialog : SPARKLINE_COMMANDS.axis,

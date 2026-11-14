@@ -83,6 +83,36 @@
       "ChunkPosition",
       "ChunkSize",
       "ChunkFormat"
+    ],
+    "pivotAnalyze": [
+      "ChunkPivotTableOptions",
+      "ChunkPivotTableActiveField",
+      "ChunkPivotTableGrouping",
+      "ChunkPivotTableSortAndFilter",
+      "ChunkPivotTableDataSource",
+      "ChunkPivotActions",
+      "ChunkPivotTableCalculations",
+      "ChunkPivotTableTools",
+      "ChunkPivotTableShowHide"
+    ],
+    "pivotDesign": [
+      "ChunkPivotTableLayout",
+      "ChunkPivotTableLayoutOptions",
+      "ChunkPivotTableStyles"
+    ],
+    "tableDesign": [
+      "ChunkTableOptions",
+      "ChunkTableTools",
+      "ChunkExternalTableData",
+      "ChunkLayout",
+      "ChunkStylesTableExcel"
+    ],
+    "sparklineDesign": [
+      "ChunkEditSparklineData",
+      "ChunkSparklineType",
+      "ChunkShowSparklineDetails",
+      "ChunkSparklineStyle",
+      "ChunkSparklineGroup"
     ]
   },
   "titles": {
@@ -143,7 +173,27 @@
         "Arrange",
         "Size",
         "Format"
-      ]
+      ],
+      "pivotAnalyze": [
+        "PivotTable",
+        "Active Field",
+        "Group",
+        "Filter",
+        "Data",
+        "Actions",
+        "Calculations",
+        "Tools",
+        "Show"
+      ],
+      "pivotDesign": ["Layout", "PivotTable Style Options", "PivotTable Styles"],
+      "tableDesign": [
+        "Properties",
+        "Tools",
+        "External Table Data",
+        "Table Style Options",
+        "Table Styles"
+      ],
+      "sparklineDesign": ["Sparkline", "Type", "Show", "Style", "Group"]
     },
     "ja": {
       "home": [
@@ -211,7 +261,31 @@
         "整列",
         "サイズ",
         "書式"
-      ]
+      ],
+      "pivotAnalyze": [
+        "ピボットテーブル",
+        "アクティブなフィールド",
+        "グループ",
+        "フィルター",
+        "データ",
+        "アクション",
+        "計算",
+        "ツール",
+        "表示"
+      ],
+      "pivotDesign": [
+        "レイアウト",
+        "ピボットテーブル スタイルのオプション",
+        "ピボットテーブル スタイル"
+      ],
+      "tableDesign": [
+        "プロパティ",
+        "ツール",
+        "外部テーブル データ",
+        "テーブル スタイル オプション",
+        "表のスタイル"
+      ],
+      "sparklineDesign": ["スパークライン", "種類", "表示", "スタイル", "グループ"]
     },
     "de": {
       "home": [
@@ -286,7 +360,27 @@
         "Anordnen",
         "Größe",
         "Format"
-      ]
+      ],
+      "pivotAnalyze": [
+        "PivotTable",
+        "Aktives Feld",
+        "Gruppe",
+        "Filter",
+        "Daten",
+        "Aktionen",
+        "Berechnungen",
+        "Tools",
+        "Einblenden"
+      ],
+      "pivotDesign": ["Layout", "Optionen für PivotTable-Formate", "PivotTable-Formate"],
+      "tableDesign": [
+        "Eigenschaften",
+        "Tools",
+        "Externe Tabellendaten",
+        "Optionen für Tabellenformat",
+        "Tabellenformatvorlagen"
+      ],
+      "sparklineDesign": ["Sparkline", "Typ", "Anzeigen", "Format", "Gruppe"]
     },
     "fr": {
       "home": [
@@ -367,7 +461,31 @@
         "Réorganiser",
         "Taille",
         "Mise en forme"
-      ]
+      ],
+      "pivotAnalyze": [
+        "Tableau croisé dynamique",
+        "Champ actif",
+        "Grouper",
+        "Filtrer",
+        "Données",
+        "Actions",
+        "Calculs",
+        "Outils",
+        "Afficher"
+      ],
+      "pivotDesign": [
+        "Disposition",
+        "Options de style de tableau croisé dynamique",
+        "Styles de tableau croisé dynamique"
+      ],
+      "tableDesign": [
+        "Propriétés",
+        "Outils",
+        "Données de table externe",
+        "Options de style de tableau",
+        "Styles de table"
+      ],
+      "sparklineDesign": ["Graphique sparkline", "Type", "Afficher", "Style", "Regrouper"]
     },
     "zh": {
       "home": ["剪贴板", "字体", "对齐方式", "编号", "样式", "单元格", "编辑", "加载项"],
@@ -402,7 +520,21 @@
       "view": ["工作表视图", "工作簿视图", "显示", "缩放", "窗口", "宏"],
       "automate": ["Office 脚本", "Office 脚本库"],
       "chartDesign": ["图表布局", "图表样式", "数据", "类型", "位置"],
-      "chartFormat": ["当前所选内容", "插入形状", "形状样式", "艺术字样式", "排列", "大小", "格式"]
+      "chartFormat": ["当前所选内容", "插入形状", "形状样式", "艺术字样式", "排列", "大小", "格式"],
+      "pivotAnalyze": [
+        "数据透视表",
+        "活动字段",
+        "分组",
+        "筛选",
+        "数据",
+        "操作",
+        "计算",
+        "工具",
+        "显示"
+      ],
+      "pivotDesign": ["布局", "数据透视表样式选项", "数据透视表样式"],
+      "tableDesign": ["属性", "工具", "外部表格数据", "表格样式选项", "表格样式"],
+      "sparklineDesign": ["迷你图", "类型", "显示", "样式", "分组"]
     },
     "ko": {
       "home": ["클립보드", "글꼴", "맞춤", "숫자", "스타일", "셀", "편집", "추가 기능"],
@@ -455,7 +587,21 @@
         "정렬",
         "크기",
         "서식"
-      ]
+      ],
+      "pivotAnalyze": [
+        "피벗 테이블",
+        "활성 필드",
+        "그룹",
+        "필터",
+        "데이터",
+        "동작",
+        "계산",
+        "도구",
+        "표시"
+      ],
+      "pivotDesign": ["레이아웃", "피벗 테이블 스타일 옵션", "피벗 테이블 스타일"],
+      "tableDesign": ["속성", "도구", "외부 테이블 데이터", "표 스타일 옵션", "표 스타일"],
+      "sparklineDesign": ["스파크라인", "유형", "표시", "스타일", "그룹"]
     },
     "th": {
       "home": ["คลิปบอร์ด", "ฟอนต์", "การจัดแนว", "ตัวเลข", "สไตล์", "เซลล์", "การแก้ไข", "Add-in"],
@@ -508,7 +654,21 @@
         "จัดเรียง",
         "ขนาด",
         "รูปแบบ"
-      ]
+      ],
+      "pivotAnalyze": [
+        "PivotTable",
+        "เขตข้อมูลที่ใช้งานอยู่:",
+        "กลุ่ม",
+        "ตัวกรอง",
+        "ข้อมูล",
+        "การกระทำ",
+        "การคำนวณ",
+        "เครื่องมือ",
+        "แสดง"
+      ],
+      "pivotDesign": ["เค้าโครง", "ตัวเลือกลักษณะของ PivotTable", "ลักษณะของ PivotTable"],
+      "tableDesign": ["คุณสมบัติ", "เครื่องมือ", "ข้อมูลตารางภายนอก", "ตัวเลือกสไตล์ตาราง", "สไตล์ตาราง"],
+      "sparklineDesign": ["เส้นแบบประกายไฟ", "ชนิด", "แสดง", "สไตล์", "กลุ่ม"]
     }
   }
 }
