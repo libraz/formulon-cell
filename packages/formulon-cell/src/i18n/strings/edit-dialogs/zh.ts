@@ -181,7 +181,7 @@ export const editDialogsZh: EditDialogsStrings = {
     showAll: '全部显示',
     search: '搜索',
     authoringGroup: '创作',
-    viewPane: '查看',
+    viewPane: '视图',
     autoCorrectPane: '自动更正',
     calculationPane: '计算',
     formulasGroup: '公式和列表',

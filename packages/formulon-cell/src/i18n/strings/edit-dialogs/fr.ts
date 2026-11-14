@@ -184,7 +184,7 @@ export const editDialogsFr: EditDialogsStrings = {
     showAll: 'Tout afficher',
     search: 'Rechercher',
     authoringGroup: 'Création',
-    viewPane: 'Afficher',
+    viewPane: 'Affichage',
     autoCorrectPane: 'Correction automatique',
     calculationPane: 'Calcul',
     formulasGroup: 'Formules et listes',

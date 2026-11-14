@@ -144,6 +144,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- The Mac Preferences window titles the View pane as the desktop draws it in French (Affichage) and Simplified Chinese (视图).
 - Column and row header letters on the Mac use the Normal font at the size cell text paints at, so at 150% zoom their letters match the cells'.
 - Bottom-aligned text in Calibri and Aptos Narrow sits 10 pt above the cell's bottom edge at every font size and row height, scaling with the zoom, as the desktop places it.
 - Swapping the workbook with `update({ workbook })` while the selection rests on a PivotTable no longer fails with a disposed workbook: the workbook panels move to the new workbook before the selection is restored.

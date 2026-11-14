@@ -61,6 +61,20 @@ describe('Preferences window', () => {
     );
   });
 
+  it.each([
+    ['zh', '视图', '零值'],
+    ['fr', 'Affichage', 'Valeurs nulles'],
+  ] as const)(
+    'titles the View pane as the desktop draws it in %s',
+    async (locale, title, zeros) => {
+      sheet = await mountStubSheet({ locale, ui: { platform: 'mac' } });
+      const instance = sheet.instance;
+      createDialogs(() => instance).open('preferences');
+      expect(dialog()?.querySelector('.fc-prefs__header')?.textContent).toBe(title);
+      expect(dialog()?.querySelector('.fc-prefs__check')?.textContent).toBe(zeros);
+    },
+  );
+
   it('carries the desktop toolbar: Back and Forward, Show All, the pane name and Search', async () => {
     sheet = await mountStubSheet({ locale: 'ja', ui: { platform: 'mac' } });
     const instance = sheet.instance;
