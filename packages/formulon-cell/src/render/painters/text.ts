@@ -1,4 +1,5 @@
 import { formatNumber } from '../../commands/format.js';
+import { fontPointsToCssPx } from '../../engine/font-units.js';
 import {
   phoneticAlignment,
   phoneticGuideSize,
@@ -202,22 +203,32 @@ export const shrinkFontSizeToFit = (
   return Math.max(1, Math.floor(fontSize * (availableWidth / measuredWidth)));
 };
 
+/** Bottom gap, in points, from the baseline to the cell's bottom edge for
+ *  fonts whose placement was measured: constant across sizes and row heights. */
+const BOTTOM_GAP_PT: Record<string, number> = {
+  calibri: 10,
+  'aptos narrow': 10,
+};
+
 /** Bottom-aligned baseline rise above the cell's bottom edge, `slope * size +
- *  intercept` CSS px, for fonts whose placement was measured in Excel. The
- *  face's own descent cannot stand in: these fonts are often absent from the
- *  host, and no single em ratio fits their rise across zoom levels. Fits of
- *  the 11 pt rows in cells-zoom-text-bottom-second-font facts.md (50-200%). */
+ *  intercept` CSS px, for fonts measured against the size ladder at 11 pt.
+ *  The face's own descent cannot stand in: these fonts are often absent from
+ *  the host, and no single em ratio fits their rise across zoom levels. */
 const BOTTOM_BASELINE_RISE: Record<string, { slope: number; intercept: number }> = {
-  calibri: { slope: 0.45, intercept: 0.4 },
   'ms pgothic': { slope: 0.45, intercept: -0.6 },
   'ms pゴシック': { slope: 0.45, intercept: -0.6 },
 };
 
-const bottomBaselineRise = (face: { family: string; size: number }): number | null => {
+/** Painted font plus the render scale (CSS px per point) it was sized with. */
+type BaselineFace = { family: string; size: number; scale?: number };
+
+const bottomBaselineRise = (face: BaselineFace): number | null => {
   const first = splitFontFamily(face.family)[0]
     ?.replace(/^["']|["']$/g, '')
     .normalize('NFKC')
     .toLowerCase();
+  const gapPt = first ? BOTTOM_GAP_PT[first] : undefined;
+  if (gapPt !== undefined) return fontPointsToCssPx(gapPt) * (face.scale ?? 1);
   const fit = first ? BOTTOM_BASELINE_RISE[first] : undefined;
   return fit ? fit.slope * face.size + fit.intercept : null;
 };
@@ -231,7 +242,7 @@ export const textBaselineY = (
   vAlign: TextVAlign,
   padY: number,
   merged = false,
-  face?: { family: string; size: number },
+  face?: BaselineFace,
 ): number => {
   if (vAlign === 'top') return Math.round(bounds.y + padY + box.ascent);
   if (vAlign === 'middle') {
@@ -740,6 +751,7 @@ export function paintCellText({
     let startY = textBaselineY(bounds, measured, vAlign, padY, merged, {
       family: font.family,
       size: fontSize,
+      scale: zoomScale,
     });
     startY += cellTextVerticalOffset(fontSize, fontVertAlign);
     if (vAlign === 'middle') startY -= (totalH - lineH) / 2;
@@ -840,6 +852,7 @@ export function paintCellText({
   let ty = textBaselineY(bounds, box, vAlign, padY, merged, {
     family: font.family,
     size: fontSize,
+    scale: zoomScale,
   });
   ty += cellTextVerticalOffset(drawFontSize, fontVertAlign);
 
