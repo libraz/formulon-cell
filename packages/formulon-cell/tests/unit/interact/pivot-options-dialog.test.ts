@@ -147,9 +147,6 @@ describe('PivotTable Options dialog', () => {
       '値の領域にフィールドがない場合のアイテムのラベル',
       '昇順で並べ替え',
       'データ ソース順で並べ替え',
-      'データ ソースから削除されたアイテムの保持',
-      '自動',
-      '最大値',
       'ソース データが変更されたときに自動的に更新する',
       'パスワードをファイルに保存する',
       'バックグラウンドでクエリを実行する',
@@ -284,6 +281,127 @@ describe('PivotTable Options dialog', () => {
       reloaded.dispose();
     }
     wb.dispose();
+  });
+
+  describe('retain items deleted from the data source', () => {
+    const open = async (limit: number | null) => {
+      const wb = await setup();
+      if (limit !== null)
+        expect(wb.updatePivotCacheOptions(0, 0, { missingItemsLimit: limit })).toBe(true);
+      const history = new History();
+      const done = openPivotOptions(
+        {
+          store: createSpreadsheetStore(),
+          origin: 'ribbon' as const,
+          commandId: 'test',
+          host,
+          strings: ja,
+          wb,
+          history,
+          onChanged: () => {},
+        },
+        0,
+        0,
+      );
+      const box = dialog().querySelector<HTMLInputElement>(
+        '[data-pvopt-cache="missingItemsLimit"]',
+      );
+      const radios = Array.from(
+        dialog().querySelectorAll<HTMLInputElement>('[data-pvopt-limit] input'),
+      );
+      if (!box || radios.length !== 2) throw new Error('retain controls missing');
+      const click = (selector: string) =>
+        dialog().querySelector<HTMLButtonElement>(selector)?.click();
+      return {
+        wb,
+        box,
+        radios,
+        done,
+        history,
+        ok: () => click('[data-pvopt-ok]'),
+        cancel: () => click('[data-pvopt-cancel]'),
+        toggle: () => box.click(),
+      };
+    };
+    type Opened = Awaited<ReturnType<typeof open>>;
+    const shown = (radios: HTMLInputElement[]) => radios.findIndex((r) => r.checked);
+
+    it.each([
+      [null, true, 0, false],
+      [0, false, 1, true],
+      [32500, true, 1, false],
+      [50, true, 1, false],
+    ])(
+      'shows %s as checked=%s, radio %s, radios disabled=%s',
+      async (limit, checked, radio, off) => {
+        const { wb, box, radios, cancel, done } = await open(limit);
+        expect(box.checked).toBe(checked);
+        expect(shown(radios)).toBe(radio);
+        expect(radios.map((r) => r.disabled)).toEqual([off, off]);
+        expect(radios.map((r) => r.parentElement?.textContent)).toEqual(['自動', '最大値']);
+        cancel();
+        expect(await done).toBe(false);
+        wb.dispose();
+      },
+    );
+
+    it.each<[string, number | null, number | null, (c: Opened) => void]>([
+      ['unchecked', null, 0, (c) => c.toggle()],
+      ['checked + Max', 0, 1048576, (c) => c.toggle()],
+      [
+        'checked + Automatic',
+        0,
+        null,
+        (c) => {
+          c.toggle();
+          c.radios[0]?.click();
+        },
+      ],
+      ['32500 unchanged', 32500, 1048576, () => {}],
+      ['50 unchanged', 50, 1048576, () => {}],
+      ['null unchanged', null, null, () => {}],
+      ['0 unchanged', 0, 0, () => {}],
+    ])('OK writes %s', async (_name, from, to, act) => {
+      const c = await open(from);
+      act(c);
+      c.ok();
+      expect(await c.done).toBe(true);
+      expect(c.wb.pivotCacheOptions(0, 0)?.missingItemsLimit).toBe(to);
+      c.wb.dispose();
+    });
+
+    it('checking the box on a 0 book selects Max and enables the radios', async () => {
+      const c = await open(0);
+      c.toggle();
+      expect(shown(c.radios)).toBe(1);
+      expect(c.radios.map((r) => r.disabled)).toEqual([false, false]);
+      c.cancel();
+      await c.done;
+      c.wb.dispose();
+    });
+
+    it('unchecking shows Max on the disabled radios, and undo restores the value', async () => {
+      const c = await open(null);
+      c.toggle();
+      expect(shown(c.radios)).toBe(1);
+      expect(c.radios.map((r) => r.disabled)).toEqual([true, true]);
+      c.ok();
+      await c.done;
+      expect(c.history.undo()).toBe(true);
+      expect(c.wb.pivotCacheOptions(0, 0)?.missingItemsLimit).toBe(null);
+      c.wb.dispose();
+    });
+
+    it('Cancel keeps 50', async () => {
+      const c = await open(50);
+      c.toggle();
+      c.toggle();
+      c.radios[0]?.click();
+      c.cancel();
+      expect(await c.done).toBe(false);
+      expect(c.wb.pivotCacheOptions(0, 0)?.missingItemsLimit).toBe(50);
+      c.wb.dispose();
+    });
   });
 
   it('opens from the instance on the active cell report, and renames through it', async () => {

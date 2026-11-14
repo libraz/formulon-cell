@@ -43,7 +43,10 @@ export type PivotOptionsEdit = Pick<
 >;
 
 /** The options of the report's cache the dialog edits. */
-export type PivotCacheOptionsEdit = Pick<PivotCacheOptions, 'saveData' | 'refreshOnLoad'>;
+export type PivotCacheOptionsEdit = Pick<
+  PivotCacheOptions,
+  'saveData' | 'refreshOnLoad' | 'missingItemsLimit'
+>;
 
 /** The report settings the dialog edits. */
 export interface PivotOptionsValues {
@@ -68,6 +71,8 @@ type CaptionKey = 'errorCaption' | 'missingCaption';
 const MAX_INDENT = 126;
 /** The largest number of report filter fields per column or row. */
 const MAX_PAGE_WRAP = 255;
+/** The largest number of retained deleted items per field the engine stores. */
+const MAX_MISSING_ITEMS = 1048576;
 
 /** One control row of a tab: a check box, a radio group, a popup or a text field.
  *  A row bound to an option or a cache option edits it; an unbound row renders the
@@ -88,6 +93,9 @@ type OptionRow =
       options: readonly string[];
       selected: number;
       option?: 'pageOverThenDown';
+      /** The Automatic / Max pair of the retained-items limit; it follows the
+       *  preceding `missingItemsLimit` check box. */
+      limit?: boolean;
     }
   | {
       kind: 'popup';
@@ -113,6 +121,7 @@ function renderGroups(
   groups: readonly (OptionGroup | 'rule')[],
   reason: string,
 ): void {
+  let retainBox: HTMLInputElement | null = null;
   for (const group of groups) {
     if (group === 'rule') {
       const rule = document.createElement('hr');
@@ -137,6 +146,7 @@ function renderGroups(
         if (row.option) box.dataset.pvoptOption = row.option;
         else if (row.cache) box.dataset.pvoptCache = row.cache;
         else disable(box, reason);
+        if (row.cache === 'missingItemsLimit') retainBox = box;
         line.append(box, document.createTextNode(row.label));
         if (row.caption) {
           const text = document.createElement('input');
@@ -166,7 +176,9 @@ function renderGroups(
         list.setAttribute('role', 'radiogroup');
         if (row.label) list.setAttribute('aria-label', row.label);
         if (row.option) list.dataset.pvoptOption = row.option;
+        if (row.limit) list.dataset.pvoptLimit = '';
         const groupName = `fc-pvoptdlg-${row.option ?? row.options.join('|')}`;
+        const radios: HTMLInputElement[] = [];
         for (const [index, option] of row.options.entries()) {
           const line = document.createElement('label');
           line.className = 'fc-pvoptdlg__radio';
@@ -175,9 +187,20 @@ function renderGroups(
           radio.name = groupName;
           radio.value = String(index);
           radio.checked = index === row.selected;
-          if (!row.option) disable(radio, reason);
+          if (!row.option && !row.limit) disable(radio, reason);
+          radios.push(radio);
           line.append(radio, document.createTextNode(option));
           list.appendChild(line);
+        }
+        const box = row.limit ? retainBox : null;
+        if (box) {
+          // Off, the limit is 0 and the pair is disabled with Max shown, as on the desktop.
+          const follow = (): void => {
+            if (!box.checked && radios[1]) radios[1].checked = true;
+            for (const radio of radios) projectDisabledState(radio, !box.checked, null);
+          };
+          follow();
+          box.addEventListener('change', follow);
         }
         wrap.appendChild(list);
         controls.appendChild(wrap);
@@ -223,8 +246,16 @@ function readControls(
       options[key] = el.value === '' ? null : el.value;
     else options[key] = el.querySelector<HTMLInputElement>('input:checked')?.value === '1';
   }
-  for (const el of root.querySelectorAll<HTMLInputElement>('[data-pvopt-cache]'))
-    cache[el.dataset.pvoptCache as CacheKey] = el.checked;
+  for (const el of root.querySelectorAll<HTMLInputElement>('[data-pvopt-cache]')) {
+    const key = el.dataset.pvoptCache as CacheKey;
+    if (key !== 'missingItemsLimit') {
+      cache[key] = el.checked;
+      continue;
+    }
+    const max =
+      root.querySelector<HTMLInputElement>('[data-pvopt-limit] input:checked')?.value === '1';
+    cache[key] = !el.checked ? 0 : max ? MAX_MISSING_ITEMS : null;
+  }
   return {
     options: options as unknown as PivotOptionsEdit,
     cache: cache as unknown as PivotCacheOptionsEdit,
@@ -477,6 +508,7 @@ export const showPivotOptionsDialog = (
     }
     const dt = t.data;
     const data = pairs.get('data')?.panel;
+    const limit = opts.cache.missingItemsLimit;
     if (data) {
       renderGroups(
         data,
@@ -496,12 +528,18 @@ export const showPivotOptionsDialog = (
                 checked: o.enableDrill,
                 option: 'enableDrill',
               },
-              { kind: 'check', label: dt.retainDeletedItems, checked: true },
+              {
+                kind: 'check',
+                label: dt.retainDeletedItems,
+                checked: limit !== 0,
+                cache: 'missingItemsLimit',
+              },
               {
                 kind: 'radios',
                 label: dt.itemsToRetain,
                 options: [dt.retainAutomatic, dt.retainMax],
-                selected: 0,
+                selected: limit === null ? 0 : 1,
+                limit: true,
               },
               {
                 kind: 'check',
@@ -686,7 +724,11 @@ function readPivotOptions(
       altText: options.altText,
       altTextSummary: options.altTextSummary,
     },
-    cache: { saveData: cache.saveData, refreshOnLoad: cache.refreshOnLoad },
+    cache: {
+      saveData: cache.saveData,
+      missingItemsLimit: cache.missingItemsLimit,
+      refreshOnLoad: cache.refreshOnLoad,
+    },
   };
 }
 
