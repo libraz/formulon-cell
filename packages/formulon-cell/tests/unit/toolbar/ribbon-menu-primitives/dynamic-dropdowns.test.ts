@@ -161,6 +161,7 @@ describe('toolbar/ribbon menu primitives', () => {
       updateTableRefreshMenu: vi.fn(),
       applySparklineAction: vi.fn(),
       updateSparklineMenu: vi.fn(),
+      updateUseInFormulaMenu: vi.fn(),
       closeBorderMenu: vi.fn(),
       closeFreezeMenu: vi.fn(),
       closePrintAreaMenu: vi.fn(),

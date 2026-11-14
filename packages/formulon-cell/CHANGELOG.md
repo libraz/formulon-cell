@@ -138,6 +138,7 @@ versioning is [SemVer](https://semver.org/).
 - On the Mac, the Insert tab's chart gallery cells are 36 pt wide, and Waterfall and Combo sit in a two-row stack of 26 pt cells beside them, as the desktop draws the Charts group.
 - Saving as `.xlsb` a workbook that holds a feature the binary writer cannot write, such as a protected range with a security descriptor, names the feature and its sheet and offers to save as `.xlsx` instead. `saveWithPrompts` then resolves the `.xlsx` bytes, or null when cancelled.
 - On the Mac, the error-check menu of a stale formula value is headed Stale Value and lists Help on This Error, Calculate Now, Switch to Automatic Calculation, Disable Format Stale Cells, Ignore Error, Edit in Formula Bar and Error Checking Options, as the desktop does.
+- On the Mac, Formulas › Use in Formula lists the workbook's names and the active sheet's own names above Paste Names, in the desktop's order; choosing one enters it in the active cell.
 
 ### Fixed
 

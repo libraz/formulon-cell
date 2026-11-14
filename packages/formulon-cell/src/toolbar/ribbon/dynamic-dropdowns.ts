@@ -87,6 +87,8 @@ export interface DynamicDropdownsCtx {
   updatePivotLayoutMenu?: (menu: HTMLElement) => void;
   /** Grey the Table Design Refresh menu's commands that have nothing to run. */
   updateTableRefreshMenu?: (menu: HTMLElement) => void;
+  /** List the workbook's defined names in the Mac Use in Formula menu before it opens. */
+  updateUseInFormulaMenu?: (menu: HTMLElement) => void;
   /** Refresh a Sparkline tab menu (checked entries, disabled entries) before it opens. */
   updateSparklineMenu?: (menu: HTMLElement) => void;
   // Sibling menu controllers that must close when a dynamic dropdown opens.
@@ -371,6 +373,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-delete-cells': 'updateCellDeleteMenu',
   'menu-error-checking': 'updateErrorCheckingMenu',
   'menu-mac-formulas-error-check': 'updateErrorCheckingMenu',
+  'menu-mac-formulas-use-in-formula': 'updateUseInFormulaMenu',
   'menu-fill': 'updateFillMenu',
   'menu-format-cells': 'updateFormatCellsMenu',
   'menu-freeze': 'updateFreezeMenu',

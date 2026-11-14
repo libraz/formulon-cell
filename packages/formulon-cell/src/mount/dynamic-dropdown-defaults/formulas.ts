@@ -45,8 +45,13 @@ import { showCommandRefusal } from '../../toolbar/dialogs/command-refusal.js';
 import { showCreateNamesDialog } from '../../toolbar/dialogs/create-names.js';
 import { showDefinedNamePickerDialog } from '../../toolbar/dialogs/defined-name-picker.js';
 import { showConfirm } from '../../toolbar/dialogs/prompt.js';
+import { createRibbonButton } from '../../toolbar/ribbon/button.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
-import { menuIconSpacer, menuPresetButton } from '../../toolbar/ribbon/menus/general.js';
+import {
+  menuIconSpacer,
+  menuPresetButton,
+  menuSeparator,
+} from '../../toolbar/ribbon/menus/general.js';
 import { handleAutoSum } from '../../wrappers/toolbar-actions.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
 
@@ -495,6 +500,25 @@ async function createNamesFromSelection(instance: SpreadsheetInstance): Promise<
   }
 }
 
+/** Writes `=name` into the active cell (after any allowed-range unlock), then redraws and refocuses. */
+const insertNameInActiveCell = (instance: SpreadsheetInstance, name: string): void => {
+  const { active } = instance.store.getState().selection;
+  const cell = {
+    sheet: active.sheet,
+    r0: active.row,
+    c0: active.col,
+    r1: active.row,
+    c1: active.col,
+  };
+  runAfterAllowedRangeUnlock(instance.store, [cell], () => {
+    insertDefinedNameFormula(instance.store.getState(), instance.workbook, name, instance.store);
+    mutators.refreshActiveSheetCells(instance.store, instance.workbook);
+    instance.host.focus();
+  });
+};
+
+const INSERT_NAME_ACTION_PREFIX = 'insert:';
+
 const buildDefinedNameAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyDefinedNameAction'] =>
   async (action) => {
@@ -509,6 +533,10 @@ const buildDefinedNameAction =
     if (action === 'create-from-selection') {
       await createNamesFromSelection(instance);
       instance.host.focus();
+      return;
+    }
+    if (action.startsWith(INSERT_NAME_ACTION_PREFIX)) {
+      insertNameInActiveCell(instance, action.slice(INSERT_NAME_ACTION_PREFIX.length));
       return;
     }
     if (action === 'use-formula') {
@@ -533,24 +561,7 @@ const buildDefinedNameAction =
         instance.host.focus();
         return;
       }
-      const { active } = instance.store.getState().selection;
-      const cell = {
-        sheet: active.sheet,
-        r0: active.row,
-        c0: active.col,
-        r1: active.row,
-        c1: active.col,
-      };
-      runAfterAllowedRangeUnlock(instance.store, [cell], () => {
-        insertDefinedNameFormula(
-          instance.store.getState(),
-          instance.workbook,
-          selected,
-          instance.store,
-        );
-        mutators.refreshActiveSheetCells(instance.store, instance.workbook);
-        instance.host.focus();
-      });
+      insertNameInActiveCell(instance, selected);
     }
   };
 
@@ -572,6 +583,47 @@ const updateDefinedNamesMenu =
     }
   };
 
+/** Collation for the name list: case-insensitive, Latin before kana before kanji. */
+const nameCollator = new Intl.Collator('ja', { sensitivity: 'base' });
+
+/** Names the Use in Formula menu lists: workbook names plus the active sheet's own, once each. */
+const listedNamesForActiveSheet = (instance: SpreadsheetInstance): string[] => {
+  const sheet = instance.store.getState().selection.active.sheet;
+  const seen = new Map<string, string>();
+  for (const entry of listDefinedNames(instance.workbook)) {
+    if (entry.hidden || (entry.localSheetId !== -1 && entry.localSheetId !== sheet)) continue;
+    const key = entry.name.trim().toLowerCase();
+    if (entry.localSheetId === sheet || !seen.has(key)) seen.set(key, entry.name);
+  }
+  return [...seen.values()].sort(nameCollator.compare);
+};
+
+/** Rebuilds the name rows and their separator ahead of Paste Names each time the menu opens. */
+const updateUseInFormulaMenu =
+  (instance: SpreadsheetInstance): NonNullable<DynamicDropdownsCtx['updateUseInFormulaMenu']> =>
+  (menu) => {
+    for (const stale of menu.querySelectorAll('[data-defined-name-insert]')) stale.remove();
+    const paste = menu.querySelector('[data-ribbon-command="mac.formulas.useInFormula.paste"]');
+    const names = listedNamesForActiveSheet(instance);
+    if (!paste || names.length === 0) return;
+    const rows = names.map((name) =>
+      createRibbonButton({
+        className: 'fc-tb__menu-item fc-tb__menu-item--mac',
+        role: 'menuitem',
+        title: name,
+        ariaLabel: name,
+        text: name,
+        dataset: {
+          definedNameAction: `${INSERT_NAME_ACTION_PREFIX}${name}`,
+          definedNameInsert: name,
+        },
+      }),
+    );
+    const separator = menuSeparator();
+    separator.dataset.definedNameInsert = '';
+    paste.before(...rows, separator);
+  };
+
 type FormulasDropdownDefaults = Pick<
   DynamicDropdownsCtx,
   | 'applyAutoSumFormula'
@@ -587,6 +639,7 @@ type FormulasDropdownDefaults = Pick<
   | 'updateWhatIfMenu'
   | 'applyDefinedNameAction'
   | 'updateDefinedNamesMenu'
+  | 'updateUseInFormulaMenu'
 >;
 
 export function createFormulasDropdownDefaults(
@@ -606,5 +659,6 @@ export function createFormulasDropdownDefaults(
     updateWhatIfMenu: updateWhatIfMenu(instance),
     applyDefinedNameAction: buildDefinedNameAction(instance),
     updateDefinedNamesMenu: updateDefinedNamesMenu(instance),
+    updateUseInFormulaMenu: updateUseInFormulaMenu(instance),
   };
 }

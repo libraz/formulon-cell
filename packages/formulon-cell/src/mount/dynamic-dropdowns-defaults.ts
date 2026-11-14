@@ -181,6 +181,7 @@ export function createDefaultDynamicDropdownsCtx(
     updateCurrencyMenu: formattingDefaults.updateCurrencyMenu,
     updateDataValidationMenu: dataDefaults.updateDataValidationMenu,
     updateDefinedNamesMenu: formulaDefaults.updateDefinedNamesMenu,
+    updateUseInFormulaMenu: formulaDefaults.updateUseInFormulaMenu,
     updateErrorCheckingMenu: formulaDefaults.updateErrorCheckingMenu,
     updateFormatCellsMenu: cellDefaults.updateFormatCellsMenu,
     updateLinksMenu: insertDefaults.updateLinksMenu,
