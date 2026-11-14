@@ -534,10 +534,7 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
   'mac.formulas.category.all': { ja: 'その他の関数...', en: 'More Functions...' },
   'mac.formulas.category.recent': { ja: 'その他の関数...', en: 'More Functions...' },
   'mac.formulas.calc.auto': { ja: '自動', en: 'Automatic' },
-  'mac.formulas.calc.autoNoTable': {
-    ja: 'データ テーブル以外は自動',
-    en: 'Automatic Except for Data Tables',
-  },
+  'mac.formulas.calc.autoNoTable': { ja: '一部', en: 'Partial' },
   'mac.formulas.calc.manual': { ja: '手動', en: 'Manual' },
   'mac.formulas.calc.formatStale': { ja: '古い値の書式設定', en: 'Format Stale Values' },
   'mac.formulas.calc.compatVersion': { ja: '互換性バージョン', en: 'Compatibility Version' },

@@ -3123,6 +3123,12 @@
       "match": "en+ja",
       "control": "menu-item"
     },
+    "menu:mac.formulas.calc.autoNoTable": {
+      "tcid": 34698,
+      "source": "tbbtn",
+      "match": "en+ja",
+      "control": "menu-item"
+    },
     "menu:mac.formulas.calc.formatStale": {
       "tcid": 34747,
       "source": "tbbtn",
@@ -3911,11 +3917,6 @@
       "name": "TabDrawInk",
       "reason": "nothing in the label set resolves this key"
     },
-    "menu:mac.formulas.calc.autoNoTable": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "menu:mac.formulas.calc.iterative": {
       "status": "unresolved",
       "tcid": null,
@@ -4343,6 +4344,7 @@
     "menu:mac.data.validation.clearCircles",
     "menu:mac.data.validation.settings",
     "menu:mac.formulas.calc.auto",
+    "menu:mac.formulas.calc.autoNoTable",
     "menu:mac.formulas.calc.compatVersion",
     "menu:mac.formulas.calc.compatVersion.learnMore",
     "menu:mac.formulas.calc.formatStale",

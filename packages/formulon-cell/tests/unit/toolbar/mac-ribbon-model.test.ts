@@ -115,7 +115,9 @@ describe('Mac Excel ribbon profile', () => {
       'mac.formulas.calc.auto',
       'mac.formulas.calc.autoNoTable',
       'mac.formulas.calc.manual',
+      'separator',
       'mac.formulas.calc.formatStale',
+      'separator',
       'mac.formulas.calc.compatVersion',
     ]);
     expect(MAC_RIBBON_MENU_ITEMS['mac.formulas.autoSum']?.map((item) => item.id)).toEqual([

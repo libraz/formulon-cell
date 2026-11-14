@@ -1607,13 +1607,6 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     ko: '자동',
     th: 'อัตโนมัติ',
   },
-  'mac.formulas.calc.autoNoTable': {
-    de: 'Automatisch außer bei Datentabellen',
-    fr: 'Automatique sauf pour les tables de données',
-    zh: '除数据表外自动',
-    ko: '데이터 표를 제외하고 자동',
-    th: 'อัตโนมัติยกเว้นตารางข้อมูล',
-  },
   'mac.formulas.calc.manual': {
     de: 'Manuell',
     fr: 'Manuel',

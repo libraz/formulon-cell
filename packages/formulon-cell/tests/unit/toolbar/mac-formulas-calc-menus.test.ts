@@ -62,7 +62,9 @@ describe('Mac Formulas > Calculation Options and Error Checking', () => {
       ['mac.formulas.calc.auto', null, false],
       ['mac.formulas.calc.autoNoTable', null, false],
       ['mac.formulas.calc.manual', null, false],
+      ['separator', null, false],
       ['mac.formulas.calc.formatStale', 'checkbox', false],
+      ['separator', null, false],
       ['mac.formulas.calc.compatVersion', null, true],
     ]);
     expect(
@@ -71,6 +73,7 @@ describe('Mac Formulas > Calculation Options and Error Checking', () => {
       [VERSION_IDS[0], 'radio', false],
       [VERSION_IDS[1], 'radio', false],
       [VERSION_IDS[2], 'radio', false],
+      ['separator', null, false],
       ['mac.formulas.calc.compatVersion.learnMore', null, true],
     ]);
     const errorCheck = MAC_RIBBON_MENU_ITEMS['mac.formulas.errorCheck'] ?? [];
@@ -82,6 +85,43 @@ describe('Mac Formulas > Calculation Options and Error Checking', () => {
     expect(macMenuLeaves(calc).map((item) => item.id)).not.toContain(
       'mac.formulas.calc.compatVersion',
     );
+  });
+
+  it('draws the separators with the shared markup and never counts them as leaves', async () => {
+    const calc = MAC_RIBBON_MENU_ITEMS['mac.formulas.calcOptions'] ?? [];
+    expect(macMenuLeaves(calc).some((item) => item.separator)).toBe(false);
+    const { host } = await mount();
+    const rows = (parent: Element | null) =>
+      [...(parent?.children ?? [])]
+        .filter((el) => !el.matches('.fc-tb__submenu'))
+        .map((el) =>
+          el.matches('.fc-tb__menu-sep[role="separator"]')
+            ? '-'
+            : ((el as HTMLElement).dataset.ribbonCommand ??
+              (el as HTMLElement).dataset.formatSubmenu),
+        );
+    expect(rows(host.querySelector('#menu-mac-formulas-calc-options'))).toEqual([
+      'mac.formulas.calc.auto',
+      'mac.formulas.calc.autoNoTable',
+      'mac.formulas.calc.manual',
+      '-',
+      'mac.formulas.calc.formatStale',
+      '-',
+      'mac.formulas.calc.compatVersion',
+    ]);
+    expect(rows(host.querySelector('#menu-mac-formulas-calc-options-compat-version'))).toEqual([
+      ...VERSION_IDS,
+      '-',
+      'mac.formulas.calc.compatVersion.learnMore',
+    ]);
+  });
+
+  it('labels the middle calculation mode with the drawn Partial wording', () => {
+    expect(
+      (['en', 'ja', 'fr', 'de', 'th', 'ko', 'zh'] as const).map((locale) =>
+        macRibbonLabelForCommand('mac.formulas.calc.autoNoTable', locale),
+      ),
+    ).toEqual(['Partial', '一部', 'Partiel', 'Teilweise', 'บางส่วน', '부분', '部分']);
   });
 
   it('composes the version labels from the per-locale templates', () => {

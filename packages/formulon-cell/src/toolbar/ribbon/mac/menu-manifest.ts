@@ -30,11 +30,18 @@ export interface MacRibbonMenuItem {
   submenu?: readonly MacRibbonMenuItem[];
   /** A checkable row: `menuitemcheckbox` or `menuitemradio`, its state in `aria-checked`. */
   check?: 'checkbox' | 'radio';
+  /** A divider (the shared `role="separator"` markup), not a command. */
+  separator?: boolean;
 }
 
-/** The command rows of a menu: a submenu row contributes its entries, not itself. */
+/** The command rows of a menu: a submenu row contributes its entries, not itself, and a
+ *  separator contributes nothing. */
 export const macMenuLeaves = (items: readonly MacRibbonMenuItem[]): MacRibbonMenuItem[] =>
-  items.flatMap((item) => (item.submenu ? macMenuLeaves(item.submenu) : [item]));
+  items.flatMap((item) =>
+    item.submenu ? macMenuLeaves(item.submenu) : item.separator ? [] : [item],
+  );
+
+const separator: MacRibbonMenuItem = { id: 'separator', label: '', separator: true };
 
 /** Root command ids whose primary face opens a Mac menu. The mount can use
  * this explicit list to apply menu-first behavior without changing the
@@ -540,11 +547,13 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.formulas.calc.auto', label: 'Automatic', labelJa: '自動' },
     {
       id: 'mac.formulas.calc.autoNoTable',
-      label: 'Automatic Except for Data Tables',
-      labelJa: 'データ テーブル以外は自動',
+      label: 'Partial',
+      labelJa: '一部',
     },
     { id: 'mac.formulas.calc.manual', label: 'Manual', labelJa: '手動' },
+    separator,
     { id: 'mac.formulas.calc.formatStale', label: 'Format Stale Values', check: 'checkbox' },
+    separator,
     {
       id: 'mac.formulas.calc.compatVersion',
       label: 'Compatibility Version',
@@ -556,6 +565,7 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
             check: 'radio',
           }),
         ),
+        separator,
         {
           id: 'mac.formulas.calc.compatVersion.learnMore',
           label: 'Learn More',

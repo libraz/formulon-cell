@@ -21,6 +21,7 @@ import { createRibbonButton } from '../button.js';
 import {
   createSubmenu,
   menuSectionHeader,
+  menuSeparator,
   menuSubmenuTrigger,
   type VisualTileIconSlug,
   visualMenuGrid,
@@ -347,7 +348,11 @@ const menuSubmenuRow = (
     label,
     dataset: { formatPanel: item.id },
   });
-  panel.append(...(item.submenu ?? []).map((entry) => menuItemButton(entry, lang)));
+  panel.append(
+    ...(item.submenu ?? []).map((entry) =>
+      entry.separator ? menuSeparator() : menuItemButton(entry, lang),
+    ),
+  );
   prepareMenu(panel, label);
   return [trigger, panel];
 };
@@ -436,6 +441,7 @@ export const createMacRibbonMenuFactory = (lang: Locale): MacRibbonMenuFactory =
     } else {
       for (const item of items) {
         if (item.submenu) menu.append(...menuSubmenuRow(item, id, lang));
+        else if (item.separator) menu.appendChild(menuSeparator());
         else menu.appendChild(menuItemButton(item, lang));
       }
     }

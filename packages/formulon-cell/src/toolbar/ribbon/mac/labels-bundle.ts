@@ -2092,6 +2092,15 @@ export const MAC_BUNDLE_LABELS: Readonly<
     th: 'อัตโนมัติ',
     zh: '自动',
   },
+  'menu:mac.formulas.calc.autoNoTable': {
+    en: 'Partial',
+    ja: '一部',
+    de: 'Teilweise',
+    fr: 'Partiel',
+    ko: '부분',
+    th: 'บางส่วน',
+    zh: '部分',
+  },
   'menu:mac.formulas.calc.compatVersion': {
     en: 'Compatibility Version',
     ja: '互換性バージョン',
