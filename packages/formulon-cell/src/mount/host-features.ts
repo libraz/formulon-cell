@@ -884,6 +884,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             s.statusBar?.refresh();
             input.renderer.invalidate();
           },
+          onOptions: () => input.openPreferences({ pane: 'errorChecking' }),
         });
         if (!s.canvasErrorClickAttached) {
           const handler = input.getOnCanvasClick();
