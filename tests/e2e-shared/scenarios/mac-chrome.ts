@@ -83,7 +83,8 @@ export async function runMacRibbonLayoutScenario(page: Page): Promise<void> {
     'view',
     'automate',
   ];
-  for (const locale of ['en', 'ja'] as const) {
+  // fr and de carry the widest labels.
+  for (const locale of ['en', 'ja', 'fr', 'de'] as const) {
     const sp = new SpreadsheetPage(page);
     await sp.mount({ platform: 'mac', locale, fixture: 'empty' });
     await sp.expectNoStub();
