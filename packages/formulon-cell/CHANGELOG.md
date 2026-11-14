@@ -143,6 +143,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- Swapping the workbook with `update({ workbook })` while the selection rests on a PivotTable no longer fails with a disposed workbook: the workbook panels move to the new workbook before the selection is restored.
 - A built-in cell style is recognised by its id whatever name the file gives it, so importing styles from a book saved in another language no longer duplicates the built-ins.
 - On the Mac, the Format Cells Alignment tab keeps the Degrees label clear of its field in every language.
 - On the Mac, Paste Special keeps each label clear of the column beside it in every language, widening the dialog where the labels need it.

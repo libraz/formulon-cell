@@ -1212,6 +1212,9 @@ export const Spreadsheet = {
         binding.unbind();
         disposeOwnedWorkbook();
         wb = next;
+        // Panels hold the workbook themselves; rebind them before the store updates below
+        // wake subscribers (the pivot field list follows the restored selection).
+        hostFeatures.bindWorkbook(wb);
         syncedSessionCfRules = new Map();
         ownsWb = true; // we now own the next handle and will dispose it
         workbookDisposed = false;
@@ -1253,7 +1256,6 @@ export const Spreadsheet = {
         dispatchPassthroughSummary();
         binding = bindEngine(wb);
         syncBindingFeatures(binding);
-        hostFeatures.bindWorkbook(wb);
         featureState.statusBar?.refresh();
         sheetTabsController?.update();
         extensionRegistry.notifyWorkbookChange(wb);
