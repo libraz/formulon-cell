@@ -845,9 +845,8 @@ export const Spreadsheet = {
       getInstance: () => instance,
       getLocale: () => i18n.locale,
     });
-    let requestedToolbar = opts.toolbar ?? (opts.ui ? ui.ribbon : false);
-    // Theme and toolbar the host set itself; `setUi` falls back to the ui defaults only without them.
-    let hostToolbar = opts.toolbar;
+    let requestedToolbar = opts.toolbar ?? false;
+    // Theme the host set itself; `setUi` falls back to the ui default only without it.
     let hostTheme = opts.theme;
     const applyToolbar = (next: MountOptions['toolbar']): void => {
       requestedToolbar = next ?? false;
@@ -1017,11 +1016,10 @@ export const Spreadsheet = {
           attachHostFeature('fxDialog');
         }
         applyTheme(hostTheme ?? ui.theme);
-        applyToolbar(hostToolbar ?? (next ? ui.ribbon : false));
+        applyToolbar(requestedToolbar);
       },
       setToolbar(next) {
         if (disposed) return;
-        hostToolbar = next;
         applyToolbar(next);
       },
       i18n,

@@ -179,7 +179,7 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('returns focus to the suspended edit, not the menu button, when the palette closes', () => {
-    sheet.instance.setUi({ platform: 'mac', features: { ribbon: false } });
+    sheet.instance.setUi({ platform: 'mac' });
     const input = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
     const fxDialog = sheet.instance.features.fxDialog as { close(): void } | undefined;
     if (!input || !fxDialog) throw new Error('Missing Mac formula-bar controls.');

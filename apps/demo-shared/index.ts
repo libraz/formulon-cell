@@ -360,12 +360,15 @@ export const composeDemoUiOptions = (input: {
   overrides: FeatureFlags;
   showRibbon: boolean;
   platform?: DemoPlatformInput;
-}): ReturnType<typeof resolveSpreadsheetUiOptions> =>
-  resolveSpreadsheetUiOptions({
+}): ReturnType<typeof resolveSpreadsheetUiOptions> & { ribbon: boolean } => ({
+  ...resolveSpreadsheetUiOptions({
     profile: input.preset,
     platform: input.platform,
-    features: { ...input.overrides, ribbon: input.showRibbon },
-  });
+    features: input.overrides,
+  }),
+  // The ribbon is mounted by the demo's own toolbar, not by a profile.
+  ribbon: input.showRibbon,
+});
 
 export const FEATURE_GROUPS: {
   title: string;

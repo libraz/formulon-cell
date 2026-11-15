@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 const mountOn = (platform: 'default' | 'mac') =>
-  mountStubSheet({ locale: 'en', ...(platform === 'mac' ? { ui: { platform } } : {}) });
+  mountStubSheet({ locale: 'en', toolbar: true, ui: { platform } });
 
 describe('the sheet bar', () => {
   it.each(['default', 'mac'] as const)(
@@ -30,6 +30,14 @@ describe('the sheet bar', () => {
     },
   );
 });
+
+const KEYS = [
+  { key: 'Delete' },
+  { key: 'x' },
+  { key: 'ArrowDown' },
+  { key: 'Enter' },
+  { key: 'PageDown' },
+];
 
 // A key pressed on a bar or pane control in the host belongs to that control, not to the grid.
 describe('controls outside the grid', () => {
@@ -46,7 +54,7 @@ describe('controls outside the grid', () => {
           !el.closest('.fc-host__grid') &&
           !el.matches('input, textarea, select'),
       );
-      expect(controls.length).toBeGreaterThan(0);
+      expect(controls.some((el) => el.closest('.fc-host__ribbon'))).toBe(true);
       const reached: string[] = [];
       const reset = (): void => {
         sheet.workbook.setNumber({ sheet: 0, row: 1, col: 1 }, 7);
@@ -55,17 +63,7 @@ describe('controls outside the grid', () => {
       };
       reset();
       for (const control of controls) {
-        // Enter and the arrows on a ribbon control run or open it, which its own tests cover.
-        const keys = control.closest('.fc-tb')
-          ? [{ key: 'Delete' }, { key: 'x' }]
-          : [
-              { key: 'Delete' },
-              { key: 'x' },
-              { key: 'ArrowDown' },
-              { key: 'Enter' },
-              { key: 'PageDown' },
-            ];
-        for (const init of keys) {
+        for (const init of KEYS) {
           if (!control.isConnected) break;
           control.focus();
           key(control, init);

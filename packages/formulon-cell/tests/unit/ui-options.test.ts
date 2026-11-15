@@ -39,7 +39,6 @@ describe('resolveSpreadsheetPlatform', () => {
 describe('resolveSpreadsheetUiOptions', () => {
   it('makes embedded chrome opt-in without inheriting default-on features', () => {
     const resolved = resolveSpreadsheetUiOptions({ profile: 'embedded' });
-    expect(resolved.ribbon).toBe(false);
     expect(resolved.print).toBe(false);
     for (const id of ALL_FEATURE_IDS) expect(resolveFlags(resolved.features)[id]).toBe(false);
     const custom = resolveSpreadsheetUiOptions({
@@ -55,7 +54,6 @@ describe('resolveSpreadsheetUiOptions', () => {
 
     expect(resolved.profile).toBe('full');
     expect(resolved.theme).toBe('paper');
-    expect(resolved.ribbon).toBe(true);
     expect(resolved.print).toBe(true);
     expect(resolved.features).toEqual({});
     expect(resolved.platform).toBe('default');
@@ -64,14 +62,12 @@ describe('resolveSpreadsheetUiOptions', () => {
   it('maps user-facing switches to internal feature flags', () => {
     const resolved = resolveSpreadsheetUiOptions({
       features: {
-        ribbon: false,
         print: false,
         pivotTable: false,
         slicer: true,
       },
     });
 
-    expect(resolved.ribbon).toBe(false);
     expect(resolved.print).toBe(false);
     expect(resolved.features.pageSetup).toBe(false);
     expect(resolved.features.pivotTableDialog).toBe(false);
@@ -112,12 +108,17 @@ describe('resolveSpreadsheetUiOptions', () => {
   it('accepts every feature id as a switch, including the draw-borders tool', () => {
     const resolved = resolveSpreadsheetUiOptions({
       profile: 'standard',
-      features: { borderDraw: false, ribbon: false },
+      features: { borderDraw: false },
     });
 
     expect(resolved.profile).toBe('standard');
     expect(resolved.features.borderDraw).toBe(false);
-    expect(resolved.ribbon).toBe(false);
     expect(resolved.features.formatDialog).toBe(false);
+  });
+
+  it('resolves no ribbon switch for any profile', () => {
+    for (const profile of ['embedded', 'minimal', 'standard', 'full'] as const) {
+      expect(resolveSpreadsheetUiOptions({ profile })).not.toHaveProperty('ribbon');
+    }
   });
 });

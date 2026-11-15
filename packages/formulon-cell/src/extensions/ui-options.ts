@@ -56,14 +56,12 @@ export const isMacHost = (el: HTMLElement): boolean =>
 
 /**
  * Switches for the spreadsheet's chrome and features, keyed by feature id.
- * `ribbon` and `print` are chrome switches; `conditionalFormatting`, `comments` and `pivotTable`
- * are the friendly names of `conditional`, `commentDialog` and `pivotTableDialog`. An omitted
- * switch means the feature's default (see {@link FeatureFlags}). The explicit switches win over
- * the profile.
+ * `print` is a chrome switch; `conditionalFormatting`, `comments` and `pivotTable` are the
+ * friendly names of `conditional`, `commentDialog` and `pivotTableDialog`. An omitted switch
+ * means the feature's default (see {@link FeatureFlags}). The explicit switches win over the
+ * profile. No switch shows the ribbon: mount it with the `toolbar` option.
  */
 export interface SpreadsheetFeatureSwitches extends FeatureFlags {
-  /** Show the ribbon. Defaults to `true` except for the `'embedded'` profile. */
-  ribbon?: boolean;
   /** Offer printing and page setup. Defaults to `true` except for the `'embedded'` profile. */
   print?: boolean;
   conditionalFormatting?: boolean;
@@ -85,9 +83,8 @@ export interface SpreadsheetUiOptions {
 export interface ResolvedSpreadsheetUiOptions {
   profile: SpreadsheetUiProfile;
   platform: ResolvedSpreadsheetPlatform;
-  /** Default theme when the host sets none; the host's own `theme` option wins. */
+  /** The theme applied when the host passes no `theme` option: always `'paper'`. */
   theme: ThemeName;
-  ribbon: boolean;
   print: boolean;
   features: FeatureFlags;
 }
@@ -131,7 +128,6 @@ export function resolveSpreadsheetUiOptions(
     profile,
     platform: resolveSpreadsheetPlatform(opts.platform),
     theme: 'paper',
-    ribbon: switches.ribbon ?? profile !== 'embedded',
     print: switches.print ?? profile !== 'embedded',
     features,
   };
