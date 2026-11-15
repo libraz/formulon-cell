@@ -87,6 +87,10 @@ describe('Mac status bar geometry', () => {
     expect(px(out.width) - px(out['padding-left'])).toBe(glyph);
     // The out button grows leftward only, into the gap after the view buttons.
     expect(px(out['margin-left'])).toBeLessThan(0);
+    // Fixed lengths only, so the target is the same at every hairline (0.5 px on a 2x screen).
+    for (const rule of [out, zoomIn, label]) {
+      expect(Object.values(rule).join(' ')).not.toContain('--fc-hairline');
+    }
 
     const inStart = px(zoomIn['margin-left']);
     const inEnd = inStart + px(zoomIn.width);
@@ -103,15 +107,22 @@ describe('Mac status bar geometry', () => {
     expect(labelStart + px(label['padding-left'])).toBe(originalLabelStart + buttonPadding);
   });
 
-  // The drawn field is 22.2 px tall; transparent 1 px bands above and below make the box 24.2 px.
+  // The drawn field is the 18.2 px line plus the padding, which grows with the hairline (0.5 px on
+  // a 2x screen, 2 px in the contrast theme); the transparent bands shrink by the same amount.
   it('grows the formula bar input box to the 24 px target around an unchanged field', () => {
     const input = decls('.fc-host__formulabar-input');
     expect(input.border).toBe('solid transparent');
-    expect(input['border-width']).toBe('1px 0');
+    expect(input['--fc-formulabar-input-band']).toBe('max(0px, calc(2px - var(--fc-hairline)))');
+    expect(input['border-width']).toBe('var(--fc-formulabar-input-band) 0');
+    expect(input['border-radius']).toBe('2px / calc(2px + var(--fc-formulabar-input-band))');
+    expect(input.padding).toBe('calc(var(--fc-hairline) + 1px) calc(var(--fc-hairline) + 6px)');
     expect(input['background-clip']).toBe('padding-box');
     expect(input['box-shadow']).toBe(
       'inset 0 0 0 var(--fc-hairline) var(--fc-formulabar-input-frame)',
     );
-    expect(22.2 + 2 * Number.parseFloat(input['border-width'] ?? '0')).toBeGreaterThanOrEqual(24);
+    for (const hairline of [0.5, 1, 2]) {
+      const band = Math.max(0, 2 - hairline);
+      expect(18.2 + 2 * (hairline + 1) + 2 * band).toBeGreaterThanOrEqual(24);
+    }
   });
 });

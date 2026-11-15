@@ -1810,15 +1810,17 @@
     content: "";
   }
 
-  /* The field is drawn inside 1 px transparent bands above and below, so the box meets the
-     24 px minimum target while the drawn field keeps its height. */
+  /* The field is drawn inside transparent bands above and below, so the box meets the 24 px
+     minimum target while the drawn field keeps its height. The padding grows with the hairline
+     (0.5 px on a 2x screen) and the bands shrink by as much, so the box is 24.2 px at any. */
   .fc-host[data-fc-platform="mac"] .fc-host__formulabar-input {
     --fc-formulabar-input-frame: var(--fc-rule);
+    --fc-formulabar-input-band: max(0px, calc(2px - var(--fc-hairline)));
     margin-left: 6px;
     padding: calc(var(--fc-hairline) + 1px) calc(var(--fc-hairline) + 6px);
     border: solid transparent;
-    border-width: 1px 0;
-    border-radius: 2px / 3px;
+    border-width: var(--fc-formulabar-input-band) 0;
+    border-radius: 2px / calc(2px + var(--fc-formulabar-input-band));
     background-clip: padding-box;
     box-shadow: inset 0 0 0 var(--fc-hairline) var(--fc-formulabar-input-frame);
   }
