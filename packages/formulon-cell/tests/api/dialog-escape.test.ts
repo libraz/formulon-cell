@@ -166,6 +166,37 @@ describe('dialogs', () => {
   );
 
   it.each(['default', 'mac'] as const)(
+    'leave docked panes open on Escape and hand focus to the sheet on the %s profile',
+    async (platform) => {
+      const { host, sheet } = await mountWithContent(platform);
+      const failures: string[] = [];
+      for (const id of PANES[platform]) {
+        // Selecting a report cell may show the field list already, so look from before it.
+        const before = new Set(shownSurfaces());
+        sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
+        host.focus();
+        sheet.dialogs.open(id);
+        await Promise.resolve();
+        const pane = shownSurfaces().find((el) => !before.has(el));
+        if (!pane) {
+          failures.push(`${id}: nothing opened`);
+          continue;
+        }
+        const first = pane.querySelector<HTMLElement>(FOCUSABLE) ?? pane;
+        first.focus();
+        pressEscape(first);
+        if (!shownSurfaces().includes(pane)) failures.push(`${id}: closed on Escape`);
+        else if (document.activeElement !== host) {
+          failures.push(`${id}: focus on ${document.activeElement?.className}`);
+        }
+        sheet.dialogs.close(id);
+      }
+      expect(failures).toEqual([]);
+    },
+    120_000,
+  );
+
+  it.each(['default', 'mac'] as const)(
     'hand focus back to the button that opened them on the %s profile',
     async (platform) => {
       const { host } = await mountWithContent(platform);

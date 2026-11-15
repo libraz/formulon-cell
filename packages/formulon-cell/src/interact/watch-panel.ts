@@ -9,7 +9,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogButton } from './dialog-shell.js';
+import { appendDialogButton, bindPaneEscape } from './dialog-shell.js';
 import { bindRovingRows, setRovingStop } from './roving-rows.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
@@ -433,17 +433,11 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     });
   };
   const onClose = (): void => close(true);
-  const onKeyDown = (e: KeyboardEvent): void => {
-    if (e.key !== 'Escape') return;
-    e.preventDefault();
-    e.stopPropagation();
-    close(true);
-  };
   addBtn.addEventListener('click', onAdd);
   removeTool?.addEventListener('click', onRemoveSelected);
   clearBtn?.addEventListener('click', onClear);
   closeBtn.addEventListener('click', onClose);
-  root.addEventListener('keydown', onKeyDown);
+  const detachPaneEscape = bindPaneEscape(root, fcHost);
 
   // Re-render on any store change. Cheap — the table is at most a few rows.
   // Tracks watches list, panel visibility, and live cell-value updates that
@@ -488,7 +482,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       removeTool?.removeEventListener('click', onRemoveSelected);
       clearBtn?.removeEventListener('click', onClear);
       closeBtn.removeEventListener('click', onClose);
-      root.removeEventListener('keydown', onKeyDown);
+      detachPaneEscape();
       detachRovingRows();
       unsub();
       root.remove();

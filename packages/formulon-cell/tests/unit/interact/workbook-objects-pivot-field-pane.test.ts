@@ -417,13 +417,14 @@ describe('PivotTable Fields pane', () => {
     wb.dispose();
   });
 
-  it('closes on Escape', async () => {
+  it('stays open on Escape and hands focus to the sheet', async () => {
     const wb = await setup();
     const { handle } = open(wb);
     host
       .querySelector('.fc-objects')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(handle.isPivotFieldListOpen()).toBe(false);
+    expect(handle.isPivotFieldListOpen()).toBe(true);
+    expect(document.activeElement).toBe(host);
     handle.detach();
     wb.dispose();
   });

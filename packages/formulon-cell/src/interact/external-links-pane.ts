@@ -2,7 +2,7 @@ import { type ExternalLinkKind, listExternalLinks } from '../commands/external-l
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
-import { appendDialogButton } from './dialog-shell.js';
+import { appendDialogButton, bindPaneEscape } from './dialog-shell.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
 /** Wording of the docked Workbook Links pane. */
@@ -77,6 +77,7 @@ export function attachExternalLinksPane(deps: ExternalLinksPaneDeps): ExternalLi
   body.append(empty, list, help);
   root.append(header, body);
   host.appendChild(root);
+  const detachPaneEscape = bindPaneEscape(root, host);
 
   const labels = (): Strings['externalLinksDialog'] => strings.externalLinksDialog;
 
@@ -153,6 +154,7 @@ export function attachExternalLinksPane(deps: ExternalLinksPaneDeps): ExternalLi
       render();
     },
     detach() {
+      detachPaneEscape();
       root.remove();
       const target = taskpaneDock();
       if (target) syncTaskpaneDock(target);

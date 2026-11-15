@@ -112,7 +112,7 @@ describe('attachWatchPanel', () => {
     handle.detach();
   });
 
-  it('open focuses the panel actions and Escape closes back to the opener', async () => {
+  it('open focuses the panel actions and Escape keeps it open with focus on the sheet', async () => {
     const handle = attachWatchPanel({ host, store, getWb: () => wb });
     host.focus();
     handle.open();
@@ -122,9 +122,9 @@ describe('attachWatchPanel', () => {
 
     expect(document.activeElement).toBe(addBtn);
 
-    root?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    addBtn?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
-    expect(root?.hidden).toBe(true);
+    expect(root?.hidden).toBe(false);
     expect(document.activeElement).toBe(host);
     handle.detach();
   });

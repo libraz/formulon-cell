@@ -223,6 +223,21 @@ export function returnFocus(
   focusSheetAfterDialog(host);
 }
 
+/**
+ * Escape in a docked, non-modal pane leaves the pane open and hands focus to the sheet `host`;
+ * the pane closes from its Close button. A key a control inside the pane already handled is left
+ * alone. Returns the detach function.
+ */
+export function bindPaneEscape(pane: HTMLElement, host: HTMLElement): () => void {
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    event.preventDefault();
+    focusSheetAfterDialog(host);
+  };
+  pane.addEventListener('keydown', onKeyDown);
+  return () => pane.removeEventListener('keydown', onKeyDown);
+}
+
 export function createDialogShell(deps: DialogShellDeps): DialogShell {
   const { host, className, onDismiss } = deps;
   const document = host.ownerDocument;

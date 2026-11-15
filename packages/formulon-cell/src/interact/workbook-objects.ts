@@ -23,7 +23,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SessionIllustration, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogIconButton, returnFocus } from './dialog-shell.js';
+import { appendDialogIconButton, bindPaneEscape, returnFocus } from './dialog-shell.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
 import { openPivotFieldSettingsAt } from './pivot-field-settings-dialog-apply.js';
 import { openPivotOptions } from './pivot-options-dialog.js';
@@ -670,10 +670,14 @@ export function attachWorkbookObjectsPanel(
     openPanel();
   };
 
+  // The object list closes on Escape; the docked field list is a pane and stays open.
   const onKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') close(true);
+    if (e.key !== 'Escape' || activePivotFieldListKey !== '') return;
+    e.preventDefault();
+    close(true);
   };
   root.addEventListener('keydown', onKey);
+  const detachPaneEscape = bindPaneEscape(root, host);
 
   return {
     open: openObjectList,
@@ -736,6 +740,7 @@ export function attachWorkbookObjectsPanel(
     detach() {
       unsubscribeSessionObjects?.();
       root.removeEventListener('keydown', onKey);
+      detachPaneEscape();
       root.hidden = true;
       placeRoot(false);
       numberFormatPicker?.detach();

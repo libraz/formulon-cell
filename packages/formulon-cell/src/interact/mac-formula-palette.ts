@@ -22,6 +22,7 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { visibleFocusReturn } from '../toolbar/ribbon/fit-ribbon.js';
 import { focusSheetAfterDialog } from './dialog-focus.js';
+import { bindPaneEscape } from './dialog-shell.js';
 import type { FormulaEditLease, FormulaEditLeaseContext } from './formula-edit-lease.js';
 import {
   CATEGORY_LABEL_KEY,
@@ -126,6 +127,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   root.hidden = true;
   deps.dock.appendChild(root);
   syncTaskpaneDock(deps.dock);
+  const detachPaneEscape = bindPaneEscape(root, deps.host);
 
   let strings = deps.getStrings();
   let labels = paletteStrings(strings);
@@ -1406,6 +1408,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     recentUnsubscribe?.();
     recentUnsubscribe = null;
     notifyMirror(null);
+    detachPaneEscape();
     root.remove();
     syncTaskpaneDock(deps.dock);
     mode = 'closed';

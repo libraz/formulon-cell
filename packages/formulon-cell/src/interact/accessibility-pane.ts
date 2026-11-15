@@ -20,7 +20,7 @@ import { sameRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogButton } from './dialog-shell.js';
+import { appendDialogButton, bindPaneEscape } from './dialog-shell.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
 type FormatDialogTab = 'font' | 'fill';
@@ -80,6 +80,7 @@ export function attachAccessibilityPane(deps: AccessibilityPaneDeps): Accessibil
   body.className = 'fc-a11ypane__body';
   root.append(header, body);
   (dock() ?? host).appendChild(root);
+  const detachPaneEscape = bindPaneEscape(root, host);
 
   let current: AccessibilityFindings = checkAccessibility(store.getState(), getWb());
   let drill: AccessibilityRuleId | null = null;
@@ -299,6 +300,7 @@ export function attachAccessibilityPane(deps: AccessibilityPaneDeps): Accessibil
     findings: () => checkAccessibility(store.getState(), getWb()),
     detach: () => {
       unsubscribe();
+      detachPaneEscape();
       root.remove();
       syncDock();
     },
