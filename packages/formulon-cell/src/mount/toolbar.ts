@@ -1019,24 +1019,13 @@ export function mountToolbar(
       }
       const immediateFunctionLeaf =
         id.startsWith('mac.function.') && isImmediateMacFormulaPrimary(target, id);
-      let returnFocusTarget: HTMLElement | null = null;
       if (cmdBtn.closest(MAC_MENU_SELECTOR)) {
         const menu = cmdBtn.closest<HTMLElement>(MAC_MENU_SELECTOR);
         const spec = menu ? dropdownsApi?.dynamicDropdownSpecForMenu(menu) : null;
-        returnFocusTarget =
-          immediateFunctionLeaf && spec
-            ? (dropdownsApi?.dynamicDropdownButtonForSpec(spec) ?? null)
-            : null;
         if (spec) dropdownsApi?.closeDynamicRibbonDropdown(spec, !immediateFunctionLeaf);
         closeStaticRibbonMenus(host);
       }
-      const applied = applyCommand(id);
-      if (applied && immediateFunctionLeaf && returnFocusTarget) {
-        const dialog = getInstance()?.features.fxDialog as
-          | { setReturnFocusTarget?: (target: HTMLElement | null) => void }
-          | undefined;
-        dialog?.setReturnFocusTarget?.(returnFocusTarget);
-      }
+      applyCommand(id);
       dismissRibbonPeek();
     }
   };

@@ -87,10 +87,11 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
   const onKey = (e: KeyboardEvent): void => {
     if (e.isComposing || e.key === 'Process') return;
     const eventTarget = e.target;
+    // Keys typed into a field, or pressed in a task pane docked beside the grid, are not grid keys.
     if (
       eventTarget instanceof Element &&
       eventTarget.closest(
-        'input, textarea, select, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]',
+        'input, textarea, select, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"], .fc-host__taskpane-dock',
       )
     )
       return;

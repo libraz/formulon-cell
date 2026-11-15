@@ -46,10 +46,6 @@ describe('interact/mac-formula-palette suspended edit lease', () => {
     expect(grid.querySelector('textarea.fc-host__editor')).toBeNull();
     expect(editor.isActive()).toBe(true);
     expect(formulaBar.input.value).toBe('=1+');
-    const trigger = document.createElement('button');
-    sheet.host.appendChild(trigger);
-    palette.setReturnFocusTarget(trigger);
-
     palette.close();
     const restored = grid.querySelector<HTMLTextAreaElement>('textarea.fc-host__editor');
     expect(restored?.value).toBe('=1+');

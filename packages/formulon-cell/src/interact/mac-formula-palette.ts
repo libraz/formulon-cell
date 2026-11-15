@@ -21,6 +21,7 @@ import type { ExternalFormulaDraftHandle, FormulaBarController } from '../mount/
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { visibleFocusReturn } from '../toolbar/ribbon/fit-ribbon.js';
+import { focusSheetAfterDialog } from './dialog-focus.js';
 import type { FormulaEditLease, FormulaEditLeaseContext } from './formula-edit-lease.js';
 import {
   CATEGORY_LABEL_KEY,
@@ -87,7 +88,6 @@ export interface MacFormulaPaletteHandle extends FxDialogHandle {
   isOpen(): boolean;
   rangeInsertTarget(): RangeInsertTarget | null;
   setStrings(next: Strings): void;
-  setReturnFocusTarget(target: HTMLElement | null): void;
 }
 
 type PaletteMode = 'closed' | 'picker' | 'arguments-editing' | 'arguments-committed';
@@ -131,9 +131,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   let labels = paletteStrings(strings);
   let mode: PaletteMode = 'closed';
   let detached = false;
-  let opener: HTMLElement | null = null;
   let restoredFocusTarget: HTMLElement | null = null;
-  let returnFocusTarget: HTMLElement | null = null;
   let anchor: Addr | null = null;
   let sessionWb: WorkbookHandle | null = null;
   let catalog = buildFunctionCatalog(
@@ -215,11 +213,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     nativeFunctionName(safeWorkbook(), canonical, activeCatalogLocale());
 
   const isClosed = (): boolean => mode === 'closed';
-
-  const setReturnFocusTarget = (target: HTMLElement | null): void => {
-    if (detached || isClosed() || !(target instanceof HTMLElement) || !target.isConnected) return;
-    returnFocusTarget = target;
-  };
 
   const readCatalog = (): FunctionCatalogSnapshot => {
     let reader: FunctionCatalogReader | null = null;
@@ -565,9 +558,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     argumentsRefs = null;
     clearRoot();
     updateDataset();
-    opener = null;
     restoredFocusTarget = null;
-    returnFocusTarget = null;
     anchor = null;
     sessionWb = null;
   };
@@ -670,8 +661,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       resetPickerSelection();
       postCommit = null;
       restoredFocusTarget = null;
-      opener = null;
-      returnFocusTarget = null;
       sessionWb = null;
       anchor = null;
       pickerRefs = null;
@@ -1292,8 +1281,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     const binding = activeDraft;
     if (binding) binding.handle.cancel();
     closing = false;
-    // An invalid or already-discarded session closes inertly and must not
-    // return focus to the opener.
+    // An invalid or already-discarded session closes inertly and must not move focus.
     if (binding && activeDraft !== binding && isClosed()) return;
     mode = 'closed';
     resetFunctionSelection();
@@ -1301,15 +1289,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     postCommit = null;
     notifyMirror(null);
     render();
-    const target =
-      connectedElement(restoredFocusTarget) ??
-      connectedElement(returnFocusTarget) ??
-      connectedElement(opener) ??
-      deps.host;
-    visibleFocusReturn(target).focus();
+    // A restored edit takes focus back; otherwise the sheet does, as after a dialog.
+    const restored = connectedElement(restoredFocusTarget);
+    if (restored) visibleFocusReturn(restored).focus();
+    else focusSheetAfterDialog(deps.host);
     restoredFocusTarget = null;
-    returnFocusTarget = null;
-    opener = null;
     sessionWb = null;
     anchor = null;
   };
@@ -1330,8 +1314,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     recentUnsubscribe = null;
     render();
     restoredFocusTarget = null;
-    returnFocusTarget = null;
-    opener = null;
     sessionWb = null;
     anchor = null;
   };
@@ -1342,7 +1324,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       applyOpenRequest(seedName, options);
       return;
     }
-    opener = connectedElement(document.activeElement);
     anchor = { ...deps.getAnchor() };
     sessionWb = safeWorkbook();
     resetFunctionSelection();
@@ -1351,7 +1332,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     guardMessage = '';
     postCommit = null;
     restoredFocusTarget = null;
-    returnFocusTarget = null;
     mode = 'picker';
     const lease = deps.suspendActiveEdit?.(leaseContext) ?? undefined;
     if (!startDraft('=', lease) && lease) {
@@ -1429,9 +1409,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     root.remove();
     syncTaskpaneDock(deps.dock);
     mode = 'closed';
-    opener = null;
     restoredFocusTarget = null;
-    returnFocusTarget = null;
     anchor = null;
     sessionWb = null;
   };
@@ -1445,7 +1423,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     isOpen: () => mode !== 'closed',
     rangeInsertTarget,
     setStrings,
-    setReturnFocusTarget,
   };
   return api;
 }

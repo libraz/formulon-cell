@@ -21,7 +21,7 @@ describe('interact/mac-formula-palette picker', () => {
   const setup = (...args: PaletteSetupArgs) => setupPalette(sheet, ...args);
 
   it('opens a nonmodal complementary 300px pane with consecutive Recent and All sections', () => {
-    const { dock, mirror, opener, palette } = setup();
+    const { dock, mirror, palette } = setup();
 
     expect(dock.hidden).toBe(true);
     palette.open();
@@ -45,18 +45,18 @@ describe('interact/mac-formula-palette picker', () => {
     palette.close();
     expect(palette.isOpen()).toBe(false);
     expect(dock.hidden).toBe(true);
-    expect(document.activeElement).toBe(opener);
+    expect(document.activeElement).toBe(sheet.host);
     expect(mirror).toHaveBeenLastCalledWith(expect.any(Object), null);
     palette.open();
     palette.detach();
     expect(dock.hidden).toBe(true);
   });
 
-  it('does not steal focus when closed, while an actual close restores the opener', () => {
+  it('does not steal focus when closed, while an actual close hands focus to the sheet', () => {
     const { opener, palette } = setup();
     const outside = document.createElement('button');
     outside.textContent = 'outside';
-    sheet.host.appendChild(outside);
+    document.body.appendChild(outside);
     outside.focus();
 
     palette.close();
@@ -65,49 +65,18 @@ describe('interact/mac-formula-palette picker', () => {
     opener.focus();
     palette.open();
     palette.close();
-    expect(document.activeElement).toBe(opener);
-    outside.focus();
-    palette.close();
-    expect(document.activeElement).toBe(outside);
+    expect(document.activeElement).toBe(sheet.host);
+
+    outside.remove();
   });
 
-  it('uses the connected return-focus target after a palette close', () => {
-    const { opener, palette } = setup();
-    const trigger = document.createElement('button');
-    trigger.textContent = 'trigger';
-    sheet.host.appendChild(trigger);
-    palette.open();
-    palette.setReturnFocusTarget(trigger);
-    palette.close();
-    expect(document.activeElement).toBe(trigger);
-    expect(opener).not.toBe(document.activeElement);
-  });
-
-  it('falls back when the return-focus target is disconnected and ignores closed-session setters', () => {
-    const { opener, palette } = setup();
-    const disconnected = document.createElement('button');
-    palette.setReturnFocusTarget(disconnected);
-    palette.open();
-    const trigger = document.createElement('button');
-    sheet.host.appendChild(trigger);
-    palette.setReturnFocusTarget(trigger);
-    trigger.remove();
-    palette.close();
-    expect(document.activeElement).toBe(opener);
-    palette.setReturnFocusTarget(disconnected);
-  });
-
-  it('does not focus or consume a return target on discard', () => {
+  it('leaves focus alone on discard', () => {
     const { palette } = setup();
-    const trigger = document.createElement('button');
-    sheet.host.appendChild(trigger);
     palette.open();
-    palette.setReturnFocusTarget(trigger);
+    const search = paletteRoot(palette).querySelector<HTMLInputElement>('input[type="search"]');
+    expect(document.activeElement).toBe(search);
     palette.discard();
-    expect(document.activeElement).not.toBe(trigger);
-    palette.open();
-    palette.close();
-    expect(document.activeElement).not.toBe(trigger);
+    expect(document.activeElement).not.toBe(sheet.host);
   });
 
   it('projects default, recent, and family picker categories without a selector', () => {

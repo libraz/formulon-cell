@@ -178,23 +178,11 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('records the visible function-menu trigger after the Mac palette opens', () => {
+  it('returns focus to the suspended edit, not the menu button, when the palette closes', () => {
     sheet.instance.setUi({ platform: 'mac', features: { ribbon: false } });
     const input = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
-    const fxDialog = sheet.instance.features.fxDialog as
-      | { setReturnFocusTarget?: (target: HTMLElement | null) => void }
-      | undefined;
-    if (!input || !fxDialog?.setReturnFocusTarget)
-      throw new Error('Missing Mac formula-bar controls.');
-
-    const observed: { target: HTMLElement | null; active: Element | null }[] = [];
-    const originalSetReturnFocusTarget = fxDialog.setReturnFocusTarget.bind(fxDialog);
-    const setReturnFocusTarget = vi
-      .spyOn(fxDialog, 'setReturnFocusTarget')
-      .mockImplementation((target) => {
-        observed.push({ target, active: document.activeElement });
-        originalSetReturnFocusTarget(target);
-      });
+    const fxDialog = sheet.instance.features.fxDialog as { close(): void } | undefined;
+    if (!input || !fxDialog) throw new Error('Missing Mac formula-bar controls.');
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       platform: 'mac',
       activeTab: 'formulas',
@@ -225,10 +213,12 @@ describe('Spreadsheet.mountToolbar', () => {
       '.fc-mac-formula-palette [data-argument-index="0"]',
     );
     expect(menu.hidden).toBe(true);
-    expect(setReturnFocusTarget).toHaveBeenCalledOnce();
-    expect(observed).toEqual([{ target: category, active: firstArgument }]);
     expect(document.activeElement).toBe(firstArgument);
-    setReturnFocusTarget.mockRestore();
+
+    // The formula bar edit the palette suspended takes focus back, not the menu's button.
+    fxDialog.close();
+    expect(document.activeElement).toBe(input);
+    expect(document.activeElement).not.toBe(category);
     tb.dispose();
   });
 

@@ -217,7 +217,7 @@ describe('interact/mac-formula-palette draft session', () => {
   });
 
   it('reopens the existing picker without reanchoring or starting another draft', () => {
-    const { anchor, beginDraft, formulaBar, opener, palette } = setup();
+    const { anchor, beginDraft, formulaBar, palette } = setup();
     const initialAnchor = { ...anchor };
     palette.open();
     expect(beginDraft).toHaveBeenCalledTimes(1);
@@ -231,7 +231,7 @@ describe('interact/mac-formula-palette draft session', () => {
     expect(beginDraft.mock.calls[0]?.[0]).toEqual(initialAnchor);
 
     palette.close();
-    expect(document.activeElement).toBe(opener);
+    expect(document.activeElement).toBe(sheet.host);
   });
 
   it('replaces a synchronized editing draft on a repeat seeded open without writing the cell', () => {

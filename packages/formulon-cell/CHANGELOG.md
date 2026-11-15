@@ -126,6 +126,7 @@ versioning is [SemVer](https://semver.org/).
 - Closing Insert Function hands focus to the sheet, as the other ribbon dialogs do, instead of to the button that opened it.
 - Split buttons open their menu with Alt+Down while the button has focus, as on the desktop.
 - A ribbon menu opened from the keyboard focuses its first item that is shown, so the Mac Paste and Recommended Charts menus take focus as the others do; arrow keys skip hidden items too.
+- Closing the Mac Formula Builder pane hands focus to the sheet, as Insert Function does, unless it hands an edit it suspended back to its cell or the formula bar. Tab, Shift+Tab and the arrow keys in a docked pane no longer reach the grid, so tabbing out of the pane keeps it open instead of moving the active cell and discarding the formula.
 - The ribbon's Number Format dropdown shows the keyboard focus ring when focused, as the other dropdowns do.
 - On the Mac chrome, the status bar's zoom out and zoom in buttons and the formula bar input take targets of at least 24 px, so they meet the minimum target size; the glyphs, the zoom label text and the drawn input field stay where they were.
 - `Workbook.load` with `locale` or `platform` opens the file under that profile, so a manually calculated workbook mounted with the same locale and platform keeps exactly the stale values the file carries, on the Mac profile too.
