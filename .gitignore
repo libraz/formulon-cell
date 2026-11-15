@@ -15,6 +15,7 @@ dist
 build
 out
 *.tsbuildinfo
+.pack
 
 # vite
 .vite

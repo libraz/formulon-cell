@@ -64,6 +64,9 @@ jobs:
       # Reads the declarations the build above emitted.
       - name: Check the public API surface
         run: node scripts/api-surface/check.mjs
+      # Packs the libraries the build above emitted and checks what would be uploaded.
+      - name: Check the packed packages
+        run: yarn check:pack
       - run: yarn typecheck
       - name: Run unit tests with coverage
         env:

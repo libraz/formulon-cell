@@ -59,6 +59,15 @@ jobs:
             mv "${pkg}/package.json.tmp" "${pkg}/package.json"
           done
 
+      # Checks the tarballs npm would upload, after the rewrite above.
+      - name: Check the packed packages
+        run: |
+          mkdir -p .pack
+          for pkg in packages/formulon-cell packages/formulon-cell-react packages/formulon-cell-vue; do
+            (cd "${pkg}" && npm pack --pack-destination "${GITHUB_WORKSPACE}/.pack")
+          done
+          node scripts/check-pack.mjs .pack/*.tgz
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:

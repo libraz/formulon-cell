@@ -21,6 +21,7 @@
     "format": "biome check --write .",
     "typecheck": "yarn workspaces foreach -A --exclude formulon-cell-monorepo run typecheck",
     "check:api": "yarn build && node scripts/api-surface/check.mjs",
+    "check:pack": "rm -rf .pack && yarn workspaces foreach -A --include '@libraz/*' pack --out \"$PROJECT_CWD/.pack/%s-%v.tgz\" && node scripts/check-pack.mjs .pack/*.tgz",
     "test": "yarn workspace @libraz/formulon-cell test",
     "icons:review": "node scripts/icons/render.mjs",
     "test:e2e": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e",
