@@ -115,7 +115,6 @@ export type {
   ContextMenuOptions,
 } from './interact/context-menu-options.js';
 export type { FormatPainterHandle } from './interact/format-painter.js';
-export type { ViewportOptions } from './interact/navigation-policy.js';
 export type { OverlayOptions } from './interact/overlay-portal.js';
 export type {
   FunctionArgumentHelp,

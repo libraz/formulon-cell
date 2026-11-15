@@ -1,6 +1,9 @@
 import type { CellAddress, CellRect, Value } from '@libraz/formulon';
 import type { AutoCorrectOptions } from '../../commands/autocorrect.js';
-import type { InteractionPolicy } from '../../commands/interaction-policy.js';
+import type {
+  EditablePredicateContext,
+  InteractionPolicy,
+} from '../../commands/interaction-policy.js';
 import type { PrinterProfile } from '../../commands/printer-profile.js';
 import type { SpellingService } from '../../commands/spelling.js';
 import type { ExtensionInput } from '../../extensions/index.js';
@@ -15,16 +18,36 @@ import type { ScreenClipCapture } from '../../mount/types.js';
 import type { ChangeBatchResult } from '../change-batch.js';
 import type { ChangedCell, ChangeOrigin, SheetRef, Workbook } from '../workbook.js';
 
+/** Where the cursor may go, in either viewport mode. */
+interface ViewportNavigation {
+  /** The cells the cursor may move to: A1 ranges (text without a sheet name applies to every
+   *  sheet; a list constrains only the sheets it names) or a predicate that receives `{ addr }`,
+   *  as `policy.editable`'s does. Tab walks the fixed range, or else the bounding rectangle of the
+   *  list. */
+  readonly selectable?:
+    | readonly string[]
+    | ((ctx: Pick<EditablePredicateContext, 'addr'>) => boolean);
+  /** `'editable'` moves Tab between the cells a policy lets the user edit. */
+  readonly tabNavigation?: 'normal' | 'editable';
+  /** At the last Tab stop, `'stop'` (the default) keeps focus in the grid and `'leave'` lets the
+   *  browser move focus on. */
+  readonly tabBoundary?: 'stop' | 'leave';
+}
+
+/** The whole sheet; the Tab options take effect only with `selectable`. */
+interface AutoViewport extends ViewportNavigation {
+  readonly mode: 'auto';
+}
+
+/** A fixed range the view and the selection stay inside. */
+interface FixedViewport extends ViewportNavigation {
+  readonly mode: 'fixed';
+  /** A1 range, optionally sheet-qualified (`'Input!A1:D20'`). */
+  readonly range: string;
+}
+
 /** The visible region: the whole sheet, or a fixed range the selection stays inside. */
-export type ViewportConfig =
-  | { readonly mode: 'auto' }
-  | {
-      readonly mode: 'fixed';
-      /** A1 range, optionally sheet-qualified (`'Input!A1:D20'`). */
-      readonly range: string;
-      /** `'editable'` moves Tab between the cells a policy lets the user edit. */
-      readonly tabNavigation?: 'normal' | 'editable';
-    };
+export type ViewportConfig = AutoViewport | FixedViewport;
 
 /** The ribbon toolbar to mount inside the host; create it with `ribbon()` from `./toolbar`. */
 export interface RibbonToolbarConfig {

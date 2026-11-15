@@ -319,13 +319,22 @@ const toRect = (r: Range): CellRect => ({
   lastCol: r.c1,
 });
 
-const legacyViewport = (config: ViewportConfig | null | undefined): ViewportOptions | undefined =>
-  config && config.mode === 'fixed'
-    ? {
-        range: config.range,
-        ...(config.tabNavigation ? { tabNavigation: config.tabNavigation } : {}),
-      }
-    : undefined;
+/** The navigation policy a config installs; `'auto'` without `selectable` installs none, since its
+ *  Tab options would have no stops to walk. */
+const legacyViewport = (config: ViewportConfig | null | undefined): ViewportOptions | undefined => {
+  if (!config || (config.mode === 'auto' && !config.selectable)) return undefined;
+  const { selectable } = config;
+  return {
+    ...(config.mode === 'fixed' ? { range: config.range } : {}),
+    ...(typeof selectable === 'function'
+      ? { selectable: (addr: Addr) => selectable({ addr }) }
+      : selectable
+        ? { selectable }
+        : {}),
+    ...(config.tabNavigation ? { tabNavigation: config.tabNavigation } : {}),
+    ...(config.tabBoundary ? { tabBoundary: config.tabBoundary } : {}),
+  };
+};
 
 /** Protect Sheet option a command's operation needs on a protected sheet; `null` when the
  *  operation is checked cell by cell instead, `undefined` when no option allows it. */

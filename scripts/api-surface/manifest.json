@@ -3,6 +3,7 @@
   "optionFunctionAllow": {
     "seed": "a behaviour hook: code that fills a new workbook once, at mount",
     "policy": "host decisions evaluated per interaction (editable predicate, restrict)",
+    "viewport": "host decision evaluated per interaction (selectable predicate)",
     "contextMenu": "transform rewrites the built-in menu; onOpen hands the host its own menu in host mode",
     "overlays": "root provides the host element overlays mount into",
     "extensions": "extensions carry behaviour: setup runs the extension",
@@ -126,7 +127,6 @@
         "UpdateEvent": "type",
         "Viewport": "type",
         "ViewportConfig": "type",
-        "ViewportOptions": "type",
         "Watches": "type",
         "Workbook": "value",
         "WorkbookChange": "type",
