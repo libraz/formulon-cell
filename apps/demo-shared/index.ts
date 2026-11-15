@@ -600,11 +600,14 @@ export const createInitialDemoWorkbook = async (
 };
 
 /** Reads an xlsx/xlsm/xlsb file into a new workbook the caller owns, and returns it with its
- *  display name (the filename without its extension). Rejects on load failure. */
+ *  display name (the filename without its extension). The file opens under the locale and
+ *  platform the spreadsheet is mounted with, so a manually calculated book keeps the stale values
+ *  it was saved with. Rejects on load failure. */
 export const openDemoWorkbookFile = async (
   file: File,
+  profile: { locale: DemoLocale; platform: DemoPlatform },
 ): Promise<{ workbook: Workbook; name: string }> => ({
-  workbook: await Workbook.load(new Uint8Array(await file.arrayBuffer())),
+  workbook: await Workbook.load(new Uint8Array(await file.arrayBuffer()), profile),
   name: file.name.replace(/\.(xlsx|xlsm)$/i, ''),
 });
 

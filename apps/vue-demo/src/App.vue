@@ -290,7 +290,10 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
   if (!live || !demoAlive) return;
   const previous = workbookOwner;
   try {
-    const { workbook: next, name } = await openDemoWorkbookFile(file);
+    const { workbook: next, name } = await openDemoWorkbookFile(file, {
+      locale: locale.value,
+      platform: platform.value,
+    });
     const current = () => demoAlive && instance.value === live;
     if (!(await adoptDemoWorkbook(live, next, current))) return;
     workbookOwner = next;

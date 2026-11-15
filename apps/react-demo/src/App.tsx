@@ -256,7 +256,7 @@ export const App = (): ReactElement => {
       if (!live || !aliveRef.current) return;
       const previous = workbookOwnerRef.current;
       try {
-        const { workbook: next, name } = await openDemoWorkbookFile(file);
+        const { workbook: next, name } = await openDemoWorkbookFile(file, { locale, platform });
         const current = () => aliveRef.current && instanceRef.current === live;
         if (!(await adoptDemoWorkbook(live, next, current))) return;
         workbookOwnerRef.current = next;
@@ -272,7 +272,7 @@ export const App = (): ReactElement => {
         );
       }
     },
-    [commandText.openFailed, commandText.workbook, instance],
+    [commandText.openFailed, commandText.workbook, instance, locale, platform],
   );
 
   const runBackstageAction = useCallback(
