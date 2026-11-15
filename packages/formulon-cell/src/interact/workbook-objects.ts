@@ -23,7 +23,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SessionIllustration, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogIconButton } from './dialog-shell.js';
+import { appendDialogIconButton, returnFocus } from './dialog-shell.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
 import { openPivotFieldSettingsAt } from './pivot-field-settings-dialog-apply.js';
 import { openPivotOptions } from './pivot-options-dialog.js';
@@ -152,10 +152,9 @@ export function attachWorkbookObjectsPanel(
     if (
       wasOpen &&
       restoreFocus &&
-      focusTarget &&
       (root.contains(document.activeElement) || document.activeElement === document.body)
     ) {
-      focusTarget.focus({ preventScroll: true });
+      returnFocus(focusTarget, root, host);
     }
   };
 
@@ -633,7 +632,11 @@ export function attachWorkbookObjectsPanel(
 
   const openPanel = (): void => {
     render();
-    restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
+    // Reopening keeps the opener recorded the first time, not a control inside the surface.
+    if (!root.contains(document.activeElement)) {
+      restoreFocusEl =
+        document.activeElement instanceof HTMLElement ? document.activeElement : host;
+    }
     root.hidden = false;
     open = true;
     placeRoot(root.classList.contains('fc-objects--taskpane'));

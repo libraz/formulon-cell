@@ -1,6 +1,6 @@
 import { visibleFocusReturn } from '../toolbar/ribbon/fit-ribbon.js';
 import { enhanceCustomSelect, syncCustomSelects } from './custom-select.js';
-import { advanceDialogTab, focusableDialogItems } from './dialog-focus.js';
+import { advanceDialogTab, focusableDialogItems, focusSheetAfterDialog } from './dialog-focus.js';
 import { clearDialogPlacement, currentDialogAnchor, placeDialogPanel } from './dialog-placement.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
@@ -200,11 +200,29 @@ const keyWasHandled = (event: KeyboardEvent): boolean =>
  *     themed overlay portal, so callers control reveal timing and theme tokens still apply
  *     outside the `.fc-host` `contain: strict` boundary.
  *  2. Keeps Tab / Shift+Tab focus inside the visible dialog, as desktop modals do.
- *  3. Hooks Escape (document keydown, while shown) to `onDismiss`; a backdrop click is swallowed
- *     and never dismisses.
+ *  3. Hooks Escape (keydown on the dialog and on the document, while shown) to `onDismiss`, so a
+ *     dialog that stops its keys from bubbling still closes; a backdrop click is swallowed and
+ *     never dismisses.
  *  4. `on()` registers listeners that `dispose()` removes in one sweep, together with the
  *     built-in Escape and backdrop listeners.
  */
+/**
+ * Hands focus back after `surface` closes: to `opener`, the element focused when it opened, while
+ * that element is still attached, outside the surface and takes focus; otherwise to the sheet
+ * `host`. Focus never falls to the page.
+ */
+export function returnFocus(
+  opener: HTMLElement | null,
+  surface: HTMLElement,
+  host: HTMLElement,
+): void {
+  const target =
+    opener?.isConnected && !surface.contains(opener) ? visibleFocusReturn(opener) : null;
+  target?.focus({ preventScroll: true });
+  if (target && host.ownerDocument.activeElement === target) return;
+  focusSheetAfterDialog(host);
+}
+
 export function createDialogShell(deps: DialogShellDeps): DialogShell {
   const { host, className, onDismiss } = deps;
   const document = host.ownerDocument;
@@ -267,7 +285,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
     if (e.target === overlay) e.stopPropagation();
   });
   if (onDismiss) {
-    on(document, 'keydown', (e) => {
+    const onEscapeKeydown: EventListener = (e) => {
       const event = e as KeyboardEvent;
       if (overlay.hidden || keyWasHandled(event) || !ownsDialogKeys(overlay)) return;
       if (event.key === 'Escape') {
@@ -275,7 +293,9 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
         event.preventDefault();
         onDismiss();
       }
-    });
+    };
+    on(overlay, 'keydown', onEscapeKeydown);
+    on(document, 'keydown', onEscapeKeydown);
   }
 
   const onTabKeydown: EventListener = (e) => {
@@ -286,6 +306,18 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
   };
   on(overlay, 'keydown', onTabKeydown);
   on(document, 'keydown', onTabKeydown);
+
+  const closeShell = (): void => {
+    removeDialogLayer(overlay);
+    const shouldRestore =
+      !overlay.hidden &&
+      (overlay.contains(document.activeElement) || document.activeElement === document.body);
+    overlay.dispatchEvent(new CustomEvent('fc-range-picker-stop-all'));
+    overlay.hidden = true;
+    clearDialogPlacement(overlay, panel);
+    if (shouldRestore) returnFocus(restoreFocusEl, overlay, host);
+    restoreFocusEl = null;
+  };
 
   return {
     overlay,
@@ -307,26 +339,15 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
         first.focus({ preventScroll: true });
       }
     },
-    close() {
-      removeDialogLayer(overlay);
-      const shouldRestore =
-        !overlay.hidden &&
-        !!restoreFocusEl &&
-        (overlay.contains(document.activeElement) || document.activeElement === document.body);
-      overlay.dispatchEvent(new CustomEvent('fc-range-picker-stop-all'));
-      overlay.hidden = true;
-      clearDialogPlacement(overlay, panel);
-      if (shouldRestore) {
-        if (restoreFocusEl) visibleFocusReturn(restoreFocusEl).focus({ preventScroll: true });
-      }
-      restoreFocusEl = null;
-    },
+    close: closeShell,
     setAriaLabel(label: string) {
       ariaLabel = label;
       overlay.setAttribute('aria-label', label);
     },
     dispose() {
       if (disposed) return;
+      // Disposing an open dialog closes it first, so focus goes back where it came from.
+      if (!overlay.hidden) closeShell();
       disposed = true;
       for (const l of listeners) {
         l.target.removeEventListener(l.event, l.handler, l.options);

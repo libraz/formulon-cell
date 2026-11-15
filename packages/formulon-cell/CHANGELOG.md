@@ -159,6 +159,7 @@ versioning is [SemVer](https://semver.org/).
 - Return in the Iterative Calculation, Page Setup, PivotTable, Insert Function, conditional formatting, Format Cells and Sparkline dialogs follows the other dialogs: it no longer presses OK while confirming IME text, from a focused button, or inside a list, where it keeps its own meaning.
 - A source or destination on a sheet named like a cell reference or a number (`A1`, `R1C1`, `2024`) is quoted in the Mac Subtotal and Consolidate dialogs, as in a formula.
 - Context menus and their submenus, the filter and PivotTable field dropdowns, the Paste Options and Auto Fill Options buttons, the sheet tab menus, the formula helper and the other popovers sit on whole pixels, so their text no longer blurs.
+- Escape closes the Calculation Options dialog from any of its controls, as it closes every other dialog. Closing Insert Copied Cells or the PivotTable Field dialog returns focus to the control that opened it, or to the sheet when that control is gone, instead of leaving it on the page.
 
 ### Removed
 

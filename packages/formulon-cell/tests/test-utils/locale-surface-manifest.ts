@@ -468,6 +468,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'block',
   ),
   shell(
+    'interact.insertCopiedCellsDialog',
+    'interact/insert-copied-cells-dialog.ts',
+    'openInsertCopiedCellsDialog',
+    'insertCopiedCellsDialog',
+    'block',
+  ),
+  shell(
     'interact.iterativeDialog',
     'interact/iterative-dialog.ts',
     'attachIterativeDialog',
@@ -797,13 +804,6 @@ export const LOCALE_SURFACE_MANUAL_FACTORIES: readonly LocaleSurfaceFactory[] = 
     'interact/filter-dropdown.ts',
     'attachFilterDropdown',
     'filterDropdown',
-    'block',
-  ),
-  manual(
-    'interact.insertCopiedCellsDialog',
-    'interact/insert-copied-cells-dialog.ts',
-    'openInsertCopiedCellsDialog',
-    'insertCopiedCellsDialog',
     'block',
   ),
   manual(

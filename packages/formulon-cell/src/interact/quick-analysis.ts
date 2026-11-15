@@ -15,6 +15,7 @@ import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
+import { returnFocus } from './dialog-shell.js';
 
 export interface QuickAnalysisDeps {
   host: HTMLElement;
@@ -195,10 +196,9 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     positionButton();
     if (
       restoreFocus &&
-      focusTarget &&
       (root.contains(document.activeElement) || document.activeElement === document.body)
     ) {
-      focusTarget.focus({ preventScroll: true });
+      returnFocus(focusTarget, root, host);
     }
   };
 
@@ -339,7 +339,11 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     if (isWholeBandSelection()) return;
     activeGroup = 'formatting';
     render();
-    restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
+    // Reopening keeps the opener recorded the first time, not a control inside the surface.
+    if (!root.contains(document.activeElement)) {
+      restoreFocusEl =
+        document.activeElement instanceof HTMLElement ? document.activeElement : host;
+    }
     root.hidden = false;
     button.hidden = true;
     open = true;

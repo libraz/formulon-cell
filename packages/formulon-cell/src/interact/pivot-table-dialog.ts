@@ -546,10 +546,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   const onKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      close();
-    } else if (isSubmitEnter(e) && !okBtn.disabled) {
+    if (isSubmitEnter(e) && !okBtn.disabled) {
       e.preventDefault();
       body.requestSubmit();
     }

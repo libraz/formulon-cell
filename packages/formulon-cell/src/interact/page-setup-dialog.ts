@@ -304,11 +304,6 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
 
   const onOverlayKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onCancel();
-      return;
-    }
     // Enter inside a textbox triggers OK — spreadsheet parity.
     if (isSubmitEnter(e)) {
       e.preventDefault();

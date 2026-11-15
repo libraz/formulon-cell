@@ -7,6 +7,8 @@ const canvasContext = (): CanvasRenderingContext2D =>
     {
       canvas: document.createElement('canvas'),
       measureText: (text: string) => ({ width: text.length * 7 }),
+      createLinearGradient: () => ({ addColorStop: (): undefined => undefined }),
+      createRadialGradient: () => ({ addColorStop: (): undefined => undefined }),
     },
     {
       get: (target, prop) =>

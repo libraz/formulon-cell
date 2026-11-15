@@ -1,7 +1,6 @@
 import type { InsertCopiedCellsDirection } from '../commands/clipboard/insert-copied-cells.js';
 import type { Strings } from '../i18n/strings.js';
-import { appendDialogActions } from './dialog-shell.js';
-import { overlayPortalFor } from './overlay-portal.js';
+import { appendDialogActions, createDialogShell } from './dialog-shell.js';
 
 export interface InsertCopiedCellsDialogDeps {
   host: HTMLElement;
@@ -9,20 +8,27 @@ export interface InsertCopiedCellsDialogDeps {
   onSubmit(direction: InsertCopiedCellsDirection): void;
 }
 
+// One open dialog per host; opening again replaces it.
+const openDialogs = new WeakMap<HTMLElement, () => void>();
+
 export function openInsertCopiedCellsDialog(deps: InsertCopiedCellsDialogDeps): void {
   const t = deps.strings.insertCopiedCellsDialog;
   const ownerDocument = deps.host.ownerDocument;
-  const portal = overlayPortalFor(deps.host);
-  portal.querySelector('.fc-insertcopied')?.remove();
+  openDialogs.get(deps.host)?.();
 
-  const root = ownerDocument.createElement('div');
-  root.className = 'fc-insertcopied';
-  root.setAttribute('role', 'dialog');
-  root.setAttribute('aria-modal', 'true');
-  root.setAttribute('aria-label', t.title);
-
-  const panel = ownerDocument.createElement('div');
-  panel.className = 'fc-insertcopied__panel';
+  const shell = createDialogShell({
+    host: deps.host,
+    className: 'fc-insertcopied',
+    ariaLabel: t.title,
+    onDismiss: () => close(),
+  });
+  const close = (): void => {
+    if (openDialogs.get(deps.host) !== close) return;
+    openDialogs.delete(deps.host);
+    shell.close();
+    shell.dispose();
+  };
+  openDialogs.set(deps.host, close);
 
   const title = ownerDocument.createElement('div');
   title.className = 'fc-insertcopied__title';
@@ -46,27 +52,16 @@ export function openInsertCopiedCellsDialog(deps: InsertCopiedCellsDialogDeps): 
     buttonSecondaryClass: 'fc-insertcopied__button--secondary',
   });
 
-  const close = (): void => root.remove();
-  cancel.addEventListener('click', close);
-  ok.addEventListener('click', () => {
-    const checked = root.querySelector<HTMLInputElement>('input[type="radio"]:checked');
+  shell.on(cancel, 'click', close);
+  shell.on(ok, 'click', () => {
+    const checked = shell.panel.querySelector<HTMLInputElement>('input[type="radio"]:checked');
     const direction = checked?.value === 'right' ? 'right' : 'down';
     close();
     deps.onSubmit(direction);
   });
-  root.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      close();
-    }
-  });
-  root.addEventListener('mousedown', (e) => {
-    if (e.target === root) e.stopPropagation();
-  });
 
-  panel.append(title, choices, footer);
-  root.append(panel);
-  portal.appendChild(root);
+  shell.panel.append(title, choices, footer);
+  shell.open();
   ok.focus({ preventScroll: true });
 }
 
