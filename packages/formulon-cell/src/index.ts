@@ -125,3 +125,4 @@ export type {
   ScreenClipResult,
 } from './mount.js';
 export type { TraceArrow } from './store/store.js';
+export type { InstanceRibbon } from './toolbar/toolbar-object.js';

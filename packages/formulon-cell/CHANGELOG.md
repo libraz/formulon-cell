@@ -74,6 +74,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- `InstanceRibbon`, the type of `instance.toolbar`, is exported from `@libraz/formulon-cell` and `@libraz/formulon-cell/toolbar`.
 - `dialogs.open('preferences', { pane })` opens Preferences on a given pane (`'view'`, `'autoCorrect'`, `'calculation'` or `'errorChecking'`), and the Mac error menu's Error Checking Options opens it on Error Checking.
 - The `@libraz/formulon-cell/adapter` entry exports what the React and Vue packages share for binding props and deriving values: `SPREADSHEET_OPTION_KEYS`, `optionsFromProps`, `patchFromOptions`, `ribbonHooksKey`, `forwardRibbonHooks`, `isLiveSpreadsheet`, `subscribeToSpreadsheet`, `subscribeToSelection`, `subscribeToLocale`, `sameProp`, `propsPatch`, `reconcileProps` and the `SpreadsheetSubscriber` type.
 - `@libraz/formulon-cell/toolbar` exports the ribbon's search family (`buildRibbonSearchIndex`, `queryRibbonSearchIndex`, their types, `projectDisabledReason`) and icon family (`createExcelRibbonSvg`, `ExcelRibbonIconName`), so a host title bar, quick access toolbar or backstage matches the ribbon; `@libraz/formulon-cell/extensions` exports `resolveSpreadsheetUiOptions` and `isFeatureDefaultOff` for a host feature-toggle panel. `InstanceRibbon` is the type of `instance.toolbar`.

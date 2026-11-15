@@ -39,6 +39,7 @@ export {
   RIBBON_TABS,
 } from './ribbon-model.js';
 export {
+  type InstanceRibbon,
   type MountToolbarOptions,
   mountToolbar,
   type RibbonOptions,
