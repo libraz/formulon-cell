@@ -161,6 +161,7 @@ versioning is [SemVer](https://semver.org/).
 - A source or destination on a sheet named like a cell reference or a number (`A1`, `R1C1`, `2024`) is quoted in the Mac Subtotal and Consolidate dialogs, as in a formula.
 - Context menus and their submenus, the filter and PivotTable field dropdowns, the Paste Options and Auto Fill Options buttons, the sheet tab menus, the formula helper and the other popovers sit on whole pixels, so their text no longer blurs.
 - Escape closes the Calculation Options dialog from any of its controls, as it closes every other dialog. Closing Insert Copied Cells or the PivotTable Field dialog returns focus to the control that opened it, or to the sheet when that control is gone, instead of leaving it on the page.
+- Closing Find and Replace or the comment and note editor returns focus to the control that opened it, as the other panels over the sheet do, instead of always to the sheet.
 
 ### Removed
 

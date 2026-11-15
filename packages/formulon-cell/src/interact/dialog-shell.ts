@@ -224,13 +224,37 @@ export function returnFocus(
 }
 
 /**
- * Escape in a docked, non-modal pane leaves the pane open and hands focus to the sheet `host`;
+ * How Escape treats a dialog surface: a modal dialog or a floating panel over the grid closes, a
+ * pane docked beside or below the grid stays open and hands focus to the sheet.
+ */
+export type SurfaceKind = 'modal' | 'floating' | 'pane';
+
+/**
+ * The control to return focus to when a dialog closes: the `anchor` the open call was given, which
+ * a click does not focus in every browser, else the element focused in `doc`; null when only the
+ * body is.
+ */
+export function openerOf(doc: Document, anchor?: HTMLElement | null): HTMLElement | null {
+  if (anchor) return anchor;
+  const active = doc.activeElement;
+  const OwnerHTMLElement = doc.defaultView?.HTMLElement ?? HTMLElement;
+  return active instanceof OwnerHTMLElement && active !== doc.body ? active : null;
+}
+
+/** Records `kind` on the surface element as `data-fc-surface`. */
+export function markSurface(surface: HTMLElement, kind: SurfaceKind): void {
+  surface.dataset.fcSurface = kind;
+}
+
+/**
+ * Escape in a surface marked as a docked pane leaves it open and hands focus to the sheet `host`;
  * the pane closes from its Close button. A key a control inside the pane already handled is left
  * alone. Returns the detach function.
  */
 export function bindPaneEscape(pane: HTMLElement, host: HTMLElement): () => void {
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
+    if (pane.dataset.fcSurface !== 'pane') return;
     event.preventDefault();
     focusSheetAfterDialog(host);
   };
@@ -254,6 +278,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', ariaLabel);
+  markSurface(overlay, 'modal');
   overlay.hidden = true;
 
   const panel = document.createElement('div');

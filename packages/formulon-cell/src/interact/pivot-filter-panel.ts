@@ -16,7 +16,7 @@ import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { enhanceCustomSelect } from './custom-select.js';
-import { deferInitialFocus } from './dialog-shell.js';
+import { deferInitialFocus, markSurface, openerOf, returnFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -132,6 +132,7 @@ export function openPivotFieldFilter(
   const target = fieldAt(ctx, addr);
   if (!target) return false;
   open.get(ctx.host)?.();
+  const opener = openerOf(ctx.host.ownerDocument);
   const { wb, strings } = ctx;
   const t = strings.workbookObjects.pivotFilterPanel;
   const sheet = addr.sheet;
@@ -147,6 +148,7 @@ export function openPivotFieldFilter(
   panel.className = 'fc-pivot-filter-panel';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'false');
+  markSurface(panel, 'floating');
   panel.setAttribute('aria-label', model.label);
   panel.style.position = 'fixed';
 
@@ -413,6 +415,7 @@ export function openPivotFieldFilter(
     detachOutside();
     doc.removeEventListener('keydown', onDocKey, true);
     if (open.get(ctx.host) === close) open.delete(ctx.host);
+    returnFocus(opener, panel, ctx.host);
   };
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape' && panel.contains(e.target as Node)) {

@@ -9,7 +9,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogButton, bindPaneEscape } from './dialog-shell.js';
+import { appendDialogButton, bindPaneEscape, markSurface } from './dialog-shell.js';
 import { bindRovingRows, setRovingStop } from './roving-rows.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
@@ -154,6 +154,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   if (mac) root.append(header, toolbar, body, empty);
   else root.append(header, body, empty);
   (dock ?? host).appendChild(root);
+  markSurface(root, 'pane');
   const syncDock = (): void => {
     if (dock) syncTaskpaneDock(dock);
   };

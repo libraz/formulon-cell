@@ -3,6 +3,7 @@ import type { ChartData, ChartValueFormatter as CoreChartValueFormatter } from '
 import type { History } from '../commands/history.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { markSurface, openerOf, returnFocus } from './dialog-shell.js';
 import { clamp } from './overlay-position.js';
 import {
   captureSettingsView,
@@ -139,16 +140,19 @@ export function createSessionChartSettings(
   surface.hidden = true;
   surface.setAttribute('role', 'dialog');
   surface.setAttribute('aria-modal', 'false');
+  markSurface(surface, 'floating');
   surface.tabIndex = -1;
   host.appendChild(surface);
+  let opener: HTMLElement | null = null;
 
   const removeEscape = (): void => {
     document.removeEventListener('keydown', onDocumentKeydown);
   };
 
-  const closeInternal = (returnFocus: boolean): void => {
+  const closeInternal = (restore: boolean): void => {
     if (surface.hidden) return;
-    const returnTarget = anchor;
+    const target = opener;
+    opener = null;
     surface.hidden = true;
     removeEscape();
     chart = null;
@@ -157,7 +161,7 @@ export function createSessionChartSettings(
     draft = null;
     newSeries = null;
     dataKey = '';
-    if (returnFocus && returnTarget?.isConnected) returnTarget.focus({ preventScroll: true });
+    if (restore) returnFocus(target, surface, host);
   };
 
   const reposition = (): void => {
@@ -375,6 +379,7 @@ export function createSessionChartSettings(
     chart = nextChart;
     data = nextData;
     anchor = nextAnchor;
+    opener = openerOf(document, nextAnchor);
     draft = draftFromChart(nextChart, nextData, automaticPalette(deps.accents?.()));
     activeTab = tab ?? 'elements';
     const entries = seriesEntries(nextData);

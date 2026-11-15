@@ -1,6 +1,7 @@
 /**
  * Escape from a dialog's first control closes it and hands focus back to the sheet, for every
- * dialog `dialogs.open` reaches.
+ * dialog `dialogs.open` reaches; a docked pane stays open instead. Each surface is marked with
+ * the kind that decides this.
  */
 import { ChartPlotType, PivotAggregation, PivotAxis } from '@libraz/formulon';
 import { type DialogId, mount, type SpreadsheetInstance } from '@libraz/formulon-cell';
@@ -64,6 +65,25 @@ const PANES: Record<Platform, readonly DialogId[]> = {
     'functionArguments',
   ],
 };
+
+// Non-modal panels floating over the grid; Escape closes them as it closes a modal dialog.
+const FLOATING: Record<Platform, readonly DialogId[]> = {
+  default: [
+    'chartSettings',
+    'comment',
+    'filterDropdown',
+    'findReplace',
+    'workbookObjects',
+    'quickAnalysis',
+  ],
+  mac: ['chartSettings', 'comment', 'filterDropdown', 'findReplace', 'workbookObjects'],
+};
+
+// The `data-fc-surface` kind a surface carries, or a failure naming what it carries instead.
+const kindMismatch = (id: DialogId, surface: HTMLElement, kind: string): string | null =>
+  surface.dataset.fcSurface === kind
+    ? null
+    : `${id}: marked ${surface.dataset.fcSurface ?? 'nothing'}, not ${kind}`;
 
 // The cell each dialog opens on; the rest open on A1.
 const ACTIVE_CELL: Partial<Record<DialogId, string>> = {
@@ -152,6 +172,12 @@ describe('dialogs', () => {
           continue;
         }
         walked.push(id);
+        const mismatch = kindMismatch(
+          id,
+          surface,
+          FLOATING[platform].includes(id) ? 'floating' : 'modal',
+        );
+        if (mismatch) failures.push(mismatch);
         const first = surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface;
         first.focus();
         pressEscape(first);
@@ -186,6 +212,8 @@ describe('dialogs', () => {
           failures.push(`${id}: nothing opened`);
           continue;
         }
+        const mismatch = kindMismatch(id, pane, 'pane');
+        if (mismatch) failures.push(mismatch);
         const first = pane.querySelector<HTMLElement>(FOCUSABLE) ?? pane;
         first.focus();
         pressEscape(first);
@@ -215,6 +243,91 @@ describe('dialogs', () => {
       pressEscape(surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface);
       expect(shownSurfaces()).not.toContain(surface);
       expect(document.activeElement).toBe(button);
+    },
+  );
+
+  it.each(['default', 'mac'] as const)(
+    'return focus from a floating panel to the control that opened it on the %s profile',
+    async (platform) => {
+      const { sheet } = await mountWithContent(platform);
+      const opener = document.createElement('button');
+      opener.textContent = 'Open';
+      document.body.appendChild(opener);
+      const failures: string[] = [];
+      // Focus leaving a chart deselects it, so chart settings opens from its own button, below.
+      for (const id of FLOATING[platform].filter((floating) => floating !== 'chartSettings')) {
+        sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
+        opener.focus();
+        const before = new Set(shownSurfaces());
+        sheet.dialogs.open(id);
+        await Promise.resolve();
+        const surface = shownSurfaces().find((el) => !before.has(el));
+        if (!surface) {
+          failures.push(`${id}: nothing opened`);
+          continue;
+        }
+        const first = surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface;
+        first.focus();
+        pressEscape(first);
+        if (shownSurfaces().includes(surface)) {
+          failures.push(`${id}: stayed open`);
+          sheet.dialogs.close(id);
+        } else if (document.activeElement !== opener) {
+          const active = document.activeElement;
+          failures.push(`${id}: focus on ${active === document.body ? 'body' : active?.className}`);
+        }
+      }
+      expect(failures).toEqual([]);
+    },
+    60_000,
+  );
+
+  it.each(['default', 'mac'] as const)(
+    'return focus to the button a click opened them from, though the click left it unfocused, on the %s profile',
+    async (platform) => {
+      const { host, sheet } = await mountWithContent(platform);
+      const launchers: Array<{ id: string; button: () => HTMLElement | null }> = [
+        {
+          id: 'chartSettings',
+          button: () => {
+            host.focus();
+            selectChart(host);
+            return host.querySelector<HTMLElement>('[data-chart-settings-tab="elements"]');
+          },
+        },
+      ];
+      if (platform === 'default') {
+        launchers.push({
+          id: 'quickAnalysis',
+          button: () => {
+            sheet.selection.set('A1:B4');
+            return host.querySelector<HTMLElement>('.fc-quick__button:not([hidden])');
+          },
+        });
+      }
+      const failures: string[] = [];
+      for (const { id, button: find } of launchers) {
+        const button = find();
+        if (!button) {
+          failures.push(`${id}: no button`);
+          continue;
+        }
+        // A click in some browsers leaves focus where it was rather than on the button.
+        (document.activeElement as HTMLElement | null)?.blur();
+        const before = new Set(shownSurfaces());
+        button.click();
+        const surface = shownSurfaces().find((el) => !before.has(el));
+        if (!surface) {
+          failures.push(`${id}: nothing opened`);
+          continue;
+        }
+        pressEscape(surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface);
+        if (document.activeElement !== button) {
+          const active = document.activeElement;
+          failures.push(`${id}: focus on ${active === document.body ? 'body' : active?.className}`);
+        }
+      }
+      expect(failures).toEqual([]);
     },
   );
 });

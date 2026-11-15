@@ -23,7 +23,13 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SessionIllustration, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogIconButton, bindPaneEscape, returnFocus } from './dialog-shell.js';
+import {
+  appendDialogIconButton,
+  bindPaneEscape,
+  markSurface,
+  openerOf,
+  returnFocus,
+} from './dialog-shell.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
 import { openPivotFieldSettingsAt } from './pivot-field-settings-dialog-apply.js';
 import { openPivotOptions } from './pivot-options-dialog.js';
@@ -119,6 +125,7 @@ export function attachWorkbookObjectsPanel(
   root.className = 'fc-objects';
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'false');
+  markSurface(root, 'floating');
   root.hidden = true;
   root.tabIndex = -1;
   host.appendChild(root);
@@ -362,6 +369,7 @@ export function attachWorkbookObjectsPanel(
     syncOpenFlag();
     root.replaceChildren();
     root.className = `fc-objects${activeFieldListPivot ? ' fc-objects--taskpane' : ''}`;
+    markSurface(root, activeFieldListPivot ? 'pane' : 'floating');
     if (open) placeRoot(activeFieldListPivot !== undefined);
     root.setAttribute('aria-label', activeFieldListPivot ? t.pivotFieldList : t.title);
 
@@ -634,8 +642,7 @@ export function attachWorkbookObjectsPanel(
     render();
     // Reopening keeps the opener recorded the first time, not a control inside the surface.
     if (!root.contains(document.activeElement)) {
-      restoreFocusEl =
-        document.activeElement instanceof HTMLElement ? document.activeElement : host;
+      restoreFocusEl = openerOf(document);
     }
     root.hidden = false;
     open = true;
@@ -670,9 +677,9 @@ export function attachWorkbookObjectsPanel(
     openPanel();
   };
 
-  // The object list closes on Escape; the docked field list is a pane and stays open.
+  // The object list floats and closes on Escape; the docked field list is a pane and stays open.
   const onKey = (e: KeyboardEvent): void => {
-    if (e.key !== 'Escape' || activePivotFieldListKey !== '') return;
+    if (e.key !== 'Escape' || root.dataset.fcSurface !== 'floating') return;
     e.preventDefault();
     close(true);
   };

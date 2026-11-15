@@ -22,7 +22,13 @@ import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
 import { showMessage } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
-import { createDialogButton, deferInitialFocus } from './dialog-shell.js';
+import {
+  createDialogButton,
+  deferInitialFocus,
+  markSurface,
+  openerOf,
+  returnFocus,
+} from './dialog-shell.js';
 import { createMacFindPanel, type MacFindPanel } from './mac-find-panel.js';
 import { isNavigationAddrAllowed, navigationPolicyFor } from './navigation-policy.js';
 import { openPopupMenu } from './popup-menu.js';
@@ -75,9 +81,11 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   let optionsOpen = false;
 
   const overlay = document.createElement('div');
+  let opener: HTMLElement | null = null;
   overlay.className = 'fc-find fc-fmtdlg__panel';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'false');
+  markSurface(overlay, 'floating');
   overlay.hidden = true;
 
   const titlebar = document.createElement('div');
@@ -734,6 +742,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
         return;
       }
       const tab = requested ?? 'find';
+      if (!overlay.contains(document.activeElement)) opener = openerOf(document);
       overlay.hidden = false;
       activeTab = tab;
       findInput.value = lastQuery;
@@ -752,7 +761,9 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       overlay.hidden = true;
       currentMatch = null;
       clearResults();
-      host.focus();
+      const target = opener;
+      opener = null;
+      returnFocus(target, overlay, host);
     },
     setStrings(next: Strings): void {
       strings = next;

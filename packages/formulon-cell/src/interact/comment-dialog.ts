@@ -26,6 +26,9 @@ import {
   appendDialogButton,
   appendDialogIconButton,
   deferInitialFocus,
+  markSurface,
+  openerOf,
+  returnFocus,
 } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 
@@ -80,6 +83,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   wrap.className = 'fc-cmtnote';
   wrap.setAttribute('role', 'dialog');
   wrap.setAttribute('aria-modal', 'false');
+  markSurface(wrap, 'floating');
   wrap.setAttribute('aria-label', t.title);
   wrap.hidden = true;
 
@@ -171,6 +175,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   wrap.appendChild(footer);
 
   host.appendChild(wrap);
+  let opener: HTMLElement | null = null;
 
   let threadedMode = false;
   let startMode = false;
@@ -547,6 +552,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   const api: CommentDialogHandle = {
     open(options: { mode?: 'note' | 'thread'; entry?: DialogEntry } = {}): void {
       mutationAuthorization = options.entry ?? INSTANCE_API_COMMENT_ENTRY;
+      if (!wrap.contains(document.activeElement)) opener = openerOf(document);
       const state = store.getState();
       const addr = state.selection.active;
       target = addr;
@@ -626,7 +632,9 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
         attached = false;
       }
       cancelPlaceFrame();
-      host.focus();
+      const target = opener;
+      opener = null;
+      returnFocus(target, wrap, host);
     },
     detach(): void {
       okBtn.removeEventListener('click', onOk);

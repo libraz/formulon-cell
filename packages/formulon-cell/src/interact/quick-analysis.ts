@@ -15,7 +15,7 @@ import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
-import { returnFocus } from './dialog-shell.js';
+import { markSurface, openerOf, returnFocus } from './dialog-shell.js';
 
 export interface QuickAnalysisDeps {
   host: HTMLElement;
@@ -151,6 +151,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   root.className = 'fc-quick';
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'false');
+  markSurface(root, 'floating');
   root.hidden = true;
   root.tabIndex = -1;
   host.appendChild(root);
@@ -335,14 +336,13 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     }
   };
 
-  const openPanel = (): void => {
+  const openPanel = (anchor?: HTMLElement): void => {
     if (isWholeBandSelection()) return;
     activeGroup = 'formatting';
     render();
     // Reopening keeps the opener recorded the first time, not a control inside the surface.
     if (!root.contains(document.activeElement)) {
-      restoreFocusEl =
-        document.activeElement instanceof HTMLElement ? document.activeElement : host;
+      restoreFocusEl = openerOf(document, anchor);
     }
     root.hidden = false;
     button.hidden = true;
@@ -361,12 +361,13 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   };
   root.addEventListener('keydown', onKey);
   host.addEventListener('pointerdown', onHostPointerDown, true);
-  button.addEventListener('click', openPanel);
+  const onButtonClick = (): void => openPanel(button);
+  button.addEventListener('click', onButtonClick);
   const unsub = store.subscribe(positionButton);
   positionButton();
 
   return {
-    open: openPanel,
+    open: () => openPanel(),
     close,
     setStrings(next) {
       strings = next;
@@ -382,7 +383,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     detach() {
       root.removeEventListener('keydown', onKey);
       host.removeEventListener('pointerdown', onHostPointerDown, true);
-      button.removeEventListener('click', openPanel);
+      button.removeEventListener('click', onButtonClick);
       unsub();
       button.remove();
       root.remove();

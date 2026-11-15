@@ -45,7 +45,7 @@ import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
-import { deferInitialFocus } from './dialog-shell.js';
+import { deferInitialFocus, markSurface, openerOf, returnFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -132,6 +132,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
   const close = (): void => {
     if (!root) return;
+    const closing = root;
     root.remove();
     root = null;
     activeRange = null;
@@ -139,8 +140,11 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     detachOutside?.();
     detachOutside = null;
     ownerDocument.removeEventListener('keydown', onDocKey, true);
-    restoreFocus?.focus({ preventScroll: true });
+    const target = restoreFocus;
     restoreFocus = null;
+    // Without a host there is no sheet to fall back to.
+    if (fcHost) returnFocus(target, closing, fcHost);
+    else target?.focus({ preventScroll: true });
   };
 
   const onDocKey = (e: KeyboardEvent): void => {
@@ -290,11 +294,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
   const open = (range: Range, col: number, anchor: { x: number; y: number; h: number }): void => {
     close();
-    const activeElement = ownerDocument.activeElement;
-    restoreFocus =
-      activeElement?.nodeType === 1 && activeElement !== ownerDocument.body
-        ? (activeElement as HTMLElement)
-        : null;
+    restoreFocus = openerOf(ownerDocument);
     activeRange = range;
     activeCol = col;
 
@@ -326,6 +326,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     r.style.top = `${anchor.y + anchor.h}px`;
     r.setAttribute('role', 'dialog');
     r.setAttribute('aria-modal', 'false');
+    markSurface(r, 'floating');
     r.setAttribute('aria-label', t.title);
 
     const search = ownerDocument.createElement('input');

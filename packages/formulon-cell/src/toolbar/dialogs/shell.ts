@@ -8,6 +8,7 @@ import {
   type DialogAnchor,
   placeDialogPanel,
 } from '../../interact/dialog-placement.js';
+import { markSurface } from '../../interact/dialog-shell.js';
 import { isSubmitEnter } from '../../interact/mac-dialog-keys.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
 
@@ -61,6 +62,7 @@ export const createDialogShell = (opts: DialogShellOptions): DialogShell => {
   overlay.setAttribute('role', opts.role ?? 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', opts.ariaLabel ?? opts.title);
+  markSurface(overlay, 'modal');
 
   const panel = ownerDocument.createElement('div');
   panel.className = 'fc-fmtdlg__panel fc-tb__dlg__panel';

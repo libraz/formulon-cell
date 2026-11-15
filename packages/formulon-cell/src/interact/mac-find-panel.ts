@@ -1,5 +1,6 @@
 import type { MacFindPanelStrings } from '../i18n/strings/mac/find-replace.js';
 import { createInteractionButton } from './chip-button.js';
+import { markSurface, openerOf, returnFocus } from './dialog-shell.js';
 import { openPopupMenu } from './popup-menu.js';
 
 export type FindScope = 'sheet' | 'workbook';
@@ -32,9 +33,11 @@ export interface MacFindPanel {
  *  menu, Previous / Next and a More Options menu leading to the full dialog. */
 export const createMacFindPanel = (deps: MacFindPanelDeps): MacFindPanel => {
   const panel = document.createElement('div');
+  let opener: HTMLElement | null = null;
   panel.className = 'fc-findpanel';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'false');
+  markSurface(panel, 'floating');
   panel.hidden = true;
 
   const button = (className: string, text = ''): HTMLButtonElement =>
@@ -193,6 +196,8 @@ export const createMacFindPanel = (deps: MacFindPanelDeps): MacFindPanel => {
 
   const api: MacFindPanel = {
     open(): void {
+      if (!panel.contains(panel.ownerDocument.activeElement))
+        opener = openerOf(panel.ownerDocument);
       panel.hidden = false;
       input.value = deps.query();
       syncField();
@@ -203,7 +208,9 @@ export const createMacFindPanel = (deps: MacFindPanelDeps): MacFindPanel => {
       if (panel.hidden) return;
       dropMenu();
       panel.hidden = true;
-      if (restoreFocus) deps.host.focus();
+      const target = opener;
+      opener = null;
+      if (restoreFocus) returnFocus(target, panel, deps.host);
     },
     isOpen: (): boolean => !panel.hidden,
     relabel,
