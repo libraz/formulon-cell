@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { FormulonError, StatusCode, WorkbookFormat } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import {
   emptyLoadDiagnostics,
   emptySaveDiagnostics,
@@ -8,7 +11,7 @@ import {
   loadDiagnosticsFromEngine,
   saveDiagnosticsFromEngine,
 } from '../../../src/engine/file-diagnostics.js';
-import type { Formulon, Workbook } from '../../../src/engine/types.js';
+import { type Formulon, PivotAggregation, type Workbook } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { buildFileLossReport } from '../../../src/interact/spreadsheet-compatibility-report.js';
@@ -137,5 +140,63 @@ describe('file diagnostics on the real engine', () => {
     expect(hasLoadLosses(reloaded.loadDiagnostics())).toBe(false);
     wb.dispose();
     reloaded.dispose();
+  });
+
+  // A PivotTable the engine models is written from its model, so an .xlsb save drops none of its parts.
+  const pivotPlacement = (wb: WorkbookHandle) =>
+    wb.getPivotTables().map((p) => [p.sheetIndex, p.top, p.left, p.rows, p.cols]);
+
+  it('drops no part when a refreshed .xlsb PivotTable is saved back to .xlsb', async () => {
+    const fixture = join(__dirname, '../../fixtures/pivot-excel/xlsb_pivot_base.xlsb');
+    const wb = await WorkbookHandle.loadBytes(new Uint8Array(readFileSync(fixture)));
+    const placement = pivotPlacement(wb);
+    expect(placement).toHaveLength(1);
+    for (const id of wb.pivotCacheIds()) expect(wb.refreshPivotCache(id)).toBeNull();
+    const { bytes, diagnostics } = wb.saveWithDiagnostics('xlsb');
+    expect(diagnostics.droppedPartCount).toBe(0);
+    const reloaded = await WorkbookHandle.loadBytes(bytes);
+    expect(pivotPlacement(reloaded)).toEqual(placement);
+    wb.dispose();
+    reloaded.dispose();
+  });
+
+  it('writes a PivotTable built in the session to .xlsb', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const rows: (string | number)[][] = [
+      ['Region', 'Amt'],
+      ['East', 5],
+      ['West', 7],
+    ];
+    for (const [r, row] of rows.entries()) {
+      for (const [c, v] of row.entries()) {
+        const addr = { sheet: 0, row: r, col: 3 + c };
+        if (typeof v === 'number') wb.setNumber(addr, v);
+        else wb.setText(addr, v);
+      }
+    }
+    const created = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 3, r1: 2, c1: 4 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      valueField: 'Amt',
+      aggregation: PivotAggregation.Sum,
+    });
+    expect(created.ok).toBe(true);
+    const { bytes, diagnostics } = wb.saveWithDiagnostics('xlsb');
+    expect(diagnostics.droppedPartCount).toBe(0);
+    const reloaded = await WorkbookHandle.loadBytes(bytes);
+    expect(pivotPlacement(reloaded)).toEqual(pivotPlacement(wb));
+    wb.dispose();
+    reloaded.dispose();
+  });
+
+  // Expected to fail on formulon 0.19.0 r38: an unedited .xlsb save counts its derived binaryIndex
+  // parts as dropped. Drop `.fails` once the engine stops counting them.
+  it.fails('reports no loss when an unedited .xlsb is saved again, to .xlsb or .xlsx', async () => {
+    const fixture = join(__dirname, '../../fixtures/pivot-excel/xlsb_pivot_base.xlsb');
+    const wb = await WorkbookHandle.loadBytes(new Uint8Array(readFileSync(fixture)));
+    expect(wb.saveWithDiagnostics('xlsb').diagnostics).toEqual(emptySaveDiagnostics());
+    expect(wb.saveWithDiagnostics('xlsx').diagnostics).toEqual(emptySaveDiagnostics());
+    wb.dispose();
   });
 });

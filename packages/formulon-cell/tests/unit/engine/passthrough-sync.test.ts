@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   classifyWorkbookObjectPath,
@@ -13,7 +15,7 @@ import {
   workbookObjectsByKind,
 } from '../../../src/engine/passthrough-sync.js';
 import { PivotAxis, PivotFilterKind } from '../../../src/engine/types.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
 const wb = (paths: readonly string[]) =>
   ({
@@ -154,5 +156,17 @@ describe('passthrough workbook objects', () => {
         value: 10,
       },
     ]);
+  });
+});
+
+describe('workbook objects on the real engine', () => {
+  it('counts a loaded .xlsb PivotTable once, as a PivotTable and not as preserved parts', async () => {
+    const fixture = join(__dirname, '../../fixtures/pivot-excel/xlsb_pivot_base.xlsb');
+    const handle = await WorkbookHandle.loadBytes(new Uint8Array(readFileSync(fixture)));
+    expect(summarizePivotTables(handle).count).toBe(1);
+    const parts = summarizePassthroughs(handle).byCategory;
+    expect(parts.pivotTables).toBeUndefined();
+    expect(parts.pivotCaches).toBeUndefined();
+    handle.dispose();
   });
 });
