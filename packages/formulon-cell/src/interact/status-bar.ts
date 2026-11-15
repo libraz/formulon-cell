@@ -190,8 +190,9 @@ const createStatusBarViewButton = (
   return button;
 };
 
-const createStatusBarZoomButton = (label: string): HTMLButtonElement => {
+const createStatusBarZoomButton = (direction: 'out' | 'in', label: string): HTMLButtonElement => {
   const button = createStatusBarButton('fc-host__statusbar-zoom-btn');
+  button.dataset.fcZoom = direction;
   button.textContent = label;
   return button;
 };
@@ -321,14 +322,14 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const zoom = document.createElement('div');
   zoom.className = 'fc-host__statusbar-zoom';
-  const zoomOut = createStatusBarZoomButton('−');
+  const zoomOut = createStatusBarZoomButton('out', '−');
   const zoomSlider = document.createElement('input');
   zoomSlider.type = 'range';
   zoomSlider.className = 'fc-host__statusbar-zoom-slider';
   zoomSlider.min = '0';
   zoomSlider.max = String(ZOOM_SLIDER_MAX);
   zoomSlider.step = '1';
-  const zoomIn = createStatusBarZoomButton('+');
+  const zoomIn = createStatusBarZoomButton('in', '+');
   const zoomLabel = createStatusBarButton('fc-host__statusbar-zoom-label');
   zoom.append(zoomOut, zoomSlider, zoomIn, zoomLabel);
 

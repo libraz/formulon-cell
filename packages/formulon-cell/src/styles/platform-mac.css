@@ -1810,8 +1810,22 @@
     content: "";
   }
 
+  /* The field is drawn inside 1 px transparent bands above and below, so the box meets the
+     24 px minimum target while the drawn field keeps its height. */
   .fc-host[data-fc-platform="mac"] .fc-host__formulabar-input {
+    --fc-formulabar-input-frame: var(--fc-rule);
     margin-left: 6px;
+    padding: calc(var(--fc-hairline) + 1px) calc(var(--fc-hairline) + 6px);
+    border: solid transparent;
+    border-width: 1px 0;
+    border-radius: 2px / 3px;
+    background-clip: padding-box;
+    box-shadow: inset 0 0 0 var(--fc-hairline) var(--fc-formulabar-input-frame);
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar-input:focus {
+    --fc-formulabar-input-frame: var(--fc-accent);
+    border-color: transparent;
   }
 
   /* Editing in the bar: red cancel, green enter, a green hairline frame, and fx dimmed. */
@@ -1826,7 +1840,9 @@
   .fc-host[data-fc-platform="mac"]
     .fc-host__formulabar[data-fc-editing="1"]
     .fc-host__formulabar-input {
-    box-shadow: inset 0 0 0 1px var(--fc-accent);
+    box-shadow:
+      inset 0 0 0 var(--fc-hairline) var(--fc-formulabar-input-frame),
+      inset 0 0 0 calc(var(--fc-hairline) + 1px) var(--fc-accent);
   }
 
   .fc-host[data-fc-platform="mac"]
@@ -1939,12 +1955,28 @@
     font-size: 16px;
   }
 
+  /* The zoom buttons draw a 14 px glyph but take a 24 px target: the extra width reaches into
+     the free space beside each glyph, so nothing drawn moves. */
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-zoom-btn[data-fc-zoom="out"] {
+    width: 24px;
+    margin-left: -10px;
+    padding-left: 10px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__statusbar-zoom-btn[data-fc-zoom="in"] {
+    width: 24px;
+    margin-left: -2px;
+    padding-right: 6px;
+  }
+
   .fc-host[data-fc-platform="mac"] .fc-host__statusbar-zoom-slider {
     width: 102px;
   }
 
   .fc-host[data-fc-platform="mac"] .fc-host__statusbar-zoom-label {
-    min-width: 54px;
+    min-width: 48px;
+    margin-left: -2px;
+    padding-left: 0;
     text-align: center;
   }
 }

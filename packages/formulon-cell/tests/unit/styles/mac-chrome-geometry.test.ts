@@ -63,12 +63,55 @@ describe('Mac status bar geometry', () => {
     expect(decls('.fc-host__statusbar-view--active').background).toBe('#b8b8b8');
   });
 
-  it('draws the zoom controls as 14 pt glyphs around a 102 pt slider and a 54 pt label', () => {
+  it('draws the zoom controls as 14 pt glyphs around a 102 pt slider', () => {
     const btn = decls('.fc-host__statusbar-zoom-btn');
     expect(btn.width).toBe('14px');
     expect(btn.border).toBe('0');
     expect(decls('.fc-host__statusbar-zoom-slider').width).toBe('102px');
-    expect(decls('.fc-host__statusbar-zoom-label')['min-width']).toBe('54px');
     expect(decls('.fc-host__statusbar-zoom').gap).toBe('3px');
+  });
+
+  // Each zoom button keeps its 14 px glyph box in place and widens its target to 24 px into the
+  // free space beside it; the label gives up its 6 px default left padding to make room.
+  it('gives each zoom button a 24 px target without moving what is drawn', () => {
+    const px = (value: string | undefined): number => Number.parseFloat(value ?? '0');
+    const gap = 3;
+    const glyph = 14;
+    const buttonPadding = 6;
+    const out = decls('.fc-host__statusbar-zoom-btn[data-fc-zoom="out"]');
+    const zoomIn = decls('.fc-host__statusbar-zoom-btn[data-fc-zoom="in"]');
+    const label = decls('.fc-host__statusbar-zoom-label');
+
+    expect(px(out.width)).toBeGreaterThanOrEqual(24);
+    expect(px(out['margin-left']) + px(out['padding-left'])).toBe(0);
+    expect(px(out.width) - px(out['padding-left'])).toBe(glyph);
+    // The out button grows leftward only, into the gap after the view buttons.
+    expect(px(out['margin-left'])).toBeLessThan(0);
+
+    const inStart = px(zoomIn['margin-left']);
+    const inEnd = inStart + px(zoomIn.width);
+    const inContent = px(zoomIn.width) - px(zoomIn['padding-right']);
+    expect(px(zoomIn.width)).toBeGreaterThanOrEqual(24);
+    expect(inStart).toBeGreaterThan(-gap);
+    expect(inStart + inContent / 2).toBe(glyph / 2);
+
+    // Positions are relative to where the zoom-in box started before it widened.
+    const labelStart = inEnd + gap + px(label['margin-left']);
+    const originalLabelStart = glyph + gap;
+    expect(labelStart).toBeGreaterThan(inEnd);
+    expect(labelStart + px(label['min-width'])).toBe(originalLabelStart + 54);
+    expect(labelStart + px(label['padding-left'])).toBe(originalLabelStart + buttonPadding);
+  });
+
+  // The drawn field is 22.2 px tall; transparent 1 px bands above and below make the box 24.2 px.
+  it('grows the formula bar input box to the 24 px target around an unchanged field', () => {
+    const input = decls('.fc-host__formulabar-input');
+    expect(input.border).toBe('solid transparent');
+    expect(input['border-width']).toBe('1px 0');
+    expect(input['background-clip']).toBe('padding-box');
+    expect(input['box-shadow']).toBe(
+      'inset 0 0 0 var(--fc-hairline) var(--fc-formulabar-input-frame)',
+    );
+    expect(22.2 + 2 * Number.parseFloat(input['border-width'] ?? '0')).toBeGreaterThanOrEqual(24);
   });
 });
