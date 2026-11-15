@@ -89,3 +89,39 @@ export async function runSheetTabCopyScenario(page: Page): Promise<void> {
   expect(await sheet.sheetName(initial)).toBe(copyName);
   expect(await sheet.readValue('A1', initial)).toMatchObject({ kind: 'number', value: 42 });
 }
+
+/** Shift+Tab moves backwards out of the sheet bar: from the Add sheet button and
+ *  from the active sheet tab, focus leaves for another control instead of being
+ *  held by the grid's key handling. */
+export async function runSheetBarShiftTabScenario(
+  page: Page,
+  platform: 'default' | 'mac',
+): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  const consoleErrors = sp.collectConsoleErrors();
+  await sp.mount({ platform });
+  await sp.expectNoStub();
+  const sheetbar = page.locator('.fc-host__sheetbar').first();
+  const starts = {
+    'Add sheet button': page.locator('.fc-host__sheetbar-add').first(),
+    'active sheet tab': page.locator('.fc-host__sheetbar-tab[aria-selected="true"]').first(),
+  };
+  for (const [name, start] of Object.entries(starts)) {
+    await start.focus();
+    await expect(start, `${name} takes focus`).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(start, `Shift+Tab moves focus off the ${name}`).not.toBeFocused();
+    expect(
+      await page.evaluate(() => {
+        const active = document.activeElement;
+        return !!active && active !== document.body && active !== document.documentElement;
+      }),
+      `Shift+Tab from the ${name} lands on a control`,
+    ).toBe(true);
+  }
+  expect(
+    await sheetbar.evaluate((el) => el.contains(document.activeElement)),
+    'Shift+Tab from the active sheet tab leaves the sheet bar',
+  ).toBe(false);
+  expect(consoleErrors.read()).toEqual([]);
+}

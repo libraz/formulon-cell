@@ -1,4 +1,5 @@
 import {
+  runSheetBarShiftTabScenario,
   runSheetTabCopyScenario,
   runSheetTabSwitchScenario,
   runSheetTabsScenario,
@@ -18,3 +19,11 @@ test('T03 (vue-demo): Move or Copy creates a named copy that undo removes and re
 }) => {
   await runSheetTabCopyScenario(page);
 });
+
+for (const platform of ['default', 'mac'] as const) {
+  test(`T04 (vue-demo, ${platform}): Shift+Tab moves backwards out of the sheet bar`, async ({
+    page,
+  }) => {
+    await runSheetBarShiftTabScenario(page, platform);
+  });
+}

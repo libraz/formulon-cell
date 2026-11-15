@@ -1,4 +1,5 @@
 import {
+  runSheetBarShiftTabScenario,
   runSheetTabCopyScenario,
   runSheetTabSwitchScenario,
   runSheetTabsScenario,
@@ -18,3 +19,11 @@ test('T03 (react-demo): Move or Copy creates a named copy that undo removes and 
 }) => {
   await runSheetTabCopyScenario(page);
 });
+
+for (const platform of ['default', 'mac'] as const) {
+  test(`T04 (react-demo, ${platform}): Shift+Tab moves backwards out of the sheet bar`, async ({
+    page,
+  }) => {
+    await runSheetBarShiftTabScenario(page, platform);
+  });
+}
