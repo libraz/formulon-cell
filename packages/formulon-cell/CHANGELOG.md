@@ -119,6 +119,7 @@ versioning is [SemVer](https://semver.org/).
 
 - Ribbon dropdowns that show their current value, such as Font Size and Number Format, include that value in their accessible name (for example "Font Size: 11", or "Width: Automatic" where the label already ends in a colon), so the name contains the visible text.
 - Buttons whose accessible name left out their visible text now carry it: ribbon buttons that show a label are named by their tooltip only when the tooltip contains that label, and by the label otherwise (Gridlines and Headings View, AVG, Show Detail and Hide Detail); the formula bar's fx button draws its glyph as generated content, so it keeps its "Insert function arguments" name.
+- The ribbon's Number Format dropdown shows the keyboard focus ring when focused, as the other dropdowns do.
 - On the Mac chrome, the status bar's zoom out and zoom in buttons and the formula bar input take targets of at least 24 px, so they meet the minimum target size; the glyphs, the zoom label text and the drawn input field stay where they were.
 - `Workbook.load` with `locale` or `platform` opens the file under that profile, so a manually calculated workbook mounted with the same locale and platform keeps exactly the stale values the file carries, on the Mac profile too.
 - Home menu, File menu and Remove Arrows labels match the desktop's in the languages where they differed.

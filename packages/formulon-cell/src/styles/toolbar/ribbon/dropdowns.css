@@ -231,7 +231,6 @@
   .fc-tb__rb-select--number-format > .fc-tb__rb-dd__btn:focus-visible {
     border-color: var(--fc-tb-ribbon-line);
     background: var(--fc-tb-ribbon-hover);
-    outline: none;
   }
 
   .fc-tb__rb-select--number-format .fc-tb__rb-dd__list {
