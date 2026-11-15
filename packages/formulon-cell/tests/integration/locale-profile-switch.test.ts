@@ -52,22 +52,16 @@ describe('integration: locale profile switching', () => {
     expect(recalc).not.toHaveBeenCalled();
   });
 
-  it.each(['de-brand', 'de_@@', 'de-Latn-DE', 'de-DE-posix', 'zh-Hant-TW', 'zh-Hans-CN'])(
-    'does not override a custom or malformed German locale: %s',
-    (locale) => {
-      const recalc = vi.fn();
-      const setProfile = vi.fn();
-      const wb = {
-        capabilities: { spreadsheetProfile: true },
-        spreadsheetProfileId: vi.fn(() => 'windows-en_US'),
-        setSpreadsheetProfileId: setProfile,
-        recalc,
-      } as unknown as WorkbookHandleType;
-
-      expect(profileLocaleForUiLocale(locale)).toBeNull();
-      expect(syncLocaleProfile(wb, locale, 'mac')).toBe(false);
-      expect(setProfile).not.toHaveBeenCalled();
-      expect(recalc).not.toHaveBeenCalled();
+  it.each([
+    ['de-brand', 'de_DE'],
+    ['de-Latn-DE', 'de_DE'],
+    ['de-DE-posix', 'de_DE'],
+    ['zh-Hant-TW', 'zh_TW'],
+    ['zh-Hans-CN', 'zh_CN'],
+  ])(
+    'resolves a script or custom tag by its language as a new workbook does: %s',
+    (locale, suffix) => {
+      expect(profileLocaleForUiLocale(locale)).toBe(suffix);
     },
   );
 

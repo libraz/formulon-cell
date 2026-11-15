@@ -1,7 +1,6 @@
 import {
   engineProfileIdFor,
   engineProfileToPublic,
-  PROFILE_SUFFIX_FOR_LOCALE,
   type ProfileLocale,
   profileLocaleFor,
   type SpreadsheetPlatform,
@@ -13,29 +12,12 @@ import { builtInLocaleFor } from '../i18n/locales.js';
 export type LocaleProfilePlatform = SpreadsheetPlatform;
 
 /**
- * Resolve a UI locale to the locale suffix used by Excel profile ids.
- * Unknown custom dictionaries deliberately return `null`: a host supplied
- * dictionary must not silently change formula semantics just because its
- * language tag happens to be unfamiliar to this adapter.
+ * Resolve a UI locale to the locale suffix used by Excel profile ids, as a new workbook does: by
+ * the tag's language subtag, with the region or script where the profiles differ (Traditional
+ * Chinese). A language with no profile returns `null`, so the workbook keeps the one it has.
  */
 export function profileLocaleForUiLocale(locale: string): ProfileLocale | null {
-  const mapped = builtInLocaleFor(locale);
-  if (!mapped) return null;
-
-  const normalized = locale.trim().replaceAll('_', '-');
-  if (normalized.toLowerCase() === mapped) return PROFILE_SUFFIX_FOR_LOCALE[mapped];
-
-  // Keep this validation aligned with the locale switcher: a built-in
-  // language may carry a region, but script and variant tags remain custom.
-  try {
-    const parsed = new Intl.Locale(normalized);
-    const region = parsed.region;
-    if (!region || parsed.script) return null;
-    if (parsed.baseName.toLowerCase() !== `${mapped}-${region.toLowerCase()}`) return null;
-    return profileLocaleFor(locale);
-  } catch {
-    return null;
-  }
+  return builtInLocaleFor(locale) ? profileLocaleFor(locale) : null;
 }
 
 /** Return the public profile selected by a UI locale and platform. */

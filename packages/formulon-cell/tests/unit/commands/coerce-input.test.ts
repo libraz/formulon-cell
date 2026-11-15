@@ -102,16 +102,16 @@ describe('coerceInput', () => {
     },
   );
 
-  it('does not apply the active profile to an explicitly custom locale', async () => {
+  it('does not apply the active profile to a locale of a language without one', async () => {
     const wb = await WorkbookHandle.createDefault();
     const store = createSpreadsheetStore();
     try {
       expect(wb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
       const canonicalize = vi.spyOn(wb, 'canonicalizeLocalizedFormula');
 
-      const input = coerceInputForCell(store.getState(), addr, '=SUMME(A1)', 'de-brand', wb);
+      const input = coerceInputForCell(store.getState(), addr, '=SUMME(A1)', 'xx-brand', wb);
       expect(input).toEqual({ kind: 'formula', text: '=SUMME(A1)' });
-      expect(canonicalizeLocalizedFormulaForInput(wb, '=SUMME(A1)', 'de-brand')).toBe('=SUMME(A1)');
+      expect(canonicalizeLocalizedFormulaForInput(wb, '=SUMME(A1)', 'xx-brand')).toBe('=SUMME(A1)');
       expect(canonicalize).not.toHaveBeenCalled();
     } finally {
       wb.dispose();

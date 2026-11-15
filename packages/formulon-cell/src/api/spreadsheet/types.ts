@@ -98,7 +98,15 @@ export interface SpreadsheetOptions {
   /** The ribbon to mount above the grid; `null` for none. */
   readonly toolbar?: RibbonToolbarConfig | null;
   readonly theme?: ThemeName;
-  /** UI language and the workbook's calculation profile. Defaults to `'en'`. */
+  /**
+   * UI language and the workbook's calculation profile. Defaults to `'en'`.
+   *
+   * The formula profile follows the tag's language subtag, and its region or script where the
+   * profiles differ (`zh-TW`, `zh-Hant`), at `mount` and at `update` alike: `de-Latn-DE` and a
+   * custom `de-brand` both select German. A tag whose language has no profile keeps the current
+   * one (`update`) or the default (`mount`). To change UI text without moving the formula profile,
+   * use `strings` or `i18n.override`.
+   */
   readonly locale?: Locale | (string & {});
   /** Overrides on top of the locale's strings. */
   readonly strings?: DeepPartial<Strings>;
