@@ -32,7 +32,12 @@ export interface RibbonEvents {
 export interface InstanceRibbon extends ToolbarState {
   /** Applies the given state. */
   update(patch: ToolbarPatch): void;
-  /** Runs a ribbon command on the current selection; throws `policy-denied` when the policy refuses it. */
+  /**
+   * Runs a ribbon command on the current selection; throws `policy-denied` when the policy refuses it.
+   *
+   * Accepts the id of a ribbon button and the id of an item in a button's menu. Only button ids are
+   * `CommandId`s that `SpreadsheetInstance.commands` runs; menu items run here.
+   */
   execute(commandId: string): void;
   /** Moves focus to the active tab; false when the ribbon has none to focus. */
   focusActiveTab(): boolean;

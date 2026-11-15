@@ -139,7 +139,13 @@ export type CommandIntent =
     };
 
 export interface Commands {
-  /** Runs a command. Throws `policy-denied` or `protected` when it may not run. */
+  /**
+   * Runs a command. Throws `policy-denied` or `protected` when it may not run.
+   *
+   * Takes {@link CommandId}s only: the commands of ribbon buttons and the cell commands. The items
+   * of a ribbon button's menu are not commands here; run them through the ribbon's
+   * `InstanceRibbon.execute`.
+   */
   execute(id: CommandId): void;
   /**
    * Whether `execute(id)` would run now, or whether the policy and sheet protection allow an
