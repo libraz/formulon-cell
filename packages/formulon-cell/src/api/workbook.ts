@@ -109,10 +109,12 @@ export interface WorkbookOptions {
   /** Engine to run on. `'stub'` is a small in-memory engine for tests and demos. Default `'wasm'`. */
   readonly engine?: 'wasm' | 'stub';
   /** Locale whose new-workbook defaults `createDefault` applies (font, row height). A loaded file
-   *  keeps its own. Default `'en'`. */
+   *  keeps its own defaults; `load` opens it under this locale's profile when given, so a
+   *  manually calculated book keeps exactly the stale values the file carries. Default `'en'`. */
   readonly locale?: string;
   /** Desktop platform whose new-workbook profile `createDefault` uses; a profile that cannot load
-   *  rejects. Default `'default'` (Windows). */
+   *  rejects. `load` opens the file under this platform's profile when given. Pass the same
+   *  locale and platform the spreadsheet mounts with. Default `'default'` (Windows). */
   readonly platform?: SpreadsheetPlatform;
   /** Resolves the URL of the engine's `.wasm` file for hosts that serve it elsewhere. */
   readonly locateFile?: LoadOptions['locateFile'];
@@ -282,11 +284,11 @@ export class Workbook {
   /** Reads a workbook from `.xlsx` or `.xlsb` bytes. */
   static async load(bytes: Uint8Array, options: WorkbookOptions = {}): Promise<Workbook> {
     options.signal?.throwIfAborted();
-    const handle = await WorkbookHandle.loadBytes(bytes, loadOptionsOf(options)).then(
-      undefined,
-      initFailure,
-    );
-    if (options.platform) handle.geometryPlatform = options.platform;
+    const handle = await WorkbookHandle.loadBytes(bytes, {
+      ...loadOptionsOf(options),
+      ...(options.locale !== undefined ? { locale: options.locale } : {}),
+      ...(options.platform !== undefined ? { platform: options.platform } : {}),
+    }).then(undefined, initFailure);
     return Workbook.#adopt(handle, options, detectSourceFormat(bytes));
   }
 

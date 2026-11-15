@@ -320,10 +320,23 @@ export class WorkbookHandle {
     return handle;
   }
 
-  static async loadBytes(bytes: Uint8Array, opts: LoadOptions = {}): Promise<WorkbookHandle> {
-    const module = await loadFormulon(opts);
-    const wb = module.Workbook.load(bytes);
+  /** Load `.xlsx` / `.xlsb` bytes. Given `locale` or `platform`, the book opens under that
+   *  pair's engine profile, so it needs no profile switch later and a manual-calculation book
+   *  keeps the stale state the file carries. A stub engine has no profiles. */
+  static async loadBytes(
+    bytes: Uint8Array,
+    opts: LoadOptions & { locale?: string; platform?: SpreadsheetPlatform } = {},
+  ): Promise<WorkbookHandle> {
+    const { locale, platform, ...loadOptions } = opts;
+    const module = await loadFormulon(loadOptions);
+    const underProfile = !isUsingStub(module) && (locale !== undefined || platform !== undefined);
+    const wb = underProfile
+      ? module.Workbook.load(bytes, {
+          profileId: engineProfileIdFor(locale ?? 'en', platform ?? 'default'),
+        })
+      : module.Workbook.load(bytes);
     const handle = new WorkbookHandle(module, wb);
+    if (platform !== undefined) handle.geometryPlatform = platform;
     handle.loadLosses = loadDiagnosticsFromEngine(wb.getDiagnostics());
     return handle;
   }
