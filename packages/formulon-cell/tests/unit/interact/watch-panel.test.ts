@@ -129,6 +129,22 @@ describe('attachWatchPanel', () => {
     handle.detach();
   });
 
+  it('leaves focus where it went before the first frame after open', async () => {
+    const handle = attachWatchPanel({ host, store, getWb: () => wb });
+    host.focus();
+    handle.open();
+    const addBtn = host.querySelector<HTMLButtonElement>('.fc-watch__btn');
+    addBtn?.focus();
+    addBtn?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    expect(document.activeElement).toBe(host);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    expect(document.activeElement).toBe(host);
+    handle.detach();
+  });
+
   it('close button closes the panel and restores focus to the opener', async () => {
     const handle = attachWatchPanel({ host, store, getWb: () => wb });
     host.focus();

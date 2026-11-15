@@ -9,7 +9,12 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogButton, bindPaneEscape, markSurface } from './dialog-shell.js';
+import {
+  appendDialogButton,
+  bindPaneEscape,
+  deferInitialFocus,
+  markSurface,
+} from './dialog-shell.js';
 import { bindRovingRows, setRovingStop } from './roving-rows.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
@@ -163,11 +168,8 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   let restoreFocusEl: HTMLElement | null = null;
 
   const focusInitial = (): void => {
-    requestAnimationFrame(() => {
-      if (root.hidden) return;
-      if (root.contains(document.activeElement)) return;
-      addBtn.focus({ preventScroll: true });
-    });
+    if (root.contains(document.activeElement)) return;
+    deferInitialFocus(root, () => addBtn.focus({ preventScroll: true }));
   };
 
   const restoreFocus = (): void => {

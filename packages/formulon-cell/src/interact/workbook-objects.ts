@@ -616,11 +616,13 @@ export function attachWorkbookObjectsPanel(
     root.appendChild(body);
   };
 
-  // A re-render replaces every control, so focus returns to the control with
-  // the same tag and data attributes.
+  // A re-render replaces every control, so focus returns to the control with the same tag,
+  // class, label and data attributes, the same one of its kind; failing that, to the panel.
   const focusKeyOf = (el: Element): string =>
     [
       el.tagName,
+      el.className,
+      el.getAttribute('aria-label') ?? '',
       ...Array.from(el.attributes)
         .filter((attr) => attr.name.startsWith('data-pivot'))
         .map((attr) => `${attr.name}=${attr.value}`),
@@ -628,13 +630,15 @@ export function attachWorkbookObjectsPanel(
   const refresh = (): void => {
     if (!open) return;
     const focused = document.activeElement;
-    const focusKey =
-      focused instanceof HTMLElement && root.contains(focused) ? focusKeyOf(focused) : null;
+    const inside = focused instanceof HTMLElement && root.contains(focused) && focused !== root;
+    const focusKey = inside ? focusKeyOf(focused) : null;
+    const sameKind = (key: string): HTMLElement[] =>
+      Array.from(root.querySelectorAll<HTMLElement>('*')).filter((el) => focusKeyOf(el) === key);
+    const ordinal = focusKey ? sameKind(focusKey).indexOf(focused as HTMLElement) : -1;
     render();
-    if (!focusKey?.includes('|')) return;
-    Array.from(root.querySelectorAll<HTMLElement>('*'))
-      .find((el) => focusKeyOf(el) === focusKey)
-      ?.focus({ preventScroll: true });
+    if (focusKey === null || root.contains(document.activeElement)) return;
+    const target = sameKind(focusKey)[ordinal] ?? root;
+    target.focus({ preventScroll: true });
   };
   const unsubscribeSessionObjects = deps.subscribeSessionObjects?.(refresh) ?? null;
 

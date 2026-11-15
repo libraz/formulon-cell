@@ -429,6 +429,61 @@ describe('PivotTable Fields pane', () => {
     wb.dispose();
   });
 
+  it('keeps focus on the same control when a store change re-renders it, so Escape still reaches the pane', async () => {
+    const wb = await setup();
+    const store = createSpreadsheetStore();
+    const listeners: Array<() => void> = [];
+    const handle = attachWorkbookObjectsPanel({
+      store,
+      host,
+      wb,
+      strings: en,
+      history: null,
+      subscribeSessionObjects: (listener) => {
+        listeners.push(listener);
+        return () => {};
+      },
+    });
+    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    const root = host.querySelector<HTMLElement>('.fc-objects');
+    if (!root) throw new Error('missing pane root');
+    const focusable = (): HTMLElement[] =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+    const identity = (el: Element): string =>
+      `${el.tagName}|${el.className}|${el.getAttribute('aria-label') ?? ''}|${el.textContent ?? ''}`;
+    const lost: string[] = [];
+    const count = focusable().length;
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i += 1) {
+      const control = focusable()[i];
+      if (!control) break;
+      const id = identity(control);
+      control.focus();
+      for (const listener of listeners) listener();
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !root.contains(active) || identity(active) !== id) {
+        lost.push(
+          `${i} ${id} -> ${active === document.body ? 'body' : identity(active as Element)}`,
+        );
+      }
+    }
+    expect(lost).toEqual([]);
+    const first = focusable()[0];
+    first?.focus();
+    for (const listener of listeners) listener();
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    expect(handle.isPivotFieldListOpen()).toBe(true);
+    expect(document.activeElement).toBe(host);
+    handle.detach();
+    wb.dispose();
+  });
+
   it('docks in the host task-pane dock and leaves it on close', async () => {
     const wb = await setup();
     const dock = document.createElement('div');

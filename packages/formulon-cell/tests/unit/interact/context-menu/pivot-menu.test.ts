@@ -414,6 +414,19 @@ describe('PivotTable context menu, as measured on the Mac app', () => {
     expect(document.querySelector('.fc-pivot-filter-panel')).toBeTruthy();
   });
 
+  it('focuses the filter panel search after the menu hands focus back to the sheet', async () => {
+    open(CELL.item);
+    submenu('pivotFilterMenu');
+    const button = item('pivotFilterLabel');
+    if (!button) throw new Error('missing item pivotFilterLabel');
+    button.focus();
+    button.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const panel = document.querySelector('.fc-pivot-filter-panel');
+    expect(panel?.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.tagName).toBe('INPUT');
+  });
+
   it('moves an item within its field as one undo step', () => {
     const order = () =>
       Array.from(wb.pivotCells(0))
