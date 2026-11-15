@@ -75,6 +75,7 @@ describe('fill shortcuts (Ctrl+D / Ctrl+R / Ctrl+E)', () => {
       formatDialog: () => null,
       formatPainter: () => null,
       goToDialog: () => null,
+      insertFunction: () => undefined,
       history,
       host: document.createElement('div'),
       hostTag: document.createElement('input'),

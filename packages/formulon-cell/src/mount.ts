@@ -573,6 +573,7 @@ export const Spreadsheet = {
       host,
       hostTag: tag,
       hyperlinkDialog: () => featureState.hyperlinkDialog,
+      insertFunction: () => instance.openFunctionArguments(),
       createTable: () =>
         void showCreateTableDialog(
           instance,

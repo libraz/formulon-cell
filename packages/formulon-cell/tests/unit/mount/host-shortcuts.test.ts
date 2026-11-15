@@ -100,6 +100,7 @@ function makeSetup(
     host,
     hostTag,
     hyperlinkDialog: () => feature.hyperlinkDialog,
+    insertFunction: () => undefined,
     createTable,
     invalidate,
     getLocale: () => locale,

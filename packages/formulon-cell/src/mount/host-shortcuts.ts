@@ -101,6 +101,8 @@ interface HostShortcutInput {
   host: HTMLElement;
   hostTag: HTMLInputElement;
   hyperlinkDialog: () => Pick<HyperlinkDialogHandle, 'open'> | null;
+  /** Opens Insert Function, as the ribbon's Insert Function button does (Shift+F3). */
+  insertFunction: () => void;
   /** Opens Create Table from the keyboard (Ctrl+T / Ctrl+L). */
   createTable: () => void;
   invalidate: () => void;
@@ -296,6 +298,11 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     if (matchesRibbonShortcut(e, 'spellingReview')) {
       e.preventDefault();
       if (canExecuteBuiltIn(input.store, 'spellingReview', 'keyboard').allowed) input.spelling();
+      return;
+    }
+    if (matchesRibbonShortcut(e, 'fx', 'fxInsert')) {
+      e.preventDefault();
+      if (canExecuteBuiltIn(input.store, 'fx', 'keyboard').allowed) input.insertFunction();
       return;
     }
     if (matchesRibbonShortcut(e, 'namedRanges')) {
