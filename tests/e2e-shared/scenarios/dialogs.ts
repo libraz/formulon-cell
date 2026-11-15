@@ -67,3 +67,88 @@ export async function runFunctionDialogShortcutScenario(page: Page): Promise<voi
   }
   expect(consoleErrors.read()).toEqual([]);
 }
+
+/** D03 (Mac) — Shift+F3 opens the docked Formula Builder pane with focus in
+ *  its search field. Escape leaves it open; Shift+Tab reaches its close button
+ *  (Chromium: WebKit leaves plain buttons out of the Tab order); the function
+ *  list is one tab stop, so one Tab leaves it; Tab moves out of the pane while
+ *  it stays open; in Chromium focus lands on the status bar and Shift+Tab comes
+ *  back into the pane (in WebKit the list is the page's last tab stop); the
+ *  close button hands focus to the sheet. */
+export async function runMacFormulaBuilderKeyboardScenario(page: Page): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  const consoleErrors = sp.collectConsoleErrors();
+  await sp.mount({ platform: 'mac' });
+  await sp.expectNoStub();
+  const host = page.locator('.fc-host').first();
+  const pane = page.locator('.fc-mac-formula-palette');
+  const search = pane.locator('.fc-mac-formula-palette__search');
+  const close = pane.locator('.fc-mac-formula-palette__header [data-action="close"]');
+
+  const open = async (): Promise<void> => {
+    await sp.focusHost();
+    await page.keyboard.press('Shift+F3');
+    await expect(pane).toBeVisible();
+    await expect(search).toBeFocused();
+  };
+
+  await open();
+  await page.keyboard.press('Escape');
+  await expect(pane).toBeVisible();
+
+  const webkit = page.context().browser()?.browserType().name() === 'webkit';
+  if (!webkit) {
+    await search.focus();
+    let reachedClose = false;
+    for (let i = 0; i < 8 && !reachedClose; i += 1) {
+      await page.keyboard.press('Shift+Tab');
+      reachedClose = await close.evaluate((el) => el === document.activeElement);
+    }
+    expect(reachedClose, 'Shift+Tab from the search field reaches the close button').toBe(true);
+  }
+
+  // Each section renders its own listbox; an empty section has no tab stop.
+  const inList = () =>
+    pane.evaluate(
+      (el) =>
+        !!document.activeElement?.closest('[role="listbox"]') &&
+        el.contains(document.activeElement),
+    );
+  await search.focus();
+  let reachedList = false;
+  for (let i = 0; i < 4 && !reachedList; i += 1) {
+    await page.keyboard.press('Tab');
+    reachedList = await inList();
+  }
+  expect(reachedList, 'Tab from the search field reaches the function list').toBe(true);
+  await page.keyboard.press('Tab');
+  expect(await inList(), 'one Tab leaves the function list').toBe(false);
+
+  await search.focus();
+  let left = false;
+  for (let i = 0; i < 12 && !left; i += 1) {
+    await page.keyboard.press('Tab');
+    left = await pane.evaluate((el) => !el.contains(document.activeElement));
+  }
+  expect(left, 'Tab moves focus out of the pane').toBe(true);
+  await expect(pane, 'the docked pane stays open after Tab leaves it').toBeVisible();
+  if (!webkit) {
+    expect(
+      await page.evaluate(() => {
+        const active = document.activeElement;
+        return !!active && active !== document.body && active !== document.documentElement;
+      }),
+      'focus lands on a control after leaving the pane',
+    ).toBe(true);
+    await page.keyboard.press('Shift+Tab');
+    expect(
+      await pane.evaluate((el) => el.contains(document.activeElement)),
+      'Shift+Tab returns into the pane',
+    ).toBe(true);
+  }
+
+  await close.click();
+  await expect(pane).toBeHidden();
+  await expect(host).toBeFocused();
+  expect(consoleErrors.read()).toEqual([]);
+}
