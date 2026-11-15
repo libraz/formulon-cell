@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** B5 — inactive ribbon panels do NOT capture Tab focus.
@@ -72,4 +73,78 @@ export async function runRibbonInactiveFocusScenario(page: Page): Promise<void> 
     return panel?.hidden ? 'hidden' : 'visible';
   });
   expect(homeFocusableNow).toBe('hidden');
+}
+
+const SPLIT_BUTTON = 'button[data-ribbon-menu-id]:has(.fc-tb__rb-split-chevron)';
+
+/** B6 — Alt+Down on a focused split button opens its menu with aria-expanded
+ *  set and focus on the first shown, enabled item, or on the menu itself when
+ *  it has none; Escape closes the menu and returns focus to the button. Every
+ *  enabled split button on every ribbon tab is walked. */
+export async function runRibbonSplitAltDownScenario(
+  page: Page,
+  platform: 'default' | 'mac',
+): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  await sp.mount({ platform });
+  await sp.expectNoStub();
+
+  const tabs = await page
+    .locator('[data-ribbon-tab]:visible')
+    .evaluateAll((els) =>
+      els
+        .map((el) => (el as HTMLElement).dataset.ribbonTab ?? '')
+        .filter((id) => id && id !== 'file'),
+    );
+  const failures: string[] = [];
+  let walked = 0;
+  for (const tab of tabs) {
+    await selectRibbonTab(page, tab);
+    const buttons = page.locator(`[data-ribbon-panel="${tab}"] ${SPLIT_BUTTON}`);
+    const count = await buttons.count();
+    for (let i = 0; i < count; i += 1) {
+      const button = buttons.nth(i);
+      if (!(await button.isVisible()) || (await button.isDisabled())) continue;
+      if ((await button.getAttribute('aria-disabled')) === 'true') continue;
+      const label = `${tab}/${(await button.getAttribute('aria-label')) ?? i}`;
+      walked += 1;
+      await button.focus();
+      await page.keyboard.press('Alt+ArrowDown');
+      await expect(button, `${label} aria-expanded`).toHaveAttribute('aria-expanded', 'true');
+      const focus = await page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null;
+        const menu = active?.closest<HTMLElement>('[role="menu"]') ?? null;
+        if (!active || !menu)
+          return { inMenu: false, ok: false, got: active?.outerHTML.slice(0, 80) };
+        const shown = (el: HTMLElement) => el.getClientRects().length > 0;
+        const items = Array.from(
+          menu.querySelectorAll<HTMLElement>(
+            '[role="menuitem"],[role="menuitemradio"],[role="menuitemcheckbox"]',
+          ),
+        ).filter(
+          (el) =>
+            el.closest('[role="menu"]') === menu &&
+            shown(el) &&
+            el.getAttribute('aria-disabled') !== 'true' &&
+            !(el as HTMLButtonElement).disabled,
+        );
+        const expected = items[0] ?? menu;
+        return {
+          inMenu: true,
+          ok: active === expected,
+          got: active.getAttribute('aria-label') ?? active.textContent?.trim().slice(0, 40),
+          want: expected.getAttribute('aria-label') ?? expected.textContent?.trim().slice(0, 40),
+        };
+      });
+      if (!focus.ok) failures.push(`${label}: focus ${JSON.stringify(focus)}`);
+      await page.keyboard.press('Escape');
+      await expect(button, `${label} collapses on Escape`).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      await expect(button, `${label} keeps focus after Escape`).toBeFocused();
+    }
+  }
+  expect(walked, 'split buttons walked').toBeGreaterThan(0);
+  expect(failures).toEqual([]);
 }
