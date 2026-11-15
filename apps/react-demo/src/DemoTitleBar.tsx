@@ -153,6 +153,7 @@ export const DemoTitleBar = ({
 
   return (
     <header className="demo__head">
+      <h1 className="demo__visually-hidden">{bookName}</h1>
       <div className="fc-tb__titlebar">
         <div
           ref={quickAccessRef}

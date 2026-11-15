@@ -186,6 +186,7 @@ onBeforeUnmount(() => {
 
 <template>
   <header class="demo__head">
+    <h1 class="demo__visually-hidden">{{ bookName }}</h1>
     <div class="fc-tb__titlebar">
       <div
         ref="quickAccess"
