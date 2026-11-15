@@ -14,3 +14,10 @@ test('B6 (react-demo): Alt+Down opens each split button menu on its first enable
   test.setTimeout(120_000);
   await runRibbonSplitAltDownScenario(page, 'default');
 });
+
+test('B6 Mac (react-demo): Alt+Down opens each split button menu on its first enabled item', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await runRibbonSplitAltDownScenario(page, 'mac');
+});

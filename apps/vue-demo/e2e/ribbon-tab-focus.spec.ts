@@ -14,3 +14,10 @@ test('B6 (vue-demo): Alt+Down opens each split button menu on its first enabled 
   test.setTimeout(120_000);
   await runRibbonSplitAltDownScenario(page, 'default');
 });
+
+test('B6 Mac (vue-demo): Alt+Down opens each split button menu on its first enabled item', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await runRibbonSplitAltDownScenario(page, 'mac');
+});
