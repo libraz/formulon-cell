@@ -100,3 +100,52 @@ export async function runViewportNavigationScenario(page: Page): Promise<void> {
   await walk(page, 'Tab', ['B2']);
   await sp.expectNoConsoleErrors();
 }
+
+/** Whether keyboard focus is on the sheet: the host itself or inside the grid. */
+const sheetFocused = (page: Page) =>
+  page.evaluate(() => {
+    const el = document.activeElement;
+    const host = (window as unknown as DemoWindow).__fcInst.host;
+    return el === host || !!el?.closest('.fc-host__grid');
+  });
+
+/** Shift+Tab mirrors Tab. With no viewport it walks left and stops at column A. With
+ *  `tabNavigation: 'editable'` both keys move only between the cells the policy lets the user
+ *  edit, in reading order, and stop at the first and last of them; with `tabBoundary: 'leave'`
+ *  Shift+Tab at the first one moves focus off the sheet and leaves the active cell alone. */
+export async function runTabWalkScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount({ fixture: 'empty' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await sp.expectNoStub();
+
+  await applyViewport(page, null, 'C3');
+  await walk(page, 'Shift+Tab', ['B3', 'A3', 'A3']);
+  expect(await sheetFocused(page), 'Shift+Tab at column A keeps focus on the sheet').toBe(true);
+
+  await page.evaluate(() =>
+    (window as unknown as DemoWindow).__fcInst.update({
+      policy: { editable: ['A1', 'C1', 'B3'], operations: { valueEdit: true } },
+    }),
+  );
+  await applyViewport(
+    page,
+    { mode: 'auto', selectable: ['A1:C3'], tabNavigation: 'editable' },
+    'A1',
+  );
+  await walk(page, 'Tab', ['C1', 'B3', 'B3']);
+  expect(await sheetFocused(page), 'Tab at the last editable cell keeps focus').toBe(true);
+  await walk(page, 'Shift+Tab', ['C1', 'A1', 'A1']);
+  expect(await sheetFocused(page), 'Shift+Tab at the first editable cell keeps focus').toBe(true);
+
+  await applyViewport(
+    page,
+    { mode: 'auto', selectable: ['A1:C3'], tabNavigation: 'editable', tabBoundary: 'leave' },
+    'C1',
+  );
+  await walk(page, 'Shift+Tab', ['A1']);
+  await page.keyboard.press('Shift+Tab');
+  await expect.poll(() => sheetFocused(page), 'Shift+Tab leaves the sheet').toBe(false);
+  expect(await active(page)).toBe('A1');
+  await sp.expectNoConsoleErrors();
+}
