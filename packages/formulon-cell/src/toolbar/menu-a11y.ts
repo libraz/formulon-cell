@@ -74,7 +74,9 @@ export function projectValueName(el: HTMLElement, value: string | null, name?: s
     '';
   el.dataset[CONTROL_NAME_KEY] = base;
   const shown = value?.trim() ?? '';
-  const label = shown ? (base ? `${base}: ${shown}` : shown) : base;
+  // A name that already ends in a colon ("Width:", "Largeur :") takes the value after a space.
+  const joiner = /[:：]\s*$/.test(base) ? ' ' : ': ';
+  const label = shown ? (base ? `${base.trimEnd()}${joiner}${shown}` : shown) : base;
   if (label) el.setAttribute('aria-label', label);
   return label;
 }
