@@ -125,8 +125,8 @@ export async function runMacErrorCheckingPaneScenario(
     await expect(backstage).toBeVisible();
     await backstage.getByRole('button', { name: text.options, exact: true }).first().click();
     await expect(prefs).toBeVisible();
-    await prefs.locator('[role="toolbar"] .fc-prefs__heading').waitFor();
-    await prefs.locator('[role="toolbar"] button').nth(2).click();
+    // Opened with no pane, the window shows the pane list.
+    await expect(prefs.locator('.fc-prefs__pane:not([hidden])')).toHaveCount(0);
     await prefs.locator('.fc-prefs__pane-button[data-pane="errorChecking"]').click();
     await expect(pane).toBeVisible();
     await expect(prefs.locator('.fc-prefs__heading')).toHaveText(text.pane);

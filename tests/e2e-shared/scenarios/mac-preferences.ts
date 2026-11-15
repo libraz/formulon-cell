@@ -2,9 +2,9 @@ import { expect, type Page } from '@playwright/test';
 
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
-/** File > Options opens the Mac Preferences window. Its toolbar carries Back and Forward, Show
- *  All, the shown pane's name and Search; Show All lists the panes, a pane button opens one, and
- *  Back steps back to Show All. */
+/** File > Options opens the Mac Preferences window on Show All. Its toolbar carries Back and
+ *  Forward, Show All, the shown pane's name and Search; a pane button opens a pane, Show All
+ *  returns to the list, and Back and Forward step through the visits. */
 export async function runMacPreferencesScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
@@ -26,22 +26,25 @@ export async function runMacPreferencesScenario(page: Page): Promise<void> {
   await expect(forward).toBeDisabled();
   await expect(showAll).toBeVisible();
   await expect(toolbar.getByRole('searchbox', { name: 'Search', exact: true })).toBeVisible();
-  // The window opens on its first pane.
-  await expect(heading).toHaveText('View');
-  await expect(prefs.locator('.fc-prefs__pane[data-pane="view"]')).toBeVisible();
-
-  await showAll.click();
+  // The window opens on Show All: the pane list, no pane shown.
   await expect(heading).toHaveText('');
+  await expect(prefs).toHaveAttribute('aria-label', 'Preferences');
   await expect(prefs.locator('.fc-prefs__pane:not([hidden])')).toHaveCount(0);
-  await expect(back).toBeEnabled();
-  await expect(forward).toBeDisabled();
 
   await prefs.locator('.fc-prefs__pane-button[data-pane="view"]').click();
   await expect(heading).toHaveText('View');
   await expect(prefs).toHaveAttribute('aria-label', 'View');
   await expect(prefs.locator('.fc-prefs__pane[data-pane="view"]')).toBeVisible();
   await expect(back).toBeEnabled();
+  await expect(forward).toBeDisabled();
 
+  await showAll.click();
+  await expect(heading).toHaveText('');
+  await expect(prefs.locator('.fc-prefs__pane:not([hidden])')).toHaveCount(0);
+  await expect(back).toBeEnabled();
+
+  await back.click();
+  await expect(heading).toHaveText('View');
   await back.click();
   await expect(heading).toHaveText('');
   await expect(prefs).toHaveAttribute('aria-label', 'Preferences');
@@ -68,8 +71,8 @@ const OPTIONS_LABEL = {
   zh: '选项',
 } as const;
 
-/** The Preferences window opens on View, and its toolbar heading and accessible name carry the
- *  pane title in the UI language. */
+/** The View pane, opened from Preferences, carries its title in the UI language in the toolbar
+ *  heading and the window's accessible name. */
 export async function runMacPreferencesViewTitleScenario(
   page: Page,
   locale: keyof typeof VIEW_PANE_TITLE,
@@ -84,6 +87,7 @@ export async function runMacPreferencesViewTitleScenario(
   await backstage.getByRole('button', { name: OPTIONS_LABEL[locale], exact: true }).first().click();
   const prefs = page.locator('.fc-prefs[role="dialog"]:not([hidden])');
   await expect(prefs).toBeVisible();
+  await prefs.locator('.fc-prefs__pane-button[data-pane="view"]').click();
   const title = VIEW_PANE_TITLE[locale];
   await expect(prefs.locator('.fc-prefs__pane[data-pane="view"]')).toBeVisible();
   await expect(prefs.locator('.fc-prefs__heading')).toHaveText(title);
