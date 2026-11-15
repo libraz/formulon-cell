@@ -125,6 +125,21 @@ export async function runExcelChromeBackstageSearchScenario(page: Page): Promise
   await expect(disabledHelpResult).toHaveAttribute('data-disabled-reason', 'Coming soon');
   await expect(disabledHelpResult).toContainText('Help');
   await expect(disabledHelpResult).toContainText('Coming soon');
+
+  // Results are reached by arrow keys, so Tab leaves the box for the next control instead of
+  // landing on a result the closing popup removes.
+  for (const query of ['coming soon', '']) {
+    await search.focus();
+    await search.fill(query);
+    await search.press('Tab');
+    await expect(search).not.toBeFocused();
+    const landed = await page.evaluate(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body) return 'body';
+      return active.getAttribute('role') === 'option' ? 'option' : 'control';
+    });
+    expect(landed, `Tab from the search box with "${query}"`).toBe('control');
+  }
 }
 
 export async function runExcelChromeTableStyleGalleryScenario(page: Page): Promise<void> {

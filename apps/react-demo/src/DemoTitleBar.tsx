@@ -312,6 +312,7 @@ export const DemoTitleBar = ({
                           id={demoSearchOptionId(index)}
                           type="button"
                           role="option"
+                          tabIndex={-1}
                           aria-selected={index === searchActiveIndex}
                           aria-disabled={item.disabled ? 'true' : undefined}
                           className={`demo__search-suggestion${
@@ -343,6 +344,7 @@ export const DemoTitleBar = ({
                       id={demoSearchOptionId(index)}
                       type="button"
                       role="option"
+                      tabIndex={-1}
                       aria-selected={index === searchActiveIndex}
                       aria-disabled={cmd.disabled ? 'true' : undefined}
                       data-disabled-reason={cmd.disabledReason}

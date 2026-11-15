@@ -276,6 +276,7 @@ onBeforeUnmount(() => {
               :id="demoSearchOptionId(suggestions.indexOf(item))"
               type="button"
               role="option"
+              tabindex="-1"
               :aria-selected="suggestions.indexOf(item) === searchActiveIndex"
               :aria-disabled="item.disabled ? 'true' : undefined"
               :class="[
@@ -303,6 +304,7 @@ onBeforeUnmount(() => {
             :id="demoSearchOptionId(index)"
             type="button"
             role="option"
+            tabindex="-1"
             :aria-selected="index === searchActiveIndex"
             :aria-disabled="cmd.disabled ? 'true' : undefined"
             :data-disabled-reason="cmd.disabledReason"
