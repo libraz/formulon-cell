@@ -316,7 +316,19 @@ async function runMacStaleValueMenu(
     'editCell',
     'options',
   ]);
-  await expect(menu.locator('[data-fc-action="options"]')).toHaveAttribute('aria-disabled', 'true');
+  // Error Checking Options... opens Preferences on the Error Checking pane.
+  const options = menu.locator('[data-fc-action="options"]');
+  await expect(options).not.toHaveAttribute('aria-disabled', 'true');
+  await options.click();
+  await expect(menu).toBeHidden();
+  const prefs = page.locator('.fc-prefs[role="dialog"]:not([hidden])');
+  await expect(prefs).toBeVisible();
+  await expect(prefs.locator('.fc-prefs__pane[data-pane="errorChecking"]')).toBeVisible();
+  await expect(prefs.locator('.fc-prefs__heading')).toHaveText('Error Checking');
+  await prefs.locator('.fc-fmtdlg__close').first().click();
+  await expect(prefs).toBeHidden();
+  expect(await staleB2()).toBe(true);
+  await openStaleMenu();
 
   // Calculate Now recalculates and keeps manual calculation.
   await menu.locator('[data-fc-action="calculateNow"]').click();
