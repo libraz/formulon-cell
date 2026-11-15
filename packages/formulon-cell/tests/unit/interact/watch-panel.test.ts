@@ -182,6 +182,60 @@ describe('attachWatchPanel', () => {
     handle.detach();
   });
 
+  it('gives its rows one tab stop, on the selected watch, and moves between them with the arrows', () => {
+    mutators.setWatchPanelOpen(store, true);
+    for (const row of [1, 2, 3]) mutators.addWatch(store, { sheet: 0, row, col: 1 });
+    mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
+    const handle = attachWatchPanel({ host, store, getWb: () => wb });
+    const rows = Array.from(host.querySelectorAll<HTMLTableRowElement>('.fc-watch__row'));
+    expect(rows.map((row) => row.tabIndex)).toEqual([-1, 0, -1]);
+    const press = (key: string): void => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+      );
+    };
+    rows[1]?.focus();
+    press('ArrowDown');
+    expect(document.activeElement).toBe(rows[2]);
+    expect(rows.map((row) => row.tabIndex)).toEqual([-1, -1, 0]);
+    press('Home');
+    expect(document.activeElement).toBe(rows[0]);
+    press('End');
+    expect(document.activeElement).toBe(rows[2]);
+    press('ArrowUp');
+    expect(document.activeElement).toBe(rows[1]);
+    handle.detach();
+  });
+
+  it('reaches Remove from the row: Delete removes the watch and focus moves on', () => {
+    mutators.setWatchPanelOpen(store, true);
+    for (const row of [1, 2, 3]) mutators.addWatch(store, { sheet: 0, row, col: 1 });
+    const handle = attachWatchPanel({ host, store, getWb: () => wb });
+    const rows = (): HTMLTableRowElement[] =>
+      Array.from(host.querySelectorAll<HTMLTableRowElement>('.fc-watch__row'));
+    const removeButtons = Array.from(host.querySelectorAll<HTMLButtonElement>('.fc-watch__remove'));
+    expect(removeButtons).toHaveLength(3);
+    expect(removeButtons.every((button) => button.tabIndex === -1)).toBe(true);
+    const removeFocused = (): void => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }),
+      );
+    };
+    rows()[1]?.focus();
+    removeFocused();
+    expect(store.getState().watch.watches.map((addr) => addr.row)).toEqual([1, 3]);
+    expect(document.activeElement).toBe(rows()[1]);
+    expect(rows()[1]?.dataset.fcRow).toBe('3');
+    expect(rows()[1]?.tabIndex).toBe(0);
+    removeFocused();
+    expect(document.activeElement).toBe(rows()[0]);
+    expect(rows()[0]?.dataset.fcRow).toBe('1');
+    removeFocused();
+    expect(store.getState().watch.watches).toEqual([]);
+    expect(document.activeElement).toBe(host.querySelector('.fc-watch__btn'));
+    handle.detach();
+  });
+
   it('clicking a row jumps the active selection to that cell', () => {
     mutators.setWatchPanelOpen(store, true);
     mutators.addWatch(store, { sheet: 0, row: 4, col: 5 });

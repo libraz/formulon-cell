@@ -8,6 +8,7 @@ import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachChromeSync } from '../../../src/mount/chrome-sync.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
+import { pressTab, tabStops } from '../../test-utils/tab-order.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -490,6 +491,40 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     const sel = sheet.instance.store.getState().selection;
     expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 });
     expect(document.querySelector('.fc-namebox-menu')).toBeNull();
+  });
+
+  it('gives the defined-name list one tab stop, and Tab or Shift+Tab leaves and closes it', () => {
+    const wb = sheet.workbook as unknown as {
+      definedNames: () => Generator<{ name: string; formula: string; localSheetId: number }>;
+    };
+    wb.definedNames = function* () {
+      for (const name of ['Alpha', 'Beta', 'Gamma'])
+        yield { name, formula: 'Sheet1!$A$1', localSheetId: -1 };
+    };
+    const open = (): HTMLButtonElement[] => {
+      tag.focus();
+      tag.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+      );
+      return Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-namebox-menu [role="option"]'),
+      );
+    };
+    const items = open();
+    expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1]);
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }),
+    );
+    expect(document.activeElement).toBe(items[2]);
+    expect(items.map((item) => item.tabIndex)).toEqual([-1, -1, 0]);
+
+    for (const back of [false, true]) {
+      open();
+      const before = tabStops().indexOf(tag);
+      expect(pressTab(back)).toBe(true);
+      expect(document.querySelector('.fc-namebox-menu')).toBeNull();
+      expect(document.activeElement).toBe(tabStops()[before + (back ? -1 : 1)]);
+    }
   });
 
   it('Enter on a defined name prefers the active sheet scoped name', () => {

@@ -30,6 +30,7 @@ import {
 } from './navigation-policy.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
+import { bindRovingRows, setRovingStop } from './roving-rows.js';
 import { attachValidationAlert } from './validation.js';
 
 export interface GoToDialogDeps {
@@ -134,6 +135,10 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   targetList.setAttribute('role', 'listbox');
   targetList.setAttribute('aria-label', t.goToLabel);
   body.appendChild(targetList);
+  const targetRows = (): HTMLElement[] =>
+    Array.from(targetList.querySelectorAll<HTMLElement>('[role="option"]'));
+  // The list takes one tab stop; the arrow keys move between its entries.
+  const detachTargetRows = bindRovingRows(targetList, targetRows);
 
   // ── Go To: direct reference ───────────────────────────────────────────
   const referenceRow = document.createElement('label');
@@ -404,6 +409,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       });
       targetList.appendChild(item);
     }
+    setRovingStop(targetRows());
     targetList.hidden = entries.length === 0;
     listLegend.hidden = entries.length === 0;
   };
@@ -538,6 +544,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       host.focus();
     },
     detach(): void {
+      detachTargetRows();
       alertDialog.detach();
       shell.dispose();
     },

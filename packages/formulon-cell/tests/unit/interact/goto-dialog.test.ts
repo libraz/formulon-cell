@@ -317,6 +317,30 @@ describe('attachGoToDialog', () => {
     handle.detach();
   });
 
+  it('gives the Go To list one tab stop and moves between entries with the arrows', () => {
+    defineNames(wb, { Alpha: '=Sheet1!$A$1', Beta: '=Sheet1!$B$1', Gamma: '=Sheet1!$C$1' });
+    const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
+    handle.open('go-to');
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>('.fc-goto__targets [role="option"]'),
+    );
+    expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1]);
+    const press = (key: string): void => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+      );
+    };
+    items[0]?.focus();
+    press('ArrowDown');
+    expect(document.activeElement).toBe(items[1]);
+    expect(items.map((item) => item.tabIndex)).toEqual([-1, 0, -1]);
+    press('End');
+    expect(document.activeElement).toBe(items[2]);
+    press('Home');
+    expect(document.activeElement).toBe(items[0]);
+    handle.detach();
+  });
+
   it('keeps only the last four recent references, newest first', () => {
     const handle = attachGoToDialog({ host, store, getWb: () => wb, strings: ja });
     for (const ref of ['A1', 'B1', 'C1', 'D1', 'E1', 'C1']) {

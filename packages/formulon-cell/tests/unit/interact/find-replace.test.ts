@@ -202,6 +202,36 @@ describe('attachFindReplace', () => {
     handle.detach();
   });
 
+  it('gives the Find All results one tab stop and moves between them with the arrows', () => {
+    seed(store, wb, [
+      { row: 1, col: 0, value: 'apple' },
+      { row: 3, col: 2, value: 'apple' },
+      { row: 5, col: 1, value: 'apple' },
+    ]);
+    const handle = attachFindReplace({ host, store, wb });
+    handle.open();
+    setInputValue($<HTMLInputElement>(host, '#fc-find-find-input'), 'apple');
+    $<HTMLButtonElement>(host, '.fc-find__btn--find-all').click();
+    const rows = Array.from(
+      host.querySelectorAll<HTMLTableRowElement>('.fc-find__results tbody tr'),
+    );
+    expect(rows.map((row) => row.tabIndex)).toEqual([0, -1, -1]);
+    const press = (key: string): void => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+      );
+    };
+    rows[0]?.focus();
+    press('ArrowDown');
+    expect(document.activeElement).toBe(rows[1]);
+    expect(rows.map((row) => row.tabIndex)).toEqual([-1, 0, -1]);
+    press('End');
+    expect(document.activeElement).toBe(rows[2]);
+    press('Home');
+    expect(document.activeElement).toBe(rows[0]);
+    handle.detach();
+  });
+
   it('renders and replaces a workbook-scoped inactive formula under navigation restriction', () => {
     const otherSheet = wb.addSheet('Other');
     const addr = { sheet: otherSheet, row: 0, col: 0 };

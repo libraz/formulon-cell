@@ -2,6 +2,7 @@ import { isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { makeButton, makeIconButton } from './mac-formula-palette-buttons.js';
 import type { MacPaletteStrings } from './mac-formula-palette-catalog.js';
+import { bindRovingRows, setRovingStop } from './roving-rows.js';
 
 export interface PickerRefs {
   search: HTMLInputElement;
@@ -115,7 +116,7 @@ export function createMacFormulaPaletteView(root: HTMLElement, ctx: MacFormulaPa
       row.className = 'fc-mac-formula-palette__function';
       row.dataset.functionName = entry.name;
       row.setAttribute('role', 'option');
-      row.tabIndex = 0;
+      row.tabIndex = -1;
       row.setAttribute('aria-selected', String(activeName === entry.name));
       if (entry.unavailable) {
         row.classList.add('is-unavailable');
@@ -143,6 +144,13 @@ export function createMacFormulaPaletteView(root: HTMLElement, ctx: MacFormulaPa
       });
       list.appendChild(row);
     }
+    // One tab stop per list: the selected row, else the first.
+    const rows = Array.from(list.children) as HTMLElement[];
+    setRovingStop(
+      rows,
+      rows.find((row) => row.getAttribute('aria-selected') === 'true'),
+    );
+    bindRovingRows(list, () => rows);
     if (!list.childElementCount) {
       const empty = document.createElement('p');
       empty.className = 'fc-mac-formula-palette__empty';

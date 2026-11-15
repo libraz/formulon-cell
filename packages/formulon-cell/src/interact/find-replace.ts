@@ -26,6 +26,7 @@ import { createDialogButton, deferInitialFocus } from './dialog-shell.js';
 import { createMacFindPanel, type MacFindPanel } from './mac-find-panel.js';
 import { isNavigationAddrAllowed, navigationPolicyFor } from './navigation-policy.js';
 import { openPopupMenu } from './popup-menu.js';
+import { bindRovingRows, setRovingStop } from './roving-rows.js';
 
 export interface FindReplaceDeps {
   host: HTMLElement;
@@ -213,6 +214,10 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   resultsHead.append(resultsHeadRow);
   const resultsBody = document.createElement('tbody');
   resultsTable.append(resultsHead, resultsBody);
+  const resultRows = (): HTMLElement[] =>
+    Array.from(resultsBody.querySelectorAll<HTMLElement>(':scope > tr'));
+  // The results take one tab stop; the arrow keys move between them.
+  bindRovingRows(resultsBody, resultRows);
   const resultsSummary = document.createElement('div');
   resultsSummary.className = 'fc-find__results-summary fc-find__pill';
   resultsSummary.setAttribute('aria-live', 'polite');
@@ -415,7 +420,6 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     const displayOf = findDisplayResolver(store.getState(), opts());
     for (const match of all) {
       const tr = document.createElement('tr');
-      tr.tabIndex = 0;
       const sheetName = wb.sheetName(match.addr.sheet);
       const value = displayOf(match.addr);
       tr.append(td(sheetName), td(addrLabel(match.addr)), td(value));
@@ -433,6 +437,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       });
       resultsBody.append(tr);
     }
+    setRovingStop(resultRows());
     results.hidden = false;
     setStatus(all.length);
     resultsSummary.textContent = t.cellsFound.replace('{count}', String(all.length));

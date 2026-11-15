@@ -27,6 +27,7 @@ import type { Strings } from '../i18n/strings.js';
 import { scrollActiveIntoView } from '../interact/navigation-policy.js';
 import { onOutsidePress } from '../interact/outside-press.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
+import { setRovingStop } from '../interact/roving-rows.js';
 import { isSingleCell } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
@@ -670,9 +671,14 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       e.preventDefault();
       e.stopPropagation();
       const wrapped = (next + items.length) % items.length;
+      setRovingStop(items, items[wrapped]);
       items[wrapped]?.focus();
     };
-    if (e.key === 'Escape') {
+    if (e.key === 'Tab') {
+      // Tab leaves the list from the name box, as if the dropdown had not opened.
+      closeNameMenu();
+      tag.focus();
+    } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
       closeNameMenu();
@@ -757,7 +763,10 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       { event: 'pointerdown', capture: true },
     );
     document.addEventListener('keydown', onNameMenuDocKey, true);
-    menu.querySelector<HTMLButtonElement>('[role="option"]')?.focus();
+    // The list takes one tab stop; the arrow keys move between its names.
+    const options = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+    setRovingStop(options);
+    options[0]?.focus();
   };
 
   const onTagFocus = (): void => tag.select();

@@ -10,6 +10,7 @@ import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogButton } from './dialog-shell.js';
+import { bindRovingRows, setRovingStop } from './roving-rows.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
 export interface WatchPanelDeps {
@@ -263,6 +264,28 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     projectDisabledState(removeTool, selectedKey === null, null);
   };
 
+  const watchRows = (): HTMLElement[] =>
+    Array.from(tbody.querySelectorAll<HTMLElement>(':scope > .fc-watch__row'));
+  const detachRovingRows = bindRovingRows(tbody, watchRows);
+
+  // Removing the focused row hands focus to the next row, else the previous, else Add.
+  const removeRow = (row: HTMLElement, addr: Addr): void => {
+    const hadFocus = row.contains(document.activeElement);
+    const at = watchRows().indexOf(row);
+    recordWatchesChange(deps.history ?? null, store, () => {
+      mutators.removeWatch(store, addr);
+    });
+    if (!hadFocus) return;
+    const rows = watchRows();
+    const next = rows[at] ?? rows[at - 1];
+    if (!next) {
+      addBtn.focus();
+      return;
+    }
+    setRovingStop(rows, next);
+    next.focus();
+  };
+
   const renderRows = (): void => {
     const watches = store.getState().watch.watches;
     syncRemoveTool();
@@ -288,7 +311,6 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       tr.dataset.fcSheet = String(addr.sheet);
       tr.dataset.fcRow = String(addr.row);
       tr.dataset.fcCol = String(addr.col);
-      tr.tabIndex = 0;
       tr.setAttribute('aria-selected', String(selected));
 
       const tdBook = document.createElement('td');
@@ -315,12 +337,12 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
           baseClass: 'fc-watch__remove',
         });
         removeBtn.setAttribute('aria-label', strings.watchPanel.removeWatch);
+        // Reached from its row, which takes the list's one tab stop.
+        removeBtn.tabIndex = -1;
         removeBtn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          recordWatchesChange(deps.history ?? null, store, () => {
-            mutators.removeWatch(store, addr);
-          });
+          removeRow(tr, addr);
         });
         tr.appendChild(tdRemove);
       }
@@ -331,13 +353,23 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       };
       tr.addEventListener('click', choose);
       tr.addEventListener('keydown', (e) => {
+        if (e.target !== tr) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           choose();
+        } else if (e.key === 'Delete') {
+          e.preventDefault();
+          removeRow(tr, addr);
         }
       });
       tbody.appendChild(tr);
     }
+    // The rows take one tab stop, on the selected watch.
+    const rendered = watchRows();
+    setRovingStop(
+      rendered,
+      rendered.find((row) => row.getAttribute('aria-selected') === 'true'),
+    );
   };
 
   /** Jump the active selection to `addr`. Switches sheet (and re-hydrates
@@ -457,6 +489,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       clearBtn?.removeEventListener('click', onClear);
       closeBtn.removeEventListener('click', onClose);
       root.removeEventListener('keydown', onKeyDown);
+      detachRovingRows();
       unsub();
       root.remove();
       syncDock();
