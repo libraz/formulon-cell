@@ -51,7 +51,6 @@ import { reportDialogLabels, showReport } from '../toolbar/dialogs/report.js';
 import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
 import { backstageMenuText, pageScaleMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
 import {
-  analyzeAccessibilityCells,
   buildTranslationReviewItems,
   type RibbonReportLang,
   reviewCellsFromState,
@@ -81,6 +80,7 @@ import type { RibbonMenus, RibbonRenderHelpers } from '../toolbar/ribbon/render-
 import { createSelectColorRibbon } from '../toolbar/ribbon/select-color.js';
 import { toolbarText } from '../toolbar/ribbon-model.js';
 import { dispatchHostClipboard, handleAutoSum } from '../wrappers/toolbar-actions.js';
+import { showAccessibilityReport } from './accessibility-report.js';
 import { selectAdjacentComment, showCommentsList } from './dynamic-dropdown-defaults/review.js';
 import { showCreateTableDialog } from './dynamic-dropdown-defaults/styles.js';
 import { createDefaultDynamicDropdownsCtx } from './dynamic-dropdowns-defaults.js';
@@ -451,9 +451,7 @@ export function createDefaultRibbonHooks(
       },
       accessibility: () => {
         if (instance.openAccessibilityChecker()) return;
-        showReviewReport(instance.i18n.strings.ribbon.accessibility, (cells) =>
-          analyzeAccessibilityCells(cells, reportLang),
-        );
+        void showAccessibilityReport(instance);
       },
       deleteComment: () => {
         dropdowns.applyReviewCommentAction('delete-active');

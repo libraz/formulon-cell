@@ -167,7 +167,9 @@
   }
   .fc-pvfsdlg__fn-list {
     justify-self: end;
-    width: 285px;
+    /* Shrinks to its column, so a narrow panel cannot push it over the radios. */
+    width: 100%;
+    max-width: 285px;
     height: 101px;
   }
   .fc-pvfsdlg__footer {

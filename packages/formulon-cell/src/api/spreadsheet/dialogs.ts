@@ -17,6 +17,8 @@ import {
 } from '../../interact/preferences-dialog.js';
 import type { ChartSettingsTarget } from '../../interact/session-chart-settings.js';
 import { closeSpellingDialog, openSpellingDialog } from '../../interact/spelling-dialog.js';
+import { showAccessibilityReport } from '../../mount/accessibility-report.js';
+import { platformLacksFeature } from '../../mount/feature-flags.js';
 import type { SpreadsheetInstance as LegacyInstance } from '../../mount/types.js';
 import { failureOfDecision, spreadsheetFailure } from '../errors.js';
 
@@ -65,10 +67,10 @@ export type DialogId = keyof DialogOptions;
 /** Opens and closes the host dialogs. */
 export interface Dialogs {
   /** Opens a dialog on the current selection. Throws `unsupported-platform` when the platform
-   *  profile has no such dialog (`preferences` is the Mac's), `feature-disabled` when its feature
-   *  is off, `policy-denied` when the interaction policy blocks it, and `protected` when sheet or
-   *  workbook protection does, deciding it as the ribbon decides the command that opens the same
-   *  dialog. */
+   *  profile has no such dialog (`preferences` is only the Mac's, `quickAnalysis` only the default
+   *  profile's), `feature-disabled` when its feature is off, `policy-denied` when the interaction
+   *  policy blocks it, and `protected` when sheet or workbook protection does, deciding it as the
+   *  ribbon decides the command that opens the same dialog. */
   open<K extends DialogId>(id: K, options?: DialogOptions[K]): void;
   /** Closes a dialog; does nothing when it is not open. */
   close(id: DialogId): void;
@@ -220,7 +222,10 @@ const ROUTES: { readonly [K in DialogId]: Route<K> } = {
   accessibilityChecker: {
     feature: null,
     commandId: 'accessibility',
-    open: (l) => l.openAccessibilityChecker(),
+    // The Mac's docked checker, else the report the default profile's ribbon shows.
+    open: (l) => {
+      if (!l.openAccessibilityChecker()) void showAccessibilityReport(l);
+    },
   },
   chartSettings: {
     feature: 'charts',
@@ -276,7 +281,11 @@ type DialogRefusal =
   | null;
 
 const refusalOf = (legacy: LegacyInstance, route: DialogRoute): DialogRefusal => {
-  if (route.platform === 'mac' && !isMacHost(legacy.host)) {
+  const platform = isMacHost(legacy.host) ? 'mac' : 'default';
+  if (
+    (route.platform !== undefined && route.platform !== platform) ||
+    (route.feature !== null && platformLacksFeature(route.feature, platform))
+  ) {
     return 'unsupported-platform';
   }
   if (route.feature !== null && legacy.features[route.feature] === undefined) {

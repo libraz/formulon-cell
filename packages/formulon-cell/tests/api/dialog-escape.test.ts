@@ -5,7 +5,7 @@
 import { ChartPlotType, PivotAggregation, PivotAxis } from '@libraz/formulon';
 import { type DialogId, mount, type SpreadsheetInstance } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it } from 'vitest';
-import { makeHost } from './helpers.js';
+import { expectFailure, makeHost } from './helpers.js';
 
 type Platform = 'default' | 'mac';
 
@@ -135,6 +135,7 @@ describe('dialogs', () => {
       for (const id of Object.keys(DIALOGS) as DialogId[]) {
         if (NOT_ON_PLATFORM[platform].includes(id)) {
           if (sheet.dialogs.canOpen(id)) failures.push(`${id}: opens on this platform`);
+          expectFailure(() => sheet.dialogs.open(id), 'unsupported-platform');
           continue;
         }
         if (PANES[platform].includes(id)) continue;
@@ -146,7 +147,10 @@ describe('dialogs', () => {
         sheet.dialogs.open(id);
         await Promise.resolve();
         const surface = shownSurfaces().find((el) => !before.has(el));
-        if (!surface) continue;
+        if (!surface) {
+          failures.push(`${id}: canOpen is true but nothing opened`);
+          continue;
+        }
         walked.push(id);
         const first = surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface;
         first.focus();
