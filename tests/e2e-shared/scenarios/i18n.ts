@@ -4,14 +4,20 @@ import { expect } from '@playwright/test';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
-/** I01 — `?locale=ja` boots the app in Japanese and keeps the demo chrome
- *  aligned with the Japanese Excel desktop baseline. */
-export async function runLocaleBootScenario(page: Page): Promise<void> {
+/** Mounts the app in Japanese and switches the demo chrome to JA when it offers a toggle. */
+async function mountJapanese(page: Page): Promise<SpreadsheetPage> {
   const sp = new SpreadsheetPage(page);
   await sp.mount({ locale: 'ja', fixture: null });
   await sp.expectNoStub();
   const jaToggle = page.getByRole('button', { name: 'JA', exact: true });
   if ((await jaToggle.count()) > 0) await jaToggle.first().click();
+  return sp;
+}
+
+/** I01 — `?locale=ja` boots the app in Japanese and keeps the demo chrome
+ *  aligned with the Japanese Excel desktop baseline. */
+export async function runLocaleBootScenario(page: Page): Promise<void> {
+  const sp = await mountJapanese(page);
 
   await expect(page.getByRole('tab', { name: 'ホーム', exact: true })).toBeVisible();
   await expect(page.getByRole('tab', { name: '挿入', exact: true })).toBeVisible();
@@ -89,11 +95,6 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await page.keyboard.press('Escape');
   await expect(sheetMenu).toBeHidden();
 
-  await sp.focusHost();
-  await page.keyboard.type('seed');
-  await page.keyboard.press('Enter');
-  await page.keyboard.press('ArrowUp');
-  await sp.shortcut('c');
   await page
     .locator('.fc-host')
     .first()
@@ -114,39 +115,6 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await expect(contextMenu).not.toContainText('Copy');
   await expect(contextMenu).not.toContainText('Paste Special');
   await expect(contextMenu).not.toContainText('Format Cells');
-  await contextMenu.locator('[data-fc-submenu="pasteSpecialMenu"]').hover();
-  const pasteSpecialSubmenu = page.locator('.fc-ctxmenu__sub');
-  await expect(pasteSpecialSubmenu).toBeVisible();
-  await pasteSpecialSubmenu.locator('[data-fc-action="pasteSpecial"]').click();
-  await expect(contextMenu).toBeHidden();
-  const pasteSpecialDialog = page.getByRole('dialog', { name: '形式を選択して貼り付け' });
-  await expect(pasteSpecialDialog).toBeVisible();
-  for (const label of [
-    '貼り付け',
-    '演算',
-    'すべて',
-    '数式',
-    '値',
-    '書式',
-    '空白セルを無視する',
-    '行/列の入れ替え',
-  ]) {
-    await expect(pasteSpecialDialog.getByText(label, { exact: true }).first()).toBeVisible();
-  }
-  await expect(pasteSpecialDialog).not.toContainText('Paste Special');
-  await expect(pasteSpecialDialog).not.toContainText('Operation');
-  await expect(pasteSpecialDialog).not.toContainText('Skip blanks');
-  await pasteSpecialDialog
-    .locator('.fc-fmtdlg__footer')
-    .getByText('キャンセル', { exact: true })
-    .click();
-  await expect(pasteSpecialDialog).toHaveCount(0);
-
-  await page
-    .locator('.fc-host')
-    .first()
-    .click({ button: 'right', position: { x: 200, y: 200 } });
-  await expect(contextMenu).toBeVisible();
   await contextMenu.getByText('セルの書式設定…', { exact: true }).first().click();
   await expect(contextMenu).toBeHidden();
   const formatDialog = page.getByRole('dialog', { name: 'セルの書式設定' });
@@ -550,8 +518,8 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     'リンク',
     '選択した行または列をグループ化',
     '選択した行または列のグループ解除',
-    'グループの詳細を表示',
-    'グループの詳細を非表示',
+    '詳細の表示',
+    '詳細を表示しない',
   ]) {
     await expect(dataRibbon.getByRole('button', { name, exact: true }).first()).toBeVisible();
   }
@@ -593,7 +561,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     '名前',
     '参照元',
     '参照先',
-    'トレース矢印の削除',
+    '矢印の削除',
     'エラー チェック',
     '数式',
     '数式の検証',
@@ -639,19 +607,19 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await expect(pageLayoutRibbon).toBeVisible();
   for (const name of [
     'テーマ',
-    '余白',
-    '印刷の向き',
-    '用紙サイズ',
+    '余白: 標準',
+    '印刷の向き: 縦',
+    '用紙サイズ: A4',
     'ページ設定',
     '改ページ',
     '背景',
     '印刷タイトル',
-    '横をページ数に合わせる',
-    '縦をページ数に合わせる',
-    '拡大縮小',
-    '目盛線',
+    '横をページ数に合わせる: 自動',
+    '縦をページ数に合わせる: 自動',
+    '拡大縮小: 100%',
+    '目盛線 表示',
     '枠線を印刷',
-    '見出し',
+    '見出し 表示',
     '行列番号を印刷',
     '配置',
     'オブジェクトの選択と表示',
@@ -692,7 +660,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     'ページ レイアウト',
     '改ページ プレビュー',
     'ウォッチ',
-    'ビュー',
+    'ビュー: 現在の表示',
     '保存',
     '削除',
     'オブジェクト',
@@ -792,8 +760,8 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     '翻訳',
     '新しいコメント',
     'コメントまたはメモの削除',
-    '前のコメント',
-    '次のコメント',
+    '前へ',
+    '次へ',
     'コメントの表示',
     'メモ',
     '検索 (Ctrl+F)',
@@ -913,6 +881,50 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     await expect(page.getByRole('tab', { name: 'Insert', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Paste', exact: true }).first()).toBeVisible();
   }
+}
+
+/** I01 — under `?locale=ja`, Paste Special opened from the context menu after a copy is
+ *  localized. Copying writes the system clipboard. */
+export async function runLocalePasteSpecialScenario(page: Page): Promise<void> {
+  const sp = await mountJapanese(page);
+  await sp.focusHost();
+  await page.keyboard.type('seed');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowUp');
+  await sp.shortcut('c');
+  await page
+    .locator('.fc-host')
+    .first()
+    .click({ button: 'right', position: { x: 200, y: 200 } });
+  const contextMenu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
+  await expect(contextMenu).toBeVisible();
+  await contextMenu.locator('[data-fc-submenu="pasteSpecialMenu"]').hover();
+  const pasteSpecialSubmenu = page.locator('.fc-ctxmenu__sub');
+  await expect(pasteSpecialSubmenu).toBeVisible();
+  await pasteSpecialSubmenu.locator('[data-fc-action="pasteSpecial"]').click();
+  await expect(contextMenu).toBeHidden();
+  const pasteSpecialDialog = page.getByRole('dialog', { name: '形式を選択して貼り付け' });
+  await expect(pasteSpecialDialog).toBeVisible();
+  for (const label of [
+    '貼り付け',
+    '演算',
+    'すべて',
+    '数式',
+    '値',
+    '書式',
+    '空白セルを無視する',
+    '行/列の入れ替え',
+  ]) {
+    await expect(pasteSpecialDialog.getByText(label, { exact: true }).first()).toBeVisible();
+  }
+  await expect(pasteSpecialDialog).not.toContainText('Paste Special');
+  await expect(pasteSpecialDialog).not.toContainText('Operation');
+  await expect(pasteSpecialDialog).not.toContainText('Skip blanks');
+  await pasteSpecialDialog
+    .locator('.fc-fmtdlg__footer')
+    .getByText('キャンセル', { exact: true })
+    .click();
+  await expect(pasteSpecialDialog).toHaveCount(0);
 }
 
 /** I02 — `?theme=dark` boots the app in the `ink` core theme.
