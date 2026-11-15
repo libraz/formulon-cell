@@ -42,6 +42,8 @@ const openNewNote = async (sp: UserJourneyPage, page: Page, ref: string): Promis
   await row.click();
   const note = page.locator('.fc-cmtnote.fc-cmtnote--mac-note');
   await expect(note).toBeVisible();
+  // The note pops in with a short scale animation; measure it at rest.
+  await note.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   return note;
 };
 
