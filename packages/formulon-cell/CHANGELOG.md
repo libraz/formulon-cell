@@ -117,6 +117,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Fixed
 
+- Ribbon dropdowns that show their current value, such as Font Size and Number Format, include that value in their accessible name (for example "Font Size: 11"), so the name contains the visible text.
 - `Workbook.load` with `locale` or `platform` opens the file under that profile, so a manually calculated workbook mounted with the same locale and platform keeps exactly the stale values the file carries, on the Mac profile too.
 - Home menu, File menu and Remove Arrows labels match the desktop's in the languages where they differed.
 - Text to Columns, Format Cells (Border), Go To Special, Calculation preferences, Page Setup, protection and Find labels match the desktop's in the languages where they differed.

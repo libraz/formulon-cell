@@ -10,6 +10,7 @@ import { createColorPalette, themeColorColumns } from '../../components/color-pa
 import { addrKey } from '../../engine/address.js';
 import { onOutsidePress } from '../../interact/outside-press.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
+import { projectValueName } from '../menu-a11y.js';
 import { type NumberFormatAction, numberFormatSample } from '../number-format.js';
 import type { RibbonCommand } from '../ribbon-model.js';
 import { createRibbonButton } from './button.js';
@@ -241,6 +242,8 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
             )
           : null;
       value.textContent = role ? `${base} ${role}` : base;
+      const button = wrap.querySelector<HTMLElement>('.fc-tb__rb-dd__btn');
+      if (button) projectValueName(button, value.textContent, command.title);
     }
   };
 

@@ -20,7 +20,7 @@ import type {
   PaperSize,
   WorkbookViewMode,
 } from '../store/types.js';
-import { projectDisabledState } from './menu-a11y.js';
+import { projectDisabledState, projectValueName } from './menu-a11y.js';
 import { projectPressedState } from './ribbon/button.js';
 import { projectSparklineDesign } from './ribbon/sparkline-design.js';
 import { projectPivotDesign, projectTableDesign } from './ribbon/table-design.js';
@@ -481,15 +481,8 @@ export const projectRibbonActiveState = (
       const value = control.querySelector<HTMLElement>('.fc-tb__rb-dd__value');
       const renderedValue = value?.textContent?.trim();
       if (button && renderedValue) {
-        const baseLabel =
-          button.dataset.fcRibbonControlLabel ??
-          button.getAttribute('aria-label') ??
-          button.getAttribute('title') ??
-          '';
-        button.dataset.fcRibbonControlLabel = baseLabel;
-        const fullLabel = baseLabel ? `${baseLabel}: ${renderedValue}` : renderedValue;
+        const fullLabel = projectValueName(button, renderedValue);
         button.setAttribute('title', fullLabel);
-        button.setAttribute('aria-label', fullLabel);
         value?.setAttribute('title', renderedValue);
       }
     }

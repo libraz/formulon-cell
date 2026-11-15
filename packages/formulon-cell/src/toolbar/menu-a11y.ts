@@ -59,6 +59,26 @@ export function projectDisabledState<T extends HTMLElement & { disabled?: boolea
   projectDisabledReason(el, disabled ? reason : null, options);
 }
 
+/** Dataset key holding a value-showing control's own name, before its value is appended. */
+const CONTROL_NAME_KEY = 'fcRibbonControlLabel';
+
+/** Names a control after its visible value: `name: value`, so the accessible name contains the
+ *  text on screen. The name is the one given, else the one remembered, else the current label; a
+ *  repeated call replaces the value instead of appending. Returns the resulting name. */
+export function projectValueName(el: HTMLElement, value: string | null, name?: string): string {
+  const base =
+    name ??
+    el.dataset[CONTROL_NAME_KEY] ??
+    el.getAttribute('aria-label') ??
+    el.getAttribute('title') ??
+    '';
+  el.dataset[CONTROL_NAME_KEY] = base;
+  const shown = value?.trim() ?? '';
+  const label = shown ? (base ? `${base}: ${shown}` : shown) : base;
+  if (label) el.setAttribute('aria-label', label);
+  return label;
+}
+
 const menuItems = (menu: HTMLElement, selector = 'button'): HTMLButtonElement[] =>
   Array.from(menu.querySelectorAll<HTMLButtonElement>(selector)).filter(
     (item) =>
