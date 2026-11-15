@@ -685,6 +685,8 @@ export function findActiveSignature(
   options: FormulaScanOptions & {
     /** Argument labels for a host-registered function without a built-in signature. */
     getCustomFunctionArgs?: (name: string) => readonly string[] | undefined;
+    /** Whether a function with no argument labels is still known; it is reported with no args. */
+    isKnownFunction?: (name: string) => boolean;
   } = {},
 ): ActiveSignature | null {
   // Resolve every syntactic name first so an unknown innermost call masks an
@@ -704,7 +706,9 @@ export function findActiveSignature(
     return null;
   }
   const args =
-    FUNCTION_SIGNATURES[span.canonicalName] ?? options.getCustomFunctionArgs?.(span.canonicalName);
+    FUNCTION_SIGNATURES[span.canonicalName] ??
+    options.getCustomFunctionArgs?.(span.canonicalName) ??
+    (options.isKnownFunction?.(span.canonicalName) ? [] : undefined);
   if (!args) return null;
   return {
     name: span.canonicalName,

@@ -104,8 +104,9 @@ declare module './workbook.js' {
     ): FunctionSuggestions | null;
     /**
      * The function call the caret (a UTF-16 offset) sits in, as the formula editor's argument
-     * tooltip shows it: the innermost call with known arguments. Null outside any call, or in a
-     * function with no argument labels.
+     * tooltip shows it: the innermost call to a known function. A function without argument
+     * labels has empty `args`, where the editor shows no tooltip. Null outside any call, or in a
+     * call to an unknown name.
      * @example
      * workbook.functionCallAt('=SUM(A1,', 8); // { name: 'SUM', args: ['number1', ...], argIndex: 1 }
      */

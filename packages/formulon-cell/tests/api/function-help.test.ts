@@ -46,6 +46,13 @@ describe('Workbook function help', () => {
     expect(wb.functionCallAt(nested, 18)).toMatchObject({ name: 'IF', argIndex: 1 });
     expect(wb.functionCallAt(nested, nested.length)).toMatchObject({ name: 'ROUND', argIndex: 0 });
     expect(wb.functionCallAt('=A1+1', 5)).toBeNull();
+    // A known function without argument labels is still a call; an unknown name is not.
+    expect(wb.functionCallAt('=CONVERT(1,', 11)).toEqual({
+      name: 'CONVERT',
+      args: [],
+      argIndex: 1,
+    });
+    expect(wb.functionCallAt('=NOSUCHFN(1,', 12)).toBeNull();
   });
 
   it('works in the German profile: localized names and the semicolon separator', async () => {

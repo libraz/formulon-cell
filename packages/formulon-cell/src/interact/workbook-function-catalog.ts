@@ -141,6 +141,7 @@ export function workbookFunctionHelp(wb: WorkbookHandle, sheet: number) {
   );
   const catalog = workbookAutocompleteCatalog(() => wb, custom.getCustomFunctionArgs);
   const argCatalog = workbookArgHelperCatalog(() => wb);
+  const isBuiltIn = (name: string): boolean => (wb.functionNames() ?? []).includes(name);
   return {
     suggest(text: string, caret: number) {
       if (caretSplitsToken(text, caret)) return null;
@@ -151,14 +152,15 @@ export function workbookFunctionHelp(wb: WorkbookHandle, sheet: number) {
         listSeparator: argCatalog.getListSeparator(),
         resolveKnownName: argCatalog.resolveFunctionName,
         getCustomFunctionArgs: custom.getCustomFunctionArgs,
+        isKnownFunction: isBuiltIn,
       });
-      if (!sig || sig.args.length === 0) return null;
+      if (!sig) return null;
       return { name: sig.name, args: sig.args, argIndex: sig.activeArgIndex };
     },
     describe(rawName: string): FunctionDescription | null {
       const name = argCatalog.resolveFunctionName(rawName.trim());
       if (!name) return null;
-      const builtIn = (wb.functionNames() ?? []).includes(name);
+      const builtIn = isBuiltIn(name);
       const lambdaArgs = builtIn ? undefined : custom.getCustomFunctionArgs(name);
       if (!builtIn && !lambdaArgs) return null;
       return {
