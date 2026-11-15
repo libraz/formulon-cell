@@ -60,8 +60,13 @@ describe('toolbar/menu-a11y', () => {
     expect(el.dataset.reason).toBeUndefined();
   });
 
-  it('prepares menus and roves focus across enabled top-level buttons only', () => {
+  it('prepares menus and roves focus across enabled, shown top-level buttons only', () => {
     const menu = document.createElement('div');
+    const hidden = button('Hidden');
+    hidden.hidden = true;
+    const hiddenGroup = document.createElement('div');
+    hiddenGroup.hidden = true;
+    hiddenGroup.append(button('In a hidden group'));
     const first = button('First');
     const disabled = button('Disabled');
     const ariaDisabled = button('Aria disabled');
@@ -71,7 +76,7 @@ describe('toolbar/menu-a11y', () => {
     submenu.append(button('Nested'));
     disabled.disabled = true;
     ariaDisabled.setAttribute('aria-disabled', 'true');
-    menu.append(first, disabled, ariaDisabled, last, submenu);
+    menu.append(hidden, hiddenGroup, first, disabled, ariaDisabled, last, submenu);
     document.body.appendChild(menu);
 
     try {
@@ -90,6 +95,12 @@ describe('toolbar/menu-a11y', () => {
       expect(document.activeElement).toBe(last);
       expect(last.tabIndex).toBe(0);
       expect(first.tabIndex).toBe(-1);
+
+      handleMenuKeydown(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }), menu, {
+        close: vi.fn(),
+      });
+
+      expect(document.activeElement).toBe(first);
     } finally {
       menu.remove();
     }

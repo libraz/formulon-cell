@@ -95,12 +95,21 @@ export function visibleLabelName(label: string, title: string): string {
   return foldForName(title).includes(foldForName(label)) ? title : label;
 }
 
+// A hidden item, or one in a hidden group, cannot take focus.
+const shownIn = (item: HTMLElement, menu: HTMLElement): boolean => {
+  for (let node: HTMLElement | null = item; node && node !== menu; node = node.parentElement) {
+    if (node.hidden) return false;
+  }
+  return true;
+};
+
 const menuItems = (menu: HTMLElement, selector = 'button'): HTMLButtonElement[] =>
   Array.from(menu.querySelectorAll<HTMLButtonElement>(selector)).filter(
     (item) =>
       !item.disabled &&
       item.getAttribute('aria-disabled') !== 'true' &&
-      item.closest<HTMLElement>('[role="menu"]') === menu,
+      item.closest<HTMLElement>('[role="menu"]') === menu &&
+      shownIn(item, menu),
   );
 
 /** Runs `handler` once the pointer moves onto `item`, and again after it leaves and returns. An
