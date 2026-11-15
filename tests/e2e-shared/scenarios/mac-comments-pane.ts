@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { selectRibbonTab } from '../pages/ribbon-tabs.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
@@ -58,6 +59,25 @@ export async function runMacShowCommentsPaneScenario(
   await expect(item).toHaveCount(1);
   await expect(item.locator('.fc-commentspane__cell')).toHaveText('C4');
   await expect(item).toContainText('Check the total');
+
+  // Only comments on cells navigation can reach are listed: a host viewport that stops at row 7
+  // drops C8's comment.
+  await toggle.click();
+  await expect(pane).toBeHidden();
+  await sp.goTo('C8');
+  await sp.clickRibbon('mac.review.newComment');
+  await expect(card).toBeVisible();
+  await card.locator('textarea').fill('Outside the viewport');
+  await card.locator('.fc-cmtnote__send').click();
+  await page.keyboard.press('Escape');
+  await expect(card).toBeHidden();
+  await toggle.click();
+  await expect(pane.locator('.fc-commentspane__cell')).toHaveText(['C4', 'C8']);
+  await page.evaluate(async () => {
+    const w = window as unknown as { __fcInst: SpreadsheetInstance };
+    await w.__fcInst.update({ viewport: { mode: 'fixed', range: 'A1:H7' } });
+  });
+  await expect(pane.locator('.fc-commentspane__cell')).toHaveText(['C4']);
 
   await pane.locator('.fc-commentspane__close').click();
   await expect(pane).toBeHidden();
