@@ -593,7 +593,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     '名前',
     '参照元',
     '参照先',
-    '矢印の削除',
+    'トレース矢印の削除',
     'エラー チェック',
     '数式',
     '数式の検証',
