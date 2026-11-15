@@ -5,6 +5,7 @@
  */
 import { ChartPlotType, PivotAggregation, PivotAxis } from '@libraz/formulon';
 import { type DialogId, mount, type SpreadsheetInstance } from '@libraz/formulon-cell';
+import { ribbon } from '@libraz/formulon-cell/toolbar';
 import { afterEach, describe, expect, it } from 'vitest';
 import { expectFailure, makeHost } from './helpers.js';
 
@@ -123,9 +124,13 @@ const selectChart = (host: HTMLElement): void => {
   chart.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true }));
 };
 
-const mountWithContent = async (platform: Platform) => {
+const mountWithContent = async (platform: Platform, withRibbon = false) => {
   const host = makeHost();
-  const sheet = await mount(host, { locale: 'en', ui: { platform } });
+  const sheet = await mount(host, {
+    locale: 'en',
+    ui: { platform },
+    ...(withRibbon ? { toolbar: ribbon() } : {}),
+  });
   live.push(sheet);
   const s = sheet.workbook.sheet(0);
   s.setValues('A1', [
@@ -329,5 +334,46 @@ describe('dialogs', () => {
       }
       expect(failures).toEqual([]);
     },
+  );
+
+  it.each(['default', 'mac'] as const)(
+    'keep the ribbon and title bar shortcuts from acting while a modal dialog is open on the %s profile',
+    async (platform) => {
+      const { host, sheet } = await mountWithContent(platform, true);
+      const toolbar = sheet.toolbar;
+      if (!toolbar) throw new Error('No ribbon.');
+      const failures: string[] = [];
+      let walked = 0;
+      for (const id of Object.keys(DIALOGS) as DialogId[]) {
+        if (NOT_ON_PLATFORM[platform].includes(id)) continue;
+        if (PANES[platform].includes(id) || FLOATING[platform].includes(id)) continue;
+        sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
+        if (id === 'pasteSpecial') sheet.commands.execute('copy');
+        host.focus();
+        const before = new Set(shownSurfaces());
+        sheet.dialogs.open(id);
+        await Promise.resolve();
+        const surface = shownSurfaces().find((el) => !before.has(el));
+        if (!surface) continue;
+        walked += 1;
+        const first = surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface;
+        first.focus();
+        const mode = toolbar.displayMode;
+        for (const init of [
+          { key: 'F1', ctrlKey: true },
+          { key: 'q', altKey: true },
+        ]) {
+          first.dispatchEvent(
+            new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }),
+          );
+        }
+        if (toolbar.displayMode !== mode) failures.push(`${id}: Ctrl+F1 changed the ribbon`);
+        if (document.activeElement !== first) failures.push(`${id}: Alt+Q moved focus`);
+        sheet.dialogs.close(id);
+      }
+      expect(failures).toEqual([]);
+      expect(walked).toBeGreaterThanOrEqual(20);
+    },
+    120_000,
   );
 });

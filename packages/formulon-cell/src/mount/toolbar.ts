@@ -40,6 +40,7 @@ import {
 } from '../commands/interaction-controller.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { resolveSpreadsheetPlatform, type SpreadsheetPlatform } from '../extensions/ui-options.js';
+import { modalDialogOwnsKeys } from '../interact/dialog-shell.js';
 import { ensureMacInk, getMacInk, type MacInkController } from '../interact/mac-ink.js';
 import { mutators } from '../store/store.js';
 import type { CellBorderStyle, State } from '../store/types.js';
@@ -1143,6 +1144,7 @@ export function mountToolbar(
   // location — Excel-style global shortcut. Attached at document so the
   // sheet (or any other focus target) doesn't need to route the key.
   const onGlobalKey = (e: KeyboardEvent): void => {
+    if (modalDialogOwnsKeys(e)) return;
     if (e.key === 'Escape' && backstageOpen) {
       e.preventDefault();
       closeBackstage();

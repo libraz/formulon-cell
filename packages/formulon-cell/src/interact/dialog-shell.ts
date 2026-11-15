@@ -234,6 +234,8 @@ export function returnFocus(
  */
 export type SurfaceKind = 'modal' | 'floating' | 'pane';
 
+const MODAL_SURFACE = '[data-fc-surface="modal"]';
+
 /**
  * The control to return focus to when a dialog closes: the `anchor` the open call was given, which
  * a click does not focus in every browser, else the element focused in `doc`; null when only the
@@ -244,6 +246,16 @@ export function openerOf(doc: Document, anchor?: HTMLElement | null): HTMLElemen
   const active = doc.activeElement;
   const OwnerHTMLElement = doc.defaultView?.HTMLElement ?? HTMLElement;
   return active instanceof OwnerHTMLElement && active !== doc.body ? active : null;
+}
+
+/**
+ * Whether `event` was pressed in a modal dialog, which owns its keys: document-level shortcuts
+ * (the ribbon's, the backstage's, the title bar's) leave it to the dialog. Also true while the
+ * dialog the key just closed is still the target's ancestor.
+ */
+export function modalDialogOwnsKeys(event: Event): boolean {
+  const target = event.target as { closest?: (selector: string) => Element | null } | null;
+  return typeof target?.closest === 'function' && target.closest(MODAL_SURFACE) !== null;
 }
 
 /** Records `kind` on the surface element as `data-fc-surface`. */

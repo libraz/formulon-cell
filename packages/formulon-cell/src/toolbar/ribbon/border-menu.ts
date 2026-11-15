@@ -7,6 +7,7 @@ import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
 
 import { setBorderPreset } from '../../commands/format.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../../components/color-palette.js';
+import { modalDialogOwnsKeys } from '../../interact/dialog-shell.js';
 import { onOutsidePress } from '../../interact/outside-press.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import type { CellBorderStyle } from '../../store/store.js';
@@ -160,6 +161,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   );
 
   const onDocumentEscapeKey = (e: KeyboardEvent): void => {
+    if (modalDialogOwnsKeys(e)) return;
     const menu = getBorderMenu();
     if (e.key === 'Escape' && !menu?.hidden) closeBorderMenu(true);
   };

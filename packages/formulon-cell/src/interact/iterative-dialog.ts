@@ -86,7 +86,6 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   shell.on(cancelBtn, 'click', () => api.close());
   shell.on(shell.overlay, 'keydown', (e) => {
     const event = e as KeyboardEvent;
-    event.stopPropagation();
     if (isSubmitEnter(event)) {
       event.preventDefault();
       onOk();

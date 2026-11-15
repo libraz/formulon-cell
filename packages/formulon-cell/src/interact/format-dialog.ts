@@ -820,7 +820,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const onOverlayKey = (e: KeyboardEvent): void => {
-    e.stopPropagation();
     if (e.key === 'Escape') {
       e.preventDefault();
       // A flyout swallows the first Escape so the dialog itself survives it.

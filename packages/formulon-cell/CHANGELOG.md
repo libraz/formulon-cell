@@ -164,6 +164,7 @@ versioning is [SemVer](https://semver.org/).
 - Escape closes the Calculation Options dialog from any of its controls, as it closes every other dialog. Closing Insert Copied Cells or the PivotTable Field dialog returns focus to the control that opened it, or to the sheet when that control is gone, instead of leaving it on the page.
 - Closing Find and Replace or the comment and note editor returns focus to the control that opened it, as the other panels over the sheet do, instead of always to the sheet.
 - A control in the PivotTable Fields pane keeps focus when the sheet or its selection changes, instead of losing it to the page, and a pane or dialog no longer pulls focus back to its first control once focus has moved elsewhere before it finished opening.
+- Keys pressed in a modal dialog no longer reach the ribbon's, the backstage's and the title bar's shortcuts: Ctrl+F1 in Go To, Paste Special, Hyperlink, Cell Styles and other dialogs used to collapse the ribbon behind them.
 
 ### Removed
 

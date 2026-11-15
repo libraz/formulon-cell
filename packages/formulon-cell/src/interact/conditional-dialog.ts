@@ -1052,7 +1052,6 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const onClose = (): void => api.close();
 
   const onOverlayKey = (e: KeyboardEvent): void => {
-    e.stopPropagation();
     if (isSubmitEnter(e)) {
       e.preventDefault();
       onAdd();

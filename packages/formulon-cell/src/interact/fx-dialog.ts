@@ -641,7 +641,6 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const onBack = (): void => goBackToPicker();
 
   const onOverlayKey = (e: KeyboardEvent): void => {
-    e.stopPropagation();
     // Enter inside an arg input commits the assembled formula. The picker
     // step has its own Enter handler on the search input.
     if (isSubmitEnter(e) && !argsWrap.hidden && !insertBtn.disabled) {

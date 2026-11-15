@@ -1077,7 +1077,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const onDeleteConfirm = (): void => confirmDeleteSelectedName();
   const onDeleteCancel = (): void => closeDeleteConfirm();
   const onOverlayKey = (e: KeyboardEvent): void => {
-    e.stopPropagation();
     if (e.key === 'Enter') {
       // Enter inside an input submits the form when mutation is enabled;
       // otherwise it's an alias for Close (legacy behaviour).

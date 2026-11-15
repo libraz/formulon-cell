@@ -179,7 +179,6 @@ export const installDialogLifecycle = <T>(
     resolve(value);
   };
   const onKey = (event: KeyboardEvent): void => {
-    event.stopPropagation();
     if (advanceDialogTab(shell.overlay, event)) return;
     if (event.key === 'Escape') {
       event.preventDefault();

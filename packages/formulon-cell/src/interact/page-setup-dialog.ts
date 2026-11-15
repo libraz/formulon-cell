@@ -303,7 +303,6 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   };
 
   const onOverlayKey = (e: KeyboardEvent): void => {
-    e.stopPropagation();
     // Enter inside a textbox triggers OK — spreadsheet parity.
     if (isSubmitEnter(e)) {
       e.preventDefault();
