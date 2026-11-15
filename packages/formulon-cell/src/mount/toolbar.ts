@@ -664,6 +664,27 @@ export function mountToolbar(
     return true;
   };
 
+  // A split button's menu opens from its chevron, or from Alt+Down while the button has focus.
+  const openSplitMenu = (command: string, button: HTMLButtonElement, menuId: string): void => {
+    if (dropdownsApi) {
+      dropdownsApi.openDynamicRibbonDropdown({ command, menuId }, button);
+      return;
+    }
+    toggleStaticRibbonSubmenu(host, button);
+  };
+  const onSplitMenuKey = (e: KeyboardEvent): void => {
+    if (e.key !== 'ArrowDown' || !e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest<HTMLButtonElement>('button[data-ribbon-command]');
+    const menuId = button?.dataset.ribbonMenuId;
+    if (!button || !menuId || !button.querySelector(SPLIT_CHEVRON_SELECTOR)) return;
+    e.preventDefault();
+    if (button.disabled || isAriaDisabled(button)) return;
+    openSplitMenu(button.dataset.ribbonCommand ?? '', button, menuId);
+  };
+  host.addEventListener('keydown', onSplitMenuKey);
+
   const createRibbonRenderer = () =>
     createRenderRibbon({
       getInst: getInstance,
@@ -980,12 +1001,7 @@ export function mountToolbar(
       // attached menu before the primary action; SVG paths are covered by
       // `closest()` just like the SVG element itself.
       if (target.closest(SPLIT_CHEVRON_SELECTOR) && cmdBtn.dataset.ribbonMenuId) {
-        const menuId = cmdBtn.dataset.ribbonMenuId;
-        if (dropdownsApi) {
-          dropdownsApi.openDynamicRibbonDropdown({ command: id, menuId }, cmdBtn);
-          return;
-        }
-        toggleStaticRibbonSubmenu(host, cmdBtn);
+        openSplitMenu(id, cmdBtn, cmdBtn.dataset.ribbonMenuId);
         return;
       }
       // Fallback dropdown behaviour: if the button has a sibling submenu
@@ -1344,6 +1360,7 @@ export function mountToolbar(
       host.removeEventListener('dblclick', onDoubleClick);
       host.removeEventListener('keydown', onKey);
       host.removeEventListener('keydown', onDisplayKey);
+      host.removeEventListener('keydown', onSplitMenuKey);
       document.removeEventListener('keydown', onGlobalKey);
       detachDocumentMouseDown();
       dropdownsDelegation?.detach();
