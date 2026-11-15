@@ -79,7 +79,6 @@ export function createMountChrome({
   };
   const fx = createHostButton({
     className: 'fc-host__formulabar-fx',
-    text: 'ƒx',
     tabIndex: -1,
     ariaLabel: barLabels(strings).fx,
   });

@@ -14,7 +14,7 @@ import type { Locale } from '../../i18n/strings.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import { panelSize, placePanel, viewportSize } from '../../interact/overlay-position.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
-import { projectDisabledState } from '../menu-a11y.js';
+import { projectDisabledState, visibleLabelName } from '../menu-a11y.js';
 import type { RibbonDisplayText, ToolbarMenuText } from '../menu-text.js';
 import {
   buildRibbonModel,
@@ -325,6 +325,7 @@ const createRibbonCommandButton = (
     const label = document.createElement('span');
     label.textContent = command.label;
     button.appendChild(label);
+    button.setAttribute('aria-label', visibleLabelName(command.label, command.title));
   }
   if (activation.menuId) {
     button.setAttribute('aria-haspopup', 'menu');

@@ -79,6 +79,20 @@ export function projectValueName(el: HTMLElement, value: string | null, name?: s
   return label;
 }
 
+const foldForName = (text: string): string =>
+  text
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/** Accessible name for a control that shows `label` and has the tooltip `title`: the tooltip
+ *  when it contains the visible label, else the label itself, so the name always carries the
+ *  visible text. A tooltip that is not the name stays the control's description. */
+export function visibleLabelName(label: string, title: string): string {
+  return foldForName(title).includes(foldForName(label)) ? title : label;
+}
+
 const menuItems = (menu: HTMLElement, selector = 'button'): HTMLButtonElement[] =>
   Array.from(menu.querySelectorAll<HTMLButtonElement>(selector)).filter(
     (item) =>

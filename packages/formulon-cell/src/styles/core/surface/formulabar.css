@@ -74,6 +74,11 @@
     cursor: pointer;
   }
 
+  /* Generated content keeps the glyph out of the visible text the label must contain. */
+  .fc-host__formulabar-fx::before {
+    content: "ƒx";
+  }
+
   .fc-host__formulabar-action {
     display: inline-flex;
     align-items: center;
