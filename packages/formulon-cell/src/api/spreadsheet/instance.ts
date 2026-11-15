@@ -419,7 +419,11 @@ export class SpreadsheetInstance {
     return stateOf(this).workbook;
   }
 
-  /** The current effective options. */
+  /**
+   * The options as the caller set them through `mount` and `update`, with the changes the user
+   * made from the UI (reported as `update` with `source: 'user'`). A key left out, or reset with
+   * `null`, is absent and takes its default; the language in effect is `i18n.locale`.
+   */
   get options(): Readonly<SpreadsheetOptions> {
     return stateOf(this).options;
   }
@@ -1214,7 +1218,7 @@ export async function mount(
     legacy,
     workbook,
     ownsWorkbook,
-    options: { ...options, locale: options.locale ?? 'en' },
+    options: { ...options },
     host: hostProviders,
     spelling,
     autoCorrect,
