@@ -93,3 +93,14 @@ export function advanceDialogTab(root: HTMLElement, event: KeyboardEvent): boole
   items[nextIndex]?.focus({ preventScroll: true });
   return true;
 }
+
+/**
+ * Hands focus to the sheet after a dialog closes, as the desktop app does: not
+ * back to the control that opened it, and never to the document body.
+ */
+export function focusSheetAfterDialog(host: HTMLElement): void {
+  // A disposed sheet has nowhere to take focus.
+  if (!host.isConnected) return;
+  host.focus({ preventScroll: true });
+  console.assert(host.ownerDocument.activeElement === host, 'the sheet host did not take focus');
+}

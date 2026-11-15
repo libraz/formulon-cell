@@ -310,7 +310,7 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
-  it('restores the connected More ribbon opener after Escape, cancel, and insertion', () => {
+  it('hands focus to the sheet after Escape, cancel, and insertion', () => {
     const opener = document.createElement('button');
     opener.type = 'button';
     opener.dataset.ribbonCommand = 'mac.formulas.more';
@@ -327,7 +327,7 @@ describe('attachFxDialog', () => {
     opener.focus();
     handle.open('COUNTIF');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(document.activeElement).toBe(opener);
+    expect(document.activeElement).toBe(host);
 
     opener.focus();
     handle.open('COUNTIF');
@@ -335,7 +335,7 @@ describe('attachFxDialog', () => {
       '.fc-fmtdlg__footer > button',
     );
     footerButtons[1]?.click();
-    expect(document.activeElement).toBe(opener);
+    expect(document.activeElement).toBe(host);
 
     opener.focus();
     handle.open('COUNTIF');
@@ -349,7 +349,7 @@ describe('attachFxDialog', () => {
     second.dispatchEvent(new Event('input', { bubbles: true }));
     document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     expect(inserted).toEqual(['=COUNTIF(A1:A3, 1)']);
-    expect(document.activeElement).toBe(opener);
+    expect(document.activeElement).toBe(host);
 
     handle.detach();
   });
