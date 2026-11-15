@@ -66,6 +66,13 @@ export {
   type WorkbookEvents,
   type WorkbookOptions,
 } from './api/workbook.js';
+export type {
+  FunctionCallAtCaret,
+  FunctionDescription,
+  FunctionHelpOptions,
+  FunctionSuggestions,
+  SuggestFunctionsOptions,
+} from './api/workbook-calc.js';
 export type { CellFormatterEntry, CellRenderInput } from './cells.js';
 export type { CategoryChartPoint, ChartCategory } from './charts/types.js';
 export type {

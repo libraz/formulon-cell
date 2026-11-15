@@ -1,8 +1,14 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { CatalogLocaleOrdinal } from '../commands/function-categories.js';
+import { FUNCTION_SIGNATURES, findActiveSignature } from '../commands/refs.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ArgHelperDeps } from './arg-helper.js';
-import { type AutocompleteDeps, collectLambdaFunctions } from './autocomplete.js';
+import {
+  type AutocompleteDeps,
+  caretSplitsToken,
+  collectLambdaFunctions,
+  completeFunctionNames,
+} from './autocomplete.js';
 import { resolveFormulaHelperDetails } from './formula-helper-catalog.js';
 import {
   catalogLocaleOrdinal,
@@ -48,13 +54,15 @@ export function workbookCustomFunctions(
 export function workbookAutocompleteCatalog(
   getWb: () => WorkbookHandle,
   getCustomFunctionArgs: CustomFunctionArgs,
-): Pick<
-  AutocompleteDeps,
-  | 'getFunctionNames'
-  | 'getFunctionDisplayNames'
-  | 'resolveFunctionName'
-  | 'getListSeparator'
-  | 'getFunctionDetails'
+): Required<
+  Pick<
+    AutocompleteDeps,
+    | 'getFunctionNames'
+    | 'getFunctionDisplayNames'
+    | 'resolveFunctionName'
+    | 'getListSeparator'
+    | 'getFunctionDetails'
+  >
 > {
   return {
     getFunctionNames: () => getWb().functionNames(),
@@ -84,7 +92,9 @@ export function workbookAutocompleteCatalog(
 /** Argument-helper deps backed by the workbook's function registry. */
 export function workbookArgHelperCatalog(
   getWb: () => WorkbookHandle,
-): Pick<ArgHelperDeps, 'getListSeparator' | 'getFunctionDisplayName' | 'resolveFunctionName'> {
+): Required<
+  Pick<ArgHelperDeps, 'getListSeparator' | 'getFunctionDisplayName' | 'resolveFunctionName'>
+> {
   return {
     getListSeparator: () => functionListSeparator(getWb()),
     getFunctionDisplayName: (canonicalName) => {
@@ -96,5 +106,67 @@ export function workbookArgHelperCatalog(
       );
     },
     resolveFunctionName: (rawName) => resolveFunctionName(getWb(), rawName),
+  };
+}
+
+const NO_HINTS = { list: () => [], args: () => undefined };
+
+/** A function call the caret sits in: its canonical name, argument labels and the argument the
+ *  caret is in. */
+export interface FunctionCallAtCaret {
+  readonly name: string;
+  readonly args: readonly string[];
+  readonly argIndex: number;
+}
+
+/** What a function call is, for a tooltip: its canonical and localized names, argument labels
+ *  and description. */
+export interface FunctionDescription {
+  readonly name: string;
+  readonly localizedName: string;
+  readonly args: readonly string[];
+  readonly description: string;
+}
+
+/**
+ * The formula editor's function completion and argument help for `wb`, as the in-cell editor
+ * and the formula bar compute them, without a mount's formula hints. `sheet` is the sheet the
+ * formula is on, whose sheet-scoped LAMBDA names it may call; -1 limits them to the workbook's.
+ */
+export function workbookFunctionHelp(wb: WorkbookHandle, sheet: number) {
+  const custom = workbookCustomFunctions(
+    () => wb,
+    () => sheet,
+    NO_HINTS,
+  );
+  const catalog = workbookAutocompleteCatalog(() => wb, custom.getCustomFunctionArgs);
+  const argCatalog = workbookArgHelperCatalog(() => wb);
+  return {
+    suggest(text: string, caret: number) {
+      if (caretSplitsToken(text, caret)) return null;
+      return completeFunctionNames(text, caret, { ...catalog, ...custom });
+    },
+    callAt(text: string, caret: number): FunctionCallAtCaret | null {
+      const sig = findActiveSignature(text, caret, {
+        listSeparator: argCatalog.getListSeparator(),
+        resolveKnownName: argCatalog.resolveFunctionName,
+        getCustomFunctionArgs: custom.getCustomFunctionArgs,
+      });
+      if (!sig || sig.args.length === 0) return null;
+      return { name: sig.name, args: sig.args, argIndex: sig.activeArgIndex };
+    },
+    describe(rawName: string): FunctionDescription | null {
+      const name = argCatalog.resolveFunctionName(rawName.trim());
+      if (!name) return null;
+      const builtIn = (wb.functionNames() ?? []).includes(name);
+      const lambdaArgs = builtIn ? undefined : custom.getCustomFunctionArgs(name);
+      if (!builtIn && !lambdaArgs) return null;
+      return {
+        name,
+        localizedName: builtIn ? (argCatalog.getFunctionDisplayName(name) ?? name) : name,
+        args: FUNCTION_SIGNATURES[name] ?? lambdaArgs ?? [],
+        description: builtIn ? (catalog.getFunctionDetails(name)?.description ?? '') : '',
+      };
+    },
   };
 }

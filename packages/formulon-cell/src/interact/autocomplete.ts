@@ -722,51 +722,20 @@ function computeContext(
     const values = deps.getColumnValues(addr.sheet, addr.col, addr.row);
     return suggestColumnHistory(text, caret, values);
   }
-  // Suggestions replace the token prefix but leave the suffix in place. If
-  // the caret splits a token, accepting would duplicate its remaining text.
-  const next = text[caret] ?? '';
-  if (next && /[\p{L}\p{N}_.\\]/u.test(next)) return null;
+  if (caretSplitsToken(text, caret)) return null;
   const existingCallParenLength = existingFunctionParenLength(text, caret);
   const struct = existingCallParenLength
     ? null
     : suggestStructuredRef(text, caret, deps.getTables?.() ?? []);
   if (struct) return struct;
-  const engineNames = deps.getFunctionNames?.();
-  const displayNames = deps.getFunctionDisplayNames?.() ?? null;
-  const fnNames = displayNames ?? engineNames;
-  const fn = suggestFunctions(
-    text,
-    caret,
-    Number.MAX_SAFE_INTEGER,
-    fnNames ? { names: fnNames } : undefined,
-  );
-  const custom = suggestCustomFunctions(text, caret, deps.getCustomFunctions?.() ?? []);
+  const completion = completeFunctionNames(text, caret, deps);
   const names = existingCallParenLength ? null : suggestNames(text, caret, deps.getNames?.() ?? []);
-  if (!fn && !custom && !names) return null;
-  // Merge runtime and built-in names. Keep the first spelling on a case-insensitive clash.
-  const seen = new Set<string>();
-  const merged: string[] = [];
-  for (const n of custom?.matches ?? []) {
-    const key = n.toLocaleLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(n);
-  }
-  for (const n of fn?.matches ?? []) {
-    const key = n.toLocaleLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(n);
-  }
-  const tokenStart = fn?.tokenStart ?? custom?.tokenStart ?? names?.tokenStart ?? caret;
-  // Prefix matches first, then the names that only contain the token, each run alphabetical.
+  if (!completion && !names) return null;
+  const functions = completion?.names ?? [];
+  const seen = new Set(functions.map((label) => label.toLocaleLowerCase()));
+  const tokenStart = completion?.tokenStart ?? names?.tokenStart ?? caret;
   const token = text.slice(tokenStart, caret).toLocaleUpperCase();
-  const sorted = sortCaseless(merged, (label) => label);
   const startsWithToken = (label: string): boolean => label.toLocaleUpperCase().startsWith(token);
-  const functions = [
-    ...sorted.filter(startsWithToken),
-    ...sorted.filter((label) => !startsWithToken(label)),
-  ];
   const grouped = deps.groupNames?.() ?? false;
   if (!names) {
     return {
@@ -820,6 +789,57 @@ function computeContext(
     kinds: entries.map((e) => e.kind),
     details: entries.map((e) => e.detail),
     groups: groups.length > 0 ? groups : undefined,
+  };
+}
+
+/** Suggestions replace the token prefix but leave the suffix in place, so a caret that splits a
+ *  token offers nothing: accepting would duplicate the token's remaining text. */
+export function caretSplitsToken(text: string, caret: number): boolean {
+  const next = text[caret] ?? '';
+  return next !== '' && /[\p{L}\p{N}_.\\]/u.test(next);
+}
+
+/** The functions a formula can call matching the identifier before `caret`: the custom
+ *  functions first, then the built-ins, keeping the first spelling on a case-insensitive clash;
+ *  names starting with the token come first, then those only containing it, each run
+ *  alphabetical. Null when the caret is not at a function name. */
+export function completeFunctionNames(
+  text: string,
+  caret: number,
+  source: Pick<
+    AutocompleteDeps,
+    'getFunctionNames' | 'getFunctionDisplayNames' | 'getCustomFunctions'
+  >,
+): { token: string; tokenStart: number; names: string[] } | null {
+  const fnNames = source.getFunctionDisplayNames?.() ?? source.getFunctionNames?.() ?? null;
+  const fn = suggestFunctions(
+    text,
+    caret,
+    Number.MAX_SAFE_INTEGER,
+    fnNames ? { names: fnNames } : undefined,
+  );
+  const custom = suggestCustomFunctions(text, caret, source.getCustomFunctions?.() ?? []);
+  if (!fn && !custom) return null;
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const n of [...(custom?.matches ?? []), ...(fn?.matches ?? [])]) {
+    const key = n.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(n);
+  }
+  const tokenStart = fn?.tokenStart ?? custom?.tokenStart ?? caret;
+  const token = text.slice(tokenStart, caret);
+  const upper = token.toLocaleUpperCase();
+  const sorted = sortCaseless(merged, (label) => label);
+  const startsWithToken = (label: string): boolean => label.toLocaleUpperCase().startsWith(upper);
+  return {
+    token,
+    tokenStart,
+    names: [
+      ...sorted.filter(startsWithToken),
+      ...sorted.filter((label) => !startsWithToken(label)),
+    ],
   };
 }
 
