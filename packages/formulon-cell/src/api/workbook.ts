@@ -67,6 +67,20 @@ import { SHEET_TABLE_MEMBERS, TABLE_MEMBERS, Table, WORKBOOK_TABLE_MEMBERS } fro
 import { WORKBOOK_CALC_MEMBERS } from './workbook-calc.js';
 import { WORKBOOK_PEOPLE_MEMBERS } from './workbook-people.js';
 
+// Each module augments Sheet/Workbook; a type re-export keeps its declarations in the published
+// types (the declaration build drops bare imports). This module is not an entry point.
+export type * from './chart.js';
+export type * from './drawing.js';
+export type * from './pivot.js';
+export type * from './pivot-cache.js';
+export type * from './sheet-cells.js';
+export type * from './sheet-find.js';
+export type * from './sheet-format.js';
+export type * from './sheet-structure.js';
+export type * from './table.js';
+export type * from './workbook-calc.js';
+export type * from './workbook-people.js';
+
 /** File container a workbook saves to. */
 export type SaveFormat = WorkbookSaveFormat;
 

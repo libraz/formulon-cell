@@ -7,11 +7,15 @@
  * the ceiling on runtime values plus the rule that every exported type is
  * reachable from some exported value's signature (no orphan types).
  *
+ * After the checks it typechecks scripts/api-surface/augmentation against the built root d.ts, so a
+ * Sheet/Workbook member that the declaration build dropped fails the gate.
+ *
  * Usage: node scripts/api-surface/check.mjs [--absence]
  *   --absence  also reports public return types and required readonly fields
  *              that include `undefined` (the surface uses `null` for absence).
  * `yarn check:api` builds the libraries and runs it. Exit code 1 when any violation is found.
  */
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -294,6 +298,31 @@ for (const f of i18nFiles)
   if (!manifest.i18nLocales.includes(f))
     violations.push(`@libraz/formulon-cell/i18n/*: unexpected entry ${f}`);
 if (checkAbsence) for (const a of absence) violations.push(`absence: ${a} can return undefined`);
+
+// The Sheet/Workbook augmentations must survive into the built root declaration. `AUGMENTATION_DIST`
+// points the root entry at another dist directory (used to prove the check red and green).
+{
+  const dist = process.env.AUGMENTATION_DIST;
+  const dir = path.join(root, 'scripts/api-surface/augmentation');
+  const project = dist
+    ? path.join(dir, '.tsconfig.override.json')
+    : path.join(dir, 'tsconfig.json');
+  if (dist)
+    fs.writeFileSync(
+      project,
+      JSON.stringify({
+        extends: './tsconfig.json',
+        compilerOptions: { paths: { '@libraz/formulon-cell': [path.join(dist, 'index.d.ts')] } },
+      }),
+    );
+  const tsc = spawnSync(path.join(root, 'node_modules/.bin/tsc'), ['-p', project], {
+    encoding: 'utf8',
+  });
+  if (dist) fs.rmSync(project);
+  if (tsc.status !== 0)
+    for (const line of (tsc.stdout + tsc.stderr).split('\n').filter(Boolean))
+      violations.push(`augmentation: ${line}`);
+}
 
 const byKind = {};
 for (const v of violations) {
