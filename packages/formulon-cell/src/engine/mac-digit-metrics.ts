@@ -41,7 +41,8 @@ const FAMILY_EM: ReadonlyMap<string, number> = new Map(
 
 /** Alternate spellings, keyed and valued by normalized name. Shared with the
  *  row model. "Yu Gothic" is deliberately absent: it is a different face from
- *  游ゴシック on Mac. */
+ *  游ゴシック on Mac, and its digit advance is not measured yet, so it takes the
+ *  unknown-family em. */
 const FAMILY_ALIASES: ReadonlyMap<string, string> = new Map(
   (
     [
