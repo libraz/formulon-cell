@@ -44,6 +44,11 @@ const RULES: readonly { name: string; pattern: RegExp }[] = [
       'g',
     ),
   },
+  {
+    // A helper taking one Japanese and one English string fills every other locale from one of them.
+    name: 'ja/en pair helper',
+    pattern: /\(\s*(?:ja\s*:\s*string\s*,\s*en|en\s*:\s*string\s*,\s*ja)\s*:\s*string\b/g,
+  },
   { name: 'per-language label field', pattern: /\b\w+Ja\b|\.ja\b|\b\w*_JA_\w*|\bJA_\w+/g },
 ];
 

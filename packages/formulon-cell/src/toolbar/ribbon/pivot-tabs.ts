@@ -5,51 +5,41 @@ import type {
   RibbonTabModel,
   ToolbarLang,
 } from '../ribbon-model.js';
+import { macBundleText } from './mac/bundle-text.js';
 import { macGroupTitle } from './mac/labels.js';
 import { PIVOT_DISABLED_COMMAND_IDS } from './pivot-command-ids.js';
 
-/** Wording of the PivotTable tabs: Japanese is measured, other languages read as English. */
-const L = (ja: string, en: string): Readonly<Record<ToolbarLang, string>> => ({
-  ja,
-  en,
-  de: en,
-  fr: en,
-  zh: en,
-  ko: en,
-  th: en,
-});
-
-const LABELS = {
-  name: L('ピボットテーブル名:', 'PivotTable Name:'),
-  options: L('オプション', 'Options'),
-  activeField: L('アクティブなフィールド:', 'Active Field:'),
-  fieldSettings: L('フィールドの設定', 'Field Settings'),
-  expandField: L('フィールドの展開', 'Expand Field'),
-  collapseField: L('フィールドの折りたたみ', 'Collapse Field'),
-  groupSelection: L('グループの選択', 'Group Selection'),
-  insertSlicer: L('スライサーの挿入', 'Insert Slicer'),
-  insertTimeline: L('タイムラインの挿入', 'Insert Timeline'),
-  filterConnections: L('フィルターの接続', 'Filter Connections'),
-  refresh: L('更新', 'Refresh'),
-  changeSource: L('データ ソースの変更', 'Change Data Source'),
-  clear: L('クリア', 'Clear'),
-  select: L('選択', 'Select'),
-  move: L('ピボットテーブルの移動', 'Move PivotTable'),
-  fieldsItemsSets: L('フィールド/項目/セット', 'Fields, Items & Sets'),
-  pivotChart: L('ピボットグラフ', 'PivotChart'),
-  fieldList: L('フィールド リスト', 'Field List'),
-  buttons: L('+/- ボタン', '+/- Buttons'),
-  headers: L('フィールドのヘッダー', 'Field Headers'),
-  subtotals: L('小計', 'Subtotals'),
-  grandTotals: L('集計', 'Grand Totals'),
-  reportLayout: L('レポートのレイアウト', 'Report Layout'),
-  blankRows: L('空白行', 'Blank Rows'),
-  rowHeaders: L('行見出し', 'Row Headers'),
-  colHeaders: L('列見出し', 'Column Headers'),
-  rowStripes: L('縞模様 (行)', 'Banded Rows'),
-  colStripes: L('縞模様 (列)', 'Banded Columns'),
-  quickStyles: L('クイック スタイル', 'Quick Styles'),
-} as const;
+/** A PivotTable tab wording, generated as the `pivot-tab:` label of this key. */
+type PivotTabText =
+  | 'name'
+  | 'options'
+  | 'activeField'
+  | 'fieldSettings'
+  | 'expandField'
+  | 'collapseField'
+  | 'groupSelection'
+  | 'insertSlicer'
+  | 'insertTimeline'
+  | 'filterConnections'
+  | 'refresh'
+  | 'changeSource'
+  | 'clear'
+  | 'select'
+  | 'move'
+  | 'fieldsItemsSets'
+  | 'pivotChart'
+  | 'fieldList'
+  | 'buttons'
+  | 'headers'
+  | 'subtotals'
+  | 'grandTotals'
+  | 'reportLayout'
+  | 'blankRows'
+  | 'rowHeaders'
+  | 'colHeaders'
+  | 'rowStripes'
+  | 'colStripes'
+  | 'quickStyles';
 
 /** The two tabs a PivotTable report adds. Commands the host cannot run stay disabled in place.
  *  The Mac profile titles the groups and lays out the Design tab the way the desktop draws them;
@@ -60,10 +50,10 @@ export const buildPivotContextualTabs = (
   profile: RibbonProfile = 'default',
 ): RibbonTabModel[] => {
   const mac = profile === 'excel365Mac';
-  const text = (key: keyof typeof LABELS): string => LABELS[key][lang];
+  const text = (key: PivotTabText): string => macBundleText(`pivot-tab:${key}`, lang);
   const command = (
     id: string,
-    key: keyof typeof LABELS,
+    key: PivotTabText,
     opts: { kind?: RibbonCommand['kind']; icon?: string } = {},
   ): RibbonCommand => ({
     id,

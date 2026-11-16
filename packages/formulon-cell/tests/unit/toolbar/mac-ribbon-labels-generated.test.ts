@@ -15,7 +15,7 @@ import { MAC_RIBBON_MENU_ITEMS } from '../../../src/toolbar/ribbon/mac/menu-mani
 import { createMacRibbonMenuFactory } from '../../../src/toolbar/ribbon/mac/menus.js';
 import { applyMenuVariant } from '../../../src/toolbar/ribbon/menus/mac-variants.js';
 import { pivotStyleLabel } from '../../../src/toolbar/ribbon/pivot-style-gallery.js';
-import { buildRibbonModel } from '../../../src/toolbar/ribbon-model.js';
+import { buildRibbonModel, CONTEXTUAL_RIBBON_TABS } from '../../../src/toolbar/ribbon-model.js';
 
 const MAC_APP = '/Applications/Microsoft Excel.app';
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -83,6 +83,102 @@ const pivotStyleName = (name: string, locale: MacLocale): string => {
 const pivotColourWords = (locale: MacLocale): string[] =>
   PIVOT_STYLES.map((name) => pivotStyleLabel(name, locale).split(', ')[0] ?? '');
 
+const contextualModels = new Map<MacLocale, ReturnType<typeof buildRibbonModel>>();
+
+/** The label of a Mac contextual tab, or of one of its commands. */
+const contextualText = (locale: MacLocale, tabId: string, commandId?: string) => {
+  let model = contextualModels.get(locale);
+  if (!model) {
+    model = buildRibbonModel(locale, {
+      profile: 'excel365Mac',
+      contextualTabs: CONTEXTUAL_RIBBON_TABS,
+    });
+    contextualModels.set(locale, model);
+  }
+  const tab = model.find((candidate) => candidate.id === tabId);
+  if (!commandId) return tab?.label;
+  return tab?.groups.flatMap((group) => group.commands).find((command) => command.id === commandId)
+    ?.label;
+};
+
+/** Where each table and chart tab wording is drawn: its tab, and the command when it is one. */
+const OBJECT_TAB_SITES: Readonly<Record<string, readonly [string, string?]>> = {
+  tableTab: ['tableDesign'],
+  tableName: ['tableDesign', 'tableName'],
+  summarizePivot: ['tableDesign', 'tableSummarizePivot'],
+  removeDuplicates: ['tableDesign', 'mac.data.removeDuplicates'],
+  convertRange: ['tableDesign', 'tableConvertRange'],
+  insertSlicer: ['tableDesign', 'mac.insert.slicer'],
+  refresh: ['tableDesign', 'tableRefresh'],
+  headerRow: ['tableDesign', 'tableHeaderRow'],
+  totalRow: ['tableDesign', 'tableTotalRow'],
+  bandedRows: ['tableDesign', 'tableBandedRows'],
+  firstColumn: ['tableDesign', 'tableFirstColumn'],
+  lastColumn: ['tableDesign', 'tableLastColumn'],
+  bandedColumns: ['tableDesign', 'tableBandedColumns'],
+  filterButton: ['tableDesign', 'tableFilterButton'],
+  quickStyles: ['tableDesign', 'tableQuickStyles'],
+  addElement: ['chartDesign', 'chartAddElement'],
+  quickLayout: ['chartDesign', 'chartQuickLayout'],
+  changeColors: ['chartDesign', 'chartColors'],
+  switchRowColumn: ['chartDesign', 'chartSwitchRowColumn'],
+  selectData: ['chartDesign', 'chartSelectData'],
+  changeType: ['chartDesign', 'chartChangeType'],
+  moveChart: ['chartDesign', 'chartMove'],
+  chartElement: ['chartFormat', 'chartElementSelect'],
+  resetStyle: ['chartFormat', 'chartResetStyle'],
+  shapes: ['chartFormat', 'chartShapes'],
+  changeShape: ['chartFormat', 'chartChangeShape'],
+  shapeFill: ['chartFormat', 'chartShapeFill'],
+  shapeOutline: ['chartFormat', 'chartShapeOutline'],
+  shapeEffects: ['chartFormat', 'chartShapeEffects'],
+  textFill: ['chartFormat', 'chartTextFill'],
+  textOutline: ['chartFormat', 'chartTextOutline'],
+  textEffects: ['chartFormat', 'chartTextEffects'],
+  bringForward: ['chartFormat', 'objectBringForward'],
+  sendBackward: ['chartFormat', 'objectSendBackward'],
+  selectionPane: ['chartFormat', 'objectSelectionPane'],
+  arrangeObjects: ['chartFormat', 'chartArrangeObjects'],
+  align: ['chartFormat', 'chartAlign'],
+  group: ['chartFormat', 'chartGroup'],
+  rotate: ['chartFormat', 'chartRotate'],
+  lockAspect: ['chartFormat', 'chartLockAspect'],
+  formatPane: ['chartFormat', 'chartFormatSelection'],
+};
+
+/** Where each PivotTable tab wording is drawn: its tab and command. */
+const PIVOT_TAB_SITES: Readonly<Record<string, readonly [string, string]>> = {
+  subtotals: ['pivotDesign', 'pivotSubtotals'],
+  grandTotals: ['pivotDesign', 'pivotGrandTotals'],
+  reportLayout: ['pivotDesign', 'pivotReportLayout'],
+  blankRows: ['pivotDesign', 'pivotBlankRows'],
+  name: ['pivotAnalyze', 'pivotName'],
+  options: ['pivotAnalyze', 'pivotOptions'],
+  activeField: ['pivotAnalyze', 'pivotActiveField'],
+  fieldSettings: ['pivotAnalyze', 'pivotFieldSettings'],
+  expandField: ['pivotAnalyze', 'pivotExpandField'],
+  collapseField: ['pivotAnalyze', 'pivotCollapseField'],
+  groupSelection: ['pivotAnalyze', 'pivotGroupSelection'],
+  insertSlicer: ['pivotAnalyze', 'pivotInsertSlicer'],
+  insertTimeline: ['pivotAnalyze', 'pivotInsertTimeline'],
+  filterConnections: ['pivotAnalyze', 'pivotFilterConnections'],
+  refresh: ['pivotAnalyze', 'pivotRefresh'],
+  changeSource: ['pivotAnalyze', 'pivotChangeSource'],
+  clear: ['pivotAnalyze', 'pivotClear'],
+  select: ['pivotAnalyze', 'pivotSelect'],
+  move: ['pivotAnalyze', 'pivotMove'],
+  fieldsItemsSets: ['pivotAnalyze', 'pivotFieldsItemsSets'],
+  pivotChart: ['pivotAnalyze', 'pivotChart'],
+  fieldList: ['pivotAnalyze', 'pivotFieldList'],
+  buttons: ['pivotAnalyze', 'pivotButtons'],
+  headers: ['pivotAnalyze', 'pivotHeaders'],
+  rowHeaders: ['pivotDesign', 'pivotRowHeaders'],
+  colHeaders: ['pivotDesign', 'pivotColHeaders'],
+  rowStripes: ['pivotDesign', 'pivotRowStripes'],
+  colStripes: ['pivotDesign', 'pivotColStripes'],
+  quickStyles: ['pivotDesign', 'pivotQuickStyles'],
+};
+
 const resolve = (namespace: string, name: string, locale: MacLocale) => {
   if (namespace === 'labels') return labels[name]?.[locale];
   if (namespace === 'groups') return GROUP_LABELS[name]?.[locale];
@@ -93,6 +189,14 @@ const resolve = (namespace: string, name: string, locale: MacLocale) => {
   if (namespace === 'home-help') return homeCommand(name, locale)?.title;
   if (namespace === 'pivot-style') return pivotStyleName(name, locale);
   if (namespace === 'gallery') return galleryText(name, locale);
+  if (namespace === 'pivot-tab') {
+    const [tabId = '', commandId] = PIVOT_TAB_SITES[name] ?? [];
+    return contextualText(locale, tabId, commandId);
+  }
+  if (namespace === 'object-tab') {
+    const [tabId = '', commandId] = OBJECT_TAB_SITES[name] ?? [];
+    return contextualText(locale, tabId, commandId);
+  }
   const script = MAC_AUTOMATION_GALLERY.find((entry) => entry.id === name);
   if (namespace === 'automation') return script?.labels[locale];
   if (namespace === 'automation-detail') return script?.details[locale];

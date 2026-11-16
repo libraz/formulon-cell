@@ -5003,6 +5003,339 @@
     "automation-ui:cancel": {
       "file": "mso40ui.framework/tbbtn.strings",
       "key": "746909326"
+    },
+    "object-tab:tableTab": {
+      "tcid": 12826,
+      "source": "tbbtn",
+      "name": "TabTableTools"
+    },
+    "object-tab:tableName": {
+      "tcid": 12488,
+      "source": "tbbtn",
+      "name": "EditTableName"
+    },
+    "object-tab:summarizePivot": {
+      "tcid": 12487,
+      "source": "tbbtn",
+      "name": "SummarizeWithPivot"
+    },
+    "object-tab:removeDuplicates": {
+      "tcid": 12230,
+      "source": "tbbtn",
+      "name": "XLRemoveDuplicates"
+    },
+    "object-tab:convertRange": {
+      "tcid": 7375,
+      "source": "tbbtn",
+      "name": "ConvertToRange"
+    },
+    "object-tab:insertSlicer": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3975413148",
+      "strip_ellipsis": true
+    },
+    "object-tab:refresh": {
+      "tcid": 11934,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorRefresh"
+    },
+    "object-tab:headerRow": {
+      "file": "mso40ui.framework/tbbtn2.strings",
+      "key": "2775573804"
+    },
+    "object-tab:totalRow": {
+      "tcid": 7372,
+      "source": "tbbtn2",
+      "name": "ToggleTotalRow"
+    },
+    "object-tab:bandedRows": {
+      "tcid": 12480,
+      "source": "tbbtn",
+      "name": "TableStyleShowBandedRows"
+    },
+    "object-tab:firstColumn": {
+      "tcid": 12478,
+      "source": "tbbtn",
+      "name": "TableStyleShowFirstColumn"
+    },
+    "object-tab:lastColumn": {
+      "tcid": 12479,
+      "source": "tbbtn",
+      "name": "TableStyleShowLastColumn"
+    },
+    "object-tab:bandedColumns": {
+      "tcid": 12481,
+      "source": "tbbtn",
+      "name": "TableStyleShowBandedCols"
+    },
+    "object-tab:filterButton": {
+      "tcid": 24619,
+      "source": "tbbtn",
+      "name": "ToggleFilterBtns"
+    },
+    "object-tab:quickStyles": {
+      "tcid": 11456,
+      "source": "tbbtn",
+      "name": "ChartStylesGallery"
+    },
+    "object-tab:addElement": {
+      "tcid": 24377,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorAddChartElement"
+    },
+    "object-tab:quickLayout": {
+      "tcid": 11457,
+      "source": "tbbtn",
+      "name": "ChartStructuresGallery"
+    },
+    "object-tab:changeColors": {
+      "tcid": 24604,
+      "source": "tbbtn",
+      "name": "ChartColorsGallery"
+    },
+    "object-tab:switchRowColumn": {
+      "tcid": 13210,
+      "source": "tbbtn",
+      "name": "ChartDataOrientation"
+    },
+    "object-tab:selectData": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1536496452",
+      "strip_ellipsis": true
+    },
+    "object-tab:changeType": {
+      "tcid": 13214,
+      "source": "tbbtn",
+      "name": "ChartChangeType"
+    },
+    "object-tab:moveChart": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "14296577",
+      "strip_ellipsis": true
+    },
+    "object-tab:chartElement": {
+      "tcid": 11468,
+      "source": "tbbtn",
+      "name": "ChartElementSelector"
+    },
+    "object-tab:resetStyle": {
+      "tcid": 14057,
+      "source": "tbbtn",
+      "name": "ChartClearToMatchStyle"
+    },
+    "object-tab:shapes": {
+      "tcid": 11529,
+      "source": "tbbtn",
+      "name": "GalAllShapes"
+    },
+    "object-tab:changeShape": {
+      "tcid": 11530,
+      "source": "tbbtn2",
+      "name": "GalChangeShape"
+    },
+    "object-tab:shapeFill": {
+      "tcid": 11689,
+      "source": "tbbtn",
+      "name": "UxColorPickerFill"
+    },
+    "object-tab:shapeOutline": {
+      "tcid": 34767,
+      "source": "tbbtn",
+      "name": "ColorPickerChartLineStyles"
+    },
+    "object-tab:shapeEffects": {
+      "tcid": 14861,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorShapeEffects"
+    },
+    "object-tab:textFill": {
+      "tcid": 14835,
+      "source": "tbbtn",
+      "name": "ColorPickerText"
+    },
+    "object-tab:textOutline": {
+      "file": "mso99.framework/mso_intl.bundle/strman_f401.strings",
+      "key": "fc"
+    },
+    "object-tab:textEffects": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2701781291"
+    },
+    "object-tab:bringForward": {
+      "tcid": 170,
+      "source": "tbbtn2",
+      "name": "BringForward"
+    },
+    "object-tab:sendBackward": {
+      "tcid": 171,
+      "source": "tbbtn2",
+      "name": "SendBackward"
+    },
+    "object-tab:selectionPane": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3058570390",
+      "strip_ellipsis": true
+    },
+    "object-tab:arrangeObjects": {
+      "tcid": 29672,
+      "source": "tbbtn",
+      "name": "OartSortingView"
+    },
+    "object-tab:align": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "736229719"
+    },
+    "object-tab:group": {
+      "tcid": 14409,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorGroup"
+    },
+    "object-tab:rotate": {
+      "tcid": 11924,
+      "source": "tbbtn",
+      "name": "GalRotateObject"
+    },
+    "object-tab:lockAspect": {
+      "tcid": 28490,
+      "source": "tbbtn",
+      "name": "LockAspectRatio"
+    },
+    "object-tab:formatPane": {
+      "file": "mso40ui.framework/tbbtn2.strings",
+      "key": "2206285436"
+    },
+    "pivot-tab:name": {
+      "tcid": 14578,
+      "source": "tbbtn",
+      "name": "LabelPivotTableName"
+    },
+    "pivot-tab:activeField": {
+      "tcid": 12472,
+      "source": "tbbtn",
+      "name": "PivotFieldName"
+    },
+    "pivot-tab:fieldSettings": {
+      "tcid": 460,
+      "source": "tbbtn2",
+      "name": "PivotTableField"
+    },
+    "pivot-tab:expandField": {
+      "tcid": 12188,
+      "source": "tbbtn",
+      "name": "SxExpandField"
+    },
+    "pivot-tab:collapseField": {
+      "tcid": 12189,
+      "source": "tbbtn",
+      "name": "SxCollapseField"
+    },
+    "pivot-tab:groupSelection": {
+      "tcid": 12624,
+      "source": "tbbtn",
+      "name": "XLPivotGroupSelection"
+    },
+    "pivot-tab:insertSlicer": {
+      "tcid": 18885,
+      "source": "tbbtn",
+      "name": "SlicerCreate",
+      "strip_ellipsis": true
+    },
+    "pivot-tab:filterConnections": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4084475615",
+      "strip_ellipsis": true
+    },
+    "pivot-tab:refresh": {
+      "tcid": 11934,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorRefresh"
+    },
+    "pivot-tab:changeSource": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "329423679",
+      "strip_ellipsis": true
+    },
+    "pivot-tab:clear": {
+      "tcid": 12330,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorClearPivotTable"
+    },
+    "pivot-tab:select": {
+      "tcid": 16026,
+      "source": "tbbtn",
+      "name": "PivotTableSelectFlyout"
+    },
+    "pivot-tab:move": {
+      "file": "strman_0017.strings",
+      "key": "104"
+    },
+    "pivot-tab:fieldsItemsSets": {
+      "tcid": 11938,
+      "source": "tbbtn",
+      "name": "FlyoutAnchorPivotTableFormula"
+    },
+    "pivot-tab:pivotChart": {
+      "tcid": 12248,
+      "source": "tbbtn",
+      "name": "sx12NewPivotChart"
+    },
+    "pivot-tab:fieldList": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3116689194"
+    },
+    "pivot-tab:buttons": {
+      "tcid": 12498,
+      "source": "tbbtn",
+      "name": "SxShowDrillIndicators"
+    },
+    "pivot-tab:headers": {
+      "tcid": 12187,
+      "source": "tbbtn",
+      "name": "SxShowFieldHeaders"
+    },
+    "pivot-tab:subtotals": {
+      "tcid": 11893,
+      "source": "tbbtn",
+      "name": "GalXLPivotSubTotals"
+    },
+    "pivot-tab:grandTotals": {
+      "tcid": 11886,
+      "source": "tbbtn",
+      "name": "GalXLPivotGrandTotals"
+    },
+    "pivot-tab:reportLayout": {
+      "file": "strman_0046.strings",
+      "key": "139"
+    },
+    "pivot-tab:blankRows": {
+      "tcid": 12473,
+      "source": "tbbtn",
+      "name": "GalPivotLayoutMoreOptions"
+    },
+    "pivot-tab:rowHeaders": {
+      "tcid": 12482,
+      "source": "tbbtn",
+      "name": "TableStyleShowRowHeaders"
+    },
+    "pivot-tab:colHeaders": {
+      "tcid": 12483,
+      "source": "tbbtn",
+      "name": "TableStyleShowColumnHeaders"
+    },
+    "pivot-tab:rowStripes": {
+      "tcid": 12480,
+      "source": "tbbtn",
+      "name": "TableStyleShowBandedRows"
+    },
+    "pivot-tab:colStripes": {
+      "tcid": 12481,
+      "source": "tbbtn",
+      "name": "TableStyleShowBandedCols"
+    },
+    "pivot-tab:quickStyles": {
+      "tcid": 12209,
+      "source": "tbbtn",
+      "name": "UxGalPivotTableStyles"
     }
   },
   "held": {
@@ -6600,6 +6933,32 @@
         "de": "Max",
         "fr": "Max"
       }
+    },
+    "pivot-tab:options": {
+      "status": "unconfirmed",
+      "reason": "drawn in ja, fr and th only; the bundle keys matching those disagree in ko (\"옵션\" / \"Options\"), so ko keeps its current text",
+      "text": {
+        "ko": "Options"
+      },
+      "tcid": null,
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "1402493628"
+      }
+    },
+    "pivot-tab:insertTimeline": {
+      "status": "unconfirmed",
+      "reason": "drawn in ja, fr and th only; the bundle keys matching those disagree in en (\"Insert Timeline\" / \"Insert Timelines\") and de, so en and de keep their current text",
+      "text": {
+        "en": "Insert Timeline",
+        "de": "Insert Timeline"
+      },
+      "tcid": null,
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "1125052223"
+      },
+      "strip_ellipsis": true
     }
   },
   "consumers": [

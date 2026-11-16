@@ -32,7 +32,7 @@ describe('PivotTable contextual tabs', () => {
     );
     expect(groups).toEqual([
       ['ピボットテーブル名:', 'オプション'],
-      ['アクティブなフィールド:', 'フィールドの設定', 'フィールドの展開', 'フィールドの折りたたみ'],
+      ['ピボット フィールド名:', 'フィールドの設定', 'フィールドの展開', 'フィールドの折りたたみ'],
       ['グループの選択'],
       ['スライサーの挿入', 'タイムラインの挿入', 'フィルターの接続'],
       ['更新', 'データ ソースの変更'],
@@ -41,6 +41,19 @@ describe('PivotTable contextual tabs', () => {
       ['ピボットグラフ'],
       ['フィールド リスト', '+/- ボタン', 'フィールドのヘッダー'],
     ]);
+  });
+
+  it('words both tabs from the desktop bundle in every locale and profile', () => {
+    const label = (lang: 'en' | 'de' | 'fr', id: string, profile?: 'excel365Mac') =>
+      buildRibbonModel(lang, { profile, contextualTabs: PIVOT_CONTEXTUAL_RIBBON_TABS })
+        .flatMap((tab) => tab.groups)
+        .flatMap((group) => group.commands)
+        .find((command) => command.id === id)?.label;
+    expect(label('en', 'pivotActiveField', 'excel365Mac')).toBe('PivotField Name:');
+    expect(label('en', 'pivotFieldsItemsSets')).toBe('Fields, Items, & Sets');
+    expect(label('de', 'pivotFieldSettings', 'excel365Mac')).toBe('Feldeinstellungen');
+    expect(label('de', 'pivotSubtotals')).toBe('Teilergebnisse');
+    expect(label('fr', 'pivotName', 'excel365Mac')).toBe('Nom du tableau croisé dynamique :');
   });
 
   it('enables the field list and leaves what the host cannot do disabled', () => {

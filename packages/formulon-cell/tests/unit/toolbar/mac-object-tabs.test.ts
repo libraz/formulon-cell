@@ -16,6 +16,24 @@ const labels = (id: string): string[][] =>
 
 // Excel for Mac (ja): the table tab and the two chart tabs.
 describe('Mac table and chart tabs', () => {
+  it('words the table and chart tabs from the desktop bundle in every locale', () => {
+    const tabIn = (locale: 'en' | 'de' | 'fr', id: string) =>
+      buildRibbonModel(locale, {
+        profile: 'excel365Mac',
+        contextualTabs: CONTEXTUAL_RIBBON_TABS,
+      }).find((tab) => tab.id === id);
+    const commandLabel = (locale: 'en' | 'de' | 'fr', tabId: string, commandId: string) =>
+      tabIn(locale, tabId)
+        ?.groups.flatMap((group) => group.commands)
+        .find((command) => command.id === commandId)?.label;
+    expect(tabIn('de', 'tableDesign')?.label).toBe('Tabelle');
+    expect(commandLabel('de', 'tableDesign', 'tableConvertRange')).toBe('In Bereich umwandeln');
+    expect(commandLabel('fr', 'tableDesign', 'tableTotalRow')).toBe('Ligne des totaux');
+    expect(commandLabel('de', 'chartDesign', 'chartAddElement')).toBe('Diagrammelement hinzufügen');
+    expect(commandLabel('en', 'chartFormat', 'chartArrangeObjects')).toBe('Reorder Objects');
+    expect(commandLabel('de', 'chartFormat', 'objectSelectionPane')).toBe('Auswahlbereich');
+  });
+
   it('names the table tab テーブル and groups it as Excel does', () => {
     expect(macTab('tableDesign')?.label).toBe('テーブル');
     expect(labels('tableDesign')).toEqual([

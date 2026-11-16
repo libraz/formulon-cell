@@ -20,7 +20,8 @@ ellipsis in every locale (see strip_trailing_ellipsis). Keys under `held` (uncon
 pinned pending, suspect value, no match) are not generated and keep their current text, unless
 the entry carries locale text: `text` ({locale: text}, the measured or current wording) and/or
 `provisional` (a strings file and key whose ja differs or is unconfirmed). A held locale takes
-`text`, else the provisional source, else `text.en`.
+`text`, else the provisional source, else `text.en`; `strip_ellipsis` applies to the provisional
+source as it does to a mapped one.
 
   gen-mac-ribbon-labels.py [OUT]        write the TS data file (default: the package's labels-bundle.ts)
   gen-mac-ribbon-labels.py --check PATH exit 1 if PATH differs from the generated output
@@ -330,6 +331,8 @@ def build(b, ours, mapfile):
             if labs is None:
                 problems.append((key, f'provisional: {why}'))
                 continue
+            if h.get('strip_ellipsis'):
+                labs = {loc: strip_trailing_ellipsis(v) for loc, v in labs.items()}
         elif 'en' not in text:
             problems.append((key, 'held text without en or a provisional source'))
             continue
