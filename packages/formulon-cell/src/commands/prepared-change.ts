@@ -63,7 +63,8 @@ export const sameStructuredValue = (left: unknown, right: unknown): boolean =>
   structurallyEqual(left, right, allKeys);
 
 /** Structural equality with the key semantics of comparing JSON forms: a key holding
- *  `undefined` equals a missing key. */
+ *  `undefined` equals a missing key. Unlike JSON, an `undefined` array element differs from
+ *  `null`; no caller compares arrays whose element type admits `undefined`. */
 export const sameJsonValue = (left: unknown, right: unknown): boolean =>
   structurallyEqual(left, right, definedKeys);
 
