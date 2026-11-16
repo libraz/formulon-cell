@@ -10,7 +10,6 @@ export {
 } from './choice.js';
 export {
   type ConditionalFormatDialogResult,
-  type ConditionalFormatDialogStyle,
   type ConditionalFormatNumberDialogOptions,
   type ConditionalFormatRuleDialogStrings,
   type ConditionalFormatTextDialogOptions,
@@ -20,6 +19,7 @@ export {
 } from './conditional-format.js';
 export {
   applyConditionalStylePreview,
+  type ConditionalFormatDialogStyle,
   type ConditionalFormatStyleOption,
   type ConditionalFormatStyleStrings,
   conditionalStyleFromValue,

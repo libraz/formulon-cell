@@ -12,14 +12,14 @@ import type { ToolbarLang } from '../../ribbon-model.js';
 
 import {
   createMenu,
-  createSubmenu,
+  formatSubmenu,
   type MenuIconSlug,
+  menuCheckable,
   menuIconButton,
   menuIconSpacer,
   menuIdForCommand,
   menuPresetButton,
   menuSeparator,
-  menuSubmenuTrigger,
 } from './general.js';
 
 export type AutoSumFormulaName = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN' | 'MORE';
@@ -44,8 +44,7 @@ type FormulasMenuText = ToolbarMenuText & {
 const calcOptionButton = (label: string, value: string, icon: MenuIconSlug): HTMLButtonElement => {
   const button = menuIconButton(label, 'calcOption', value, icon);
   if (value === 'auto' || value === 'manual' || value === 'auto-no-table') {
-    button.setAttribute('role', 'menuitemradio');
-    button.setAttribute('aria-checked', 'false');
+    menuCheckable(button, 'menuitemradio');
   }
   return button;
 };
@@ -57,33 +56,7 @@ const checkableOption = (
   value: string,
   role: 'menuitemcheckbox' | 'menuitemradio',
 ): HTMLButtonElement => {
-  const button = menuPresetButton(label, attr, value, menuIconSpacer());
-  button.setAttribute('role', role);
-  button.setAttribute('aria-checked', 'false');
-  return button;
-};
-
-/** A submenu row and its panel, in the shared format-submenu markup. */
-const formatSubmenu = (
-  menuId: string,
-  key: string,
-  label: string,
-  children: readonly Node[],
-): [HTMLButtonElement, HTMLDivElement] => {
-  const id = `${menuId}-${key}`;
-  const trigger = menuSubmenuTrigger(
-    menuPresetButton(label, 'formatSubmenu', key, menuIconSpacer()),
-    undefined,
-    { controlsId: id },
-  );
-  const panel = createSubmenu({
-    id,
-    className: 'fc-tb__submenu fc-tb__submenu--format',
-    label,
-    dataset: { formatPanel: key },
-  });
-  panel.append(...children);
-  return [trigger, panel];
+  return menuCheckable(menuPresetButton(label, attr, value, menuIconSpacer()), role);
 };
 
 export const createFormulasMenuFactories = (

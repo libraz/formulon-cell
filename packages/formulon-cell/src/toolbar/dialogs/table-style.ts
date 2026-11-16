@@ -282,14 +282,15 @@ export const showTableStyleDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
-    const onOk = (): TableStyleDialogValue | null => {
+    const onOk = (): void => {
       const label = name.valueOrError(errorRow, strings.namedRangeDialog.errorEmptyName);
-      if (label === null) return null;
+      if (label === null) return;
       const taken = opts.validateName?.(label);
       if (taken) {
         name.showError(errorRow, taken);
-        return null;
+        return;
       }
       // The engine drops a stripe size whose element is absent.
       const sizes = Object.fromEntries(
@@ -302,12 +303,7 @@ export const showTableStyleDialog = (
         setAsDefault: setDefault.checked,
       };
       lifecycle.finish(value);
-      return value;
     };
-    okBtn.addEventListener('click', () => {
-      onOk();
-    });
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     render();
     mountDialog(shell, name.focus);

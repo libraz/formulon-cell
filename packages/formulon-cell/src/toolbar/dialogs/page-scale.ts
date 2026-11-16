@@ -1,4 +1,5 @@
 import { showNumberPrompt } from './prompt.js';
+import type { DialogLocale } from './shell.js';
 
 export interface PageScaleDialogOptions {
   title: string;
@@ -8,7 +9,7 @@ export interface PageScaleDialogOptions {
   okLabel: string;
   cancelLabel: string;
   invalidMessage: string;
-  locale?: string | (() => string);
+  locale?: DialogLocale;
 }
 
 export const showPageScaleDialog = (opts: PageScaleDialogOptions): Promise<number | null> =>

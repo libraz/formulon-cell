@@ -3,13 +3,16 @@ import { formatEditableNumber } from '../../engine/value.js';
 import {
   appendDialogActions,
   appendDialogButton,
+  appendDialogMessage,
   appendErrorRow,
   appendInputRow,
   createDialogShell,
+  type DialogLocale,
   type DialogShell,
   focusAndSelectInput,
   installDialogLifecycle,
   mountDialog,
+  resolveDialogLocale,
   showInputError,
 } from './shell.js';
 
@@ -34,7 +37,7 @@ export interface NumberPromptOptions {
   cancelLabel: string;
   invalidMessage: string;
   /** BCP 47 input locale, or a getter for a live profile. */
-  locale?: string | (() => string);
+  locale?: DialogLocale;
   /** Require a whole number. `step` controls the spinner increment only. */
   integer?: boolean;
   /** Extra classes on the dialog panel, for a dialog-specific layout. */
@@ -76,10 +79,7 @@ const appendAlertText = (shell: DialogShell, opts: AlertText): void => {
     headline.textContent = opts.headline;
     shell.body.appendChild(headline);
   }
-  const msg = doc.createElement('p');
-  msg.className = 'fc-tb__dlg__message';
-  msg.textContent = opts.message;
-  shell.body.appendChild(msg);
+  appendDialogMessage(shell.body, opts.message);
 };
 
 /** Excel 365-styled modal prompt. Returns the entered value, or `null`
@@ -102,6 +102,7 @@ export const showPrompt = (opts: PromptOptions): Promise<string | null> =>
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const value = input.value;
@@ -112,8 +113,6 @@ export const showPrompt = (opts: PromptOptions): Promise<string | null> =>
       }
       lifecycle.finish(value);
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => focusAndSelectInput(input));
   });
@@ -123,8 +122,7 @@ export const showNumberPrompt = (opts: NumberPromptOptions): Promise<number | nu
   new Promise<number | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title });
     if (opts.panelClasses) shell.panel.classList.add(...opts.panelClasses);
-    const getLocale = (): string =>
-      typeof opts.locale === 'function' ? opts.locale() : (opts.locale ?? 'en-US');
+    const getLocale = (): string => resolveDialogLocale(opts.locale);
     const locale = getLocale();
     const integerContract = opts.integer === true;
     const input = appendInputRow(shell.body, opts.label, {
@@ -156,6 +154,7 @@ export const showNumberPrompt = (opts: NumberPromptOptions): Promise<number | nu
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const n = readValue();
@@ -165,8 +164,6 @@ export const showNumberPrompt = (opts: NumberPromptOptions): Promise<number | nu
       }
       lifecycle.finish(n);
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => focusAndSelectInput(input));
   });

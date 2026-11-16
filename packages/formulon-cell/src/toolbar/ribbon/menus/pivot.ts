@@ -74,9 +74,6 @@ const MENUS: Readonly<Record<string, readonly Entry[]>> = {
   ],
 };
 
-/** Commands that open one of these menus. */
-export const PIVOT_LAYOUT_MENU_COMMANDS = Object.keys(MENUS);
-
 export const createPivotMenuFactories = (deps: PivotMenuDeps): PivotMenuFactories => {
   const t = deps.ribbonMenuText;
   const createPivotLayoutMenu = (commandId: string): HTMLDivElement => {

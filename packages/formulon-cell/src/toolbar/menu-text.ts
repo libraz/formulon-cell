@@ -1,7 +1,7 @@
 import { dictionaries, type Strings } from '../i18n/strings.js';
 import type { ToolbarLang } from './ribbon-model.js';
 
-const resolveStrings = (input: Strings | ToolbarLang): Strings =>
+export const resolveStrings = (input: Strings | ToolbarLang): Strings =>
   typeof input === 'string' ? dictionaries[input] : input;
 
 export type ConditionalMenuText = Strings['conditionalMenu'];

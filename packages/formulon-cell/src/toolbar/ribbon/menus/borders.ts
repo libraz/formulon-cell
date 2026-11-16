@@ -3,7 +3,7 @@
 // preset → fire `data-border-preset`, draw action → fire `data-border-draw`,
 // submenu trigger → toggle a nested line-color / line-style submenu beside the
 // main dropdown. The line-color submenu hosts a shared color palette; picks
-// update the playground-owned `selectedBorderColor` via `onPickColor`.
+// update the host-owned border colour via `onPickColor`.
 
 import { createColorPalette, pickNativeColor } from '../../../components/color-palette.js';
 import { projectDisabledState } from '../../menu-a11y.js';
@@ -24,6 +24,7 @@ import {
   createMenu,
   createMenuButton,
   createSubmenu,
+  menuCheckable,
   menuIconSpacer,
   menuPresetButton,
   menuSectionHeader,
@@ -57,9 +58,7 @@ const drawActionItem = (
     action,
     leading ?? (icon ? createBorderPreview(icon) : menuIconSpacer()),
   );
-  btn.setAttribute('role', 'menuitemcheckbox');
-  btn.setAttribute('aria-checked', 'false');
-  return btn;
+  return menuCheckable(btn, 'menuitemcheckbox');
 };
 
 const submenuTrigger = (
@@ -86,8 +85,8 @@ const createLineStyleSubmenu = (label: string, noneLabel: string): HTMLDivElemen
       attr: 'borderLineStyle',
       value,
     });
-    btn.setAttribute('role', 'menuitemradio');
-    btn.setAttribute('aria-checked', value === 'thin' ? 'true' : 'false');
+    menuCheckable(btn, 'menuitemradio');
+    if (value === 'thin') btn.setAttribute('aria-checked', 'true');
     if (value === 'none') {
       btn.classList.add('fc-tb__submenu-item--line-style-none');
       btn.appendChild(submenuItemText(noneLabel));
@@ -151,14 +150,7 @@ export const createBordersMenu = (deps: BordersMenuDeps, variant?: MenuVariant):
     // Section 4: heading + draw actions
     menuSectionHeader(t.drawBordersHeading),
     drawActionItem('draw', t.drawBorder, { bottom: 'thin' }),
-    drawActionItem('grid', t.drawBorderGrid, {
-      top: 'thin',
-      right: 'thin',
-      bottom: 'thin',
-      left: 'thin',
-      innerGrid: true,
-      showBase: false,
-    }),
+    drawActionItem('grid', t.drawBorderGrid, BORDER_PRESETS.all),
     drawActionItem('erase', t.eraseBorder, undefined, createBorderEraserPreview()),
     submenuTrigger('lineColor', t.lineColor, createBorderLineColorPreview()),
     submenuTrigger('lineStyle', t.lineStyle, createBorderLineStylePreview()),

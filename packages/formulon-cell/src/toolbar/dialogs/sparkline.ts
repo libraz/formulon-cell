@@ -9,7 +9,7 @@ import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import { attachRangePickerButton } from '../../interact/range-picker-control.js';
 import type { SpreadsheetStore } from '../../store/store.js';
 import { projectDisabledState } from '../menu-a11y.js';
-import { appendCheckboxRow } from './form-controls.js';
+import { appendCheckboxRow, createRadioOption } from './form-controls.js';
 import { showMessage } from './prompt.js';
 import {
   appendDialogActions,
@@ -36,6 +36,31 @@ export interface SparklineRangeDialogOptions {
   pickerLabel: string;
 }
 
+/** Turns off browser assistance on a range text field and names it. */
+const configureRangeInput = (input: HTMLInputElement, label: string): void => {
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.setAttribute('aria-label', label);
+};
+
+/** Attaches the range picker button that fills `input` with a range picked on the sheet. */
+const attachSparklineRangeField = (
+  input: HTMLInputElement,
+  opts: Pick<SparklineRangeDialogOptions, 'store' | 'getWb' | 'pickerLabel'>,
+): HTMLButtonElement => {
+  const pick = createRangePickFormatter({
+    store: opts.store,
+    sheetName: (index) => opts.getWb()?.sheetName(index) ?? `Sheet${index + 1}`,
+  });
+  pick.begin();
+  return attachRangePickerButton(input, {
+    label: opts.pickerLabel,
+    getValue: () => pick.range(),
+    subscribeToRangeChanges: pick.subscribe,
+    kind: 'sparkline-range',
+  });
+};
+
 /** A dialog with one range field: the Edit Single Sparkline's Data and Date Axis dialogs. Returns
  *  the range typed or picked, or null on cancel. */
 export const showSparklineRangeDialog = (
@@ -51,23 +76,11 @@ export const showSparklineRangeDialog = (
     const input = shell.body.ownerDocument.createElement('input');
     input.type = 'text';
     input.className = 'fc-tb__dlg__input';
-    input.autocomplete = 'off';
-    input.spellcheck = false;
+    configureRangeInput(input, opts.label);
     input.value = opts.initial;
-    input.setAttribute('aria-label', opts.label);
     row.append(text, input);
     shell.body.appendChild(row);
-    const pick = createRangePickFormatter({
-      store: opts.store,
-      sheetName: (index) => opts.getWb()?.sheetName(index) ?? `Sheet${index + 1}`,
-    });
-    pick.begin();
-    attachRangePickerButton(input, {
-      label: opts.pickerLabel,
-      getValue: () => pick.range(),
-      subscribeToRangeChanges: pick.subscribe,
-      kind: 'sparkline-range',
-    });
+    attachSparklineRangeField(input, opts);
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
       cancelLabel: opts.cancelLabel,
@@ -78,6 +91,7 @@ export const showSparklineRangeDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const range = resolveSparklineRange(
@@ -91,8 +105,6 @@ export const showSparklineRangeDialog = (
       }
       lifecycle.finish(range);
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
     mountDialog(shell, () => focusAndSelectInput(input));
   });
 
@@ -132,17 +144,14 @@ export const showSparklineHiddenEmptyDialog = (
       [BlanksAs.Span, opts.connect],
     ];
     for (const [value, label] of options) {
-      const wrap = shell.body.ownerDocument.createElement('label');
-      wrap.className = 'fc-fmtdlg__radio';
-      const radio = shell.body.ownerDocument.createElement('input');
-      radio.type = 'radio';
-      radio.name = EMPTY_CELLS_RADIO;
-      radio.value = String(value);
-      radio.checked = value === opts.initial.emptyCellsAs;
-      const span = shell.body.ownerDocument.createElement('span');
-      span.textContent = label;
-      wrap.append(radio, span);
-      shell.body.appendChild(wrap);
+      shell.body.appendChild(
+        createRadioOption(shell.body.ownerDocument, {
+          name: EMPTY_CELLS_RADIO,
+          value: String(value),
+          label,
+          checked: value === opts.initial.emptyCellsAs,
+        }).wrap,
+      );
     }
     const showHidden = appendCheckboxRow(
       shell.body,
@@ -159,6 +168,7 @@ export const showSparklineHiddenEmptyDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void =>
       lifecycle.finish({
@@ -168,8 +178,6 @@ export const showSparklineHiddenEmptyDialog = (
         ) as BlanksAs,
         displayHidden: showHidden.checked,
       });
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
     mountDialog(shell, okBtn);
   });
 
@@ -252,24 +260,13 @@ export const showSparklineAxisDialog = (
       if (className) node.className = className;
       return node;
     };
-    const radio = (name: string, label: string, checked: boolean) => {
-      const wrap = el('label', 'fc-fmtdlg__radio');
-      const input = el('input');
-      input.type = 'radio';
-      input.name = name;
-      input.checked = checked;
-      const span = el('span');
-      span.textContent = label;
-      wrap.append(input, span);
-      return { wrap, input };
-    };
+    const radio = (name: string, label: string, checked: boolean) =>
+      createRadioOption(doc, { name, label, checked });
     const textField = (label: string, value: string) => {
       const input = el('input', 'fc-tb__dlg__input');
       input.type = 'text';
-      input.autocomplete = 'off';
-      input.spellcheck = false;
+      configureRangeInput(input, label);
       input.value = value;
-      input.setAttribute('aria-label', label);
       return input;
     };
 
@@ -309,16 +306,10 @@ export const showSparklineAxisDialog = (
     const dateInput = textField(t.dateRange, opts.initial.dateRange);
     const dateRow = el('div', 'fc-macsparkaxis__indent');
     dateRow.appendChild(dateInput);
-    const pick = createRangePickFormatter({
+    const picker = attachSparklineRangeField(dateInput, {
       store: opts.store,
-      sheetName: (index) => opts.getWb()?.sheetName(index) ?? `Sheet${index + 1}`,
-    });
-    pick.begin();
-    const picker = attachRangePickerButton(dateInput, {
-      label: t.pickerLabel,
-      getValue: () => pick.range(),
-      subscribeToRangeChanges: pick.subscribe,
-      kind: 'sparkline-range',
+      getWb: opts.getWb,
+      pickerLabel: t.pickerLabel,
     });
     const rule = el('hr', 'fc-macsparkaxis__rule');
     horizontal.append(general.wrap, date.wrap, dateCaption, dateRow, rule);
@@ -368,6 +359,7 @@ export const showSparklineAxisDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const boundOf = (end: typeof min): SparklineAxisBound | null => {
       const type =
@@ -418,7 +410,5 @@ export const showSparklineAxisDialog = (
         max: maxBound,
       });
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
     mountDialog(shell, () => general.input.focus());
   });

@@ -1,8 +1,6 @@
-// Title-bar, backstage navigation, autosave, and "title more" menu wiring
-// extracted from main.ts. The factory does NOT own the mutable ribbon/backstage
-// state — main.ts retains the module-scope `let`s and exposes them via
-// getter/setters on the ctx, because there are many external read/write sites
-// in main.ts that would otherwise need rewriting.
+// Title-bar, backstage navigation, autosave, and "title more" menu wiring. The
+// factory does not own the mutable ribbon/backstage state: the caller keeps it
+// and exposes it through getter/setters on the ctx.
 
 import { findNext } from '../../commands/find.js';
 import { openCommentDialogFrom } from '../../interact/dialog-entry.js';
@@ -48,8 +46,7 @@ export interface BackstageTitleCtx {
   projectFormatToolbar: () => void;
   showRibbonReport: (title: string, items: readonly RibbonReportItem[]) => void;
   setRibbonDisplayMenuOpen: (open: boolean) => void;
-  // State accessors — backed by module-scope `let`s in main.ts so existing
-  // external read/write sites continue to work without modification.
+  // State accessors, backed by the caller's own ribbon/backstage state.
   getActiveRibbonTab: () => RibbonTab;
   setActiveRibbonTab: (tab: RibbonTab) => void;
   getRibbonCollapsed: () => boolean;

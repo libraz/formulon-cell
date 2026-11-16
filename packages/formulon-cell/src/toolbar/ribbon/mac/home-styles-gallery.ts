@@ -54,6 +54,8 @@ export const createMacCellStylesGallery = (opts: MacCellStylesGalleryOptions): H
 
   const profile = (inst: SpreadsheetInstance) =>
     cellStyleFallbackProfileForPlatform(inst.host.dataset.fcPlatform);
+  const buildInst = getInst();
+  const buildProfile = buildInst ? profile(buildInst) : null;
   const chips = new Map<string, HTMLButtonElement>();
   for (const id of STRIP_STYLE_IDS) {
     const label = labels[id] ?? CELL_STYLES.find((s) => s.id === id)?.label ?? id;
@@ -65,10 +67,11 @@ export const createMacCellStylesGallery = (opts: MacCellStylesGalleryOptions): H
     });
     chip.title = label;
     chip.setAttribute('aria-label', label);
-    const inst = getInst();
     paintCellStyleChip(
       chip,
-      inst ? resolveCellStyleFormat(id, inst.workbook ?? null, profile(inst)) : {},
+      buildInst && buildProfile
+        ? resolveCellStyleFormat(id, buildInst.workbook ?? null, buildProfile)
+        : {},
     );
     chip.addEventListener('click', () => {
       const current = getInst();

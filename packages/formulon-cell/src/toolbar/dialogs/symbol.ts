@@ -62,6 +62,7 @@ export const showSymbolDialog = (opts: SymbolDialogOptions): Promise<string | nu
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const value = input.value.trim();
@@ -71,8 +72,6 @@ export const showSymbolDialog = (opts: SymbolDialogOptions): Promise<string | nu
       }
       lifecycle.finish(value);
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, input);
   });

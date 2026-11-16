@@ -3,7 +3,6 @@
 // callbacks through; the actual session-illustration implementation lives in
 // the consumer.
 
-export type SessionIllustrationKind = 'image' | 'shape' | 'screenshot';
 export type SessionShapeKind =
   | 'rectangle'
   | 'rounded-rectangle'

@@ -81,50 +81,44 @@ export const showAdvancedFilterDialog = (
     rangeGroup.className = 'fc-advfilter__ranges';
     shell.body.appendChild(rangeGroup);
 
+    const attachPicker = (
+      input: HTMLInputElement,
+      kind: Parameters<typeof attachRangePickerButton>[1]['kind'],
+      getValue: (() => string) | undefined,
+    ): HTMLButtonElement | null =>
+      opts.rangePickerLabel && getValue
+        ? attachRangePickerButton(input, {
+            label: opts.rangePickerLabel,
+            getValue,
+            subscribeToRangeChanges: opts.subscribeToRangeChanges,
+            kind,
+          })
+        : null;
     const listRange = appendTextRow(
       rangeGroup,
       opts.listRangeLabel,
       opts.initialListRange,
       'fc-advfilter__row--list',
     );
-    if (opts.rangePickerLabel && opts.pickRange) {
-      attachRangePickerButton(listRange, {
-        label: opts.rangePickerLabel,
-        getValue: opts.pickRange,
-        subscribeToRangeChanges: opts.subscribeToRangeChanges,
-        kind: 'advanced-filter-list-range',
-      });
-    }
+    attachPicker(listRange, 'advanced-filter-list-range', opts.pickRange);
     const criteriaRange = appendTextRow(
       rangeGroup,
       opts.criteriaRangeLabel,
       opts.initialCriteriaRange ?? '',
       'fc-advfilter__row--criteria',
     );
-    if (opts.rangePickerLabel && opts.pickRange) {
-      attachRangePickerButton(criteriaRange, {
-        label: opts.rangePickerLabel,
-        getValue: opts.pickRange,
-        subscribeToRangeChanges: opts.subscribeToRangeChanges,
-        kind: 'advanced-filter-criteria-range',
-      });
-    }
+    attachPicker(criteriaRange, 'advanced-filter-criteria-range', opts.pickRange);
     const copyTo = appendTextRow(
       rangeGroup,
       opts.copyToLabel,
       opts.initialCopyTo ?? '',
       'fc-advfilter__row--copy-to',
     );
-    const pickCopyTo = opts.pickAddress ?? opts.pickRange;
-    let copyToPicker: HTMLButtonElement | null = null;
-    if (opts.rangePickerLabel && pickCopyTo) {
-      copyToPicker = attachRangePickerButton(copyTo, {
-        label: opts.rangePickerLabel,
-        getValue: pickCopyTo,
-        subscribeToRangeChanges: opts.subscribeToRangeChanges,
-        kind: 'advanced-filter-copy-to',
-      });
-    }
+    const copyToPicker = attachPicker(
+      copyTo,
+      'advanced-filter-copy-to',
+      opts.pickAddress ?? opts.pickRange,
+    );
 
     const copying = (): boolean => !actionInputs || actionInputs[1]?.checked === true;
     const syncCopyTo = (): void => {
@@ -153,6 +147,7 @@ export const showAdvancedFilterDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
 
     const onOk = (): void => {
@@ -179,9 +174,6 @@ export const showAdvancedFilterDialog = (
         uniqueOnly: uniqueOnly.checked,
       });
     };
-
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, listRange);
   });

@@ -11,61 +11,65 @@ import type {
 } from '../store/store.js';
 import { mutators } from '../store/store.js';
 
-export type ConditionalPresetAction =
-  | 'clear-selection'
-  | 'clear-sheet'
-  | 'duplicates'
-  | 'unique'
-  | 'top10'
-  | 'bottom10'
-  | 'top10-percent'
-  | 'bottom10-percent'
-  | 'above-avg'
-  | 'below-avg'
-  | 'data-blue'
-  | 'data-green'
-  | 'data-red'
-  | 'data-orange'
-  | 'data-purple'
-  | 'data-teal'
-  | 'data-solid-blue'
-  | 'data-solid-green'
-  | 'data-solid-red'
-  | 'data-solid-orange'
-  | 'data-solid-purple'
-  | 'data-solid-teal'
-  | 'scale-gyr'
-  | 'scale-ryg'
-  | 'scale-gw'
-  | 'scale-rw'
-  | 'scale-bwr'
-  | 'scale-rwb'
-  | 'scale-gwr'
-  | 'scale-rwg'
-  | 'scale-wr'
-  | 'scale-wg'
-  | 'scale-gy'
-  | 'scale-yg'
-  | 'icons-arrows3'
-  | 'icons-arrows5'
-  | 'icons-triangles3'
-  | 'icons-traffic3'
-  | 'icons-trafficRim3'
-  | 'icons-symbols3'
-  | 'icons-flags3'
-  | 'icons-stars3'
-  | 'icons-quarters5'
-  | 'icons-ratings5'
-  | 'icons-boxes5'
-  | 'icons-arrowsGray3'
-  | 'icons-arrows4'
-  | 'icons-arrowsGray4'
-  | 'icons-arrowsGray5'
-  | 'icons-signs3'
-  | 'icons-traffic4'
-  | 'icons-redToBlack4'
-  | 'icons-symbolsCircled3'
-  | 'icons-ratings4';
+/** Every preset action the conditional-format menu can request. */
+export const CONDITIONAL_PRESET_ACTIONS = [
+  'clear-selection',
+  'clear-sheet',
+  'duplicates',
+  'unique',
+  'top10',
+  'bottom10',
+  'top10-percent',
+  'bottom10-percent',
+  'above-avg',
+  'below-avg',
+  'data-blue',
+  'data-green',
+  'data-red',
+  'data-orange',
+  'data-purple',
+  'data-teal',
+  'data-solid-blue',
+  'data-solid-green',
+  'data-solid-red',
+  'data-solid-orange',
+  'data-solid-purple',
+  'data-solid-teal',
+  'scale-gyr',
+  'scale-ryg',
+  'scale-gw',
+  'scale-rw',
+  'scale-bwr',
+  'scale-rwb',
+  'scale-gwr',
+  'scale-rwg',
+  'scale-wr',
+  'scale-wg',
+  'scale-gy',
+  'scale-yg',
+  'icons-arrows3',
+  'icons-arrows5',
+  'icons-triangles3',
+  'icons-traffic3',
+  'icons-trafficRim3',
+  'icons-symbols3',
+  'icons-flags3',
+  'icons-stars3',
+  'icons-quarters5',
+  'icons-ratings5',
+  'icons-boxes5',
+  'icons-arrowsGray3',
+  'icons-arrows4',
+  'icons-arrowsGray4',
+  'icons-arrowsGray5',
+  'icons-signs3',
+  'icons-traffic4',
+  'icons-redToBlack4',
+  'icons-symbolsCircled3',
+  'icons-ratings4',
+] as const;
+
+export type ConditionalPresetAction = (typeof CONDITIONAL_PRESET_ACTIONS)[number];
 
 export function listConditionalRules(state: State): readonly ConditionalRule[] {
   return state.conditional.rules;
@@ -110,7 +114,7 @@ export function conditionalRulesForRange(
 const highlightFill = { fill: '#ffc7ce', color: '#9c0006' } as const;
 const topBottomFill = { fill: '#c6efce', color: '#006100' } as const;
 
-const dataBarColor = (action: ConditionalPresetAction): string => {
+export const dataBarColor = (action: ConditionalPresetAction): string => {
   const map: Partial<Record<ConditionalPresetAction, string>> = {
     'data-blue': '#638ec6',
     'data-green': '#63a95c',
@@ -136,7 +140,7 @@ const dataBarGradient = (action: ConditionalPresetAction): boolean =>
   action === 'data-purple' ||
   action === 'data-teal';
 
-const colorScaleStops = (
+export const colorScaleStops = (
   action: ConditionalPresetAction,
 ): [string, string] | [string, string, string] => {
   const map: Partial<Record<ConditionalPresetAction, [string, string] | [string, string, string]>> =

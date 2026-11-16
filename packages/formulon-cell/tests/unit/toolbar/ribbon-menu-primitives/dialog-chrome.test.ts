@@ -51,7 +51,7 @@ describe('toolbar/ribbon menu primitives', () => {
       ...interactSurfaceSources,
     ]) {
       expect(source).toMatch(
-        /createDialogSelect|appendDialogSelectOptions|appendDialogDatalistOptions/,
+        /createDialogSelect|appendSelectRow|appendDialogSelectOptions|appendDialogDatalistOptions/,
       );
       expect(source.match(/document\.createElement\('option'\)/g) ?? []).toHaveLength(0);
       expect(source.match(/appendChild\(option\)/g) ?? []).toHaveLength(0);

@@ -1,6 +1,7 @@
 import { attachRangePickerButton } from '../../interact/range-picker-control.js';
 import type { SheetProtectionPermissions } from '../../store/store.js';
 import { projectDisabledState } from '../menu-a11y.js';
+import { appendNamedRadioRow } from './form-controls.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -126,79 +127,61 @@ export interface AllowEditRangeDialogOptions {
   subscribeToRangeChanges: (listener: () => void) => () => void;
 }
 
-const permissionOrder: Array<keyof SheetProtectionPermissions> = [
-  'selectLockedCells',
-  'selectUnlockedCells',
-  'formatCells',
-  'formatColumns',
-  'formatRows',
-  'insertColumns',
-  'insertRows',
-  'insertHyperlinks',
-  'deleteColumns',
-  'deleteRows',
-  'sort',
-  'autoFilter',
-  'pivotTables',
-  'objects',
-  'scenarios',
-];
-
-const permissionLabel = (
-  strings: ProtectSheetDialogStrings,
-  key: keyof SheetProtectionPermissions,
-): string => {
-  switch (key) {
-    case 'selectLockedCells':
-      return strings.allowSelectLockedCells;
-    case 'selectUnlockedCells':
-      return strings.allowSelectUnlockedCells;
-    case 'formatCells':
-      return strings.allowFormatCells;
-    case 'formatColumns':
-      return strings.allowFormatColumns;
-    case 'formatRows':
-      return strings.allowFormatRows;
-    case 'insertColumns':
-      return strings.allowInsertColumns;
-    case 'insertRows':
-      return strings.allowInsertRows;
-    case 'insertHyperlinks':
-      return strings.allowInsertHyperlinks;
-    case 'deleteColumns':
-      return strings.allowDeleteColumns;
-    case 'deleteRows':
-      return strings.allowDeleteRows;
-    case 'sort':
-      return strings.allowSort;
-    case 'autoFilter':
-      return strings.allowAutoFilter;
-    case 'pivotTables':
-      return strings.allowPivotTables;
-    case 'objects':
-      return strings.allowEditObjects;
-    case 'scenarios':
-      return strings.allowEditScenarios;
-  }
+const appendPasswordPair = (
+  body: HTMLElement,
+  strings: {
+    password: string;
+    passwordPlaceholder: string;
+    confirmPassword: string;
+    passwordMismatch: string;
+  },
+): {
+  password: HTMLInputElement;
+  confirm: HTMLInputElement;
+  /** Shows the mismatch error and returns true when a password was typed and the confirmation differs. */
+  mismatch: (errorRow: HTMLElement) => boolean;
+} => {
+  const password = appendInputRow(body, strings.password, {
+    placeholder: strings.passwordPlaceholder,
+  });
+  password.type = 'password';
+  const confirm = appendInputRow(body, strings.confirmPassword);
+  confirm.type = 'password';
+  return {
+    password,
+    confirm,
+    mismatch: (errorRow) => {
+      if (!password.value || password.value === confirm.value) return false;
+      showInputError(errorRow, confirm, strings.passwordMismatch);
+      return true;
+    },
+  };
 };
 
-export const defaultSheetProtectionPermissions = (): SheetProtectionPermissions => ({
-  selectLockedCells: true,
-  selectUnlockedCells: true,
-  formatCells: false,
-  formatColumns: false,
-  formatRows: false,
-  insertColumns: false,
-  insertRows: false,
-  insertHyperlinks: false,
-  deleteColumns: false,
-  deleteRows: false,
-  sort: false,
-  autoFilter: false,
-  pivotTables: false,
-  objects: false,
-  scenarios: false,
-});
+const PERMISSIONS: ReadonlyArray<{
+  key: keyof SheetProtectionPermissions;
+  label: keyof ProtectSheetDialogStrings;
+  allowed: boolean;
+}> = [
+  { key: 'selectLockedCells', label: 'allowSelectLockedCells', allowed: true },
+  { key: 'selectUnlockedCells', label: 'allowSelectUnlockedCells', allowed: true },
+  { key: 'formatCells', label: 'allowFormatCells', allowed: false },
+  { key: 'formatColumns', label: 'allowFormatColumns', allowed: false },
+  { key: 'formatRows', label: 'allowFormatRows', allowed: false },
+  { key: 'insertColumns', label: 'allowInsertColumns', allowed: false },
+  { key: 'insertRows', label: 'allowInsertRows', allowed: false },
+  { key: 'insertHyperlinks', label: 'allowInsertHyperlinks', allowed: false },
+  { key: 'deleteColumns', label: 'allowDeleteColumns', allowed: false },
+  { key: 'deleteRows', label: 'allowDeleteRows', allowed: false },
+  { key: 'sort', label: 'allowSort', allowed: false },
+  { key: 'autoFilter', label: 'allowAutoFilter', allowed: false },
+  { key: 'pivotTables', label: 'allowPivotTables', allowed: false },
+  { key: 'objects', label: 'allowEditObjects', allowed: false },
+  { key: 'scenarios', label: 'allowEditScenarios', allowed: false },
+];
+
+const defaultSheetProtectionPermissions = (): SheetProtectionPermissions =>
+  Object.fromEntries(PERMISSIONS.map(({ key, allowed }) => [key, allowed]));
 
 export const showProtectSheetDialog = (opts: {
   strings: ProtectSheetDialogStrings;
@@ -218,12 +201,7 @@ export const showProtectSheetDialog = (opts: {
       line.textContent = text;
       shell.body.appendChild(line);
     }
-    const password = appendInputRow(shell.body, strings.password, {
-      placeholder: strings.passwordPlaceholder,
-    });
-    password.type = 'password';
-    const confirm = appendInputRow(shell.body, strings.confirmPassword);
-    confirm.type = 'password';
+    const { password, mismatch } = appendPasswordPair(shell.body, strings);
 
     const allowLabel = document.createElement('div');
     allowLabel.className = 'fc-tb__dlg__label';
@@ -235,14 +213,14 @@ export const showProtectSheetDialog = (opts: {
     choices.setAttribute('role', 'group');
     choices.setAttribute('aria-label', strings.allowLabel);
     const inputs = new Map<keyof SheetProtectionPermissions, HTMLInputElement>();
-    for (const key of permissionOrder) {
+    for (const { key, label } of PERMISSIONS) {
       const row = document.createElement('label');
       row.className = 'fc-fmtdlg__radio';
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.checked = initial[key] === true;
       const text = document.createElement('span');
-      text.textContent = permissionLabel(strings, key);
+      text.textContent = strings[label] as string;
       row.append(input, text);
       choices.appendChild(row);
       inputs.set(key, input);
@@ -257,7 +235,7 @@ export const showProtectSheetDialog = (opts: {
 
     const permissions = (): SheetProtectionPermissions => {
       const out: SheetProtectionPermissions = {};
-      for (const key of permissionOrder) out[key] = inputs.get(key)?.checked === true;
+      for (const { key } of PERMISSIONS) out[key] = inputs.get(key)?.checked === true;
       return out;
     };
 
@@ -266,19 +244,15 @@ export const showProtectSheetDialog = (opts: {
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
-      if (password.value && password.value !== confirm.value) {
-        showInputError(errorRow, confirm, strings.passwordMismatch);
-        return;
-      }
+      if (mismatch(errorRow)) return;
       lifecycle.finish({
         password: password.value || undefined,
         permissions: permissions(),
       });
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => focusAndSelectInput(password));
   });
@@ -300,9 +274,8 @@ export const showUnprotectSheetDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => lifecycle.finish(password.value),
+      buttons: { okBtn, cancelBtn },
     });
-    okBtn.addEventListener('click', () => lifecycle.finish(password.value));
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => focusAndSelectInput(password));
   });
@@ -314,12 +287,7 @@ export const showProtectWorkbookDialog = (
 ): Promise<{ password?: string } | null> =>
   new Promise<{ password?: string } | null>((resolve) => {
     const shell = createDialogShell({ title: strings.title, bodyVariant: 'app' });
-    const password = appendInputRow(shell.body, strings.password, {
-      placeholder: strings.passwordPlaceholder,
-    });
-    password.type = 'password';
-    const confirm = appendInputRow(shell.body, strings.confirmPassword);
-    confirm.type = 'password';
+    const { password, mismatch } = appendPasswordPair(shell.body, strings);
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
       cancelLabel: strings.cancel,
@@ -331,16 +299,12 @@ export const showProtectWorkbookDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
-      if (password.value && password.value !== confirm.value) {
-        showInputError(errorRow, confirm, strings.passwordMismatch);
-        return;
-      }
+      if (mismatch(errorRow)) return;
       lifecycle.finish({ password: password.value || undefined });
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => focusAndSelectInput(password));
   });
@@ -367,12 +331,7 @@ export const showAllowEditRangeDialog = (
       initial: opts.initialTitle ?? '',
     });
     titleInput.autocomplete = 'off';
-    const password = appendInputRow(shell.body, strings.password, {
-      placeholder: strings.passwordPlaceholder,
-    });
-    password.type = 'password';
-    const confirm = appendInputRow(shell.body, strings.confirmPassword);
-    confirm.type = 'password';
+    const { password, confirm, mismatch } = appendPasswordPair(shell.body, strings);
     let passwordTouched = false;
     if (opts.hasPassword) {
       // A mask stands for the current password; editing the field replaces it.
@@ -395,6 +354,7 @@ export const showAllowEditRangeDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const value = rangeInput.value.trim();
@@ -402,18 +362,13 @@ export const showAllowEditRangeDialog = (
         showInputError(errorRow, rangeInput, strings.invalid);
         return;
       }
-      if (passwordTouched && password.value && password.value !== confirm.value) {
-        showInputError(errorRow, confirm, strings.passwordMismatch);
-        return;
-      }
+      if (passwordTouched && mismatch(errorRow)) return;
       lifecycle.finish({
         range: value,
         title: titleInput.value.trim(),
         ...(passwordTouched ? { password: password.value || null } : {}),
       });
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => focusAndSelectInput(rangeInput));
   });
@@ -475,25 +430,16 @@ export const showAllowEditRangesManagerDialog = (opts: {
         list.appendChild(empty);
       }
       for (const row of rows) {
-        const label = document.createElement('label');
-        label.className = 'fc-fmtdlg__row fc-fmtdlg__row--block fc-tb__dlg__check';
-        const radio = document.createElement('input');
-        radio.type = 'radio';
-        radio.name = 'fc-allow-edit-ranges';
-        radio.value = row.id;
-        radio.checked = row.id === selected;
-        radio.addEventListener('change', () => {
-          if (radio.checked) selected = row.id;
+        appendNamedRadioRow(list, {
+          name: 'fc-allow-edit-ranges',
+          value: row.id,
+          title: row.title,
+          note: row.ref,
+          checked: row.id === selected,
+          onSelect: (id) => {
+            selected = id;
+          },
         });
-        const body = document.createElement('span');
-        const name = document.createElement('strong');
-        name.textContent = row.title;
-        const ref = document.createElement('span');
-        ref.className = 'fc-tb__dlg__note';
-        ref.textContent = row.ref;
-        body.append(name, ref);
-        label.append(radio, body);
-        list.appendChild(label);
       }
       projectDisabledState(modifyBtn, selected === '', null);
       projectDisabledState(deleteBtn, selected === '', null);

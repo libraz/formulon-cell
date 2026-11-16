@@ -38,12 +38,7 @@ export type ConditionalFormatDialogStyle = {
 };
 
 type MutableConditionalFormatDialogStyle = {
-  fill?: string;
-  color?: string;
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  strike?: boolean;
+  -readonly [K in keyof ConditionalFormatDialogStyle]: ConditionalFormatDialogStyle[K];
 };
 
 export interface ConditionalFormatStyleOption {
@@ -53,64 +48,65 @@ export interface ConditionalFormatStyleOption {
   custom?: boolean;
 }
 
-export const conditionalStyleOptions = (
-  strings: ConditionalFormatStyleStrings,
-): ConditionalFormatStyleOption[] => [
+/** Style id of the first option, which is also the fallback style. */
+export const DEFAULT_CF_STYLE_ID = 'light-red-dark-red';
+
+const STYLE_PRESETS: readonly {
+  value: string;
+  label: keyof ConditionalFormatStyleStrings;
+  style?: ConditionalFormatDialogStyle;
+  custom?: boolean;
+}[] = [
   {
-    value: 'light-red-dark-red',
-    label: strings.formatLightRed,
+    value: DEFAULT_CF_STYLE_ID,
+    label: 'formatLightRed',
     style: { fill: '#ffc7ce', color: '#9c0006' },
   },
   {
     value: 'yellow-dark-yellow',
-    label: strings.formatYellow,
+    label: 'formatYellow',
     style: { fill: '#ffeb9c', color: '#9c6500' },
   },
   {
     value: 'green-dark-green',
-    label: strings.formatGreen,
+    label: 'formatGreen',
     style: { fill: '#c6efce', color: '#006100' },
   },
-  {
-    value: 'light-red-fill',
-    label: strings.formatLightRedFill,
-    style: { fill: '#ffc7ce' },
-  },
-  {
-    value: 'red-text',
-    label: strings.formatRedText,
-    style: { color: '#9c0006' },
-  },
+  { value: 'light-red-fill', label: 'formatLightRedFill', style: { fill: '#ffc7ce' } },
+  { value: 'red-text', label: 'formatRedText', style: { color: '#9c0006' } },
   {
     value: 'red-border',
-    label: strings.formatRedBorder,
+    label: 'formatRedBorder',
     style: { color: '#9c0006', underline: true },
   },
-  {
-    value: 'red-fill',
-    label: strings.formatRedFill,
-    style: { fill: '#ff0000' },
-  },
+  { value: 'red-fill', label: 'formatRedFill', style: { fill: '#ff0000' } },
   {
     value: 'red-text-fill',
-    label: strings.formatRedTextFill,
+    label: 'formatRedTextFill',
     style: { fill: '#ff0000', color: '#ffffff' },
   },
-  {
-    value: 'custom',
-    label: strings.customFormat,
-    custom: true,
-  },
+  { value: 'custom', label: 'customFormat', custom: true },
 ];
+
+const PRESET_STYLE_BY_VALUE = new Map(STYLE_PRESETS.map((preset) => [preset.value, preset.style]));
+const FALLBACK_STYLE = PRESET_STYLE_BY_VALUE.get(
+  DEFAULT_CF_STYLE_ID,
+) as ConditionalFormatDialogStyle;
+
+export const conditionalStyleOptions = (
+  strings: ConditionalFormatStyleStrings,
+): ConditionalFormatStyleOption[] =>
+  STYLE_PRESETS.map((preset) => ({
+    value: preset.value,
+    label: strings[preset.label],
+    ...(preset.style ? { style: { ...preset.style } } : {}),
+    ...(preset.custom ? { custom: true } : {}),
+  }));
 
 export const conditionalStyleFromValue = (
   value: string,
-  strings: ConditionalFormatStyleStrings,
-): ConditionalFormatDialogStyle =>
-  conditionalStyleOptions(strings).find((style) => style.value === value)?.style ?? {
-    fill: '#ffc7ce',
-    color: '#9c0006',
-  };
+  _strings: ConditionalFormatStyleStrings,
+): ConditionalFormatDialogStyle => ({ ...(PRESET_STYLE_BY_VALUE.get(value) ?? FALLBACK_STYLE) });
 
 export const applyConditionalStylePreview = (
   preview: HTMLElement,
@@ -172,6 +168,7 @@ export const showConditionalFormatCustomStyleDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const style: MutableConditionalFormatDialogStyle = {};
@@ -185,7 +182,5 @@ export const showConditionalFormatCustomStyleDialog = (
       if (strike.checked) style.strike = true;
       lifecycle.finish(style);
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
     mountDialog(shell, fill);
   });

@@ -18,7 +18,7 @@ export type Letterform = {
   box: readonly [number, number, number, number];
 };
 
-export const LETTERS = {
+const LETTERS = {
   A: {
     d: join(
       'M5.5 16.5 10.4 4h3.2L18.5 16.5h-2.2l-1.1-3h-6.4l-1.1 3H5.5Z',
@@ -117,7 +117,7 @@ type StrokeLetterform = {
 /** Height of the A crossbar, as a fraction of the cap height from the apex. */
 const CROSSBAR = 0.64;
 
-export const STROKE_LETTERS = {
+const STROKE_LETTERS = {
   A: {
     aspect: 0.8,
     draw: (x, y, w, h) =>

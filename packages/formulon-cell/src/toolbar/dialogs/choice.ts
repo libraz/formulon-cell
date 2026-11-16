@@ -1,3 +1,4 @@
+import { appendRadioGroup } from './form-controls.js';
 import {
   appendDialogActions,
   createDialogShell,
@@ -27,50 +28,26 @@ export const showChoiceDialog = <T extends string>(
   new Promise<T | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title, bodyVariant: 'app' });
 
-    if (opts.label) {
-      const label = document.createElement('p');
-      label.className = 'fc-tb__dlg__message';
-      label.textContent = opts.label;
-      shell.body.appendChild(label);
-    }
-
-    const group = document.createElement('div');
-    group.className = 'fc-fmtdlg__choice-grid fc-tb__dlg__choices';
-    group.setAttribute('role', 'radiogroup');
-    group.setAttribute('aria-label', opts.label ?? opts.title);
-    const name = `app-choice-${Math.random().toString(36).slice(2)}`;
-    for (const [index, option] of opts.options.entries()) {
-      const wrap = document.createElement('label');
-      wrap.className = 'fc-fmtdlg__radio';
-      const input = document.createElement('input');
-      input.type = 'radio';
-      input.name = name;
-      input.value = option.value;
-      input.checked = option.value === opts.initial || (!opts.initial && index === 0);
-      const text = document.createElement('span');
-      text.textContent = option.label;
-      wrap.append(input, text);
-      group.appendChild(wrap);
-    }
-    shell.body.appendChild(group);
+    const { group, read } = appendRadioGroup(shell.body, {
+      ariaLabel: opts.label ?? opts.title,
+      caption: opts.label || undefined,
+      options: opts.options,
+      isChecked: (value, index) => value === opts.initial || (!opts.initial && index === 0),
+    });
 
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
       cancelLabel: opts.cancelLabel,
       okLabel: opts.okLabel,
     });
 
-    const selected = (): T | null =>
-      (group.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.value as
-        | T
-        | undefined) ?? null;
+    const selected = (): T | null => read() ?? null;
     const lifecycle = installDialogLifecycle<T | null>({
       shell,
       resolve,
       onCancel: () => null,
       onSubmit: () => lifecycle.finish(selected()),
+      buttons: { okBtn, cancelBtn },
     });
-    okBtn.addEventListener('click', () => lifecycle.finish(selected()));
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () =>
       group.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.focus(),

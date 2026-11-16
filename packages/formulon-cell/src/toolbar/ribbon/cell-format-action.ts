@@ -11,9 +11,8 @@ import type { Locale } from '../../i18n/strings.js';
 import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
 import { showMessage } from '../dialogs/prompt.js';
 
-// Cell Format ribbon dispatcher. Extracted from main.ts so the playground
-// doesn't carry the dispatch table in module scope. Side effects live on the
-// caller's side via the `deps` struct (status text, tab list refresh, etc).
+// Cell Format ribbon dispatcher. Side effects live on the caller's side via
+// the `deps` struct (status text, tab list refresh, etc).
 
 import {
   hiddenExtentInSelection,
@@ -44,7 +43,7 @@ type CellFormatMenuText = ToolbarMenuText & {
 export interface CellFormatActionDeps {
   inst: SpreadsheetInstance | null;
   ribbonLang: Locale;
-  /** Result of `normalizedSelectionRange()`; main.ts computes this. */
+  /** Result of `normalizedSelectionRange()`, computed by the caller. */
   range: Range | null;
   statusMetric: HTMLElement | null;
   ribbonMenuText: ToolbarMenuText;

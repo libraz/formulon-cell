@@ -8,6 +8,7 @@ import type { ToolbarMenuText } from '../../menu-text.js';
 
 import {
   createMenu,
+  menuCheckable,
   menuIconSpacer,
   menuPresetButton,
   menuSectionHeader,
@@ -27,10 +28,7 @@ const checkedItem = (
   role: 'menuitemcheckbox' | 'menuitemradio',
   leading: Node = menuIconSpacer(),
 ): HTMLButtonElement => {
-  const button = menuPresetButton(label, attr, value, leading);
-  button.setAttribute('role', role);
-  button.setAttribute('aria-checked', 'false');
-  return button;
+  return menuCheckable(menuPresetButton(label, attr, value, leading), role);
 };
 
 /** The six colours of a palette, side by side. */

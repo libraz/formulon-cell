@@ -148,6 +148,7 @@ export const showRemoveDuplicatesDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const selected = checks
@@ -159,8 +160,6 @@ export const showRemoveDuplicatesDialog = (
       }
       lifecycle.finish({ columns: selected, hasHeader: hasHeader.checked });
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, checks[0] ?? okBtn);
   });

@@ -91,13 +91,6 @@ export interface SortDialogResult {
   matchCase: boolean;
 }
 
-const buildColumnSelect = (
-  columns: readonly SortDialogColumn[],
-  initial: string,
-): HTMLSelectElement => {
-  return createDialogSelect(columns, initial);
-};
-
 interface SortLevelControls {
   row: HTMLDivElement;
   label: HTMLSpanElement;
@@ -126,7 +119,7 @@ const appendSortLevelRow = (
   label.textContent = rowLabel;
   label.setAttribute('role', 'rowheader');
 
-  const column = buildColumnSelect(keys, initial.column);
+  const column = createDialogSelect(keys, initial.column);
   column.classList.add('fc-sortdlg__column');
   column.setAttribute('aria-label', rowLabel);
   column.setAttribute('role', 'cell');
@@ -371,13 +364,12 @@ const showSortOptionsSheet = (
       resolve,
       onCancel: () => null,
       onSubmit: () => lifecycle.finish(choice()),
+      buttons: { okBtn, cancelBtn },
     });
     const choice = (): SortOptionsChoice => ({
       orientation: leftToRight.checked && !topToBottom.checked ? 'leftToRight' : 'topToBottom',
       matchCase: caseSensitive.checked,
     });
-    okBtn.addEventListener('click', () => lifecycle.finish(choice()));
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
     mountDialog(shell, topToBottom, { immediate: true });
   });
 
@@ -469,14 +461,10 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
         level.row.classList.toggle('fc-sortdlg__level--selected', selected);
         level.row.setAttribute('aria-selected', String(selected));
       }
-      const hasSelected = levels.length > 0;
-      projectDisabledState(
-        deleteLevelBtn,
-        !hasSelected || levels.length === 1,
-        opts.levelUnavailableLabel,
-        { datasetKey: 'disabledReason' },
-      );
-      projectDisabledState(copyLevelBtn, !hasSelected, opts.levelUnavailableLabel, {
+      projectDisabledState(deleteLevelBtn, levels.length === 1, opts.levelUnavailableLabel, {
+        datasetKey: 'disabledReason',
+      });
+      projectDisabledState(copyLevelBtn, false, opts.levelUnavailableLabel, {
         datasetKey: 'disabledReason',
       });
     };
@@ -579,9 +567,8 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
       resolve,
       onCancel: () => null,
       onSubmit: () => lifecycle.finish(buildResult()),
+      buttons: { okBtn, cancelBtn },
     });
-    okBtn.addEventListener('click', () => lifecycle.finish(buildResult()));
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => levels[0]?.column.focus({ preventScroll: true }), { immediate: true });
   });

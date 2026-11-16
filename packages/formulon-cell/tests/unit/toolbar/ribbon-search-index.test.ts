@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ribbonActivationForCommand } from '../../../src/toolbar/ribbon/activation.js';
 import {
   buildRibbonSearchIndex,
@@ -290,5 +290,19 @@ describe('toolbar/ribbon/search-index', () => {
       disabledReason: 'Coming soon',
       tab: 'help',
     });
+  });
+
+  it('normalizes item text once, not once per query', () => {
+    const items = buildRibbonSearchIndex('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS });
+    queryRibbonSearchIndex(items, 'pivot');
+    const normalize = vi.spyOn(String.prototype, 'normalize');
+    try {
+      const results = queryRibbonSearchIndex(items, 'pivot');
+      // Only the query itself is normalized: once as text, once as words.
+      expect(normalize.mock.calls.length).toBe(2);
+      expect(results.length).toBeGreaterThan(0);
+    } finally {
+      normalize.mockRestore();
+    }
   });
 });

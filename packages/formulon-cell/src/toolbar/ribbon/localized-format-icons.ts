@@ -1,4 +1,5 @@
 import type { Locale } from '../../i18n/strings.js';
+import { SVG_NS } from '../../svg-namespace.js';
 
 /** Letter glyphs observed in Excel's localized Home font controls. */
 export function localizedFormatIcon(
@@ -14,13 +15,12 @@ export function localizedFormatIcon(
         : {};
   const glyph = letters[name];
   if (!glyph) return null;
-  const namespace = 'http://www.w3.org/2000/svg';
-  const svg = ownerDocument.createElementNS(namespace, 'svg');
+  const svg = ownerDocument.createElementNS(SVG_NS, 'svg');
   svg.classList.add('fc-tb__rb-icon');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
-  const letter = ownerDocument.createElementNS(namespace, 'text');
+  const letter = ownerDocument.createElementNS(SVG_NS, 'text');
   letter.textContent = glyph;
   letter.setAttribute('x', '12');
   letter.setAttribute('y', '18');
@@ -32,7 +32,7 @@ export function localizedFormatIcon(
   else if (name === 'italic') letter.setAttribute('font-style', 'italic');
   svg.append(letter);
   if (name === 'underline') {
-    const line = ownerDocument.createElementNS(namespace, 'path');
+    const line = ownerDocument.createElementNS(SVG_NS, 'path');
     line.setAttribute('d', 'M5 21h14');
     line.setAttribute('stroke', 'currentColor');
     line.setAttribute('stroke-width', '1.5');

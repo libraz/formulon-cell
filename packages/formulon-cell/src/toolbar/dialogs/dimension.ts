@@ -1,5 +1,6 @@
 import type { Strings } from '../../i18n/strings.js';
 import { showNumberPrompt } from './prompt.js';
+import type { DialogLocale } from './shell.js';
 
 export interface DimensionDialogOptions {
   /** Row Height or Column Width. */
@@ -8,7 +9,7 @@ export interface DimensionDialogOptions {
   /** Undefined leaves the field empty, as for a selection of mixed sizes. */
   initial?: number;
   max: number;
-  locale?: string | (() => string);
+  locale?: DialogLocale;
 }
 
 /** The Row Height / Column Width dialog: one number field, titled and laid out

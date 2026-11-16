@@ -12,7 +12,7 @@ import { isInnermostRowItem, pivotRowItemAt } from '../../interact/pivot-detail.
 import { pivotGroupTargetAt } from '../../interact/pivot-group.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { showMessage } from '../dialogs/prompt.js';
-import { projectDisabledState } from '../menu-a11y.js';
+import { projectDisabledState, projectOwnedDisabled } from '../menu-a11y.js';
 import type { RibbonCommand, ToolbarText } from '../ribbon-model.js';
 import { projectPressedState } from './button.js';
 
@@ -21,16 +21,14 @@ export interface TableNameInputCtx {
   text: ToolbarText;
 }
 
-/** The Table Name box of the Table Design tab: shows the active table's name and renames on commit. */
-export const createTableNameInput = (
+/** The labelled text box shared by the Table Name box and the PivotTable readouts. */
+const createRibbonInput = (
   command: RibbonCommand,
-  ctx: TableNameInputCtx,
-): HTMLDivElement => {
+): { wrap: HTMLDivElement; input: HTMLInputElement } => {
   const wrap = document.createElement('div');
   wrap.className = 'fc-tb__rb-input';
   wrap.dataset.ribbonCommand = command.id;
   wrap.dataset.ribbonInput = command.id;
-
   const label = document.createElement('span');
   label.className = 'fc-tb__rb-input__label';
   label.textContent = command.label;
@@ -39,9 +37,18 @@ export const createTableNameInput = (
   input.className = 'fc-tb__rb-input__field';
   input.title = command.title;
   input.setAttribute('aria-label', command.title);
+  wrap.append(label, input);
+  return { wrap, input };
+};
+
+/** The Table Name box of the Table Design tab: shows the active table's name and renames on commit. */
+export const createTableNameInput = (
+  command: RibbonCommand,
+  ctx: TableNameInputCtx,
+): HTMLDivElement => {
+  const { wrap, input } = createRibbonInput(command);
   input.spellcheck = false;
   input.autocomplete = 'off';
-  wrap.append(label, input);
 
   const currentName = (): string => {
     const inst = ctx.getInst();
@@ -74,16 +81,18 @@ export const createTableNameInput = (
 
   input.addEventListener('change', commit);
   input.addEventListener('keydown', (event) => {
+    const leave = (): void => {
+      const sheetHost = ctx.getInst()?.host;
+      if (sheetHost) focusSheet(sheetHost);
+    };
     if (isSubmitEnter(event)) {
       event.preventDefault();
       commit();
-      const sheetHost = ctx.getInst()?.host;
-      if (sheetHost) focusSheet(sheetHost);
+      leave();
     } else if (event.key === 'Escape') {
       event.preventDefault();
       revert();
-      const sheetHost = ctx.getInst()?.host;
-      if (sheetHost) focusSheet(sheetHost);
+      leave();
     }
   });
   revert();
@@ -106,15 +115,9 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
   for (const command of ['tableSummarizePivot', 'tableInsertSlicer']) {
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
     if (!button) continue;
-    if (sessionOnly) {
-      button.dataset.tableSessionTitle ??= button.title;
-      projectDisabledState(button, true, reason, { titlePrefix: button.dataset.tableSessionTitle });
-      button.dataset.tableSessionOnly = 'true';
-    } else if (button.dataset.tableSessionOnly) {
-      projectDisabledState(button, false, null, { titlePrefix: button.dataset.tableSessionTitle });
-      delete button.dataset.tableSessionOnly;
-      delete button.dataset.tableSessionTitle;
-    }
+    projectOwnedDisabled(button, sessionOnly, reason, 'tableSessionOnly', {
+      titleKey: 'tableSessionTitle',
+    });
   }
   for (const [command, option] of Object.entries(TABLE_OPTION_COMMANDS)) {
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
@@ -125,13 +128,7 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
         : table?.[option] === true;
     projectPressedState(button, pressed);
     // Leave other disabled reasons (policy, protection) alone when the table is engine-backed.
-    if (sessionOnly) {
-      projectDisabledState(button, true, reason);
-      button.dataset.tableSessionOnly = 'true';
-    } else if (button.dataset.tableSessionOnly) {
-      projectDisabledState(button, false, null);
-      delete button.dataset.tableSessionOnly;
-    }
+    projectOwnedDisabled(button, sessionOnly, reason, 'tableSessionOnly');
   }
   host
     .querySelector('[data-ribbon-gallery="tableQuickStyles"]')
@@ -159,10 +156,7 @@ const projectPivotDetailCommands = (
       `[data-ribbon-command="${command}"]`,
     )) {
       // Re-enable only what this projection greyed; policy and protection own the rest.
-      if (enabled && button.dataset.pivotDetailOff !== 'true') continue;
-      projectDisabledState(button, !enabled, null);
-      if (enabled) delete button.dataset.pivotDetailOff;
-      else button.dataset.pivotDetailOff = 'true';
+      projectOwnedDisabled(button, !enabled, null, 'pivotDetailOff');
     }
   }
 };
@@ -199,18 +193,7 @@ export const createPivotReadout = (
   command: RibbonCommand,
   ctx: TableNameInputCtx,
 ): HTMLDivElement => {
-  const wrap = document.createElement('div');
-  wrap.className = 'fc-tb__rb-input';
-  wrap.dataset.ribbonCommand = command.id;
-  wrap.dataset.ribbonInput = command.id;
-  const label = document.createElement('span');
-  label.className = 'fc-tb__rb-input__label';
-  label.textContent = command.label;
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'fc-tb__rb-input__field';
-  input.title = command.title;
-  input.setAttribute('aria-label', command.title);
+  const { wrap, input } = createRibbonInput(command);
   input.readOnly = true;
   const inst = ctx.getInst();
   const active = inst?.store.getState().selection.active;
@@ -227,6 +210,5 @@ export const createPivotReadout = (
         ? field.customName || field.sourceName
         : info?.fieldName) || '';
   }
-  wrap.append(label, input);
   return wrap;
 };

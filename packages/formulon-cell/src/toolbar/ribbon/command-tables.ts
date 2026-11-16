@@ -7,10 +7,9 @@ import {
   openPageSetupDialogFrom,
   openPivotTableDialogFrom,
 } from '../../interact/dialog-entry.js';
-// Dispatch tables for the playground ribbon — each map is one row per ribbon
-// command id, replacing what used to be a `case 'id': handler; return true;`
-// triplet in `applyRibbonCommand`. Pulled out of main.ts so the dispatcher can
-// stay short and the data sits in a single grep-friendly location.
+// Dispatch tables for the ribbon: each map has one row per ribbon command id,
+// read by `applyRibbonCommand`, so the dispatcher stays short and the data sits
+// in one grep-friendly place.
 
 import {
   bumpDecimals,

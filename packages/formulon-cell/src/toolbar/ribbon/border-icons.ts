@@ -1,7 +1,7 @@
 // Pure SVG icon factories for the Borders dropdown. The data (presets,
-// preview shapes, line-style sample swatches) is framework-agnostic and
-// has no dependency on the playground's runtime state — only the
-// surrounding menu factory in main.ts wires these into the actual DOM.
+// preview shapes, line-style sample swatches) is framework-agnostic and has no
+// dependency on runtime state; the menu factory in menus/borders.ts wires these
+// into the DOM.
 
 import type { CellBorderStyle } from '../../store/store.js';
 import { SVG_NS } from '../../svg-namespace.js';
@@ -20,6 +20,34 @@ export interface BorderPreviewSpec {
   showBase?: boolean;
 }
 
+const svgRoot = (viewBox: string, size: readonly [number, number], ...classes: string[]) => {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', viewBox);
+  svg.setAttribute('width', String(size[0]));
+  svg.setAttribute('height', String(size[1]));
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add(...classes);
+  return svg;
+};
+
+const appendLine = (
+  svg: SVGSVGElement,
+  [x1, y1, x2, y2]: readonly [number, number, number, number],
+  opts: { width: number | string; cap?: string; dash?: string | null },
+): void => {
+  const line = document.createElementNS(SVG_NS, 'line');
+  line.setAttribute('x1', String(x1));
+  line.setAttribute('y1', String(y1));
+  line.setAttribute('x2', String(x2));
+  line.setAttribute('y2', String(y2));
+  line.setAttribute('stroke', 'currentColor');
+  line.setAttribute('stroke-width', String(opts.width));
+  if (opts.cap) line.setAttribute('stroke-linecap', opts.cap);
+  if (opts.dash) line.setAttribute('stroke-dasharray', opts.dash);
+  svg.appendChild(line);
+};
+
 const BORDER_ICON_BOX = { x: 2, y: 2, w: 12, h: 12 } as const;
 const BORDER_BASE_COLOR = '#c7c7c7';
 
@@ -33,17 +61,17 @@ const drawBorderEdge = (
 ): void => {
   if (!side) return;
   const isHorizontal = y1 === y2;
-  const mk = (offset = 0, width = 1): void => {
-    const line = document.createElementNS(SVG_NS, 'line');
-    line.setAttribute('x1', String(isHorizontal ? x1 : x1 + offset));
-    line.setAttribute('y1', String(isHorizontal ? y1 + offset : y1));
-    line.setAttribute('x2', String(isHorizontal ? x2 : x2 + offset));
-    line.setAttribute('y2', String(isHorizontal ? y2 + offset : y2));
-    line.setAttribute('stroke', 'currentColor');
-    line.setAttribute('stroke-width', String(width));
-    line.setAttribute('stroke-linecap', 'square');
-    svg.appendChild(line);
-  };
+  const mk = (offset = 0, width = 1): void =>
+    appendLine(
+      svg,
+      [
+        isHorizontal ? x1 : x1 + offset,
+        isHorizontal ? y1 + offset : y1,
+        isHorizontal ? x2 : x2 + offset,
+        isHorizontal ? y2 + offset : y2,
+      ],
+      { width, cap: 'square' },
+    );
   if (side === 'thin') mk(0, 1);
   else if (side === 'thick') mk(0, 2);
   else if (side === 'double') {
@@ -53,13 +81,7 @@ const drawBorderEdge = (
 };
 
 export const createBorderPreview = (spec: BorderPreviewSpec): SVGSVGElement => {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 16 16');
-  svg.setAttribute('width', '16');
-  svg.setAttribute('height', '16');
-  svg.setAttribute('focusable', 'false');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('fc-tb__border-preview');
+  const svg = svgRoot('0 0 16 16', [16, 16], 'fc-tb__border-preview');
   const { x, y, w, h } = BORDER_ICON_BOX;
   if (spec.showBase !== false) {
     const base = document.createElementNS(SVG_NS, 'rect');
@@ -74,22 +96,8 @@ export const createBorderPreview = (spec: BorderPreviewSpec): SVGSVGElement => {
     svg.appendChild(base);
   }
   if (spec.innerGrid) {
-    const v = document.createElementNS(SVG_NS, 'line');
-    v.setAttribute('x1', String(x + w / 2));
-    v.setAttribute('y1', String(y));
-    v.setAttribute('x2', String(x + w / 2));
-    v.setAttribute('y2', String(y + h));
-    v.setAttribute('stroke', 'currentColor');
-    v.setAttribute('stroke-width', '1');
-    svg.appendChild(v);
-    const hLine = document.createElementNS(SVG_NS, 'line');
-    hLine.setAttribute('x1', String(x));
-    hLine.setAttribute('y1', String(y + h / 2));
-    hLine.setAttribute('x2', String(x + w));
-    hLine.setAttribute('y2', String(y + h / 2));
-    hLine.setAttribute('stroke', 'currentColor');
-    hLine.setAttribute('stroke-width', '1');
-    svg.appendChild(hLine);
+    appendLine(svg, [x + w / 2, y, x + w / 2, y + h], { width: 1 });
+    appendLine(svg, [x, y + h / 2, x + w, y + h / 2], { width: 1 });
   }
   drawBorderEdge(svg, spec.top ?? null, x, y, x + w, y);
   drawBorderEdge(svg, spec.bottom ?? null, x, y + h, x + w, y + h);
@@ -99,20 +107,21 @@ export const createBorderPreview = (spec: BorderPreviewSpec): SVGSVGElement => {
 };
 
 const createBorderToolIcon = (className: string): SVGSVGElement => {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 16 16');
-  svg.setAttribute('width', '16');
-  svg.setAttribute('height', '16');
-  svg.setAttribute('focusable', 'false');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('fc-tb__border-preview', className);
-  return svg;
+  return svgRoot('0 0 16 16', [16, 16], 'fc-tb__border-preview', className);
 };
 
-const appendPath = (
+/** Append a `<path>` to `svg`; `fill` defaults to `none` and each stroke attribute is written only when given. */
+export const appendPath = (
   svg: SVGSVGElement,
   d: string,
-  opts: { fill?: string; stroke?: string; strokeWidth?: string; strokeLinecap?: string } = {},
+  opts: {
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: string;
+    strokeLinecap?: string;
+    strokeLinejoin?: string;
+    transform?: string;
+  } = {},
 ): void => {
   const path = document.createElementNS(SVG_NS, 'path');
   path.setAttribute('d', d);
@@ -120,6 +129,8 @@ const appendPath = (
   if (opts.stroke) path.setAttribute('stroke', opts.stroke);
   if (opts.strokeWidth) path.setAttribute('stroke-width', opts.strokeWidth);
   if (opts.strokeLinecap) path.setAttribute('stroke-linecap', opts.strokeLinecap);
+  if (opts.strokeLinejoin) path.setAttribute('stroke-linejoin', opts.strokeLinejoin);
+  if (opts.transform) path.setAttribute('transform', opts.transform);
   svg.appendChild(path);
 };
 
@@ -133,6 +144,8 @@ export const createBorderEraserPreview = (): SVGSVGElement => {
   appendPath(svg, 'M8.2 4.8l3 3', { stroke: '#ffffff', strokeWidth: '1' });
   return svg;
 };
+
+const PEN_COLOR_BAR = 'fc-tb__pen-color-bar';
 
 /** A pencil over a bar in the colour it applies: the icon of an entry that picks a line or point
  *  colour. `setPenColorBar` repaints the bar. */
@@ -149,8 +162,6 @@ export const createPenColorIcon = (className: string, color = '#ed7d31'): SVGSVG
   return svg;
 };
 
-const PEN_COLOR_BAR = 'fc-tb__pen-color-bar';
-
 export const setPenColorBar = (icon: ParentNode, color: string): void => {
   icon.querySelector(`.${PEN_COLOR_BAR}`)?.setAttribute('stroke', color);
 };
@@ -166,18 +177,18 @@ export const createBorderLineStylePreview = (): SVGSVGElement => {
     [12, null, '2'],
   ];
   for (const [y, dash, width] of styles) {
-    const line = document.createElementNS(SVG_NS, 'line');
-    line.setAttribute('x1', '2');
-    line.setAttribute('y1', String(y));
-    line.setAttribute('x2', '14');
-    line.setAttribute('y2', String(y));
-    line.setAttribute('stroke', 'currentColor');
-    line.setAttribute('stroke-width', width);
-    line.setAttribute('stroke-linecap', 'square');
-    if (dash) line.setAttribute('stroke-dasharray', dash);
-    svg.appendChild(line);
+    appendLine(svg, [2, y, 14, y], { width, cap: 'square', dash });
   }
   return svg;
+};
+
+const ALL_BORDERS: BorderPreviewSpec = {
+  top: 'thin',
+  right: 'thin',
+  bottom: 'thin',
+  left: 'thin',
+  innerGrid: true,
+  showBase: false,
 };
 
 export const BORDER_PRESETS: Record<string, BorderPreviewSpec> = {
@@ -186,14 +197,7 @@ export const BORDER_PRESETS: Record<string, BorderPreviewSpec> = {
   left: { left: 'thin' },
   right: { right: 'thin' },
   clear: {},
-  all: {
-    top: 'thin',
-    right: 'thin',
-    bottom: 'thin',
-    left: 'thin',
-    innerGrid: true,
-    showBase: false,
-  },
+  all: ALL_BORDERS,
   outline: {
     top: 'thin',
     right: 'thin',
@@ -213,37 +217,16 @@ export const BORDER_PRESETS: Record<string, BorderPreviewSpec> = {
   topAndBottom: { top: 'thin', bottom: 'thin' },
   topAndThickBottom: { top: 'thin', bottom: 'thick' },
   topAndDoubleBottom: { top: 'thin', bottom: 'double' },
-  format: {
-    top: 'thin',
-    right: 'thin',
-    bottom: 'thin',
-    left: 'thin',
-    innerGrid: true,
-    showBase: false,
-  },
+  format: ALL_BORDERS,
 };
 
 /** Wide horizontal sample for the "線のスタイル / Line style" submenu so
  *  users can compare stroke widths and dash patterns side-by-side. */
 export const createLineSamplePreview = (style: CellBorderStyle | 'none'): SVGSVGElement => {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 80 12');
-  svg.setAttribute('width', '80');
-  svg.setAttribute('height', '12');
-  svg.setAttribute('focusable', 'false');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('fc-tb__line-sample');
+  const svg = svgRoot('0 0 80 12', [80, 12], 'fc-tb__line-sample');
   if (style === 'none') return svg;
   const draw = (yOffset: number, w: number, d: string | null): void => {
-    const line = document.createElementNS(SVG_NS, 'line');
-    line.setAttribute('x1', '4');
-    line.setAttribute('y1', String(yOffset));
-    line.setAttribute('x2', '76');
-    line.setAttribute('y2', String(yOffset));
-    line.setAttribute('stroke', 'currentColor');
-    line.setAttribute('stroke-width', String(w));
-    if (d) line.setAttribute('stroke-dasharray', d);
-    svg.appendChild(line);
+    appendLine(svg, [4, yOffset, 76, yOffset], { width: w, dash: d });
   };
   if (style === 'double') {
     draw(4, 1, null);

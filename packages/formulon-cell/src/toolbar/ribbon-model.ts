@@ -1,6 +1,16 @@
+import { interpolate } from '../i18n/interpolate.js';
 import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
-import { pageScaleMenuText, toolbarMenuText, viewToggleMenuText } from './menu-text.js';
-import { fontFamilyCatalog, fontFamilyLocaleForStrings } from './ribbon/font-family-options.js';
+import {
+  pageScaleMenuText,
+  resolveStrings,
+  toolbarMenuText,
+  viewToggleMenuText,
+} from './menu-text.js';
+import {
+  dictionaryLocaleOf,
+  fontFamilyCatalog,
+  localeForStrings,
+} from './ribbon/font-family-options.js';
 import { buildMacRibbonModel } from './ribbon/mac/model.js';
 import { buildMacObjectTabs } from './ribbon/mac/object-tabs.js';
 import { buildPivotContextualTabs } from './ribbon/pivot-tabs.js';
@@ -243,9 +253,6 @@ export const FONT_FAMILIES = [
 
 export type ToolbarText = Strings['ribbon'];
 
-const resolveStrings = (input: Strings | ToolbarLang): Strings =>
-  typeof input === 'string' ? dictionaries[input] : input;
-
 export const toolbarText = (input: Strings | ToolbarLang): ToolbarText =>
   resolveStrings(input).ribbon;
 
@@ -267,9 +274,6 @@ export interface BuildRibbonModelOptions {
 }
 
 const COMMAND_SURFACE_LANG: ToolbarLang = 'en';
-
-const interpolate = (template: string, vars: Record<string, string>): string =>
-  template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? '');
 
 const cmd = (
   id: string,
@@ -305,12 +309,8 @@ export function buildRibbonModel(
   const strings = resolveStrings(input);
   const tr = strings.ribbon;
   const profileLang: ToolbarLang =
-    typeof input === 'string'
-      ? input
-      : ((Object.entries(dictionaries).find(([, dictionary]) => dictionary === strings)?.[0] as
-          | ToolbarLang
-          | undefined) ?? 'ja');
-  const fontLocale = typeof input === 'string' ? input : fontFamilyLocaleForStrings(strings);
+    typeof input === 'string' ? input : (dictionaryLocaleOf(strings) ?? 'ja');
+  const fontLocale = typeof input === 'string' ? input : localeForStrings(strings);
   const menuText = toolbarMenuText(strings);
   const pageScaleText = pageScaleMenuText(strings);
   const viewText = viewToggleMenuText(strings);

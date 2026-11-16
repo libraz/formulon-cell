@@ -3,8 +3,10 @@
 // flat actions (newRule / manage). Each submenu panel renders the matching
 // preset list — swatches for data bars and color scales, glyph rows for icon
 // sets, plain menu items for highlight rules. All clicks emit a `data-cf-*`
-// attribute the playground main dispatcher reads.
+// attribute the conditional-format dispatcher reads.
 
+import type { ConditionalPresetAction } from '../../../commands/conditional-format.js';
+import { colorScaleStops, dataBarColor } from '../../../commands/conditional-format.js';
 import { projectDisabledState } from '../../menu-a11y.js';
 import { conditionalMenuText } from '../../menu-text.js';
 import type { ToolbarLang } from '../../ribbon-model.js';
@@ -112,7 +114,6 @@ export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
     dateLastMonth: string;
     dateThisMonth: string;
     dateNextMonth: string;
-    dateUnsupported: string;
     greaterPrompt: string;
     lessPrompt: string;
     betweenPrompt: string;
@@ -140,53 +141,15 @@ export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
     cancel: string;
   };
   return {
-    highlight: t.highlight,
-    topBottom: t.topBottom,
+    ...t,
     dataBar: t.dataBars,
     colorScale: t.colorScales,
     iconSet: t.iconSets,
-    newRule: t.newRule,
-    clear: t.clear,
-    manage: t.manage,
-    greater: t.greater,
-    less: t.less,
-    between: t.between,
-    equal: t.equal,
     text: t.textContains,
     date: t.dateOccurring,
     duplicate: t.duplicates,
-    unique: t.unique,
-    top10: t.top10,
-    bottom10: t.bottom10,
-    top10Percent: t.top10Percent,
-    bottom10Percent: t.bottom10Percent,
-    aboveAvg: t.aboveAvg,
-    belowAvg: t.belowAvg,
-    textPrompt: t.textPrompt,
-    greaterPrompt: t.greaterPrompt,
-    lessPrompt: t.lessPrompt,
-    betweenPrompt: t.betweenPrompt,
-    betweenAndPrompt: t.betweenAndPrompt,
-    equalPrompt: t.equalPrompt,
-    topBottomPrompt: t.topBottomPrompt,
-    formatPreview: t.formatPreview,
-    customFormat: t.customFormat,
-    customFormatTitle: t.customFormatTitle,
-    customFillColor: t.customFillColor,
-    customTextColor: t.customTextColor,
-    customBold: t.customBold,
-    customItalic: t.customItalic,
-    customUnderline: t.customUnderline,
-    customStrike: t.customStrike,
-    formatLightRed: t.formatLightRed,
-    formatYellow: t.formatYellow,
-    formatGreen: t.formatGreen,
-    formatLightRedFill: t.formatLightRedFill,
-    formatRedText: t.formatRedText,
-    formatRedBorder: t.formatRedBorder,
-    formatRedFill: t.formatRedFill,
-    formatRedTextFill: t.formatRedTextFill,
-    datePrompt: t.datePrompt,
+    gradient: t.gradientFill,
+    solid: t.solidFill,
     datePeriods: {
       yesterday: t.dateYesterday,
       today: t.dateToday,
@@ -199,66 +162,6 @@ export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
       'this-month': t.dateThisMonth,
       'next-month': t.dateNextMonth,
     },
-    dateUnsupported: t.dateUnsupported,
-    ok: t.ok,
-    cancel: t.cancel,
-    otherRules: t.otherRules,
-    gradient: t.gradientFill,
-    solid: t.solidFill,
-    direction: t.direction,
-    shapes: t.shapes,
-    indicators: t.indicators,
-    ratings: t.ratings,
-    flags: t.flags,
-    bars: t.bars,
-    clearSelection: t.clearSelection,
-    clearSheet: t.clearSheet,
-    clearTable: t.clearTable,
-    clearPivot: t.clearPivot,
-    dataBarGradientBlue: t.dataBarGradientBlue,
-    dataBarGradientGreen: t.dataBarGradientGreen,
-    dataBarGradientRed: t.dataBarGradientRed,
-    dataBarGradientOrange: t.dataBarGradientOrange,
-    dataBarGradientPurple: t.dataBarGradientPurple,
-    dataBarGradientTeal: t.dataBarGradientTeal,
-    dataBarSolidBlue: t.dataBarSolidBlue,
-    dataBarSolidGreen: t.dataBarSolidGreen,
-    dataBarSolidRed: t.dataBarSolidRed,
-    dataBarSolidOrange: t.dataBarSolidOrange,
-    dataBarSolidPurple: t.dataBarSolidPurple,
-    dataBarSolidTeal: t.dataBarSolidTeal,
-    colorScaleGreenYellowRed: t.colorScaleGreenYellowRed,
-    colorScaleRedYellowGreen: t.colorScaleRedYellowGreen,
-    colorScaleGreenWhite: t.colorScaleGreenWhite,
-    colorScaleRedWhite: t.colorScaleRedWhite,
-    colorScaleBlueWhiteRed: t.colorScaleBlueWhiteRed,
-    colorScaleRedWhiteBlue: t.colorScaleRedWhiteBlue,
-    colorScaleGreenWhiteRed: t.colorScaleGreenWhiteRed,
-    colorScaleRedWhiteGreen: t.colorScaleRedWhiteGreen,
-    colorScaleWhiteRed: t.colorScaleWhiteRed,
-    colorScaleWhiteGreen: t.colorScaleWhiteGreen,
-    colorScaleGreenYellow: t.colorScaleGreenYellow,
-    colorScaleYellowGreen: t.colorScaleYellowGreen,
-    iconArrows3: t.iconArrows3,
-    iconArrowsGray3: t.iconArrowsGray3,
-    iconTriangles3: t.iconTriangles3,
-    iconArrowsGray4: t.iconArrowsGray4,
-    iconArrows4: t.iconArrows4,
-    iconArrowsGray5: t.iconArrowsGray5,
-    iconArrows5: t.iconArrows5,
-    iconTraffic3: t.iconTraffic3,
-    iconTrafficRim3: t.iconTrafficRim3,
-    iconSigns3: t.iconSigns3,
-    iconTraffic4: t.iconTraffic4,
-    iconRedToBlack4: t.iconRedToBlack4,
-    iconSymbolsCircled3: t.iconSymbolsCircled3,
-    iconSymbols3: t.iconSymbols3,
-    iconFlags3: t.iconFlags3,
-    iconStars3: t.iconStars3,
-    iconRatings4: t.iconRatings4,
-    iconQuarters5: t.iconQuarters5,
-    iconRatings5: t.iconRatings5,
-    iconBoxes5: t.iconBoxes5,
   };
 };
 
@@ -280,28 +183,28 @@ const buildHighlightSubmenu = (submenu: HTMLDivElement, t: CfMenuText, mac: bool
 };
 
 const buildTopBottomSubmenu = (submenu: HTMLDivElement, t: CfMenuText, mac: boolean): void => {
-  if (mac) {
-    // The Mac menu orders the rules top 10, top %, bottom 10, bottom %, and each opens a dialog.
-    const prompt = (label: string): string => (label.endsWith('...') ? label : `${label}...`);
-    submenu.append(
-      cfMenuItem(prompt(t.top10), 'top10', 'top'),
-      cfMenuItem(prompt(t.top10Percent), 'top10-percent', 'top'),
-      cfMenuItem(prompt(t.bottom10), 'bottom10', 'top'),
-      cfMenuItem(prompt(t.bottom10Percent), 'bottom10-percent', 'top'),
-      cfMenuItem(prompt(t.aboveAvg), 'above-avg', 'top'),
-      cfMenuItem(prompt(t.belowAvg), 'below-avg', 'top'),
-      menuSeparator(),
-      cfMenuItem(t.otherRules, 'new-rule', 'manage'),
-    );
-    return;
-  }
+  // The Mac menu orders the rules top 10, top %, bottom 10, bottom %, and each opens a dialog.
+  const prompt = (label: string): string => (label.endsWith('...') ? label : `${label}...`);
+  const label = (text: string): string => (mac ? prompt(text) : text);
+  const rules: ReadonlyArray<readonly [string, string]> = mac
+    ? [
+        [t.top10, 'top10'],
+        [t.top10Percent, 'top10-percent'],
+        [t.bottom10, 'bottom10'],
+        [t.bottom10Percent, 'bottom10-percent'],
+        [t.aboveAvg, 'above-avg'],
+        [t.belowAvg, 'below-avg'],
+      ]
+    : [
+        [t.top10, 'top10'],
+        [t.bottom10, 'bottom10'],
+        [t.top10Percent, 'top10-percent'],
+        [t.bottom10Percent, 'bottom10-percent'],
+        [t.aboveAvg, 'above-avg'],
+        [t.belowAvg, 'below-avg'],
+      ];
   submenu.append(
-    cfMenuItem(t.top10, 'top10', 'top'),
-    cfMenuItem(t.bottom10, 'bottom10', 'top'),
-    cfMenuItem(t.top10Percent, 'top10-percent', 'top'),
-    cfMenuItem(t.bottom10Percent, 'bottom10-percent', 'top'),
-    cfMenuItem(t.aboveAvg, 'above-avg', 'top'),
-    cfMenuItem(t.belowAvg, 'below-avg', 'top'),
+    ...rules.map(([text, action]) => cfMenuItem(label(text), action, 'top')),
     menuSeparator(),
     cfMenuItem(t.otherRules, 'new-rule', 'manage'),
   );
@@ -310,21 +213,25 @@ const buildTopBottomSubmenu = (submenu: HTMLDivElement, t: CfMenuText, mac: bool
 type CfSwatch = readonly [action: string, colors: readonly string[], label: string];
 
 const buildDataBarSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
+  const swatch = (action: ConditionalPresetAction, label: string): CfSwatch => {
+    const color = dataBarColor(action);
+    return [action, [action.startsWith('data-solid') ? color : '#fff', color], label];
+  };
   const gradientBars: readonly CfSwatch[] = [
-    ['data-blue', ['#fff', '#638ec6'], t.dataBarGradientBlue],
-    ['data-green', ['#fff', '#63a95c'], t.dataBarGradientGreen],
-    ['data-red', ['#fff', '#c45a5a'], t.dataBarGradientRed],
-    ['data-orange', ['#fff', '#d6a440'], t.dataBarGradientOrange],
-    ['data-teal', ['#fff', '#4ba1a8'], t.dataBarGradientTeal],
-    ['data-purple', ['#fff', '#8a74b9'], t.dataBarGradientPurple],
+    swatch('data-blue', t.dataBarGradientBlue),
+    swatch('data-green', t.dataBarGradientGreen),
+    swatch('data-red', t.dataBarGradientRed),
+    swatch('data-orange', t.dataBarGradientOrange),
+    swatch('data-teal', t.dataBarGradientTeal),
+    swatch('data-purple', t.dataBarGradientPurple),
   ];
   const solidBars: readonly CfSwatch[] = [
-    ['data-solid-blue', ['#4472c4', '#4472c4'], t.dataBarSolidBlue],
-    ['data-solid-green', ['#70ad47', '#70ad47'], t.dataBarSolidGreen],
-    ['data-solid-red', ['#c00000', '#c00000'], t.dataBarSolidRed],
-    ['data-solid-orange', ['#ed7d31', '#ed7d31'], t.dataBarSolidOrange],
-    ['data-solid-teal', ['#31a9bd', '#31a9bd'], t.dataBarSolidTeal],
-    ['data-solid-purple', ['#8064a2', '#8064a2'], t.dataBarSolidPurple],
+    swatch('data-solid-blue', t.dataBarSolidBlue),
+    swatch('data-solid-green', t.dataBarSolidGreen),
+    swatch('data-solid-red', t.dataBarSolidRed),
+    swatch('data-solid-orange', t.dataBarSolidOrange),
+    swatch('data-solid-teal', t.dataBarSolidTeal),
+    swatch('data-solid-purple', t.dataBarSolidPurple),
   ];
   const row = (bars: readonly CfSwatch[]): HTMLDivElement =>
     cfPanel(
@@ -342,19 +249,24 @@ const buildDataBarSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
 };
 
 const buildColorScaleSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
+  const scale = (action: ConditionalPresetAction, label: string): CfSwatch => [
+    action,
+    colorScaleStops(action),
+    label,
+  ];
   const colorScales: readonly CfSwatch[] = [
-    ['scale-gyr', ['#63be7b', '#ffeb84', '#f8696b'], t.colorScaleGreenYellowRed],
-    ['scale-ryg', ['#f8696b', '#ffeb84', '#63be7b'], t.colorScaleRedYellowGreen],
-    ['scale-gwr', ['#63be7b', '#ffffff', '#f8696b'], t.colorScaleGreenWhiteRed],
-    ['scale-rwg', ['#f8696b', '#ffffff', '#63be7b'], t.colorScaleRedWhiteGreen],
-    ['scale-bwr', ['#5a8dee', '#ffffff', '#f8696b'], t.colorScaleBlueWhiteRed],
-    ['scale-rwb', ['#f8696b', '#ffffff', '#5a8dee'], t.colorScaleRedWhiteBlue],
-    ['scale-wr', ['#ffffff', '#f8696b'], t.colorScaleWhiteRed],
-    ['scale-rw', ['#f8696b', '#ffffff'], t.colorScaleRedWhite],
-    ['scale-gw', ['#63be7b', '#ffffff'], t.colorScaleGreenWhite],
-    ['scale-wg', ['#ffffff', '#63be7b'], t.colorScaleWhiteGreen],
-    ['scale-gy', ['#63be7b', '#ffeb84'], t.colorScaleGreenYellow],
-    ['scale-yg', ['#ffeb84', '#63be7b'], t.colorScaleYellowGreen],
+    scale('scale-gyr', t.colorScaleGreenYellowRed),
+    scale('scale-ryg', t.colorScaleRedYellowGreen),
+    scale('scale-gwr', t.colorScaleGreenWhiteRed),
+    scale('scale-rwg', t.colorScaleRedWhiteGreen),
+    scale('scale-bwr', t.colorScaleBlueWhiteRed),
+    scale('scale-rwb', t.colorScaleRedWhiteBlue),
+    scale('scale-wr', t.colorScaleWhiteRed),
+    scale('scale-rw', t.colorScaleRedWhite),
+    scale('scale-gw', t.colorScaleGreenWhite),
+    scale('scale-wg', t.colorScaleWhiteGreen),
+    scale('scale-gy', t.colorScaleGreenYellow),
+    scale('scale-yg', t.colorScaleYellowGreen),
   ];
   const scales = cfPanel(
     'fc-tb__cf-choice-grid-panel',
@@ -363,47 +275,60 @@ const buildColorScaleSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void =>
   submenu.append(scales, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
 };
 
+type CfIconRow = readonly [action: string, count: number, label: string];
+
 const buildIconSetSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
-  submenu.append(
-    menuSectionHeader(t.direction),
-    cfPanel('fc-tb__cf-icon-panel', [
-      cfIconChoice('icons-arrows3', 3, t.iconArrows3),
-      cfIconChoice('icons-arrowsGray3', 3, t.iconArrowsGray3),
-      cfIconChoice('icons-triangles3', 3, t.iconTriangles3),
-      cfIconChoice('icons-arrowsGray4', 4, t.iconArrowsGray4),
-      cfIconChoice('icons-arrows4', 4, t.iconArrows4),
-      cfIconChoice('icons-arrowsGray5', 5, t.iconArrowsGray5),
-      cfIconChoice('icons-arrows5', 5, t.iconArrows5),
-    ]),
-  );
-  submenu.append(
-    menuSectionHeader(t.shapes),
-    cfPanel('fc-tb__cf-icon-panel', [
-      cfIconChoice('icons-traffic3', 3, t.iconTraffic3),
-      cfIconChoice('icons-trafficRim3', 3, t.iconTrafficRim3),
-      cfIconChoice('icons-signs3', 3, t.iconSigns3),
-      cfIconChoice('icons-traffic4', 4, t.iconTraffic4),
-      cfIconChoice('icons-redToBlack4', 4, t.iconRedToBlack4),
-    ]),
-  );
-  submenu.append(
-    menuSectionHeader(t.indicators),
-    cfPanel('fc-tb__cf-icon-panel', [
-      cfIconChoice('icons-symbolsCircled3', 3, t.iconSymbolsCircled3),
-      cfIconChoice('icons-symbols3', 3, t.iconSymbols3),
-      cfIconChoice('icons-flags3', 3, t.iconFlags3),
-    ]),
-  );
-  submenu.append(
-    menuSectionHeader(t.ratings),
-    cfPanel('fc-tb__cf-icon-panel', [
-      cfIconChoice('icons-stars3', 3, t.iconStars3),
-      cfIconChoice('icons-ratings4', 4, t.iconRatings4),
-      cfIconChoice('icons-quarters5', 5, t.iconQuarters5),
-      cfIconChoice('icons-ratings5', 5, t.iconRatings5),
-      cfIconChoice('icons-boxes5', 5, t.iconBoxes5),
-    ]),
-  );
+  const sections: ReadonlyArray<readonly [header: string, rows: readonly CfIconRow[]]> = [
+    [
+      t.direction,
+      [
+        ['icons-arrows3', 3, t.iconArrows3],
+        ['icons-arrowsGray3', 3, t.iconArrowsGray3],
+        ['icons-triangles3', 3, t.iconTriangles3],
+        ['icons-arrowsGray4', 4, t.iconArrowsGray4],
+        ['icons-arrows4', 4, t.iconArrows4],
+        ['icons-arrowsGray5', 5, t.iconArrowsGray5],
+        ['icons-arrows5', 5, t.iconArrows5],
+      ],
+    ],
+    [
+      t.shapes,
+      [
+        ['icons-traffic3', 3, t.iconTraffic3],
+        ['icons-trafficRim3', 3, t.iconTrafficRim3],
+        ['icons-signs3', 3, t.iconSigns3],
+        ['icons-traffic4', 4, t.iconTraffic4],
+        ['icons-redToBlack4', 4, t.iconRedToBlack4],
+      ],
+    ],
+    [
+      t.indicators,
+      [
+        ['icons-symbolsCircled3', 3, t.iconSymbolsCircled3],
+        ['icons-symbols3', 3, t.iconSymbols3],
+        ['icons-flags3', 3, t.iconFlags3],
+      ],
+    ],
+    [
+      t.ratings,
+      [
+        ['icons-stars3', 3, t.iconStars3],
+        ['icons-ratings4', 4, t.iconRatings4],
+        ['icons-quarters5', 5, t.iconQuarters5],
+        ['icons-ratings5', 5, t.iconRatings5],
+        ['icons-boxes5', 5, t.iconBoxes5],
+      ],
+    ],
+  ];
+  for (const [header, rows] of sections) {
+    submenu.append(
+      menuSectionHeader(header),
+      cfPanel(
+        'fc-tb__cf-icon-panel',
+        rows.map(([action, count, label]) => cfIconChoice(action, count, label)),
+      ),
+    );
+  }
   submenu.append(menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
 };
 

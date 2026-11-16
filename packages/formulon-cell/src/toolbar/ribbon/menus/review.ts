@@ -1,5 +1,5 @@
 // Review tab menus: notes, watch window, sheet/workbook protection. Each
-// factory builds shared icon menu rows extracted from main.ts.
+// factory builds shared icon menu rows.
 
 import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarText } from '../../ribbon-model.js';
@@ -48,18 +48,6 @@ export const createReviewMenuFactories = (
 
   const createProtectMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
-    if (id === 'protect') {
-      menu.append(
-        menuIconButton(t.protectSheetCommand, 'protectAction', 'protect-sheet', 'protect-sheet'),
-        menuIconButton(
-          t.unprotectSheetCommand,
-          'protectAction',
-          'unprotect-sheet',
-          'protect-unprotect-sheet',
-        ),
-      );
-      return menu;
-    }
     menu.append(
       menuIconButton(t.protectSheetCommand, 'protectAction', 'protect-sheet', 'protect-sheet'),
       menuIconButton(
@@ -68,6 +56,9 @@ export const createReviewMenuFactories = (
         'unprotect-sheet',
         'protect-unprotect-sheet',
       ),
+    );
+    if (id === 'protect') return menu;
+    menu.append(
       menuSeparator(),
       menuIconButton(t.lockCell, 'protectAction', 'lock-cell', 'protect-lock-cell'),
       menuIconButton(t.unlockCell, 'protectAction', 'unlock-cell', 'protect-unlock-cell'),

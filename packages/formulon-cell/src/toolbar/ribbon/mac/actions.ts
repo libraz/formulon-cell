@@ -84,7 +84,7 @@ const SPARKLINE_DIALOGS = new WeakMap<object, MacSparklineDialogHandle>();
 const SLICER_DIALOGS = new WeakMap<object, MacSlicerDialogHandle>();
 
 /** Open the instance's shared sparkline dialog: Insert Sparkline, or Edit Sparklines for `edit`. */
-export const openMacSparklineDialog = (
+const openMacSparklineDialog = (
   instance: SpreadsheetInstance,
   edit?: MacSparklineEditTarget,
 ): void => {
@@ -205,7 +205,7 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
     statistics.setStrings(next);
   });
 
-  const actions: Record<string, MacRibbonAction> = {
+  const actions: Record<MacRibbonActionId, MacRibbonAction> = {
     'mac.insert.pivotTable': () =>
       openPivotTableDialogFrom(instance.store, undefined, {
         origin: 'ribbon',

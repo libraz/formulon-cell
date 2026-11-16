@@ -19,6 +19,7 @@ import {
   onPointerArrive,
 } from '../menu-a11y.js';
 import { RIBBON_BORDERS_MENU_ID } from './activation.js';
+import type { RibbonFormatMutator } from './command-tables.js';
 
 export interface BorderMenuCtx {
   getInst: () => SpreadsheetInstance | null;
@@ -26,12 +27,7 @@ export interface BorderMenuCtx {
   getSelectedBorderStyle: () => CellBorderStyle;
   setSelectedBorderStyle: (style: CellBorderStyle) => void;
   getSelectedBorderColor: () => string;
-  applyRibbonFormat: (
-    fn: (
-      state: ReturnType<SpreadsheetInstance['store']['getState']>,
-      store: SpreadsheetInstance['store'],
-    ) => void,
-  ) => void;
+  applyRibbonFormat: (fn: RibbonFormatMutator) => void;
 }
 
 export interface BorderMenuApi {
@@ -243,15 +239,16 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
     });
   };
 
+  const openSubmenuOf = (button: HTMLElement): void => {
+    const which = button.dataset.borderSubmenu as 'lineColor' | 'lineStyle' | undefined;
+    if (which) openSubmenu(which);
+  };
+
   borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border-submenu]').forEach((btn) => {
-    onPointerArrive(btn, () => {
-      const which = btn.dataset.borderSubmenu as 'lineColor' | 'lineStyle' | undefined;
-      if (which) openSubmenu(which);
-    });
+    onPointerArrive(btn, () => openSubmenuOf(btn));
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const which = btn.dataset.borderSubmenu as 'lineColor' | 'lineStyle' | undefined;
-      if (which) openSubmenu(which);
+      openSubmenuOf(btn);
     });
   });
 
@@ -266,65 +263,52 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   // Line-color picks are handled by the shared palette's onPick callback,
   // wired in createLineColorSubmenu().
 
+  const pickLineStyle = (styleBtn: HTMLButtonElement, container: HTMLElement | null): void => {
+    const value = styleBtn.dataset.borderLineStyle ?? 'thin';
+    if (value !== 'none') {
+      const next = value as CellBorderStyle;
+      ctx.setSelectedBorderStyle(next);
+      ctx.getInst()?.borderDraw?.setStyle(next);
+    }
+    container?.querySelectorAll<HTMLButtonElement>('[data-border-line-style]').forEach((s) => {
+      s.setAttribute('aria-checked', s === styleBtn ? 'true' : 'false');
+    });
+    closeBorderSubmenus();
+  };
+
   lineStyleSubmenu
     ?.querySelectorAll<HTMLButtonElement>('[data-border-line-style]')
     .forEach((styleBtn) => {
-      styleBtn.addEventListener('click', () => {
-        const value = styleBtn.dataset.borderLineStyle ?? 'thin';
-        if (value !== 'none') {
-          const next = value as CellBorderStyle;
-          ctx.setSelectedBorderStyle(next);
-          ctx.getInst()?.borderDraw?.setStyle(next);
-        }
-        lineStyleSubmenu
-          .querySelectorAll<HTMLButtonElement>('[data-border-line-style]')
-          .forEach((s) => {
-            s.setAttribute('aria-checked', s === styleBtn ? 'true' : 'false');
-          });
-        closeBorderSubmenus();
-      });
+      styleBtn.addEventListener('click', () => pickLineStyle(styleBtn, lineStyleSubmenu));
     });
 
   const onDocumentClick = (event: MouseEvent): void => {
     const target = event.target as Element | null;
     if (!(target instanceof Element)) return;
-    const menu = target?.closest<HTMLElement>(BORDER_MENU_SELECTOR);
+    const menu = target.closest<HTMLElement>(BORDER_MENU_SELECTOR);
     if (!menu || menu === borderMenu) return;
-    const preset = target?.closest<HTMLButtonElement>('[data-border-preset]');
+    const preset = target.closest<HTMLButtonElement>('[data-border-preset]');
     if (preset) {
       event.preventDefault();
       applyBorderPresetMenuAction(preset.dataset.borderPreset ?? '');
       return;
     }
-    const draw = target?.closest<HTMLButtonElement>('[data-border-draw]');
+    const draw = target.closest<HTMLButtonElement>('[data-border-draw]');
     if (draw) {
       event.preventDefault();
       applyBorderDrawMenuAction(draw.dataset.borderDraw);
       return;
     }
-    const submenu = target?.closest<HTMLButtonElement>('[data-border-submenu]');
+    const submenu = target.closest<HTMLButtonElement>('[data-border-submenu]');
     if (submenu) {
       event.preventDefault();
-      const which = submenu.dataset.borderSubmenu as 'lineColor' | 'lineStyle' | undefined;
-      if (which) openSubmenu(which);
+      openSubmenuOf(submenu);
       return;
     }
-    const lineStyle = target?.closest<HTMLButtonElement>('[data-border-line-style]');
+    const lineStyle = target.closest<HTMLButtonElement>('[data-border-line-style]');
     if (lineStyle) {
       event.preventDefault();
-      const value = lineStyle.dataset.borderLineStyle ?? 'thin';
-      const lineStyleMenu = getLineStyleSubmenu();
-      if (value !== 'none') {
-        const next = value as CellBorderStyle;
-        ctx.setSelectedBorderStyle(next);
-        ctx.getInst()?.borderDraw?.setStyle(next);
-      }
-      lineStyleMenu
-        ?.querySelectorAll<HTMLButtonElement>('[data-border-line-style]')
-        .forEach((s) => {
-          s.setAttribute('aria-checked', s === lineStyle ? 'true' : 'false');
-        });
-      closeBorderSubmenus();
+      pickLineStyle(lineStyle, getLineStyleSubmenu());
     }
   };
   document.addEventListener('click', onDocumentClick);
@@ -332,15 +316,14 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   const onDocumentMouseOver = (event: MouseEvent): void => {
     const target = event.target as Element | null;
     if (!(target instanceof Element)) return;
-    const menu = target?.closest<HTMLElement>(BORDER_MENU_SELECTOR);
+    const menu = target.closest<HTMLElement>(BORDER_MENU_SELECTOR);
     if (!menu || menu === borderMenu) return;
-    const submenu = target?.closest<HTMLButtonElement>('[data-border-submenu]');
+    const submenu = target.closest<HTMLButtonElement>('[data-border-submenu]');
     if (submenu) {
-      const which = submenu.dataset.borderSubmenu as 'lineColor' | 'lineStyle' | undefined;
-      if (which) openSubmenu(which);
+      openSubmenuOf(submenu);
       return;
     }
-    if (target?.closest('[data-border-preset], [data-border-draw]')) closeBorderSubmenus();
+    if (target.closest('[data-border-preset], [data-border-draw]')) closeBorderSubmenus();
   };
   const detachPointerArrive = delegatePointerArrive(document, onDocumentMouseOver);
 

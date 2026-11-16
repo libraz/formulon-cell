@@ -1,4 +1,5 @@
 import type { DefinedNameEntry } from '../../commands/named-ranges.js';
+import { appendNamedRadioRow } from './form-controls.js';
 import {
   appendDialogActions,
   createDialogShell,
@@ -26,29 +27,18 @@ export const showDefinedNamePickerDialog = (
     let selected = opts.names[0]?.name ?? '';
     const radios: HTMLInputElement[] = [];
     for (const [index, entry] of opts.names.entries()) {
-      const label = document.createElement('label');
-      label.className = 'fc-fmtdlg__row fc-fmtdlg__row--block fc-tb__dlg__check';
-
-      const radio = document.createElement('input');
-      radio.type = 'radio';
-      radio.name = 'fc-defined-name-picker';
-      radio.value = entry.name;
-      radio.checked = index === 0;
-      radio.addEventListener('change', () => {
-        if (radio.checked) selected = radio.value;
-      });
-      radios.push(radio);
-
-      const body = document.createElement('span');
-      const name = document.createElement('strong');
-      name.textContent = entry.name;
-      const formula = document.createElement('span');
-      formula.className = 'fc-tb__dlg__note';
-      formula.textContent = entry.formula;
-      body.append(name, formula);
-
-      label.append(radio, body);
-      list.appendChild(label);
+      radios.push(
+        appendNamedRadioRow(list, {
+          name: 'fc-defined-name-picker',
+          value: entry.name,
+          title: entry.name,
+          note: entry.formula,
+          checked: index === 0,
+          onSelect: (value) => {
+            selected = value;
+          },
+        }),
+      );
     }
     shell.body.appendChild(list);
 
@@ -61,12 +51,11 @@ export const showDefinedNamePickerDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       lifecycle.finish(selected || null);
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => {
       (radios[0] ?? okBtn).focus();

@@ -13,11 +13,11 @@ import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarText } from '../../ribbon-model.js';
 import {
   createMenu,
-  createSubmenu,
+  formatSubmenu,
+  menuCheckable,
   menuIconSpacer,
   menuPresetButton,
   menuSeparator,
-  menuSubmenuTrigger,
 } from './general.js';
 
 export interface ShapeFormatMenuFactories {
@@ -70,10 +70,7 @@ const radioItem = (
   value: string,
   leading: Node,
 ): HTMLButtonElement => {
-  const item = menuPresetButton(label, attr, value, leading);
-  item.setAttribute('role', 'menuitemradio');
-  item.setAttribute('aria-checked', 'false');
-  return item;
+  return menuCheckable(menuPresetButton(label, attr, value, leading), 'menuitemradio');
 };
 
 export const createShapeFormatMenuFactories = (
@@ -120,20 +117,14 @@ export const createShapeFormatMenuFactories = (
     label: string,
     items: readonly HTMLButtonElement[],
   ): [HTMLButtonElement, HTMLDivElement] => {
-    const id = `menu-shape-outline-${key}`;
-    const trigger = menuSubmenuTrigger(
-      menuPresetButton(label, 'formatSubmenu', key, menuIconSpacer()),
-      undefined,
-      { controlsId: id },
-    );
-    const submenu = createSubmenu({
-      id,
-      className: 'fc-tb__submenu fc-tb__submenu--format fc-tb__submenu--shape-outline',
+    return formatSubmenu(
+      'menu-shape-outline',
+      key,
       label,
-      dataset: { formatPanel: key },
-    });
-    submenu.append(...items);
-    return [trigger, submenu];
+      items,
+      menuIconSpacer(),
+      'fc-tb__submenu--shape-outline',
+    );
   };
 
   const createShapeOutlineMenu = (): HTMLDivElement => {

@@ -112,6 +112,84 @@ const splitPreview = (
     .join('\n');
 };
 
+interface DelimiterControls {
+  grid: HTMLDivElement;
+  checks: HTMLInputElement[];
+  otherInput: HTMLInputElement;
+  collapseLabel: HTMLLabelElement;
+  collapse: HTMLInputElement;
+  selected: () => string[];
+}
+
+/** The delimiter checkbox grid with its Other field, and the consecutive-delimiters checkbox. */
+const buildDelimiterControls = (
+  strings: TextToColumnsDialogStrings,
+  initial: ReadonlySet<string>,
+  config: { gridLabel: string; otherLabel: string; otherMaxLength: number },
+): DelimiterControls => {
+  const specs = delimiterSpecs(strings);
+  const grid = document.createElement('div');
+  grid.className = 'fc-textcols__delimiter-grid';
+  grid.setAttribute('role', 'group');
+  grid.setAttribute('aria-label', config.gridLabel);
+  const checks: HTMLInputElement[] = [];
+  for (const spec of specs) {
+    const label = document.createElement('label');
+    label.className = 'fc-textcols__delimiter';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = spec.value;
+    checkbox.checked = initial.has(spec.value);
+    checkbox.dataset.dialogField = `delimiter-${spec.value === '\t' ? 'tab' : spec.value}`;
+    checks.push(checkbox);
+    const text = document.createElement('span');
+    text.textContent = spec.label;
+    label.append(checkbox, text);
+    grid.appendChild(label);
+  }
+  const otherLabel = document.createElement('label');
+  otherLabel.className = 'fc-textcols__other';
+  const otherText = document.createElement('span');
+  otherText.textContent = config.otherLabel;
+  const otherInput = document.createElement('input');
+  otherInput.type = 'text';
+  otherInput.className = 'fc-tb__dlg__input';
+  otherInput.maxLength = config.otherMaxLength;
+  otherInput.dataset.dialogField = 'delimiter-other';
+  const customInitial = [...initial].find(
+    (delimiter) => !specs.some((spec) => spec.value === delimiter),
+  );
+  if (customInitial) otherInput.value = customInitial;
+  otherLabel.append(otherText, otherInput);
+  grid.appendChild(otherLabel);
+  const collapseLabel = document.createElement('label');
+  collapseLabel.className = 'fc-textcols__collapse';
+  const collapse = document.createElement('input');
+  collapse.type = 'checkbox';
+  collapse.dataset.dialogField = 'collapse-consecutive';
+  collapseLabel.append(collapse, document.createTextNode(strings.treatConsecutive));
+  const selected = (): string[] => {
+    const values = checks.filter((c) => c.checked).map((c) => c.value);
+    if (otherInput.value) values.push(otherInput.value);
+    return values;
+  };
+  return { grid, checks, otherInput, collapseLabel, collapse, selected };
+};
+
+/** The labelled source-data preview section; returns the `pre` that shows the text. */
+const appendPreview = (body: HTMLElement, label: string): HTMLPreElement => {
+  const previewWrap = document.createElement('section');
+  previewWrap.className = 'fc-textcols__preview';
+  const previewLabel = document.createElement('div');
+  previewLabel.className = 'fc-textcols__preview-label fc-tb__dlg__label';
+  previewLabel.textContent = label;
+  const preview = document.createElement('pre');
+  preview.className = 'fc-tb__dlg__preview';
+  previewWrap.append(previewLabel, preview);
+  body.appendChild(previewWrap);
+  return preview;
+};
+
 const QUALIFIERS = ['"', "'"] as const;
 
 const showTextToColumnsWizard = (
@@ -166,46 +244,19 @@ const showTextToColumnsWizard = (
 
     // Step 2: delimiters, consecutive runs and the quote character.
     const initial = new Set(opts.initialDelimiters ?? ['\t']);
-    const checks: HTMLInputElement[] = [];
-    const delimiterBox = document.createElement('div');
-    delimiterBox.className = 'fc-textcols__delimiter-grid';
-    delimiterBox.setAttribute('role', 'group');
-    delimiterBox.setAttribute('aria-label', wizard.delimiters);
-    for (const spec of delimiterSpecs(strings)) {
-      const label = document.createElement('label');
-      label.className = 'fc-textcols__delimiter';
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.value = spec.value;
-      checkbox.checked = initial.has(spec.value);
-      checkbox.dataset.dialogField = `delimiter-${spec.value === '\t' ? 'tab' : spec.value}`;
-      checks.push(checkbox);
-      const text = document.createElement('span');
-      text.textContent = spec.label;
-      label.append(checkbox, text);
-      delimiterBox.appendChild(label);
-    }
-    const otherLabel = document.createElement('label');
-    otherLabel.className = 'fc-textcols__other';
-    const otherInput = document.createElement('input');
-    otherInput.type = 'text';
-    otherInput.className = 'fc-tb__dlg__input';
-    otherInput.maxLength = 1;
-    otherInput.dataset.dialogField = 'delimiter-other';
-    const customInitial = [...initial].find(
-      (delimiter) => !delimiterSpecs(strings).some((spec) => spec.value === delimiter),
-    );
-    if (customInitial) otherInput.value = customInitial;
-    const otherText = document.createElement('span');
-    otherText.textContent = wizard.other;
-    otherLabel.append(otherText, otherInput);
-    delimiterBox.appendChild(otherLabel);
-    const collapseLabel = document.createElement('label');
-    collapseLabel.className = 'fc-textcols__collapse';
-    const collapse = document.createElement('input');
-    collapse.type = 'checkbox';
-    collapse.dataset.dialogField = 'collapse-consecutive';
-    collapseLabel.append(collapse, document.createTextNode(strings.treatConsecutive));
+    const previewRows = opts.previewRows ?? [];
+    const {
+      grid: delimiterBox,
+      checks,
+      otherInput,
+      collapseLabel,
+      collapse,
+      selected: selectedDelimiters,
+    } = buildDelimiterControls(strings, initial, {
+      gridLabel: wizard.delimiters,
+      otherLabel: wizard.other,
+      otherMaxLength: 1,
+    });
     const qualifierLabel = document.createElement('label');
     qualifierLabel.className = 'fc-textcols__qualifier';
     const qualifier = createDialogSelect(
@@ -231,7 +282,7 @@ const showTextToColumnsWizard = (
     // The ruler runs one tick per character, longer every fifth, numbered every tenth.
     const rulerLength = Math.min(
       120,
-      Math.max(0, ...(opts.previewRows ?? []).slice(0, 8).map((row) => row.length)),
+      Math.max(0, ...previewRows.slice(0, 8).map((row) => row.length)),
     );
     if (wizard.fixedSteps?.length) {
       const steps = document.createElement('div');
@@ -261,7 +312,7 @@ const showTextToColumnsWizard = (
       }
       fixedEditor.appendChild(ruler);
     }
-    const fixedRows = (opts.previewRows ?? []).slice(0, 8).map((row) => {
+    const fixedRows = previewRows.slice(0, 8).map((row) => {
       const line = document.createElement('div');
       line.className = 'fc-textcols__fixed-row';
       const chars = [...row.slice(0, 120)].map((char, pos) => {
@@ -335,15 +386,7 @@ const showTextToColumnsWizard = (
     projectDisabledState(detailsBtn, true, strings.fixedWidthUnavailable);
 
     // Preview of the source data, shared by every step.
-    const previewWrap = document.createElement('section');
-    previewWrap.className = 'fc-textcols__preview';
-    const previewLabel = document.createElement('div');
-    previewLabel.className = 'fc-textcols__preview-label fc-tb__dlg__label';
-    previewLabel.textContent = wizard.preview;
-    const preview = document.createElement('pre');
-    preview.className = 'fc-tb__dlg__preview';
-    previewWrap.append(previewLabel, preview);
-    shell.body.appendChild(previewWrap);
+    const preview = appendPreview(shell.body, wizard.preview);
 
     const errorRow = appendErrorRow(shell.body);
     const cancelBtn = appendDialogButton(shell.footer, { label: strings.cancel });
@@ -354,15 +397,10 @@ const showTextToColumnsWizard = (
       variant: 'primary',
     });
 
-    const selectedDelimiters = (): string[] => {
-      const values = checks.filter((c) => c.checked).map((c) => c.value);
-      if (otherInput.value) values.push(otherInput.value);
-      return values;
-    };
     const isFixed = (): boolean => fixed.checked;
     function updatePreview(): void {
       preview.textContent = isFixed()
-        ? (opts.previewRows ?? [])
+        ? previewRows
             .map((row) => {
               const cuts = [...fixedBreaks].filter((c) => c < row.length).sort((a, b) => a - b);
               const parts: string[] = [];
@@ -374,7 +412,7 @@ const showTextToColumnsWizard = (
               return parts.join(' | ');
             })
             .join('\n')
-        : splitPreview(opts.previewRows ?? [], selectedDelimiters(), collapse.checked);
+        : splitPreview(previewRows, selectedDelimiters(), collapse.checked);
     }
     /** Step 2 shows the delimiter choices or the break editor, whichever the data type needs. */
     const syncKind = (): void => {
@@ -506,59 +544,22 @@ const showTextToColumnsSinglePage = (
     delimiterLegend.className = 'fc-tb__dlg__label';
     delimiterLegend.textContent = strings.delimiters;
     delimiterFieldset.appendChild(delimiterLegend);
-    const delimiterGrid = document.createElement('div');
-    delimiterGrid.className = 'fc-textcols__delimiter-grid';
-    delimiterGrid.setAttribute('role', 'group');
-    delimiterGrid.setAttribute('aria-label', strings.delimiters);
-    delimiterFieldset.appendChild(delimiterGrid);
-    const checks: HTMLInputElement[] = [];
-    for (const spec of delimiterSpecs(strings)) {
-      const label = document.createElement('label');
-      label.className = 'fc-textcols__delimiter';
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.value = spec.value;
-      checkbox.checked = initial.has(spec.value);
-      checkbox.dataset.dialogField = `delimiter-${spec.value === '\t' ? 'tab' : spec.value}`;
-      checks.push(checkbox);
-      const text = document.createElement('span');
-      text.textContent = spec.label;
-      label.append(checkbox, text);
-      delimiterGrid.appendChild(label);
-    }
-    const otherLabel = document.createElement('label');
-    otherLabel.className = 'fc-textcols__other';
-    const otherText = document.createElement('span');
-    otherText.textContent = strings.other;
-    const otherInput = document.createElement('input');
-    otherInput.type = 'text';
-    otherInput.className = 'fc-tb__dlg__input';
-    otherInput.maxLength = 8;
-    otherInput.dataset.dialogField = 'delimiter-other';
-    const customInitial = [...initial].find(
-      (delimiter) => !delimiterSpecs(strings).some((spec) => spec.value === delimiter),
-    );
-    if (customInitial) otherInput.value = customInitial;
-    otherLabel.append(otherText, otherInput);
-    delimiterGrid.appendChild(otherLabel);
-    const collapseLabel = document.createElement('label');
-    collapseLabel.className = 'fc-textcols__collapse';
-    const collapse = document.createElement('input');
-    collapse.type = 'checkbox';
-    collapse.dataset.dialogField = 'collapse-consecutive';
-    collapseLabel.append(collapse, document.createTextNode(strings.treatConsecutive));
-    delimiterFieldset.appendChild(collapseLabel);
+    const {
+      grid: delimiterGrid,
+      checks,
+      otherInput,
+      collapseLabel,
+      collapse,
+      selected: selectedDelimiters,
+    } = buildDelimiterControls(strings, initial, {
+      gridLabel: strings.delimiters,
+      otherLabel: strings.other,
+      otherMaxLength: 8,
+    });
+    delimiterFieldset.append(delimiterGrid, collapseLabel);
     shell.body.appendChild(delimiterFieldset);
 
-    const previewWrap = document.createElement('section');
-    previewWrap.className = 'fc-textcols__preview';
-    const previewLabel = document.createElement('div');
-    previewLabel.className = 'fc-textcols__preview-label fc-tb__dlg__label';
-    previewLabel.textContent = strings.preview;
-    const preview = document.createElement('pre');
-    preview.className = 'fc-tb__dlg__preview';
-    previewWrap.append(previewLabel, preview);
-    shell.body.appendChild(previewWrap);
+    const preview = appendPreview(shell.body, strings.preview);
 
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
@@ -566,13 +567,6 @@ const showTextToColumnsSinglePage = (
       okLabel: strings.ok,
     });
 
-    const selectedDelimiters = (): string[] => {
-      const values = checks
-        .filter((checkbox) => checkbox.checked)
-        .map((checkbox) => checkbox.value);
-      if (otherInput.value) values.push(otherInput.value);
-      return values;
-    };
     const updatePreview = (): void => {
       preview.textContent = splitPreview(
         opts.previewRows ?? [],
@@ -586,6 +580,7 @@ const showTextToColumnsSinglePage = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const delimiters = selectedDelimiters();
@@ -609,8 +604,6 @@ const showTextToColumnsSinglePage = (
         updatePreview();
       });
     }
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     updatePreview();
     mountDialog(shell, checks.find((checkbox) => checkbox.checked) ?? checks[0] ?? okBtn);

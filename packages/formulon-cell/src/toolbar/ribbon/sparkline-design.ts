@@ -8,7 +8,7 @@ import {
   sparklineGroupIds,
 } from '../../commands/sparkline-design.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
-import { projectDisabledState } from '../menu-a11y.js';
+import { projectOwnedDisabled } from '../menu-a11y.js';
 import { projectPressedState } from './button.js';
 import { SPARKLINE_COMMANDS } from './sparkline-tabs.js';
 
@@ -51,19 +51,10 @@ export const projectSparklineDesign = (host: HTMLElement, instance: SpreadsheetI
       locked ||
       (id === 'sparklineShowMarkers' && settings.type !== SparklineType.Line) ||
       (id === SPARKLINE_COMMANDS.group && oneGroup);
-    if (disabled) {
-      if (!button.disabled || button.dataset[OWN_DISABLED]) {
-        button.dataset[OWN_TITLE] ??= button.title;
-        projectDisabledState(button, true, locked ? reason : null, {
-          titlePrefix: button.dataset[OWN_TITLE],
-        });
-        button.dataset[OWN_DISABLED] = 'true';
-      }
-    } else if (button.dataset[OWN_DISABLED]) {
-      projectDisabledState(button, false, null, { titlePrefix: button.dataset[OWN_TITLE] });
-      delete button.dataset[OWN_DISABLED];
-      delete button.dataset[OWN_TITLE];
-    }
+    projectOwnedDisabled(button, disabled, locked ? reason : null, OWN_DISABLED, {
+      titleKey: OWN_TITLE,
+      respectForeign: true,
+    });
   }
   host
     .querySelector(`[data-ribbon-gallery="${SPARKLINE_COMMANDS.styleGallery}"]`)

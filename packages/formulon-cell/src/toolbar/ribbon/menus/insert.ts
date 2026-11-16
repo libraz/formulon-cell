@@ -1,7 +1,6 @@
 // Insert tab menus: Symbol grid, PivotTable, Chart/Picture/Shapes/Screenshot,
 // Links, DataValidation, DefinedNames, Script, AddIns, PDF. Each factory is a
-// shared icon, symbol, or visual-tile menu extracted from main.ts so the entry
-// file no longer has to hold them inline.
+// shared icon, symbol, or visual-tile menu.
 
 import type { ToolbarMenuText } from '../../menu-text.js';
 import { toolbarSymbolGroups } from '../symbols.js';

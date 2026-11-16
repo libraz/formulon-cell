@@ -62,6 +62,38 @@ export function projectDisabledState<T extends HTMLElement & { disabled?: boolea
   projectDisabledReason(el, disabled ? reason : null, options);
 }
 
+export interface OwnedDisabledOptions {
+  /** Dataset key remembering the control's own tooltip, so the reason can come and go beneath it. */
+  titleKey?: string;
+  /** Leave a control disabled by someone else alone instead of taking its disabled state over. */
+  respectForeign?: boolean;
+}
+
+/**
+ * Disable or re-enable `el` for a reason this projection owns. `markerKey` (a dataset key) records
+ * that the projection disabled it, so re-enabling touches only controls it disabled itself and a
+ * disabled state set elsewhere survives.
+ */
+export function projectOwnedDisabled<T extends HTMLElement & { disabled?: boolean }>(
+  el: T,
+  disabled: boolean,
+  reason: string | null,
+  markerKey: string,
+  options: OwnedDisabledOptions = {},
+): void {
+  const { titleKey } = options;
+  if (disabled) {
+    if (options.respectForeign && el.disabled && !el.dataset[markerKey]) return;
+    if (titleKey) el.dataset[titleKey] ??= el.title;
+    projectDisabledState(el, true, reason, titleKey ? { titlePrefix: el.dataset[titleKey] } : {});
+    el.dataset[markerKey] = 'true';
+  } else if (el.dataset[markerKey]) {
+    projectDisabledState(el, false, null, titleKey ? { titlePrefix: el.dataset[titleKey] } : {});
+    delete el.dataset[markerKey];
+    if (titleKey) delete el.dataset[titleKey];
+  }
+}
+
 /** Dataset key holding a value-showing control's own name, before its value is appended. */
 const CONTROL_NAME_KEY = 'fcRibbonControlLabel';
 

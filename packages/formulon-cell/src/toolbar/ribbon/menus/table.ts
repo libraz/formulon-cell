@@ -36,15 +36,6 @@ const LABELS = {
   },
 } as const satisfies Record<string, Readonly<Record<ToolbarLang, string>>>;
 
-/** The actions of the Refresh menu, in menu order. */
-export const TABLE_REFRESH_ACTIONS = [
-  'refresh',
-  'refresh-all',
-  'refresh-status',
-  'cancel-refresh',
-  'connection-properties',
-] as const;
-
 export interface TableMenuFactories {
   createTableRefreshMenu: (commandId: string) => HTMLDivElement;
 }

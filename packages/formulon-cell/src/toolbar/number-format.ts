@@ -20,8 +20,6 @@ export type NumberFormatAction =
   | 'text'
   | 'more';
 
-const defaultCurrencySymbolForToolbar = currencySymbolForLocale;
-
 /** The long date as Excel's dropdown applies it: with the weekday where the locale pattern has none. */
 const withWeekday = (long: string, locale: string): string => {
   if (long.includes('dddd')) return long;
@@ -36,7 +34,7 @@ export const numberFormatForAction = (
   locale: string,
 ): NumFmt | null => {
   const patterns = datePatternsForLocale(locale);
-  const symbol = defaultCurrencySymbolForToolbar(locale);
+  const symbol = currencySymbolForLocale(locale);
   switch (action) {
     case 'general':
       return { kind: 'general' };

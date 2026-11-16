@@ -1,6 +1,5 @@
 // Generic menu primitives shared across all ribbon dropdown factories.
-// Extracted from main.ts so the per-tab menu modules can build off the same
-// building blocks without dragging the whole playground entry along with them.
+// The per-tab menu modules build on these shared building blocks.
 
 import { createExcelRibbonSvg, type ExcelRibbonIconName } from '../../excel-ribbon-icons.js';
 import { prepareMenu } from '../../menu-a11y.js';
@@ -16,9 +15,6 @@ export const MENU_ICON_GLYPHS = {
   'audit-clear-dependents': 'clearArrows',
   'audit-clear-precedents': 'clearArrows',
   'autosum-average': 'autosum',
-  'autosum-count': 'autosum',
-  'autosum-max': 'autosum',
-  'autosum-min': 'autosum',
   'autosum-more': 'function',
   'autosum-sum': 'autosum',
   'break-page': 'pageBreaks',
@@ -41,18 +37,12 @@ export const MENU_ICON_GLYPHS = {
   'clear-hyperlinks': 'clearHyperlinks',
   'clear-comments': 'clearComments',
   'comment-add': 'commentAdd',
-  'comment-delete': 'commentAdd',
-  'comment-delete-all': 'commentAdd',
   'comment-previous': 'goTo',
   'comment-next': 'goTo',
   'comment-convert': 'commentAdd',
   conditional: 'conditional',
   copy: 'copy',
-  'currency-chf': 'currency',
-  'currency-dollar': 'currency',
-  'currency-euro': 'currency',
   'currency-more': 'currency',
-  'currency-pound': 'currency',
   'currency-yen': 'currency',
   'defined-name-define': 'names',
   'defined-name-create-from-selection': 'namesCreateFromSelection',
@@ -62,20 +52,14 @@ export const MENU_ICON_GLYPHS = {
   'delete-col': 'deleteCols',
   'delete-row': 'deleteRows',
   'delete-sheet': 'deleteRows',
-  'delete-shift-left': 'deleteCols',
-  'delete-shift-up': 'deleteRows',
   'error-checking': 'errorChecking',
-  'fill-days': 'fill',
   'fill-down': 'fillDown',
   'fill-group': 'fillGroup',
   'fill-justify': 'fillJustify',
   'fill-left': 'fillLeft',
-  'fill-months': 'fill',
   'fill-right': 'fillRight',
   'fill-series': 'fillSeries',
   'fill-up': 'fillUp',
-  'fill-weekdays': 'fill',
-  'fill-years': 'fill',
   'flash-fill': 'flashFill',
   'filter-advanced': 'filterAdvanced',
   'filter-by-value': 'filterByValue',
@@ -90,8 +74,6 @@ export const MENU_ICON_GLYPHS = {
   'format-hide-sheet': 'formatCells',
   'format-lock': 'protect',
   'format-move-copy': 'formatCells',
-  'format-move-left': 'formatCells',
-  'format-move-right': 'formatCells',
   'format-protect': 'protect',
   'format-rename-sheet': 'formatCells',
   'format-row-autofit': 'formatCells',
@@ -119,8 +101,6 @@ export const MENU_ICON_GLYPHS = {
   'insert-col': 'insertCols',
   'insert-row': 'insertRows',
   'insert-sheet': 'insertRows',
-  'insert-shift-down': 'insertRows',
-  'insert-shift-right': 'insertCols',
   'link-clear': 'link',
   'link-edit': 'link',
   'link-external': 'link',
@@ -336,6 +316,16 @@ export const menuPresetButton = (
   return button;
 };
 
+/** Make a menu row checkable: `role` plus an unchecked `aria-checked`. */
+export const menuCheckable = (
+  button: HTMLButtonElement,
+  role: 'menuitemradio' | 'menuitemcheckbox',
+): HTMLButtonElement => {
+  button.setAttribute('role', role);
+  button.setAttribute('aria-checked', 'false');
+  return button;
+};
+
 export type MenuTextChipOptions = {
   label: string;
   attr: string;
@@ -375,6 +365,31 @@ export const menuSubmenuTrigger = (
 
   button.appendChild(menuSpan('fc-tb__menu-item__caret', { ariaHidden: true }));
   return button;
+};
+
+/** A submenu row and its panel in the shared format-submenu markup. */
+export const formatSubmenu = (
+  menuId: string,
+  key: string,
+  label: string,
+  children: readonly Node[],
+  leading: Node = menuIconSpacer(),
+  extraClassName = '',
+): [HTMLButtonElement, HTMLDivElement] => {
+  const id = `${menuId}-${key}`;
+  const trigger = menuSubmenuTrigger(
+    menuPresetButton(label, 'formatSubmenu', key, leading),
+    undefined,
+    { controlsId: id },
+  );
+  const panel = createSubmenu({
+    id,
+    className: `fc-tb__submenu fc-tb__submenu--format${extraClassName ? ` ${extraClassName}` : ''}`,
+    label,
+    dataset: { formatPanel: key },
+  });
+  panel.append(...children);
+  return [trigger, panel];
 };
 
 export type ColorSwatchButtonOptions = {

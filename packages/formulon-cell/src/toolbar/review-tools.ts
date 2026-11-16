@@ -1,4 +1,5 @@
 import { formatA1Cell, parseAddrKey } from '../engine/address.js';
+import { interpolate } from '../i18n/interpolate.js';
 import type { Locale } from '../i18n/strings.js';
 import { dictionaries, type Strings } from '../i18n/strings.js';
 import type { State } from '../store/types.js';
@@ -110,9 +111,6 @@ export function reviewCellsFromState(
 const reportText = (lang: RibbonReportLang): ReviewReportText => dictionaries[lang].reviewReports;
 
 const reviewText = reportText;
-
-const interpolate = (template: string, vars: Record<string, string | number>): string =>
-  template.replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ''));
 
 export function formatRibbonReport(
   title: string,

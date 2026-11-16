@@ -162,8 +162,7 @@ export const showCustomListsDialog = (opts: CustomListsDialogOptions): Promise<s
       resolve,
       onCancel: () => null,
       onSubmit: () => lifecycle.finish(choose()),
+      buttons: { okBtn, cancelBtn },
     });
-    okBtn.addEventListener('click', () => lifecycle.finish(choose()));
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
     mountDialog(shell, lists, { immediate: true });
   });

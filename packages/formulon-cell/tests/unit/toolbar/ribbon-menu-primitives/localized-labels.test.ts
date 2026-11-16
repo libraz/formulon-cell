@@ -170,13 +170,10 @@ describe('toolbar/ribbon menu primitives', () => {
     const actionSource = readFileSync(join(ribbonDir, 'conditional-menu-action.ts'), 'utf8');
 
     expect(conditionalMenuSource).toContain('datePeriods: {');
-    expect(conditionalMenuSource).toContain('dateUnsupported: t.dateUnsupported');
-    expect(conditionalMenuSource).toContain('ok: t.ok');
-    expect(conditionalMenuSource).toContain('cancel: t.cancel');
+    expect(conditionalMenuSource).toContain('...t,');
     expect(actionSource).toContain('cfDatePeriodOptions(title.datePeriods)');
     expect(actionSource).toContain('okLabel: title.ok');
     expect(actionSource).toContain('cancelLabel: title.cancel');
-    expect(actionSource).toContain('message: title.dateUnsupported');
     expect(actionSource).not.toContain("ribbonLang === 'ja'");
     expect(actionSource).not.toContain('昨日');
     expect(actionSource).not.toContain('Yesterday');

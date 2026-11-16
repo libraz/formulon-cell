@@ -151,6 +151,8 @@ export interface DialogLifecycleHooks<T> {
   resolve: (value: T) => void;
   onSubmit?: () => void;
   onCancel: () => T;
+  /** When given, OK click runs `onSubmit` and Cancel click closes with `onCancel()`. */
+  buttons?: { okBtn: HTMLElement; cancelBtn: HTMLElement };
 }
 
 type DialogCanceller = () => void;
@@ -168,9 +170,8 @@ export const installDialogLifecycle = <T>(
   hooks: DialogLifecycleHooks<T>,
 ): {
   finish: (value: T) => void;
-  onKey: (event: KeyboardEvent) => void;
 } => {
-  const { shell, resolve, onSubmit, onCancel } = hooks;
+  const { shell, resolve, onSubmit, onCancel, buttons } = hooks;
   let done = false;
   const cancel = (): void => {
     finish(onCancel());
@@ -198,8 +199,10 @@ export const installDialogLifecycle = <T>(
     if (event.target === shell.overlay) event.stopPropagation();
   });
   shell.overlay.addEventListener('keydown', onKey);
+  buttons?.okBtn.addEventListener('click', () => onSubmit?.());
+  buttons?.cancelBtn.addEventListener('click', cancel);
   activeDialogCancellers.add(cancel);
-  return { finish, onKey };
+  return { finish };
 };
 
 export interface MountDialogOptions {
@@ -273,6 +276,21 @@ export const appendInputRow = (
   row.appendChild(label);
   body.appendChild(row);
   return input;
+};
+
+/** A BCP 47 locale, or a getter that follows a live profile. */
+export type DialogLocale = string | (() => string);
+
+export const resolveDialogLocale = (locale: DialogLocale | undefined): string =>
+  typeof locale === 'function' ? locale() : (locale ?? 'en-US');
+
+/** Appends a `p.fc-tb__dlg__message` paragraph. */
+export const appendDialogMessage = (body: HTMLElement, text: string): HTMLParagraphElement => {
+  const msg = body.ownerDocument.createElement('p');
+  msg.className = 'fc-tb__dlg__message';
+  msg.textContent = text;
+  body.appendChild(msg);
+  return msg;
 };
 
 export const appendErrorRow = (body: HTMLElement): HTMLDivElement => {

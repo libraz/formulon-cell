@@ -1,5 +1,6 @@
 import type { PhoneticSettings } from '../../commands/phonetic.js';
 import type { PhoneticAlignment } from '../../engine/phonetic-sync.js';
+import { appendRadioGroup } from './form-controls.js';
 import {
   appendDialogActions,
   createDialogShell,
@@ -18,38 +19,19 @@ export interface PhoneticSettingsDialogOptions {
   cancelLabel: string;
 }
 
-const appendRadioGroup = <T extends string>(
+const appendPhoneticRadioGroup = <T extends string>(
   body: HTMLElement,
   label: string,
   options: readonly { value: T; label: string }[],
   initial: T,
 ): (() => T) => {
-  const group = document.createElement('div');
-  group.className = 'fc-fmtdlg__choice-grid fc-tb__dlg__choices';
-  group.setAttribute('role', 'radiogroup');
-  group.setAttribute('aria-label', label);
-  const caption = document.createElement('p');
-  caption.className = 'fc-tb__dlg__message';
-  caption.textContent = label;
-  const name = `phonetic-${Math.random().toString(36).slice(2)}`;
-  for (const option of options) {
-    const wrap = document.createElement('label');
-    wrap.className = 'fc-fmtdlg__radio';
-    const input = document.createElement('input');
-    input.type = 'radio';
-    input.name = name;
-    input.value = option.value;
-    input.checked = option.value === initial;
-    const text = document.createElement('span');
-    text.textContent = option.label;
-    wrap.append(input, text);
-    group.appendChild(wrap);
-  }
-  body.append(caption, group);
-  return () =>
-    (group.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.value as
-      | T
-      | undefined) ?? initial;
+  const { read } = appendRadioGroup(body, {
+    ariaLabel: label,
+    caption: label,
+    options,
+    isChecked: (value) => value === initial,
+  });
+  return () => read() ?? initial;
 };
 
 /** Phonetic guide settings: kana form and alignment. Returns the choice, or
@@ -59,13 +41,13 @@ export const showPhoneticSettingsDialog = (
 ): Promise<PhoneticSettings | null> =>
   new Promise<PhoneticSettings | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title, bodyVariant: 'app' });
-    const readForm = appendRadioGroup(
+    const readForm = appendPhoneticRadioGroup(
       shell.body,
       opts.typeLabel,
       opts.typeOptions,
       opts.initial.form,
     );
-    const readAlignment = appendRadioGroup(
+    const readAlignment = appendPhoneticRadioGroup(
       shell.body,
       opts.alignmentLabel,
       opts.alignmentOptions,
@@ -81,9 +63,8 @@ export const showPhoneticSettingsDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => lifecycle.finish(read()),
+      buttons: { okBtn, cancelBtn },
     });
-    okBtn.addEventListener('click', () => lifecycle.finish(read()));
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
     mountDialog(shell, () =>
       shell.body.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.focus(),
     );

@@ -3,8 +3,10 @@ import { attachRangePickerButton } from '../../interact/range-picker-control.js'
 import {
   applyConditionalStylePreview,
   type ConditionalFormatDialogStyle,
+  type ConditionalFormatStyleStrings,
   conditionalStyleFromValue,
   conditionalStyleOptions,
+  DEFAULT_CF_STYLE_ID,
   showConditionalFormatCustomStyleDialog,
 } from './conditional-format-style.js';
 import { createDialogSelect } from './form-controls.js';
@@ -19,34 +21,9 @@ import {
   showInputError,
 } from './shell.js';
 
-export type { ConditionalFormatDialogStyle } from './conditional-format-style.js';
-export {
-  applyConditionalStylePreview,
-  conditionalStyleFromValue,
-  conditionalStyleOptions,
-} from './conditional-format-style.js';
-
-export interface ConditionalFormatRuleDialogStrings {
-  ok: string;
-  cancel: string;
+export interface ConditionalFormatRuleDialogStrings extends ConditionalFormatStyleStrings {
   formatWith: string;
   formatPreview: string;
-  customFormat: string;
-  customFormatTitle: string;
-  customFillColor: string;
-  customTextColor: string;
-  customBold: string;
-  customItalic: string;
-  customUnderline: string;
-  customStrike: string;
-  formatLightRed: string;
-  formatYellow: string;
-  formatGreen: string;
-  formatLightRedFill: string;
-  formatRedText: string;
-  formatRedBorder: string;
-  formatRedFill: string;
-  formatRedTextFill: string;
   invalidNumber: string;
   invalidText: string;
 }
@@ -109,7 +86,7 @@ const appendFormatRow = (
   label.textContent = strings.formatWith;
   const select = createDialogSelect(
     conditionalStyleOptions(strings),
-    initialStyle ?? 'light-red-dark-red',
+    initialStyle ?? DEFAULT_CF_STYLE_ID,
     { className: 'fc-tb__dlg__select' },
   );
   let customStyle: ConditionalFormatDialogStyle | null = null;
@@ -118,38 +95,29 @@ const appendFormatRow = (
   preview.dataset.conditionalFormatPreview = 'true';
   preview.textContent = 'AaBbCcYyZz';
   preview.title = strings.formatPreview;
+  const currentStyle = (): ConditionalFormatDialogStyle =>
+    select.value === 'custom' && customStyle
+      ? customStyle
+      : conditionalStyleFromValue(select.value, strings);
   const updatePreview = (): void => {
     const selected = select.selectedOptions[0]?.textContent ?? strings.formatPreview;
-    applyConditionalStylePreview(
-      preview,
-      select.value === 'custom' && customStyle
-        ? customStyle
-        : conditionalStyleFromValue(select.value, strings),
-      selected,
-    );
+    applyConditionalStylePreview(preview, currentStyle(), selected);
   };
   select.addEventListener('change', () => {
     updatePreview();
     if (select.value !== 'custom') return;
-    void showConditionalFormatCustomStyleDialog(
-      strings,
-      customStyle ?? conditionalStyleFromValue(select.value, strings),
-    ).then((style) => {
+    void showConditionalFormatCustomStyleDialog(strings, currentStyle()).then((style) => {
       if (!style) return;
       customStyle = style;
       updatePreview();
     });
   });
   updatePreview();
-  const getStyle = (): ConditionalFormatDialogStyle =>
-    select.value === 'custom' && customStyle
-      ? customStyle
-      : conditionalStyleFromValue(select.value, strings);
   label.appendChild(select);
   label.appendChild(preview);
   row.appendChild(label);
   body.appendChild(row);
-  return { select, preview, getStyle };
+  return { select, preview, getStyle: currentStyle };
 };
 
 const readNumber = (
@@ -236,6 +204,7 @@ export const showConditionalFormatNumberDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const a = readField(first);
@@ -255,8 +224,6 @@ export const showConditionalFormatNumberDialog = (
         style: formatRow.getStyle(),
       });
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => focusAndSelectInput(first));
   });
@@ -279,6 +246,7 @@ export const showConditionalFormatTextDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const text = input.value.trim();
@@ -288,8 +256,6 @@ export const showConditionalFormatTextDialog = (
       }
       lifecycle.finish({ text, style: formatRow.getStyle() });
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => focusAndSelectInput(input));
   });

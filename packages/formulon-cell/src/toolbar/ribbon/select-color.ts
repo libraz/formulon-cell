@@ -1,7 +1,6 @@
 import type { Locale } from '../../i18n/strings.js';
 
-// Ribbon `<select>`-style dropdown and color-picker control builders extracted
-// from main.ts. The factory wires in i18n, host hooks (apply/read control
+// Ribbon `<select>`-style dropdown and color-picker control builders. The factory wires in i18n, host hooks (apply/read control
 // value, font availability, color palette) and produces the DOM elements that
 // renderRibbon mounts.
 
@@ -13,14 +12,9 @@ import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectValueName } from '../menu-a11y.js';
 import { type NumberFormatAction, numberFormatSample } from '../number-format.js';
 import type { RibbonCommand } from '../ribbon-model.js';
+import { svgPathIcon } from '../svg-icon.js';
 import { createRibbonButton } from './button.js';
-import {
-  FONT_SUBMENU_FAMILIES,
-  RECENT_FONT_VALUES,
-  recentFontValues,
-  recordRecentFont,
-  THEME_FONT_VALUES,
-} from './font-availability.js';
+import { recentFontValues, recordRecentFont, THEME_FONT_VALUES } from './font-availability.js';
 import { type FontFamilyOption, fontFamilyOptions } from './font-family-options.js';
 
 export interface SelectColorRibbonText {
@@ -82,18 +76,8 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     createRibbonIcon,
   } = ctx;
 
-  const makeSvg = (viewBox: string, pathData: string, className: string): SVGSVGElement => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add(className);
-    svg.setAttribute('viewBox', viewBox);
-    svg.setAttribute('fill', 'currentColor');
-    svg.setAttribute('focusable', 'false');
-    svg.setAttribute('aria-hidden', 'true');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', pathData);
-    svg.appendChild(path);
-    return svg;
-  };
+  const makeSvg = (viewBox: string, pathData: string, className: string): SVGSVGElement =>
+    svgPathIcon(pathData, viewBox, className);
 
   const ribbonMarginDetail = (value: string): string | null => {
     const fmt = (top: string, bottom: string, left: string, right: string): string =>
@@ -139,20 +123,12 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     option: FontFamilyOption,
     options: readonly FontFamilyOption[],
   ): string | null => {
-    // Theme/all grouping now comes from the shared option catalog.  Keep the
-    // legacy sets as a compatibility fallback for hosts that construct an
-    // older command model by hand; RECENT_FONT_VALUES is intentionally empty
-    // until real recent-use state exists. The retained
-    // ribbonText.fontSectionRecent string stays in the text contract for
-    // hosts that provide real recent-use data later.
-    const section = option.section || (THEME_FONT_VALUES.has(option.value) ? 'theme' : 'all');
-    const firstInSection = options.find((candidate) => {
-      const candidateSection =
-        candidate.section || (THEME_FONT_VALUES.has(candidate.value) ? 'theme' : 'all');
-      return candidateSection === section;
-    })?.value;
+    // Grouping comes from the shared option catalog; hand-built options without a section fall back to the theme set.
+    const sectionOf = (candidate: FontFamilyOption): string =>
+      candidate.section || (THEME_FONT_VALUES.has(candidate.value) ? 'theme' : 'all');
+    const section = sectionOf(option);
+    const firstInSection = options.find((candidate) => sectionOf(candidate) === section)?.value;
     if (option.value === firstInSection) {
-      if (RECENT_FONT_VALUES.has(option.value)) return null;
       if (section === 'recent') return ribbonText.fontSectionRecent;
       return section === 'theme' ? ribbonText.fontSectionTheme : ribbonText.fontSectionAll;
     }
@@ -237,7 +213,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         command.id === 'fontFamily'
           ? ribbonFontRole(
               fontFamilyOptions(ribbonLang, current, command.options, shouldShowFontOption).find(
-                (option) => option.value === current,
+                (candidate) => candidate.value === current,
               ),
             )
           : null;
@@ -288,14 +264,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
 
     const value = document.createElement('span');
     value.className = 'fc-tb__rb-dd__value';
-    button.append(
-      value,
-      makeSvg(
-        '0 0 12 12',
-        'M2.15 4.65a.5.5 0 0 1 .7 0L6 7.79l3.15-3.14a.5.5 0 1 1 .7.7l-3.5 3.5a.5.5 0 0 1-.7 0l-3.5-3.5a.5.5 0 0 1 0-.7Z',
-        'fc-tb__rb-dd__chev',
-      ),
-    );
+    button.append(value, makeSvg('0 0 12 12', RIBBON_CHEVRON_PATH, 'fc-tb__rb-dd__chev'));
     wrap.appendChild(button);
 
     let detachDocDown: (() => void) | null = null;
@@ -357,6 +326,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           heading.textContent = section;
           list.appendChild(heading);
         }
+        const numberSample =
+          command.id === 'numberFormat' && !numberFormatHasSubtitle(option.value)
+            ? numberFormatSampleFor(option.value)
+            : null;
         const selected = option.value === current;
         const item = createRibbonControlButton({
           className: `fc-tb__rb-dd__opt${selected ? ' fc-tb__rb-dd__opt--selected' : ''}`,
@@ -407,12 +380,9 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
             preview.append(label);
           }
           item.append(check, preview);
-          // FONT_SUBMENU_FAMILIES is retained as a compatibility export, but
-          // no arrow is rendered until a real submenu interaction exists.
-          if (FONT_SUBMENU_FAMILIES.has(option.value)) item.dataset.fcFontSubmenu = 'false';
         } else if (
           command.id === 'numberFormat' &&
-          (numberFormatHasSubtitle(option.value) || numberFormatSampleFor(option.value))
+          (numberFormatHasSubtitle(option.value) || numberSample)
         ) {
           const text = document.createElement('span');
           text.className = 'fc-tb__rb-dd__numfmt-text';
@@ -420,7 +390,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           detail.className = 'fc-tb__rb-dd__numfmt-subtitle';
           detail.textContent = numberFormatHasSubtitle(option.value)
             ? numberFormatSubtitle(option.value)
-            : (numberFormatSampleFor(option.value) ?? '');
+            : (numberSample ?? '');
           text.append(label, detail);
           item.append(check, text);
         } else {

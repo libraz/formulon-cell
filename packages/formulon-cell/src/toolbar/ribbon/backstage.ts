@@ -62,7 +62,7 @@ export interface BackstageDeps {
   backstageText: BackstageText;
   ribbonText: BackstageRibbonText;
   shellSavedText: string;
-  /** The current document name (`docName` in main.ts). Captured at call-time. */
+  /** The current document name Captured at call-time. */
   docName: () => string;
   /** Optional host-supplied printable document HTML for the Backstage Print preview. */
   printPreviewHtml?: () => string | undefined;

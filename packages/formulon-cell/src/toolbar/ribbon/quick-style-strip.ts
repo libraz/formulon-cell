@@ -50,7 +50,7 @@ const GEOMETRY: Record<
   },
 };
 
-export const quickStyleStripGeometry = (
+const quickStyleStripGeometry = (
   kind: QuickStyleStripKind,
   mac: boolean,
 ): QuickStyleStripGeometry => GEOMETRY[kind][mac ? 'mac' : 'desktop'];

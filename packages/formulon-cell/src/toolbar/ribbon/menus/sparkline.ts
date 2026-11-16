@@ -5,6 +5,7 @@ import { SHAPE_LINE_WEIGHTS } from '../../../commands/shape-format.js';
 import type { SparklineStylePreset } from '../../../commands/sparkline-presets.js';
 import { createColorPalette } from '../../../components/color-palette.js';
 import type { MacStrings } from '../../../i18n/strings/mac/types.js';
+import { SVG_NS } from '../../../svg-namespace.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarText } from '../../ribbon-model.js';
 import { createPenColorIcon } from '../border-icons.js';
@@ -13,12 +14,12 @@ import {
   colorSwatchGrid,
   createMenu,
   createMenuButton,
-  createSubmenu,
+  formatSubmenu,
+  menuCheckable,
   menuIconSpacer,
   menuPresetButton,
   menuSectionHeader,
   menuSeparator,
-  menuSubmenuTrigger,
 } from './general.js';
 import type { MenuVariant } from './mac-variants.js';
 import { lineSample, pointsLabel } from './shape-format.js';
@@ -35,7 +36,7 @@ export const SPARKLINE_MARKER_PARTS = [
 export type SparklineMarkerPart = (typeof SPARKLINE_MARKER_PARTS)[number];
 
 /** Axis menu entries, by the value their button carries. */
-export const SPARKLINE_AXIS_ITEMS = [
+const SPARKLINE_AXIS_ITEMS = [
   'general',
   'date',
   'show',
@@ -63,13 +64,11 @@ export interface SparklineStyleSlot {
 }
 
 export const SPARKLINE_STYLE_SLOTS: readonly SparklineStyleSlot[] = [
-  ...STYLE_FAMILIES.flatMap((name) =>
-    Array.from({ length: STYLE_SET_SIZE }, (_, i) => ({ id: `${name}-${i + 1}`, name, n: i + 1 })),
-  ),
-  ...(['dark', 'colorful'] as const).flatMap((name) =>
-    Array.from({ length: STYLE_SET_SIZE }, (_, i) => ({ id: `${name}-${i + 1}`, name, n: i + 1 })),
-  ),
-];
+  ...STYLE_FAMILIES,
+  ...(['dark', 'colorful'] as const),
+].flatMap((name) =>
+  Array.from({ length: STYLE_SET_SIZE }, (_, i) => ({ id: `${name}-${i + 1}`, name, n: i + 1 })),
+);
 
 /** The accessible name of the Style preset at gallery `index`: its colour word before its name. */
 export const sparklineStyleLabel = (t: ToolbarText['sparkline'], index: number): string => {
@@ -84,8 +83,7 @@ export const sparklineStyleThumbnail = (
   preset: SparklineStylePreset,
   css: (color: Color) => string,
 ): SVGSVGElement => {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
+  const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'fc-tb__sparkline-style__thumb');
   svg.setAttribute('viewBox', '0 0 28 16');
   svg.setAttribute('aria-hidden', 'true');
@@ -96,7 +94,7 @@ export const sparklineStyleThumbnail = (
     [18, 13],
     [25, 6],
   ];
-  const line = document.createElementNS(ns, 'polyline');
+  const line = document.createElementNS(SVG_NS, 'polyline');
   line.setAttribute('points', points.map(([x, y]) => `${x},${y}`).join(' '));
   line.setAttribute('fill', 'none');
   line.setAttribute('stroke', css(preset.series));
@@ -110,7 +108,7 @@ export const sparklineStyleThumbnail = (
   ];
   for (const [point, color] of marks) {
     if (!point) continue;
-    const dot = document.createElementNS(ns, 'circle');
+    const dot = document.createElementNS(SVG_NS, 'circle');
     dot.setAttribute('cx', String(point[0]));
     dot.setAttribute('cy', String(point[1]));
     dot.setAttribute('r', '1.8');
@@ -140,14 +138,6 @@ export const createSparklineMenuFactories = (
   const t = ribbonText.sparkline;
   const item = (label: string, attr: string, value: string): HTMLButtonElement =>
     menuPresetButton(label, attr, value, menuIconSpacer());
-  const checkable = (
-    button: HTMLButtonElement,
-    role: 'menuitemradio' | 'menuitemcheckbox',
-  ): HTMLButtonElement => {
-    button.setAttribute('role', role);
-    button.setAttribute('aria-checked', 'false');
-    return button;
-  };
 
   const palette = (title: string, attr: string, prefix = ''): HTMLElement => {
     const colors = createColorPalette({
@@ -167,30 +157,6 @@ export const createSparklineMenuFactories = (
     return colors.el;
   };
 
-  /** A trigger and the panel it opens beside the menu. */
-  const submenu = (
-    menuId: string,
-    key: string,
-    label: string,
-    children: readonly Node[],
-    leading: Node = menuIconSpacer(),
-  ): [HTMLButtonElement, HTMLDivElement] => {
-    const id = `${menuId}-${key}`;
-    const trigger = menuSubmenuTrigger(
-      menuPresetButton(label, 'formatSubmenu', key, leading),
-      undefined,
-      { controlsId: id },
-    );
-    const panel = createSubmenu({
-      id,
-      className: 'fc-tb__submenu fc-tb__submenu--format',
-      label,
-      dataset: { formatPanel: key },
-    });
-    panel.append(...children);
-    return [trigger, panel];
-  };
-
   // Hidden & Empty Cells: on the Mac a submenu of the settings, which a click opens as hover does;
   // elsewhere an entry that opens the Hidden and Empty Cell Settings dialog.
   const createSparklineEditDataMenu = (
@@ -199,14 +165,14 @@ export const createSparklineMenuFactories = (
   ): HTMLDivElement => {
     const menu = createMenu(SPARKLINE_MENU_IDS.editData);
     const empty = (label: string, value: string) =>
-      checkable(item(label, 'sparklineEmpty', value), 'menuitemradio');
+      menuCheckable(item(label, 'sparklineEmpty', value), 'menuitemradio');
     const hidden: Node[] = variant?.mac
-      ? submenu(SPARKLINE_MENU_IDS.editData, 'hidden-empty', macText.hiddenEmptyMenu, [
+      ? formatSubmenu(SPARKLINE_MENU_IDS.editData, 'hidden-empty', macText.hiddenEmptyMenu, [
           empty(t.emptyAsGaps, String(BlanksAs.Gap)),
           empty(t.emptyAsZero, String(BlanksAs.Zero)),
           empty(t.connectPoints, String(BlanksAs.Span)),
           menuSeparator(),
-          checkable(item(t.showHiddenData, 'sparklineEmpty', 'hidden'), 'menuitemcheckbox'),
+          menuCheckable(item(t.showHiddenData, 'sparklineEmpty', 'hidden'), 'menuitemcheckbox'),
         ])
       : [item(t.hiddenEmpty, 'sparklineEdit', 'hidden-empty')];
     menu.append(
@@ -231,9 +197,7 @@ export const createSparklineMenuFactories = (
         title: name,
         ariaLabel: name,
       });
-      swatch.setAttribute('role', 'menuitemradio');
-      swatch.setAttribute('aria-checked', 'false');
-      grid.appendChild(swatch);
+      grid.appendChild(menuCheckable(swatch, 'menuitemradio'));
     });
     menu.appendChild(grid);
     return menu;
@@ -242,7 +206,7 @@ export const createSparklineMenuFactories = (
   const createSparklineColorMenu = (): HTMLDivElement => {
     const menu = createMenu(SPARKLINE_MENU_IDS.color);
     const weights = SHAPE_LINE_WEIGHTS.map((weight) =>
-      checkable(
+      menuCheckable(
         menuPresetButton(
           ribbonMenuText.shapeOutlinePoints.replace('{n}', pointsLabel(weight)),
           'sparklineWeight',
@@ -255,7 +219,7 @@ export const createSparklineMenuFactories = (
     menu.append(
       palette(t.color, 'sparklineColor'),
       menuSeparator(),
-      ...submenu(SPARKLINE_MENU_IDS.color, 'weight', t.weight, [
+      ...formatSubmenu(SPARKLINE_MENU_IDS.color, 'weight', t.weight, [
         ...weights,
         menuSeparator(),
         item(t.customWeight, 'sparklineWeight', 'custom'),
@@ -276,7 +240,7 @@ export const createSparklineMenuFactories = (
       last: t.lastPoint,
     };
     for (const part of SPARKLINE_MARKER_PARTS) {
-      const [trigger, panel] = submenu(
+      const [trigger, panel] = formatSubmenu(
         SPARKLINE_MENU_IDS.markerColor,
         part,
         labels[part],
@@ -292,14 +256,14 @@ export const createSparklineMenuFactories = (
   const createSparklineAxisMenu = (): HTMLDivElement => {
     const menu = createMenu(SPARKLINE_MENU_IDS.axis);
     const radio = (label: string, value: SparklineAxisItem) =>
-      checkable(item(label, 'sparklineAxis', value), 'menuitemradio');
+      menuCheckable(item(label, 'sparklineAxis', value), 'menuitemradio');
     menu.append(
       menuSectionHeader(t.horizontalAxis),
       radio(t.generalAxis, 'general'),
       // Date Axis Type opens a dialog, so it checks like the other axis types.
       radio(t.dateAxis, 'date'),
-      checkable(item(t.showAxis, 'sparklineAxis', 'show'), 'menuitemcheckbox'),
-      checkable(item(t.plotRtl, 'sparklineAxis', 'rtl'), 'menuitemcheckbox'),
+      menuCheckable(item(t.showAxis, 'sparklineAxis', 'show'), 'menuitemcheckbox'),
+      menuCheckable(item(t.plotRtl, 'sparklineAxis', 'rtl'), 'menuitemcheckbox'),
       menuSeparator(),
       menuSectionHeader(t.verticalMin),
       radio(t.autoEach, 'min-individual'),

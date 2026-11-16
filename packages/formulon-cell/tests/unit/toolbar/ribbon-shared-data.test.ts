@@ -112,8 +112,6 @@ describe('toolbar/ribbon shared data', () => {
 
     expect(selectColorSource).toContain("from './font-availability.js'");
     expect(selectColorSource).toContain('THEME_FONT_VALUES');
-    expect(selectColorSource).toContain('RECENT_FONT_VALUES');
-    expect(selectColorSource).toContain('FONT_SUBMENU_FAMILIES');
     expect(selectColorSource).not.toContain('const themeFontValues = new Set');
     expect(selectColorSource).not.toContain('const recentFontValues = new Set');
     expect(selectColorSource).not.toContain('const commonFontValues = new Set');

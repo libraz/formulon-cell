@@ -8,11 +8,11 @@
  * `scripts/icons/render.mjs` for the contact sheet used to review changes.
  */
 
+import { SVG_NS } from '../svg-namespace.js';
 import { RIBBON_GLYPHS } from './icon-kit/glyphs/index.js';
 import { PALETTE } from './icon-kit/tokens.js';
-import type { IconDefinition, IconSegment } from './icon-kit/types.js';
+import type { IconDefinition } from './icon-kit/types.js';
 
-export type ExcelRibbonIconSegment = IconSegment;
 export type ExcelRibbonIconDefinition = IconDefinition;
 
 export const EXCEL_RIBBON_ICON_PATHS: Record<string, ExcelRibbonIconDefinition> = RIBBON_GLYPHS;
@@ -46,14 +46,14 @@ export const createExcelRibbonSvg = (name: string, className: string): SVGSVGEle
   const segments = excelRibbonIconPaths(name);
   if (!segments) return null;
 
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const svg = document.createElementNS(SVG_NS, 'svg');
   svg.classList.add(className);
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('focusable', 'false');
   svg.setAttribute('aria-hidden', 'true');
 
   for (const segment of segments) {
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', segment.d);
     paint(path, 'fill', segment.fill ?? 'none');
     if (segment.stroke) paint(path, 'stroke', segment.stroke);

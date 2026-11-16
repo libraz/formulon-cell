@@ -75,6 +75,7 @@ export const showFormatAsTableDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       const range = rangeInput.value.trim();
@@ -95,8 +96,6 @@ export const showFormatAsTableDialog = (
       }
       lifecycle.finish({ range, hasHeaders: headersInput.checked, name });
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () => focusAndSelectInput(rangeInput));
   });

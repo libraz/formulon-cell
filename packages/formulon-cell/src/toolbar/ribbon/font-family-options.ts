@@ -72,12 +72,18 @@ const labelForValue = (value: string): string =>
 
 const normalizedValue = (value: string): string => value.trim().normalize('NFC');
 
-const localeForStrings = (strings: Strings): Locale => {
+/** The locale whose bundled dictionary is exactly `strings`, if any. */
+export const dictionaryLocaleOf = (strings: Strings): Locale | undefined => {
   for (const [locale, dictionary] of Object.entries(dictionaries) as [Locale, Strings][]) {
     if (dictionary === strings) return locale;
   }
-  return strings.ribbon.fontFamilies.some((family) => /[\u3000-\u9fff]/.test(family)) ? 'ja' : 'en';
+  return undefined;
 };
+
+/** Locale for `strings`: its dictionary, else `ja` when the font list holds CJK names, else `en`. */
+export const localeForStrings = (strings: Strings): Locale =>
+  dictionaryLocaleOf(strings) ??
+  (strings.ribbon.fontFamilies.some((family) => /[\u3000-\u9fff]/.test(family)) ? 'ja' : 'en');
 
 const makeCatalog = (
   locale: Locale,
@@ -117,7 +123,7 @@ export const fontFamilyCatalog = (
   );
 
 /** Build a catalog from an already-localized command's value/label pairs. */
-export const fontFamilyCatalogFromOptions = (
+const fontFamilyCatalogFromOptions = (
   locale: Locale,
   sourceOptions: readonly FontFamilyOptionSource[],
 ): readonly FontFamilyOption[] => makeCatalog(locale, sourceOptions);
@@ -157,18 +163,17 @@ export const fontFamilyOptions = (
     });
   }
   const theme = available.filter((option) => option.section === 'theme');
+  let collator: Intl.Collator | null = null;
+  try {
+    collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' });
+  } catch {
+    collator = null;
+  }
   const all = available
     .filter((option) => option.section === 'all')
-    .sort((left, right) => {
-      try {
-        return new Intl.Collator(locale, { numeric: true, sensitivity: 'base' }).compare(
-          left.label,
-          right.label,
-        );
-      } catch {
-        return left.label.localeCompare(right.label);
-      }
-    });
+    .sort((left, right) =>
+      collator ? collator.compare(left.label, right.label) : left.label.localeCompare(right.label),
+    );
   return [...theme, ...all];
 };
 
@@ -189,5 +194,3 @@ export const fontFamilyValueFromLabel = (locale: Locale, input: string): string 
   );
   return option?.value ?? input;
 };
-
-export const fontFamilyLocaleForStrings = localeForStrings;

@@ -14,6 +14,7 @@ import type { Strings } from '../../i18n/strings.js';
 import { createDialogSelect } from './form-controls.js';
 import {
   appendDialogActions,
+  appendDialogMessage,
   createDialogShell,
   installDialogLifecycle,
   mountDialog,
@@ -41,59 +42,34 @@ const lossLabel = (strings: Strings, loss: WorkbookSaveLoss): string => {
   }
 };
 
-const appendMessage = (body: HTMLElement, text: string): void => {
-  const msg = body.ownerDocument.createElement('p');
-  msg.className = 'fc-tb__dlg__message';
-  msg.textContent = text;
-  body.appendChild(msg);
+const lossText = (strings: Strings, loss: WorkbookSaveLoss): string => {
+  const label = lossLabel(strings, loss);
+  return loss.count === undefined ? label : `${label} (${loss.count})`;
 };
 
-const appendLossList = (
-  body: HTMLElement,
-  strings: Strings,
-  losses: readonly WorkbookSaveLoss[],
-) => {
+const appendLossList = (body: HTMLElement, items: readonly string[]): void => {
   const list = body.ownerDocument.createElement('ul');
   list.className = 'fc-tb__dlg__loss-list';
-  for (const loss of losses) {
+  for (const text of items) {
     const item = body.ownerDocument.createElement('li');
-    const label = lossLabel(strings, loss);
-    item.textContent = loss.count === undefined ? label : `${label} (${loss.count})`;
+    item.textContent = text;
     list.appendChild(item);
   }
   body.appendChild(list);
 };
 
-/** Warn that `format` leaves `losses` out. Resolves true to save anyway. */
-export const confirmWorkbookSaveLosses = (
-  strings: Strings,
-  format: WorkbookSaveFormat,
-  losses: readonly WorkbookSaveLoss[],
+/** An alert dialog with a filled body and Cancel / OK; resolves true on OK. */
+const confirmWithBody = (
+  title: string,
+  okLabel: string,
+  cancelLabel: string,
+  fillBody: (body: HTMLElement) => void,
   host?: HTMLElement,
 ): Promise<boolean> =>
   new Promise<boolean>((resolve) => {
-    const t = strings.workbookSave;
-    const shell = createDialogShell({
-      host,
-      title: t.lossTitle,
-      role: 'alertdialog',
-      bodyVariant: 'app',
-    });
-    const type = formatLabel(strings, format);
-    const certain = losses.filter((loss) => loss.certain);
-    const possible = losses.filter((loss) => !loss.certain);
-    if (certain.length > 0) {
-      appendMessage(shell.body, t.lossMessage.replace('{format}', type));
-      appendLossList(shell.body, strings, certain);
-    }
-    if (possible.length > 0) {
-      appendMessage(shell.body, t.mayLoseMessage.replace('{format}', type));
-      appendLossList(shell.body, strings, possible);
-    }
-    const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: t.cancel,
-      okLabel: t.saveAnyway,
-    });
+    const shell = createDialogShell({ host, title, role: 'alertdialog', bodyVariant: 'app' });
+    fillBody(shell.body);
+    const { cancelBtn, okBtn } = appendDialogActions(shell.footer, { cancelLabel, okLabel });
     const lifecycle = installDialogLifecycle<boolean>({
       shell,
       resolve,
@@ -103,6 +79,41 @@ export const confirmWorkbookSaveLosses = (
     cancelBtn.addEventListener('click', () => lifecycle.finish(false));
     mountDialog(shell, cancelBtn);
   });
+
+/** Warn that `format` leaves `losses` out. Resolves true to save anyway. */
+export const confirmWorkbookSaveLosses = (
+  strings: Strings,
+  format: WorkbookSaveFormat,
+  losses: readonly WorkbookSaveLoss[],
+  host?: HTMLElement,
+): Promise<boolean> => {
+  const t = strings.workbookSave;
+  const type = formatLabel(strings, format);
+  const certain = losses.filter((loss) => loss.certain);
+  const possible = losses.filter((loss) => !loss.certain);
+  return confirmWithBody(
+    t.lossTitle,
+    t.saveAnyway,
+    t.cancel,
+    (body) => {
+      if (certain.length > 0) {
+        appendDialogMessage(body, t.lossMessage.replace('{format}', type));
+        appendLossList(
+          body,
+          certain.map((loss) => lossText(strings, loss)),
+        );
+      }
+      if (possible.length > 0) {
+        appendDialogMessage(body, t.mayLoseMessage.replace('{format}', type));
+        appendLossList(
+          body,
+          possible.map((loss) => lossText(strings, loss)),
+        );
+      }
+    },
+    host,
+  );
+};
 
 /** Tell the user the `.xlsb` writer cannot hold `feature`, on sheet `sheetName` when it is
  *  sheet-scoped. Resolves true to save as `.xlsx` instead. */
@@ -111,35 +122,21 @@ const offerXlsxForUnwritable = (
   feature: XlsbUnwritable,
   sheetName: string | null,
   host?: HTMLElement,
-): Promise<boolean> =>
-  new Promise<boolean>((resolve) => {
-    const t = strings.workbookSave;
-    const shell = createDialogShell({
-      host,
-      title: t.unwritableTitle,
-      role: 'alertdialog',
-      bodyVariant: 'app',
-    });
-    appendMessage(shell.body, t.unwritableMessage);
-    const list = shell.body.ownerDocument.createElement('ul');
-    list.className = 'fc-tb__dlg__loss-list';
-    const item = shell.body.ownerDocument.createElement('li');
-    item.textContent = sheetName === null ? t[feature.id] : `${t[feature.id]} (${sheetName})`;
-    list.appendChild(item);
-    shell.body.appendChild(list);
-    const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: t.cancel,
-      okLabel: t.saveAsFormat.replace('{format}', formatLabel(strings, 'xlsx')),
-    });
-    const lifecycle = installDialogLifecycle<boolean>({
-      shell,
-      resolve,
-      onCancel: () => false,
-    });
-    okBtn.addEventListener('click', () => lifecycle.finish(true));
-    cancelBtn.addEventListener('click', () => lifecycle.finish(false));
-    mountDialog(shell, cancelBtn);
-  });
+): Promise<boolean> => {
+  const t = strings.workbookSave;
+  return confirmWithBody(
+    t.unwritableTitle,
+    t.saveAsFormat.replace('{format}', formatLabel(strings, 'xlsx')),
+    t.cancel,
+    (body) => {
+      appendDialogMessage(body, t.unwritableMessage);
+      appendLossList(body, [
+        sheetName === null ? t[feature.id] : `${t[feature.id]} (${sheetName})`,
+      ]);
+    },
+    host,
+  );
+};
 
 /** File types `wb` can be written as, in menu order. */
 export const workbookSaveFormats = (wb: WorkbookHandle): WorkbookSaveFormat[] =>
@@ -179,9 +176,8 @@ export const chooseWorkbookSaveFormat = (
       resolve,
       onCancel: () => null,
       onSubmit: () => lifecycle.finish(chosen()),
+      buttons: { okBtn, cancelBtn },
     });
-    okBtn.addEventListener('click', () => lifecycle.finish(chosen()));
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
     mountDialog(shell, select);
   });
 

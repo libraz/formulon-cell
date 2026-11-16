@@ -4,6 +4,7 @@
 
 import { SVG_NS } from '../../../svg-namespace.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
+import { appendPath as appendBasePath } from '../border-icons.js';
 import { createMenu, menuPresetButton, menuSeparator } from './general.js';
 
 export type TextOrientationGlyph = 'ccw' | 'cw' | 'vertical' | 'up' | 'down' | 'format';
@@ -35,17 +36,12 @@ const appendPath = (
     transform,
   }: TextOrientationPathAttrs = {},
 ): void => {
-  const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('d', d);
-  path.setAttribute('fill', fill);
-  if (stroke) {
-    path.setAttribute('stroke', stroke);
-    path.setAttribute('stroke-width', strokeWidth);
-    path.setAttribute('stroke-linecap', strokeLinecap);
-    path.setAttribute('stroke-linejoin', strokeLinejoin);
-  }
-  if (transform) path.setAttribute('transform', transform);
-  svg.appendChild(path);
+  appendBasePath(svg, d, {
+    fill,
+    stroke,
+    ...(stroke ? { strokeWidth, strokeLinecap, strokeLinejoin } : {}),
+    transform,
+  });
 };
 
 const createTextOrientationIcon = (glyph: TextOrientationGlyph): SVGSVGElement => {

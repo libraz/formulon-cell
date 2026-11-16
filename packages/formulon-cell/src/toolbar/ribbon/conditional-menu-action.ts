@@ -1,13 +1,15 @@
 import type { Locale } from '../../i18n/strings.js';
 
-// Extracted from main.ts. Dispatches the ribbon's conditional formatting menu
-// actions: opens the new-rule / manage dialogs, prompts for inline rule input,
-// or applies preset actions on the store. State (workbook instance, locale,
-// fills, prompt closures) is injected via a deps struct so the function stays
-// host-agnostic.
+// Dispatches the ribbon's conditional formatting menu actions: opens the
+// new-rule / manage dialogs, prompts for inline rule input, or applies preset
+// actions on the store. State (workbook instance, locale, fills, prompt
+// closures) is injected via a deps struct so the function stays host-agnostic.
 
 import type { ConditionalPresetAction } from '../../commands/conditional-format.js';
-import { applyConditionalPresetAction } from '../../commands/conditional-format.js';
+import {
+  applyConditionalPresetAction,
+  CONDITIONAL_PRESET_ACTIONS,
+} from '../../commands/conditional-format.js';
 import { recordConditionalRulesChange } from '../../commands/slice-history.js';
 import type { Range } from '../../engine/types.js';
 import type { ConditionalDialogOpenOptions } from '../../interact/conditional-dialog.js';
@@ -15,8 +17,6 @@ import type { SpreadsheetInstance } from '../../mount.js';
 import type { CellFormat, ConditionalRule } from '../../store/store.js';
 
 import { buildCfMenuText } from './menus/conditional.js';
-
-// Pure helpers copied from main.ts so this module stands alone.
 
 const DATE_PERIODS = [
   'yesterday',
@@ -33,69 +33,15 @@ const DATE_PERIODS = [
 
 type DatePeriod = (typeof DATE_PERIODS)[number];
 
-const isDatePeriod = (value: string): value is DatePeriod =>
-  DATE_PERIODS.includes(value as DatePeriod);
-
 const cfDatePeriodOptions = (
   labels: Record<DatePeriod, string>,
 ): Array<{ value: DatePeriod; label: string }> =>
   DATE_PERIODS.map((value) => ({ value, label: labels[value] }));
 
-const conditionalPresetActions = new Set<ConditionalPresetAction>([
-  'clear-selection',
-  'clear-sheet',
-  'duplicates',
-  'unique',
-  'above-avg',
-  'below-avg',
-  'data-blue',
-  'data-green',
-  'data-red',
-  'data-orange',
-  'data-purple',
-  'data-teal',
-  'data-solid-blue',
-  'data-solid-green',
-  'data-solid-red',
-  'data-solid-orange',
-  'data-solid-purple',
-  'data-solid-teal',
-  'scale-gyr',
-  'scale-ryg',
-  'scale-gw',
-  'scale-rw',
-  'scale-bwr',
-  'scale-rwb',
-  'scale-gwr',
-  'scale-rwg',
-  'scale-wr',
-  'scale-wg',
-  'scale-gy',
-  'scale-yg',
-  'icons-arrows3',
-  'icons-arrows5',
-  'icons-triangles3',
-  'icons-traffic3',
-  'icons-trafficRim3',
-  'icons-symbols3',
-  'icons-flags3',
-  'icons-stars3',
-  'icons-quarters5',
-  'icons-ratings5',
-  'icons-boxes5',
-  'icons-arrowsGray3',
-  'icons-arrows4',
-  'icons-arrowsGray4',
-  'icons-arrowsGray5',
-  'icons-signs3',
-  'icons-traffic4',
-  'icons-redToBlack4',
-  'icons-symbolsCircled3',
-  'icons-ratings4',
-]);
+const conditionalPresetActions = new Set<string>(CONDITIONAL_PRESET_ACTIONS);
 
 const isConditionalPresetAction = (action: string): action is ConditionalPresetAction =>
-  conditionalPresetActions.has(action as ConditionalPresetAction);
+  conditionalPresetActions.has(action);
 
 export const SUPPORTED_CONDITIONAL_MENU_ACTIONS = new Set<string>([
   'new-rule',
@@ -224,7 +170,6 @@ export const applyConditionalMenuAction = async (
     promptCfNumber,
     promptCfText,
     showChoiceDialog,
-    showMessage,
     refreshWorkbookCells,
     addConditionalRuleFromRibbon,
   } = deps;
@@ -321,14 +266,6 @@ export const applyConditionalMenuAction = async (
       cancelLabel: title.cancel,
     });
     if (period === null) return;
-    if (!isDatePeriod(period)) {
-      void showMessage({
-        title: title.date,
-        message: title.dateUnsupported,
-        okLabel: title.ok,
-      });
-      return;
-    }
     addConditionalRuleFromRibbon({ kind: 'date-occurring', range, period, apply: cfFill });
     return;
   }

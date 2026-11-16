@@ -6,8 +6,10 @@ import {
   appendDialogActions,
   appendErrorRow,
   createDialogShell,
+  type DialogLocale,
   installDialogLifecycle,
   mountDialog,
+  resolveDialogLocale,
   showInputError,
 } from './shell.js';
 
@@ -18,7 +20,7 @@ export interface ZoomDialogOptions {
   okLabel: string;
   cancelLabel: string;
   invalidMessage: string;
-  locale?: string | (() => string);
+  locale?: DialogLocale;
 }
 
 export const showZoomDialog = (opts: ZoomDialogOptions): Promise<number | null> =>
@@ -57,7 +59,7 @@ export interface MacZoomDialogOptions {
   okLabel: string;
   cancelLabel: string;
   invalidMessage: string;
-  locale?: string | (() => string);
+  locale?: DialogLocale;
 }
 
 export type MacZoomChoice =
@@ -71,8 +73,7 @@ export const showMacZoomDialog = (opts: MacZoomDialogOptions): Promise<MacZoomCh
     const shell = createDialogShell({ title: opts.title });
     shell.panel.classList.add('fc-tb__dlg--mac-zoom');
     const doc = shell.body.ownerDocument;
-    const getLocale = (): string =>
-      typeof opts.locale === 'function' ? opts.locale() : (opts.locale ?? 'en-US');
+    const getLocale = (): string => resolveDialogLocale(opts.locale);
     const caption = doc.createElement('div');
     caption.className = 'fc-tb__dlg__label';
     caption.textContent = opts.caption;
@@ -124,6 +125,7 @@ export const showMacZoomDialog = (opts: MacZoomDialogOptions): Promise<MacZoomCh
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
     const onOk = (): void => {
       if (selection.checked) {
@@ -142,8 +144,6 @@ export const showMacZoomDialog = (opts: MacZoomDialogOptions): Promise<MacZoomCh
       }
       lifecycle.finish({ kind: 'percent', percent: n });
     };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, () =>
       (group.querySelector<HTMLInputElement>('input:checked') ?? custom).focus(),

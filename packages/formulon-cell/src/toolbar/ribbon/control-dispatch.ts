@@ -2,7 +2,7 @@ import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 import type { Locale } from '../../i18n/strings.js';
 import { openFormatDialogFrom, openPageSetupDialogFrom } from '../../interact/dialog-entry.js';
 import { focusSheet as focusSheetElement } from '../../interact/dialog-focus.js';
-// Ribbon control dispatch extracted from main.ts. Owns the read/write side of
+// Ribbon control dispatch. Owns the read/write side of
 // the ribbon: reading the current value of a control from the active cell or
 // page setup, and applying a control change (font, fill, number format,
 // merge, page-setup presets, sheet views) back into the workbook. Also hosts
@@ -37,7 +37,7 @@ import { fontPointsToCssPx } from '../../engine/font-units.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { getPageSetup, mutators } from '../../store/store.js';
 import type { NumFmt, PageOrientation, PaperSize } from '../../store/types.js';
-import { showPageScaleDialog } from '../dialogs.js';
+import { showPageScaleDialog } from '../dialogs/page-scale.js';
 import { createExcelRibbonSvg } from '../excel-ribbon-icons.js';
 import { fluentIconPaths } from '../fluent-icons.js';
 import type { PageScaleMenuText } from '../menu-text.js';
@@ -48,11 +48,8 @@ import {
 } from '../number-format.js';
 import { projectActiveState } from '../ribbon-active-state.js';
 import type { ToolbarText } from '../ribbon-model.js';
-
-export type RibbonFormatMutator = (
-  state: ReturnType<SpreadsheetInstance['store']['getState']>,
-  store: SpreadsheetInstance['store'],
-) => void;
+import { svgPathIcon } from '../svg-icon.js';
+import type { RibbonFormatMutator } from './command-tables.js';
 
 export interface ControlDispatchCtx {
   getInst: () => SpreadsheetInstance | null;
@@ -87,21 +84,9 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
 
   const createRibbonIcon = (name: string): SVGSVGElement | null => {
     const excelSvg = createExcelRibbonSvg(name, 'fc-tb__rb-icon');
-    const fluentPaths = fluentIconPaths(name);
     if (excelSvg) return excelSvg;
-    if (!fluentPaths) return null;
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('fc-tb__rb-icon');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('focusable', 'false');
-    svg.setAttribute('aria-hidden', 'true');
-    svg.setAttribute('fill', 'currentColor');
-    for (const d of fluentPaths) {
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', d);
-      svg.appendChild(path);
-    }
-    return svg;
+    const fluentPaths = fluentIconPaths(name);
+    return fluentPaths ? svgPathIcon(fluentPaths, '0 0 24 24', 'fc-tb__rb-icon') : null;
   };
 
   const currentRibbonControlValue = (id: string): string => {
@@ -121,7 +106,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
     if (id === 'fontSize') return String(active?.fontSize ?? ribbonText.defaultFontSize);
     if (id === 'fontColor') return active?.fontColor ?? '#201f1e';
     if (id === 'fillColor') return active?.fillColor ?? '#ffffff';
-    if (id === 'numberFormat') return inst ? projectActiveState(inst).numberFormat : 'general';
+    if (id === 'numberFormat') return active?.numberFormat ?? 'general';
     if (id === 'merge') {
       if (!inst) return 'mergeCenter';
       const state = inst.store.getState();
@@ -164,6 +149,23 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
     focusSheetElement(sheetEl);
   };
 
+  const writePageSetup = (
+    i: SpreadsheetInstance,
+    id: string,
+    sheet: number,
+    mutate: () => void,
+    focus: () => void = () => focusSheetElement(sheetEl),
+  ): void => {
+    pageSetupWrite(
+      { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+      sheet,
+      undefined,
+      () => recordPageSetupChange(i.history, i.store, mutate),
+    );
+    projectFormatToolbar();
+    focus();
+  };
+
   const applyCustomPageScaleControl = async (
     id: 'scaleWidth' | 'scaleHeight' | 'scalePercent',
   ): Promise<void> => {
@@ -195,24 +197,22 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       focusSheet();
       return;
     }
-    pageSetupWrite(
-      { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
+    writePageSetup(
+      i,
+      id,
       sheet,
-      undefined,
-      () =>
-        recordPageSetupChange(i.history, i.store, () => {
-          if (isScale)
-            mutators.setPageSetup(i.store, sheet, { scale: n / 100, fitWidth: 0, fitHeight: 0 });
-          else
-            mutators.setPageSetup(
-              i.store,
-              sheet,
-              id === 'scaleWidth' ? { fitWidth: n } : { fitHeight: n },
-            );
-        }),
+      () => {
+        if (isScale)
+          mutators.setPageSetup(i.store, sheet, { scale: n / 100, fitWidth: 0, fitHeight: 0 });
+        else
+          mutators.setPageSetup(
+            i.store,
+            sheet,
+            id === 'scaleWidth' ? { fitWidth: n } : { fitHeight: n },
+          );
+      },
+      focusSheet,
     );
-    projectFormatToolbar();
-    focusSheet();
   };
 
   const applyMergeControl = (value: string): void => {
@@ -272,7 +272,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       const fmt = numberFormatForAction(value);
       if (fmt) applyRibbonFormat((state, store) => setNumFmt(state, store, fmt), id);
     } else if (id === 'merge') {
-      void applyMergeControl(value);
+      applyMergeControl(value);
     } else if (id === 'marginsPreset') {
       const i = getInst();
       if (!i) return;
@@ -284,47 +284,19 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
         return;
       }
       const sheet = i.store.getState().data.sheetIndex;
-      pageSetupWrite(
-        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
-        sheet,
-        undefined,
-        () =>
-          recordPageSetupChange(i.history, i.store, () =>
-            setMarginPreset(i.store, sheet, value as MarginPreset),
-          ),
-      );
-      projectFormatToolbar();
-      focusSheetElement(sheetEl);
+      writePageSetup(i, id, sheet, () => setMarginPreset(i.store, sheet, value as MarginPreset));
     } else if (id === 'orientationPreset') {
       const i = getInst();
       if (!i) return;
       const sheet = i.store.getState().data.sheetIndex;
-      pageSetupWrite(
-        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
-        sheet,
-        undefined,
-        () =>
-          recordPageSetupChange(i.history, i.store, () =>
-            setPageOrientation(i.store, sheet, value as PageOrientation),
-          ),
+      writePageSetup(i, id, sheet, () =>
+        setPageOrientation(i.store, sheet, value as PageOrientation),
       );
-      projectFormatToolbar();
-      focusSheetElement(sheetEl);
     } else if (id === 'paperSizePreset') {
       const i = getInst();
       if (!i) return;
       const sheet = i.store.getState().data.sheetIndex;
-      pageSetupWrite(
-        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
-        sheet,
-        undefined,
-        () =>
-          recordPageSetupChange(i.history, i.store, () =>
-            setPaperSize(i.store, sheet, value as PaperSize),
-          ),
-      );
-      projectFormatToolbar();
-      focusSheetElement(sheetEl);
+      writePageSetup(i, id, sheet, () => setPaperSize(i.store, sheet, value as PaperSize));
     } else if (id === 'scaleWidth' || id === 'scaleHeight') {
       const i = getInst();
       if (!i) return;
@@ -334,21 +306,13 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       }
       const sheet = i.store.getState().data.sheetIndex;
       const n = Math.max(0, Math.min(99, Number.parseInt(value, 10) || 0));
-      pageSetupWrite(
-        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
-        sheet,
-        undefined,
-        () =>
-          recordPageSetupChange(i.history, i.store, () => {
-            mutators.setPageSetup(
-              i.store,
-              sheet,
-              id === 'scaleWidth' ? { fitWidth: n } : { fitHeight: n },
-            );
-          }),
-      );
-      projectFormatToolbar();
-      focusSheetElement(sheetEl);
+      writePageSetup(i, id, sheet, () => {
+        mutators.setPageSetup(
+          i.store,
+          sheet,
+          id === 'scaleWidth' ? { fitWidth: n } : { fitHeight: n },
+        );
+      });
     } else if (id === 'scalePercent') {
       const i = getInst();
       if (!i) return;
@@ -358,17 +322,9 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       }
       const sheet = i.store.getState().data.sheetIndex;
       const pct = Math.max(10, Math.min(400, Number.parseInt(value, 10) || 100));
-      pageSetupWrite(
-        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
-        sheet,
-        undefined,
-        () =>
-          recordPageSetupChange(i.history, i.store, () => {
-            mutators.setPageSetup(i.store, sheet, { scale: pct / 100, fitWidth: 0, fitHeight: 0 });
-          }),
-      );
-      projectFormatToolbar();
-      focusSheetElement(sheetEl);
+      writePageSetup(i, id, sheet, () => {
+        mutators.setPageSetup(i.store, sheet, { scale: pct / 100, fitWidth: 0, fitHeight: 0 });
+      });
     } else if (id === 'sheetViewSelect') {
       const i = getInst();
       if (!i) return;

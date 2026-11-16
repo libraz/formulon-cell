@@ -1,6 +1,6 @@
 // Home tab style-gallery dropdowns: Table Styles, Cell Styles, Currency. Each
 // builds a swatch / chip / preset list that emits a `data-table-*`,
-// `data-cell-style*`, or `data-currency*` attribute the playground dispatcher
+// `data-cell-style*`, or `data-currency*` attribute the dropdown dispatcher
 // reads. Kept in one file because they share the same factory pattern (deps
 // bundle of ribbonLang + dictionaries + ribbonText) and they all sit in the
 // Home tab's Styles group.

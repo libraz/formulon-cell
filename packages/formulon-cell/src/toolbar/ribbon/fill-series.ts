@@ -2,11 +2,12 @@ import type { Locale } from '../../i18n/strings.js';
 
 // Fill Series subsystem: direction/mode types, the source-range collapse
 // helper, the auto-direction heuristic, and the modal dialog that lets the
-// user pick direction + series type. Kept self-contained so main.ts only
-// owns the imperative `runFillSeries` / `applyFillSeries` glue.
+// user pick direction + series type. Kept self-contained so callers only own
+// the imperative `runFillSeries` / `applyFillSeries` glue.
 
 import type { Range } from '../../engine/types.js';
 import { dictionaries, type Strings } from '../../i18n/strings.js';
+import { createRadioOption } from '../dialogs/form-controls.js';
 import {
   appendDialogActions,
   createDialogShell,
@@ -36,26 +37,16 @@ export const fillSeriesSourceRange = (range: Range, direction: RibbonFillDirecti
 export const inferFillSeriesDirection = (range: Range): RibbonFillDirection =>
   range.r1 > range.r0 ? 'down' : 'right';
 
-export const makeFillSeriesRadio = <T extends string>(
+const makeFillSeriesRadio = <T extends string>(
   name: string,
   value: T,
   label: string,
   checked: boolean,
 ): HTMLLabelElement => {
-  const wrap = document.createElement('label');
-  wrap.className = 'fc-fmtdlg__radio';
-  const input = document.createElement('input');
-  input.type = 'radio';
-  input.name = name;
-  input.value = value;
-  input.checked = checked;
-  const span = document.createElement('span');
-  span.textContent = label;
-  wrap.append(input, span);
-  return wrap;
+  return createRadioOption(document, { name, value, label, checked }).wrap;
 };
 
-export const selectedFillSeriesRadio = <T extends string>(
+const selectedFillSeriesRadio = <T extends string>(
   root: HTMLElement,
   name: string,
   fallback: T,
@@ -78,58 +69,59 @@ export const showFillSeriesDialog = (
     cols.className = 'fc-pastesp__cols';
     shell.body.appendChild(cols);
 
-    const dirName = `app-fill-series-dir-${Math.random().toString(36).slice(2)}`;
-    const dirGroup = document.createElement('div');
-    dirGroup.className = 'fc-pastesp__group';
-    const dirLegend = document.createElement('div');
-    dirLegend.className = 'fc-pastesp__legend';
-    dirLegend.textContent = t.seriesIn;
-    const dirList = document.createElement('div');
-    dirList.className = 'fc-pastesp__list';
-    dirList.setAttribute('role', 'radiogroup');
-    dirList.setAttribute('aria-label', dirLegend.textContent);
-    const initialDirection = inferFillSeriesDirection(range);
-    const directionOptions: Array<{ value: RibbonFillDirection; label: string }> = [
-      { value: 'down', label: t.columns },
-      { value: 'right', label: t.rows },
-      { value: 'up', label: t.up },
-      { value: 'left', label: t.left },
-    ];
-    for (const option of directionOptions) {
-      dirList.appendChild(
-        makeFillSeriesRadio(dirName, option.value, option.label, option.value === initialDirection),
-      );
-    }
-    dirGroup.append(dirLegend, dirList);
-    cols.appendChild(dirGroup);
+    const appendRadioColumn = <V extends string>(
+      namePrefix: string,
+      legendText: string,
+      options: ReadonlyArray<{ value: V; label: string }>,
+      initial: V,
+    ): { name: string; list: HTMLDivElement } => {
+      const name = `${namePrefix}-${Math.random().toString(36).slice(2)}`;
+      const group = document.createElement('div');
+      group.className = 'fc-pastesp__group';
+      const legend = document.createElement('div');
+      legend.className = 'fc-pastesp__legend';
+      legend.textContent = legendText;
+      const list = document.createElement('div');
+      list.className = 'fc-pastesp__list';
+      list.setAttribute('role', 'radiogroup');
+      list.setAttribute('aria-label', legendText);
+      for (const option of options) {
+        list.appendChild(
+          makeFillSeriesRadio(name, option.value, option.label, option.value === initial),
+        );
+      }
+      group.append(legend, list);
+      cols.appendChild(group);
+      return { name, list };
+    };
 
-    const modeName = `app-fill-series-mode-${Math.random().toString(36).slice(2)}`;
-    const modeGroup = document.createElement('div');
-    modeGroup.className = 'fc-pastesp__group';
-    const modeLegend = document.createElement('div');
-    modeLegend.className = 'fc-pastesp__legend';
-    modeLegend.textContent = t.type;
-    const modeList = document.createElement('div');
-    modeList.className = 'fc-pastesp__list';
-    modeList.setAttribute('role', 'radiogroup');
-    modeList.setAttribute('aria-label', modeLegend.textContent);
-    const modeOptions: Array<{ value: RibbonFillSeriesMode; label: string }> = [
-      { value: 'auto', label: t.autoFill },
-      { value: 'copy', label: t.copy },
-      { value: 'linear', label: t.linear },
-      { value: 'growth', label: t.growth },
-      { value: 'days', label: t.day },
-      { value: 'weekdays', label: t.weekday },
-      { value: 'months', label: t.month },
-      { value: 'years', label: t.year },
-    ];
-    for (const option of modeOptions) {
-      modeList.appendChild(
-        makeFillSeriesRadio(modeName, option.value, option.label, option.value === 'auto'),
-      );
-    }
-    modeGroup.append(modeLegend, modeList);
-    cols.appendChild(modeGroup);
+    const initialDirection = inferFillSeriesDirection(range);
+    const { name: dirName, list: dirList } = appendRadioColumn<RibbonFillDirection>(
+      'app-fill-series-dir',
+      t.seriesIn,
+      [
+        { value: 'down', label: t.columns },
+        { value: 'right', label: t.rows },
+        { value: 'up', label: t.up },
+        { value: 'left', label: t.left },
+      ],
+      initialDirection,
+    );
+    const { name: modeName } = appendRadioColumn<RibbonFillSeriesMode>(
+      'app-fill-series-mode',
+      t.type,
+      [
+        { value: 'auto', label: t.autoFill },
+        { value: 'copy', label: t.copy },
+        { value: 'linear', label: t.linear },
+        { value: 'growth', label: t.growth },
+        { value: 'days', label: t.day },
+        { value: 'weekdays', label: t.weekday },
+        { value: 'months', label: t.month },
+        { value: 'years', label: t.year },
+      ],
+      'auto',
+    );
 
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
       cancelLabel: t.cancel,

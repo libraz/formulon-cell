@@ -47,6 +47,39 @@ const searchWords = (value: string): string[] =>
     .split(/[^a-z0-9\u3040-\u30ff\u3400-\u9fff]+/i)
     .filter(Boolean);
 
+interface PreparedSearchItem {
+  source: string;
+  label: string;
+  hint: string;
+  keywords: string;
+  words: string[];
+  labelWords: string[];
+  hintWords: string[];
+}
+
+const preparedItems = new WeakMap<RibbonSearchItem, PreparedSearchItem>();
+
+/** The normalized text and word lists of `item`, computed once per item and text. */
+const prepareSearchItem = (item: RibbonSearchItem): PreparedSearchItem => {
+  const source = `${item.label}\u0000${item.hint}\u0000${item.keywords}`;
+  const cached = preparedItems.get(item);
+  if (cached && cached.source === source) return cached;
+  const prepared: PreparedSearchItem = {
+    source,
+    label: normalizeSearchText(item.label),
+    hint: normalizeSearchText(item.hint),
+    keywords: normalizeSearchText(item.keywords),
+    words: searchWords(`${item.label} ${item.hint} ${item.keywords}`),
+    labelWords: searchWords(item.label),
+    hintWords: searchWords(item.hint),
+  };
+  preparedItems.set(item, prepared);
+  return prepared;
+};
+
+const FILTER_ALIASES = 'filter sort dropdown autofilter フィルター 並べ替え';
+const WATCH_ALIASES = 'watch window add watch delete watch formula auditing ウォッチ ウィンドウ';
+
 const COMMAND_SEARCH_ALIASES: Readonly<Record<string, string>> = {
   freeze: 'freeze panes lock panes split window 固定 ウィンドウ枠固定',
   pageBreaks: 'page break breaks 改ページ page breaks',
@@ -71,8 +104,8 @@ const COMMAND_SEARCH_ALIASES: Readonly<Record<string, string>> = {
     'selection pane arrange objects pictures shapes images drawings 選択 ウィンドウ オブジェクト 配置 図形 画像',
   arrangeObjectsPageLayout:
     'arrange bring forward bring to front send backward send to back front back order objects pictures shapes drawings 配置 前面 背面 最前面 最背面 図形 画像 オブジェクト',
-  sortFilterHome: 'filter sort dropdown autofilter フィルター 並べ替え',
-  filter: 'filter sort dropdown autofilter フィルター 並べ替え',
+  sortFilterHome: FILTER_ALIASES,
+  filter: FILTER_ALIASES,
   findHome: 'find and select find select search go to replace special 検索 選択 ジャンプ 置換',
   merge:
     'merge cells merge and center combine cells unmerge cells center across selection セル結合 結合 解除',
@@ -100,8 +133,8 @@ const COMMAND_SEARCH_ALIASES: Readonly<Record<string, string>> = {
   whatIf:
     'what-if analysis goal seek data table scenario forecast what if 分析 ゴール シーク データ テーブル',
   errorChecking: 'error checking formula errors trace error エラーチェック 数式 エラー',
-  watch: 'watch window add watch delete watch formula auditing ウォッチ ウィンドウ',
-  watchView: 'watch window add watch delete watch formula auditing ウォッチ ウィンドウ',
+  watch: WATCH_ALIASES,
+  watchView: WATCH_ALIASES,
   protect:
     'protect sheet unprotect sheet lock cells password permissions 保護 シート保護 保護解除 パスワード',
   protectReview:
@@ -109,6 +142,9 @@ const COMMAND_SEARCH_ALIASES: Readonly<Record<string, string>> = {
   accessibility:
     'check accessibility accessible issues review warnings alt text アクセシビリティ チェック 確認',
 };
+
+const FILTER_BOOST = 32;
+const WATCH_BOOST = 16;
 
 /** Small, static popularity prior for Search/Tell me. This is not telemetry:
  *  it keeps common spreadsheet workflows above broad tab/group keyword matches
@@ -119,8 +155,8 @@ const COMMAND_SEARCH_BOOSTS: Readonly<Record<string, number>> = {
   printPageLayout: 34,
   pivotTableInsert: 34,
   pivotFieldListView: 30,
-  sortFilterHome: 32,
-  filter: 32,
+  sortFilterHome: FILTER_BOOST,
+  filter: FILTER_BOOST,
   sortAsc: 30,
   sortDesc: 30,
   conditional: 28,
@@ -150,8 +186,8 @@ const COMMAND_SEARCH_BOOSTS: Readonly<Record<string, number>> = {
   viewZeros: 16,
   viewRightToLeft: 14,
   accessibility: 18,
-  watch: 16,
-  watchView: 16,
+  watch: WATCH_BOOST,
+  watchView: WATCH_BOOST,
 };
 
 const usageBoostFor = (commandId: string, prior: RibbonSearchUsagePrior | undefined): number => {
@@ -268,10 +304,7 @@ export function queryRibbonSearchIndex(
   if (!q) return items.slice(0, limit);
   const qTokens = searchWords(q);
   const scoreItem = (item: RibbonSearchItem): number | null => {
-    const label = normalizeSearchText(item.label);
-    const hint = normalizeSearchText(item.hint);
-    const keywords = normalizeSearchText(item.keywords);
-    const words = searchWords(`${item.label} ${item.hint} ${item.keywords}`);
+    const { label, hint, keywords, words, labelWords, hintWords } = prepareSearchItem(item);
     if (!keywords.includes(q) && !qTokens.every((token) => keywords.includes(token))) return null;
 
     let score = 0;
@@ -285,9 +318,9 @@ export function queryRibbonSearchIndex(
 
     for (const token of qTokens) {
       if (label === token) score += 110;
-      else if (searchWords(item.label).some((word) => word.startsWith(token))) score += 90;
+      else if (labelWords.some((word) => word.startsWith(token))) score += 90;
       else if (label.includes(token)) score += 60;
-      else if (searchWords(item.hint).some((word) => word.startsWith(token))) score += 35;
+      else if (hintWords.some((word) => word.startsWith(token))) score += 35;
       else if (words.some((word) => word.startsWith(token))) score += 25;
       else if (keywords.includes(token)) score += 10;
     }

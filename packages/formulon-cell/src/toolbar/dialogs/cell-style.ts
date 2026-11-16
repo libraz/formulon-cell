@@ -33,6 +33,7 @@ interface CellStyleDialogStrings {
 }
 
 type IncludeKey = keyof Required<CellStyleIncludeOptions>;
+const INCLUDE_KEYS = ['number', 'alignment', 'font', 'border', 'fill', 'protection'] as const;
 
 /** Wording of the desktop Style dialog. */
 export interface CellStyleDialogMacStrings {
@@ -171,7 +172,7 @@ export const showCellStyleDialog = (
         head.appendChild(cell);
       }
       table.appendChild(head);
-      for (const key of ['number', 'alignment', 'font', 'border', 'fill', 'protection'] as const) {
+      for (const key of INCLUDE_KEYS) {
         const row = document.createElement('div');
         row.className = 'fc-cellstyledlg__row';
         boxes[key] = appendCheckboxRow(row, mac.strings.properties[key], include[key], key);
@@ -187,32 +188,17 @@ export const showCellStyleDialog = (
       legend.className = 'fc-tb__dlg__label';
       legend.textContent = t.cellStyleIncludes;
       shell.body.appendChild(legend);
-      boxes.number = appendCheckboxRow(
-        shell.body,
-        t.cellStyleIncludeNumber,
-        include.number,
-        'number',
-      );
-      boxes.alignment = appendCheckboxRow(
-        shell.body,
-        t.cellStyleIncludeAlignment,
-        include.alignment,
-        'alignment',
-      );
-      boxes.font = appendCheckboxRow(shell.body, t.cellStyleIncludeFont, include.font, 'font');
-      boxes.border = appendCheckboxRow(
-        shell.body,
-        t.cellStyleIncludeBorder,
-        include.border,
-        'border',
-      );
-      boxes.fill = appendCheckboxRow(shell.body, t.cellStyleIncludeFill, include.fill, 'fill');
-      boxes.protection = appendCheckboxRow(
-        shell.body,
-        t.cellStyleIncludeProtection,
-        include.protection,
-        'protection',
-      );
+      const legacyLabels: Record<IncludeKey, string> = {
+        number: t.cellStyleIncludeNumber,
+        alignment: t.cellStyleIncludeAlignment,
+        font: t.cellStyleIncludeFont,
+        border: t.cellStyleIncludeBorder,
+        fill: t.cellStyleIncludeFill,
+        protection: t.cellStyleIncludeProtection,
+      };
+      for (const key of INCLUDE_KEYS) {
+        boxes[key] = appendCheckboxRow(shell.body, legacyLabels[key], include[key], key);
+      }
     }
     const { number, alignment, font, border, fill, protection } = boxes;
     const errorRow = appendErrorRow(shell.body);
@@ -232,11 +218,12 @@ export const showCellStyleDialog = (
       resolve,
       onCancel: () => null,
       onSubmit: () => onOk(),
+      buttons: { okBtn, cancelBtn },
     });
-    const onOk = (): CellStyleDialogResult | null => {
+    const onOk = (): void => {
       const label = name.valueOrError(errorRow, opts.strings.namedRangeDialog.errorEmptyName);
       if (label === null) {
-        return null;
+        return;
       }
       const result: CellStyleDialogResult = {
         name: label,
@@ -250,12 +237,7 @@ export const showCellStyleDialog = (
         },
       };
       lifecycle.finish(result);
-      return result;
     };
-    okBtn.addEventListener('click', () => {
-      onOk();
-    });
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
     mountDialog(shell, name.focus);
   });
