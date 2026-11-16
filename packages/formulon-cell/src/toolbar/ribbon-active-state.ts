@@ -20,8 +20,9 @@ import type {
   PaperSize,
   WorkbookViewMode,
 } from '../store/types.js';
-import { projectDisabledState, projectValueName } from './menu-a11y.js';
+import { projectDisabledState, projectValueName, RIBBON_DISABLED_REASON_KEY } from './menu-a11y.js';
 import { projectPressedState } from './ribbon/button.js';
+import { RIBBON_VIEW_MODES } from './ribbon/command-tables.js';
 import { projectSparklineDesign } from './ribbon/sparkline-design.js';
 import { projectPivotDesign, projectTableDesign } from './ribbon/table-design.js';
 
@@ -484,8 +485,8 @@ export const projectRibbonActiveState = (
 ): void => {
   if (!instance) return;
   const active = projectActiveState(instance);
+  const EventCtor = host.ownerDocument.defaultView?.Event ?? Event;
   for (const control of host.querySelectorAll<HTMLElement>('[data-ribbon-select]')) {
-    const EventCtor = host.ownerDocument.defaultView?.Event ?? Event;
     control.dispatchEvent(new EventCtor('fc-ribbon-control-refresh'));
 
     // The font family field intentionally truncates inside its Excel-sized
@@ -517,18 +518,14 @@ export const projectRibbonActiveState = (
       button,
       !splitSaved,
       splitSaved ? null : instance.i18n.strings.ribbonMenu.splitNotSaved,
-      { datasetKey: 'ribbonDisabledReason' },
+      { datasetKey: RIBBON_DISABLED_REASON_KEY },
     );
   }
   for (const [command, key] of RIBBON_ACTIVE_COMMANDS) {
     const button = buttons.get(command)?.[0];
     if (!button) continue;
-    let pressed = Boolean(active[key]);
-    if (command === 'viewNormal') pressed = active.workbookView === 'normal';
-    else if (command === 'viewPageLayout') pressed = active.workbookView === 'pageLayout';
-    else if (command === 'viewPageBreakPreview')
-      pressed = active.workbookView === 'pageBreakPreview';
-    projectPressedState(button, pressed);
+    const viewMode = RIBBON_VIEW_MODES[command];
+    projectPressedState(button, viewMode ? active.workbookView === viewMode : Boolean(active[key]));
   }
 
   const sheetBackground = host.querySelector<HTMLButtonElement>(

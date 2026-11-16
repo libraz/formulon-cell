@@ -1,5 +1,3 @@
-import { filterDefinitionWrite } from '../../commands/filter-actions.js';
-import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 // Ribbon command dispatcher. Fans out a ribbon command id to the matching
 // handler — first via the declarative dispatch tables (dialog openers,
 // function-arg openers, format mutators, zoom presets, view modes, border-draw
@@ -14,9 +12,11 @@ import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 
 import { canExecuteBuiltInRequest } from '../../commands/built-in-command-policy.js';
 import { selectedSessionChart, switchSessionChartRowColumn } from '../../commands/chart-design.js';
+import { filterDefinitionWrite } from '../../commands/filter-actions.js';
 import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
 import { setOutlineSummaryPosition } from '../../commands/outline.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
+import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 import {
   DEFAULT_PIVOT_TOGGLES,
   PIVOT_STYLE_TOGGLES,
@@ -99,13 +99,12 @@ import {
   RIBBON_ZOOM_PRESETS,
   type RibbonFormatMutator,
 } from './command-tables.js';
+import type { UiTheme } from './dynamic-dropdowns.js';
 import { openMacSlicerDialog, openSparklineGroupEditor } from './mac/actions.js';
 import { dispatchMacRibbonCommand } from './mac/dispatch.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
 
 export { isMacRibbonCommandSupported } from './mac/dispatch.js';
-
-type UiTheme = 'paper' | 'ink' | 'contrast';
 
 /** Toolbar-owned UI state read on each dispatch. Kept as plain values rather
  *  than getters because the dispatcher only reads them once per call. */
@@ -226,9 +225,9 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
   if (!canExecuteBuiltInRequest(i.store, id, 'ribbon').allowed) return true;
   if (id.startsWith('mac.'))
     return dispatchMacRibbonCommand(id, deps, (alias) =>
-      applyGenericRibbonCommand(alias, deps, id),
+      applyGenericRibbonCommand(i, alias, deps, id),
     );
-  return applyGenericRibbonCommand(id, deps, id);
+  return applyGenericRibbonCommand(i, id, deps, id);
 };
 
 /** Pick Excel's next named font-size step, with a one-point fallback outside
@@ -243,25 +242,19 @@ export const adjacentFontSizePoints = (current: number, direction: 1 | -1): numb
 };
 
 const applyGenericRibbonCommand = (
+  i: SpreadsheetInstance,
   id: string,
   deps: ApplyRibbonCommandDeps,
   policyCommandId = id,
 ): boolean => {
-  const i = deps.inst;
-  if (!i) return false;
   const { ui, runtime, hooks } = deps;
   const state = i.store.getState();
   const range = state.selection.range;
   const rowCount = Math.max(1, range.r1 - range.r0 + 1);
   const colCount = Math.max(1, range.c1 - range.c0 + 1);
-  const rowColCtx = (commandId: string) =>
-    ({
-      store: i.store,
-      workbook: i.workbook,
-      history: i.history,
-      origin: 'ribbon',
-      commandId,
-    }) as const;
+  const ribbonCtx = (commandId: string) =>
+    ({ store: i.store, history: i.history, origin: 'ribbon', commandId }) as const;
+  const rowColCtx = (commandId: string) => ({ ...ribbonCtx(commandId), workbook: i.workbook });
   const dialogOpener = RIBBON_DIALOG_OPENERS[id];
   if (dialogOpener) {
     dialogOpener(i);
@@ -343,19 +336,8 @@ const applyGenericRibbonCommand = (
       if (i.redo()) runtime.focusSheet();
       return true;
     case 'fontGrow':
-      runtime.applyRibbonFormat((s, store) =>
-        withSelectionFormatOrigin(
-          store,
-          'ribbon',
-          () => {
-            const points = projectActiveState(i).fontSize;
-            setFont(s, store, { fontSize: fontPointsToCssPx(adjacentFontSizePoints(points, 1)) });
-          },
-          policyCommandId,
-        ),
-      );
-      return true;
-    case 'fontShrink':
+    case 'fontShrink': {
+      const direction = id === 'fontGrow' ? 1 : -1;
       runtime.applyRibbonFormat((s, store) =>
         withSelectionFormatOrigin(
           store,
@@ -363,13 +345,14 @@ const applyGenericRibbonCommand = (
           () => {
             const points = projectActiveState(i).fontSize;
             setFont(s, store, {
-              fontSize: fontPointsToCssPx(adjacentFontSizePoints(points, -1)),
+              fontSize: fontPointsToCssPx(adjacentFontSizePoints(points, direction)),
             });
           },
           policyCommandId,
         ),
       );
       return true;
+    }
     case 'editPhonetic':
       openPhoneticEditor({
         inst: i,
@@ -543,31 +526,14 @@ const applyGenericRibbonCommand = (
     case 'tableFilterButton': {
       const toggle = () =>
         toggleTableOptionAction(
-          {
-            store: i.store,
-            history: i.history,
-            workbook: i.workbook,
-            origin: 'ribbon',
-            commandId: id,
-          },
+          rowColCtx(id),
           TABLE_OPTION_COMMANDS[id] as TableOption,
           i.i18n.strings.ribbonMenu.cellStyleTotalCell,
         );
       // The filter button turns the table's AutoFilter on or off.
       const outcome =
         id === 'tableFilterButton'
-          ? filterDefinitionWrite(
-              {
-                store: i.store,
-                history: i.history,
-                workbook: i.workbook,
-                origin: 'ribbon',
-                commandId: id,
-              },
-              range.sheet,
-              undefined,
-              toggle,
-            )
+          ? filterDefinitionWrite(rowColCtx(id), range.sheet, undefined, toggle)
           : toggle();
       if (outcome === 'blocked') {
         void showMessage({
@@ -597,7 +563,7 @@ const applyGenericRibbonCommand = (
     case 'sparklineShowFirst':
     case 'sparklineShowLast':
     case 'sparklineShowMarkers': {
-      const ctx = { store: i.store, history: i.history, origin: 'ribbon', commandId: id } as const;
+      const ctx = ribbonCtx(id);
       const type = SPARKLINE_TYPE_COMMANDS[id];
       const flag = SPARKLINE_SHOW_COMMANDS[id];
       if (type !== undefined) patchSelectedSparklineGroupsAction(ctx, { type });
@@ -789,6 +755,7 @@ const applyGenericRibbonCommand = (
       hooks?.formula?.errorChecking?.();
       return true;
     case 'showFormulasFormula':
+    case 'viewFormulas':
       setShowFormulas(i.store, !i.store.getState().ui.showFormulas, i.workbook);
       runtime.projectFormatToolbar();
       runtime.focusSheet();
@@ -808,33 +775,20 @@ const applyGenericRibbonCommand = (
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;
-    case 'pageLayoutGridlinesPrint': {
-      const sheet = i.store.getState().data.sheetIndex;
-      const setup = getPageSetup(i.store.getState(), sheet);
-      pageSetupWrite(
-        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
-        sheet,
-        undefined,
-        () => setPrintGridlines(i.store, sheet, !setup.showGridlines, i.history),
-      );
-      runtime.projectFormatToolbar();
-      runtime.focusSheet();
-      return true;
-    }
     case 'viewHeadings':
     case 'pageLayoutHeadingsView':
       setHeadingsVisible(i.store, i.store.getState().ui.showHeaders === false, i.workbook);
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;
+    case 'pageLayoutGridlinesPrint':
     case 'pageLayoutHeadingsPrint': {
       const sheet = i.store.getState().data.sheetIndex;
       const setup = getPageSetup(i.store.getState(), sheet);
-      pageSetupWrite(
-        { store: i.store, history: i.history, origin: 'ribbon', commandId: id },
-        sheet,
-        undefined,
-        () => setPrintHeadings(i.store, sheet, !setup.showHeadings, i.history),
+      pageSetupWrite(ribbonCtx(id), sheet, undefined, () =>
+        id === 'pageLayoutGridlinesPrint'
+          ? setPrintGridlines(i.store, sheet, !setup.showGridlines, i.history)
+          : setPrintHeadings(i.store, sheet, !setup.showHeadings, i.history),
       );
       runtime.projectFormatToolbar();
       runtime.focusSheet();
@@ -857,11 +811,6 @@ const applyGenericRibbonCommand = (
       return true;
     case 'sheetViewDelete':
       hooks?.sheetView?.deleteActive?.();
-      return true;
-    case 'viewFormulas':
-      setShowFormulas(i.store, !i.store.getState().ui.showFormulas, i.workbook);
-      runtime.projectFormatToolbar();
-      runtime.focusSheet();
       return true;
     case 'viewFormulaBar':
       runtime.setFormulaBarVisible(!ui.formulaBarVisible);

@@ -25,6 +25,7 @@ import type {
 import { valuesOnlyClipboard } from './interaction-policy.js';
 import { outlineDetailAxis } from './outline.js';
 import { deny } from './permission-reasons.js';
+import { pivotReportRange } from './pivot-actions.js';
 import {
   isCellWritable,
   isPartialShift,
@@ -757,12 +758,19 @@ const activeReportRange = (store: SpreadsheetStore): Range | null => {
   if (!wb?.capabilities.pivotTables) return null;
   const pivot = findPivotTableAtCell(wb, store.getState().selection.active);
   if (!pivot) return null;
-  return (
-    wb.pivotBounds(pivot.sheetIndex).find((b) => b.pivotIndex === pivot.pivotIndex)?.range ?? null
-  );
+  return pivotReportRange(wb, pivot.sheetIndex, pivot.pivotIndex);
 };
 
-const FUNCTION_COMMAND_PREFIX = 'mac.function.';
+/** Prefix of the Mac ribbon's per-function commands (`mac.function.SUM`). */
+export const FUNCTION_COMMAND_PREFIX = 'mac.function.';
+
+/** The Mac ribbon command that inserts function `name`. */
+export const macFunctionCommandId = (name: string): `mac.function.${string}` =>
+  `${FUNCTION_COMMAND_PREFIX}${name}`;
+
+/** The function a Mac per-function command inserts; null for any other command. */
+export const macFunctionNameOf = (id: string): string | null =>
+  id.startsWith(FUNCTION_COMMAND_PREFIX) ? id.slice(FUNCTION_COMMAND_PREFIX.length) : null;
 
 /** Commands that shift cells rather than whole rows or columns: Insert / Delete Cells over a
  *  selection that is not whole rows or columns, and a table's own rows and columns. */
@@ -800,7 +808,7 @@ const shiftedBand = (
 };
 
 const isBuiltInCommandRequest = (id: string): id is BuiltInCommandRequest =>
-  isBuiltInCommandId(id) || id.startsWith(FUNCTION_COMMAND_PREFIX);
+  isBuiltInCommandId(id) || macFunctionNameOf(id) !== null;
 
 const invalidCommand = (id: string): PermissionDecision =>
   deny('invalid', 'notBuiltInCommand', { reason: `${id} is not a built-in command` });
@@ -825,7 +833,7 @@ export const builtInCommandIntent = (
   if (!isBuiltInCommandRequest(id)) return undefined;
   const operation = isBuiltInCommandId(id)
     ? builtInOperation(store, id)
-    : functionLeafOperation(store, id.slice(FUNCTION_COMMAND_PREFIX.length));
+    : functionLeafOperation(store, macFunctionNameOf(id) ?? '');
   if (operation === undefined || operation === null) return operation;
   const workbookTheme = /^mac\.page\.(theme|color|font)\.(office|gray)$/.test(id);
   const state = store.getState();

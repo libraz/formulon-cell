@@ -7,15 +7,13 @@
 import { canExecuteBuiltInRequest } from '../commands/built-in-command-policy.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { localizedDecisionReason, permissionReasonText } from '../commands/permission-reasons.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { projectDisabledState, RIBBON_DISABLED_REASON_KEY } from '../toolbar/menu-a11y.js';
 import { MAC_FORMULAS_MORE_MENU_ID } from '../toolbar/ribbon/mac/model.js';
 import type { SpreadsheetInstance } from './types.js';
 
-/** The one dataset key every projector writes a disabled reason under. */
-const REASON_KEY = 'ribbonDisabledReason';
 /** Marks a button this projection disabled; its value is the text it wrote. */
 const PROJECTED_MARK = 'ribbonPolicyDisabled';
-const REASON_OPTIONS = { datasetKey: REASON_KEY } as const;
+const REASON_OPTIONS = { datasetKey: RIBBON_DISABLED_REASON_KEY } as const;
 
 export interface RibbonInteractionPolicyDeps {
   getInstance: () => SpreadsheetInstance | null;

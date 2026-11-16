@@ -760,20 +760,6 @@ export const MAC_DISABLED_TRANSLATIONS = {
     ko: '포함된 통합 문서에서는 이 기능을 사용할 수 없습니다.',
     th: 'ฟีเจอร์นี้ไม่พร้อมใช้งานในเวิร์กบุ๊กแบบฝังตัว',
   },
-  workbookThemeUnsupported: {
-    de: 'Arbeitsmappendesigns können in der eingebetteten Arbeitsmappe nicht geändert werden.',
-    fr: 'Les thèmes du classeur ne peuvent pas être modifiés dans le classeur incorporé.',
-    zh: '无法在嵌入式工作簿中更改工作簿主题。',
-    ko: '포함된 통합 문서에서는 통합 문서 테마를 변경할 수 없습니다.',
-    th: 'ไม่สามารถเปลี่ยนธีมเวิร์กบุ๊กในเวิร์กบุ๊กแบบฝังตัวได้',
-  },
-  threadedCommentsUnsupported: {
-    de: 'Threadkommentare sind nicht verfügbar. Verwenden Sie stattdessen Zellnotizen.',
-    fr: 'Les commentaires avec conversation ne sont pas disponibles ; utilisez plutôt les notes de cellule.',
-    zh: '线程批注不可用；请改用单元格备注。',
-    ko: '스레드 댓글을 사용할 수 없습니다. 대신 셀 메모를 사용하세요.',
-    th: 'ข้อคิดเห็นแบบเธรดไม่พร้อมใช้งาน ให้ใช้บันทึกย่อของเซลล์แทน',
-  },
 } as const satisfies Readonly<Record<string, ExtraTranslations>>;
 
 export const MAC_CONTEXT_LABELS = {

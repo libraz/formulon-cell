@@ -5,6 +5,9 @@ type MenuOptions = {
   items?: string;
 };
 
+/** Dataset key of a ribbon control's disabled reason. */
+export const RIBBON_DISABLED_REASON_KEY = 'ribbonDisabledReason';
+
 /** Dataset key holding an element's own title while a reason replaces it. */
 const BASE_TITLE_KEY = 'fcBaseTitle';
 

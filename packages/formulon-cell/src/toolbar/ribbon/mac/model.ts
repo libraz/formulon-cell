@@ -1,3 +1,4 @@
+import { macFunctionCommandId } from '../../../commands/built-in-command-policy.js';
 import { allFunctionNames } from '../../../commands/function-categories.js';
 import { DEFAULT_SHEET_VIEW_ID, TEMPORARY_SHEET_VIEW_ID } from '../../../commands/sheet-views.js';
 import { dictionaries, type Strings } from '../../../i18n/strings.js';
@@ -34,6 +35,14 @@ export {
   macRibbonMenuIdForCommand,
 } from './menu-manifest.js';
 export { projectMacRibbonState } from './state-projection.js';
+
+const PAGE_SCALE_OPTIONS: readonly RibbonOption[] = [
+  { value: '0', label: 'Automatic' },
+  { value: '1', label: '1 page' },
+  { value: '2', label: '2 pages' },
+  { value: '3', label: '3 pages' },
+  { value: 'custom', label: 'Custom' },
+];
 
 const command = (
   id: string,
@@ -306,20 +315,8 @@ const pageLayoutTab = (): RibbonTabModel =>
       'page-setup',
     ),
     group({ ja: '拡大縮小印刷', en: 'Scale to Fit' }, [
-      selectCommand('scaleWidth', t('scaleWidth'), [
-        { value: '0', label: 'Automatic' },
-        { value: '1', label: '1 page' },
-        { value: '2', label: '2 pages' },
-        { value: '3', label: '3 pages' },
-        { value: 'custom', label: 'Custom' },
-      ]),
-      selectCommand('scaleHeight', t('scaleHeight'), [
-        { value: '0', label: 'Automatic' },
-        { value: '1', label: '1 page' },
-        { value: '2', label: '2 pages' },
-        { value: '3', label: '3 pages' },
-        { value: 'custom', label: 'Custom' },
-      ]),
+      selectCommand('scaleWidth', t('scaleWidth'), PAGE_SCALE_OPTIONS),
+      selectCommand('scaleHeight', t('scaleHeight'), PAGE_SCALE_OPTIONS),
     ]),
     group(
       { ja: 'シートのオプション', en: 'Sheet Options' },
@@ -874,10 +871,12 @@ export const MAC_RIBBON_COMMAND_IDS: readonly string[] = Object.freeze(
       ...macMenuLeafCommandIds,
       ...MAC_RIBBON_MENU_COMMANDS,
       'mac.home.addins',
-      ...allFunctionNames().map((name) => `mac.function.${name}`),
+      ...allFunctionNames().map(macFunctionCommandId),
     ]),
   ),
 );
+
+export const MAC_RIBBON_COMMAND_ID_SET: ReadonlySet<string> = new Set(MAC_RIBBON_COMMAND_IDS);
 
 export const MAC_RIBBON_DISABLED_COMMAND_IDS: ReadonlySet<string> = new Set([
   ...macCatalog.flatMap((tab) =>

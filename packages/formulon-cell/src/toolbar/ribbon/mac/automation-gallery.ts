@@ -966,19 +966,19 @@ export async function runMacAutomationScript(
   switch (id) {
     case 'allRowsColumns':
       runAllRowsColumns(instance);
-      return undefined;
+      return;
     case 'freezeSelection':
       runFreezeSelection(instance);
-      return undefined;
+      return;
     case 'makeSubtable':
       runMakeSubtable(instance);
-      return undefined;
+      return;
     case 'removeHyperlinks':
       runRemoveHyperlinks(instance);
-      return undefined;
+      return;
     case 'countEmptyRows':
       runCountEmptyRows(instance);
-      return undefined;
+      return;
     case 'tableToJson':
       await runTableToJson(instance);
       return;

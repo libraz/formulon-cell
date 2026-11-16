@@ -1,3 +1,4 @@
+import { macFunctionNameOf } from '../commands/built-in-command-policy.js';
 import { listCustomCellStyles } from '../commands/cell-styles.js';
 import { selectedSessionChart } from '../commands/chart-design.js';
 import { listCustomPivotTableStyles, listCustomTableStyles } from '../commands/format-as-table.js';
@@ -68,6 +69,7 @@ import {
   type DynamicDropdownsApi,
   type DynamicDropdownsCtx,
   ribbonDropdownMenuIdForCommand,
+  type UiTheme,
 } from '../toolbar/ribbon/dynamic-dropdowns.js';
 import { attachRibbonFit } from '../toolbar/ribbon/fit-ribbon.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
@@ -129,8 +131,6 @@ const customStyleLists = (instance: SpreadsheetInstance): readonly (readonly unk
   ];
 };
 
-type UiTheme = 'paper' | 'ink' | 'contrast';
-
 export type { RibbonDisplayMode } from '../toolbar/ribbon/render-ribbon.js';
 
 const DEFAULT_BORDER_STYLE: CellBorderStyle = 'thin';
@@ -169,7 +169,7 @@ const scrollActiveTabIntoView = (host: HTMLElement): void => {
 };
 
 const isImmediateMacFormulaOpener = (commandId: string): boolean =>
-  commandId === 'mac.formulas.insertFunction' || commandId.startsWith('mac.function.');
+  commandId === 'mac.formulas.insertFunction' || macFunctionNameOf(commandId) !== null;
 
 const isImmediateMacFormulaPrimary = (target: Element, commandId: string): boolean =>
   isImmediateMacFormulaOpener(commandId) &&
@@ -1027,7 +1027,7 @@ export function mountToolbar(
         if (toggleStaticRibbonSubmenu(host, cmdBtn)) return;
       }
       const immediateFunctionLeaf =
-        id.startsWith('mac.function.') && isImmediateMacFormulaPrimary(target, id);
+        macFunctionNameOf(id) !== null && isImmediateMacFormulaPrimary(target, id);
       if (cmdBtn.closest(MAC_MENU_SELECTOR)) {
         const menu = cmdBtn.closest<HTMLElement>(MAC_MENU_SELECTOR);
         const spec = menu ? dropdownsApi?.dynamicDropdownSpecForMenu(menu) : null;
@@ -1035,7 +1035,6 @@ export function mountToolbar(
         closeStaticRibbonMenus(host);
       }
       applyCommand(id);
-      dismissRibbonPeek();
     }
   };
   host.addEventListener('mousedown', onMouseDown);

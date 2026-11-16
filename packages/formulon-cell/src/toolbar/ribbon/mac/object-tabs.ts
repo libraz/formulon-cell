@@ -67,7 +67,7 @@ export const buildMacObjectTabs = (
   lang: ToolbarLang,
   tabLabels: { chartDesign: string; chartFormat: string },
 ): RibbonTabModel[] => {
-  const text = (key: keyof typeof LABELS): string => LABELS[key][lang] ?? LABELS[key].en;
+  const text = (key: keyof typeof LABELS): string => LABELS[key][lang];
   const command = (
     id: string,
     key: keyof typeof LABELS,

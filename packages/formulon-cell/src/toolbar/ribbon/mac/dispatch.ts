@@ -2,6 +2,7 @@ import type { BuiltInCommandId } from '../../../commands/built-in-command-ids.js
 import {
   canExecuteBuiltIn,
   canExecuteBuiltInRequest,
+  macFunctionNameOf,
 } from '../../../commands/built-in-command-policy.js';
 import { inputLocaleForWorkbook } from '../../../commands/coerce-input.js';
 import {
@@ -42,14 +43,9 @@ import type { ApplyRibbonCommandDeps } from '../apply-ribbon-command.js';
 import { createMacRibbonActions, MAC_RIBBON_ACTION_IDS } from './actions.js';
 import { MAC_CONTEXT_LABELS } from './labels-data.js';
 import { toolbarLangForLocale } from './locale.js';
+import { type LiveFunctionNames, liveNameSet } from './menus.js';
 import { reportMacRibbonError } from './report-error.js';
-
-type LiveFunctionNames = ReadonlySet<string> | readonly string[] | null | undefined;
-
-const liveNameSet = (names: LiveFunctionNames): ReadonlySet<string> | undefined => {
-  if (names === null || names === undefined) return undefined;
-  return names instanceof Set ? names : new Set(names);
-};
+import { isThreadedCommentCommand } from './state-projection.js';
 
 const aliases: Readonly<Record<string, string>> = {
   'mac.home.addins': 'addIn',
@@ -155,6 +151,50 @@ const validationActions = {
   'mac.data.validation.clearRules': 'clear-rules',
 } as const;
 
+const papers = {
+  'mac.page.size.a4': 'A4',
+  'mac.page.size.a3': 'A3',
+  'mac.page.size.letter': 'letter',
+  'mac.page.size.legal': 'legal',
+} as const;
+
+const printAreaActions = {
+  'mac.page.printArea.set': 'set',
+  'mac.page.printArea.add': 'add',
+  'mac.page.printArea.clear': 'clear',
+} as const;
+
+const sortActions = {
+  'mac.data.sortAsc': 'asc',
+  'mac.data.sortDesc': 'desc',
+  'mac.data.sortCustom': 'custom',
+  'mac.data.filter': 'filter',
+  'mac.data.clear': 'filter-clear',
+  'mac.data.reapply': 'filter-reapply',
+  'mac.data.advancedFilter': 'filter-advanced',
+  'mac.data.removeDuplicates': 'dedupe',
+} as const;
+
+const drawTools = {
+  'mac.draw.eraser': 'eraser',
+  'mac.draw.eraser.stroke': 'eraser',
+  'mac.draw.penBlack': 'pen-black',
+  'mac.draw.penRed': 'pen-red',
+  'mac.draw.pencil': 'pencil',
+  'mac.draw.highlighter': 'highlighter',
+} as const;
+
+// Menu availability and execution of a root's legacy primary action have
+// separate permissions. Public applyCommand callers can invoke roots too.
+const rootActionPermissions: Readonly<Record<string, BuiltInCommandId>> = {
+  'mac.formulas.autoSum': 'mac.autosum.SUM',
+  'mac.formulas.removeArrows': 'mac.formulas.removeArrows.all',
+  'mac.formulas.errorCheck': 'mac.formulas.errorCheck.run',
+  'mac.data.validation': 'mac.data.validation.settings',
+  'mac.page.pageBreaks': 'mac.page.break.insert',
+};
+
+/** Ids the dispatcher handles in code rather than through a table above. */
 const operations = [
   'mac.insert.recommendedPivotTable',
   'mac.insert.table',
@@ -182,16 +222,8 @@ const operations = [
   'mac.page.break.insert',
   'mac.page.break.remove',
   'mac.page.break.reset',
-  'mac.data.sortAsc',
-  'mac.data.sortDesc',
-  'mac.data.sortCustom',
-  'mac.data.filter',
-  'mac.data.clear',
-  'mac.data.reapply',
-  'mac.data.advancedFilter',
   'mac.data.flashFill',
   'mac.data.textToColumns',
-  'mac.data.removeDuplicates',
   'mac.data.validation',
   'mac.page.theme.office',
   'mac.page.theme.gray',
@@ -208,13 +240,6 @@ const operations = [
   'mac.page.margins.custom',
   'mac.page.orientation.portrait',
   'mac.page.orientation.landscape',
-  'mac.page.size.a4',
-  'mac.page.size.a3',
-  'mac.page.size.letter',
-  'mac.page.size.legal',
-  'mac.page.printArea.set',
-  'mac.page.printArea.add',
-  'mac.page.printArea.clear',
   'mac.page.pageBreaks',
   'mac.view.cellFocus.focusCell',
   'mac.view.cellFocus.autoHighlight',
@@ -235,35 +260,35 @@ const operations = [
   'mac.review.showNotes',
   'mac.review.convertNotes',
   'mac.draw.toggle',
-  'mac.draw.eraser',
-  'mac.draw.eraser.stroke',
-  'mac.draw.penBlack',
-  'mac.draw.penRed',
-  'mac.draw.pencil',
-  'mac.draw.highlighter',
   'mac.draw.trackpad',
 ] as const;
 
+const SUPPORTED_COMMAND_IDS: ReadonlySet<string> = new Set([
+  ...Object.keys(aliases),
+  'mac.insert.recommendedChart',
+  'mac.insert.recommendedChart.apply',
+  ...Object.keys(chartKinds),
+  ...Object.keys(chartGroupings),
+  ...Object.keys(shapeKinds),
+  ...Object.keys(autoSumFunctions),
+  ...Object.keys(formulaAuditActions),
+  ...Object.keys(validationActions),
+  ...Object.keys(mergeActions),
+  ...Object.keys(papers),
+  ...Object.keys(printAreaActions),
+  ...Object.keys(sortActions),
+  ...Object.keys(drawTools),
+  ...operations,
+  ...MAC_RIBBON_ACTION_IDS,
+]);
+
 export const isMacRibbonCommandSupported = (id: string, liveNames?: LiveFunctionNames): boolean => {
-  if (id.startsWith('mac.function.')) {
-    const name = id.slice('mac.function.'.length);
+  const name = macFunctionNameOf(id);
+  if (name !== null) {
     const liveSet = liveNameSet(liveNames);
     return liveSet === undefined ? name in FUNCTION_SIGNATURES : liveSet.has(name);
   }
-  return (
-    id in aliases ||
-    id === 'mac.insert.recommendedChart' ||
-    id === 'mac.insert.recommendedChart.apply' ||
-    id in chartKinds ||
-    id in chartGroupings ||
-    id in shapeKinds ||
-    id in autoSumFunctions ||
-    id in formulaAuditActions ||
-    id in validationActions ||
-    id in mergeActions ||
-    operations.some((operation) => operation === id) ||
-    (MAC_RIBBON_ACTION_IDS as readonly string[]).includes(id)
-  );
+  return SUPPORTED_COMMAND_IDS.has(id);
 };
 
 const invoke = (instance: SpreadsheetInstance, operation: () => unknown): void => {
@@ -321,36 +346,23 @@ export function dispatchMacRibbonCommand(
 ): boolean {
   const instance = deps.inst;
   if (!instance) return false;
+  // Only a per-function command is checked against the live catalog.
   const reportedNames =
-    typeof instance.workbook?.functionNames === 'function'
-      ? instance.workbook.functionNames()
-      : null;
+    macFunctionNameOf(id) === null
+      ? undefined
+      : typeof instance.workbook?.functionNames === 'function'
+        ? instance.workbook.functionNames()
+        : null;
   if (!isMacRibbonCommandSupported(id, reportedNames)) return false;
-  // Menu availability and execution of a root's legacy primary action have
-  // separate permissions. Public applyCommand callers can invoke roots too.
-  const rootActionPermissions: Readonly<Record<string, BuiltInCommandId>> = {
-    'mac.formulas.autoSum': 'mac.autosum.SUM',
-    'mac.formulas.removeArrows': 'mac.formulas.removeArrows.all',
-    'mac.formulas.errorCheck': 'mac.formulas.errorCheck.run',
-    'mac.data.validation': 'mac.data.validation.settings',
-    'mac.page.pageBreaks': 'mac.page.break.insert',
-  };
   const requiredAction = rootActionPermissions[id];
   if (requiredAction && !canExecuteBuiltIn(instance.store, requiredAction, 'ribbon').allowed)
     return true;
   if (
-    id === 'mac.insert.newComment' ||
-    (id.startsWith('mac.review.') &&
-      ['newComment', 'deleteComment', 'previousComment', 'nextComment', 'showComments'].includes(
-        id.slice('mac.review.'.length),
-      ))
-  ) {
-    if (
-      !instance.workbook?.capabilities?.threadedComments ||
-      !canExecuteBuiltInRequest(instance.store, id, 'ribbon').allowed
-    )
-      return true;
-  }
+    isThreadedCommentCommand(id) &&
+    (!instance.workbook?.capabilities?.threadedComments ||
+      !canExecuteBuiltInRequest(instance.store, id, 'ribbon').allowed)
+  )
+    return true;
   const alias = aliases[id];
   if (alias) return dispatchGeneric(alias);
   const run = (): unknown => {
@@ -366,11 +378,12 @@ export function dispatchMacRibbonCommand(
     }
     if (['mac.page.theme', 'mac.page.color', 'mac.page.font'].includes(id)) return;
     if (id === 'mac.formulas.errorCheck.run') return runMacErrorCheck(instance);
-    const ctx = createDefaultDynamicDropdownsCtx(instance);
+    let dropdowns: ReturnType<typeof createDefaultDynamicDropdownsCtx> | undefined;
+    const ctx = () => (dropdowns ??= createDefaultDynamicDropdownsCtx(instance));
     const state = instance.store.getState();
     const sheet = state.data.sheetIndex;
     if (id === 'mac.insert.recommendedChart' || id === 'mac.insert.recommendedChart.apply') {
-      return ctx.createRecommendedChartFromSelection();
+      return ctx().createRecommendedChartFromSelection();
     }
     const chart = chartKinds[id as keyof typeof chartKinds];
     if (chart) return createChartVariantFromSelection(instance, chart, undefined, id);
@@ -378,25 +391,26 @@ export function dispatchMacRibbonCommand(
     if (grouped)
       return createChartVariantFromSelection(instance, grouped[0], { grouping: grouped[1] }, id);
     const shape = shapeKinds[id as keyof typeof shapeKinds];
-    if (shape) return ctx.insertShapeFromRibbon(shape);
+    if (shape) return ctx().insertShapeFromRibbon(shape);
     const autoSum = autoSumFunctions[id as keyof typeof autoSumFunctions];
-    if (autoSum) return ctx.applyAutoSumFormula(autoSum);
+    if (autoSum) return ctx().applyAutoSumFormula(autoSum);
     const auditAction = formulaAuditActions[id as keyof typeof formulaAuditActions];
-    if (auditAction) return ctx.applyFormulaAuditAction(auditAction);
+    if (auditAction) return ctx().applyFormulaAuditAction(auditAction);
     const validationAction = validationActions[id as keyof typeof validationActions];
-    if (validationAction) return ctx.applyDataValidationAction(validationAction);
+    if (validationAction) return ctx().applyDataValidationAction(validationAction);
     const mergeAction = mergeActions[id as keyof typeof mergeActions];
-    if (mergeAction) return ctx.applyMergeAction(mergeAction);
-    if (id.startsWith('mac.function.'))
-      return instance.openFunctionArguments(id.slice('mac.function.'.length));
-    // Page-setup writes run under the Mac command id that asked for them.
+    if (mergeAction) return ctx().applyMergeAction(mergeAction);
+    const functionName = macFunctionNameOf(id);
+    if (functionName !== null) return instance.openFunctionArguments(functionName);
+    // Writes run under the Mac command id that asked for them.
+    const writeCtx = {
+      store: instance.store,
+      history: instance.history,
+      origin: 'ribbon',
+      commandId: id,
+    } as const;
     const pageSetup = <T>(write: () => T): T | undefined =>
-      pageSetupWrite(
-        { store: instance.store, history: instance.history, origin: 'ribbon', commandId: id },
-        sheet,
-        undefined,
-        write,
-      );
+      pageSetupWrite(writeCtx, sheet, undefined, write);
     if (id.startsWith('mac.page.margins.')) {
       const preset = id.slice('mac.page.margins.'.length);
       if (preset === 'custom')
@@ -412,53 +426,32 @@ export function dispatchMacRibbonCommand(
       if (value === 'portrait' || value === 'landscape')
         return pageSetup(() => setPageOrientation(instance.store, sheet, value, instance.history));
     }
-    const papers = {
-      'mac.page.size.a4': 'A4',
-      'mac.page.size.a3': 'A3',
-      'mac.page.size.letter': 'letter',
-      'mac.page.size.legal': 'legal',
-    } as const;
     const paper = papers[id as keyof typeof papers];
     if (paper) return pageSetup(() => setPaperSize(instance.store, sheet, paper, instance.history));
-    const print = {
-      'mac.page.printArea.set': 'set',
-      'mac.page.printArea.add': 'add',
-      'mac.page.printArea.clear': 'clear',
-    } as const;
-    const printAction = print[id as keyof typeof print];
-    if (printAction) return ctx.applyPrintAreaAction(printAction);
-    const sort = {
-      'mac.data.sortAsc': 'asc',
-      'mac.data.sortDesc': 'desc',
-      'mac.data.sortCustom': 'custom',
-      'mac.data.filter': 'filter',
-      'mac.data.clear': 'filter-clear',
-      'mac.data.reapply': 'filter-reapply',
-      'mac.data.advancedFilter': 'filter-advanced',
-      'mac.data.removeDuplicates': 'dedupe',
-    } as const;
-    const sortAction = sort[id as keyof typeof sort];
-    if (sortAction) return ctx.applySortMenuAction(sortAction);
+    const printAction = printAreaActions[id as keyof typeof printAreaActions];
+    if (printAction) return ctx().applyPrintAreaAction(printAction);
+    const sortAction = sortActions[id as keyof typeof sortActions];
+    if (sortAction) return ctx().applySortMenuAction(sortAction);
     switch (id) {
       case 'mac.insert.recommendedPivotTable':
-        return ctx.applyPivotTableAction('recommended');
+        return ctx().applyPivotTableAction('recommended');
       case 'mac.insert.table':
         return showCreateTableDialog(instance, {}, { origin: 'ribbon', commandId: id });
       case 'mac.insert.photo':
       case 'mac.insert.photo.file':
-        return ctx.insertPictureFromRibbon('device');
+        return ctx().insertPictureFromRibbon('device');
       case 'mac.insert.screenshot':
       case 'mac.insert.screenshot.clipping':
-        return ctx.insertScreenshotFromRibbon();
+        return ctx().insertScreenshotFromRibbon();
       case 'mac.insert.headerFooter':
         return openPageSetupDialogFrom(instance.store, 'headerFooter', {
           origin: 'ribbon',
           commandId: 'mac.insert.headerFooter',
         });
       case 'mac.insert.symbol':
-        return ctx.applySymbolAction('more');
+        return ctx().applySymbolAction('more');
       case 'mac.formulas.autoSum':
-        return ctx.applyAutoSumFormula('SUM');
+        return ctx().applyAutoSumFormula('SUM');
       case 'mac.formulas.defineName':
       case 'mac.formulas.defineName.define':
         return openDefineNameDialogFrom(instance.store, {
@@ -467,29 +460,29 @@ export function dispatchMacRibbonCommand(
         });
       case 'mac.formulas.useInFormula':
       case 'mac.formulas.useInFormula.paste':
-        return ctx.applyDefinedNameAction('use-formula');
+        return ctx().applyDefinedNameAction('use-formula');
       case 'mac.formulas.createFromSelection':
-        return ctx.applyDefinedNameAction('create-from-selection');
+        return ctx().applyDefinedNameAction('create-from-selection');
       case 'mac.formulas.removeArrows':
-        return ctx.applyFormulaAuditAction('clear-all');
+        return ctx().applyFormulaAuditAction('clear-all');
       case 'mac.formulas.errorCheck':
         return runMacErrorCheck(instance);
       case 'mac.formulas.calc.auto':
-        return ctx.applyCalcOptionAction('auto');
+        return ctx().applyCalcOptionAction('auto');
       case 'mac.formulas.calc.manual':
-        return ctx.applyCalcOptionAction('manual');
+        return ctx().applyCalcOptionAction('manual');
       case 'mac.formulas.calc.autoNoTable':
-        return ctx.applyCalcOptionAction('auto-no-table');
+        return ctx().applyCalcOptionAction('auto-no-table');
       case 'mac.formulas.calc.formatStale':
-        return ctx.applyCalcOptionAction('format-stale');
+        return ctx().applyCalcOptionAction('format-stale');
       case 'mac.formulas.calc.compatVersion.1':
       case 'mac.formulas.calc.compatVersion.2':
       case 'mac.formulas.calc.compatVersion.3':
-        return ctx.applyCalcOptionAction(`compat-${id.slice(-1)}`);
+        return ctx().applyCalcOptionAction(`compat-${id.slice(-1)}`);
       case 'mac.data.flashFill':
-        return ctx.applyFillDirection('flash');
+        return ctx().applyFillDirection('flash');
       case 'mac.data.textToColumns':
-        return ctx.splitTextToColumnsCustom();
+        return ctx().splitTextToColumnsCustom();
       case 'mac.data.validation':
         return openDataValidationDialogFrom(instance.store, {
           origin: 'ribbon',
@@ -497,11 +490,11 @@ export function dispatchMacRibbonCommand(
         });
       case 'mac.page.pageBreaks':
       case 'mac.page.break.insert':
-        return ctx.applyPageBreakAction('insert');
+        return ctx().applyPageBreakAction('insert');
       case 'mac.page.break.remove':
-        return ctx.applyPageBreakAction('remove');
+        return ctx().applyPageBreakAction('remove');
       case 'mac.page.break.reset':
-        return ctx.applyPageBreakAction('reset-all');
+        return ctx().applyPageBreakAction('reset-all');
       case 'mac.view.cellFocus.focusCell':
         mutators.setFocusCell(instance.store, !state.ui.focusCell);
         return true;
@@ -510,16 +503,16 @@ export function dispatchMacRibbonCommand(
         return true;
       case 'mac.view.freeze':
       case 'mac.view.freeze.panes':
-        return ctx.applyFreezeAction(
+        return ctx().applyFreezeAction(
           state.layout.splitPanes !== true &&
             (state.layout.freezeRows > 0 || state.layout.freezeCols > 0)
             ? 'off'
             : 'selection',
         );
       case 'mac.view.freeze.firstRow':
-        return ctx.applyFreezeAction('row');
+        return ctx().applyFreezeAction('row');
       case 'mac.view.freeze.firstColumn':
-        return ctx.applyFreezeAction('col');
+        return ctx().applyFreezeAction('col');
       case 'mac.insert.newComment':
       case 'mac.review.newComment':
         return openCommentDialogFrom(instance.store, 'thread', { origin: 'ribbon', commandId: id });
@@ -531,13 +524,7 @@ export function dispatchMacRibbonCommand(
           (entry) =>
             !entry.parentId && entry.cell.row === active.row && entry.cell.col === active.col,
         );
-        const ctx = {
-          store: instance.store,
-          history: instance.history,
-          origin: 'ribbon',
-          commandId: id,
-        } as const;
-        return threadWrite(ctx, roots.length > 0 ? [active] : [], undefined, () =>
+        return threadWrite(writeCtx, roots.length > 0 ? [active] : [], undefined, () =>
           recordThreadedChange(
             instance.history,
             instance.store,
@@ -545,9 +532,9 @@ export function dispatchMacRibbonCommand(
             sheet,
             () => {
               for (const root of roots)
-                removeThreadedComment(instance.store, sheet, root.id, instance.workbook, ctx);
+                removeThreadedComment(instance.store, sheet, root.id, instance.workbook, writeCtx);
             },
-            ctx,
+            writeCtx,
           ),
         );
       }
@@ -585,15 +572,7 @@ export function dispatchMacRibbonCommand(
       if (id === 'mac.draw.toggle') return ink.toggle();
       if (id === 'mac.draw.trackpad')
         return ink.setTrackpadMode(!ink.isActive() || !ink.getTrackpadMode());
-      const tools = {
-        'mac.draw.eraser': 'eraser',
-        'mac.draw.eraser.stroke': 'eraser',
-        'mac.draw.penBlack': 'pen-black',
-        'mac.draw.penRed': 'pen-red',
-        'mac.draw.pencil': 'pencil',
-        'mac.draw.highlighter': 'highlighter',
-      } as const;
-      const tool = tools[id as keyof typeof tools];
+      const tool = drawTools[id as keyof typeof drawTools];
       if (tool) return ink.setTool(tool);
     }
     const action = createMacRibbonActions(instance)[id];

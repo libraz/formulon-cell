@@ -22,31 +22,44 @@ import { findPivotTableAtCell } from '../../../engine/passthrough-sync.js';
 import { getMacInk } from '../../../interact/mac-ink.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { rangeValidationsIntersect } from '../../../store/range-validations.js';
-import { projectDisabledState } from '../../menu-a11y.js';
-import { indexRibbonButtons, projectActiveState } from '../../ribbon-active-state.js';
+import { rangeContainsAddr } from '../../../store/selection-geometry.js';
+import { projectDisabledState, RIBBON_DISABLED_REASON_KEY } from '../../menu-a11y.js';
+import {
+  type ActiveState,
+  indexRibbonButtons,
+  projectActiveState,
+} from '../../ribbon-active-state.js';
+import type { ToolbarLang } from '../../ribbon-model.js';
 import { projectPressedState } from '../button.js';
+import { RIBBON_VIEW_MODES } from '../command-tables.js';
 import { EMBEDDED_UNSUPPORTED, macRibbonLabelForCommand } from './labels.js';
 import { MAC_CONTEXT_LABELS } from './labels-data.js';
 import { toolbarLangForLocale } from './locale.js';
 
-const MAC_ACTIVE_STATE_KEYS: Readonly<Record<string, keyof ReturnType<typeof projectActiveState>>> =
-  {
-    'mac.page.showGridlines': 'gridlinesVisible',
-    'mac.page.printGridlines': 'printGridlines',
-    'mac.page.showHeadings': 'headingsVisible',
-    'mac.page.printHeadings': 'printHeadings',
-    'mac.view.standard': 'workbookView',
-    'mac.view.pageBreakPreview': 'workbookView',
-    'mac.view.pageLayout': 'workbookView',
-    'mac.view.gridlines': 'gridlinesVisible',
-    'mac.view.headings': 'headingsVisible',
-    'mac.formulas.showFormulas': 'formulasVisible',
-    'mac.review.showNotes': 'allNotesVisible',
-    'mac.data.filter': 'filterOn',
-    'mac.review.protectSheet': 'protected',
-    'mac.view.freeze': 'frozen',
-    'mac.view.split': 'splitPanes',
-  };
+const MAC_ACTIVE_STATE_KEYS: Readonly<Record<string, keyof ActiveState>> = {
+  'mac.page.showGridlines': 'gridlinesVisible',
+  'mac.page.printGridlines': 'printGridlines',
+  'mac.page.showHeadings': 'headingsVisible',
+  'mac.page.printHeadings': 'printHeadings',
+  'mac.view.standard': 'workbookView',
+  'mac.view.pageBreakPreview': 'workbookView',
+  'mac.view.pageLayout': 'workbookView',
+  'mac.view.gridlines': 'gridlinesVisible',
+  'mac.view.headings': 'headingsVisible',
+  'mac.formulas.showFormulas': 'formulasVisible',
+  'mac.review.showNotes': 'allNotesVisible',
+  'mac.data.filter': 'filterOn',
+  'mac.review.protectSheet': 'protected',
+  'mac.view.freeze': 'frozen',
+  'mac.view.split': 'splitPanes',
+};
+
+/** The workbook view each Mac view button selects, by its generic command. */
+const MAC_VIEW_MODE_COMMANDS: Readonly<Record<string, string>> = {
+  'mac.view.standard': 'viewNormal',
+  'mac.view.pageLayout': 'viewPageLayout',
+  'mac.view.pageBreakPreview': 'viewPageBreakPreview',
+};
 
 const MAC_POLICY_PROJECTED_COMMANDS = [
   'mac.page.theme',
@@ -103,6 +116,25 @@ const MAC_CONTENT_STATE_COMMANDS = [
   'mac.view.sheetViewExit',
 ] as const;
 
+const setButtonLabel = (button: HTMLElement, label: string): void => {
+  button.textContent = label;
+  button.title = label;
+  button.setAttribute('aria-label', label);
+};
+
+/** Projects a command button's disabled state; the tooltip leads with the button's own name. */
+const projectCommandDisabled = (
+  button: HTMLButtonElement,
+  id: string,
+  lang: ToolbarLang,
+  disabled: boolean,
+  reason: string | null,
+): void =>
+  projectDisabledState(button, disabled, reason, {
+    datasetKey: RIBBON_DISABLED_REASON_KEY,
+    titlePrefix: button.getAttribute('aria-label')?.trim() || macRibbonLabelForCommand(id, lang),
+  });
+
 const contentDisabledReason = (
   instance: SpreadsheetInstance,
   id: (typeof MAC_CONTENT_STATE_COMMANDS)[number],
@@ -140,20 +172,10 @@ const contentDisabledReason = (
 
 const hasValuesInSelection = (instance: SpreadsheetInstance): boolean => {
   const state = instance.store.getState();
-  const { sheet, r0, r1, c0, c1 } = state.selection.range;
   for (const [key, cell] of state.data.cells) {
     if (cell.value.kind === 'blank') continue;
     const addr = parseAddrKey(key);
-    if (
-      addr &&
-      addr.sheet === sheet &&
-      addr.row >= r0 &&
-      addr.row <= r1 &&
-      addr.col >= c0 &&
-      addr.col <= c1
-    ) {
-      return true;
-    }
+    if (addr && rangeContainsAddr(state.selection.range, addr)) return true;
   }
   return false;
 };
@@ -174,19 +196,22 @@ const hasValidationInSelection = (instance: SpreadsheetInstance): boolean => {
   for (const [key, cellFormat] of format.formats) {
     if (!cellFormat.validation) continue;
     const addr = parseAddrKey(key);
-    if (
-      addr &&
-      addr.sheet === sheet &&
-      addr.row >= r0 &&
-      addr.row <= r1 &&
-      addr.col >= c0 &&
-      addr.col <= c1
-    ) {
-      return true;
-    }
+    if (addr && rangeContainsAddr(selection.range, addr)) return true;
   }
   return false;
 };
+
+const THREADED_COMMENT_COMMANDS: ReadonlySet<string> = new Set([
+  'mac.insert.newComment',
+  'mac.review.newComment',
+  'mac.review.deleteComment',
+  'mac.review.previousComment',
+  'mac.review.nextComment',
+  'mac.review.showComments',
+]);
+
+/** Commands that create, step through or delete threaded comments. */
+export const isThreadedCommentCommand = (id: string): boolean => THREADED_COMMENT_COMMANDS.has(id);
 
 const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): string | null => {
   const state = instance.store.getState();
@@ -202,13 +227,7 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
   if (id === 'mac.insert.shapeArrow' && instance.workbook?.capabilities?.shapes) {
     return strings.shapeArrowNotSaved;
   }
-  if (
-    id === 'mac.insert.newComment' ||
-    (id.startsWith('mac.review.') &&
-      ['newComment', 'deleteComment', 'previousComment', 'nextComment', 'showComments'].includes(
-        id.slice('mac.review.'.length),
-      ))
-  ) {
+  if (isThreadedCommentCommand(id)) {
     if (!instance.workbook?.capabilities?.threadedComments)
       return MAC_CONTEXT_LABELS.threadedCommentsUnavailable[lang];
     const roots =
@@ -347,19 +366,10 @@ export const projectMacRibbonState = (
   }
 
   for (const [command, key] of Object.entries(MAC_ACTIVE_STATE_KEYS)) {
-    let pressed = Boolean(active[key]);
-    if (
-      command === 'mac.view.standard' ||
-      command === 'mac.view.pageLayout' ||
-      command === 'mac.view.pageBreakPreview'
-    ) {
-      const view = command.endsWith('standard')
-        ? 'normal'
-        : command.endsWith('pageLayout')
-          ? 'pageLayout'
-          : 'pageBreakPreview';
-      pressed = active.workbookView === view;
-    }
+    const viewCommand = MAC_VIEW_MODE_COMMANDS[command];
+    const pressed = viewCommand
+      ? active.workbookView === RIBBON_VIEW_MODES[viewCommand]
+      : Boolean(active[key]);
     for (const button of buttons.get(command) ?? []) {
       projectPressedState(button, pressed);
     }
@@ -371,9 +381,7 @@ export const projectMacRibbonState = (
     const label = active.frozen
       ? macRibbonLabelForCommand('mac.view.freeze.off', lang)
       : button.dataset.freezeLabel;
-    button.textContent = label;
-    button.title = label;
-    button.setAttribute('aria-label', label);
+    setButtonLabel(button, label);
   }
 
   // The Notes menu's first item edits the active cell's note, and is absent when that note is
@@ -386,9 +394,7 @@ export const projectMacRibbonState = (
     const label = activeNote
       ? macRibbonLabelForCommand('mac.review.editNote', lang)
       : button.dataset.newNoteLabel;
-    button.textContent = label;
-    button.title = label;
-    button.setAttribute('aria-label', label);
+    setButtonLabel(button, label);
     button.hidden = activeNote && !noteChangePermitted(noteState, noteState.selection.active);
   }
 
@@ -408,16 +414,12 @@ export const projectMacRibbonState = (
   for (const trigger of host.querySelectorAll<HTMLButtonElement>(
     '[data-format-submenu="mac.formulas.calc.compatVersion"]',
   )) {
-    projectDisabledState(
+    projectCommandDisabled(
       trigger,
+      'mac.formulas.calc.compatVersion',
+      lang,
       compatVersion === null,
       compatVersion === null ? unavailable : null,
-      {
-        datasetKey: 'ribbonDisabledReason',
-        titlePrefix:
-          trigger.getAttribute('aria-label')?.trim() ||
-          macRibbonLabelForCommand('mac.formulas.calc.compatVersion', lang),
-      },
     );
   }
   // Format Stale Values also stays off under Automatic, which the desktop gives no reason for.
@@ -431,12 +433,7 @@ export const projectMacRibbonState = (
   const formatStale = instance.store.getState().ui.formatStaleValues;
   for (const button of buttons.get('mac.formulas.calc.formatStale') ?? []) {
     button.setAttribute('aria-checked', String(formatStale));
-    projectDisabledState(button, staleOff, staleReason, {
-      datasetKey: 'ribbonDisabledReason',
-      titlePrefix:
-        button.getAttribute('aria-label')?.trim() ||
-        macRibbonLabelForCommand('mac.formulas.calc.formatStale', lang),
-    });
+    projectCommandDisabled(button, 'mac.formulas.calc.formatStale', lang, staleOff, staleReason);
   }
   const { focusCell, autoHighlight } = instance.store.getState().ui;
   for (const button of buttons.get('mac.view.cellFocus.focusCell') ?? []) {
@@ -457,9 +454,7 @@ export const projectMacRibbonState = (
           version,
           row.shown,
         );
-        button.textContent = label;
-        button.title = label;
-        button.setAttribute('aria-label', label);
+        setButtonLabel(button, label);
       }
     }
   }
@@ -468,11 +463,7 @@ export const projectMacRibbonState = (
   const noNames = !hasListedDefinedNames(instance.workbook);
   for (const id of ['mac.formulas.useInFormula', 'mac.formulas.useInFormula.paste']) {
     for (const button of buttons.get(id) ?? []) {
-      projectDisabledState(button, noNames, null, {
-        datasetKey: 'ribbonDisabledReason',
-        titlePrefix:
-          button.getAttribute('aria-label')?.trim() || macRibbonLabelForCommand(id, lang),
-      });
+      projectCommandDisabled(button, id, lang, noNames, null);
     }
   }
 
@@ -489,40 +480,27 @@ export const projectMacRibbonState = (
       ['objectSendBackward', atBack, strings.arrangeAtBack],
     ] as const) {
       for (const button of buttons.get(id) ?? []) {
-        projectDisabledState(button, blocked, reason, {
-          datasetKey: 'ribbonDisabledReason',
-          titlePrefix:
-            button.getAttribute('aria-label')?.trim() || macRibbonLabelForCommand(id, lang),
-        });
+        projectCommandDisabled(button, id, lang, blocked, reason);
       }
     }
   }
 
   for (const id of MAC_CONTENT_STATE_COMMANDS) {
+    const targets = buttons.get(id);
+    if (!targets) continue;
     const reason = contentDisabledReason(instance, id);
-    for (const button of buttons.get(id) ?? []) {
-      projectDisabledState(button, reason !== null, reason, {
-        datasetKey: 'ribbonDisabledReason',
-        titlePrefix:
-          button.getAttribute('aria-label')?.trim() || macRibbonLabelForCommand(id, lang),
-      });
-    }
+    for (const button of targets) projectCommandDisabled(button, id, lang, reason !== null, reason);
   }
 
   for (const id of MAC_POLICY_PROJECTED_COMMANDS) {
+    const targets = buttons.get(id);
+    if (!targets) continue;
     const decision = canExecuteBuiltIn(instance.store, id, 'ribbon');
     const contextualReason = contextualDisabledReason(instance, id);
     const disabled = !decision.allowed || contextualReason !== null;
     const reason = decision.allowed
       ? contextualReason
       : instance.i18n.strings.backstage.commandUnavailable;
-    for (const button of buttons.get(id) ?? []) {
-      const titlePrefix =
-        button.getAttribute('aria-label')?.trim() || macRibbonLabelForCommand(id, lang);
-      projectDisabledState(button, disabled, reason, {
-        datasetKey: 'ribbonDisabledReason',
-        titlePrefix,
-      });
-    }
+    for (const button of targets) projectCommandDisabled(button, id, lang, disabled, reason);
   }
 };

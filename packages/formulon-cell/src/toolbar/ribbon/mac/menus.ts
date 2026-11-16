@@ -1,6 +1,8 @@
 import {
   canExecuteBuiltIn,
   canExecuteBuiltInRequest,
+  macFunctionCommandId,
+  macFunctionNameOf,
 } from '../../../commands/built-in-command-policy.js';
 import {
   type CatalogFunctionCategory,
@@ -16,7 +18,12 @@ import { dictionaries, type Locale } from '../../../i18n/strings.js';
 import { catalogLocaleOrdinal, catalogLocaleTag } from '../../../interact/function-catalog-text.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import type { SpreadsheetStore } from '../../../store/store.js';
-import { focusMenuItem, prepareMenu, projectDisabledState } from '../../menu-a11y.js';
+import {
+  focusMenuItem,
+  prepareMenu,
+  projectDisabledState,
+  RIBBON_DISABLED_REASON_KEY,
+} from '../../menu-a11y.js';
 import { createRibbonButton } from '../button.js';
 import {
   createSubmenu,
@@ -40,7 +47,7 @@ import {
 
 export type MacRibbonMenuFactory = (commandId: string) => HTMLDivElement | null;
 
-type LiveFunctionNames = ReadonlySet<string> | readonly string[] | null | undefined;
+export type LiveFunctionNames = ReadonlySet<string> | readonly string[] | null | undefined;
 
 export interface MacFunctionAvailabilityContext {
   /** The live workbook reader, supplied only when functionNames() was live. */
@@ -125,21 +132,18 @@ const projectFunctionButtonState = (
   const displayName = functionDisplayName(context?.reader, lang, name);
   const unavailable = isFunctionUnavailableForInsertion(availability);
   const reason = context?.unavailableReason ?? defaultFunctionUnavailableReason(lang);
-  const decision = canExecuteBuiltIn(store, `mac.function.${name}`, 'ribbon');
+  const decision = canExecuteBuiltIn(store, macFunctionCommandId(name), 'ribbon');
   const disabledReason = unavailable
     ? reason
     : decision.allowed
       ? null
       : localizedDecisionReason(decision, dictionaries[lang]);
   projectDisabledState(button, unavailable || !decision.allowed, disabledReason, {
-    datasetKey: 'ribbonDisabledReason',
+    datasetKey: RIBBON_DISABLED_REASON_KEY,
     titlePrefix: displayName,
   });
   if (unavailable) {
     button.dataset.functionUnavailable = 'true';
-    button.setAttribute('aria-description', reason);
-    button.dataset.ribbonDisabledReason = reason;
-    button.title = `${displayName}\n${reason}`;
   } else {
     delete button.dataset.functionUnavailable;
   }
@@ -170,7 +174,7 @@ const MORE_FUNCTION_CATEGORIES: readonly MacMoreFunctionCategory[] = [
 const moreFunctionPanelId = (category: CatalogFunctionCategory): string =>
   `menu-mac-formulas-more-${category}`;
 
-const liveNameSet = (names: LiveFunctionNames): ReadonlySet<string> | undefined => {
+export const liveNameSet = (names: LiveFunctionNames): ReadonlySet<string> | undefined => {
   if (names === null || names === undefined) return undefined;
   return names instanceof Set ? names : new Set(names);
 };
@@ -272,9 +276,7 @@ const menuItemButton = (
   visual = false,
   displayName?: string,
 ): HTMLButtonElement => {
-  const functionName = item.id.startsWith('mac.function.')
-    ? item.id.slice('mac.function.'.length)
-    : null;
+  const functionName = macFunctionNameOf(item.id);
   const localized =
     displayName ??
     (functionName
@@ -312,7 +314,7 @@ const menuItemButton = (
     !!item.disabled,
     macRibbonDisabledReason(item.disabledReason, lang) ?? null,
     {
-      datasetKey: 'ribbonDisabledReason',
+      datasetKey: RIBBON_DISABLED_REASON_KEY,
       titlePrefix: label,
     },
   );
@@ -362,7 +364,6 @@ const createMoreFunctionsMenu = (lang: Locale): HTMLDivElement => {
   menu.className = 'fc-tb__menu fc-tb__menu--mac fc-tb__menu--mac-more';
   menu.id = MAC_FORMULAS_MORE_MENU_ID;
   menu.hidden = true;
-  prepareMenu(menu, macRibbonLabelForCommand('mac.formulas.more', lang));
 
   for (const { category } of MORE_FUNCTION_CATEGORIES) {
     const localizedLabel = macFunctionCategoryLabel(category, lang);
@@ -383,7 +384,7 @@ const createMoreFunctionsMenu = (lang: Locale): HTMLDivElement => {
     });
     panel.append(
       ...supportedFunctionNames(category).map((name) =>
-        menuItemButton({ id: `mac.function.${name}`, label: name }, lang),
+        menuItemButton({ id: macFunctionCommandId(name), label: name }, lang),
       ),
     );
     prepareMenu(panel, localizedLabel);
@@ -449,15 +450,6 @@ export const createMacRibbonMenuFactory = (lang: Locale): MacRibbonMenuFactory =
   };
 };
 
-export const createMacRibbonMenus = (
-  lang: Locale,
-): Readonly<Record<string, MacRibbonMenuFactory>> => {
-  const factory = createMacRibbonMenuFactory(lang);
-  return Object.fromEntries(
-    Object.keys(MAC_RIBBON_MENU_ITEMS).map((commandId) => [commandId, factory]),
-  );
-};
-
 /** Update the session MRU without replacing an unchanged menu or losing its keyboard focus. */
 const projectMacRecentMenuPrepared = (
   host: HTMLElement,
@@ -479,15 +471,13 @@ const projectMacRecentMenuPrepared = (
       ? (menu.ownerDocument.activeElement as HTMLElement).dataset.ribbonCommand
       : undefined;
   const items: MacRibbonMenuItem[] = [
-    ...names.map((name) => ({ id: `mac.function.${name}`, label: name })),
+    ...names.map((name) => ({ id: macFunctionCommandId(name), label: name })),
     ...(MAC_RIBBON_MENU_ITEMS['mac.formulas.recent'] ?? []),
   ];
   if (rebuild) {
     menu.replaceChildren(
       ...items.map((item) => {
-        const name = item.id.startsWith('mac.function.')
-          ? item.id.slice('mac.function.'.length)
-          : undefined;
+        const name = macFunctionNameOf(item.id);
         return menuItemButton(
           item,
           lang,
@@ -500,8 +490,8 @@ const projectMacRecentMenuPrepared = (
   if (rebuild || restricted || wasRestricted) {
     const buttons = Array.from(menu.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]'));
     for (const button of buttons) {
-      const name = button.dataset.ribbonCommand?.replace(/^mac\.function\./, '');
-      if (name && button.dataset.ribbonCommand?.startsWith('mac.function.')) {
+      const name = macFunctionNameOf(button.dataset.ribbonCommand ?? '');
+      if (name) {
         projectFunctionButtonState(button, name, store, lang, availabilityContext);
         continue;
       }
@@ -515,7 +505,7 @@ const projectMacRecentMenuPrepared = (
         !decision.allowed,
         decision.allowed ? null : localizedDecisionReason(decision, dictionaries[lang]),
         {
-          datasetKey: 'ribbonDisabledReason',
+          datasetKey: RIBBON_DISABLED_REASON_KEY,
           titlePrefix: button.textContent ?? '',
         },
       );
@@ -562,30 +552,22 @@ const projectFunctionCategoryMenu = (
       ? (menu.ownerDocument.activeElement as HTMLElement).dataset.ribbonCommand
       : undefined;
   if (rebuild) {
-    const names = supportedFunctionNames(category, liveSet);
-    const items = names.map(
-      (name): MacRibbonMenuItem => ({
-        id: `mac.function.${name}`,
-        label: name,
-      }),
-    );
     menu.replaceChildren(
-      ...items.map((item) => {
-        const name = item.id.slice('mac.function.'.length);
-        return menuItemButton(
-          item,
+      ...supportedFunctionNames(category, liveSet).map((name) =>
+        menuItemButton(
+          { id: macFunctionCommandId(name), label: name },
           lang,
           false,
           functionDisplayName(availabilityContext?.reader, lang, name),
-        );
-      }),
+        ),
+      ),
     );
     prepareMenu(menu, menu.getAttribute('aria-label') ?? undefined);
   }
   if (rebuild || restricted || wasRestricted) {
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
       const command = button.dataset.ribbonCommand ?? '';
-      const name = command.startsWith('mac.function.') ? command.slice('mac.function.'.length) : '';
+      const name = macFunctionNameOf(command);
       if (name) projectFunctionButtonState(button, name, store, lang, availabilityContext);
     }
   }

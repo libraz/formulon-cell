@@ -14,7 +14,11 @@ import type { Locale } from '../../i18n/strings.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import { panelSize, placePanel, viewportSize } from '../../interact/overlay-position.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
-import { projectDisabledState, visibleLabelName } from '../menu-a11y.js';
+import {
+  projectDisabledState,
+  RIBBON_DISABLED_REASON_KEY,
+  visibleLabelName,
+} from '../menu-a11y.js';
 import type { RibbonDisplayText, ToolbarMenuText } from '../menu-text.js';
 import {
   buildRibbonModel,
@@ -313,7 +317,7 @@ const createRibbonCommandButton = (
   if (disabled) {
     const disabledReason = command.disabledReason ?? ctx.ribbonText.disabled;
     projectDisabledState(button, disabled, disabledReason, {
-      datasetKey: 'ribbonDisabledReason',
+      datasetKey: RIBBON_DISABLED_REASON_KEY,
       titlePrefix: command.title,
     });
   }

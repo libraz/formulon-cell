@@ -36,16 +36,6 @@ export const EMBEDDED_UNSUPPORTED: Label = {
   en: 'This feature is not available in the embedded workbook.',
   ...MAC_DISABLED_TRANSLATIONS.embeddedUnsupported,
 };
-export const WORKBOOK_THEME_UNSUPPORTED: Label = {
-  ja: 'ブックのテーマはこの埋め込み環境では変更できません。',
-  en: 'Workbook themes cannot be changed in the embedded workbook.',
-  ...MAC_DISABLED_TRANSLATIONS.workbookThemeUnsupported,
-};
-export const THREADED_COMMENTS_UNSUPPORTED: Label = {
-  ja: 'スレッド形式のコメントは未対応です。セルのメモを使用してください。',
-  en: 'Threaded comments are unavailable; use cell notes instead.',
-  ...MAC_DISABLED_TRANSLATIONS.threadedCommentsUnsupported,
-};
 
 const labelSeeds: Record<string, LegacyLabel> = {
   home: { ja: 'ホーム', en: 'Home' },
@@ -413,8 +403,6 @@ export const macRibbonDisabledReason = (
   if (reason === OFFICE_REQUIRED.en) return OFFICE_REQUIRED[lang];
   if (reason === NOT_IMPLEMENTED.en) return NOT_IMPLEMENTED[lang];
   if (reason === EMBEDDED_UNSUPPORTED.en) return EMBEDDED_UNSUPPORTED[lang];
-  if (reason === WORKBOOK_THEME_UNSUPPORTED.en) return WORKBOOK_THEME_UNSUPPORTED[lang];
-  if (reason === THREADED_COMMENTS_UNSUPPORTED.en) return THREADED_COMMENTS_UNSUPPORTED[lang];
   return reason;
 };
 

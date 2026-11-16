@@ -7,7 +7,7 @@
 // through the dropdown API.
 
 import {
-  MAC_RIBBON_COMMAND_IDS,
+  MAC_RIBBON_COMMAND_ID_SET,
   MAC_RIBBON_DISABLED_COMMAND_IDS,
   MAC_RIBBON_MENU_COMMAND_SET,
   macRibbonMenuIdForCommand,
@@ -648,6 +648,6 @@ export const ribbonActivationForCommand = (commandId: string): RibbonActivationS
     return macMenuId ? { kind: 'dropdown', menuId: macMenuId } : { kind: 'primaryAction' };
   }
   if (MAC_RIBBON_DISABLED_COMMAND_IDS.has(commandId)) return { kind: 'disabled' };
-  if (MAC_RIBBON_COMMAND_IDS.includes(commandId)) return { kind: 'primaryAction' };
+  if (MAC_RIBBON_COMMAND_ID_SET.has(commandId)) return { kind: 'primaryAction' };
   return { kind: 'disabled' };
 };
