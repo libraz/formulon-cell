@@ -4,13 +4,16 @@ import {
   PivotShowValuesAs,
   PivotSortOrder,
 } from '../../../../src/engine/types.js';
-import type { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { column, columnFormats, loadFixture, pivotGrid } from './fixture.js';
 
-const withFixture = async (file: string, run: (wb: WorkbookHandle) => void): Promise<void> => {
+const withFixture = async (
+  file: string,
+  run: (wb: WorkbookHandle) => void | Promise<void>,
+): Promise<void> => {
   const wb = await loadFixture(file);
   try {
-    run(wb);
+    await run(wb);
   } finally {
     wb.dispose();
   }
@@ -122,6 +125,23 @@ describe('pivot operations match the desktop app', () => {
       expect(column(pivotGrid(wb), 'A').slice(1, -1)).toEqual(labels);
     }),
   );
+
+  it('keeps a sort by values through a save and reload', () =>
+    withFixture('ja_d7_two_rows_values_cols.xlsx', async (wb) => {
+      expect(wb.setPivotFieldSort(0, 0, 0, PivotSortOrder.Ascending, 'Sum of Amt')).toBe(true);
+      const labels = ['North', 'A', 'B', 'East', 'A', 'South', 'A', 'B'];
+      expect(column(pivotGrid(wb), 'A').slice(1, -1)).toEqual(labels);
+      const reloaded = await WorkbookHandle.loadBytes(wb.saveWithDiagnostics('xlsx').bytes);
+      try {
+        expect(reloaded.getPivotField(0, 0, 0)).toMatchObject({
+          sortOrder: PivotSortOrder.Ascending,
+          sortByField: 'Sum of Amt',
+        });
+        expect(column(pivotGrid(reloaded), 'A').slice(1, -1)).toEqual(labels);
+      } finally {
+        reloaded.dispose();
+      }
+    }));
 
   it('drops a hidden item and recomputes the grand total', () =>
     withFixture('ja_d7_two_rows_values_cols.xlsx', (wb) => {

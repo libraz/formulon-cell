@@ -160,22 +160,28 @@ describe('file diagnostics on the real engine', () => {
     reloaded.dispose();
   });
 
-  it('writes a PivotTable built in the session to .xlsb', async () => {
+  // The report's cells, so a reload can be compared value by value.
+  const pivotReport = (wb: WorkbookHandle) =>
+    Array.from(wb.pivotCells(0), (c) => [c.addr.row, c.addr.col, c.value]);
+
+  it('writes a PivotTable built in the session to .xlsb, blank source cells included', async () => {
     const wb = await WorkbookHandle.createDefault();
-    const rows: (string | number)[][] = [
+    const rows: (string | number | null)[][] = [
       ['Region', 'Amt'],
       ['East', 5],
+      [null, 3],
       ['West', 7],
+      ['West', null],
     ];
     for (const [r, row] of rows.entries()) {
       for (const [c, v] of row.entries()) {
         const addr = { sheet: 0, row: r, col: 3 + c };
         if (typeof v === 'number') wb.setNumber(addr, v);
-        else wb.setText(addr, v);
+        else if (v !== null) wb.setText(addr, v);
       }
     }
     const created = createPivotTableFromRange(wb, {
-      source: { sheet: 0, r0: 0, c0: 3, r1: 2, c1: 4 },
+      source: { sheet: 0, r0: 0, c0: 3, r1: 4, c1: 4 },
       destination: { sheet: 0, row: 5, col: 0 },
       rowField: 'Region',
       valueField: 'Amt',
@@ -183,16 +189,16 @@ describe('file diagnostics on the real engine', () => {
     });
     expect(created.ok).toBe(true);
     const { bytes, diagnostics } = wb.saveWithDiagnostics('xlsb');
-    expect(diagnostics.droppedPartCount).toBe(0);
+    expect(diagnostics).toEqual(emptySaveDiagnostics());
     const reloaded = await WorkbookHandle.loadBytes(bytes);
     expect(pivotPlacement(reloaded)).toEqual(pivotPlacement(wb));
+    expect(pivotReport(wb)).toHaveLength(10);
+    expect(pivotReport(reloaded)).toEqual(pivotReport(wb));
     wb.dispose();
     reloaded.dispose();
   });
 
-  // Expected to fail on formulon 0.19.0 r38: an unedited .xlsb save counts its derived binaryIndex
-  // parts as dropped. Drop `.fails` once the engine stops counting them.
-  it.fails('reports no loss when an unedited .xlsb is saved again, to .xlsb or .xlsx', async () => {
+  it('reports no loss when an unedited .xlsb is saved again, to .xlsb or .xlsx', async () => {
     const fixture = join(__dirname, '../../fixtures/pivot-excel/xlsb_pivot_base.xlsb');
     const wb = await WorkbookHandle.loadBytes(new Uint8Array(readFileSync(fixture)));
     expect(wb.saveWithDiagnostics('xlsb').diagnostics).toEqual(emptySaveDiagnostics());
