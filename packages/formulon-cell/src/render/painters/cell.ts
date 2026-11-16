@@ -1,6 +1,7 @@
 import type {
   CellBorderSide,
   CellBorderStyle,
+  CellFormat,
   CellGradientFill,
   CellVAlign,
   ConditionalIconSet,
@@ -12,6 +13,10 @@ import { visualZoom } from './text.js';
 import type { CellPaintCtx } from './types.js';
 
 /* ---- Base cell painters: background, fill, borders, diagonals, text. ---- */
+
+/** Whether the format carries its own background: solid, pattern or gradient. */
+export const hasCellFill = (fmt: Partial<CellFormat> | undefined): boolean =>
+  !!(fmt?.fill || fmt?.fillPattern || fmt?.fillGradient);
 
 export function paintCellBackground({
   ctx,

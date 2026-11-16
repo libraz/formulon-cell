@@ -56,6 +56,7 @@ import {
 } from '../painters/text.js';
 import {
   CONDITIONAL_ICON_GUTTER,
+  hasCellFill,
   paintCellBackground,
   paintCellFill,
   paintCellText,
@@ -131,9 +132,6 @@ export interface CellPaintResult {
 /** Horizontal extent of an overflow candidate's single-line run, laid out as
  *  `paintCellText` lays it out. */
 const NO_PIVOT_BUTTONS: readonly PivotCellButton[] = [];
-
-const hasFillSource = (fmt: Partial<CellFormat> | undefined): boolean =>
-  !!(fmt?.fill || fmt?.fillPattern || fmt?.fillGradient);
 
 const overflowRunSpan = (
   ctx: CanvasRenderingContext2D,
@@ -456,7 +454,7 @@ export function paintCells(
         if (!gridLinesShown(state)) continue;
         const next = format.formats.get(addrKey({ sheet: data.sheetIndex, row, col: owner + 1 }));
         // The following cell's fill already covers the rule before it.
-        if (hasFillSource(next)) continue;
+        if (hasCellFill(next)) continue;
         const own = format.formats.get(addrKey({ sheet: data.sheetIndex, row, col: owner }));
         ctx.fillStyle = own?.fill ?? theme.bg;
         ctx.fillRect(ruleCenter(boundary, dprPx, rtlOn) - rule / 2, surface.y, rule, surface.h);
@@ -504,7 +502,7 @@ export function paintCells(
     const anchorFormat = format.formats.get(anchorKey);
     for (const rect of rects) {
       paintMergeSurface(rect, isActive, selected);
-      if (hasFillSource(anchorFormat)) {
+      if (hasCellFill(anchorFormat)) {
         paintCellFill({
           ctx,
           theme,
@@ -562,12 +560,11 @@ export function paintCells(
         !cell &&
         !isActive &&
         !isMergeAnchor &&
-        !hasFillSource(engineFmt) &&
+        !hasCellFill(engineFmt) &&
         !engineFmt?.borders &&
-        !hasFillSource(fmt) &&
+        !hasCellFill(fmt) &&
         !fmt?.borders &&
-        !styleFmt?.fill &&
-        !styleFmt?.fillPattern &&
+        !hasCellFill(styleFmt) &&
         !styleFmt?.borders &&
         !spark &&
         !hasValidationCircle &&
@@ -687,7 +684,7 @@ export function paintCells(
       // Static format fill OR overlay fill — both painted via paintCellFill,
       // which reads `format.fill`. The merged effectiveFmt already prefers
       // overlay over static, so a single call yields the right result.
-      if (hasFillSource(effectiveFmt)) {
+      if (hasCellFill(effectiveFmt)) {
         if (isMergeAnchor && mergedRects.length > 0) {
           for (const mergedRect of mergedRects) {
             paintCellFill({ ...paintCtx, bounds: mergedRect });
@@ -700,7 +697,7 @@ export function paintCells(
         !isActive &&
         !objectSelected &&
         (isInRange || isInExtraRange) &&
-        hasFillSource(effectiveFmt)
+        hasCellFill(effectiveFmt)
       ) {
         if (isMergeAnchor && mergedRects.length > 0) {
           for (const mergedRect of mergedRects) {
@@ -710,8 +707,7 @@ export function paintCells(
           paintSelectedFillShade(paintCtx);
         }
       }
-      if (isActive && !effectiveFmt?.fill && !effectiveFmt?.fillGradient)
-        paintCellBackground(paintCtx);
+      if (isActive && !hasCellFill(effectiveFmt)) paintCellBackground(paintCtx);
       if (overlay) paintDataBar(ctx, bounds, overlay);
       const hideConditionalValue =
         overlay?.showValue === false &&
