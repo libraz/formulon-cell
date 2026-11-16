@@ -3,7 +3,6 @@ import type { Strings } from '../i18n/strings.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { createInteractionButton } from './chip-button.js';
-import { deferInitialFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -70,7 +69,7 @@ export function showPivotSpillCallout(
     above >= 4 ? above : hostRect.top + cell.y + cell.h + 8,
     { fallbackWidth: 384, fallbackHeight: 241 },
   );
-  deferInitialFocus(callout, () => ok.focus({ preventScroll: true }));
+  ok.focus({ preventScroll: true });
   const detachOutside = onOutsidePress(
     doc,
     () => [callout],

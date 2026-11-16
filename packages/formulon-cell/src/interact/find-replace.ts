@@ -22,13 +22,7 @@ import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
 import { showMessage } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
-import {
-  createDialogButton,
-  deferInitialFocus,
-  markSurface,
-  openerOf,
-  returnFocus,
-} from './dialog-shell.js';
+import { createDialogButton, markSurface, openerOf, returnFocus } from './dialog-shell.js';
 import { createMacFindPanel, type MacFindPanel } from './mac-find-panel.js';
 import { isNavigationAddrAllowed, navigationPolicyFor } from './navigation-policy.js';
 import { openPopupMenu } from './popup-menu.js';
@@ -751,10 +745,8 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       syncOptions();
       syncTab();
       updateSummary();
-      deferInitialFocus(overlay, () => {
-        findInput.focus();
-        findInput.select();
-      });
+      findInput.focus();
+      findInput.select();
     },
     close(): void {
       lastQuery = findInput.value;

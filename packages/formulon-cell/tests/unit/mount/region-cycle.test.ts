@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Spreadsheet } from '../../../src/mount.js';
+import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
@@ -32,6 +33,9 @@ const stopOf = (host: HTMLElement): string => {
   return 'other';
 };
 
+const nextFrame = (): Promise<void> =>
+  new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
 const ring = (host: HTMLElement, shiftKey: boolean, presses: number): string[] => {
   const seen: string[] = [];
   for (let i = 0; i < presses; i += 1) {
@@ -59,6 +63,30 @@ describe.each(['default', 'mac'] as const)('F6 region cycling on the %s profile'
       'grid',
       'sheetTab',
     ]);
+  });
+
+  it('moves exactly one stop on F6 with the Watch Window open, and nothing pulls focus after', async () => {
+    await mountFull(true);
+    f6(document.activeElement as Element);
+    expect(stopOf(sheet.host)).toBe('sheetTab');
+    await nextFrame();
+    await nextFrame();
+    expect(stopOf(sheet.host)).toBe('sheetTab');
+  });
+
+  it('does not move focus into the Watch Window when the store changes', async () => {
+    await mountFull(true);
+    const store = sheet.instance.store;
+    const grid = sheetFocusTarget(sheet.host);
+    mutators.addWatch(store, { sheet: 0, row: 0, col: 0 });
+    await nextFrame();
+    expect(document.activeElement).toBe(grid);
+    // Closed and reopened through the store, not through the panel's own open().
+    mutators.setWatchPanelOpen(store, false);
+    mutators.setWatchPanelOpen(store, true);
+    await nextFrame();
+    await nextFrame();
+    expect(document.activeElement).toBe(grid);
   });
 
   it('runs the ring in exact reverse on Shift+F6', async () => {

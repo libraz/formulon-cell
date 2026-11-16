@@ -16,7 +16,7 @@ import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { enhanceCustomSelect } from './custom-select.js';
-import { deferInitialFocus, markSurface, openerOf, returnFocus } from './dialog-shell.js';
+import { markSurface, openerOf, returnFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -433,7 +433,7 @@ export function openPivotFieldFilter(
     fallbackWidth: 257,
     fallbackHeight: 434,
   });
-  deferInitialFocus(panel, () => search.focus({ preventScroll: true }));
+  search.focus({ preventScroll: true });
   const detachOutside = onOutsidePress(
     doc,
     () => [panel],

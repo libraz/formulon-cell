@@ -25,7 +25,6 @@ import {
   appendDialogActions,
   appendDialogButton,
   appendDialogIconButton,
-  deferInitialFocus,
   markSurface,
   openerOf,
   returnFocus,
@@ -617,10 +616,8 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
         window.addEventListener('resize', onScrollOrResize);
         attached = true;
       }
-      deferInitialFocus(wrap, () => {
-        textarea.focus();
-        textarea.select();
-      });
+      textarea.focus();
+      textarea.select();
     },
     close(): void {
       wrap.hidden = true;

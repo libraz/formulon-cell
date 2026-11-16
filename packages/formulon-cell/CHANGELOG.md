@@ -172,6 +172,7 @@ versioning is [SemVer](https://semver.org/).
 - Keys pressed in a modal dialog no longer reach the ribbon's, the backstage's and the title bar's shortcuts: Ctrl+F1 in Go To, Paste Special, Hyperlink, Cell Styles and other dialogs used to collapse the ribbon behind them.
 - Closing a dialog returns focus to the control that opened it, also when that control is outside the sheet, such as a host's backstage card or toolbar button: Page Setup, Go To, Format Cells, Hyperlink, Paste Special, Define Name, Insert Function, Spelling and the other dialogs used to move focus to the sheet after closing.
 - Escape that closes the backstage leaves focus on the File tab instead of dropping it to the page.
+- The comment editor, Find, the filter dropdowns and the Watch Window take focus as they open, so a key pressed straight after opening reaches them; the Watch Window no longer pulls focus back a moment after it opens or when its watches change, which made F6 skip regions.
 - Tab in the formula bar no longer keeps focus there: with an edit it commits and moves on with focus in the grid, without one it moves on from the grid, and where the bar is read-only the key is left to the browser. A viewer with a fixed viewport, and a bar focused without typing, used to stay in the bar. A grid-only spreadsheet with a viewport range no longer holds Tab at its last cell (or Shift+Tab at its first) unless `tabBoundary: 'stop'` asks for it.
 
 ### Removed

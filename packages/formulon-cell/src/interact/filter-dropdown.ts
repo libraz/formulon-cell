@@ -45,7 +45,7 @@ import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
-import { deferInitialFocus, markSurface, openerOf, returnFocus } from './dialog-shell.js';
+import { markSurface, openerOf, returnFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -1107,7 +1107,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       fallbackHeight: 320,
     });
 
-    deferInitialFocus(r, () => search.focus());
+    search.focus();
 
     detachOutside = onOutsidePress(
       ownerDocument,

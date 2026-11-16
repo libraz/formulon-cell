@@ -219,12 +219,23 @@ describe('dialogs', () => {
         }
         const mismatch = kindMismatch(id, pane, 'pane');
         if (mismatch) failures.push(mismatch);
+        // From its first control, then from the pane itself.
         const first = pane.querySelector<HTMLElement>(FOCUSABLE) ?? pane;
-        first.focus();
-        pressEscape(first);
-        if (!shownSurfaces().includes(pane)) failures.push(`${id}: closed on Escape`);
-        else if (document.activeElement !== sheetFocusTarget(host)) {
-          failures.push(`${id}: focus on ${document.activeElement?.className}`);
+        for (const [where, target] of [
+          ['control', first],
+          ['root', pane],
+        ] as const) {
+          if (target === pane && pane.tabIndex < 0 && !pane.hasAttribute('tabindex')) continue;
+          target.focus();
+          if (document.activeElement !== target) continue;
+          pressEscape(target);
+          if (!shownSurfaces().includes(pane)) {
+            failures.push(`${id} ${where}: closed on Escape`);
+            break;
+          }
+          if (document.activeElement !== sheetFocusTarget(host)) {
+            failures.push(`${id} ${where}: focus on ${document.activeElement?.className}`);
+          }
         }
         sheet.dialogs.close(id);
       }
@@ -459,5 +470,63 @@ describe('dialogs', () => {
       expect(walked).toBeGreaterThanOrEqual(20);
     },
     120_000,
+  );
+
+  it.each(['default', 'mac'] as const)(
+    'floating panels take focus as they open: Escape in the same task closes them on the %s profile',
+    async (platform) => {
+      const { host, sheet } = await mountWithContent(platform);
+      const failures: string[] = [];
+      for (const id of FLOATING[platform]) {
+        sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
+        sheetFocusTarget(host).focus();
+        if (id === 'chartSettings') selectChart(host);
+        const before = new Set(shownSurfaces());
+        sheet.dialogs.open(id);
+        // Nothing is awaited: a key pressed now must already land inside the panel.
+        const surface = shownSurfaces().find((el) => !before.has(el));
+        if (!surface) {
+          failures.push(`${id}: nothing opened`);
+          continue;
+        }
+        const active = document.activeElement as HTMLElement | null;
+        if (!active || !surface.contains(active)) {
+          failures.push(`${id}: focus on ${active === document.body ? 'body' : active?.className}`);
+          sheet.dialogs.close(id);
+          continue;
+        }
+        pressEscape(active);
+        if (shownSurfaces().includes(surface)) {
+          failures.push(`${id}: stayed open`);
+          sheet.dialogs.close(id);
+        }
+      }
+      expect(failures).toEqual([]);
+    },
+    60_000,
+  );
+
+  it.each(['default', 'mac'] as const)(
+    'docked panes do not pull focus back after it moved to the sheet on the %s profile',
+    async (platform) => {
+      const { host, sheet } = await mountWithContent(platform);
+      const nextFrame = (): Promise<void> =>
+        new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      const failures: string[] = [];
+      for (const id of PANES[platform]) {
+        sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
+        sheetFocusTarget(host).focus();
+        sheet.dialogs.open(id);
+        sheetFocusTarget(host).focus();
+        await nextFrame();
+        await nextFrame();
+        if (document.activeElement !== sheetFocusTarget(host)) {
+          failures.push(`${id}: focus on ${document.activeElement?.className}`);
+        }
+        sheet.dialogs.close(id);
+      }
+      expect(failures).toEqual([]);
+    },
+    60_000,
   );
 });
