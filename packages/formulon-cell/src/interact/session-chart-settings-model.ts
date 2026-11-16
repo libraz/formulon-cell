@@ -2,6 +2,7 @@
 
 import { seriesColorOf, withoutSeriesColor } from '../charts/engine-adapter.js';
 import { prepareChartData } from '../charts/filters.js';
+import { clamp, finite as finiteOr } from '../charts/numeric.js';
 import { DEFAULT_THEME_ACCENTS } from '../charts/series-colors.js';
 import type {
   ChartAxisSpec,
@@ -148,10 +149,7 @@ const validAxisLogBase = (value: unknown): number | undefined =>
     ? value
     : undefined;
 
-const normalizedAxisLogBase = (value: number): number => {
-  if (!Number.isFinite(value)) return 10;
-  return Math.max(2, Math.min(1000, value));
-};
+const normalizedAxisLogBase = (value: number): number => clamp(finiteOr(value, 10), 2, 1000);
 
 interface ChartAxisDraft {
   visible: boolean;
@@ -253,9 +251,7 @@ const cloneDataLabels = (value?: ChartDataLabelSpec): MutableDataLabels => {
   ) {
     next.showValue = false;
   }
-  next.fontSize = Number.isFinite(value?.fontSize)
-    ? Math.max(6, Math.min(72, value?.fontSize ?? 10))
-    : 10;
+  next.fontSize = clamp(finiteOr(value?.fontSize ?? 10, 10), 6, 72);
   return next;
 };
 
@@ -304,7 +300,7 @@ const effectiveLegendVisible = (chart: SessionChartSettingsShape, data: ChartDat
 };
 
 export const boundedHoleSize = (value: number | undefined): number =>
-  Number.isFinite(value) ? Math.max(10, Math.min(90, value ?? 50)) : 50;
+  clamp(finiteOr(value ?? 50, 50), 10, 90);
 
 /**
  * Build the transient chart spec used by settings controls. This lets every
@@ -457,13 +453,13 @@ const jsonEqual = (left: unknown, right: unknown): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
 export const boundedGapWidth = (value: number | undefined): number =>
-  Number.isFinite(value) ? Math.max(0, Math.min(500, value ?? 150)) : 150;
+  clamp(finiteOr(value ?? 150, 150), 0, 500);
 
 export const boundedOverlap = (value: number | undefined): number =>
-  Number.isFinite(value) ? Math.max(-100, Math.min(100, value ?? 0)) : 0;
+  clamp(finiteOr(value ?? 0, 0), -100, 100);
 
 export const boundedFirstSliceAngle = (value: number | undefined): number =>
-  Number.isFinite(value) ? Math.max(0, Math.min(360, value ?? 0)) : 0;
+  clamp(finiteOr(value ?? 0, 0), 0, 360);
 
 export const normalizedCrossingCustom = (
   value: number,
@@ -472,8 +468,7 @@ export const normalizedCrossingCustom = (
 ): number => {
   if (numeric) return Number.isFinite(value) ? value : 0;
   const count = Math.max(1, categoryCount);
-  const rounded = Number.isFinite(value) ? Math.round(value) : 1;
-  return Math.max(1, Math.min(count, rounded));
+  return clamp(finiteOr(Math.round(value), 1), 1, count);
 };
 
 export const categoryCountForDraft = (data: ChartData, draft: ChartDraft): number => {
@@ -605,7 +600,7 @@ export const updateAxisLogBase = (draft: ChartDraft, axisName: AxisName, value: 
   const trimmed = value.trim();
   const parsed = trimmed === '' ? Number.NaN : Number(trimmed);
   const axis = draft[axisName];
-  axis.logBaseDraft = normalizedAxisLogBase(Number.isFinite(parsed) ? parsed : 10);
+  axis.logBaseDraft = normalizedAxisLogBase(parsed);
   if (axis.logEnabled) axis.logBase = axis.logBaseDraft;
   updateLogChanged(draft, axisName);
 };

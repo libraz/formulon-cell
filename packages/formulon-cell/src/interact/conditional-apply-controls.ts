@@ -1,4 +1,5 @@
 import type { CellFormat } from '../store/store.js';
+import { makeCheckbox } from './format-dialog-dom.js';
 
 export interface ConditionalApplyFormatLabels {
   fillColor: string;
@@ -54,14 +55,8 @@ const appendApplyStyleCheckbox = (
   labelText: string,
   fieldName: string,
 ): HTMLInputElement => {
-  const wrap = document.createElement('label');
-  wrap.className = 'fc-fmtdlg__check';
-  const input = document.createElement('input');
-  input.type = 'checkbox';
+  const { wrap, input } = makeCheckbox(labelText);
   input.dataset.dialogField = fieldName;
-  const label = document.createElement('span');
-  label.textContent = labelText;
-  wrap.append(input, label);
   parent.appendChild(wrap);
   return input;
 };

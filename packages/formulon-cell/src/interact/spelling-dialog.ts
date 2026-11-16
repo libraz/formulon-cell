@@ -60,7 +60,7 @@ const COMMAND_ID = 'spelling';
 
 /** The cells and notes the check walks, by rows from the active cell, wrapping to the top. One
  *  selected cell checks the whole sheet; a selected range checks only that range. */
-export function spellingTargets(instance: SpreadsheetInstance): SpellingTarget[] {
+function spellingTargets(instance: SpreadsheetInstance): SpellingTarget[] {
   const state = instance.store.getState();
   const { active, range, extraRanges } = state.selection;
   const sheet = state.data.sheetIndex;

@@ -1,5 +1,6 @@
 import { copy, planCopyRanges } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
+import { consumeCutMarquee as clearCutMarquee } from '../commands/clipboard/cut-band-snapshots.js';
 import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import { pasteBatchWrite, pasteWrite } from '../commands/clipboard/paste-actions.js';
@@ -73,9 +74,21 @@ export const hasPastePayload = (
 /** A cut can only be pasted once, so its marquee is consumed by the paste.
  *  A copy marquee stays up for repeat pastes, exactly like the desktop app. */
 export const consumeCutMarquee = (store: SpreadsheetStore): void => {
-  if (store.getState().ui.copyMode !== 'cut') return;
-  mutators.setCopyRange(store, null);
-  mutators.setCopyRanges(store, null);
+  if (store.getState().ui.copyMode === 'cut') clearCutMarquee(store);
+};
+
+/** The quick Paste Special items: what each pastes, and whether it transposes. */
+const QUICK_PASTE_PRESETS: Partial<Record<ItemId, readonly [PasteWhat, boolean]>> = {
+  pasteAll: ['all', false],
+  pasteFormulas: ['formulas', false],
+  pasteFormulasNumFmt: ['formulas-and-numfmt', false],
+  pasteValues: ['values', false],
+  pasteValuesNumFmt: ['values-and-numfmt', false],
+  pasteFormatsOnly: ['formats', false],
+  pasteTranspose: ['all', true],
+  pasteKeepSource: ['all-using-source-theme', false],
+  pasteNoBorders: ['all-except-borders', false],
+  pasteColumnWidths: ['column-widths', false],
 };
 
 export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): ContextMenuClipboard {
@@ -294,41 +307,15 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
         });
         return true;
       }
-      case 'pasteAll':
-        runPasteSpecial('pasteAll', 'all', false);
-        return true;
-      case 'pasteFormulas':
-        runPasteSpecial('pasteFormulas', 'formulas', false);
-        return true;
-      case 'pasteFormulasNumFmt':
-        runPasteSpecial('pasteFormulasNumFmt', 'formulas-and-numfmt', false);
-        return true;
-      case 'pasteValues':
-        runPasteSpecial('pasteValues', 'values', false);
-        return true;
-      case 'pasteValuesNumFmt':
-        runPasteSpecial('pasteValuesNumFmt', 'values-and-numfmt', false);
-        return true;
-      case 'pasteFormatsOnly':
-        runPasteSpecial('pasteFormatsOnly', 'formats', false);
-        return true;
-      case 'pasteTranspose':
-        runPasteSpecial('pasteTranspose', 'all', true);
-        return true;
-      case 'pasteKeepSource':
-        runPasteSpecial('pasteKeepSource', 'all-using-source-theme', false);
-        return true;
-      case 'pasteNoBorders':
-        runPasteSpecial('pasteNoBorders', 'all-except-borders', false);
-        return true;
-      case 'pasteColumnWidths':
-        runPasteSpecial('pasteColumnWidths', 'column-widths', false);
-        return true;
       case 'pasteLink':
         runPasteLink();
         return true;
-      default:
-        return false;
+      default: {
+        const preset = QUICK_PASTE_PRESETS[id];
+        if (!preset) return false;
+        runPasteSpecial(id, preset[0], preset[1]);
+        return true;
+      }
     }
   };
 

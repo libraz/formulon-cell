@@ -94,7 +94,8 @@ export function advanceDialogTab(root: HTMLElement, event: KeyboardEvent): boole
   return true;
 }
 
-const GRID_SELECTOR = '.fc-host__grid';
+/** Selector of the grid element inside a mounted spreadsheet host. */
+export const GRID_SELECTOR = '.fc-host__grid';
 
 /**
  * The element that holds focus when the sheet has it: the grid of the mounted

@@ -1,6 +1,13 @@
 import { headerFilterRanges, hiddenFilterButtonTest } from '../commands/filter-ranges.js';
 import { isMacHost } from '../extensions/ui-options.js';
-import { hitZone, layoutForView, type Rect, rangeRects } from '../render/geometry.js';
+import {
+  hitZone,
+  layoutForView,
+  mirrorX,
+  type Rect,
+  rangeRects,
+  type ViewLayout,
+} from '../render/geometry.js';
 import {
   PAGE_BREAK_GRAB,
   type PageBandHit,
@@ -13,6 +20,17 @@ import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { MAC_GRID_CURSORS, resizeCursor } from './grid-cursors.js';
 import { resizableTableGripAt } from './table-resize.js';
+
+/** Pointer position local to `grid` in layout space (mirrored for a right-to-left sheet). */
+export const gridLocal = (
+  grid: HTMLElement,
+  state: State,
+  e: { clientX: number; clientY: number },
+): { layout: ViewLayout; x: number; y: number } => {
+  const rect = grid.getBoundingClientRect();
+  const layout = layoutForView(state);
+  return { layout, x: mirrorX(layout, e.clientX - rect.left), y: e.clientY - rect.top };
+};
 
 /** Pixels the fill-handle hit zone extends past the painted handle. */
 const FILL_HANDLE_HIT_PAD = 3;

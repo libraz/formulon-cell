@@ -42,14 +42,13 @@ import { createInteractionButton } from './chip-button.js';
 import { focusSheet } from './dialog-focus.js';
 import {
   appendDrawingHandles,
+  bindObjectDeselect,
   createObjectSelectionPublisher,
   type DrawingHandle,
   focusedPanelId,
   focusPanel,
   INTERACTIVE,
   isDuplicateShortcut,
-  keepKeyFromGrid,
-  keepsObjectSelected,
   previewFrame,
   subscribeObjectOverlay,
   trackFrameDrag,
@@ -214,7 +213,7 @@ const dataForKind = (data: ChartData, kind: ChartKind): ChartData => {
 
 /** The parts of a chart's data range Excel outlines while it is selected:
  *  series names, categories (or X values) and values. */
-export const chartSourceHighlights = (chart: SessionChart): ChartSourceHighlight[] => {
+const chartSourceHighlights = (chart: SessionChart): ChartSourceHighlight[] => {
   const source = chart.source;
   if (!source || chart.kind === 'unsupported') return [];
   const headerRow = chart.headerRow === true;
@@ -442,24 +441,7 @@ export function attachSessionCharts(deps: {
   };
 
   const menu = createObjectMenu(host);
-  /** Whether `target` is part of a chart, its settings or the ribbon, which keep the chart selected. */
-  const insideCharts = (target: EventTarget | null): boolean =>
-    target instanceof Node &&
-    (root.contains(target) ||
-      menu.contains(target) ||
-      keepsObjectSelected(target) ||
-      (target instanceof Element && target.closest('.fc-chart-settings') !== null));
-
-  // Like Excel, a press anywhere else on the sheet leaves the chart.
-  const onDocumentPointerDown = (e: PointerEvent): void => {
-    if (!insideCharts(e.target)) deselect();
-  };
-  document.addEventListener('pointerdown', onDocumentPointerDown, true);
-  const onFocusOut = (e: FocusEvent): void => {
-    if (e.relatedTarget !== null && !insideCharts(e.relatedTarget)) deselect();
-  };
-  root.addEventListener('focusout', onFocusOut);
-  root.addEventListener('keydown', keepKeyFromGrid);
+  const unbindDeselect = bindObjectDeselect(root, menu, deselect, '.fc-chart-settings');
 
   /** Move or resize a chart to grid pixels; false when the workbook refused. */
   const placeChart = (
@@ -928,9 +910,7 @@ export function attachSessionCharts(deps: {
     },
     detach() {
       unsubscribe();
-      document.removeEventListener('pointerdown', onDocumentPointerDown, true);
-      root.removeEventListener('focusout', onFocusOut);
-      root.removeEventListener('keydown', keepKeyFromGrid);
+      unbindDeselect();
       menu.detach();
       selectedId = null;
       syncSelection();

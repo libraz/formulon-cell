@@ -3,13 +3,11 @@ import { formatA1Cell } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { MAC_CONTEXT_LABELS } from '../toolbar/ribbon/mac/labels-data.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
 import { focusSheet } from './dialog-focus.js';
-import { appendDialogButton } from './dialog-shell.js';
 import { isNavigationAddrAllowed, subscribeNavigationPolicy } from './navigation-policy.js';
-import { syncTaskpaneDock } from './taskpane-dock.js';
+import { createDockedPane, syncTaskpaneDock, taskpaneDockOf } from './taskpane-dock.js';
 
 export interface CommentsPaneDeps {
   /** The `.fc-host` element; the pane docks in its task-pane dock. */
@@ -31,23 +29,10 @@ export interface CommentsPaneHandle {
  */
 export function attachCommentsPane(deps: CommentsPaneDeps): CommentsPaneHandle {
   const { host, store, getWb } = deps;
-  const dock = host.querySelector<HTMLElement>('.fc-host__taskpane-dock');
+  const dock = taskpaneDockOf(host);
 
-  const root = document.createElement('div');
-  root.className = 'fc-commentspane';
-  root.setAttribute('role', 'region');
+  const { root, title, closeBtn, body } = createDockedPane('fc-commentspane');
   root.hidden = !store.getState().ui.commentsPaneOpen;
-
-  const header = document.createElement('div');
-  header.className = 'fc-commentspane__header';
-  const title = document.createElement('span');
-  title.className = 'fc-commentspane__title';
-  const closeBtn = appendDialogButton(header, { label: '', baseClass: 'fc-commentspane__close' });
-  closeBtn.append(createExcelRibbonSvg('paneClose', 'fc-pane-close__glyph') ?? '');
-  header.prepend(title);
-  const body = document.createElement('div');
-  body.className = 'fc-commentspane__body';
-  root.append(header, body);
   (dock ?? host).appendChild(root);
 
   let lastOpen = root.hidden === false;

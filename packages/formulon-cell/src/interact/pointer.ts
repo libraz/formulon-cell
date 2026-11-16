@@ -104,6 +104,7 @@ import {
 import { pivotRowItemAt, togglePivotItemDetail } from './pivot-detail.js';
 import { movePivotItem, type PivotItemSlots, pivotItemSlotsAt } from './pivot-item-order.js';
 import { movePivotTable } from './pivot-move.js';
+import { capturePointerSafely, releaseHeldPointer } from './pointer-capture.js';
 import {
   indexAt,
   isFillHandleHit,
@@ -631,20 +632,10 @@ export function attachPointer(
     fullFidelityCellWrites(hostPolicy()) && policyPermits(hostPolicy(), 'fill');
   const pageDragAllowed = (): boolean => policyPermits(hostPolicy(), 'pageSetup');
 
-  // setPointerCapture throws on synthetic events / certain pointer-id mismatches.
-  // Wrap to avoid crashing the handler; the worst-case fallback is that move
-  // events stop firing once the pointer leaves the host.
-  const tryCapture = (e: PointerEvent): void => {
-    try {
-      host.setPointerCapture(e.pointerId);
-    } catch {
-      /* no-op: still works without capture for in-host drags */
-    }
-  };
   /** Take focus and pointer capture for a gesture the host owns. */
   const grab = (e: PointerEvent): void => {
     host.focus();
-    tryCapture(e);
+    capturePointerSafely(host, e.pointerId);
   };
 
   /** A secondary press moves the selection before the context menu opens:
@@ -878,7 +869,7 @@ export function attachPointer(
       const pressed = box ? hitTest(layoutForView(s), s.viewport, x, y) : null;
       if (box && ref && pressed) {
         e.preventDefault();
-        tryCapture(e);
+        capturePointerSafely(host, e.pointerId);
         const orig = { sheet: s.data.sheetIndex, r0: ref.r0, c0: ref.c0, r1: ref.r1, c1: ref.c1 };
         drag = {
           kind: 'ref-box',
@@ -905,7 +896,7 @@ export function attachPointer(
     //  pointerdown's default focus-change behavior).
     if (inFormula && zone.kind === 'cell' && editor) {
       e.preventDefault();
-      tryCapture(e);
+      capturePointerSafely(host, e.pointerId);
       const rawAnchor = { row: zone.row, col: zone.col };
       const mergedAnchor = mergeAnchorOf(s, {
         sheet: s.data.sheetIndex,
@@ -1572,7 +1563,7 @@ export function attachPointer(
 
   const onUp = (e: PointerEvent): void => {
     autoscroll.stop();
-    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    releaseHeldPointer(host, e.pointerId);
     if (
       (selectionDisabled() && drag.kind !== 'none' && drag.kind !== 'range-insert') ||
       (hostPolicy() !== undefined &&
@@ -1801,7 +1792,7 @@ export function attachPointer(
   const onCancel = (e: PointerEvent): void => {
     finishSecondaryDrag();
     autoscroll.stop();
-    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    releaseHeldPointer(host, e.pointerId);
     if (drag.kind === 'selection-marquee') {
       const base = drag.base;
       store.setState((s) => ({ ...s, selection: base }));

@@ -4,6 +4,7 @@
 // keeps its hydrated floor.
 
 import type { Range } from '../engine/types.js';
+import { formatEditableNumber } from '../engine/value.js';
 import type { Strings } from '../i18n/strings.js';
 import { iconSetSlotCount } from '../render/conditional.js';
 import { paintConditionalIcon } from '../render/painters/cell.js';
@@ -18,9 +19,9 @@ import {
   bindScalePointValueVisibility,
   collectScalePoint,
   conditionalSelect,
-  localizedScalePointValue,
   scaleTypeOptions,
 } from './conditional-form-controls.js';
+import { makeCheckbox } from './format-dialog-dom.js';
 
 type IconSetRule = Extract<ConditionalRule, { kind: 'icon-set' }>;
 
@@ -140,22 +141,10 @@ export function appendIconSetForm(
   // Family the pickers were last seeded from; a family change reseeds them.
   let pickerFamily: ConditionalIconSet | undefined;
 
-  const iconReverseRow = document.createElement('label');
-  iconReverseRow.className = 'fc-fmtdlg__check';
-  const iconReverseCk = document.createElement('input');
-  iconReverseCk.type = 'checkbox';
-  const iconReverseText = document.createElement('span');
-  iconReverseText.textContent = t.reverseOrder;
-  iconReverseRow.append(iconReverseCk, iconReverseText);
+  const { wrap: iconReverseRow, input: iconReverseCk } = makeCheckbox(t.reverseOrder);
   group.appendChild(iconReverseRow);
 
-  const iconOnlyRow = document.createElement('label');
-  iconOnlyRow.className = 'fc-fmtdlg__check';
-  const iconOnlyCk = document.createElement('input');
-  iconOnlyCk.type = 'checkbox';
-  const iconOnlyText = document.createElement('span');
-  iconOnlyText.textContent = t.showIconOnly;
-  iconOnlyRow.append(iconOnlyCk, iconOnlyText);
+  const { wrap: iconOnlyRow, input: iconOnlyCk } = makeCheckbox(t.showIconOnly);
   group.appendChild(iconOnlyRow);
 
   const iconOperatorOptions: DialogSelectOption[] = [
@@ -252,8 +241,7 @@ export function appendIconSetForm(
       if (!control) continue;
       control.operator.value = point.gte === false ? '>' : '>=';
       control.type.value = point.kind;
-      control.value.value =
-        'value' in point ? localizedScalePointValue(point.value, getLocale()) : '';
+      control.value.value = 'value' in point ? formatEditableNumber(point.value, getLocale()) : '';
     }
   };
 

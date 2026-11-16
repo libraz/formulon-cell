@@ -154,6 +154,29 @@ export function clearDialogError(errorRow: HTMLElement): void {
   errorRow.textContent = '';
 }
 
+/** A polite live status line appended to `body`, with its `data-state` marking an error. */
+export function createDialogStatus(
+  body: HTMLElement,
+  className: string,
+): { el: HTMLDivElement; error(message: string): void; clear(): void } {
+  const el = document.createElement('div');
+  el.className = className;
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  body.appendChild(el);
+  return {
+    el,
+    error(message) {
+      el.dataset.state = 'error';
+      el.textContent = message;
+    },
+    clear() {
+      delete el.dataset.state;
+      el.textContent = '';
+    },
+  };
+}
+
 interface BoundListener {
   target: EventTarget;
   event: string;

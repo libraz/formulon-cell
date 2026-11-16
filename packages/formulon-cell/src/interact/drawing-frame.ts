@@ -30,6 +30,42 @@ export const keepsObjectSelected = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest(RIBBON_SURFACE) !== null;
 
 /**
+ * Deselect on a press or focus move outside `root`, `menu`, the ribbon and any
+ * `extraInside` match, and keep keys pressed in `root` from the grid. Returns
+ * the disposer.
+ */
+export const bindObjectDeselect = (
+  root: HTMLElement,
+  menu: { contains(target: Node): boolean },
+  deselect: () => void,
+  extraInside?: string,
+): (() => void) => {
+  const inside = (target: EventTarget | null): boolean =>
+    target instanceof Node &&
+    (root.contains(target) ||
+      menu.contains(target) ||
+      keepsObjectSelected(target) ||
+      (extraInside !== undefined &&
+        target instanceof Element &&
+        target.closest(extraInside) !== null));
+  // Like Excel, a press anywhere else on the sheet leaves the object.
+  const onDocumentPointerDown = (e: PointerEvent): void => {
+    if (!inside(e.target)) deselect();
+  };
+  const onFocusOut = (e: FocusEvent): void => {
+    if (e.relatedTarget !== null && !inside(e.relatedTarget)) deselect();
+  };
+  document.addEventListener('pointerdown', onDocumentPointerDown, true);
+  root.addEventListener('focusout', onFocusOut);
+  root.addEventListener('keydown', keepKeyFromGrid);
+  return () => {
+    document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+    root.removeEventListener('focusout', onFocusOut);
+    root.removeEventListener('keydown', keepKeyFromGrid);
+  };
+};
+
+/**
  * Keep a key pressed on a selected object from the grid under it, which would
  * otherwise type into or move the active cell. Shortcuts the sheet owns still
  * reach it: Undo, and Copy, Cut and Paste, which act on the selected object.

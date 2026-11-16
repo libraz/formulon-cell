@@ -27,7 +27,6 @@ export const attachRangePickerButton = (
     pressed: false,
   });
   button.title = opts.label;
-  button.setAttribute('aria-pressed', 'false');
 
   let unsubscribe: (() => void) | null = null;
   let observer: MutationObserver | null = null;

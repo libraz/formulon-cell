@@ -82,7 +82,7 @@ describe('interact/format-dialog-state', () => {
     hydrateDraftFromFormat(draft, summary.activeFormat, 'en');
     draft.align = 'center';
     const touched = new Set(['align'] as const);
-    expect(buildTouchedDialogPatch(draft, touched, false)).toEqual({ align: 'center' });
+    expect(buildTouchedDialogPatch(draft, touched, false, () => '')).toEqual({ align: 'center' });
   });
 
   it.each([

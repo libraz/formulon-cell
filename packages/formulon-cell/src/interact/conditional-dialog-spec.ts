@@ -31,15 +31,10 @@ export const formatPresetPatch = (preset: FormatPreset): Partial<CellFormat> => 
       return { color: '#c00000' };
     case 'light-red-fill':
       return { fill: '#ffc7ce' };
-    case 'red-border':
-      return {
-        borders: {
-          top: { style: 'thin', color: '#ff0000' },
-          right: { style: 'thin', color: '#ff0000' },
-          bottom: { style: 'thin', color: '#ff0000' },
-          left: { style: 'thin', color: '#ff0000' },
-        },
-      };
+    case 'red-border': {
+      const side = () => ({ style: 'thin' as const, color: '#ff0000' });
+      return { borders: { top: side(), right: side(), bottom: side(), left: side() } };
+    }
     case 'custom':
       return {};
   }

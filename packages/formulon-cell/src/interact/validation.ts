@@ -16,7 +16,7 @@ import { cellRect, layoutForView } from '../render/geometry.js';
 import { gridHitState } from '../render/grid.js';
 import { validationAt } from '../store/range-validations.js';
 import { renderScale } from '../store/render-scale.js';
-import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { pickFromListValues } from './autocomplete.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
@@ -77,11 +77,7 @@ export interface ValidationAlertHandle {
 }
 
 /** The active value of a cell as the list shows it selected. */
-const cellText = (
-  s: ReturnType<SpreadsheetStore['getState']>,
-  row: number,
-  col: number,
-): string => {
+const cellText = (s: State, row: number, col: number): string => {
   const current = s.data.cells.get(addrKey({ sheet: s.data.sheetIndex, row, col }))?.value;
   if (current?.kind === 'text') return current.value;
   if (current?.kind === 'number') return String(current.value);

@@ -200,15 +200,6 @@ export function paintChartPart(svg: SVGSVGElement, part: ChartPart | null): void
       ))
         for (const [x, y] of corners(box)) circle(x, y);
       break;
-    case 'title': {
-      const box = union(boxes('[data-chart-role="title"]'));
-      if (box) {
-        const f = padded(box);
-        frame(f);
-        for (const [x, y] of corners(f)) circle(x, y);
-      }
-      break;
-    }
     case 'legend': {
       const box = union(boxes('[data-chart-role="legend"]'));
       if (box) {
@@ -218,8 +209,13 @@ export function paintChartPart(svg: SVGSVGElement, part: ChartPart | null): void
       }
       break;
     }
+    case 'title':
     case 'axisLabels': {
-      const box = union(boxes(`[data-chart-role="${part.role}"]`));
+      const box = union(
+        boxes(
+          part.kind === 'title' ? '[data-chart-role="title"]' : `[data-chart-role="${part.role}"]`,
+        ),
+      );
       if (box) {
         const f = padded(box);
         frame(f);

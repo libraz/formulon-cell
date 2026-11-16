@@ -356,28 +356,11 @@ export function summarizeDialogFormats(
   return { activeFormat, mixed };
 }
 
-const defaultPatternFor = (category: NumberCategory): string => {
-  switch (category) {
-    case 'date':
-      return 'yyyy-mm-dd';
-    case 'time':
-      return 'HH:MM:SS';
-    case 'fraction':
-      return '# ?/?';
-    case 'special':
-      return '000';
-    case 'custom':
-      return '0.00';
-    default:
-      return '';
-  }
-};
-
 export function buildTouchedDialogPatch(
   draft: DraftState,
   touched: ReadonlySet<FormatDialogField>,
   padNumber: boolean,
-  defaultPattern: (category: NumberCategory) => string = defaultPatternFor,
+  defaultPattern: (category: NumberCategory) => string,
   canonicalizeFormula?: FormulaTransform,
 ): Partial<CellFormat> {
   const patch: Partial<CellFormat> = {};

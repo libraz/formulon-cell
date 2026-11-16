@@ -5,6 +5,10 @@ import { lastUsedCell } from './data-edge-navigation.js';
 /** How long the thumbs stay after the last scroll before they fade out. */
 const IDLE_HIDE_MS = 1000;
 
+/** Scrollable extent in rows or columns: the used count, or the view when it reaches past it. */
+const thumbTotal = (used: number, start: number, visible: number): number =>
+  Math.max(used, start + visible);
+
 /** Length and offset of an overlay thumb along a track of `track` px. The
  *  scrollable extent is the used rows or columns, or the view when it reaches
  *  past them, so a short sheet shows a full-length thumb. */
@@ -14,7 +18,7 @@ export function overlayThumb(input: {
   visible: number;
   used: number;
 }): { length: number; offset: number } {
-  const total = Math.max(input.used, input.start + input.visible);
+  const total = thumbTotal(input.used, input.start, input.visible);
   if (total <= 0) return { length: input.track, offset: 0 };
   return {
     length: (input.track * input.visible) / total,
@@ -38,24 +42,17 @@ export function attachOverlayScrollbars(deps: {
   store: SpreadsheetStore;
 }): OverlayScrollbarsHandle {
   const { grid, store } = deps;
-  const thumb = (axis: 'v' | 'h'): HTMLDivElement => {
+  const bar = (kind: 'thumb' | 'track', axis: 'v' | 'h'): HTMLDivElement => {
     const el = document.createElement('div');
-    el.className = `fc-scrollthumb fc-scrollthumb--${axis}`;
+    el.className = `fc-scroll${kind} fc-scroll${kind}--${axis}`;
     el.setAttribute('aria-hidden', 'true');
     grid.appendChild(el);
     return el;
   };
-  const track = (axis: 'v' | 'h'): HTMLDivElement => {
-    const el = document.createElement('div');
-    el.className = `fc-scrolltrack fc-scrolltrack--${axis}`;
-    el.setAttribute('aria-hidden', 'true');
-    grid.appendChild(el);
-    return el;
-  };
-  const verticalTrack = track('v');
-  const horizontalTrack = track('h');
-  const vertical = thumb('v');
-  const horizontal = thumb('h');
+  const verticalTrack = bar('track', 'v');
+  const horizontalTrack = bar('track', 'h');
+  const vertical = bar('thumb', 'v');
+  const horizontal = bar('thumb', 'h');
 
   let extentKey: readonly unknown[] = [];
   let extent = { row: 0, col: 0 };
@@ -67,6 +64,9 @@ export function attachOverlayScrollbars(deps: {
     }
     return extent;
   };
+
+  /** Offset of each thumb along its axis, in px from the grid edge, as last placed. */
+  const thumbStart = { v: 0, h: 0 };
 
   const place = (s: State): void => {
     const layout = layoutForView(s);
@@ -85,6 +85,8 @@ export function attachOverlayScrollbars(deps: {
       visible: s.viewport.colCount,
       used: used.col + 1,
     });
+    thumbStart.v = top + v.offset;
+    thumbStart.h = left + h.offset;
     vertical.style.top = `${top + v.offset}px`;
     vertical.style.height = `${v.length}px`;
     horizontal.style.left = `${left + h.offset}px`;
@@ -116,13 +118,9 @@ export function attachOverlayScrollbars(deps: {
   const axisOf = (el: HTMLElement): 'v' | 'h' =>
     el.classList.contains('fc-scroll--v') ? 'v' : 'h';
   const pos = (e: PointerEvent, axis: 'v' | 'h'): number => (axis === 'v' ? e.clientY : e.clientX);
-  const thumbEdge = (axis: 'v' | 'h'): { start: number; end: number } => {
+  const thumbStartOnScreen = (axis: 'v' | 'h'): number => {
     const box = grid.getBoundingClientRect();
-    const el = axis === 'v' ? vertical : horizontal;
-    const origin = axis === 'v' ? box.top : box.left;
-    const a = Number.parseFloat(axis === 'v' ? el.style.top : el.style.left) || 0;
-    const len = Number.parseFloat(axis === 'v' ? el.style.height : el.style.width) || 0;
-    return { start: origin + a, end: origin + a + len };
+    return (axis === 'v' ? box.top : box.left) + thumbStart[axis];
   };
 
   const onTrackDown = (e: PointerEvent): void => {
@@ -133,7 +131,7 @@ export function attachOverlayScrollbars(deps: {
     e.stopPropagation();
     const s = store.getState();
     const page = Math.max(1, (axis === 'v' ? s.viewport.rowCount : s.viewport.colCount) - 1);
-    const dir = pos(e, axis) < thumbEdge(axis).start ? -1 : 1;
+    const dir = pos(e, axis) < thumbStartOnScreen(axis) ? -1 : 1;
     if (axis === 'v') mutators.scrollBy(store, dir * page, 0);
     else mutators.scrollBy(store, 0, dir * page);
   };
@@ -150,7 +148,7 @@ export function attachOverlayScrollbars(deps: {
     const v = axis === 'v';
     const start0 = v ? s.viewport.rowStart : s.viewport.colStart;
     const visible = v ? s.viewport.rowCount : s.viewport.colCount;
-    const total = Math.max((v ? used.row : used.col) + 1, start0 + visible);
+    const total = thumbTotal((v ? used.row : used.col) + 1, start0, visible);
     const origin = v ? gridOriginY(layout) : gridOriginX(layout);
     const trackLen = Math.max(1, (v ? grid.clientHeight : grid.clientWidth) - origin);
     const from = pos(e, axis);

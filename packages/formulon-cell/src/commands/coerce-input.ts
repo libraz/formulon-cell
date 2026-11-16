@@ -128,6 +128,20 @@ export function canonicalizeLocalizedFormulaForInput(
   return wb.canonicalizeLocalizedFormula(formula, profile);
 }
 
+/** Show a canonical formula in the workbook's localized grammar; the formula itself when the
+ * workbook is absent, cannot localize, or throws. */
+export function formulaForDisplaySafe(
+  wb: WorkbookHandle | null | undefined,
+  formula: string,
+): string {
+  if (!wb || typeof wb.getFormulaForDisplay !== 'function') return formula;
+  try {
+    return wb.getFormulaForDisplay(formula);
+  } catch {
+    return formula;
+  }
+}
+
 /** Callback used by external clipboard payloads. Internal snapshots continue
  * to read formulas directly from the store and therefore remain canonical. */
 export function localizeFormulaForClipboard(wb: WorkbookHandle): (formula: string) => string {

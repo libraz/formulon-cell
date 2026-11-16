@@ -735,7 +735,6 @@ function computeContext(
   const seen = new Set(functions.map((label) => label.toLocaleLowerCase()));
   const tokenStart = completion?.tokenStart ?? names?.tokenStart ?? caret;
   const token = text.slice(tokenStart, caret).toLocaleUpperCase();
-  const startsWithToken = (label: string): boolean => label.toLocaleUpperCase().startsWith(token);
   const grouped = deps.groupNames?.() ?? false;
   if (!names) {
     return {
@@ -775,10 +774,7 @@ function computeContext(
     }
   } else {
     const mixed = sortCaseless([...functionEntries, ...nameEntries], (e) => e.label);
-    entries.push(
-      ...mixed.filter((e) => startsWithToken(e.label)),
-      ...mixed.filter((e) => !startsWithToken(e.label)),
-    );
+    entries.push(...partitionByPrefix(mixed, (e) => e.label, token));
   }
   return {
     matches: entries.map((e) => e.label),
@@ -832,14 +828,10 @@ export function completeFunctionNames(
   const token = text.slice(tokenStart, caret);
   const upper = token.toLocaleUpperCase();
   const sorted = sortCaseless(merged, (label) => label);
-  const startsWithToken = (label: string): boolean => label.toLocaleUpperCase().startsWith(upper);
   return {
     token,
     tokenStart,
-    names: [
-      ...sorted.filter(startsWithToken),
-      ...sorted.filter((label) => !startsWithToken(label)),
-    ],
+    names: partitionByPrefix(sorted, (label) => label, upper),
   };
 }
 
@@ -963,10 +955,24 @@ function suggestCustomFunctions(
   const { token, tokenStart } = formulaIdentifierPrefix(text, caret);
   if (token.length < 1 || !/^[\p{L}_]/u.test(token)) return null;
   const upper = token.toLocaleUpperCase();
-  const matches = names.filter((n) => n.toLocaleUpperCase().startsWith(upper));
+  const matches = names.filter((n) => startsWithFolded(n, upper));
   if (matches.length === 0) return null;
   return { token, tokenStart, matches };
 }
+
+/** Case-insensitive prefix test; `upperToken` is already upper-cased. */
+const startsWithFolded = (label: string, upperToken: string): boolean =>
+  label.toLocaleUpperCase().startsWith(upperToken);
+
+/** The items whose label starts with `upperToken` first, the rest after, each keeping its order. */
+const partitionByPrefix = <T>(
+  items: readonly T[],
+  label: (item: T) => string,
+  upperToken: string,
+): T[] => [
+  ...items.filter((item) => startsWithFolded(label(item), upperToken)),
+  ...items.filter((item) => !startsWithFolded(label(item), upperToken)),
+];
 
 /** Stable sort by lowercased label, lowercasing each label once. */
 const sortCaseless = <T>(items: readonly T[], label: (item: T) => string): T[] =>

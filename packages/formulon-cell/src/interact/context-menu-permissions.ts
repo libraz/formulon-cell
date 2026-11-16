@@ -7,6 +7,7 @@ import type { OperationIntent, PermissionDecision } from '../commands/interactio
 import { deny, localizedDecisionReason } from '../commands/permission-reasons.js';
 import type { Range } from '../engine/types.js';
 import type { Strings } from '../i18n/strings/types.js';
+import { rangeContainsRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { ContextMenuInteractionController, ContextMenuItem } from './context-menu-options.js';
 import type { ItemId } from './context-menu-spec.js';
@@ -53,16 +54,7 @@ export function createContextMenuPermissions(
   const canPasteToRange = (range: Range | null): boolean => {
     const bounds = navigationBoundsFor(store);
     if (!bounds) return true;
-    if (
-      !range ||
-      range.sheet !== bounds.sheet ||
-      range.r0 < bounds.r0 ||
-      range.c0 < bounds.c0 ||
-      range.r1 > bounds.r1 ||
-      range.c1 > bounds.c1
-    ) {
-      return false;
-    }
+    if (!range || !rangeContainsRange(bounds, range)) return false;
     if (!interactionController) return true;
     return interactionController.canExecute({
       operation: 'paste',

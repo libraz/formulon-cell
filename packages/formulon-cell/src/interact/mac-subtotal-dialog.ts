@@ -19,6 +19,7 @@ import {
   appendDialogButton,
   appendDialogFrame,
   createDialogShell,
+  createDialogStatus,
 } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 
@@ -103,11 +104,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
   const summaryOption = appendOption(body);
   summaryOption.input.checked = true;
 
-  const status = document.createElement('div');
-  status.className = 'fc-mac-subtotal__status';
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
-  body.appendChild(status);
+  const status = createDialogStatus(body, 'fc-mac-subtotal__status');
 
   const removeAllBtn = appendDialogButton(footer, {
     label: '',
@@ -192,13 +189,11 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
   };
 
   const fail = (message: string): void => {
-    status.dataset.state = 'error';
-    status.textContent = message;
+    status.error(message);
   };
 
   const removeAll = (): void => {
-    delete status.dataset.state;
-    status.textContent = '';
+    status.clear();
     const removed = removeMacSubtotals(instance, region);
     if (!removed.ok) {
       fail(describeMacDataError(instance.i18n.strings, removed.error));
@@ -208,8 +203,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
   };
 
   const run = (): void => {
-    delete status.dataset.state;
-    status.textContent = '';
+    status.clear();
     const columns = checks.filter((input) => input.checked).map((input) => Number(input.value));
     if (columns.length === 0) {
       fail(strings.errors.invalidColumn);
@@ -263,8 +257,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
     open(): void {
       applyLabels();
       defaults();
-      delete status.dataset.state;
-      status.textContent = '';
+      status.clear();
       shell.open();
       queueMicrotask(() => groupBySelect.focus());
     },

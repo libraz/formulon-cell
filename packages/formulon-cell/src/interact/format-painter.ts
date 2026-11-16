@@ -9,6 +9,7 @@ import { hitTest, layoutForView } from '../render/geometry.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 import { createGridLocalPoint } from './grid-local-point.js';
+import { capturePointerSafely, releaseHeldPointer } from './pointer-capture.js';
 
 export interface FormatPainterDeps {
   host: HTMLElement;
@@ -225,11 +226,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
       row: cell.row + rows - 1,
       col: cell.col + cols - 1,
     });
-    try {
-      host.setPointerCapture(e.pointerId);
-    } catch {
-      /* synthetic events / id mismatch: the drag still works inside the host */
-    }
+    capturePointerSafely(host, e.pointerId);
   };
 
   const onPointerMove = (e: PointerEvent): void => {
@@ -249,7 +246,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
 
   const onPointerUp = (e: PointerEvent): void => {
     if (!snapshot || !dragging) return;
-    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    releaseHeldPointer(host, e.pointerId);
     dragging = false;
     dragStart = null;
     lastHit = null;
@@ -262,7 +259,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
 
   const onPointerCancel = (e: PointerEvent): void => {
     if (!snapshot || !dragging) return;
-    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    releaseHeldPointer(host, e.pointerId);
     dragging = false;
     dragStart = null;
     lastHit = null;

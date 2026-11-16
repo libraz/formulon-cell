@@ -1,3 +1,4 @@
+import { clamp } from '../charts/numeric.js';
 import type { History } from '../commands/history.js';
 import {
   canDeleteIllustration,
@@ -313,9 +314,9 @@ export function attachWorkbookObjectsPanel(
         // An untouched corner keeps following the shape's size.
         ...(saved || radius.value === initialRadius
           ? {}
-          : { radius: Math.max(0, Math.min(48, Number(radius.value) || 0)) }),
-        lineWidth: Math.max(0, Math.min(MAX_SHAPE_LINE_WIDTH, Number(lineWidth.value) || 0)),
-        opacity: Math.max(0, Math.min(1, Number(opacity.value) || 0)),
+          : { radius: clamp(Number(radius.value) || 0, 0, 48) }),
+        lineWidth: clamp(Number(lineWidth.value) || 0, 0, MAX_SHAPE_LINE_WIDTH),
+        opacity: clamp(Number(opacity.value) || 0, 0, 1),
       });
     });
     form.append(

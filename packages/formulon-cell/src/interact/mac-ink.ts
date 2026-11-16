@@ -1,4 +1,4 @@
-import { finite } from '../charts/numeric.js';
+import { clamp, finite } from '../charts/numeric.js';
 import type { History } from '../commands/history.js';
 import { objectChangeAllowed, objectWrite } from '../commands/object-actions.js';
 import { clearSessionIllustration, createSessionImage } from '../commands/session-illustration.js';
@@ -132,10 +132,7 @@ const styleFor = (tool: MacInkDrawingTool): ToolStyle => {
   }
 };
 
-const clamp01 = (value: number): number => Math.max(0, Math.min(1, finite(value, 0)));
-
-const escapeXml = (value: string): string =>
-  value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
+const clamp01 = (value: number): number => clamp(finite(value, 0), 0, 1);
 
 const pathFor = (points: readonly { x: number; y: number }[], offsetX = 0, offsetY = 0): string => {
   if (points.length === 0) return '';
@@ -165,7 +162,7 @@ const svgImageFor = (
   const w = Math.max(2, maxX - minX + padding * 2);
   const h = Math.max(2, maxY - minY + padding * 2);
   const d = pathFor(points, x, y);
-  const svg = `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${escapeXml(d)}" fill="none" stroke="${style.color}" stroke-width="${style.lineWidth}" stroke-linecap="round" stroke-linejoin="round" opacity="${style.opacity}"/></svg>`;
+  const svg = `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${d}" fill="none" stroke="${style.color}" stroke-width="${style.lineWidth}" stroke-linecap="round" stroke-linejoin="round" opacity="${style.opacity}"/></svg>`;
   return { src: `data:image/svg+xml,${encodeURIComponent(svg)}`, d, x, y, w, h };
 };
 
@@ -218,7 +215,7 @@ const nextId = (store: SpreadsheetStore, sheet: number): string => {
   return id;
 };
 
-const localSize = (grid: HTMLElement, state: ReturnType<SpreadsheetStore['getState']>) => {
+const localSize = (grid: HTMLElement, state: State) => {
   const rect = grid.getBoundingClientRect();
   return {
     width: Math.max(1, finite(rect.width, state.viewport.widthPx || grid.clientWidth || 1)),
@@ -226,11 +223,7 @@ const localSize = (grid: HTMLElement, state: ReturnType<SpreadsheetStore['getSta
   };
 };
 
-const pointAt = (
-  state: ReturnType<SpreadsheetStore['getState']>,
-  x: number,
-  y: number,
-): InkPoint | null => {
+const pointAt = (state: State, x: number, y: number): InkPoint | null => {
   const layout = layoutForView(state);
   const cell = hitTest(layout, state.viewport, x, y);
   if (!cell) return null;
@@ -246,7 +239,7 @@ const pointAt = (
 
 const pointToLocal = (
   layout: ViewLayout,
-  viewport: ReturnType<SpreadsheetStore['getState']>['viewport'],
+  viewport: State['viewport'],
   point: InkPoint,
 ): { x: number; y: number } | null => {
   const rect = cellRectUnclamped(layout, viewport, point.row, point.col);
@@ -254,10 +247,7 @@ const pointToLocal = (
   return { x: rect.x + point.u * rect.w, y: rect.y + point.v * rect.h };
 };
 
-const localPoints = (
-  state: ReturnType<SpreadsheetStore['getState']>,
-  metadata: MacInkMetadata,
-): { x: number; y: number }[] => {
+const localPoints = (state: State, metadata: MacInkMetadata): { x: number; y: number }[] => {
   const layout = layoutForView(state);
   return metadata.points.flatMap((point) => {
     const local = pointToLocal(layout, state.viewport, point);
@@ -288,7 +278,7 @@ type InkClipLayers = Record<InkPane, SVGGElement>;
 const INK_PANES: readonly InkPane[] = ['body', 'frozen-rows', 'frozen-cols', 'corner'];
 
 const clipBoundsFor = (
-  state: ReturnType<SpreadsheetStore['getState']>,
+  state: State,
   size: { width: number; height: number },
 ): Record<InkPane, InkClipBounds> => {
   const layout = layoutForView(state);
@@ -575,11 +565,11 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
 
   const finishStroke = (): void => {
     if (drawingPointerId === null || inProgress.length === 0) return;
-    const points = inProgress.slice();
+    const points = inProgress;
     drawingPointerId = null;
     inProgress = [];
     const mode = effectiveTool();
-    if (!mode || mode === 'eraser' || points.length === 0) {
+    if (!mode || mode === 'eraser') {
       renderInProgress();
       return;
     }

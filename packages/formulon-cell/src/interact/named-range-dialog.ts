@@ -502,9 +502,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       const item = document.createElement('div');
       item.className = 'fc-namedlg__item fc-namedlg__row';
       item.setAttribute('role', 'option');
-      item.setAttribute('aria-selected', rowIndex === selectedNameIndex ? 'true' : 'false');
-      item.tabIndex = rowIndex === selectedNameIndex ? 0 : -1;
-      item.classList.toggle('fc-namedlg__item--selected', rowIndex === selectedNameIndex);
       const name = document.createElement('span');
       name.className = 'fc-namedlg__row-name';
       name.textContent = entry.name;
@@ -739,12 +736,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     return { name, formula };
   };
 
-  const loadSelectedNameIntoForm = (): void => {
-    const entry = currentRows[selectedNameIndex];
-    if (!entry) return;
-    openEditor('edit');
-  };
-
   function closeDeleteConfirm(): void {
     deleteShell.close();
     pendingDeleteName = null;
@@ -764,7 +755,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     host,
     className: 'fc-namedlg-define',
     ariaLabel: t.title,
-    onDismiss: () => closeDefine(),
+    onDismiss: () => defineShell.close(),
   });
   defineShell.overlay.classList.add('fc-fmtdlg');
   const defineFrame = appendDialogFrame(defineShell, {
@@ -879,9 +870,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     renderDefineNames();
     return true;
   };
-  const closeDefine = (): void => {
-    defineShell.close();
-  };
   defineShell.on(defineAddBtn, 'click', () => {
     defineCommit();
   });
@@ -900,10 +888,10 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     defineName.input.value = '';
     renderDefineNames();
   });
-  defineShell.on(defineActions.cancelBtn, 'click', closeDefine);
+  defineShell.on(defineActions.cancelBtn, 'click', defineShell.close);
   defineShell.on(defineActions.okBtn, 'click', () => {
     if (defineName.input.value.trim() && !defineCommit()) return;
-    closeDefine();
+    defineShell.close();
   });
   const openDefine = (): void => {
     const m = strings.mac.namedRangeDialog;
@@ -1053,27 +1041,15 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
         currentRows.length === 0 ? t.filterRequiresNames : null,
         t.filterButton,
       );
-    }
-    if (canMutate) {
       if (note.parentElement) note.remove();
-    } else {
-      if (!note.parentElement) body.appendChild(note);
+    } else if (!note.parentElement) {
+      body.appendChild(note);
     }
     clearError();
     clearMainError();
   };
 
   const onClose = (): void => api.close();
-  const onNew = (): void => {
-    openEditor('new');
-  };
-  const onEdit = (): void => loadSelectedNameIntoForm();
-  const onDelete = (): void => requestDeleteSelectedName();
-  const onFilter = (): void => openFilterMenu();
-  const onQuickCommit = (): void => commitQuickRefers();
-  const onQuickCancel = (): void => cancelQuickRefers();
-  const onDeleteConfirm = (): void => confirmDeleteSelectedName();
-  const onDeleteCancel = (): void => closeDeleteConfirm();
   const onOverlayKey = (e: KeyboardEvent): void => {
     if (e.key === 'Enter') {
       // Enter inside an input submits the form when mutation is enabled;
@@ -1092,14 +1068,14 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   shell.on(formRow, 'submit', onSubmit as EventListener);
   editorShell.on(editorCancelBtn, 'click', () => closeEditor());
-  deleteShell.on(deleteOkBtn, 'click', onDeleteConfirm);
-  deleteShell.on(deleteCancelBtn, 'click', onDeleteCancel);
-  shell.on(newBtn, 'click', onNew);
-  shell.on(editBtn, 'click', onEdit);
-  shell.on(deleteBtn, 'click', onDelete);
-  shell.on(filterBtn, 'click', onFilter);
-  shell.on(quickCommitBtn, 'click', onQuickCommit);
-  shell.on(quickCancelBtn, 'click', onQuickCancel);
+  deleteShell.on(deleteOkBtn, 'click', confirmDeleteSelectedName);
+  deleteShell.on(deleteCancelBtn, 'click', closeDeleteConfirm);
+  shell.on(newBtn, 'click', () => openEditor('new'));
+  shell.on(editBtn, 'click', () => openEditor('edit'));
+  shell.on(deleteBtn, 'click', () => requestDeleteSelectedName());
+  shell.on(filterBtn, 'click', openFilterMenu);
+  shell.on(quickCommitBtn, 'click', commitQuickRefers);
+  shell.on(quickCancelBtn, 'click', cancelQuickRefers);
   shell.on(closeBtn, 'click', onClose);
   shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 

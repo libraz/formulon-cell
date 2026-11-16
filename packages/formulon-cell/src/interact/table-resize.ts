@@ -35,7 +35,7 @@ export function resizableTableGripAt(
 }
 
 /** The table whose resize grip lies under the pointer on the current sheet. */
-export function tableGripAt(s: State, x: number, y: number): TableOverlay | null {
+function tableGripAt(s: State, x: number, y: number): TableOverlay | null {
   const layout = layoutForView(s);
   for (const table of s.tables.tables) {
     if (table.range.sheet !== s.data.sheetIndex) continue;

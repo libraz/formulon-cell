@@ -1,5 +1,6 @@
 import {
   canonicalizeLocalizedFormulaForInput,
+  formulaForDisplaySafe,
   inputLocaleForWorkbook,
   parseLocalizedNumericInput,
 } from '../commands/coerce-input.js';
@@ -9,6 +10,7 @@ import { formatA1Range } from '../engine/address.js';
 import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
 import { rewriteLoadedConditionalRule } from '../engine/cf-writeback.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   type CellFormat,
@@ -37,6 +39,7 @@ import { conditionalSelect } from './conditional-form-controls.js';
 import { appendIconSetForm } from './conditional-icon-set-form.js';
 import { appendDialogButton, createDialogShell, deferInitialFocus } from './dialog-shell.js';
 import { attachFormatDialog, type FormatDialogHandle } from './format-dialog.js';
+import { makeCheckbox } from './format-dialog-dom.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
@@ -84,15 +87,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     const wbLocale = wb ? inputLocaleForWorkbook(wb) : undefined;
     return deps.getLocale?.() ?? wbLocale ?? 'en-US';
   };
-  const localizeFormulaForDisplay = (formula: string): string => {
-    const wb = deps.getWb?.() ?? null;
-    if (!wb || typeof wb.getFormulaForDisplay !== 'function') return formula;
-    try {
-      return wb.getFormulaForDisplay(formula);
-    } catch {
-      return formula;
-    }
-  };
+  const localizeFormulaForDisplay = (formula: string): string =>
+    formulaForDisplaySafe(deps.getWb?.() ?? null, formula);
   const canonicalizeFormulaForCommit = (formula: string): string => {
     if (!formula.startsWith('=')) return formula;
     const wb = deps.getWb?.() ?? null;
@@ -131,8 +127,6 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       kind,
     });
   };
-  const isMacPlatform = (): boolean =>
-    (host.closest<HTMLElement>('[data-fc-platform]') ?? host).dataset.fcPlatform === 'mac';
   const shell = createDialogShell({
     host,
     className: 'fc-conddlg',
@@ -371,13 +365,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   tbNRow.append(tbNLabel, tbNInput);
   topBottomGroup.appendChild(tbNRow);
 
-  const tbPercentRow = document.createElement('label');
-  tbPercentRow.className = 'fc-fmtdlg__check';
-  const tbPercentCk = document.createElement('input');
-  tbPercentCk.type = 'checkbox';
-  const tbPercentText = document.createElement('span');
-  tbPercentText.textContent = t.usePercent;
-  tbPercentRow.append(tbPercentCk, tbPercentText);
+  const { wrap: tbPercentRow, input: tbPercentCk } = makeCheckbox(t.usePercent);
   topBottomGroup.appendChild(tbPercentRow);
 
   // ── Above/below average subform ────────────────────────────────────────
@@ -464,13 +452,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   textContainsRow.append(textContainsLabel, textContainsInput);
   textContainsGroup.appendChild(textContainsRow);
 
-  const caseSensitiveRow = document.createElement('label');
-  caseSensitiveRow.className = 'fc-fmtdlg__check';
-  const caseSensitiveCk = document.createElement('input');
-  caseSensitiveCk.type = 'checkbox';
-  const caseSensitiveText = document.createElement('span');
-  caseSensitiveText.textContent = t.caseSensitive;
-  caseSensitiveRow.append(caseSensitiveCk, caseSensitiveText);
+  const { wrap: caseSensitiveRow, input: caseSensitiveCk } = makeCheckbox(t.caseSensitive);
   textContainsGroup.appendChild(caseSensitiveRow);
 
   // ── Date-occurring subform ─────────────────────────────────────────────
@@ -737,7 +719,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   let currentMode: 'manage' | 'new' | 'edit' = 'manage';
   let currentEditIndex: number | null = null;
   // The Mac layout applies to a new rule only; editing keeps the full form.
-  const macLayout = (): boolean => currentMode === 'new' && isMacPlatform();
+  const macLayout = (): boolean => currentMode === 'new' && isMacHost(host);
   const syncDialogMode = (): void => {
     const isNew = currentMode === 'new';
     const isEdit = currentMode === 'edit';

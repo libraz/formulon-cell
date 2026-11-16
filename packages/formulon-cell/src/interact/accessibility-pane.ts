@@ -18,11 +18,10 @@ import type { MacAccessibilityPaneStrings } from '../i18n/strings/mac/accessibil
 import type { Strings } from '../i18n/strings.js';
 import { sameRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { focusSheet } from './dialog-focus.js';
 import { appendDialogButton, bindPaneEscape, markSurface } from './dialog-shell.js';
-import { syncTaskpaneDock } from './taskpane-dock.js';
+import { createDockedPane, syncTaskpaneDock, taskpaneDockOf } from './taskpane-dock.js';
 
 type FormatDialogTab = 'font' | 'fill';
 
@@ -63,23 +62,10 @@ const sectionOf = (rule: AccessibilityRuleId): AccessibilitySectionId =>
 export function attachAccessibilityPane(deps: AccessibilityPaneDeps): AccessibilityPaneHandle {
   const { host, store, getWb } = deps;
   const labels = (): MacAccessibilityPaneStrings => deps.getStrings().mac.accessibilityPane;
-  const dock = (): HTMLElement | null => host.querySelector<HTMLElement>('.fc-host__taskpane-dock');
+  const dock = (): HTMLElement | null => taskpaneDockOf(host);
 
-  const root = document.createElement('div');
-  root.className = 'fc-a11ypane';
-  root.setAttribute('role', 'region');
+  const { root, title, closeBtn, body } = createDockedPane('fc-a11ypane');
   root.hidden = true;
-
-  const header = document.createElement('div');
-  header.className = 'fc-a11ypane__header';
-  const title = document.createElement('span');
-  title.className = 'fc-a11ypane__title';
-  const closeBtn = appendDialogButton(header, { label: '', baseClass: 'fc-a11ypane__close' });
-  closeBtn.append(createExcelRibbonSvg('paneClose', 'fc-pane-close__glyph') ?? '');
-  header.prepend(title);
-  const body = document.createElement('div');
-  body.className = 'fc-a11ypane__body';
-  root.append(header, body);
   (dock() ?? host).appendChild(root);
   markSurface(root, 'pane');
   const detachPaneEscape = bindPaneEscape(root, host);

@@ -16,6 +16,7 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { markSurface, openerOf, returnFocus } from './dialog-shell.js';
+import { clamp } from './overlay-position.js';
 
 export interface QuickAnalysisDeps {
   host: HTMLElement;
@@ -89,8 +90,8 @@ function positionPanel(host: HTMLElement, root: HTMLElement, store: SpreadsheetS
       : trailingEdgeX(anchor, false) + 8
     : host.clientWidth / 2 - panelW / 2;
   const top = anchor ? anchor.y + anchor.h + 8 : host.clientHeight / 2 - panelH / 2;
-  root.style.left = `${Math.max(8, Math.min(host.clientWidth - panelW - 8, left))}px`;
-  root.style.top = `${Math.max(8, Math.min(host.clientHeight - panelH - 8, top))}px`;
+  root.style.left = `${clamp(left, 8, host.clientWidth - panelW - 8)}px`;
+  root.style.top = `${clamp(top, 8, host.clientHeight - panelH - 8)}px`;
 }
 
 function createQuickAnalysisLauncher(): HTMLButtonElement {
@@ -184,8 +185,8 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     button.setAttribute('aria-label', strings.quickAnalysis.title);
     const rtl = state.ui.rightToLeft === true;
     const anchorX = rtl ? trailingEdgeX(anchor, true) - 25 : trailingEdgeX(anchor, false) + 3;
-    button.style.left = `${Math.max(4, Math.min(host.clientWidth - 26, anchorX))}px`;
-    button.style.top = `${Math.max(4, Math.min(host.clientHeight - 26, anchor.y + anchor.h + 3))}px`;
+    button.style.left = `${clamp(anchorX, 4, host.clientWidth - 26)}px`;
+    button.style.top = `${clamp(anchor.y + anchor.h + 3, 4, host.clientHeight - 26)}px`;
   };
 
   const close = (restoreFocus = false): void => {

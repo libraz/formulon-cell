@@ -8,7 +8,12 @@ import type { InteractionOrigin } from '../commands/interaction-policy.js';
 import { parseMacRange } from '../commands/mac-data-tools.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogShell,
+  createDialogStatus,
+} from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
@@ -68,11 +73,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
   // the selection captured when the dialog opened.
   let tableRange: Range = instance.store.getState().selection.range;
   let origin: InteractionOrigin = 'instanceApi';
-  const status = document.createElement('div');
-  status.className = 'fc-datatable__status';
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
-  body.appendChild(status);
+  const status = createDialogStatus(body, 'fc-datatable__status');
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
     cancelLabel: t.cancel,
     okLabel: t.ok,
@@ -115,8 +116,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
   };
 
   const showError = (message: string): void => {
-    status.dataset.state = 'error';
-    status.textContent = message;
+    status.error(message);
   };
 
   const run = (): void => {
@@ -154,8 +154,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
       pickFormat.begin();
       rowField.input.value = '';
       colField.input.value = '';
-      delete status.dataset.state;
-      status.textContent = '';
+      status.clear();
       shell.open();
       queueMicrotask(() => rowField.input.focus());
     },

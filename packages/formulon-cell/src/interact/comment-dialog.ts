@@ -21,6 +21,7 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { type DialogEntry, INSTANCE_API_COMMENT_ENTRY } from './dialog-entry.js';
+import { GRID_SELECTOR } from './dialog-focus.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -448,7 +449,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   // Locate the grid canvas — cellRect returns coords relative to the canvas,
   // so we need its offset within the host to position correctly.
   const findGrid = (): HTMLElement | null => {
-    const el = host.querySelector('.fc-host__grid');
+    const el = host.querySelector(GRID_SELECTOR);
     return el instanceof HTMLElement ? el : null;
   };
 

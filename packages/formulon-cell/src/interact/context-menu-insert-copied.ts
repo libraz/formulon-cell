@@ -46,9 +46,7 @@ export const wholeBandAxisFor = (snapshot: ClipboardSnapshot): 'row' | 'col' | n
   // axis. Leave it on the ordinary path rather than presenting a misleading
   // row/column-specific insert action.
   if (wholeRow === wholeCol) return null;
-  if (wholeRow) return 'row';
-  if (wholeCol) return 'col';
-  return null;
+  return wholeRow ? 'row' : 'col';
 };
 
 /** "Insert Copied Cells" from a row or column header. The header already
@@ -61,13 +59,9 @@ function runInsertCopiedBand(ctx: ContextMenuInsertCopiedContext, kind: 'row' | 
   const source = store.getState().ui.copyRange;
   if (!source) return;
 
-  const sourceAxisMatchesHeader = (snap: ClipboardSnapshot): boolean => {
-    return wholeBandAxisFor(snap) === kind;
-  };
-
   const insertBand = (snap: ClipboardSnapshot | null, text: string): void => {
     if (snap && wholeBandAxisFor(snap) !== null) {
-      if (!sourceAxisMatchesHeader(snap)) return;
+      if (wholeBandAxisFor(snap) !== kind) return;
       // The shared path performs the structural edit, dimension copy, and
       // full-band paste as one transaction. A failed preflight must not
       // fall through to the legacy direction-based inserter because that

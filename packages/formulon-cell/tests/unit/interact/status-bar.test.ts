@@ -1208,11 +1208,40 @@ describe('attachStatusBar', () => {
     handle.detach();
   });
 
+  it('skips the aggregate and static label writes when a notification changes nothing', () => {
+    seedNumber(store, 0, 0, 4);
+    seedNumber(store, 1, 0, 6);
+    setRange(store, 0, 0, 1, 0);
+    const handle = attachStatusBar({ statusbar, store, getEngineLabel: () => 'stub', strings: en });
+    handle.refresh();
+    const center = statusbar.querySelector('.fc-host__statusbar-aggs') as HTMLElement;
+    expect(center.textContent).toContain('10');
+    const observer = new MutationObserver(() => {});
+    observer.observe(statusbar, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+    for (let i = 0; i < 20; i += 1) store.setState((s) => ({ ...s }));
+    const records = observer.takeRecords();
+    observer.disconnect();
+    const staticLabels = ['.fc-host__statusbar-zoom-btn', '.fc-host__statusbar-view'];
+    const touched = records.filter(
+      (r) =>
+        center.contains(r.target) ||
+        (r.attributeName === 'aria-label' &&
+          r.target instanceof Element &&
+          staticLabels.some((sel) => (r.target as Element).matches(sel))),
+    );
+    expect(touched).toHaveLength(0);
+    handle.detach();
+  });
+
   it('keeps status bar button DOM on the shared interaction primitive', () => {
     const source = readFileSync(join(root, 'src/interact/status-bar.ts'), 'utf8');
 
     expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
-    expect(source).toContain('const createStatusBarButton');
     expect(source).toContain('const createStatusBarCalcButton');
     expect(source).toContain('const createStatusBarViewButton');
     expect(source).toContain('const createStatusBarZoomButton');

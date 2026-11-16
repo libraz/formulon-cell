@@ -1,6 +1,7 @@
 import { authorizeWrite } from '../commands/authorized-write.js';
 import {
   canonicalizeLocalizedFormulaForInput,
+  formulaForDisplaySafe,
   inputLocaleForWorkbook,
 } from '../commands/coerce-input.js';
 import { type SelectionFormatAction, setFont } from '../commands/format.js';
@@ -268,15 +269,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     ? { ...strings.formatDialog, ...strings.mac.formatDialog }
     : strings.formatDialog;
 
-  const localizeDialogFormula = (formula: string): string => {
-    const wb = getWb();
-    if (!wb || typeof wb.getFormulaForDisplay !== 'function') return formula;
-    try {
-      return wb.getFormulaForDisplay(formula);
-    } catch {
-      return formula;
-    }
-  };
+  const localizeDialogFormula = (formula: string): string =>
+    formulaForDisplaySafe(getWb(), formula);
 
   const canonicalizeDialogFormula = (formula: string): string => {
     const wb = getWb();
@@ -440,13 +434,16 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     syncMixedControls();
   };
 
+  const defaultPatternFor = (cat: NumberCategory): string =>
+    defaultPatternForLocale(cat, getFormatLocale(), isMacHost(host));
+
   // ── Preview rendering ──────────────────────────────────────────────────
   const renderPreviewBody = createFormatPreview({
     refs: view,
     draft,
     getLocale: getFormatLocale,
     getDate1904,
-    defaultPatternFor: (cat) => defaultPatternFor(cat),
+    defaultPatternFor,
     padNumber: () => padsNumberRows(getWb()),
     // A rule's differential format has no cell to preview; a number format has.
     previewValue: () => (dialogMode === 'dxf' ? null : previewValue),
@@ -467,9 +464,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     renderPreviewBody();
     if (macDxf) projectDisabledState(clearBtn, !macDxfHasContent(), null);
   };
-
-  const defaultPatternFor = (cat: NumberCategory): string =>
-    defaultPatternForLocale(cat, getFormatLocale(), isMacHost(host));
 
   // ── Tab switch ─────────────────────────────────────────────────────────
   const tabOrder = Array.from(tabButtons.keys());

@@ -62,27 +62,11 @@ export const resolveContextMenuTarget = (
     const selected = selectedRanges.find(
       (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && zone.col >= sel.c0 && zone.col <= sel.c1,
     );
-    if (selected && isWholeRowRange(selected)) {
-      return {
-        kind: 'row',
-        cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
-      };
-    }
-    if (selected && isWholeColumnRange(selected)) {
-      return {
-        kind: 'col',
-        cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
-      };
-    }
-    if (!selected && updateCellSelection && canChangeSelection()) {
-      const cell = { sheet: s.selection.active.sheet, row: zone.row, col: zone.col };
-      mutators.setActive(store, cell);
-      return { kind: 'cell', cell };
-    }
-    return {
-      kind: 'cell',
-      cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
-    };
+    const cell = { sheet: s.selection.active.sheet, row: zone.row, col: zone.col };
+    if (selected && isWholeRowRange(selected)) return { kind: 'row', cell };
+    if (selected && isWholeColumnRange(selected)) return { kind: 'col', cell };
+    if (!selected && updateCellSelection && canChangeSelection()) mutators.setActive(store, cell);
+    return { kind: 'cell', cell };
   }
   return fallback;
 };

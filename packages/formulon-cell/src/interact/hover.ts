@@ -81,14 +81,6 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     linkCursor = on;
   };
 
-  const cellAt = (e: MouseEvent | PointerEvent): { row: number; col: number } | null => {
-    const rect = grid.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const s = store.getState();
-    return hitTest(layoutForView(s), s.viewport, x, y);
-  };
-
   const cellFormatAt = (
     row: number,
     col: number,
@@ -121,12 +113,9 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   } | null = null;
 
   // The stale-value tip rides the cell's error triangle.
-  const staleTipAt = (e: PointerEvent): string | undefined => {
+  const staleTipAt = (x: number, y: number): string | undefined => {
     const stale = deps.staleTip;
     if (!stale) return undefined;
-    const box = grid.getBoundingClientRect();
-    const x = e.clientX - box.left;
-    const y = e.clientY - box.top;
     const hit = gridHitState(grid).errorTriangles.find(
       (t) => t.kind === 'error' && triangleHitContains(t, x, y),
     );
@@ -136,10 +125,14 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   };
 
   const onMove = (e: PointerEvent): void => {
-    const at = cellAt(e);
+    const rect = grid.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const s = store.getState();
+    const layout = layoutForView(s);
+    const at = hitTest(layout, s.viewport, x, y);
     let fmt: ReturnType<typeof cellFormatAt> = null;
     if (at) {
-      const s = store.getState();
       if (
         last &&
         last.row === at.row &&
@@ -156,8 +149,8 @@ export function attachHover(deps: HoverDeps): HoverHandle {
       last = null;
     }
     // A shown note is already on the canvas; hovering it adds no popup.
-    const note = fmt?.commentVisible || store.getState().ui.showAllNotes ? undefined : fmt?.comment;
-    const tooltip = staleTipAt(e) || note || fmt?.hyperlinkTooltip;
+    const note = fmt?.commentVisible || s.ui.showAllNotes ? undefined : fmt?.comment;
+    const tooltip = staleTipAt(x, y) || note || fmt?.hyperlinkTooltip;
     if (tooltip) {
       if (tooltip !== shownText) {
         tip.textContent = tooltip;
@@ -175,17 +168,14 @@ export function attachHover(deps: HoverDeps): HoverHandle {
       tip.style.minHeight = '';
       tip.style.borderWidth = '';
       if (anchored && at) {
-        const s = store.getState();
-        const layout = layoutForView(s);
         const pt = pointPx(layout, s.viewport);
         tip.style.width = `${NOTE_CARD_W_PT * pt}px`;
         tip.style.minHeight = `${NOTE_CARD_H_PT * pt}px`;
         tip.style.borderWidth = `${pt}px`;
         const cell = cellRect(layout, s.viewport, at.row, at.col);
         const above = cellRect(layout, s.viewport, Math.max(0, at.row - 1), at.col);
-        const gridBox = grid.getBoundingClientRect();
-        px = gridBox.left + cell.x + cell.w;
-        py = gridBox.top + above.y;
+        px = rect.left + cell.x + cell.w;
+        py = rect.top + above.y;
       }
       placePanel(tip, px, py, {
         pad: 8,

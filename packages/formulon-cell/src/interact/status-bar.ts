@@ -98,7 +98,6 @@ export interface StatusBarHandle {
   detach(): void;
 }
 
-const ALL_KEYS: readonly StatusAggKey[] = STATUS_AGGREGATE_KEYS;
 const STATUS_OPTION_KEYS: readonly StatusBarOptionKey[] = [
   'capsLock',
   'numLock',
@@ -132,7 +131,7 @@ interface SelectionAggregateIndex {
   columns: Map<number, AggregateCellEntry[]>;
 }
 
-const aggregateRangeKeys = (state: ReturnType<SpreadsheetStore['getState']>): AggregateRangeKey[] =>
+const aggregateRangeKeys = (state: State): AggregateRangeKey[] =>
   selectionRangeList(state.selection).map((range) => [
     range.sheet,
     range.r0,
@@ -143,7 +142,7 @@ const aggregateRangeKeys = (state: ReturnType<SpreadsheetStore['getState']>): Ag
 
 const sameAggregateKey = (
   cache: AggregateCache | undefined,
-  state: ReturnType<SpreadsheetStore['getState']>,
+  state: State,
   ranges: readonly AggregateRangeKey[],
 ): cache is AggregateCache => {
   if (
@@ -167,12 +166,8 @@ const sameAggregateKey = (
   });
 };
 
-const createStatusBarButton = (className: string): HTMLButtonElement => {
-  return createInteractionButton({ className });
-};
-
 const createStatusBarCalcButton = (): HTMLButtonElement => {
-  const button = createStatusBarButton('fc-host__statusbar-calcmode');
+  const button = createInteractionButton({ className: 'fc-host__statusbar-calcmode' });
   button.style.display = 'none';
   return button;
 };
@@ -181,7 +176,7 @@ const createStatusBarViewButton = (
   mode: WorkbookViewMode,
   onClick: () => void,
 ): HTMLButtonElement => {
-  const button = createStatusBarButton('fc-host__statusbar-view');
+  const button = createInteractionButton({ className: 'fc-host__statusbar-view' });
   button.dataset.viewMode = mode;
   button.addEventListener('click', onClick);
   const icon = document.createElement('span');
@@ -191,7 +186,7 @@ const createStatusBarViewButton = (
 };
 
 const createStatusBarZoomButton = (direction: 'out' | 'in', label: string): HTMLButtonElement => {
-  const button = createStatusBarButton('fc-host__statusbar-zoom-btn');
+  const button = createInteractionButton({ className: 'fc-host__statusbar-zoom-btn' });
   button.dataset.fcZoom = direction;
   button.textContent = label;
   return button;
@@ -201,7 +196,7 @@ const createStatusBarChooserRow = (
   labelText: string,
   checked: boolean,
 ): { row: HTMLButtonElement; check: HTMLSpanElement } => {
-  const row = createStatusBarButton('fc-statusbar__chooser-item');
+  const row = createInteractionButton({ className: 'fc-statusbar__chooser-item' });
   row.setAttribute('role', 'menuitemcheckbox');
   row.setAttribute('aria-checked', checked ? 'true' : 'false');
   const check = document.createElement('span');
@@ -255,7 +250,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   filterCount.hidden = true;
   left.appendChild(filterCount);
   const accessibilityStatus = deps.accessibility
-    ? createStatusBarButton('fc-host__statusbar-a11y')
+    ? createInteractionButton({ className: 'fc-host__statusbar-a11y' })
     : null;
   if (accessibilityStatus) {
     accessibilityStatus.addEventListener('click', () => deps.accessibility?.open());
@@ -275,7 +270,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     deps.onRecalc?.();
   });
 
-  const recalcButton = createStatusBarButton('fc-host__statusbar-recalc');
+  const recalcButton = createInteractionButton({ className: 'fc-host__statusbar-recalc' });
   recalcButton.hidden = true;
   recalcButton.addEventListener('click', () => {
     deps.onRecalc?.();
@@ -284,7 +279,6 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const right = document.createElement('span');
   right.className = 'fc-host__statusbar-right';
-  right.textContent = '';
 
   const lockIndicators = document.createElement('span');
   lockIndicators.className = 'fc-host__statusbar-locks';
@@ -330,7 +324,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   zoomSlider.max = String(ZOOM_SLIDER_MAX);
   zoomSlider.step = '1';
   const zoomIn = createStatusBarZoomButton('in', '+');
-  const zoomLabel = createStatusBarButton('fc-host__statusbar-zoom-label');
+  const zoomLabel = createInteractionButton({ className: 'fc-host__statusbar-zoom-label' });
   zoom.append(zoomOut, zoomSlider, zoomIn, zoomLabel);
 
   statusbar.append(
@@ -378,8 +372,8 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     calcBadge.dataset.calcMode = String(mode);
   };
 
-  const refreshRecalcButton = (): void => {
-    const show = isMacHost(statusbar) && deps.hasStaleValues?.() === true;
+  const refreshRecalcButton = (mac: boolean): void => {
+    const show = mac && deps.hasStaleValues?.() === true;
     recalcButton.hidden = !show;
     if (!show) return;
     const t = strings.mac.chrome;
@@ -388,7 +382,12 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     recalcButton.setAttribute('aria-label', t.calculate);
   };
 
-  const refreshStaticLabels = (): void => {
+  let staticLabelsFor: { strings: Strings; mac: boolean } | undefined;
+
+  /** Writes the string-dependent labels; a no-op until the strings or platform change. */
+  const refreshStaticLabels = (mac: boolean): void => {
+    if (staticLabelsFor?.strings === strings && staticLabelsFor.mac === mac) return;
+    staticLabelsFor = { strings, mac };
     const t = strings.statusBar;
     zoomOut.setAttribute('aria-label', t.zoomOut);
     zoomSlider.setAttribute('aria-label', t.zoom);
@@ -397,7 +396,6 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     viewButtons.normal.title = t.normalView;
     viewButtons.pageLayout.setAttribute('aria-label', t.pageLayoutView);
     viewButtons.pageLayout.title = t.pageLayoutView;
-    const mac = isMacHost(statusbar);
     const pageBreak = mac ? strings.mac.chrome.pageBreakPreview : t.pageBreakPreview;
     viewButtons.pageBreakPreview.setAttribute('aria-label', pageBreak);
     viewButtons.pageBreakPreview.title = pageBreak;
@@ -576,6 +574,18 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       : t.statusClean;
   };
 
+  let aggregatePainted:
+    | {
+        stats: SelectionStats;
+        keys: readonly StatusAggKey[];
+        locale: string;
+        numFmt: NumFmt | undefined;
+        date1904: boolean;
+        strings: Strings;
+        mac: boolean;
+      }
+    | undefined;
+
   const refresh = (): void => {
     const s = store.getState();
     refreshAccessibility();
@@ -585,7 +595,8 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     ) {
       aggregateIndex = undefined;
     }
-    refreshStaticLabels();
+    const mac = isMacHost(statusbar);
+    refreshStaticLabels(mac);
     refreshModeLabel();
     refreshFilterCount();
     const ranges = aggregateRangeKeys(s);
@@ -608,29 +619,40 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       ? s.format.formats.get(addrKey({ sheet: first.sheet, row: first.row, col: first.col }))
           ?.numFmt
       : undefined;
-    const pieces: string[] = [];
-    const values: string[] = [];
-    for (const key of keys) {
-      const v = statusAggregateValue(key, stats);
-      if (v == null) continue;
-      // Counts are whole numbers in no particular format.
-      const counted = key === 'count' || key === 'countNumbers';
-      const text = counted
-        ? fmtGeneral(v, aggLocale)
-        : fmt(v, aggLocale, numFmt, s.ui.date1904 === true);
-      pieces.push(`${labelFor(key)}: ${text}`);
-      values.push(text);
+    const date1904 = s.ui.date1904 === true;
+    const painted = aggregatePainted;
+    if (
+      !painted ||
+      painted.stats !== stats ||
+      painted.keys !== keys ||
+      painted.locale !== aggLocale ||
+      painted.numFmt !== numFmt ||
+      painted.date1904 !== date1904 ||
+      painted.strings !== strings ||
+      painted.mac !== mac
+    ) {
+      aggregatePainted = { stats, keys, locale: aggLocale, numFmt, date1904, strings, mac };
+      const pieces: string[] = [];
+      const values: string[] = [];
+      for (const key of keys) {
+        const v = statusAggregateValue(key, stats);
+        if (v == null) continue;
+        // Counts are whole numbers in no particular format.
+        const counted = key === 'count' || key === 'countNumbers';
+        const text = counted ? fmtGeneral(v, aggLocale) : fmt(v, aggLocale, numFmt, date1904);
+        pieces.push(`${labelFor(key)}: ${text}`);
+        values.push(text);
+      }
+      // The Mac bar shows each aggregate as its own item, with no separator and no cell count.
+      const items = pieces.flatMap((text, i) => {
+        const item = document.createElement('span');
+        item.className = 'fc-host__statusbar-agg';
+        item.textContent = text;
+        item.dataset.value = values[i] ?? '';
+        return i > 0 && !mac ? [document.createTextNode(' · '), item] : [item];
+      });
+      center.replaceChildren(...items);
     }
-    // The Mac bar shows each aggregate as its own item, with no separator and no cell count.
-    const mac = isMacHost(statusbar);
-    const items = pieces.flatMap((text, i) => {
-      const item = document.createElement('span');
-      item.className = 'fc-host__statusbar-agg';
-      item.textContent = text;
-      item.dataset.value = values[i] ?? '';
-      return i > 0 && !mac ? [document.createTextNode(' · '), item] : [item];
-    });
-    center.replaceChildren(...items);
 
     const cells = stats.cells;
     const cellText = mac
@@ -638,11 +660,12 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       : cells === 1
         ? `1 ${strings.statusBar.cell}`
         : `${cells} ${strings.statusBar.cells}`;
-    right.textContent = deps.showEngineLabel
+    const rightText = deps.showEngineLabel
       ? cellText
         ? `${cellText} · ${getEngineLabel()}`
         : getEngineLabel()
       : cellText;
+    if (right.textContent !== rightText) right.textContent = rightText;
     refreshLockIndicators();
     refreshUploadStatus();
     refreshMacroRecording();
@@ -673,7 +696,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
     refreshCalcBadge();
-    refreshRecalcButton();
+    refreshRecalcButton(mac);
   };
 
   const setZoom = (next: number): void => {
@@ -797,7 +820,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const active = new Set(store.getState().ui.statusAggs);
     const options = store.getState().ui.statusOptions;
     const addAggRows = (): void => {
-      for (const key of ALL_KEYS) {
+      for (const key of STATUS_AGGREGATE_KEYS) {
         addCheckboxRow(labelFor(key), active.has(key), () => {
           mutators.toggleStatusAgg(store, key);
         });

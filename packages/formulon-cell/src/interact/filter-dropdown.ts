@@ -92,13 +92,6 @@ export interface FilterDropdownHandle {
   detach(): void;
 }
 
-const createFilterDropdownActionButton = (className: string, label: string): HTMLButtonElement => {
-  return createInteractionButton({
-    className,
-    text: label,
-  });
-};
-
 const findColumnCriteria = (
   criteria: readonly ValueFilterCriteria[],
   range: Range,
@@ -834,15 +827,15 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
     const actions = ownerDocument.createElement('div');
     actions.className = 'fc-filter-dropdown__actions';
-    const apply = createFilterDropdownActionButton(
-      'fc-filter-dropdown__apply',
-      mac ? m.apply : t.apply,
-    );
+    const apply = createInteractionButton({
+      className: 'fc-filter-dropdown__apply',
+      text: mac ? m.apply : t.apply,
+    });
     apply.addEventListener('click', () => applyActiveFilter());
-    const clear = createFilterDropdownActionButton(
-      'fc-filter-dropdown__clear',
-      mac ? m.clear : t.clear,
-    );
+    const clear = createInteractionButton({
+      className: 'fc-filter-dropdown__clear',
+      text: mac ? m.clear : t.clear,
+    });
     clear.addEventListener('click', () => {
       if (!activeRange) return;
       const wb = deps.getWb?.();
@@ -883,10 +876,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       sortRow.className = 'fc-filter-dropdown__sort';
       for (const direction of ['asc', 'desc'] as const) {
         const sortId = direction === 'asc' ? 'sortAsc' : 'sortDesc';
-        const button = createFilterDropdownActionButton(
-          `fc-filter-dropdown__sort-${direction}`,
-          direction === 'asc' ? m.sortAsc : m.sortDesc,
-        );
+        const button = createInteractionButton({
+          className: `fc-filter-dropdown__sort-${direction}`,
+          text: direction === 'asc' ? m.sortAsc : m.sortDesc,
+        });
         button.addEventListener('click', () => {
           const wb = deps.getWb?.();
           if (!activeRange || !wb || !deps.history) return;
@@ -1065,7 +1058,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       title.className = 'fc-filter-dropdown__title';
       title.textContent = columnTitle(range, col);
       r.setAttribute('aria-label', title.textContent || t.title);
-      const closeButton = createFilterDropdownActionButton('fc-filter-dropdown__close', '');
+      const closeButton = createInteractionButton({
+        className: 'fc-filter-dropdown__close',
+        text: '',
+      });
       closeButton.setAttribute('aria-label', m.close);
       closeButton.addEventListener('click', close);
       const section = (text: string): HTMLElement => {

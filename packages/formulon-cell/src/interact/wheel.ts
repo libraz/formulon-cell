@@ -5,11 +5,11 @@ import {
   gridOriginX,
   gridOriginY,
   layoutForView,
-  mirrorX,
 } from '../render/geometry.js';
 import { renderScale, steppedZoom } from '../store/render-scale.js';
-import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { navigationPolicyFor } from './navigation-policy.js';
+import { gridLocal } from './pointer-targets.js';
 
 export interface WheelDeps {
   /** Element to listen on — typically the grid canvas wrapper. */
@@ -23,14 +23,11 @@ export interface WheelDeps {
 /** Whether the pointer is over the top and/or left pane of a split. */
 function splitPaneAt(
   grid: HTMLElement,
-  state: ReturnType<SpreadsheetStore['getState']>,
+  state: State,
   e: WheelEvent,
 ): { top: boolean; left: boolean } {
   if (state.layout.splitPanes !== true) return { top: false, left: false };
-  const layout = layoutForView(state);
-  const rect = grid.getBoundingClientRect();
-  const x = mirrorX(layout, e.clientX - rect.left);
-  const y = e.clientY - rect.top;
+  const { layout, x, y } = gridLocal(grid, state, e);
   return {
     top:
       layout.freezeRows > 0 && y < gridOriginY(layout) + frozenRowsHeight(layout, state.viewport),
@@ -42,16 +39,14 @@ function splitPaneAt(
 /** Where the pointer sits relative to frozen panes (not splits), in screen px. */
 function frozenRegionAt(
   grid: HTMLElement,
-  state: ReturnType<SpreadsheetStore['getState']>,
+  state: State,
   e: WheelEvent,
 ): { blockY: boolean; blockX: boolean } {
   const layout = layoutForView(state);
   if (state.layout.splitPanes === true || (layout.freezeRows === 0 && layout.freezeCols === 0)) {
     return { blockY: false, blockX: false };
   }
-  const rect = grid.getBoundingClientRect();
-  const x = mirrorX(layout, e.clientX - rect.left);
-  const y = e.clientY - rect.top;
+  const { x, y } = gridLocal(grid, state, e);
   const originX = gridOriginX(layout);
   const originY = gridOriginY(layout);
   // Headers and the frozen rows take no wheel input; the frozen columns scroll rows only.
@@ -70,6 +65,10 @@ const MAC_COLS_PER_LINE = 0.15;
 
 const DOM_DELTA_LINE = 1;
 const DOM_DELTA_PAGE = 2;
+
+/** Px per wheel delta unit: one cell per line, `count` cells per page, else raw px. */
+const wheelUnit = (deltaMode: number, cell: number, count: number): number =>
+  deltaMode === DOM_DELTA_LINE ? cell : deltaMode === DOM_DELTA_PAGE ? cell * count : 1;
 
 /**
  * Wheel-to-scroll bridge.
@@ -117,18 +116,8 @@ export function attachWheel(deps: WheelDeps): () => void {
     // scroll gesture has to walk the column index backwards.
     const dirX = state.ui.rightToLeft === true ? -1 : 1;
     // Line deltas step one row/column per line, page deltas a page of them.
-    const unitY =
-      e.deltaMode === DOM_DELTA_LINE
-        ? rh
-        : e.deltaMode === DOM_DELTA_PAGE
-          ? rh * state.viewport.rowCount
-          : 1;
-    const unitX =
-      e.deltaMode === DOM_DELTA_LINE
-        ? cw
-        : e.deltaMode === DOM_DELTA_PAGE
-          ? cw * state.viewport.colCount
-          : 1;
+    const unitY = wheelUnit(e.deltaMode, rh, state.viewport.rowCount);
+    const unitX = wheelUnit(e.deltaMode, cw, state.viewport.colCount);
     const mac =
       e.deltaMode === DOM_DELTA_LINE &&
       (grid.closest<HTMLElement>('.fc-host') ?? grid).dataset.fcPlatform === 'mac';

@@ -14,6 +14,7 @@ import {
   conditionalSelect,
   setMacScaleFields,
 } from './conditional-form-controls.js';
+import { makeCheckbox } from './format-dialog-dom.js';
 
 type DataBarRule = Extract<ConditionalRule, { kind: 'data-bar' }>;
 type DataBarAxisPosition = NonNullable<DataBarRule['axisPosition']>;
@@ -229,26 +230,14 @@ export function appendDataBarForm(
   barAxisColorRow.append(barAxisColorLabel, barAxisColorInput);
   group.appendChild(barAxisColorRow);
 
-  const showValueRow = document.createElement('label');
-  showValueRow.className = 'fc-fmtdlg__check';
-  const showValueCk = document.createElement('input');
-  showValueCk.type = 'checkbox';
+  const { wrap: showValueRow, input: showValueCk } = makeCheckbox(t.showValue);
   showValueCk.checked = true;
   showValueCk.setAttribute('data-cf-bar-show-value', '');
-  const showValueText = document.createElement('span');
-  showValueText.textContent = t.showValue;
-  showValueRow.append(showValueCk, showValueText);
   group.appendChild(showValueRow);
   // Excel for Mac words the same flag the other way round: "show the bar only".
-  const barOnlyRow = document.createElement('label');
-  barOnlyRow.className = 'fc-fmtdlg__check';
+  const { wrap: barOnlyRow, input: barOnlyCk } = makeCheckbox(t.macBarOnly);
   barOnlyRow.hidden = true;
-  const barOnlyCk = document.createElement('input');
-  barOnlyCk.type = 'checkbox';
   barOnlyCk.setAttribute('data-cf-bar-only', '');
-  const barOnlyText = document.createElement('span');
-  barOnlyText.textContent = t.macBarOnly;
-  barOnlyRow.append(barOnlyCk, barOnlyText);
   group.appendChild(barOnlyRow);
   const syncBarOnly = (): void => {
     barOnlyCk.checked = !showValueCk.checked;

@@ -15,7 +15,12 @@ import type { Addr } from '../engine/types.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogShell,
+  createDialogStatus,
+} from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
@@ -115,11 +120,7 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     }),
   );
 
-  const status = document.createElement('div');
-  status.className = 'fc-mac-goalseek__status';
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
-  body.appendChild(status);
+  const status = createDialogStatus(body, 'fc-mac-goalseek__status');
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
     cancelLabel: t.cancel,
     okLabel: t.run,
@@ -202,18 +203,15 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
   };
 
   const showError = (error: MacDataError): void => {
-    status.dataset.state = 'error';
-    status.textContent = describeMacDataError(instance.i18n.strings, error);
+    status.error(describeMacDataError(instance.i18n.strings, error));
   };
 
   const showMessage = (message: string): void => {
-    status.dataset.state = 'error';
-    status.textContent = message;
+    status.error(message);
   };
 
   const clearStatus = (): void => {
-    delete status.dataset.state;
-    status.textContent = '';
+    status.clear();
   };
 
   const run = async (): Promise<void> => {
@@ -263,7 +261,7 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     const changingSnapshot = cellSnapshot(instance.workbook, changingCell);
     const token = ++runToken;
     setBusy(true);
-    status.textContent = t.calculating;
+    status.el.textContent = t.calculating;
     const result = await solveMacGoalSeek(instance, request);
     if (token !== runToken) return;
     if (!result.ok) {
@@ -280,11 +278,11 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     };
     setInputsDisabled(true);
     // A non-converged run still offers its last iterate, as the desktop app keeps it.
-    status.dataset.state = result.value.converged ? 'success' : 'error';
+    status.el.dataset.state = result.value.converged ? 'success' : 'error';
     const outcome = result.value.converged
       ? t.converged
       : instance.i18n.strings.mac.data.errors.notConverged;
-    status.textContent = `${outcome} ${t.result}: ${result.value.changingValue}`;
+    status.el.textContent = `${outcome} ${t.result}: ${result.value.changingValue}`;
   };
 
   shell.on(okBtn, 'click', () => {

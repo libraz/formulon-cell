@@ -12,7 +12,7 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { sheetFocusTarget } from './dialog-focus.js';
 import { appendDialogButton, bindPaneEscape, markSurface } from './dialog-shell.js';
 import { bindRovingRows, setRovingStop } from './roving-rows.js';
-import { syncTaskpaneDock } from './taskpane-dock.js';
+import { syncTaskpaneDock, taskpaneDockOf } from './taskpane-dock.js';
 
 export interface WatchPanelDeps {
   /** Element the panel docks under. The panel appends itself as a child of
@@ -62,7 +62,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   // a + / - toolbar acting on the selected watch, and no per-row remove column.
   const fcHost = host.closest<HTMLElement>('.fc-host') ?? host;
   const mac = fcHost.dataset.fcPlatform === 'mac';
-  const dock = mac ? fcHost.querySelector<HTMLElement>('.fc-host__taskpane-dock') : null;
+  const dock = mac ? taskpaneDockOf(fcHost) : null;
   const macLabels = () => strings.mac.watchWindow;
   let selectedKey: string | null = null;
 

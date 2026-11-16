@@ -8,13 +8,12 @@ import {
   frozenRowsHeight,
   gridOriginX,
   gridOriginY,
-  layoutForView,
-  mirrorX,
   rowHeight,
 } from '../render/geometry.js';
 import { SPLIT_BAR_PX } from '../render/grid/lines.js';
 import { frozenColStart, frozenRowStart } from '../store/freeze-band.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { gridLocal } from './pointer-targets.js';
 
 export interface SplitDragDeps {
   grid: HTMLElement;
@@ -58,16 +57,10 @@ export function attachSplitDrag(deps: SplitDragDeps): () => void {
     | (BarHit & { before: LayoutSnapshot; sheet: number; origin: { row: number; col: number } })
     | null = null;
 
-  const local = (e: MouseEvent, state: State) => {
-    const rect = grid.getBoundingClientRect();
-    const layout = layoutForView(state);
-    return { layout, x: mirrorX(layout, e.clientX - rect.left), y: e.clientY - rect.top };
-  };
-
   const barAt = (e: MouseEvent): BarHit | null => {
     const state = store.getState();
     if (state.layout.splitPanes !== true) return null;
-    const { layout, x, y } = local(e, state);
+    const { layout, x, y } = gridLocal(grid, state, e);
     const barY = gridOriginY(layout) + frozenRowsHeight(layout, state.viewport);
     const barX = gridOriginX(layout) + frozenColsWidth(layout, state.viewport);
     const row = layout.freezeRows > 0 && Math.abs(y - barY) <= SPLIT_BAR_PX;
@@ -125,7 +118,7 @@ export function attachSplitDrag(deps: SplitDragDeps): () => void {
     }
     e.stopPropagation();
     const state = store.getState();
-    const { layout, x, y } = local(e, state);
+    const { layout, x, y } = gridLocal(grid, state, e);
     const { viewport } = state;
     const rows = drag.row
       ? countToward(y - gridOriginY(layout), drag.origin.row, MAX_ROW + 1, (r) =>

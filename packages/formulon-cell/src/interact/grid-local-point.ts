@@ -1,3 +1,5 @@
+import { GRID_SELECTOR } from './dialog-focus.js';
+
 /**
  * Maps pointer events to coordinates local to the host's grid surface
  * (`.fc-host__grid`, falling back to the host itself). The grid element is
@@ -9,7 +11,7 @@ export const createGridLocalPoint = (
   let grid: HTMLElement | null = null;
   return (e) => {
     if (!grid || !host.contains(grid)) {
-      grid = host.querySelector<HTMLElement>('.fc-host__grid');
+      grid = host.querySelector<HTMLElement>(GRID_SELECTOR);
     }
     const rect = (grid ?? host).getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };

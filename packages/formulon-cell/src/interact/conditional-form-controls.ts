@@ -86,9 +86,6 @@ export function appendScalePointRow(
   return { row, type, value };
 }
 
-export const localizedScalePointValue = (value: number, locale?: string): string =>
-  formatEditableNumber(value, locale);
-
 export const collectScalePoint = (
   input: ScalePointControl,
   locale?: string,
@@ -110,8 +107,7 @@ export const applyScalePoint = (
 ): void => {
   const next = point ?? fallback;
   control.type.value = next.kind;
-  control.value.value =
-    'value' in next ? localizedScalePointValue(next.value, locale) : fallbackValue;
+  control.value.value = 'value' in next ? formatEditableNumber(next.value, locale) : fallbackValue;
   if (control.operator) control.operator.value = next.gte === false ? '>' : '>=';
   control.type.dispatchEvent(new Event('change'));
 };

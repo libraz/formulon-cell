@@ -64,6 +64,7 @@ export function runContextMenuStructureItem(
     commandId: id,
   };
   const shift = { store, wb, history, origin: 'contextMenu', commandId: id } as const;
+  const r = state.selection.range;
   switch (id) {
     case 'insertCells': {
       // Whole rows or columns are inserted at once, without the dialog.
@@ -93,27 +94,22 @@ export function runContextMenuStructureItem(
       return true;
     }
     case 'rowInsertAbove': {
-      const r = state.selection.range;
       if (insertRowsAction(action, r.r0, r.r1 - r.r0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'rowInsertBelow': {
-      const r = state.selection.range;
       if (insertRowsAction(action, r.r1 + 1, r.r1 - r.r0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'rowDelete': {
-      const r = state.selection.range;
       if (deleteRowsAction(action, r.r0, r.r1 - r.r0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'rowHide': {
-      const r = state.selection.range;
       layoutWrite(action, 'row', undefined, () => hideRows(store, history, r.r0, r.r1));
       return true;
     }
     case 'rowUnhide': {
-      const r = state.selection.range;
       const hidden = hiddenExtentInSelection(state.layout, 'row', r.r0, r.r1);
       if (!hidden) return true;
       layoutWrite(action, 'row', undefined, () =>
@@ -122,37 +118,30 @@ export function runContextMenuStructureItem(
       return true;
     }
     case 'rowGroup': {
-      const r = state.selection.range;
       layoutWrite(action, 'row', undefined, () => groupRows(store, history, r.r0, r.r1));
       return true;
     }
     case 'rowUngroup': {
-      const r = state.selection.range;
       layoutWrite(action, 'row', undefined, () => ungroupRows(store, history, r.r0, r.r1));
       return true;
     }
     case 'colInsertLeft': {
-      const r = state.selection.range;
       if (insertColumnsAction(action, r.c0, r.c1 - r.c0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'colInsertRight': {
-      const r = state.selection.range;
       if (insertColumnsAction(action, r.c1 + 1, r.c1 - r.c0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'colDelete': {
-      const r = state.selection.range;
       if (deleteColumnsAction(action, r.c0, r.c1 - r.c0 + 1)) ctx.afterCommit();
       return true;
     }
     case 'colHide': {
-      const r = state.selection.range;
       layoutWrite(action, 'col', undefined, () => hideCols(store, history, r.c0, r.c1));
       return true;
     }
     case 'colUnhide': {
-      const r = state.selection.range;
       const hidden = hiddenExtentInSelection(state.layout, 'col', r.c0, r.c1);
       if (!hidden) return true;
       layoutWrite(action, 'col', undefined, () =>
@@ -161,12 +150,10 @@ export function runContextMenuStructureItem(
       return true;
     }
     case 'colGroup': {
-      const r = state.selection.range;
       layoutWrite(action, 'col', undefined, () => groupCols(store, history, r.c0, r.c1));
       return true;
     }
     case 'colUngroup': {
-      const r = state.selection.range;
       layoutWrite(action, 'col', undefined, () => ungroupCols(store, history, r.c0, r.c1));
       return true;
     }

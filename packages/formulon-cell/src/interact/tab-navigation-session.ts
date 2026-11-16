@@ -121,7 +121,7 @@ export function attachTabNavigationSession(store: SpreadsheetStore): () => void 
 }
 
 /** Remove the listener and discard all per-store navigation memory. */
-export function disposeTabNavigationSession(store: SpreadsheetStore): void {
+function disposeTabNavigationSession(store: SpreadsheetStore): void {
   const session = sessions.get(store);
   if (!session) return;
   sessions.delete(store);

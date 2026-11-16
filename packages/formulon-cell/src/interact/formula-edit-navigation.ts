@@ -4,6 +4,7 @@ import { mergeAnchorOf } from '../commands/merge.js';
 import { r1c1AtomToA1 } from '../commands/refs.js';
 import { MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
+import { sameAddr } from '../store/direct-format.js';
 import type { State } from '../store/types.js';
 import { jumpToDataEdge } from './data-edge-navigation.js';
 import {
@@ -135,13 +136,9 @@ export function navigateFormulaReference(
     ? mergeAnchorOf(state, jumpToDataEdge(state, tip, dRow, dCol))
     : stepVisibleWithMerge(state, tip, dRow, dCol, MAX_ROW, MAX_COL);
   if (
-    destination.row === tip.row &&
-    destination.col === tip.col &&
+    sameAddr(destination, tip) &&
     current &&
-    (input.extend ||
-      (current.anchor.sheet === current.tip.sheet &&
-        current.anchor.row === current.tip.row &&
-        current.anchor.col === current.tip.col))
+    (input.extend || sameAddr(current.anchor, current.tip))
   )
     return current;
 

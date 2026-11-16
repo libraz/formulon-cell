@@ -416,12 +416,11 @@ describe('attachFilterDropdown', () => {
     const source = readFileSync(join(root, 'src/interact/filter-dropdown.ts'), 'utf8');
 
     expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
-    expect(source).toContain('const createFilterDropdownActionButton');
     expect(source).toContain(
-      "const apply = createFilterDropdownActionButton(\n      'fc-filter-dropdown__apply'",
+      "const apply = createInteractionButton({\n      className: 'fc-filter-dropdown__apply'",
     );
     expect(source).toContain(
-      "const clear = createFilterDropdownActionButton(\n      'fc-filter-dropdown__clear'",
+      "const clear = createInteractionButton({\n      className: 'fc-filter-dropdown__clear'",
     );
     expect(source).not.toContain("document.createElement('button')");
   });

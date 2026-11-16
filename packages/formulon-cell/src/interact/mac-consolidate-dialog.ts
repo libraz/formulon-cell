@@ -16,6 +16,7 @@ import {
   appendDialogFrame,
   createDialogButton,
   createDialogShell,
+  createDialogStatus,
 } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
@@ -182,11 +183,7 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
   criteriaHeading.className = 'fc-mac-consolidate__criteria-heading';
   criteria.prepend(criteriaHeading);
 
-  const status = document.createElement('div');
-  status.className = 'fc-mac-consolidate__status';
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
-  body.appendChild(status);
+  const status = createDialogStatus(body, 'fc-mac-consolidate__status');
 
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
     cancelLabel: t.cancel,
@@ -239,8 +236,7 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
   };
 
   const run = (): void => {
-    delete status.dataset.state;
-    status.textContent = '';
+    status.clear();
     // A reference still in the field counts, so the list need not be filled first.
     const pending = sourceInput.value.trim();
     const sources = pending ? [...references, pending] : [...references];
@@ -263,14 +259,12 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
     };
     const plan = planMacConsolidate(instance, request);
     if (!plan.ok) {
-      status.dataset.state = 'error';
-      status.textContent = describeMacDataError(instance.i18n.strings, plan.error);
+      status.error(describeMacDataError(instance.i18n.strings, plan.error));
       return;
     }
     const committed = commitMacConsolidate(instance, request, plan.value);
     if (!committed.ok) {
-      status.dataset.state = 'error';
-      status.textContent = describeMacDataError(instance.i18n.strings, committed.error);
+      status.error(describeMacDataError(instance.i18n.strings, committed.error));
       return;
     }
     close();
@@ -291,8 +285,7 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
     open(): void {
       applyLabels();
       defaults();
-      delete status.dataset.state;
-      status.textContent = '';
+      status.clear();
       shell.open();
       queueMicrotask(() => sourceInput.focus());
     },

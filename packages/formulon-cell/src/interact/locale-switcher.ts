@@ -41,8 +41,6 @@ const localeOptionFor = (locale: string): BuiltInLocale | null => {
   }
 };
 
-const errorFor = (message: string): Error => new Error(message);
-
 export function attachLocaleSwitcher(deps: LocaleSwitcherDeps): LocaleSwitcherHandle {
   const { container, getLocale, setLocale } = deps;
   let strings = deps.strings ?? defaultStrings;
@@ -70,12 +68,7 @@ export function attachLocaleSwitcher(deps: LocaleSwitcherDeps): LocaleSwitcherHa
   label.htmlFor = select.id;
   container.append(label, select, status);
 
-  const removeCustomOption = (): void => {
-    select.querySelector<HTMLOptionElement>(`option[${CUSTOM_OPTION_ATTRIBUTE}]`)?.remove();
-  };
-
   const renderOptions = (current: string): void => {
-    removeCustomOption();
     select.replaceChildren();
     const selectedLocale = localeOptionFor(current);
     const optionStrings = strings.localeSwitcher.options;
@@ -96,11 +89,11 @@ export function attachLocaleSwitcher(deps: LocaleSwitcherDeps): LocaleSwitcherHa
       select.insertBefore(custom, select.firstChild);
     }
 
-    select.value = selectedLocale ?? current;
     // A browser can reject an empty or otherwise unusual value assignment.
     // Keep the actual getter value visible through the selected option rather
     // than silently choosing one of the built-in languages.
     const expectedValue = selectedLocale ?? current;
+    select.value = expectedValue;
     if (select.value !== expectedValue) {
       const fallback = Array.from(select.options).find((option) => option.value === expectedValue);
       if (fallback) fallback.selected = true;
@@ -156,7 +149,7 @@ export function attachLocaleSwitcher(deps: LocaleSwitcherDeps): LocaleSwitcherHa
       if (!accepted || localeOptionFor(actual) !== requested) {
         refresh();
         showFailure(
-          errorFor(
+          new Error(
             `${strings.localeSwitcher.changeFailed} Requested ${requested}; active locale is ${actual}.`,
           ),
         );

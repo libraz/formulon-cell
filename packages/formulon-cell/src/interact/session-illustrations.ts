@@ -33,14 +33,13 @@ import { focusSheet } from './dialog-focus.js';
 import {
   appendDrawingHandles,
   appendRotationHandle,
+  bindObjectDeselect,
   createObjectSelectionPublisher,
   type DrawingFrame,
   type DrawingHandle,
   focusedPanelId,
   focusPanel,
   isDuplicateShortcut,
-  keepKeyFromGrid,
-  keepsObjectSelected,
   previewFrame,
   subscribeObjectOverlay,
   trackFrameDrag,
@@ -305,21 +304,7 @@ export function attachSessionIllustrations(deps: {
   };
 
   const menu = createObjectMenu(host);
-  /** Whether `target` is part of an object, its menu or the ribbon, which keep it selected. */
-  const insideObjects = (target: EventTarget | null): boolean =>
-    target instanceof Node &&
-    (root.contains(target) || menu.contains(target) || keepsObjectSelected(target));
-
-  // Like Excel, a press anywhere else on the sheet leaves the object.
-  const onDocumentPointerDown = (e: PointerEvent): void => {
-    if (!insideObjects(e.target)) deselect();
-  };
-  document.addEventListener('pointerdown', onDocumentPointerDown, true);
-  const onFocusOut = (e: FocusEvent): void => {
-    if (e.relatedTarget !== null && !insideObjects(e.relatedTarget)) deselect();
-  };
-  root.addEventListener('focusout', onFocusOut);
-  root.addEventListener('keydown', keepKeyFromGrid);
+  const unbindDeselect = bindObjectDeselect(root, menu, deselect);
 
   const isEditable = (item: SessionIllustration): boolean =>
     item.nativeObjectId === undefined || item.nativeGeometryEditable === true;
@@ -642,9 +627,7 @@ export function attachSessionIllustrations(deps: {
     },
     detach() {
       unsubscribe();
-      document.removeEventListener('pointerdown', onDocumentPointerDown, true);
-      root.removeEventListener('focusout', onFocusOut);
-      root.removeEventListener('keydown', keepKeyFromGrid);
+      unbindDeselect();
       menu.detach();
       selectedId = null;
       syncSelection();

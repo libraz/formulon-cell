@@ -13,6 +13,7 @@ import {
   type SpreadsheetStore,
 } from '../store/store.js';
 import { createGridLocalPoint } from './grid-local-point.js';
+import { capturePointerSafely, releaseHeldPointer } from './pointer-capture.js';
 
 export type BorderDrawMode = 'draw' | 'grid' | 'erase';
 
@@ -45,9 +46,13 @@ interface EdgeHit {
 }
 
 const EDGE_TOL = 6;
-const HOST_CLASS_DRAW = 'fc-host--border-draw';
-const HOST_CLASS_GRID = 'fc-host--border-grid';
-const HOST_CLASS_ERASE = 'fc-host--border-erase';
+const HOST_CLASS: Record<BorderDrawMode, string> = {
+  draw: 'fc-host--border-draw',
+  grid: 'fc-host--border-grid',
+  erase: 'fc-host--border-erase',
+};
+
+const edgeKey = (hit: EdgeHit): string => `${hit.row}:${hit.col}:${hit.edge}`;
 
 /**
  * Excel-parity border drawing modes. Activated from the borders dropdown:
@@ -78,10 +83,8 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
   };
 
   const setHostClass = (next: BorderDrawMode | null): void => {
-    host.classList.remove(HOST_CLASS_DRAW, HOST_CLASS_GRID, HOST_CLASS_ERASE);
-    if (next === 'draw') host.classList.add(HOST_CLASS_DRAW);
-    else if (next === 'grid') host.classList.add(HOST_CLASS_GRID);
-    else if (next === 'erase') host.classList.add(HOST_CLASS_ERASE);
+    host.classList.remove(...Object.values(HOST_CLASS));
+    if (next) host.classList.add(HOST_CLASS[next]);
   };
 
   const activate = (
@@ -186,14 +189,6 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     }
   };
 
-  const capturePointer = (id: number): void => {
-    try {
-      host.setPointerCapture(id);
-    } catch {
-      /* synthetic events / id mismatch: the drag still works inside the host */
-    }
-  };
-
   const onPointerDown = (e: PointerEvent): void => {
     if (mode === null || e.button !== 0) return;
     const { x, y } = localXY(e);
@@ -205,21 +200,21 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
       e.stopPropagation();
       dragging = true;
       dragAnchor = cell;
-      capturePointer(e.pointerId);
+      capturePointerSafely(host, e.pointerId);
       return;
     }
     const hit = edgeAt(x, y);
     if (!hit) return;
     e.preventDefault();
     e.stopPropagation();
-    lastEdgeKey = `${hit.row}:${hit.col}:${hit.edge}`;
+    lastEdgeKey = edgeKey(hit);
     // A password prompt ends the stroke; the edge is drawn once the range unlocks.
     if (paintEdge(hit)) {
       lastEdgeKey = null;
       return;
     }
     dragging = true;
-    capturePointer(e.pointerId);
+    capturePointerSafely(host, e.pointerId);
   };
 
   const onPointerMove = (e: PointerEvent): void => {
@@ -233,13 +228,13 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     }
     const hit = edgeAt(x, y);
     if (!hit) return;
-    const key = `${hit.row}:${hit.col}:${hit.edge}`;
+    const key = edgeKey(hit);
     if (key === lastEdgeKey) return;
     e.preventDefault();
     e.stopPropagation();
     lastEdgeKey = key;
     if (paintEdge(hit)) {
-      if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+      releaseHeldPointer(host, e.pointerId);
       dragging = false;
       lastEdgeKey = null;
     }
@@ -247,7 +242,7 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
 
   const onPointerUp = (e: PointerEvent): void => {
     if (mode === null || !dragging) return;
-    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    releaseHeldPointer(host, e.pointerId);
     if (mode === 'grid' && dragAnchor) {
       const { x, y } = localXY(e);
       const s = store.getState();
@@ -276,7 +271,7 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
 
   const onPointerCancel = (e: PointerEvent): void => {
     if (mode === null || !dragging) return;
-    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    releaseHeldPointer(host, e.pointerId);
     dragging = false;
     dragAnchor = null;
     lastEdgeKey = null;

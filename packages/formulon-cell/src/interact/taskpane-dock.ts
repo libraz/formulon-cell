@@ -1,3 +1,6 @@
+import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
+import { appendDialogButton } from './dialog-shell.js';
+
 /** Width limits and edge hit width of the desktop app's docked task pane, in px. */
 const DOCK_MIN_WIDTH = 271;
 const DOCK_MAX_WIDTH = 1001;
@@ -52,4 +55,35 @@ export function syncTaskpaneDock(dock: HTMLElement): void {
   dock.hidden = !Array.from(dock.children).some(
     (child) => child instanceof HTMLElement && !child.hidden,
   );
+}
+
+/** The host's task-pane dock, or null when the host has none. */
+export const taskpaneDockOf = (host: HTMLElement): HTMLElement | null =>
+  host.querySelector<HTMLElement>('.fc-host__taskpane-dock');
+
+/** The skeleton every docked pane shares: a region root, a header carrying the title and the
+ *  round close button, and a body. Classes are `prefix`, `prefix__header`, `__title`,
+ *  `__close` and `__body`. The caller fills in the text, visibility and placement. */
+export function createDockedPane(prefix: string): {
+  root: HTMLDivElement;
+  title: HTMLSpanElement;
+  closeBtn: HTMLButtonElement;
+  body: HTMLDivElement;
+} {
+  const root = document.createElement('div');
+  root.className = prefix;
+  root.setAttribute('role', 'region');
+
+  const header = document.createElement('div');
+  header.className = `${prefix}__header`;
+  const title = document.createElement('span');
+  title.className = `${prefix}__title`;
+  const closeBtn = appendDialogButton(header, { label: '', baseClass: `${prefix}__close` });
+  closeBtn.append(createExcelRibbonSvg('paneClose', 'fc-pane-close__glyph') ?? '');
+  header.prepend(title);
+
+  const body = document.createElement('div');
+  body.className = `${prefix}__body`;
+  root.append(header, body);
+  return { root, title, closeBtn, body };
 }

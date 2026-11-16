@@ -141,11 +141,8 @@ export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
   shell.on(shell.overlay, 'keydown', (rawEvent) => {
     const event = rawEvent as KeyboardEvent;
     if (!isSubmitEnter(event)) return;
-    const target = event.target;
-    if (!target || typeof target !== 'object' || !('nodeType' in target)) return;
-    const element = target as Element;
-    if (element.nodeType !== 1 || element.tagName !== 'INPUT') return;
-    const input = target as HTMLInputElement;
+    const input = event.target as HTMLInputElement | null;
+    if (input?.tagName !== 'INPUT') return;
     if (input.type !== 'radio' || input !== ownerDocument.activeElement) return;
     event.preventDefault();
     event.stopPropagation();
@@ -176,8 +173,8 @@ export function runCellShiftChoice(
 ): boolean {
   const { store, wb, history } = target;
   const ctx: RowColActionContext = { ...target, workbook: wb };
-  const { r0, c0, r1, c1 } = normalizeRange(range);
-  const norm: Range = { sheet: range.sheet, r0, c0, r1, c1 };
+  const norm = normalizeRange(range);
+  const { r0, c0, r1, c1 } = norm;
   const sheet = store.getState().data.sheetIndex;
   if (choice === 'rows') {
     const band = [{ kind: 'range', range: rowShiftBand(sheet, r0) }] as const;

@@ -13,53 +13,35 @@ export interface DialogEntry {
   readonly commandId: string;
 }
 
-/** The entry of a Format Cells open through the public instance method. */
-export const INSTANCE_API_FORMAT_ENTRY: DialogEntry = {
+/** The entry of a command run through the public instance API. */
+export const instanceApiEntry = (commandId: string): DialogEntry => ({
   origin: 'instanceApi',
-  commandId: 'formatCells',
-};
+  commandId,
+});
+
+/** The entry of a Format Cells open through the public instance method. */
+export const INSTANCE_API_FORMAT_ENTRY: DialogEntry = instanceApiEntry('formatCells');
 
 /** The entry of a Data Validation open through the public instance method. */
-export const INSTANCE_API_VALIDATION_ENTRY: DialogEntry = {
-  origin: 'instanceApi',
-  commandId: 'dataValidation',
-};
+export const INSTANCE_API_VALIDATION_ENTRY: DialogEntry = instanceApiEntry('dataValidation');
 
 /** The entry of a Name Manager open through the public instance method. */
-export const INSTANCE_API_NAME_MANAGER_ENTRY: DialogEntry = {
-  origin: 'instanceApi',
-  commandId: 'namedRanges',
-};
+export const INSTANCE_API_NAME_MANAGER_ENTRY: DialogEntry = instanceApiEntry('namedRanges');
 
 /** The entry of a Define Name open through the public instance method. */
-export const INSTANCE_API_DEFINE_NAME_ENTRY: DialogEntry = {
-  origin: 'instanceApi',
-  commandId: 'defineName',
-};
+export const INSTANCE_API_DEFINE_NAME_ENTRY: DialogEntry = instanceApiEntry('defineName');
 
 /** The entry of a Page Setup open through the public instance method. */
-export const INSTANCE_API_PAGE_SETUP_ENTRY: DialogEntry = {
-  origin: 'instanceApi',
-  commandId: 'pageSetup',
-};
+export const INSTANCE_API_PAGE_SETUP_ENTRY: DialogEntry = instanceApiEntry('pageSetup');
 
 /** The entry of an Insert Hyperlink open through the public instance method. */
-export const INSTANCE_API_HYPERLINK_ENTRY: DialogEntry = {
-  origin: 'instanceApi',
-  commandId: 'insertHyperlink',
-};
+export const INSTANCE_API_HYPERLINK_ENTRY: DialogEntry = instanceApiEntry('insertHyperlink');
 
 /** The entry of an Insert PivotTable open through the public instance method. */
-export const INSTANCE_API_PIVOT_TABLE_ENTRY: DialogEntry = {
-  origin: 'instanceApi',
-  commandId: 'pivotTableInsert',
-};
+export const INSTANCE_API_PIVOT_TABLE_ENTRY: DialogEntry = instanceApiEntry('pivotTableInsert');
 
 /** The entry of a note or comment dialog open through the public instance method. */
-export const INSTANCE_API_COMMENT_ENTRY: DialogEntry = {
-  origin: 'instanceApi',
-  commandId: 'newCommentReview',
-};
+export const INSTANCE_API_COMMENT_ENTRY: DialogEntry = instanceApiEntry('newCommentReview');
 
 /** The result of Paste Special on an instance without its dialog. */
 export const PASTE_SPECIAL_UNAVAILABLE: ChangeBatchResult = refusedBatch({
@@ -68,16 +50,11 @@ export const PASTE_SPECIAL_UNAVAILABLE: ChangeBatchResult = refusedBatch({
 });
 
 /** The entry of a Paste Special open or apply through the public instance methods. */
-export const INSTANCE_API_PASTE_SPECIAL_ENTRY: DialogEntry = {
-  origin: 'instanceApi',
-  commandId: 'pasteSpecial',
-};
+export const INSTANCE_API_PASTE_SPECIAL_ENTRY: DialogEntry = instanceApiEntry('pasteSpecial');
 
 /** The entry of Insert Copied Cells through the public instance method. */
-export const INSTANCE_API_INSERT_COPIED_CELLS_ENTRY: DialogEntry = {
-  origin: 'instanceApi',
-  commandId: 'insertCopiedCells',
-};
+export const INSTANCE_API_INSERT_COPIED_CELLS_ENTRY: DialogEntry =
+  instanceApiEntry('insertCopiedCells');
 
 /** The mount's dialog openers that take the entry of an internal UI caller. */
 export interface DialogOpeners {

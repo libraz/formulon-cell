@@ -1,4 +1,4 @@
-import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import { formulaForDisplaySafe, inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { extractRefs, type FormulaRef } from '../commands/refs.js';
 import { addrKey, formatA1Cell } from '../engine/address.js';
 import type { CellValue } from '../engine/types.js';
@@ -189,15 +189,6 @@ export function attachEvaluateFormulaDialog(
     );
   };
 
-  const formulaForDisplay = (formula: string, wb: WorkbookHandle | null): string => {
-    if (!wb || typeof wb.getFormulaForDisplay !== 'function') return formula;
-    try {
-      return wb.getFormulaForDisplay(formula);
-    } catch {
-      return formula;
-    }
-  };
-
   const valueForDisplay = (
     wb: WorkbookHandle | null,
     addr: { sheet: number; row: number; col: number },
@@ -234,7 +225,7 @@ export function attachEvaluateFormulaDialog(
       wb,
       active.sheet,
     );
-    evaluationBox.textContent = formulaForDisplay(canonicalEvaluation, wb);
+    evaluationBox.textContent = formulaForDisplaySafe(wb, canonicalEvaluation);
     const uniqueRefs = uniqueRefCount(currentFormula, currentRefs);
     const reason =
       currentRefs.length === 0
@@ -261,7 +252,7 @@ export function attachEvaluateFormulaDialog(
     currentFormula = formula;
     currentRefs = extractRefs(formula);
     stepIndex = 0;
-    formulaBox.textContent = formulaForDisplay(formula, wb);
+    formulaBox.textContent = formulaForDisplaySafe(wb, formula);
     syncEvaluation();
     resultBox.textContent = valueForDisplay(wb, active);
   };
