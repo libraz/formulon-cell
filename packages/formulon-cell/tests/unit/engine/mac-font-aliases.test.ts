@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { macDigitAdvance } from '../../../src/engine/mac-digit-metrics.js';
+import { macDigitAdvance, roundDigitAdvance } from '../../../src/engine/mac-digit-metrics.js';
 import { macDefaultRowPt } from '../../../src/engine/mac-row-model.js';
 
 describe('Mac font aliases', () => {
-  it('keeps Yu Gothic apart from 游ゴシック in the digit metrics, as in the row model', () => {
+  it('gives Yu Gothic its own entries: 游ゴシック digits, its own row height', () => {
     expect(macDefaultRowPt('Yu Gothic', 11)).not.toBe(macDefaultRowPt('游ゴシック', 11));
-    // Yu Gothic has no digit-metric entry of its own, so it uses the unknown-family em.
-    expect(macDigitAdvance('Yu Gothic', 10)).toBeCloseTo(5.5, 5);
-    expect(macDigitAdvance('游ゴシック', 10)).toBeCloseTo(5.6, 5);
+    expect(macDigitAdvance('Yu Gothic', 10)).toBe(macDigitAdvance('游ゴシック', 10));
+    // Measured whole-point digit widths at 10, 11 and 12 pt.
+    expect([10, 11, 12].map((pt) => roundDigitAdvance(macDigitAdvance('Yu Gothic', pt)))).toEqual([
+      6, 6, 7,
+    ]);
   });
 
   it('resolves the shared aliases in both tables', () => {

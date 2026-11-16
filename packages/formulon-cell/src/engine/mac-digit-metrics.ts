@@ -30,6 +30,8 @@ const FAMILY_EM: ReadonlyMap<string, number> = new Map(
       ['ＭＳ Ｐゴシック', 0.5],
       ['Aptos Narrow', 0.52],
       ['游ゴシック', 0.56],
+      // Measured 6 / 6 / 7 pt digits at 10 / 11 / 12 pt, as 游ゴシック.
+      ['Yu Gothic', 0.56],
       ['Meiryo', 0.6],
       ['Tahoma', 0.546],
       ['等线', 0.5],
@@ -40,9 +42,8 @@ const FAMILY_EM: ReadonlyMap<string, number> = new Map(
 );
 
 /** Alternate spellings, keyed and valued by normalized name. Shared with the
- *  row model. "Yu Gothic" is deliberately absent: it is a different face from
- *  游ゴシック on Mac, and its digit advance is not measured yet, so it takes the
- *  unknown-family em. */
+ *  row model. "Yu Gothic" is deliberately absent: on Mac it shares 游ゴシック's
+ *  digits but not its default row height, so it has entries of its own. */
 const FAMILY_ALIASES: ReadonlyMap<string, string> = new Map(
   (
     [
