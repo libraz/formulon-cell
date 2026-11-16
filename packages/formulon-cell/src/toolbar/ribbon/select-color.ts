@@ -268,7 +268,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     wrap.appendChild(button);
 
     let detachDocDown: (() => void) | null = null;
+    let outsidePressTimer: ReturnType<typeof setTimeout> | null = null;
     const close = (): void => {
+      if (outsidePressTimer !== null) clearTimeout(outsidePressTimer);
+      outsidePressTimer = null;
       wrap.classList.remove('fc-tb__rb-dd--open');
       button.setAttribute('aria-expanded', 'false');
       wrap.querySelector('.fc-tb__rb-dd__list')?.remove();
@@ -435,7 +438,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         ),
       );
       focusListOption(list, selectedIndex);
-      setTimeout(() => {
+      if (outsidePressTimer !== null) clearTimeout(outsidePressTimer);
+      outsidePressTimer = setTimeout(() => {
+        outsidePressTimer = null;
+        if (!wrap.classList.contains('fc-tb__rb-dd--open')) return;
         detachDocDown = onOutsidePress(document, () => [wrap], close, {
           event: 'mousedown',
           capture: true,
@@ -503,7 +509,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     wrap.appendChild(native);
 
     let detachDocDown: (() => void) | null = null;
+    let outsidePressTimer: ReturnType<typeof setTimeout> | null = null;
     const close = (): void => {
+      if (outsidePressTimer !== null) clearTimeout(outsidePressTimer);
+      outsidePressTimer = null;
       wrap.classList.remove('fc-tb__rb-color--open');
       button.setAttribute('aria-expanded', 'false');
       wrap.querySelector('.fc-tb__color-flyout')?.remove();
@@ -560,7 +569,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       });
       wrap.appendChild(flyout);
       palette.focus();
-      setTimeout(() => {
+      if (outsidePressTimer !== null) clearTimeout(outsidePressTimer);
+      outsidePressTimer = setTimeout(() => {
+        outsidePressTimer = null;
+        if (!wrap.classList.contains('fc-tb__rb-color--open')) return;
         detachDocDown = onOutsidePress(document, () => [wrap], close, {
           event: 'mousedown',
           capture: true,
