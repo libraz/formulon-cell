@@ -22,6 +22,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'cfRulesDialog',
   'pivotTableDialog',
   'pivotGroupDialog',
+  'pivotShowDetailDialog',
   'workbookObjects',
   'sessionCharts',
   'sessionIllustrations',
@@ -585,6 +586,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'interact/pivot-group-dialog.ts',
     'openPivotGroupDialog',
     'pivotGroupDialog',
+    'block',
+  ),
+  shell(
+    'interact.pivotShowDetailDialog',
+    'interact/pivot-detail-picker.ts',
+    'openPivotShowDetailDialog',
+    'pivotShowDetailDialog',
     'block',
   ),
   shell(
