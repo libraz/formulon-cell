@@ -2,10 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { ko } from '../../../src/i18n/strings/ko.js';
 import { zh } from '../../../src/i18n/strings/zh.js';
 import { macRibbonLabelForCommand } from '../../../src/toolbar/ribbon/mac/labels.js';
+import { createTableMenuFactories } from '../../../src/toolbar/ribbon/menus/table.js';
+import type { ToolbarLang } from '../../../src/toolbar/ribbon-model.js';
 
 /** The ribbon draws these zero-width spaces between the words of some labels. */
 const ZWSP = String.fromCodePoint(0x200b);
 const NBSP = String.fromCodePoint(0xa0);
+
+/** Text of one item of the Table Design tab's Refresh menu. */
+const tableRefreshItem = (lang: ToolbarLang, value: string): string | null | undefined =>
+  createTableMenuFactories(lang, 'Refresh')
+    .createTableRefreshMenu('tableRefresh')
+    .querySelector(`[data-table-refresh="${value}"] .fc-tb__menu-item__text`)?.textContent;
 
 describe('menu wording', () => {
   it.each([
@@ -91,6 +99,18 @@ describe('menu wording', () => {
       'de Page Setup',
       macRibbonLabelForCommand('mac.page.pageSetup', 'de'),
       `Seiteneinrichtung${NBSP}…`,
+    ],
+    ['de Refresh Status', tableRefreshItem('de', 'refresh-status'), 'Status aktualisieren'],
+    ['fr Refresh Status', tableRefreshItem('fr', 'refresh-status'), 'Actualiser l’état'],
+    [
+      'en Connection Properties',
+      tableRefreshItem('en', 'connection-properties'),
+      'Connection Properties...',
+    ],
+    [
+      'ja Connection Properties',
+      tableRefreshItem('ja', 'connection-properties'),
+      '接続のプロパティ...',
     ],
   ])('reads %s as the desktop draws it', (_, ours, drawn) => {
     expect(ours).toBe(drawn);

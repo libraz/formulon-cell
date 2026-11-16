@@ -196,7 +196,7 @@ class Surface:
                            | set(seed_keys(labels, 'DICTIONARY_LABEL_KEYS')))
         self.menu_keys = (set(seed_keys(labels, 'menuLabelSeeds')) | set(list_keys(labels, 'BUNDLE_MENU_KEYS'))
                           | set(seed_keys(labels, 'DICTIONARY_MENU_KEYS')))
-        self.group_keys = set(seed_keys(labels, 'groupSeeds')) | set(list_keys(labels, 'BUNDLE_GROUP_KEYS'))
+        self.group_keys = set(list_keys(labels, 'BUNDLE_GROUP_KEYS'))
         self.model = read_model()
         self.menus = read_menus()
         text = ''.join((MAC / f).read_text(encoding='utf-8')
@@ -208,6 +208,10 @@ class Surface:
         self.tail = {i.rsplit('.', 1)[-1] for i in self.ids}
         direct = set(re.findall(r"\bt\('(\w+)'\)", text)) | set(re.findall(r"\blabels(?:\.|\[')(\w+)", text))
         direct |= set(re.findall(r"\bleaf\(\s*'[^']+',\s*'(\w+)'", text))
+        # More Functions categories are worded by the label of their id (macFunctionCategoryLabel).
+        direct |= set(re.findall(r"\{ category: '(\w+)' \}", text))
+        table = (MAC.parent / 'menus' / 'table.ts').read_text(encoding='utf-8')
+        direct |= set(re.findall(r"\blabel\('(\w+)'\)", table))
         self.direct = direct
         model_src = (MAC / 'model.ts').read_text(encoding='utf-8')
         self.group_titles = set(re.findall(r"group\(\s*'([^']+)'", model_src))

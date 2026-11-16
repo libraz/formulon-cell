@@ -134,6 +134,12 @@
       "name": "ChunkConvertToLinkedEntity",
       "match": "en+ja"
     },
+    "groups:Data from Picture": {
+      "tcid": 34021,
+      "source": "tbbtn",
+      "name": "ChunkDataFromPicture",
+      "match": "en+ja"
+    },
     "groups:Defined Names": {
       "tcid": 11621,
       "source": "tbbtn",
@@ -349,6 +355,12 @@
       "tcid": 12792,
       "source": "tbbtn",
       "name": "ChunkProtect",
+      "match": "en+ja"
+    },
+    "groups:Protection Changes": {
+      "tcid": 11630,
+      "source": "tbbtn",
+      "name": "ChunkProofCommentChanges",
       "match": "en+ja"
     },
     "groups:Python (Preview)": {
@@ -699,6 +711,13 @@
         "zh": "公式: 0.1.0.4.0"
       }
     },
+    "labels:cancelRefresh": {
+      "tcid": 1953,
+      "source": "tbbtn",
+      "name": "CancelRefresh",
+      "match": "en+ja",
+      "evidence": "the same TCID is drawn in the Data tab Refresh All menu in all seven locales"
+    },
     "labels:cellFocus": {
       "tcid": 34325,
       "source": "tbbtn",
@@ -928,6 +947,20 @@
         "zh": "页面布局: 0.1.0.0.1"
       }
     },
+    "labels:compatibility": {
+      "tcid": 16801,
+      "source": "tbbtn",
+      "name": "GalInsertFnDeprecated",
+      "match": "en+ja",
+      "evidence": "drawn in the More Functions menu in all seven locales"
+    },
+    "labels:connectionProperties": {
+      "tcid": 12489,
+      "source": "tbbtn",
+      "name": "ConnectionProperties",
+      "match": "en+ja",
+      "control": "menu-item"
+    },
     "labels:consolidate": {
       "tcid": 863,
       "source": "tbbtn",
@@ -961,6 +994,13 @@
         "th": "สูตร: 0.1.0.2.3",
         "zh": "公式: 0.1.0.2.3"
       }
+    },
+    "labels:cube": {
+      "tcid": 13984,
+      "source": "tbbtn2",
+      "name": "GalInsertFnCube",
+      "match": "en+ja",
+      "evidence": "drawn in the More Functions menu in all seven locales"
     },
     "labels:customViews": {
       "tcid": 950,
@@ -1152,6 +1192,13 @@
         "th": "สูตร: 0.1.0.1.2",
         "zh": "公式: 0.1.0.1.2"
       }
+    },
+    "labels:engineering": {
+      "tcid": 13985,
+      "source": "tbbtn2",
+      "name": "GalInsertFnEngineering",
+      "match": "en+ja",
+      "evidence": "drawn in the More Functions menu in all seven locales"
     },
     "labels:equation": {
       "tcid": 15451,
@@ -1517,6 +1564,13 @@
         "th": "แทรก: 0.1.0.3.2",
         "zh": "插入: 0.1.0.3.2"
       }
+    },
+    "labels:information": {
+      "tcid": 12825,
+      "source": "tbbtn2",
+      "name": "GalInsertFnInformation",
+      "match": "en+ja",
+      "evidence": "drawn in the More Functions menu in all seven locales"
     },
     "labels:initialize": {
       "tcid": 46569,
@@ -2219,6 +2273,13 @@
         "th": "ข้อมูล: 0.1.0.1.0",
         "zh": "数据: 0.1.0.1.0"
       }
+    },
+    "labels:refreshStatus": {
+      "tcid": 1954,
+      "source": "tbbtn2",
+      "name": "RefreshStatus",
+      "match": "en+ja",
+      "evidence": "the same TCID is drawn in the Data tab Refresh All menu in all seven locales"
     },
     "labels:relativeRecording": {
       "tcid": 896,
@@ -3133,6 +3194,13 @@
         "th": "สูตร: 0.1.0.3.5",
         "zh": "公式: 0.1.0.3.5"
       }
+    },
+    "labels:web": {
+      "tcid": 24506,
+      "source": "tbbtn",
+      "name": "GalInsertFnWeb",
+      "match": "en+ja",
+      "evidence": "drawn in the More Functions menu in all seven locales"
     },
     "labels:whatIf": {
       "tcid": 11936,
@@ -5926,15 +5994,14 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "groups:Options": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "groups:Queries & Connections": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
+      "status": "unconfirmed",
+      "tcid": 27712,
+      "reason": "group titles are not drawn; the ribbon's chunk at this slot is ChunkDataConnections (TCID 11625: en Connections, ja 接続), while this wording comes from TCID 27712, which no ribbon node uses",
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "1204396210"
+      }
     },
     "groups:Read-Only": {
       "status": "unresolved",
@@ -7445,6 +7512,7 @@
     "groups:Data (PivotTable)",
     "groups:Data Tools",
     "groups:Data Types",
+    "groups:Data from Picture",
     "groups:Defined Names",
     "groups:Editing",
     "groups:External Table Data",
@@ -7481,6 +7549,7 @@
     "groups:Proofing",
     "groups:Properties",
     "groups:Protect",
+    "groups:Protection Changes",
     "groups:Python (Preview)",
     "groups:Scale to Fit",
     "groups:Shape Styles",
@@ -7521,6 +7590,7 @@
     "labels:automate",
     "labels:background",
     "labels:calcOptions",
+    "labels:cancelRefresh",
     "labels:cellFocus",
     "labels:chartArea",
     "labels:chartBar",
@@ -7536,8 +7606,11 @@
     "labels:checkBox",
     "labels:clear",
     "labels:color",
+    "labels:compatibility",
+    "labels:connectionProperties",
     "labels:consolidate",
     "labels:createFromSelection",
+    "labels:cube",
     "labels:customViews",
     "labels:data",
     "labels:dataAnalysis",
@@ -7550,6 +7623,7 @@
     "labels:dependents",
     "labels:draw",
     "labels:editor",
+    "labels:engineering",
     "labels:equation",
     "labels:eraser",
     "labels:errorCheck",
@@ -7573,6 +7647,7 @@
     "labels:highlighter",
     "labels:home",
     "labels:icons",
+    "labels:information",
     "labels:initialize",
     "labels:insert",
     "labels:insertFunction",
@@ -7614,6 +7689,7 @@
     "labels:recommendedPivotTable",
     "labels:recordMacro",
     "labels:refreshAll",
+    "labels:refreshStatus",
     "labels:relativeRecording",
     "labels:removeArrows",
     "labels:removeDuplicates",
@@ -7674,6 +7750,7 @@
     "labels:useInFormula",
     "labels:view",
     "labels:watch",
+    "labels:web",
     "labels:whatIf",
     "labels:wordArt",
     "labels:workbookLinks",

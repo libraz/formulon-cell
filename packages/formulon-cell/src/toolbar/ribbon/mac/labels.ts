@@ -12,7 +12,6 @@ import {
   type Label,
   type LabelLike,
   type LegacyLabel,
-  localizedGroupLabel,
   localizedLabel,
   localizedMenuLabel,
   MAC_CONTEXT_LABELS,
@@ -212,6 +211,14 @@ const BUNDLE_LABEL_KEYS: readonly string[] = [
   'textToColumns',
   'analysis',
   'macros',
+  'engineering',
+  'cube',
+  'information',
+  'compatibility',
+  'web',
+  'refreshStatus',
+  'cancelRefresh',
+  'connectionProperties',
 ];
 
 /** Command labels the app has no string for, by their `mac.ribbonLabels` dictionary field. */
@@ -244,49 +251,9 @@ const unknownLabel = (key: string): Label => perLocale(() => key);
 
 export const t = (key: string): Label => labels[key] ?? unknownLabel(key);
 
-const MORE_FUNCTION_CATEGORY_LABELS: Readonly<Record<string, Label>> = {
-  statistical: t('statistical'),
-  engineering: {
-    ja: 'エンジニアリング',
-    en: 'Engineering',
-    de: 'Technik',
-    fr: 'Ingénierie',
-    zh: '工程',
-    ko: '공학',
-    th: 'วิศวกรรม',
-  },
-  cube: {
-    ja: 'キューブ',
-    en: 'Cube',
-    de: 'Cube',
-    fr: 'Cube',
-    zh: '多维数据集',
-    ko: '정육면체',
-    th: 'คิวบ์',
-  },
-  information: {
-    ja: '情報',
-    en: 'Information',
-    de: 'Informationen',
-    fr: 'Informations',
-    zh: '信息',
-    ko: '정보',
-    th: 'ข้อมูล',
-  },
-  compatibility: {
-    ja: '互換性',
-    en: 'Compatibility',
-    de: 'Kompatibilität',
-    fr: 'Compatibilité',
-    zh: '兼容性',
-    ko: '호환성',
-    th: 'ความเข้ากันได้',
-  },
-  web: { ja: 'Web', en: 'Web', de: 'Web', fr: 'Web', zh: 'Web', ko: '웹', th: 'เว็บ' },
-};
-
+/** A More Functions menu category in `lang`; each category is worded by the label of its id. */
 export const macFunctionCategoryLabel = (category: string, lang: ToolbarLang): string =>
-  MORE_FUNCTION_CATEGORY_LABELS[category]?.[lang] ?? category;
+  labels[category]?.[lang] ?? category;
 
 /** Group titles the app bundle words in every locale, as `groups:` keys. */
 const BUNDLE_GROUP_KEYS: readonly string[] = [
@@ -377,21 +344,14 @@ const BUNDLE_GROUP_KEYS: readonly string[] = [
   'Show (Sparkline)',
   'Style',
   'Group (Sparkline)',
+  'Data from Picture',
+  'Queries & Connections',
+  'Protection Changes',
 ];
 
-const groupSeeds: Record<string, LegacyLabel> = {
-  'Data from Picture': { ja: '画像からのデータ', en: 'Data from Picture' },
-  'Queries & Connections': { ja: 'クエリと接続', en: 'Queries & Connections' },
-  Options: { ja: 'オプション', en: 'Options' },
-  'Protection Changes': { ja: '変更箇所', en: 'Changes' },
-};
-
-export const GROUP_LABELS: Readonly<Record<string, Label>> = Object.fromEntries([
-  ...BUNDLE_GROUP_KEYS.map((key) => [key, macBundleLabel(`groups:${key}`)] as const),
-  ...Object.entries(groupSeeds).map(
-    ([key, seed]) => [key, localizedGroupLabel(key, seed)] as const,
-  ),
-]);
+export const GROUP_LABELS: Readonly<Record<string, Label>> = Object.fromEntries(
+  BUNDLE_GROUP_KEYS.map((key) => [key, macBundleLabel(`groups:${key}`)] as const),
+);
 
 /** A ribbon group title in `lang`, or `key` itself when it has no label. */
 export const macGroupTitle = (key: string, lang: ToolbarLang): string =>

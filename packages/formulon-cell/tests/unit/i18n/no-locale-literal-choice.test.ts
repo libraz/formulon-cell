@@ -102,16 +102,11 @@ const LOCALE_TABLE_RULES: readonly { name: string; pattern: RegExp }[] = [
 const LOCALE_TABLES_PENDING: Readonly<Record<string, string>> = {
   'toolbar/ribbon/mac/labels-data.ts:MAC_LABEL_TRANSLATIONS':
     'ribbon command labels not yet on the bundle route',
-  'toolbar/ribbon/mac/labels-data.ts:MAC_GROUP_TRANSLATIONS':
-    'ribbon group titles not yet on the bundle route',
   'toolbar/ribbon/mac/labels-data.ts:MAC_MENU_TRANSLATIONS':
     'ribbon menu labels not yet on the bundle route',
   'toolbar/ribbon/mac/labels-data.ts:MAC_FUNCTION_TRANSLATIONS':
     'function names in the ribbon function menus, not yet on the bundle route',
   'toolbar/ribbon/mac/labels.ts:labelSeeds': 'ja/en command label seeds, not yet converted',
-  'toolbar/ribbon/mac/labels.ts:MORE_FUNCTION_CATEGORY_LABELS':
-    'function category names, not yet on the bundle route',
-  'toolbar/ribbon/mac/labels.ts:groupSeeds': 'ja/en group title seeds, not yet converted',
   'toolbar/ribbon/mac/labels.ts:menuLabelSeeds': 'ja/en menu label seeds, not yet converted',
   'toolbar/ribbon/mac/labels.ts:text': 'English fallback for the ja/en seeds above',
   'toolbar/ribbon/mac/labels.ts:macRibbonDisabledReason':
@@ -125,7 +120,6 @@ const LOCALE_TABLES_PENDING: Readonly<Record<string, string>> = {
     'gallery items carry the English reason, translated at render',
   'toolbar/ribbon/mac/automation-gallery.ts:automationScript':
     'gallery items carry the English label, translated at render',
-  'toolbar/ribbon/menus/table.ts:LABELS': 'external-data menu labels, not yet on the bundle route',
   'interact/function-catalog-text.ts:FUNCTION_DESCRIPTIONS':
     'function descriptions, not yet in the dictionaries',
   'commands/input-grammar.ts:BACKSLASH_CURRENCY': 'currency symbol per input locale, data',

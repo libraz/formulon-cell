@@ -2,7 +2,7 @@ import {
   type MacRibbonReasonStrings,
   macRibbonReasonsEn,
 } from '../../../i18n/strings/mac/ribbon-reasons.js';
-import type { Locale, Strings } from '../../../i18n/strings.js';
+import type { Locale } from '../../../i18n/strings.js';
 import { dictionaries } from '../../../i18n/strings.js';
 import { MAC_BUNDLE_LABELS } from './labels-bundle.js';
 
@@ -19,8 +19,6 @@ export type ExtraTranslations = Readonly<{
   ko: string;
   th: string;
 }>;
-
-type RibbonKey = Exclude<keyof Strings['ribbon'], 'tabs' | 'fontFamilies'>;
 
 /**
  * Mac labels without a reusable central dictionary field. Values are kept by
@@ -40,35 +38,6 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
     th: 'ปากกาสีดำ',
   },
   penRed: { de: 'Roter Stift', fr: 'Stylet rouge', zh: '红色笔', ko: '빨간색 펜', th: 'ปากกาสีแดง' },
-};
-
-/** Group titles worded by a ribbon dictionary entry. */
-export const MAC_GROUP_SOURCES: Readonly<Record<string, RibbonKey>> = {
-  Options: 'options',
-};
-
-export const MAC_GROUP_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> = {
-  'Data from Picture': {
-    de: 'Daten aus Bild',
-    fr: 'Données de l’image',
-    zh: '来自图片的数据',
-    ko: '그림의 데이터',
-    th: 'ข้อมูลจากรูปภาพ',
-  },
-  'Protection Changes': {
-    de: 'Änderungen',
-    fr: 'Modifications',
-    zh: '更改',
-    ko: '변경 내용',
-    th: 'การเปลี่ยนแปลง',
-  },
-  'Queries & Connections': {
-    de: 'Abfragen und Verbindungen',
-    fr: 'Requêtes et connexions',
-    zh: '查询和连接',
-    ko: '쿼리 및 연결',
-    th: 'คิวรีและการเชื่อมต่อ',
-  },
 };
 
 type MacRibbonReason = keyof MacRibbonReasonStrings;
@@ -115,30 +84,10 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
   },
 };
 
-const readCoreValue = (locale: Locale, key: RibbonKey): string => {
-  const value = (dictionaries[locale].ribbon as unknown as Record<string, unknown>)[key];
-  if (typeof value !== 'string')
-    throw new Error(`Mac label source ribbon.${String(key)} is not a string.`);
-  return value;
-};
-
-export const localizedFromCore = (key: RibbonKey): Label =>
-  Object.fromEntries(MAC_LOCALES.map((locale) => [locale, readCoreValue(locale, key)])) as Label;
-
 export const localizedFromTranslations = (
   seed: LegacyLabel,
   translations: ExtraTranslations,
 ): Label => ({ ...seed, ...translations });
-
-export const localizedGroupLabel = (key: string, seed: LegacyLabel): Label => {
-  const bundled = MAC_BUNDLE_LABELS[`groups:${key}`];
-  if (bundled) return bundled;
-  const source = MAC_GROUP_SOURCES[key];
-  if (source) return localizedFromCore(source);
-  const translations = MAC_GROUP_TRANSLATIONS[key];
-  if (translations) return localizedFromTranslations(seed, translations);
-  throw new Error(`Missing Mac ribbon translations for group: ${key}`);
-};
 
 export const localizedMenuLabel = (key: string, seed: LegacyLabel): Label => {
   const bundled = MAC_BUNDLE_LABELS[`menu:${key}`];
