@@ -341,6 +341,7 @@ describe('clearValidationInRange', () => {
     > = [];
     const wb = {
       capabilities: { dataValidation: true },
+      getValidationsForSheet: () => [],
       clearValidations: (sheet: number) => {
         calls.push({ kind: 'clear', sheet });
         return true;
@@ -389,6 +390,7 @@ describe('clearValidationInRange', () => {
     const calls: Array<{ kind: 'clear'; sheet: number }> = [];
     const wb = {
       capabilities: { dataValidation: true },
+      getValidationsForSheet: () => [],
       clearValidations: (sheet: number) => {
         calls.push({ kind: 'clear', sheet });
         return true;

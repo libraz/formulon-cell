@@ -14,7 +14,7 @@ import {
   upsertDefinedName,
 } from '../../../src/commands/named-ranges.js';
 import type { Addr } from '../../../src/engine/types.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -123,9 +123,10 @@ describe('named range commands', () => {
     const { wb, calls } = makeWb();
     const result = upsertDefinedName(wb, ' Total ', ' =Sheet1!$B$1 ');
 
+    // The entry is read back; this fake stores the formula as written.
     expect(result).toEqual({
       ok: true,
-      entry: { name: 'Total', formula: 'Sheet1!$B$1', localSheetId: -1 },
+      entry: { name: 'Total', formula: '=Sheet1!$B$1', localSheetId: -1 },
     });
     expect(calls).toEqual([{ name: 'Total', formula: '=Sheet1!$B$1', localSheetId: -1 }]);
   });
@@ -634,5 +635,16 @@ describe('Create from Selection names', () => {
         { top: false, left: true, bottom: false, right: false },
       ),
     ).toEqual({ ok: false, reason: 'too-large' });
+  });
+});
+
+describe('upsertDefinedName on the real engine', () => {
+  it('returns the name as the engine stored it, its formula respelled', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const result = upsertDefinedName(wb, 'Rate', '=sum(1.50,2)');
+    const stored = [...wb.definedNames()].find((e) => e.name === 'Rate');
+    expect(stored).toBeDefined();
+    expect(result).toMatchObject({ ok: true, entry: { name: 'Rate', formula: stored?.formula } });
+    wb.dispose();
   });
 });

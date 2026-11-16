@@ -648,6 +648,27 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     renderPreview();
   };
 
+  /** The committed call as the engine stored it, which may be respelled: the anchor's formula
+   *  read back, with the call to `name` in it; null when the cell holds no such call. */
+  const storedCall = (
+    name: string,
+  ): { raw: string; caret: number; args: readonly string[] } | null => {
+    const stored = anchor ? safeWorkbook()?.cellFormula(anchor) : null;
+    if (!stored) return null;
+    for (let open = stored.indexOf('('); open >= 0; open = stored.indexOf('(', open + 1)) {
+      const call = projectFormulaCallAtCaret(
+        stored,
+        open + 1,
+        resolveProjectedName,
+        activeListSeparator(),
+      );
+      if (call?.span.canonicalName === name) {
+        return { raw: stored, caret: call.span.call.end, args: call.args };
+      }
+    }
+    return null;
+  };
+
   const finishDraft = (
     binding: DraftBinding,
     outcome: 'committed' | 'cancelled' | 'discarded',
@@ -707,12 +728,13 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     activeDraft = null;
     binding.unsubscribe();
     if (outcome === 'committed' && committedName) {
+      const stored = storedCall(committedName);
       postCommit = {
         name: committedName,
-        args: committedArgs,
-        raw: committedRaw,
+        args: stored ? [...stored.args] : committedArgs,
+        raw: stored?.raw ?? committedRaw,
         result: committedResult,
-        caret: committedProjection?.span.call.end ?? currentCaret,
+        caret: stored?.caret ?? committedProjection?.span.call.end ?? currentCaret,
       };
       mode = 'arguments-committed';
       synchronized = committedValid;

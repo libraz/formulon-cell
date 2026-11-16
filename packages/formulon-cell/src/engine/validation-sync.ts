@@ -113,6 +113,15 @@ export function hydrateValidationsFromEngine(
   });
 }
 
+/** Each rule's formulas as the engine stored them, read back right after the sync wrote it. */
+const storedFormulas = new WeakMap<CellValidation, { formula1: string; formula2: string }>();
+
+/** The formulas the engine stored for a rule the last sync wrote; the engine may respell them,
+ *  so a written rule is matched against these rather than the text sent. */
+export const storedValidationFormulas = (
+  validation: CellValidation,
+): { formula1: string; formula2: string } | undefined => storedFormulas.get(validation);
+
 /**
  * Replace the engine's data-validation rules on `sheet` with whatever
  * FormatSlice currently asserts. Cells sharing identical validation config
@@ -159,6 +168,7 @@ export function syncValidationsToEngine(
   if (strict && !clearSucceeded) {
     throw strictSyncError('clearValidations', `sheet:${sheet}`);
   }
+  const written: CellValidation[] = [];
   for (const { validation, ranges } of rules) {
     if (ranges.length === 0) continue;
     const encoded = encodeValidation(validation, ranges);
@@ -173,6 +183,14 @@ export function syncValidationsToEngine(
     if (strict && !addSucceeded) {
       throw strictSyncError('addValidationEntry', address);
     }
+    if (addSucceeded) written.push(validation);
+  }
+  // The sheet was cleared first, so the engine lists the written rules in write order.
+  const entries = written.length > 0 ? wb.getValidationsForSheet(sheet) : [];
+  for (const [i, validation] of written.entries()) {
+    const entry = entries[i];
+    if (entry)
+      storedFormulas.set(validation, { formula1: entry.formula1, formula2: entry.formula2 });
   }
 }
 

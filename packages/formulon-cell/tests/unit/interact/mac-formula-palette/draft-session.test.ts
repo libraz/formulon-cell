@@ -437,6 +437,28 @@ describe('interact/mac-formula-palette draft session', () => {
     expect(sheet.workbook.cellFormula(anchor)).toBe('=ACOS(1)');
   });
 
+  it('edits the committed call as the cell stores it after Done', () => {
+    const { formulaBar, palette } = setup();
+    const anchor = sheet.instance.store.getState().selection.active;
+    palette.open('ROUND');
+    const field = (i: number) =>
+      paletteRoot(palette).querySelector<HTMLInputElement>(`[data-argument-index="${i}"]`);
+    const type = (i: number, value: string) => {
+      const input = field(i);
+      if (!input) throw new Error(`no argument ${i}`);
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    type(0, '1.50');
+    type(1, '2');
+    paletteRoot(palette).querySelector<HTMLButtonElement>('[data-action="done"]')?.click();
+    const stored = sheet.workbook.cellFormula(anchor) ?? '';
+    expect(stored).toMatch(/^=ROUND\(.*,2\)$/i);
+    type(1, '3');
+    expect(formulaBar.input.value).toBe(stored.replace(/,2\)$/, ',3)'));
+    expect(field(0)?.value).toBe(stored.slice(stored.indexOf('(') + 1, stored.lastIndexOf(',')));
+  });
+
   it('records a synchronized explicit trailing-blank commit in Recent', () => {
     const { formulaBar, palette } = setup();
     palette.open('IF');

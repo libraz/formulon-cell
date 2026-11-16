@@ -509,6 +509,14 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     draftHistory.clear();
   };
 
+  /** After a commit the bar shows the cell as the engine stored it, which may be respelled,
+   *  and that text is the baseline the next edit compares against. */
+  const showCommittedText = (): void => {
+    if (detached) return;
+    updateChrome();
+    fxBaseline = fxInput.value;
+  };
+
   const refreshDiscardedChrome = (): void => {
     // Discard is a system boundary: clear only this controller's local chrome
     // state, then project the context that is current now. Ref ownership was
@@ -898,6 +906,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
     if (committed) {
       finishExternalDraft(draft, 'committed', false, false);
+      showCommittedText();
       return true;
     }
     if (draft.cancelRequested || detached) {
@@ -969,6 +978,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     finishEditing();
     moveAfterCommit(advance);
     focusSheet(host);
+    showCommittedText();
     return true;
   };
 

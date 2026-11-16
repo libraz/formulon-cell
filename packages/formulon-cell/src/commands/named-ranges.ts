@@ -395,16 +395,15 @@ export function upsertDefinedName(
   // Defining/redefining a name changes what `=MyRange` resolves to — recompute
   // so dependent cells and a subsequent save reflect the new target.
   wb.recalcAuto();
-  // The engine stores the formula without its leading `=`, as `definedNames()` reads it back.
-  const stored = trimmedFormula.replace(/^=/, '');
+  // The entry is the name as the engine stored it, read back: its formula may be respelled.
   const written = [...wb.definedNames()].find(
     (e) => e.localSheetId === localSheetId && isSameDefinedName(e.name, trimmedName),
   );
   return {
     ok: true,
     entry: {
-      name: trimmedName,
-      formula: stored,
+      name: written?.name ?? trimmedName,
+      formula: written?.formula ?? trimmedFormula.replace(/^=/, ''),
       localSheetId,
       ...(written?.comment ? { comment: written.comment } : {}),
       ...(written?.hidden ? { hidden: true } : {}),

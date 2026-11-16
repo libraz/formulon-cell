@@ -14,6 +14,7 @@ describe('validation sync signatures', () => {
     }
     const wb = {
       capabilities: { dataValidation: true },
+      getValidationsForSheet: () => [],
       clearValidations: () => true,
       addValidationEntry: vi.fn(() => true),
     } as unknown as WorkbookHandle;

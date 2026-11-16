@@ -2,7 +2,7 @@ import { ComparisonOperator, ValidationErrorStyle, ValidationType } from '@libra
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { syncValidationsToEngine } from '../engine/validation-sync.js';
+import { storedValidationFormulas, syncValidationsToEngine } from '../engine/validation-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { subtractFromRangeValidations } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
@@ -106,10 +106,17 @@ function validationMatchesEngineRule(
   if (entry.errorStyle !== expectedErrorStyle) return false;
   if (entry.allowBlank !== (validation.allowBlank !== false)) return false;
   if (entry.showErrorMessage !== (validation.showErrorMessage !== false)) return false;
+  // A rule this session wrote matches the formulas the engine stored for it, respelled or not.
+  const stored = storedValidationFormulas(validation);
+  if (stored && (entry.formula1 !== stored.formula1 || entry.formula2 !== stored.formula2)) {
+    return false;
+  }
   if (validation.kind === 'custom') {
+    if (stored) return true;
     return normalizeFormula(entry.formula1) === normalizeFormula(validation.formula);
   }
   if (validation.kind === 'list') {
+    if (stored) return true;
     if (Array.isArray(validation.source)) {
       return normalizeListFormula(entry.formula1) === `"${validation.source.join(',')}"`;
     }
@@ -131,9 +138,9 @@ function validationMatchesEngineRule(
                 : validation.op === '>='
                   ? ComparisonOperator.GreaterThanOrEqual
                   : ComparisonOperator.LessThanOrEqual;
-  if (entry.op !== op || !boundMatches(entry.formula1, validation.aFormula, validation.a)) {
-    return false;
-  }
+  if (entry.op !== op) return false;
+  if (stored) return true;
+  if (!boundMatches(entry.formula1, validation.aFormula, validation.a)) return false;
   const needsFormula2 = validation.op === 'between' || validation.op === 'notBetween';
   return (
     !needsFormula2 ||

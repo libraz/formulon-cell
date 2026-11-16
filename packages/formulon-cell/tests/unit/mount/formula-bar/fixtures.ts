@@ -36,6 +36,7 @@ export const attachFormulaBarHarness = (
   store: SpreadsheetStore = sheet.instance.store,
   getWorkbook: () => WorkbookHandle = () => sheet.workbook,
   cancelBindingEditor: () => void = () => {},
+  updateChrome: (fxInput: HTMLTextAreaElement) => void = () => {},
 ) => {
   const formulabar = document.createElement('div');
   const fxInput = document.createElement('textarea');
@@ -63,7 +64,7 @@ export const attachFormulaBarHarness = (
     host: sheet.host,
     onValidation,
     store,
-    updateChrome: () => {},
+    updateChrome: () => updateChrome(fxInput),
     wb: getWorkbook,
   });
   return { controller, fxInput, detach: controller.detach };

@@ -26,6 +26,7 @@ const makeEngine = (
     cleared,
     wb: {
       capabilities: { dataValidation: true } as never,
+      getValidationsForSheet: () => [],
       clearValidations(sheet: number): boolean {
         cleared.push(sheet);
         const result = opts.clearResults?.[clearIndex] ?? true;
