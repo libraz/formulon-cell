@@ -1,3 +1,9 @@
+import {
+  type ActiveReferenceGesture,
+  createFormulaReferenceGesture,
+  type FormulaReferenceGesture,
+} from './formula-reference-gesture.js';
+
 export type FormulaDraftMode = 'edit' | 'point';
 
 export interface FormulaDraftSnapshot {
@@ -73,6 +79,55 @@ export const caretSnapshot = (
   caret: number,
   mode: FormulaDraftMode,
 ): FormulaDraftSnapshot => ({ value, start: caret, end: caret, direction: 'none', mode });
+
+/** The planned effect of picking `ref`, or null when an `update` pick no longer matches its live gesture. */
+export const planReferenceInsert = (input: {
+  value: string;
+  selectionStart: number;
+  selectionEnd: number;
+  ref: string;
+  phase?: 'start' | 'update';
+  active: ActiveReferenceGesture | null;
+  r1c1: boolean;
+}): {
+  picked: FormulaReferenceGesture;
+  result: { text: string; caret: number };
+  next: ActiveReferenceGesture | null;
+} | null => {
+  const { value, selectionStart, selectionEnd, phase } = input;
+  const create = (): FormulaReferenceGesture =>
+    createFormulaReferenceGesture(value, selectionStart, selectionEnd, { r1c1: input.r1c1 });
+  let gesture: FormulaReferenceGesture | null = null;
+  if (phase === 'start') {
+    gesture = create();
+  } else if (phase === 'update') {
+    const current = input.active;
+    if (
+      !current ||
+      current.value !== value ||
+      current.caret !== selectionStart ||
+      current.caret !== selectionEnd
+    ) {
+      return null;
+    }
+    gesture = current.gesture;
+  }
+  const picked = gesture ?? create();
+  const result = picked.insert(input.ref);
+  const next = phase && gesture ? { gesture, value: result.text, caret: result.caret } : null;
+  return { picked, result, next };
+};
+
+/** Record an arrow-driven reference move as one continuing `reference` group. */
+export const recordPointNavigation = (
+  history: FormulaDraftHistory,
+  before: FormulaDraftSnapshot,
+  result: { value: string; caret: number },
+  mode: FormulaDraftMode,
+): void => {
+  if (!history.hasActiveGroup) history.beginGroup(before, 'reference');
+  history.updateGroup(caretSnapshot(result.value, result.caret, mode), 'reference', before);
+};
 
 export type DraftHistoryAction = 'undo' | 'redo';
 
@@ -327,7 +382,7 @@ export class FormulaDraftHistory {
 
   private push(transaction: Transaction): void {
     if (transaction.before.value === transaction.after.value) return;
-    this.undoStack.push(cloneTransaction(transaction));
+    this.undoStack.push(transaction);
     if (this.undoStack.length > MAX_TRANSACTIONS) this.undoStack.shift();
     this.redoStack = [];
   }

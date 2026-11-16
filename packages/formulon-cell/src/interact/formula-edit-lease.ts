@@ -1,6 +1,13 @@
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { EditorMode, EditorRefHighlight, SelectionSlice, UiSlice } from '../store/types.js';
+import type { SpreadsheetStore } from '../store/store.js';
+import type {
+  EditorMode,
+  EditorRefHighlight,
+  SelectionSlice,
+  State,
+  UiSlice,
+} from '../store/types.js';
 
 /** Session that borrows a suspended edit; a locale switch or a stale session invalidates the lease. */
 export interface FormulaEditLeaseContext {
@@ -43,6 +50,48 @@ export interface FormulaEditLease {
   finalize(): void;
   discard(): void;
 }
+
+/** The store-owned part of a lease snapshot, captured from `state`. */
+export const captureLeaseStoreState = (
+  state: State,
+): Pick<FormulaEditLeaseSnapshot, 'selection' | 'editorMode' | 'editorRefs' | 'copy' | 'r1c1'> => ({
+  selection: state.selection,
+  editorMode: state.ui.editor,
+  editorRefs: state.ui.editorRefs,
+  copy: {
+    copyRange: state.ui.copyRange ?? null,
+    copyRanges: state.ui.copyRanges ?? null,
+    copyMode: state.ui.copyMode ?? null,
+    copyRevision: state.ui.copyRevision ?? 0,
+  },
+  r1c1: state.ui.r1c1,
+});
+
+/** Write the snapshot's store-owned part back, installing `editorRefs` as the live refs. */
+export const applyLeaseStoreState = (
+  store: SpreadsheetStore,
+  snapshot: Readonly<FormulaEditLeaseSnapshot>,
+  editorRefs: EditorRefHighlight[],
+): void => {
+  store.setState((current) => ({
+    ...current,
+    selection: snapshot.selection,
+    ui: {
+      ...current.ui,
+      editor: snapshot.editorMode,
+      editorRefs,
+      copyRange: snapshot.copy.copyRange,
+      copyRanges: snapshot.copy.copyRanges,
+      copyMode: snapshot.copy.copyMode,
+      copyRevision: snapshot.copy.copyRevision,
+      r1c1: snapshot.r1c1,
+    },
+  }));
+};
+
+/** Strict-boolean R1C1 flag: only an explicit `true` selects R1C1 notation. */
+export const r1c1Active = (state: { readonly ui: Pick<UiSlice, 'r1c1'> }): boolean =>
+  state.ui.r1c1 === true;
 
 const cloneValue = <T>(value: T): T => {
   if (value === null || typeof value !== 'object') return value;

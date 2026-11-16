@@ -9,6 +9,7 @@ import {
 } from '../engine/range-input.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeOfAddr } from '../store/selection-geometry.js';
 import { deny, type PermissionReasonKey } from './permission-reasons.js';
 
 /** Operations that can be authorized by an embedded instance. Keep this list
@@ -215,7 +216,7 @@ export interface CellRefusal {
 export const boundingRange = (cells: readonly Addr[]): Range | null => {
   const [first] = cells;
   if (!first) return null;
-  const range = { sheet: first.sheet, r0: first.row, c0: first.col, r1: first.row, c1: first.col };
+  const range = { ...rangeOfAddr(first) };
   for (const { sheet, row, col } of cells) {
     if (sheet !== range.sheet) return null;
     range.r0 = Math.min(range.r0, row);

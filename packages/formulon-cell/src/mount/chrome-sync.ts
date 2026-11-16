@@ -30,7 +30,7 @@ import { scrollActiveIntoView } from '../interact/navigation-policy.js';
 import { onOutsidePress } from '../interact/outside-press.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
 import { setRovingStop } from '../interact/roving-rows.js';
-import { isSingleCell } from '../store/selection-geometry.js';
+import { isSingleCell, rangeOfAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import type { NumFmt } from '../store/types/cell-format.js';
@@ -258,11 +258,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       merge.c0 === range.c0 &&
       merge.r1 === range.r1 &&
       merge.c1 === range.c1;
-    return formatSelectionRef(
-      logicalCell ? { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col } : range,
-      a,
-      s.ui.r1c1 === true,
-    );
+    return formatSelectionRef(logicalCell ? rangeOfAddr(a) : range, a, s.ui.r1c1 === true);
   };
 
   interface MirrorViewport {

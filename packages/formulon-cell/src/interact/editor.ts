@@ -45,12 +45,17 @@ import {
   type FormulaDraftSnapshot,
   historyActionForInputType,
   historyActionForKey,
+  planReferenceInsert,
+  recordPointNavigation,
 } from './formula-draft-history.js';
 import {
+  applyLeaseStoreState,
+  captureLeaseStoreState,
   createFormulaEditLease,
   type FormulaEditLease,
   type FormulaEditLeaseContext,
   type FormulaEditLeaseSnapshot,
+  r1c1Active,
 } from './formula-edit-lease.js';
 import {
   type FormulaReferenceNavigationState,
@@ -58,11 +63,7 @@ import {
   pickedReferenceNavigation,
 } from './formula-edit-navigation.js';
 import { classifyFormulaReferenceArrow } from './formula-reference-arrow.js';
-import {
-  type ActiveReferenceGesture,
-  createFormulaReferenceGesture,
-  type FormulaReferenceGesture,
-} from './formula-reference-gesture.js';
+import type { ActiveReferenceGesture } from './formula-reference-gesture.js';
 import { isImeKey } from './mac-dialog-keys.js';
 import {
   navigationPolicyFor,
@@ -85,7 +86,7 @@ import {
 const syncEditorRefs = (store: SpreadsheetStore, text: string, editedAddr: Addr): void => {
   mutators.setEditorRefs(
     store,
-    editorRefHighlights(text, editedAddr, store.getState().ui.r1c1 === true),
+    editorRefHighlights(text, editedAddr, r1c1Active(store.getState())),
   );
 };
 
@@ -227,32 +228,19 @@ export class InlineEditor {
     const el = this.input;
     const selectionStart = el.selectionStart ?? el.value.length;
     const selectionEnd = el.selectionEnd ?? selectionStart;
-    let gesture: FormulaReferenceGesture | null = null;
-    if (options?.phase === 'start') {
-      gesture = createFormulaReferenceGesture(el.value, selectionStart, selectionEnd, {
-        r1c1: this.deps.store.getState().ui.r1c1 === true,
-      });
-    } else if (options?.phase === 'update') {
-      const current = this.referenceGesture;
-      if (
-        !current ||
-        current.value !== el.value ||
-        current.caret !== selectionStart ||
-        current.caret !== selectionEnd
-      ) {
-        this.referenceGesture = null;
-        return;
-      }
-      gesture = current.gesture;
-    } else {
-      this.referenceGesture = null;
-    }
-    const r1c1 = this.deps.store.getState().ui.r1c1 === true;
-    const picked =
-      gesture ?? createFormulaReferenceGesture(el.value, selectionStart, selectionEnd, { r1c1 });
-    const result = picked.insert(ref);
-    this.referenceGesture =
-      options?.phase && gesture ? { gesture, value: result.text, caret: result.caret } : null;
+    const r1c1 = r1c1Active(this.deps.store.getState());
+    const plan = planReferenceInsert({
+      value: el.value,
+      selectionStart,
+      selectionEnd,
+      ref,
+      phase: options?.phase,
+      active: this.referenceGesture,
+      r1c1,
+    });
+    this.referenceGesture = plan?.next ?? null;
+    if (!plan) return;
+    const { picked, result } = plan;
     const after = caretSnapshot(result.text, result.caret, this.arrowMode);
     if (options?.phase) {
       this.draftHistory.updateGroup(after, 'reference', historyBefore);
@@ -277,7 +265,7 @@ export class InlineEditor {
   replaceReferenceAt(index: number, ref: string, options?: { phase: 'start' | 'update' }): void {
     const el = this.input;
     if (!el || !this.editingAddr) return;
-    const r1c1 = this.deps.store.getState().ui.r1c1 === true;
+    const r1c1 = r1c1Active(this.deps.store.getState());
     const target = extractRefs(el.value, { r1c1, base: this.editingAddr })[index];
     if (!target) return;
     const historyBefore = this.captureDraftSnapshot();
@@ -316,16 +304,7 @@ export class InlineEditor {
         end: input.selectionEnd ?? input.value.length,
         direction: input.selectionDirection,
       },
-      selection: state.selection,
-      editorMode: state.ui.editor,
-      editorRefs: state.ui.editorRefs,
-      copy: {
-        copyRange: state.ui.copyRange ?? null,
-        copyRanges: state.ui.copyRanges ?? null,
-        copyMode: state.ui.copyMode ?? null,
-        copyRevision: state.ui.copyRevision ?? 0,
-      },
-      r1c1: state.ui.r1c1,
+      ...captureLeaseStoreState(state),
       locale: context.getLocale(),
     };
 
@@ -432,7 +411,7 @@ export class InlineEditor {
       mutators.setEditorRefs(this.deps.store, []);
       return;
     }
-    this.detachInput(true);
+    this.detachInput(false);
     this.editingAddr = null;
     this.composing = false;
     mutators.setEditor(this.deps.store, { kind: 'idle' });
@@ -789,7 +768,7 @@ export class InlineEditor {
     if (!input || !base) return;
     this.draftHistory.endGroup();
     const r = rotateRefAt(input.value, input.selectionStart ?? input.value.length, {
-      r1c1: this.deps.store.getState().ui.r1c1 === true,
+      r1c1: r1c1Active(this.deps.store.getState()),
       base: { row: base.row, col: base.col },
     });
     if (r.text !== input.value) this.applyRecordedEdit(r.text, r.caret, r.caret, 'f4');
@@ -868,7 +847,7 @@ export class InlineEditor {
       direction: arrow.direction,
       extend: arrow.extend,
       current,
-      r1c1: this.deps.store.getState().ui.r1c1 === true,
+      r1c1: r1c1Active(this.deps.store.getState()),
       jump: arrow.jump,
     });
     if (!result) return false;
@@ -877,14 +856,7 @@ export class InlineEditor {
     this.referenceGesture = null;
     this.pointNavigation = result;
     input.value = result.value;
-    if (!this.draftHistory.hasActiveGroup) {
-      this.draftHistory.beginGroup(historyBefore, 'reference');
-    }
-    this.draftHistory.updateGroup(
-      caretSnapshot(result.value, result.caret, this.arrowMode),
-      'reference',
-      historyBefore,
-    );
+    recordPointNavigation(this.draftHistory, historyBefore, result, this.arrowMode);
     input.setSelectionRange(result.caret, result.caret);
     this.syncInputState();
     // The programmatic edit must not reopen suggestions that swallow the next arrow.
@@ -1069,20 +1041,7 @@ export class InlineEditor {
     this.composing = false;
     this.arrowMode = restoredArrowMode;
     this.pointNavigation = null;
-    this.deps.store.setState((current) => ({
-      ...current,
-      selection: snapshot.selection,
-      ui: {
-        ...current.ui,
-        editor: snapshot.editorMode,
-        editorRefs: [...snapshot.editorRefs],
-        copyRange: snapshot.copy.copyRange,
-        copyRanges: snapshot.copy.copyRanges,
-        copyMode: snapshot.copy.copyMode,
-        copyRevision: snapshot.copy.copyRevision,
-        r1c1: snapshot.r1c1,
-      },
-    }));
+    applyLeaseStoreState(this.deps.store, snapshot, [...snapshot.editorRefs]);
 
     const input = this.mountInput(snapshot.anchor, snapshot.raw, (el) => {
       const max = snapshot.raw.length;
