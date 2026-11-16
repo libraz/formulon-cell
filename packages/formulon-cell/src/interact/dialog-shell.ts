@@ -263,6 +263,37 @@ export function modalDialogOwnsKeys(event: Event): boolean {
   return typeof target?.closest === 'function' && target.closest(MODAL_SURFACE) !== null;
 }
 
+const stopKeyBubble = (event: Event): void => event.stopPropagation();
+const KEY_EVENTS = ['keydown', 'keyup', 'keypress'] as const;
+
+/**
+ * Keeps the keys pressed in a modal surface from bubbling past it, so no key handler on the host
+ * page or on the document acts on them; the dialog's own handlers run first, a capture-phase
+ * listener still sees the key, and nothing is default-prevented. Returns the detach function.
+ */
+export function keepKeysInModal(overlay: HTMLElement): () => void {
+  for (const type of KEY_EVENTS) overlay.addEventListener(type, stopKeyBubble);
+  return () => {
+    for (const type of KEY_EVENTS) overlay.removeEventListener(type, stopKeyBubble);
+  };
+}
+
+/**
+ * Registers a document-level keyboard shortcut that leaves keys pressed in a modal dialog to
+ * the dialog. Returns the detach function.
+ */
+export function onDocumentShortcut(
+  doc: Document,
+  handler: (event: KeyboardEvent) => void,
+): () => void {
+  const listener = (event: KeyboardEvent): void => {
+    if (modalDialogOwnsKeys(event)) return;
+    handler(event);
+  };
+  doc.addEventListener('keydown', listener);
+  return () => doc.removeEventListener('keydown', listener);
+}
+
 /** Records `kind` on the surface element as `data-fc-surface`. */
 export function markSurface(surface: HTMLElement, kind: SurfaceKind): void {
   surface.dataset.fcSurface = kind;
@@ -302,6 +333,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
   overlay.setAttribute('aria-label', ariaLabel);
   markSurface(overlay, 'modal');
   overlay.hidden = true;
+  const releaseKeys = keepKeysInModal(overlay);
 
   const panel = document.createElement('div');
   panel.className = `${className}__panel`;
@@ -412,6 +444,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
         l.target.removeEventListener(l.event, l.handler, l.options);
       }
       listeners.length = 0;
+      releaseKeys();
       selectObserver.disconnect();
       for (const handle of selectHandles.splice(0)) handle.dispose();
       removeDialogLayer(overlay);

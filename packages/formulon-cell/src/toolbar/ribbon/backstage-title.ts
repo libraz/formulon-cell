@@ -6,7 +6,7 @@
 
 import { findNext } from '../../commands/find.js';
 import { openCommentDialogFrom } from '../../interact/dialog-entry.js';
-import { modalDialogOwnsKeys } from '../../interact/dialog-shell.js';
+import { onDocumentShortcut } from '../../interact/dialog-shell.js';
 import { onOutsidePress } from '../../interact/outside-press.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -269,8 +269,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     runTitleSearch();
   });
 
-  ownerDocument.addEventListener('keydown', (event) => {
-    if (modalDialogOwnsKeys(event)) return;
+  onDocumentShortcut(ownerDocument, (event) => {
     const key = event.key.toLowerCase();
     const excelSearchShortcut = key === 'q' && event.altKey && !event.ctrlKey && !event.metaKey;
     const legacySearchShortcut = key === 'u' && event.metaKey && event.ctrlKey;

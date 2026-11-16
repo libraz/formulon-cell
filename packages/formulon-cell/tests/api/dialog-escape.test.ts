@@ -337,45 +337,69 @@ describe('dialogs', () => {
   );
 
   it.each(['default', 'mac'] as const)(
-    'keep the ribbon and title bar shortcuts from acting while a modal dialog is open on the %s profile',
+    'keep keys pressed in a modal dialog from the ribbon and the host page on the %s profile',
     async (platform) => {
       const { host, sheet } = await mountWithContent(platform, true);
       const toolbar = sheet.toolbar;
       if (!toolbar) throw new Error('No ribbon.');
+      const KEYS: KeyboardEventInit[] = [
+        { key: 'q', altKey: true },
+        { key: 'F1', ctrlKey: true },
+        { key: 'u', metaKey: true, ctrlKey: true },
+        { key: 'a' },
+        { key: 'Escape' },
+      ];
+      // A host page's own shortcut handler, listening in the bubble phase.
+      const seen: string[] = [];
+      const hostPage = (event: KeyboardEvent): void => {
+        seen.push(event.key);
+      };
+      document.addEventListener('keydown', hostPage);
       const failures: string[] = [];
       let walked = 0;
-      for (const id of Object.keys(DIALOGS) as DialogId[]) {
-        if (NOT_ON_PLATFORM[platform].includes(id)) continue;
-        if (PANES[platform].includes(id) || FLOATING[platform].includes(id)) continue;
-        sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
-        if (id === 'pasteSpecial') sheet.commands.execute('copy');
-        host.focus();
-        const before = new Set(shownSurfaces());
-        sheet.dialogs.open(id);
-        await Promise.resolve();
-        const surface = shownSurfaces().find((el) => !before.has(el));
-        if (!surface) continue;
-        walked += 1;
-        const first = surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface;
-        first.focus();
-        const mode = toolbar.displayMode;
-        for (const init of [
-          { key: 'F1', ctrlKey: true },
-          { key: 'q', altKey: true },
-        ]) {
-          first.dispatchEvent(
+      try {
+        for (const id of Object.keys(DIALOGS) as DialogId[]) {
+          if (NOT_ON_PLATFORM[platform].includes(id)) continue;
+          if (PANES[platform].includes(id) || FLOATING[platform].includes(id)) continue;
+          sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
+          if (id === 'pasteSpecial') sheet.commands.execute('copy');
+          host.focus();
+          const before = new Set(shownSurfaces());
+          sheet.dialogs.open(id);
+          await Promise.resolve();
+          const surface = shownSurfaces().find((el) => !before.has(el));
+          if (!surface) continue;
+          walked += 1;
+          const first = surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface;
+          first.focus();
+          const mode = toolbar.displayMode;
+          seen.length = 0;
+          for (const init of KEYS) {
+            (document.activeElement ?? first).dispatchEvent(
+              new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }),
+            );
+          }
+          if (seen.length > 0) failures.push(`${id}: the host page saw ${seen.join(' ')}`);
+          if (toolbar.displayMode !== mode) failures.push(`${id}: Ctrl+F1 changed the ribbon`);
+          sheet.dialogs.close(id);
+        }
+        // Once no dialog is open, the host page sees the same keys.
+        seen.length = 0;
+        for (const init of KEYS.slice(0, 4)) {
+          document.body.dispatchEvent(
             new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }),
           );
         }
-        if (toolbar.displayMode !== mode) failures.push(`${id}: Ctrl+F1 changed the ribbon`);
-        if (document.activeElement !== first) failures.push(`${id}: Alt+Q moved focus`);
-        sheet.dialogs.close(id);
+        expect(seen).toEqual(['q', 'F1', 'u', 'a']);
+      } finally {
+        document.removeEventListener('keydown', hostPage);
       }
       expect(failures).toEqual([]);
       expect(walked).toBeGreaterThanOrEqual(20);
     },
     120_000,
   );
+
   it.each(['default', 'mac'] as const)(
     'return focus from a modal dialog to a control outside the sheet that opened it on the %s profile',
     async (platform) => {
