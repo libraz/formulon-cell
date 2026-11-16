@@ -8,6 +8,7 @@ import {
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { refusedBatch } from '../commands/interaction-policy.js';
+import { PERMISSION_REASONS, type RefusalLike } from '../commands/permission-reasons.js';
 import { deferForAllowedRangeUnlock, isCellWritable } from '../commands/protection.js';
 import { dblClickRange, editorRefHighlights, extractRefs, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
@@ -87,10 +88,15 @@ const syncEditorRefs = (store: SpreadsheetStore, text: string, editedAddr: Addr)
   );
 };
 
-const policyRejection = (operation: string): { severity: 'stop'; message: string } => ({
+/** A stop alert for a refusal; the alert dialog localizes it through `refusal`. */
+const refusalAlert = (refusal: RefusalLike): CellInputAlert => ({
   severity: 'stop',
-  message: `The ${operation} operation is not permitted for this cell.`,
+  message: refusal.reason ?? PERMISSION_REASONS[refusal.reasonKey ?? 'operationDenied'],
+  refusal,
 });
+
+const operationDeniedAlert = (): CellInputAlert =>
+  refusalAlert({ code: 'operationDenied', reasonKey: 'operationDenied' });
 
 export interface EditorDeps {
   host: HTMLElement;
@@ -377,7 +383,7 @@ export class InlineEditor {
         effects: [{ kind: 'cells', cells: [a] }],
       });
       if (!permission.allowed) {
-        this.deps.onValidation?.(policyRejection(operation));
+        this.deps.onValidation?.(refusalAlert(permission));
         return;
       }
     }
@@ -453,16 +459,13 @@ export class InlineEditor {
       // Keep the editor open with the offending value so the user can correct.
       this.input.focus();
       this.input.select();
-      this.deps.onValidation?.(result.alert ?? policyRejection(result.operation));
+      this.deps.onValidation?.(result.alert ?? operationDeniedAlert());
       return;
     }
     if (result.status === 'failed') {
       console.warn('formulon-cell: editor write failed', result.error);
       this.input.focus();
-      this.deps.onValidation?.({
-        severity: 'stop',
-        message: 'The cell value could not be written.',
-      });
+      this.deps.onValidation?.(refusalAlert({ code: 'invalid', reasonKey: 'valueNotWritten' }));
       return;
     } else if (result.notice) {
       if (this.deps.onValidation) this.deps.onValidation(result.notice);
@@ -516,17 +519,17 @@ export class InlineEditor {
         });
       } catch (err) {
         console.warn('formulon-cell: restricted editor fill failed', err);
-        result = refusedBatch({ code: 'invalid', reason: String(err) });
+        result = refusedBatch({
+          code: 'invalid',
+          reasonKey: 'cellsNotFilled',
+          reason: String(err),
+        });
       }
       if (result.status === 'refused') {
         input.focus();
         input.select();
         const rejection = result.rejections[0];
-        this.deps.onValidation?.({
-          severity: 'stop',
-          message: rejection?.reason ?? policyRejection(operation).message,
-          ...(rejection ? { refusal: rejection } : {}),
-        });
+        this.deps.onValidation?.(rejection ? refusalAlert(rejection) : operationDeniedAlert());
         return;
       }
       this.deps.onAfterCommit();

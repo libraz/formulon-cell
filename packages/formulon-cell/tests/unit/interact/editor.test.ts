@@ -5,9 +5,11 @@ import {
   registerInteractionController,
 } from '../../../src/commands/interaction-controller.js';
 import type { InteractionPolicy } from '../../../src/commands/interaction-policy.js';
+import { localizedDecisionReason } from '../../../src/commands/permission-reasons.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { defaultStrings } from '../../../src/i18n/strings.js';
 import { InlineEditor } from '../../../src/interact/editor.js';
 import {
   createSpreadsheetStore,
@@ -1672,6 +1674,86 @@ describe('InlineEditor', () => {
     expect(editor.isActive()).toBe(false);
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'x' });
     expect(onAfterCommit).toHaveBeenCalledTimes(1);
+  });
+
+  describe('validation circles after a multi-cell commit', () => {
+    it('drops the circles of the cells a Ctrl+Enter fill made valid', () => {
+      const rule = { kind: 'whole', op: 'between', a: 1, b: 10 } as const;
+      const cells = [0, 1].map((col) => ({ sheet: 0, row: 0, col }));
+      wb.attachStore(store);
+      for (const cell of cells) {
+        mutators.setCellFormat(store, cell, { validation: rule });
+        wb.setNumber(cell, 99);
+      }
+      mutators.refreshActiveSheetCells(store, wb);
+      mutators.setValidationCircles(store, new Set(cells.map((cell) => addrKey(cell))));
+      const surface = new InlineEditor({
+        host,
+        grid,
+        store,
+        wb,
+        onAfterCommit: () => mutators.refreshActiveSheetCells(store, wb),
+      });
+      mutators.setActive(store, cells[0] as (typeof cells)[number]);
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+
+      surface.begin('5');
+      surface.commitMulti();
+
+      expect(store.getState().errorIndicators.validationCircles.size).toBe(0);
+      wb.attachStore(null);
+    });
+  });
+
+  describe('refusal alerts', () => {
+    const openGuarded = (): {
+      onValidation: Mock;
+      surface: InlineEditor;
+      input: HTMLTextAreaElement;
+    } => {
+      const onValidation = vi.fn();
+      const surface = new InlineEditor({ host, grid, store, wb, onAfterCommit, onValidation });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      surface.begin('');
+      const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+      input.value = 'x';
+      return { onValidation, surface, input };
+    };
+
+    it('raises one alert when a commit meets a protected cell', () => {
+      const { onValidation, surface, input } = openGuarded();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setProtectedSheet(store, 0, true);
+
+      surface.commit('none');
+      expect(onValidation).toHaveBeenCalledTimes(1);
+      expect(onValidation).toHaveBeenLastCalledWith(
+        expect.objectContaining({ severity: 'stop', code: 'protectedCell' }),
+      );
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+      expect(onValidation).toHaveBeenCalledTimes(2);
+      input.dispatchEvent(new Event('blur'));
+      expect(onValidation).toHaveBeenCalledTimes(3);
+      warn.mockRestore();
+      surface.cancel();
+    });
+
+    it('words a failed write through the localized refusal path', () => {
+      const { onValidation, surface } = openGuarded();
+      wb.setText = () => {
+        throw new Error('boom');
+      };
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      surface.commit('none');
+      expect(onValidation).toHaveBeenCalledTimes(1);
+      const alert = onValidation.mock.calls[0]?.[0];
+      expect(localizedDecisionReason(alert.refusal, defaultStrings)).toBe(
+        defaultStrings.permissionReasons.valueNotWritten,
+      );
+      warn.mockRestore();
+      surface.cancel();
+    });
   });
 
   describe('single-cell commit write path', () => {

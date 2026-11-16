@@ -34,6 +34,24 @@ describe('mount/formula-bar — native commit result', () => {
     harness.detach();
   });
 
+  it('raises one alert per commit attempt on a protected cell', () => {
+    const onValidation = vi.fn();
+    const harness = attachFormulaBarHarness(sheet, onValidation);
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(sheet.instance.store, addr);
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+    harness.fxInput.value = 'denied';
+    harness.fxInput.dispatchEvent(new Event('input'));
+    setProtectedSheet(sheet.instance.store, 0, true, { workbook: sheet.workbook });
+
+    expect(harness.controller.commitFx('none')).toBe(false);
+    expect(onValidation).toHaveBeenCalledTimes(1);
+    harness.fxInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    expect(onValidation).toHaveBeenCalledTimes(2);
+    harness.detach();
+  });
+
   it('returns false for a protected default-mounted cell and keeps the edit state intact', () => {
     const onValidation = vi.fn();
     const harness = attachFormulaBarHarness(sheet, onValidation);
